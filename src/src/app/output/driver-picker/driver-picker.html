@@ -1,0 +1,25 @@
+<div class="flex flex-wrap items-center gap-2">
+  <span class="text-ink-muted text-xs tracking-wide uppercase">Driver</span>
+  <span class="font-mono text-xs">{{ drivers.summary() ?? '—' }}</span>
+
+  <label
+    class="border-edge bg-inset text-ink hover:border-accent cursor-pointer rounded-md border px-3 py-1.5 text-sm"
+  >
+    Load main.bin…
+    <input type="file" class="hidden" accept=".bin,application/octet-stream" (change)="onFile($event)" />
+  </label>
+
+  @if (drivers.isCustom()) {
+    <button amk-button variant="ghost" (click)="drivers.reset()">Use default</button>
+  }
+
+  <span class="text-ink-muted ml-auto text-xs tracking-wide uppercase">Song loads at</span>
+  <span class="font-mono text-xs">{{ loadAddress() }}</span>
+</div>
+
+<p class="text-ink-muted mt-2 text-xs leading-relaxed">
+  The driver, its sound effects, the song pointer table and every global song all live inside
+  <code class="text-ink font-mono">main.bin</code>. Load your install's
+  <code class="text-ink font-mono">asm/SNES/bin/main.bin</code> and the figures below are exactly
+  what you'll get in the hack.
+</p>

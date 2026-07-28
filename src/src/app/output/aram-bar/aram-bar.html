@@ -1,0 +1,18 @@
+<!-- d3 owns everything inside this element; Angular never templates into it. -->
+<svg
+  #svg
+  class="block w-full"
+  [attr.height]="height"
+  role="img"
+  [attr.aria-label]="label()"
+  (mouseleave)="hover.set(null)"
+></svg>
+
+@if (tooltip(); as tip) {
+  <div
+    class="border-edge bg-raised text-ink pointer-events-none absolute bottom-full z-10 mb-1 -translate-x-1/2 rounded border px-2 py-1 font-mono text-xs whitespace-nowrap"
+    [style.left.px]="tip.x"
+  >
+    {{ tip.text }}
+  </div>
+}

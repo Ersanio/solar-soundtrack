@@ -1,0 +1,6 @@
+<!-- The 1px gap plus a surface-coloured background is what draws the grid rules. -->
+<div class="bg-edge border-edge grid grid-cols-[repeat(auto-fill,minmax(9rem,1fr))] gap-px border-b">
+  @for (cell of cells(); track cell.label) {
+    <amk-stat-tile [label]="cell.label" [value]="cell.value" [dim]="cell.dim" />
+  }
+</div>

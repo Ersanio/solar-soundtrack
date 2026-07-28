@@ -1,0 +1,36 @@
+<h1 class="mr-2 text-base font-semibold">Web MML</h1>
+
+<label class="text-ink-muted flex items-center gap-1.5">
+  Compiler
+  <!-- Options come from the registry, so a new MmlCompiler needs no UI change. -->
+  <select
+    class="border-edge bg-inset text-ink rounded-md border px-2 py-1"
+    [value]="store.compilerId()"
+    (change)="onCompilerChange($event)"
+  >
+    @for (compiler of store.available; track compiler.id) {
+      <option [value]="compiler.id">{{ compiler.name }} — {{ compiler.targets.join(', ') }}</option>
+    }
+  </select>
+</label>
+
+<amk-checkbox [(checked)]="store.autoCompile">Compile as I type</amk-checkbox>
+
+<amk-transport-controls />
+
+<button amk-button variant="primary" [disabled]="!store.canCompile()" (click)="store.compileNow()">
+  Compile
+</button>
+
+<button amk-button [disabled]="!store.canDownload()" (click)="store.downloadBin()">
+  Download .bin
+</button>
+
+<button
+  amk-button
+  title="Compile at the driver's load address and assemble a playable SPC"
+  [disabled]="!store.canDownload()"
+  (click)="store.downloadSpc()"
+>
+  Export .spc
+</button>

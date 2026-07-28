@@ -1,0 +1,21 @@
+@let items = store.diagnostics();
+
+<ul class="divide-edge divide-y">
+  @for (diagnostic of items; track $index) {
+    <li>
+      <button
+        type="button"
+        class="hover:bg-raised flex w-full cursor-pointer items-baseline gap-2 px-3 py-1.5 text-left"
+        (click)="reveal(diagnostic)"
+      >
+        <span class="text-ink-muted shrink-0 font-mono text-xs">line {{ diagnostic.span.line }}</span>
+        <span class="shrink-0 font-mono text-xs" [class]="severityClass[diagnostic.severity]">
+          {{ diagnostic.code }}
+        </span>
+        <span class="text-ink">{{ diagnostic.message }}</span>
+      </button>
+    </li>
+  } @empty {
+    <li class="text-ink-muted px-3 py-1.5">No diagnostics.</li>
+  }
+</ul>

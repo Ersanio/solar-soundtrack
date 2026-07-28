@@ -1,0 +1,66 @@
+@import 'tailwindcss';
+
+/**
+ * Tailwind v4 theme. Everything is declared here as CSS variables — v4 has no
+ * `tailwind.config.js`, and each `--color-*` entry generates the matching
+ * `bg-*` / `text-*` / `border-*` utilities.
+ *
+ * The interface is dark-only on purpose: it is a code editor that sits beside a
+ * hex dump, and a light theme would need its own validated bar palette.
+ */
+@theme {
+  --color-surface: #16181d;
+  --color-raised: #1d2027;
+  --color-inset: #12141a;
+  --color-edge: #2c313b;
+
+  --color-ink: #d8dce4;
+  --color-ink-muted: #838b9b;
+
+  --color-accent: #6ea8fe;
+  --color-danger: #ff7b72;
+  --color-warn: #e3b341;
+  --color-good: #7ee787;
+
+  /*
+   * ARAM budget bar. A categorical set — the segments are identities (driver,
+   * song, samples, echo), not magnitudes — validated for CVD separation and
+   * contrast against --color-surface above. Do not reorder or re-hue without
+   * re-running the palette validator: adjacent-pair separation is the property
+   * being preserved.
+   */
+  --color-seg-driver: #3987e5;
+  --color-seg-song: #199e70;
+  --color-seg-samples: #c98500;
+  --color-seg-echo: #d55181;
+  --color-seg-free: #333844;
+
+  --font-mono: ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace;
+}
+
+:root {
+  color-scheme: dark;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--color-surface);
+  color: var(--color-ink);
+  font-family:
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    sans-serif;
+  font-size: 14px;
+}
+
+/* Keyboard focus stays visible everywhere; components never remove it. */
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+}

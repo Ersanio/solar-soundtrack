@@ -1,0 +1,42 @@
+<details class="border-edge border-b" open>
+  <summary class="hover:bg-raised flex cursor-pointer items-center justify-between gap-3 px-3 py-2">
+    <span class="text-ink-muted text-xs font-semibold tracking-wide uppercase">ARAM budget</span>
+    <span class="font-mono text-xs" [class.text-danger]="overflowing()">{{ store.freeLabel() }}</span>
+  </summary>
+
+  <div class="flex flex-col gap-3 px-3 pt-1 pb-3">
+    <amk-driver-picker />
+
+    <!--
+      Stacked bar. The table below repeats every value, so colour is never the
+      only carrier of identity.
+    -->
+    <amk-aram-bar [segments]="segments()" />
+
+    <table class="w-full border-collapse text-xs">
+      <tbody>
+        @for (row of tableRows(); track row.key) {
+          <tr class="border-edge/60 border-b last:border-0">
+            <td class="w-4 py-1">
+              <span class="block size-2.5 rounded-sm" [class]="fill[row.group]"></span>
+            </td>
+            <td class="py-1">
+              {{ row.label }}
+              @if (row.detail) {
+                <span class="text-ink-muted"> {{ row.detail }}</span>
+              }
+            </td>
+            <td class="text-ink-muted py-1 text-right font-mono">{{ row.range }}</td>
+            <td class="py-1 text-right font-mono tabular-nums">{{ row.size }}</td>
+          </tr>
+        }
+      </tbody>
+    </table>
+
+    @for (note of notes(); track $index) {
+      <p class="text-xs leading-relaxed" [class]="overflowing() ? 'text-danger' : 'text-ink-muted'">
+        {{ note }}
+      </p>
+    }
+  </div>
+</details>

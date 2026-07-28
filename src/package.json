@@ -1,0 +1,50 @@
+{
+  "name": "webmml",
+  "version": "0.0.0",
+  "description": "Browser-based AddmusicK MML editor — compiles MML to N-SPC song data",
+  "scripts": {
+    "ng": "ng",
+    "start": "ng serve",
+    "build": "ng build",
+    "watch": "ng build --watch --configuration development",
+    "test": "ng test",
+    "typecheck": "tsc -p tsconfig.app.json --noEmit",
+    "selftest": "esbuild scripts/selftest.ts --bundle --platform=node --format=esm --outfile=.selftest/selftest.mjs --log-level=warning && node .selftest/selftest.mjs",
+    "spctest": "esbuild scripts/spctest.ts --bundle --platform=node --format=esm --outfile=.selftest/spctest.mjs --log-level=warning && node .selftest/spctest.mjs",
+    "audiotest": "esbuild scripts/audiotest.ts --bundle --platform=node --format=esm --outfile=.selftest/audiotest.mjs --log-level=warning && node .selftest/audiotest.mjs",
+    "charttest": "esbuild scripts/charttest.ts --bundle --platform=node --format=esm --outfile=.selftest/charttest.mjs --log-level=warning && node .selftest/charttest.mjs",
+    "check": "npm run typecheck && npm run selftest && npm run spctest && npm run audiotest && npm run charttest"
+  },
+  "private": true,
+  "packageManager": "npm@11.13.0",
+  "dependencies": {
+    "@angular/common": "^22.0.0",
+    "@angular/compiler": "^22.0.0",
+    "@angular/core": "^22.0.0",
+    "@angular/forms": "^22.0.0",
+    "@angular/platform-browser": "^22.0.0",
+    "@angular/router": "^22.0.0",
+    "d3": "^7.9.0",
+    "d3-scale": "^4.0.2",
+    "d3-selection": "^3.0.0",
+    "rxjs": "~7.8.0",
+    "tslib": "^2.3.0"
+  },
+  "devDependencies": {
+    "@angular/build": "^22.0.8",
+    "@angular/cli": "^22.0.8",
+    "@angular/compiler-cli": "^22.0.0",
+    "@tailwindcss/postcss": "^4.1.12",
+    "@types/d3": "^7.4.3",
+    "@types/d3-scale": "^4.0.9",
+    "@types/d3-selection": "^3.0.11",
+    "@types/node": "^26.1.2",
+    "esbuild": "^0.28.1",
+    "jsdom": "^28.0.0",
+    "postcss": "^8.5.3",
+    "prettier": "^3.8.1",
+    "tailwindcss": "^4.1.12",
+    "typescript": "~6.0.2",
+    "vitest": "^4.0.8"
+  }
+}

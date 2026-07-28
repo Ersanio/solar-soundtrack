@@ -1,0 +1,39 @@
+<button
+  amk-button
+  variant="primary"
+  [disabled]="!store.canCompile()"
+  [attr.aria-label]="playback.isPlaying() ? 'Pause' : 'Compile and play'"
+  (click)="playback.toggle()"
+>
+  {{ playback.isPlaying() ? '❚❚ Pause' : '▶ Play' }}
+</button>
+
+<button
+  amk-button
+  aria-label="Stop"
+  title="Stop"
+  [disabled]="playback.isIdle()"
+  (click)="playback.stop()"
+>
+  ■
+</button>
+
+<span class="text-ink-muted w-10 font-mono text-xs tabular-nums">{{ playback.timeLabel() }}</span>
+
+<amk-checkbox
+  [(checked)]="playback.live"
+  title="While playing, reload the song at the same position whenever it recompiles"
+>
+  Live
+</amk-checkbox>
+
+<input
+  type="range"
+  min="0"
+  max="100"
+  class="accent-accent w-20 cursor-pointer"
+  aria-label="Volume"
+  title="Volume"
+  [value]="playback.volume()"
+  (input)="onVolume($event)"
+/>
