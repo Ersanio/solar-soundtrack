@@ -1,32 +1,61 @@
-import { Component, ElementRef, effect, inject, viewChild } from '@angular/core';
+import { Component, ElementRef, effect, inject, signal, viewChild } from '@angular/core';
 
 import { Panel } from '../../shared/panel/panel';
+import { type TabDef, Tabs } from '../../shared/tabs/tabs';
 import { EditorStore } from '../../state/editor-store';
 import { ChannelMixer } from '../channel-mixer/channel-mixer';
+import { SampleBrowser } from '../sample-browser/sample-browser';
 
 /**
- * The MML source editor.
+ * The MML source editor and the sample library, as two tabs.
  *
- * Still a plain `<textarea>`, as the prototype was — CodeMirror and syntax
- * highlighting are a later milestone. Everything is arranged so that swap only
- * has to touch this component.
+ * They share this pane rather than taking a column of their own so that the
+ * ARAM budget stays visible on the right while samples are being added — the
+ * moment a sample set stops fitting is the moment you want to see it.
+ *
+ * The source view is still a plain `<textarea>`, as the prototype was;
+ * CodeMirror and syntax highlighting are a later milestone, and everything is
+ * arranged so that swap only has to touch this component.
  */
 @Component({
   selector: 'amk-editor-pane',
-  imports: [Panel, ChannelMixer],
+  imports: [Panel, Tabs, ChannelMixer, SampleBrowser],
   templateUrl: './editor-pane.html',
   host: { class: 'flex min-h-0 min-w-0 flex-col' },
 })
 export class EditorPane {
   protected readonly store = inject(EditorStore);
-  private readonly area = viewChild.required<ElementRef<HTMLTextAreaElement>>('area');
+
+  protected readonly TABS: readonly TabDef[] = [
+    { id: 'source', label: 'Source' },
+    { id: 'samples', label: 'Samples' },
+  ];
+  protected readonly tab = signal('source');
+
+  /**
+   * Optional, not required: the textarea only exists while the Source tab is
+   * showing, and `viewChild.required` throws when it is not.
+   */
+  private readonly area = viewChild<ElementRef<HTMLTextAreaElement>>('area');
 
   constructor() {
     // Sanctioned effect: driving an imperative DOM API (selection) from state.
+    //
+    // Depends on `area()` as well as `reveal()` so that revealing a span while
+    // the Samples tab is open works: switching the tab renders the textarea,
+    // which populates the view child, which re-runs this and does the focus.
     effect(() => {
       const span = this.store.reveal();
       if (!span) return;
-      const element = this.area().nativeElement;
+
+      if (this.tab() !== 'source') {
+        this.tab.set('source');
+        return;
+      }
+
+      const element = this.area()?.nativeElement;
+      if (!element) return;
+
       element.focus();
       element.setSelectionRange(span.start, Math.max(span.end, span.start + 1));
       this.store.caret.set(span.start);

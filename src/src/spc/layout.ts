@@ -162,13 +162,19 @@ export interface AramBudget {
 	overflowBytes: number;
 }
 
+/**
+ * `samples` is required rather than taken from `driver`, for the same reason
+ * `buildSpc` requires it: a song can name its own set with `#samples`, and a
+ * budget computed against the driver's default would quietly disagree with the
+ * SPC that actually gets written. See `SpcExportRequest.samples`.
+ */
 export function computeBudget(
 	driver: DriverBundle,
+	samples: BrrSample[],
 	plan: AramPlan,
 	songBytes: number,
 	echoBufferSize: number,
 ): AramBudget {
-	const { samples } = driver;
 	const layout = computeSpcLayout(plan, driver.programPos, samples, songBytes, echoBufferSize);
 
 	// Everything below the song is one line item, because it is one file. The

@@ -141,8 +141,17 @@ export class AddmusicKParser {
 	private readonly channelLengths = new Array<number>(8).fill(0);
 	private introLength = 0;
 	private guessLength = true;
+	/** Seconds from `#spc { #length "m:ss" }`, which overrides the estimate. */
+	private declaredSeconds: number | null = null;
 	private readonly tempoChanges: Array<[number, number]> = [];
 	private readonly sampleNames: string[] = [];
+	/**
+	 * Sample filenames in SRCN order, as `#samples` declared them — AMK's
+	 * `mySamples`. Empty means the song has not declared a set, which is what
+	 * the `$E5` and `$F3` guards test for; the implicit `#default` fallback is
+	 * applied at the end of compilation (Music.cpp:3064), not here.
+	 */
+	private readonly sampleList: string[] = [];
 	private readonly tags: SongTags = {};
 	private readonly instrumentData: number[] = [];
 
@@ -461,14 +470,13 @@ export class AddmusicKParser {
 	private parseReplacementDirective(): void {
 		const start = this.pos;
 		this.pos++;
-		const close = this.text.indexOf('"', this.pos);
-		if (close === -1) {
-			this.error("AMK0020", "Unterminated replacement directive.");
+		// Music.cpp:2518 reads this with `getQuotedString`, so `\"` is legal here
+		// too — `"foo=\"bar\""` defines a replacement whose value contains quotes.
+		const body = this.getQuotedString();
+		if (body === null) {
 			this.pos = this.text.length;
 			return;
 		}
-		const body = this.text.slice(this.pos, close);
-		this.pos = close + 1;
 
 		const eq = body.indexOf("=");
 		if (eq === -1) {
@@ -498,7 +506,9 @@ export class AddmusicKParser {
 			this.sortedReplacements = [...this.replacements.entries()].sort((a, b) => b[0].length - a[0].length);
 			this.replacementsDirty = false;
 		}
-		for (let guard = 0; guard < 100; guard++) {
+		// Music.cpp:137 caps this at 500. Anything lower rejects chains the
+		// reference compiles.
+		for (let guard = 0; guard < 500; guard++) {
 			let matched = false;
 			for (const [find, replacement] of this.sortedReplacements) {
 				if (this.text.startsWith(find, this.pos)) {
@@ -532,9 +542,19 @@ export class AddmusicKParser {
 		this.error("AMK0101", "Illegal use of comments. Sorry about that.");
 	}
 
+	/**
+	 * Music.cpp:535 — `?` on its own, or `?0`, stops the song looping.
+	 *
+	 * `?1` and `?2` set AMK's `noMusic[channel][]`, which is written at
+	 * Music.cpp:543-544 and read nowhere in the reference, so they are consumed
+	 * and discarded. Consuming the digit matters either way: without it `?1`
+	 * both stopped the song looping and left the `1` to be reported as a stray
+	 * character.
+	 */
 	private parseQMark(): void {
 		this.pos++;
-		this.doesntLoop = true;
+		const which = this.getInt();
+		if (which === -1 || which === 0) this.doesntLoop = true;
 	}
 
 	private parseHash(): void {
@@ -656,7 +676,12 @@ export class AddmusicKParser {
 		}
 	}
 
+	/** ID666 gives each text field 32 bytes (Music.cpp:3528-3547). */
+	private static readonly TAG_LIMIT = 32;
+
+	/** Music.cpp:3452 */
 	private parseSpcInfo(): void {
+		const start = this.pos;
 		this.skipSpaces();
 		if (this.text[this.pos] !== "{") return this.error("AMK0060", 'Error parsing #spc; expected "{".');
 		this.pos++;
@@ -666,15 +691,17 @@ export class AddmusicKParser {
 			if (this.pos >= this.text.length) return this.error("AMK0061", "Unterminated #spc block.");
 			if (this.text[this.pos] === "}") {
 				this.pos++;
-				return;
+				break;
 			}
 			if (this.text[this.pos] !== "#") {
 				return this.error("AMK0062", 'Error parsing #spc; expected a field name or "}".');
 			}
 			this.pos++;
 
+			// Music.cpp:3468 reads to the next whitespace, so `#titlex` is reported
+			// as the unknown field `titlex` rather than as `title` with a stray `x`.
 			let field = "";
-			while (this.pos < this.text.length && isAlpha(this.text[this.pos])) {
+			while (this.pos < this.text.length && !isSpace(this.text[this.pos])) {
 				field += this.text[this.pos].toLowerCase();
 				this.pos++;
 			}
@@ -683,22 +710,101 @@ export class AddmusicKParser {
 				return this.error("AMK0063", `Error parsing #spc; field "${field}" is missing its quoted value.`);
 			}
 			this.pos++;
-			const close = this.text.indexOf('"', this.pos);
-			if (close === -1) return this.error("AMK0064", "Unterminated string in #spc block.");
-			const value = this.text.slice(this.pos, close);
-			this.pos = close + 1;
+			const value = this.getQuotedString();
+			if (value === null) return;
 
 			switch (field) {
 				case "title": this.tags.title = value; break;
 				case "game": this.tags.game = value; break;
 				case "author": this.tags.author = value; break;
 				case "comment": this.tags.comment = value; break;
-				case "length": this.tags.length = value; break;
+				case "length":
+					this.tags.length = value;
+					if (!this.parseLengthField(value, start)) return;
+					break;
 				default:
 					this.error("AMK0065", `Unknown #spc field "#${field}".`);
 					return;
 			}
 		}
+
+		this.truncateTag("title", start);
+		this.truncateTag("game", start);
+		this.truncateTag("author", start);
+		this.truncateTag("comment", start);
+	}
+
+	/**
+	 * `#length "m:ss"` or `#length "auto"` (Music.cpp:3493-3521).
+	 *
+	 * A declared length also switches length *guessing* off, which is the whole
+	 * point of the field: without that the estimate would win and the declared
+	 * value would be recorded in the tag but never used.
+	 */
+	private parseLengthField(value: string, start: number): boolean {
+		if (value === "auto") {
+			this.guessLength = true;
+			this.declaredSeconds = null;
+			return true;
+		}
+
+		const match = /^(\d+):(\d+)$/.exec(value);
+		if (!match) {
+			this.errorAt(start, this.pos, "AMK0066", 'Error parsing #spc #length; format must be "m:ss" or "auto".');
+			return false;
+		}
+
+		const seconds = Number(match[1]) * 60 + Number(match[2]);
+		if (seconds > 999) {
+			this.errorAt(start, this.pos, "AMK0067", "Songs longer than 16:39 are not allowed by the SPC format.");
+			return false;
+		}
+
+		this.guessLength = false;
+		this.declaredSeconds = seconds;
+		return true;
+	}
+
+	private truncateTag(field: "title" | "game" | "author" | "comment", start: number): void {
+		const value = this.tags[field];
+		if (value === undefined || value.length <= AddmusicKParser.TAG_LIMIT) return;
+		this.tags[field] = value.slice(0, AddmusicKParser.TAG_LIMIT);
+		this.warn(
+			start,
+			this.pos,
+			"AMK0205",
+			`The "${field}" field is ${value.length} characters; ID666 allows 32, so it was truncated to "${this.tags[field]}".`,
+		);
+	}
+
+	/**
+	 * globals.cpp:658 — a quoted string body, honouring the single escape the
+	 * format allows.
+	 *
+	 * `pos` must sit just past the opening quote; on success it ends just past
+	 * the closing one. Returns `null` after reporting, so callers can bail.
+	 */
+	private getQuotedString(): string | null {
+		let out = "";
+		while (this.pos < this.text.length && this.text[this.pos] !== '"') {
+			if (this.text[this.pos] === "\\") {
+				if (this.text[this.pos + 1] !== '"') {
+					this.error("AMK0068", 'The only escape sequence allowed inside a string is \\".');
+					return null;
+				}
+				out += '"';
+				this.pos += 2;
+				continue;
+			}
+			out += this.text[this.pos];
+			this.pos++;
+		}
+		if (this.pos >= this.text.length) {
+			this.error("AMK0064", "Unterminated string.");
+			return null;
+		}
+		this.pos++;
+		return out;
 	}
 
 	private parseDefaultLength(): void {
@@ -1162,7 +1268,13 @@ export class AddmusicKParser {
 				return this.error("AMK0120", 'Ambiguous use of "[[[" — separate the "[[" and "[" to clarify your intent.');
 			}
 			if (this.inE6Loop) return this.error("AMK0121", "You cannot nest a subloop within another subloop.");
-			if (this.loopLabel > 0) {
+			// Music.cpp:1217 guards this with `text[pos - 2] == ')'` as well, and
+			// that lookbehind is all but unreachable: both brackets have been
+			// consumed by now, so `pos - 2` is the first '[', never the ')' of a
+			// label. Reproduced rather than simplified away, because `loopLabel`
+			// survives from `(n)[` until the matching `]`, so testing it alone
+			// rejects `(5)[ c [[d]]4 ]` — which the reference compiles.
+			if (this.loopLabel > 0 && this.text[this.pos - 2] === ")") {
 				return this.error("AMK0122", "A label loop cannot define a subloop. Use a standard or remote loop instead.");
 			}
 			this.handleSuperLoopEnter();
@@ -1581,6 +1693,14 @@ export class AddmusicKParser {
 			if (this.hexLeft === 2 && this.currentHex === 0xe5 && this.songTargetProgram === 1) {
 				if (i >= 0x80) {
 					this.hexLeft--;
+					// Music.cpp:1826 — anything past the stock group needs #samples
+					// to have supplied it.
+					if (this.sampleList.length === 0 && (i & 0x7f) > 0x13) {
+						return this.error(
+							"AMK0114",
+							"This song uses custom samples, but has not yet defined its samples with the #samples command.",
+						);
+					}
 					this.append(0xf3);
 					this.append(i - 0x80);
 					this.noteSampleUse(i - 0x80);
@@ -1640,7 +1760,10 @@ export class AddmusicKParser {
 				return;
 			}
 
-			if (this.hexLeft === 0 && this.currentHex === 0xf3) this.noteSampleUse(i);
+			// Music.cpp:1964 — `hexLeft == 1` is the sample number. `hexLeft == 0`
+			// is the pitch multiplier that follows it, so recording usage there
+			// marked the wrong sample entirely.
+			if (this.hexLeft === 1 && this.currentHex === 0xf3) this.noteSampleUse(i);
 
 			if (this.hexLeft === 2 && this.currentHex === 0xf1) {
 				this.echoBufferSize = Math.max(this.echoBufferSize, i);
@@ -1648,8 +1771,18 @@ export class AddmusicKParser {
 			}
 
 			// Music.cpp:1976 — Addmusic 4.05 numbered custom instruments from $13.
-			if (this.currentHex === 0xda && this.songTargetProgram === 1 && i >= 0x13) {
-				i = i - 0x13 + 30;
+			if (this.currentHex === 0xda && this.songTargetProgram === 1) {
+				if (i >= 0x13) i = i - 0x13 + 30;
+
+				// Two deliberate deviations from Music.cpp:1981. AMK indexes
+				// `instrumentData[(i - 30) * 5]` unconditionally, so a `$DA` below
+				// $13 reaches it with a negative subscript; and the stride is 5
+				// where entries are 6 bytes, so it reads the wrong instrument's
+				// sample. Both are guarded here rather than reproduced.
+				const entry = (i - 30) * 6;
+				if (i >= 30 && entry < this.instrumentData.length) {
+					this.noteSampleUse(this.instrumentData[entry]);
+				}
 			}
 
 			if (this.hexLeft === 0 && this.currentHex === 0xe6) {
@@ -1930,14 +2063,21 @@ export class AddmusicKParser {
 		this.warn(this.pos, this.pos + 1, code, message);
 	}
 
+	/**
+	 * Reports a directive this compiler does not implement, and consumes the
+	 * rest of its line.
+	 *
+	 * Advancing `this.pos` is the part that matters. Without it the scanner
+	 * carried straight on into the directive's `{ … }` body and read it as MML,
+	 * producing a cascade of nonsense diagnostics after the real one. That was
+	 * invisible only because `errorCount > 0` makes `index.ts` bail before any
+	 * of them are shown.
+	 */
 	private unsupported(start: number, code: string, what: string, feature: string): void {
-		const end = this.text.indexOf("\n", this.pos);
-		this.errorAt(
-			start,
-			end === -1 ? this.text.length : end,
-			code,
-			`${what} is not supported by this compiler version yet (${feature}).`,
-		);
+		const newline = this.text.indexOf("\n", this.pos);
+		const end = newline === -1 ? this.text.length : newline;
+		this.errorAt(start, end, code, `${what} is not supported by this compiler version yet (${feature}).`);
+		this.pos = end;
 	}
 
 	// =========================================================================
@@ -1960,7 +2100,8 @@ export class AddmusicKParser {
 			introLength: this.introLength,
 			sampleNames: this.sampleNames,
 			tags: this.tags,
-			seconds: this.errorCount === 0 ? this.estimateSeconds() : null,
+			// A declared `#length` wins: it is why `guessLength` was turned off.
+			seconds: this.errorCount === 0 ? (this.declaredSeconds ?? this.estimateSeconds()) : null,
 			hasYoshiDrums: this.hasYoshiDrums,
 			targetAMKVersion: this.targetAMKVersion,
 			songTargetProgram: this.songTargetProgram,

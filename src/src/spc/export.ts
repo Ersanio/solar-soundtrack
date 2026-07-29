@@ -54,6 +54,19 @@ export interface SpcExportRequest {
 	/** Compiled song data, relocated for `plan.localPos`. */
 	songData: Uint8Array;
 	driver: DriverBundle;
+	/**
+	 * The sample set, in SRCN order — index 0 becomes directory entry 0.
+	 *
+	 * Deliberately required rather than defaulting to `driver.samples`. A song
+	 * can name its own samples with `#samples`, and a silent fallback here would
+	 * compile clean, budget plausibly, and export an SPC holding the wrong
+	 * sounds. Making every caller state the list turns that into a type error.
+	 *
+	 * Entries are compared by object identity: listing the same `BrrSample`
+	 * twice costs one copy in ARAM, two distinct objects with equal bytes cost
+	 * two. Resolvers should hand out stable instances.
+	 */
+	samples: BrrSample[];
 	/** Where the song sits in ARAM, from `planAram`. */
 	plan: AramPlan;
 	tags?: SongTags;
@@ -86,8 +99,7 @@ export interface SpcExportResult {
 export class SpcExportError extends Error {}
 
 export function buildSpc(request: SpcExportRequest): SpcExportResult {
-	const { songData, driver, plan, tags = {}, yoshiDrums = false } = request;
-	const { samples } = driver;
+	const { songData, driver, samples, plan, tags = {}, yoshiDrums = false } = request;
 	const localPos = plan.localPos;
 	const layout = computeSpcLayout(plan, driver.programPos, samples, songData.length, request.echoBufferSize ?? 0);
 

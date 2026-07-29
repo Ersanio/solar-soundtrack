@@ -1,0 +1,99 @@
+<div class="border-edge flex shrink-0 flex-wrap items-center gap-2 border-b px-3 py-2">
+  <label
+    class="border-edge bg-inset text-ink hover:border-accent cursor-pointer rounded-md border px-3 py-1.5 text-sm"
+  >
+    Add .brr files…
+    <input type="file" class="hidden" accept=".brr" multiple (change)="onFiles($event)" />
+  </label>
+
+  @if (library.overrideCount() > 0) {
+    <button amk-button variant="ghost" (click)="library.resetAll()">
+      Reset all ({{ library.overrideCount() }})
+    </button>
+  }
+
+  <span class="ml-auto font-mono text-xs" [class.text-danger]="overflowing()">{{ freeLabel() }}</span>
+</div>
+
+@if (library.storageError(); as storageError) {
+  <p class="border-edge text-warn border-b px-3 py-2 text-xs leading-relaxed">{{ storageError }}</p>
+}
+
+@if (rejected().length > 0) {
+  <ul class="border-edge text-danger border-b px-3 py-2 text-xs leading-relaxed">
+    @for (message of rejected(); track message) {
+      <li>{{ message }}</li>
+    }
+  </ul>
+}
+
+@if (customDriver()) {
+  <p class="border-edge text-ink-muted border-b px-3 py-2 text-xs leading-relaxed">
+    A custom <code class="text-ink font-mono">main.bin</code> is loaded. Instruments
+    <code class="text-ink font-mono">&#64;0</code>–<code class="text-ink font-mono">&#64;29</code> are resolved by
+    the driver's own table, so they may not map to the samples listed here.
+  </p>
+}
+
+<ul class="divide-edge min-h-0 flex-1 divide-y overflow-auto">
+  @for (file of library.files(); track file.name) {
+    <li class="hover:bg-raised flex items-center gap-3 px-3 py-2">
+      <span class="text-ink-muted w-6 shrink-0 text-right font-mono text-xs tabular-nums">{{ $index }}</span>
+
+      <button
+        type="button"
+        class="border-edge bg-inset text-ink-muted hover:text-ink hover:border-accent shrink-0 cursor-pointer rounded border px-2 py-1 font-mono text-xs disabled:cursor-not-allowed disabled:opacity-40"
+        [disabled]="file.error !== null"
+        [attr.aria-label]="
+          (playback.auditioning() === file.name ? 'Stop ' : 'Play ') + file.name
+        "
+        (click)="onAudition(file)"
+      >
+        {{ playback.auditioning() === file.name ? '■' : '▶' }}
+      </button>
+
+      <div class="min-w-0 flex-1">
+        <div class="flex items-baseline gap-2">
+          <span class="text-ink truncate font-mono text-xs">{{ file.name }}</span>
+          @if (file.source !== 'stock') {
+            <span
+              class="bg-accent/20 text-accent shrink-0 rounded px-1 py-px text-[10px] font-semibold tracking-wide uppercase"
+              >{{ file.source === 'override' ? 'replaced' : 'added' }}</span
+            >
+          }
+          <span class="text-ink-muted ml-auto shrink-0 font-mono text-xs tabular-nums">{{ sizeLabel(file) }}</span>
+        </div>
+
+        @if (file.error) {
+          <p class="text-danger mt-0.5 text-xs leading-relaxed">{{ file.error }}</p>
+        } @else {
+          <svg
+            class="text-accent mt-1 h-8 w-full"
+            viewBox="0 0 1 2"
+            preserveAspectRatio="none"
+            aria-hidden="true"
+            focusable="false"
+          >
+            <g transform="translate(0,1)">
+              <path [attr.d]="waveform(file)" fill="currentColor" />
+            </g>
+          </svg>
+          <p class="text-ink-muted mt-0.5 font-mono text-xs">{{ detailLabel(file) }}</p>
+        }
+      </div>
+
+      @if (file.source === 'override') {
+        <button amk-button variant="ghost" (click)="library.revert(file.name)">Revert</button>
+      } @else if (file.source === 'user') {
+        <button amk-button variant="ghost" (click)="library.remove(file.name)">Delete</button>
+      }
+    </li>
+  }
+</ul>
+
+<p class="border-edge text-ink-muted shrink-0 border-t px-3 py-2 text-xs leading-relaxed">
+  Replacing a bundled file changes what its instrument plays — the list and its order are fixed, so
+  <code class="text-ink font-mono">&#64;0</code> is always the first entry. Added files need
+  <code class="text-ink font-mono">#samples</code> to be reachable from MML. Exports are unaffected by
+  mute and solo.
+</p>

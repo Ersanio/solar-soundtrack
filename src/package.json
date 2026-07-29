@@ -18,7 +18,8 @@
     "audiotest": "esbuild scripts/audiotest.ts --bundle --platform=node --format=esm --outfile=.selftest/audiotest.mjs --log-level=warning && node .selftest/audiotest.mjs",
     "worklettest": "npm run build:worklet && esbuild scripts/worklettest.ts --bundle --platform=node --format=esm --outfile=.selftest/worklettest.mjs --log-level=warning && node .selftest/worklettest.mjs",
     "charttest": "esbuild scripts/charttest.ts --bundle --platform=node --format=esm --outfile=.selftest/charttest.mjs --log-level=warning && node .selftest/charttest.mjs",
-    "check": "npm run typecheck && npm run selftest && npm run spctest && npm run audiotest && npm run worklettest && npm run charttest"
+    "brrtest": "esbuild scripts/brrtest.ts --bundle --platform=node --format=esm --outfile=.selftest/brrtest.mjs --log-level=warning && node .selftest/brrtest.mjs",
+    "check": "npm run typecheck && npm run selftest && npm run spctest && npm run audiotest && npm run worklettest && npm run charttest && npm run brrtest"
   },
   "private": true,
   "packageManager": "npm@11.13.0",

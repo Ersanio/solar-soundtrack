@@ -353,5 +353,68 @@ console.log("\nARAM overflow is caught");
 	check("overflow rejected", !result.ok && result.diagnostics.some((d) => d.code === "AMK0300"));
 }
 
+console.log("\nparity fixes against AddmusicKsrc");
+{
+	// Music.cpp:535 — `?1` and `?2` set `noMusic[][]`, which the reference never
+	// reads. Only `?` and `?0` stop the song looping. Before the digit was
+	// consumed, `?1` both killed the loop and left a stray `1` behind.
+	const bare = compile("#amk 4\n#0 ? o4 c4\n");
+	const zero = compile("#amk 4\n#0 ?0 o4 c4\n");
+	const one = compile("#amk 4\n#0 ?1 o4 c4\n");
+	const two = compile("#amk 4\n#0 ?2 o4 c4\n");
+	check("? compiles", bare.ok, bare.diagnostics.map((d) => d.message).join("; "));
+	check("?1 compiles with no stray-character diagnostic", one.ok && one.diagnostics.length === 0,
+		one.diagnostics.map((d) => `${d.code} ${d.message}`).join("; "));
+	check("? stops the song looping", bare.stats?.loops === false);
+	check("?0 stops the song looping", zero.stats?.loops === false);
+	check("?1 leaves looping alone", one.stats?.loops === true, `loops=${one.stats?.loops}`);
+	check("?2 leaves looping alone", two.stats?.loops === true, `loops=${two.stats?.loops}`);
+
+	// Music.cpp:1217 guards this with a lookbehind that can never be true, so
+	// the reference compiles a subloop inside a label-loop definition.
+	const labelSubloop = compile("#amk 4\n#0 o4 (5)[ c4 [[d4]]4 ]\n");
+	check("a subloop inside a label loop compiles, as in AMK", labelSubloop.ok,
+		labelSubloop.diagnostics.map((d) => `${d.code} ${d.message}`).join("; "));
+
+	// Music.cpp:3493 — a declared length must switch guessing off, or the
+	// estimate wins and the declared value is recorded but never used.
+	const declared = compile('#amk 4\n#spc { #length "1:30" }\n#0 o4 c4\n');
+	check("#length \"1:30\" is 90 seconds", declared.stats?.seconds === 90, `${declared.stats?.seconds}`);
+	const auto = compile('#amk 4\n#spc { #length "auto" }\n#0 o4 c1 c1 c1\n');
+	check("#length \"auto\" still estimates", (auto.stats?.seconds ?? 0) > 0, `${auto.stats?.seconds}`);
+	const badLength = compile('#amk 4\n#spc { #length "90" }\n#0 o4 c4\n');
+	check("a malformed #length is rejected", !badLength.ok && badLength.diagnostics.some((d) => d.code === "AMK0066"));
+	const tooLong = compile('#amk 4\n#spc { #length "20:00" }\n#0 o4 c4\n');
+	check("a length past 16:39 is rejected", !tooLong.ok && tooLong.diagnostics.some((d) => d.code === "AMK0067"));
+
+	// Music.cpp:3528 — ID666 gives each text field 32 bytes.
+	const longTitle = compile(`#amk 4\n#spc { #title "${"x".repeat(40)}" }\n#0 o4 c4\n`);
+	check("an over-long title is truncated to 32", longTitle.stats?.tags.title?.length === 32,
+		`${longTitle.stats?.tags.title?.length}`);
+	check("truncation warns", longTitle.diagnostics.some((d) => d.code === "AMK0205"));
+
+	// globals.cpp:667 — the one escape the format allows.
+	const escaped = compile('#amk 4\n#spc { #title "a \\"b\\" c" }\n#0 o4 c4\n');
+	check('\\" survives inside a quoted string', escaped.stats?.tags.title === 'a "b" c',
+		JSON.stringify(escaped.stats?.tags.title));
+	const badEscape = compile('#amk 4\n#spc { #title "a \\n b" }\n#0 o4 c4\n');
+	check("any other escape is rejected", !badEscape.ok && badEscape.diagnostics.some((d) => d.code === "AMK0068"));
+
+	// Music.cpp:1826 — a sample load past the stock group needs #samples first.
+	const am4Sample = compile("#am4\n#0 o4 $E5 $94 $02 c4\n");
+	check("am4 $E5 sample load past $13 without #samples is rejected",
+		!am4Sample.ok && am4Sample.diagnostics.some((d) => d.code === "AMK0114"),
+		am4Sample.diagnostics.map((d) => `${d.code} ${d.message}`).join("; "));
+	const am4Stock = compile("#am4\n#0 o4 $E5 $85 $02 c4\n");
+	check("am4 $E5 sample load within the stock group is fine", am4Stock.ok,
+		am4Stock.diagnostics.map((d) => `${d.code} ${d.message}`).join("; "));
+
+	// An unsupported directive must consume its line, or the scanner reads the
+	// block body as MML and buries the real diagnostic in nonsense.
+	const unsupported = compile("#amk 4\n#pad $100\n#0 o4 c4\n");
+	check("#pad reports exactly one error", unsupported.diagnostics.filter((d) => d.severity === "error").length === 1,
+		unsupported.diagnostics.map((d) => `${d.code} ${d.message}`).join("; "));
+}
+
 console.log(`\n${failures === 0 ? "all checks passed" : `${failures} check(s) failed`}\n`);
 process.exit(failures === 0 ? 0 : 1);

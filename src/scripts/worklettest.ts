@@ -146,6 +146,7 @@ if (!result.ok || !result.data) throw new Error("the test song did not compile")
 const spc = buildSpc({
 	songData: result.data,
 	driver,
+	samples: driver.samples,
 	plan,
 	tags: result.stats?.tags,
 	seconds: result.stats?.seconds,

@@ -111,6 +111,19 @@ console.log("\ndriver bundle");
 	check("programPos is $0400", driver.manifest.programPos === 0x0400, hex(driver.manifest.programPos));
 	check("mainLoopPos is $042E", driver.manifest.mainLoopPos === 0x042e, hex(driver.manifest.mainLoopPos));
 	check("20 default samples", driver.samples.length === 20, `${driver.samples.length}`);
+	{
+		// The app resolves its sample set by looking the `#default` group's names
+		// up in the library, so those names must match what `loadDriver` parsed —
+		// name for name, in order. If they ever drift, every export silently loses
+		// the samples that failed to resolve, and only the browser would show it.
+		const group = driver.manifest.sampleGroups["default"] ?? [];
+		const parsed = driver.samples.map((sample) => sample.sampleName);
+		check(
+			"the #default group names match the parsed samples, in order",
+			group.length === parsed.length && group.every((name, index) => name === parsed[index]),
+			`group [${group.slice(0, 3).join(", ")}…] vs parsed [${parsed.slice(0, 3).join(", ")}…]`,
+		);
+	}
 	check("no embedded song table", driver.embedded === null);
 	check("SongPointers is $236D", driver.manifest.songPointers === 0x236d, hex(driver.manifest.songPointers));
 	check(
@@ -279,7 +292,7 @@ console.log("\ncustom driver: a final-pass build is read as-is");
 	check("plan uses the embedded table", customPlan.fromEmbeddedTable);
 
 	// The whole point: a real driver makes the budget exact without modelling.
-	const customBudget = computeBudget(custom, customPlan, 100, 0);
+	const customBudget = computeBudget(custom, custom.samples, customPlan, 100, 0);
 	const rows = customBudget.rows.reduce((sum, row) => sum + row.bytes, 0);
 	check("custom budget accounts for all 64 KiB", rows === 0x10000, `${rows}`);
 	check(
@@ -368,6 +381,7 @@ check("song compiles", compiled.ok, compiled.diagnostics.map((d) => `${d.code} $
 const { spc, layout } = buildSpc({
 	songData: compiled.data!,
 	driver,
+	samples: driver.samples,
 	plan,
 	tags: compiled.stats!.tags,
 	seconds: compiled.stats!.seconds,
@@ -454,7 +468,7 @@ console.log("\nsample directory");
 
 console.log("\nARAM budget");
 {
-	const budget = computeBudget(driver, plan, compiled.data!.length, compiled.stats!.echoBufferSize);
+	const budget = computeBudget(driver, driver.samples, plan, compiled.data!.length, compiled.stats!.echoBufferSize);
 
 	// Every byte of ARAM must be accounted for exactly once.
 	const total = budget.rows.reduce((sum, row) => sum + row.bytes, 0);

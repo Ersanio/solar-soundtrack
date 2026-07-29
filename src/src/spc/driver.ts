@@ -6,13 +6,11 @@
  * here assembles anything — asar is not involved at runtime.
  */
 
-export interface BrrSample {
-	sampleName: string;
-	/** BRR blocks with the 2-byte loop header stripped (globals.cpp:470). */
-	data: Uint8Array;
-	/** Byte offset of the loop point, relative to the start of `data`. */
-	loopOffset: number;
-}
+import { type BrrSample, parseBrr } from "./brr";
+
+// Re-exported because the SPC writer and the ARAM budget have always imported
+// it from here; the type itself now lives with the rest of the BRR handling.
+export type { BrrSample };
 
 export interface DriverManifest {
 	amkVersion: string;
@@ -246,20 +244,6 @@ function findSongTable(
 	}
 
 	return best;
-}
-
-function parseBrr(name: string, raw: Uint8Array): BrrSample {
-	if (raw.length < 2 || (raw.length - 2) % 9 !== 0) {
-		throw new DriverError(
-			`Sample "${name}" has an invalid length (${raw.length}); (size - 2) must be a multiple of 9. ` +
-				`Is the 2-byte loop header missing?`,
-		);
-	}
-	return {
-		sampleName: name,
-		loopOffset: raw[0] | (raw[1] << 8),
-		data: raw.subarray(2),
-	};
 }
 
 /**

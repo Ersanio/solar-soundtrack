@@ -81,6 +81,7 @@ function compileToSpc(source: string, muteChannels = 0): Uint8Array {
 	return buildSpc({
 		songData: result.data,
 		driver,
+		samples: driver.samples,
 		plan,
 		tags: result.stats?.tags,
 		seconds: result.stats?.seconds,

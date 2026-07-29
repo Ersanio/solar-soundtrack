@@ -1,20 +1,36 @@
-<amk-panel heading="Source" class="min-h-0 flex-1">
-  <span panelAside class="text-ink-muted font-mono text-xs">{{ store.caretLabel() }}</span>
+<amk-panel heading="Editor" class="min-h-0 flex-1">
+  <div panelAside class="flex items-center gap-3">
+    <amk-tabs [tabs]="TABS" [(active)]="tab" />
+    @if (tab() === 'source') {
+      <span class="text-ink-muted font-mono text-xs">{{ store.caretLabel() }}</span>
+    }
+  </div>
 
-  <textarea
-    #area
-    class="bg-surface text-ink h-full w-full resize-none border-0 p-3 font-mono text-[13px] leading-relaxed whitespace-pre focus:outline-none"
-    spellcheck="false"
-    autocomplete="off"
-    autocapitalize="off"
-    wrap="off"
-    aria-label="MML source"
-    [value]="store.source()"
-    (input)="onInput($event)"
-    (keydown)="onKeydown($event)"
-    (keyup)="syncCaret($event)"
-    (click)="syncCaret($event)"
-  ></textarea>
+  @switch (tab()) {
+    @case ('source') {
+      <div id="panel-source" role="tabpanel" aria-labelledby="tab-source" class="h-full">
+        <textarea
+          #area
+          class="bg-surface text-ink h-full w-full resize-none border-0 p-3 font-mono text-[13px] leading-relaxed whitespace-pre focus:outline-none"
+          spellcheck="false"
+          autocomplete="off"
+          autocapitalize="off"
+          wrap="off"
+          aria-label="MML source"
+          [value]="store.source()"
+          (input)="onInput($event)"
+          (keydown)="onKeydown($event)"
+          (keyup)="syncCaret($event)"
+          (click)="syncCaret($event)"
+        ></textarea>
+      </div>
+    }
+    @case ('samples') {
+      <div id="panel-samples" role="tabpanel" aria-labelledby="tab-samples" class="flex h-full min-h-0 flex-col">
+        <amk-sample-browser class="min-h-0 flex-1" />
+      </div>
+    }
+  }
 </amk-panel>
 
 <amk-channel-mixer />

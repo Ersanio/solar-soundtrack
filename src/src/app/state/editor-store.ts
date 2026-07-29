@@ -6,6 +6,7 @@ import { buildSpc, spcFilename } from '@spc/export';
 import { ARAM_SIZE, type AramBudget, computeBudget } from '@spc/layout';
 import { caretPosition, downloadBlob, errorMessage } from '../util/format';
 import { DriverStore } from './driver-store';
+import { SampleStore } from './sample-store';
 
 const STORAGE_KEY = 'webmml.draft';
 
@@ -44,6 +45,7 @@ export interface Status {
 @Service()
 export class EditorStore {
   private readonly drivers = inject(DriverStore);
+  private readonly library = inject(SampleStore);
 
   readonly available = compilers.list();
 
@@ -95,12 +97,32 @@ export class EditorStore {
     () => this.diagnostics().filter((d) => d.severity === 'error').length,
   );
 
+  /**
+   * The sample set every export and budget is measured against.
+   *
+   * One place, so the budget in the output pane and the SPC the player loads
+   * can never disagree. The order is the `#default` group's, which is what
+   * keeps `@0`-`@29` meaning what `INSTRUMENT_TO_SAMPLE` says they mean; the
+   * *bytes* are whatever the library currently holds for each name, so
+   * replacing a bundled file changes what its instrument plays.
+   *
+   * Once songs can name their own set with `#samples`, this resolves the
+   * compiler's list instead of the default group.
+   */
+  private readonly samples = computed(() => this.library.resolve(this.library.defaultGroup()));
+
   readonly budget = computed<AramBudget | null>(() => {
     const driver = this.drivers.driver();
     const plan = this.drivers.plan();
     if (!driver || !plan) return null;
     const result = this.result();
-    return computeBudget(driver, plan, result?.data?.length ?? 0, result?.stats?.echoBufferSize ?? 0);
+    return computeBudget(
+      driver,
+      this.samples(),
+      plan,
+      result?.data?.length ?? 0,
+      result?.stats?.echoBufferSize ?? 0,
+    );
   });
 
   readonly freeLabel = computed(() => {
@@ -190,6 +212,7 @@ export class EditorStore {
       return buildSpc({
         songData: result.data,
         driver,
+        samples: this.samples(),
         plan,
         tags: result.stats?.tags,
         seconds: result.stats?.seconds,
