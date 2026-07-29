@@ -1,7 +1,9 @@
 import type { CompileRequest, CompileResult, MmlCompiler } from "../../core/types";
 import { emptyStats, failure } from "../../core/types";
 import { link } from "./link";
-import { AddmusicKParser } from "./parser";
+import { type AddmusicKOptions, AddmusicKParser } from "./parser";
+
+export type { AddmusicKOptions };
 
 /**
  * AddmusicK, covering every target it accepts.
@@ -42,6 +44,7 @@ export class AddmusicKCompiler implements MmlCompiler {
 
 	compile(request: CompileRequest): CompileResult {
 		const { source, aramAddress } = request;
+		const options = readOptions(request.options);
 
 		if (!Number.isInteger(aramAddress) || aramAddress < 0 || aramAddress > 0xffff) {
 			return failure([
@@ -54,18 +57,22 @@ export class AddmusicKCompiler implements MmlCompiler {
 			]);
 		}
 
-		const parsed = new AddmusicKParser(source).parse();
+		const parsed = new AddmusicKParser(source, options).parse();
 
 		const stats = emptyStats();
 		stats.channelTicks = parsed.channelLengths.map((ticks) => Math.floor(ticks));
 		stats.echoBufferSize = parsed.echoBufferSize;
-		stats.sampleNames = parsed.sampleNames;
+		stats.sampleNames = [...(parsed.sampleList ?? [])];
 		stats.hasIntro = parsed.hasIntro;
 		stats.loops = !parsed.doesntLoop;
 		stats.seconds = parsed.seconds;
 		stats.tags = parsed.tags;
 
-		if (parsed.errorCount > 0) return failure(parsed.diagnostics, stats);
+		// Carried on every return, including the failures: the sample panel stays
+		// populated while a song is mid-edit and not compiling.
+		const sampleList = parsed.sampleList;
+
+		if (parsed.errorCount > 0) return failure(parsed.diagnostics, stats, sampleList);
 
 		const hasData = parsed.data.slice(0, 8).some((channel) => channel.length > 0);
 		if (!hasData) {
@@ -80,6 +87,7 @@ export class AddmusicKCompiler implements MmlCompiler {
 					},
 				],
 				stats,
+				sampleList,
 			);
 		}
 
@@ -91,10 +99,48 @@ export class AddmusicKCompiler implements MmlCompiler {
 		stats.headerSize = linked.headerSize;
 		stats.totalSize = linked.data.length;
 
-		if (linked.diagnostics.some((d) => d.severity === "error")) {
-			return failure(diagnostics, stats);
+		// Music.cpp:3286 — `#pad` reserves ARAM for a song that is still growing,
+		// so outgrowing the reservation is worth saying out loud.
+		if (parsed.minSize > 0 && stats.totalSize > parsed.minSize) {
+			diagnostics.push({
+				severity: "warning",
+				code: "AMK0213",
+				message:
+					`This song is 0x${(stats.totalSize - parsed.minSize).toString(16).toUpperCase()} bytes larger ` +
+					`than the 0x${parsed.minSize.toString(16).toUpperCase()} it asked #pad to reserve.`,
+				span: { start: 0, end: 0, line: 1 },
+			});
 		}
 
-		return { ok: true, data: linked.data, diagnostics, stats };
+		if (linked.diagnostics.some((d) => d.severity === "error")) {
+			return failure(diagnostics, stats, sampleList);
+		}
+
+		return { ok: true, data: linked.data, sampleList, diagnostics, stats };
 	}
+}
+
+/**
+ * Reads {@link AddmusicKOptions} out of the request's untyped `options` bag.
+ *
+ * `CompileRequest.options` is `Record<string, unknown>` and documented as
+ * "unknown keys must be ignored", so this validates rather than casts: a host
+ * that passes nothing, or passes the wrong shape, gets `undefined` and the
+ * compiler behaves as it did before options existed.
+ */
+function readOptions(options: CompileRequest["options"]): AddmusicKOptions | undefined {
+	if (!options) return undefined;
+
+	const names = options["sampleNames"];
+	const groups = options["sampleGroups"];
+	if (!Array.isArray(names) || typeof groups !== "object" || groups === null) return undefined;
+
+	const optimize = options["optimizeSampleUsage"];
+
+	return {
+		sampleNames: names.filter((name): name is string => typeof name === "string"),
+		sampleGroups: groups as Readonly<Record<string, readonly string[]>>,
+		// Only an explicit `false` turns it off, matching AddmusicK's default.
+		optimizeSampleUsage: typeof optimize === "boolean" ? optimize : undefined,
+	};
 }

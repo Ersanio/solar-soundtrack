@@ -23,6 +23,7 @@ import type { Diagnostic, Span, SongTags } from "../../core/types";
 import { TARGET_AM4, TARGET_AMM, TARGET_NONE, preprocess } from "./preprocess";
 import {
 	DEFAULT_TRANSPOSE,
+	EMPTY_SAMPLE_NAME,
 	FIRST_VCMD,
 	HEX_LENGTHS,
 	INSTRUMENT_TO_SAMPLE,
@@ -34,6 +35,28 @@ import {
 	PITCH_TABLE,
 	TICKS_PER_WHOLE,
 } from "./tables";
+
+/**
+ * What the host knows about the sample library that the compiler cannot.
+ *
+ * Filenames only — `core/types.ts` keeps the compiler free of any dependency on
+ * the SPC layer, so resolving a name to bytes stays the host's job. Groups come
+ * through too because `#default` is not special: it is one entry in a table that
+ * an install can extend, and `#samples { #optimized }` is just as valid.
+ */
+export interface AddmusicKOptions {
+	/** Every sample name the host can resolve. */
+	sampleNames: readonly string[];
+	/** Named groups from the driver manifest, e.g. `default`. */
+	sampleGroups: Readonly<Record<string, readonly string[]>>;
+	/**
+	 * Replace samples the song never plays with `EMPTY.brr`, freeing the ARAM
+	 * they would occupy. AddmusicK's `optimizeSampleUsage`, which defaults to on
+	 * there too (`globals.cpp:40`; its `-u` flag turns it off). Defaults to `true`
+	 * when omitted.
+	 */
+	optimizeSampleUsage?: boolean;
+}
 
 /** Raw output of the scan, before pointers are resolved. See `link.ts`. */
 export interface ParseOutput {
@@ -51,7 +74,18 @@ export interface ParseOutput {
 	echoBufferAllocVCMDChannel: number;
 	channelLengths: number[];
 	introLength: number;
-	sampleNames: string[];
+	/**
+	 * Sample filenames in SRCN order, or `null` when nothing could be resolved
+	 * (no `#samples` and no host-supplied groups to fall back on).
+	 */
+	sampleList: readonly string[] | null;
+	/**
+	 * Which SRCNs the song actually plays, by index. AMK's `usedSamples`, which
+	 * `optimizeSampleUsage` uses to swap unreferenced samples for `EMPTY.brr`.
+	 */
+	usedSamples: boolean[];
+	/** `#pad` target size, 0 when the song did not ask for one. */
+	minSize: number;
 	tags: SongTags;
 	seconds: number | null;
 	hasYoshiDrums: boolean;
@@ -144,7 +178,6 @@ export class AddmusicKParser {
 	/** Seconds from `#spc { #length "m:ss" }`, which overrides the estimate. */
 	private declaredSeconds: number | null = null;
 	private readonly tempoChanges: Array<[number, number]> = [];
-	private readonly sampleNames: string[] = [];
 	/**
 	 * Sample filenames in SRCN order, as `#samples` declared them — AMK's
 	 * `mySamples`. Empty means the song has not declared a set, which is what
@@ -152,6 +185,61 @@ export class AddmusicKParser {
 	 * applied at the end of compilation (Music.cpp:3064), not here.
 	 */
 	private readonly sampleList: string[] = [];
+	/**
+	 * Whether each `sampleList` entry must be kept even if unplayed — AMK's
+	 * `Sample::important`.
+	 *
+	 * A name written out in `#samples` is always important (`Music.cpp:2726`
+	 * passes `true`), as is every sample lifted out of a `.bnk` bank.
+	 *
+	 * Group members carry per-sample flags AddmusicK reads from
+	 * `Addmusic_sample groups.txt`, where a trailing `!` marks a sample as
+	 * "important; i.e. it should always be in ARAM no matter what". Its documented
+	 * purpose is protecting samples that *sound effects and global songs* need —
+	 * things a per-song usage scan cannot see, since `usedSamples` is per-song and
+	 * nothing in AddmusicK combines it across songs.
+	 *
+	 * We export a standalone SPC of a single song with no sound effects and no
+	 * global songs, so there is nothing outside the song to protect and group
+	 * members are treated as unimportant. That is the right answer here rather
+	 * than a concession: the flags would only start to matter if this ever grew a
+	 * ROM-insertion path.
+	 */
+	private readonly sampleImportant: boolean[] = [];
+	/**
+	 * AMK's `usedSamples`, a `bool[256]` indexed by SRCN (Music.h:83).
+	 *
+	 * Collected but not yet acted on. AMK's `optimizeSampleUsage`
+	 * (Music.cpp:3074) uses it to replace every unreferenced sample with
+	 * `EMPTY.brr`, and it is on by default — `-u` turns it off — so our exports
+	 * carry samples that real AddmusicK would have dropped. That is the one known
+	 * byte-level divergence left.
+	 *
+	 * Implementing it needs two things this project does not have. `EMPTY.brr` is
+	 * not in `public/driver/samples/`, and the pass skips any sample marked
+	 * `important` — a per-sample flag AddmusicK reads from
+	 * `Addmusic_sample groups.txt` and that `manifest.json` has no equivalent of.
+	 * Guessing at those flags would drop samples AMK keeps, which is worse than
+	 * carrying a few spare ones, so the pass waits for the metadata.
+	 */
+	private readonly usedSamples = new Array<boolean>(256).fill(false);
+	/**
+	 * `#path` prefix for quoted sample names, `""` when unset.
+	 *
+	 * AMK builds `"./" + dir + "/"` (Music.cpp:2786) because it resolves against
+	 * a real working directory. The library here is a flat namespace, so the
+	 * prefix is normalised to `dir/`.
+	 */
+	private basepath = "";
+	/**
+	 * Inside a `(!n)[ … ]` body, between the `[` and its `]`.
+	 *
+	 * Set by `parseRemoteDefinition` and cleared by `parseLoopEnd`, which are the
+	 * only two places that need to tell a remote body from an ordinary label loop.
+	 */
+	private inRemoteDefinition = false;
+	/** `#pad` minimum song size in bytes, 0 when unset (AMK's `minSize`). */
+	private minSize = 0;
 	private readonly tags: SongTags = {};
 	private readonly instrumentData: number[] = [];
 
@@ -165,7 +253,10 @@ export class AddmusicKParser {
 	private errorCount = 0;
 	private readonly warnedOnce = new Set<string>();
 
-	constructor(private readonly source: string) {
+	constructor(
+		private readonly source: string,
+		private readonly options?: AddmusicKOptions,
+	) {
 		this.text = "";
 	}
 
@@ -588,11 +679,12 @@ export class AddmusicKParser {
 
 		if (this.matchWord("spc")) {
 			this.pos += 3;
-			this.parseSpcInfo();
+			this.parseBlock(() => this.parseSpcInfo());
 		} else if (this.matchWord("halvetempo")) {
 			this.pos += 10;
 			if (this.channelDefined) return this.error("AMK0040", "#halvetempo must be used before any and all channels.");
 			this.tempoRatio *= 2;
+			if (!this.checkTempoRatio(start)) return;
 		} else if (this.matchWord("option")) {
 			this.pos += 6;
 			this.parseOptionDirective();
@@ -609,18 +701,24 @@ export class AddmusicKParser {
 			this.append(0x07);
 		} else if (this.matchWord("samples")) {
 			this.pos += 7;
-			this.unsupported(start, "AMK0050", "#samples", "custom samples");
+			this.parseBlock(() => this.parseSampleDefinitions(start));
 		} else if (this.matchWord("instruments")) {
 			this.pos += 11;
-			this.unsupported(start, "AMK0051", "#instruments", "custom instruments");
+			this.parseBlock(() => this.parseInstrumentDefinitions(start));
 		} else if (this.matchWord("path")) {
 			this.pos += 4;
-			this.unsupported(start, "AMK0052", "#path", "custom samples");
+			this.parsePath();
 		} else if (this.matchWord("pad")) {
 			this.pos += 3;
-			this.unsupported(start, "AMK0053", "#pad", "song padding");
+			this.parsePadDefinition();
 		} else {
 			const end = this.text.indexOf("\n", this.pos);
+			// Deliberately stricter than the reference. `parseSpecialDirective`
+			// (Music.cpp:2413-2509) has no else branch at all, so AMK leaves `pos`
+			// on the first letter and the scanner reads `#foo` as the note `f`
+			// followed by an `o` octave directive — silently turning a typo into
+			// music. Reporting it costs compatibility with songs that only work by
+			// accident, which is a trade worth making.
 			this.errorAt(start, end === -1 ? this.text.length : end, "AMK0055", "Unknown # directive.");
 			while (this.pos < this.text.length && this.text[this.pos] !== "\n") this.pos++;
 		}
@@ -642,6 +740,9 @@ export class AddmusicKParser {
 				this.append(0x06);
 				this.append(0x00);
 				this.usingSMWVTable = true;
+			} else {
+				// Music.cpp:2354
+				this.warn(start, this.pos, "AMK0203", "This song already uses the SMW velocity table; this command wastes three bytes.");
 			}
 		} else if (this.matchWord("nspcvtable")) {
 			this.pos += 10;
@@ -663,7 +764,12 @@ export class AddmusicKParser {
 			const n = this.getInt();
 			if (n === -1) return this.error("AMK0042", "Missing integer argument for #option dividetempo.");
 			if (n === 0) return this.error("AMK0043", "Argument for #option dividetempo cannot be 0.");
+			// Music.cpp:2388
+			if (n === 1) {
+				this.warn(start, this.pos, "AMK0214", "#option dividetempo 1 has no effect.");
+			}
 			this.tempoRatio = n;
+			if (!this.checkTempoRatio(start)) return;
 		} else if (this.targetAMKVersion >= 4 && this.matchWord("amk109hotpatch")) {
 			this.pos += 14;
 			this.append(0xfa);
@@ -674,6 +780,304 @@ export class AddmusicKParser {
 		} else {
 			this.error("AMK0044", "#option directive missing or unrecognised first argument.");
 		}
+	}
+
+	/**
+	 * `#path "dir"` — Music.cpp:2776.
+	 *
+	 * A replacement, not a stack: a second `#path` discards the first. It applies
+	 * to quoted names in `#samples` and `#instruments` and to `(...)` sample
+	 * loads, but never to `#group` members, which AMK resolves unprefixed.
+	 */
+	private parsePath(): void {
+		this.skipSpaces();
+		if (this.text[this.pos] !== '"') {
+			return this.error("AMK0052", "Unexpected symbol in #path; expected a quoted string.");
+		}
+		this.pos++;
+		const dir = this.getQuotedString();
+		if (dir === null) return;
+
+		const trimmed = dir.replace(/^[.\\/]+/, "").replace(/[\\/]+$/, "").replace(/\\/g, "/");
+		this.basepath = trimmed.length === 0 ? "" : `${trimmed}/`;
+	}
+
+	/**
+	 * Consumes the remainder of a `{ … }` directive block after a failure.
+	 *
+	 * Every error path inside a block parser returns immediately, which leaves the
+	 * closing brace behind. The MML scanner then reads it as a triplet-close and
+	 * the real diagnostic disappears under a cascade of nonsense — the same
+	 * failure mode `unsupported()` had before it learned to advance `pos`.
+	 */
+	private skipPastBlockEnd(): void {
+		while (this.pos < this.text.length && this.text[this.pos] !== "}") this.pos++;
+		if (this.pos < this.text.length) this.pos++;
+	}
+
+	/** Runs a block parser and cleans up after it if it bailed. */
+	private parseBlock(body: () => void): void {
+		const before = this.errorCount;
+		body();
+		if (this.errorCount > before) this.skipPastBlockEnd();
+	}
+
+	/**
+	 * Rejects a tempo divisor that has run away (Music.cpp:2394, :2501).
+	 *
+	 * AMK detects this by signed overflow — `tempoRatio` is an `int`, and enough
+	 * `#halvetempo`s push it negative. JavaScript numbers never wrap, so the
+	 * condition has to be stated directly instead. A divisor past 0x8000 already
+	 * makes every tempo round to zero, so the exact threshold is immaterial.
+	 */
+	private checkTempoRatio(start: number): boolean {
+		if (this.tempoRatio > 0 && this.tempoRatio <= 0x8000) return true;
+		this.errorAt(start, this.pos, "AMK0215", "The tempo divisor has grown too large — #halvetempo was used too many times.");
+		return false;
+	}
+
+	/**
+	 * `#pad $NNNN` — Music.cpp:2756.
+	 *
+	 * Declares a minimum size for the song, so that inserting it into a ROM
+	 * reserves that much ARAM even while the song is still short. It does *not*
+	 * pad the emitted data here: AMK only zero-fills for global songs
+	 * (`AddmusicK.cpp:1266`, gated on `i <= highestGlobalSong`), and a song
+	 * compiled by this app is always the local one. So the value is recorded,
+	 * reported, and warned about when the song outgrows it.
+	 */
+	private parsePadDefinition(): void {
+		this.skipSpaces();
+		if (this.text[this.pos] !== "$") {
+			return this.error("AMK0053", "Error parsing #pad; the size must be a $ hex value.");
+		}
+		this.pos++;
+		const size = this.getHex(true);
+		if (size === -1) return this.error("AMK0053", "Error parsing #pad; the size must be a $ hex value.");
+		this.minSize = size;
+	}
+
+	/**
+	 * `#samples { … }` — Music.cpp:2697.
+	 *
+	 * Entries are quoted filenames or `#groupName`, and their order *is* the SRCN
+	 * assignment. Repeats are kept rather than collapsed: AMK's `addSample`
+	 * pushes an entry onto `mySamples` for every occurrence and only avoids
+	 * storing the *bytes* twice, so `{ #default #default }` really does produce
+	 * forty directory entries over twenty blobs. `buildSpc` reproduces that by
+	 * deduplicating on sample identity.
+	 */
+	private parseSampleDefinitions(start: number): void {
+		this.skipSpaces();
+		if (this.text[this.pos] !== "{") {
+			return this.error("AMK0050", 'Unexpected character in #samples; expected "{".');
+		}
+		this.pos++;
+
+		for (;;) {
+			this.skipSpaces();
+			if (this.pos >= this.text.length) {
+				return this.errorAt(start, this.pos, "AMK0108", "Unexpected end of file while parsing #samples.");
+			}
+
+			const character = this.text[this.pos];
+			if (character === "}") {
+				this.pos++;
+				return;
+			}
+
+			if (character === '"') {
+				this.pos++;
+				const quoted = this.getQuotedString();
+				if (quoted === null) return;
+				if (!this.addSampleByName(this.basepath + quoted)) return;
+				continue;
+			}
+
+			if (character === "#") {
+				this.pos++;
+				let group = "";
+				// AMK reads to the next whitespace (Music.cpp:2736), which would
+				// swallow a closing brace in `{ #default}`. Stopping at `}` too
+				// costs nothing and accepts a form nobody expects to be illegal.
+				while (this.pos < this.text.length && !isSpace(this.text[this.pos]) && this.text[this.pos] !== "}") {
+					group += this.text[this.pos];
+					this.pos++;
+				}
+				if (!this.addSampleGroup(group)) return;
+				continue;
+			}
+
+			return this.error("AMK0057", `Unexpected character "${character}" in #samples.`);
+		}
+	}
+
+	/** Appends one sample by filename. Returns false if it reported an error. */
+	private addSampleByName(name: string): boolean {
+		const dot = name.lastIndexOf(".");
+		if (dot === -1) {
+			this.error("AMK0107", `The sample "${name}" is missing its extension; is it a .brr or a .bnk?`);
+			return false;
+		}
+
+		const extension = name.slice(dot).toLowerCase();
+		if (extension === ".bnk") {
+			this.error("AMK0054", `"${name}": sample banks (.bnk) are not supported by this compiler version yet.`);
+			return false;
+		}
+		if (extension !== ".brr") {
+			this.error("AMK0056", `"${name}" is not a valid sample; only ".brr" and ".bnk" are allowed.`);
+			return false;
+		}
+
+		// With no library to check against — a bare `compile()` with no options —
+		// take the name on trust rather than rejecting every song.
+		if (this.options && !this.options.sampleNames.includes(name)) {
+			this.error("AMK0058", `Could not find the sample "${name}".`);
+			return false;
+		}
+
+		this.sampleList.push(name);
+		// Music.cpp:2726 passes `important = true` for every explicitly named
+		// sample, so writing one out is itself a statement that it must be kept.
+		this.sampleImportant.push(true);
+		return true;
+	}
+
+	/**
+	 * `#instruments { … }` — Music.cpp:2551.
+	 *
+	 * Each entry is six bytes: a sample, then exactly five `$xx` values. They
+	 * append to the same `instrumentData` block the HFD `$ED $6136` hack fills
+	 * (`parseHFDInstrumentHack`), and the first entry becomes `@30`. Note the two
+	 * paths reach six bytes differently — HFD supplies five and gets a zero
+	 * appended, whereas here the sample byte is the first of the six.
+	 *
+	 * `link.ts` needs no changes for any of this: `buildHeader` already sizes the
+	 * header off `instrumentData.length` and `relocate` already steps over it.
+	 */
+	private parseInstrumentDefinitions(start: number): void {
+		this.skipSpaces();
+		if (this.text[this.pos] !== "{") {
+			return this.error("AMK0051", 'Could not find the opening brace in #instruments; expected "{".');
+		}
+		this.pos++;
+
+		for (;;) {
+			this.skipSpaces();
+			if (this.pos >= this.text.length) {
+				return this.errorAt(start, this.pos, "AMK0069", "Unexpected end of file while parsing #instruments.");
+			}
+			if (this.text[this.pos] === "}") {
+				this.pos++;
+				return;
+			}
+
+			const sample = this.readInstrumentSample();
+			if (sample === null) return;
+			this.instrumentData.push(sample);
+			this.noteSampleUse(sample);
+
+			for (let byte = 0; byte < 5; byte++) {
+				this.skipSpaces();
+				if (this.text[this.pos] !== "$") {
+					return this.errorAt(
+						start,
+						this.pos,
+						"AMK0087",
+						"Error parsing #instruments; every instrument needs exactly six bytes — a sample followed by five $xx values.",
+					);
+				}
+				this.pos++;
+				const value = this.getHex();
+				if (value === -1 || value > 0xff) {
+					return this.error("AMK0088", "Error parsing #instruments; expected a one-byte hex value.");
+				}
+				this.instrumentData.push(value);
+			}
+		}
+	}
+
+	/**
+	 * The sample byte of an `#instruments` entry.
+	 *
+	 * Three forms (Music.cpp:2572-2630): a quoted filename, `@n` copying a stock
+	 * instrument's sample, or `nXX` for noise. Returns `null` after reporting.
+	 */
+	private readInstrumentSample(): number | null {
+		const character = this.text[this.pos];
+
+		if (character === '"') {
+			this.pos++;
+			const quoted = this.getQuotedString();
+			if (quoted === null) return null;
+			const name = this.basepath + quoted;
+			// Resolved against *this song's* list, not the whole library, because
+			// the byte stored is an SRCN. That lookup is also what makes
+			// `#instruments` before `#samples` fail on its own, with no ordering
+			// rule to enforce — which is how AMK does it (Music.cpp:2596-2607).
+			const srcn = this.sampleList.indexOf(name);
+			if (srcn === -1) {
+				this.error("AMK0089", `The sample "${name}" was not included in this song; add it to #samples first.`);
+				return null;
+			}
+			return srcn;
+		}
+
+		if (character === "@") {
+			this.pos++;
+			const n = this.getInt();
+			if (n === -1) {
+				this.error("AMK0102", "Error parsing the instrument-copy portion of #instruments.");
+				return null;
+			}
+			if (n >= 30) {
+				this.error("AMK0103", "Cannot use a custom instrument's sample as a base for another custom instrument.");
+				return null;
+			}
+			return INSTRUMENT_TO_SAMPLE[n];
+		}
+
+		if (character === "n") {
+			this.pos++;
+			const pitch = this.getHex();
+			if (pitch === -1 || pitch > 0xff) {
+				this.error("AMK0104", "Error parsing the noise portion of #instruments.");
+				return null;
+			}
+			if (pitch >= 0x20) {
+				this.error("AMK0105", "Invalid noise pitch; it must be a hex value from $00 to $1F.");
+				return null;
+			}
+			// The high bit is what tells the driver this is noise, not a sample.
+			return pitch | 0x80;
+		}
+
+		this.error(
+			"AMK0106",
+			`Unexpected character "${character}" in #instruments; expected a quoted sample name, @n, or nXX.`,
+		);
+		return null;
+	}
+
+	/** Appends a named group's members, in order. globals.cpp:527. */
+	private addSampleGroup(group: string): boolean {
+		const members = this.options?.sampleGroups[group];
+		if (!members) {
+			const known = Object.keys(this.options?.sampleGroups ?? {});
+			this.error(
+				"AMK0059",
+				`The sample group "#${group}" could not be found.` +
+					(known.length > 0 ? ` Available groups: ${known.map((name) => `#${name}`).join(", ")}.` : ""),
+			);
+			return false;
+		}
+		// Group members are resolved unprefixed; `#path` does not apply to them.
+		for (const member of members) {
+			this.sampleList.push(member);
+			this.sampleImportant.push(false);
+		}
+		return true;
 	}
 
 	/** ID666 gives each text field 32 bytes (Music.cpp:3528-3547). */
@@ -1076,12 +1480,21 @@ export class AddmusicKParser {
 			if (n >= 0x13 && n < 30) n = n - 0x13 + 30;
 
 			if (n >= 30) {
-				return this.errorAt(
-					start,
-					this.pos,
-					"AMK0092",
-					`Custom instrument @${n} requires #instruments, which this compiler version does not support yet.`,
-				);
+				// Music.cpp:889. AMK only performs this check when
+				// `optimizeSampleUsage` is on; here it is unconditional, because
+				// `$DA n` past the end of the table makes the driver read six bytes
+				// of whatever follows it as an instrument.
+				const entry = (n - 30) * 6;
+				if (entry >= this.instrumentData.length) {
+					return this.errorAt(
+						start,
+						this.pos,
+						"AMK0092",
+						`Custom instrument @${n} has not been defined yet. Define it in an #instruments block; ` +
+							`the first entry there is @30.`,
+					);
+				}
+				this.noteSampleUse(this.instrumentData[entry]);
 			}
 
 			if (this.songTargetProgram === 1) this.ignoreTuning[this.channel] = false;
@@ -1090,7 +1503,23 @@ export class AddmusicKParser {
 			this.append(n);
 		}
 
-		if (n < 30) this.noteSampleUse(INSTRUMENT_TO_SAMPLE[n]);
+		if (n < 30) {
+			const srcn = INSTRUMENT_TO_SAMPLE[n];
+			// A song that replaced the sample list with a shorter one has left the
+			// stock instruments pointing past the end of the directory, which the
+			// DSP would read as a garbage BRR address. AMK only survives this by
+			// accident — its `usedSamples` is a bool[256] that absorbs the write.
+			if (this.sampleList.length > 0 && srcn >= this.sampleList.length) {
+				this.errorAt(
+					start,
+					this.pos,
+					"AMK0109",
+					`@${n} plays sample ${srcn}, but this song's #samples list only defines ` +
+						`${this.sampleList.length}. Include a group that covers the stock instruments, such as #default.`,
+				);
+			}
+			this.noteSampleUse(srcn);
+		}
 		this.instrument[this.channel] = n;
 
 		// Music.cpp:910 — AddmusicM resets tuning when a stock instrument is set.
@@ -1180,21 +1609,93 @@ export class AddmusicKParser {
 	// Loops
 	// =========================================================================
 
+	/** Music.cpp:917 — a `(` is either a sample load or a label loop. */
 	private parseOpenParen(): void {
 		const next = this.text[this.pos + 1];
-		if (next === '"' || next === "@") {
-			const start = this.pos;
-			const close = this.text.indexOf(")", this.pos);
-			this.pos = close === -1 ? this.text.length : close + 1;
-			this.errorAt(
+		if (next === '"' || next === "@") this.parseSampleLoad();
+		else this.parseLabelLoop();
+	}
+
+	/**
+	 * `("kick.brr", $02)` or `(@1, $02)` — Music.cpp:925.
+	 *
+	 * The comma is mandatory and the tuning multiplier sits *inside* the
+	 * parentheses; both forms compile to `$F3 <srcn> <tuning>`, the sample-load
+	 * VCMD that the `#amk 1` and Addmusic 4.05 paths already emit.
+	 */
+	private parseSampleLoad(): void {
+		const start = this.pos;
+		this.pos++;
+
+		let srcn: number;
+		if (this.text[this.pos] === "@") {
+			this.pos++;
+			const n = this.getInt();
+			// AMK reads `instrToSample[i]` with no check at all (Music.cpp:932),
+			// so a missing or out-of-range number indexes past a 30-entry array.
+			if (n === -1 || n >= 30) {
+				return this.errorAt(
+					start,
+					this.pos,
+					"AMK0110",
+					"A sample load must name a stock instrument between @0 and @29, as in (@1, $02).",
+				);
+			}
+			srcn = INSTRUMENT_TO_SAMPLE[n];
+		} else {
+			this.pos++;
+			// AMK scans raw to the closing quote here rather than going through
+			// `getQuotedString`, so it has no escape handling. Using the shared
+			// reader is harmless: a name containing a quote could never resolve.
+			const quoted = this.getQuotedString();
+			if (quoted === null) return;
+			const name = this.basepath + quoted;
+			const found = this.sampleList.indexOf(name);
+			if (found === -1) {
+				return this.errorAt(
+					start,
+					this.pos,
+					"AMK0132",
+					`The sample "${name}" was not included in this song; add it to #samples first.`,
+				);
+			}
+			srcn = found;
+		}
+
+		if (this.text[this.pos] !== ",") {
+			return this.errorAt(
 				start,
 				this.pos,
-				"AMK0110",
-				"The sample load command requires #samples, which this compiler version does not support yet.",
+				"AMK0133",
+				'Error parsing the sample load command; expected a comma, as in ("kick.brr", $02).',
 			);
-			return;
 		}
-		this.parseLabelLoop();
+		this.pos++;
+		this.skipSpaces();
+
+		if (this.text[this.pos] !== "$") {
+			return this.errorAt(
+				start,
+				this.pos,
+				"AMK0134",
+				"Error parsing the sample load command; the tuning multiplier must be a $xx value.",
+			);
+		}
+		this.pos++;
+		const tuning = this.getHex();
+		if (tuning === -1 || tuning > 0xff) {
+			return this.errorAt(start, this.pos, "AMK0135", "Error parsing the sample load command's tuning value.");
+		}
+
+		if (this.text[this.pos] !== ")") {
+			return this.errorAt(start, this.pos, "AMK0136", 'Error parsing the sample load command; expected ")".');
+		}
+		this.pos++;
+
+		this.noteSampleUse(srcn);
+		this.append(0xf3);
+		this.append(srcn);
+		this.append(tuning);
 	}
 
 	private parseLabelLoop(): void {
@@ -1205,13 +1706,14 @@ export class AddmusicKParser {
 			if (this.targetAMKVersion < 2) {
 				return this.errorAt(start, this.pos + 1, "AMK0117", "Unrecognized character '!'.");
 			}
-			const close = this.text.indexOf(")", this.pos);
-			this.pos = close === -1 ? this.text.length : close + 1;
-			if (this.text[this.pos] === "[") {
-				const end = this.text.indexOf("]", this.pos);
-				this.pos = end === -1 ? this.text.length : end + 1;
-			}
-			this.errorAt(start, this.pos, "AMK0111", "Remote code is not supported by this compiler version yet.");
+			this.pos++;
+			this.skipSpaces();
+
+			// Music.cpp:1015 — definitions and calls are told apart by *where they
+			// are*, not by syntax. `channelDefined` latches on the first `#N` and
+			// never clears, so every definition has to precede every channel.
+			if (this.channelDefined) this.parseRemoteCall(start);
+			else this.parseRemoteDefinition(start);
 			return;
 		}
 
@@ -1254,6 +1756,159 @@ export class AddmusicKParser {
 		this.append(target >> 8);
 		this.append(count);
 		this.loopLabel = 0;
+	}
+
+	/**
+	 * `(!n)[ … ]` outside any channel — Music.cpp:1125.
+	 *
+	 * Only records the intent. The `[` is deliberately left for `parseLoopStart`,
+	 * which does all the channel-8 bookkeeping and writes `loopPointers[n]`; the
+	 * difference from an ordinary label loop is entirely in what `parseLoopEnd`
+	 * does at the other end, which is what `inRemoteDefinition` selects.
+	 *
+	 * Note the label is *not* offset by one, where `(n)` label loops are
+	 * (Music.cpp:1156). So `(!1)` and `(0)` share a slot. Reproduced as-is.
+	 */
+	private parseRemoteDefinition(start: number): void {
+		const label = this.getInt();
+		if (label === -1) return this.errorAt(start, this.pos, "AMK0111", "Error parsing remote code definition.");
+
+		this.skipSpaces();
+		if (this.text[this.pos] !== ")") {
+			return this.errorAt(start, this.pos, "AMK0111", "Error parsing remote code definition; expected \")\".");
+		}
+		this.pos++;
+
+		if (this.text[this.pos] !== "[") {
+			return this.errorAt(
+				start,
+				this.pos,
+				"AMK0137",
+				"Error parsing remote code definition; the definition body was missing.",
+			);
+		}
+
+		this.loopLabel = label;
+		this.inRemoteDefinition = true;
+		// AMK also sets `remoteDefinitionType` here, from a stale member variable
+		// (Music.cpp:1141). It is written there and at init and read nowhere, so
+		// there is nothing to model.
+	}
+
+	/**
+	 * `(!n, type[, arg])` or `(!!n)` inside a channel — Music.cpp:1015-1123.
+	 *
+	 * Both emit the five-byte `$FC` remote-code VCMD. A call points at a
+	 * previously defined body; `(!!n)` points at nothing and instead selects a
+	 * disable variant by its argument.
+	 */
+	private parseRemoteCall(start: number): void {
+		if (this.targetAMKVersion >= 3 && this.text[this.pos] === "!") {
+			this.pos++;
+			const which = this.tryGetIntWithNegative();
+			if (which === null) {
+				return this.errorAt(start, this.pos, "AMK0138", "Error parsing remote code reset; expected a number.");
+			}
+			this.skipSpaces();
+			if (this.text[this.pos] !== ")") {
+				return this.errorAt(start, this.pos, "AMK0139", "Error parsing remote code reset; expected \")\".");
+			}
+			this.pos++;
+
+			// Music.cpp:1037. 0 disables both kinds, -1 the key-on kind, anything
+			// else the non-key-on kind.
+			this.append(0xfc);
+			this.append(0x00);
+			this.append(0x00);
+			this.append(which === 0 ? 0x00 : which === -1 ? 0x08 : 0x07);
+			this.append(0x00);
+			return;
+		}
+
+		const label = this.getInt();
+		if (label === -1) return this.errorAt(start, this.pos, "AMK0143", "Error parsing remote code setup.");
+
+		this.skipSpaces();
+		if (this.text[this.pos] !== ",") {
+			return this.errorAt(start, this.pos, "AMK0144", "Error parsing remote code setup; expected a comma.");
+		}
+		this.pos++;
+		this.skipSpaces();
+
+		const type = this.tryGetIntWithNegative();
+		if (type === null) {
+			return this.errorAt(
+				start,
+				this.pos,
+				"AMK0145",
+				"Error parsing remote code setup; the event type was missing. Remote code cannot be defined inside a channel.",
+			);
+		}
+		this.skipSpaces();
+
+		// Event types 1 and 2 fire relative to a note, so they carry a duration.
+		let argument = 0;
+		if (type === 1 || type === 2) {
+			if (this.text[this.pos] !== ",") {
+				return this.errorAt(start, this.pos, "AMK0146", "Error parsing remote code setup; the third argument is missing.");
+			}
+			this.pos++;
+			this.skipSpaces();
+
+			if (this.text[this.pos] === "$") {
+				this.pos++;
+				argument = this.getHex();
+				if (argument === -1) {
+					return this.errorAt(
+						start,
+						this.pos,
+						"AMK0147",
+						"Error parsing remote code setup; could not read the third argument as a hex value.",
+					);
+				}
+			} else {
+				argument = this.getNoteLength(this.getInt());
+				if (argument > 0x100) {
+					return this.errorAt(start, this.pos, "AMK0148", "The note length specified was too large.");
+				}
+				// A full 256 ticks wraps to zero in one byte (Music.cpp:1101).
+				if (argument === 0x100) argument = 0;
+			}
+			this.skipSpaces();
+		}
+
+		if (this.text[this.pos] !== ")") {
+			return this.errorAt(start, this.pos, "AMK0149", "Error parsing remote code setup; expected \")\".");
+		}
+		this.pos++;
+
+		if (this.text[this.pos] === "[") {
+			return this.errorAt(start, this.pos, "AMK0153", "Remote code cannot be defined within a channel.");
+		}
+
+		const target = this.loopPointers.get(label);
+		if (target === undefined) {
+			// AMK appends `loopPointers[i]` unchecked here, which for an undefined
+			// label is its -1 initialiser — two 0xFF bytes that relocation then
+			// turns into a pointer to nowhere.
+			return this.errorAt(start, this.pos, "AMK0115", `Remote code (!${label}) has not been defined yet.`);
+		}
+
+		this.append(0xfc);
+		this.loopLocations[this.channel].push(this.data[this.channel].length);
+		this.append(target & 0xff);
+		this.append(target >> 8);
+		this.append(type & 0xff);
+		this.append(argument & 0xff);
+	}
+
+	/** `getIntWithNegative`, but reporting absence instead of throwing. */
+	private tryGetIntWithNegative(): number | null {
+		try {
+			return this.getIntWithNegative();
+		} catch {
+			return null;
+		}
 	}
 
 	private parseLoopStart(): void {
@@ -1327,6 +1982,11 @@ export class AddmusicKParser {
 		if (this.channel !== 8) return this.error("AMK0129", "Loop end found outside of a loop.");
 
 		let count = this.getInt();
+		// Music.cpp:1293 — a remote body is jumped into by the driver, not looped
+		// over by the channel, so a repeat count on it means nothing.
+		if (count !== -1 && this.inRemoteDefinition) {
+			return this.error("AMK0164", "Remote code definitions cannot repeat.");
+		}
 		if (count === -1) count = 1;
 		if (count < 1 || count > 255) return this.error("AMK0116", "Invalid loop count.");
 
@@ -1334,17 +1994,29 @@ export class AddmusicKParser {
 		this.channel = this.prevChannel;
 		this.handleNormalLoopExit(count);
 
-		this.append(0xe9);
-		this.loopLocations[this.channel].push(this.data[this.channel].length);
-		this.append(this.prevLoop & 0xff);
-		this.append(this.prevLoop >> 8);
-		this.append(count);
+		// The one structural difference between a label loop and a remote
+		// definition: an ordinary loop emits the `$E9` call that runs it here and
+		// now, whereas a remote body is only stored, to be triggered later by a
+		// `$FC` event (Music.cpp:1305).
+		if (!this.inRemoteDefinition) {
+			this.append(0xe9);
+			this.loopLocations[this.channel].push(this.data[this.channel].length);
+			this.append(this.prevLoop & 0xff);
+			this.append(this.prevLoop >> 8);
+			this.append(count);
+		}
+
+		this.inRemoteDefinition = false;
 		this.loopLabel = 0;
 	}
 
 	private parseStarLoop(): void {
 		this.pos++;
 		if (this.channel === 8) return this.error("AMK0112", "Nested loops are not allowed.");
+		// Deliberately stricter than the reference. Music.cpp:1321 has no such
+		// check, so `*` before any `[ ]` emits `$E9` against an uninitialised
+		// `prevLoop` of -1 — two 0xFF bytes that relocation turns into a pointer
+		// to nowhere. There is no reading of that as intentional.
 		if (this.prevLoop === -1) return this.error("AMK0130", "No previous loop to recall.");
 
 		this.updateQ[this.channel] = true;
@@ -1447,12 +2119,31 @@ export class AddmusicKParser {
 		if (this.channel !== 8) this.passedNote[this.channel] = true;
 		else this.passedNote[this.prevChannel] = true;
 
-		const letter = this.text[this.pos].toLowerCase();
+		const raw = this.text[this.pos];
+		const letter = raw.toLowerCase();
 		this.pos++;
 
+		// Music.cpp:2125 — older AddmusicK builds did not fold case here, so an
+		// upper-case note that works now will not work there.
+		if (raw !== letter && this.targetAMKVersion < 4) {
+			this.warnOnce(
+				"caseNote",
+				"AMK0216",
+				"Upper-case note letters will not translate correctly on AddmusicK 1.0.8 or lower.",
+			);
+		}
+
+		// Music.cpp:2138 — a remote body runs as a hex-command sequence off an
+		// event trigger; it has no note pointer of its own to advance.
+		if (this.inRemoteDefinition) {
+			return this.error("AMK0165", "Remote code definitions cannot contain note data.");
+		}
+
 		// Music.cpp:2141 — only AddmusicK insists notes live inside a channel;
-		// the legacy formats allow them before any channel directive.
-		if (this.songTargetProgram === 0 && !this.channelDefined) {
+		// the legacy formats allow them before any channel directive. A remote
+		// definition sits outside every channel, which is why AMK exempts it —
+		// though the check above has already rejected notes there anyway.
+		if (this.songTargetProgram === 0 && !this.channelDefined && !this.inRemoteDefinition) {
 			return this.error("AMK0140", "Note data must be inside a channel.");
 		}
 
@@ -1697,7 +2388,7 @@ export class AddmusicKParser {
 					// to have supplied it.
 					if (this.sampleList.length === 0 && (i & 0x7f) > 0x13) {
 						return this.error(
-							"AMK0114",
+							"AMK0131",
 							"This song uses custom samples, but has not yet defined its samples with the #samples command.",
 						);
 					}
@@ -1707,6 +2398,12 @@ export class AddmusicKParser {
 					return;
 				}
 				this.append(0xe5);
+			}
+
+			// Music.cpp:1784 — the third `nonNativeHexWarning` trigger. Shares the
+			// warn-once key with the other two, as AMK shares the flag.
+			if (this.hexLeft === 0 && this.currentHex === 0xf4 && i >= 0x07 && this.songTargetProgram === 2) {
+				this.warnOnce("nonNativeHex", "AMK0207", "A hex command was used that is not native to AddmusicM. Did you mean #amk 1?");
 			}
 
 			if (this.hexLeft === 1 && this.targetAMKVersion > 1 && this.currentHex === 0xfa && i === 0x05) {
@@ -1768,6 +2465,21 @@ export class AddmusicKParser {
 			if (this.hexLeft === 2 && this.currentHex === 0xf1) {
 				this.echoBufferSize = Math.max(this.echoBufferSize, i);
 				this.hasEchoBufferCommand = true;
+			}
+
+			// Beyond the reference, and deliberately. AMK tracks `$DA` sample usage
+			// only on the am4 path (Music.cpp:1976), so a plain AddmusicK song
+			// written with raw `$DA $05` instead of `@5` has that sample judged
+			// unused and replaced with `EMPTY.brr` — it goes silent. Tracking every
+			// target keeps a sample AMK would discard, which is the safe direction
+			// to differ in, and it is what makes the optimisation trustworthy.
+			if (this.hexLeft === 0 && this.currentHex === 0xda) {
+				if (i < 30) {
+					this.noteSampleUse(INSTRUMENT_TO_SAMPLE[i]);
+				} else {
+					const custom = (i - 30) * 6;
+					if (custom < this.instrumentData.length) this.noteSampleUse(this.instrumentData[custom]);
+				}
 			}
 
 			// Music.cpp:1976 — Addmusic 4.05 numbered custom instruments from $13.
@@ -2014,7 +2726,12 @@ export class AddmusicKParser {
 		let onIntro = true;
 
 		for (let z = 0; z < changes.length - 1; z++) {
-			if (changes[z][0] > totalLength) break;
+			if (changes[z][0] > totalLength) {
+				// Music.cpp:3236 — a `t` past the shortest channel's end never runs,
+				// which usually means a channel is shorter than intended.
+				this.warnOnce("tempoPastEnd", "AMK0217", "A tempo change was found beyond the end of the song.");
+				break;
+			}
 			if (changes[z][1] < 0) onIntro = false;
 			const span = changes[z + 1][0] - changes[z][0];
 			const seconds = span / (2 * Math.abs(changes[z][1]));
@@ -2027,9 +2744,60 @@ export class AddmusicKParser {
 			: Math.floor(introSeconds * 2 + 0.5);
 	}
 
+	/**
+	 * Records that the song plays a given sample directory slot.
+	 *
+	 * Previously this pushed a synthetic `#default[N]` string onto a name list,
+	 * in first-use order — which meant `stats.sampleNames` was neither filenames
+	 * nor in SRCN order, despite promising both. The set of slots and the ordered
+	 * list of names are two different things, so they are two fields now.
+	 */
 	private noteSampleUse(srcn: number): void {
-		const name = `#default[${srcn}]`;
-		if (!this.sampleNames.includes(name)) this.sampleNames.push(name);
+		if (srcn >= 0 && srcn < this.usedSamples.length) this.usedSamples[srcn] = true;
+	}
+
+	/**
+	 * The song's sample set, in SRCN order.
+	 *
+	 * A song with no `#samples` gets the `#default` group, which is what
+	 * Music.cpp:3064 does by re-entering the parser on a synthetic
+	 * `"{#default }"` at the very end of compilation. Doing it here rather than
+	 * eagerly is what lets an explicit `#samples` anywhere in the file suppress
+	 * it, and it also means the list survives an early parse failure.
+	 *
+	 * `null` rather than `[]` when there is nothing to resolve: an empty list is
+	 * a real answer meaning "no samples", and the host must be able to tell it
+	 * apart from "this compiler was given no library to look names up in".
+	 */
+	private resolveSampleList(): readonly string[] | null {
+		const declared = this.sampleList.length > 0;
+
+		const names = declared ? [...this.sampleList] : [...(this.options?.sampleGroups["default"] ?? [])];
+		if (names.length === 0) return null;
+
+		// The implicit fallback is a group expansion, so nothing in it is
+		// important — the same as if the song had written `#samples { #default }`.
+		const important = declared ? this.sampleImportant : names.map(() => false);
+
+		if (this.options?.optimizeSampleUsage === false) return names;
+		return this.optimizeSamples(names, important);
+	}
+
+	/**
+	 * Replaces samples the song never plays with `EMPTY.brr` — AMK's
+	 * `optimizeSampleUsage` (Music.cpp:3074).
+	 *
+	 * The directory keeps its length and every SRCN keeps its meaning; only the
+	 * bytes behind the unplayed slots go away. Because every replaced slot names
+	 * the same zero-length sample, `buildSpc` writes it once and points the rest
+	 * at that one entry.
+	 *
+	 * This is only safe if usage tracking is complete, since a sample wrongly
+	 * judged unused becomes silence. See the `$DA` note in `parseHexCommand` for
+	 * the one hole in the reference's tracking that is deliberately plugged here.
+	 */
+	private optimizeSamples(names: string[], important: readonly boolean[]): readonly string[] {
+		return names.map((name, srcn) => (this.usedSamples[srcn] || important[srcn] ? name : EMPTY_SAMPLE_NAME));
 	}
 
 	// =========================================================================
@@ -2098,7 +2866,9 @@ export class AddmusicKParser {
 			echoBufferAllocVCMDChannel: this.echoBufferAllocVCMDChannel,
 			channelLengths: this.channelLengths,
 			introLength: this.introLength,
-			sampleNames: this.sampleNames,
+			sampleList: this.resolveSampleList(),
+			usedSamples: this.usedSamples,
+			minSize: this.minSize,
 			tags: this.tags,
 			// A declared `#length` wins: it is why `guessLength` was turned off.
 			seconds: this.errorCount === 0 ? (this.declaredSeconds ?? this.estimateSeconds()) : null,

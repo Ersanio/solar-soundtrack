@@ -38,7 +38,10 @@ export interface CompileStats {
 	channelTicks: number[];
 	/** Echo buffer size in 2 KiB units; bytes = `echoBufferSize << 11`. */
 	echoBufferSize: number;
-	/** Sample filenames the song asked for, in SRCN order. */
+	/**
+	 * Sample filenames the song asked for, in SRCN order — a display mirror of
+	 * {@link CompileResult.sampleList}, flattened to `[]` when there is none.
+	 */
 	sampleNames: string[];
 	hasIntro: boolean;
 	loops: boolean;
@@ -72,6 +75,18 @@ export interface CompileResult {
 	ok: boolean;
 	/** Relocated song data, ready to paste at `aramAddress`. Null if `!ok`. */
 	data: Uint8Array | null;
+	/**
+	 * The sample set this song needs, by filename, in SRCN order — index 0 is
+	 * directory entry 0. `null` means the compiler has no opinion and the host
+	 * should use whatever default its driver ships; `[]` means the song genuinely
+	 * asks for no samples at all, which is why the two cannot be conflated.
+	 *
+	 * This is a correctness-critical output, not a statistic. Building an SPC
+	 * against a different set than the compiler resolved produces a file that
+	 * looks valid and plays the wrong sounds, so hosts must feed this to the SPC
+	 * writer rather than assuming.
+	 */
+	sampleList: readonly string[] | null;
 	diagnostics: Diagnostic[];
 	/** Present even on failure where possible, so the UI can still show partials. */
 	stats: CompileStats | null;
@@ -113,6 +128,10 @@ export function emptyStats(): CompileStats {
 	};
 }
 
-export function failure(diagnostics: Diagnostic[], stats: CompileStats | null = null): CompileResult {
-	return { ok: false, data: null, diagnostics, stats };
+export function failure(
+	diagnostics: Diagnostic[],
+	stats: CompileStats | null = null,
+	sampleList: readonly string[] | null = null,
+): CompileResult {
+	return { ok: false, data: null, sampleList, diagnostics, stats };
 }

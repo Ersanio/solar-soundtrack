@@ -13,11 +13,22 @@ import type { CompileResult } from "../src/core/types";
 
 let failures = 0;
 
-function compile(source: string, aramAddress = 0x3e00): CompileResult {
+function compile(source: string, aramAddress = 0x3e00, options?: Record<string, unknown>): CompileResult {
 	const compiler = compilers.get("addmusick");
 	if (!compiler) throw new Error("addmusick compiler not registered");
-	return compiler.compile({ source, aramAddress });
+	return compiler.compile({ source, aramAddress, options });
 }
+
+/**
+ * A stand-in sample library, so `#samples` can be exercised without dragging in
+ * the driver bundle. Twenty names for `#default`, mirroring the real manifest's
+ * shape, plus a couple of extras to reference by hand.
+ */
+const STOCK = Array.from({ length: 20 }, (_, index) => `${index.toString(16).toUpperCase().padStart(2, "0")} SMW.brr`);
+const LIBRARY = {
+	sampleNames: [...STOCK, "kick.brr", "drums/snare.brr"],
+	sampleGroups: { default: STOCK, optimized: STOCK.slice(0, 5) },
+};
 
 function hex(data: Uint8Array): string {
 	return [...data].map((b) => b.toString(16).toUpperCase().padStart(2, "0")).join(" ");
@@ -302,12 +313,13 @@ console.log("\npreprocessor");
 	check("amm handles ; in the scanner", ammComment.ok, ammComment.diagnostics.map((d) => d.message).join("; "));
 }
 
-console.log("\nunimplemented features error clearly");
+console.log("\nwhat is still unimplemented says so clearly");
 {
 	for (const [source, code] of [
-		['#amk 4\n#samples\n{\n#default\n}\n#0 c4\n', "AMK0050"],
+		// Sample banks are the last directive form left unsupported.
+		['#amk 4\n#samples { "x.bnk" }\n#0 c4\n', "AMK0054"],
+		// Not unimplemented, but the neighbouring failure people hit first.
 		["#amk 4\n#0 @30 c4\n", "AMK0092"],
-		["#amk 4\n#0 (!1)[$F4 $02]\n", "AMK0111"],
 	] as const) {
 		const result = compile(source);
 		check(
@@ -403,17 +415,395 @@ console.log("\nparity fixes against AddmusicKsrc");
 	// Music.cpp:1826 — a sample load past the stock group needs #samples first.
 	const am4Sample = compile("#am4\n#0 o4 $E5 $94 $02 c4\n");
 	check("am4 $E5 sample load past $13 without #samples is rejected",
-		!am4Sample.ok && am4Sample.diagnostics.some((d) => d.code === "AMK0114"),
+		!am4Sample.ok && am4Sample.diagnostics.some((d) => d.code === "AMK0131"),
 		am4Sample.diagnostics.map((d) => `${d.code} ${d.message}`).join("; "));
 	const am4Stock = compile("#am4\n#0 o4 $E5 $85 $02 c4\n");
 	check("am4 $E5 sample load within the stock group is fine", am4Stock.ok,
 		am4Stock.diagnostics.map((d) => `${d.code} ${d.message}`).join("; "));
 
 	// An unsupported directive must consume its line, or the scanner reads the
-	// block body as MML and buries the real diagnostic in nonsense.
-	const unsupported = compile("#amk 4\n#pad $100\n#0 o4 c4\n");
-	check("#pad reports exactly one error", unsupported.diagnostics.filter((d) => d.severity === "error").length === 1,
+	// block body as MML and buries the real diagnostic in nonsense. `#samples`
+	// with a `.bnk` entry is the remaining case that takes this path.
+	const unsupported = compile('#amk 4\n#samples { "x.bnk" }\n#0 o4 c4\n', 0x3e00, LIBRARY);
+	check("an unsupported entry reports exactly one error",
+		unsupported.diagnostics.filter((d) => d.severity === "error").length === 1,
 		unsupported.diagnostics.map((d) => `${d.code} ${d.message}`).join("; "));
+}
+
+console.log("\n#samples and #path");
+{
+	const names = (result: CompileResult): readonly string[] => result.sampleList ?? [];
+
+	// Music.cpp:3064 — a song with no #samples gets the #default group, applied
+	// at the end of compilation rather than eagerly.
+	const implicit = compile("#amk 4\n#0 o4 @0 c4\n", 0x3e00, LIBRARY);
+	check("no #samples falls back to #default", names(implicit).length === 20, `${names(implicit).length}`);
+	check("the fallback is in manifest order", names(implicit)[0] === STOCK[0]);
+
+	// With no library at all the compiler has no opinion, and the host keeps its
+	// own default. `[]` would mean "this song wants zero samples".
+	const noLibrary = compile("#amk 4\n#0 o4 @0 c4\n");
+	check("no library yields null, not an empty list", noLibrary.sampleList === null);
+
+	const explicitDefault = compile("#amk 4\n#samples { #default }\n#0 o4 @0 c4\n", 0x3e00, LIBRARY);
+	check("#samples { #default } resolves to 20", names(explicitDefault).length === 20,
+		`${names(explicitDefault).length}`);
+
+	// AMK pushes onto mySamples per occurrence and only avoids duplicating the
+	// bytes, so the directory really does grow. buildSpc dedupes the blobs.
+	const twice = compile("#amk 4\n#samples { #default #default }\n#0 o4 @0 c4\n", 0x3e00, LIBRARY);
+	check("#default twice gives 40 entries", names(twice).length === 40, `${names(twice).length}`);
+
+	const extra = compile('#amk 4\n#samples { #default "kick.brr" }\n#0 o4 @0 c4\n', 0x3e00, LIBRARY);
+	check("an added file lands after the group", names(extra).length === 21 && names(extra)[20] === "kick.brr",
+		names(extra).slice(19).join(", "));
+
+	const otherGroup = compile("#amk 4\n#samples { #optimized }\n#0 o4 c4\n", 0x3e00, LIBRARY);
+	check("#optimized resolves too, so #default is not special", names(otherGroup).length === 5,
+		`${names(otherGroup).length}`);
+
+	// #path prefixes quoted names, replaces rather than stacks, and never
+	// applies to group members.
+	const pathed = compile('#amk 4\n#path "drums"\n#samples { "snare.brr" }\n#0 o4 c4\n', 0x3e00, LIBRARY);
+	check("#path prefixes a quoted name", names(pathed)[0] === "drums/snare.brr", names(pathed).join(", "));
+	const repathed = compile('#amk 4\n#path "wrong"\n#path "drums"\n#samples { "snare.brr" }\n#0 o4 c4\n', 0x3e00, LIBRARY);
+	check("a second #path replaces the first", repathed.sampleList?.[0] === "drums/snare.brr",
+		names(repathed).join(", "));
+	const groupUnprefixed = compile('#amk 4\n#path "drums"\n#samples { #default }\n#0 o4 @0 c4\n', 0x3e00, LIBRARY);
+	check("#path does not touch group members", names(groupUnprefixed)[0] === STOCK[0], names(groupUnprefixed)[0]);
+
+	for (const [source, code, label] of [
+		['#amk 4\n#samples { "nope.brr" }\n#0 c4\n', "AMK0058", "an unknown filename"],
+		["#amk 4\n#samples { #nosuchgroup }\n#0 c4\n", "AMK0059", "an unknown group"],
+		['#amk 4\n#samples { "x.wav" }\n#0 c4\n', "AMK0056", "a non-brr extension"],
+		['#amk 4\n#samples { "x.bnk" }\n#0 c4\n', "AMK0054", "a sample bank"],
+		['#amk 4\n#samples { "noext" }\n#0 c4\n', "AMK0107", "a missing extension"],
+		['#amk 4\n#samples ( "x.brr" )\n#0 c4\n', "AMK0050", "a missing brace"],
+		['#amk 4\n#samples { "kick.brr" }\n#0 o4 @5 c4\n', "AMK0109", "@5 past a short sample list"],
+	] as const) {
+		const result = compile(source, 0x3e00, LIBRARY);
+		check(
+			`${label} is rejected with ${code}`,
+			!result.ok && result.diagnostics.some((d) => d.code === code),
+			result.diagnostics.map((d) => `${d.code} ${d.message}`).join("; "),
+		);
+	}
+
+	// A short list is fine as long as nothing reaches past it.
+	const shortButSafe = compile('#amk 4\n#samples { "kick.brr" }\n#0 o4 $F3 $00 $02 c4\n', 0x3e00, LIBRARY);
+	check("a one-sample list compiles when nothing exceeds it", shortButSafe.ok,
+		shortButSafe.diagnostics.map((d) => `${d.code} ${d.message}`).join("; "));
+}
+
+console.log("\n#instruments and @30+");
+{
+	const ENTRY = "$8F $E0 $00 $02 $B0"; // ADSR1, ADSR2, GAIN, tuning hi, tuning lo
+	const withDefault = (body: string) => `#amk 4\n#samples { #default }\n${body}`;
+
+	const one = compile(withDefault(`#instruments { @0 ${ENTRY} }\n#0 o4 @30 c4\n`), 0x3e00, LIBRARY);
+	check("a custom instrument compiles", one.ok, one.diagnostics.map((d) => `${d.code} ${d.message}`).join("; "));
+
+	// add = 0 (no intro) + 2 (loops) + 4 = 6, so the six instrument bytes sit at
+	// header[6..12) and the channel pointer table starts at 12.
+	check("the header grew by exactly six bytes", one.stats?.headerSize === 28, `${one.stats?.headerSize}`);
+	if (one.data) {
+		// @0's sample is instrToSample[0] = 0x00.
+		expectBytes("the instrument block is sample + five bytes", one.data.slice(6, 12),
+			[0x00, 0x8f, 0xe0, 0x00, 0x02, 0xb0]);
+		const word0 = one.data[0] | (one.data[1] << 8);
+		check("header word 0 points past the instrument block", word0 === 0x3e00 + 12, `0x${word0.toString(16)}`);
+		const channel0 = one.data[12] | (one.data[13] << 8);
+		check("the channel pointer relocated correctly", channel0 === 0x3e00 + one.stats!.headerSize,
+			`0x${channel0.toString(16)}`);
+		check("@30 emits $DA $1E", [...one.data].includes(0x1e) && [...one.data].includes(0xda));
+	}
+
+	// The relocation walk steps over the instrument block using a byte counter,
+	// and that path has never run with a non-empty block. All four header shapes
+	// use a different `add`, so each moves the block somewhere else.
+	for (const [body, label, headerSize] of [
+		[`#instruments { @0 ${ENTRY} }\n#0 o4 @30 c4\n`, "loops, no intro", 28],
+		[`#instruments { @0 ${ENTRY} }\n#0 o4 @30 c4 ?\n`, "no loop, no intro", 26],
+		[`#instruments { @0 ${ENTRY} }\n#0 o4 @30 c4 / d4\n`, "loops, intro", 46],
+		[`#instruments { @0 ${ENTRY} }\n#0 o4 @30 c4 / d4 ?\n`, "no loop, intro", 44],
+	] as const) {
+		const result = compile(withDefault(body), 0x3e00, LIBRARY);
+		check(`${label}: compiles`, result.ok, result.diagnostics.map((d) => `${d.code} ${d.message}`).join("; "));
+		check(`${label}: header is ${headerSize} bytes`, result.stats?.headerSize === headerSize,
+			`${result.stats?.headerSize}`);
+		if (!result.data) continue;
+
+		// Wherever the block landed, word 0 must point just past it, and every
+		// channel pointer must land inside the song rather than in the header.
+		const add = (result.stats!.hasIntro ? 2 : 0) + (result.stats!.loops ? 2 : 0) + 4;
+		expectBytes(`${label}: block sits at header[${add}]`, result.data.slice(add, add + 6),
+			[0x00, 0x8f, 0xe0, 0x00, 0x02, 0xb0]);
+		const word0 = result.data[0] | (result.data[1] << 8);
+		check(`${label}: word 0 = base + ${add + 6}`, word0 === 0x3e00 + add + 6, `0x${word0.toString(16)}`);
+		const channel0 = result.data[add + 6] | (result.data[add + 7] << 8);
+		check(`${label}: channel 0 points into the song`, channel0 >= 0x3e00 + result.stats!.headerSize,
+			`0x${channel0.toString(16)} vs header end 0x${(0x3e00 + result.stats!.headerSize).toString(16)}`);
+	}
+
+	// Two entries, so @31 is reachable and the stride is verifiable.
+	const two = compile(withDefault(`#instruments { @0 ${ENTRY} n05 ${ENTRY} }\n#0 o4 @31 c4\n`), 0x3e00, LIBRARY);
+	check("two entries compile and @31 resolves", two.ok, two.diagnostics.map((d) => `${d.code} ${d.message}`).join("; "));
+	check("the block is twelve bytes", two.stats?.headerSize === 34, `${two.stats?.headerSize}`);
+	if (two.data) {
+		// Noise sets the high bit: $05 | $80 = $85 (Music.cpp:2618).
+		expectBytes("the noise entry stores $85", two.data.slice(12, 18), [0x85, 0x8f, 0xe0, 0x00, 0x02, 0xb0]);
+	}
+
+	// A quoted name resolves to an index into this song's own sample list.
+	const named = compile(
+		`#amk 4\n#samples { #default "kick.brr" }\n#instruments { "kick.brr" ${ENTRY} }\n#0 o4 @30 c4\n`,
+		0x3e00,
+		LIBRARY,
+	);
+	check("a quoted name compiles", named.ok, named.diagnostics.map((d) => `${d.code} ${d.message}`).join("; "));
+	check("it resolves to SRCN 20, its slot in this song", named.data?.[6] === 20, `${named.data?.[6]}`);
+
+	for (const [source, code, label] of [
+		[`#amk 4\n#instruments { "kick.brr" ${ENTRY} }\n#0 c4\n`, "AMK0089", "a name not in #samples"],
+		[withDefault(`#instruments { @30 ${ENTRY} }\n#0 c4\n`), "AMK0103", "@30 as a base instrument"],
+		[withDefault(`#instruments { n20 ${ENTRY} }\n#0 c4\n`), "AMK0105", "a noise pitch past $1F"],
+		[withDefault("#instruments { @0 $8F $E0 $00 $02 }\n#0 c4\n"), "AMK0087", "only four bytes"],
+		[withDefault(`#instruments ( @0 ${ENTRY} )\n#0 c4\n`), "AMK0051", "a missing brace"],
+		[withDefault(`#instruments { %0 ${ENTRY} }\n#0 c4\n`), "AMK0106", "an unexpected character"],
+		[withDefault(`#instruments { @0 ${ENTRY} }\n#0 o4 @31 c4\n`), "AMK0092", "@31 with one entry defined"],
+	] as const) {
+		const result = compile(source, 0x3e00, LIBRARY);
+		check(
+			`${label} is rejected with ${code}`,
+			!result.ok && result.diagnostics.some((d) => d.code === code),
+			result.diagnostics.map((d) => `${d.code} ${d.message}`).join("; "),
+		);
+	}
+
+	// Music.cpp:880 — the convert remap turns @@19 into @30, so it starts
+	// resolving against #instruments the moment @30+ is allowed at all.
+	const doubleAt = compile(withDefault(`#instruments { @0 ${ENTRY} }\n#0 o4 @@19 c4\n`), 0x3e00, LIBRARY);
+	check("@@19 remaps to @30 and resolves", doubleAt.ok,
+		doubleAt.diagnostics.map((d) => `${d.code} ${d.message}`).join("; "));
+	check("@@19 emits $DA $1E", doubleAt.data ? [...doubleAt.data.slice(12)].includes(0x1e) : false);
+}
+
+console.log("\nthe sample load command");
+{
+	const withDefault = (body: string) => `#amk 4\n#samples { #default }\n${body}`;
+
+	// Both forms compile to $F3 <srcn> <tuning>. @1's sample is instrToSample[1] = 1.
+	const byNumber = compile(withDefault("#0 o4 (@1, $02) c4\n"), 0x3e00, LIBRARY);
+	check("(@1, $02) compiles", byNumber.ok, byNumber.diagnostics.map((d) => `${d.code} ${d.message}`).join("; "));
+	if (byNumber.data) {
+		const bytes = [...byNumber.data];
+		const at = bytes.indexOf(0xf3);
+		check("it emits $F3 $01 $02", at !== -1 && bytes[at + 1] === 0x01 && bytes[at + 2] === 0x02,
+			at === -1 ? "no $F3" : `$F3 ${hex(Uint8Array.from(bytes.slice(at + 1, at + 3)))}`);
+	}
+
+	const byName = compile(withDefault(`#0 o4 ("${STOCK[1]}", $02) c4\n`), 0x3e00, LIBRARY);
+	check("the quoted form compiles", byName.ok, byName.diagnostics.map((d) => `${d.code} ${d.message}`).join("; "));
+	if (byName.data) {
+		const bytes = [...byName.data];
+		const at = bytes.indexOf(0xf3);
+		check("a name resolves to its slot in this song", at !== -1 && bytes[at + 1] === 0x01,
+			at === -1 ? "no $F3" : `srcn ${bytes[at + 1]}`);
+	}
+
+	// #path applies here too (Music.cpp:958).
+	const pathed = compile(
+		'#amk 4\n#path "drums"\n#samples { "snare.brr" }\n#0 o4 ("snare.brr", $02) c4\n',
+		0x3e00,
+		LIBRARY,
+	);
+	check("#path applies to a sample load", pathed.ok, pathed.diagnostics.map((d) => `${d.code} ${d.message}`).join("; "));
+
+	// A `(` that is not a sample load must still reach the label-loop parser.
+	const label = compile("#amk 4\n#0 o4 (1)[c4 d4]2 (1)3\n", 0x3e00, LIBRARY);
+	check("label loops still parse", label.ok, label.diagnostics.map((d) => `${d.code} ${d.message}`).join("; "));
+
+	for (const [source, code, label] of [
+		[withDefault("#0 o4 (@1) c4\n"), "AMK0133", "a missing comma"],
+		[withDefault("#0 o4 (@1, 02) c4\n"), "AMK0134", "a tuning value without $"],
+		[withDefault("#0 o4 (@1, $02 c4\n"), "AMK0136", "a missing close paren"],
+		[withDefault("#0 o4 (@30, $02) c4\n"), "AMK0110", "@30 as a sample load"],
+		[withDefault("#0 o4 (@, $02) c4\n"), "AMK0110", "a missing instrument number"],
+		[withDefault('#0 o4 ("nope.brr", $02) c4\n'), "AMK0132", "a name not in #samples"],
+	] as const) {
+		const result = compile(source, 0x3e00, LIBRARY);
+		check(
+			`${label} is rejected with ${code}`,
+			!result.ok && result.diagnostics.some((d) => d.code === code),
+			result.diagnostics.map((d) => `${d.code} ${d.message}`).join("; "),
+		);
+	}
+
+	// Stage C's fix: $F3's *first* argument is the sample, so usage tracking must
+	// read that rather than the tuning byte. The am4 $E5 bridge builds one by hand.
+	const am4 = compile("#am4\n#0 o4 $E5 $81 $02 c4\n", 0x3e00, LIBRARY);
+	check("am4 $E5 $81 still becomes $F3 $01 $02", am4.ok, am4.diagnostics.map((d) => `${d.code} ${d.message}`).join("; "));
+	if (am4.data) {
+		const bytes = [...am4.data];
+		const at = bytes.indexOf(0xf3);
+		check("the am4 bridge emits the right bytes", at !== -1 && bytes[at + 1] === 0x01 && bytes[at + 2] === 0x02,
+			at === -1 ? "no $F3" : `$F3 ${bytes[at + 1]} ${bytes[at + 2]}`);
+	}
+}
+
+console.log("\nremote code");
+{
+	// A definition sits outside every channel; a call is inside one. That is the
+	// only thing distinguishing them (Music.cpp:1015).
+	const defined = compile("#amk 4\n(!1)[$F4 $02]\n#0 o4 (!1, 1, 8) c4\n");
+	check("define then call compiles", defined.ok, defined.diagnostics.map((d) => `${d.code} ${d.message}`).join("; "));
+
+	if (defined.data) {
+		const bytes = [...defined.data];
+		const fc = bytes.indexOf(0xfc);
+		check("the call emits $FC", fc !== -1);
+		// $FC <ptr lo> <ptr hi> <type> <arg>. Type 1, and `8` is an eighth note:
+		// getNoteLength(8) = 192/8 = 24 ticks.
+		check("event type and argument are carried", fc !== -1 && bytes[fc + 3] === 1 && bytes[fc + 4] === 24,
+			fc === -1 ? "no $FC" : `type ${bytes[fc + 3]}, arg ${bytes[fc + 4]}`);
+		// The definition body lives in the loop block and must NOT be followed by
+		// an $E9 back-call, which is what separates it from a label loop.
+		check("the body is stored, not called", bytes.filter((b) => b === 0xe9).length === 0,
+			`${bytes.filter((b) => b === 0xe9).length} $E9 bytes`);
+	}
+
+	// A label loop still emits its $E9, so the two paths really do differ.
+	const labelLoop = compile("#amk 4\n#0 o4 (1)[c4]2\n");
+	check("a label loop still emits $E9", labelLoop.data ? [...labelLoop.data].includes(0xe9) : false);
+
+	// A hex third argument, and the types that take none.
+	const hexArg = compile("#amk 4\n(!2)[$F4 $02]\n#0 o4 (!2, 2, $30) c4\n");
+	check("a $xx third argument works", hexArg.ok, hexArg.diagnostics.map((d) => `${d.code} ${d.message}`).join("; "));
+	const noArg = compile("#amk 4\n(!3)[$F4 $02]\n#0 o4 (!3, -1) c4\n");
+	check("type -1 needs no third argument", noArg.ok, noArg.diagnostics.map((d) => `${d.code} ${d.message}`).join("; "));
+
+	// `(!!n)` disables an event: 0 both kinds, -1 key-on, anything else non-key-on.
+	for (const [source, expected, label] of [
+		["#amk 4\n#0 o4 (!!0) c4\n", 0x00, "(!!0) disables both"],
+		["#amk 4\n#0 o4 (!!-1) c4\n", 0x08, "(!!-1) disables key-on"],
+		["#amk 4\n#0 o4 (!!5) c4\n", 0x07, "(!!5) disables non-key-on"],
+	] as const) {
+		const result = compile(source);
+		check(`${label}: compiles`, result.ok, result.diagnostics.map((d) => `${d.code} ${d.message}`).join("; "));
+		if (!result.data) continue;
+		const bytes = [...result.data];
+		const fc = bytes.indexOf(0xfc);
+		check(`${label}: emits $FC 00 00 ${expected.toString(16).padStart(2, "0")} 00`,
+			fc !== -1 && bytes[fc + 1] === 0 && bytes[fc + 2] === 0 && bytes[fc + 3] === expected && bytes[fc + 4] === 0,
+			fc === -1 ? "no $FC" : hex(Uint8Array.from(bytes.slice(fc, fc + 5))));
+	}
+
+	for (const [source, code, label] of [
+		["#amk 1\n#0 o4 (!1, 1, 8) c4\n", "AMK0117", "remote code in #amk 1"],
+		["#amk 4\n(!1)[$F4 $02]\n#0 o4 (!1) c4\n", "AMK0144", "a call with no event type"],
+		["#amk 4\n(!1)[$F4 $02]\n#0 o4 (!1, 1) c4\n", "AMK0146", "type 1 with no third argument"],
+		["#amk 4\n#0 o4 (!9, 1, 8) c4\n", "AMK0115", "a call to an undefined label"],
+		["#amk 4\n(!1)\n#0 o4 c4\n", "AMK0137", "a definition with no body"],
+		["#amk 4\n#0 o4 (!1, 1, 8)[$F4 $02] c4\n", "AMK0153", "defining remote code inside a channel"],
+		["#amk 4\n(!1)[c4]\n#0 o4 c4\n", "AMK0165", "note data in a remote definition"],
+		["#amk 4\n(!1)[$F4 $02]2\n#0 o4 c4\n", "AMK0164", "a repeat count on a definition"],
+	] as const) {
+		const result = compile(source);
+		check(
+			`${label} is rejected with ${code}`,
+			!result.ok && result.diagnostics.some((d) => d.code === code),
+			result.diagnostics.map((d) => `${d.code} ${d.message}`).join("; "),
+		);
+	}
+}
+
+console.log("\n#pad and the remaining warnings");
+{
+	// #pad records a reservation. It does not zero-fill: AMK only pads global
+	// songs, and a song compiled here is always the local one.
+	const padded = compile("#amk 4\n#pad $2000\n#0 o4 c4\n");
+	check("#pad compiles", padded.ok, padded.diagnostics.map((d) => `${d.code} ${d.message}`).join("; "));
+	check("#pad does not inflate the song", (padded.stats?.totalSize ?? 0) < 0x2000, `${padded.stats?.totalSize}`);
+	const outgrown = compile("#amk 4\n#pad $10\n#0 o4 [c4 d4 e4 f4]8\n");
+	check("outgrowing #pad warns", outgrown.diagnostics.some((d) => d.code === "AMK0213"),
+		outgrown.diagnostics.map((d) => d.code).join(", "));
+	const badPad = compile("#amk 4\n#pad 100\n#0 o4 c4\n");
+	check("#pad without $ is rejected", !badPad.ok && badPad.diagnostics.some((d) => d.code === "AMK0053"));
+
+	const twiceVTable = compile("#amk 4\n#option smwvtable\n#option smwvtable\n#0 o4 c4\n");
+	check("a repeated #option smwvtable warns", twiceVTable.diagnostics.some((d) => d.code === "AMK0203"),
+		twiceVTable.diagnostics.map((d) => d.code).join(", "));
+
+	const divideOne = compile("#amk 4\n#option dividetempo 1\n#0 o4 c4\n");
+	check("#option dividetempo 1 warns", divideOne.diagnostics.some((d) => d.code === "AMK0214"),
+		divideOne.diagnostics.map((d) => d.code).join(", "));
+
+	const runaway = compile(`#amk 4\n${"#halvetempo\n".repeat(20)}#0 o4 c4\n`);
+	check("a runaway tempo divisor is rejected", !runaway.ok && runaway.diagnostics.some((d) => d.code === "AMK0215"),
+		runaway.diagnostics.map((d) => d.code).join(", "));
+
+	const upperCase = compile("#amk 2\n#0 o4 C4\n");
+	check("upper-case notes warn below #amk 4", upperCase.diagnostics.some((d) => d.code === "AMK0216"),
+		upperCase.diagnostics.map((d) => d.code).join(", "));
+	const upperCaseModern = compile("#amk 4\n#0 o4 C4\n");
+	check("but not on #amk 4", !upperCaseModern.diagnostics.some((d) => d.code === "AMK0216"));
+
+	// A tempo change after the shortest channel has ended never executes.
+	const lateTempo = compile("#amk 4\n#0 o4 c4\n#1 o4 c1 c1 t60 c1\n");
+	check("a tempo change past the end warns", lateTempo.diagnostics.some((d) => d.code === "AMK0217"),
+		lateTempo.diagnostics.map((d) => d.code).join(", "));
+}
+
+console.log("\noptimizeSampleUsage");
+{
+	const EMPTY = "EMPTY.brr";
+	const names = (result: CompileResult): readonly string[] => result.sampleList ?? [];
+	const kept = (result: CompileResult): number => names(result).filter((name) => name !== EMPTY).length;
+	const run = (source: string, optimize?: boolean) =>
+		compile(source, 0x3e00, { ...LIBRARY, optimizeSampleUsage: optimize });
+
+	// On by default, as in AddmusicK (globals.cpp:40; its -u flag turns it off).
+	const oneInstrument = run("#amk 4\n#0 o4 @0 c4\n");
+	check("the list keeps its length", names(oneInstrument).length === 20, `${names(oneInstrument).length}`);
+	check("only the played sample survives", kept(oneInstrument) === 1, `${kept(oneInstrument)} kept`);
+	check("and it stays at its own SRCN", names(oneInstrument)[0] === STOCK[0], names(oneInstrument)[0]);
+
+	const off = run("#amk 4\n#0 o4 @0 c4\n", false);
+	check("optimizeSampleUsage: false keeps everything", kept(off) === 20, `${kept(off)} kept`);
+
+	// @0 is SRCN 0 and @1 is SRCN 1, so two instruments keep two samples.
+	const two = run("#amk 4\n#0 o4 @0 c4\n#1 o4 @1 c4\n");
+	check("two instruments keep two samples", kept(two) === 2, `${kept(two)} kept`);
+
+	// Explicitly named samples are important and survive unplayed (Music.cpp:2726).
+	const named = run('#amk 4\n#samples { "kick.brr" "drums/snare.brr" }\n#0 o4 $F3 $00 $02 c4\n');
+	check("a named sample is kept even when unplayed", kept(named) === 2, `${kept(named)} kept: ${names(named).join(", ")}`);
+
+	// Group members are not important, so an unplayed one goes.
+	const group = run("#amk 4\n#samples { #optimized }\n#0 o4 @0 c4\n");
+	check("an unplayed group member is dropped", kept(group) === 1 && names(group).length === 5,
+		`${kept(group)} of ${names(group).length}`);
+
+	// Every path that selects a sample has to mark it, or the pass silences it.
+	for (const [source, expected, label] of [
+		["#amk 4\n#0 o4 @0 c4\n", 1, "@n"],
+		["#amk 4\n#0 o4 $F3 $07 $02 c4\n", 1, "$F3"],
+		["#amk 4\n#0 o4 $DA $05 c4\n", 1, "raw $DA, which AMK itself misses"],
+		["#amk 4\n#samples { #default }\n#instruments { @9 $8F $E0 $00 $02 $B0 }\n#0 o4 @30 c4\n", 1, "@30"],
+		['#amk 4\n#samples { #default }\n#0 o4 ("' + STOCK[9] + '", $02) c4\n', 1, "a sample load"],
+		["#amk 4\n(!1)[$F3 $07 $02]\n#0 o4 (!1, -1) c4\n", 1, "$F3 inside remote code"],
+	] as const) {
+		const result = run(source);
+		check(
+			`${label} marks its sample as used`,
+			result.ok && kept(result) >= expected,
+			result.ok ? `${kept(result)} kept` : result.diagnostics.map((d) => `${d.code} ${d.message}`).join("; "),
+		);
+	}
+
+	// A song that plays nothing at all still gets a full-length directory.
+	const silent = run("#amk 4\n#0 o4 l1 r r\n");
+	check("a song with no instrument keeps the directory length", names(silent).length === 20);
 }
 
 console.log(`\n${failures === 0 ? "all checks passed" : `${failures} check(s) failed`}\n`);

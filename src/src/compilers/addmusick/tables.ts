@@ -30,6 +30,15 @@ export const HEX_LENGTHS: readonly number[] = [
 	1, 4, 4, 3, 2, 9, 3, 4, 2, 3, 3, 2, 5, 1, 1,
 ];
 
+/**
+ * The sample AddmusicK substitutes for slots a song never plays, so their bytes
+ * do not have to be uploaded. `optimizeSampleUsage`, Music.cpp:3076.
+ *
+ * A zero-byte file in an AddmusicK install; hosts resolve it to a zero-length
+ * sample rather than fetching anything.
+ */
+export const EMPTY_SAMPLE_NAME = "EMPTY.brr";
+
 export const FIRST_VCMD = 0xda;
 export const LAST_VCMD = 0xfe;
 
