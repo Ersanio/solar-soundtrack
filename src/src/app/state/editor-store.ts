@@ -176,8 +176,11 @@ export class EditorStore {
    * Deliberately a method rather than a `computed`: building one copies the full
    * 64 KiB ARAM image plus every sample, which is wasted work on each keystroke
    * when nothing is playing and nothing is being exported.
+   *
+   * `muteChannels` is a preview affordance for playback only — exports never
+   * pass one, so a downloaded SPC always contains the whole song.
    */
-  assembleSpc(): Uint8Array | null {
+  assembleSpc(muteChannels = 0): Uint8Array | null {
     const driver = this.drivers.driver();
     const plan = this.drivers.plan();
     const result = this.result();
@@ -191,6 +194,7 @@ export class EditorStore {
         tags: result.stats?.tags,
         seconds: result.stats?.seconds,
         echoBufferSize: result.stats?.echoBufferSize,
+        muteChannels,
       }).spc;
     } catch (error) {
       this.override.set({ kind: 'error', text: errorMessage(error) });

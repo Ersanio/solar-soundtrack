@@ -440,7 +440,7 @@ console.log("\nsample directory");
 		const start = aram[entry] | (aram[entry + 1] << 8);
 		const loop = aram[entry + 2] | (aram[entry + 3] << 8);
 		const sample = driver.samples[index];
-		if (start !== expected || loop !== expected + sample.loopPoint) { ok = false; break; }
+		if (start !== expected || loop !== expected + sample.loopOffset) { ok = false; break; }
 		// Spot-check that the BRR actually got copied.
 		if (aram[start] !== sample.data[0] || aram[start + sample.data.length - 1] !== sample.data[sample.data.length - 1]) {
 			ok = false;

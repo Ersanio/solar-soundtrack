@@ -1,0 +1,252 @@
+/**
+ * Runs the shipped worklet bundle the way the browser will.
+ *
+ * The audio thread is not a worker thread: an AudioWorkletGlobalScope exposes
+ * only ECMAScript, `console`, and the AudioWorklet interfaces. No `fetch`, no
+ * `setTimeout`, and — the one that actually bit — no `TextDecoder`, because
+ * those are `[Exposed=(Window,Worker)]` and a worklet scope is neither.
+ *
+ * Node has all of them globally, so `audiotest` cannot catch a worklet reaching
+ * for one; the failure only appears in a browser, as a dead play button. This
+ * evaluates `public/player/spc-worklet.js` inside a `vm` context holding
+ * nothing but that permitted set, then drives the real processor through real
+ * render quanta and listens to what comes out.
+ *
+ *   npm run worklettest
+ */
+
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { createContext, runInContext } from "node:vm";
+
+import { compilers } from "../src/compilers";
+import { loadDriver } from "../src/spc/driver";
+import { buildSpc } from "../src/spc/export";
+import { planAram } from "../src/spc/layout";
+import type { FromWorklet, ToWorklet } from "../src/spc/protocol";
+
+const PUBLIC = join(import.meta.dirname, "..", "public");
+
+// --- driver bundle loading (same shim as spctest) ---------------------------
+const resp = (b: Buffer, ct: string) => ({
+	ok: true,
+	status: 200,
+	headers: { get: (n: string) => (n.toLowerCase() === "content-type" ? ct : null) },
+	async arrayBuffer() {
+		return b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength);
+	},
+	async json() {
+		return JSON.parse(b.toString("utf8"));
+	},
+});
+globalThis.fetch = (async (input: string) => {
+	const path = join(PUBLIC, decodeURI(String(input)));
+	const bytes = readFileSync(path);
+	return resp(bytes, path.endsWith(".json") ? "application/json" : "application/octet-stream");
+}) as unknown as typeof fetch;
+
+let failures = 0;
+function check(name: string, condition: boolean, detail = ""): void {
+	if (condition) console.log(`  ok    ${name}`);
+	else {
+		failures++;
+		console.log(`  FAIL  ${name}${detail ? `\n        ${detail}` : ""}`);
+	}
+}
+
+const SAMPLE_RATE = 48000; // deliberately not 32000, so resampling is exercised
+const QUANTUM = 128;
+
+interface Port {
+	onmessage: ((event: { data: ToWorklet }) => void) | null;
+	postMessage(message: FromWorklet): void;
+	close(): void;
+}
+
+interface Processor {
+	process(inputs: Float32Array[][], outputs: Float32Array[][]): boolean;
+}
+
+/**
+ * Everything an AudioWorkletGlobalScope offers, and nothing else. A bare `vm`
+ * context starts with only the ECMAScript intrinsics — crucially it has no Node
+ * globals — so anything the bundle needs has to be listed here explicitly.
+ */
+function loadProcessor(bundle: string, wasm: Uint8Array): { processor: Processor; port: Port; sent: FromWorklet[] } {
+	const sent: FromWorklet[] = [];
+	const port: Port = {
+		onmessage: null,
+		postMessage: (message) => sent.push(message),
+		close: () => {},
+	};
+
+	let registered: (new (options: unknown) => Processor) | null = null;
+
+	const scope = createContext({
+		console,
+		sampleRate: SAMPLE_RATE,
+		currentTime: 0,
+		currentFrame: 0,
+		AudioWorkletProcessor: class {
+			readonly port = port;
+		},
+		registerProcessor: (_name: string, constructor: new (options: unknown) => Processor) => {
+			registered = constructor;
+		},
+		__wasm: wasm,
+	});
+
+	runInContext(bundle, scope, { filename: "spc-worklet.js" });
+	if (!registered) throw new Error("the bundle registered no processor");
+
+	// Compile inside the context, as the page's posted module would arrive.
+	const module = runInContext("new WebAssembly.Module(__wasm)", scope) as WebAssembly.Module;
+	const processor = new (registered as new (options: unknown) => Processor)({
+		processorOptions: { module },
+	});
+
+	return { processor, port, sent };
+}
+
+/** Pumps `quanta` render blocks and returns the interleaved result. */
+function render(processor: Processor, quanta: number): Float32Array {
+	const out = new Float32Array(quanta * QUANTUM * 2);
+	const left = new Float32Array(QUANTUM);
+	const right = new Float32Array(QUANTUM);
+
+	for (let block = 0; block < quanta; block++) {
+		left.fill(0);
+		right.fill(0);
+		processor.process([], [[left, right]], {});
+		for (let i = 0; i < QUANTUM; i++) {
+			out[(block * QUANTUM + i) * 2] = left[i];
+			out[(block * QUANTUM + i) * 2 + 1] = right[i];
+		}
+	}
+	return out;
+}
+
+function peak(samples: Float32Array): number {
+	let max = 0;
+	for (const sample of samples) max = Math.max(max, Math.abs(sample));
+	return max;
+}
+
+// ---------------------------------------------------------------------------
+
+const driver = await loadDriver();
+const plan = planAram(driver);
+const compiler = compilers.get("addmusick")!;
+
+const result = compiler.compile({
+	source: "#amk 4\n#0 t40 o4 v220 q7F @0 l8 c d e f g4 e4 c4 r4\n",
+	aramAddress: plan.localPos,
+});
+if (!result.ok || !result.data) throw new Error("the test song did not compile");
+const spc = buildSpc({
+	songData: result.data,
+	driver,
+	plan,
+	tags: result.stats?.tags,
+	seconds: result.stats?.seconds,
+	echoBufferSize: result.stats?.echoBufferSize,
+	date: new Date(2026, 6, 28),
+}).spc;
+
+const bundlePath = join(PUBLIC, "player", "spc-worklet.js");
+const bundle = readFileSync(bundlePath, "utf8");
+const wasm = new Uint8Array(readFileSync(join(PUBLIC, "player", "spc.wasm")));
+
+console.log("\nthe bundle survives a worklet scope");
+const { processor, port, sent } = loadProcessor(bundle, wasm);
+check("it registers a processor and constructs", true);
+check(
+	"constructing reported no error",
+	!sent.some((m) => m.type === "error"),
+	sent
+		.filter((m) => m.type === "error")
+		.map((m) => (m as { message: string }).message)
+		.join("; "),
+);
+
+console.log("\nit reaches for nothing the audio thread lacks");
+{
+	// A worklet scope has none of these. Catching them here rather than in the
+	// browser is the whole point of this file.
+	const forbidden = ["TextDecoder", "TextEncoder", "fetch", "setTimeout", "setInterval", "XMLHttpRequest", "document", "window", "Blob", "URL", "crypto", "performance"];
+	for (const name of forbidden) {
+		const defined = runInContext(`typeof ${name} !== "undefined"`, createContext({})) as boolean;
+		check(`${name} is absent from the scope`, !defined);
+	}
+}
+
+console.log("\nsilence before a song is loaded");
+{
+	const samples = render(processor, 8);
+	check("output is silent while idle", peak(samples) === 0, `peak ${peak(samples)}`);
+}
+
+console.log("\na loaded song renders audio through the resampler");
+{
+	port.onmessage!({ data: { type: "load", spc, atSeconds: 0, lengthSeconds: 0, fadeSeconds: 0 } });
+
+	render(processor, 200); // let the driver key on
+	const samples = render(processor, 400); // ~1.07 s at 48 kHz
+
+	check("no error was reported", !sent.some((m) => m.type === "error"), JSON.stringify(sent.filter((m) => m.type === "error")));
+	check("output is not silent", peak(samples) > 0.01, `peak ${peak(samples).toFixed(4)}`);
+	check("output stays inside full scale", peak(samples) <= 1.0, `peak ${peak(samples).toFixed(4)}`);
+
+	const positions = sent.filter((m) => m.type === "position") as { seconds: number }[];
+	check("it reports its position", positions.length > 0, `${positions.length} updates`);
+	check(
+		"position advances in step with the frames rendered",
+		Math.abs(positions[positions.length - 1].seconds - (600 * QUANTUM) / SAMPLE_RATE) < 0.15,
+		`${positions[positions.length - 1]?.seconds.toFixed(3)}s vs ${((600 * QUANTUM) / SAMPLE_RATE).toFixed(3)}s`,
+	);
+}
+
+console.log("\npause and resume");
+{
+	port.onmessage!({ data: { type: "paused", paused: true } });
+	const quiet = render(processor, 20);
+	check("pausing silences the output", peak(quiet) === 0, `peak ${peak(quiet)}`);
+
+	port.onmessage!({ data: { type: "paused", paused: false } });
+	const loud = render(processor, 200);
+	check("resuming brings it back", peak(loud) > 0.01, `peak ${peak(loud).toFixed(4)}`);
+}
+
+console.log("\nseeking lands somewhere else in the song");
+{
+	port.onmessage!({ data: { type: "seek", seconds: 0 } });
+	const fromStart = render(processor, 100);
+
+	port.onmessage!({ data: { type: "seek", seconds: 3 } });
+	const fromThree = render(processor, 100);
+
+	let identical = true;
+	for (let i = 0; i < fromStart.length; i++) {
+		if (fromStart[i] !== fromThree[i]) {
+			identical = false;
+			break;
+		}
+	}
+	check("a seek changes what is rendered", !identical);
+	check("still audible after seeking", peak(fromThree) > 0.005, `peak ${peak(fromThree).toFixed(4)}`);
+}
+
+console.log("\nthe end of a song is reported");
+{
+	const { processor: fresh, port: freshPort, sent: freshSent } = loadProcessor(bundle, wasm);
+	freshPort.onmessage!({ data: { type: "load", spc, atSeconds: 0, lengthSeconds: 1, fadeSeconds: 0.5 } });
+
+	render(fresh, 700); // past 1 s + 0.5 s of fade at 48 kHz
+	check("it reports the song ended", freshSent.some((m) => m.type === "ended"));
+
+	const after = render(fresh, 20);
+	check("nothing is rendered after the end", peak(after) === 0, `peak ${peak(after)}`);
+}
+
+console.log(`\n${failures === 0 ? "all checks passed" : `${failures} check(s) failed`}\n`);
+process.exit(failures === 0 ? 0 : 1);

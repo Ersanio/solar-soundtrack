@@ -18,4 +18,8 @@ export class TransportControls {
   protected onVolume(event: Event): void {
     this.playback.volume.set(Number((event.target as HTMLInputElement).value));
   }
+
+  protected onSeek(event: Event): void {
+    this.playback.seek(Number((event.target as HTMLInputElement).value));
+  }
 }

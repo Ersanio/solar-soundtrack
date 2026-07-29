@@ -2,6 +2,7 @@ import { Component, ElementRef, effect, inject, viewChild } from '@angular/core'
 
 import { Panel } from '../../shared/panel/panel';
 import { EditorStore } from '../../state/editor-store';
+import { ChannelMixer } from '../channel-mixer/channel-mixer';
 
 /**
  * The MML source editor.
@@ -12,7 +13,7 @@ import { EditorStore } from '../../state/editor-store';
  */
 @Component({
   selector: 'amk-editor-pane',
-  imports: [Panel],
+  imports: [Panel, ChannelMixer],
   templateUrl: './editor-pane.html',
   host: { class: 'flex min-h-0 min-w-0 flex-col' },
 })

@@ -5,6 +5,20 @@ import { SpcPlayer } from '@spc/player';
 import { errorMessage, formatTime } from '../util/format';
 import { EditorStore } from './editor-store';
 
+/** N-SPC songs have eight music channels. */
+const CHANNELS = 8;
+const ALL_CHANNELS = 0xff;
+
+export interface ChannelState {
+  index: number;
+  /** The song actually writes to this channel. */
+  used: boolean;
+  muted: boolean;
+  soloed: boolean;
+  /** Audible right now, once solo is taken into account. */
+  audible: boolean;
+}
+
 @Service()
 export class Playback {
   private readonly editor = inject(EditorStore);
@@ -13,34 +27,91 @@ export class Playback {
   readonly state = signal<'idle' | 'playing' | 'paused'>('idle');
   readonly elapsed = signal(0);
   /** Percent, as the range input reports it. */
-  readonly volume = signal(70);
+  readonly volume = signal(500);
   /** Reload the running song in place whenever it recompiles. */
   readonly live = signal(true);
+  readonly loop = signal(false);
+
+  /** Channels the user silenced, and channels they isolated, as bitmasks. */
+  private readonly mutedMask = signal(0);
+  private readonly soloedMask = signal(0);
 
   readonly isPlaying = computed(() => this.state() === 'playing');
   readonly isIdle = computed(() => this.state() === 'idle');
   readonly timeLabel = computed(() => formatTime(this.elapsed()));
 
-  private frame: number | undefined;
-  private lastWholeSecond = -1;
+  /** The compiler's play-length estimate, which is what the seek bar spans. */
+  readonly duration = computed(() => this.editor.result()?.stats?.seconds ?? 0);
+  readonly durationLabel = computed(() => formatTime(this.duration()));
+  readonly canSeek = computed(() => !this.isIdle() && this.duration() > 0);
+
+  /**
+   * Soloing wins over muting, as it does on a mixer: with anything soloed, only
+   * those channels are heard and the mute flags are held but not applied.
+   */
+  private readonly silenced = computed(() => {
+    const soloed = this.soloedMask();
+    return soloed ? ~soloed & ALL_CHANNELS : this.mutedMask();
+  });
+
+  readonly channels = computed<ChannelState[]>(() => {
+    const sizes = this.editor.result()?.stats?.channelSizes ?? [];
+    const muted = this.mutedMask();
+    const soloed = this.soloedMask();
+    const silenced = this.silenced();
+
+    return Array.from({ length: CHANNELS }, (_, index) => {
+      const bit = 1 << index;
+      return {
+        index,
+        used: (sizes[index] ?? 0) > 0,
+        muted: (muted & bit) !== 0,
+        soloed: (soloed & bit) !== 0,
+        audible: (silenced & bit) === 0,
+      };
+    });
+  });
+
+  readonly isSoloing = computed(() => this.soloedMask() !== 0);
+  readonly hasChannelOverrides = computed(() => (this.mutedMask() | this.soloedMask()) !== 0);
 
   constructor() {
     effect(() => this.player.setVolume(this.volume() / 100));
+    effect(() => this.player.setLoop(this.loop()));
 
     // Live reload: swap the running song for the newly compiled one and
     // fast-forward back to where it was, so editing does not restart playback.
-    // `play(spc, t)` re-emulates to `t` with output muted.
     effect(() => {
       const result = this.editor.result();
-      untracked(() => this.reloadIfLive(result));
+      untracked(() => {
+        if (this.live() && result?.ok) this.reload(result);
+      });
     });
 
-    inject(DestroyRef).onDestroy(() => this.stopTicker());
+    // Muting is a property of the song data, not of the emulator: the SPC is
+    // rebuilt with those channels blanked and reloaded where it left off. The
+    // reload costs a short gap, which is why this is not tied to a slider.
+    effect(() => {
+      this.silenced();
+      untracked(() => this.reload(this.editor.result()));
+    });
+
+    this.player.onPosition = (seconds) => this.elapsed.set(seconds);
+    this.player.onEnded = () => {
+      this.state.set('idle');
+      this.elapsed.set(0);
+    };
+    this.player.onError = (error) => {
+      this.state.set('idle');
+      this.editor.fail(errorMessage(error));
+    };
+
+    inject(DestroyRef).onDestroy(() => void this.player.dispose());
   }
 
-  private reloadIfLive(result: CompileResult | null): void {
-    if (!this.live() || this.state() !== 'playing' || !result?.ok) return;
-    const spc = this.editor.assembleSpc();
+  private reload(result: CompileResult | null): void {
+    if (this.state() !== 'playing' || !result?.ok) return;
+    const spc = this.editor.assembleSpc(this.silenced());
     if (spc) this.player.play(spc, this.player.getTime());
   }
 
@@ -48,14 +119,12 @@ export class Playback {
   async toggle(): Promise<void> {
     if (this.state() === 'playing') {
       this.player.pause();
-      this.stopTicker();
       this.state.set('paused');
       return;
     }
 
     if (this.state() === 'paused') {
       this.player.resume();
-      this.startTicker();
       this.state.set('playing');
       return;
     }
@@ -69,47 +138,44 @@ export class Playback {
     this.player.setVolume(this.volume() / 100);
 
     this.editor.compileNow();
-    const spc = this.editor.assembleSpc();
+    const spc = this.editor.assembleSpc(this.silenced());
     if (!spc) {
       this.editor.fail('cannot play: song has errors');
       return;
     }
 
     this.player.play(spc, 0);
-    this.startTicker();
     this.state.set('playing');
   }
 
   stop(): void {
     this.player.stop();
-    this.stopTicker();
     this.state.set('idle');
     this.elapsed.set(0);
-    this.lastWholeSecond = -1;
   }
 
   /**
-   * Polls the AudioContext clock each frame but only writes the signal when the
-   * displayed second changes — under zoneless change detection, writing every
-   * frame would re-render the app 60 times a second to show the same text.
+   * Jumps to a point in the song. The emulator replays silently to get there,
+   * so this is not instant on a long song.
    */
-  private startTicker(): void {
-    if (this.frame !== undefined) return;
-    const tick = (): void => {
-      const now = this.player.getTime();
-      const whole = Math.floor(now);
-      if (whole !== this.lastWholeSecond) {
-        this.lastWholeSecond = whole;
-        this.elapsed.set(now);
-      }
-      this.frame = requestAnimationFrame(tick);
-    };
-    this.frame = requestAnimationFrame(tick);
+  seek(seconds: number): void {
+    if (this.isIdle()) return;
+    const target = Math.max(0, Math.min(seconds, this.duration()));
+    this.elapsed.set(target);
+    this.player.seek(target);
   }
 
-  private stopTicker(): void {
-    if (this.frame === undefined) return;
-    cancelAnimationFrame(this.frame);
-    this.frame = undefined;
+  toggleMute(channel: number): void {
+    this.mutedMask.update((mask) => mask ^ (1 << channel));
+  }
+
+  toggleSolo(channel: number): void {
+    this.soloedMask.update((mask) => mask ^ (1 << channel));
+  }
+
+  /** Clears both masks, so the whole song is heard again. */
+  clearChannels(): void {
+    this.mutedMask.set(0);
+    this.soloedMask.set(0);
   }
 }

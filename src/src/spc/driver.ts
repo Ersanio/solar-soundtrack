@@ -7,11 +7,11 @@
  */
 
 export interface BrrSample {
-	name: string;
+	sampleName: string;
 	/** BRR blocks with the 2-byte loop header stripped (globals.cpp:470). */
 	data: Uint8Array;
 	/** Byte offset of the loop point, relative to the start of `data`. */
-	loopPoint: number;
+	loopOffset: number;
 }
 
 export interface DriverManifest {
@@ -256,8 +256,8 @@ function parseBrr(name: string, raw: Uint8Array): BrrSample {
 		);
 	}
 	return {
-		name,
-		loopPoint: raw[0] | (raw[1] << 8),
+		sampleName: name,
+		loopOffset: raw[0] | (raw[1] << 8),
 		data: raw.subarray(2),
 	};
 }

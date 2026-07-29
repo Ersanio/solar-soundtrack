@@ -1,0 +1,18 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "ng serve",
+            "type": "msedge",
+            "request": "launch",
+            "url": "http://localhost:4200/",
+            // The Angular workspace is one level down, and the dev server's
+            // sourcemaps use paths relative to it ("src/app/app.ts"). Without
+            // this, they resolve against the repo root and breakpoints never bind.
+            "webRoot": "${workspaceFolder}/src"
+        }
+    ]
+}
