@@ -10,6 +10,8 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { compilers } from "../src/compilers";
+import { EMPTY_SAMPLE_NAME } from "../src/compilers/addmusick/tables";
+import { emptySample } from "../src/spc/brr";
 import { analyzeDriver, encodePathSegment, loadDriver, withCustomProgram } from "../src/spc/driver";
 import { buildSpc } from "../src/spc/export";
 import { computeBudget, planAram } from "../src/spc/layout";
@@ -490,6 +492,111 @@ console.log(`  smp tbl  ${hex(layout.sampleTablePos)} - ${hex(layout.sampleTable
 console.log(`  samples  ${hex(layout.sampleDataPos)} - ${hex(layout.sampleDataEnd)}`);
 console.log(`  echo     ${hex(layout.echoStart)} - ${hex(layout.echoEnd)}`);
 console.log(`  free     ${layout.freeBytes} bytes`);
+
+console.log("\n#samples reaches the sample directory");
+{
+	// The decisive end-to-end check: a song that names its own sample set must
+	// produce an SPC built from *that* set. Every intermediate stage can look
+	// right while the writer quietly falls back to the driver's twenty, and the
+	// only symptom would be an SPC that plays the wrong sounds.
+	const byName = new Map(driver.samples.map((sample) => [sample.sampleName, sample]));
+	const options = {
+		sampleNames: driver.samples.map((sample) => sample.sampleName),
+		sampleGroups: driver.manifest.sampleGroups,
+	};
+	const only = driver.samples[0];
+
+	const source = `#amk 4\n#samples { "${only.sampleName}" }\n#0 o4 $F3 $00 $02 c4\n`;
+	const one = compiler.compile({ source, aramAddress: plan.localPos, options });
+	check("a one-sample song compiles", one.ok, one.diagnostics.map((d) => `${d.code} ${d.message}`).join("; "));
+	check("it resolves exactly one name", one.sampleList?.length === 1, `${one.sampleList?.length}`);
+
+	const samples = (one.sampleList ?? []).map((name) => byName.get(name) ?? emptySample(name));
+	check("that name resolves to a real sample", samples.length === 1);
+
+	const built = buildSpc({
+		songData: one.data!,
+		driver,
+		samples,
+		plan,
+		echoBufferSize: one.stats?.echoBufferSize,
+		date: new Date(2026, 6, 28),
+	});
+
+	const entries = (built.layout.sampleTableEnd - built.layout.sampleTablePos) / 4;
+	check("the directory holds one entry, not twenty", entries === 1, `${entries}`);
+	check(
+		"only that sample's bytes are stored",
+		built.layout.sampleDataEnd - built.layout.sampleDataPos === only.data.length,
+		`${built.layout.sampleDataEnd - built.layout.sampleDataPos} vs ${only.data.length}`,
+	);
+	check(
+		"it frees the ARAM the other nineteen were using",
+		built.layout.freeBytes > layout.freeBytes,
+		`${built.layout.freeBytes} vs ${layout.freeBytes} for the full set`,
+	);
+
+	// The directory entry must point at the sample, and DSP DIR at the table.
+	const aram = built.spc.subarray(0x100, 0x100 + 0x10000);
+	const start = aram[built.layout.sampleTablePos] | (aram[built.layout.sampleTablePos + 1] << 8);
+	check("the entry points at the sample data", start === built.layout.sampleDataPos, hex(start));
+	check("the stored bytes are that sample's", aram[start] === only.data[0], hex(aram[start]));
+
+	// And the budget must agree with what was written, since they are computed
+	// from the same layout but by different call sites.
+	const budget = computeBudget(driver, samples, plan, one.data!.length, one.stats?.echoBufferSize ?? 0);
+	check("the budget agrees with the built file", budget.layout.sampleDataEnd === built.layout.sampleDataEnd,
+		`${budget.layout.sampleDataEnd} vs ${built.layout.sampleDataEnd}`);
+	check("the samples row counts one", budget.rows.find((row) => row.key === "samples")?.label === "samples (1)",
+		budget.rows.find((row) => row.key === "samples")?.label);
+}
+
+console.log("\noptimizeSampleUsage frees real ARAM");
+{
+	// The point of the pass: a song using two instruments should not upload all
+	// twenty samples. Measured on the real bundle, through the real writer.
+	const byName = new Map(driver.samples.map((sample) => [sample.sampleName, sample]));
+	byName.set(EMPTY_SAMPLE_NAME, emptySample(EMPTY_SAMPLE_NAME));
+
+	const options = {
+		sampleNames: driver.samples.map((sample) => sample.sampleName),
+		sampleGroups: driver.manifest.sampleGroups,
+	};
+	const source = "#amk 4\n#0 t40 o4 v220 q7F @0 l8 c d e f\n#1 o3 v200 @1 l4 c e g\n";
+
+	const build = (optimize: boolean) => {
+		const result = compiler.compile({ source, aramAddress: plan.localPos, options: { ...options, optimizeSampleUsage: optimize } });
+		if (!result.ok || !result.data) throw new Error(result.diagnostics.map((d) => d.message).join("; "));
+		const samples = (result.sampleList ?? []).map((name) => byName.get(name) ?? emptySample(name));
+		return { result, built: buildSpc({ songData: result.data, driver, samples, plan, echoBufferSize: result.stats?.echoBufferSize, date: new Date(2026, 6, 28) }) };
+	};
+
+	const lean = build(true);
+	const full = build(false);
+
+	const leanBytes = lean.built.layout.sampleDataEnd - lean.built.layout.sampleDataPos;
+	const fullBytes = full.built.layout.sampleDataEnd - full.built.layout.sampleDataPos;
+
+	check("the directory is the same length either way",
+		lean.built.layout.sampleTableEnd - lean.built.layout.sampleTablePos ===
+			full.built.layout.sampleTableEnd - full.built.layout.sampleTablePos);
+	check("optimising uploads far fewer sample bytes", leanBytes < fullBytes / 4, `${leanBytes} vs ${fullBytes}`);
+	check("it frees that ARAM", lean.built.layout.freeBytes > full.built.layout.freeBytes,
+		`${lean.built.layout.freeBytes} vs ${full.built.layout.freeBytes}`);
+
+	// Emptied slots all name one sample, so its zero bytes are stored once and
+	// every other entry is a copy of that entry's four bytes.
+	const aram = lean.built.spc.subarray(0x100, 0x100 + 0x10000);
+	const table = lean.built.layout.sampleTablePos;
+	const entryOf = (srcn: number) => aram[table + srcn * 4] | (aram[table + srcn * 4 + 1] << 8);
+	const emptied = (lean.result.sampleList ?? []).map((name, srcn) => ({ name, srcn })).filter((s) => s.name === EMPTY_SAMPLE_NAME);
+	check("some slots really were emptied", emptied.length > 15, `${emptied.length}`);
+	check("every emptied slot shares one pointer",
+		emptied.every((slot) => entryOf(slot.srcn) === entryOf(emptied[0].srcn)),
+		`first ${hex(entryOf(emptied[0].srcn))}`);
+	check("a kept sample points somewhere else", entryOf(0) !== entryOf(emptied[0].srcn),
+		`kept ${hex(entryOf(0))} vs empty ${hex(entryOf(emptied[0].srcn))}`);
+}
 
 console.log(`\n${failures === 0 ? "all checks passed" : `${failures} check(s) failed`}\n`);
 process.exit(failures === 0 ? 0 : 1);

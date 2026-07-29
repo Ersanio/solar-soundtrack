@@ -16,6 +16,8 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { compilers } from "../src/compilers";
+import { EMPTY_SAMPLE_NAME } from "../src/compilers/addmusick/tables";
+import { type BrrSample, emptySample } from "../src/spc/brr";
 import { loadDriver } from "../src/spc/driver";
 import { buildSpc } from "../src/spc/export";
 import { planAram } from "../src/spc/layout";
@@ -73,15 +75,39 @@ const driver = await loadDriver();
 const plan = planAram(driver);
 const compiler = compilers.get("addmusick")!;
 
+/** What the host would pass: every name the driver bundle can resolve. */
+const OPTIONS = {
+	sampleNames: driver.samples.map((sample) => sample.sampleName),
+	sampleGroups: driver.manifest.sampleGroups,
+};
+const BY_NAME = new Map(driver.samples.map((sample) => [sample.sampleName, sample]));
+BY_NAME.set(EMPTY_SAMPLE_NAME, emptySample(EMPTY_SAMPLE_NAME));
+
+/**
+ * Resolves names to samples the way the app does, preserving positions.
+ *
+ * Dropping an unresolvable name would shift every later SRCN down and rewire the
+ * directory — which is exactly the bug this helper was written with, and it made
+ * a `$DA`-selected instrument play silence while an `@`-selected one survived by
+ * happening to sit at index 0.
+ */
+function resolveSamples(names: readonly string[]): BrrSample[] {
+	return names.map((name) => BY_NAME.get(name) ?? emptySample(name));
+}
+
 function compileToSpc(source: string, muteChannels = 0): Uint8Array {
-	const result = compiler.compile({ source, aramAddress: plan.localPos });
+	const result = compiler.compile({ source, aramAddress: plan.localPos, options: OPTIONS });
 	if (!result.ok || !result.data) {
 		throw new Error(result.diagnostics.map((d) => `${d.code} ${d.message}`).join("; "));
 	}
+	// Resolve the compiler's own list, exactly as the app does. Passing
+	// `driver.samples` regardless would defeat the point of every `#samples` test.
+	const samples = resolveSamples(result.sampleList ?? driver.samples.map((s) => s.sampleName));
+
 	return buildSpc({
 		songData: result.data,
 		driver,
-		samples: driver.samples,
+		samples,
 		plan,
 		tags: result.stats?.tags,
 		seconds: result.stats?.seconds,
@@ -204,6 +230,146 @@ console.log("\nmuting a channel takes it out of the mix");
 
 	// Muting must not disturb the song it was derived from.
 	check("an unmuted build is unchanged", rms(render(0b00)).toFixed(6) === rms(both).toFixed(6));
+}
+
+console.log("\na song-declared sample set still plays");
+{
+	// One sample instead of twenty. If the writer had fallen back to the driver's
+	// set, the directory would be wrong and this would still make noise — so the
+	// check that matters is that `@0`'s SRCN 0 now points at the sample we named.
+	const only = driver.samples[0].sampleName;
+	const spc = compileToSpc(`#amk 4\n#samples { "${only}" }\n#0 t40 o4 v220 q7F ("${only}", $02) l8 c d e f\n`);
+	emu.loadSpc(spc);
+	emu.render(4000);
+	const samples = emu.render(32000);
+	check("a one-sample song is audible", peak(samples) > 0.01, `peak ${peak(samples).toFixed(4)}`);
+}
+
+console.log("\na custom instrument resolves in the emulator");
+{
+	// The only end-to-end proof that `@30` works: the driver has to find the
+	// instrument table via zero-page $6C, which it only sets while loading a song.
+	// A wrong header offset here produces silence or noise, not a wrong timbre.
+	const base = "#amk 4\n#samples { #default }\n";
+	const entry = "$8F $E0 $00 $02 $B0";
+
+	const custom = compileToSpc(`${base}#instruments { @0 ${entry} }\n#0 t40 o4 v220 q7F @30 l8 c d e f g4 e4 c4 r4\n`);
+	emu.loadSpc(custom);
+	emu.render(4000);
+	const customAudio = emu.render(32000);
+	check("@30 is audible", peak(customAudio) > 0.01, `peak ${peak(customAudio).toFixed(4)}`);
+	check("@30 has real signal level", rms(customAudio) > 0.001, `rms ${rms(customAudio).toFixed(5)}`);
+
+	// Same sample, different ADSR: @30 must not simply sound like @0.
+	const stock = compileToSpc(`${base}#0 t40 o4 v220 q7F @0 l8 c d e f g4 e4 c4 r4\n`);
+	emu.loadSpc(stock);
+	emu.render(4000);
+	const stockAudio = emu.render(32000);
+	check("@0 is audible too", peak(stockAudio) > 0.01, `peak ${peak(stockAudio).toFixed(4)}`);
+
+	let identical = true;
+	for (let index = 0; index < customAudio.length; index++) {
+		if (customAudio[index] !== stockAudio[index]) {
+			identical = false;
+			break;
+		}
+	}
+	check("the custom envelope changes the sound", !identical);
+
+	// A second entry, so @31 exercises the six-byte stride in the driver. Both
+	// need ADSR1 bit 7 set: clearing it selects GAIN mode, and a $00 GAIN byte
+	// makes the instrument silent no matter what else is right.
+	const two = compileToSpc(
+		`${base}#instruments { @0 ${entry} @1 $8F $E0 $00 $02 $B0 }\n#0 t40 o4 v220 q7F @31 l8 c d e f\n`,
+	);
+	emu.loadSpc(two);
+	emu.render(4000);
+	check("@31 is audible with two entries defined", peak(emu.render(32000)) > 0.01);
+}
+
+console.log("\noptimizeSampleUsage does not silence the song");
+{
+	// The pass replaces unplayed samples with a zero-length one. If usage tracking
+	// missed anything, the SPC still looks valid and simply goes quiet — so this
+	// renders it and compares against the unoptimised build of the same song.
+	const source = "#amk 4\n#0 t40 o4 v220 q7F @0 l8 c d e f g4 e4 c4 r4\n#1 o3 v200 q7D @1 l4 [c e g e]4\n";
+
+	const render = (optimize: boolean): Int16Array => {
+		const result = compiler.compile({
+			source,
+			aramAddress: plan.localPos,
+			options: { ...OPTIONS, optimizeSampleUsage: optimize },
+		});
+		if (!result.ok || !result.data) throw new Error(result.diagnostics.map((d) => d.message).join("; "));
+		const samples = resolveSamples(result.sampleList ?? []);
+		const spc = buildSpc({
+			songData: result.data,
+			driver,
+			samples,
+			plan,
+			echoBufferSize: result.stats?.echoBufferSize,
+			date: new Date(2026, 6, 28),
+		}).spc;
+		emu.loadSpc(spc);
+		emu.render(4000);
+		return emu.render(32000);
+	};
+
+	const lean = render(true);
+	const full = render(false);
+
+	check("an optimised song is still audible", peak(lean) > 0.01, `peak ${peak(lean).toFixed(4)}`);
+	check("at the same level as the full build", Math.abs(rms(lean) - rms(full)) < 0.0005,
+		`rms ${rms(lean).toFixed(5)} vs ${rms(full).toFixed(5)}`);
+
+	// Dropping only unplayed samples must not change a single sample of output.
+	let identical = lean.length === full.length;
+	if (identical) {
+		for (let index = 0; index < lean.length; index++) {
+			if (lean[index] !== full[index]) {
+				identical = false;
+				break;
+			}
+		}
+	}
+	check("and byte-for-byte identical, since only unplayed samples went", identical);
+
+	// A song reaching a sample only through raw `$DA` — the tracking hole AMK has.
+	const hexSelected = compiler.compile({
+		source: "#amk 4\n#0 t40 o4 v220 q7F $DA $01 l8 c d e f\n",
+		aramAddress: plan.localPos,
+		options: OPTIONS,
+	});
+	// Pins the hazard that made the check above fail while it was being written: a
+	// resolver that drops unresolvable names instead of holding their slots shifts
+	// every later SRCN down, so the song plays the wrong samples. The two lists
+	// must be the same length and the kept sample must stay at its own index.
+	const holding = resolveSamples(hexSelected.sampleList ?? []);
+	check("resolving preserves every slot", holding.length === (hexSelected.sampleList ?? []).length,
+		`${holding.length} of ${(hexSelected.sampleList ?? []).length}`);
+
+	// And a name that resolves to nothing at all must still hold its position,
+	// rather than collapsing the list and renumbering every SRCN after it.
+	const withUnknown = resolveSamples([driver.samples[0].sampleName, "no-such-file.brr", driver.samples[1].sampleName]);
+	check("an unresolvable name still occupies its slot", withUnknown.length === 3, `${withUnknown.length}`);
+	check("the samples around it keep their indices",
+		withUnknown[0].sampleName === driver.samples[0].sampleName &&
+			withUnknown[2].sampleName === driver.samples[1].sampleName,
+		withUnknown.map((s) => s.sampleName).join(", "));
+
+	const hexSamples = holding;
+	emu.loadSpc(
+		buildSpc({
+			songData: hexSelected.data!,
+			driver,
+			samples: hexSamples,
+			plan,
+			echoBufferSize: hexSelected.stats?.echoBufferSize,
+			date: new Date(2026, 6, 28),
+		}).spc,
+	);
+	emu.render(4000);
+	check("a sample selected by raw $DA survives optimisation", peak(emu.render(32000)) > 0.01);
 }
 
 console.log(`\n${failures === 0 ? "all checks passed" : `${failures} check(s) failed`}\n`);
