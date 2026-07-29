@@ -1,6 +1,16 @@
 import { Service, computed, effect, inject, signal } from '@angular/core';
 
-import { type BrrSample, blockCount, decodeBrr, parseBrr, peaks, validateBrr, validateName } from '@spc/brr';
+import { EMPTY_SAMPLE_NAME } from '@compilers/addmusick/tables';
+import {
+  type BrrSample,
+  blockCount,
+  decodeBrr,
+  emptySample,
+  parseBrr,
+  peaks,
+  validateBrr,
+  validateName,
+} from '@spc/brr';
 import { clear, del, loadAll, put, storageFailure } from '../util/idb';
 import { DriverStore } from './driver-store';
 
@@ -117,6 +127,11 @@ export class SampleStore {
     for (const [name, bytes] of overrides) {
       if (validateBrr(bytes) === null) map.set(name, parseBrr(name, bytes));
     }
+
+    // The compiler names this for every slot its optimisation pass emptied. It is
+    // not a library file and never appears in `files()`; one shared instance
+    // means `buildSpc` stores its zero bytes once however many slots point at it.
+    map.set(EMPTY_SAMPLE_NAME, emptySample(EMPTY_SAMPLE_NAME));
     return map;
   });
 
@@ -129,10 +144,30 @@ export class SampleStore {
     const map = this.byName();
     const out: BrrSample[] = [];
     for (const name of names) {
-      const sample = map.get(name);
-      if (sample) out.push(sample);
+      // An unresolvable name must still occupy its slot. Skipping it would shift
+      // every later SRCN down by one and silently rewire the whole directory —
+      // the song would play the wrong samples rather than miss one. The compiler
+      // is what reports the name; here it just has to not corrupt the indexing.
+      out.push(map.get(name) ?? this.placeholder(name));
     }
     return out;
+  }
+
+  /**
+   * A zero-length stand-in for a name the library cannot resolve.
+   *
+   * Memoised for the same reason the real samples are: `buildSpc` deduplicates
+   * by object identity, so one instance per name keeps repeated slots cheap.
+   */
+  private readonly placeholders = new Map<string, BrrSample>();
+
+  private placeholder(name: string): BrrSample {
+    let sample = this.placeholders.get(name);
+    if (!sample) {
+      sample = emptySample(name);
+      this.placeholders.set(name, sample);
+    }
+    return sample;
   }
 
   constructor() {

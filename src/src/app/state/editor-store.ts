@@ -78,7 +78,13 @@ export class EditorStore {
     if (!compiler) return null;
 
     const started = performance.now();
-    const result = compiler.compile({ source: this.committed(), aramAddress: plan.localPos });
+    const result = compiler.compile({
+      source: this.committed(),
+      aramAddress: plan.localPos,
+      // What the sample library holds. A compiler that does not understand these
+      // keys ignores them, per the `CompileRequest.options` contract.
+      options: { sampleNames: this.library.names(), sampleGroups: this.library.groups() },
+    });
     return { result, elapsedMs: performance.now() - started, aramAddress: plan.localPos };
   });
 
@@ -101,15 +107,16 @@ export class EditorStore {
    * The sample set every export and budget is measured against.
    *
    * One place, so the budget in the output pane and the SPC the player loads
-   * can never disagree. The order is the `#default` group's, which is what
-   * keeps `@0`-`@29` meaning what `INSTRUMENT_TO_SAMPLE` says they mean; the
-   * *bytes* are whatever the library currently holds for each name, so
-   * replacing a bundled file changes what its instrument plays.
-   *
-   * Once songs can name their own set with `#samples`, this resolves the
-   * compiler's list instead of the default group.
+   * can never disagree. The compiler decides *which* names and in what order —
+   * that ordering is the SRCN assignment — and the library supplies the bytes,
+   * so replacing a bundled file changes what its instrument plays. A `null`
+   * list means the compiler had no opinion, and the driver's own set stands.
    */
-  private readonly samples = computed(() => this.library.resolve(this.library.defaultGroup()));
+  private readonly samples = computed(() => {
+    const named = this.result()?.sampleList;
+    if (named) return this.library.resolve(named);
+    return this.drivers.driver()?.samples ?? [];
+  });
 
   readonly budget = computed<AramBudget | null>(() => {
     const driver = this.drivers.driver();

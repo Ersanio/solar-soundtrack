@@ -98,6 +98,21 @@ export function validateName(name: string): string | null {
 	return null;
 }
 
+/**
+ * A zero-length sample, for a directory slot that must exist but is never keyed.
+ *
+ * AddmusicK's `EMPTY.brr` is a genuinely zero-byte file, and `globals.cpp:453`
+ * special-cases that with `if (sample.size() != 0)` — skipping the loop-header
+ * check every other sample must pass. So there is nothing to ship as an asset:
+ * an empty sample is entirely synthesisable.
+ *
+ * The name is the caller's to choose, because which name means "empty" is a
+ * convention of the compiler front-end rather than of the BRR format.
+ */
+export function emptySample(name: string): BrrSample {
+	return { sampleName: name, data: new Uint8Array(0), loopOffset: 0 };
+}
+
 /** Splits a `.brr` file into its loop offset and block data. */
 export function parseBrr(name: string, raw: Uint8Array): BrrSample {
 	const problem = validateBrr(raw);
