@@ -1,14 +1,16 @@
 import { Service, computed, effect, inject, signal } from '@angular/core';
 
-import { EMPTY_SAMPLE_NAME } from '@compilers/addmusick/tables';
+import { EMPTY_SAMPLE_NAME, bankSlotName } from '@compilers/addmusick/tables';
 import {
   type BrrSample,
   blockCount,
   decodeBrr,
   emptySample,
   parseBrr,
+  parseSampleBank,
   peaks,
   validateBrr,
+  validateSampleBank,
   validateName,
 } from '@spc/brr';
 import { clear, del, loadAll, put, storageFailure } from '../util/idb';
@@ -17,9 +19,39 @@ import { DriverStore } from './driver-store';
 /** Envelope resolution. Wide enough to read, small enough to keep in a signal. */
 const WAVEFORM_BUCKETS = 160;
 
+/** Where `webmml.samples` keeps the settings that are not file bytes. */
+const SETTINGS_KEY = 'webmml.samples';
+
+interface StoredSettings {
+  optimize?: boolean;
+  /** Explicit importance, overriding the driver bundle's defaults. */
+  important?: Record<string, boolean>;
+}
+
+/** One slot of a `.bnk` bank, as the browser shows it. */
+export interface SampleSlot {
+  /** Position in the bank, which is also its SRCN once the bank is loaded. */
+  index: number;
+  /** The resolvable name, `bankSlotName(bank, index)`. */
+  name: string;
+  /** Length of the BRR data, header-free. Zero for a blank directory entry. */
+  bytes: number;
+  empty: boolean;
+  blocks: number;
+  loopOffset: number;
+  frames: number;
+  envelope: Float32Array;
+  important: boolean;
+}
+
 export interface SampleFile {
   name: string;
-  /** The raw `.brr` file, loop header included. */
+  /**
+   * `sample` — one `.brr`, one entry in the sample directory.
+   * `bank` — one `.bnk`, which contributes {@link SampleSlot}s instead.
+   */
+  kind: 'sample' | 'bank';
+  /** The raw uploaded file. For a `.brr` that includes the loop header. */
   bytes: Uint8Array;
   /**
    * `stock` — as shipped in `public/driver/samples/`.
@@ -29,11 +61,21 @@ export interface SampleFile {
   source: 'stock' | 'override' | 'user';
   /** Why the file is unusable, or `null`. Invalid files are listed, not dropped. */
   error: string | null;
+  /** Kept in ARAM even when the song never plays it. Banks defer to their slots. */
+  important: boolean;
+
+  // --- kind 'sample' -------------------------------------------------------
   blocks: number;
   loopOffset: number;
   frames: number;
   /** `WAVEFORM_BUCKETS * 2` min/max pairs in -1..1, for drawing. */
   envelope: Float32Array;
+
+  // --- kind 'bank' ---------------------------------------------------------
+  /** Directory entries the bank contributes, blanks included. */
+  slotCount: number;
+  /** How many of those actually hold a sample. */
+  usedSlots: number;
 }
 
 /**
@@ -74,6 +116,46 @@ export class SampleStore {
   /** The `#default` group's names, in SRCN order. */
   readonly defaultGroup = computed<readonly string[]>(() => this.groups()['default'] ?? []);
 
+  // --- optimisation and importance -----------------------------------------
+
+  /** Replace samples the song never plays with `EMPTY.brr`. */
+  readonly optimize = signal(true);
+
+  /** Importance the user set explicitly, overriding the bundle's defaults. */
+  private readonly importantOverrides = signal<ReadonlyMap<string, boolean>>(new Map());
+
+  /**
+   * Samples the driver bundle ships as important — the `!`-marked names from
+   * AddmusicK's `Addmusic_sample groups.txt`.
+   */
+  private readonly defaultImportant = computed(
+    () => new Set(this.drivers.driver()?.manifest.importantSamples ?? []),
+  );
+
+  /** Whether a sample survives optimisation even when the song never plays it. */
+  isImportant(name: string): boolean {
+    return this.importantOverrides().get(name) ?? this.defaultImportant().has(name);
+  }
+
+  /** Every name currently marked important, for the compiler's options. */
+  readonly importantSamples = computed<readonly string[]>(() => {
+    const names = new Set(this.defaultImportant());
+    for (const [name, important] of this.importantOverrides()) {
+      if (important) names.add(name);
+      else names.delete(name);
+    }
+    return [...names];
+  });
+
+  setImportant(name: string, important: boolean): void {
+    const next = new Map(this.importantOverrides());
+    // Storing the bundle's own answer would pin it, so a later manifest change
+    // would not reach a sample the user never actually touched.
+    if (important === this.defaultImportant().has(name)) next.delete(name);
+    else next.set(name, important);
+    this.importantOverrides.set(next);
+  }
+
   /**
    * Every file in the library, sorted with the bundled set first in its own
    * order and user uploads after, alphabetically.
@@ -103,8 +185,15 @@ export class SampleStore {
   /** Filenames that are safe to reference from MML, in library order. */
   readonly names = computed(() => this.files().filter((file) => file.error === null).map((file) => file.name));
 
+  /** Bytes the library would contribute to ARAM if every sample were used. */
   readonly totalBytes = computed(() =>
-    this.files().reduce((sum, file) => (file.error === null ? sum + file.bytes.length - 2 : sum), 0),
+    this.files().reduce((sum, file) => {
+      if (file.error !== null) return sum;
+      // A `.brr` file is its 2-byte loop header plus block data; a bank's slots
+      // are already header-free, so only their data counts.
+      if (file.kind === 'sample') return sum + file.bytes.length - 2;
+      return sum + this.bankSlots(file.name).reduce((bank, slot) => bank + slot.bytes, 0);
+    }, 0),
   );
 
   readonly overrideCount = computed(() => this.files().filter((file) => file.source !== 'stock').length);
@@ -125,6 +214,15 @@ export class SampleStore {
       if (!overrides.has(sample.sampleName)) map.set(sample.sampleName, sample);
     }
     for (const [name, bytes] of overrides) {
+      if (isBank(name)) {
+        // A bank is one file but 64 resolvable names, so every slot goes in.
+        if (validateSampleBank(bytes) === null) {
+          for (const slot of parseSampleBank(bytes, (index) => bankSlotName(name, index))) {
+            map.set(slot.sampleName, slot);
+          }
+        }
+        continue;
+      }
       if (validateBrr(bytes) === null) map.set(name, parseBrr(name, bytes));
     }
 
@@ -171,6 +269,7 @@ export class SampleStore {
   }
 
   constructor() {
+    this.loadSettings();
     void this.hydrate();
 
     // Sanctioned effect: mirroring signal state into external storage, as
@@ -181,6 +280,41 @@ export class SampleStore {
       if (!this.hydrated()) return;
       void this.persist(overrides);
     });
+
+    // Sanctioned effect: the same, for the settings. These are small JSON and go
+    // to localStorage beside `webmml.draft`; IndexedDB stays the store for bytes.
+    effect(() => {
+      const settings: StoredSettings = {
+        optimize: this.optimize(),
+        important: Object.fromEntries(this.importantOverrides()),
+      };
+      try {
+        localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+      } catch {
+        // Private browsing, or a full quota. The library still works for this
+        // session, and `storageError` already says persistence is unavailable.
+      }
+    });
+  }
+
+  private loadSettings(): void {
+    let stored: StoredSettings | null = null;
+    try {
+      const raw = localStorage.getItem(SETTINGS_KEY);
+      stored = raw ? (JSON.parse(raw) as StoredSettings) : null;
+    } catch {
+      stored = null; // Unreadable or not ours; the defaults are fine.
+    }
+    if (!stored) return;
+
+    if (typeof stored.optimize === 'boolean') this.optimize.set(stored.optimize);
+    if (stored.important) {
+      const overrides = new Map<string, boolean>();
+      for (const [name, important] of Object.entries(stored.important)) {
+        if (typeof important === 'boolean') overrides.set(name, important);
+      }
+      this.importantOverrides.set(overrides);
+    }
   }
 
   private async hydrate(): Promise<void> {
@@ -206,7 +340,7 @@ export class SampleStore {
     const next = new Map(this.overrides());
 
     for (const file of files) {
-      const problem = validateName(file.name);
+      const problem = validateName(file.name) ?? extensionProblem(file.name);
       if (problem) {
         rejected.push(problem);
         continue;
@@ -243,11 +377,63 @@ export class SampleStore {
   }
 
   private describe(name: string, bytes: Uint8Array, source: SampleFile['source']): SampleFile {
+    if (isBank(name)) return this.describeBank(name, bytes, source);
+
     const error = validateBrr(bytes);
-    if (error) {
-      return { name, bytes, source, error, blocks: 0, loopOffset: 0, frames: 0, envelope: new Float32Array(0) };
-    }
+    if (error) return { ...blank(name, bytes, source), kind: 'sample', error };
     return this.describeParsed(name, bytes, parseBrr(name, bytes), source);
+  }
+
+  private describeBank(name: string, bytes: Uint8Array, source: SampleFile['source']): SampleFile {
+    const error = validateSampleBank(bytes);
+    if (error) return { ...blank(name, bytes, source), kind: 'bank', error };
+
+    const slots = this.bankSlots(name);
+    return {
+      ...blank(name, bytes, source),
+      kind: 'bank',
+      error: null,
+      // A bank has no importance of its own; each slot carries one, so the row
+      // reports whether *any* slot is pinned rather than inventing an answer.
+      important: slots.some((slot) => slot.important),
+      slotCount: slots.length,
+      usedSlots: slots.filter((slot) => !slot.empty).length,
+    };
+  }
+
+  /**
+   * The slots of an uploaded bank, waveforms included.
+   *
+   * Memoised on the bank's bytes rather than recomputed with `files()`: decoding
+   * 64 waveforms is wasted work while a bank sits collapsed, which is most of
+   * the time. `important` is read live, so ticking a slot does not rebuild this.
+   */
+  private readonly slotCache = new Map<string, { bytes: Uint8Array; slots: readonly BrrSample[] }>();
+
+  bankSlots(name: string): SampleSlot[] {
+    const bytes = this.overrides().get(name);
+    if (!bytes || validateSampleBank(bytes) !== null) return [];
+
+    let cached = this.slotCache.get(name);
+    if (!cached || cached.bytes !== bytes) {
+      cached = { bytes, slots: parseSampleBank(bytes, (index) => bankSlotName(name, index)) };
+      this.slotCache.set(name, cached);
+    }
+
+    return cached.slots.map((slot, index) => {
+      const pcm = decodeBrr(slot);
+      return {
+        index,
+        name: slot.sampleName,
+        bytes: slot.data.length,
+        empty: slot.data.length === 0,
+        blocks: blockCount(slot),
+        loopOffset: slot.loopOffset,
+        frames: pcm.length,
+        envelope: peaks(pcm, WAVEFORM_BUCKETS),
+        important: this.isImportant(slot.sampleName),
+      };
+    });
   }
 
   private describeParsed(
@@ -258,10 +444,10 @@ export class SampleStore {
   ): SampleFile {
     const pcm = decodeBrr(sample);
     return {
-      name,
-      bytes,
-      source,
+      ...blank(name, bytes, source),
+      kind: 'sample',
       error: null,
+      important: this.isImportant(name),
       blocks: blockCount(sample),
       loopOffset: sample.loopOffset,
       frames: pcm.length,
@@ -274,6 +460,39 @@ export class SampleStore {
     const sample = this.byName().get(name);
     return sample ? decodeBrr(sample) : null;
   }
+}
+
+/** A row with every field at its zero value, for the variants to fill in. */
+function blank(name: string, bytes: Uint8Array, source: SampleFile['source']): SampleFile {
+  return {
+    name,
+    kind: 'sample',
+    bytes,
+    source,
+    error: null,
+    important: false,
+    blocks: 0,
+    loopOffset: 0,
+    frames: 0,
+    envelope: new Float32Array(0),
+    slotCount: 0,
+    usedSlots: 0,
+  };
+}
+
+const isBank = (name: string): boolean => name.toLowerCase().endsWith('.bnk');
+
+/**
+ * Why a filename's extension is unusable, or `null`.
+ *
+ * `#samples` accepts only `.brr` and `.bnk` (`Music.cpp:2723-2728`), so anything
+ * else is worth refusing at upload rather than letting it sit in the library as a
+ * file no song can reference.
+ */
+function extensionProblem(name: string): string | null {
+  const lower = name.toLowerCase();
+  if (lower.endsWith('.brr') || lower.endsWith('.bnk')) return null;
+  return `"${name}" is neither a .brr sample nor a .bnk sample bank.`;
 }
 
 /**

@@ -81,9 +81,15 @@ export class EditorStore {
     const result = compiler.compile({
       source: this.committed(),
       aramAddress: plan.localPos,
-      // What the sample library holds. A compiler that does not understand these
-      // keys ignores them, per the `CompileRequest.options` contract.
-      options: { sampleNames: this.library.names(), sampleGroups: this.library.groups() },
+      // What the sample library holds, and what the user asked to be done with
+      // it. A compiler that does not understand these keys ignores them, per the
+      // `CompileRequest.options` contract.
+      options: {
+        sampleNames: this.library.names(),
+        sampleGroups: this.library.groups(),
+        importantSamples: this.library.importantSamples(),
+        optimizeSampleUsage: this.library.optimize(),
+      },
     });
     return { result, elapsedMs: performance.now() - started, aramAddress: plan.localPos };
   });
