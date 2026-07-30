@@ -16,8 +16,14 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { compilers } from "../src/compilers";
-import { EMPTY_SAMPLE_NAME } from "../src/compilers/addmusick/tables";
-import { type BrrSample, emptySample } from "../src/spc/brr";
+import { EMPTY_SAMPLE_NAME, bankSlotName } from "../src/compilers/addmusick/tables";
+import {
+	SAMPLE_BANK_BYTES,
+	SAMPLE_BANK_SLOTS,
+	type BrrSample,
+	emptySample,
+	parseSampleBank,
+} from "../src/spc/brr";
 import { loadDriver } from "../src/spc/driver";
 import { buildSpc } from "../src/spc/export";
 import { planAram } from "../src/spc/layout";
@@ -370,6 +376,93 @@ console.log("\noptimizeSampleUsage does not silence the song");
 	);
 	emu.render(4000);
 	check("a sample selected by raw $DA survives optimisation", peak(emu.render(32000)) > 0.01);
+}
+
+console.log("\na .bnk sample bank plays through the emulator");
+{
+	// The decisive check for banks. A wrong slot walk, a wrong loop offset or a
+	// directory that disagrees with the data all produce noise or silence rather
+	// than a wrong timbre, so only rendering settles it.
+	//
+	// The bank is built here from a bundled sample's own blocks, so the audio has
+	// a known-good reference: playing slot 3 of the bank must sound exactly like
+	// playing that sample directly.
+	const source = driver.samples[9]; // 0A SMW @9.brr — long enough to hear
+	const SLOT = 3;
+
+	const bank = new Uint8Array(SAMPLE_BANK_BYTES);
+	{
+		const image = bank.subarray(12);
+		const at = SAMPLE_BANK_SLOTS * 4;
+		const start = at + 0x8000;
+		const loop = start + source.loopOffset;
+		image[SLOT * 4] = start & 0xff;
+		image[SLOT * 4 + 1] = (start >> 8) & 0xff;
+		image[SLOT * 4 + 2] = loop & 0xff;
+		image[SLOT * 4 + 3] = (loop >> 8) & 0xff;
+		image.set(source.data, at);
+	}
+
+	const slots = parseSampleBank(bank, (index) => bankSlotName("test.bnk", index));
+	check("the bank parses to 64 slots", slots.length === SAMPLE_BANK_SLOTS, `${slots.length}`);
+	check(
+		"the populated slot round-trips the sample's bytes",
+		slots[SLOT].data.length === source.data.length && slots[SLOT].loopOffset === source.loopOffset,
+		`${slots[SLOT].data.length} vs ${source.data.length} bytes`,
+	);
+
+	// Resolve bank slots alongside the bundled library, as the app does.
+	const withBank = new Map(BY_NAME);
+	for (const slot of slots) withBank.set(slot.sampleName, slot);
+
+	const options = {
+		sampleNames: [...OPTIONS.sampleNames, "test.bnk"],
+		sampleGroups: OPTIONS.sampleGroups,
+	};
+
+	const render = (mml: string, extra: Record<string, unknown> = {}): Int16Array => {
+		const result = compiler.compile({ source: mml, aramAddress: plan.localPos, options: { ...options, ...extra } });
+		if (!result.ok || !result.data) throw new Error(result.diagnostics.map((d) => `${d.code} ${d.message}`).join("; "));
+		const samples = (result.sampleList ?? []).map((name) => withBank.get(name) ?? emptySample(name));
+		emu.loadSpc(
+			buildSpc({
+				songData: result.data,
+				driver,
+				samples,
+				plan,
+				echoBufferSize: result.stats?.echoBufferSize,
+				date: new Date(2026, 6, 28),
+			}).spc,
+		);
+		emu.render(4000);
+		return emu.render(32000);
+	};
+
+	// $F3 selects the slot by SRCN, the only way a bank sample is reachable.
+	const fromBank = render(`#amk 4\n#samples { "test.bnk" }\n#0 t40 o4 v220 q7F $F3 $0${SLOT} $02 l1 c c\n`);
+	check("a bank slot is audible", peak(fromBank) > 0.01, `peak ${peak(fromBank).toFixed(4)}`);
+
+	// The same sample, reached the ordinary way, at the same SRCN.
+	const direct = render(
+		`#amk 4\n#samples { #default }\n#0 t40 o4 v220 q7F $F3 $09 $02 l1 c c\n`,
+	);
+	check("so is the same sample played directly", peak(direct) > 0.01, `peak ${peak(direct).toFixed(4)}`);
+	check(
+		"and the bank slot sounds identical to it",
+		fromBank.length === direct.length && fromBank.every((value, index) => value === direct[index]),
+		`rms ${rms(fromBank).toFixed(5)} vs ${rms(direct).toFixed(5)}`,
+	);
+
+	// Optimisation must not disturb a slot the song actually plays.
+	const unoptimised = render(
+		`#amk 4\n#samples { "test.bnk" }\n#0 t40 o4 v220 q7F $F3 $0${SLOT} $02 l1 c c\n`,
+		{ optimizeSampleUsage: false },
+	);
+	check(
+		"optimising a bank leaves the played slot untouched",
+		fromBank.every((value, index) => value === unoptimised[index]),
+		`rms ${rms(fromBank).toFixed(5)} vs ${rms(unoptimised).toFixed(5)}`,
+	);
 }
 
 console.log(`\n${failures === 0 ? "all checks passed" : `${failures} check(s) failed`}\n`);

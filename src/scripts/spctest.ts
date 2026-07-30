@@ -126,6 +126,25 @@ console.log("\ndriver bundle");
 			`group [${group.slice(0, 3).join(", ")}…] vs parsed [${parsed.slice(0, 3).join(", ")}…]`,
 		);
 	}
+	{
+		// The `!`-marked names from AddmusicK's `Addmusic_sample groups.txt`. A name
+		// here that is not in the group would silently protect nothing, and the
+		// count is worth pinning so an edit to one list is noticed in the other.
+		const important = driver.manifest.importantSamples ?? [];
+		const group = driver.manifest.sampleGroups["default"] ?? [];
+		check("17 samples are marked important", important.length === 17, `${important.length}`);
+		check(
+			"every important name is in the #default group",
+			important.every((name) => group.includes(name)),
+			important.filter((name) => !group.includes(name)).join(", "),
+		);
+		check(
+			"0D, 0F and 11 are the unimportant ones",
+			group.filter((name) => !important.includes(name)).join(", ") ===
+				"0D SMW @14.brr, 0F SMW @21.brr, 11 SMW @17.brr",
+			group.filter((name) => !important.includes(name)).join(", "),
+		);
+	}
 	check("no embedded song table", driver.embedded === null);
 	check("SongPointers is $236D", driver.manifest.songPointers === 0x236d, hex(driver.manifest.songPointers));
 	check(
@@ -549,6 +568,33 @@ console.log("\n#samples reaches the sample directory");
 		`${budget.layout.sampleDataEnd} vs ${built.layout.sampleDataEnd}`);
 	check("the samples row counts one", budget.rows.find((row) => row.key === "samples")?.label === "samples (1)",
 		budget.rows.find((row) => row.key === "samples")?.label);
+}
+
+console.log("\nthe budget says how many samples are really loaded");
+{
+	// "samples (20)" for every possible song reads as "the default set is loaded"
+	// no matter what optimisation actually did, which is how a real bug in the
+	// importance fallback went unnoticed. The row has to distinguish the two.
+	const byName = new Map(driver.samples.map((sample) => [sample.sampleName, sample]));
+	byName.set(EMPTY_SAMPLE_NAME, emptySample(EMPTY_SAMPLE_NAME));
+
+	const options = {
+		sampleNames: driver.samples.map((sample) => sample.sampleName),
+		sampleGroups: driver.manifest.sampleGroups,
+		importantSamples: driver.manifest.importantSamples ?? [],
+	};
+	const source = "#amk 4\n#0 t40 o4 v220 q7F @0 l8 c d e f\n";
+
+	const label = (optimize: boolean): string => {
+		const result = compiler.compile({ source, aramAddress: plan.localPos, options: { ...options, optimizeSampleUsage: optimize } });
+		const samples = (result.sampleList ?? []).map((name) => byName.get(name) ?? emptySample(name));
+		const budget = computeBudget(driver, samples, plan, result.data!.length, result.stats?.echoBufferSize ?? 0);
+		return budget.rows.find((row) => row.key === "samples")?.label ?? "";
+	};
+
+	check("unoptimised reports the plain count", label(false) === "samples (20)", label(false));
+	// 17 important plus @0's own sample, which is one of them.
+	check("optimised reports loaded of total", label(true) === "samples (17 of 20)", label(true));
 }
 
 console.log("\noptimizeSampleUsage frees real ARAM");
