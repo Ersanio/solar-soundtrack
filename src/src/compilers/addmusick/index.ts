@@ -62,7 +62,15 @@ export class AddmusicKCompiler implements MmlCompiler {
 		const stats = emptyStats();
 		stats.channelTicks = parsed.channelLengths.map((ticks) => Math.floor(ticks));
 		stats.echoBufferSize = parsed.echoBufferSize;
-		stats.sampleNames = [...(parsed.sampleList ?? [])];
+		// What the song asked for, before optimisation replaced anything unplayed —
+		// which is what the field has always claimed to be, and what the UI needs
+		// to explain why a sample is or is not in ARAM.
+		stats.sampleNames = [...(parsed.requestedSamples ?? [])];
+		// `usedSamples` is indexed by SRCN, which is a position in that same list.
+		// Collapsing to names loses nothing the UI needs and spares it the mapping.
+		stats.usedSampleNames = [
+			...new Set(stats.sampleNames.filter((_, srcn) => parsed.usedSamples[srcn])),
+		];
 		stats.hasIntro = parsed.hasIntro;
 		stats.loops = !parsed.doesntLoop;
 		stats.seconds = parsed.seconds;
@@ -136,10 +144,14 @@ function readOptions(options: CompileRequest["options"]): AddmusicKOptions | und
 	if (!Array.isArray(names) || typeof groups !== "object" || groups === null) return undefined;
 
 	const optimize = options["optimizeSampleUsage"];
+	const important = options["importantSamples"];
 
 	return {
 		sampleNames: names.filter((name): name is string => typeof name === "string"),
 		sampleGroups: groups as Readonly<Record<string, readonly string[]>>,
+		importantSamples: Array.isArray(important)
+			? important.filter((name): name is string => typeof name === "string")
+			: undefined,
 		// Only an explicit `false` turns it off, matching AddmusicK's default.
 		optimizeSampleUsage: typeof optimize === "boolean" ? optimize : undefined,
 	};

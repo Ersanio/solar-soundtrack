@@ -26,7 +26,7 @@ function compile(source: string, aramAddress = 0x3e00, options?: Record<string, 
  */
 const STOCK = Array.from({ length: 20 }, (_, index) => `${index.toString(16).toUpperCase().padStart(2, "0")} SMW.brr`);
 const LIBRARY = {
-	sampleNames: [...STOCK, "kick.brr", "drums/snare.brr"],
+	sampleNames: [...STOCK, "kick.brr", "drums/snare.brr", "zelda.bnk"],
 	sampleGroups: { default: STOCK, optimized: STOCK.slice(0, 5) },
 };
 
@@ -313,13 +313,13 @@ console.log("\npreprocessor");
 	check("amm handles ; in the scanner", ammComment.ok, ammComment.diagnostics.map((d) => d.message).join("; "));
 }
 
-console.log("\nwhat is still unimplemented says so clearly");
+console.log("\nnear misses report clearly");
 {
 	for (const [source, code] of [
-		// Sample banks are the last directive form left unsupported.
-		['#amk 4\n#samples { "x.bnk" }\n#0 c4\n', "AMK0054"],
-		// Not unimplemented, but the neighbouring failure people hit first.
+		// Every directive form is implemented now; these are the errors people
+		// actually hit while writing one.
 		["#amk 4\n#0 @30 c4\n", "AMK0092"],
+		['#amk 4\n#samples { "x.wav" }\n#0 c4\n', "AMK0056"],
 	] as const) {
 		const result = compile(source);
 		check(
@@ -421,11 +421,10 @@ console.log("\nparity fixes against AddmusicKsrc");
 	check("am4 $E5 sample load within the stock group is fine", am4Stock.ok,
 		am4Stock.diagnostics.map((d) => `${d.code} ${d.message}`).join("; "));
 
-	// An unsupported directive must consume its line, or the scanner reads the
-	// block body as MML and buries the real diagnostic in nonsense. `#samples`
-	// with a `.bnk` entry is the remaining case that takes this path.
-	const unsupported = compile('#amk 4\n#samples { "x.bnk" }\n#0 o4 c4\n', 0x3e00, LIBRARY);
-	check("an unsupported entry reports exactly one error",
+	// A failing block directive must consume the rest of its block, or the scanner
+	// reads the body as MML and buries the real diagnostic in nonsense.
+	const unsupported = compile('#amk 4\n#samples { "x.wav" }\n#0 o4 c4\n', 0x3e00, LIBRARY);
+	check("a bad #samples entry reports exactly one error",
 		unsupported.diagnostics.filter((d) => d.severity === "error").length === 1,
 		unsupported.diagnostics.map((d) => `${d.code} ${d.message}`).join("; "));
 }
@@ -445,6 +444,10 @@ console.log("\n#samples and #path");
 	const noLibrary = compile("#amk 4\n#0 o4 @0 c4\n");
 	check("no library yields null, not an empty list", noLibrary.sampleList === null);
 
+	// Optimisation off from here on: this section is about which names resolve and
+	// in what order, and emptying the unplayed ones would only obscure that.
+	const resolved = (source: string) => compile(source, 0x3e00, { ...LIBRARY, optimizeSampleUsage: false });
+
 	const explicitDefault = compile("#amk 4\n#samples { #default }\n#0 o4 @0 c4\n", 0x3e00, LIBRARY);
 	check("#samples { #default } resolves to 20", names(explicitDefault).length === 20,
 		`${names(explicitDefault).length}`);
@@ -454,7 +457,7 @@ console.log("\n#samples and #path");
 	const twice = compile("#amk 4\n#samples { #default #default }\n#0 o4 @0 c4\n", 0x3e00, LIBRARY);
 	check("#default twice gives 40 entries", names(twice).length === 40, `${names(twice).length}`);
 
-	const extra = compile('#amk 4\n#samples { #default "kick.brr" }\n#0 o4 @0 c4\n', 0x3e00, LIBRARY);
+	const extra = resolved('#amk 4\n#samples { #default "kick.brr" }\n#0 o4 @0 c4\n');
 	check("an added file lands after the group", names(extra).length === 21 && names(extra)[20] === "kick.brr",
 		names(extra).slice(19).join(", "));
 
@@ -464,9 +467,9 @@ console.log("\n#samples and #path");
 
 	// #path prefixes quoted names, replaces rather than stacks, and never
 	// applies to group members.
-	const pathed = compile('#amk 4\n#path "drums"\n#samples { "snare.brr" }\n#0 o4 c4\n', 0x3e00, LIBRARY);
+	const pathed = resolved('#amk 4\n#path "drums"\n#samples { "snare.brr" }\n#0 o4 c4\n');
 	check("#path prefixes a quoted name", names(pathed)[0] === "drums/snare.brr", names(pathed).join(", "));
-	const repathed = compile('#amk 4\n#path "wrong"\n#path "drums"\n#samples { "snare.brr" }\n#0 o4 c4\n', 0x3e00, LIBRARY);
+	const repathed = resolved('#amk 4\n#path "wrong"\n#path "drums"\n#samples { "snare.brr" }\n#0 o4 c4\n');
 	check("a second #path replaces the first", repathed.sampleList?.[0] === "drums/snare.brr",
 		names(repathed).join(", "));
 	const groupUnprefixed = compile('#amk 4\n#path "drums"\n#samples { #default }\n#0 o4 @0 c4\n', 0x3e00, LIBRARY);
@@ -476,7 +479,7 @@ console.log("\n#samples and #path");
 		['#amk 4\n#samples { "nope.brr" }\n#0 c4\n', "AMK0058", "an unknown filename"],
 		["#amk 4\n#samples { #nosuchgroup }\n#0 c4\n", "AMK0059", "an unknown group"],
 		['#amk 4\n#samples { "x.wav" }\n#0 c4\n', "AMK0056", "a non-brr extension"],
-		['#amk 4\n#samples { "x.bnk" }\n#0 c4\n', "AMK0054", "a sample bank"],
+		['#amk 4\n#samples { "nope.bnk" }\n#0 c4\n', "AMK0058", "an unknown sample bank"],
 		['#amk 4\n#samples { "noext" }\n#0 c4\n', "AMK0107", "a missing extension"],
 		['#amk 4\n#samples ( "x.brr" )\n#0 c4\n', "AMK0050", "a missing brace"],
 		['#amk 4\n#samples { "kick.brr" }\n#0 o4 @5 c4\n', "AMK0109", "@5 past a short sample list"],
@@ -775,11 +778,10 @@ console.log("\noptimizeSampleUsage");
 	const two = run("#amk 4\n#0 o4 @0 c4\n#1 o4 @1 c4\n");
 	check("two instruments keep two samples", kept(two) === 2, `${kept(two)} kept`);
 
-	// Explicitly named samples are important and survive unplayed (Music.cpp:2726).
-	const named = run('#amk 4\n#samples { "kick.brr" "drums/snare.brr" }\n#0 o4 $F3 $00 $02 c4\n');
-	check("a named sample is kept even when unplayed", kept(named) === 2, `${kept(named)} kept: ${names(named).join(", ")}`);
+	// Importance no longer follows from having written a name out; it comes from
+	// the host, and the "importance comes from the host" section covers it.
 
-	// Group members are not important, so an unplayed one goes.
+	// Nothing is important by default here, so an unplayed group member goes.
 	const group = run("#amk 4\n#samples { #optimized }\n#0 o4 @0 c4\n");
 	check("an unplayed group member is dropped", kept(group) === 1 && names(group).length === 5,
 		`${kept(group)} of ${names(group).length}`);
@@ -804,6 +806,130 @@ console.log("\noptimizeSampleUsage");
 	// A song that plays nothing at all still gets a full-length directory.
 	const silent = run("#amk 4\n#0 o4 l1 r r\n");
 	check("a song with no instrument keeps the directory length", names(silent).length === 20);
+}
+
+console.log("\n#samples with a .bnk sample bank");
+{
+	const names = (result: CompileResult): readonly string[] => result.sampleList ?? [];
+	const run = (source: string, extra: Record<string, unknown> = {}) =>
+		compile(source, 0x3e00, { ...LIBRARY, ...extra });
+
+	// A bank contributes all 64 slots, blanks included. Keeping the blanks is what
+	// holds a ported song's SRCNs where the original game put them.
+	const bank = run('#amk 4\n#samples { "zelda.bnk" }\n#0 o4 c4\n', { optimizeSampleUsage: false });
+	check("a bank compiles", bank.ok, bank.diagnostics.map((d) => `${d.code} ${d.message}`).join("; "));
+	check("it contributes 64 entries", names(bank).length === 64, `${names(bank).length}`);
+	check("slot 0 is named :00", names(bank)[0] === "zelda.bnk:00", names(bank)[0]);
+	check("slot 63 is named :3F", names(bank)[63] === "zelda.bnk:3F", names(bank)[63]);
+
+	// After a group, the bank's slots start at that group's length.
+	const after = run('#amk 4\n#samples { #default "zelda.bnk" }\n#0 o4 @0 c4\n', { optimizeSampleUsage: false });
+	check("#default then a bank puts slot 0 at SRCN 20", names(after)[20] === "zelda.bnk:00", names(after)[20]);
+	check("and the whole list is 84 long", names(after).length === 84, `${names(after).length}`);
+
+	// A bank is addressed positionally. Referencing one by name where a single
+	// sample is expected has to fail, because only slot names are in the list.
+	for (const [source, code, label] of [
+		['#amk 4\n#samples { "zelda.bnk" }\n#instruments { "zelda.bnk" $8F $E0 $00 $02 $B0 }\n#0 c4\n',
+			"AMK0089", "a bank as an #instruments base"],
+		['#amk 4\n#samples { "zelda.bnk" }\n#0 o4 ("zelda.bnk", $02) c4\n', "AMK0132", "a bank as a sample load"],
+	] as const) {
+		const result = run(source);
+		check(`${label} is rejected with ${code}`,
+			!result.ok && result.diagnostics.some((d) => d.code === code),
+			result.diagnostics.map((d) => `${d.code} ${d.message}`).join("; "));
+	}
+
+	// $F3 addresses a slot by SRCN, which is the only way to reach one.
+	const played = run('#amk 4\n#samples { "zelda.bnk" }\n#0 o4 $F3 $05 $02 c4\n');
+	check("a slot reached by $F3 survives optimisation",
+		played.ok && names(played)[5] === "zelda.bnk:05", `${names(played)[5]}`);
+	check("its unplayed neighbours do not", names(played)[6] === "EMPTY.brr", names(played)[6]);
+}
+
+console.log("\nimportance comes from the host, not from the syntax");
+{
+	const names = (result: CompileResult): readonly string[] => result.sampleList ?? [];
+	const kept = (result: CompileResult): number => names(result).filter((n) => n !== "EMPTY.brr").length;
+	const run = (source: string, important: readonly string[] = []) =>
+		compile(source, 0x3e00, { ...LIBRARY, importantSamples: important });
+
+	// The rule AMK uses — a name written out in #samples is important — is gone.
+	// A checkbox is a better signal of intent than having typed a filename.
+	const unmarked = run('#amk 4\n#samples { "kick.brr" "drums/snare.brr" }\n#0 o4 $F3 $00 $02 c4\n');
+	check("an unmarked named sample is reclaimed when unplayed", kept(unmarked) === 1, `${kept(unmarked)} kept`);
+
+	const marked = run('#amk 4\n#samples { "kick.brr" "drums/snare.brr" }\n#0 o4 $F3 $00 $02 c4\n', [
+		"drums/snare.brr",
+	]);
+	check("marking it important keeps it", kept(marked) === 2, `${kept(marked)} kept`);
+	check("and it stays at its own SRCN", names(marked)[1] === "drums/snare.brr", names(marked)[1]);
+
+	// Group members are no different — importance is per name, wherever it came from.
+	const group = run("#amk 4\n#samples { #optimized }\n#0 o4 @0 c4\n", [STOCK[3]]);
+	check("an important group member is kept", names(group)[3] === STOCK[3], names(group)[3]);
+	check("an unimportant one is not", names(group)[2] === "EMPTY.brr", names(group)[2]);
+
+	// Bank slots take part too.
+	const slot = run('#amk 4\n#samples { "zelda.bnk" }\n#0 o4 c4\n', ["zelda.bnk:07"]);
+	check("an important bank slot is kept", names(slot)[7] === "zelda.bnk:07", names(slot)[7]);
+	check("an unimportant slot is emptied", names(slot)[8] === "EMPTY.brr", names(slot)[8]);
+
+	// Regression: the implicit `#default` fallback never goes through `pushSample`,
+	// so it briefly had no importance at all and reclaimed every important sample
+	// in any song that omitted `#samples` — which is most songs.
+	const implicitImportant = run("#amk 4\n#0 o4 @0 c4\n", [STOCK[9], STOCK[12]]);
+	check("the implicit #default fallback honours importance",
+		names(implicitImportant)[9] === STOCK[9] && names(implicitImportant)[12] === STOCK[12],
+		`[9]=${names(implicitImportant)[9]} [12]=${names(implicitImportant)[12]}`);
+	check("and still reclaims the rest", names(implicitImportant)[11] === "EMPTY.brr", names(implicitImportant)[11]);
+	check("an explicit #samples { #default } agrees with it",
+		names(run("#amk 4\n#samples { #default }\n#0 o4 @0 c4\n", [STOCK[9], STOCK[12]])).join() ===
+			names(implicitImportant).join());
+
+	// `stats.sampleNames` is what the song asked for, before anything was emptied —
+	// which is how the browser can say a sample is not in the song at all.
+	const asked = run("#amk 4\n#0 o4 @0 c4\n");
+	check("stats.sampleNames is the pre-optimisation list",
+		asked.stats?.sampleNames.length === 20 && !asked.stats?.sampleNames.includes("EMPTY.brr"),
+		`${asked.stats?.sampleNames.length} names, EMPTY present: ${asked.stats?.sampleNames.includes("EMPTY.brr")}`);
+	check("while sampleList is the optimised one", names(asked).includes("EMPTY.brr"));
+}
+
+console.log("\nwhich samples the song actually plays");
+{
+	const used = (result: CompileResult): readonly string[] => result.stats?.usedSampleNames ?? [];
+	const run = (source: string) => compile(source, 0x3e00, LIBRARY);
+
+	// Being included and being played are different things, and the browser marks
+	// them differently, so the compiler has to tell them apart.
+	const one = run("#amk 4\n#0 o4 @0 c4\n");
+	check("only the played sample is reported used", used(one).length === 1, used(one).join(", "));
+	check("and it is the right one", used(one)[0] === STOCK[0], used(one)[0]);
+	check("the asked-for list is still the whole group", one.stats?.sampleNames.length === 20);
+
+	// instrToSample[14] is SRCN 0x0D, i.e. the fourteenth entry — the case in the
+	// filenames where the instrument number and the SRCN differ.
+	const fourteen = run("#amk 4\n#0 o4 @14 c4\n");
+	check("@14 marks SRCN 0x0D as used", used(fourteen)[0] === STOCK[0x0d], used(fourteen).join(", "));
+
+	// Every route into a sample counts, not just `@n`.
+	check("$F3 counts", used(run("#amk 4\n#0 o4 $F3 $07 $02 c4\n"))[0] === STOCK[7], "");
+	const load = run(`#amk 4\n#samples { #default }\n#0 o4 ("${STOCK[9]}", $02) c4\n`);
+	check("a sample load counts", used(load).includes(STOCK[9]), used(load).join(", "));
+	const custom = run("#amk 4\n#samples { #default }\n#instruments { @9 $8F $E0 $00 $02 $B0 }\n#0 o4 @30 c4\n");
+	check("a custom instrument's own sample counts", used(custom).includes(STOCK[0x0a]), used(custom).join(", "));
+
+	// Bank slots report by slot name, which is what the browser rows are keyed on.
+	const bank = run('#amk 4\n#samples { "zelda.bnk" }\n#0 o4 $F3 $05 $02 c4\n');
+	check("a played bank slot is reported by its slot name", used(bank)[0] === "zelda.bnk:05", used(bank).join(", "));
+
+	// A name listed twice must be reported once, whichever SRCN was played.
+	const twice = run("#amk 4\n#samples { #default #default }\n#0 o4 @0 c4\n");
+	check("a duplicated name is reported once", used(twice).length === 1, used(twice).join(", "));
+
+	const silent = run("#amk 4\n#0 o4 l1 r r\n");
+	check("a song playing nothing reports nothing used", used(silent).length === 0, used(silent).join(", "));
 }
 
 console.log(`\n${failures === 0 ? "all checks passed" : `${failures} check(s) failed`}\n`);

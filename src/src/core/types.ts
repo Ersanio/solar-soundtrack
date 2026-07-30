@@ -39,10 +39,19 @@ export interface CompileStats {
 	/** Echo buffer size in 2 KiB units; bytes = `echoBufferSize << 11`. */
 	echoBufferSize: number;
 	/**
-	 * Sample filenames the song asked for, in SRCN order — a display mirror of
-	 * {@link CompileResult.sampleList}, flattened to `[]` when there is none.
+	 * Sample filenames the song asked for, in SRCN order, before any optimisation
+	 * pass replaced the unplayed ones. `[]` when the compiler had no opinion.
 	 */
 	sampleNames: string[];
+	/**
+	 * The subset of {@link sampleNames} the song actually plays — through an
+	 * instrument, a `$F3` load, or a custom instrument's own sample.
+	 *
+	 * Distinct from being *asked for*: a song can include a whole sample group and
+	 * touch three of it. Deduplicated by name, so a sample listed at two SRCNs
+	 * appears once if either is played.
+	 */
+	usedSampleNames: string[];
 	hasIntro: boolean;
 	loops: boolean;
 	/** Estimated seconds, or `null` when the compiler could not guess. */
@@ -121,6 +130,7 @@ export function emptyStats(): CompileStats {
 		channelTicks: [0, 0, 0, 0, 0, 0, 0, 0],
 		echoBufferSize: 0,
 		sampleNames: [],
+		usedSampleNames: [],
 		hasIntro: false,
 		loops: true,
 		seconds: null,

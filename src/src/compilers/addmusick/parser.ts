@@ -24,6 +24,8 @@ import { TARGET_AM4, TARGET_AMM, TARGET_NONE, preprocess } from "./preprocess";
 import {
 	DEFAULT_TRANSPOSE,
 	EMPTY_SAMPLE_NAME,
+	BANK_SLOT_COUNT,
+	bankSlotName,
 	FIRST_VCMD,
 	HEX_LENGTHS,
 	INSTRUMENT_TO_SAMPLE,
@@ -49,6 +51,15 @@ export interface AddmusicKOptions {
 	sampleNames: readonly string[];
 	/** Named groups from the driver manifest, e.g. `default`. */
 	sampleGroups: Readonly<Record<string, readonly string[]>>;
+	/**
+	 * Names never to replace with `EMPTY.brr`, however they entered the list —
+	 * AMK's `Sample::important`.
+	 *
+	 * In AddmusicK this is per group *membership*, read from the `!` marks in
+	 * `Addmusic_sample groups.txt`. Here it is per sample and the host owns it, so
+	 * that whatever the user marked wins over any inference the parser might make.
+	 */
+	importantSamples?: readonly string[];
 	/**
 	 * Replace samples the song never plays with `EMPTY.brr`, freeing the ARAM
 	 * they would occupy. AddmusicK's `optimizeSampleUsage`, which defaults to on
@@ -83,6 +94,11 @@ export interface ParseOutput {
 	 * Which SRCNs the song actually plays, by index. AMK's `usedSamples`, which
 	 * `optimizeSampleUsage` uses to swap unreferenced samples for `EMPTY.brr`.
 	 */
+	/**
+	 * The set before optimisation — what the song asked for, whether or not each
+	 * entry survived. `sampleList` is what to build; this is what to explain.
+	 */
+	requestedSamples: readonly string[] | null;
 	usedSamples: boolean[];
 	/** `#pad` target size, 0 when the song did not ask for one. */
 	minSize: number;
@@ -921,11 +937,7 @@ export class AddmusicKParser {
 		}
 
 		const extension = name.slice(dot).toLowerCase();
-		if (extension === ".bnk") {
-			this.error("AMK0054", `"${name}": sample banks (.bnk) are not supported by this compiler version yet.`);
-			return false;
-		}
-		if (extension !== ".brr") {
+		if (extension !== ".brr" && extension !== ".bnk") {
 			this.error("AMK0056", `"${name}" is not a valid sample; only ".brr" and ".bnk" are allowed.`);
 			return false;
 		}
@@ -937,11 +949,32 @@ export class AddmusicKParser {
 			return false;
 		}
 
-		this.sampleList.push(name);
-		// Music.cpp:2726 passes `important = true` for every explicitly named
-		// sample, so writing one out is itself a statement that it must be kept.
-		this.sampleImportant.push(true);
+		if (extension === ".bnk") {
+			// A bank contributes all 64 slots, empty ones included
+			// (`addSampleBank`, globals.cpp:581-615). Keeping the blanks is the
+			// point: a song ported from another game addresses its samples by
+			// SRCN, so skipping empty slots would renumber every one after them.
+			for (let slot = 0; slot < BANK_SLOT_COUNT; slot++) this.pushSample(bankSlotName(name, slot));
+			return true;
+		}
+
+		this.pushSample(name);
 		return true;
+	}
+
+	/**
+	 * Appends one name to the sample list, recording whether it is important.
+	 *
+	 * Importance comes from the host and nowhere else. AMK infers it from where a
+	 * name came from — `true` for anything written out in `#samples`
+	 * (`Music.cpp:2726`), the group's own flag for a `#group` member, `true` for
+	 * every bank slot (`globals.cpp:614`) — because a filename was the only signal
+	 * of intent it had. Here the user marks samples directly, and an inference
+	 * would silently override that.
+	 */
+	private pushSample(name: string): void {
+		this.sampleList.push(name);
+		this.sampleImportant.push(this.isImportantName(name));
 	}
 
 	/**
@@ -1073,10 +1106,7 @@ export class AddmusicKParser {
 			return false;
 		}
 		// Group members are resolved unprefixed; `#path` does not apply to them.
-		for (const member of members) {
-			this.sampleList.push(member);
-			this.sampleImportant.push(false);
-		}
+		for (const member of members) this.pushSample(member);
 		return true;
 	}
 
@@ -2769,18 +2799,29 @@ export class AddmusicKParser {
 	 * a real answer meaning "no samples", and the host must be able to tell it
 	 * apart from "this compiler was given no library to look names up in".
 	 */
+	private requestedSampleList(): readonly string[] | null {
+		if (this.sampleList.length > 0) return [...this.sampleList];
+		const fallback = this.options?.sampleGroups["default"];
+		return fallback && fallback.length > 0 ? [...fallback] : null;
+	}
+
 	private resolveSampleList(): readonly string[] | null {
-		const declared = this.sampleList.length > 0;
+		const names = this.requestedSampleList();
+		if (!names) return null;
 
-		const names = declared ? [...this.sampleList] : [...(this.options?.sampleGroups["default"] ?? [])];
-		if (names.length === 0) return null;
-
-		// The implicit fallback is a group expansion, so nothing in it is
-		// important — the same as if the song had written `#samples { #default }`.
-		const important = declared ? this.sampleImportant : names.map(() => false);
+		// The implicit `#default` fallback never went through `pushSample`, so it
+		// has no recorded importance — it has to be looked up the same way, or
+		// every important sample in a song that omits `#samples` (which is most
+		// songs) is quietly reclaimed.
+		const important =
+			this.sampleList.length > 0 ? this.sampleImportant : names.map((name) => this.isImportantName(name));
 
 		if (this.options?.optimizeSampleUsage === false) return names;
-		return this.optimizeSamples(names, important);
+		return this.optimizeSamples([...names], important);
+	}
+
+	private isImportantName(name: string): boolean {
+		return this.options?.importantSamples?.includes(name) ?? false;
 	}
 
 	/**
@@ -2867,6 +2908,7 @@ export class AddmusicKParser {
 			channelLengths: this.channelLengths,
 			introLength: this.introLength,
 			sampleList: this.resolveSampleList(),
+			requestedSamples: this.requestedSampleList(),
 			usedSamples: this.usedSamples,
 			minSize: this.minSize,
 			tags: this.tags,
