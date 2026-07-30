@@ -31,5 +31,25 @@
       "12 SMW @15.brr",
       "13 SMW Thunder.brr"
     ]
-  }
+  },
+  "//importantSamples": "The samples marked with a trailing '!' in AddmusicK's 'Addmusic_sample groups.txt'. An important sample stays in ARAM even when the song never plays it, because sound effects and global songs need it. Everything except 0D, 0F and 11.",
+  "importantSamples": [
+    "00 SMW @0.brr",
+    "01 SMW @1.brr",
+    "02 SMW @2.brr",
+    "03 SMW @3.brr",
+    "04 SMW @4.brr",
+    "05 SMW @8.brr",
+    "06 SMW @22.brr",
+    "07 SMW @5.brr",
+    "08 SMW @6.brr",
+    "09 SMW @7.brr",
+    "0A SMW @9.brr",
+    "0B SMW @10.brr",
+    "0C SMW @13.brr",
+    "0E SMW @29.brr",
+    "10 SMW @12.brr",
+    "12 SMW @15.brr",
+    "13 SMW Thunder.brr"
+  ]
 }

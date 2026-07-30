@@ -35,6 +35,14 @@ export interface DriverManifest {
 	 */
 	songPointers: number;
 	sampleGroups: Record<string, string[]>;
+	/**
+	 * Samples that must stay in ARAM even when a song never plays them — the
+	 * names carrying a trailing `!` in AddmusicK's `Addmusic_sample groups.txt`.
+	 *
+	 * Optional: a hand-built bundle without it simply has no important samples,
+	 * which means sample optimisation is free to reclaim any of them.
+	 */
+	importantSamples?: string[];
 }
 
 export interface DriverBundle {
