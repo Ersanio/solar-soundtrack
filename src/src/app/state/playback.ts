@@ -46,9 +46,23 @@ export class Playback {
   private readonly mutedMask = signal(0);
   private readonly soloedMask = signal(0);
 
+  /** Where the seek bar is being dragged to, while the drag is still going on. */
+  private readonly scrubbing = signal<number | null>(null);
+
   readonly isPlaying = computed(() => this.state() === 'playing');
   readonly isIdle = computed(() => this.state() === 'idle');
-  readonly timeLabel = computed(() => formatTime(this.elapsed()));
+
+  /**
+   * The playhead as the transport should show it: the drag target while the user
+   * is scrubbing, and the song's own position the rest of the time.
+   *
+   * The distinction is what keeps a drag smooth. `elapsed` is pushed from the
+   * audio thread ten times a second, and a seek bar bound straight to it has its
+   * value rewritten from under the pointer on every update — the thumb snaps
+   * between the cursor and the song until the button comes back up.
+   */
+  readonly position = computed(() => this.scrubbing() ?? this.elapsed());
+  readonly timeLabel = computed(() => formatTime(this.position()));
 
   /**
    * One pass through the song — intro plus a single trip round the loop — which
@@ -136,6 +150,7 @@ export class Playback {
     this.player.onEnded = () => {
       this.state.set('idle');
       this.elapsed.set(0);
+      this.scrubbing.set(null);
       this.driver.set(null);
     };
     this.player.onError = (error) => {
@@ -298,7 +313,34 @@ export class Playback {
     this.player.stop();
     this.state.set('idle');
     this.elapsed.set(0);
+    this.scrubbing.set(null);
     this.driver.set(null);
+  }
+
+  /**
+   * Follows the seek bar without moving the song.
+   *
+   * Seeking on every drag event would queue a re-emulation per pixel, since the
+   * emulator has no snapshot to jump to; this only moves what is displayed, and
+   * {@link commitScrub} does the work once the drag ends.
+   */
+  scrubTo(seconds: number): void {
+    if (this.isIdle()) return;
+    this.scrubbing.set(Math.max(0, Math.min(seconds, this.duration())));
+  }
+
+  /**
+   * Ends a drag, jumping to wherever it left the thumb.
+   *
+   * Idempotent, and called from both `change` and `pointerup`, because neither
+   * alone is enough: a drag that ends on the value it started from fires no
+   * `change` in every browser, which would leave the transport parked on a
+   * position the song has since played past. Whichever event arrives first
+   * commits; the other finds nothing to do.
+   */
+  commitScrub(): void {
+    const target = this.scrubbing();
+    if (target !== null) this.seek(target);
   }
 
   /**
@@ -306,6 +348,7 @@ export class Playback {
    * so this is not instant on a long song.
    */
   seek(seconds: number): void {
+    this.scrubbing.set(null);
     if (this.isIdle()) return;
     const target = Math.max(0, Math.min(seconds, this.duration()));
     this.elapsed.set(target);

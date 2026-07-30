@@ -19,9 +19,15 @@
 </button>
 
 <!--
-  Seeking on `change` rather than `input`: there is no snapshot to jump to, so
-  the emulator replays the song silently to reach the new position. Firing on
-  every drag event would queue a re-emulation per pixel.
+  Two halves to a drag. `input` only parks the displayed position under the
+  pointer — the value is bound, so without it the next position update from the
+  audio thread would yank the thumb back mid-drag. The seek itself waits for the
+  release, because there is no snapshot to jump to and the emulator has to replay
+  the song silently to get there; firing per drag event would queue a
+  re-emulation per pixel.
+
+  `pointerup` alongside `change` so a drag that ends where it began still lets
+  go — see `Playback.commitScrub`.
 -->
 <input
   type="range"
@@ -31,9 +37,12 @@
   aria-label="Seek"
   title="Seek — the song replays silently to reach the new position"
   [max]="playback.duration()"
-  [value]="playback.elapsed()"
+  [value]="playback.position()"
   [disabled]="!playback.canSeek()"
-  (change)="onSeek($event)"
+  (input)="onScrub($event)"
+  (change)="playback.commitScrub()"
+  (pointerup)="playback.commitScrub()"
+  (pointercancel)="playback.commitScrub()"
 />
 
 <span class="text-ink-muted w-20 font-mono text-xs tabular-nums">

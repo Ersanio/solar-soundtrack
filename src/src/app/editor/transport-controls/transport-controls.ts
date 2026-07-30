@@ -19,7 +19,8 @@ export class TransportControls {
     this.playback.volume.set(Number((event.target as HTMLInputElement).value));
   }
 
-  protected onSeek(event: Event): void {
-    this.playback.seek(Number((event.target as HTMLInputElement).value));
+  /** Dragging: move the readout with the pointer, but leave the song alone. */
+  protected onScrub(event: Event): void {
+    this.playback.scrubTo(Number((event.target as HTMLInputElement).value));
   }
 }
