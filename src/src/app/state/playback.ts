@@ -28,7 +28,7 @@ export class Playback {
   readonly state = signal<'idle' | 'playing' | 'paused'>('idle');
   readonly elapsed = signal(0);
   /** Percent, as the range input reports it. */
-  readonly volume = signal(500);
+  readonly volume = signal(300);
   /** Reload the running song in place whenever it recompiles. */
   readonly live = signal(true);
   readonly loop = signal(false);

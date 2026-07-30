@@ -1,9 +1,8 @@
 /**
- * The compiler-agnostic contract.
+ * What goes into the compiler and what comes out of it.
  *
- * Everything in this file is deliberately free of AddmusicK specifics. A future
- * "Addmusic 5" front-end only has to implement `MmlCompiler` and register itself;
- * no UI code changes.
+ * The UI reads these types too — diagnostics, stats and the sample list are all
+ * rendered — so they live here rather than inside `compilers/addmusick/`.
  */
 
 export type Severity = "error" | "warning" | "info";
@@ -101,24 +100,8 @@ export interface CompileResult {
 	stats: CompileStats | null;
 }
 
-export interface MmlCompiler {
-	/** Stable machine id, e.g. `addmusick`. Persisted in project files. */
-	readonly id: string;
-	/** Human label for the picker. */
-	readonly name: string;
-	/** Marker(s) this compiler claims, e.g. `["#amk 4"]`. Shown in the UI. */
-	readonly targets: readonly string[];
-	/**
-	 * Cheap sniff used to auto-select a compiler for a given source. Return a
-	 * confidence in [0, 1]; the registry picks the highest. Returning 0 means
-	 * "definitely not mine".
-	 */
-	detect(source: string): number;
-	compile(request: CompileRequest): CompileResult;
-}
-
 // ---------------------------------------------------------------------------
-// Small helpers shared by implementations.
+// Small helpers.
 // ---------------------------------------------------------------------------
 
 export function emptyStats(): CompileStats {

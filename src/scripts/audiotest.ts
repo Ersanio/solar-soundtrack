@@ -15,7 +15,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { compilers } from "../src/compilers";
+import { compiler } from "../src/compilers";
 import { EMPTY_SAMPLE_NAME, bankSlotName } from "../src/compilers/addmusick/tables";
 import {
 	SAMPLE_BANK_BYTES,
@@ -79,7 +79,6 @@ function rms(samples: Int16Array): number {
 
 const driver = await loadDriver();
 const plan = planAram(driver);
-const compiler = compilers.get("addmusick")!;
 
 /** What the host would pass: every name the driver bundle can resolve. */
 const OPTIONS = {

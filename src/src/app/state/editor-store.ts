@@ -1,6 +1,6 @@
 import { Service, computed, effect, inject, signal } from '@angular/core';
 
-import { compilers } from '@compilers';
+import { compiler } from '@compilers';
 import type { CompileResult, Diagnostic, Span } from '@core/types';
 import { buildSpc, spcFilename } from '@spc/export';
 import { ARAM_SIZE, type AramBudget, computeBudget } from '@spc/layout';
@@ -47,10 +47,7 @@ export class EditorStore {
   private readonly drivers = inject(DriverStore);
   private readonly library = inject(SampleStore);
 
-  readonly available = compilers.list();
-
   readonly source = signal(localStorage.getItem(STORAGE_KEY) ?? SAMPLE_SONG);
-  readonly compilerId = signal(this.available[0]?.id ?? 'addmusick');
   readonly autoCompile = signal(true);
   readonly caret = signal(0);
 
@@ -73,9 +70,6 @@ export class EditorStore {
   private readonly compilation = computed(() => {
     const plan = this.drivers.plan();
     if (!plan) return null;
-
-    const compiler = compilers.get(this.compilerId()) ?? this.available[0];
-    if (!compiler) return null;
 
     const started = performance.now();
     const result = compiler.compile({

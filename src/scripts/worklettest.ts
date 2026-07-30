@@ -19,7 +19,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { createContext, runInContext } from "node:vm";
 
-import { compilers } from "../src/compilers";
+import { compiler } from "../src/compilers";
 import { loadDriver } from "../src/spc/driver";
 import { buildSpc } from "../src/spc/export";
 import { planAram } from "../src/spc/layout";
@@ -136,7 +136,6 @@ function peak(samples: Float32Array): number {
 
 const driver = await loadDriver();
 const plan = planAram(driver);
-const compiler = compilers.get("addmusick")!;
 
 const result = compiler.compile({
 	source: "#amk 4\n#0 t40 o4 v220 q7F @0 l8 c d e f g4 e4 c4 r4\n",

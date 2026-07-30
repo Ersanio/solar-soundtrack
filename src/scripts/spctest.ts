@@ -9,7 +9,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { compilers } from "../src/compilers";
+import { compiler } from "../src/compilers";
 import { EMPTY_SAMPLE_NAME } from "../src/compilers/addmusick/tables";
 import { emptySample } from "../src/spc/brr";
 import { analyzeDriver, encodePathSegment, loadDriver, withCustomProgram } from "../src/spc/driver";
@@ -395,7 +395,6 @@ console.log("\ncustom driver: bad input is rejected");
 }
 
 console.log("\ncompile + export");
-const compiler = compilers.get("addmusick")!;
 const compiled = compiler.compile({ source: SONG, aramAddress: plan.localPos });
 check("song compiles", compiled.ok, compiled.diagnostics.map((d) => `${d.code} ${d.message}`).join("; "));
 

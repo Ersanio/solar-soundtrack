@@ -15,9 +15,4 @@ import { TransportControls } from '../transport-controls/transport-controls';
 })
 export class TopBar {
   protected readonly store = inject(EditorStore);
-
-  protected onCompilerChange(event: Event): void {
-    this.store.compilerId.set((event.target as HTMLSelectElement).value);
-    this.store.compileNow();
-  }
 }

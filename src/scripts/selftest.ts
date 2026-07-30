@@ -8,14 +8,12 @@
  *   npm run selftest
  */
 
-import { compilers } from "../src/compilers";
+import { compiler } from "../src/compilers";
 import type { CompileResult } from "../src/core/types";
 
 let failures = 0;
 
 function compile(source: string, aramAddress = 0x3e00, options?: Record<string, unknown>): CompileResult {
-	const compiler = compilers.get("addmusick");
-	if (!compiler) throw new Error("addmusick compiler not registered");
 	return compiler.compile({ source, aramAddress, options });
 }
 
@@ -209,11 +207,6 @@ console.log("\nlegacy targets compile");
 	check("#amk 3 rejected", !amk3.ok, amk3.diagnostics.map((d) => d.code).join(", "));
 	const amk9 = compile("#amk 9\n#0 o4 c4\n");
 	check("future version rejected", !amk9.ok);
-
-	const detect = (s: string) => compilers.get("addmusick")!.detect(s);
-	check("detect() claims #am4", detect("#am4\n") === 1, `${detect("#am4\n")}`);
-	check("detect() claims #amk 4", detect("#amk 4\n") === 1);
-	check("detect() disowns #amk 3", detect("#amk 3\n") === 0);
 }
 
 console.log("\ntarget selects the compatibility prefix");

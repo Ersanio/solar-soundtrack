@@ -1,4 +1,4 @@
-import type { CompileRequest, CompileResult, MmlCompiler } from "../../core/types";
+import type { CompileRequest, CompileResult } from "../../core/types";
 import { emptyStats, failure } from "../../core/types";
 import { link } from "./link";
 import { type AddmusicKOptions, AddmusicKParser } from "./parser";
@@ -29,19 +29,7 @@ export type { AddmusicKOptions };
  * `#samples`, `#instruments`, `#path`, `#pad`, remote code `(!)`, and custom
  * instruments `@30+`.
  */
-export class AddmusicKCompiler implements MmlCompiler {
-	readonly id = "addmusick";
-	readonly name = "AddmusicK";
-	readonly targets = ["#amk 1", "#amk 2", "#amk 4", "#am4", "#amm"] as const;
-
-	detect(source: string): number {
-		if (/^[ \t]*#(am4|amm)\b/im.test(source)) return 1;
-		const marker = /^[ \t]*#amk[ \t]*=?[ \t]*(\d+)/im.exec(source);
-		if (!marker) return 0.1; // Might be ours; the compiler will say so properly.
-		const version = Number(marker[1]);
-		return version >= 1 && version <= 4 && version !== 3 ? 1 : 0;
-	}
-
+export class AddmusicKCompiler {
 	compile(request: CompileRequest): CompileResult {
 		const { source, aramAddress } = request;
 		const options = readOptions(request.options);
