@@ -78,6 +78,8 @@ class SpcProcessor extends AudioWorkletProcessor {
 	/** Output frames emitted since the song started, and so the wall clock. */
 	private frames = 0;
 	private postedAt = -1;
+	/** Stamped on every position, so the page can discard ones a seek overtook. */
+	private epoch = 0;
 
 	/** Resampler: 32 kHz source, `sampleRate` sink, linear between two frames. */
 	private readonly step = SPC_SAMPLE_RATE / sampleRate;
@@ -123,10 +125,12 @@ class SpcProcessor extends AudioWorkletProcessor {
 					this.songLoops = message.songLoops;
 					this.introTicks = message.introTicks;
 					this.loopTicks = message.loopTicks;
+					this.epoch = message.epoch;
 					this.seek(message.atSeconds);
 					this.playing = true;
 					break;
 				case "seek":
+					this.epoch = message.epoch;
 					this.seek(message.seconds);
 					break;
 				case "paused":
@@ -348,6 +352,7 @@ class SpcProcessor extends AudioWorkletProcessor {
 					ticks: this.ticks,
 					songTicks: this.songTicks(),
 					driver: readDriverState(this.core.aram()),
+					epoch: this.epoch,
 				});
 			}
 		} catch (error) {

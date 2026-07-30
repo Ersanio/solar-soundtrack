@@ -77,6 +77,11 @@ export class SpcPlayer {
 	private driver: DriverState | null = null;
 	private volume = 1;
 	private looping = false;
+	/**
+	 * Counts loads and seeks, so a position that was already in flight when the
+	 * playhead moved can be told from one that reflects the move.
+	 */
+	private epoch = 0;
 
 	/**
 	 * Where the song has got to, pushed from the audio thread roughly ten times a
@@ -186,10 +191,12 @@ export class SpcPlayer {
 		this.position = Math.max(0, atSeconds);
 		this.songTicks = 0;
 		this.ticks = 0;
+		this.epoch++;
 		this.post({
 			type: "load",
 			spc,
 			atSeconds: this.position,
+			epoch: this.epoch,
 			introTicks: timing.introTicks ?? 0,
 			loopTicks: timing.loopTicks ?? 0,
 			fadeSeconds: timing.fadeSeconds ?? readDigits(spc, ID666_FADE, 5) / 1000,
@@ -229,7 +236,8 @@ export class SpcPlayer {
 	seek(seconds: number): void {
 		if (!this.node || this.state === "idle") return;
 		this.position = Math.max(0, seconds);
-		this.post({ type: "seek", seconds: this.position });
+		this.epoch++;
+		this.post({ type: "seek", seconds: this.position, epoch: this.epoch });
 	}
 
 	setLoop(loop: boolean): void {
@@ -279,6 +287,10 @@ export class SpcPlayer {
 	private receive(message: FromWorklet): void {
 		switch (message.type) {
 			case "position":
+				// Posted before the seek that overtook it: it describes a playhead
+				// that no longer exists, and reporting it would drag the transport
+				// back to where the song was until the next update landed.
+				if (message.epoch !== this.epoch) return;
 				this.position = message.seconds;
 				this.ticks = message.ticks;
 				this.songTicks = message.songTicks;

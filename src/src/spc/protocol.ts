@@ -27,6 +27,8 @@ export type ToWorklet =
 			spc: Uint8Array;
 			/** Start position; the emulator fast-forwards to it. */
 			atSeconds: number;
+			/** See {@link FromWorklet}'s `epoch`. */
+			epoch: number;
 			/**
 			 * The song's shape in music ticks: the intro, played once, and the loop
 			 * that follows it. Both 0 when the compiler could not work them out, in
@@ -47,7 +49,7 @@ export type ToWorklet =
 			 */
 			songLoops: boolean;
 	  }
-	| { type: "seek"; seconds: number }
+	| { type: "seek"; seconds: number; epoch: number }
 	| { type: "paused"; paused: boolean }
 	| { type: "loop"; loop: boolean }
 	| { type: "stop" };
@@ -64,6 +66,17 @@ export type FromWorklet =
 			songTicks: number;
 			/** What the driver is doing, for anything that wants to follow along. */
 			driver: DriverState;
+			/**
+			 * Which load or seek this position belongs to.
+			 *
+			 * Messages cross the thread boundary asynchronously, so a position posted
+			 * just before a seek arrives at the page just after it — and a transport
+			 * that trusted it would show the old playhead until the next update, a
+			 * tenth of a second of the thumb snapping back to where the song *was*.
+			 * The page counts its own seeks and ignores anything stamped with an
+			 * earlier one.
+			 */
+			epoch: number;
 	  }
 	| { type: "ended" }
 	| { type: "error"; message: string };

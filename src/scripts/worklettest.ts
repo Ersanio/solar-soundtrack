@@ -215,7 +215,7 @@ console.log("\nsilence before a song is loaded");
 console.log("\na loaded song renders audio through the resampler");
 {
 	port.onmessage!({
-		data: { type: "load", spc, atSeconds: 0, introTicks: 0, loopTicks: 0, fadeSeconds: 0, songLoops: true },
+		data: { type: "load", spc, atSeconds: 0, introTicks: 0, loopTicks: 0, fadeSeconds: 0, songLoops: true, epoch: 1 },
 	});
 
 	render(processor, 200); // let the driver key on
@@ -247,11 +247,20 @@ console.log("\npause and resume");
 
 console.log("\nseeking lands somewhere else in the song");
 {
-	port.onmessage!({ data: { type: "seek", seconds: 0 } });
+	port.onmessage!({ data: { type: "seek", seconds: 0, epoch: 2 } });
 	const fromStart = render(processor, 100);
 
-	port.onmessage!({ data: { type: "seek", seconds: 3 } });
+	port.onmessage!({ data: { type: "seek", seconds: 3, epoch: 3 } });
 	const fromThree = render(processor, 100);
+
+	// The page discards positions stamped with an earlier epoch, which is what
+	// stops a seek being undone by an update that was already on its way.
+	const stamped = sent.filter((m) => m.type === "position") as { epoch: number }[];
+	check(
+		"positions carry the epoch of the seek that produced them",
+		stamped.length > 0 && stamped[stamped.length - 1].epoch === 3,
+		`epoch ${stamped[stamped.length - 1]?.epoch}`,
+	);
 
 	let identical = true;
 	for (let i = 0; i < fromStart.length; i++) {
@@ -275,6 +284,7 @@ const load = (over: Partial<Extract<ToWorklet, { type: "load" }>> = {}) => ({
 		loopTicks: LOOP_TICKS,
 		fadeSeconds: 0.5,
 		songLoops: true,
+		epoch: 1,
 		...over,
 	},
 });
