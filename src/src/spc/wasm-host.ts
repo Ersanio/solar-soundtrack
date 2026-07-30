@@ -32,6 +32,10 @@ export const SPC_SAMPLE_RATE = 32000;
 /** The DSP is stereo, and `_playSPC` writes the two channels interleaved. */
 export const SPC_CHANNELS = 2;
 
+/** An `.spc` file carries the APU RAM image at this offset, 64 KiB of it. */
+const SPC_RAM_AT = 0x100;
+const SPC_RAM_SIZE = 0x10000;
+
 /**
  * `EM_ASM` blocks compiled into the binary, keyed by the code address the wasm
  * passes to `_emscripten_asm_const_int`. Upstream routed these at its backend
@@ -71,6 +75,19 @@ export interface SpcCore {
 	renderView(frames: number): Int16Array;
 	/** As `renderView`, but returns an independent copy. */
 	render(frames: number): Int16Array;
+	/**
+	 * The emulator's 64 KiB of APU RAM, live.
+	 *
+	 * This is the driver's own state — where each voice is reading its music
+	 * data, what tempo it is running at, how far its tick accumulator has got —
+	 * and reading it is the only way to know what the song is actually doing
+	 * rather than what it was predicted to do. See `driver-state.ts` for the
+	 * addresses; `readme/readme_files/aram_map.html` documents all of them.
+	 *
+	 * A fresh view each call: the wasm heap can be reallocated by `memory.grow`,
+	 * which detaches any array handed out earlier. Valid only after `loadSpc`.
+	 */
+	aram(): Uint8Array;
 	/** Anything the module wrote to stdout/stderr, which in practice means a crash message. */
 	readonly output: string;
 }
@@ -104,10 +121,24 @@ export function instantiate(module: WebAssembly.Module): SpcCore {
 	let i16!: Int16Array;
 	let view!: DataView;
 
+	/**
+	 * Views handed back by `renderView` and `aram`, cached.
+	 *
+	 * Both are called about a thousand times a second on the audio thread, and a
+	 * fresh `subarray` each time is a fresh object each time — allocation the
+	 * audio thread should not be doing. They are rebuilt only when the thing they
+	 * point at actually moves: a grown heap, or a reallocated scratch buffer.
+	 */
+	let audioView: Int16Array | null = null;
+	let audioFrames = -1;
+	let aramView: Uint8Array | null = null;
+
 	const refresh = (): void => {
 		u8 = new Uint8Array(memory.buffer);
 		i16 = new Int16Array(memory.buffer);
 		view = new DataView(memory.buffer);
+		audioView = null;
+		aramView = null;
 	};
 
 	const cstring = (ptr: number): string => {
@@ -201,17 +232,91 @@ export function instantiate(module: WebAssembly.Module): SpcCore {
 		scratch = core.p(frames * SPC_CHANNELS * 2 + 4);
 		if (!scratch) throw new SpcCoreError(`could not allocate ${frames} frames inside the emulator`);
 		scratchFrames = frames;
+		audioView = null;
 	};
+
+	/** Emulates `frames` and throws the audio away. */
+	const renderFrames = (frames: number): void => {
+		reserve(frames);
+		core.m(scratch, frames * SPC_CHANNELS);
+	};
+
+	const load = (spc: Uint8Array): void => {
+		const ptr = core.p(spc.length);
+		if (!ptr) throw new SpcCoreError(`could not allocate ${spc.length} bytes for the SPC image`);
+		try {
+			u8.set(spc, ptr);
+			core.l(ptr, spc.length);
+		} finally {
+			core.q(ptr);
+		}
+	};
+
+	/**
+	 * Finds the emulator's APU RAM inside the wasm heap.
+	 *
+	 * snes_spc's RAM is a plain array in a struct it allocates for itself, and
+	 * the binary exports no way to ask where. But a freshly loaded SPC leaves it
+	 * holding the file's own 64 KiB RAM image, so it can be found by looking for
+	 * that image in the heap.
+	 *
+	 * Two copies match: the live RAM and a pristine one the core keeps to reset
+	 * from. They are identical at load, so they are told apart by running the
+	 * emulator briefly and seeing which one the driver writes to. That costs a
+	 * few milliseconds of emulation, which is why the answer is cached for the
+	 * lifetime of the instance — the struct does not move.
+	 */
+	const findAram = (spc: Uint8Array): number => {
+		const image = spc.subarray(SPC_RAM_AT, SPC_RAM_AT + SPC_RAM_SIZE);
+
+		// The driver's code, which is neither zeroes nor a repeating pattern.
+		const anchorAt = 0x400;
+		const candidates: number[] = [];
+		outer: for (let at = 0; at + SPC_RAM_SIZE <= u8.length && candidates.length < 8; at++) {
+			for (let k = 0; k < 16; k++) if (u8[at + anchorAt + k] !== image[anchorAt + k]) continue outer;
+			for (let k = 0; k < SPC_RAM_SIZE; k += 89) if (u8[at + k] !== image[k]) continue outer;
+			candidates.push(at);
+		}
+		if (candidates.length === 0) {
+			throw new SpcCoreError(
+				"could not find the emulator's APU RAM in the wasm heap; spc.wasm is not the vendored build",
+			);
+		}
+
+		// One of the matches is the copy of the file this very load allocated and
+		// then freed; the heap hands that block straight back out for the audio
+		// scratch buffer, so simply "did it change" is not enough to tell them
+		// apart. The live RAM is the one the driver is *running in*: its zero page
+		// moves, and its program — which nothing writes to — stays put.
+		const before = candidates.map((at) => u8.slice(at, at + 0x100));
+		renderFrames(SPC_SAMPLE_RATE / 20);
+
+		const live = candidates.filter((at, index) => {
+			const now = u8.subarray(at, at + 0x100);
+			const running = before[index].some((value, offset) => value !== now[offset]);
+			if (!running) return false;
+			// $0400 up is the driver's code, per the ARAM map. Reused heap is noise.
+			for (let k = 0x400; k < 0x2000; k += 37) if (u8[at + k] !== image[k]) return false;
+			return true;
+		});
+
+		if (live.length !== 1) {
+			throw new SpcCoreError(
+				`expected exactly one live APU RAM in the wasm heap, found ${live.length} of ${candidates.length} candidates`,
+			);
+		}
+		return live[0];
+	};
+
+	let aramAt = -1;
 
 	return {
 		loadSpc(spc: Uint8Array): void {
-			const ptr = core.p(spc.length);
-			if (!ptr) throw new SpcCoreError(`could not allocate ${spc.length} bytes for the SPC image`);
-			try {
-				u8.set(spc, ptr);
-				core.l(ptr, spc.length);
-			} finally {
-				core.q(ptr);
+			load(spc);
+			if (aramAt < 0) {
+				aramAt = findAram(spc);
+				// Finding it meant running the emulator, so put the song back.
+				load(spc);
 			}
 		},
 
@@ -223,11 +328,21 @@ export function instantiate(module: WebAssembly.Module): SpcCore {
 			reserve(frames);
 			const count = frames * SPC_CHANNELS;
 			core.m(scratch, count);
-			return i16.subarray(scratch >> 1, (scratch >> 1) + count);
+			if (!audioView || audioFrames !== frames) {
+				audioView = i16.subarray(scratch >> 1, (scratch >> 1) + count);
+				audioFrames = frames;
+			}
+			return audioView;
 		},
 
 		render(frames: number): Int16Array {
 			return this.renderView(frames).slice();
+		},
+
+		aram(): Uint8Array {
+			if (aramAt < 0) throw new SpcCoreError("APU RAM is only available once an SPC has been loaded");
+			aramView ??= u8.subarray(aramAt, aramAt + SPC_RAM_SIZE);
+			return aramView;
 		},
 
 		get output(): string {
