@@ -404,7 +404,7 @@ const { spc, layout } = buildSpc({
 	samples: driver.samples,
 	plan,
 	tags: compiled.stats!.tags,
-	seconds: compiled.stats!.seconds,
+	seconds: compiled.stats!.tagSeconds,
 	echoBufferSize: compiled.stats!.echoBufferSize,
 	date: new Date(2026, 6, 28),
 });

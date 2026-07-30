@@ -222,7 +222,7 @@ export class EditorStore {
         samples: this.samples(),
         plan,
         tags: result.stats?.tags,
-        seconds: result.stats?.seconds,
+        seconds: result.stats?.tagSeconds,
         echoBufferSize: result.stats?.echoBufferSize,
         muteChannels,
       }).spc;

@@ -12,10 +12,35 @@
  */
 
 import { SPC_PROCESSOR, type FromWorklet, type SpcProcessorOptions, type ToWorklet } from "./protocol";
+import type { DriverState } from "./driver-state";
 
 export class PlayerError extends Error {}
 
 export type PlayerState = "idle" | "playing" | "paused";
+
+/**
+ * What a caller knows about a song that its ID666 header does not say.
+ *
+ * The shape is given in music ticks, not seconds, because that is what the
+ * player follows: it counts the driver's own ticks out of the emulator rather
+ * than timing the song against a clock. Ticks are exact on both sides; the
+ * seconds they take are not predictable, since a busy song makes the driver drop
+ * ticks (`main.asm`, `MainLoop`).
+ */
+export interface SongTiming {
+	/** Ticks in the intro, played once. 0 for a song with no intro. */
+	introTicks?: number;
+	/** Ticks in the main loop. 0 when the compiler could not work it out, which
+	 * leaves the song playing until it is stopped. */
+	loopTicks?: number;
+	/** Seconds of fade after the end. Omitted, the ID666 fade is used. */
+	fadeSeconds?: number;
+	/**
+	 * Whether the song data loops on its own. Defaults to true, which is the
+	 * normal case; set it false so loop mode restarts the song by hand.
+	 */
+	songLoops?: boolean;
+}
 
 /**
  * ID666 stores both of these as ASCII digits in the file header, so a song
@@ -47,12 +72,29 @@ export class SpcPlayer {
 
 	private state: PlayerState = "idle";
 	private position = 0;
+	private songTicks = 0;
+	private ticks = 0;
+	private driver: DriverState | null = null;
 	private volume = 1;
 	private looping = false;
 
-	/** Seconds elapsed, pushed from the audio thread roughly ten times a second. */
-	onPosition: ((seconds: number) => void) | null = null;
-	/** The song reached the end of its ID666 length and fade, and is not looping. */
+	/**
+	 * Where the song has got to, pushed from the audio thread roughly ten times a
+	 * second.
+	 *
+	 * In music ticks, and within one pass: a looping song reports the same range
+	 * over and over. Ticks rather than seconds because they are counted off the
+	 * driver, so they stay in step with what is being heard however long it plays
+	 * — which seconds derived from a predicted tempo do not.
+	 */
+	onPosition: ((songTicks: number) => void) | null = null;
+	/**
+	 * What the driver is doing, alongside every position update: where each voice
+	 * is reading its music data, and the tempo in force. For views that follow the
+	 * song rather than just time it.
+	 */
+	onDriverState: ((state: DriverState) => void) | null = null;
+	/** The song reached the end of its length and fade, and is not looping. */
 	onEnded: (() => void) | null = null;
 	/** The emulator or the audio graph failed; playback has stopped. */
 	onError: ((error: PlayerError) => void) | null = null;
@@ -131,16 +173,27 @@ export class SpcPlayer {
 		}
 	}
 
-	/** Loads an SPC and plays it, optionally fast-forwarded to `atSeconds`. */
-	play(spc: Uint8Array, atSeconds = 0): void {
+	/**
+	 * Loads an SPC and plays it, optionally fast-forwarded to `atSeconds`.
+	 *
+	 * `timing` says what the header cannot. The ID666 length counts the main loop
+	 * twice and the fade beside it is sized for a listening app, so a host that
+	 * knows the song's real shape states it here in ticks and gets a playhead that
+	 * follows the driver. Left out, the song plays on with the file's own fade.
+	 */
+	play(spc: Uint8Array, atSeconds = 0, timing: SongTiming = {}): void {
 		this.require();
 		this.position = Math.max(0, atSeconds);
+		this.songTicks = 0;
+		this.ticks = 0;
 		this.post({
 			type: "load",
 			spc,
 			atSeconds: this.position,
-			lengthSeconds: readDigits(spc, ID666_LENGTH, 3),
-			fadeSeconds: readDigits(spc, ID666_FADE, 5) / 1000,
+			introTicks: timing.introTicks ?? 0,
+			loopTicks: timing.loopTicks ?? 0,
+			fadeSeconds: timing.fadeSeconds ?? readDigits(spc, ID666_FADE, 5) / 1000,
+			songLoops: timing.songLoops ?? true,
 		});
 		this.post({ type: "paused", paused: false });
 		this.state = "playing";
@@ -151,6 +204,9 @@ export class SpcPlayer {
 		this.post({ type: "stop" });
 		this.state = "idle";
 		this.position = 0;
+		this.songTicks = 0;
+		this.ticks = 0;
+		this.driver = null;
 	}
 
 	pause(): void {
@@ -181,9 +237,24 @@ export class SpcPlayer {
 		if (this.node) this.post({ type: "loop", loop });
 	}
 
-	/** Seconds elapsed, or 0 when nothing is loaded. */
+	/** Emulated seconds since the song was loaded, or 0 when nothing is loaded. */
 	getTime(): number {
 		return this.position;
+	}
+
+	/** Music ticks counted since the song was loaded, past the end of the loop. */
+	getTicks(): number {
+		return this.ticks;
+	}
+
+	/** The playhead folded into one pass, in music ticks. */
+	getSongTicks(): number {
+		return this.songTicks;
+	}
+
+	/** The driver's last reported state, or null before playback has started. */
+	getDriverState(): DriverState | null {
+		return this.driver;
 	}
 
 	/** 0 to 1.5. */
@@ -209,7 +280,11 @@ export class SpcPlayer {
 		switch (message.type) {
 			case "position":
 				this.position = message.seconds;
-				this.onPosition?.(message.seconds);
+				this.ticks = message.ticks;
+				this.songTicks = message.songTicks;
+				this.driver = message.driver;
+				this.onPosition?.(message.songTicks);
+				this.onDriverState?.(message.driver);
 				break;
 			case "ended":
 				this.state = "idle";

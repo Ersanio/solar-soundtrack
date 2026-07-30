@@ -1,7 +1,8 @@
 import { DestroyRef, Service, computed, effect, inject, signal, untracked } from '@angular/core';
 
 import type { CompileResult } from '@core/types';
-import { SpcPlayer } from '@spc/player';
+import { SpcPlayer, type SongTiming } from '@spc/player';
+import type { DriverState } from '@spc/driver-state';
 import { SPC_SAMPLE_RATE } from '@spc/wasm-host';
 import { errorMessage, formatTime } from '../util/format';
 import { EditorStore } from './editor-store';
@@ -27,6 +28,14 @@ export class Playback {
 
   readonly state = signal<'idle' | 'playing' | 'paused'>('idle');
   readonly elapsed = signal(0);
+  /**
+   * What the driver is doing right now — where each voice is reading its music
+   * data, and the tempo in force — refreshed about ten times a second.
+   *
+   * Read straight out of the emulator rather than inferred, so a view built on
+   * it follows the song itself. `null` while nothing is playing.
+   */
+  readonly driver = signal<DriverState | null>(null);
   /** Percent, as the range input reports it. */
   readonly volume = signal(300);
   /** Reload the running song in place whenever it recompiles. */
@@ -41,10 +50,35 @@ export class Playback {
   readonly isIdle = computed(() => this.state() === 'idle');
   readonly timeLabel = computed(() => formatTime(this.elapsed()));
 
-  /** The compiler's play-length estimate, which is what the seek bar spans. */
-  readonly duration = computed(() => this.editor.result()?.stats?.seconds ?? 0);
+  /**
+   * One pass through the song — intro plus a single trip round the loop — which
+   * is what the seek bar spans and where the emulator fades out.
+   *
+   * `stats.playback` rather than the AddmusicK figures beside it, on both counts:
+   * `tagSeconds` is the ID666 field and counts the loop twice, and the estimate
+   * it is built from is a few percent fast, which a looping playhead turns into
+   * a drift that grows with every pass.
+   */
+  readonly duration = computed(() => {
+    const played = this.editor.result()?.stats?.playback;
+    return played ? played.introSeconds + played.mainSeconds : 0;
+  });
   readonly durationLabel = computed(() => formatTime(this.duration()));
   readonly canSeek = computed(() => !this.isIdle() && this.duration() > 0);
+
+  /**
+   * How long the tail past the end runs before playback stops.
+   *
+   * The file's own ID666 fade is ten seconds, which suits a listening app and
+   * not an editor: on a four-second song that is ten seconds of the loop coming
+   * round again underneath a fade, long after the transport has reached the end.
+   * Sizing it to the song keeps the tail musical, and the bounds stop a jingle
+   * or a ten-minute piece from getting a silly one.
+   */
+  private readonly fadeSeconds = computed(() => {
+    const total = this.duration();
+    return total > 0 ? Math.min(Math.max(total / 8, 1), 3) : 0;
+  });
 
   /**
    * Soloing wins over muting, as it does on a mixer: with anything soloed, only
@@ -97,10 +131,12 @@ export class Playback {
       untracked(() => this.reload(this.editor.result()));
     });
 
-    this.player.onPosition = (seconds) => this.elapsed.set(seconds);
+    this.player.onPosition = (songTicks) => this.elapsed.set(this.secondsAt(songTicks));
+    this.player.onDriverState = (state) => this.driver.set(state);
     this.player.onEnded = () => {
       this.state.set('idle');
       this.elapsed.set(0);
+      this.driver.set(null);
     };
     this.player.onError = (error) => {
       this.state.set('idle');
@@ -181,10 +217,48 @@ export class Playback {
     }
   }
 
+  /**
+   * What the player should be told about the song, over what the file says.
+   *
+   * `undefined` rather than 0 for an unguessable length: that leaves the ID666
+   * tag in charge, which is the only thing left to go on.
+   */
+  private timing(): SongTiming {
+    const stats = this.editor.result()?.stats;
+    return {
+      introTicks: stats?.introTicks ?? 0,
+      loopTicks: stats?.loopTicks ?? 0,
+      fadeSeconds: this.duration() > 0 ? this.fadeSeconds() : undefined,
+      songLoops: stats?.loops ?? true,
+    };
+  }
+
+  /**
+   * Turns a tick position into the second it falls on, for the transport to show.
+   *
+   * The playhead itself is counted off the driver and is exact; this only puts a
+   * clock face on it. Interpolating within the intro and the loop separately
+   * matters because the two can run at different tempos, so one flat scale would
+   * put the readout out by however much they differ.
+   */
+  private secondsAt(songTicks: number): number {
+    const stats = this.editor.result()?.stats;
+    const played = stats?.playback;
+    if (!stats || !played) return 0;
+
+    if (stats.introTicks > 0 && songTicks < stats.introTicks) {
+      return (songTicks / stats.introTicks) * played.introSeconds;
+    }
+    if (stats.loopTicks <= 0) return played.introSeconds;
+    return played.introSeconds + ((songTicks - stats.introTicks) / stats.loopTicks) * played.mainSeconds;
+  }
+
   private reload(result: CompileResult | null): void {
     if (this.state() !== 'playing' || !result?.ok) return;
     const spc = this.editor.assembleSpc(this.silenced());
-    if (spc) this.player.play(spc, this.player.getTime());
+    // Resume inside the song rather than at the raw clock, so reloading after a
+    // long looping session does not re-emulate every pass to get back.
+    if (spc) this.player.play(spc, this.secondsAt(this.player.getSongTicks()), this.timing());
   }
 
   /** Play, pause or resume. The first press doubles as the audio unlock gesture. */
@@ -216,7 +290,7 @@ export class Playback {
       return;
     }
 
-    this.player.play(spc, 0);
+    this.player.play(spc, 0, this.timing());
     this.state.set('playing');
   }
 
@@ -224,6 +298,7 @@ export class Playback {
     this.player.stop();
     this.state.set('idle');
     this.elapsed.set(0);
+    this.driver.set(null);
   }
 
   /**

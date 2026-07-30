@@ -384,13 +384,68 @@ console.log("\nparity fixes against AddmusicKsrc");
 	// Music.cpp:3493 — a declared length must switch guessing off, or the
 	// estimate wins and the declared value is recorded but never used.
 	const declared = compile('#amk 4\n#spc { #length "1:30" }\n#0 o4 c4\n');
-	check("#length \"1:30\" is 90 seconds", declared.stats?.seconds === 90, `${declared.stats?.seconds}`);
+	check("#length \"1:30\" is 90 seconds", declared.stats?.tagSeconds === 90, `${declared.stats?.tagSeconds}`);
+	// AMK leaves intro/main at zero for a declared length, so its own readout
+	// prints 0:00. We report what the author wrote instead; the tag is untouched.
+	check("a declared #length is also the play length", declared.stats?.introSeconds === 90 && declared.stats?.mainSeconds === 0,
+		`${declared.stats?.introSeconds}+${declared.stats?.mainSeconds}`);
 	const auto = compile('#amk 4\n#spc { #length "auto" }\n#0 o4 c1 c1 c1\n');
-	check("#length \"auto\" still estimates", (auto.stats?.seconds ?? 0) > 0, `${auto.stats?.seconds}`);
+	check("#length \"auto\" still estimates", (auto.stats?.tagSeconds ?? 0) > 0, `${auto.stats?.tagSeconds}`);
 	const badLength = compile('#amk 4\n#spc { #length "90" }\n#0 o4 c4\n');
 	check("a malformed #length is rejected", !badLength.ok && badLength.diagnostics.some((d) => d.code === "AMK0066"));
 	const tooLong = compile('#amk 4\n#spc { #length "20:00" }\n#0 o4 c4\n');
 	check("a length past 16:39 is rejected", !tooLong.ok && tooLong.diagnostics.some((d) => d.code === "AMK0067"));
+
+	// Music.cpp:3253-3262 — two different lengths come out of one estimate. Four
+	// whole notes at t96 are 4*192 ticks / (2*96) = 4 seconds of music, and the
+	// ID666 tag carries 8 because it counts the loop twice before the fade.
+	const plain = compile("#amk 4\n#0 o4 t96 a1 g1 e1 e1\n");
+	check("a 4-second loop estimates as 4 seconds",
+		plain.stats?.introSeconds === 0 && plain.stats?.mainSeconds === 4,
+		`intro=${plain.stats?.introSeconds} main=${plain.stats?.mainSeconds}`);
+	check("its ID666 tag counts the loop twice", plain.stats?.tagSeconds === 8, `${plain.stats?.tagSeconds}`);
+
+	// An intro is counted once and the loop twice, so 2+2 seconds tags as 6.
+	const intro = compile("#amk 4\n#0 o4 t96 a1 a1 / a1 a1\n");
+	check("an intro and its loop are reported apart",
+		intro.stats?.introSeconds === 2 && intro.stats?.mainSeconds === 2,
+		`intro=${intro.stats?.introSeconds} main=${intro.stats?.mainSeconds}`);
+	check("an intro tags as intro + two loops", intro.stats?.tagSeconds === 6, `${intro.stats?.tagSeconds}`);
+
+	// Music.cpp:809 — a tempo fade makes the length unguessable, and all of the
+	// figures have to go, not just the tag.
+	const faded = compile("#amk 4\n#0 o4 t20,96 c1\n");
+	check("a tempo fade leaves every length unknown",
+		faded.ok && faded.stats?.tagSeconds === null && faded.stats?.introSeconds === null && faded.stats?.mainSeconds === null,
+		`${faded.stats?.tagSeconds}/${faded.stats?.introSeconds}/${faded.stats?.mainSeconds}`);
+	check("and no playback timing either", faded.stats?.playback === null, `${JSON.stringify(faded.stats?.playback)}`);
+
+	// The driver's real rate is (tempo + 1) * 500/256 ticks a second, not the
+	// 2 * tempo AddmusicK rounds it to — 768 ticks at t96 run 4.0538s, not 4.
+	// `audiotest` measures this against the emulator; here it is just arithmetic.
+	const played = (ticks: number, tempo: number) => (ticks * 256) / (500 * (tempo + 1));
+	check("playback timing uses the driver's rate, not the estimate",
+		Math.abs(plain.stats!.playback!.mainSeconds - played(768, 96)) < 1e-9,
+		`${plain.stats?.playback?.mainSeconds} vs ${played(768, 96)}`);
+	const drift = plain.stats!.playback!.mainSeconds / plain.stats!.mainSeconds!;
+	check("which runs longer than AddmusicK's figure", drift > 1.01 && drift < 1.03, `${drift}`);
+	check("the intro is timed the same way",
+		Math.abs(intro.stats!.playback!.introSeconds - played(384, 96)) < 1e-9 &&
+			Math.abs(intro.stats!.playback!.mainSeconds - played(384, 96)) < 1e-9,
+		JSON.stringify(intro.stats?.playback));
+
+	// Each segment carries its own tempo, so the two rates cannot differ by one
+	// constant factor across a song that changes tempo part-way.
+	const shifting = compile("#amk 4\n#0 o4 t192 c1 c1 t16 c1 c1\n");
+	check("a tempo change is timed segment by segment",
+		Math.abs(shifting.stats!.playback!.mainSeconds - (played(384, 192) + played(384, 16))) < 1e-9,
+		`${shifting.stats?.playback?.mainSeconds}`);
+
+	// A declared length has no ticks to time, so it stands in for itself.
+	check("a declared #length is its own playback length",
+		declared.stats?.playback?.introSeconds === 90 && declared.stats?.playback?.mainSeconds === 0,
+		JSON.stringify(declared.stats?.playback));
+
 
 	// Music.cpp:3528 — ID666 gives each text field 32 bytes.
 	const longTitle = compile(`#amk 4\n#spc { #title "${"x".repeat(40)}" }\n#0 o4 c4\n`);

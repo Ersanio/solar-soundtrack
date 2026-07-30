@@ -19,7 +19,7 @@
  * too; comments cite the reference line numbers so the two can be diffed.
  */
 
-import type { Diagnostic, Span, SongTags } from "../../core/types";
+import type { Diagnostic, SongLength, Span, SongTags } from "../../core/types";
 import { TARGET_AM4, TARGET_AMM, TARGET_NONE, preprocess } from "./preprocess";
 import {
 	DEFAULT_TRANSPOSE,
@@ -103,7 +103,19 @@ export interface ParseOutput {
 	/** `#pad` target size, 0 when the song did not ask for one. */
 	minSize: number;
 	tags: SongTags;
-	seconds: number | null;
+	/**
+	 * ID666 tag length — intro plus *two* passes of the main loop, AddmusicK's
+	 * `Music::seconds` (Music.cpp:3255). This is what goes in the SPC header, and
+	 * it is not how long the song is: for that, add {@link introSeconds} and
+	 * {@link mainSeconds}.
+	 */
+	tagSeconds: number | null;
+	/** Intro length in seconds, one pass. AddmusicK's `Music::introSeconds`. */
+	introSeconds: number | null;
+	/** Main loop length in seconds, one pass. AddmusicK's `Music::mainSeconds`. */
+	mainSeconds: number | null;
+	/** The same split at the driver's real tick rate. See {@link TEMPO_TICK_SECONDS}. */
+	playback: SongLength | null;
 	hasYoshiDrums: boolean;
 	/** 0 for #am4/#amm, otherwise the `#amk` parser version. */
 	targetAMKVersion: number;
@@ -112,6 +124,30 @@ export interface ParseOutput {
 	diagnostics: Diagnostic[];
 	errorCount: number;
 }
+
+/**
+ * How long one tick lasts, in seconds, at a given tempo.
+ *
+ * AddmusicK's `1 / (2 * tempo)` is a rounding, and it says so — Music.cpp:3255
+ * asks "Just 2? Not 2.012584 or something?". The driver's timer 0 runs at
+ * 8000/16 = 500 Hz (`mov $fa,#$10`, main.asm, commented "2 ms") and its ticker
+ * adds the tempo to `$49` once per pass of the main loop, playing a tick when
+ * that carries — so a tick every 256 units, and the divisor is 1.953125.
+ *
+ * The `+ 1` is not a fudge: the driver stores the `t` value plus one. Reading
+ * `$51` back out of the emulator gives 41 for `t40`, 193 for `t192` and 255 for
+ * `t254`, and it is that register the ticker multiplies by.
+ *
+ * Even so this is an estimate, and deliberately only used for labels. The main
+ * loop plays at most one tick per pass however many are due, so a song busy
+ * enough to slow the driver down loses ticks outright — around 0.8% on eight
+ * active channels, which no function of tempo can predict. Anything that has to
+ * stay in step with the audio counts the driver's own ticks instead; see
+ * `spc/driver-state.ts`.
+ */
+const TIMER_HZ = 500;
+const TEMPO_UNIT = 256;
+const TEMPO_TICK_SECONDS = (tempo: number): number => TEMPO_UNIT / (TIMER_HZ * (tempo + 1));
 
 const isSpace = (c: string): boolean => c === " " || c === "\t" || c === "\n" || c === "\r" || c === "\v" || c === "\f";
 const isDigit = (c: string): boolean => c >= "0" && c <= "9";
@@ -2738,7 +2774,15 @@ export class AddmusicKParser {
 		}
 	}
 
-	private estimateSeconds(): number | null {
+	/**
+	 * Splits the song into an intro and a main loop, in seconds (Music.cpp:3221).
+	 *
+	 * Kept as the pair rather than one number because AddmusicK reports two
+	 * different lengths from it: `introSeconds + mainSeconds` is how long the song
+	 * is, and is what it prints (Music.cpp:525, :3320), while the ID666 tag gets
+	 * `introSeconds + mainSeconds * 2` — the loop played twice, then faded.
+	 */
+	private estimateSeconds(): { estimated: SongLength; played: SongLength } | null {
 		if (!this.guessLength) return null;
 
 		let totalLength = Infinity;
@@ -2751,8 +2795,10 @@ export class AddmusicKParser {
 		if (changes.length === 0 || changes[0][0] !== 0) changes.unshift([0, 0x36]);
 		changes.push([totalLength, 0]);
 
-		let introSeconds = 0;
-		let mainSeconds = 0;
+		let beforeLoop = 0;
+		let afterLoop = 0;
+		let playedBeforeLoop = 0;
+		let playedAfterLoop = 0;
 		let onIntro = true;
 
 		for (let z = 0; z < changes.length - 1; z++) {
@@ -2763,15 +2809,31 @@ export class AddmusicKParser {
 				break;
 			}
 			if (changes[z][1] < 0) onIntro = false;
+			const tempo = Math.abs(changes[z][1]);
 			const span = changes[z + 1][0] - changes[z][0];
-			const seconds = span / (2 * Math.abs(changes[z][1]));
-			if (onIntro) introSeconds += seconds;
-			else mainSeconds += seconds;
+			// The two rates have to be summed side by side rather than scaled at the
+			// end: each segment carries its own tempo, and they do not agree by a
+			// constant factor.
+			const seconds = span / (2 * tempo);
+			const played = span * TEMPO_TICK_SECONDS(tempo);
+			if (onIntro) {
+				beforeLoop += seconds;
+				playedBeforeLoop += played;
+			} else {
+				afterLoop += seconds;
+				playedAfterLoop += played;
+			}
 		}
 
-		return this.hasIntro
-			? Math.floor(introSeconds + mainSeconds * 2 + 0.5)
-			: Math.floor(introSeconds * 2 + 0.5);
+		// Music.cpp:3253-3262 — without an intro the whole song *is* the loop, so
+		// what was accumulated before the (absent) `/` is the main section.
+		const split = (before: number, after: number): SongLength =>
+			this.hasIntro ? { introSeconds: before, mainSeconds: after } : { introSeconds: 0, mainSeconds: before };
+
+		return {
+			estimated: split(beforeLoop, afterLoop),
+			played: split(playedBeforeLoop, playedAfterLoop),
+		};
 	}
 
 	/**
@@ -2889,6 +2951,36 @@ export class AddmusicKParser {
 		this.pos = end;
 	}
 
+	/**
+	 * The three length figures, from either the estimate or a declared `#length`.
+	 *
+	 * A declared `#length` wins — turning off `guessLength` is the whole point of
+	 * it — and gives only the tag value, since the author stated a play length and
+	 * not a structure. AddmusicK leaves `introSeconds`/`mainSeconds` at zero there,
+	 * so its own readout prints `0:00` for such a song; reporting the declared
+	 * length instead is a deliberate divergence, and it changes nothing in the tag.
+	 */
+	private lengths(): Pick<ParseOutput, "tagSeconds" | "introSeconds" | "mainSeconds" | "playback"> {
+		const unknown = { tagSeconds: null, introSeconds: null, mainSeconds: null, playback: null };
+		if (this.errorCount > 0) return unknown;
+
+		if (this.declaredSeconds !== null) {
+			// Nothing to time against: the declared value is all there is, so it
+			// stands in for the played length too.
+			const declared = { introSeconds: this.declaredSeconds, mainSeconds: 0 };
+			return { tagSeconds: this.declaredSeconds, ...declared, playback: declared };
+		}
+
+		const split = this.estimateSeconds();
+		if (!split) return unknown;
+
+		return {
+			...split.estimated,
+			playback: split.played,
+			tagSeconds: Math.floor(split.estimated.introSeconds + split.estimated.mainSeconds * 2 + 0.5),
+		};
+	}
+
 	// =========================================================================
 
 	private output(): ParseOutput {
@@ -2912,8 +3004,7 @@ export class AddmusicKParser {
 			usedSamples: this.usedSamples,
 			minSize: this.minSize,
 			tags: this.tags,
-			// A declared `#length` wins: it is why `guessLength` was turned off.
-			seconds: this.errorCount === 0 ? (this.declaredSeconds ?? this.estimateSeconds()) : null,
+			...this.lengths(),
 			hasYoshiDrums: this.hasYoshiDrums,
 			targetAMKVersion: this.targetAMKVersion,
 			songTargetProgram: this.songTargetProgram,

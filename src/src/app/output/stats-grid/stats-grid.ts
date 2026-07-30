@@ -2,7 +2,7 @@ import { Component, computed, inject } from '@angular/core';
 
 import { StatTile } from '../../shared/stat-tile/stat-tile';
 import { EditorStore } from '../../state/editor-store';
-import { hex4 } from '../../util/format';
+import { formatTime, hex4 } from '../../util/format';
 
 interface Cell {
   label: string;
@@ -25,6 +25,8 @@ export class StatsGrid {
 
     const echoBytes = stats.echoBufferSize << 11;
     const end = base + stats.totalSize;
+    const playSeconds =
+      stats.introSeconds === null || stats.mainSeconds === null ? null : stats.introSeconds + stats.mainSeconds;
 
     const cells: Cell[] = [
       { label: 'Total size', value: stats.totalSize ? `0x${hex4(stats.totalSize)}` : '—', dim: !stats.totalSize },
@@ -40,10 +42,17 @@ export class StatsGrid {
         dim: !stats.loopDataSize,
       },
       { label: 'Echo buffer', value: echoBytes ? `0x${hex4(echoBytes)}` : '0', dim: echoBytes === 0 },
+      // One pass through the song, as AddmusicK itself reports it. The doubled
+      // figure next to it is the ID666 header field, which is a different thing.
       {
         label: 'Length',
-        value: stats.seconds === null ? 'unknown' : `${stats.seconds}s`,
-        dim: stats.seconds === null,
+        value: playSeconds === null ? 'unknown' : formatTime(playSeconds),
+        dim: playSeconds === null,
+      },
+      {
+        label: 'ID666 length',
+        value: stats.tagSeconds === null ? 'unknown' : `${stats.tagSeconds}s`,
+        dim: stats.tagSeconds === null,
       },
       { label: 'Intro', value: stats.hasIntro ? 'yes' : 'no', dim: !stats.hasIntro },
       { label: 'Loops', value: stats.loops ? 'yes' : 'no', dim: !stats.loops },

@@ -49,6 +49,11 @@ export class AddmusicKCompiler {
 
 		const stats = emptyStats();
 		stats.channelTicks = parsed.channelLengths.map((ticks) => Math.floor(ticks));
+		// Music.cpp:3209 — the song turns over when its *shortest* channel runs out,
+		// so that is the pass length however long the other channels are.
+		const played = stats.channelTicks.filter((ticks) => ticks !== 0);
+		stats.introTicks = Math.floor(parsed.introLength);
+		stats.loopTicks = played.length ? Math.min(...played) - stats.introTicks : 0;
 		stats.echoBufferSize = parsed.echoBufferSize;
 		// What the song asked for, before optimisation replaced anything unplayed —
 		// which is what the field has always claimed to be, and what the UI needs
@@ -61,7 +66,10 @@ export class AddmusicKCompiler {
 		];
 		stats.hasIntro = parsed.hasIntro;
 		stats.loops = !parsed.doesntLoop;
-		stats.seconds = parsed.seconds;
+		stats.tagSeconds = parsed.tagSeconds;
+		stats.introSeconds = parsed.introSeconds;
+		stats.mainSeconds = parsed.mainSeconds;
+		stats.playback = parsed.playback;
 		stats.tags = parsed.tags;
 
 		// Carried on every return, including the failures: the sample panel stays

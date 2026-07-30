@@ -15,6 +15,12 @@ export interface Span {
 	line: number;
 }
 
+/** A song split into the part played once and the part played round and round. */
+export interface SongLength {
+	introSeconds: number;
+	mainSeconds: number;
+}
+
 export interface Diagnostic {
 	severity: Severity;
 	/** Stable identifier, e.g. `AMK0007`. Lets the UI link to docs later. */
@@ -35,6 +41,18 @@ export interface CompileStats {
 	totalSize: number;
 	/** Tick count per channel. */
 	channelTicks: number[];
+	/**
+	 * The song's shape in music ticks — the intro, played once, and the loop that
+	 * follows it. Taken from the shortest channel, which is where the song turns
+	 * over, so `introTicks + loopTicks` is one pass.
+	 *
+	 * These are what the player follows. Ticks survive the trip into the driver
+	 * intact, whereas the seconds they take cannot be predicted exactly: a busy
+	 * song makes the driver drop ticks, so any figure in seconds is an estimate
+	 * and a playhead built on one drifts.
+	 */
+	introTicks: number;
+	loopTicks: number;
 	/** Echo buffer size in 2 KiB units; bytes = `echoBufferSize << 11`. */
 	echoBufferSize: number;
 	/**
@@ -53,8 +71,29 @@ export interface CompileStats {
 	usedSampleNames: string[];
 	hasIntro: boolean;
 	loops: boolean;
-	/** Estimated seconds, or `null` when the compiler could not guess. */
-	seconds: number | null;
+	/**
+	 * The length written to the ID666 tag: the intro plus *two* passes of the main
+	 * loop, which is the SPC convention of looping once before the fade.
+	 *
+	 * This is a header field, not a song length — feed it to the SPC writer and
+	 * nothing else. What to show a listener is {@link introSeconds} plus
+	 * {@link mainSeconds}. `null` when the compiler could not guess.
+	 */
+	tagSeconds: number | null;
+	/** Estimated intro seconds, one pass. `null` when the compiler could not guess. */
+	introSeconds: number | null;
+	/** Estimated main-loop seconds, one pass. `null` when the compiler could not guess. */
+	mainSeconds: number | null;
+	/**
+	 * The same split measured against the driver's real tick rate instead of
+	 * AddmusicK's rounded one — what anything following the audio must use.
+	 *
+	 * {@link introSeconds} and {@link mainSeconds} are AddmusicK's arithmetic, and
+	 * that is deliberate: they are what it prints and what the ID666 tag is built
+	 * from. They are also 2-6% out, which is fine for a label and useless for a
+	 * playhead, since the error compounds on every pass round the loop.
+	 */
+	playback: SongLength | null;
 	/** ID666 tags parsed out of `#spc { }`. */
 	tags: SongTags;
 }
@@ -111,12 +150,17 @@ export function emptyStats(): CompileStats {
 		headerSize: 0,
 		totalSize: 0,
 		channelTicks: [0, 0, 0, 0, 0, 0, 0, 0],
+		introTicks: 0,
+		loopTicks: 0,
 		echoBufferSize: 0,
 		sampleNames: [],
 		usedSampleNames: [],
 		hasIntro: false,
 		loops: true,
-		seconds: null,
+		tagSeconds: null,
+		introSeconds: null,
+		mainSeconds: null,
+		playback: null,
 		tags: {},
 	};
 }
