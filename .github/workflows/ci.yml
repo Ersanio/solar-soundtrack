@@ -1,0 +1,80 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# The Angular workspace lives one level down, so every step runs from src/.
+defaults:
+  run:
+    working-directory: src
+
+jobs:
+  check:
+    name: Typecheck and tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: src/package-lock.json
+
+      - run: npm ci
+
+      # typecheck plus the seven byte-level harnesses: the compiler self-test,
+      # SPC assembly, the headless MML -> SPC -> PCM audio chain, the worklet,
+      # the chart helpers and BRR/bank decoding.
+      - run: npm run check
+
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: check
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+
+    # Let a running deploy finish rather than cancelling it half-published.
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: src/package-lock.json
+
+      - run: npm ci
+
+      # Project Pages serve from /<repo>/, and the app fetches driver/ and
+      # player/ with relative URLs, so they resolve against <base href>. Deriving
+      # it from the repo name keeps a rename or a fork from silently 404ing every
+      # asset. `npm run build` (not `ng build`) so the prebuild hook still
+      # generates public/player/spc-worklet.js, which is not checked in.
+      - name: Build
+        run: npm run build -- --base-href=/${{ github.event.repository.name }}/
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: src/dist/webmml/browser
+
+      - id: deployment
+        uses: actions/deploy-pages@v4
