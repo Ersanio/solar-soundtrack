@@ -52,7 +52,7 @@ export class AddmusicKCompiler {
 		// Music.cpp:3209 — the song turns over when its *shortest* channel runs out,
 		// so that is the pass length however long the other channels are.
 		const played = stats.channelTicks.filter((ticks) => ticks !== 0);
-		stats.introTicks = Math.floor(parsed.introLength);
+		stats.introTicks = Math.floor(parsed.introTicks);
 		stats.loopTicks = played.length ? Math.min(...played) - stats.introTicks : 0;
 		stats.echoBufferSize = parsed.echoBufferSize;
 		// What the song asked for, before optimisation replaced anything unplayed —

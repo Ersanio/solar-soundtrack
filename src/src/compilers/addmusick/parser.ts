@@ -84,7 +84,10 @@ export interface ParseOutput {
 	echoBufferAllocVCMDLoc: number;
 	echoBufferAllocVCMDChannel: number;
 	channelLengths: number[];
+	/** AddmusicK's `introLength`: the last `/` parsed. Kept for parity only. */
 	introLength: number;
+	/** Where the intro actually ends, in ticks: the first `/` in the file. */
+	introTicks: number;
 	/**
 	 * Sample filenames in SRCN order, or `null` when nothing could be resolved
 	 * (no `#samples` and no host-supplied groups to fall back on).
@@ -226,6 +229,7 @@ export class AddmusicKParser {
 	private echoBufferAllocVCMDChannel = 0;
 	private readonly channelLengths = new Array<number>(8).fill(0);
 	private introLength = 0;
+	private introTicks = 0;
 	private guessLength = true;
 	/** Seconds from `#spc { #length "m:ss" }`, which overrides the estimate. */
 	private declaredSeconds: number | null = null;
@@ -1409,6 +1413,17 @@ export class AddmusicKParser {
 
 		if (!this.hasIntro) {
 			this.tempoChanges.push([this.channelLengths[this.channel], -this.tempo]);
+			// Where the intro ends, for anything that needs it as a tick count.
+			//
+			// Deliberately the *first* `/` in the file, matching the marker pushed
+			// beside it: the length estimate splits intro from loop at that tick, so
+			// taking the boundary from anywhere else contradicts the seconds it
+			// reports. AddmusicK's own `introLength` is assigned on every `/`
+			// (Music.cpp:751) and so ends up holding whichever channel happened to be
+			// parsed last, which on a song whose channels carry their `/` at
+			// different points is simply a different place in the song. It gets away
+			// with it because the only thing it feeds is a dead statement.
+			this.introTicks = this.channelLengths[this.channel];
 		} else {
 			for (const change of this.tempoChanges) {
 				if (change[1] < 0) change[1] = -this.tempo;
@@ -2999,6 +3014,7 @@ export class AddmusicKParser {
 			echoBufferAllocVCMDChannel: this.echoBufferAllocVCMDChannel,
 			channelLengths: this.channelLengths,
 			introLength: this.introLength,
+			introTicks: this.introTicks,
 			sampleList: this.resolveSampleList(),
 			requestedSamples: this.requestedSampleList(),
 			usedSamples: this.usedSamples,

@@ -446,6 +446,29 @@ console.log("\nparity fixes against AddmusicKsrc");
 		declared.stats?.playback?.introSeconds === 90 && declared.stats?.playback?.mainSeconds === 0,
 		JSON.stringify(declared.stats?.playback));
 
+	// Channels may carry their `/` at different points. AddmusicK reassigns
+	// introLength on every one and so ends up holding whichever channel was parsed
+	// last, while the length estimate splits at the first — a different place in
+	// the song. Taking the boundary from anywhere but the first contradicts the
+	// seconds reported beside it, and a transport built on the pair maps the whole
+	// first pass onto the wrong scale and then wraps to the wrong bar.
+	//
+	// Channel 0 turns over at 384 ticks here and channel 1 at 192, so the two
+	// rules disagree and the wrong one shows.
+	const staggered = compile("#amk 4\n#0 t192 @0 o4 q7F a1 a1 / g1 g1\n#1 @1 o3 q7F c1 / d1 d1 d1\n");
+	check("the intro ends at the first / in the file", staggered.stats?.introTicks === 384,
+		`${staggered.stats?.introTicks} ticks`);
+	check("and the loop is what is left of the shortest channel", staggered.stats?.loopTicks === 384,
+		`${staggered.stats?.loopTicks} ticks`);
+	// Two views of one boundary, so they have to land in the same place.
+	const split = staggered.stats!.playback!;
+	check("the tick split agrees with the seconds split",
+		Math.abs(
+			staggered.stats!.introTicks / (staggered.stats!.introTicks + staggered.stats!.loopTicks) -
+				split.introSeconds / (split.introSeconds + split.mainSeconds),
+		) < 1e-9,
+		`${staggered.stats?.introTicks}/${staggered.stats?.loopTicks} vs ${split.introSeconds}/${split.mainSeconds}`);
+
 
 	// Music.cpp:3528 — ID666 gives each text field 32 bytes.
 	const longTitle = compile(`#amk 4\n#spc { #title "${"x".repeat(40)}" }\n#0 o4 c4\n`);
