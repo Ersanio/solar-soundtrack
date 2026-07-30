@@ -82,11 +82,6 @@ export interface SpcExportRequest {
 	echoBufferSize?: number;
 	/** Emit the Yoshi drums variant ($F5 = 2). */
 	yoshiDrums?: boolean;
-	/**
-	 * Bitmask of channels to silence, bit 0 being channel #0. For previewing
-	 * parts in isolation; exported files should always be built without it.
-	 */
-	muteChannels?: number;
 	/** Overridable for reproducible output in tests. */
 	date?: Date;
 }
@@ -102,8 +97,6 @@ export function buildSpc(request: SpcExportRequest): SpcExportResult {
 	const { songData, driver, samples, plan, tags = {}, yoshiDrums = false } = request;
 	const localPos = plan.localPos;
 	const layout = computeSpcLayout(plan, driver.programPos, samples, songData.length, request.echoBufferSize ?? 0);
-
-	const song = request.muteChannels ? muteChannels(songData, localPos, request.muteChannels) : songData;
 
 	const spc = new Uint8Array(SPC_SIZE);
 	spc.set(driver.spcBase.subarray(0, Math.min(driver.spcBase.length, SPC_SIZE)), 0);
@@ -128,7 +121,7 @@ export function buildSpc(request: SpcExportRequest): SpcExportResult {
 	const aram = spc.subarray(ARAM_BASE, ARAM_BASE + ARAM_SIZE);
 
 	aram.set(plan.programImage, driver.programPos);
-	aram.set(song, localPos);
+	aram.set(songData, localPos);
 
 	const tablePos = layout.sampleTablePos;
 	let samplePos = layout.sampleDataPos;
@@ -190,45 +183,6 @@ export function spcFilename(tags: SongTags): string {
 }
 
 // ---------------------------------------------------------------------------
-
-/**
- * Silences channels by blanking their entries in the song's channel pointer
- * table, which is how the format already spells "this channel is not used":
- * `link.ts` writes SENTINEL_ZERO for absent channels and relocation turns that
- * into a literal 0x0000 (link.ts:164-174, 217-219). So a muted channel is
- * byte-for-byte a channel the MML never declared, and the driver skips it
- * without knowing the difference. Nothing here touches the emulator.
- *
- * The relocated header opens with a pointer to that table, so its offset comes
- * straight out of the blob. A song with an intro carries a second table 16
- * bytes later, pointed at by the next word — which is exactly how it is
- * recognised, since the alternatives there are the constants 0x00FF and 0x0000.
- */
-function muteChannels(songData: Uint8Array, aramAddress: number, mask: number): Uint8Array {
-	const song = songData.slice();
-	const word = (at: number): number => song[at] | (song[at + 1] << 8);
-
-	const table = word(0) - aramAddress;
-	const hasIntro = word(2) === word(0) + 16;
-	const tables = hasIntro ? [table, table + 16] : [table];
-
-	const last = tables[tables.length - 1] + 15;
-	if (table < 0 || last >= song.length) {
-		throw new SpcExportError(
-			`Channel pointer table at 0x${hex(table)} lies outside the ${song.length}-byte song blob.`,
-		);
-	}
-
-	for (const base of tables) {
-		for (let channel = 0; channel < 8; channel++) {
-			if (!(mask & (1 << channel))) continue;
-			song[base + channel * 2] = 0;
-			song[base + channel * 2 + 1] = 0;
-		}
-	}
-
-	return song;
-}
 
 function totalSampleBytes(samples: BrrSample[]): number {
 	let total = 0;

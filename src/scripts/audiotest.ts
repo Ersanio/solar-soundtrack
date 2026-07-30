@@ -27,8 +27,16 @@ import {
 import { loadDriver } from "../src/spc/driver";
 import { buildSpc } from "../src/spc/export";
 import { planAram } from "../src/spc/layout";
-import { SPC_SAMPLE_RATE, instantiate } from "../src/spc/wasm-host";
-import { TICK_POLL_HZ, readDriverState, readNoteDuration, sawTick, tickVoice } from "../src/spc/driver-state";
+import { SPC_CHANNELS, SPC_SAMPLE_RATE, instantiate } from "../src/spc/wasm-host";
+import {
+	TICK_POLL_HZ,
+	applyChannelMutes,
+	createMuteShadow,
+	readDriverState,
+	readNoteDuration,
+	sawTick,
+	tickVoice,
+} from "../src/spc/driver-state";
 
 const PUBLIC = join(import.meta.dirname, "..", "public");
 
@@ -101,7 +109,7 @@ function resolveSamples(names: readonly string[]): BrrSample[] {
 	return names.map((name) => BY_NAME.get(name) ?? emptySample(name));
 }
 
-function compileToSpc(source: string, muteChannels = 0): Uint8Array {
+function compileToSpc(source: string): Uint8Array {
 	const result = compiler.compile({ source, aramAddress: plan.localPos, options: OPTIONS });
 	if (!result.ok || !result.data) {
 		throw new Error(result.diagnostics.map((d) => `${d.code} ${d.message}`).join("; "));
@@ -118,9 +126,40 @@ function compileToSpc(source: string, muteChannels = 0): Uint8Array {
 		tags: result.stats?.tags,
 		seconds: result.stats?.tagSeconds,
 		echoBufferSize: result.stats?.echoBufferSize,
-		muteChannels,
 		date: new Date(2026, 6, 28),
 	}).spc;
+}
+
+/** Frames per emulated block, matching the rate the worklet polls the driver at. */
+const BLOCK = SPC_SAMPLE_RATE / TICK_POLL_HZ;
+
+/**
+ * Renders with channels muted the way the app mutes them: by writing the
+ * driver's mute register after every emulated block, exactly as `worklet.ts`
+ * does. Nothing about the SPC image changes.
+ *
+ * `warmup` frames are rendered and thrown away first, so the song is past its
+ * boot handshake by the time the level is measured; keep it and `frames` whole
+ * multiples of {@link BLOCK}. `maskAt` is given the frame the block starts on,
+ * counted from the very beginning, so a test can mute partway through.
+ */
+function renderMuted(spc: Uint8Array, warmup: number, frames: number, maskAt: (frame: number) => number): Int16Array {
+	emu.loadSpc(spc);
+	const shadow = createMuteShadow();
+	const out = new Int16Array(frames * SPC_CHANNELS);
+
+	let written = 0;
+	for (let done = 0; done < warmup + frames; done += BLOCK) {
+		const chunk = emu.renderView(Math.min(BLOCK, warmup + frames - done));
+		if (done >= warmup) {
+			out.set(chunk, written);
+			written += chunk.length;
+		}
+		// After the block, like the worklet: a mask posted now takes effect on
+		// the next one.
+		applyChannelMutes(emu.aram(), maskAt(done), shadow);
+	}
+	return out.subarray(0, written);
 }
 
 console.log("\nemulator boots");
@@ -209,6 +248,36 @@ console.log("\nfast-forward lands somewhere different");
 	check("still audible after skipping", peak(fromThree) > 0.005, `peak ${peak(fromThree).toFixed(4)}`);
 }
 
+console.log("\nthe mute register is composed, not assigned");
+{
+	// A pure check of the bookkeeping, with no emulator involved: a song can mute
+	// its own channels through `$FA $05`, and taking a mixer mute away must not
+	// take those with it.
+	const aram = new Uint8Array(0x10000);
+	const shadow = createMuteShadow();
+
+	aram[0x5e] = 0b0000_1000; // the song's own doing
+	aram[0x0241 + 2 * 1] = 200;
+
+	applyChannelMutes(aram, 0b0000_0010, shadow);
+	check("a mixer mute joins the song's own", aram[0x5e] === 0b0000_1010, `$5E = ${aram[0x5e].toString(2)}`);
+	check("the muted channel's volume is taken", aram[0x0241 + 2 * 1] === 0);
+	check("and its bit is flagged for rewriting", (aram[0x5c] & 0b10) !== 0);
+
+	aram[0x5c] = 0;
+	applyChannelMutes(aram, 0, shadow);
+	check("lifting it leaves the song's own mute", aram[0x5e] === 0b0000_1000, `$5E = ${aram[0x5e].toString(2)}`);
+	check("and hands the volume back", aram[0x0241 + 2 * 1] === 200);
+
+	// A volume written while muted is the one that comes back.
+	applyChannelMutes(aram, 0b0000_0010, shadow);
+	aram[0x0241 + 2 * 1] = 90; // as a `v` command mid-mute would
+	applyChannelMutes(aram, 0b0000_0010, shadow);
+	aram[0x5c] = 0;
+	applyChannelMutes(aram, 0, shadow);
+	check("a volume set during the mute survives it", aram[0x0241 + 2 * 1] === 90, `got ${aram[0x0241 + 2 * 1]}`);
+}
+
 console.log("\nmuting a channel takes it out of the mix");
 {
 	// Two clearly different parts, so muting either one is audible in the level
@@ -217,11 +286,8 @@ console.log("\nmuting a channel takes it out of the mix");
 #0 t40 o4 v220 q7F @0 l8 c d e f g4 e4 c4 r4
 #1 o3 v200 q7D @1 l4 [c e g e]4
 `;
-	const render = (muteChannels: number): Int16Array => {
-		emu.loadSpc(compileToSpc(source, muteChannels));
-		emu.render(4000);
-		return emu.render(32000);
-	};
+	const spc = compileToSpc(source);
+	const render = (mask: number): Int16Array => renderMuted(spc, 4000, 32000, () => mask);
 
 	const both = render(0b00);
 	const noSecond = render(0b10);
@@ -235,7 +301,153 @@ console.log("\nmuting a channel takes it out of the mix");
 	check("muting every used channel is silent", peak(neither) < 0.01, `peak ${peak(neither).toFixed(4)}`);
 
 	// Muting must not disturb the song it was derived from.
-	check("an unmuted build is unchanged", rms(render(0b00)).toFixed(6) === rms(both).toFixed(6));
+	check("an unmuted render is unchanged", rms(render(0b00)).toFixed(6) === rms(both).toFixed(6));
+}
+
+console.log("\na muted channel goes on carrying the song");
+{
+	// The whole point of muting at the driver rather than by blanking the
+	// channel's pointer. Everything song-global here lives in `#0`: the tempo,
+	// and the `/` that says where the intro ends. `#0` is also the shortest
+	// channel, and the driver turns the song over when its *first* channel runs
+	// out of data — so a `#0` that stopped being read would move the loop point
+	// as well as losing the tempo.
+	const source = `#amk 4
+#0 t192 v200 @0 o4 q7F a1 / g1
+#1 v180 @1 o3 q7F c1 d1 e1
+`;
+	const stats = compiler.compile({ source, aramAddress: plan.localPos, options: OPTIONS }).stats!;
+	const spc = compileToSpc(source);
+	// Every pass after the first is the loop on its own — the intro is played
+	// once — so that is the gap between turnovers.
+	const expected = stats.loopTicks;
+
+	/** Ticks counted and loop turnovers seen over `seconds`, with `mask` held. */
+	function follow(mask: number, seconds: number) {
+		emu.loadSpc(spc);
+		const shadow = createMuteShadow();
+
+		// Let the song key on, so there is a voice to count off.
+		for (let done = 0; done < SPC_SAMPLE_RATE / 20; done += BLOCK) {
+			emu.renderView(BLOCK);
+			applyChannelMutes(emu.aram(), mask, shadow);
+		}
+
+		const voice = tickVoice(emu.aram());
+		let previous = readNoteDuration(emu.aram(), voice);
+		let pointer = readDriverState(emu.aram()).trackPointers[0];
+		let ticks = 0;
+		const passes: number[] = [];
+		let pending = -1;
+		let before = 0;
+
+		for (let frame = 0; frame < SPC_SAMPLE_RATE * seconds; frame += BLOCK) {
+			emu.renderView(BLOCK);
+			const aram = emu.aram();
+			applyChannelMutes(aram, mask, shadow);
+
+			const now = readNoteDuration(aram, voice);
+			ticks += sawTick(previous, now);
+			previous = now;
+
+			// A 16-bit pointer read from outside the emulator can be caught
+			// half-written; a real jump is still there on the next look.
+			const next = readDriverState(aram).trackPointers[0];
+			if (pending >= 0) {
+				if (next < before) passes.push(pending);
+				pending = -1;
+			} else if (next < pointer) {
+				pending = ticks;
+				before = pointer;
+			}
+			pointer = next;
+		}
+		return { ticks, passes };
+	}
+
+	const seconds = 24;
+	const open = follow(0b00, seconds);
+	const muted = follow(0b01, seconds);
+	const gaps = (passes: number[]) => passes.slice(1).map((v, i) => v - passes[i]);
+	const median = (values: number[]): number => [...values].sort((a, b) => a - b)[values.length >> 1];
+
+	const openGap = median(gaps(open.passes));
+	const mutedGap = median(gaps(muted.passes));
+
+	check(
+		`the song turns over every ${expected} ticks, as the compiler says`,
+		gaps(open.passes).length >= 2 && Math.abs(openGap - expected) <= 1,
+		`${gaps(open.passes).length} passes, median ${openGap}`,
+	);
+	check(
+		"and muting the channel that carries the `/` does not move that",
+		gaps(muted.passes).length >= 2 && mutedGap === openGap,
+		`${mutedGap} muted vs ${openGap} open`,
+	);
+	// If `t192` had gone with the channel the driver would fall back to its own
+	// tempo and the count would be out by a factor, not by a fraction of a
+	// percent. The slack is for the drop-ticks a busy driver loses, which a
+	// muted channel loses slightly fewer of.
+	check(
+		"and it still sets the tempo it declares",
+		Math.abs(muted.ticks - open.ticks) < open.ticks * 0.01,
+		`${muted.ticks} ticks muted vs ${open.ticks} open, over ${seconds}s`,
+	);
+	// The channel really was silent for all of that.
+	check(
+		"while making no sound",
+		peak(renderMuted(spc, 4000, 32000, () => 0b11)) < 0.01,
+		`peak ${peak(renderMuted(spc, 4000, 32000, () => 0b11)).toFixed(4)}`,
+	);
+}
+
+console.log("\nmuting cuts a note that is already ringing");
+{
+	// `$5E` alone only stops the *next* note; the volume has to be taken too.
+	// One very long note, muted a third of the way in, so anything still audible
+	// afterwards is the ringing note the mute failed to cut.
+	const source = "#amk 4\n#0 t20 v220 @0 o4 q7F c1\n";
+	const spc = compileToSpc(source);
+
+	const warmup = 32000; // 1s in, well inside the note
+	const frames = 32000;
+	const cutAt = warmup + 3200; // 100 ms into the measured window
+
+	const open = renderMuted(spc, warmup, frames, () => 0);
+	const cut = renderMuted(spc, warmup, frames, (frame) => (frame >= cutAt ? 0b1 : 0));
+
+	// Skip past the cut itself: the driver needs a music tick to write VxVOL.
+	const after = (samples: Int16Array) => samples.subarray((3200 + 3200) * SPC_CHANNELS);
+
+	check("the note is ringing to begin with", peak(after(open)) > 0.02, `peak ${peak(after(open)).toFixed(4)}`);
+	check("and the mute silences it", peak(after(cut)) < 0.002, `peak ${peak(after(cut)).toFixed(4)}`);
+	check("without touching what came before", rms(cut.subarray(0, 3200 * SPC_CHANNELS)) === rms(open.subarray(0, 3200 * SPC_CHANNELS)));
+}
+
+console.log("\nunmuting gives the channel its volume back");
+{
+	const source = "#amk 4\n#0 t60 v220 @0 o4 q7D l8 [c d e f]8\n";
+	const spc = compileToSpc(source);
+
+	const warmup = 32000;
+	const frames = 96000;
+	const lift = warmup + 32000;
+
+	const open = renderMuted(spc, warmup, frames, () => 0);
+	const restored = renderMuted(spc, warmup, frames, (frame) => (frame < lift ? 0b1 : 0));
+	// The emulator is left where the last render finished, so the register can be
+	// read straight out of it.
+	const volume = emu.aram()[0x0241];
+
+	const tail = (samples: Int16Array) => samples.subarray(64000 * SPC_CHANNELS);
+
+	check("the track volume register is back", volume === 220, `$0241 = ${volume}`);
+	check("the channel is audible again", peak(tail(restored)) > 0.02, `peak ${peak(tail(restored)).toFixed(4)}`);
+	check(
+		"and at the level it had",
+		Math.abs(rms(tail(restored)) - rms(tail(open))) < rms(tail(open)) * 0.1,
+		`${rms(tail(restored)).toFixed(5)} vs ${rms(tail(open)).toFixed(5)}`,
+	);
 }
 
 console.log("\na song-declared sample set still plays");

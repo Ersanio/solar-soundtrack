@@ -6,11 +6,14 @@ import { Playback } from '../../state/playback';
 /**
  * Per-channel mute and solo for previewing parts in isolation.
  *
- * These are not emulator controls: the vendored core exposes no way to silence
- * a voice, so `Playback` rebuilds the SPC with the channel's pointer blanked
- * and reloads at the current position (see `muteChannels` in `spc/export.ts`).
- * That costs a short gap on every toggle, which is why these are buttons rather
- * than faders — one deliberate press at a time.
+ * The song is not rebuilt: the mask goes to the running emulator, which writes
+ * the driver's own mute register in APU RAM (`applyChannelMutes` in
+ * `spc/driver-state.ts`). A muted channel goes on being parsed and only loses
+ * its sound, which is what keeps the song intact — tempo, echo settings and the
+ * intro marker are all song-global but live in whichever channel the user typed
+ * them in, so a channel that stops being read takes them with it.
+ *
+ * Toggling is immediate and costs no gap in playback.
  */
 @Component({
   selector: 'amk-channel-mixer',

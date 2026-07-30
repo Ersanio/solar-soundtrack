@@ -137,13 +137,10 @@ export class Playback {
       });
     });
 
-    // Muting is a property of the song data, not of the emulator: the SPC is
-    // rebuilt with those channels blanked and reloaded where it left off. The
-    // reload costs a short gap, which is why this is not tied to a slider.
-    effect(() => {
-      this.silenced();
-      untracked(() => this.reload(this.editor.result()));
-    });
+    // Muting is a gate on the driver, not a property of the song data: the mask
+    // goes straight to APU RAM and every channel goes on being played, so
+    // nothing is rebuilt and playback does not break stride.
+    effect(() => this.player.setMute(this.silenced()));
 
     this.player.onPosition = (songTicks) => this.elapsed.set(this.secondsAt(songTicks));
     this.player.onDriverState = (state) => this.driver.set(state);
@@ -270,7 +267,7 @@ export class Playback {
 
   private reload(result: CompileResult | null): void {
     if (this.state() !== 'playing' || !result?.ok) return;
-    const spc = this.editor.assembleSpc(this.silenced());
+    const spc = this.editor.assembleSpc();
     // Resume inside the song rather than at the raw clock, so reloading after a
     // long looping session does not re-emulate every pass to get back.
     if (spc) this.player.play(spc, this.secondsAt(this.player.getSongTicks()), this.timing());
@@ -299,7 +296,7 @@ export class Playback {
     this.player.setVolume(this.volume() / 100);
 
     this.editor.compileNow();
-    const spc = this.editor.assembleSpc(this.silenced());
+    const spc = this.editor.assembleSpc();
     if (!spc) {
       this.editor.fail('cannot play: song has errors');
       return;
