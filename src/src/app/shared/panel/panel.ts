@@ -17,7 +17,7 @@ import { Component, input } from '@angular/core';
       <h2 class="text-ink-muted text-xs font-semibold tracking-wide uppercase">{{ heading() }}</h2>
       <ng-content select="[panelAside]" />
     </div>
-    <div class="min-h-0 flex-1">
+    <div class="min-h-0 flex-1 overflow-auto">
       <ng-content />
     </div>
   `,
