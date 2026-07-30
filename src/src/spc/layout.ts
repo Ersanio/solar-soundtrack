@@ -177,6 +177,9 @@ export function computeBudget(
 ): AramBudget {
 	const layout = computeSpcLayout(plan, driver.programPos, samples, songBytes, echoBufferSize);
 
+	/** Directory entries that actually carry data, i.e. were not emptied. */
+	const loaded = samples.reduce((count, sample) => (sample.data.length > 0 ? count + 1 : count), 0);
+
 	// Everything below the song is one line item, because it is one file. The
 	// detail names only what we can actually verify from the bytes — whether the
 	// image carries its own song table and global songs — since that is what
@@ -218,7 +221,11 @@ export function computeBudget(
 		},
 		{
 			key: "samples",
-			label: `samples (${samples.length})`,
+			// Directory entries and actual samples are not the same number once
+			// optimisation has emptied the unplayed ones. Reporting only the
+			// entry count reads as "the whole default set is loaded" no matter what
+			// was really uploaded, so say both when they differ.
+			label: loaded === samples.length ? `samples (${samples.length})` : `samples (${loaded} of ${samples.length})`,
 			start: layout.sampleDataPos,
 			bytes: layout.sampleDataEnd - layout.sampleDataPos,
 			group: "samples",
