@@ -39,6 +39,35 @@ export const HEX_LENGTHS: readonly number[] = [
  */
 export const EMPTY_SAMPLE_NAME = "EMPTY.brr";
 
+/**
+ * Entries a `.bnk` bank contributes to the sample list, blanks included
+ * (`addSampleBank`, globals.cpp:581).
+ *
+ * Deliberately stated here rather than imported from `spc/brr.ts`, which has its
+ * own `SAMPLE_BANK_SLOTS` for reading the directory: the compiler layer does not
+ * depend on the SPC layer, and this is the AddmusicK-side statement of the same
+ * number. `brrtest` asserts the two agree so they cannot drift apart.
+ */
+export const BANK_SLOT_COUNT = 0x40;
+
+/**
+ * Name for one slot of a `.bnk` sample bank.
+ *
+ * A bank is a single file holding up to 64 samples, but the compiler deals only
+ * in names and the host resolves them to bytes — so each slot needs a name of
+ * its own. AddmusicK generates these from a global counter
+ * (`__SRCNBANKBRR%04X`, globals.cpp:612); deriving the name from the bank and
+ * the slot instead makes it deterministic, which is what lets the two sides
+ * agree without sharing any mutable state.
+ *
+ * The `:` cannot collide with a real filename: `validateName` in `spc/brr.ts`
+ * already refuses the characters that would matter, and a slot name is never
+ * typed by hand.
+ */
+export function bankSlotName(bank: string, slot: number): string {
+	return `${bank}:${slot.toString(16).toUpperCase().padStart(2, "0")}`;
+}
+
 export const FIRST_VCMD = 0xda;
 export const LAST_VCMD = 0xfe;
 

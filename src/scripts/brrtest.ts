@@ -33,7 +33,13 @@ import {
 	peaks,
 	validateBrr,
 	validateName,
+	SAMPLE_BANK_BYTES,
+	SAMPLE_BANK_SLOTS,
+	parseSampleBank,
+	usedBankSlots,
+	validateSampleBank,
 } from "../src/spc/brr";
+import { BANK_SLOT_COUNT, bankSlotName } from "../src/compilers/addmusick/tables";
 
 const PUBLIC = join(import.meta.dirname, "..", "public");
 
@@ -60,6 +66,41 @@ function block(shift: number, filter: number, nibbles: number[], flags = 0): Uin
 
 const clamp16 = (v: number): number => (v > 0x7fff ? 0x7fff : v < -0x8000 ? -0x8000 : v);
 const wrap16 = (v: number): number => (v << 16) >> 16;
+
+/** Bytes of `.bnk` header that AddmusicK discards before reading anything. */
+const BANK_HEADER = 12;
+
+/**
+ * Builds a `.bnk` sample bank.
+ *
+ * `slots` gives the blocks for each populated slot, keyed by index; anything
+ * omitted stays a blank directory entry. Sample data is laid out after the
+ * directory and addressed in the ARAM $8000 space the real format uses.
+ */
+function bankFixture(slots: Record<number, Uint8Array>, loops: Record<number, number> = {}): Uint8Array {
+	const raw = new Uint8Array(SAMPLE_BANK_BYTES);
+	const image = raw.subarray(BANK_HEADER);
+
+	// Directory first, then data — 4 bytes per slot.
+	let at = SAMPLE_BANK_SLOTS * 4;
+	for (const [key, data] of Object.entries(slots)) {
+		const slot = Number(key);
+		const start = at + 0x8000;
+		const loop = start + (loops[slot] ?? 0);
+		image[slot * 4] = start & 0xff;
+		image[slot * 4 + 1] = (start >> 8) & 0xff;
+		image[slot * 4 + 2] = loop & 0xff;
+		image[slot * 4 + 3] = (loop >> 8) & 0xff;
+		image.set(data, at);
+		at += data.length;
+	}
+	return raw;
+}
+
+/** One BRR block, without the `.brr` file's 2-byte loop header. */
+function bareBlock(shift: number, filter: number, nibbles: number[], end = false): Uint8Array {
+	return block(shift, filter, nibbles, end ? 1 : 0).subarray(2);
+}
 
 // ---------------------------------------------------------------------------
 
@@ -340,6 +381,95 @@ console.log("\npeaks reduces without lying");
 
 	check("no samples gives no geometry", peaks(new Int16Array(0), 8).every((v) => v === 0));
 	check("zero buckets is handled", peaks(pcm, 0).length === 0);
+}
+
+console.log("\nsample banks split into their slots");
+{
+	const names = (bank: string) => (slot: number) => bankSlotName(bank, slot);
+	const ramp = [7, 6, 4, 1, 15, 13, 10, 8, 9, 11, 14, 2, 5, 7, 3, 0];
+
+	check("the two slot counts agree", BANK_SLOT_COUNT === SAMPLE_BANK_SLOTS, `${BANK_SLOT_COUNT} vs ${SAMPLE_BANK_SLOTS}`);
+
+	check("a bank must be exactly 32 KB", validateSampleBank(new Uint8Array(0x4000)) !== null);
+	check("32 KB passes", validateSampleBank(new Uint8Array(SAMPLE_BANK_BYTES)) === null);
+	check("one byte short is rejected", validateSampleBank(new Uint8Array(SAMPLE_BANK_BYTES - 1)) !== null);
+
+	{
+		// A single-block sample in slot 0, everything else blank.
+		const bank = bankFixture({ 0: bareBlock(8, 0, ramp, true) });
+		const slots = parseSampleBank(bank, names("t.bnk"));
+
+		check("it always yields 64 slots", slots.length === SAMPLE_BANK_SLOTS, `${slots.length}`);
+		check("slot names follow the convention", slots[0].sampleName === "t.bnk:00", slots[0].sampleName);
+		check("slot 63 is named 3F", slots[63].sampleName === "t.bnk:3F", slots[63].sampleName);
+		check("a blank directory entry is an empty slot", slots[1].data.length === 0);
+		check("blank slots are still named", slots[1].sampleName === "t.bnk:01", slots[1].sampleName);
+		check("the populated slot holds one block", slots[0].data.length === BRR_BLOCK_BYTES, `${slots[0].data.length}`);
+		check("used-slot count ignores the blanks", usedBankSlots(slots) === 1, `${usedBankSlots(slots)}`);
+	}
+
+	{
+		// Three blocks, only the last flagged END: the walk must take all three.
+		const three = new Uint8Array(BRR_BLOCK_BYTES * 3);
+		three.set(bareBlock(8, 0, ramp), 0);
+		three.set(bareBlock(8, 0, ramp), BRR_BLOCK_BYTES);
+		three.set(bareBlock(8, 0, ramp, true), BRR_BLOCK_BYTES * 2);
+
+		const slots = parseSampleBank(bankFixture({ 5: three }), names("t.bnk"));
+		check("the walk runs to the END flag, inclusive", slots[5].data.length === BRR_BLOCK_BYTES * 3,
+			`${slots[5].data.length}`);
+		check("and stops there", blockCount(slots[5]) === 3, `${blockCount(slots[5])}`);
+	}
+
+	{
+		// The directory stores an address; loopOffset must come out relative.
+		const two = new Uint8Array(BRR_BLOCK_BYTES * 2);
+		two.set(bareBlock(8, 0, ramp), 0);
+		two.set(bareBlock(8, 0, ramp, true), BRR_BLOCK_BYTES);
+
+		const slots = parseSampleBank(bankFixture({ 2: two }, { 2: BRR_BLOCK_BYTES }), names("t.bnk"));
+		check("loopOffset is the loop address minus the start", slots[2].loopOffset === BRR_BLOCK_BYTES,
+			`${slots[2].loopOffset}`);
+	}
+
+	{
+		// A slot must decode to exactly what the same blocks would as a `.brr`.
+		const data = bareBlock(9, 2, ramp, true);
+		const slots = parseSampleBank(bankFixture({ 0: data }), names("t.bnk"));
+		const fromBank = decodeBrr(slots[0]);
+
+		const standalone = new Uint8Array(2 + data.length);
+		standalone.set(data, 2);
+		const fromFile = decodeBrr(parseBrr("t.brr", standalone));
+
+		check("a slot decodes like the equivalent .brr", fromBank.length === fromFile.length &&
+			fromBank.every((value, index) => value === fromFile[index]),
+			`${fromBank.length} vs ${fromFile.length} samples`);
+	}
+
+	{
+		// A directory entry pointing outside the image cannot be followed, and
+		// must not be allowed to read past the buffer or shift the slot list.
+		const bank = bankFixture({});
+		const image = bank.subarray(BANK_HEADER);
+		image[0] = 0x00; // start $0000 — below the $8000 origin
+		image[1] = 0x00;
+		image[2] = 0x10; // a non-zero loop, so it is not read as a blank entry
+		image[3] = 0x00;
+
+		const slots = parseSampleBank(bank, names("t.bnk"));
+		check("an out-of-range address yields an empty slot, not a crash", slots.length === SAMPLE_BANK_SLOTS &&
+			slots[0].data.length === 0, `${slots.length} slots, slot 0 has ${slots[0].data.length} bytes`);
+	}
+
+	check("a wrong-sized bank throws rather than guessing", (() => {
+		try {
+			parseSampleBank(new Uint8Array(16), names("t.bnk"));
+			return false;
+		} catch {
+			return true;
+		}
+	})());
 }
 
 console.log(`\n${failures === 0 ? "all checks passed" : `${failures} check(s) failed`}\n`);

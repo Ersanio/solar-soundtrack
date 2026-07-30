@@ -129,6 +129,106 @@ export function blockCount(sample: BrrSample): number {
 	return Math.floor(sample.data.length / BRR_BLOCK_BYTES);
 }
 
+// ---------------------------------------------------------------------------
+// Sample banks
+// ---------------------------------------------------------------------------
+
+/**
+ * A `.bnk` is exactly 32 KB — the upper half of a real cartridge's ARAM, dumped.
+ * `globals.cpp:575` rejects any other size outright.
+ */
+export const SAMPLE_BANK_BYTES = 0x8000;
+
+/** A bank always carries a 64-entry sample directory, empty slots included. */
+export const SAMPLE_BANK_SLOTS = 0x40;
+
+/** Bytes of header ahead of the directory, discarded (`globals.cpp:577`). */
+const SAMPLE_BANK_HEADER = 12;
+
+/** ARAM address the bank image is mapped at, so addresses rebase against it. */
+const SAMPLE_BANK_ORIGIN = 0x8000;
+
+/** Why a byte run is not a usable `.bnk`, or `null` if it is. */
+export function validateSampleBank(bytes: Uint8Array): string | null {
+	if (bytes.length !== SAMPLE_BANK_BYTES) {
+		return (
+			`${bytes.length.toLocaleString()} bytes: a sample bank must be exactly ` +
+			`${SAMPLE_BANK_BYTES.toLocaleString()}, being a dump of ARAM $8000-$FFFF.`
+		);
+	}
+	return null;
+}
+
+/**
+ * Splits a `.bnk` sample bank into its slots — `addSampleBank`, globals.cpp:551.
+ *
+ * A bank is how a song ported from another SNES game gets that game's
+ * instruments: the 64 slots keep their original SRCNs, so sequence data lifted
+ * from the original finds each sample exactly where it expects it. Which is why
+ * this always returns {@link SAMPLE_BANK_SLOTS} entries, empty ones included —
+ * dropping the blanks would renumber everything after them.
+ *
+ * Slot data carries **no** 2-byte loop header. AMK takes the `noLoopHeader`
+ * path for banks (`globals.cpp:468-472`), reading the loop point out of the
+ * directory instead, so {@link parseBrr} is not usable here.
+ *
+ * `names(slot)` supplies each slot's name; the convention belongs to the
+ * compiler front-end, not to the format.
+ */
+export function parseSampleBank(bytes: Uint8Array, names: (slot: number) => string): BrrSample[] {
+	const problem = validateSampleBank(bytes);
+	if (problem) throw new BrrError(`Not a valid sample bank: ${problem}`);
+
+	// Every offset below — the directory *and* the addresses in it — is relative
+	// to the image with its header removed, because AMK erases those 12 bytes
+	// before reading anything.
+	const image = bytes.subarray(SAMPLE_BANK_HEADER);
+	const word = (at: number): number => image[at] | (image[at + 1] << 8);
+
+	const out: BrrSample[] = [];
+	for (let slot = 0; slot < SAMPLE_BANK_SLOTS; slot++) {
+		const name = names(slot);
+		const start = word(slot * 4);
+		// Deliberately computed before the rebase, exactly as `globals.cpp:584`
+		// does, which makes it an offset from the sample's own start rather than
+		// an address — the same thing `BrrSample.loopOffset` means.
+		const loopOffset = (word(slot * 4 + 2) - start) & 0xffff;
+
+		// A blank directory entry (`globals.cpp:587`). Real banks are rarely full.
+		if (start === 0 && loopOffset === 0) {
+			out.push(emptySample(name));
+			continue;
+		}
+
+		let at = start - SAMPLE_BANK_ORIGIN;
+		const from = at;
+		// Walk block by block to the one whose header sets the end flag, keeping
+		// it. A bank stores no length, so the flag is the only terminator; the
+		// bounds check is ours, since a truncated or mis-addressed bank would
+		// otherwise run off the image.
+		while (at >= 0 && at + BRR_BLOCK_BYTES <= image.length) {
+			const header = image[at];
+			at += BRR_BLOCK_BYTES;
+			if ((header & 1) === 1) break;
+		}
+
+		out.push(
+			from >= 0 && at > from
+				? { sampleName: name, data: image.subarray(from, at), loopOffset }
+				: // An address outside the image is not recoverable, and an empty
+					// slot is the one representation that cannot corrupt the directory.
+					emptySample(name),
+		);
+	}
+
+	return out;
+}
+
+/** Non-empty slots in a parsed bank, for display. */
+export function usedBankSlots(slots: readonly BrrSample[]): number {
+	return slots.reduce((count, slot) => (slot.data.length > 0 ? count + 1 : count), 0);
+}
+
 /**
  * Saturate to signed 16 bits — snes_spc's `CLAMP16`, which is
  * `if ((int16_t) io != io) io = (io >> 31) ^ 0x7FFF`.
