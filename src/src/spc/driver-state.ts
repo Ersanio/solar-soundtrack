@@ -1,5 +1,6 @@
 /**
- * Reading what the N-SPC driver is doing, out of the emulator's APU RAM.
+ * Reading what the N-SPC driver is doing, out of the emulator's APU RAM — and,
+ * in one place, telling it what to do.
  *
  * Everything else in this app predicts playback: the compiler works out how long
  * a song should take, and the transport follows that prediction. This module
@@ -7,6 +8,11 @@
  * page, and `readme/readme_files/aram_map.html` documents every byte of it, so
  * the current tempo, the position of each voice in its music data and the tick
  * accumulator can simply be read.
+ *
+ * {@link applyChannelMutes} is the exception, and it lives here because it is
+ * the same knowledge pointed the other way: APU RAM is a live window into the
+ * emulator's heap, so the driver's own mute register can be written as easily as
+ * its tempo can be read.
  *
  * That matters because prediction is not exact and cannot be made exact. The
  * driver's main loop (`AddmusicKsrc/main.asm`, `MainLoop`) processes at most one
@@ -29,12 +35,26 @@ const enum Addr {
 	TempoCounter = 0x49,
 	/** `$51`: music tempo, as the `t` command and any fade leave it. */
 	Tempo = 0x51,
+	/** `$5C`: voice bits whose `VxVOL` the driver must rewrite this tick. */
+	VolumeDirty = 0x5c,
+	/**
+	 * `$5E`: the driver's own mute mask, one bit per voice.
+	 *
+	 * `main.asm:71` — "Used to mute a channel (via Yoshi Drums, etc.). One bit
+	 * per channel, setting it stops a channel from playing."
+	 */
+	MuteMask = 0x5e,
 	/** `$70-$7F`: music note duration, one byte per voice. */
 	NoteDurations = 0x70,
+	/** `$0241+2n`: per-voice track volume, as `v` and `$E8` leave it. */
+	TrackVolumes = 0x0241,
 }
 
 /** N-SPC songs have eight music channels. */
 export const VOICES = 8;
+
+/** Every voice, as a bitmask. */
+const ALL_VOICES = 0xff;
 
 /** Where the driver has got to, as of the last emulated sample. */
 export interface DriverState {
@@ -137,4 +157,107 @@ export function readLoopStarts(aram: Uint8Array, songAddress: number): number[] 
 	const hasIntro = word(aram, songAddress + 2) === first + 16;
 	const table = hasIntro ? word(aram, songAddress + 2) : first;
 	return Array.from({ length: VOICES }, (_, voice) => word(aram, table + voice * 2));
+}
+
+/**
+ * What {@link applyChannelMutes} has to remember between calls.
+ *
+ * Muting takes a channel's volume away from it, so the value has to be kept
+ * somewhere until the channel is given it back.
+ */
+export interface MuteShadow {
+	/** The mask last written, so `$5E` bits the song set itself survive. */
+	applied: number;
+	/** The track volume taken off each voice, waiting to be put back. */
+	saved: Uint8Array;
+	/** Voices whose volume has not been restored yet. */
+	restoring: number;
+}
+
+export function createMuteShadow(): MuteShadow {
+	return { applied: 0, saved: new Uint8Array(VOICES), restoring: 0 };
+}
+
+/** Forgets everything, for when the emulator is reloaded from the SPC image. */
+export function resetMuteShadow(shadow: MuteShadow): void {
+	shadow.applied = 0;
+	shadow.restoring = 0;
+	shadow.saved.fill(0);
+}
+
+/**
+ * Silences the voices in `mask`, by writing the driver's own mute register.
+ *
+ * The alternative — building the SPC with those channels' pointers blanked —
+ * silences them by making the driver skip them entirely, which is not the same
+ * thing at all. A channel that is never parsed takes the whole song with it:
+ * `$FA $04` (echo buffer size), `$FA $06` (playback mode), `t`, `w` and the echo
+ * and FIR commands are all song-global but live in whichever channel the user
+ * happened to type them in, and the intro ends when the *first* channel runs out
+ * of data (`main.asm:2340-2346`), so dropping one moves the loop point. Muting
+ * here leaves every channel parsing and only takes away its sound.
+ *
+ * Two registers, because `$5E` alone is not immediate:
+ *
+ * - `$5E` gates note dispatch (`main.asm:2389-2414`). With the bit set the
+ *   driver skips `NoteVCMD` but still runs duration bookkeeping, every `$DA-$FF`
+ *   command, loops, subroutines, remote code and the end-of-note key-off. It
+ *   stops the *next* note, and does nothing to one already ringing.
+ * - `$0241+2n` is the track volume the driver multiplies in on every tick
+ *   (`main.asm:2813-2815`). Zeroing it and flagging the voice in `$5C` makes the
+ *   driver write `VxVOL = 0` itself on its next tick (`main.asm:2816-2821`),
+ *   which cuts the ringing note within a few milliseconds.
+ *
+ * Call once per emulated block. Re-applying is not just cheap insurance: `$5E`
+ * is rebuilt from `$6E` whenever a song uses Yoshi drums (`main.asm:1813-1816`)
+ * and zeroed when a song starts (`main.asm:2185`), and `$5C` is consumed and
+ * cleared once per music tick (`main.asm:2501-2513`), so a single write can be
+ * swallowed by the loop that was already running.
+ */
+export function applyChannelMutes(aram: Uint8Array, mask: number, shadow: MuteShadow): void {
+	const wanted = mask & ALL_VOICES;
+	if (wanted === 0 && shadow.applied === 0 && shadow.restoring === 0) return;
+
+	// Voices let go of since the last call owe their volume back; ones muted
+	// again before that happened can keep waiting.
+	shadow.restoring = (shadow.restoring | (shadow.applied & ~wanted)) & ~wanted;
+
+	// Composed rather than assigned, so a song muting its own channels with
+	// `$FA $05` keeps those bits.
+	aram[Addr.MuteMask] = (aram[Addr.MuteMask] & ~shadow.applied) | wanted;
+	shadow.applied = wanted;
+
+	let dirty = 0;
+	for (let voice = 0; voice < VOICES; voice++) {
+		const bit = 1 << voice;
+		const at = Addr.TrackVolumes + voice * 2;
+
+		if (wanted & bit) {
+			// Non-zero means the song has written a volume since we last looked —
+			// a `v` command, or a step of a volume fade. Keep the newest one.
+			const volume = aram[at];
+			if (volume !== 0) {
+				shadow.saved[voice] = volume;
+				aram[at] = 0;
+				dirty |= bit;
+			}
+			continue;
+		}
+
+		if (!(shadow.restoring & bit)) continue;
+
+		// Done once the value is back and the driver has consumed the flag. It
+		// can be cleared out from under a write that lands mid-loop, in which
+		// case the voice simply returns at its next note rather than mid-note.
+		if (aram[at] === shadow.saved[voice] && (aram[Addr.VolumeDirty] & bit) === 0) {
+			shadow.restoring &= ~bit;
+			continue;
+		}
+		aram[at] = shadow.saved[voice];
+		dirty |= bit;
+	}
+
+	// OR rather than assign, matching the driver's own `or ($5c),($48)`, so
+	// voices that do not need a rewrite are not given one.
+	aram[Addr.VolumeDirty] |= dirty;
 }

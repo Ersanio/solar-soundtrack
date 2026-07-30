@@ -84,6 +84,11 @@ export interface SpcCore {
 	 * rather than what it was predicted to do. See `driver-state.ts` for the
 	 * addresses; `readme/readme_files/aram_map.html` documents all of them.
 	 *
+	 * A window onto the heap rather than a copy, so it can be written as well as
+	 * read and the SPC700 sees the change on its next instruction — which is how
+	 * channel muting works, with no help from the core, which exports nothing for
+	 * it. `loadSpc` puts the pristine image back over anything written here.
+	 *
 	 * A fresh view each call: the wasm heap can be reallocated by `memory.grow`,
 	 * which detaches any array handed out earlier. Valid only after `loadSpc`.
 	 */
