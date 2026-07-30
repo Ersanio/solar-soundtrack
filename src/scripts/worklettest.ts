@@ -158,26 +158,35 @@ function peak(samples: Float32Array): number {
 	return max;
 }
 
+function rms(samples: Float32Array): number {
+	let sum = 0;
+	for (const sample of samples) sum += sample * sample;
+	return Math.sqrt(sum / samples.length);
+}
+
 // ---------------------------------------------------------------------------
 
 const driver = await loadDriver();
 const plan = planAram(driver);
 
-const result = compiler.compile({
-	source: "#amk 4\n#0 t40 o4 v220 q7F @0 l8 c d e f g4 e4 c4 r4\n",
-	aramAddress: plan.localPos,
-});
-if (!result.ok || !result.data) throw new Error("the test song did not compile");
-const spc = buildSpc({
-	songData: result.data,
-	driver,
-	samples: driver.samples,
-	plan,
-	tags: result.stats?.tags,
-	seconds: result.stats?.tagSeconds,
-	echoBufferSize: result.stats?.echoBufferSize,
-	date: new Date(2026, 6, 28),
-}).spc;
+function compileToSpc(source: string): Uint8Array {
+	const result = compiler.compile({ source, aramAddress: plan.localPos });
+	if (!result.ok || !result.data) throw new Error("the test song did not compile");
+	return buildSpc({
+		songData: result.data,
+		driver,
+		samples: driver.samples,
+		plan,
+		tags: result.stats?.tags,
+		seconds: result.stats?.tagSeconds,
+		echoBufferSize: result.stats?.echoBufferSize,
+		date: new Date(2026, 6, 28),
+	}).spc;
+}
+
+const spc = compileToSpc("#amk 4\n#0 t40 o4 v220 q7F @0 l8 c d e f g4 e4 c4 r4\n");
+/** Two parts, for the tests that need something left over after a mute. */
+const duet = compileToSpc("#amk 4\n#0 t40 o4 v220 q7F @0 l8 c d e f g4 e4 c4 r4\n#1 o3 v200 q7D @1 l4 [c e g e]4\n");
 
 const bundlePath = join(PUBLIC, "player", "spc-worklet.js");
 const bundle = readFileSync(bundlePath, "utf8");
@@ -389,6 +398,37 @@ console.log("\na song with no loop point is restarted by hand");
 
 	const last = positions(freshSent).at(-1)!;
 	check("and the count itself restarts", last.ticks < LOOP_TICKS, `${last.ticks} ticks`);
+}
+
+console.log("\nmuting a channel without breaking stride");
+{
+	// Two channels, so muting one leaves something to hear. The claim under test
+	// is that the mask reaches the driver through the port and the song carries
+	// on regardless — no reload, no gap, no interruption to the tick stream.
+	const { processor: fresh, sent: freshSent } = restart({ spc: duet, loopTicks: 0 }, false);
+
+	render(fresh, 200); // let both channels key on
+	const both = render(fresh, 300);
+
+	port.onmessage!({ data: { type: "mute", mask: 0b10 } });
+	const one = render(fresh, 300);
+
+	port.onmessage!({ data: { type: "mute", mask: 0b11 } });
+	render(fresh, 40); // the driver needs a music tick to write the volumes
+	const none = render(fresh, 300);
+
+	port.onmessage!({ data: { type: "mute", mask: 0 } });
+	const back = render(fresh, 300);
+
+	check("muting one channel lowers the level", rms(one) < rms(both), `${rms(one).toFixed(5)} vs ${rms(both).toFixed(5)}`);
+	check("muting both silences it", peak(none) < 0.005, `peak ${peak(none).toFixed(4)}`);
+	check("unmuting brings the song back", peak(back) > 0.01, `peak ${peak(back).toFixed(4)}`);
+	check("no error was reported", !freshSent.some((m) => m.type === "error"), JSON.stringify(freshSent.filter((m) => m.type === "error")));
+
+	// The point of muting this way: the playhead never notices.
+	const ticks = positions(freshSent).map((p) => p.ticks);
+	check("the tick count never goes backwards", ticks.every((t, i) => i === 0 || t >= ticks[i - 1]), ticks.join(", "));
+	check("and it kept advancing throughout", ticks.length > 1 && ticks.at(-1)! > ticks[0], `${ticks[0]} -> ${ticks.at(-1)}`);
 }
 
 console.log(`\n${failures === 0 ? "all checks passed" : `${failures} check(s) failed`}\n`);

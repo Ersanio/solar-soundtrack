@@ -52,6 +52,14 @@ export type ToWorklet =
 	| { type: "seek"; seconds: number; epoch: number }
 	| { type: "paused"; paused: boolean }
 	| { type: "loop"; loop: boolean }
+	/**
+	 * Voices to silence, as a bitmask, bit 0 being channel #0.
+	 *
+	 * A gate on the driver rather than a change to the song: every channel goes
+	 * on being parsed, so the song keeps its tempo, its echo and its intro. The
+	 * worklet holds the mask and re-applies it, so it survives loads and seeks.
+	 */
+	| { type: "mute"; mask: number }
 	| { type: "stop" };
 
 /** Audio thread to page. */

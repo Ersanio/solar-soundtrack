@@ -11,7 +11,17 @@
  */
 
 import { SPC_CHANNELS, SPC_SAMPLE_RATE, type SpcCore, instantiate } from "./wasm-host";
-import { TICK_POLL_HZ, readDriverState, readNoteDuration, sawTick, tickVoice } from "./driver-state";
+import {
+	type MuteShadow,
+	TICK_POLL_HZ,
+	applyChannelMutes,
+	createMuteShadow,
+	readDriverState,
+	readNoteDuration,
+	resetMuteShadow,
+	sawTick,
+	tickVoice,
+} from "./driver-state";
 import { SPC_PROCESSOR, type FromWorklet, type SpcProcessorOptions, type ToWorklet } from "./protocol";
 
 // AudioWorkletGlobalScope is not in lib.dom, which only describes the page side.
@@ -53,6 +63,10 @@ class SpcProcessor extends AudioWorkletProcessor {
 
 	private fadeSeconds = 0;
 	private songLoops = false;
+
+	/** Voices the mixer has silenced, and the volumes taken off them. */
+	private muteMask = 0;
+	private readonly muteShadow: MuteShadow = createMuteShadow();
 
 	/** One pass through the song, in ticks: the intro plus one trip round. */
 	private introTicks = 0;
@@ -142,11 +156,15 @@ class SpcProcessor extends AudioWorkletProcessor {
 					// is; switching it on makes the question moot.
 					if (!this.looping) this.rebaseEnd();
 					break;
+				case "mute":
+					this.muteMask = message.mask;
+					break;
 				case "stop":
 					this.playing = false;
 					this.spc = null;
 					this.frames = 0;
 					this.postedAt = -1;
+					resetMuteShadow(this.muteShadow);
 					break;
 			}
 		} catch (error) {
@@ -174,11 +192,15 @@ class SpcProcessor extends AudioWorkletProcessor {
 		this.ticks = 0;
 		this.voice = -1;
 		this.duration = 0;
+		// The reload puts the pristine image back, so `$5E` and every track
+		// volume are the song's own again. A volume saved from the position just
+		// left would be restored into a song that has moved on.
+		resetMuteShadow(this.muteShadow);
 
 		const wanted = Math.round(target * SPC_SAMPLE_RATE);
 		for (let done = 0; done < wanted; done += SOURCE_BLOCK) {
 			core.renderView(Math.min(SOURCE_BLOCK, wanted - done));
-			this.readTicks();
+			this.afterBlock();
 		}
 
 		this.frames = Math.round(target * sampleRate);
@@ -196,14 +218,19 @@ class SpcProcessor extends AudioWorkletProcessor {
 	}
 
 	/**
-	 * Reads the driver's tick accumulator and folds it into the running count.
+	 * Everything that happens in APU RAM between emulated blocks.
 	 *
-	 * Called immediately after every emulated block, which is what keeps the
-	 * sampling above the driver's iteration rate.
+	 * Two things, sharing the one look at it: the driver's tick accumulator is
+	 * folded into the running count, and the mixer's mute mask is pressed back
+	 * onto the driver. Running at the block rate is what keeps tick sampling
+	 * above the driver's iteration rate, and it is also what makes the mute
+	 * stick — see {@link applyChannelMutes}.
 	 */
-	private readTicks(): void {
+	private afterBlock(): void {
 		if (!this.core) return;
 		const aram = this.core.aram();
+		applyChannelMutes(aram, this.muteMask, this.muteShadow);
+
 		// The song has not keyed on yet at load; latch the voice once it has.
 		if (this.voice < 0) {
 			this.voice = tickVoice(aram);
@@ -254,7 +281,7 @@ class SpcProcessor extends AudioWorkletProcessor {
 		if (this.blockPos >= SOURCE_BLOCK) {
 			this.block.set(this.core!.renderView(SOURCE_BLOCK));
 			this.blockPos = 0;
-			this.readTicks();
+			this.afterBlock();
 		}
 		const at = this.blockPos * SPC_CHANNELS;
 		this.pullL = this.block[at];

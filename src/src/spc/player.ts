@@ -77,6 +77,7 @@ export class SpcPlayer {
 	private driver: DriverState | null = null;
 	private volume = 1;
 	private looping = false;
+	private muteMask = 0;
 	/**
 	 * Counts loads and seeks, so a position that was already in flight when the
 	 * playhead moved can be told from one that reflects the move.
@@ -158,6 +159,7 @@ export class SpcPlayer {
 		// Autoplay policy leaves a fresh context suspended until a gesture.
 		await context.resume();
 		this.post({ type: "loop", loop: this.looping });
+		this.post({ type: "mute", mask: this.muteMask });
 	}
 
 	private async compile(): Promise<WebAssembly.Module> {
@@ -243,6 +245,18 @@ export class SpcPlayer {
 	setLoop(loop: boolean): void {
 		this.looping = loop;
 		if (this.node) this.post({ type: "loop", loop });
+	}
+
+	/**
+	 * Silences voices, as a bitmask, bit 0 being channel #0.
+	 *
+	 * Takes effect within a few milliseconds and survives loads and seeks: the
+	 * song data is not involved, so nothing has to be rebuilt and playback does
+	 * not break stride.
+	 */
+	setMute(mask: number): void {
+		this.muteMask = mask;
+		if (this.node) this.post({ type: "mute", mask });
 	}
 
 	/** Emulated seconds since the song was loaded, or 0 when nothing is loaded. */
