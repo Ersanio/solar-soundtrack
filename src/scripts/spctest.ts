@@ -26,11 +26,11 @@ function response(body: Buffer | string, contentType: string) {
 		ok: true,
 		status: 200,
 		headers: { get: (name: string) => (name.toLowerCase() === "content-type" ? contentType : null) },
-		async arrayBuffer() {
+		arrayBuffer() {
 			return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
 		},
-		async json() {
-			return JSON.parse(bytes.toString("utf8"));
+		json() {
+			return JSON.parse(bytes.toString("utf8")) as unknown;
 		},
 	};
 }
@@ -43,7 +43,7 @@ function response(body: Buffer | string, contentType: string) {
  *      over-encoded `@` never resolves to a real file;
  *   2. an unresolved path is answered 200 with index.html, not 404.
  */
-globalThis.fetch = (async (input: string) => {
+globalThis.fetch = ((input: string) => {
 	const path = join(DRIVER_DIR, decodeURI(String(input).replace(/^driver\//, "")));
 	try {
 		const bytes = readFileSync(path);
@@ -103,7 +103,7 @@ console.log("\nmissing files are diagnosed, not misread");
 	} catch (error) {
 		message = error instanceof Error ? error.message : String(error);
 	}
-	check("HTML fallback is rejected", /HTML page/.test(message), message || "(no error thrown)");
+	check("HTML fallback is rejected", message.includes("HTML page"), message || "(no error thrown)");
 }
 
 const driver = await loadDriver();

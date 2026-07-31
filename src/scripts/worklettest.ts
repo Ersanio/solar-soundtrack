@@ -32,14 +32,14 @@ const resp = (b: Buffer, ct: string) => ({
 	ok: true,
 	status: 200,
 	headers: { get: (n: string) => (n.toLowerCase() === "content-type" ? ct : null) },
-	async arrayBuffer() {
+	arrayBuffer() {
 		return b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength);
 	},
-	async json() {
-		return JSON.parse(b.toString("utf8"));
+	json() {
+		return JSON.parse(b.toString("utf8")) as unknown;
 	},
 });
-globalThis.fetch = (async (input: string) => {
+globalThis.fetch = ((input: string) => {
 	const path = join(PUBLIC, decodeURI(String(input)));
 	const bytes = readFileSync(path);
 	return resp(bytes, path.endsWith(".json") ? "application/json" : "application/octet-stream");
@@ -143,7 +143,7 @@ function render(processor: Processor, quanta: number): Float32Array {
 	for (let block = 0; block < quanta; block++) {
 		left.fill(0);
 		right.fill(0);
-		processor.process([], [[left, right]], {});
+		processor.process([], [[left, right]]);
 		for (let i = 0; i < QUANTUM; i++) {
 			out[(block * QUANTUM + i) * 2] = left[i];
 			out[(block * QUANTUM + i) * 2 + 1] = right[i];

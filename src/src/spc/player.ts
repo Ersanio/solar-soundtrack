@@ -43,11 +43,10 @@ export interface SongTiming {
 }
 
 /**
- * ID666 stores both of these as ASCII digits in the file header, so a song
- * carries its own length and fade. Reading them here keeps `play()` down to the
- * bytes and works for any `.spc`, not only the ones `buildSpc` produces.
+ * ID666 stores this as ASCII digits in the file header, so a song carries its
+ * own fade. Reading it here keeps `play()` down to the bytes and works for any
+ * `.spc`, not only the ones `buildSpc` produces.
  */
-const ID666_LENGTH = 0xa9; // 3 digits, seconds
 const ID666_FADE = 0xac; // 5 digits, milliseconds
 
 /** The player allows a little headroom above unity, as the old backend did. */

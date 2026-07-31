@@ -16,7 +16,7 @@ interface TableRow {
 }
 
 /** Stacked-bar segments, in memory order. */
-const GROUPS: ReadonlyArray<{ group: Group; label: string }> = [
+const GROUPS: readonly { group: Group; label: string }[] = [
   { group: 'driver', label: 'driver' },
   { group: 'song', label: 'your song' },
   { group: 'samples', label: 'samples' },

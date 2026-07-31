@@ -233,7 +233,7 @@ export class AddmusicKParser {
 	private guessLength = true;
 	/** Seconds from `#spc { #length "m:ss" }`, which overrides the estimate. */
 	private declaredSeconds: number | null = null;
-	private readonly tempoChanges: Array<[number, number]> = [];
+	private readonly tempoChanges: [number, number][] = [];
 	/**
 	 * Sample filenames in SRCN order, as `#samples` declared them — AMK's
 	 * `mySamples`. Empty means the song has not declared a set, which is what
@@ -301,7 +301,7 @@ export class AddmusicKParser {
 
 	// --- replacements --------------------------------------------------------
 	private readonly replacements = new Map<string, string>();
-	private sortedReplacements: Array<[string, string]> = [];
+	private sortedReplacements: [string, string][] = [];
 	private replacementsDirty = false;
 
 	// --- diagnostics ---------------------------------------------------------

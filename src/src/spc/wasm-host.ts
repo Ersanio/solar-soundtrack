@@ -55,7 +55,7 @@ export class SpcCoreError extends Error {}
  */
 function decodeAscii(bytes: Uint8Array): string {
 	let text = "";
-	for (let index = 0; index < bytes.length; index++) text += String.fromCharCode(bytes[index]);
+	for (const byte of bytes) text += String.fromCharCode(byte);
 	return text;
 }
 
@@ -121,6 +121,9 @@ export function instantiate(module: WebAssembly.Module): SpcCore {
 	let output = "";
 	let failed = false;
 
+	// `const` can't carry a definite-assignment assertion (`const x!: T` is a TS
+	// syntax error), so this stays `let` even though it's only ever assigned once.
+	// eslint-disable-next-line prefer-const
 	let memory!: WebAssembly.Memory;
 	let u8!: Uint8Array;
 	let i16!: Int16Array;

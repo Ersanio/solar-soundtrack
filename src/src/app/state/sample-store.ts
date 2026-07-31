@@ -299,7 +299,7 @@ export class SampleStore {
   }
 
   private loadSettings(): void {
-    let stored: StoredSettings | null = null;
+    let stored: StoredSettings | null;
     try {
       const raw = localStorage.getItem(SETTINGS_KEY);
       stored = raw ? (JSON.parse(raw) as StoredSettings) : null;
@@ -416,7 +416,7 @@ export class SampleStore {
     if (!bytes || validateSampleBank(bytes) !== null) return [];
 
     let cached = this.slotCache.get(name);
-    if (!cached || cached.bytes !== bytes) {
+    if (cached?.bytes !== bytes) {
       cached = { bytes, slots: parseSampleBank(bytes, (index) => bankSlotName(name, index)) };
       this.slotCache.set(name, cached);
     }

@@ -26,6 +26,8 @@ jobs:
 
       - run: npm ci
 
+      - run: npm run lint
+
       # typecheck plus the seven byte-level harnesses: the compiler self-test,
       # SPC assembly, the headless MML -> SPC -> PCM audio chain, the worklet,
       # the chart helpers and BRR/bank decoding.

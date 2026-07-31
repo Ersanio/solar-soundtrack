@@ -45,14 +45,14 @@ const resp = (b: Buffer, ct: string) => ({
 	ok: true,
 	status: 200,
 	headers: { get: (n: string) => (n.toLowerCase() === "content-type" ? ct : null) },
-	async arrayBuffer() {
+	arrayBuffer() {
 		return b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength);
 	},
-	async json() {
-		return JSON.parse(b.toString("utf8"));
+	json() {
+		return JSON.parse(b.toString("utf8")) as unknown;
 	},
 });
-globalThis.fetch = (async (input: string) => {
+globalThis.fetch = ((input: string) => {
 	const path = join(PUBLIC, decodeURI(String(input)));
 	try {
 		const bytes = readFileSync(path);

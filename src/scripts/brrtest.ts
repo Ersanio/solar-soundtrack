@@ -109,9 +109,9 @@ console.log("\nthe container is validated before it is trusted");
 	check("an empty file is rejected", validateBrr(new Uint8Array(0)) !== null);
 	check("a file too short for one block is rejected", validateBrr(new Uint8Array(8)) !== null);
 	check("a length that is not 2 + 9n is rejected", validateBrr(new Uint8Array(2 + 9 + 3)) !== null);
-	check("a valid one-block file passes", validateBrr(block(0, 0, new Array(16).fill(0))) === null);
+	check("a valid one-block file passes", validateBrr(block(0, 0, new Array<number>(16).fill(0))) === null);
 
-	const pastEnd = block(0, 0, new Array(16).fill(0));
+	const pastEnd = block(0, 0, new Array<number>(16).fill(0));
 	pastEnd[0] = 0xff;
 	check("a loop point past the end is rejected", validateBrr(pastEnd) !== null);
 
@@ -119,7 +119,7 @@ console.log("\nthe container is validated before it is trusted");
 	misaligned[0] = 4; // not a multiple of 9
 	check("a loop point off the block grid is rejected", validateBrr(misaligned) !== null);
 
-	const parsed = parseBrr("t.brr", block(0, 0, new Array(16).fill(0)));
+	const parsed = parseBrr("t.brr", block(0, 0, new Array<number>(16).fill(0)));
 	check("parseBrr strips the 2-byte header", parsed.data.length === BRR_BLOCK_BYTES, `${parsed.data.length}`);
 	check("parseBrr reads the loop offset", parsed.loopOffset === 0);
 }
@@ -325,7 +325,7 @@ console.log("\nthe twenty bundled samples decode");
 	const manifest = JSON.parse(readFileSync(join(PUBLIC, "driver", "manifest.json"), "utf8")) as {
 		sampleGroups: Record<string, string[]>;
 	};
-	const names = manifest.sampleGroups.default;
+	const names = manifest.sampleGroups['default'];
 	check("the default group has 20 names", names.length === 20, `${names.length}`);
 
 	let allValid = true;

@@ -19,7 +19,8 @@
     "worklettest": "npm run build:worklet && esbuild scripts/worklettest.ts --bundle --platform=node --format=esm --outfile=.selftest/worklettest.mjs --log-level=warning && node .selftest/worklettest.mjs",
     "charttest": "esbuild scripts/charttest.ts --bundle --platform=node --format=esm --outfile=.selftest/charttest.mjs --log-level=warning && node .selftest/charttest.mjs",
     "brrtest": "esbuild scripts/brrtest.ts --bundle --platform=node --format=esm --outfile=.selftest/brrtest.mjs --log-level=warning && node .selftest/brrtest.mjs",
-    "check": "npm run typecheck && npm run selftest && npm run spctest && npm run audiotest && npm run worklettest && npm run charttest && npm run brrtest"
+    "check": "npm run typecheck && npm run selftest && npm run spctest && npm run audiotest && npm run worklettest && npm run charttest && npm run brrtest",
+    "lint": "ng lint"
   },
   "private": true,
   "packageManager": "npm@11.13.0",
@@ -40,17 +41,22 @@
     "@angular/build": "^22.0.8",
     "@angular/cli": "^22.0.8",
     "@angular/compiler-cli": "^22.0.0",
+    "@eslint/js": "^10.0.1",
     "@tailwindcss/postcss": "^4.1.12",
     "@types/d3": "^7.4.3",
     "@types/d3-scale": "^4.0.9",
     "@types/d3-selection": "^3.0.11",
     "@types/node": "^26.1.2",
+    "angular-eslint": "22.1.0",
     "esbuild": "^0.28.1",
+    "eslint": "^10.6.0",
+    "eslint-config-prettier": "^10.1.8",
     "jsdom": "^28.0.0",
     "postcss": "^8.5.3",
     "prettier": "^3.8.1",
     "tailwindcss": "^4.1.12",
     "typescript": "~6.0.2",
+    "typescript-eslint": "8.62.1",
     "vitest": "^4.0.8"
   }
 }
