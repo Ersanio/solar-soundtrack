@@ -1,9 +1,12 @@
 import { Component, inject } from '@angular/core';
 
+import { GIT_COMMIT_SHA } from '../../git-info.generated';
 import { Button } from '../../shared/button/button';
 import { Checkbox } from '../../shared/checkbox/checkbox';
 import { EditorStore } from '../../state/editor-store';
 import { TransportControls } from '../transport-controls/transport-controls';
+
+const REPO_URL = 'https://github.com/Ersanio/solar-soundtrack';
 
 @Component({
   selector: 'amk-top-bar',
@@ -15,4 +18,6 @@ import { TransportControls } from '../transport-controls/transport-controls';
 })
 export class TopBar {
   protected readonly store = inject(EditorStore);
+  protected readonly commitUrl = `${REPO_URL}/commit/${GIT_COMMIT_SHA}`;
+  protected readonly commitShort = GIT_COMMIT_SHA.slice(0, 7);
 }
