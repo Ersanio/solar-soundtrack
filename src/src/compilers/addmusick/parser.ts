@@ -862,9 +862,9 @@ export class AddmusicKParser {
 	 * Consumes the remainder of a `{ … }` directive block after a failure.
 	 *
 	 * Every error path inside a block parser returns immediately, which leaves the
-	 * closing brace behind. The MML scanner then reads it as a triplet-close and
-	 * the real diagnostic disappears under a cascade of nonsense — the same
-	 * failure mode `unsupported()` had before it learned to advance `pos`.
+	 * closing brace behind. The MML scanner then reads the block's contents as
+	 * notes and its brace as a triplet-close, and the real diagnostic disappears
+	 * under a cascade of nonsense.
 	 */
 	private skipPastBlockEnd(): void {
 		while (this.pos < this.text.length && this.text[this.pos] !== "}") this.pos++;
@@ -2947,23 +2947,6 @@ export class AddmusicKParser {
 		if (this.warnedOnce.has(key)) return;
 		this.warnedOnce.add(key);
 		this.warn(this.pos, this.pos + 1, code, message);
-	}
-
-	/**
-	 * Reports a directive this compiler does not implement, and consumes the
-	 * rest of its line.
-	 *
-	 * Advancing `this.pos` is the part that matters. Without it the scanner
-	 * carried straight on into the directive's `{ … }` body and read it as MML,
-	 * producing a cascade of nonsense diagnostics after the real one. That was
-	 * invisible only because `errorCount > 0` makes `index.ts` bail before any
-	 * of them are shown.
-	 */
-	private unsupported(start: number, code: string, what: string, feature: string): void {
-		const newline = this.text.indexOf("\n", this.pos);
-		const end = newline === -1 ? this.text.length : newline;
-		this.errorAt(start, end, code, `${what} is not supported by this compiler version yet (${feature}).`);
-		this.pos = end;
 	}
 
 	/**

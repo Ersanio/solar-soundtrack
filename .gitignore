@@ -1,3 +1,9 @@
+# Local reference copies of AddmusicK 1.0.11's sources and readme. The compiler
+# cites them by line number; fetch them from an AddmusicK release.
 AddmusicKsrc/
 AddmusicKreadme/
-.claude/
+
+# Claude Code. Machine-local permissions and installed skills stay out; the
+# CLAUDE.md guidance files are checked in so a fresh clone gets them.
+**/.claude/*
+!**/.claude/CLAUDE.md

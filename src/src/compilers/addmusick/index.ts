@@ -19,15 +19,17 @@ export type { AddmusicKOptions };
  * `#amk 3` (Codec's beta) is rejected — AddmusicK itself does not implement it.
  *
  * Implemented across all targets: channels, notes/rests/ties, note lengths,
- * octaves, `h` transpose, `t`/`v`/`w`/`y`/`q`/`p`/`n`, default instruments,
- * `tuning[]`, loops, `&` pitch slide, `$` hex commands with the legacy
- * translations (HFD `$ED`, Addmusic 4.05 `$E5`/`$E4`, `#amk 1` `$FC` remote
- * gain), `/` intro, `?`, `"a=b"` replacements, `#spc`, `#halvetempo`, `#option`,
- * `#louder`, and the `#define`/`#if` preprocessor.
+ * octaves, `h` transpose, `t`/`v`/`w`/`y`/`q`/`p`/`n`, default and custom
+ * instruments (`@30+`), `tuning[]`, loops, remote code `(!)`, `&` pitch slide,
+ * `$` hex commands with the legacy translations (HFD `$ED`, Addmusic 4.05
+ * `$E5`/`$E4`, `#amk 1` `$FC` remote gain), `/` intro, `?`, `"a=b"`
+ * replacements, `#spc`, `#samples`, `#instruments`, `#path`, `#pad`,
+ * `#halvetempo`, `#option`, `#louder`, `#tempoimmunity`, and the
+ * `#define`/`#if` preprocessor.
  *
- * Not implemented yet, and reported as errors rather than mis-compiled:
- * `#samples`, `#instruments`, `#path`, `#pad`, remote code `(!)`, and custom
- * instruments `@30+`.
+ * One deliberate divergence: an unknown `#directive` is an error here, where
+ * `parseSpecialDirective` (Music.cpp:2413) has no else branch and lets the
+ * scanner read `#foo` as a note. See the comment at that branch in `parser.ts`.
  */
 export class AddmusicKCompiler {
 	compile(request: CompileRequest): CompileResult {
