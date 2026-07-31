@@ -1,4 +1,5 @@
-import { ApplicationConfig, provideBrowserGlobalErrorListeners } from '@angular/core';
+import { ApplicationConfig, provideBrowserGlobalErrorListeners, isDevMode } from '@angular/core';
+import { provideServiceWorker } from '@angular/service-worker';
 
 /**
  * No `provideZonelessChangeDetection()` here on purpose: this workspace was
@@ -9,5 +10,11 @@ import { ApplicationConfig, provideBrowserGlobalErrorListeners } from '@angular/
  * is `provideRouter(routes)` plus an outlet.
  */
 export const appConfig: ApplicationConfig = {
-  providers: [provideBrowserGlobalErrorListeners()],
+  providers: [
+    provideBrowserGlobalErrorListeners(),
+    provideServiceWorker('ngsw-worker.js', {
+      enabled: !isDevMode(),
+      registrationStrategy: 'registerWhenStable:30000',
+    }),
+  ],
 };

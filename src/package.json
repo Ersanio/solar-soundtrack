@@ -31,6 +31,7 @@
     "@angular/forms": "^22.0.0",
     "@angular/platform-browser": "^22.0.0",
     "@angular/router": "^22.0.0",
+    "@angular/service-worker": "22.0.8",
     "d3": "^7.9.0",
     "d3-scale": "^4.0.2",
     "d3-selection": "^3.0.0",
