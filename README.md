@@ -115,7 +115,7 @@ This project stands on other people's work:
   [https://codeberg.org/Telinc1/smwcentral-spc-player](WebAssembly SPC player) built on
   it, which this project uses.
 - **The AddmusicK maintainers** from its changelog: [Kipernal](https://smwc.me/u/9822), [KungFuFurby](https://smwc.me/u/30120), [KevinM](https://smwc.me/u/36308), [Medic](https://smwc.me/u/9157), [HertzDevil](https://smwc.me/u/20031), [Atari 2.0](https://smwc.me/u/35033), [nyanpasu64](https://smwc.me/u/22354), JUMP Team, [SimFan96](https://smwc.me/u/34677), [Anas](https://smwc.me/u/25222), [HuFlungDu](https://smwc.me/u/6666), [lx5](https://smwc.me/u/12344), [Pinci](https://smwc.me/u/17935), [6646](https://smwc.me/u/6646), [Akaginite](https://smwc.me/u/8691), [Aikku](https://smwc.me/u/40371), [Sinc-X](https://smwc.me/u/15846), [Lui](https://smwc.me/u/16989), [Vitor](https://smwc.me/u/8251), [Barrels O' Fun](https://smwc.me/u/24105), [Yoshifanatic](https://smwc.me/u/13743)
-- **[blackhole89](https://smwc.me/u/3342)** - [the name. _Solar Soundtrack_ was originally his idea](https://web.archive.org/web/20210403023416/http://twilightro.kafuka.org/~blackhole89/sst.php): a piano-roll
+- **[blackhole89](https://smwc.me/u/3342)** - [the name. _Solar Soundtrack_ was originally their idea](https://web.archive.org/web/20210403023416/http://twilightro.kafuka.org/~blackhole89/sst.php): a piano-roll
   style editor for the N-SPC engine, which I assume was never finished. The name was too
   good to leave unused, and this project is a different shape to what they had in mind, but
   the credit is theirs.
