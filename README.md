@@ -61,11 +61,30 @@ npm install
 npm start          # dev server on http://localhost:4200/
 ```
 
-Node 24 is what CI uses. To run the full test suite:
+Node 24 is what CI uses.
 
-```bash
-npm run check      # typecheck, plus seven byte-level test harnesses
-```
+### npm scripts
+
+| Command | What it does |
+| --- | --- |
+| `npm start` | Angular dev server (`ng serve`) on `http://localhost:4200/`. |
+| `npm run build` | Production build via `ng build`, output in `dist/`. |
+| `npm run watch` | Dev-configuration build with `--watch`, no server. |
+| `npm run typecheck` | `tsc --noEmit`, no build output. |
+| `npm run lint` | `ng lint` (ESLint). |
+| `npm run test` | `ng test` (Vitest). |
+| `npm run check` | What CI runs to gate a merge: typecheck plus six byte-level harnesses (`selftest`, `spctest`, `audiotest`, `worklettest`, `charttest`, `brrtest`) that pin the compiler, SPC assembly, the headless audio chain, the worklet, chart helpers and BRR/bank decoding against known-good byte output. |
+
+Two things run automatically before the commands above (via `pre*` npm hooks), so you never
+need to invoke them yourself:
+
+- **`build:worklet`** bundles `src/spc/worklet.ts` with `esbuild` into
+  `public/player/spc-worklet.js`, since an `AudioWorklet` is loaded separately by the browser's
+  audio thread and isn't something Angular's own build produces.
+- **`generate-git-info`** writes the current `git rev-parse HEAD` SHA to a gitignored file, which
+  powers the GitHub commit link in the app's toolbar. It's captured once when the dev
+  server/build starts, so it goes stale if you commit while `npm start` keeps running - restart
+  to refresh it.
 
 ## How it works
 
