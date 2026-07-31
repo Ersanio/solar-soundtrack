@@ -47,7 +47,7 @@ games, and even for homebrew. A huge library of music is available at [SMW Centr
 - **No playhead highlighting.** Showing which note is playing, in the editor, live, is the
   feature I most want that can help debug music. This will be implemented in the future.
 
-See the [https://github.com/ersanio/solar-soundtrack/issues](GitHub Issues) for a list of
+See the [GitHub Issues](https://github.com/ersanio/solar-soundtrack/issues) for a list of
 ideas, planned features and known issues.
 
 ## Running it locally
