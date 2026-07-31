@@ -17,7 +17,7 @@ const SAMPLE_SONG = `#amk 4
     #title  "Level Theme"
     #author "Akito Nakatsuka"
     #game   "Ice Climber (NES)"
-    #comment "Quick demo song for Solar Soundtrack"
+    #comment "Demo for Solar Soundtrack"
 }
 
 #0 w255 t54
