@@ -106,7 +106,10 @@ export function buildSpc(request: SpcExportRequest): SpcExportResult {
 	writeText(spc, HEADER.game, 32, tags.game ?? "Super Mario World (custom)");
 	writeText(spc, HEADER.comment, 32, tags.comment ?? "");
 	writeText(spc, HEADER.artist, 32, tags.author ?? "");
-	writeText(spc, HEADER.dumper, 16, "Web MML");
+	// Exactly fills the 16-byte field, so no terminator is written. ID666 text
+	// fields are fixed-width and a full one is read to its end, the same way a
+	// 32-character title already fills the field above.
+	writeText(spc, HEADER.dumper, 16, "Solar Soundtrack");
 	writeText(spc, HEADER.date, 11, formatDate(request.date ?? new Date()));
 
 	const seconds = resolveSeconds(request.seconds, tags.length);

@@ -19,8 +19,8 @@ import { DriverStore } from './driver-store';
 /** Envelope resolution. Wide enough to read, small enough to keep in a signal. */
 const WAVEFORM_BUCKETS = 160;
 
-/** Where `webmml.samples` keeps the settings that are not file bytes. */
-const SETTINGS_KEY = 'webmml.samples';
+/** Where `solar-soundtrack.samples` keeps the settings that are not file bytes. */
+const SETTINGS_KEY = 'solar-soundtrack.samples';
 
 interface StoredSettings {
   optimize?: boolean;
@@ -282,7 +282,8 @@ export class SampleStore {
     });
 
     // Sanctioned effect: the same, for the settings. These are small JSON and go
-    // to localStorage beside `webmml.draft`; IndexedDB stays the store for bytes.
+    // to localStorage beside `solar-soundtrack.draft`; IndexedDB stays the store
+    // for bytes.
     effect(() => {
       const settings: StoredSettings = {
         optimize: this.optimize(),

@@ -7,7 +7,7 @@
   },
   "newProjectRoot": "projects",
   "projects": {
-    "webmml": {
+    "solar-soundtrack": {
       "projectType": "application",
       "schematics": {},
       "root": "",
@@ -57,10 +57,10 @@
           "builder": "@angular/build:dev-server",
           "configurations": {
             "production": {
-              "buildTarget": "webmml:build:production"
+              "buildTarget": "solar-soundtrack:build:production"
             },
             "development": {
-              "buildTarget": "webmml:build:development"
+              "buildTarget": "solar-soundtrack:build:development"
             }
           },
           "defaultConfiguration": "development"

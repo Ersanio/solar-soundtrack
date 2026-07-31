@@ -8,28 +8,31 @@ import { caretPosition, downloadBlob, errorMessage } from '../util/format';
 import { DriverStore } from './driver-store';
 import { SampleStore } from './sample-store';
 
-const STORAGE_KEY = 'webmml.draft';
+const STORAGE_KEY = 'solar-soundtrack.draft';
 
 const SAMPLE_SONG = `#amk 4
 
 #spc
 {
-    #title  "Scaffold Test"
-    #author "you"
-    #game   "Super Mario World"
+    #title  "Main Theme"
+    #author "Akito Nakatsuka"
+    #game   "Ice Climber (NES)"
+    #comment "Quick demo song for Solar Soundtrack"
 }
 
-; ---- channel 0: lead ----
-#0
-t40 o4 v200 q7F @0 l8
-c d e f g4 e4 c4 r4
-(1)[e f g a b4 g4]2
-o5 c1
+#0 w255 t54
+o2
 
-; ---- channel 1: bass ----
-#1
-o2 v160 q7D @1 l8
-[c c > c < c ]8
+g32. r12 e32. r48 f16 r16 g32. r8^48 > c32 r64 < b32 r64 > c32 r64 < b32 r64 > c32 < r64
+g32. r12 e32. r48 f16 r16 g32. r8^48 > c32 r64 < b32 r64 > c32 r64 < b32 r64 > c32 < r64
+a32. r12 f32. r48 g16 r16 a32. r8^48 > d32 r64 c+32 r64 d32 r64 c+32 r64 d32 < r64
+a32. r12 f32. r48 g16 r16 a32. r8^48 > d32 r64 c+32 r64 d32 r64 c+32 r64 d32 < r64
+
+b32. r12 g32. r48 a16 r16 b32. r8^48 > f32 r64 e32 r64 f32 r64 e32 r64 f32 < r64
+b32. r12 g32. r48 a16 r16 b32. r8^48 > f32 r64 e32 r64 f32 r64 e32 r64 f32 r64
+
+e16 c16 < g16 > e16 c16 < g16 > f16 d16 < a16 > f16 d16 < a16 >
+f+16 d16 c16 f+16 d16 c16 g16 f16 d16 < b16 a+16 a16
 `;
 
 /** How long typing pauses before an auto-compile fires. */

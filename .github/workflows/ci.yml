@@ -62,10 +62,7 @@ jobs:
 
       - run: npm ci
 
-      # Project Pages serve from /<repo>/, and the app fetches driver/ and
-      # player/ with relative URLs, so they resolve against <base href>. Deriving
-      # it from the repo name keeps a rename or a fork from silently 404ing every
-      # asset. `npm run build` (not `ng build`) so the prebuild hook still
+      # `npm run build` (not `ng build`) so the prebuild hook still
       # generates public/player/spc-worklet.js, which is not checked in.
       - name: Build
         run: npm run build -- --base-href=/${{ github.event.repository.name }}/
@@ -74,7 +71,7 @@ jobs:
 
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: src/dist/webmml/browser
+          path: src/dist/solar-soundtrack/browser
 
       - id: deployment
         uses: actions/deploy-pages@v4

@@ -13,7 +13,7 @@
  * `available()` reports which of the two happened, so the UI can say so.
  */
 
-const DB_NAME = 'webmml';
+const DB_NAME = 'solar-soundtrack';
 const DB_VERSION = 1;
 const STORE = 'samples';
 

@@ -68,7 +68,7 @@ const SONG = `#amk 4
 #spc
 {
     #title  "Export Test"
-    #author "web mml"
+    #author "solar soundtrack"
 }
 #0 t40 o4 v200 q7F @0 l8 c d e f g4 e4 c4 r4
 #1 o2 v160 q7D @1 l8 [c c > c < c]4
@@ -420,7 +420,7 @@ console.log("\nfile structure");
 	check("PC = mainLoopPos", (spc[0x25] | (spc[0x26] << 8)) === 0x042e, hex(spc[0x25] | (spc[0x26] << 8)));
 	check("SP = $CF (post-init)", spc[0x2b] === 0xcf, `0x${spc[0x2b].toString(16)}`);
 	check("title tag", text(0x2e, 32) === "Export Test", text(0x2e, 32));
-	check("artist tag", text(0xb1, 32) === "web mml", text(0xb1, 32));
+	check("artist tag", text(0xb1, 32) === "solar soundtrack", text(0xb1, 32));
 	check("game defaults", text(0x4e, 32) === "Super Mario World (custom)", text(0x4e, 32));
 	check("date", text(0x9e, 10) === "07/28/2026", text(0x9e, 10));
 	check("length is ASCII digits", /^\d{3}$/.test(text(0xa9, 3)), text(0xa9, 3));
