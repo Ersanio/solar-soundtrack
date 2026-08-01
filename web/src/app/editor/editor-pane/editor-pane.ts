@@ -1,4 +1,12 @@
-import { Component, ElementRef, effect, inject, signal, viewChild } from '@angular/core';
+import {
+  Component,
+  ElementRef,
+  effect,
+  inject,
+  signal,
+  untracked,
+  viewChild,
+} from '@angular/core';
 
 import { Panel } from '../../shared/panel/panel';
 import { type TabDef, Tabs } from '../../shared/tabs/tabs';
@@ -59,6 +67,42 @@ export class EditorPane {
       element.focus();
       element.setSelectionRange(span.start, Math.max(span.end, span.start + 1));
       this.store.caret.set(span.start);
+    });
+
+    // Sanctioned effect: the same imperative-DOM job as `reveal` above, for a
+    // panel that changes text rather than selecting it.
+    //
+    // The splice is applied here rather than through `store.edit` alone
+    // because a one-way `[value]` binding rewrites the whole textarea, which
+    // drops the caret to the end. The Tab handler below has the same problem
+    // and solves it the same way.
+    effect(() => {
+      const edit = this.store.replace();
+      if (!edit) return;
+
+      const element = this.area()?.nativeElement;
+      if (!element) return;
+
+      untracked(() => {
+        // Consumed on the spot. A splice describes one moment in one document,
+        // so leaving it set would let any later re-run of this effect — a tab
+        // switch, say — apply it a second time to text it no longer fits.
+        this.store.replace.set(null);
+
+        const { span, text } = edit;
+        const next = `${element.value.slice(0, span.start)}${text}${element.value.slice(span.end)}`;
+        element.value = next;
+
+        // The caret stays where it was unless the edit moved the ground under
+        // it, so dragging a slider does not drag the caret out of the command
+        // being edited — which would swap the panel out mid-gesture. Read
+        // untracked, or moving the caret would itself re-trigger this effect.
+        const caret = Math.min(this.store.caret(), span.start + text.length);
+        element.selectionStart = element.selectionEnd = Math.max(caret, span.start);
+
+        this.store.edit(next);
+        this.store.caret.set(element.selectionStart);
+      });
     });
   }
 

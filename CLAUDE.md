@@ -36,9 +36,13 @@ CI runs `npm run lint` then `npm run check`.
 ### Tests
 
 There are no `.spec.ts` files in the repository — `npm run test` (`ng test`, Vitest) is scaffolding
-and currently runs nothing. The real suite is six harnesses under `scripts/`, each a standalone
+and currently runs nothing. The real suite is eight harnesses under `scripts/`, each a standalone
 esbuild-bundled Node script with its own npm script. To run one, run its script; they take no
 filter flags, so narrowing a run means editing the harness.
+
+Note that none of them covers Angular templates, and neither does `npm run typecheck` — `tsc` does
+not run the template compiler, so a bad binding (`viewBox=` instead of `[attr.viewBox]=`) passes
+`check` and fails only at `ng build` / `npm start`. Run one of those before believing a UI change.
 
 - `npm run selftest` — compiler output, byte for byte.
 - `npm run spctest` — MML → `.spc`, verifying the assembled file's structure. Stubs `fetch` over
@@ -51,6 +55,13 @@ filter flags, so narrowing a run means editing the harness.
   `audiotest` structurally cannot.
 - `npm run charttest` — stacked-bar geometry for the ARAM bar.
 - `npm run brrtest` — BRR container handling and the decoder.
+- `npm run tokentest` — the MML source scanner behind the command inspector. Its load-bearing
+  assertion is **restartability**: stepping line by line with the state carried across must equal
+  scanning the whole document. CodeMirror will restart the scanner at arbitrary lines, so a state
+  machine that secretly depends on having seen the top of the file would work here and mis-colour
+  text there, much later.
+- `npm run firtest` — the echo FIR maths, anchored on the two filters in the SNES manual that
+  AddmusicK ships as `EchoFilter0`/`EchoFilter1`, and on bsnes's own DSP behaviour.
 
 Separately, `scripts/Compare-Spc.ps1` and `scripts/Compare-SongBin.ps1` diff output against a real
 AddmusicK build, region-aware so ID666 noise does not drown the real differences. Those are what
@@ -74,8 +85,8 @@ Three layers, and the boundary between them is the part that matters.
 
 | Path | Layer |
 | --- | --- |
-| `web/src/compiler/` | MML compiler: `preprocess.ts` → `parser.ts` → `link.ts` |
-| `web/src/spc/` | SPC assembly, BRR, driver bundle, emulator host, audio worklet |
+| `web/src/compiler/` | MML compiler: `preprocess.ts` → `parser.ts` → `link.ts`, plus `tokens.ts` |
+| `web/src/spc/` | SPC assembly, BRR, echo FIR maths, driver bundle, emulator host, audio worklet |
 | `web/src/app/` | Angular UI |
 
 `compiler/` and `spc/` are **framework-free and DOM-free** — no Angular, no `document`, no
@@ -133,6 +144,24 @@ wrong sounds. It is a correctness-critical output, not a statistic.
 **Diagnostics carry source spans** (`{start, end, line}`) and stable `AMK####` codes, and are carried
 on failure paths too so partial UI stays populated. Constructs this compiler does not implement are
 reported as errors, never silently mis-compiled.
+
+**`tokens.ts` does not go through the compiler, and must not.** Compiler spans are offsets into the
+*preprocessed* text — `preprocess.ts` drops the `#amk` marker, `#define` lines and comments without
+preserving positions — whereas anything that follows the caret needs offsets into what was typed.
+So the scanner is a second, independent pass over the raw source. It reads the undebounced `source`,
+it works on text that does not compile, and it reuses `HEX_LENGTHS`/`VCMD_NAMES` from `tables.ts`
+rather than restating them. It is shaped as a resumable line stepper with a small copyable
+`ScanState` because that is CodeMirror's `StreamLanguage` contract, so the eventual syntax
+highlighting is an adapter rather than a rewrite; `compiler/` itself stays free of any CodeMirror
+dependency. (The same preprocess gap means the existing diagnostic `reveal` is slightly misaligned
+on songs with an `#amk` line — a real bug, still unfixed.)
+
+**The echo FIR sits inside the feedback loop.** `spc/fir.ts` is checked against bsnes's own DSP
+(`AddmusicKsrc/SPC_DSP.cpp:610-700`): a coefficient is worth `c/128`, a repeat is scaled by
+`EFB/128 · H(f)` so repeat *k* has gain `|H|^k`, and taps 0–6 are summed into a value that *wraps*
+at 16 bits before tap 7 is added and clamped — so `Σ|c₀…c₆| > 128` can crackle. C7 multiplies the
+newest sample and C0 the oldest, which does not affect any plot here because magnitude is blind to
+tap reversal.
 
 ### Angular specifics
 

@@ -22,7 +22,9 @@
     "worklettest": "npm run build:worklet && esbuild scripts/worklettest.ts --bundle --platform=node --format=esm --outfile=.selftest/worklettest.mjs --log-level=warning && node .selftest/worklettest.mjs",
     "charttest": "esbuild scripts/charttest.ts --bundle --platform=node --format=esm --outfile=.selftest/charttest.mjs --log-level=warning && node .selftest/charttest.mjs",
     "brrtest": "esbuild scripts/brrtest.ts --bundle --platform=node --format=esm --outfile=.selftest/brrtest.mjs --log-level=warning && node .selftest/brrtest.mjs",
-    "check": "npm run typecheck && npm run selftest && npm run spctest && npm run audiotest && npm run worklettest && npm run charttest && npm run brrtest",
+    "tokentest": "esbuild scripts/tokentest.ts --bundle --platform=node --format=esm --outfile=.selftest/tokentest.mjs --log-level=warning && node .selftest/tokentest.mjs",
+    "firtest": "esbuild scripts/firtest.ts --bundle --platform=node --format=esm --outfile=.selftest/firtest.mjs --log-level=warning && node .selftest/firtest.mjs",
+    "check": "npm run typecheck && npm run selftest && npm run spctest && npm run audiotest && npm run worklettest && npm run charttest && npm run brrtest && npm run tokentest && npm run firtest",
     "lint": "ng lint"
   },
   "private": true,

@@ -1,0 +1,46 @@
+<details class="border-edge border-b" open>
+  <summary
+    class="hover:bg-raised flex cursor-pointer items-center justify-between gap-3 px-3 py-2"
+  >
+    <span class="text-ink-muted text-xs font-semibold tracking-wide uppercase">
+      Command inspector
+    </span>
+    <span class="font-mono text-xs" [class.text-ink-muted]="!command()">{{ summary() }}</span>
+  </summary>
+
+  <div class="flex flex-col gap-3 px-3 pt-1 pb-3">
+    @if (command(); as current) {
+      <div class="flex items-baseline gap-2">
+        <span class="text-accent font-mono text-sm">{{ label() }}</span>
+        <span class="text-ink text-sm">{{ current.name }}</span>
+      </div>
+
+      @if (incomplete()) {
+        <p class="text-warn text-xs leading-relaxed">
+          This command is missing arguments, so what it does cannot be read off yet.
+        </p>
+      }
+
+      @switch (view()) {
+        @case ('fir') {
+          <amk-fir-designer [command]="current" />
+        }
+        @case ('echo') {
+          <amk-echo-inspector [command]="current" />
+        }
+        @case ('letter') {
+          <amk-letter-command [command]="current" />
+        }
+        @default {
+          <amk-generic-command [command]="current" />
+        }
+      }
+    } @else {
+      <p class="text-ink-muted text-xs leading-relaxed">
+        Put the cursor on a command in the editor — a hex command like
+        <code class="text-ink">$F5</code>, or a letter one like
+        <code class="text-ink">t</code> — to see what it does.
+      </p>
+    }
+  </div>
+</details>

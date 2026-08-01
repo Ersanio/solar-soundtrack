@@ -35,6 +35,17 @@ games, and even for homebrew. A huge library of music is available at [SMW Centr
   costs in ARAM, and mark them as important for use in global songs or sound effects.
 - **An ARAM budget** that tells you how your work fits within the ARAM.
 - **Error reporting** that mentions the erroneous lines with a proper error message.
+- **A command inspector** that explains whatever the cursor is sitting on: `t54` as a tempo in BPM,
+  `@2` as the sample it actually plays, `$F1` as a delay in milliseconds and a buffer size in KiB,
+  and any other hex command as its name with its arguments decoded.
+- **An echo FIR filter designer.** The eight coefficients of `$F5` are the least readable thing in
+  the language, so put the cursor on one and you get a frequency-response plot, named presets
+  (including Super Mario World's own filter, verbatim), a dark-to-bright tone control, and
+  FIRcon-style draw-a-curve-and-fit. It plots the echo tail repeat by repeat, since the filter is
+  inside the feedback loop and each pass is filtered again; it shades the region below ~2 kHz where
+  eight taps at 32 kHz have no real say; and it warns when the feedback and the filter together
+  make an echo that builds up instead of dying away. Edits go straight back into the MML, so with
+  **Live** on you hear the change on the running song.
 - **A hex dump** of the compiled song data, just because.
 - **Bring your own main.bin** by uploading your own `main.bin` from your own AddmusicK, or
   use the bundled default one.

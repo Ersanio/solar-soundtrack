@@ -119,7 +119,9 @@ export const VCMD_NAMES: Readonly<Record<number, string>> = {
 	0xf4: "misc",
 	0xf5: "FIR filter",
 	0xf6: "DSP write",
-	0xf7: "echo FIR",
+	// AddmusicM's "Write Byte" — an address and a value, matching its
+	// `HEX_LENGTHS` entry of 4. It is not an echo command; the FIR one is `$F5`.
+	0xf7: "write byte",
 	0xf8: "noise",
 	0xf9: "data send",
 	0xfa: "misc",

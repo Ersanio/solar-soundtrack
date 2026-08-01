@@ -1,0 +1,150 @@
+<amk-fir-graph
+  [taps]="taps()"
+  [feedback]="feedback()"
+  [target]="mode() === 'draw' ? target() : null"
+  [drawable]="mode() === 'draw'"
+  (picked)="addTargetPoint($event)"
+/>
+
+<!-- What the eight numbers add up to, in words. -->
+<div class="flex flex-wrap items-baseline gap-x-4 gap-y-1 text-xs">
+  <span class="text-ink">
+    {{ activePreset()?.name ?? description().shape }}
+  </span>
+  <span class="text-ink-muted font-mono">corner {{ cornerLabel() }}</span>
+  <span class="text-ink-muted font-mono">tilt {{ tiltLabel() }}</span>
+</div>
+
+@if (stability().runaway) {
+  <p class="text-danger text-xs leading-relaxed">
+    With the echo feedback at
+    <span class="font-mono">${{ feedback().toString(16).toUpperCase().padStart(2, '0') }}</span>
+    this filter has a loop gain of {{ stability().loopGain.toFixed(2) }} — the echo will build up
+    on itself instead of dying away, and clip. Lower the feedback, or pull the marked band down.
+  </p>
+}
+
+@if (overriddenBy(); as later) {
+  <p class="text-warn text-xs leading-relaxed">
+    A <code class="text-ink">$F1</code> on line {{ later.line }} replaces these coefficients with
+    {{ later.filter }} — so they only apply until it runs. AddmusicK does this silently.
+  </p>
+}
+
+@if (headroom().mayWrap) {
+  <p class="text-warn text-xs leading-relaxed">
+    The first seven coefficients sum to {{ headroom().sum }}, over the 128 the DSP can add up
+    without wrapping. A loud echo may crackle. (Super Mario World's own filter does this too, so
+    it is only worth worrying about well past the limit.)
+  </p>
+}
+
+<!-- Three ways in, most abstract first. -->
+<div class="border-edge flex gap-1 border-b pb-2">
+  <button amk-button variant="ghost" [class.text-accent]="mode() === 'presets'" (click)="mode.set('presets')">
+    Presets
+  </button>
+  <button amk-button variant="ghost" [class.text-accent]="mode() === 'tone'" (click)="mode.set('tone')">
+    Tone
+  </button>
+  <button amk-button variant="ghost" [class.text-accent]="mode() === 'draw'" (click)="mode.set('draw')">
+    Draw
+  </button>
+</div>
+
+@switch (mode()) {
+  @case ('presets') {
+    <div class="flex flex-wrap gap-1.5">
+      @for (preset of FIR_PRESETS; track preset.name) {
+        <button
+          amk-button
+          [variant]="activePreset()?.name === preset.name ? 'primary' : 'default'"
+          [title]="preset.note"
+          (click)="applyPreset(preset.taps)"
+        >
+          {{ preset.name }}
+        </button>
+      }
+    </div>
+    @if (activePreset(); as preset) {
+      <p class="text-ink-muted text-xs leading-relaxed">{{ preset.note }}</p>
+    }
+  }
+
+  @case ('tone') {
+    <div class="flex flex-col gap-2">
+      <label class="flex items-center gap-3 text-xs">
+        <span class="text-ink-muted w-16">Tone</span>
+        <input
+          type="range"
+          class="accent-accent min-w-0 flex-1"
+          min="-1"
+          max="1"
+          step="0.05"
+          [value]="tone()"
+          (input)="tone.set(+$any($event.target).value); previewTone()"
+          (change)="commitTone()"
+        />
+        <span class="text-ink-muted w-14 text-right font-mono tabular-nums">
+          {{ tone() < 0 ? 'darker' : tone() > 0 ? 'brighter' : 'flat' }}
+        </span>
+      </label>
+      <label class="flex items-center gap-3 text-xs">
+        <span class="text-ink-muted w-16">Strength</span>
+        <input
+          type="range"
+          class="accent-accent min-w-0 flex-1"
+          min="0"
+          max="1"
+          step="0.05"
+          [value]="strength()"
+          (input)="strength.set(+$any($event.target).value); previewTone()"
+          (change)="commitTone()"
+        />
+        <span class="text-ink-muted w-14 text-right font-mono tabular-nums">
+          {{ (strength() * 100).toFixed(0) }}%
+        </span>
+      </label>
+    </div>
+  }
+
+  @case ('draw') {
+    <div class="flex flex-col gap-2">
+      <p class="text-ink-muted text-xs leading-relaxed">
+        Click the plot to place points, then fit. Eight taps cannot follow a shape below about
+        2 kHz — the shaded part of the plot — so nothing drawn there will come back.
+      </p>
+      <div class="flex gap-1.5">
+        <button amk-button variant="primary" [disabled]="target().length < 2" (click)="fit()">
+          Fit to curve
+        </button>
+        <button amk-button [disabled]="target().length === 0" (click)="clearTarget()">Clear</button>
+        <span class="text-ink-muted self-center font-mono text-xs">
+          {{ target().length }} point{{ target().length === 1 ? '' : 's' }}
+        </span>
+      </div>
+    </div>
+  }
+}
+
+<!-- The raw truth, always. -->
+<div class="border-edge border-t pt-2">
+  <div class="text-ink-muted mb-1 text-[11px] tracking-wide uppercase">Coefficients</div>
+  <div class="grid grid-cols-4 gap-1">
+    @for (row of rows(); track row.index) {
+      <label class="flex flex-col gap-0.5">
+        <span class="text-ink-muted font-mono text-[10px]">C{{ row.index }} · ${{ row.hex }}</span>
+        <input
+          type="number"
+          class="bg-inset border-edge text-ink w-full rounded-sm border px-1 py-0.5 font-mono text-xs tabular-nums"
+          min="-128"
+          max="127"
+          step="1"
+          [attr.aria-label]="'Coefficient ' + row.index"
+          [value]="row.tap"
+          (change)="setTap(row.index, $any($event.target).value)"
+        />
+      </label>
+    }
+  </div>
+</div>

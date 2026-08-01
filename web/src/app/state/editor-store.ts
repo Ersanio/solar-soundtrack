@@ -1,6 +1,7 @@
 import { Service, computed, effect, inject, signal } from '@angular/core';
 
 import { compiler } from '@compiler';
+import { commandAt, tokenize } from '@compiler/tokens';
 import type { CompileResult, Diagnostic, Span } from '@core/types';
 import { buildSpc, spcFilename } from '@spc/export';
 import { ARAM_SIZE, type AramBudget, computeBudget } from '@spc/layout';
@@ -60,6 +61,16 @@ export class EditorStore {
    * for a selection without reaching across the component tree.
    */
   readonly reveal = signal<Span | null>(null);
+
+  /**
+   * A splice the editor should apply, set when a panel edits a command in
+   * place. The counterpart to {@link reveal}: that one asks for a selection,
+   * this one asks for a change, and both exist because the editor owns the
+   * textarea and nothing else may reach into it.
+   *
+   * A fresh object each time, so writing the same edit twice still takes.
+   */
+  readonly replace = signal<{ span: Span; text: string } | null>(null);
 
   /**
    * The text the compiler last ran on. It lags `source` by the typing debounce,
@@ -147,6 +158,21 @@ export class EditorStore {
     const { line, column } = caretPosition(this.source(), this.caret());
     return `Ln ${line}, Col ${column}`;
   });
+
+  /**
+   * The source scanned into tokens and commands.
+   *
+   * Off `source` rather than `committed`, deliberately: the inspector follows
+   * the caret, and a caret that has moved to a command the compiler has not
+   * seen yet would otherwise inspect the wrong thing for {@link DEBOUNCE_MS}.
+   * Scanning is a single linear pass over a few kilobytes, which is cheap
+   * enough to redo per keystroke — unlike compiling, which is why that one is
+   * debounced and this one is not.
+   */
+  readonly tokens = computed(() => tokenize(this.source()));
+
+  /** The command the caret is in, which the command inspector renders. */
+  readonly commandAtCaret = computed(() => commandAt(this.tokens().commands, this.caret()));
 
   /** Set by actions that can fail outside compilation (export, driver upload). */
   private readonly override = signal<Status | null>(null);

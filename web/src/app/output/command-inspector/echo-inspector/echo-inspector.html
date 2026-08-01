@@ -1,0 +1,38 @@
+@if (isEchoOff()) {
+  <p class="text-ink-muted text-xs leading-relaxed">
+    Silences the echo and clears every channel's echo bit. The buffer stays reserved — only
+    <code class="text-ink">$FA $04</code> changes that, and the compiler writes it for you.
+  </p>
+} @else {
+  <table class="w-full border-collapse text-xs">
+    <tbody>
+      @for (row of rows(); track row.label) {
+        <tr class="border-edge/60 border-t first:border-t-0">
+          <td class="text-ink-muted py-1 pr-3 whitespace-nowrap">{{ row.label }}</td>
+          <td class="py-1 font-mono tabular-nums">
+            {{ row.value }}
+            @if (row.note) {
+              <span class="text-ink-muted block font-sans text-[11px]">{{ row.note }}</span>
+            }
+          </td>
+        </tr>
+      }
+    </tbody>
+  </table>
+
+  @if (taps(); as filter) {
+    <div>
+      <div class="text-ink-muted mb-1 text-[11px] tracking-wide uppercase">
+        Filter this selects
+      </div>
+      <amk-fir-graph [taps]="filter" [feedback]="feedback()" />
+    </div>
+
+    @if (overrides(); as earlier) {
+      <p class="text-warn text-xs leading-relaxed">
+        This replaces the coefficients set by the <code class="text-ink">$F5</code> on line
+        {{ earlier.line }}. AddmusicK does this silently.
+      </p>
+    }
+  }
+}
