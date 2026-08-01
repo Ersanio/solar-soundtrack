@@ -52,6 +52,8 @@ games, and even for homebrew. A huge library of music is available at [SMW Centr
 - **Export** a finished `.spc`, or the raw song-data `.bin`.
 - Your draft and your sample library are kept locally, so closing the tab does not lose
   your work.
+- **A changelog** in the top bar, listing what each day of work added. It is a plain hand-edited
+  list in `web/src/app/changelog/changelog-data.ts` — add a block at the top when you add a feature.
 
 ## What is not there yet
 

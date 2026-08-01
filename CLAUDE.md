@@ -179,6 +179,17 @@ at 16 bits before tap 7 is added and clamped — so `Σ|c₀…c₆| > 128` can 
 newest sample and C0 the oldest, which does not affect any plot here because magnitude is blind to
 tap reversal.
 
+**The changelog is part of the feature.** `web/src/app/changelog/changelog-data.ts` backs the top
+bar's changelog popup. A commit that adds or materially changes a user-facing feature adds its
+entry **in the same commit** — a new block at the top of `CHANGELOG` if the date is new, otherwise
+one more string in the existing block for that date.
+
+Write for **music porters, not developers**, and keep it to a short phrase naming the feature:
+"Sample browser & importer", not a sentence about how it works. How something is implemented never
+belongs here, however interesting — nobody writing MML needs to know the playhead follows the
+driver rather than estimating it. Refactors, internal work and small fixes get no entry at all. It
+is hand-written and must never be generated from commit subjects, which are not written for users.
+
 ### Angular specifics
 
 Angular 22, zoneless (the workspace was scaffolded `--zoneless`, so zone.js is not a dependency and
