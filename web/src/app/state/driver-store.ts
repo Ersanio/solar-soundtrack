@@ -1,6 +1,11 @@
 import { Service, computed, signal } from '@angular/core';
 
 import { type DriverBundle, loadDriver, withCustomProgram } from '@spc/driver';
+import {
+  type InstrumentTables,
+  bundledInstrumentTables,
+  readInstrumentTables,
+} from '@spc/instruments';
 import { type AramPlan, planAram } from '@spc/layout';
 import { errorMessage } from '../util/format';
 
@@ -29,6 +34,19 @@ export class DriverStore {
   readonly plan = computed<AramPlan | null>(() => {
     const driver = this.driver();
     return driver ? planAram(driver) : null;
+  });
+
+  /**
+   * The instrument and percussion tables this driver actually carries.
+   *
+   * Read out of `main.bin` rather than stated, so an uploaded driver reports its
+   * own instruments; falls back to the bundled tables, labelled, when the search
+   * cannot make sense of the image. See `spc/instruments.ts`.
+   */
+  readonly instruments = computed<InstrumentTables>(() => {
+    const driver = this.driver();
+    if (!driver) return bundledInstrumentTables();
+    return readInstrumentTables(driver.programData, driver.programPos);
   });
 
   readonly summary = computed(() => {

@@ -1,7 +1,7 @@
-import { Component, computed, inject, input } from '@angular/core';
+import { Component, computed, input } from '@angular/core';
 
+import { noiseHz } from '@spc/adsr';
 import type { Command } from '@compiler/tokens';
-import { EditorStore } from '../../../state/editor-store';
 
 /**
  * The single-letter commands, said in the units they mean.
@@ -38,8 +38,6 @@ import { EditorStore } from '../../../state/editor-store';
 })
 export class LetterCommand {
   readonly command = input.required<Command>();
-
-  private readonly store = inject(EditorStore);
 
   protected readonly readout = computed<{ label: string; value: string; note?: string }[] | null>(
     () => {
@@ -100,10 +98,22 @@ export class LetterCommand {
         case 'q':
           return [{ label: 'Quantization', value: `$${first.toString(16).toUpperCase().padStart(2, '0')}` }];
 
-        case '@':
+        case 'n':
           return [
-            { label: 'Instrument', value: String(first) },
-            { label: 'Sample', value: this.sampleFor(first) },
+            { label: 'Noise clock', value: `$${first.toString(16).toUpperCase().padStart(2, '0')} of $1F` },
+            {
+              label: 'Frequency',
+              value: first === 0 ? 'silent' : `${Math.round(noiseHz(first)).toLocaleString()} Hz`,
+              // One DSP register drives every voice's noise (`main.asm:2552`
+              // ModifyNoise), so this is not a per-channel setting even though it
+              // is written on a channel.
+              note: 'shared by every channel — a later n retunes this one too',
+            },
+            {
+              label: 'Replaces',
+              value: 'the instrument’s sample',
+              note: 'cancelled by the next instrument change',
+            },
           ];
 
         case '*':
@@ -118,21 +128,6 @@ export class LetterCommand {
     },
   );
 
-  /**
-   * What `@n` actually plays.
-   *
-   * The compiler's sample list *is* the SRCN assignment — its order decides
-   * which sample each slot addresses — so this reads the real answer rather
-   * than guessing from the stock table.
-   */
-  private sampleFor(instrument: number): string {
-    const list = this.store.result()?.sampleList;
-    if (!list) return 'the driver’s default set';
-    // @0-@29 index the stock instruments, @30 and up are the song's own,
-    // defined in `#instruments` after them.
-    const name = list[instrument];
-    return name ?? 'not in this song’s sample list';
-  }
 }
 
 /**

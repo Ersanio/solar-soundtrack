@@ -38,6 +38,12 @@
         @case ('echo') {
           <amk-echo-inspector [command]="current" />
         }
+        @case ('instrument') {
+          <amk-instrument-inspector [command]="current" />
+        }
+        @case ('adsr') {
+          <amk-adsr-command [command]="current" />
+        }
         @case ('letter') {
           <amk-letter-command [command]="current" />
         }

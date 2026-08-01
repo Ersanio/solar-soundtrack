@@ -29,14 +29,14 @@ All from `web/`. Node 24 is what CI uses.
 | `npm run watch` | Dev-configuration build with `--watch`, no server. |
 | `npm run typecheck` | `tsc -p tsconfig.app.json --noEmit`. |
 | `npm run lint` | `ng lint` over `src/**` and `scripts/**`. |
-| `npm run check` | The merge gate: typecheck plus the six byte-level harnesses. |
+| `npm run check` | The merge gate: typecheck plus all ten byte-level harnesses. |
 
 CI runs `npm run lint` then `npm run check`.
 
 ### Tests
 
 There are no `.spec.ts` files in the repository — `npm run test` (`ng test`, Vitest) is scaffolding
-and currently runs nothing. The real suite is eight harnesses under `scripts/`, each a standalone
+and currently runs nothing. The real suite is ten harnesses under `scripts/`, each a standalone
 esbuild-bundled Node script with its own npm script. To run one, run its script; they take no
 filter flags, so narrowing a run means editing the harness.
 
@@ -62,6 +62,16 @@ not run the template compiler, so a bad binding (`viewBox=` instead of `[attr.vi
   text there, much later.
 - `npm run firtest` — the echo FIR maths, anchored on the two filters in the SNES manual that
   AddmusicK ships as `EchoFilter0`/`EchoFilter1`, and on bsnes's own DSP behaviour.
+- `npm run instrtest` — the driver's instrument and percussion tables. Its load-bearing assertion is
+  that `spc/instruments.ts` finds them in `public/driver/main.bin` **uniquely**: the tables carry no
+  citable address (`InstrumentData.asm` and `Commands.asm` are not in an AddmusicK release's
+  `AddmusicKsrc/`), so they are located by matching the SRCN column against `INSTRUMENT_TO_SAMPLE`,
+  and a second candidate would make that a guess. It also pins the one index where the driver and
+  `Music.cpp`'s `instrToSample` disagree — 19, which is the whole `@19` story.
+- `npm run adsrtest` — the envelope maths. `CLOCKS` is checked against the *published SNES noise
+  ladder*, because the DSP uses the same table for noise and every other function here is defined in
+  terms of it; nothing else could catch a transposed digit. It also asserts that the two magic tables
+  in AddmusicK's readme calculator are exactly the step counts of bsnes's envelope stepping.
 
 Separately, `scripts/Compare-Spc.ps1` and `scripts/Compare-SongBin.ps1` diff output against a real
 AddmusicK build, region-aware so ID666 noise does not drown the real differences. Those are what

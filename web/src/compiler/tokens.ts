@@ -56,7 +56,16 @@
  */
 
 import type { Span } from "../core/types";
-import { FIRST_VCMD, HEX_LENGTHS, LAST_VCMD, VCMD_NAMES } from "./tables";
+import { FIRST_VCMD, HEX_LENGTHS, INSTRUMENT_TO_SAMPLE, LAST_VCMD, VCMD_NAMES } from "./tables";
+
+/**
+ * The first `#instruments` entry's number.
+ *
+ * Stated here rather than imported from `spc/instruments.ts`: `compiler/` does
+ * not depend on the SPC layer, the same split `tables.ts:42-51` describes for
+ * `BANK_SLOT_COUNT`. `instrtest` asserts the two agree.
+ */
+const FIRST_CUSTOM_INSTRUMENT = 30;
 
 export type TokenKind =
 	| "comment"
@@ -87,6 +96,8 @@ export type TokenKind =
 	| "hex"
 	| "hexArg"
 	| "number"
+	/** A letter command's argument that is read as hex — see {@link HEX_ARG_LETTERS}. */
+	| "hexNumber"
 	| "operator"
 	| "unknown";
 
@@ -126,9 +137,21 @@ export const TOKEN_TAGS: Readonly<Record<TokenKind, string>> = {
 	hex: "keyword",
 	hexArg: "number",
 	number: "number",
+	// Same colour as a decimal argument: the radix is a fact about the command,
+	// not something the reader should have to notice from the highlighting.
+	hexNumber: "number",
 	operator: "operator",
 	unknown: "invalid",
 };
+
+/**
+ * Letters whose argument `parser.ts` reads with `getHex` rather than `getInt`.
+ *
+ * `q7F` is quantization `$7F` (`parser.ts:1405`) and `n1F` is noise clock `$1F`
+ * (`parser.ts:1665`), so reading either as decimal is wrong twice over: the value
+ * is wrong, and `F` would otherwise be taken for a note.
+ */
+const HEX_ARG_LETTERS = new Set(["q", "n"]);
 
 /** Human names for the single-letter commands, to match {@link VCMD_NAMES}. */
 const LETTER_NAMES: Readonly<Record<string, string>> = {
@@ -258,6 +281,32 @@ export interface ScanState {
 	 * `step` may not look behind its own `at` to find the paren.
 	 */
 	sampleName: boolean;
+	/**
+	 * The next token is a hex argument — see {@link HEX_ARG_LETTERS}.
+	 *
+	 * One-shot, like {@link sampleName}, but consumed *after* the replacement
+	 * arm rather than before it: `getHex` opens with `doReplacement`
+	 * (`parser.ts:532`), so `nx` with `"x=1F"` really does read `$1F`. Letting
+	 * the flag survive into the expansion is what reproduces that. It is cleared
+	 * by whatever token comes next whether or not that token is a hex digit,
+	 * which reproduces the other half: `getHex` skips no spaces, so `n 1F` fails.
+	 */
+	hexArgNext: boolean;
+	/**
+	 * `#instruments` has been seen and the block's `{` has not.
+	 *
+	 * Not a one-shot: the brace is usually on the following line.
+	 */
+	pendingInstruments: boolean;
+	/**
+	 * Between an `#instruments` block's braces.
+	 *
+	 * Load-bearing, not cosmetic. An instrument's ADSR and GAIN bytes land in
+	 * `$DA`-`$FE` — `$FE $6A $B8` is the commonest setting in the stock table —
+	 * so without this the block's second byte opens a VCMD and swallows the rest
+	 * of the entry as its arguments.
+	 */
+	inInstruments: boolean;
 }
 
 export function startState(): ScanState {
@@ -270,6 +319,9 @@ export function startState(): ScanState {
 		loopDepth: 0,
 		replacements: NO_REPLACEMENTS,
 		sampleName: false,
+		hexArgNext: false,
+		pendingInstruments: false,
+		inInstruments: false,
 	};
 }
 
@@ -372,6 +424,17 @@ function stepInner(
 		}
 	}
 
+	// Deliberately below the replacement arm; see `ScanState.hexArgNext`.
+	if (state.hexArgNext) {
+		state.hexArgNext = false;
+		if (isHexDigit(c)) {
+			let end = at;
+			// `getHex` stops at two digits (`parser.ts:536`).
+			while (end < line.length && end - at < 2 && isHexDigit(line[end])) end++;
+			return { kind: "hexNumber", end };
+		}
+	}
+
 	if (isSpace(c)) {
 		let end = at + 1;
 		while (end < line.length && isSpace(line[end])) end++;
@@ -400,7 +463,7 @@ function stepInner(
 			return scanString(line, at, state, sampleName);
 
 		case "#":
-			return scanHash(line, at);
+			return scanHash(line, at, state);
 
 		case "|":
 			// `parser.ts:435` — a bar line abandons any half-written hex command.
@@ -428,7 +491,17 @@ function stepInner(
 			// The one thing the two forms must be told apart for: `parser.ts:1732`
 			// tests exactly this character, and a sample name is not a definition.
 			state.sampleName = line[at + 1] === '"';
+			// `(@5, $02)` loads instrument 5's *sample* (`parser.ts:1743`); the `@`
+			// is part of that command and not an instrument change, so it is taken
+			// here rather than left to open one.
+			if (line[at + 1] === "@") return { kind: "label", end: at + 2 };
 			return { kind: "label", end: at + 1 };
+
+		// `parser.ts:1585` — a second `@` is the "direct" form, which forces the
+		// `$DA` that `@19`-`@29` would otherwise not emit. One token, so `gather`
+		// can tell the two apart from the text alone.
+		case "@":
+			return { kind: "instrument", end: line[at + 1] === "@" ? at + 2 : at + 1 };
 
 		case ")":
 			return { kind: "label", end: at + 1 };
@@ -440,11 +513,28 @@ function stepInner(
 		case "^":
 			return { kind: "tie", end: at + 1 };
 
+		case "{":
+			// `parser.ts:1071` — the brace after `#instruments` opens the block.
+			// Any half-written hex run is abandoned rather than carried into it,
+			// so a stray `$EF` above cannot eat the first entry's bytes.
+			if (state.pendingInstruments) {
+				state.pendingInstruments = false;
+				state.inInstruments = true;
+				state.hexLeft = 0;
+				state.currentHex = 0;
+				state.awaitingArpCount = false;
+			}
+			return { kind: "operator", end: at + 1 };
+
+		case "}":
+			// `parseInstrumentDefinitions` accepts no nesting (`Music.cpp:2570`), so
+			// the first `}` closes the block.
+			state.inInstruments = false;
+			return { kind: "operator", end: at + 1 };
+
 		case "?":
 		case "/":
 		case "&":
-		case "{":
-		case "}":
 		case ",":
 			return { kind: "operator", end: at + 1 };
 
@@ -462,7 +552,10 @@ function stepInner(
 	if (isNoteLetter(lower)) return { kind: "note", end: scanNoteBody(line, at + 1) };
 
 	const kind = LETTER_KINDS[lower] ?? LETTER_KINDS[c];
-	if (kind) return { kind, end: at + 1 };
+	if (kind) {
+		if (HEX_ARG_LETTERS.has(lower)) state.hexArgNext = true;
+		return { kind, end: at + 1 };
+	}
 
 	return { kind: "unknown", end: at + 1 };
 }
@@ -484,10 +577,14 @@ function scanNumber(line: string, at: number): StepResult {
 /**
  * `#amk 4` and friends versus a `#0` channel directive — `parser.ts:707-712`.
  */
-function scanHash(line: string, at: number): StepResult {
+function scanHash(line: string, at: number, state: ScanState): StepResult {
 	let end = at + 1;
 	if (isAlpha(line[end])) {
 		while (end < line.length && isAlpha(line[end])) end++;
+		// `parser.ts:797` matches this case-insensitively. Every other directive
+		// clears the flag, so an `#instruments` with no block cannot arm the next
+		// unrelated `{`.
+		state.pendingInstruments = line.slice(at, end).toLowerCase() === "#instruments";
 		return { kind: "directive", end };
 	}
 	while (end < line.length && isDigit(line[end])) end++;
@@ -603,6 +700,11 @@ function scanHex(line: string, at: number, state: ScanState): StepResult {
 	// A bare `$` with nothing behind it: half-typed, not yet meaningful.
 	if (digits === 0) return { kind: "unknown", end };
 
+	// Inside `#instruments` every `$xx` is one of an entry's five bytes, whatever
+	// it happens to equal. `parseInstrumentDefinitions` reads them positionally
+	// (`Music.cpp:2638-2645`) and never consults the VCMD table.
+	if (state.inInstruments) return { kind: "hexArg", end };
+
 	if (state.awaitingArpCount) {
 		// `parser.ts:2420` — `$FB`'s length byte. A high bit means the two-byte
 		// form; otherwise the count is the number of note bytes that follow.
@@ -682,11 +784,55 @@ export interface Command {
 	 * commands from different channels and call one later.
 	 */
 	channel?: number;
+	/**
+	 * Written as `@@n`, the "direct" form (`parser.ts:1585`).
+	 *
+	 * Worth carrying because it changes what the command *means*, not just how it
+	 * looks: `@19` emits nothing at all, while `@@19` emits `$DA` — and, through
+	 * the unconditional remap at `parser.ts:1597`, means custom instrument 30.
+	 */
+	direct?: boolean;
+}
+
+/** Where a custom instrument's sample byte came from. */
+export type InstrumentSample =
+	/** `"kick.brr"` — an index into this song's own sample list. */
+	| { form: "file"; name: string }
+	/** `@n` with `n < 30`: that stock instrument's sample. `parser.ts:1147`. */
+	| { form: "copy"; instrument: number; srcn: number }
+	/** `nXX`: noise at that clock, flagged by the sample byte's high bit. */
+	| { form: "noise"; clock: number; byte: number };
+
+/** One entry of an `#instruments` block. */
+export interface InstrumentDefinition {
+	/** What `@n` addresses it as. The first entry in the file is `@30`. */
+	number: number;
+	/** Always one of the three forms; an entry that opens as none is not one. */
+	sample: InstrumentSample;
+	/** ADSR1, ADSR2, GAIN, tuning, subtuning. Short while half-written. */
+	bytes: number[];
+	/** A sample form and all five bytes are present. */
+	complete: boolean;
+	span: Span;
 }
 
 export interface TokenIndex {
 	tokens: Token[];
 	commands: Command[];
+	/**
+	 * Every `#instruments` entry in the document, in `@30`-upward order.
+	 *
+	 * Here rather than in `ScanState` on purpose. Numbering runs `30 + k` across
+	 * *all* the blocks in a file, so a counter carried in the scan state would
+	 * encode "how many entries appear above this line" — precisely the hidden
+	 * dependency on having seen the top of the file that the resumable contract
+	 * forbids and that `tokentest` exists to catch. Built in a second pass over
+	 * the gathered stream instead, where {@link Command} already lives.
+	 *
+	 * Known divergence: this pass does not evaluate `#if`, so a block inside an
+	 * untaken branch is counted here where `preprocess.ts` would drop it.
+	 */
+	instruments: InstrumentDefinition[];
 }
 
 /**
@@ -773,7 +919,90 @@ export function tokenize(text: string): TokenIndex {
 		lineNumber++;
 	}
 
-	return { tokens, commands: gather(stream ?? tokens, text) };
+	const stream_ = stream ?? tokens;
+	return {
+		tokens,
+		commands: gather(stream_, text),
+		instruments: gatherInstruments(stream_, text),
+	};
+}
+
+/**
+ * The `#instruments` entries, read off the gathered stream.
+ *
+ * Mirrors `parseInstrumentDefinitions` (`parser.ts:1068`, `Music.cpp:2560`): a
+ * sample in one of three forms, then exactly five `$xx` bytes, repeated until
+ * the closing brace. Anything malformed is recorded as an incomplete entry
+ * rather than abandoning the block, because this runs on half-typed source by
+ * design — the panel has to say something useful mid-keystroke.
+ */
+function gatherInstruments(tokens: GatherToken[], text: string): InstrumentDefinition[] {
+	const out: InstrumentDefinition[] = [];
+	const textOf = (token: GatherToken): string => token.text ?? text.slice(token.start, token.end);
+	let number = FIRST_CUSTOM_INSTRUMENT;
+
+	for (let i = 0; i < tokens.length; i++) {
+		if (tokens[i].kind !== "directive") continue;
+		if (textOf(tokens[i]).toLowerCase() !== "#instruments") continue;
+
+		let j = i + 1;
+		while (j < tokens.length && tokens[j].kind === "comment") j++;
+		if (j >= tokens.length || textOf(tokens[j]) !== "{") {
+			i = j - 1;
+			continue;
+		}
+		j++;
+
+		while (j < tokens.length && textOf(tokens[j]) !== "}") {
+			const start = tokens[j];
+			if (start.kind === "comment") {
+				j++;
+				continue;
+			}
+
+			let sample: InstrumentSample;
+			let last = start;
+			if (start.kind === "string") {
+				sample = { form: "file", name: textOf(start).replace(/^"|"$/g, "") };
+				j++;
+			} else if (start.kind === "instrument" && tokens[j + 1]?.kind === "number") {
+				const n = numberValue(textOf(tokens[j + 1]), "number");
+				// `parser.ts:1147` — a custom instrument cannot be based on another.
+				sample = { form: "copy", instrument: n, srcn: INSTRUMENT_TO_SAMPLE[n] ?? -1 };
+				last = tokens[j + 1];
+				j += 2;
+			} else if (start.kind === "noise" && tokens[j + 1]?.kind === "hexNumber") {
+				const clock = numberValue(textOf(tokens[j + 1]), "hexNumber");
+				// `parser.ts:1162` — the high bit is what tells the driver it is noise.
+				sample = { form: "noise", clock, byte: clock | 0x80 };
+				last = tokens[j + 1];
+				j += 2;
+			} else {
+				// Not the start of an entry. Skipped so one stray character cannot
+				// throw the rest of the block's numbering out.
+				j++;
+				continue;
+			}
+
+			const bytes: number[] = [];
+			while (j < tokens.length && bytes.length < 5 && tokens[j].kind === "hexArg") {
+				bytes.push(parseInt(textOf(tokens[j]).slice(1), 16));
+				last = tokens[j];
+				j++;
+			}
+
+			out.push({
+				number: number++,
+				sample,
+				bytes,
+				complete: bytes.length === 5,
+				span: { start: start.start, end: last.end, line: start.line },
+			});
+		}
+		i = j;
+	}
+
+	return out;
 }
 
 /** Groups the flat token list into commands with their arguments. */
@@ -833,8 +1062,8 @@ function gather(tokens: GatherToken[], text: string): Command[] {
 		let j = i + 1;
 		while (j < tokens.length) {
 			const next = tokens[j];
-			if (next.kind === "number") {
-				args.push({ value: numberValue(textOf(next)), span: spanOf(next) });
+			if (next.kind === "number" || next.kind === "hexNumber") {
+				args.push({ value: numberValue(textOf(next), next.kind), span: spanOf(next) });
 				from ??= next.replacement;
 				last = next;
 				j++;
@@ -847,7 +1076,8 @@ function gather(tokens: GatherToken[], text: string): Command[] {
 			break;
 		}
 
-		const letter = textOf(token)[0];
+		const raw = textOf(token);
+		const letter = raw[0];
 		commands.push({
 			kind: letter,
 			name: LETTER_NAMES[letter.toLowerCase()] ?? nameForNote(token.kind),
@@ -856,6 +1086,7 @@ function gather(tokens: GatherToken[], text: string): Command[] {
 			complete: true,
 			replacement: from,
 			channel,
+			direct: raw.startsWith("@@") || undefined,
 		});
 		i = j - 1;
 	}
@@ -869,7 +1100,9 @@ function nameForNote(kind: TokenKind): string {
 	return "note";
 }
 
-function numberValue(raw: string): number {
+/** The radix comes from the kind, which keeps {@link gather} a pure function of the stream. */
+function numberValue(raw: string, kind: TokenKind): number {
+	if (kind === "hexNumber") return raw.length === 0 ? -1 : parseInt(raw, 16);
 	const digits = raw.replace(/^=/, "").replace(/\.+$/, "");
 	return digits.length === 0 ? -1 : parseInt(digits, 10);
 }

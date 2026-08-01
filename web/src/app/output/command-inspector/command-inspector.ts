@@ -1,18 +1,24 @@
 import { Component, computed, inject } from '@angular/core';
 
 import { EditorStore } from '../../state/editor-store';
+import { AdsrCommand } from './adsr-command/adsr-command';
 import { EchoInspector } from './echo-inspector/echo-inspector';
 import { FirDesigner } from './fir-designer/fir-designer';
 import { GenericCommand } from './generic-command/generic-command';
+import { InstrumentInspector } from './instrument-inspector/instrument-inspector';
 import { LetterCommand } from './letter-command/letter-command';
 
 /**
  * Which view a hex command gets.
  *
- * A lookup rather than a chain of conditions, so adding `$ED`'s ADSR editor is
- * an entry here and a component, not a change to the dispatcher.
+ * A lookup rather than a chain of conditions, so adding a view is an entry here
+ * and a component, not a change to the dispatcher.
  */
 const VIEWS: Readonly<Record<number, string>> = {
+  // `$DA` is the hex form of `@`, and the only way to reach the driver's own
+  // instrument table entry 19 — so it gets the same view.
+  0xda: 'instrument',
+  0xed: 'adsr',
   0xef: 'echo',
   0xf0: 'echo',
   0xf1: 'echo',
@@ -20,8 +26,25 @@ const VIEWS: Readonly<Record<number, string>> = {
   0xf5: 'fir',
 };
 
-/** Letter commands worth spelling out; the rest fall through to the generic view. */
-const LETTER_VIEWS = new Set(['t', 'v', 'w', 'y', 'o', 'l', 'h', 'q', '@', '*', '[']);
+/**
+ * Letter commands worth spelling out; the rest fall through to the generic view.
+ *
+ * A map rather than a set now that `@` earns a view of its own.
+ */
+const LETTER_VIEWS: Readonly<Record<string, string>> = {
+  t: 'letter',
+  v: 'letter',
+  w: 'letter',
+  y: 'letter',
+  o: 'letter',
+  l: 'letter',
+  h: 'letter',
+  q: 'letter',
+  n: 'letter',
+  '*': 'letter',
+  '[': 'letter',
+  '@': 'instrument',
+};
 
 /**
  * What the caret is sitting on.
@@ -36,7 +59,14 @@ const LETTER_VIEWS = new Set(['t', 'v', 'w', 'y', 'o', 'l', 'h', 'q', '@', '*', 
  */
 @Component({
   selector: 'amk-command-inspector',
-  imports: [EchoInspector, FirDesigner, GenericCommand, LetterCommand],
+  imports: [
+    AdsrCommand,
+    EchoInspector,
+    FirDesigner,
+    GenericCommand,
+    InstrumentInspector,
+    LetterCommand,
+  ],
   templateUrl: './command-inspector.html',
   host: { class: 'block' },
 })
@@ -45,12 +75,28 @@ export class CommandInspector {
 
   protected readonly command = this.store.commandAtCaret;
 
+  /**
+   * Whether the caret is inside an `#instruments` entry.
+   *
+   * A definition and a use are written identically — `@5` and `n1F` mean one
+   * thing in a channel and quite another in the block — so this has to win over
+   * the letter the command starts with, and it is decided here rather than in
+   * each view that could be fooled by it.
+   */
+  private readonly defining = computed(() => {
+    const command = this.command();
+    if (!command) return false;
+    const at = command.span.start;
+    return this.store.tokens().instruments.some((d) => at >= d.span.start && at < d.span.end);
+  });
+
   /** Which view to render; `null` leaves the generic readout standing. */
   protected readonly view = computed(() => {
     const command = this.command();
     if (!command) return null;
+    if (this.defining()) return 'instrument';
     if (command.vcmd !== undefined) return VIEWS[command.vcmd] ?? null;
-    return LETTER_VIEWS.has(command.kind.toLowerCase()) ? 'letter' : null;
+    return LETTER_VIEWS[command.kind.toLowerCase()] ?? null;
   });
 
   /** `$F5` and the like; a letter command has no VCMD byte. */
