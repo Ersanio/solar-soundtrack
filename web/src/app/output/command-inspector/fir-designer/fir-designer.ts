@@ -1,4 +1,4 @@
-import { Component, computed, inject, input, signal } from '@angular/core';
+import { Component, computed, effect, inject, input, signal, untracked } from '@angular/core';
 
 import type { Command } from '@compiler/tokens';
 import {
@@ -17,6 +17,7 @@ import {
 } from '@spc/fir';
 import { Button } from '../../../shared/button/button';
 import { EditorStore } from '../../../state/editor-store';
+import { Playback } from '../../../state/playback';
 import { builtInFilterName, firOverriddenBy } from '../fir-override';
 import { FirGraph } from '../fir-graph/fir-graph';
 
@@ -45,6 +46,7 @@ export class FirDesigner {
   readonly command = input.required<Command>();
 
   private readonly store = inject(EditorStore);
+  private readonly playback = inject(Playback);
 
   protected readonly FIR_PRESETS = FIR_PRESETS;
   protected readonly mode = signal<Mode>('presets');
@@ -94,6 +96,57 @@ export class FirDesigner {
   });
 
   protected readonly stability = computed(() => echoStability(this.taps(), this.feedback()));
+
+  /**
+   * Just the flag, so the effect below runs on a genuine change.
+   *
+   * `stability()` is a fresh object on every keystroke, since `taps()` rebuilds
+   * from `command().args`. A `computed` over the boolean compares by value and
+   * only notifies when it actually flips.
+   */
+  private readonly runaway = computed(() => this.stability().runaway);
+
+  /**
+   * The `$F5` the last reading was taken on, and what it said.
+   *
+   * Moving the caret between two `$F5` commands reuses this component with a new
+   * input rather than building a new one, so the span is what tells arriving at
+   * a filter apart from editing one. `-1` is no reading yet: a span offset is
+   * never negative, so the first pass can never look like a continuation.
+   */
+  private lastStart = -1;
+  private lastRunaway = false;
+
+  constructor() {
+    // The song stops the moment an edit makes the echo run away, so the warning
+    // beside the graph is never left sitting next to a song building towards
+    // the clip it describes. Only the transition acts: opening the inspector on
+    // a filter that is already bad is not an edit, and pressing play again with
+    // the warning still up is a decision the user is entitled to make.
+    effect(() => {
+      const start = this.command().span.start;
+      const runaway = this.runaway();
+      const sameCommand = this.lastStart === start;
+      const wasRunaway = this.lastRunaway;
+      this.lastStart = start;
+      this.lastRunaway = runaway;
+
+      // In order: nothing is wrong, the caret arrived on another `$F5` (or on
+      // this one) rather than editing it, and an unchanged warning is not a new
+      // one.
+      if (!runaway || !sameCommand || wasRunaway) return;
+
+      untracked(() => {
+        // A paused song is not audible, and resuming one is as deliberate an act
+        // as pressing play.
+        if (!this.playback.isPlaying()) return;
+        this.playback.stop();
+        this.store.fail(
+          'playback automatically stopped to protect your ears and speakers due to a runaway FIR filter',
+        );
+      });
+    });
+  }
 
   /**
    * A later `$F1` in this channel, which silently throws these coefficients
