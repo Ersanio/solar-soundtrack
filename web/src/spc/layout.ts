@@ -107,8 +107,17 @@ export function computeSpcLayout(
 		sampleDataEnd += sample.data.length;
 	}
 
-	// AddmusicK.cpp:1345 — the echo buffer sits at the top of ARAM, or occupies a
-	// token $FF00-$FF03 when the song uses no echo.
+	// AddmusicK.cpp:1351 — the echo buffer sits at the top of ARAM, or a token
+	// $FF00-$FF03 when the song uses no echo. It is never absent: with EDL 0 the
+	// `beq` at main.asm:2608 skips the address maths, but `eor #$FF` still runs and
+	// leaves ESA at $FF, and the DSP writes four bytes per sample there regardless —
+	// which is what the spin-wait at main.asm:2624 exists for.
+	//
+	// echoStart reserves the whole page rather than those four bytes, because ESA
+	// stores a high byte only and nothing else can share the page. That is stricter
+	// than AddmusicK, which reserves nothing here (AddmusicK.cpp:1341 adds a
+	// zero-length buffer) and so would let samples run to $10000 and be clobbered by
+	// that write. The cost is reporting 256 B less free than it does.
 	const echoSize = echoBufferSize << 11;
 	const echoStart = echoSize > 0 ? ARAM_SIZE - echoSize : 0xff00;
 	const echoEnd = echoSize > 0 ? ARAM_SIZE : 0xff04;
@@ -132,23 +141,22 @@ export function computeSpcLayout(
 // Budget breakdown
 // ---------------------------------------------------------------------------
 
-export type BudgetKey =
-	| "variables"
-	| "driver"
-	| "song"
-	| "align"
-	| "sampleTable"
-	| "samples"
-	| "free"
-	| "echo";
+/**
+ * The five regions of ARAM, in memory order.
+ *
+ * One row per stacked-bar segment and no finer: the panel draws these five and
+ * lists these five, so there is no second granularity for it to roll up from.
+ * Sub-allocations that used to be their own rows — driver variables, the page
+ * gap after the song, the sample directory — are folded into the region they
+ * belong to, because none of them is separately actionable.
+ */
+export type BudgetKey = "driver" | "song" | "samples" | "free" | "echo";
 
 export interface BudgetRow {
 	key: BudgetKey;
 	label: string;
 	start: number;
 	bytes: number;
-	/** Which stacked-bar segment this row rolls up into. */
-	group: "driver" | "song" | "samples" | "free" | "echo";
 	/** Extra context shown beside the label. */
 	detail?: string;
 }
@@ -180,68 +188,49 @@ export function computeBudget(
 	/** Directory entries that actually carry data, i.e. were not emptied. */
 	const loaded = samples.reduce((count, sample) => (sample.data.length > 0 ? count + 1 : count), 0);
 
-	// Everything below the song is one line item, because it is one file. The
-	// detail names only what we can actually verify from the bytes — whether the
-	// image carries its own song table and global songs — since that is what
-	// decides whether this figure matches a real install. Sound effects are in
-	// there too, but nothing here confirms it (a !noSFX build has none).
+	// Everything below the song is one line item, because it is one file — its
+	// zero-page variables included. The detail names only what we can actually
+	// verify from the bytes — whether the image carries its own song table and
+	// global songs — since that is what decides whether this figure matches a
+	// real install. Sound effects are in there too, but nothing here confirms it
+	// (a !noSFX build has none).
 	const driverDetail = driver.embedded
 		? `song table + ${driver.embedded.globalSongCount} global song(s) included`
 		: "song table appended; no global songs";
 
-	const rows: BudgetRow[] = [
-		{ key: "variables", label: "driver variables", start: 0, bytes: driver.programPos, group: "driver" },
-		{
-			key: "driver",
-			label: "driver",
-			detail: driverDetail,
-			start: driver.programPos,
-			bytes: plan.programImage.length,
-			group: "driver",
-		},
-	];
+	// Directory entries and actual samples are not the same number once
+	// optimisation has emptied the unplayed ones. Reporting only the entry count
+	// reads as "the whole default set is loaded" no matter what was really
+	// uploaded, so say both when they differ.
+	const sampleDetail =
+		loaded === samples.length
+			? `${samples.length} ${samples.length === 1 ? "sample" : "samples"}`
+			: `${loaded} of ${samples.length} loaded`;
 
-	rows.push(
-		{ key: "song", label: "your song", start: layout.songPos, bytes: songBytes, group: "song" },
+	const rows: BudgetRow[] = [
+		{ key: "driver", label: "SPC-700 engine", detail: driverDetail, start: 0, bytes: layout.programEnd },
+		{ key: "song", label: "your song", start: layout.songPos, bytes: songBytes },
 		{
-			// The sample directory has to start on a page boundary, so whatever is
-			// left of the page after the song is unusable. Up to 255 bytes.
-			key: "align",
-			label: "page alignment",
-			start: layout.songEnd,
-			bytes: layout.sampleTablePos - layout.songEnd,
-			group: "samples",
-		},
-		{
-			key: "sampleTable",
-			label: "sample directory",
-			start: layout.sampleTablePos,
-			bytes: layout.sampleTableEnd - layout.sampleTablePos,
-			group: "samples",
-		},
-		{
+			// Song end rather than sampleDataPos: the directory must start on a page
+			// boundary, so up to 255 bytes of the song's last page are unusable, and
+			// the directory itself is four bytes per entry. Both exist only to carry
+			// samples, so both are counted as sample data.
 			key: "samples",
-			// Directory entries and actual samples are not the same number once
-			// optimisation has emptied the unplayed ones. Reporting only the
-			// entry count reads as "the whole default set is loaded" no matter what
-			// was really uploaded, so say both when they differ.
-			label: loaded === samples.length ? `samples (${samples.length})` : `samples (${loaded} of ${samples.length})`,
-			start: layout.sampleDataPos,
-			bytes: layout.sampleDataEnd - layout.sampleDataPos,
-			group: "samples",
+			label: "sample data",
+			detail: sampleDetail,
+			start: layout.songEnd,
+			bytes: layout.sampleDataEnd - layout.songEnd,
 		},
-		{ key: "free", label: "free", start: layout.sampleDataEnd, bytes: Math.max(0, layout.freeBytes), group: "free" },
+		{ key: "free", label: "free", start: layout.sampleDataEnd, bytes: Math.max(0, layout.freeBytes) },
 		{
-			// Everything from echoStart up is off limits. With no echo that is still
-			// a whole page: AddmusicK parks a 4-byte stub at $FF00 and nothing may
-			// be allocated above it.
+			// Everything from echoStart up is off limits — a whole page even with no
+			// echo, for the reason computeSpcLayout gives.
 			key: "echo",
 			label: echoBufferSize > 0 ? "echo buffer" : "echo buffer (reserved)",
 			start: layout.echoStart,
 			bytes: ARAM_SIZE - layout.echoStart,
-			group: "echo",
 		},
-	);
+	];
 
 	const usedBytes = ARAM_SIZE - Math.max(0, layout.freeBytes);
 

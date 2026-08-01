@@ -13,8 +13,6 @@ const ALL_CHANNELS = 0xff;
 
 export interface ChannelState {
   index: number;
-  /** The song actually writes to this channel. */
-  used: boolean;
   muted: boolean;
   soloed: boolean;
   /** Audible right now, once solo is taken into account. */
@@ -42,9 +40,14 @@ export class Playback {
   readonly live = signal(true);
   readonly loop = signal(false);
 
-  /** Channels the user silenced, and channels they isolated, as bitmasks. */
+  /** Channels the user silenced, as a bitmask. */
   private readonly mutedMask = signal(0);
-  private readonly soloedMask = signal(0);
+  /**
+   * The one channel the user isolated, or `null`. Solo is exclusive rather than
+   * a mask: isolating a part means hearing that part, and two channels soloed at
+   * once is just a mute of everything else wearing the wrong name.
+   */
+  private readonly soloedChannel = signal<number | null>(null);
 
   /** Where the seek bar is being dragged to, while the drag is still going on. */
   private readonly scrubbing = signal<number | null>(null);
@@ -95,34 +98,43 @@ export class Playback {
   });
 
   /**
-   * Soloing wins over muting, as it does on a mixer: with anything soloed, only
-   * those channels are heard and the mute flags are held but not applied.
+   * With a channel soloed only that channel is heard, and nothing else applies:
+   * engaging solo clears the mutes outright rather than holding them, so what
+   * the buttons show is always what is being heard.
    */
   private readonly silenced = computed(() => {
-    const soloed = this.soloedMask();
-    return soloed ? ~soloed & ALL_CHANNELS : this.mutedMask();
+    const soloed = this.soloedChannel();
+    return soloed === null ? this.mutedMask() : ~(1 << soloed) & ALL_CHANNELS;
   });
 
+  /**
+   * Only the channels the song actually writes to. A channel with no data has
+   * nothing to mute, so it gets no controls at all and they appear as the song
+   * grows into them. The state behind them is untouched by this: a channel that
+   * goes empty keeps its mute or solo and resumes it if the channel comes back,
+   * and `clearChannels()` reaches it either way.
+   */
   readonly channels = computed<ChannelState[]>(() => {
     const sizes = this.editor.result()?.stats?.channelSizes ?? [];
     const muted = this.mutedMask();
-    const soloed = this.soloedMask();
+    const soloed = this.soloedChannel();
     const silenced = this.silenced();
 
-    return Array.from({ length: CHANNELS }, (_, index) => {
-      const bit = 1 << index;
-      return {
-        index,
-        used: (sizes[index] ?? 0) > 0,
-        muted: (muted & bit) !== 0,
-        soloed: (soloed & bit) !== 0,
-        audible: (silenced & bit) === 0,
-      };
-    });
+    return Array.from({ length: CHANNELS }, (_, index) => index)
+      .filter((index) => (sizes[index] ?? 0) > 0)
+      .map((index) => {
+        const bit = 1 << index;
+        return {
+          index,
+          muted: (muted & bit) !== 0,
+          soloed: soloed === index,
+          audible: (silenced & bit) === 0,
+        };
+      });
   });
 
-  readonly isSoloing = computed(() => this.soloedMask() !== 0);
-  readonly hasChannelOverrides = computed(() => (this.mutedMask() | this.soloedMask()) !== 0);
+  readonly isSoloing = computed(() => this.soloedChannel() !== null);
+  readonly hasChannelOverrides = computed(() => this.mutedMask() !== 0 || this.isSoloing());
 
   constructor() {
     effect(() => this.player.setVolume(this.volume() / 100));
@@ -352,17 +364,26 @@ export class Playback {
     this.player.seek(target);
   }
 
+  /** Ignored while a channel is soloed, where the mute buttons are disabled. */
   toggleMute(channel: number): void {
+    if (this.isSoloing()) return;
     this.mutedMask.update((mask) => mask ^ (1 << channel));
   }
 
+  /**
+   * Moves the solo to `channel`, or lifts it if that channel already has it.
+   * Taking a solo discards the mutes, so lifting it again leaves the whole song
+   * audible rather than restoring a mute the buttons stopped showing.
+   */
   toggleSolo(channel: number): void {
-    this.soloedMask.update((mask) => mask ^ (1 << channel));
+    const soloed = this.soloedChannel() === channel ? null : channel;
+    this.soloedChannel.set(soloed);
+    if (soloed !== null) this.mutedMask.set(0);
   }
 
-  /** Clears both masks, so the whole song is heard again. */
+  /** Drops every mute and any solo, so the whole song is heard again. */
   clearChannels(): void {
     this.mutedMask.set(0);
-    this.soloedMask.set(0);
+    this.soloedChannel.set(null);
   }
 }

@@ -317,8 +317,9 @@ console.log("\ncustom driver: a final-pass build is read as-is");
 	const rows = customBudget.rows.reduce((sum, row) => sum + row.bytes, 0);
 	check("custom budget accounts for all 64 KiB", rows === 0x10000, `${rows}`);
 	check(
-		"driver row covers code + SFX + table + globals",
-		customBudget.rows.find((r) => r.key === "driver")?.bytes === body.length,
+		"driver row covers variables + code + SFX + table + globals",
+		customBudget.rows.find((r) => r.key === "driver")?.bytes === custom.programPos + body.length,
+		`${customBudget.rows.find((r) => r.key === "driver")?.bytes} vs ${custom.programPos + body.length}`,
 	);
 }
 
@@ -565,13 +566,13 @@ console.log("\n#samples reaches the sample directory");
 	const budget = computeBudget(driver, samples, plan, one.data!.length, one.stats?.echoBufferSize ?? 0);
 	check("the budget agrees with the built file", budget.layout.sampleDataEnd === built.layout.sampleDataEnd,
 		`${budget.layout.sampleDataEnd} vs ${built.layout.sampleDataEnd}`);
-	check("the samples row counts one", budget.rows.find((row) => row.key === "samples")?.label === "samples (1)",
-		budget.rows.find((row) => row.key === "samples")?.label);
+	check("the samples row counts one", budget.rows.find((row) => row.key === "samples")?.detail === "1 sample",
+		budget.rows.find((row) => row.key === "samples")?.detail);
 }
 
 console.log("\nthe budget says how many samples are really loaded");
 {
-	// "samples (20)" for every possible song reads as "the default set is loaded"
+	// "20 samples" for every possible song reads as "the default set is loaded"
 	// no matter what optimisation actually did, which is how a real bug in the
 	// importance fallback went unnoticed. The row has to distinguish the two.
 	const byName = new Map(driver.samples.map((sample) => [sample.sampleName, sample]));
@@ -584,16 +585,16 @@ console.log("\nthe budget says how many samples are really loaded");
 	};
 	const source = "#amk 4\n#0 t40 o4 v220 q7F @0 l8 c d e f\n";
 
-	const label = (optimize: boolean): string => {
+	const detail = (optimize: boolean): string => {
 		const result = compiler.compile({ source, aramAddress: plan.localPos, options: { ...options, optimizeSampleUsage: optimize } });
 		const samples = (result.sampleList ?? []).map((name) => byName.get(name) ?? emptySample(name));
 		const budget = computeBudget(driver, samples, plan, result.data!.length, result.stats?.echoBufferSize ?? 0);
-		return budget.rows.find((row) => row.key === "samples")?.label ?? "";
+		return budget.rows.find((row) => row.key === "samples")?.detail ?? "";
 	};
 
-	check("unoptimised reports the plain count", label(false) === "samples (20)", label(false));
+	check("unoptimised reports the plain count", detail(false) === "20 samples", detail(false));
 	// 17 important plus @0's own sample, which is one of them.
-	check("optimised reports loaded of total", label(true) === "samples (17 of 20)", label(true));
+	check("optimised reports loaded of total", detail(true) === "17 of 20 loaded", detail(true));
 }
 
 console.log("\noptimizeSampleUsage frees real ARAM");

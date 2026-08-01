@@ -16,7 +16,7 @@ import type { BudgetRow } from '@spc/layout';
 import { elementSize } from '../../shared/chart/element-size';
 import { stackSegments } from '../../shared/chart/stack';
 
-export type Group = BudgetRow['group'];
+export type Group = BudgetRow['key'];
 
 export interface Segment {
   group: Group;

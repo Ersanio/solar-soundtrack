@@ -6,23 +6,12 @@ import { hex4 } from '../../util/format';
 import { AramBar, type Group, type Segment } from '../aram-bar/aram-bar';
 import { DriverPicker } from '../driver-picker/driver-picker';
 
-interface TableRow {
-  key: string;
-  group: Group;
-  label: string;
+/** A budget row as the table renders it: a bar segment plus its text columns. */
+interface TableRow extends Segment {
   detail: string;
   range: string;
   size: string;
 }
-
-/** Stacked-bar segments, in memory order. */
-const GROUPS: readonly { group: Group; label: string }[] = [
-  { group: 'driver', label: 'driver' },
-  { group: 'song', label: 'your song' },
-  { group: 'samples', label: 'samples' },
-  { group: 'free', label: 'free' },
-  { group: 'echo', label: 'echo' },
-];
 
 @Component({
   selector: 'amk-aram-budget',
@@ -46,32 +35,34 @@ export class AramBudget {
     echo: 'bg-seg-echo',
   };
 
-  protected readonly segments = computed<Segment[]>(() => {
-    const budget = this.store.budget();
-    if (!budget) return [];
-    return GROUPS.map(({ group, label }) => ({
-      group,
-      label,
-      bytes: budget.rows
-        .filter((row) => row.group === group)
-        .reduce((sum, row) => sum + row.bytes, 0),
-    })).filter((segment) => segment.bytes > 0);
-  });
-
-  protected readonly tableRows = computed<TableRow[]>(() => {
+  /**
+   * The table's rows, which are also the bar's segments.
+   *
+   * `computeBudget` already emits exactly the five regions the bar draws, so
+   * there is nothing to roll up here — one pass builds both.
+   *
+   * `free` is kept even at zero bytes: "no room left" is precisely what you
+   * come to this table to read, and a missing row says it far less clearly.
+   */
+  protected readonly rows = computed<TableRow[]>(() => {
     const budget = this.store.budget();
     if (!budget) return [];
     return budget.rows
       .filter((row) => row.bytes > 0 || row.key === 'free')
       .map((row) => ({
-        key: row.key,
-        group: row.group,
+        group: row.key,
         label: row.label,
+        bytes: row.bytes,
         detail: row.detail ?? '',
         range: `$${hex4(row.start)}–$${hex4(row.start + Math.max(row.bytes, 1) - 1)}`,
         size: row.bytes.toLocaleString(),
       }));
   });
+
+  /** The bar has no zero-width mark to draw, so it omits what the table lists. */
+  protected readonly segments = computed<Segment[]>(() =>
+    this.rows().filter((row) => row.bytes > 0),
+  );
 
   protected readonly overflowing = computed(() => (this.store.budget()?.overflowBytes ?? 0) > 0);
 

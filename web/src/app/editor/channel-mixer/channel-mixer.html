@@ -1,14 +1,11 @@
 <h3 class="text-ink-muted text-xs font-semibold tracking-wide uppercase">Channels</h3>
 
 @for (channel of playback.channels(); track channel.index) {
-  <div
-    class="border-edge flex items-center overflow-hidden rounded-md border"
-    [class.opacity-40]="!channel.used"
-  >
+  <div class="border-edge flex items-center overflow-hidden rounded-md border">
     <span
       class="border-edge border-r px-1.5 py-0.5 font-mono text-xs"
       [class.text-ink-muted]="!channel.audible"
-      [class.line-through]="channel.used && !channel.audible"
+      [class.line-through]="!channel.audible"
     >
       {{ channel.index }}
     </span>
@@ -16,7 +13,7 @@
     <button
       type="button"
       [class]="muteClass(channel.muted)"
-      [disabled]="!channel.used"
+      [disabled]="playback.isSoloing()"
       [attr.aria-pressed]="channel.muted"
       [attr.aria-label]="'Mute channel ' + channel.index"
       [title]="'Mute channel ' + channel.index"
@@ -28,7 +25,6 @@
     <button
       type="button"
       [class]="soloClass(channel.soloed)"
-      [disabled]="!channel.used"
       [attr.aria-pressed]="channel.soloed"
       [attr.aria-label]="'Solo channel ' + channel.index"
       [title]="'Solo channel ' + channel.index"
@@ -47,7 +43,3 @@
 >
   Reset
 </button>
-
-@if (playback.isSoloing()) {
-  <span class="text-ink-muted text-xs">soloing — mutes are held</span>
-}

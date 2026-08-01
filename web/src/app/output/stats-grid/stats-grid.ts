@@ -42,29 +42,26 @@ export class StatsGrid {
         dim: !stats.loopDataSize,
       },
       { label: 'Echo buffer', value: echoBytes ? `0x${hex4(echoBytes)}` : '0', dim: echoBytes === 0 },
-      // One pass through the song, as AddmusicK itself reports it. The doubled
-      // figure next to it is the ID666 header field, which is a different thing.
+      // One pass through the song, as AddmusicK itself reports it. Not the ID666
+      // header field, which doubles the loop and is not shown here.
       {
         label: 'Length',
         value: playSeconds === null ? 'unknown' : formatTime(playSeconds),
         dim: playSeconds === null,
       },
-      {
-        label: 'ID666 length',
-        value: stats.tagSeconds === null ? 'unknown' : `${stats.tagSeconds}s`,
-        dim: stats.tagSeconds === null,
-      },
       { label: 'Intro', value: stats.hasIntro ? 'yes' : 'no', dim: !stats.hasIntro },
-      { label: 'Loops', value: stats.loops ? 'yes' : 'no', dim: !stats.loops },
     ];
 
+    // A channel with no data gets no tile at all — eight permanent placeholders
+    // said nothing, and the grid reflows as channels come into use.
     for (let channel = 0; channel < 8; channel++) {
       const size = stats.channelSizes[channel] ?? 0;
+      if (size === 0) continue;
       const ticks = stats.channelTicks[channel] ?? 0;
       cells.push({
         label: `Channel ${channel}`,
-        value: size ? `0x${hex4(size)} · ${ticks}t` : '—',
-        dim: size === 0,
+        value: `0x${hex4(size)} · ${ticks}t`,
+        dim: false,
       });
     }
 

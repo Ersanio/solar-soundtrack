@@ -24,19 +24,18 @@ import { Playback } from '../../state/playback';
 export class ChannelMixer {
   protected readonly playback = inject(Playback);
 
-  protected static readonly TOGGLE =
-    'cursor-pointer px-1.5 py-0.5 font-mono text-xs transition-colors ' +
-    'disabled:cursor-not-allowed';
+  protected static readonly TOGGLE = 'cursor-pointer px-1.5 py-0.5 font-mono text-xs transition-colors';
 
+  /** Disabled while soloing, where a mute would have nothing to act on. */
   protected muteClass(active: boolean): string {
-    return `${ChannelMixer.TOGGLE} ${
+    return `${ChannelMixer.TOGGLE} disabled:cursor-not-allowed disabled:opacity-40 ${
       active ? 'bg-danger/20 text-danger font-semibold' : 'text-ink-muted hover:not-disabled:text-ink'
     }`;
   }
 
   protected soloClass(active: boolean): string {
     return `${ChannelMixer.TOGGLE} ${
-      active ? 'bg-accent/20 text-accent font-semibold' : 'text-ink-muted hover:not-disabled:text-ink'
+      active ? 'bg-accent/20 text-accent font-semibold' : 'text-ink-muted hover:text-ink'
     }`;
   }
 }

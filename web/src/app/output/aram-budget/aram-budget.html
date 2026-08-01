@@ -15,7 +15,7 @@
 
     <table class="w-full border-collapse text-xs">
       <tbody>
-        @for (row of tableRows(); track row.key) {
+        @for (row of rows(); track row.group) {
           <tr class="border-edge/60 border-b last:border-0">
             <td class="w-4 py-1">
               <span class="block size-2.5 rounded-sm" [class]="fill[row.group]"></span>
