@@ -9,8 +9,8 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { compiler } from "../src/compilers";
-import { EMPTY_SAMPLE_NAME } from "../src/compilers/addmusick/tables";
+import { compiler } from "../src/compiler";
+import { EMPTY_SAMPLE_NAME } from "../src/compiler/tables";
 import { emptySample } from "../src/spc/brr";
 import { analyzeDriver, encodePathSegment, loadDriver, withCustomProgram } from "../src/spc/driver";
 import { buildSpc } from "../src/spc/export";

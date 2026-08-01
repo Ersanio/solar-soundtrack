@@ -11,7 +11,7 @@
  * step-for-step against each other.
  */
 
-import type { Diagnostic } from "../../core/types";
+import type { Diagnostic } from "../core/types";
 import type { ParseOutput } from "./parser";
 
 export interface LinkResult {

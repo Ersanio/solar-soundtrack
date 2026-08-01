@@ -19,7 +19,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { createContext, runInContext } from "node:vm";
 
-import { compiler } from "../src/compilers";
+import { compiler } from "../src/compiler";
 import { loadDriver } from "../src/spc/driver";
 import { buildSpc } from "../src/spc/export";
 import { planAram } from "../src/spc/layout";

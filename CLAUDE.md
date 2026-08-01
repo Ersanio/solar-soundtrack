@@ -74,14 +74,14 @@ Three layers, and the boundary between them is the part that matters.
 
 | Path | Layer |
 | --- | --- |
-| `src/src/compilers/addmusick/` | MML compiler: `preprocess.ts` → `parser.ts` → `link.ts` |
+| `src/src/compiler/` | MML compiler: `preprocess.ts` → `parser.ts` → `link.ts` |
 | `src/src/spc/` | SPC assembly, BRR, driver bundle, emulator host, audio worklet |
 | `src/src/app/` | Angular UI |
 
-`compilers/` and `spc/` are **framework-free and DOM-free** — no Angular, no `document`, no
+`compiler/` and `spc/` are **framework-free and DOM-free** — no Angular, no `document`, no
 `window`, no `fetch` outside `driver.ts`. That is load-bearing, not stylistic: it is why the same
 modules run in Node under the harnesses, on the main thread, and inside an AudioWorkletGlobalScope.
-Keep it that way. The TS path aliases (`@compilers`, `@core/*`, `@spc/*`) mark the boundary; `core/types.ts`
+Keep it that way. The TS path aliases (`@compiler`, `@core/*`, `@spc/*`) mark the boundary; `core/types.ts`
 is the shared vocabulary and deliberately knows nothing about the SPC layer.
 
 ### The pipeline
@@ -163,7 +163,7 @@ stays safe to overwrite.
 ### Formatting
 
 Two conventions coexist, split by layer. `app/` follows Prettier (`.prettierrc`: 2 spaces, single
-quotes, width 100). `compilers/`, `spc/` and `scripts/` use tabs and double quotes, carried over
+quotes, width 100). `compiler/`, `spc/` and `scripts/` use tabs and double quotes, carried over
 from the pre-Angular prototype. Match the file you are editing.
 
 ## Deployment

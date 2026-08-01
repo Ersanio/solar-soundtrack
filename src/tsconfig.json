@@ -18,8 +18,8 @@
        ported verbatim from the prototype. Aliases keep component imports from
        turning into ../../.. chains and mark the boundary. */
     "paths": {
-      "@compilers": ["./src/compilers/index.ts"],
-      "@compilers/*": ["./src/compilers/*"],
+      "@compiler": ["./src/compiler/index.ts"],
+      "@compiler/*": ["./src/compiler/*"],
       "@core/*": ["./src/core/*"],
       "@spc/*": ["./src/spc/*"]
     }

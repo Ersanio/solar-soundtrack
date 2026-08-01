@@ -39,7 +39,7 @@ import {
 	usedBankSlots,
 	validateSampleBank,
 } from "../src/spc/brr";
-import { BANK_SLOT_COUNT, bankSlotName } from "../src/compilers/addmusick/tables";
+import { BANK_SLOT_COUNT, bankSlotName } from "../src/compiler/tables";
 
 const PUBLIC = join(import.meta.dirname, "..", "public");
 

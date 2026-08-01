@@ -19,7 +19,7 @@
  * too; comments cite the reference line numbers so the two can be diffed.
  */
 
-import type { Diagnostic, SongLength, Span, SongTags } from "../../core/types";
+import type { Diagnostic, SongLength, Span, SongTags } from "../core/types";
 import { TARGET_AM4, TARGET_AMM, TARGET_NONE, preprocess } from "./preprocess";
 import {
 	DEFAULT_TRANSPOSE,

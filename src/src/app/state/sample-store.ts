@@ -1,6 +1,6 @@
 import { Service, computed, effect, inject, signal } from '@angular/core';
 
-import { EMPTY_SAMPLE_NAME, bankSlotName } from '@compilers/addmusick/tables';
+import { EMPTY_SAMPLE_NAME, bankSlotName } from '@compiler/tables';
 import {
   type BrrSample,
   blockCount,
@@ -88,7 +88,7 @@ export interface SampleFile {
  * source of truth and `spctest` can keep asserting on them.
  *
  * The bundled twenty keep their order and membership no matter what, because
- * `INSTRUMENT_TO_SAMPLE` (`compilers/addmusick/tables.ts`) hardcodes that
+ * `INSTRUMENT_TO_SAMPLE` (`compiler/tables.ts`) hardcodes that
  * `@0`-`@29` mean specific SRCNs. Replacing a file's *bytes* changes what `@0`
  * sounds like, which is the point; changing the *list* is `#samples`'s job.
  */

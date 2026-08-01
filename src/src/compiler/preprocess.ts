@@ -15,7 +15,7 @@
  * definition is preserved.
  */
 
-import type { Diagnostic } from "../../core/types";
+import type { Diagnostic } from "../core/types";
 
 /** Version marker found in the source. */
 export const TARGET_AM4 = -1;

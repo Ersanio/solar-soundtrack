@@ -8,7 +8,7 @@
  *   npm run selftest
  */
 
-import { compiler } from "../src/compilers";
+import { compiler } from "../src/compiler";
 import type { CompileResult } from "../src/core/types";
 
 let failures = 0;

@@ -1,6 +1,6 @@
 import { Service, computed, effect, inject, signal } from '@angular/core';
 
-import { compiler } from '@compilers';
+import { compiler } from '@compiler';
 import type { CompileResult, Diagnostic, Span } from '@core/types';
 import { buildSpc, spcFilename } from '@spc/export';
 import { ARAM_SIZE, type AramBudget, computeBudget } from '@spc/layout';

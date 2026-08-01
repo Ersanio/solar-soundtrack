@@ -1,5 +1,5 @@
-import type { CompileRequest, CompileResult } from "../../core/types";
-import { emptyStats, failure } from "../../core/types";
+import type { CompileRequest, CompileResult } from "../core/types";
+import { emptyStats, failure } from "../core/types";
 import { link } from "./link";
 import { type AddmusicKOptions, AddmusicKParser } from "./parser";
 
@@ -154,3 +154,6 @@ function readOptions(options: CompileRequest["options"]): AddmusicKOptions | und
 		optimizeSampleUsage: typeof optimize === "boolean" ? optimize : undefined,
 	};
 }
+
+/** The compiler. There is one, and this is it. */
+export const compiler = new AddmusicKCompiler();

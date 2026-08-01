@@ -10,13 +10,14 @@ Installing AddmusicK is not needed, nor is a ROM. The tool is a static site and 
 
 ## Why this exists
 
-AddmusicK is the custom music tool that SMW Central uses. Porting music with AddmusicK has always
+AddmusicK is the custom music tool that SMW Central uses. Porting music with Addmusic has always
 been one of my favourite things to do in this hobby. What was never fun was the loop around it:
 to actually _hear_ a port, you had to insert it into the ROM, open an emulator, and go to the level
-that plays it. When you change around notes, you have to repeat this process.
+that plays it. When you change around notes, you have to repeat this process. Nowadays, AddmusicK
+has a "porter mode" that makes this process easier, but still requires switching windows.
 
 So the idea was to make a single tool for *everything* custom music-related. Write it, hear
-it, edit it, even export it, without leaving the one window. I hope to make custom music
+it, edit it, even export it, without leaving this one window. I hope to make custom music
 more accessible to people, this way.
 
 AddmusicK, in my opinion, also has room to grow past SMW: the same engine has potential for other
@@ -97,7 +98,7 @@ There are three layers, roughly:
 
 | Path                           | What lives there                                                    |
 | ------------------------------ | ------------------------------------------------------------------- |
-| `src/src/compilers/addmusick/` | The MML compiler - preprocessor, parser, linker                     |
+| `src/src/compiler/`            | The MML compiler - preprocessor, parser, linker                     |
 | `src/src/spc/`                 | SPC assembly, BRR handling, the emulator host and the audio worklet |
 | `src/src/app/`                 | The Angular UI                                                      |
 

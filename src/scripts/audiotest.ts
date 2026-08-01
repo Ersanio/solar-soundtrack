@@ -15,8 +15,8 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { compiler } from "../src/compilers";
-import { EMPTY_SAMPLE_NAME, bankSlotName } from "../src/compilers/addmusick/tables";
+import { compiler } from "../src/compiler";
+import { EMPTY_SAMPLE_NAME, bankSlotName } from "../src/compiler/tables";
 import {
 	SAMPLE_BANK_BYTES,
 	SAMPLE_BANK_SLOTS,
