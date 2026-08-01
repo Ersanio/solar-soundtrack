@@ -22,10 +22,6 @@
  * also keeps working while the song does not compile, which is most of the time
  * while someone is typing.
  *
- * The trade is that this sees only what is written: commands introduced by a
- * `"a=b"` replacement or by `#define` are invisible here, and the inspector
- * shows nothing for them rather than showing something wrong.
- *
  * The dispatch mirrors `Music::parseHexCommand` / `Music::scan` as ported in
  * `parser.ts` — in particular the `hexLeft` / `currentHex` / `currentHexSub`
  * state machine at `parser.ts:195-199`, which is why a hex command split across
@@ -33,6 +29,30 @@
  * forks (`#am4`'s `$ED` and `$E5`, `#amk 1`'s `$FC`): those need the directives
  * parsed, and getting them wrong costs a mis-coloured argument rather than a
  * wrong byte.
+ *
+ * Replacements — `"echo1=$EF"` and then a bare `echo1` — are followed, because
+ * writing commands that way is ordinary and an inspector that went blank on
+ * them would be blind to whole songs. {@link ScanState} carries the definitions
+ * visible at each point as an immutable value, so `copyState` stays a shallow
+ * copy and rule 1 above still holds: a state captured at line 40 *is* the set
+ * of replacements in scope at line 40, with nothing from line 90 leaking back.
+ *
+ * Three deliberate departures from `parser.ts` there, none of them free:
+ *
+ *   - Only a definition that opens and closes on one line registers. AMK's
+ *     `getQuotedString` runs happily past a newline, but carrying a partial
+ *     body across lines would put a growing string in the copied state, and one
+ *     stray `"` near the top of a long file would then make every keystroke
+ *     quadratic.
+ *   - `getInt` / `getHex` (`parser.ts:502-532`) expand mid-token, so AMK reads
+ *     `"4=8"` + `c44` as `c84` and `"2b=EF"` + `$2b` as `$EF`. Both need a
+ *     rewrite *inside* a token, which a model whose tokens are spans cannot
+ *     express. `tokentest` pins both divergences so neither gets "fixed".
+ *   - Recursion is bounded by an active set and a character budget rather than
+ *     by AMK's 500 iterations at one position (`parser.ts:687`). That count
+ *     limits chain length; expansion here is a tree, and `"g=g g"` would be
+ *     exponential under any depth-only cap. This runs on every keystroke, so
+ *     the guard has to bound total work.
  */
 
 import type { Span } from "../core/types";
@@ -145,11 +165,71 @@ const LETTER_KINDS: Readonly<Record<string, TokenKind>> = {
 	p: "vibrato",
 };
 
+/** One `"find=value"` definition — `parser.ts:664`. */
+export interface Replacement {
+	find: string;
+	value: string;
+}
+
+/**
+ * The replacements in scope at one point in the document.
+ *
+ * Immutable: {@link withReplacement} returns a new table rather than mutating
+ * this one, which is what lets {@link copyState} keep sharing the reference and
+ * stay O(1). A table that grew in place would be seen by every state that ever
+ * pointed at it, including states for lines above the definition.
+ *
+ * `byFirstChar` is the whole reason lookup is affordable. `tokenize` runs on
+ * every keystroke, undebounced (`editor-store.ts:172`), and the match is tried
+ * at every dispatch position; a linear pass over every definition each time is
+ * tens of milliseconds on a large song. Buckets are sorted longest-first, which
+ * is exactly equivalent to AMK's global longest-first sort (`parser.ts:682`) —
+ * two entries that can both match at one position necessarily share a first
+ * character, so a global sort would never break a tie differently.
+ */
+export interface ReplacementTable {
+	readonly entries: readonly Replacement[];
+	readonly byFirstChar: ReadonlyMap<string, readonly Replacement[]>;
+}
+
+export const NO_REPLACEMENTS: ReplacementTable = { entries: [], byFirstChar: new Map() };
+
+/** `parser.ts:664` — a repeated `find` overwrites, as `Map.set` does. */
+function withReplacement(table: ReplacementTable, find: string, value: string): ReplacementTable {
+	const entries = table.entries.filter((entry) => entry.find !== find).concat({ find, value });
+	const byFirstChar = new Map<string, Replacement[]>();
+	for (const entry of entries) {
+		const bucket = byFirstChar.get(entry.find[0]);
+		if (bucket) bucket.push(entry);
+		else byFirstChar.set(entry.find[0], [entry]);
+	}
+	for (const bucket of byFirstChar.values()) bucket.sort((a, b) => b.find.length - a.find.length);
+	return { entries, byFirstChar };
+}
+
+/**
+ * The longest definition matching at `at`, or `null`.
+ *
+ * A bare `startsWith` with no word boundary, because `parser.ts:690` has none:
+ * `"e=$EF"` really does replace every `e` in the song. It looks like a bug and
+ * is not one.
+ */
+function matchReplacement(line: string, at: number, table: ReplacementTable): Replacement | null {
+	const bucket = table.byFirstChar.get(line[at]);
+	if (!bucket) return null;
+	for (const entry of bucket) {
+		if (line.startsWith(entry.find, at)) return entry;
+	}
+	return null;
+}
+
 /**
  * Everything the scanner must carry across a line boundary.
  *
  * Flat and small on purpose: CodeMirror copies it once per line, and anything
- * here that were a reference into the document would break that.
+ * here that were a reference into the document would break that. The one
+ * compound field, {@link ReplacementTable}, is safe precisely because it is
+ * never mutated — sharing it is sharing a value, not aliasing the document.
  */
 export interface ScanState {
 	/** Arguments still expected, mirroring the parser's own `hexLeft`. */
@@ -167,6 +247,17 @@ export interface ScanState {
 	inString: boolean;
 	/** Open `[` brackets, for future bracket matching. */
 	loopDepth: number;
+	/** The definitions in scope here. Shared by reference; never mutated. */
+	replacements: ReplacementTable;
+	/**
+	 * The next token is the `"` of a sample load, not a replacement directive.
+	 *
+	 * `parser.ts:1732` sends a `("` straight to `parseSampleLoad`, which reads
+	 * the name itself, so that quote never reaches the `"` arm of the dispatch
+	 * and never defines anything. Carried as a one-shot flag set by `(` because
+	 * `step` may not look behind its own `at` to find the paren.
+	 */
+	sampleName: boolean;
 }
 
 export function startState(): ScanState {
@@ -177,6 +268,8 @@ export function startState(): ScanState {
 		awaitingArpCount: false,
 		inString: false,
 		loopDepth: 0,
+		replacements: NO_REPLACEMENTS,
+		sampleName: false,
 	};
 }
 
@@ -184,12 +277,38 @@ export function copyState(state: ScanState): ScanState {
 	return { ...state };
 }
 
+/** A token from inside an expansion, which has no source text of its own. */
+export interface ExpandedToken {
+	kind: TokenKind;
+	text: string;
+}
+
 export interface StepResult {
 	/** `null` for whitespace, which carries no highlight and is not a token. */
 	kind: TokenKind | null;
 	/** Offset just past the token. Always greater than the `at` passed in. */
 	end: number;
+	/**
+	 * Present only on a `"replacement"` token: what the macro stands for.
+	 *
+	 * Positions are gone by design. The text came from a definition somewhere
+	 * else entirely, so the caller stamps every one of these with the use site's
+	 * span — the collapse `doReplacement` performs on `origins` at
+	 * `parser.ts:691-698`.
+	 */
+	expansion?: ExpandedToken[];
 }
+
+/** Nested expansions. Small: a chain this long is already pathological. */
+const MAX_EXPANSION_DEPTH = 8;
+/**
+ * Characters one top-level {@link step} may expand, across the whole tree.
+ *
+ * The backstop against branching blowup — `"g=g g"` doubles at every level, so
+ * a depth cap alone bounds nothing. Budgeting total characters makes the worst
+ * case per call flat, which is what a per-keystroke scan needs.
+ */
+const MAX_EXPANSION_CHARS = 1024;
 
 const isSpace = (c: string): boolean =>
 	c === " " || c === "\t" || c === "\r" || c === "\v" || c === "\f";
@@ -209,11 +328,49 @@ const isNoteLetter = (c: string): boolean =>
  * so no caller can spin. `at` must be less than `line.length`.
  */
 export function step(line: string, at: number, state: ScanState): StepResult {
+	return stepInner(line, at, state, [], { chars: MAX_EXPANSION_CHARS });
+}
+
+/**
+ * @param active `find` strings currently being expanded, so a definition cannot
+ *   re-enter itself. This is what stops `"zz=zz $00"` and the mutually
+ *   recursive `"p1=p2"` / `"p2=p1"` dead in their tracks; the budget alone
+ *   would only stop them slowly.
+ * @param budget Characters left to expand, shared across the whole tree.
+ */
+function stepInner(
+	line: string,
+	at: number,
+	state: ScanState,
+	active: string[],
+	budget: { chars: number },
+): StepResult {
 	const c = line[at];
+
+	// Read-and-clear, unconditionally and first, so the flag can never outlive
+	// the single token after the `(` that set it.
+	const sampleName = state.sampleName;
+	state.sampleName = false;
 
 	// A string may run past the end of a line, so it is checked before anything
 	// else can claim the character.
-	if (state.inString) return scanString(line, at, state);
+	if (state.inString) return scanString(line, at, state, sampleName);
+
+	// `doReplacement` sits at the top of the dispatch loop (`parser.ts:415`),
+	// ahead of the whitespace and `"` arms alike, so a replacement may match on
+	// the opening quote of a directive. A sample load is the one exception:
+	// `parseSampleLoad` walks past `("` itself without expanding anything.
+	if (!sampleName && state.replacements.entries.length > 0) {
+		const hit = matchReplacement(line, at, state.replacements);
+		if (hit && !active.includes(hit.find)) {
+			const expansion: ExpandedToken[] = [];
+			active.push(hit.find);
+			scanExpansion(hit.value, state, expansion, active, budget);
+			active.pop();
+			// `find` is non-empty by construction, so this still advances.
+			return { kind: "replacement", end: at + hit.find.length, expansion };
+		}
+	}
 
 	if (isSpace(c)) {
 		let end = at + 1;
@@ -240,7 +397,7 @@ export function step(line: string, at: number, state: ScanState): StepResult {
 			return scanHex(line, at, state);
 
 		case '"':
-			return scanString(line, at, state);
+			return scanString(line, at, state, sampleName);
 
 		case "#":
 			return scanHash(line, at);
@@ -268,6 +425,11 @@ export function step(line: string, at: number, state: ScanState): StepResult {
 		// its name as a string and its tuning as a number without this having to
 		// know which form it is looking at.
 		case "(":
+			// The one thing the two forms must be told apart for: `parser.ts:1732`
+			// tests exactly this character, and a sample name is not a definition.
+			state.sampleName = line[at + 1] === '"';
+			return { kind: "label", end: at + 1 };
+
 		case ")":
 			return { kind: "label", end: at + 1 };
 
@@ -338,10 +500,15 @@ function scanHash(line: string, at: number): StepResult {
  * `\"` escapes a quote inside the body, as `getQuotedString` allows
  * (`parser.ts:620-622`). An unterminated string stays open into the next line,
  * which is why `inString` is part of the state.
+ *
+ * A directive that both opens and closes here defines a replacement. "Both
+ * here" is the same thing as "on one line", since one `step` call never crosses
+ * a line break — which is why that restriction costs no extra state.
  */
-function scanString(line: string, at: number, state: ScanState): StepResult {
+function scanString(line: string, at: number, state: ScanState, sampleName: boolean): StepResult {
+	const opened = !state.inString;
 	let end = at;
-	if (!state.inString) {
+	if (opened) {
 		end++; // the opening quote
 		state.inString = true;
 	}
@@ -352,11 +519,67 @@ function scanString(line: string, at: number, state: ScanState): StepResult {
 		}
 		if (line[end] === '"') {
 			state.inString = false;
+			if (opened && !sampleName) define(line.slice(at + 1, end), state);
 			return { kind: "string", end: end + 1 };
 		}
 		end++;
 	}
 	return { kind: "string", end: line.length };
+}
+
+/**
+ * `parseReplacementDirective`, `parser.ts:640-666`.
+ *
+ * Split on the *first* `=`, right-trim the name, left-trim the value. A body
+ * with no `=` or an empty name is an error there (AMK0021 / AMK0022) and simply
+ * defines nothing here — the compiler is where diagnostics belong.
+ */
+function define(body: string, state: ScanState): void {
+	// `getQuotedString` (`parser.ts:1297-1318`) resolves the one escape the
+	// format has before the body is ever split, so `"foo=\"bar\""` defines a
+	// value containing quotes rather than one containing backslashes.
+	const unescaped = body.replace(/\\"/g, '"');
+	const eq = unescaped.indexOf("=");
+	if (eq === -1) return;
+	const find = unescaped.slice(0, eq).replace(/\s+$/, "");
+	if (find.length === 0) return;
+	const value = unescaped.slice(eq + 1).replace(/^\s+/, "");
+	state.replacements = withReplacement(state.replacements, find, value);
+}
+
+/**
+ * Scans the text a replacement stands for, appending what it finds to `out`.
+ *
+ * The same stepper, over a string that is not in the document — which is how
+ * the state effects land where they matter. `echo1` expanding to `$EF` leaves
+ * `currentHex` and `hexLeft` set, so the `$2b $2d $2d` written after it in the
+ * *real* source scan as that command's arguments. That is the whole point.
+ */
+function scanExpansion(
+	text: string,
+	state: ScanState,
+	out: ExpandedToken[],
+	active: string[],
+	budget: { chars: number },
+): void {
+	if (active.length > MAX_EXPANSION_DEPTH) return;
+	budget.chars -= text.length;
+	if (budget.chars < 0) return;
+
+	let at = 0;
+	while (at < text.length) {
+		const { kind, end, expansion } = stepInner(text, at, state, active, budget);
+		const next = end > at ? end : at + 1;
+		if (expansion) {
+			// `push(...expansion)` would put the whole array on the argument stack,
+			// and this runs on user-supplied text — the same care `parser.ts:693`
+			// takes with `concat` over `splice`.
+			for (const token of expansion) out.push(token);
+		} else if (kind) {
+			out.push({ kind, text: text.slice(at, next) });
+		}
+		at = next;
+	}
 }
 
 /**
@@ -440,6 +663,17 @@ export interface Command {
 	/** Every argument the command expects is present. */
 	complete: boolean;
 	/**
+	 * The replacement this was written as, when any part of it came through one.
+	 *
+	 * A safety interlock as much as a label: the parts that came from the macro
+	 * collapse onto the use site, so {@link span} covers the name the author
+	 * typed rather than the bytes. Anything that *rewrites* a command in place —
+	 * the FIR designer does — must refuse when this is set, or it would inline
+	 * the macro and, if the expansion carried anything past the command, delete
+	 * that too.
+	 */
+	replacement?: string;
+	/**
 	 * The `#0`-`#7` channel this was written under, or `undefined` before any.
 	 *
 	 * Source order within one channel is execution order, which is what lets a
@@ -453,6 +687,22 @@ export interface Command {
 export interface TokenIndex {
 	tokens: Token[];
 	commands: Command[];
+}
+
+/**
+ * What {@link gather} reads: a token stream in which an expansion has been
+ * spliced in, in place of the `replacement` token that produced it.
+ *
+ * Kept out of {@link TokenIndex.tokens} on purpose. That list is what a
+ * highlighter consumes and what {@link tokenAt} binary-searches, so it must
+ * stay ordered and non-overlapping — whereas every token from one expansion
+ * shares a single span by design.
+ */
+interface GatherToken extends Token {
+	/** Literal text, for a token with no source of its own. */
+	text?: string;
+	/** The macro it came through. */
+	replacement?: string;
 }
 
 /** Kinds that introduce a letter command and can therefore take arguments. */
@@ -484,6 +734,9 @@ const LETTER_COMMAND_KINDS = new Set<TokenKind>([
  */
 export function tokenize(text: string): TokenIndex {
 	const tokens: Token[] = [];
+	// Built only once a replacement actually expands, so a song without any —
+	// which is most of them — pays nothing for this at all.
+	let stream: GatherToken[] | null = null;
 	const state = startState();
 
 	let offset = 0;
@@ -495,11 +748,23 @@ export function tokenize(text: string): TokenIndex {
 
 		let at = 0;
 		while (at < line.length) {
-			const { kind, end } = step(line, at, state);
+			const { kind, end, expansion } = step(line, at, state);
 			// `step` is contractually required to advance; this is the belt to that
 			// brace, so a bug there cannot hang the editor.
 			const next = end > at ? end : at + 1;
-			if (kind) tokens.push({ kind, start: offset + at, end: offset + next, line: lineNumber });
+			if (kind) {
+				const token: Token = { kind, start: offset + at, end: offset + next, line: lineNumber };
+				if (expansion) {
+					stream ??= tokens.slice();
+					const from = line.slice(at, next);
+					for (const expanded of expansion) {
+						stream.push({ ...token, kind: expanded.kind, text: expanded.text, replacement: from });
+					}
+				} else {
+					stream?.push(token);
+				}
+				tokens.push(token);
+			}
 			at = next;
 		}
 
@@ -508,13 +773,16 @@ export function tokenize(text: string): TokenIndex {
 		lineNumber++;
 	}
 
-	return { tokens, commands: gather(tokens, text) };
+	return { tokens, commands: gather(stream ?? tokens, text) };
 }
 
 /** Groups the flat token list into commands with their arguments. */
-function gather(tokens: Token[], text: string): Command[] {
+function gather(tokens: GatherToken[], text: string): Command[] {
 	const commands: Command[] = [];
 	const spanOf = (token: Token): Span => ({ start: token.start, end: token.end, line: token.line });
+	// A token from an expansion stands for text that is not in the document, so
+	// its own `text` wins over the span it was stamped with.
+	const textOf = (token: GatherToken): string => token.text ?? text.slice(token.start, token.end);
 	let channel: number | undefined;
 
 	for (let i = 0; i < tokens.length; i++) {
@@ -523,21 +791,20 @@ function gather(tokens: Token[], text: string): Command[] {
 		if (token.kind === "channel") {
 			// `#0`-`#7`. A malformed one leaves the previous channel standing,
 			// which is also what the parser does — it reports and carries on.
-			const parsed = Number.parseInt(text.slice(token.start + 1, token.end), 10);
+			const parsed = Number.parseInt(textOf(token).slice(1), 10);
 			if (!Number.isNaN(parsed)) channel = parsed;
 			continue;
 		}
 
 		if (token.kind === "hex") {
-			const vcmd = parseInt(text.slice(token.start + 1, token.end), 16);
+			const vcmd = parseInt(textOf(token).slice(1), 16);
 			const args: { value: number; span: Span }[] = [];
-			let last = token;
+			let from = token.replacement;
+			let last: GatherToken = token;
 			let j = i + 1;
 			while (j < tokens.length && tokens[j].kind === "hexArg") {
-				args.push({
-					value: parseInt(text.slice(tokens[j].start + 1, tokens[j].end), 16),
-					span: spanOf(tokens[j]),
-				});
+				args.push({ value: parseInt(textOf(tokens[j]).slice(1), 16), span: spanOf(tokens[j]) });
+				from ??= tokens[j].replacement;
 				last = tokens[j];
 				j++;
 			}
@@ -549,6 +816,7 @@ function gather(tokens: Token[], text: string): Command[] {
 				span: { start: token.start, end: last.end, line: token.line },
 				args,
 				complete: expected !== null && args.length >= expected,
+				replacement: from,
 				channel,
 			});
 			i = j - 1;
@@ -560,30 +828,33 @@ function gather(tokens: Token[], text: string): Command[] {
 		// `y10,1,2` and `t144` alike: consecutive numbers, optionally separated by
 		// commas, belong to the command that opened them.
 		const args: { value: number; span: Span }[] = [];
-		let last = token;
+		let from = token.replacement;
+		let last: GatherToken = token;
 		let j = i + 1;
 		while (j < tokens.length) {
 			const next = tokens[j];
 			if (next.kind === "number") {
-				args.push({ value: numberValue(text, next), span: spanOf(next) });
+				args.push({ value: numberValue(textOf(next)), span: spanOf(next) });
+				from ??= next.replacement;
 				last = next;
 				j++;
 				continue;
 			}
-			if (next.kind === "operator" && text[next.start] === "," && tokens[j + 1]?.kind === "number") {
+			if (next.kind === "operator" && textOf(next) === "," && tokens[j + 1]?.kind === "number") {
 				j++;
 				continue;
 			}
 			break;
 		}
 
-		const letter = text[token.start];
+		const letter = textOf(token)[0];
 		commands.push({
 			kind: letter,
 			name: LETTER_NAMES[letter.toLowerCase()] ?? nameForNote(token.kind),
 			span: { start: token.start, end: last.end, line: token.line },
 			args,
 			complete: true,
+			replacement: from,
 			channel,
 		});
 		i = j - 1;
@@ -598,9 +869,9 @@ function nameForNote(kind: TokenKind): string {
 	return "note";
 }
 
-function numberValue(text: string, token: Token): number {
-	const raw = text.slice(token.start, token.end).replace(/^=/, "").replace(/\.+$/, "");
-	return raw.length === 0 ? -1 : parseInt(raw, 10);
+function numberValue(raw: string): number {
+	const digits = raw.replace(/^=/, "").replace(/\.+$/, "");
+	return digits.length === 0 ? -1 : parseInt(digits, 10);
 }
 
 /**
@@ -631,6 +902,12 @@ function expectedArgs(vcmd: number, args: { value: number }[]): number | null {
  * The end is inclusive so that a caret parked just after the last argument —
  * where it lands after typing one — still inspects the command it just
  * finished, rather than nothing.
+ *
+ * Two commands can therefore both contain one offset: adjacent ones meeting at
+ * a shared boundary, and — since a replacement collapses onto its use site —
+ * every command a single macro expanded to. Both are answered with the first,
+ * which is what "the command it just finished" means, and which keeps the
+ * result from depending on where the binary search happened to land.
  */
 export function commandAt(commands: Command[], offset: number): Command | null {
 	let low = 0;
@@ -640,7 +917,15 @@ export function commandAt(commands: Command[], offset: number): Command | null {
 		const { span } = commands[mid];
 		if (offset < span.start) high = mid - 1;
 		else if (offset > span.end) low = mid + 1;
-		else return commands[mid];
+		else {
+			let index = mid;
+			while (index > 0) {
+				const previous = commands[index - 1].span;
+				if (offset < previous.start || offset > previous.end) break;
+				index--;
+			}
+			return commands[index];
+		}
 	}
 	return null;
 }

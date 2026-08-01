@@ -13,6 +13,12 @@ import type { Command } from '@compiler/tokens';
  * order is execution order; across channels the driver interleaves by time, so
  * "later in the file" would not mean "runs afterwards" and the warning would be
  * guesswork. A `$F5` and a `$F1` in different channels are left alone.
+ *
+ * One blind spot, left alone deliberately: a replacement collapses everything
+ * it expands to onto its use site, so a `$F5` and a `$F1` written inside the
+ * *same* macro share a `span.start` and neither of these sees the other. That
+ * is an edge of an edge, and the alternative — a secondary order carried on
+ * every command just for this — costs more than the warning is worth.
  */
 export function firOverriddenBy(fir: Command, commands: Command[]): Command | null {
   return (

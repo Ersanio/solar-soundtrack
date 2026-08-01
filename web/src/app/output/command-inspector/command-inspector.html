@@ -13,7 +13,17 @@
       <div class="flex items-baseline gap-2">
         <span class="text-accent font-mono text-sm">{{ label() }}</span>
         <span class="text-ink text-sm">{{ current.name }}</span>
+        @if (replacement(); as via) {
+          <span class="text-ink-muted font-mono text-xs">via "{{ via }}"</span>
+        }
       </div>
+
+      @if (replacement(); as via) {
+        <p class="text-ink-muted text-xs leading-relaxed">
+          Written as the <code class="text-ink">"{{ via }}"</code> replacement, so the cursor is on
+          the macro's name rather than on the command itself.
+        </p>
+      }
 
       @if (incomplete()) {
         <p class="text-warn text-xs leading-relaxed">

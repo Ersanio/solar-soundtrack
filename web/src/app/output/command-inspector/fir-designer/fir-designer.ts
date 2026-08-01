@@ -163,8 +163,19 @@ export class FirDesigner {
     this.target.set([]);
   }
 
+  /**
+   * A `$F5` reached through a replacement is readable but not writable.
+   *
+   * Its span covers the macro's name, not the bytes — everything the expansion
+   * produced collapses onto the use site — so writing over it would inline the
+   * macro, and would silently swallow anything the same expansion carried past
+   * the command. The definition is the only honest place to edit.
+   */
+  protected readonly readOnly = computed(() => this.command().replacement !== undefined);
+
   /** Writes the eight bytes back over the `$F5` run they came from. */
   private commit(taps: number[]): void {
+    if (this.readOnly()) return;
     this.pending.set(null);
     const text = `$F5 ${taps.map((tap) => `$${toHexByte(tap)}`).join(' ')}`;
     this.store.replace.set({ span: { ...this.command().span }, text });

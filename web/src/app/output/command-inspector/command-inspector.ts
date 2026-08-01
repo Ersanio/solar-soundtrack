@@ -62,11 +62,21 @@ export class CommandInspector {
       : `$${command.vcmd.toString(16).toUpperCase().padStart(2, '0')}`;
   });
 
+  /**
+   * The replacement the command was written as, when it was written as one.
+   *
+   * Worth saying out loud: the caret is on a name like `echo1`, and without
+   * this the panel would claim a `$EF` is under a cursor that is plainly not
+   * sitting on one.
+   */
+  protected readonly replacement = computed(() => this.command()?.replacement ?? null);
+
   /** Shown in the summary row, so the section reads without being opened. */
   protected readonly summary = computed(() => {
     const command = this.command();
     if (!command) return 'nothing at the caret';
-    return `${this.label()} ${command.name}`;
+    const via = this.replacement();
+    return `${this.label()} ${command.name}${via ? ` via ${via}` : ''}`;
   });
 
   /**
