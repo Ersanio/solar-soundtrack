@@ -494,8 +494,14 @@ function rescale(ideal: number[], target: (hz: number) => number): number[] {
  * Fits eight taps to a drawn magnitude curve.
  *
  * `points` are the handles the user dragged, as gain multipliers against
- * frequency; between and beyond them the target is interpolated linearly in
- * log-frequency, which is how the curve looks on screen.
+ * frequency. Between them the target is interpolated linearly in frequency and
+ * beyond them it is held flat, which is exactly how the plot strokes it — the
+ * straight segments the user sees are the segments that get fitted.
+ *
+ * That correspondence is the whole reason this is linear rather than log. The
+ * two must agree, and the plot's axis is linear because an 8-tap response is a
+ * degree-7 polynomial in `cos(ω)` — its features are evenly spaced in
+ * frequency, not in octaves.
  */
 export function fitToTarget(points: { hz: number; gain: number }[]): number[] {
 	if (points.length === 0) return [...FLAT_TAPS];
@@ -509,7 +515,7 @@ export function fitToTarget(points: { hz: number; gain: number }[]): number[] {
 			if (hz <= sorted[i].hz) {
 				const a = sorted[i - 1];
 				const b = sorted[i];
-				const t = (Math.log(hz) - Math.log(a.hz)) / (Math.log(b.hz) - Math.log(a.hz));
+				const t = (hz - a.hz) / (b.hz - a.hz);
 				return a.gain + (b.gain - a.gain) * t;
 			}
 		}
@@ -559,8 +565,10 @@ export function designTone({ tone, strength = 1 }: ToneOptions): number[] {
 	const spanLog = Math.log(nyquist) - lowLog;
 
 	const target = (hz: number): number => {
-		// Linear in log-frequency, which is how the tilt reads by ear and how it
-		// is drawn on the plot.
+		// Linear in log-frequency, which is how a tilt reads by ear. Unlike
+		// {@link fitToTarget} this one is not tracing a line the user drew, so it
+		// is free to follow hearing rather than the plot's linear axis — it comes
+		// out as a curve there, which is correct and not worth straightening.
 		const t = Math.min(1, Math.max(0, (Math.log(Math.max(hz, FIR_AUTHORITY_HZ)) - lowLog) / spanLog));
 		// Dark cuts the top, bright cuts the bottom; either way the peak is 1.
 		const cut = amount < 0 ? t : 1 - t;

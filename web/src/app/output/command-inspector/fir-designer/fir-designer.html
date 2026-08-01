@@ -48,15 +48,12 @@
   </p>
 }
 
-<!-- Three ways in, most abstract first. A macro's bytes stay readable but not
+<!-- Two ways in, more abstract first. A macro's bytes stay readable but not
      writable: the span under the caret is the macro, not the command. -->
 <fieldset class="contents" [disabled]="readOnly()">
   <div class="border-edge flex gap-1 border-b pb-2">
     <button amk-button variant="ghost" [class.text-accent]="mode() === 'presets'" (click)="mode.set('presets')">
       Presets
-    </button>
-    <button amk-button variant="ghost" [class.text-accent]="mode() === 'tone'" (click)="mode.set('tone')">
-      Tone
     </button>
     <button amk-button variant="ghost" [class.text-accent]="mode() === 'draw'" (click)="mode.set('draw')">
       Draw
@@ -80,43 +77,6 @@
       @if (activePreset(); as preset) {
         <p class="text-ink-muted text-xs leading-relaxed">{{ preset.note }}</p>
       }
-    }
-
-    @case ('tone') {
-      <div class="flex flex-col gap-2">
-        <label class="flex items-center gap-3 text-xs">
-          <span class="text-ink-muted w-16">Tone</span>
-          <input
-            type="range"
-            class="accent-accent min-w-0 flex-1"
-            min="-1"
-            max="1"
-            step="0.05"
-            [value]="tone()"
-            (input)="tone.set(+$any($event.target).value); previewTone()"
-            (change)="commitTone()"
-          />
-          <span class="text-ink-muted w-14 text-right font-mono tabular-nums">
-            {{ tone() < 0 ? 'darker' : tone() > 0 ? 'brighter' : 'flat' }}
-          </span>
-        </label>
-        <label class="flex items-center gap-3 text-xs">
-          <span class="text-ink-muted w-16">Strength</span>
-          <input
-            type="range"
-            class="accent-accent min-w-0 flex-1"
-            min="0"
-            max="1"
-            step="0.05"
-            [value]="strength()"
-            (input)="strength.set(+$any($event.target).value); previewTone()"
-            (change)="commitTone()"
-          />
-          <span class="text-ink-muted w-14 text-right font-mono tabular-nums">
-            {{ (strength() * 100).toFixed(0) }}%
-          </span>
-        </label>
-      </div>
     }
 
     @case ('draw') {

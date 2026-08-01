@@ -7,7 +7,6 @@ import {
   type FirTaps,
   clampTap,
   describeFir,
-  designTone,
   echoStability,
   firHeadroom,
   fitToTarget,
@@ -21,15 +20,25 @@ import { Playback } from '../../../state/playback';
 import { builtInFilterName, firOverriddenBy } from '../fir-override';
 import { FirGraph } from '../fir-graph/fir-graph';
 
-type Mode = 'presets' | 'tone' | 'draw';
+type Mode = 'presets' | 'draw';
 
 /**
- * Four ways of writing the same eight bytes.
+ * How close two drawn points have to be to count as the same one — about 3% of
+ * the band, which is a click target's worth of the plot's width.
+ */
+const MERGE_HZ = 500;
+
+/**
+ * Three ways of writing the same eight bytes.
  *
- * Presets for the common case, a tone control for "make it darker", the
- * draw-and-fit interaction the community knows from FIRcon, and the raw
- * coefficients for anyone who wants them. They all read and write one signal,
- * so no two of them can disagree about what the filter is.
+ * Presets for the common case, the draw-and-fit interaction the community knows
+ * from FIRcon, and the raw coefficients for anyone who wants them. They all read
+ * and write one signal, so no two of them can disagree about what the filter is.
+ *
+ * There was a fourth — a tone slider over `designTone` — and it went
+ * because it was a worse way to reach the presets it generates. `Warm`, `Dark`
+ * and `Bright` are still that function's output, so the tilt it designs is
+ * reachable in one click rather than by finding a slider position.
  *
  * The taps come from the `$F5` under the caret and go back to the same place.
  * Committing them recompiles, and because the player already reloads a
@@ -52,25 +61,19 @@ export class FirDesigner {
   protected readonly mode = signal<Mode>('presets');
 
   /**
-   * A pending edit, held while a control is being dragged.
+   * The eight coefficients, as the DSP would read them.
    *
-   * `null` means "whatever is in the text". Slider drags fire continuously and
-   * committing each one would push a recompile through the typing debounce
-   * dozens of times a second, so the graph follows this and the text is only
-   * written when the gesture ends.
+   * Read straight from the text with nothing held in front of it. The tone
+   * slider needed a pending-edit signal here, because a drag fires continuously
+   * and committing each frame would push a recompile through the typing debounce
+   * dozens of times a second. Every control that is left commits once per
+   * gesture, so the text can be the only source of truth again.
    */
-  private readonly pending = signal<number[] | null>(null);
-
-  /** The eight coefficients, as the DSP would read them. */
   protected readonly taps = computed<FirTaps>(() => {
-    const pending = this.pending();
-    if (pending) return pending;
     const args = this.command().args;
     return Array.from({ length: FIR_TAPS }, (_, i) => toSigned(args[i]?.value ?? 0));
   });
 
-  protected readonly tone = signal(0);
-  protected readonly strength = signal(1);
   protected readonly target = signal<{ hz: number; gain: number }[]>([]);
 
   protected readonly description = computed(() => describeFir(this.taps()));
@@ -183,15 +186,6 @@ export class FirDesigner {
     this.commit(taps);
   }
 
-  /** Live while dragging: the graph updates, the text does not. */
-  protected previewTone(): void {
-    this.pending.set(designTone({ tone: this.tone(), strength: this.strength() }));
-  }
-
-  protected commitTone(): void {
-    this.commit(designTone({ tone: this.tone(), strength: this.strength() }));
-  }
-
   protected setTap(index: number, value: string): void {
     const parsed = Number.parseInt(value, 10);
     if (Number.isNaN(parsed)) return;
@@ -202,8 +196,11 @@ export class FirDesigner {
 
   protected addTargetPoint(point: { hz: number; gain: number }): void {
     // One point per frequency, so clicking twice near the same place moves the
-    // handle rather than stacking two of them.
-    const kept = this.target().filter((p) => Math.abs(Math.log(p.hz / point.hz)) > 0.2);
+    // handle rather than stacking two of them. Measured in plain hertz because
+    // the plot's axis is linear: a log ratio would call two clicks 200 Hz apart
+    // at the top of the band the same point while treating two overlapping ones
+    // down at 100 Hz as distinct, which is backwards from what you can see.
+    const kept = this.target().filter((p) => Math.abs(p.hz - point.hz) > MERGE_HZ);
     this.target.set([...kept, point].sort((a, b) => a.hz - b.hz));
   }
 
@@ -229,7 +226,6 @@ export class FirDesigner {
   /** Writes the eight bytes back over the `$F5` run they came from. */
   private commit(taps: number[]): void {
     if (this.readOnly()) return;
-    this.pending.set(null);
     const text = `$F5 ${taps.map((tap) => `$${toHexByte(tap)}`).join(' ')}`;
     this.store.replace.set({ span: { ...this.command().span }, text });
   }

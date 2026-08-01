@@ -13,11 +13,25 @@ import {
 const TOP_DB = 12;
 const FLOOR_DB = -48;
 /**
- * The axis runs octave to octave, 125 Hz to Nyquist, so the gridlines land on
- * the plot's own edges and the labels underneath line up with them without
- * being positioned by hand.
+ * The frequency axis is **linear**, DC to Nyquist, which is not what an audio
+ * plot usually does and is deliberate.
+ *
+ * An 8-tap response is a degree-7 polynomial in `cos(ω)`, so its nulls and
+ * ripples are spaced evenly in frequency. Every feature of AddmusicK's own
+ * `EchoFilter0` — both nulls, both ripple peaks — sits above 8.7 kHz, which a
+ * log axis over the same range squeezes into its rightmost seventh while
+ * spending four octaves on a region {@link FIR_AUTHORITY_HZ} says the filter
+ * cannot shape at all. Linear gives that top octave half the width instead.
+ *
+ * It also makes DC drawable. `firDcGain` is a real quantity — the manual's
+ * low-pass sums to 132 and so lifts steady tones by 3% — and a log axis can
+ * never show 0 Hz at all.
+ *
+ * The cost is that hearing is logarithmic and this is not. That argument is at
+ * its weakest here: the octaves it would buy space for are exactly the ones the
+ * filter has no authority over.
  */
-const FROM_HZ = 125;
+const FROM_HZ = 0;
 const TO_HZ = DSP_RATE / 2;
 const POINTS = 160;
 
@@ -33,7 +47,8 @@ const REPEATS = 4;
 const VIEW_W = 320;
 const VIEW_H = 150;
 
-const OCTAVES = [125, 250, 500, 1000, 2000, 4000, 8000, 16000];
+/** Every 2 kHz, so the ticks are evenly spaced and land on both plot edges. */
+const TICKS = [0, 2000, 4000, 6000, 8000, 10000, 12000, 14000, 16000];
 
 @Component({
   selector: 'amk-fir-graph',
@@ -143,29 +158,36 @@ export class FirGraph {
     fromHz: FROM_HZ,
     toHz: TO_HZ,
     points: POINTS,
+    log: false,
   });
 
-  /** Log frequency to plot x. */
+  /** Frequency to plot x. */
   private readonly xOf = (hz: number): number => {
-    const t =
-      (Math.log(Math.max(hz, FROM_HZ)) - Math.log(FROM_HZ)) / (Math.log(TO_HZ) - Math.log(FROM_HZ));
-    return t * VIEW_W;
+    return ((hz - FROM_HZ) / (TO_HZ - FROM_HZ)) * VIEW_W;
   };
 
-  /** Gain to plot y, clamped to the floor so a null does not run off-canvas. */
+  /**
+   * Gain to plot y, clamped at both ends so nothing runs off-canvas.
+   *
+   * A null falls to negative infinity, and a boost reaches +18 dB — `Σ|c|/128`
+   * is 8 with every tap at the rail — which is past the top of the plot. Either
+   * end is pinned to the edge and drawn at half thickness there, which reads as
+   * "off the scale" rather than as the curve simply vanishing.
+   */
   private readonly yOf = (gain: number): number => {
-    const db = Math.max(20 * Math.log10(Math.max(gain, 1e-9)), FLOOR_DB);
-    return ((TOP_DB - db) / (TOP_DB - FLOOR_DB)) * VIEW_H;
+    const db = 20 * Math.log10(Math.max(gain, 1e-9));
+    const clamped = Math.min(Math.max(db, FLOOR_DB), TOP_DB);
+    return ((TOP_DB - clamped) / (TOP_DB - FLOOR_DB)) * VIEW_H;
   };
 
   protected readonly unityY = computed(() => this.yOf(1));
   protected readonly authorityWidth = computed(() => this.xOf(FIR_AUTHORITY_HZ));
 
   protected readonly gridLines = computed(() =>
-    OCTAVES.map((hz) => ({
+    TICKS.map((hz) => ({
       hz,
       x: this.xOf(hz),
-      label: hz >= 1000 ? `${hz / 1000}k` : `${hz}`,
+      label: hz === 0 ? '0' : `${hz / 1000}k`,
     })),
   );
 
@@ -188,11 +210,24 @@ export class FirGraph {
     return out;
   });
 
+  /**
+   * The drawn target, including the flat runs past the outermost points.
+   *
+   * `fitToTarget` holds the first and last gain out to the edges of the band
+   * rather than extrapolating the slope, so those two runs are as much a part
+   * of what gets fitted as the segments between the points. Stroking only
+   * between the points would show less than the fit is actually given — the
+   * curve would appear to stop while the filter was still being told what to
+   * do out there. FIRcon draws the same two extensions.
+   */
   protected readonly targetPath = computed(() => {
     const points = this.target();
     if (!points || points.length < 2) return null;
     const sorted = [...points].sort((a, b) => a.hz - b.hz);
-    return sorted.map((p, i) => `${i === 0 ? 'M' : 'L'}${this.xOf(p.hz)} ${this.yOf(p.gain)}`).join(' ');
+    const drawn = sorted.map((p) => `L${this.xOf(p.hz)} ${this.yOf(p.gain)}`).join(' ');
+    const first = this.yOf(sorted[0].gain);
+    const last = this.yOf(sorted[sorted.length - 1].gain);
+    return `M0 ${first} ${drawn} L${VIEW_W} ${last}`;
   });
 
   protected readonly runawayBand = computed(() => {
@@ -219,16 +254,17 @@ export class FirGraph {
     const tx = (event.clientX - rect.left) / rect.width;
     const ty = (event.clientY - rect.top) / rect.height;
 
-    const hz = FROM_HZ * Math.exp(Math.min(Math.max(tx, 0), 1) * Math.log(TO_HZ / FROM_HZ));
+    const hz = FROM_HZ + Math.min(Math.max(tx, 0), 1) * (TO_HZ - FROM_HZ);
     const db = TOP_DB - Math.min(Math.max(ty, 0), 1) * (TOP_DB - FLOOR_DB);
     this.picked.emit({ hz, gain: 10 ** (db / 20) });
   }
 
   /** What a screen reader gets instead of the picture. */
   protected readonly description = computed(() => {
-    const at = (hz: number) => (20 * Math.log10(Math.max(firMagnitude(this.taps(), hz), 1e-9))).toFixed(0);
+    const at = (hz: number) =>
+      (20 * Math.log10(Math.max(firMagnitude(this.taps(), hz), 1e-9))).toFixed(0);
     return (
-      `Echo filter response: ${at(500)} decibels at 500 hertz, ${at(2000)} at 2 kilohertz, ` +
+      `Echo filter response: ${at(0)} decibels at DC, ${at(2000)} at 2 kilohertz, ` +
       `${at(8000)} at 8 kilohertz, ${at(14000)} at 14 kilohertz.`
     );
   });
