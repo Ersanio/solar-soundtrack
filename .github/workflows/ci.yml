@@ -6,10 +6,10 @@ on:
   pull_request:
   workflow_dispatch:
 
-# The Angular workspace lives one level down, so every step runs from src/.
+# The Angular workspace lives one level down, so every step runs from web/.
 defaults:
   run:
-    working-directory: src
+    working-directory: web
 
 jobs:
   check:
@@ -22,7 +22,7 @@ jobs:
         with:
           node-version: 24
           cache: npm
-          cache-dependency-path: src/package-lock.json
+          cache-dependency-path: web/package-lock.json
 
       - run: npm ci
 
@@ -60,7 +60,7 @@ jobs:
         with:
           node-version: 24
           cache: npm
-          cache-dependency-path: src/package-lock.json
+          cache-dependency-path: web/package-lock.json
 
       - run: npm ci
 
@@ -73,7 +73,7 @@ jobs:
 
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: src/dist/solar-soundtrack/browser
+          path: web/dist/solar-soundtrack/browser
 
       - id: deployment
         uses: actions/deploy-pages@v4

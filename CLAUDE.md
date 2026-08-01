@@ -10,8 +10,8 @@ No ROM, no AddmusicK install, no server.
 
 ## Repository layout
 
-The Angular workspace is one level down, in `src/`. **Every npm/ng command runs from `src/`, not
-the repository root.** Application code therefore lives at `src/src/`.
+The Angular workspace is one level down, in `web/`. **Every npm/ng command runs from `web/`, not
+the repository root.** Application code therefore lives at `web/src/`.
 
 At the root, `AddmusicKsrc/` and `AddmusicKreadme/` hold a local copy of AddmusicK 1.0.11's C++
 sources and its readme. They are **gitignored and not part of the repository**, but they are the
@@ -20,7 +20,7 @@ from an AddmusicK release if they are missing.
 
 ## Commands
 
-All from `src/`. Node 24 is what CI uses.
+All from `web/`. Node 24 is what CI uses.
 
 | Command | What it does |
 | --- | --- |
@@ -61,10 +61,10 @@ establish fidelity; the harnesses only catch gross breakage.
 `prestart` / `prebuild` / `prewatch` / `pretypecheck` / `prelint` run these, so never invoke them
 by hand:
 
-- **`build:worklet`** — esbuild bundles `src/spc/worklet.ts` into `public/player/spc-worklet.js`
+- **`build:worklet`** — esbuild bundles `web/src/spc/worklet.ts` into `public/player/spc-worklet.js`
   (generated, gitignored). An AudioWorklet is loaded by URL from the audio thread, so the Angular
   builder cannot produce it as part of the app bundle.
-- **`generate-git-info`** — writes `src/app/git-info.generated.ts` with `git rev-parse HEAD` for the
+- **`generate-git-info`** — writes `web/src/app/git-info.generated.ts` with `git rev-parse HEAD` for the
   toolbar's commit link (generated, gitignored). Captured once at startup, so it goes stale if you
   commit while `npm start` is running; restart to refresh.
 
@@ -74,9 +74,9 @@ Three layers, and the boundary between them is the part that matters.
 
 | Path | Layer |
 | --- | --- |
-| `src/src/compiler/` | MML compiler: `preprocess.ts` → `parser.ts` → `link.ts` |
-| `src/src/spc/` | SPC assembly, BRR, driver bundle, emulator host, audio worklet |
-| `src/src/app/` | Angular UI |
+| `web/src/compiler/` | MML compiler: `preprocess.ts` → `parser.ts` → `link.ts` |
+| `web/src/spc/` | SPC assembly, BRR, driver bundle, emulator host, audio worklet |
+| `web/src/app/` | Angular UI |
 
 `compiler/` and `spc/` are **framework-free and DOM-free** — no Angular, no `document`, no
 `window`, no `fetch` outside `driver.ts`. That is load-bearing, not stylistic: it is why the same
@@ -145,7 +145,7 @@ State lives in four `@Service()` singletons in `app/state/`, in dependency order
 Selector prefix is `amk` — `amk-root`, `amk-editor-pane` for components, camelCase `amk*` for
 directives. ESLint enforces both.
 
-Styling is Tailwind v4, with the entire theme as CSS variables in `src/src/styles.css` (v4 has no
+Styling is Tailwind v4, with the entire theme as CSS variables in `web/src/styles.css` (v4 has no
 `tailwind.config.js`). Dark-only on purpose. The `--color-seg-*` ARAM bar palette is a validated
 categorical set — do not reorder or re-hue it without re-validating, since adjacent-pair CVD
 separation and contrast against `--color-surface` are the properties being preserved. Templates are
@@ -156,7 +156,7 @@ Persistence: the MML draft goes to `localStorage`; the sample library to Indexed
 (private browsing, exhausted quota) and must never stop someone compiling a song.
 
 Framework-generic Angular 22 conventions (signal APIs, `@Service()`, host bindings, control flow,
-accessibility) live in `src/.claude/CLAUDE.md`, which the Angular CLI generated via
+accessibility) live in `web/.claude/CLAUDE.md`, which the Angular CLI generated via
 `--ai-config=claude` and can regenerate. Keep project-specific guidance here instead, so that file
 stays safe to overwrite.
 
@@ -169,7 +169,7 @@ from the pre-Angular prototype. Match the file you are editing.
 ## Deployment
 
 `.github/workflows/ci.yml` lints and checks every push and PR; pushes to `main` additionally build
-with `--base-href=/<repo-name>/` and deploy `src/dist/solar-soundtrack/browser` to GitHub Pages.
+with `--base-href=/<repo-name>/` and deploy `web/dist/solar-soundtrack/browser` to GitHub Pages.
 The build must go through `npm run build` rather than `ng build` so the prebuild hook still emits
 the worklet bundle, which is not checked in. The app is a PWA (`ngsw-config.json`); the service
 worker is enabled in production builds only.

@@ -53,11 +53,11 @@ ideas, planned features and known issues.
 
 ## Running it locally
 
-The application is written in Angular. The Angular workspace lives in `src/`,
+The application is written in Angular. The Angular workspace lives in `web/`,
 one level down from the repository root.
 
 ```bash
-cd src
+cd web
 npm install
 npm start          # dev server on http://localhost:4200/
 ```
@@ -79,7 +79,7 @@ Node 24 is what CI uses.
 Two things run automatically before the commands above (via `pre*` npm hooks), so you never
 need to invoke them yourself:
 
-- **`build:worklet`** bundles `src/spc/worklet.ts` with `esbuild` into
+- **`build:worklet`** bundles `web/src/spc/worklet.ts` with `esbuild` into
   `public/player/spc-worklet.js`, since an `AudioWorklet` is loaded separately by the browser's
   audio thread and isn't something Angular's own build produces.
 - **`generate-git-info`** writes the current `git rev-parse HEAD` SHA to a gitignored file, which
@@ -98,13 +98,13 @@ There are three layers, roughly:
 
 | Path                           | What lives there                                                    |
 | ------------------------------ | ------------------------------------------------------------------- |
-| `src/src/compiler/`            | The MML compiler - preprocessor, parser, linker                     |
-| `src/src/spc/`                 | SPC assembly, BRR handling, the emulator host and the audio worklet |
-| `src/src/app/`                 | The Angular UI                                                      |
+| `web/src/compiler/`            | The MML compiler - preprocessor, parser, linker                     |
+| `web/src/spc/`                 | SPC assembly, BRR handling, the emulator host and the audio worklet |
+| `web/src/app/`                 | The Angular UI                                                      |
 
 On testing: `npm run check` runs byte-level harnesses that pin the compiler's output,
 SPC assembly, the full headless MML → SPC → PCM chain, BRR and bank decoding. Separately,
-`src/scripts/Compare-Spc.ps1` and `Compare-SongBin.ps1` diff this compiler's output
+`web/scripts/Compare-Spc.ps1` and `Compare-SongBin.ps1` diff this compiler's output
 against a native AddmusicK build, for byte-by-byte comparison.
 
 ## Contributing
@@ -145,7 +145,7 @@ This project stands on other people's work:
 MIT - see [LICENSE](LICENSE).
 
 The bundled third-party material keeps its own terms. The emulator core is LGPL 2.1, and
-the driver bundle under `src/public/driver/` is AddmusicK output whose `#default` samples
+the driver bundle under `web/public/driver/` is AddmusicK output whose `#default` samples
 originate from Super Mario World; `LICENSE` spells both out.
 
 ## Contact
