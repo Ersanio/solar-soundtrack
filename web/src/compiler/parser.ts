@@ -309,6 +309,19 @@ export class AddmusicKParser {
 	private errorCount = 0;
 	private readonly warnedOnce = new Set<string>();
 
+	/**
+	 * Where each character of `this.text` came from in the source.
+	 *
+	 * Kept in step with `this.text` through preprocessing and through
+	 * replacement expansion, so every diagnostic can be reported at a position
+	 * the editor can actually select. See {@link spanAt}.
+	 */
+	private origins: number[] = [];
+	/** The source as the preprocessor saw it: BOM stripped, nothing else. */
+	private scanned = "";
+	/** 1 when a BOM was removed, since that shifts every offset after it. */
+	private bomOffset = 0;
+
 	constructor(
 		private readonly source: string,
 		private readonly options?: AddmusicKOptions,
@@ -324,12 +337,22 @@ export class AddmusicKParser {
 		let text = this.source;
 		if (text.charCodeAt(0) === 0xfeff) text = text.slice(1);
 
+		// A stripped BOM shifts everything after it, so spans are mapped back
+		// through the text the preprocessor actually saw and the byte is added
+		// again at the end.
+		this.bomOffset = this.source.length - text.length;
+		this.scanned = text;
+
 		const pre = preprocess(text);
 		this.diagnostics.push(...pre.diagnostics);
 		this.errorCount += pre.diagnostics.filter((d) => d.severity === "error").length;
 
 		// AddmusicK pads the buffer so lookahead never runs off the end.
 		this.text = `${pre.text}                       `;
+		// The padding is not in the source, so it maps to its end.
+		this.origins = pre.origins.concat(
+			new Array<number>(this.text.length - pre.text.length).fill(text.length),
+		);
 
 		if (this.errorCount === 0 && this.applyTarget(pre.version)) {
 			this.detectStartingChannel();
@@ -644,8 +667,14 @@ export class AddmusicKParser {
 
 	/**
 	 * Greedy, longest-match-first, applied repeatedly so replacements can be
-	 * transitive. Like the original this rewrites the buffer in place, so spans
-	 * in diagnostics are relative to the expanded text.
+	 * transitive. Like the original this rewrites the buffer in place.
+	 *
+	 * Expanded text has no source of its own — it came from a `"a=b"` definition
+	 * somewhere else entirely — so all of it is given the position of the use
+	 * site. A diagnostic inside an expansion then points at the thing that was
+	 * written rather than at text the author cannot see, and everything after
+	 * the splice keeps its own origin instead of sliding by the length
+	 * difference.
 	 */
 	private doReplacement(): void {
 		if (this.replacements.size === 0) return;
@@ -659,7 +688,14 @@ export class AddmusicKParser {
 			let matched = false;
 			for (const [find, replacement] of this.sortedReplacements) {
 				if (this.text.startsWith(find, this.pos)) {
+					const useSite = this.originAt(this.pos);
 					this.text = this.text.slice(0, this.pos) + replacement + this.text.slice(this.pos + find.length);
+					// `concat` rather than `splice(...)` with a spread: a long
+					// replacement would push its whole length onto the argument
+					// stack, and this runs on user-supplied text.
+					this.origins = this.origins
+						.slice(0, this.pos)
+						.concat(new Array<number>(replacement.length).fill(useSite), this.origins.slice(this.pos + find.length));
 					matched = true;
 					break;
 				}
@@ -2922,12 +2958,42 @@ export class AddmusicKParser {
 	// Diagnostics
 	// =========================================================================
 
+	/**
+	 * Turns a position in the parser's buffer into one in the original source.
+	 *
+	 * The buffer is not the text the author wrote: preprocessing removed the
+	 * `#amk` marker, every `#define`/`#if` line, the untaken side of a false
+	 * branch and all comments, and replacement expansion has rewritten parts of
+	 * what is left. Reporting raw buffer offsets meant every diagnostic in a
+	 * song beginning `#amk 4` pointed six characters early, and further adrift
+	 * the more the preprocessor had removed. {@link origins} is what makes them
+	 * land.
+	 *
+	 * The line is counted in the source too, so it agrees with the offset rather
+	 * than with the buffer.
+	 */
 	private spanAt(start: number, end: number): Span {
+		const from = this.originAt(start);
+		// The end maps from the last character *inside* the range, so a span
+		// that ends where a comment was stripped does not swallow the comment.
+		let to = end > start ? this.originAt(end - 1) + 1 : from;
+		// Text that came from a replacement collapses to a single point, which
+		// would select nothing; give it one character so it can still be seen.
+		if (to <= from && end > start) to = Math.min(from + 1, this.scanned.length);
+
 		let line = 1;
-		for (let n = 0; n < start && n < this.text.length; n++) {
-			if (this.text[n] === "\n") line++;
+		for (let n = 0; n < from && n < this.scanned.length; n++) {
+			if (this.scanned[n] === "\n") line++;
 		}
-		return { start, end: Math.max(end, start), line };
+
+		return { start: from + this.bomOffset, end: Math.max(to, from) + this.bomOffset, line };
+	}
+
+	/** {@link origins} with the ends clamped, for positions past the buffer. */
+	private originAt(index: number): number {
+		if (index <= 0) return 0;
+		if (index >= this.origins.length) return this.scanned.length;
+		return this.origins[index];
 	}
 
 	private error(code: string, message: string): void {

@@ -145,16 +145,22 @@ wrong sounds. It is a correctness-critical output, not a statistic.
 on failure paths too so partial UI stays populated. Constructs this compiler does not implement are
 reported as errors, never silently mis-compiled.
 
-**`tokens.ts` does not go through the compiler, and must not.** Compiler spans are offsets into the
-*preprocessed* text — `preprocess.ts` drops the `#amk` marker, `#define` lines and comments without
-preserving positions — whereas anything that follows the caret needs offsets into what was typed.
-So the scanner is a second, independent pass over the raw source. It reads the undebounced `source`,
-it works on text that does not compile, and it reuses `HEX_LENGTHS`/`VCMD_NAMES` from `tables.ts`
-rather than restating them. It is shaped as a resumable line stepper with a small copyable
-`ScanState` because that is CodeMirror's `StreamLanguage` contract, so the eventual syntax
-highlighting is an adapter rather than a rewrite; `compiler/` itself stays free of any CodeMirror
-dependency. (The same preprocess gap means the existing diagnostic `reveal` is slightly misaligned
-on songs with an `#amk` line — a real bug, still unfixed.)
+**Diagnostic spans are mapped back to the source the author wrote.** The parser works on
+preprocessed, replacement-expanded text, which is not what is in the editor: `preprocess.ts` removes
+the `#amk` marker, every `#define`/`#if` line, the untaken side of a false branch and all comments.
+So it returns `origins`, one source offset per output character, the parser keeps that array in step
+with its buffer (including through `doReplacement`, where expanded text is attributed to the use
+site), and `spanAt` is the single choke point that converts. Anything that adds a diagnostic gets
+this for free; anything that bypasses `spanAt` will be wrong. `selftest` asserts the offsets land on
+the offending character, not merely near it.
+
+**`tokens.ts` still does not go through the compiler, and must not.** Even with spans mapped, the
+scanner needs to run on text that does not compile and without waiting for the 150 ms debounce, so
+it is a second, independent pass over the raw source. It reuses `HEX_LENGTHS`/`VCMD_NAMES` from
+`tables.ts` rather than restating them, and is shaped as a resumable line stepper with a small
+copyable `ScanState` because that is CodeMirror's `StreamLanguage` contract — so the eventual syntax
+highlighting is an adapter rather than a rewrite, and `compiler/` stays free of any CodeMirror
+dependency.
 
 **The echo FIR sits inside the feedback loop.** `spc/fir.ts` is checked against bsnes's own DSP
 (`AddmusicKsrc/SPC_DSP.cpp:610-700`): a coefficient is worth `c/128`, a repeat is scaled by

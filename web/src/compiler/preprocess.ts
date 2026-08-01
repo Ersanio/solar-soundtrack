@@ -24,6 +24,18 @@ export const TARGET_NONE = 0;
 
 export interface PreprocessResult {
 	text: string;
+	/**
+	 * Where each character of `text` came from in the original source.
+	 *
+	 * `origins[i]` is the offset in `source` that produced `text[i]`, so a
+	 * position in the preprocessed text can be turned back into a position the
+	 * editor can select. Without it every span the parser produces is short by
+	 * however much this pass deleted — which for a song opening `#amk 4` is
+	 * every span in the file.
+	 *
+	 * Always the same length as `text`.
+	 */
+	origins: number[];
 	/** `-1` = `#am4`, `-2` = `#amm`, `0` = none, otherwise the `#amk` version. */
 	version: number;
 	diagnostics: Diagnostic[];
@@ -37,11 +49,25 @@ export function preprocess(source: string): PreprocessResult {
 	const okayStatus: boolean[] = [];
 
 	let out = "";
+	const origins: number[] = [];
 	let pos = 0;
 	let line = 1;
 	let level = 0;
 	let okayToAdd = true;
 	let version = TARGET_NONE;
+
+	/**
+	 * Appends to the output, recording where it came from.
+	 *
+	 * Every chunk emitted here is a consecutive run of `source` starting at
+	 * `at`, so the origins follow by counting. The clamp only matters for the
+	 * closing quote of an unterminated string, which is synthesised rather than
+	 * copied and would otherwise point past the end.
+	 */
+	const emit = (chunk: string, at: number): void => {
+		out += chunk;
+		for (let i = 0; i < chunk.length; i++) origins.push(Math.min(at + i, source.length));
+	};
 
 	const fail = (message: string, code = "AMK0400"): void => {
 		diagnostics.push({ severity: "error", code, message, span: { start: pos, end: pos + 1, line } });
@@ -94,20 +120,22 @@ export function preprocess(source: string): PreprocessResult {
 
 		if (source[pos] === '"') {
 			// Replacement definitions are copied verbatim, quotes included.
+			const quoteAt = pos;
 			pos++;
 			const body = getArgument('"', false);
-			if (okayToAdd) out += `"${body}"`;
+			if (okayToAdd) emit(`"${body}"`, quoteAt);
 			pos++;
 			continue;
 		}
 
 		if (source[pos] !== "#") {
 			// Newlines survive even inside a false branch so line numbers hold.
-			if (okayToAdd || source[pos] === "\n") out += source[pos];
+			if (okayToAdd || source[pos] === "\n") emit(source[pos], pos);
 			pos++;
 			continue;
 		}
 
+		const hashAt = pos;
 		pos++;
 
 		// `#amk=1` predates the spaced form and is special-cased.
@@ -218,7 +246,7 @@ export function preprocess(source: string): PreprocessResult {
 				break;
 			default:
 				// Not a preprocessor directive — hand it to the scanner intact.
-				if (okayToAdd) out += `#${directive}`;
+				if (okayToAdd) emit(`#${directive}`, hashAt);
 		}
 	}
 
@@ -234,23 +262,29 @@ export function preprocess(source: string): PreprocessResult {
 	// AddmusicM songs keep their semicolons; everything else has them stripped
 	// here, which is why the scanner treats a stray `;` as an error.
 	if (version !== TARGET_AMM) {
-		out = stripComments(out);
+		return { ...stripComments(out, origins), version, diagnostics };
 	}
 
-	return { text: out, version, diagnostics };
+	return { text: out, origins, version, diagnostics };
 }
 
-function stripComments(text: string): string {
+function stripComments(text: string, origins: number[]): { text: string; origins: number[] } {
 	let out = "";
+	const kept: number[] = [];
 	let inComment = false;
-	for (const character of text) {
+	for (let i = 0; i < text.length; i++) {
+		const character = text[i];
 		if (character === "\n") {
 			inComment = false;
 			out += character;
+			kept.push(origins[i]);
 			continue;
 		}
 		if (character === ";") inComment = true;
-		if (!inComment) out += character;
+		if (!inComment) {
+			out += character;
+			kept.push(origins[i]);
+		}
 	}
-	return out;
+	return { text: out, origins: kept };
 }
