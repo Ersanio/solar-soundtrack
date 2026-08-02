@@ -32,14 +32,7 @@ import {
 	toSigned,
 } from "../src/spc/fir";
 
-let failures = 0;
-function check(name: string, condition: boolean, detail = ""): void {
-	if (condition) console.log(`  ok    ${name}`);
-	else {
-		failures++;
-		console.log(`  FAIL  ${name}${detail ? `\n        ${detail}` : ""}`);
-	}
-}
+import { check, summarise } from "./harness";
 
 const dB = (gain: number) => 20 * Math.log10(Math.max(gain, 1e-9));
 
@@ -385,5 +378,4 @@ console.log("\ncurve sampling");
 	check("a linear axis works too", firCurve(CLASSIC, { fromHz: 0, toHz: 16000, points: 10, log: false }).length === 10);
 }
 
-console.log(failures === 0 ? "\nAll FIR tests passed.\n" : `\n${failures} FIR test(s) failed.\n`);
-process.exit(failures === 0 ? 0 : 1);
+summarise();

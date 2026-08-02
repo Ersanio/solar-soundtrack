@@ -13,6 +13,15 @@ export function hex4(value: number): string {
   return hex(value).padStart(4, '0');
 }
 
+/**
+ * A short duration, in whichever unit reads better. `∞` for a rate of 0, which
+ * in an SNES envelope means the level never advances.
+ */
+export function duration(seconds: number): string {
+  if (!Number.isFinite(seconds)) return '∞';
+  return seconds >= 1 ? `${seconds.toFixed(2)} s` : `${(seconds * 1000).toFixed(0)} ms`;
+}
+
 /** `m:ss`, clamped at zero — the transport never shows negative time. */
 export function formatTime(seconds: number): string {
   const whole = Math.max(0, Math.floor(seconds));

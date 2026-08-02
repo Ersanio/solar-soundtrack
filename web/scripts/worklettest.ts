@@ -25,34 +25,11 @@ import { buildSpc } from "../src/spc/export";
 import { planAram } from "../src/spc/layout";
 import type { FromWorklet, ToWorklet } from "../src/spc/protocol";
 
+import { check, stubFetch, summarise } from "./harness";
+
 const PUBLIC = join(import.meta.dirname, "..", "public");
 
-// --- driver bundle loading (same shim as spctest) ---------------------------
-const resp = (b: Buffer, ct: string) => ({
-	ok: true,
-	status: 200,
-	headers: { get: (n: string) => (n.toLowerCase() === "content-type" ? ct : null) },
-	arrayBuffer() {
-		return b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength);
-	},
-	json() {
-		return JSON.parse(b.toString("utf8")) as unknown;
-	},
-});
-globalThis.fetch = ((input: string) => {
-	const path = join(PUBLIC, decodeURI(String(input)));
-	const bytes = readFileSync(path);
-	return resp(bytes, path.endsWith(".json") ? "application/json" : "application/octet-stream");
-}) as unknown as typeof fetch;
-
-let failures = 0;
-function check(name: string, condition: boolean, detail = ""): void {
-	if (condition) console.log(`  ok    ${name}`);
-	else {
-		failures++;
-		console.log(`  FAIL  ${name}${detail ? `\n        ${detail}` : ""}`);
-	}
-}
+stubFetch();
 
 const SAMPLE_RATE = 48000; // deliberately not 32000, so resampling is exercised
 const QUANTUM = 128;
@@ -473,5 +450,4 @@ console.log("\nmuting a channel without breaking stride");
 	);
 }
 
-console.log(`\n${failures === 0 ? "all checks passed" : `${failures} check(s) failed`}\n`);
-process.exit(failures === 0 ? 0 : 1);
+summarise();

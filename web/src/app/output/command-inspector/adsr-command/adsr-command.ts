@@ -10,8 +10,9 @@ import {
   sustainLevel,
 } from '@spc/adsr';
 import type { Command } from '@compiler/tokens';
-import { hex2 } from '../../../util/format';
+import { duration, hex2 } from '../../../util/format';
 import { AdsrGraph } from '../adsr-graph/adsr-graph';
+import { type DetailRow, DetailTable } from '../../../shared/detail-table/detail-table';
 
 /**
  * `$ED` — the envelope, set on a channel rather than baked into an instrument.
@@ -24,7 +25,7 @@ import { AdsrGraph } from '../adsr-graph/adsr-graph';
  */
 @Component({
   selector: 'amk-adsr-command',
-  imports: [AdsrGraph],
+  imports: [AdsrGraph, DetailTable],
   host: { class: 'block' },
   template: `
     @if (args().length < 2) {
@@ -34,21 +35,7 @@ import { AdsrGraph } from '../adsr-graph/adsr-graph';
       </p>
     } @else {
       <div class="space-y-3">
-        <table class="w-full border-collapse text-xs">
-          <tbody>
-            @for (row of rows(); track row.label) {
-              <tr class="border-edge/60 border-t first:border-t-0">
-                <td class="text-ink-muted py-1 pr-3 whitespace-nowrap">{{ row.label }}</td>
-                <td class="py-1 font-mono tabular-nums">
-                  {{ row.value }}
-                  @if (row.note) {
-                    <span class="text-ink-muted block font-sans text-[11px]">{{ row.note }}</span>
-                  }
-                </td>
-              </tr>
-            }
-          </tbody>
-        </table>
+        <amk-detail-table [rows]="rows()" />
 
         <div>
           <div class="text-ink-muted mb-1 text-[11px] tracking-wide uppercase">Envelope</div>
@@ -81,7 +68,7 @@ export class AdsrCommand {
   protected readonly gain = computed(() => (this.isGain() ? this.args()[1] : 0));
 
   protected readonly rows = computed(() => {
-    const rows: { label: string; value: string; note?: string }[] = [];
+    const rows: DetailRow[] = [];
     if (this.isGain()) {
       const gain = decodeGain(this.args()[1]);
       rows.push({ label: 'Mode', value: 'GAIN', note: `$${hex2(this.args()[0])} selects it` });
@@ -107,21 +94,16 @@ export class AdsrCommand {
     const envelope = decodeAdsr(this.args()[0] | 0x80, this.args()[1]);
     const release = releaseSeconds(envelope.release, envelope.sustain);
     rows.push({ label: 'Mode', value: 'ADSR' });
-    rows.push({ label: 'Attack', value: time(attackSeconds(envelope.attack)) });
+    rows.push({ label: 'Attack', value: duration(attackSeconds(envelope.attack)) });
     rows.push({
       label: 'Decay',
-      value: time(decaySeconds(envelope.decay, envelope.sustain)),
+      value: duration(decaySeconds(envelope.decay, envelope.sustain)),
       note: `to ${Math.round(sustainLevel(envelope.sustain) * 100)}% of full`,
     });
     rows.push({
       label: 'Release',
-      value: Number.isFinite(release) ? time(release) : 'held indefinitely',
+      value: Number.isFinite(release) ? duration(release) : 'held indefinitely',
     });
     return rows;
   });
-}
-
-function time(value: number): string {
-  if (!Number.isFinite(value)) return '∞';
-  return value >= 1 ? `${value.toFixed(2)} s` : `${(value * 1000).toFixed(0)} ms`;
 }

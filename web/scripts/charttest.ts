@@ -13,14 +13,7 @@
 
 import { stackSegments } from "../src/app/shared/chart/stack";
 
-let failures = 0;
-function check(name: string, condition: boolean, detail = ""): void {
-	if (condition) console.log(`  ok    ${name}`);
-	else {
-		failures++;
-		console.log(`  FAIL  ${name}${detail ? `\n        ${detail}` : ""}`);
-	}
-}
+import { check, summarise } from "./harness";
 
 const OPTS = { width: 600, gap: 2, minWidth: 3 };
 const EPSILON = 1e-6;
@@ -93,5 +86,4 @@ console.log("\ndegenerate input produces no geometry rather than bad geometry");
 	check("a cramped bar does not overflow", end.x + end.width <= 20 + EPSILON, `${(end.x + end.width).toFixed(2)}`);
 }
 
-console.log(`\n${failures === 0 ? "all checks passed" : `${failures} check(s) failed`}\n`);
-process.exit(failures === 0 ? 0 : 1);
+summarise();

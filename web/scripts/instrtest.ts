@@ -20,7 +20,11 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
-import { INSTRUMENT_TO_SAMPLE } from "../src/compiler/tables";
+import {
+	FIRST_CUSTOM_INSTRUMENT as COMPILER_FIRST_CUSTOM,
+	FIRST_PERCUSSION_INSTRUMENT as COMPILER_FIRST_PERCUSSION,
+	INSTRUMENT_TO_SAMPLE,
+} from "../src/compiler/tables";
 import {
 	FIRST_CUSTOM_INSTRUMENT,
 	FIRST_PERCUSSION_INSTRUMENT,
@@ -34,14 +38,7 @@ import {
 	readInstrumentTables,
 } from "../src/spc/instruments";
 
-let failures = 0;
-function check(name: string, condition: boolean, detail = ""): void {
-	if (condition) console.log(`  ok    ${name}`);
-	else {
-		failures++;
-		console.log(`  FAIL  ${name}${detail ? `\n        ${detail}` : ""}`);
-	}
-}
+import { check, summarise } from "./harness";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const program = new Uint8Array(readFileSync(join(here, "..", "public", "driver", "main.bin")));
@@ -156,9 +153,19 @@ console.log("\nentry shape");
 		tables.percussion[1].srcn === 0x06 && tables.percussion[1].note === 0xa4,
 	);
 	check("the first custom instrument is @30", FIRST_CUSTOM_INSTRUMENT === 30);
+
+	// tables.ts and instruments.ts each state these for their own layer, because
+	// compiler/ does not depend on spc/. That is only safe if they agree.
+	check(
+		"the compiler and the SPC layer agree on where the custom band starts",
+		COMPILER_FIRST_CUSTOM === FIRST_CUSTOM_INSTRUMENT,
+		`${COMPILER_FIRST_CUSTOM} vs ${FIRST_CUSTOM_INSTRUMENT}`,
+	);
+	check(
+		"and on where percussion starts",
+		COMPILER_FIRST_PERCUSSION === FIRST_PERCUSSION_INSTRUMENT,
+		`${COMPILER_FIRST_PERCUSSION} vs ${FIRST_PERCUSSION_INSTRUMENT}`,
+	);
 }
 
-console.log(
-	failures === 0 ? "\nAll instrument table tests passed.\n" : `\n${failures} instrument table test(s) failed.\n`,
-);
-process.exit(failures === 0 ? 0 : 1);
+summarise();

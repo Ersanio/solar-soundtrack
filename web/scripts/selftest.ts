@@ -11,7 +11,7 @@
 import { compiler } from "../src/compiler";
 import type { CompileResult } from "../src/core/types";
 
-let failures = 0;
+import { check, summarise } from "./harness";
 
 function compile(source: string, aramAddress = 0x3e00, options?: Record<string, unknown>): CompileResult {
 	return compiler.compile({ source, aramAddress, options });
@@ -30,15 +30,6 @@ const LIBRARY = {
 
 function hex(data: Uint8Array): string {
 	return [...data].map((b) => b.toString(16).toUpperCase().padStart(2, "0")).join(" ");
-}
-
-function check(name: string, condition: boolean, detail = ""): void {
-	if (condition) {
-		console.log(`  ok    ${name}`);
-	} else {
-		failures++;
-		console.log(`  FAIL  ${name}${detail ? `\n        ${detail}` : ""}`);
-	}
 }
 
 function expectBytes(name: string, actual: Uint8Array, expected: number[]): void {
@@ -1239,5 +1230,4 @@ console.log("\nwhich samples the song actually plays");
 	check("a song playing nothing reports nothing used", used(silent).length === 0, used(silent).join(", "));
 }
 
-console.log(`\n${failures === 0 ? "all checks passed" : `${failures} check(s) failed`}\n`);
-process.exit(failures === 0 ? 0 : 1);
+summarise();

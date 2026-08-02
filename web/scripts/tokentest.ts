@@ -24,14 +24,7 @@ import {
 	TOKEN_TAGS,
 } from "../src/compiler/tokens";
 
-let failures = 0;
-function check(name: string, condition: boolean, detail = ""): void {
-	if (condition) console.log(`  ok    ${name}`);
-	else {
-		failures++;
-		console.log(`  FAIL  ${name}${detail ? `\n        ${detail}` : ""}`);
-	}
-}
+import { check, summarise } from "./harness";
 
 const at = (text: string, offset: number) => commandAt(tokenize(text).commands, offset);
 
@@ -633,5 +626,4 @@ console.log("\nan empty document is not a special case");
 	check("tokenAt on nothing is null", tokenAt([], 0) === null);
 }
 
-console.log(failures === 0 ? "\nAll token tests passed.\n" : `\n${failures} token test(s) failed.\n`);
-process.exit(failures === 0 ? 0 : 1);
+summarise();

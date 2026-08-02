@@ -1,10 +1,12 @@
 import { Component, computed, inject, input } from '@angular/core';
 
 import type { Command } from '@compiler/tokens';
+import { hex2 } from '../../../util/format';
 import { FIR_PRESETS, type FirTaps, toSigned } from '@spc/fir';
 import { EditorStore } from '../../../state/editor-store';
 import { firOverriddenBefore } from '../fir-override';
 import { FirGraph } from '../fir-graph/fir-graph';
+import { type DetailRow, DetailTable } from '../../../shared/detail-table/detail-table';
 
 /**
  * The echo commands, read out in the units they actually mean.
@@ -17,7 +19,7 @@ import { FirGraph } from '../fir-graph/fir-graph';
  */
 @Component({
   selector: 'amk-echo-inspector',
-  imports: [FirGraph],
+  imports: [FirGraph, DetailTable],
   templateUrl: './echo-inspector.html',
   host: { class: 'flex flex-col gap-3' },
 })
@@ -36,7 +38,7 @@ export class EchoInspector {
    * out-of-range value wraps silently rather than erroring — worth saying, since
    * nothing else in the toolchain does.
    */
-  protected readonly rows = computed<{ label: string; value: string; note?: string }[]>(() => {
+  protected readonly rows = computed<DetailRow[]>(() => {
     const args = this.args();
     switch (this.vcmd()) {
       case 0xef:
@@ -54,7 +56,7 @@ export class EchoInspector {
             value: `${masked * 16} ms`,
             note:
               delay > 0x0f
-                ? `$${hex(delay)} is out of range; the driver masks it to $${hex(masked)}`
+                ? `$${hex2(delay)} is out of range; the driver masks it to $${hex2(masked)}`
                 : `${masked * 2} KiB of ARAM reserved for the buffer`,
           },
           { label: 'Feedback', value: signedLabel(args[1]) },
@@ -108,13 +110,11 @@ export class EchoInspector {
   });
 }
 
-const hex = (value: number): string => value.toString(16).toUpperCase().padStart(2, '0');
-
 /** Echo volumes and feedback are signed, and negative means phase-inverted. */
 function signedLabel(value: number | undefined): string {
   if (value === undefined) return '—';
   const signed = toSigned(value);
-  return `${signed} ($${hex(value)})`;
+  return `${signed} ($${hex2(value)})`;
 }
 
 function filterName(which: number): string {

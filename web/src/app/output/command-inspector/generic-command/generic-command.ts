@@ -1,6 +1,7 @@
 import { Component, computed, input } from '@angular/core';
 
 import type { Command } from '@compiler/tokens';
+import { hex2 } from '../../../util/format';
 
 /**
  * The fallback view: any command the inspector has nothing special to say
@@ -50,7 +51,7 @@ export class GenericCommand {
   protected readonly rows = computed(() =>
     this.command().args.map((arg, index) => ({
       index,
-      hex: `$${(arg.value & 0xff).toString(16).toUpperCase().padStart(2, '0')}`,
+      hex: `$${hex2(arg.value & 0xff)}`,
       decimal: arg.value,
       // Shown alongside the unsigned reading rather than instead of it: some
       // arguments are signed (pan, feedback, FIR taps) and some are not, and

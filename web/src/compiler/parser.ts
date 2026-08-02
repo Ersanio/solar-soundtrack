@@ -26,6 +26,8 @@ import {
 	EMPTY_SAMPLE_NAME,
 	BANK_SLOT_COUNT,
 	bankSlotName,
+	FIRST_CUSTOM_INSTRUMENT,
+	FIRST_PERCUSSION_INSTRUMENT,
 	FIRST_VCMD,
 	HEX_LENGTHS,
 	INSTRUMENT_TO_SAMPLE,
@@ -1160,7 +1162,7 @@ export class AddmusicKParser {
 				this.error("AMK0102", "Error parsing the instrument-copy portion of #instruments.");
 				return null;
 			}
-			if (n >= 30) {
+			if (n >= FIRST_CUSTOM_INSTRUMENT) {
 				this.error("AMK0103", "Cannot use a custom instrument's sample as a base for another custom instrument.");
 				return null;
 			}
@@ -1619,12 +1621,12 @@ export class AddmusicKParser {
 		if (n === -1) return this.error("AMK0090", 'Error parsing instrument ("@") command.');
 		if (n < 0 || n > 255) return this.error("AMK0091", 'Illegal value for instrument ("@") command.');
 
-		if (n <= 18 || direct || n >= 30) {
+		if (n <= 18 || direct || n >= FIRST_CUSTOM_INSTRUMENT) {
 			// Music.cpp:880 — Addmusic 4.05/M numbered custom instruments from $13;
 			// AddmusicK starts them at 30.
-			if (n >= 0x13 && n < 30) n = n - 0x13 + 30;
+			if (n >= 0x13 && n < FIRST_CUSTOM_INSTRUMENT) n = n - 0x13 + FIRST_CUSTOM_INSTRUMENT;
 
-			if (n >= 30) {
+			if (n >= FIRST_CUSTOM_INSTRUMENT) {
 				// Music.cpp:889. AMK only performs this check when
 				// `optimizeSampleUsage` is on; here it is unconditional, because
 				// `$DA n` past the end of the table makes the driver read six bytes
@@ -1648,7 +1650,7 @@ export class AddmusicKParser {
 			this.append(n);
 		}
 
-		if (n < 30) {
+		if (n < FIRST_CUSTOM_INSTRUMENT) {
 			const srcn = INSTRUMENT_TO_SAMPLE[n];
 			// A song that replaced the sample list with a shorter one has left the
 			// stock instruments pointing past the end of the directory, which the
@@ -1778,7 +1780,7 @@ export class AddmusicKParser {
 			const n = this.getInt();
 			// AMK reads `instrToSample[i]` with no check at all (Music.cpp:932),
 			// so a missing or out-of-range number indexes past a 30-entry array.
-			if (n === -1 || n >= 30) {
+			if (n === -1 || n >= FIRST_CUSTOM_INSTRUMENT) {
 				return this.errorAt(
 					start,
 					this.pos,
@@ -2325,7 +2327,10 @@ export class AddmusicKParser {
 				}
 			} else if (note >= NOTE_MAX) {
 				this.errorAt(start, this.pos, "AMK0142", "Note's pitch was too high.");
-			} else if (this.instrument[this.channel] >= 21 && this.instrument[this.channel] < 30) {
+			} else if (
+				this.instrument[this.channel] >= FIRST_PERCUSSION_INSTRUMENT &&
+				this.instrument[this.channel] < FIRST_CUSTOM_INSTRUMENT
+			) {
 				note = 0xd0 + (this.instrument[this.channel] - 21);
 				const isSfxChannel =
 					this.channel === 6 ||
@@ -2643,7 +2648,7 @@ export class AddmusicKParser {
 			// target keeps a sample AMK would discard, which is the safe direction
 			// to differ in, and it is what makes the optimisation trustworthy.
 			if (this.hexLeft === 0 && this.currentHex === 0xda) {
-				if (i < 30) {
+				if (i < FIRST_CUSTOM_INSTRUMENT) {
 					this.noteSampleUse(INSTRUMENT_TO_SAMPLE[i]);
 				} else {
 					const custom = (i - 30) * 6;
@@ -2653,7 +2658,7 @@ export class AddmusicKParser {
 
 			// Music.cpp:1976 — Addmusic 4.05 numbered custom instruments from $13.
 			if (this.currentHex === 0xda && this.songTargetProgram === 1) {
-				if (i >= 0x13) i = i - 0x13 + 30;
+				if (i >= 0x13) i = i - 0x13 + FIRST_CUSTOM_INSTRUMENT;
 
 				// Two deliberate deviations from Music.cpp:1981. AMK indexes
 				// `instrumentData[(i - 30) * 5]` unconditionally, so a `$DA` below
@@ -2661,7 +2666,7 @@ export class AddmusicKParser {
 				// where entries are 6 bytes, so it reads the wrong instrument's
 				// sample. Both are guarded here rather than reproduced.
 				const entry = (i - 30) * 6;
-				if (i >= 30 && entry < this.instrumentData.length) {
+				if (i >= FIRST_CUSTOM_INSTRUMENT && entry < this.instrumentData.length) {
 					this.noteSampleUse(this.instrumentData[entry]);
 				}
 			}

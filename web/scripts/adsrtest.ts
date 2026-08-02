@@ -38,14 +38,7 @@ import {
 } from "../src/spc/adsr";
 import { readInstrumentTables } from "../src/spc/instruments";
 
-let failures = 0;
-function check(name: string, condition: boolean, detail = ""): void {
-	if (condition) console.log(`  ok    ${name}`);
-	else {
-		failures++;
-		console.log(`  FAIL  ${name}${detail ? `\n        ${detail}` : ""}`);
-	}
-}
+import { check, summarise } from "./harness";
 
 console.log("\nCLOCKS, checked against the published noise ladder");
 {
@@ -238,5 +231,4 @@ console.log("\nthe stock table decodes");
 	);
 }
 
-console.log(failures === 0 ? "\nAll ADSR tests passed.\n" : `\n${failures} ADSR test(s) failed.\n`);
-process.exit(failures === 0 ? 0 : 1);
+summarise();

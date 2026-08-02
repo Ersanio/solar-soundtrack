@@ -7,6 +7,7 @@
  */
 
 import { type BrrSample, parseBrr } from "./brr";
+import { ARAM_SIZE } from "./layout";
 
 // Re-exported because the SPC writer and the ARAM budget have always imported
 // it from here; the type itself now lives with the rest of the BRR handling.
@@ -107,7 +108,7 @@ export function analyzeDriver(
 	// The size match is the criterion; this only catches a header that says the
 	// image loads somewhere it physically cannot fit, which would otherwise be
 	// mishandled silently.
-	if (hasUploadHeader && declaredAddress + declaredSize > 0x10000) {
+	if (hasUploadHeader && declaredAddress + declaredSize > ARAM_SIZE) {
 		throw new DriverError(
 			`This driver declares that it loads at $${hex(declaredAddress)} and is ` +
 				`0x${hex(declaredSize)} bytes, which runs past the end of ARAM.`,
@@ -229,7 +230,7 @@ function findSongTable(
 		let previous = -1;
 		for (let k = 0; k < entries; k++) {
 			const value = word(programData, start + k * 2);
-			if (value <= previous || value < programPos || value > 0x10000) {
+			if (value <= previous || value < programPos || value > ARAM_SIZE) {
 				ascending = false;
 				break;
 			}
@@ -365,13 +366,13 @@ export function withCustomProgram(bundle: DriverBundle, raw: Uint8Array, name: s
 	if (raw.length < 64) {
 		throw new DriverError(`"${name}" is only ${raw.length} bytes — that is not a driver image.`);
 	}
-	if (raw.length > 0x10000 - 0x200) {
+	if (raw.length > ARAM_SIZE - 0x200) {
 		throw new DriverError(`"${name}" is ${raw.length} bytes, which cannot fit in ARAM alongside anything else.`);
 	}
 
 	const analysis = analyzeDriver(raw, bundle.manifest, true);
 
-	if (analysis.programPos + analysis.programData.length >= 0x10000) {
+	if (analysis.programPos + analysis.programData.length >= ARAM_SIZE) {
 		throw new DriverError(`"${name}" would end past the top of ARAM.`);
 	}
 

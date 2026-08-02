@@ -23,18 +23,13 @@ import type { Command } from '@compiler/tokens';
 import { DEFAULT_TRANSPOSE, INSTRUMENT_TO_SAMPLE } from '@compiler/tables';
 import { DriverStore } from '../../../state/driver-store';
 import { EditorStore } from '../../../state/editor-store';
-import { hex2 } from '../../../util/format';
+import { duration, hex2 } from '../../../util/format';
 import { AdsrGraph } from '../adsr-graph/adsr-graph';
+import type { DetailRow } from '../../../shared/detail-table/detail-table';
 import { HexPipe } from '../../../util/hex.pipe';
 
 /** Which of the things `@n` — or a raw `$DA` — can mean. */
 type Band = 'melodic' | 'unsupported' | 'percussion' | 'custom' | 'undefined' | 'beyond';
-
-interface Row {
-  label: string;
-  value: string;
-  note?: string;
-}
 
 /**
  * What `@n` selects — which is a table entry, not a sample.
@@ -199,11 +194,11 @@ export class InstrumentInspector {
   /** Whether to draw an envelope at all — there is nothing to draw without bytes. */
   protected readonly hasEnvelope = computed(() => this.bytes() !== null);
 
-  protected readonly rows = computed<Row[]>(() => {
+  protected readonly rows = computed<DetailRow[]>(() => {
     const bytes = this.bytes();
     if (!bytes) return [];
 
-    const rows: Row[] = [];
+    const rows: DetailRow[] = [];
     if (this.isNoise()) {
       const clock = this.srcn() & 0x1f;
       rows.push({
@@ -227,15 +222,15 @@ export class InstrumentInspector {
     if (envelope.adsrEnabled) {
       const release = releaseSeconds(envelope.release, envelope.sustain);
       rows.push({ label: 'Envelope', value: 'ADSR', note: `GAIN $${hex2(bytes[3])} is not used` });
-      rows.push({ label: 'Attack', value: time(attackSeconds(envelope.attack)) });
+      rows.push({ label: 'Attack', value: duration(attackSeconds(envelope.attack)) });
       rows.push({
         label: 'Decay',
-        value: time(decaySeconds(envelope.decay, envelope.sustain)),
+        value: duration(decaySeconds(envelope.decay, envelope.sustain)),
         note: `to ${Math.round(sustainLevel(envelope.sustain) * 100)}% of full`,
       });
       rows.push({
         label: 'Release',
-        value: Number.isFinite(release) ? time(release) : 'held indefinitely',
+        value: Number.isFinite(release) ? duration(release) : 'held indefinitely',
         // AddmusicK calls this release; on the DSP it is the sustain-phase fall.
         note: envelope.release === 0 ? 'a rate of 0 never decays' : undefined,
       });
@@ -348,11 +343,6 @@ function sampleByte(sample: { form: string; srcn?: number; byte?: number }): num
   // A named file's SRCN is decided by the resolved `#samples` list, which the
   // scanner cannot know; the panel shows the name instead.
   return -1;
-}
-
-function time(value: number): string {
-  if (!Number.isFinite(value)) return '∞';
-  return value >= 1 ? `${value.toFixed(2)} s` : `${(value * 1000).toFixed(0)} ms`;
 }
 
 function semitones(value: number): string {

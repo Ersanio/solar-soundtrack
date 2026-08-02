@@ -45,6 +45,21 @@ export const EMPTY_SAMPLE_NAME = "EMPTY.brr";
 export const BANK_SLOT_COUNT = 0x40;
 
 /**
+ * Where AddmusicK's instrument bands begin.
+ *
+ * The bands are not contiguous and the boundaries are not derivable: `@0`-`@18`
+ * select a driver instrument, `@19`/`@20` do nothing audible, `@21`-`@29` arm a
+ * drum on the next note without emitting anything, and `@30` up are the song's
+ * own `#instruments` entries (`Music.cpp:1594`, ported at `parser.ts:1622`).
+ *
+ * Stated here for the same reason as `BANK_SLOT_COUNT` above: `spc/instruments.ts`
+ * names the same two numbers for the driver-table side, `compiler/` does not
+ * depend on the SPC layer, and `instrtest` asserts the two agree.
+ */
+export const FIRST_PERCUSSION_INSTRUMENT = 21;
+export const FIRST_CUSTOM_INSTRUMENT = 30;
+
+/**
  * Name for one slot of a `.bnk` sample bank.
  *
  * A bank is a single file holding up to 64 samples, but the compiler deals only

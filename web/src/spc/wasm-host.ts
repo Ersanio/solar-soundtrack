@@ -193,6 +193,8 @@ export function instantiate(module: WebAssembly.Module): SpcCore {
 			// _emscripten_resize_heap — the vendored binary fixes min == max pages,
 			// so this always fails there. Kept honest for a core that can grow.
 			f: (requested: number): number => {
+				// 65536 is the WebAssembly page size, not ARAM — it only happens to
+				// be the same number as SPC_RAM_SIZE.
 				const pages = Math.ceil((requested - memory.buffer.byteLength) / 65536);
 				try {
 					memory.grow(Math.max(pages, 1));

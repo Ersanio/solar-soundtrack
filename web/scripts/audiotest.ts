@@ -32,38 +32,11 @@ import {
 	tickVoice,
 } from "../src/spc/driver-state";
 
+import { check, stubFetch, summarise } from "./harness";
+
 const PUBLIC = join(import.meta.dirname, "..", "public");
 
-// --- driver bundle loading (same shim as spctest) ---------------------------
-const resp = (b: Buffer, ct: string) => ({
-	ok: true,
-	status: 200,
-	headers: { get: (n: string) => (n.toLowerCase() === "content-type" ? ct : null) },
-	arrayBuffer() {
-		return b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength);
-	},
-	json() {
-		return JSON.parse(b.toString("utf8")) as unknown;
-	},
-});
-globalThis.fetch = ((input: string) => {
-	const path = join(PUBLIC, decodeURI(String(input)));
-	try {
-		const bytes = readFileSync(path);
-		return resp(bytes, path.endsWith(".json") ? "application/json" : "application/octet-stream");
-	} catch {
-		return resp(Buffer.from("<!doctype html>"), "text/html");
-	}
-}) as unknown as typeof fetch;
-
-let failures = 0;
-function check(name: string, condition: boolean, detail = ""): void {
-	if (condition) console.log(`  ok    ${name}`);
-	else {
-		failures++;
-		console.log(`  FAIL  ${name}${detail ? `\n        ${detail}` : ""}`);
-	}
-}
+stubFetch();
 
 /** Peak absolute amplitude, as a fraction of full scale. */
 function peak(samples: Int16Array): number {
@@ -890,5 +863,4 @@ console.log("\nthe driver's own ticks are counted exactly");
 	);
 }
 
-console.log(`\n${failures === 0 ? "all checks passed" : `${failures} check(s) failed`}\n`);
-process.exit(failures === 0 ? 0 : 1);
+summarise();

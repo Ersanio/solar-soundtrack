@@ -56,16 +56,14 @@
  */
 
 import type { Span } from "../core/types";
-import { FIRST_VCMD, HEX_LENGTHS, INSTRUMENT_TO_SAMPLE, LAST_VCMD, VCMD_NAMES } from "./tables";
-
-/**
- * The first `#instruments` entry's number.
- *
- * Stated here rather than imported from `spc/instruments.ts`: `compiler/` does
- * not depend on the SPC layer, the same split `tables.ts:42-51` describes for
- * `BANK_SLOT_COUNT`. `instrtest` asserts the two agree.
- */
-const FIRST_CUSTOM_INSTRUMENT = 30;
+import {
+	FIRST_CUSTOM_INSTRUMENT,
+	FIRST_VCMD,
+	HEX_LENGTHS,
+	INSTRUMENT_TO_SAMPLE,
+	LAST_VCMD,
+	VCMD_NAMES,
+} from "./tables";
 
 export type TokenKind =
 	| "comment"

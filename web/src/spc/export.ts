@@ -16,14 +16,13 @@
 
 import type { SongTags } from "../core/types";
 import type { BrrSample, DriverBundle } from "./driver";
-import { type AramPlan, type SpcLayout, computeSpcLayout } from "./layout";
+import { ARAM_SIZE, type AramPlan, type SpcLayout, computeSpcLayout } from "./layout";
 
 export type { SpcLayout } from "./layout";
 
 const SPC_SIZE = 0x10200;
 const ARAM_BASE = 0x100;
 const DSP_BASE = 0x10100;
-const ARAM_SIZE = 0x10000;
 
 /** SPC header field offsets (ID666, text format). */
 const HEADER = {

@@ -41,16 +41,9 @@ import {
 } from "../src/spc/brr";
 import { BANK_SLOT_COUNT, bankSlotName } from "../src/compiler/tables";
 
-const PUBLIC = join(import.meta.dirname, "..", "public");
+import { check, summarise } from "./harness";
 
-let failures = 0;
-function check(name: string, condition: boolean, detail = ""): void {
-	if (condition) console.log(`  ok    ${name}`);
-	else {
-		failures++;
-		console.log(`  FAIL  ${name}${detail ? `\n        ${detail}` : ""}`);
-	}
-}
+const PUBLIC = join(import.meta.dirname, "..", "public");
 
 /** Builds a one-block `.brr` file, loop header included. */
 function block(shift: number, filter: number, nibbles: number[], flags = 0): Uint8Array {
@@ -492,5 +485,4 @@ console.log("\nsample banks split into their slots");
 	);
 }
 
-console.log(`\n${failures === 0 ? "all checks passed" : `${failures} check(s) failed`}\n`);
-process.exit(failures === 0 ? 0 : 1);
+summarise();

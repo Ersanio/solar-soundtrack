@@ -1,6 +1,7 @@
 import { Component, computed, inject } from '@angular/core';
 
 import { EditorStore } from '../../state/editor-store';
+import { hex2 } from '../../util/format';
 import { AdsrCommand } from './adsr-command/adsr-command';
 import { EchoInspector } from './echo-inspector/echo-inspector';
 import { FirDesigner } from './fir-designer/fir-designer';
@@ -103,9 +104,7 @@ export class CommandInspector {
   protected readonly label = computed(() => {
     const command = this.command();
     if (!command) return '';
-    return command.vcmd === undefined
-      ? command.kind
-      : `$${command.vcmd.toString(16).toUpperCase().padStart(2, '0')}`;
+    return command.vcmd === undefined ? command.kind : `$${hex2(command.vcmd)}`;
   });
 
   /**

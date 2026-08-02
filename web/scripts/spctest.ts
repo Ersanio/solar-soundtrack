@@ -6,9 +6,6 @@
  *   npm run spctest
  */
 
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
-
 import { compiler } from "../src/compiler";
 import { EMPTY_SAMPLE_NAME } from "../src/compiler/tables";
 import { emptySample } from "../src/spc/brr";
@@ -16,52 +13,10 @@ import { analyzeDriver, encodePathSegment, loadDriver, withCustomProgram } from 
 import { buildSpc } from "../src/spc/export";
 import { computeBudget, planAram } from "../src/spc/layout";
 
-const DRIVER_DIR = join(import.meta.dirname, "..", "public", "driver");
+import { check, stubFetch, summarise } from "./harness";
 
-const FALLBACK_HTML = "<!doctype html><html><body>SPA fallback</body></html>";
+stubFetch();
 
-function response(body: Buffer | string, contentType: string) {
-	const bytes = typeof body === "string" ? Buffer.from(body, "utf8") : body;
-	return {
-		ok: true,
-		status: 200,
-		headers: { get: (name: string) => (name.toLowerCase() === "content-type" ? contentType : null) },
-		arrayBuffer() {
-			return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
-		},
-		json() {
-			return JSON.parse(bytes.toString("utf8")) as unknown;
-		},
-	};
-}
-
-/**
- * Fetch shim that mirrors Vite's dev server, including the two behaviours that
- * produced the "invalid BRR length 2205" bug:
- *
- *   1. paths are decoded with `decodeURI`, which leaves `%40` untouched, so an
- *      over-encoded `@` never resolves to a real file;
- *   2. an unresolved path is answered 200 with index.html, not 404.
- */
-globalThis.fetch = ((input: string) => {
-	const path = join(DRIVER_DIR, decodeURI(String(input).replace(/^driver\//, "")));
-	try {
-		const bytes = readFileSync(path);
-		const contentType = path.endsWith(".json") ? "application/json" : "application/octet-stream";
-		return response(bytes, contentType);
-	} catch {
-		return response(FALLBACK_HTML, "text/html");
-	}
-}) as unknown as typeof fetch;
-
-let failures = 0;
-function check(name: string, condition: boolean, detail = ""): void {
-	if (condition) console.log(`  ok    ${name}`);
-	else {
-		failures++;
-		console.log(`  FAIL  ${name}${detail ? `\n        ${detail}` : ""}`);
-	}
-}
 const hex = (n: number) => `$${n.toString(16).toUpperCase().padStart(4, "0")}`;
 
 const SONG = `#amk 4
@@ -699,5 +654,4 @@ console.log("\noptimizeSampleUsage frees real ARAM");
 	);
 }
 
-console.log(`\n${failures === 0 ? "all checks passed" : `${failures} check(s) failed`}\n`);
-process.exit(failures === 0 ? 0 : 1);
+summarise();
