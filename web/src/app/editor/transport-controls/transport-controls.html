@@ -50,13 +50,13 @@
 </span>
 
 <amk-checkbox
-  [(checked)]="playback.live"
   title="While playing, reload the song at the same position whenever it recompiles"
+  [(checked)]="playback.live"
 >
   Live
 </amk-checkbox>
 
-<amk-checkbox [(checked)]="playback.loop" title="Keep playing past the end, round the song's loop">
+<amk-checkbox title="Keep playing past the end, round the song's loop" [(checked)]="playback.loop">
   Loop
 </amk-checkbox>
 

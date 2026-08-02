@@ -1,6 +1,6 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
-import { SwUpdate, VersionReadyEvent } from '@angular/service-worker';
+import { SwUpdate, type VersionReadyEvent } from '@angular/service-worker';
 import { filter } from 'rxjs';
 
 import { Button } from '../shared/button/button';

@@ -19,6 +19,7 @@ import { EditorStore } from '../../../state/editor-store';
 import { Playback } from '../../../state/playback';
 import { builtInFilterName, firOverriddenBy } from '../fir-override';
 import { FirGraph } from '../fir-graph/fir-graph';
+import { Hex2Pipe } from '../../../util/hex.pipe';
 
 type Mode = 'presets' | 'draw';
 
@@ -47,15 +48,15 @@ const MERGE_HZ = 500;
  */
 @Component({
   selector: 'amk-fir-designer',
-  imports: [Button, FirGraph],
+  imports: [Button, FirGraph, Hex2Pipe],
   templateUrl: './fir-designer.html',
   host: { class: 'flex flex-col gap-3' },
 })
 export class FirDesigner {
-  readonly command = input.required<Command>();
-
   private readonly store = inject(EditorStore);
   private readonly playback = inject(Playback);
+
+  readonly command = input.required<Command>();
 
   protected readonly FIR_PRESETS = FIR_PRESETS;
   protected readonly mode = signal<Mode>('presets');

@@ -54,7 +54,7 @@ const POSITION_INTERVAL = 0.1;
 const FULL_SCALE = 32768;
 
 class SpcProcessor extends AudioWorkletProcessor {
-	private core: SpcCore | null = null;
+	private readonly core: SpcCore | null = null;
 	private spc: Uint8Array | null = null;
 
 	private playing = false;

@@ -18,7 +18,7 @@
 @if (stability().runaway) {
   <p class="text-danger text-xs leading-relaxed">
     With the echo feedback at
-    <span class="font-mono">${{ feedback().toString(16).toUpperCase().padStart(2, '0') }}</span>
+    <span class="font-mono">${{ feedback() | hex2 }}</span>
     this filter has a loop gain of {{ stability().loopGain.toFixed(2) }} — the echo will build up on
     itself instead of dying away, and clip. Lower the feedback, or pull the marked band down.
   </p>
@@ -70,7 +70,10 @@
     </button>
   </div>
 
-  @switch (mode()) {
+  <!-- Bound to a @let so the template type-checker can narrow it: `@default
+       never` needs a reference, not a call it has to assume varies. -->
+  @let current = mode();
+  @switch (current) {
     @case ('presets') {
       <div class="flex flex-wrap gap-1.5">
         @for (preset of FIR_PRESETS; track preset.name) {
@@ -108,6 +111,7 @@
         </div>
       </div>
     }
+    @default never;
   }
 
   <!-- The raw truth, always. -->
@@ -125,7 +129,7 @@
             min="-128"
             max="127"
             step="1"
-            [attr.aria-label]="'Coefficient ' + row.index"
+            [attr.aria-label]="`Coefficient ${row.index}`"
             [value]="row.tap"
             (change)="setTap(row.index, $any($event.target).value)"
           />

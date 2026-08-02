@@ -15,8 +15,8 @@
       [class]="muteClass(channel.muted)"
       [disabled]="playback.isSoloing()"
       [attr.aria-pressed]="channel.muted"
-      [attr.aria-label]="'Mute channel ' + channel.index"
-      [title]="'Mute channel ' + channel.index"
+      [attr.aria-label]="`Mute channel ${channel.index}`"
+      [title]="`Mute channel ${channel.index}`"
       (click)="playback.toggleMute(channel.index)"
     >
       M
@@ -26,8 +26,8 @@
       type="button"
       [class]="soloClass(channel.soloed)"
       [attr.aria-pressed]="channel.soloed"
-      [attr.aria-label]="'Solo channel ' + channel.index"
-      [title]="'Solo channel ' + channel.index"
+      [attr.aria-label]="`Solo channel ${channel.index}`"
+      [title]="`Solo channel ${channel.index}`"
       (click)="playback.toggleSolo(channel.index)"
     >
       S

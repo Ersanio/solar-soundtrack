@@ -52,46 +52,46 @@ const MIN_SPAN_SECONDS = 0.01;
   template: `
     <figure class="m-0">
       <svg
-        [attr.viewBox]="VIEW_BOX"
         preserveAspectRatio="none"
         class="bg-inset border-edge h-24 w-full rounded-sm border"
         role="img"
+        [attr.viewBox]="VIEW_BOX"
         [attr.aria-label]="description()"
       >
         <!-- Full level, so a GAIN that never reaches it reads as not reaching it. -->
         <line
           x1="0"
-          [attr.x2]="VIEW_W"
           y1="2"
           y2="2"
           class="stroke-edge"
           stroke-width="0.5"
           stroke-dasharray="3 3"
+          [attr.x2]="VIEW_W"
         />
 
         @if (sustainY(); as y) {
           <line
             x1="0"
+            class="stroke-edge"
+            stroke-width="0.5"
             [attr.x2]="VIEW_W"
             [attr.y1]="y"
             [attr.y2]="y"
-            class="stroke-edge"
-            stroke-width="0.5"
           />
         }
 
         @for (mark of phaseMarks(); track mark.label) {
           <line
-            [attr.x1]="mark.x"
-            [attr.x2]="mark.x"
             y1="0"
-            [attr.y2]="VIEW_H"
             class="stroke-edge"
             stroke-width="0.5"
+            [attr.x1]="mark.x"
+            [attr.x2]="mark.x"
+            [attr.y2]="VIEW_H"
           />
         }
 
-        <path [attr.d]="path()" fill="none" class="stroke-accent" stroke-width="2" />
+        <path fill="none" class="stroke-accent" stroke-width="2" [attr.d]="path()" />
       </svg>
 
       <figcaption class="text-ink-muted mt-1 flex justify-between font-mono text-[10px]">
@@ -145,8 +145,8 @@ export class AdsrGraph {
   });
 
   protected readonly durationLabel = computed(() => {
-    const seconds = this.duration();
-    return seconds >= 1 ? `${seconds.toFixed(2)} s` : `${(seconds * 1000).toFixed(0)} ms`;
+    const total = this.duration();
+    return total >= 1 ? `${total.toFixed(2)} s` : `${(total * 1000).toFixed(0)} ms`;
   });
 
   protected readonly path = computed(() =>

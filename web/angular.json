@@ -71,7 +71,14 @@
         "lint": {
           "builder": "@angular-eslint/builder:lint",
           "options": {
-            "lintFilePatterns": ["src/**/*.ts", "src/**/*.html", "scripts/**/*.ts"]
+            "lintFilePatterns": [
+              "src/**/*.ts",
+              "src/**/*.html",
+              "scripts/**/*.ts",
+              "scripts/**/*.mjs",
+              "eslint.config.js"
+            ],
+            "maxWarnings": 0
           }
         }
       }

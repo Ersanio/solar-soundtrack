@@ -117,7 +117,7 @@
               focusable="false"
             >
               <g transform="translate(0,1)">
-                <path [attr.d]="waveform(file)" fill="currentColor" />
+                <path fill="currentColor" [attr.d]="waveform(file)" />
               </g>
             </svg>
             <p class="text-ink-muted mt-0.5 font-mono text-xs">{{ detailLabel(file) }}</p>
@@ -155,7 +155,7 @@
           @for (slot of slots(file.name); track slot.name) {
             <li class="flex items-center gap-3 py-1.5">
               <span class="text-ink-muted w-6 shrink-0 text-right font-mono text-xs tabular-nums">
-                {{ slot.index.toString(16).toUpperCase().padStart(2, '0') }}
+                {{ slot.index | hex2 }}
               </span>
 
               @if (isUsed(slot.name)) {
@@ -190,7 +190,7 @@
                     focusable="false"
                   >
                     <g transform="translate(0,1)">
-                      <path [attr.d]="waveform(slot)" fill="currentColor" />
+                      <path fill="currentColor" [attr.d]="waveform(slot)" />
                     </g>
                   </svg>
                   <p class="text-ink-muted mt-0.5 font-mono text-xs">{{ detailLabel(slot) }}</p>

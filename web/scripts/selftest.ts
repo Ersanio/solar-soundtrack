@@ -878,8 +878,12 @@ console.log("\nthe sample load command");
 	);
 
 	// A `(` that is not a sample load must still reach the label-loop parser.
-	const label = compile("#amk 4\n#0 o4 (1)[c4 d4]2 (1)3\n", 0x3e00, LIBRARY);
-	check("label loops still parse", label.ok, label.diagnostics.map((d) => `${d.code} ${d.message}`).join("; "));
+	const labelLoops = compile("#amk 4\n#0 o4 (1)[c4 d4]2 (1)3\n", 0x3e00, LIBRARY);
+	check(
+		"label loops still parse",
+		labelLoops.ok,
+		labelLoops.diagnostics.map((d) => `${d.code} ${d.message}`).join("; "),
+	);
 
 	for (const [source, code, label] of [
 		[withDefault("#0 o4 (@1) c4\n"), "AMK0133", "a missing comma"],

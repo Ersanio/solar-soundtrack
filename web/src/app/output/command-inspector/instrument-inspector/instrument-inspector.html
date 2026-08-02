@@ -61,7 +61,7 @@
               <code class="text-ink">&#64;&#64;{{ written() }}</code> does not help: the direct form
               is remapped to <code class="text-ink">&#64;{{ written() + 11 }}</code
               >, a custom instrument. Only a raw
-              <code class="text-ink">$DA ${{ written().toString(16).toUpperCase() }}</code>
+              <code class="text-ink">$DA ${{ written() | hex }}</code>
               reaches the driver's own entry.
             </p>
           }
@@ -70,12 +70,13 @@
 
       @case ('beyond') {
         <p class="text-warn text-xs leading-relaxed">
-          <code class="text-ink">$DA ${{ written().toString(16).toUpperCase() }}</code> reads past
-          the driver's 20-entry instrument table. Where it lands depends on how that driver indexes
-          the table, which is not something this editor can read, so the bytes it picks up are not
-          shown. Percussion is not reached this way — that is
-          <code class="text-ink">&#64;21</code>–<code class="text-ink">&#64;29</code>, which rewrite
-          the note instead.
+          <code class="text-ink">$DA ${{ written() | hex }}</code> reads past the driver's 20-entry
+          instrument table. Where it lands depends on how that driver indexes the table, which is
+          not something this editor can read, so the bytes it picks up are not shown. Percussion is
+          not reached this way — that is <code class="text-ink">&#64;21</code>–<code
+            class="text-ink"
+            >&#64;29</code
+          >, which rewrite the note instead.
         </p>
       }
 
@@ -112,7 +113,7 @@
                       drum {{ drumIndex() }} of 9 — no <code>$DA</code> is emitted
                     }
                     @case ('custom') {
-                      custom instrument, entry {{ emitted()! - 29 }} of {{ customCount() }}
+                      custom instrument, entry {{ customEntry() }} of {{ customCount() }}
                     }
                     @default {
                       @if (raw()) {

@@ -1,4 +1,8 @@
-import { ApplicationConfig, provideBrowserGlobalErrorListeners, isDevMode } from '@angular/core';
+import {
+  type ApplicationConfig,
+  provideBrowserGlobalErrorListeners,
+  isDevMode,
+} from '@angular/core';
 import { provideServiceWorker } from '@angular/service-worker';
 
 /**

@@ -25,11 +25,11 @@
   <amk-changelog />
 
   <a
-    [href]="commitUrl"
     target="_blank"
     rel="noopener noreferrer"
     class="text-ink-muted hover:text-ink flex items-center gap-1.5 text-sm hover:underline"
-    [attr.aria-label]="'View commit ' + commitShort + ' on GitHub'"
+    [href]="commitUrl"
+    [attr.aria-label]="`View commit ${commitShort} on GitHub`"
   >
     <svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor" aria-hidden="true">
       <path

@@ -706,13 +706,13 @@ console.log("\nthe loop really lasts as long as the compiler says");
 	 * once per measurement.
 	 */
 	function measureLoop(source: string, seconds: number): number {
-		const emu = instantiate(new WebAssembly.Module(readFileSync(join(PUBLIC, "player", "spc.wasm"))));
-		emu.loadSpc(compileToSpc(source));
+		const loopEmu = instantiate(new WebAssembly.Module(readFileSync(join(PUBLIC, "player", "spc.wasm"))));
+		loopEmu.loadSpc(compileToSpc(source));
 
 		const total = SPC_SAMPLE_RATE * seconds;
 		const mono = new Float64Array(total);
 		for (let at = 0; at < total; at += 32000) {
-			const out = emu.render(Math.min(32000, total - at));
+			const out = loopEmu.render(Math.min(32000, total - at));
 			for (let i = 0; i < out.length / 2; i++) mono[at + i] = (out[i * 2] + out[i * 2 + 1]) / 2;
 		}
 

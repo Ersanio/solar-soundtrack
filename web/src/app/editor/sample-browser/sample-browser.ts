@@ -7,6 +7,7 @@ import { DriverStore } from '../../state/driver-store';
 import { EditorStore } from '../../state/editor-store';
 import { Playback } from '../../state/playback';
 import { type SampleFile, type SampleSlot, SampleStore } from '../../state/sample-store';
+import { Hex2Pipe } from '../../util/hex.pipe';
 
 /**
  * The sample library, as a file browser.
@@ -18,7 +19,7 @@ import { type SampleFile, type SampleSlot, SampleStore } from '../../state/sampl
  */
 @Component({
   selector: 'amk-sample-browser',
-  imports: [Button, Checkbox],
+  imports: [Button, Checkbox, Hex2Pipe],
   templateUrl: './sample-browser.html',
   host: { class: 'flex min-h-0 min-w-0 flex-col' },
 })

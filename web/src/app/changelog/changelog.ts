@@ -27,6 +27,7 @@ import { CHANGELOG } from './changelog-data';
   template: `
     <button
       #trigger
+      type="button"
       class="text-ink-muted hover:text-ink flex cursor-pointer items-center gap-1.5 text-sm hover:underline"
       aria-haspopup="dialog"
       [attr.aria-expanded]="open()"
@@ -57,7 +58,7 @@ import { CHANGELOG } from './changelog-data';
           class="border-edge bg-raised flex shrink-0 items-center justify-between gap-3 rounded-t-md border-b px-3 py-2"
         >
           <h2 class="text-ink-muted text-xs font-semibold tracking-wide uppercase">Changelog</h2>
-          <button amk-button variant="ghost" (click)="dismiss()" aria-label="Close the changelog">
+          <button amk-button variant="ghost" aria-label="Close the changelog" (click)="dismiss()">
             <svg viewBox="0 0 16 16" width="14" height="14" fill="none" aria-hidden="true">
               <path
                 d="M3 3l10 10M13 3L3 13"

@@ -22,9 +22,9 @@ import { FirGraph } from '../fir-graph/fir-graph';
   host: { class: 'flex flex-col gap-3' },
 })
 export class EchoInspector {
-  readonly command = input.required<Command>();
-
   private readonly store = inject(EditorStore);
+
+  readonly command = input.required<Command>();
 
   protected readonly vcmd = computed(() => this.command().vcmd ?? 0);
   protected readonly args = computed(() => this.command().args.map((a) => a.value));

@@ -1,7 +1,7 @@
-import { Component, ElementRef, computed, input, model, viewChildren } from '@angular/core';
+import { Component, type ElementRef, computed, input, model, viewChildren } from '@angular/core';
 
-export interface TabDef {
-  id: string;
+export interface TabDef<Id extends string = string> {
+  id: Id;
   label: string;
 }
 
@@ -14,12 +14,15 @@ export interface TabDef {
  * through every tab. Panels are the caller's business — it renders them with
  * `@switch` and gives each `role="tabpanel"` plus `id="panel-<id>"`, which is
  * what `aria-controls` here points at.
+ *
+ * Generic over the id so a caller can pass a union rather than `string`, and
+ * have the compiler check that its `@switch` covers every tab.
  */
 @Component({
   selector: 'amk-tabs',
   host: { class: 'flex items-center gap-1', role: 'tablist' },
   template: `
-    @for (tab of tabs(); track tab.id; let index = $index) {
+    @for (tab of tabs(); track tab.id) {
       <button
         #tabButton
         type="button"
@@ -30,16 +33,16 @@ export interface TabDef {
         [tabindex]="tab.id === active() ? 0 : -1"
         [class]="buttonClass(tab.id === active())"
         (click)="active.set(tab.id)"
-        (keydown)="onKeydown($event, index)"
+        (keydown)="onKeydown($event, $index)"
       >
         {{ tab.label }}
       </button>
     }
   `,
 })
-export class Tabs {
-  readonly tabs = input.required<readonly TabDef[]>();
-  readonly active = model.required<string>();
+export class Tabs<Id extends string = string> {
+  readonly tabs = input.required<readonly TabDef<Id>[]>();
+  readonly active = model.required<Id>();
 
   private readonly buttons = viewChildren<ElementRef<HTMLButtonElement>>('tabButton');
 

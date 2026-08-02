@@ -25,6 +25,7 @@ import { DriverStore } from '../../../state/driver-store';
 import { EditorStore } from '../../../state/editor-store';
 import { hex2 } from '../../../util/format';
 import { AdsrGraph } from '../adsr-graph/adsr-graph';
+import { HexPipe } from '../../../util/hex.pipe';
 
 /** Which of the things `@n` — or a raw `$DA` — can mean. */
 type Band = 'melodic' | 'unsupported' | 'percussion' | 'custom' | 'undefined' | 'beyond';
@@ -45,15 +46,15 @@ interface Row {
  */
 @Component({
   selector: 'amk-instrument-inspector',
-  imports: [AdsrGraph],
+  imports: [AdsrGraph, HexPipe],
   templateUrl: './instrument-inspector.html',
   host: { class: 'block' },
 })
 export class InstrumentInspector {
-  readonly command = input.required<Command>();
-
   private readonly store = inject(EditorStore);
   private readonly drivers = inject(DriverStore);
+
+  readonly command = input.required<Command>();
 
   /** The number written, before AddmusicK does anything to it. */
   protected readonly written = computed(() => {
@@ -136,6 +137,15 @@ export class InstrumentInspector {
 
   /** How many entries the song's `#instruments` blocks define. */
   protected readonly customCount = computed(() => this.store.tokens().instruments.length);
+
+  /**
+   * Which `#instruments` entry `@n` is, counting from 1 — `@30` is the first.
+   * Null outside the custom band, which is the only place the template uses it.
+   */
+  protected readonly customEntry = computed(() => {
+    const n = this.emitted();
+    return n === null ? null : n - FIRST_CUSTOM_INSTRUMENT + 1;
+  });
 
   /** The driver's own entry, for the melodic and percussion bands. */
   private readonly entry = computed<InstrumentEntry | null>(() => {

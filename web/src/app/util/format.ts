@@ -1,11 +1,16 @@
 /** Formatting helpers shared by the editor's panels. */
 
+/** Upper-case hex, as many digits as the value needs. */
+export function hex(value: number): string {
+  return value.toString(16).toUpperCase();
+}
+
 export function hex2(value: number): string {
-  return value.toString(16).toUpperCase().padStart(2, '0');
+  return hex(value).padStart(2, '0');
 }
 
 export function hex4(value: number): string {
-  return value.toString(16).toUpperCase().padStart(4, '0');
+  return hex(value).padStart(4, '0');
 }
 
 /** `m:ss`, clamped at zero — the transport never shows negative time. */

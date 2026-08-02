@@ -1,10 +1,20 @@
-import { Component, ElementRef, effect, inject, signal, untracked, viewChild } from '@angular/core';
+import {
+  Component,
+  type ElementRef,
+  effect,
+  inject,
+  signal,
+  untracked,
+  viewChild,
+} from '@angular/core';
 
 import { Panel } from '../../shared/panel/panel';
 import { type TabDef, Tabs } from '../../shared/tabs/tabs';
 import { EditorStore } from '../../state/editor-store';
 import { ChannelMixer } from '../channel-mixer/channel-mixer';
 import { SampleBrowser } from '../sample-browser/sample-browser';
+
+type EditorTab = 'source' | 'samples';
 
 /**
  * The MML source editor and the sample library, as two tabs.
@@ -26,11 +36,11 @@ import { SampleBrowser } from '../sample-browser/sample-browser';
 export class EditorPane {
   protected readonly store = inject(EditorStore);
 
-  protected readonly TABS: readonly TabDef[] = [
+  protected readonly TABS: readonly TabDef<EditorTab>[] = [
     { id: 'source', label: 'Source' },
     { id: 'samples', label: 'Samples' },
   ];
-  protected readonly tab = signal('source');
+  protected readonly tab = signal<EditorTab>('source');
 
   /**
    * Optional, not required: the textarea only exists while the Source tab is
