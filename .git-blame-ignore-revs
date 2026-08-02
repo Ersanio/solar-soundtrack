@@ -1,0 +1,9 @@
+# Revisions to skip when running `git blame`. Enable with:
+#
+#     git config blame.ignoreRevsFile .git-blame-ignore-revs
+#
+# Only whole-tree reformats belong here — never a commit that changed behaviour.
+
+# Reformat with Prettier (2026-08-02). The first run of a formatter that had
+# been configured but never invoked.
+7357fdc9acd2b669bb01176287db0e25cb10cc27
