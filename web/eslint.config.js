@@ -149,8 +149,19 @@ module.exports = defineConfig([
       // the ARAM bar needs for geometry, are not what this rule means.
       '@angular-eslint/template/no-inline-styles': ['error', { allowBindToStyle: true }],
 
-      // `no-call-expression` is deliberately absent until the sample browser
-      // stops calling methods per row — see the commit that adds it.
+      // `no-call-expression` would be the rule that catches work done per row
+      // per change-detection pass — the sample browser's decode-the-whole-
+      // library bug was exactly its target. It cannot be used here: it matches
+      // every `Call` node in a template, and in a signals codebase every read
+      // is one. It reports 178 problems, and the first is
+      // `library.overrideCount() > 0`. Its `allowList`/`allowPrefix` options
+      // match on the callee's name, and nothing in a name distinguishes a
+      // signal from a method.
+      //
+      // So that class of bug is kept out structurally instead: panels build a
+      // `computed` of view models with everything resolved — see the `rows` in
+      // sample-browser.ts, aram-budget.ts and stats-grid.ts — rather than
+      // calling a method per row.
     },
   },
   eslintConfigPrettier,
