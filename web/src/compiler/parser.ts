@@ -428,6 +428,10 @@ export class AddmusicKParser {
 				}
 			}
 
+			// One line per MML command keeps this readable as the lookup table it
+			// is. Prettier expands `case "x": f(); break;` to three lines each,
+			// which turns 40 lines into 280 and hides the shape of the dispatch.
+			// prettier-ignore
 			switch (lower) {
 				case "?": this.parseQMark(); break;
 				case "#": this.parseHash(); break;

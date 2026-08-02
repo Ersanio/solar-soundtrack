@@ -28,9 +28,10 @@ jobs:
 
       - run: npm run lint
 
-      # typecheck plus the seven byte-level harnesses: the compiler self-test,
-      # SPC assembly, the headless MML -> SPC -> PCM audio chain, the worklet,
-      # the chart helpers and BRR/bank decoding.
+      # Formatting, both typechecks (app and the CLI harnesses) and the ten
+      # byte-level harnesses: the compiler self-test, SPC assembly, the headless
+      # MML -> SPC -> PCM audio chain, the worklet, the chart helpers, BRR/bank
+      # decoding, the MML scanner, the echo FIR, the instrument tables and ADSR.
       - run: npm run check
 
   deploy:

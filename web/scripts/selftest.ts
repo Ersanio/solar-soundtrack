@@ -63,6 +63,10 @@ console.log("\nminimal song, no intro, loops");
 		//   [6]  channel 0 phrase ptr = 0 + 22 = 22  -> 0x3E16
 		//   [8..20] unused channels                  -> 0x0000
 		const header = result.data.slice(0, 22);
+		// The pairing is the documentation here — each line is one little-endian
+		// word and the comment names it. Prettier puts one byte per line, which
+		// separates every word from its own annotation.
+		// prettier-ignore
 		expectBytes(
 			"header",
 			header,

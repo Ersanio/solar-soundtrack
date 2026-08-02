@@ -12,6 +12,15 @@ trim_trailing_whitespace = true
 quote_type = single
 ij_typescript_use_double_quotes = false
 
+# The framework-free layers keep the pre-Angular prototype's tabs and double
+# quotes, so the port can still be diffed against AddmusicK's C++ sources. This
+# mirrors the matching override in .prettierrc — change both or neither.
+[{src/compiler,src/spc,src/core,scripts}/**.ts]
+indent_style = tab
+quote_type = double
+ij_typescript_use_double_quotes = true
+max_line_length = 120
+
 [*.md]
 max_line_length = off
 trim_trailing_whitespace = false
