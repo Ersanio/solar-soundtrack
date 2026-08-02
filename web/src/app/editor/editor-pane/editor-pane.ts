@@ -66,9 +66,18 @@ export class EditorPane {
       const element = this.area()?.nativeElement;
       if (!element) return;
 
-      element.focus();
-      element.setSelectionRange(span.start, Math.max(span.end, span.start + 1));
-      this.store.caret.set(span.start);
+      untracked(() => {
+        // Consumed on the spot, for the same reason `replace` below is: this
+        // effect also depends on `area()` and `tab()`, so a later tab switch
+        // re-runs it. Left set, revealing a diagnostic and then flipping to
+        // Samples and back would re-select that span and pull the caret out of
+        // wherever the author had since put it.
+        this.store.reveal.set(null);
+
+        element.focus();
+        element.setSelectionRange(span.start, Math.max(span.end, span.start + 1));
+        this.store.caret.set(span.start);
+      });
     });
 
     // Sanctioned effect: the same imperative-DOM job as `reveal` above, for a

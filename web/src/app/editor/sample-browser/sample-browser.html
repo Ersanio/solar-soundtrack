@@ -40,18 +40,19 @@
 }
 
 <ul class="divide-edge min-h-0 flex-1 divide-y overflow-auto">
-  @for (file of library.files(); track file.name) {
+  @for (row of rows(); track row.file.name) {
+    @let file = row.file;
     <li class="hover:bg-raised px-3 py-2">
       <div class="flex items-center gap-3">
         @if (file.kind === 'bank') {
           <button
             type="button"
             class="text-ink-muted hover:text-ink w-6 shrink-0 cursor-pointer text-right font-mono text-xs"
-            [attr.aria-expanded]="isOpen(file.name)"
-            [attr.aria-label]="(isOpen(file.name) ? 'Collapse ' : 'Expand ') + file.name"
+            [attr.aria-expanded]="row.expanded"
+            [attr.aria-label]="(row.expanded ? 'Collapse ' : 'Expand ') + file.name"
             (click)="toggleOpen(file.name)"
           >
-            {{ isOpen(file.name) ? '▾' : '▸' }}
+            {{ row.expanded ? '▾' : '▸' }}
           </button>
         } @else {
           <span class="text-ink-muted w-6 shrink-0 text-right font-mono text-xs tabular-nums">{{
@@ -88,7 +89,7 @@
                 >{{ file.source === 'override' ? 'replaced' : 'added' }}</span
               >
             }
-            @if (file.kind === 'sample' && isUsed(file.name)) {
+            @if (file.kind === 'sample' && row.used) {
               <span
                 class="bg-good/20 text-good shrink-0 rounded px-1 py-px text-[10px] font-semibold tracking-wide uppercase"
                 title="This song plays this sample, so it is always loaded."
@@ -96,17 +97,17 @@
               >
             }
             <span class="text-ink-muted ml-auto shrink-0 font-mono text-xs tabular-nums">{{
-              sizeLabel(file)
+              row.size
             }}</span>
           </div>
 
           @if (file.error) {
             <p class="text-danger mt-0.5 text-xs leading-relaxed">{{ file.error }}</p>
           } @else if (file.kind === 'bank') {
-            <p class="text-ink-muted mt-0.5 font-mono text-xs">{{ bankLabel(file) }}</p>
-          } @else if (!isRequested(file.name)) {
+            <p class="text-ink-muted mt-0.5 font-mono text-xs">{{ row.bank }}</p>
+          } @else if (!row.requested) {
             <p class="text-ink-muted mt-0.5 font-mono text-xs">
-              {{ detailLabel(file) }} · not in this song
+              {{ row.detail }} · not in this song
             </p>
           } @else {
             <svg
@@ -117,15 +118,15 @@
               focusable="false"
             >
               <g transform="translate(0,1)">
-                <path fill="currentColor" [attr.d]="waveform(file)" />
+                <path fill="currentColor" [attr.d]="row.waveform" />
               </g>
             </svg>
-            <p class="text-ink-muted mt-0.5 font-mono text-xs">{{ detailLabel(file) }}</p>
+            <p class="text-ink-muted mt-0.5 font-mono text-xs">{{ row.detail }}</p>
           }
         </div>
 
         @if (file.kind === 'sample' && file.error === null) {
-          @if (isRequested(file.name)) {
+          @if (row.requested) {
             <!-- Offered even when the sample is used, so the control does not
                  appear and vanish as the MML is edited. -->
             <amk-checkbox
@@ -150,15 +151,16 @@
         }
       </div>
 
-      @if (file.kind === 'bank' && file.error === null && isOpen(file.name)) {
+      @if (row.open) {
         <ul class="border-edge divide-edge mt-2 ml-6 divide-y border-l pl-3">
-          @for (slot of slots(file.name); track slot.name) {
+          @for (slotRow of row.slots; track slotRow.slot.name) {
+            @let slot = slotRow.slot;
             <li class="flex items-center gap-3 py-1.5">
               <span class="text-ink-muted w-6 shrink-0 text-right font-mono text-xs tabular-nums">
                 {{ slot.index | hex2 }}
               </span>
 
-              @if (isUsed(slot.name)) {
+              @if (slotRow.used) {
                 <span
                   class="bg-good/20 text-good shrink-0 rounded px-1 py-px text-[10px] font-semibold tracking-wide uppercase"
                   title="This song plays this slot, so it is always loaded."
@@ -190,18 +192,18 @@
                     focusable="false"
                   >
                     <g transform="translate(0,1)">
-                      <path fill="currentColor" [attr.d]="waveform(slot)" />
+                      <path fill="currentColor" [attr.d]="slotRow.waveform" />
                     </g>
                   </svg>
-                  <p class="text-ink-muted mt-0.5 font-mono text-xs">{{ detailLabel(slot) }}</p>
+                  <p class="text-ink-muted mt-0.5 font-mono text-xs">{{ slotRow.detail }}</p>
                 }
               </div>
 
               <span class="text-ink-muted shrink-0 font-mono text-xs tabular-nums">{{
-                slotSizeLabel(slot)
+                slotRow.size
               }}</span>
 
-              @if (isRequested(slot.name)) {
+              @if (slotRow.requested) {
                 <amk-checkbox
                   class="shrink-0 text-xs"
                   [checked]="slot.important"

@@ -1,4 +1,13 @@
-import { Component, computed, effect, inject, input, signal, untracked } from '@angular/core';
+import {
+  Component,
+  computed,
+  effect,
+  inject,
+  input,
+  linkedSignal,
+  signal,
+  untracked,
+} from '@angular/core';
 
 import type { Command } from '@compiler/tokens';
 import {
@@ -22,6 +31,12 @@ import { FirGraph } from '../fir-graph/fir-graph';
 import { Hex2Pipe } from '../../../util/hex.pipe';
 
 type Mode = 'presets' | 'draw';
+
+/** Which `$F5` the echo was last judged on, and what the verdict was. */
+interface Reading {
+  start: number;
+  runaway: boolean;
+}
 
 /**
  * How close two drawn points have to be to count as the same one — about 3% of
@@ -111,15 +126,26 @@ export class FirDesigner {
   private readonly runaway = computed(() => this.stability().runaway);
 
   /**
-   * The `$F5` the last reading was taken on, and what it said.
+   * The current reading, and whether it is one an edit just produced.
    *
-   * Moving the caret between two `$F5` commands reuses this component with a new
-   * input rather than building a new one, so the span is what tells arriving at
-   * a filter apart from editing one. `-1` is no reading yet: a span offset is
-   * never negative, so the first pass can never look like a continuation.
+   * `became` is the whole question: an edit to *this* `$F5` that turned a sane
+   * filter into a runaway one. Moving the caret between two `$F5` commands
+   * reuses this component with a new input rather than building a new one, so
+   * the span is what tells arriving at a filter apart from editing it, and the
+   * previous reading is what tells a new warning from a standing one.
+   *
+   * A `linkedSignal` rather than fields mutated inside the effect: the previous
+   * value then lives in the signal graph, where it is derived in one place and
+   * readable, instead of in instance state whose answer depends on how many
+   * times the effect happened to have run.
    */
-  private lastStart = -1;
-  private lastRunaway = false;
+  private readonly reading = linkedSignal<Reading, Reading & { became: boolean }>({
+    source: () => ({ start: this.command().span.start, runaway: this.runaway() }),
+    computation: (next, previous) => ({
+      ...next,
+      became: next.runaway && previous?.value.start === next.start && !previous.value.runaway,
+    }),
+  });
 
   constructor() {
     // The song stops the moment an edit makes the echo run away, so the warning
@@ -128,17 +154,7 @@ export class FirDesigner {
     // a filter that is already bad is not an edit, and pressing play again with
     // the warning still up is a decision the user is entitled to make.
     effect(() => {
-      const start = this.command().span.start;
-      const runaway = this.runaway();
-      const sameCommand = this.lastStart === start;
-      const wasRunaway = this.lastRunaway;
-      this.lastStart = start;
-      this.lastRunaway = runaway;
-
-      // In order: nothing is wrong, the caret arrived on another `$F5` (or on
-      // this one) rather than editing it, and an unchanged warning is not a new
-      // one.
-      if (!runaway || !sameCommand || wasRunaway) return;
+      if (!this.reading().became) return;
 
       untracked(() => {
         // A paused song is not audible, and resuming one is as deliberate an act

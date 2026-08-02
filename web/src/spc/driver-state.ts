@@ -144,22 +144,6 @@ export function sawTick(previous: number, current: number): number {
 export const TICK_POLL_HZ = 1000;
 
 /**
- * Where the song's main loop begins, per voice, in APU RAM.
- *
- * The song header opens with its phrase list: word 0 points at the pointer table
- * the song starts from, and a song with an intro carries a second table 16 bytes
- * later that the loop returns to instead (`link.ts` `buildHeader`, which writes
- * the loop target as `aramAddress + 2` exactly when there is an intro). Each
- * table is eight 16-bit voice pointers, `0` for a voice the song does not use.
- */
-export function readLoopStarts(aram: Uint8Array, songAddress: number): number[] {
-	const first = word(aram, songAddress);
-	const hasIntro = word(aram, songAddress + 2) === first + 16;
-	const table = hasIntro ? word(aram, songAddress + 2) : first;
-	return Array.from({ length: VOICES }, (_, voice) => word(aram, table + voice * 2));
-}
-
-/**
  * What {@link applyChannelMutes} has to remember between calls.
  *
  * Muting takes a channel's volume away from it, so the value has to be kept

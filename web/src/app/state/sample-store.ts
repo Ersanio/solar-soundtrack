@@ -28,6 +28,9 @@ interface StoredSettings {
   important?: Record<string, boolean>;
 }
 
+/** A slot as decoded from the bank's bytes, before importance is layered on. */
+type DecodedSlot = Omit<SampleSlot, 'important'>;
+
 /** One slot of a `.bnk` bank, as the browser shows it. */
 export interface SampleSlot {
   /** Position in the bank, which is also its SRCN once the bank is loaded. */
@@ -161,8 +164,13 @@ export class SampleStore {
   /**
    * Every file in the library, sorted with the bundled set first in its own
    * order and user uploads after, alphabetically.
+   *
+   * Everything here is derived from bytes, and every entry costs a `decodeBrr`
+   * plus a `peaks` pass. Importance is layered on by {@link files} instead of
+   * being read in here, because it is a checkbox: folding it in would make one
+   * tick re-decode the whole library.
    */
-  readonly files = computed<SampleFile[]>(() => {
+  private readonly described = computed<SampleFile[]>(() => {
     const stock = this.stock();
     const overrides = this.overrides();
     const stockNames = new Set(stock.map((sample) => sample.sampleName));
@@ -184,6 +192,19 @@ export class SampleStore {
     return out;
   });
 
+  /** {@link described}, with each row's current importance. */
+  readonly files = computed<SampleFile[]>(() =>
+    this.described().map((file) => ({
+      ...file,
+      // A bank has no importance of its own; each slot carries one, so the row
+      // reports whether *any* slot is pinned rather than inventing an answer.
+      important:
+        file.kind === 'bank'
+          ? this.decodedSlots(file.name).some((slot) => this.isImportant(slot.name))
+          : this.isImportant(file.name),
+    })),
+  );
+
   /** Filenames that are safe to reference from MML, in library order. */
   readonly names = computed(() =>
     this.files()
@@ -198,7 +219,7 @@ export class SampleStore {
       // A `.brr` file is its 2-byte loop header plus block data; a bank's slots
       // are already header-free, so only their data counts.
       if (file.kind === 'sample') return sum + file.bytes.length - 2;
-      return sum + this.bankSlots(file.name).reduce((bank, slot) => bank + slot.bytes, 0);
+      return sum + this.decodedSlots(file.name).reduce((bank, slot) => bank + slot.bytes, 0);
     }, 0),
   );
 
@@ -397,42 +418,41 @@ export class SampleStore {
     const error = validateSampleBank(bytes);
     if (error) return { ...blank(name, bytes, source), kind: 'bank', error };
 
-    const slots = this.bankSlots(name);
+    const slots = this.decodedSlots(name);
     return {
       ...blank(name, bytes, source),
       kind: 'bank',
       error: null,
-      // A bank has no importance of its own; each slot carries one, so the row
-      // reports whether *any* slot is pinned rather than inventing an answer.
-      important: slots.some((slot) => slot.important),
       slotCount: slots.length,
       usedSlots: slots.filter((slot) => !slot.empty).length,
     };
   }
 
   /**
-   * The slots of an uploaded bank, waveforms included.
+   * The decoded slots of an uploaded bank, keyed by the bank's own bytes.
    *
-   * Memoised on the bank's bytes rather than recomputed with `files()`: decoding
-   * 64 waveforms is wasted work while a bank sits collapsed, which is most of
-   * the time. `important` is read live, so ticking a slot does not rebuild this.
+   * The cache covers the decode, not just the parse. A bank holds up to 64
+   * samples, and `decodeBrr` plus `peaks` on all of them is far too much to
+   * repeat: `bankSlots` is called once per rendered row, so without this the
+   * whole bank is decoded again on every pass — and during playback the
+   * transport pushes a new position ten times a second.
+   *
+   * Importance is deliberately not in here. It is a boolean the user toggles,
+   * and folding it in would make one checkbox invalidate every waveform.
    */
   private readonly slotCache = new Map<
     string,
-    { bytes: Uint8Array; slots: readonly BrrSample[] }
+    { bytes: Uint8Array; rows: readonly DecodedSlot[] }
   >();
 
-  bankSlots(name: string): SampleSlot[] {
+  private decodedSlots(name: string): readonly DecodedSlot[] {
     const bytes = this.overrides().get(name);
     if (!bytes || validateSampleBank(bytes) !== null) return [];
 
-    let cached = this.slotCache.get(name);
-    if (cached?.bytes !== bytes) {
-      cached = { bytes, slots: parseSampleBank(bytes, (index) => bankSlotName(name, index)) };
-      this.slotCache.set(name, cached);
-    }
+    const cached = this.slotCache.get(name);
+    if (cached?.bytes === bytes) return cached.rows;
 
-    return cached.slots.map((slot, index) => {
+    const rows = parseSampleBank(bytes, (index) => bankSlotName(name, index)).map((slot, index) => {
       const pcm = decodeBrr(slot);
       return {
         index,
@@ -443,9 +463,19 @@ export class SampleStore {
         loopOffset: slot.loopOffset,
         frames: pcm.length,
         envelope: peaks(pcm, WAVEFORM_BUCKETS),
-        important: this.isImportant(slot.sampleName),
       };
     });
+
+    this.slotCache.set(name, { bytes, rows });
+    return rows;
+  }
+
+  /** The slots of an uploaded bank, waveforms included, importance layered on. */
+  bankSlots(name: string): SampleSlot[] {
+    return this.decodedSlots(name).map((row) => ({
+      ...row,
+      important: this.isImportant(row.name),
+    }));
   }
 
   private describeParsed(
@@ -459,7 +489,6 @@ export class SampleStore {
       ...blank(name, bytes, source),
       kind: 'sample',
       error: null,
-      important: this.isImportant(name),
       blocks: blockCount(sample),
       loopOffset: sample.loopOffset,
       frames: pcm.length,
