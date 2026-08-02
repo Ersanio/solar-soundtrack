@@ -28,8 +28,10 @@ All from `web/`. Node 24 is what CI uses.
 | `npm run build` | Production build into `dist/`. |
 | `npm run watch` | Dev-configuration build with `--watch`, no server. |
 | `npm run typecheck` | `tsc -p tsconfig.app.json --noEmit`. |
+| `npm run typecheck:scripts` | The same for `scripts/`, which the app tsconfig does not cover. |
 | `npm run lint` | `ng lint` over `src/**` and `scripts/**`. |
-| `npm run check` | The merge gate: typecheck plus all ten byte-level harnesses. |
+| `npm run format` | Prettier over the workspace. |
+| `npm run check` | The merge gate: formatting, both typechecks, all ten byte-level harnesses. |
 
 CI runs `npm run lint` then `npm run check`.
 
@@ -218,9 +220,38 @@ stays safe to overwrite.
 
 ### Formatting
 
-Two conventions coexist, split by layer. `app/` follows Prettier (`.prettierrc`: 2 spaces, single
-quotes, width 100). `compiler/`, `spc/` and `scripts/` use tabs and double quotes, carried over
-from the pre-Angular prototype. Match the file you are editing.
+Prettier owns the whole workspace, in two profiles split by layer — `app/` at 2 spaces, single
+quotes, width 100; `compiler/`, `spc/`, `core/` and `scripts/` at tabs, double quotes, width 120,
+carried over from the pre-Angular prototype. Both are in `.prettierrc`, with matching
+`.editorconfig` sections so editors agree; **change both or neither**. Never hand-format — run
+`npm run format`, and `npm run check` fails on anything Prettier would rewrite.
+
+`endOfLine` is `"auto"` because the working tree is CRLF. Prettier's `"lf"` default makes every
+file fail `--check` for reasons that have nothing to do with formatting.
+
+Two regions carry `// prettier-ignore`, both because reflow destroys information rather than
+because someone preferred the old layout: the MML command dispatch in `parser.ts`, which is a
+lookup table one line per case, and the one hand-annotated byte table in `selftest.ts`, where each
+line is a little-endian word with its own comment. Add a marker only for that kind of reason, and
+say what it is.
+
+The reformat that first ran Prettier over the tree is listed in `.git-blame-ignore-revs`. Enable it
+with `git config blame.ignoreRevsFile .git-blame-ignore-revs` so `git blame` on the ported compiler
+keeps pointing at the port.
+
+### Linting
+
+`eslint.config.js` is where the conventions above stop being prose. Rules that exist to hold a
+property the codebase already has (`prefer-signals`, `prefer-service-decorator`, `inject-at-top`,
+`consistent-type-imports`, and the template rules) are set to `error`, and `ng lint` runs with
+`maxWarnings: 0` — a `warn` would never fail CI, so there is no point setting one.
+
+Four rules are deliberately **off**, each with its reasoning inline in the config. Read that before
+switching one on: `no-unnecessary-condition` and `template/no-duplicate-attributes` and
+`template/button-has-type` report only false positives here, and `template/no-call-expression`
+cannot tell a signal read from a method call, so it flags 178 correct lines. The bug that last rule
+would catch is kept out structurally instead — panels build a `computed` of view models rather than
+calling a method per row (`sample-browser.ts`, `aram-budget.ts`, `stats-grid.ts`).
 
 ## Deployment
 
