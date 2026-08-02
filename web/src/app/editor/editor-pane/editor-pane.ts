@@ -56,7 +56,9 @@ export class EditorPane {
     // which populates the view child, which re-runs this and does the focus.
     effect(() => {
       const span = this.store.reveal();
-      if (!span) return;
+      if (!span) {
+        return;
+      }
 
       if (this.tab() !== 'source') {
         this.tab.set('source');
@@ -64,7 +66,9 @@ export class EditorPane {
       }
 
       const element = this.area()?.nativeElement;
-      if (!element) return;
+      if (!element) {
+        return;
+      }
 
       untracked(() => {
         // Consumed on the spot, for the same reason `replace` below is: this
@@ -89,10 +93,14 @@ export class EditorPane {
     // and solves it the same way.
     effect(() => {
       const edit = this.store.replace();
-      if (!edit) return;
+      if (!edit) {
+        return;
+      }
 
       const element = this.area()?.nativeElement;
-      if (!element) return;
+      if (!element) {
+        return;
+      }
 
       untracked(() => {
         // Consumed on the spot. A splice describes one moment in one document,
@@ -135,7 +143,10 @@ export class EditorPane {
       return;
     }
 
-    if (event.key !== 'Tab' || event.shiftKey) return;
+    if (event.key !== 'Tab' || event.shiftKey) {
+      return;
+    }
+
     event.preventDefault();
 
     const element = event.target as HTMLTextAreaElement;

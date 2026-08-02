@@ -95,14 +95,19 @@ export function computeSpcLayout(
 	// The sample directory must start on a page boundary — the DSP's DIR register
 	// only stores the high byte.
 	let sampleTablePos = songEnd;
-	if ((sampleTablePos & 0xff) !== 0) sampleTablePos = (sampleTablePos & 0xff00) + 0x100;
+	if ((sampleTablePos & 0xff) !== 0) {
+		sampleTablePos = (sampleTablePos & 0xff00) + 0x100;
+	}
 
 	const sampleTableEnd = sampleTablePos + samples.length * 4;
 
 	let sampleDataEnd = sampleTableEnd;
 	const seen = new Set<BrrSample>();
 	for (const sample of samples) {
-		if (seen.has(sample)) continue;
+		if (seen.has(sample)) {
+			continue;
+		}
+
 		seen.add(sample);
 		sampleDataEnd += sample.data.length;
 	}

@@ -162,7 +162,10 @@ function decode(bytes: readonly number[], at: number, size: number): InstrumentE
 
 function decodeAll(bytes: readonly number[], count: number, size: number): InstrumentEntry[] {
 	const out: InstrumentEntry[] = [];
-	for (let i = 0; i < count; i++) out.push(decode(bytes, i * size, size));
+	for (let i = 0; i < count; i++) {
+		out.push(decode(bytes, i * size, size));
+	}
+
 	return out;
 }
 
@@ -181,17 +184,26 @@ export function findInstrumentTables(program: Uint8Array): number[] {
 	for (let at = 0; at + melodicBytes + percussionBytes <= program.length; at++) {
 		let ok = true;
 		for (let i = 0; ok && i < MELODIC_SRCN.length; i++) {
-			if (program[at + i * INSTRUMENT_ENTRY_BYTES] !== MELODIC_SRCN[i]) ok = false;
+			if (program[at + i * INSTRUMENT_ENTRY_BYTES] !== MELODIC_SRCN[i]) {
+				ok = false;
+			}
 		}
+
 		// The percussion column is an independent confirmation: it pins the
 		// stride-7 table immediately after, which is what makes a coincidental
 		// stride-6 run in unrelated code fail rather than be adopted.
 		for (let i = 0; ok && i < PERCUSSION_SRCN.length; i++) {
 			const perc = at + melodicBytes + i * PERCUSSION_ENTRY_BYTES;
-			if (program[perc] !== PERCUSSION_SRCN[i]) ok = false;
+			if (program[perc] !== PERCUSSION_SRCN[i]) {
+				ok = false;
+			}
 		}
-		if (ok) hits.push(at);
+
+		if (ok) {
+			hits.push(at);
+		}
 	}
+
 	return hits;
 }
 
@@ -214,7 +226,9 @@ export function bundledInstrumentTables(): InstrumentTables {
  */
 export function readInstrumentTables(program: Uint8Array, programPos: number): InstrumentTables {
 	const hits = findInstrumentTables(program);
-	if (hits.length !== 1) return bundledInstrumentTables();
+	if (hits.length !== 1) {
+		return bundledInstrumentTables();
+	}
 
 	const at = hits[0];
 	const melodic = Array.from(program.subarray(at, at + MELODIC_SLOTS * INSTRUMENT_ENTRY_BYTES));

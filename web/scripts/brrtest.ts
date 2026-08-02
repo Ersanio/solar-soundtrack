@@ -54,6 +54,7 @@ function block(shift: number, filter: number, nibbles: number[], flags = 0): Uin
 	for (let index = 0; index < BRR_BLOCK_SAMPLES; index += 2) {
 		raw[3 + (index >> 1)] = ((nibbles[index] & 0x0f) << 4) | (nibbles[index + 1] & 0x0f);
 	}
+
 	return raw;
 }
 
@@ -87,6 +88,7 @@ function bankFixture(slots: Record<number, Uint8Array>, loops: Record<number, nu
 		image.set(data, at);
 		at += data.length;
 	}
+
 	return raw;
 }
 
@@ -145,6 +147,7 @@ console.log("\nfilter 0 decodes to a closed form");
 				break;
 			}
 		}
+
 		check(`shift ${shift} matches (nibble << shift) >> 1, doubled`, ok, detail);
 	}
 }
@@ -190,9 +193,11 @@ console.log("\nfilters 1-3 match their published coefficients");
 				worst = delta;
 				at = index;
 			}
+
 			p2 = p1;
 			p1 = pcm[index];
 		}
+
 		check(
 			`filter ${filter} tracks ${filter === 1 ? "15/16" : filter === 2 ? "61/32, -15/16" : "115/64, -13/16"} within ${TOLERANCE}`,
 			worst <= TOLERANCE,
@@ -231,7 +236,9 @@ console.log("\nit matches snes_spc's decode_brr exactly");
 
 				const shift = header >> 4;
 				s = (s << shift) >> 1;
-				if (shift >= 0xd) s = (s >> 25) << 11;
+				if (shift >= 0xd) {
+					s = (s >> 25) << 11;
+				}
 
 				const filter = header & 0x0c;
 				const p1 = prev1;
@@ -252,8 +259,12 @@ console.log("\nit matches snes_spc's decode_brr exactly");
 				}
 
 				// CLAMP16 then (int16_t)(s * 2)
-				if (s > 0x7fff) s = 0x7fff;
-				else if (s < -0x8000) s = -0x8000;
+				if (s > 0x7fff) {
+					s = 0x7fff;
+				} else if (s < -0x8000) {
+					s = -0x8000;
+				}
+
 				const value = ((s * 2) << 16) >> 16;
 
 				prev2 = prev1;
@@ -261,6 +272,7 @@ console.log("\nit matches snes_spc's decode_brr exactly");
 				out[at++] = value;
 			}
 		}
+
 		return out;
 	};
 
@@ -280,8 +292,11 @@ console.log("\nit matches snes_spc's decode_brr exactly");
 			const at = 2 + b * BRR_BLOCK_BYTES;
 			// Every shift 0-15 and every filter 0-3 gets exercised across trials.
 			raw[at] = (((trial + b) % 16) << 4) | (((trial + b) % 4) << 2);
-			for (let k = 1; k < BRR_BLOCK_BYTES; k++) raw[at + k] = next() & 0xff;
+			for (let k = 1; k < BRR_BLOCK_BYTES; k++) {
+				raw[at + k] = next() & 0xff;
+			}
 		}
+
 		const mine = decodeBrr(parseBrr("t.brr", raw));
 		const theirs = reference(raw.subarray(2));
 		for (let i = 0; i < mine.length; i++) {
@@ -292,6 +307,7 @@ console.log("\nit matches snes_spc's decode_brr exactly");
 			}
 		}
 	}
+
 	check("400 randomised multi-block samples decode identically", mismatches === 0, detail);
 
 	// Several of the reference's shift forms are only equivalent to the ratios
@@ -303,12 +319,18 @@ console.log("\nit matches snes_spc's decode_brr exactly");
 		for (let filter = 0; filter < 4 && allEven; filter++) {
 			const raw = new Uint8Array(2 + BRR_BLOCK_BYTES);
 			raw[2] = (shift << 4) | (filter << 2);
-			for (let k = 1; k < BRR_BLOCK_BYTES; k++) raw[2 + k] = next() & 0xff;
+			for (let k = 1; k < BRR_BLOCK_BYTES; k++) {
+				raw[2 + k] = next() & 0xff;
+			}
+
 			for (const value of decodeBrr(parseBrr("t.brr", raw))) {
-				if (value % 2 !== 0) allEven = false;
+				if (value % 2 !== 0) {
+					allEven = false;
+				}
 			}
 		}
 	}
+
 	check("every decoded sample is even, as the filter forms assume", allEven);
 }
 
@@ -331,16 +353,24 @@ console.log("\nthe twenty bundled samples decode");
 			quiet = `${name}: ${validateBrr(raw)}`;
 			break;
 		}
+
 		const sample = parseBrr(name, raw);
 		const pcm = decodeBrr(sample);
-		if (pcm.length !== blockCount(sample) * BRR_BLOCK_SAMPLES) allSized = false;
+		if (pcm.length !== blockCount(sample) * BRR_BLOCK_SAMPLES) {
+			allSized = false;
+		}
+
 		let peak = 0;
-		for (const value of pcm) peak = Math.max(peak, Math.abs(value));
+		for (const value of pcm) {
+			peak = Math.max(peak, Math.abs(value));
+		}
+
 		if (peak === 0) {
 			allAudible = false;
 			quiet = name;
 		}
 	}
+
 	check("every bundled sample passes validation", allValid, quiet);
 	check("decoded length is blocks x 16 for all of them", allSized);
 	check("none of them decode to pure silence", allAudible, quiet);
@@ -359,16 +389,27 @@ console.log("\npeaks reduces without lying");
 	for (let bucket = 0; bucket < 8; bucket++) {
 		const min = envelope[bucket * 2];
 		const max = envelope[bucket * 2 + 1];
-		if (min < -1 || max > 1) inRange = false;
-		if (min > max) ordered = false;
+		if (min < -1 || max > 1) {
+			inRange = false;
+		}
+
+		if (min > max) {
+			ordered = false;
+		}
 	}
+
 	check("every value is within -1..1", inRange);
 	check("min never exceeds max", ordered);
 
 	// More buckets than samples must still draw something.
 	const wide = peaks(pcm, 64);
 	let anyNonZero = false;
-	for (const value of wide) if (value !== 0) anyNonZero = true;
+	for (const value of wide) {
+		if (value !== 0) {
+			anyNonZero = true;
+		}
+	}
+
 	check("more buckets than samples still produces signal", anyNonZero);
 
 	check(

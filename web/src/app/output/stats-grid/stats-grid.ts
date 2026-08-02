@@ -21,7 +21,9 @@ export class StatsGrid {
   protected readonly cells = computed<Cell[]>(() => {
     const stats = this.store.result()?.stats;
     const base = this.store.aramAddress();
-    if (!stats || base === null) return [];
+    if (!stats || base === null) {
+      return [];
+    }
 
     const echoBytes = stats.echoBufferSize << 11;
     const end = base + stats.totalSize;
@@ -70,7 +72,10 @@ export class StatsGrid {
     // said nothing, and the grid reflows as channels come into use.
     for (let channel = 0; channel < 8; channel++) {
       const size = stats.channelSizes[channel] ?? 0;
-      if (size === 0) continue;
+      if (size === 0) {
+        continue;
+      }
+
       const ticks = stats.channelTicks[channel] ?? 0;
       cells.push({
         label: `Channel ${channel}`,

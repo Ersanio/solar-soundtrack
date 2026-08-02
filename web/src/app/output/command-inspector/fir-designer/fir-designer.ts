@@ -105,12 +105,21 @@ export class FirDesigner {
     const self = this.command();
     let found = 0;
     for (const command of this.store.tokens().commands) {
-      if (command.span.start >= self.span.start) break;
+      if (command.span.start >= self.span.start) {
+        break;
+      }
+
       // Same channel only: source order is execution order within a channel,
       // and means nothing between them.
-      if (command.channel !== self.channel) continue;
-      if (command.vcmd === 0xf1 && command.args.length >= 2) found = command.args[1].value;
+      if (command.channel !== self.channel) {
+        continue;
+      }
+
+      if (command.vcmd === 0xf1 && command.args.length >= 2) {
+        found = command.args[1].value;
+      }
     }
+
     return found;
   });
 
@@ -154,12 +163,17 @@ export class FirDesigner {
     // a filter that is already bad is not an edit, and pressing play again with
     // the warning still up is a decision the user is entitled to make.
     effect(() => {
-      if (!this.reading().became) return;
+      if (!this.reading().became) {
+        return;
+      }
 
       untracked(() => {
         // A paused song is not audible, and resuming one is as deliberate an act
         // as pressing play.
-        if (!this.playback.isPlaying()) return;
+        if (!this.playback.isPlaying()) {
+          return;
+        }
+
         this.playback.stop();
         this.store.fail(
           'playback automatically stopped to protect your ears and speakers due to a runaway FIR filter',
@@ -175,7 +189,10 @@ export class FirDesigner {
    */
   protected readonly overriddenBy = computed(() => {
     const later = firOverriddenBy(this.command(), this.store.tokens().commands);
-    if (!later) return null;
+    if (!later) {
+      return null;
+    }
+
     return {
       line: later.span.line,
       filter: builtInFilterName(later.args[2]?.value ?? 0),
@@ -188,7 +205,10 @@ export class FirDesigner {
 
   protected readonly cornerLabel = computed(() => {
     const corner = this.description().cornerHz;
-    if (corner === null) return '—';
+    if (corner === null) {
+      return '—';
+    }
+
     return corner >= 1000 ? `${(corner / 1000).toFixed(1)} kHz` : `${Math.round(corner)} Hz`;
   });
 
@@ -205,7 +225,10 @@ export class FirDesigner {
 
   protected setTap(index: number, value: string): void {
     const parsed = Number.parseInt(value, 10);
-    if (Number.isNaN(parsed)) return;
+    if (Number.isNaN(parsed)) {
+      return;
+    }
+
     const next = [...this.taps()];
     next[index] = clampTap(parsed);
     this.commit(next);
@@ -222,7 +245,10 @@ export class FirDesigner {
   }
 
   protected fit(): void {
-    if (this.target().length < 2) return;
+    if (this.target().length < 2) {
+      return;
+    }
+
     this.commit(fitToTarget(this.target()));
   }
 
@@ -242,7 +268,10 @@ export class FirDesigner {
 
   /** Writes the eight bytes back over the `$F5` run they came from. */
   private commit(taps: number[]): void {
-    if (this.readOnly()) return;
+    if (this.readOnly()) {
+      return;
+    }
+
     const text = `$F5 ${taps.map((tap) => `$${toHexByte(tap)}`).join(' ')}`;
     this.store.replace.set({ span: { ...this.command().span }, text });
   }

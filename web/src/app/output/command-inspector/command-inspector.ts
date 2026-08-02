@@ -86,7 +86,10 @@ export class CommandInspector {
    */
   private readonly defining = computed(() => {
     const command = this.command();
-    if (!command) return false;
+    if (!command) {
+      return false;
+    }
+
     const at = command.span.start;
     return this.store.tokens().instruments.some((d) => at >= d.span.start && at < d.span.end);
   });
@@ -94,16 +97,28 @@ export class CommandInspector {
   /** Which view to render; `null` leaves the generic readout standing. */
   protected readonly view = computed(() => {
     const command = this.command();
-    if (!command) return null;
-    if (this.defining()) return 'instrument';
-    if (command.vcmd !== undefined) return VIEWS[command.vcmd] ?? null;
+    if (!command) {
+      return null;
+    }
+
+    if (this.defining()) {
+      return 'instrument';
+    }
+
+    if (command.vcmd !== undefined) {
+      return VIEWS[command.vcmd] ?? null;
+    }
+
     return LETTER_VIEWS[command.kind.toLowerCase()] ?? null;
   });
 
   /** `$F5` and the like; a letter command has no VCMD byte. */
   protected readonly label = computed(() => {
     const command = this.command();
-    if (!command) return '';
+    if (!command) {
+      return '';
+    }
+
     return command.vcmd === undefined ? command.kind : `$${hex2(command.vcmd)}`;
   });
 
@@ -119,7 +134,10 @@ export class CommandInspector {
   /** Shown in the summary row, so the section reads without being opened. */
   protected readonly summary = computed(() => {
     const command = this.command();
-    if (!command) return 'nothing at the caret';
+    if (!command) {
+      return 'nothing at the caret';
+    }
+
     const via = this.replacement();
     return `${this.label()} ${command.name}${via ? ` via ${via}` : ''}`;
   });

@@ -70,6 +70,7 @@ export class EchoInspector {
           },
         ];
       }
+
       case 0xf2:
         return [
           { label: 'Over', value: `${args[0] ?? 0} ticks` },
@@ -87,7 +88,10 @@ export class EchoInspector {
    * earlier in the song is what a later `$F1` would be overriding.
    */
   protected readonly taps = computed<FirTaps | null>(() => {
-    if (this.vcmd() !== 0xf1) return null;
+    if (this.vcmd() !== 0xf1) {
+      return null;
+    }
+
     const which = this.args()[2] ?? 0;
     // main.asm:3507 — filter 0 is SMW's low-pass, filter 1 is flat.
     const preset = FIR_PRESETS.find((p) => p.name === (which === 0 ? 'Classic' : 'Flat'));
@@ -104,7 +108,10 @@ export class EchoInspector {
    * The same fact the FIR designer reports, seen from the other end.
    */
   protected readonly overrides = computed(() => {
-    if (this.vcmd() !== 0xf1) return null;
+    if (this.vcmd() !== 0xf1) {
+      return null;
+    }
+
     const earlier = firOverriddenBefore(this.command(), this.store.tokens().commands);
     return earlier ? { line: earlier.span.line } : null;
   });
@@ -112,22 +119,42 @@ export class EchoInspector {
 
 /** Echo volumes and feedback are signed, and negative means phase-inverted. */
 function signedLabel(value: number | undefined): string {
-  if (value === undefined) return '—';
+  if (value === undefined) {
+    return '—';
+  }
+
   const signed = toSigned(value);
   return `${signed} ($${hex2(value)})`;
 }
 
 function filterName(which: number): string {
-  if (which === 0) return '0 — SMW low-pass';
-  if (which === 1) return '1 — flat';
+  if (which === 0) {
+    return '0 — SMW low-pass';
+  }
+
+  if (which === 1) {
+    return '1 — flat';
+  }
+
   return `${which} — out of range`;
 }
 
 /** `$EF`'s first argument is a bitmask, one bit per voice. */
 function channelList(mask: number): string {
   const on: number[] = [];
-  for (let voice = 0; voice < 8; voice++) if (mask & (1 << voice)) on.push(voice);
-  if (on.length === 0) return 'none';
-  if (on.length === 8) return 'all';
+  for (let voice = 0; voice < 8; voice++) {
+    if (mask & (1 << voice)) {
+      on.push(voice);
+    }
+  }
+
+  if (on.length === 0) {
+    return 'none';
+  }
+
+  if (on.length === 8) {
+    return 'all';
+  }
+
   return on.join(', ');
 }

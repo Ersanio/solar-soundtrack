@@ -23,7 +23,10 @@ export class HexDump {
   protected readonly range = computed(() => {
     const data = this.store.result()?.data;
     const base = this.store.aramAddress();
-    if (!data || base === null) return '';
+    if (!data || base === null) {
+      return '';
+    }
+
     return `0x${hex4(base)}–0x${hex4(base + data.length - 1)}`;
   });
 
@@ -31,7 +34,9 @@ export class HexDump {
     const result = this.store.result();
     const base = this.store.aramAddress();
     const data = result?.data;
-    if (!data || base === null) return [];
+    if (!data || base === null) {
+      return [];
+    }
 
     const headerSize = result?.stats?.headerSize ?? 0;
     const total = Math.min(Math.ceil(data.length / 16), MAX_ROWS);

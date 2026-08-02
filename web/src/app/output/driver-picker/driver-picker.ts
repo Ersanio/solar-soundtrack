@@ -20,7 +20,10 @@ export class DriverPicker {
   protected onFile(event: Event): void {
     const input = event.target as HTMLInputElement;
     const file = input.files?.[0];
-    if (file) void this.drivers.useCustom(file);
+    if (file) {
+      void this.drivers.useCustom(file);
+    }
+
     input.value = ''; // allow re-picking the same file
   }
 }

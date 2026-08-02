@@ -66,7 +66,9 @@ export function preprocess(source: string): PreprocessResult {
 	 */
 	const emit = (chunk: string, at: number): void => {
 		out += chunk;
-		for (let i = 0; i < chunk.length; i++) origins.push(Math.min(at + i, source.length));
+		for (let i = 0; i < chunk.length; i++) {
+			origins.push(Math.min(at + i, source.length));
+		}
 	};
 
 	const fail = (message: string, code = "AMK0400"): void => {
@@ -81,15 +83,23 @@ export function preprocess(source: string): PreprocessResult {
 				fail("Unexpected end of file found.");
 				return value;
 			}
+
 			if (endChar === " ") {
-				if (source[pos] === " " || source[pos] === "\t") break;
+				if (source[pos] === " " || source[pos] === "\t") {
+					break;
+				}
 			} else if (source[pos] === endChar) {
 				break;
 			}
-			if (breakOnNewLines && (source[pos] === "\r" || source[pos] === "\n")) break;
+
+			if (breakOnNewLines && (source[pos] === "\r" || source[pos] === "\n")) {
+				break;
+			}
+
 			value += source[pos];
 			pos++;
 		}
+
 		return value;
 	};
 
@@ -101,7 +111,10 @@ export function preprocess(source: string): PreprocessResult {
 	 */
 	const skipSpaces = (): void => {
 		while (pos < source.length && isSpace(source[pos])) {
-			if (source[pos] === "\n" || source[pos] === "\r") break;
+			if (source[pos] === "\n" || source[pos] === "\r") {
+				break;
+			}
+
 			pos++;
 		}
 	};
@@ -112,25 +125,34 @@ export function preprocess(source: string): PreprocessResult {
 			fail(`Could not parse integer for ${what}.`);
 			return 0;
 		}
+
 		return value;
 	};
 
 	while (pos < source.length) {
-		if (source[pos] === "\n") line++;
+		if (source[pos] === "\n") {
+			line++;
+		}
 
 		if (source[pos] === '"') {
 			// Replacement definitions are copied verbatim, quotes included.
 			const quoteAt = pos;
 			pos++;
 			const body = getArgument('"', false);
-			if (okayToAdd) emit(`"${body}"`, quoteAt);
+			if (okayToAdd) {
+				emit(`"${body}"`, quoteAt);
+			}
+
 			pos++;
 			continue;
 		}
 
 		if (source[pos] !== "#") {
 			// Newlines survive even inside a false branch so line numbers hold.
-			if (okayToAdd || source[pos] === "\n") emit(source[pos], pos);
+			if (okayToAdd || source[pos] === "\n") {
+				emit(source[pos], pos);
+			}
+
 			pos++;
 			continue;
 		}
@@ -140,7 +162,10 @@ export function preprocess(source: string): PreprocessResult {
 
 		// `#amk=1` predates the spaced form and is special-cased.
 		if (source.startsWith("amk=1", pos)) {
-			if (version >= 0) version = 1;
+			if (version >= 0) {
+				version = 1;
+			}
+
 			pos += 5;
 			continue;
 		}
@@ -153,52 +178,62 @@ export function preprocess(source: string): PreprocessResult {
 					level++;
 					break;
 				}
+
 				skipSpaces();
 				const name = getArgument(" ", true);
 				if (name.length === 0) {
 					fail("#define was missing its argument.");
 					break;
 				}
+
 				skipSpaces();
 				const value = getArgument(" ", true);
 				defines.set(name, value.length === 0 ? 1 : parseNumber(value, "#define"));
 				break;
 			}
+
 			case "undef": {
 				if (!okayToAdd) {
 					level++;
 					break;
 				}
+
 				skipSpaces();
 				const name = getArgument(" ", true);
 				if (name.length === 0) {
 					fail("#undef was missing its argument.");
 					break;
 				}
+
 				defines.delete(name);
 				break;
 			}
+
 			case "ifdef": {
 				if (!okayToAdd) {
 					level++;
 					break;
 				}
+
 				skipSpaces();
 				const name = getArgument(" ", true);
 				if (name.length === 0) {
 					fail("#ifdef was missing its argument.");
 					break;
 				}
+
 				okayStatus.push(okayToAdd);
 				okayToAdd = defines.has(name);
 				level++;
 				break;
 			}
+
 			case "ifndef": {
 				if (!okayToAdd) {
 					level++;
 					break;
 				}
+
 				skipSpaces();
 				const name = getArgument(" ", true);
 				okayStatus.push(okayToAdd);
@@ -206,31 +241,37 @@ export function preprocess(source: string): PreprocessResult {
 					fail("#ifndef was missing its argument.");
 					break;
 				}
+
 				okayToAdd = !defines.has(name);
 				level++;
 				break;
 			}
+
 			case "if": {
 				if (!okayToAdd) {
 					level++;
 					break;
 				}
+
 				skipSpaces();
 				const name = getArgument(" ", true);
 				if (name.length === 0) {
 					fail("#if was missing its first argument.");
 					break;
 				}
+
 				if (!defines.has(name)) {
 					fail("First argument for #if was never defined.");
 					break;
 				}
+
 				skipSpaces();
 				const operator = getArgument(" ", true);
 				if (operator.length === 0) {
 					fail("#if was missing its comparison operator.");
 					break;
 				}
+
 				skipSpaces();
 				const rhsText = getArgument(" ", true);
 				if (rhsText.length === 0) {
@@ -263,9 +304,11 @@ export function preprocess(source: string): PreprocessResult {
 					default:
 						fail("Unknown operator for #if.");
 				}
+
 				level++;
 				break;
 			}
+
 			case "endif": {
 				if (level > 0) {
 					level--;
@@ -273,8 +316,10 @@ export function preprocess(source: string): PreprocessResult {
 				} else {
 					fail("There was an #endif without a matching #ifdef, #ifndef, or #if.");
 				}
+
 				break;
 			}
+
 			case "amk": {
 				if (version >= 0) {
 					skipSpaces();
@@ -288,8 +333,10 @@ export function preprocess(source: string): PreprocessResult {
 						}
 					}
 				}
+
 				break;
 			}
+
 			case "amm":
 				version = TARGET_AMM;
 				break;
@@ -298,7 +345,9 @@ export function preprocess(source: string): PreprocessResult {
 				break;
 			default:
 				// Not a preprocessor directive — hand it to the scanner intact.
-				if (okayToAdd) emit(`#${directive}`, hashAt);
+				if (okayToAdd) {
+					emit(`#${directive}`, hashAt);
+				}
 		}
 	}
 
@@ -332,11 +381,16 @@ function stripComments(text: string, origins: number[]): { text: string; origins
 			kept.push(origins[i]);
 			continue;
 		}
-		if (character === ";") inComment = true;
+
+		if (character === ";") {
+			inComment = true;
+		}
+
 		if (!inComment) {
 			out += character;
 			kept.push(origins[i]);
 		}
 	}
+
 	return { text: out, origins: kept };
 }

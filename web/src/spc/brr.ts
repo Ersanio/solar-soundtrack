@@ -58,10 +58,14 @@ export interface BrrSample {
  * the reason rather than throw it away.
  */
 export function validateBrr(bytes: Uint8Array): string | null {
-	if (bytes.length === 0) return "The file is empty.";
+	if (bytes.length === 0) {
+		return "The file is empty.";
+	}
+
 	if (bytes.length < 2 + BRR_BLOCK_BYTES) {
 		return `Only ${bytes.length} bytes — too short to hold the 2-byte loop header and a single 9-byte block.`;
 	}
+
 	if ((bytes.length - 2) % BRR_BLOCK_BYTES !== 0) {
 		return (
 			`${bytes.length} bytes: (size - 2) must be a multiple of 9. ` +
@@ -74,9 +78,11 @@ export function validateBrr(bytes: Uint8Array): string | null {
 	if (loopOffset >= dataLength) {
 		return `The loop point (0x${loopOffset.toString(16).toUpperCase()}) is past the end of the ${dataLength}-byte sample.`;
 	}
+
 	if (loopOffset % BRR_BLOCK_BYTES !== 0) {
 		return `The loop point (${loopOffset}) is not on a 9-byte block boundary.`;
 	}
+
 	return null;
 }
 
@@ -91,10 +97,22 @@ export function validateBrr(bytes: Uint8Array): string | null {
  * sample list was fixed at build time.
  */
 export function validateName(name: string): string | null {
-	if (name.trim().length === 0) return "The name is empty.";
-	if (name.includes("#")) return `"${name}" contains a '#', which MML reads as the start of a directive.`;
-	if (name.includes(";")) return `"${name}" contains a ';', which MML reads as the start of a comment.`;
-	if (name.includes('"')) return `"${name}" contains a quote, which would terminate the name inside #samples.`;
+	if (name.trim().length === 0) {
+		return "The name is empty.";
+	}
+
+	if (name.includes("#")) {
+		return `"${name}" contains a '#', which MML reads as the start of a directive.`;
+	}
+
+	if (name.includes(";")) {
+		return `"${name}" contains a ';', which MML reads as the start of a comment.`;
+	}
+
+	if (name.includes('"')) {
+		return `"${name}" contains a quote, which would terminate the name inside #samples.`;
+	}
+
 	return null;
 }
 
@@ -116,7 +134,10 @@ export function emptySample(name: string): BrrSample {
 /** Splits a `.brr` file into its loop offset and block data. */
 export function parseBrr(name: string, raw: Uint8Array): BrrSample {
 	const problem = validateBrr(raw);
-	if (problem) throw new BrrError(`Sample "${name}" is not valid: ${problem}`);
+	if (problem) {
+		throw new BrrError(`Sample "${name}" is not valid: ${problem}`);
+	}
+
 	return {
 		sampleName: name,
 		loopOffset: raw[0] | (raw[1] << 8),
@@ -156,6 +177,7 @@ export function validateSampleBank(bytes: Uint8Array): string | null {
 			`${SAMPLE_BANK_BYTES.toLocaleString()}, being a dump of ARAM $8000-$FFFF.`
 		);
 	}
+
 	return null;
 }
 
@@ -177,7 +199,9 @@ export function validateSampleBank(bytes: Uint8Array): string | null {
  */
 export function parseSampleBank(bytes: Uint8Array, names: (slot: number) => string): BrrSample[] {
 	const problem = validateSampleBank(bytes);
-	if (problem) throw new BrrError(`Not a valid sample bank: ${problem}`);
+	if (problem) {
+		throw new BrrError(`Not a valid sample bank: ${problem}`);
+	}
 
 	// Every offset below — the directory *and* the addresses in it — is relative
 	// to the image with its header removed, because AMK erases those 12 bytes
@@ -209,7 +233,9 @@ export function parseSampleBank(bytes: Uint8Array, names: (slot: number) => stri
 		while (at >= 0 && at + BRR_BLOCK_BYTES <= image.length) {
 			const header = image[at];
 			at += BRR_BLOCK_BYTES;
-			if ((header & 1) === 1) break;
+			if ((header & 1) === 1) {
+				break;
+			}
 		}
 
 		out.push(
@@ -234,8 +260,14 @@ export function usedBankSlots(slots: readonly BrrSample[]): number {
  * `if ((int16_t) io != io) io = (io >> 31) ^ 0x7FFF`.
  */
 function clamp16(value: number): number {
-	if (value > 0x7fff) return 0x7fff;
-	if (value < -0x8000) return -0x8000;
+	if (value > 0x7fff) {
+		return 0x7fff;
+	}
+
+	if (value < -0x8000) {
+		return -0x8000;
+	}
+
 	return value;
 }
 
@@ -278,7 +310,9 @@ export function decodeBrr(sample: BrrSample): Int16Array {
 			s = (s << shift) >> 1;
 			// Shifts of 13-15 are invalid; the hardware collapses them to -0x800
 			// for a negative nibble and 0 otherwise.
-			if (shift >= 0xd) s = (s >> 25) << 11;
+			if (shift >= 0xd) {
+				s = (s >> 25) << 11;
+			}
 
 			const p1 = previous1;
 			const p2 = previous2 >> 1;
@@ -320,8 +354,13 @@ export function decodeBrr(sample: BrrSample): Int16Array {
  */
 export function peaks(pcm: Int16Array, buckets: number): Float32Array {
 	const out = new Float32Array(buckets * 2);
-	if (buckets <= 0) return out;
-	if (pcm.length === 0) return out;
+	if (buckets <= 0) {
+		return out;
+	}
+
+	if (pcm.length === 0) {
+		return out;
+	}
 
 	const width = pcm.length / buckets;
 	for (let bucket = 0; bucket < buckets; bucket++) {
@@ -334,11 +373,18 @@ export function peaks(pcm: Int16Array, buckets: number): Float32Array {
 		let max = 0;
 		for (let index = start; index < end && index < pcm.length; index++) {
 			const value = pcm[index];
-			if (value < min) min = value;
-			if (value > max) max = value;
+			if (value < min) {
+				min = value;
+			}
+
+			if (value > max) {
+				max = value;
+			}
 		}
+
 		out[bucket * 2] = min / 0x8000;
 		out[bucket * 2 + 1] = max / 0x8000;
 	}
+
 	return out;
 }

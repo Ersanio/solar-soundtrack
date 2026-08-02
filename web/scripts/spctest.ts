@@ -55,6 +55,7 @@ console.log("\nmissing files are diagnosed, not misread");
 	} catch (error) {
 		message = error instanceof Error ? error.message : String(error);
 	}
+
 	check("HTML fallback is rejected", message.includes("HTML page"), message || "(no error thrown)");
 }
 
@@ -78,6 +79,7 @@ console.log("\ndriver bundle");
 			`group [${group.slice(0, 3).join(", ")}…] vs parsed [${parsed.slice(0, 3).join(", ")}…]`,
 		);
 	}
+
 	{
 		// The `!`-marked names from AddmusicK's `Addmusic_sample groups.txt`. A name
 		// here that is not in the group would silently protect nothing, and the
@@ -96,6 +98,7 @@ console.log("\ndriver bundle");
 			group.filter((name) => !important.includes(name)).join(", "),
 		);
 	}
+
 	check("no embedded song table", driver.embedded === null);
 	check("SongPointers is $236D", driver.manifest.songPointers === 0x236d, hex(driver.manifest.songPointers));
 	check(
@@ -135,6 +138,7 @@ console.log("\nsong table survives pointer-like bytes before it");
 			base[base.length - 2] = tailWord & 0xff;
 			base[base.length - 1] = tailWord >> 8;
 		}
+
 		const body = new Uint8Array(base.length + tableBytes + GB);
 		body.set(base, 0);
 		const firstGlobal = driver.programPos + base.length + tableBytes;
@@ -143,6 +147,7 @@ console.log("\nsong table survives pointer-like bytes before it");
 			body[base.length + i * 2] = address & 0xff;
 			body[base.length + i * 2 + 1] = address >> 8;
 		}
+
 		const localPos = driver.programPos + body.length;
 		body[base.length + G * 2] = localPos & 0xff;
 		body[base.length + G * 2 + 1] = localPos >> 8;
@@ -182,6 +187,7 @@ console.log("\nsong table survives pointer-like bytes before it");
 			body[base.length + i * 2] = address & 0xff;
 			body[base.length + i * 2 + 1] = address >> 8;
 		}
+
 		const slot = driver.programPos + body.length + SLACK;
 		body[base.length + G * 2] = slot & 0xff;
 		body[base.length + G * 2 + 1] = slot >> 8;
@@ -246,6 +252,7 @@ console.log("\ncustom driver: a final-pass build is read as-is");
 		body[base.length + i * 2] = address & 0xff;
 		body[base.length + i * 2 + 1] = address >> 8;
 	}
+
 	const localPos = driver.programPos + body.length;
 	body[base.length + GLOBALS * 2] = localPos & 0xff;
 	body[base.length + GLOBALS * 2 + 1] = localPos >> 8;
@@ -339,6 +346,7 @@ console.log("\nupload header detection is the size rule alone");
 	} catch {
 		threw = true;
 	}
+
 	check("header that overruns ARAM is rejected", threw);
 }
 
@@ -354,6 +362,7 @@ console.log("\ncustom driver: bad input is rejected");
 		} catch {
 			threw = true;
 		}
+
 		check(`${label} rejected`, threw);
 	}
 }
@@ -416,6 +425,7 @@ console.log("\nARAM contents");
 			break;
 		}
 	}
+
 	check("song data at localPos", matches);
 
 	// The song header's first word points at its own phrase pointer block.
@@ -447,6 +457,7 @@ console.log("\nsample directory");
 			ok = false;
 			break;
 		}
+
 		// Spot-check that the BRR actually got copied.
 		if (
 			aram[start] !== sample.data[0] ||
@@ -455,8 +466,10 @@ console.log("\nsample directory");
 			ok = false;
 			break;
 		}
+
 		expected += sample.data.length;
 	}
+
 	check("all 20 directory entries and BRR blobs correct", ok);
 	check("sample data ends where layout says", expected === layout.sampleDataEnd, hex(expected));
 }
@@ -600,7 +613,10 @@ console.log("\noptimizeSampleUsage frees real ARAM");
 			aramAddress: plan.localPos,
 			options: { ...options, optimizeSampleUsage: optimize },
 		});
-		if (!result.ok || !result.data) throw new Error(result.diagnostics.map((d) => d.message).join("; "));
+		if (!result.ok || !result.data) {
+			throw new Error(result.diagnostics.map((d) => d.message).join("; "));
+		}
+
 		const samples = (result.sampleList ?? []).map((name) => byName.get(name) ?? emptySample(name));
 		return {
 			result,

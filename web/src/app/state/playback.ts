@@ -145,7 +145,9 @@ export class Playback {
     effect(() => {
       const result = this.editor.result();
       untracked(() => {
-        if (this.live() && result?.ok) this.reload(result);
+        if (this.live() && result?.ok) {
+          this.reload(result);
+        }
       });
     });
 
@@ -162,6 +164,7 @@ export class Playback {
       this.scrubbing.set(null);
       this.driver.set(null);
     };
+
     this.player.onError = (error) => {
       this.state.set('idle');
       this.editor.fail(errorMessage(error));
@@ -199,7 +202,9 @@ export class Playback {
    */
   audition(name: string, pcm: Int16Array): void {
     this.stopAudition();
-    if (pcm.length === 0) return;
+    if (pcm.length === 0) {
+      return;
+    }
 
     try {
       this.auditionContext ??= new AudioContext();
@@ -207,7 +212,9 @@ export class Playback {
 
       const buffer = context.createBuffer(1, pcm.length, SPC_SAMPLE_RATE);
       const channel = buffer.getChannelData(0);
-      for (let index = 0; index < pcm.length; index++) channel[index] = pcm[index] / 0x8000;
+      for (let index = 0; index < pcm.length; index++) {
+        channel[index] = pcm[index] / 0x8000;
+      }
 
       const source = context.createBufferSource();
       source.buffer = buffer;
@@ -218,6 +225,7 @@ export class Playback {
           this.auditioning.set(null);
         }
       };
+
       source.start();
 
       this.auditionSource = source;
@@ -232,7 +240,10 @@ export class Playback {
     const source = this.auditionSource;
     this.auditionSource = null;
     this.auditioning.set(null);
-    if (!source) return;
+    if (!source) {
+      return;
+    }
+
     source.onended = null;
     try {
       source.stop();
@@ -268,23 +279,34 @@ export class Playback {
   private secondsAt(songTicks: number): number {
     const stats = this.editor.result()?.stats;
     const played = stats?.playback;
-    if (!stats || !played) return 0;
+    if (!stats || !played) {
+      return 0;
+    }
 
     if (stats.introTicks > 0 && songTicks < stats.introTicks) {
       return (songTicks / stats.introTicks) * played.introSeconds;
     }
-    if (stats.loopTicks <= 0) return played.introSeconds;
+
+    if (stats.loopTicks <= 0) {
+      return played.introSeconds;
+    }
+
     return (
       played.introSeconds + ((songTicks - stats.introTicks) / stats.loopTicks) * played.mainSeconds
     );
   }
 
   private reload(result: CompileResult | null): void {
-    if (this.state() !== 'playing' || !result?.ok) return;
+    if (this.state() !== 'playing' || !result?.ok) {
+      return;
+    }
+
     const spc = this.editor.assembleSpc();
     // Resume inside the song rather than at the raw clock, so reloading after a
     // long looping session does not re-emulate every pass to get back.
-    if (spc) this.player.play(spc, this.secondsAt(this.player.getSongTicks()), this.timing());
+    if (spc) {
+      this.player.play(spc, this.secondsAt(this.player.getSongTicks()), this.timing());
+    }
   }
 
   /** Play, pause or resume. The first press doubles as the audio unlock gesture. */
@@ -302,11 +324,14 @@ export class Playback {
     }
 
     try {
-      if (!this.player.isReady) await this.player.init();
+      if (!this.player.isReady) {
+        await this.player.init();
+      }
     } catch (error) {
       this.editor.fail(errorMessage(error));
       return;
     }
+
     this.player.setVolume(this.volume() / 100);
 
     this.editor.compileNow();
@@ -336,7 +361,10 @@ export class Playback {
    * {@link commitScrub} does the work once the drag ends.
    */
   scrubTo(seconds: number): void {
-    if (this.isIdle()) return;
+    if (this.isIdle()) {
+      return;
+    }
+
     this.scrubbing.set(Math.max(0, Math.min(seconds, this.duration())));
   }
 
@@ -351,7 +379,9 @@ export class Playback {
    */
   commitScrub(): void {
     const target = this.scrubbing();
-    if (target !== null) this.seek(target);
+    if (target !== null) {
+      this.seek(target);
+    }
   }
 
   /**
@@ -360,7 +390,10 @@ export class Playback {
    */
   seek(seconds: number): void {
     this.scrubbing.set(null);
-    if (this.isIdle()) return;
+    if (this.isIdle()) {
+      return;
+    }
+
     const target = Math.max(0, Math.min(seconds, this.duration()));
     this.elapsed.set(target);
     this.player.seek(target);
@@ -368,7 +401,10 @@ export class Playback {
 
   /** Ignored while a channel is soloed, where the mute buttons are disabled. */
   toggleMute(channel: number): void {
-    if (this.isSoloing()) return;
+    if (this.isSoloing()) {
+      return;
+    }
+
     this.mutedMask.update((mask) => mask ^ (1 << channel));
   }
 
@@ -380,7 +416,9 @@ export class Playback {
   toggleSolo(channel: number): void {
     const soloed = this.soloedChannel() === channel ? null : channel;
     this.soloedChannel.set(soloed);
-    if (soloed !== null) this.mutedMask.set(0);
+    if (soloed !== null) {
+      this.mutedMask.set(0);
+    }
   }
 
   /** Drops every mute and any solo, so the whole song is heard again. */

@@ -89,7 +89,9 @@ function setupScope(bundle: string, wasm: Uint8Array): NonNullable<typeof shared
 	});
 
 	runInContext(bundle, scope, { filename: "spc-worklet.js" });
-	if (!registered) throw new Error("the bundle registered no processor");
+	if (!registered) {
+		throw new Error("the bundle registered no processor");
+	}
 
 	// Compile inside the context, as the page's posted module would arrive.
 	const module = runInContext("new WebAssembly.Module(__wasm)", scope) as WebAssembly.Module;
@@ -126,18 +128,25 @@ function render(processor: Processor, quanta: number): Float32Array {
 			out[(block * QUANTUM + i) * 2 + 1] = right[i];
 		}
 	}
+
 	return out;
 }
 
 function peak(samples: Float32Array): number {
 	let max = 0;
-	for (const sample of samples) max = Math.max(max, Math.abs(sample));
+	for (const sample of samples) {
+		max = Math.max(max, Math.abs(sample));
+	}
+
 	return max;
 }
 
 function rms(samples: Float32Array): number {
 	let sum = 0;
-	for (const sample of samples) sum += sample * sample;
+	for (const sample of samples) {
+		sum += sample * sample;
+	}
+
 	return Math.sqrt(sum / samples.length);
 }
 
@@ -148,7 +157,10 @@ const plan = planAram(driver);
 
 function compileToSpc(source: string): Uint8Array {
 	const result = compiler.compile({ source, aramAddress: plan.localPos });
-	if (!result.ok || !result.data) throw new Error("the test song did not compile");
+	if (!result.ok || !result.data) {
+		throw new Error("the test song did not compile");
+	}
+
 	return buildSpc({
 		songData: result.data,
 		driver,
@@ -272,6 +284,7 @@ console.log("\nseeking lands somewhere else in the song");
 			break;
 		}
 	}
+
 	check("a seek changes what is rendered", !identical);
 	check("still audible after seeking", peak(fromThree) > 0.005, `peak ${peak(fromThree).toFixed(4)}`);
 }

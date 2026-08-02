@@ -146,9 +146,13 @@ export class SampleStore {
   readonly importantSamples = computed<readonly string[]>(() => {
     const names = new Set(this.defaultImportant());
     for (const [name, important] of this.importantOverrides()) {
-      if (important) names.add(name);
-      else names.delete(name);
+      if (important) {
+        names.add(name);
+      } else {
+        names.delete(name);
+      }
     }
+
     return [...names];
   });
 
@@ -156,8 +160,12 @@ export class SampleStore {
     const next = new Map(this.importantOverrides());
     // Storing the bundle's own answer would pin it, so a later manifest change
     // would not reach a sample the user never actually touched.
-    if (important === this.defaultImportant().has(name)) next.delete(name);
-    else next.set(name, important);
+    if (important === this.defaultImportant().has(name)) {
+      next.delete(name);
+    } else {
+      next.set(name, important);
+    }
+
     this.importantOverrides.set(next);
   }
 
@@ -187,7 +195,9 @@ export class SampleStore {
     }
 
     const extra = [...overrides.keys()].filter((name) => !stockNames.has(name)).sort();
-    for (const name of extra) out.push(this.describe(name, overrides.get(name)!, 'user'));
+    for (const name of extra) {
+      out.push(this.describe(name, overrides.get(name)!, 'user'));
+    }
 
     return out;
   });
@@ -215,10 +225,16 @@ export class SampleStore {
   /** Bytes the library would contribute to ARAM if every sample were used. */
   readonly totalBytes = computed(() =>
     this.files().reduce((sum, file) => {
-      if (file.error !== null) return sum;
+      if (file.error !== null) {
+        return sum;
+      }
+
       // A `.brr` file is its 2-byte loop header plus block data; a bank's slots
       // are already header-free, so only their data counts.
-      if (file.kind === 'sample') return sum + file.bytes.length - 2;
+      if (file.kind === 'sample') {
+        return sum + file.bytes.length - 2;
+      }
+
       return sum + this.decodedSlots(file.name).reduce((bank, slot) => bank + slot.bytes, 0);
     }, 0),
   );
@@ -240,8 +256,11 @@ export class SampleStore {
     const overrides = this.overrides();
 
     for (const sample of this.stock()) {
-      if (!overrides.has(sample.sampleName)) map.set(sample.sampleName, sample);
+      if (!overrides.has(sample.sampleName)) {
+        map.set(sample.sampleName, sample);
+      }
     }
+
     for (const [name, bytes] of overrides) {
       if (isBank(name)) {
         // A bank is one file but 64 resolvable names, so every slot goes in.
@@ -250,9 +269,13 @@ export class SampleStore {
             map.set(slot.sampleName, slot);
           }
         }
+
         continue;
       }
-      if (validateBrr(bytes) === null) map.set(name, parseBrr(name, bytes));
+
+      if (validateBrr(bytes) === null) {
+        map.set(name, parseBrr(name, bytes));
+      }
     }
 
     // The compiler names this for every slot its optimisation pass emptied. It is
@@ -277,6 +300,7 @@ export class SampleStore {
       // is what reports the name; here it just has to not corrupt the indexing.
       out.push(map.get(name) ?? this.placeholder(name));
     }
+
     return out;
   }
 
@@ -294,6 +318,7 @@ export class SampleStore {
       sample = emptySample(name);
       this.placeholders.set(name, sample);
     }
+
     return sample;
   }
 
@@ -306,7 +331,10 @@ export class SampleStore {
     // empty map is never written back over a populated database.
     effect(() => {
       const overrides = this.overrides();
-      if (!this.hydrated()) return;
+      if (!this.hydrated()) {
+        return;
+      }
+
       void this.persist(overrides);
     });
 
@@ -335,28 +363,43 @@ export class SampleStore {
     } catch {
       stored = null; // Unreadable or not ours; the defaults are fine.
     }
-    if (!stored) return;
 
-    if (typeof stored.optimize === 'boolean') this.optimize.set(stored.optimize);
+    if (!stored) {
+      return;
+    }
+
+    if (typeof stored.optimize === 'boolean') {
+      this.optimize.set(stored.optimize);
+    }
+
     if (stored.important) {
       const overrides = new Map<string, boolean>();
       for (const [name, important] of Object.entries(stored.important)) {
-        if (typeof important === 'boolean') overrides.set(name, important);
+        if (typeof important === 'boolean') {
+          overrides.set(name, important);
+        }
       }
+
       this.importantOverrides.set(overrides);
     }
   }
 
   private async hydrate(): Promise<void> {
     const stored = await loadAll();
-    if (stored.size > 0) this.overrides.set(stored);
+    if (stored.size > 0) {
+      this.overrides.set(stored);
+    }
+
     this.hydrated.set(true);
     this.storageError.set(storageFailure());
   }
 
   private async persist(overrides: ReadonlyMap<string, Uint8Array>): Promise<void> {
     await clear();
-    for (const [name, bytes] of overrides) await put(name, bytes);
+    for (const [name, bytes] of overrides) {
+      await put(name, bytes);
+    }
+
     this.storageError.set(storageFailure());
   }
 
@@ -375,6 +418,7 @@ export class SampleStore {
         rejected.push(problem);
         continue;
       }
+
       next.set(file.name, new Uint8Array(await file.arrayBuffer()));
     }
 
@@ -384,19 +428,28 @@ export class SampleStore {
 
   /** Drops an override, restoring the bundled file. No-op for user files. */
   revert(name: string): void {
-    if (!this.stock().some((sample) => sample.sampleName === name)) return;
+    if (!this.stock().some((sample) => sample.sampleName === name)) {
+      return;
+    }
+
     this.drop(name);
   }
 
   /** Removes a user-uploaded file. No-op for bundled names — use `revert`. */
   remove(name: string): void {
-    if (this.stock().some((sample) => sample.sampleName === name)) return;
+    if (this.stock().some((sample) => sample.sampleName === name)) {
+      return;
+    }
+
     this.drop(name);
   }
 
   private drop(name: string): void {
     const next = new Map(this.overrides());
-    if (!next.delete(name)) return;
+    if (!next.delete(name)) {
+      return;
+    }
+
     this.overrides.set(next);
     void del(name);
   }
@@ -407,16 +460,23 @@ export class SampleStore {
   }
 
   private describe(name: string, bytes: Uint8Array, source: SampleFile['source']): SampleFile {
-    if (isBank(name)) return this.describeBank(name, bytes, source);
+    if (isBank(name)) {
+      return this.describeBank(name, bytes, source);
+    }
 
     const error = validateBrr(bytes);
-    if (error) return { ...blank(name, bytes, source), kind: 'sample', error };
+    if (error) {
+      return { ...blank(name, bytes, source), kind: 'sample', error };
+    }
+
     return this.describeParsed(name, bytes, parseBrr(name, bytes), source);
   }
 
   private describeBank(name: string, bytes: Uint8Array, source: SampleFile['source']): SampleFile {
     const error = validateSampleBank(bytes);
-    if (error) return { ...blank(name, bytes, source), kind: 'bank', error };
+    if (error) {
+      return { ...blank(name, bytes, source), kind: 'bank', error };
+    }
 
     const slots = this.decodedSlots(name);
     return {
@@ -447,10 +507,14 @@ export class SampleStore {
 
   private decodedSlots(name: string): readonly DecodedSlot[] {
     const bytes = this.overrides().get(name);
-    if (!bytes || validateSampleBank(bytes) !== null) return [];
+    if (!bytes || validateSampleBank(bytes) !== null) {
+      return [];
+    }
 
     const cached = this.slotCache.get(name);
-    if (cached?.bytes === bytes) return cached.rows;
+    if (cached?.bytes === bytes) {
+      return cached.rows;
+    }
 
     const rows = parseSampleBank(bytes, (index) => bankSlotName(name, index)).map((slot, index) => {
       const pcm = decodeBrr(slot);
@@ -532,7 +596,10 @@ const isBank = (name: string): boolean => name.toLowerCase().endsWith('.bnk');
  */
 function extensionProblem(name: string): string | null {
   const lower = name.toLowerCase();
-  if (lower.endsWith('.brr') || lower.endsWith('.bnk')) return null;
+  if (lower.endsWith('.brr') || lower.endsWith('.bnk')) {
+    return null;
+  }
+
   return `"${name}" is neither a .brr sample nor a .bnk sample bank.`;
 }
 

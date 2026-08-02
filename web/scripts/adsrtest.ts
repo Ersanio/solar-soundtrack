@@ -57,6 +57,7 @@ console.log("\nCLOCKS, checked against the published noise ladder");
 			check(`clock ${n}`, false, `${Math.round(noiseHz(n))} Hz, expected ${LADDER[n]}`);
 		}
 	}
+
 	check("every clock reproduces its published frequency", ladder);
 	check("clock 0 is silence, not a division by zero", noiseHz(0) === 0);
 	check("the fastest clock is the sample rate", noiseHz(0x1f) === 32000);
@@ -80,6 +81,7 @@ console.log("\nthe readme's magic tables are bsnes's step counts");
 			env -= env >> 8;
 			steps++;
 		}
+
 		if (steps !== DECAY_STEPS[sustain]) {
 			decay = false;
 			check(`decay to sustain ${sustain}`, false, `${steps} steps, readme says ${DECAY_STEPS[sustain]}`);
@@ -93,11 +95,13 @@ console.log("\nthe readme's magic tables are bsnes's step counts");
 			env -= env >> 8;
 			steps++;
 		}
+
 		if (steps !== RELEASE_STEPS[sustain]) {
 			release = false;
 			check(`release from sustain ${sustain}`, false, `${steps}, readme says ${RELEASE_STEPS[sustain]}`);
 		}
 	}
+
 	check("every decay step count matches", decay);
 	check("every release step count matches", release);
 }
@@ -108,8 +112,11 @@ console.log("\nphase durations");
 	const readmeAttack = (a: number) => (CLOCKS[a * 2 + 1] * 64) / 32000;
 	let slow = true;
 	for (let a = 0; a <= 14; a++) {
-		if (Math.abs(attackSeconds(a) - readmeAttack(a)) > 1e-12) slow = false;
+		if (Math.abs(attackSeconds(a) - readmeAttack(a)) > 1e-12) {
+			slow = false;
+		}
 	}
+
 	check("attack 0-14 matches the readme exactly", slow);
 
 	// The divergence, pinned. The readme compares the attack *nibble* to 0x1F
@@ -126,7 +133,12 @@ console.log("\nphase durations");
 	check("a sustain of 7 needs no decay at all", decaySeconds(0, 7) === 0);
 	check("a release rate of 0 never ends", releaseSeconds(0, 3) === Infinity);
 	let levels = true;
-	for (let s = 0; s < 8; s++) if (sustainLevel(s) !== (s + 1) / 8) levels = false;
+	for (let s = 0; s < 8; s++) {
+		if (sustainLevel(s) !== (s + 1) / 8) {
+			levels = false;
+		}
+	}
+
 	check("sustain level is (s+1)/8", levels);
 }
 

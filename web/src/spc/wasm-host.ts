@@ -55,7 +55,10 @@ export class SpcCoreError extends Error {}
  */
 function decodeAscii(bytes: Uint8Array): string {
 	let text = "";
-	for (const byte of bytes) text += String.fromCharCode(byte);
+	for (const byte of bytes) {
+		text += String.fromCharCode(byte);
+	}
+
 	return text;
 }
 
@@ -150,9 +153,15 @@ export function instantiate(module: WebAssembly.Module): SpcCore {
 	};
 
 	const cstring = (ptr: number): string => {
-		if (!ptr) return "";
+		if (!ptr) {
+			return "";
+		}
+
 		let end = ptr;
-		while (u8[end]) end++;
+		while (u8[end]) {
+			end++;
+		}
+
 		return decodeAscii(u8.subarray(ptr, end));
 	};
 
@@ -166,10 +175,12 @@ export function instantiate(module: WebAssembly.Module): SpcCore {
 			},
 			// _emscripten_asm_const_int(code, signature, arguments)
 			b: (code: number): number => {
-				if (code === ASM_CONST_FAILED) failed = true;
-				else if (code !== ASM_CONST_READY) {
+				if (code === ASM_CONST_FAILED) {
+					failed = true;
+				} else if (code !== ASM_CONST_READY) {
 					throw new SpcCoreError(`unknown EM_ASM callback ${code} — this is not the vendored binary`);
 				}
+
 				return 0;
 			},
 			// _exit
@@ -185,6 +196,7 @@ export function instantiate(module: WebAssembly.Module): SpcCore {
 					output += decodeAscii(u8.subarray(ptr, ptr + len));
 					written += len;
 				}
+
 				view.setUint32(pnum, written, true);
 				return 0;
 			},
@@ -228,19 +240,30 @@ export function instantiate(module: WebAssembly.Module): SpcCore {
 	core.j(); // __wasm_call_ctors
 	core.k(0, 0); // main, whose only job is the EM_ASM callback above
 
-	if (failed) throw new SpcCoreError("snes_spc reported that it failed to initialise");
+	if (failed) {
+		throw new SpcCoreError("snes_spc reported that it failed to initialise");
+	}
 
 	// One scratch buffer, grown on demand, rather than a malloc per render.
 	let scratch = 0;
 	let scratchFrames = 0;
 
 	const reserve = (frames: number): void => {
-		if (frames <= scratchFrames) return;
-		if (scratch) core.q(scratch);
+		if (frames <= scratchFrames) {
+			return;
+		}
+
+		if (scratch) {
+			core.q(scratch);
+		}
+
 		// The +4 matches upstream: `_playSPC` writes one sample past the end when
 		// interpolating the tail of a block.
 		scratch = core.p(frames * SPC_CHANNELS * 2 + 4);
-		if (!scratch) throw new SpcCoreError(`could not allocate ${frames} frames inside the emulator`);
+		if (!scratch) {
+			throw new SpcCoreError(`could not allocate ${frames} frames inside the emulator`);
+		}
+
 		scratchFrames = frames;
 		audioView = null;
 	};
@@ -253,7 +276,10 @@ export function instantiate(module: WebAssembly.Module): SpcCore {
 
 	const load = (spc: Uint8Array): void => {
 		const ptr = core.p(spc.length);
-		if (!ptr) throw new SpcCoreError(`could not allocate ${spc.length} bytes for the SPC image`);
+		if (!ptr) {
+			throw new SpcCoreError(`could not allocate ${spc.length} bytes for the SPC image`);
+		}
+
 		try {
 			u8.set(spc, ptr);
 			core.l(ptr, spc.length);
@@ -283,10 +309,21 @@ export function instantiate(module: WebAssembly.Module): SpcCore {
 		const anchorAt = 0x400;
 		const candidates: number[] = [];
 		outer: for (let at = 0; at + SPC_RAM_SIZE <= u8.length && candidates.length < 8; at++) {
-			for (let k = 0; k < 16; k++) if (u8[at + anchorAt + k] !== image[anchorAt + k]) continue outer;
-			for (let k = 0; k < SPC_RAM_SIZE; k += 89) if (u8[at + k] !== image[k]) continue outer;
+			for (let k = 0; k < 16; k++) {
+				if (u8[at + anchorAt + k] !== image[anchorAt + k]) {
+					continue outer;
+				}
+			}
+
+			for (let k = 0; k < SPC_RAM_SIZE; k += 89) {
+				if (u8[at + k] !== image[k]) {
+					continue outer;
+				}
+			}
+
 			candidates.push(at);
 		}
+
 		if (candidates.length === 0) {
 			throw new SpcCoreError(
 				"could not find the emulator's APU RAM in the wasm heap; spc.wasm is not the vendored build",
@@ -304,9 +341,17 @@ export function instantiate(module: WebAssembly.Module): SpcCore {
 		const live = candidates.filter((at, index) => {
 			const now = u8.subarray(at, at + 0x100);
 			const running = before[index].some((value, offset) => value !== now[offset]);
-			if (!running) return false;
+			if (!running) {
+				return false;
+			}
+
 			// $0400 up is the driver's code, per the ARAM map. Reused heap is noise.
-			for (let k = 0x400; k < 0x2000; k += 37) if (u8[at + k] !== image[k]) return false;
+			for (let k = 0x400; k < 0x2000; k += 37) {
+				if (u8[at + k] !== image[k]) {
+					return false;
+				}
+			}
+
 			return true;
 		});
 
@@ -315,6 +360,7 @@ export function instantiate(module: WebAssembly.Module): SpcCore {
 				`expected exactly one live APU RAM in the wasm heap, found ${live.length} of ${candidates.length} candidates`,
 			);
 		}
+
 		return live[0];
 	};
 
@@ -331,7 +377,9 @@ export function instantiate(module: WebAssembly.Module): SpcCore {
 		},
 
 		skip(seconds: number): void {
-			if (seconds > 0) core.n(Math.floor(seconds));
+			if (seconds > 0) {
+				core.n(Math.floor(seconds));
+			}
 		},
 
 		renderView(frames: number): Int16Array {
@@ -342,6 +390,7 @@ export function instantiate(module: WebAssembly.Module): SpcCore {
 				audioView = i16.subarray(scratch >> 1, (scratch >> 1) + count);
 				audioFrames = frames;
 			}
+
 			return audioView;
 		},
 
@@ -350,7 +399,10 @@ export function instantiate(module: WebAssembly.Module): SpcCore {
 		},
 
 		aram(): Uint8Array {
-			if (aramAt < 0) throw new SpcCoreError("APU RAM is only available once an SPC has been loaded");
+			if (aramAt < 0) {
+				throw new SpcCoreError("APU RAM is only available once an SPC has been loaded");
+			}
+
 			aramView ??= u8.subarray(aramAt, aramAt + SPC_RAM_SIZE);
 			return aramView;
 		},

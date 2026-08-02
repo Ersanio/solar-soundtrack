@@ -46,7 +46,10 @@ export class SampleBrowser {
     const input = event.target as HTMLInputElement;
     const files = [...(input.files ?? [])];
     input.value = ''; // allow re-picking the same file
-    if (files.length === 0) return;
+    if (files.length === 0) {
+      return;
+    }
+
     this.rejected.set(await this.library.upload(files));
   }
 
@@ -55,7 +58,10 @@ export class SampleBrowser {
 
   protected toggleOpen(name: string): void {
     const next = new Set(this.opened());
-    if (!next.delete(name)) next.add(name);
+    if (!next.delete(name)) {
+      next.add(name);
+    }
+
     this.opened.set(next);
   }
 
@@ -115,7 +121,10 @@ export class SampleBrowser {
 
   protected readonly freeLabel = computed(() => {
     const free = this.freeBytes();
-    if (free < 0) return `over ARAM by ${(-free).toLocaleString()} B`;
+    if (free < 0) {
+      return `over ARAM by ${(-free).toLocaleString()} B`;
+    }
+
     return `${free.toLocaleString()} B free of ${ARAM_SIZE.toLocaleString()}`;
   });
 
@@ -146,8 +155,11 @@ export class SampleBrowser {
       this.playback.stopAudition();
       return;
     }
+
     const pcm = this.library.pcm(name);
-    if (pcm) this.playback.audition(name, pcm);
+    if (pcm) {
+      this.playback.audition(name, pcm);
+    }
   }
 
   protected onImportant(name: string, important: boolean): void {
@@ -190,7 +202,9 @@ interface FileRow {
 function waveform(file: SampleFile | SampleSlot): string {
   const envelope = file.envelope;
   const buckets = envelope.length / 2;
-  if (buckets === 0) return '';
+  if (buckets === 0) {
+    return '';
+  }
 
   const step = 1 / buckets;
   let top = '';
@@ -200,11 +214,15 @@ function waveform(file: SampleFile | SampleSlot): string {
     top += `${bucket === 0 ? 'M' : 'L'}${x},${(-envelope[bucket * 2 + 1]).toFixed(4)}`;
     bottom = `L${x},${(-envelope[bucket * 2]).toFixed(4)}${bottom}`;
   }
+
   return `${top}${bottom}Z`;
 }
 
 function detailLabel(file: SampleFile | SampleSlot): string {
-  if ('error' in file && file.error) return file.error;
+  if ('error' in file && file.error) {
+    return file.error;
+  }
+
   const seconds = (file.frames / 32000).toFixed(2);
   const loop = file.loopOffset > 0 ? `loop @ ${file.loopOffset.toLocaleString()}` : 'no loop point';
   return `${file.blocks.toLocaleString()} blocks · ${seconds}s · ${loop}`;

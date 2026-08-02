@@ -30,6 +30,7 @@ All from `web/`. Node 24 is what CI uses.
 | `npm run typecheck` | `tsc -p tsconfig.app.json --noEmit`. |
 | `npm run typecheck:scripts` | The same for `scripts/`, which the app tsconfig does not cover. |
 | `npm run lint` | `ng lint` over `src/**` and `scripts/**`. |
+| `npm run lint:fix` | The same with `--fix`. Follow it with `npm run format`. |
 | `npm run format` | Prettier over the workspace. |
 | `npm run check` | The merge gate: formatting, both typechecks, all ten byte-level harnesses. |
 
@@ -252,6 +253,14 @@ switching one on: `no-unnecessary-condition` and `template/no-duplicate-attribut
 cannot tell a signal read from a method call, so it flags 178 correct lines. The bug that last rule
 would catch is kept out structurally instead — panels build a `computed` of view models rather than
 calling a method per row (`sample-browser.ts`, `aram-budget.ts`, `stats-grid.ts`).
+
+One last block sits **after `eslintConfigPrettier`**, and has to: it holds `curly` and
+`padding-line-between-statements`, which brace every block and leave a blank line after it. Neither
+is something Prettier can do — it never adds braces and never inserts blank lines, only collapses
+them — so this is the one place where layout is a lint rule, and there is no formatter option to go
+looking for. `eslint-config-prettier` switches `curly` off, so setting it in any earlier block would
+be silently undone. `npm run lint:fix` fixes both; run `npm run format` after it, since the brace
+fixer emits `if (x) { … }` on one line and leaves the wrapping to Prettier.
 
 ## Deployment
 

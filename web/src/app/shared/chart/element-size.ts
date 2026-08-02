@@ -30,11 +30,15 @@ export function elementSize(target: Signal<ElementRef<Element> | undefined>): Si
   effect(() => {
     const element = target()?.nativeElement;
     observer?.disconnect();
-    if (!element) return;
+    if (!element) {
+      return;
+    }
 
     observer = new ResizeObserver((entries) => {
       const box = entries[0]?.contentRect;
-      if (box) size.set({ width: box.width, height: box.height });
+      if (box) {
+        size.set({ width: box.width, height: box.height });
+      }
     });
     observer.observe(element);
   });

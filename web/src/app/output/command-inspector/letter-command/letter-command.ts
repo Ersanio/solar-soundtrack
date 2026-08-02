@@ -31,7 +31,10 @@ export class LetterCommand {
   protected readonly readout = computed<DetailRow[] | null>(() => {
     const command = this.command();
     const args = command.args.map((a) => a.value);
-    if (args.length === 0 || args[0] < 0) return null;
+    if (args.length === 0 || args[0] < 0) {
+      return null;
+    }
+
     const first = args[0];
 
     switch (command.kind.toLowerCase()) {
@@ -143,7 +146,10 @@ function bpm(tempo: number): number {
 
 /** 192 ticks to a whole note, so `l8` is 24 — when it divides evenly. */
 function ticksFor(denominator: number): string {
-  if (denominator <= 0) return '—';
+  if (denominator <= 0) {
+    return '—';
+  }
+
   const ticks = 192 / denominator;
   return Number.isInteger(ticks) ? String(ticks) : `${ticks.toFixed(2)} (rounded by the compiler)`;
 }

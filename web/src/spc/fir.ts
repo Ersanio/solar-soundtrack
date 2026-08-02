@@ -100,6 +100,7 @@ export function firMagnitude(taps: FirTaps, hz: number): number {
 		real += c * Math.cos(omega * n);
 		imaginary += c * Math.sin(omega * n);
 	}
+
 	return Math.hypot(real, imaginary);
 }
 
@@ -124,6 +125,7 @@ export function firCurveFrequencies(options: CurveOptions): number[] {
 		const t = i / (count - 1);
 		out.push(log ? Math.exp(lowLog + (highLog - lowLog) * t) : fromHz + (toHz - fromHz) * t);
 	}
+
 	return out;
 }
 
@@ -140,7 +142,10 @@ export function firCurve(taps: FirTaps, options: CurveOptions): number[] {
  */
 export function firDcGain(taps: FirTaps): number {
 	let sum = 0;
-	for (const tap of taps) sum += tap;
+	for (const tap of taps) {
+		sum += tap;
+	}
+
 	return sum / TAP_UNIT;
 }
 
@@ -161,8 +166,11 @@ export function firPeakGain(taps: FirTaps): number {
 	const steps = 512;
 	for (let i = 0; i <= steps; i++) {
 		const magnitude = firMagnitude(taps, (DSP_RATE / 2) * (i / steps));
-		if (magnitude > peak) peak = magnitude;
+		if (magnitude > peak) {
+			peak = magnitude;
+		}
 	}
+
 	return peak;
 }
 
@@ -258,6 +266,7 @@ function cornerOf(frequencies: number[], response: number[], peak: number): numb
 			return frequencies[i - 1] + (frequencies[i] - frequencies[i - 1]) * t;
 		}
 	}
+
 	return null;
 }
 
@@ -338,7 +347,10 @@ export interface FirHeadroom {
  */
 export function firHeadroom(taps: FirTaps): FirHeadroom {
 	let sum = 0;
-	for (let n = 0; n < Math.min(taps.length, FIR_TAPS - 1); n++) sum += Math.abs(taps[n]);
+	for (let n = 0; n < Math.min(taps.length, FIR_TAPS - 1); n++) {
+		sum += Math.abs(taps[n]);
+	}
+
 	return { sum, fraction: sum / TAP_UNIT, mayWrap: sum > TAP_UNIT };
 }
 
@@ -355,6 +367,7 @@ export function firRepeatCurves(taps: FirTaps, repeats: number, options: CurveOp
 	for (let k = 1; k <= repeats; k++) {
 		out.push(first.map((magnitude) => magnitude ** k));
 	}
+
 	return out;
 }
 
@@ -382,9 +395,15 @@ function quantise(ideal: number[], error: (taps: number[]) => number): number[] 
 	while (firHeadroom(taps).mayWrap) {
 		let widest = 0;
 		for (let i = 1; i < FIR_TAPS - 1; i++) {
-			if (Math.abs(taps[i]) > Math.abs(taps[widest])) widest = i;
+			if (Math.abs(taps[i]) > Math.abs(taps[widest])) {
+				widest = i;
+			}
 		}
-		if (taps[widest] === 0) break;
+
+		if (taps[widest] === 0) {
+			break;
+		}
+
 		taps[widest] -= Math.sign(taps[widest]);
 	}
 
@@ -395,7 +414,10 @@ function quantise(ideal: number[], error: (taps: number[]) => number): number[] 
 		for (let i = 0; i < taps.length; i++) {
 			for (const delta of [-1, 1]) {
 				const candidate = clampTap(taps[i] + delta);
-				if (candidate === taps[i]) continue;
+				if (candidate === taps[i]) {
+					continue;
+				}
+
 				const previous = taps[i];
 				taps[i] = candidate;
 				const score = firHeadroom(taps).mayWrap ? Infinity : error(taps);
@@ -407,7 +429,10 @@ function quantise(ideal: number[], error: (taps: number[]) => number): number[] 
 				}
 			}
 		}
-		if (!improved) break;
+
+		if (!improved) {
+			break;
+		}
 	}
 
 	return taps;
@@ -422,6 +447,7 @@ function magnitudeError(target: (hz: number) => number): (taps: number[]) => num
 			const difference = firMagnitude(taps, hz) - target(hz);
 			sum += difference * difference;
 		}
+
 		return sum;
 	};
 }
@@ -458,6 +484,7 @@ function impulseFor(target: (hz: number) => number): number[] {
 			const weight = k === 0 || k === bins ? 0.5 : 1;
 			sum += weight * target(hz) * Math.cos((2 * Math.PI * hz * offset) / DSP_RATE);
 		}
+
 		// h(τ) = (2/fs)·∫₀^(fs/2) H(f)·cos(2πfτ) df, and the sample spacing
 		// (fs/2)/bins cancels the 2/fs, leaving the mean of the summed terms.
 		ideal.push(sum / bins);
@@ -486,7 +513,11 @@ function rescale(ideal: number[], target: (hz: number) => number): number[] {
 		numerator += achieved * target(hz);
 		denominator += achieved * achieved;
 	}
-	if (denominator === 0) return ideal;
+
+	if (denominator === 0) {
+		return ideal;
+	}
+
 	return ideal.map((v) => v * (numerator / denominator));
 }
 
@@ -504,13 +535,22 @@ function rescale(ideal: number[], target: (hz: number) => number): number[] {
  * frequency, not in octaves.
  */
 export function fitToTarget(points: { hz: number; gain: number }[]): number[] {
-	if (points.length === 0) return [...FLAT_TAPS];
+	if (points.length === 0) {
+		return [...FLAT_TAPS];
+	}
+
 	const sorted = [...points].sort((a, b) => a.hz - b.hz);
 
 	const target = (hz: number): number => {
-		if (hz <= sorted[0].hz) return sorted[0].gain;
+		if (hz <= sorted[0].hz) {
+			return sorted[0].gain;
+		}
+
 		const last = sorted[sorted.length - 1];
-		if (hz >= last.hz) return last.gain;
+		if (hz >= last.hz) {
+			return last.gain;
+		}
+
 		for (let i = 1; i < sorted.length; i++) {
 			if (hz <= sorted[i].hz) {
 				const a = sorted[i - 1];
@@ -519,6 +559,7 @@ export function fitToTarget(points: { hz: number; gain: number }[]): number[] {
 				return a.gain + (b.gain - a.gain) * t;
 			}
 		}
+
 		return last.gain;
 	};
 
@@ -550,7 +591,9 @@ export interface ToneOptions {
  */
 export function designTone({ tone, strength = 1 }: ToneOptions): number[] {
 	const amount = Math.max(-1, Math.min(1, tone)) * Math.max(0, Math.min(1, strength));
-	if (amount === 0) return [...FLAT_TAPS];
+	if (amount === 0) {
+		return [...FLAT_TAPS];
+	}
 
 	// 18 dB across the band at full deflection: unmistakable, and still within
 	// what eight taps can render smoothly.

@@ -165,4 +165,33 @@ module.exports = defineConfig([
     },
   },
   eslintConfigPrettier,
+  {
+    // Every block is braced, and every block is followed by a blank line.
+    //
+    // Prettier cannot express either half: it never adds or removes braces, and
+    // it never inserts blank lines, only collapses runs of them to one. So this
+    // is the one place where layout is a lint rule rather than a formatter
+    // setting — and it has to sit *after* eslintConfigPrettier, which lists
+    // `curly` among the rules it switches off. Set earlier, it would be turned
+    // back off by the last element of this array and pass for the wrong reason.
+    files: ['**/*.ts', '**/*.js', '**/*.mjs'],
+    rules: {
+      // `all` is also the only form that is safe next to Prettier: the
+      // `multi-line` and `multi-or-nest` options argue with it about wrapping.
+      curly: ['error', 'all'],
+
+      // `block-like` is any statement ending in `}`, so this covers if/else,
+      // for, while, switch and try, and leaves `const x = computed(() => {…});`
+      // alone. Nothing is required before a closing brace, so a block that ends
+      // its function needs no trailing blank line.
+      //
+      // Deprecated out of ESLint core in 8.53 and rehomed in @stylistic, but it
+      // still ships in ESLint 10 and runs without a warning. If a future major
+      // drops it, that surfaces as an unknown-rule error rather than as silence.
+      'padding-line-between-statements': [
+        'error',
+        { blankLine: 'always', prev: 'block-like', next: '*' },
+      ],
+    },
+  },
 ]);

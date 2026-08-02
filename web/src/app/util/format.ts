@@ -18,7 +18,10 @@ export function hex4(value: number): string {
  * in an SNES envelope means the level never advances.
  */
 export function duration(seconds: number): string {
-  if (!Number.isFinite(seconds)) return '∞';
+  if (!Number.isFinite(seconds)) {
+    return '∞';
+  }
+
   return seconds >= 1 ? `${seconds.toFixed(2)} s` : `${(seconds * 1000).toFixed(0)} ms`;
 }
 

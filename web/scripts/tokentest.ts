@@ -349,6 +349,7 @@ console.log("\na recursive replacement cannot hang the editor");
 			tokens.every((t) => t.end > t.start),
 		);
 	}
+
 	const elapsed = Date.now() - started;
 	// Crude, but an exponential regression is not a near miss.
 	check("all three finish promptly", elapsed < 500, `took ${elapsed} ms`);
@@ -571,8 +572,10 @@ console.log("\nrestartability — the property CodeMirror relies on");
 				if (kind) {
 					manual.push({ kind, start: offset + cursor, end: offset + next, line: lineNumber });
 				}
+
 				cursor = next;
 			}
+
 			offset += line.length + 1;
 			lineNumber++;
 		}

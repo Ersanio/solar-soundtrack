@@ -123,8 +123,14 @@ export class Changelog {
    * left to `toggle()` — closing here first would let the click reopen it.
    */
   protected onDocumentPointerDown(event: PointerEvent): void {
-    if (!this.open()) return;
-    if (this.host.nativeElement.contains(event.target as Node)) return;
+    if (!this.open()) {
+      return;
+    }
+
+    if (this.host.nativeElement.contains(event.target as Node)) {
+      return;
+    }
+
     this.open.set(false);
   }
 }

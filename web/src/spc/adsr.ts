@@ -114,7 +114,10 @@ export function sustainLevel(sustain: number): number {
 
 /** Seconds to fall silent after key-off. `getReleaseTime`, readme:77-80. */
 export function releaseSeconds(release: number, sustain: number): number {
-	if (release === 0) return Infinity;
+	if (release === 0) {
+		return Infinity;
+	}
+
 	const fall = [255, 383, 469, 533, 584, 626, 663, 695][sustain];
 	return (CLOCKS[release] * fall) / DSP_RATE;
 }
@@ -236,6 +239,7 @@ export function envelopeGain(gain: number): EnvelopePoint[] {
 				env += env < 0x600 ? 0x20 : 0x8;
 				break;
 		}
+
 		env = Math.min(Math.max(env, 0), ENVELOPE_MAX);
 		push();
 	}
@@ -265,6 +269,7 @@ export function decodeGain(gain: number): Gain {
 	if ((gain & 0x80) === 0) {
 		return { mode: "direct", level: (gain & 0x7f) / 0x7f, rate: null };
 	}
+
 	const rate = gain & 0x1f;
 	const mode = (["linearDecrease", "expDecrease", "linearIncrease", "bentIncrease"] as const)[(gain >> 5) & 0x03];
 	return { mode, level: null, rate };
@@ -300,7 +305,10 @@ export function tuningMultiplier(tuning: number, subTuning: number): number {
 
 /** The same multiplier said in semitones, which is how a musician hears it. */
 export function tuningSemitones(multiplier: number): number {
-	if (multiplier <= 0) return -Infinity;
+	if (multiplier <= 0) {
+		return -Infinity;
+	}
+
 	return 12 * Math.log2(multiplier);
 }
 

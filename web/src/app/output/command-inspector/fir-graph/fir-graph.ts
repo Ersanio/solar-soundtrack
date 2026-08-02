@@ -207,6 +207,7 @@ export class FirGraph {
         opacity: 0.45 / (pass - 1),
       });
     }
+
     return out;
   });
 
@@ -222,7 +223,10 @@ export class FirGraph {
    */
   protected readonly targetPath = computed(() => {
     const points = this.target();
-    if (!points || points.length < 2) return null;
+    if (!points || points.length < 2) {
+      return null;
+    }
+
     const sorted = [...points].sort((a, b) => a.hz - b.hz);
     const drawn = sorted.map((p) => `L${this.xOf(p.hz)} ${this.yOf(p.gain)}`).join(' ');
     const first = this.yOf(sorted[0].gain);
@@ -232,9 +236,15 @@ export class FirGraph {
 
   protected readonly runawayBand = computed(() => {
     const feedback = this.feedback();
-    if (!feedback) return null;
+    if (!feedback) {
+      return null;
+    }
+
     const band = echoStability(this.taps(), feedback).runawayBand;
-    if (!band) return null;
+    if (!band) {
+      return null;
+    }
+
     const x = this.xOf(band.fromHz);
     // A band that is one sample wide still has to be visible.
     return { x, width: Math.max(this.xOf(band.toHz) - x, 2) };
@@ -249,7 +259,9 @@ export class FirGraph {
    */
   protected onPick(event: PointerEvent): void {
     const rect = (event.currentTarget as SVGSVGElement).getBoundingClientRect();
-    if (rect.width === 0 || rect.height === 0) return;
+    if (rect.width === 0 || rect.height === 0) {
+      return;
+    }
 
     const tx = (event.clientX - rect.left) / rect.width;
     const ty = (event.clientY - rect.top) / rect.height;

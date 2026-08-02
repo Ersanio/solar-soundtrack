@@ -154,7 +154,10 @@ class SpcProcessor extends AudioWorkletProcessor {
 					this.looping = message.loop;
 					// Switching looping off mid-song has to decide where "the end" now
 					// is; switching it on makes the question moot.
-					if (!this.looping) this.rebaseEnd();
+					if (!this.looping) {
+						this.rebaseEnd();
+					}
+
 					break;
 				case "mute":
 					this.muteMask = message.mask;
@@ -184,7 +187,9 @@ class SpcProcessor extends AudioWorkletProcessor {
 	 */
 	private seek(seconds: number): void {
 		const { core, spc } = this;
-		if (!core || !spc) return;
+		if (!core || !spc) {
+			return;
+		}
 
 		const target = Math.max(0, seconds);
 		core.loadSpc(spc);
@@ -227,7 +232,10 @@ class SpcProcessor extends AudioWorkletProcessor {
 	 * stick — see {@link applyChannelMutes}.
 	 */
 	private afterBlock(): void {
-		if (!this.core) return;
+		if (!this.core) {
+			return;
+		}
+
 		const aram = this.core.aram();
 		applyChannelMutes(aram, this.muteMask, this.muteShadow);
 
@@ -237,6 +245,7 @@ class SpcProcessor extends AudioWorkletProcessor {
 			this.duration = readNoteDuration(aram, this.voice);
 			return;
 		}
+
 		const now = readNoteDuration(aram, this.voice);
 		this.ticks += sawTick(this.duration, now);
 		this.duration = now;
@@ -255,6 +264,7 @@ class SpcProcessor extends AudioWorkletProcessor {
 			this.endsAtTicks = duration;
 			return;
 		}
+
 		const passes = Math.ceil((this.ticks - duration) / this.loopTicks);
 		this.endsAtTicks = duration + passes * this.loopTicks;
 	}
@@ -269,9 +279,17 @@ class SpcProcessor extends AudioWorkletProcessor {
 	 */
 	private songTicks(): number {
 		const duration = this.durationTicks();
-		if (duration <= 0 || this.ticks <= duration) return this.ticks;
-		if (!this.looping && this.ticks >= this.endsAtTicks) return duration;
-		if (this.loopTicks <= 0) return duration;
+		if (duration <= 0 || this.ticks <= duration) {
+			return this.ticks;
+		}
+
+		if (!this.looping && this.ticks >= this.endsAtTicks) {
+			return duration;
+		}
+
+		if (this.loopTicks <= 0) {
+			return duration;
+		}
 
 		return this.introTicks + ((this.ticks - this.introTicks) % this.loopTicks);
 	}
@@ -283,6 +301,7 @@ class SpcProcessor extends AudioWorkletProcessor {
 			this.blockPos = 0;
 			this.afterBlock();
 		}
+
 		const at = this.blockPos * SPC_CHANNELS;
 		this.pullL = this.block[at];
 		this.pullR = this.block[at + 1];
@@ -297,14 +316,22 @@ class SpcProcessor extends AudioWorkletProcessor {
 	 * song whose tempo drops during the tail would fade at the wrong speed.
 	 */
 	private gainAt(position: number): number {
-		if (this.looping || this.fadeFrom < 0) return 1;
-		if (this.fadeSeconds <= 0) return 0;
+		if (this.looping || this.fadeFrom < 0) {
+			return 1;
+		}
+
+		if (this.fadeSeconds <= 0) {
+			return 0;
+		}
+
 		return Math.max(0, 1 - (position - this.fadeFrom) / this.fadeSeconds);
 	}
 
 	process(_inputs: Float32Array[][], outputs: Float32Array[][]): boolean {
 		const output = outputs[0];
-		if (!output?.length) return true;
+		if (!output?.length) {
+			return true;
+		}
 
 		const left = output[0];
 		const right = output[1] ?? output[0];
@@ -312,7 +339,10 @@ class SpcProcessor extends AudioWorkletProcessor {
 
 		if (!this.core || !this.spc || !this.playing || this.paused) {
 			left.fill(0);
-			if (right !== left) right.fill(0);
+			if (right !== left) {
+				right.fill(0);
+			}
+
 			return true;
 		}
 
@@ -326,15 +356,23 @@ class SpcProcessor extends AudioWorkletProcessor {
 					// only replay the intro and cost a re-emulation. A song with no loop
 					// point is the exception: nothing brings it round, so it is restarted
 					// by hand rather than left running into silence.
-					if (!this.songLoops && this.ticks >= this.durationTicks()) this.seek(0);
+					if (!this.songLoops && this.ticks >= this.durationTicks()) {
+						this.seek(0);
+					}
 				} else {
 					// The end is a tick count, so it is reached exactly; the fade that
 					// follows it is wall time, latched here so it runs at a steady rate.
-					if (this.fadeFrom < 0 && this.ticks >= this.endsAtTicks) this.fadeFrom = position;
+					if (this.fadeFrom < 0 && this.ticks >= this.endsAtTicks) {
+						this.fadeFrom = position;
+					}
+
 					if (this.fadeFrom >= 0 && position >= this.fadeFrom + this.fadeSeconds) {
 						this.playing = false;
 						left.fill(0);
-						if (right !== left) right.fill(0);
+						if (right !== left) {
+							right.fill(0);
+						}
+
 						this.send({ type: "ended" });
 						return true;
 					}
@@ -384,7 +422,10 @@ class SpcProcessor extends AudioWorkletProcessor {
 			}
 		} catch (error) {
 			left.fill(0);
-			if (right !== left) right.fill(0);
+			if (right !== left) {
+				right.fill(0);
+			}
+
 			this.fail(error);
 		}
 

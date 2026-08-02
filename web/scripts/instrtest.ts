@@ -79,8 +79,11 @@ console.log("\nthe SRCN column against AddmusicK's own table");
 
 	let melodic = true;
 	for (let n = 0; n <= 18; n++) {
-		if (tables.melodic[n].srcn !== INSTRUMENT_TO_SAMPLE[n]) melodic = false;
+		if (tables.melodic[n].srcn !== INSTRUMENT_TO_SAMPLE[n]) {
+			melodic = false;
+		}
 	}
+
 	check("@0-@18 match instrToSample", melodic);
 
 	let percussion = true;
@@ -89,6 +92,7 @@ console.log("\nthe SRCN column against AddmusicK's own table");
 			percussion = false;
 		}
 	}
+
 	check("@21-@29 match instrToSample", percussion);
 
 	// The one disagreement, and the reason the search key stops at 18. AMK's

@@ -96,7 +96,10 @@ export class AramBar {
 
   protected readonly tooltip = computed(() => {
     const hover = this.hover();
-    if (!hover) return null;
+    if (!hover) {
+      return null;
+    }
+
     return {
       x: hover.x,
       text: `${hover.segment.label}: ${hover.segment.bytes.toLocaleString()} B`,

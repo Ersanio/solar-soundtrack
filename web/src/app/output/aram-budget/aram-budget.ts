@@ -46,7 +46,10 @@ export class AramBudget {
    */
   protected readonly rows = computed<TableRow[]>(() => {
     const budget = this.store.budget();
-    if (!budget) return [];
+    if (!budget) {
+      return [];
+    }
+
     return budget.rows
       .filter((row) => row.bytes > 0 || row.key === 'free')
       .map((row) => ({
@@ -74,11 +77,13 @@ export class AramBudget {
           'a real install will have less room than shown. Load your own main.bin for exact figures.',
       );
     }
+
     if (this.overflowing()) {
       notes.push(
         'This will not fit in ARAM. Reduce samples, shorten the song, or lower the echo buffer.',
       );
     }
+
     return notes;
   });
 }

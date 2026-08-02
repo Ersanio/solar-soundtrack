@@ -41,13 +41,19 @@ stubFetch();
 /** Peak absolute amplitude, as a fraction of full scale. */
 function peak(samples: Int16Array): number {
 	let max = 0;
-	for (const sample of samples) max = Math.max(max, Math.abs(sample));
+	for (const sample of samples) {
+		max = Math.max(max, Math.abs(sample));
+	}
+
 	return max / 32768;
 }
 
 function rms(samples: Int16Array): number {
 	let sum = 0;
-	for (const sample of samples) sum += sample * sample;
+	for (const sample of samples) {
+		sum += sample * sample;
+	}
+
 	return Math.sqrt(sum / samples.length) / 32768;
 }
 
@@ -81,6 +87,7 @@ function compileToSpc(source: string): Uint8Array {
 	if (!result.ok || !result.data) {
 		throw new Error(result.diagnostics.map((d) => `${d.code} ${d.message}`).join("; "));
 	}
+
 	// Resolve the compiler's own list, exactly as the app does. Passing
 	// `driver.samples` regardless would defeat the point of every `#samples` test.
 	const samples = resolveSamples(result.sampleList ?? driver.samples.map((s) => s.sampleName));
@@ -122,10 +129,12 @@ function renderMuted(spc: Uint8Array, warmup: number, frames: number, maskAt: (f
 			out.set(chunk, written);
 			written += chunk.length;
 		}
+
 		// After the block, like the worklet: a mask posted now takes effect on
 		// the next one.
 		applyChannelMutes(emu.aram(), maskAt(done), shadow);
 	}
+
 	return out.subarray(0, written);
 }
 
@@ -174,6 +183,7 @@ console.log("\nnotes differ audibly from each other");
 		emu.render(4000);
 		return emu.render(16000);
 	};
+
 	const low = render("#amk 4\n#0 t40 o2 v220 q7F @0 l1 c c c c\n");
 	const high = render("#amk 4\n#0 t40 o5 v220 q7F @0 l1 c c c c\n");
 
@@ -188,6 +198,7 @@ console.log("\nnotes differ audibly from each other");
 			}
 		}
 	}
+
 	check("o2 and o5 render differently", !identical);
 	check(
 		"both are audible",
@@ -215,6 +226,7 @@ console.log("\nfast-forward lands somewhere different");
 			break;
 		}
 	}
+
 	check("skipping 3s changes the output", !identical);
 	check("still audible after skipping", peak(fromThree) > 0.005, `peak ${peak(fromThree).toFixed(4)}`);
 }
@@ -337,14 +349,19 @@ console.log("\na muted channel goes on carrying the song");
 			// half-written; a real jump is still there on the next look.
 			const next = readDriverState(aram).trackPointers[0];
 			if (pending >= 0) {
-				if (next < before) passes.push(pending);
+				if (next < before) {
+					passes.push(pending);
+				}
+
 				pending = -1;
 			} else if (next < pointer) {
 				pending = ticks;
 				before = pointer;
 			}
+
 			pointer = next;
 		}
+
 		return { ticks, passes };
 	}
 
@@ -478,6 +495,7 @@ console.log("\na custom instrument resolves in the emulator");
 			break;
 		}
 	}
+
 	check("the custom envelope changes the sound", !identical);
 
 	// A second entry, so @31 exercises the six-byte stride in the driver. Both
@@ -504,7 +522,10 @@ console.log("\noptimizeSampleUsage does not silence the song");
 			aramAddress: plan.localPos,
 			options: { ...OPTIONS, optimizeSampleUsage: optimize },
 		});
-		if (!result.ok || !result.data) throw new Error(result.diagnostics.map((d) => d.message).join("; "));
+		if (!result.ok || !result.data) {
+			throw new Error(result.diagnostics.map((d) => d.message).join("; "));
+		}
+
 		const samples = resolveSamples(result.sampleList ?? []);
 		const spc = buildSpc({
 			songData: result.data,
@@ -539,6 +560,7 @@ console.log("\noptimizeSampleUsage does not silence the song");
 			}
 		}
 	}
+
 	check("and byte-for-byte identical, since only unplayed samples went", identical);
 
 	// A song reaching a sample only through raw `$DA` — the tracking hole AMK has.
@@ -619,7 +641,9 @@ console.log("\na .bnk sample bank plays through the emulator");
 
 	// Resolve bank slots alongside the bundled library, as the app does.
 	const withBank = new Map(BY_NAME);
-	for (const slot of slots) withBank.set(slot.sampleName, slot);
+	for (const slot of slots) {
+		withBank.set(slot.sampleName, slot);
+	}
 
 	const options = {
 		sampleNames: [...OPTIONS.sampleNames, "test.bnk"],
@@ -628,7 +652,10 @@ console.log("\na .bnk sample bank plays through the emulator");
 
 	const render = (mml: string, extra: Record<string, unknown> = {}): Int16Array => {
 		const result = compiler.compile({ source: mml, aramAddress: plan.localPos, options: { ...options, ...extra } });
-		if (!result.ok || !result.data) throw new Error(result.diagnostics.map((d) => `${d.code} ${d.message}`).join("; "));
+		if (!result.ok || !result.data) {
+			throw new Error(result.diagnostics.map((d) => `${d.code} ${d.message}`).join("; "));
+		}
+
 		const samples = (result.sampleList ?? []).map((name) => withBank.get(name) ?? emptySample(name));
 		emu.loadSpc(
 			buildSpc({
@@ -686,11 +713,15 @@ console.log("\nthe loop really lasts as long as the compiler says");
 		const mono = new Float64Array(total);
 		for (let at = 0; at < total; at += 32000) {
 			const out = loopEmu.render(Math.min(32000, total - at));
-			for (let i = 0; i < out.length / 2; i++) mono[at + i] = (out[i * 2] + out[i * 2 + 1]) / 2;
+			for (let i = 0; i < out.length / 2; i++) {
+				mono[at + i] = (out[i * 2] + out[i * 2 + 1]) / 2;
+			}
 		}
 
 		let loudest = 0;
-		for (const value of mono) loudest = Math.max(loudest, Math.abs(value));
+		for (const value of mono) {
+			loudest = Math.max(loudest, Math.abs(value));
+		}
 
 		const threshold = loudest * 0.15;
 		const quiet = Math.round(0.2 * SPC_SAMPLE_RATE);
@@ -698,9 +729,14 @@ console.log("\nthe loop really lasts as long as the compiler says");
 		let silent = quiet;
 		for (let i = 0; i < total; i++) {
 			if (Math.abs(mono[i]) > threshold) {
-				if (silent >= quiet) onsets.push(i);
+				if (silent >= quiet) {
+					onsets.push(i);
+				}
+
 				silent = 0;
-			} else silent++;
+			} else {
+				silent++;
+			}
 		}
 
 		const spans = onsets.length - 1;
@@ -782,14 +818,19 @@ console.log("\nthe driver's own ticks are counted exactly");
 			// jump is still there on the next look.
 			const next = readDriverState(aram).trackPointers[0];
 			if (pending >= 0) {
-				if (next < before) passes.push(pending);
+				if (next < before) {
+					passes.push(pending);
+				}
+
 				pending = -1;
 			} else if (next < pointer) {
 				pending = ticks;
 				before = pointer;
 			}
+
 			pointer = next;
 		}
+
 		return { ticks, passes };
 	}
 

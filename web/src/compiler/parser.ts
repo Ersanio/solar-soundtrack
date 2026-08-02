@@ -337,7 +337,9 @@ export class AddmusicKParser {
 
 	parse(): ParseOutput {
 		let text = this.source;
-		if (text.charCodeAt(0) === 0xfeff) text = text.slice(1);
+		if (text.charCodeAt(0) === 0xfeff) {
+			text = text.slice(1);
+		}
 
 		// A stripped BOM shifts everything after it, so spans are mapped back
 		// through the text the preprocessor actually saw and the byte is added
@@ -356,7 +358,10 @@ export class AddmusicKParser {
 
 		if (this.errorCount === 0 && this.applyTarget(pre.version)) {
 			this.detectStartingChannel();
-			for (let z = 0; z < 19; z++) this.transposeMap[z] = DEFAULT_TRANSPOSE[z];
+			for (let z = 0; z < 19; z++) {
+				this.transposeMap[z] = DEFAULT_TRANSPOSE[z];
+			}
+
 			// Music.cpp:410 — Addmusic 4.05 suppresses tuning until an instrument
 			// is explicitly declared on a channel.
 			this.ignoreTuning.fill(this.songTargetProgram === 1);
@@ -406,6 +411,7 @@ export class AddmusicKParser {
 				break;
 			}
 		}
+
 		this.resizedChannel = this.channel;
 	}
 
@@ -484,6 +490,7 @@ export class AddmusicKParser {
 				this.append(0);
 			}
 		}
+
 		this.channel = saved;
 	}
 
@@ -497,7 +504,10 @@ export class AddmusicKParser {
 
 	private skipSpaces(): void {
 		while (this.pos < this.text.length && isSpace(this.text[this.pos])) {
-			if (this.text[this.pos] === "\n") this.line++;
+			if (this.text[this.pos] === "\n") {
+				this.line++;
+			}
+
 			this.pos++;
 		}
 	}
@@ -511,6 +521,7 @@ export class AddmusicKParser {
 			this.pos++;
 			digits++;
 		}
+
 		return digits === 0 ? -1 : value;
 	}
 
@@ -521,6 +532,7 @@ export class AddmusicKParser {
 			negative = true;
 			this.pos++;
 		}
+
 		let value = 0;
 		let digits = 0;
 		while (this.pos < this.text.length && isDigit(this.text[this.pos])) {
@@ -528,7 +540,11 @@ export class AddmusicKParser {
 			this.pos++;
 			digits++;
 		}
-		if (digits === 0) throw new Error("Invalid number");
+
+		if (digits === 0) {
+			throw new Error("Invalid number");
+		}
+
 		return negative ? -value : value;
 	}
 
@@ -537,17 +553,27 @@ export class AddmusicKParser {
 		let value = 0;
 		let digits = 0;
 		while (this.pos < this.text.length) {
-			if (digits >= 2 && !anyLength) break;
+			if (digits >= 2 && !anyLength) {
+				break;
+			}
+
 			const c = this.text[this.pos];
 			let nibble: number;
-			if (c >= "0" && c <= "9") nibble = c.charCodeAt(0) - 0x30;
-			else if (c >= "A" && c <= "F") nibble = c.charCodeAt(0) - 0x37;
-			else if (c >= "a" && c <= "f") nibble = c.charCodeAt(0) - 0x57;
-			else break;
+			if (c >= "0" && c <= "9") {
+				nibble = c.charCodeAt(0) - 0x30;
+			} else if (c >= "A" && c <= "F") {
+				nibble = c.charCodeAt(0) - 0x37;
+			} else if (c >= "a" && c <= "f") {
+				nibble = c.charCodeAt(0) - 0x57;
+			} else {
+				break;
+			}
+
 			this.pos++;
 			digits++;
 			value = value * 16 + nibble;
 		}
+
 		return digits === 0 ? -1 : value;
 	}
 
@@ -560,6 +586,7 @@ export class AddmusicKParser {
 			value--;
 			this.pos++;
 		}
+
 		return value;
 	}
 
@@ -573,8 +600,11 @@ export class AddmusicKParser {
 				this.error("AMK0010", "Error parsing note length.");
 				ticks = this.defaultNoteLength;
 			}
+
 			// Exact tick counts only gained dot/triplet modifiers in #amk 4.
-			if (this.targetAMKVersion < 4) return ticks;
+			if (this.targetAMKVersion < 4) {
+				return ticks;
+			}
 		} else if (n < 1 || n > TICKS_PER_WHOLE) {
 			ticks = this.defaultNoteLength;
 		} else {
@@ -585,8 +615,10 @@ export class AddmusicKParser {
 					"A note length was used that is not divisible by 192 ticks, so it produces a fractional tick value.",
 				);
 			}
+
 			ticks = Math.floor(TICKS_PER_WHOLE / n);
 		}
+
 		return this.getNoteLengthModifier(ticks, true);
 	}
 
@@ -601,25 +633,34 @@ export class AddmusicKParser {
 					`Adding ${dots + 1 === 1 ? "a dot" : `${dots + 1} dots`} to this note produces a fractional tick value.`,
 				);
 			}
+
 			frac = Math.floor(frac / 2);
 			ticks += frac;
 			this.pos++;
 			dots++;
 			// Music.cpp:2960 — Addmusic 4.05 stops after two dots.
-			if (dots === 2 && this.songTargetProgram === 1) break;
+			if (dots === 2 && this.songTargetProgram === 1) {
+				break;
+			}
 		}
+
 		if (this.triplet && allowTriplet) {
 			if (ticks % 3 !== 0) {
 				this.warnOnce("fraction", "AMK0200", "Putting this note in a triplet produces a fractional tick value.");
 			}
+
 			ticks = Math.floor((ticks * 2.0) / 3.0 + 0.5);
 		}
+
 		return ticks;
 	}
 
 	/** Music.cpp:3662 — the tempo ratio only applies from #amk 4. */
 	private divideByTempoRatio(value: number, fractionIsError: boolean): number {
-		if (this.targetAMKVersion < 4 || this.tempoRatio === 1) return value;
+		if (this.targetAMKVersion < 4 || this.tempoRatio === 1) {
+			return value;
+		}
+
 		const result = Math.floor(value / this.tempoRatio);
 		if (value % this.tempoRatio !== 0) {
 			if (fractionIsError) {
@@ -628,12 +669,16 @@ export class AddmusicKParser {
 				this.warnOnce("ratio", "AMK0201", "The tempo ratio produced a fractional value.");
 			}
 		}
+
 		return result;
 	}
 
 	private multiplyByTempoRatio(value: number): number {
 		const result = value * this.tempoRatio;
-		if (result >= 256) this.error("AMK0012", "Using the tempo ratio on this value would overflow.");
+		if (result >= 256) {
+			this.error("AMK0012", "Using the tempo ratio on this value would overflow.");
+		}
+
 		return result;
 	}
 
@@ -681,11 +726,15 @@ export class AddmusicKParser {
 	 * difference.
 	 */
 	private doReplacement(): void {
-		if (this.replacements.size === 0) return;
+		if (this.replacements.size === 0) {
+			return;
+		}
+
 		if (this.replacementsDirty) {
 			this.sortedReplacements = [...this.replacements.entries()].sort((a, b) => b[0].length - a[0].length);
 			this.replacementsDirty = false;
 		}
+
 		// Music.cpp:137 caps this at 500. Anything lower rejects chains the
 		// reference compiles.
 		for (let guard = 0; guard < 500; guard++) {
@@ -704,8 +753,12 @@ export class AddmusicKParser {
 					break;
 				}
 			}
-			if (!matched) return;
+
+			if (!matched) {
+				return;
+			}
 		}
+
 		this.error("AMK0023", "Replacement expansion did not terminate (recursive definition?).");
 	}
 
@@ -721,10 +774,14 @@ export class AddmusicKParser {
 	private parseComment(): void {
 		if (this.songTargetProgram === 2) {
 			this.pos++;
-			while (this.pos < this.text.length && this.text[this.pos] !== "\n") this.pos++;
+			while (this.pos < this.text.length && this.text[this.pos] !== "\n") {
+				this.pos++;
+			}
+
 			this.line++;
 			return;
 		}
+
 		this.pos++;
 		this.error("AMK0101", "Illegal use of comments. Sorry about that.");
 	}
@@ -741,7 +798,9 @@ export class AddmusicKParser {
 	private parseQMark(): void {
 		this.pos++;
 		const which = this.getInt();
-		if (which === -1 || which === 0) this.doesntLoop = true;
+		if (which === -1 || which === 0) {
+			this.doesntLoop = true;
+		}
 	}
 
 	private parseHash(): void {
@@ -750,9 +809,15 @@ export class AddmusicKParser {
 			this.parseSpecialDirective();
 			return;
 		}
+
 		const n = this.getInt();
-		if (n === -1) return this.error("AMK0030", "Error parsing channel directive.");
-		if (n < 0 || n > 7) return this.error("AMK0031", "Illegal value for channel directive; must be #0 to #7.");
+		if (n === -1) {
+			return this.error("AMK0030", "Error parsing channel directive.");
+		}
+
+		if (n < 0 || n > 7) {
+			return this.error("AMK0031", "Illegal value for channel directive; must be #0 to #7.");
+		}
 
 		this.channel = n;
 		this.q[8] = this.q[n];
@@ -765,7 +830,10 @@ export class AddmusicKParser {
 
 	private matchWord(word: string): boolean {
 		const slice = this.text.slice(this.pos, this.pos + word.length);
-		if (slice.toLowerCase() !== word) return false;
+		if (slice.toLowerCase() !== word) {
+			return false;
+		}
+
 		const after = this.text[this.pos + word.length];
 		return after === undefined || isSpace(after) || after === "{";
 	}
@@ -778,9 +846,14 @@ export class AddmusicKParser {
 			this.parseBlock(() => this.parseSpcInfo());
 		} else if (this.matchWord("halvetempo")) {
 			this.pos += 10;
-			if (this.channelDefined) return this.error("AMK0040", "#halvetempo must be used before any and all channels.");
+			if (this.channelDefined) {
+				return this.error("AMK0040", "#halvetempo must be used before any and all channels.");
+			}
+
 			this.tempoRatio *= 2;
-			if (!this.checkTempoRatio(start)) return;
+			if (!this.checkTempoRatio(start)) {
+				return;
+			}
 		} else if (this.matchWord("option")) {
 			this.pos += 6;
 			this.parseOptionDirective();
@@ -789,6 +862,7 @@ export class AddmusicKParser {
 			if (this.targetAMKVersion > 1) {
 				this.warn(start, this.pos, "AMK0204", "#louder is redundant in #amk 2 and above.");
 			}
+
 			this.append(0xf4);
 			this.append(0x08);
 		} else if (this.matchWord("tempoimmunity")) {
@@ -816,17 +890,23 @@ export class AddmusicKParser {
 			// music. Reporting it costs compatibility with songs that only work by
 			// accident, which is a trade worth making.
 			this.errorAt(start, end === -1 ? this.text.length : end, "AMK0055", "Unknown # directive.");
-			while (this.pos < this.text.length && this.text[this.pos] !== "\n") this.pos++;
+			while (this.pos < this.text.length && this.text[this.pos] !== "\n") {
+				this.pos++;
+			}
 		}
 	}
 
 	/** Music.cpp:parseOptionDirective. */
 	private parseOptionDirective(): void {
 		const start = this.pos;
-		if (this.targetAMKVersion === 1) return this.error("AMK0045", "#option is not available in #amk 1.");
+		if (this.targetAMKVersion === 1) {
+			return this.error("AMK0045", "#option is not available in #amk 1.");
+		}
+
 		if (this.channelDefined) {
 			return this.error("AMK0041", "#option directives must be used before any and all channels.");
 		}
+
 		this.skipSpaces();
 
 		if (this.matchWord("smwvtable")) {
@@ -868,14 +948,23 @@ export class AddmusicKParser {
 			this.pos += 11;
 			this.skipSpaces();
 			const n = this.getInt();
-			if (n === -1) return this.error("AMK0042", "Missing integer argument for #option dividetempo.");
-			if (n === 0) return this.error("AMK0043", "Argument for #option dividetempo cannot be 0.");
+			if (n === -1) {
+				return this.error("AMK0042", "Missing integer argument for #option dividetempo.");
+			}
+
+			if (n === 0) {
+				return this.error("AMK0043", "Argument for #option dividetempo cannot be 0.");
+			}
+
 			// Music.cpp:2388
 			if (n === 1) {
 				this.warn(start, this.pos, "AMK0214", "#option dividetempo 1 has no effect.");
 			}
+
 			this.tempoRatio = n;
-			if (!this.checkTempoRatio(start)) return;
+			if (!this.checkTempoRatio(start)) {
+				return;
+			}
 		} else if (this.targetAMKVersion >= 4 && this.matchWord("amk109hotpatch")) {
 			this.pos += 14;
 			this.append(0xfa);
@@ -900,9 +989,12 @@ export class AddmusicKParser {
 		if (this.text[this.pos] !== '"') {
 			return this.error("AMK0052", "Unexpected symbol in #path; expected a quoted string.");
 		}
+
 		this.pos++;
 		const dir = this.getQuotedString();
-		if (dir === null) return;
+		if (dir === null) {
+			return;
+		}
 
 		const trimmed = dir
 			.replace(/^[.\\/]+/, "")
@@ -920,15 +1012,22 @@ export class AddmusicKParser {
 	 * under a cascade of nonsense.
 	 */
 	private skipPastBlockEnd(): void {
-		while (this.pos < this.text.length && this.text[this.pos] !== "}") this.pos++;
-		if (this.pos < this.text.length) this.pos++;
+		while (this.pos < this.text.length && this.text[this.pos] !== "}") {
+			this.pos++;
+		}
+
+		if (this.pos < this.text.length) {
+			this.pos++;
+		}
 	}
 
 	/** Runs a block parser and cleans up after it if it bailed. */
 	private parseBlock(body: () => void): void {
 		const before = this.errorCount;
 		body();
-		if (this.errorCount > before) this.skipPastBlockEnd();
+		if (this.errorCount > before) {
+			this.skipPastBlockEnd();
+		}
 	}
 
 	/**
@@ -940,7 +1039,10 @@ export class AddmusicKParser {
 	 * makes every tempo round to zero, so the exact threshold is immaterial.
 	 */
 	private checkTempoRatio(start: number): boolean {
-		if (this.tempoRatio > 0 && this.tempoRatio <= 0x8000) return true;
+		if (this.tempoRatio > 0 && this.tempoRatio <= 0x8000) {
+			return true;
+		}
+
 		this.errorAt(
 			start,
 			this.pos,
@@ -965,9 +1067,13 @@ export class AddmusicKParser {
 		if (this.text[this.pos] !== "$") {
 			return this.error("AMK0053", "Error parsing #pad; the size must be a $ hex value.");
 		}
+
 		this.pos++;
 		const size = this.getHex(true);
-		if (size === -1) return this.error("AMK0053", "Error parsing #pad; the size must be a $ hex value.");
+		if (size === -1) {
+			return this.error("AMK0053", "Error parsing #pad; the size must be a $ hex value.");
+		}
+
 		this.minSize = size;
 	}
 
@@ -986,6 +1092,7 @@ export class AddmusicKParser {
 		if (this.text[this.pos] !== "{") {
 			return this.error("AMK0050", 'Unexpected character in #samples; expected "{".');
 		}
+
 		this.pos++;
 
 		for (;;) {
@@ -1003,8 +1110,14 @@ export class AddmusicKParser {
 			if (character === '"') {
 				this.pos++;
 				const quoted = this.getQuotedString();
-				if (quoted === null) return;
-				if (!this.addSampleByName(this.basepath + quoted)) return;
+				if (quoted === null) {
+					return;
+				}
+
+				if (!this.addSampleByName(this.basepath + quoted)) {
+					return;
+				}
+
 				continue;
 			}
 
@@ -1018,7 +1131,11 @@ export class AddmusicKParser {
 					group += this.text[this.pos];
 					this.pos++;
 				}
-				if (!this.addSampleGroup(group)) return;
+
+				if (!this.addSampleGroup(group)) {
+					return;
+				}
+
 				continue;
 			}
 
@@ -1052,7 +1169,10 @@ export class AddmusicKParser {
 			// (`addSampleBank`, globals.cpp:581-615). Keeping the blanks is the
 			// point: a song ported from another game addresses its samples by
 			// SRCN, so skipping empty slots would renumber every one after them.
-			for (let slot = 0; slot < BANK_SLOT_COUNT; slot++) this.pushSample(bankSlotName(name, slot));
+			for (let slot = 0; slot < BANK_SLOT_COUNT; slot++) {
+				this.pushSample(bankSlotName(name, slot));
+			}
+
 			return true;
 		}
 
@@ -1092,6 +1212,7 @@ export class AddmusicKParser {
 		if (this.text[this.pos] !== "{") {
 			return this.error("AMK0051", 'Could not find the opening brace in #instruments; expected "{".');
 		}
+
 		this.pos++;
 
 		for (;;) {
@@ -1099,13 +1220,17 @@ export class AddmusicKParser {
 			if (this.pos >= this.text.length) {
 				return this.errorAt(start, this.pos, "AMK0069", "Unexpected end of file while parsing #instruments.");
 			}
+
 			if (this.text[this.pos] === "}") {
 				this.pos++;
 				return;
 			}
 
 			const sample = this.readInstrumentSample();
-			if (sample === null) return;
+			if (sample === null) {
+				return;
+			}
+
 			this.instrumentData.push(sample);
 			this.noteSampleUse(sample);
 
@@ -1119,11 +1244,13 @@ export class AddmusicKParser {
 						"Error parsing #instruments; every instrument needs exactly six bytes — a sample followed by five $xx values.",
 					);
 				}
+
 				this.pos++;
 				const value = this.getHex();
 				if (value === -1 || value > 0xff) {
 					return this.error("AMK0088", "Error parsing #instruments; expected a one-byte hex value.");
 				}
+
 				this.instrumentData.push(value);
 			}
 		}
@@ -1141,7 +1268,10 @@ export class AddmusicKParser {
 		if (character === '"') {
 			this.pos++;
 			const quoted = this.getQuotedString();
-			if (quoted === null) return null;
+			if (quoted === null) {
+				return null;
+			}
+
 			const name = this.basepath + quoted;
 			// Resolved against *this song's* list, not the whole library, because
 			// the byte stored is an SRCN. That lookup is also what makes
@@ -1152,6 +1282,7 @@ export class AddmusicKParser {
 				this.error("AMK0089", `The sample "${name}" was not included in this song; add it to #samples first.`);
 				return null;
 			}
+
 			return srcn;
 		}
 
@@ -1162,10 +1293,12 @@ export class AddmusicKParser {
 				this.error("AMK0102", "Error parsing the instrument-copy portion of #instruments.");
 				return null;
 			}
+
 			if (n >= FIRST_CUSTOM_INSTRUMENT) {
 				this.error("AMK0103", "Cannot use a custom instrument's sample as a base for another custom instrument.");
 				return null;
 			}
+
 			return INSTRUMENT_TO_SAMPLE[n];
 		}
 
@@ -1176,10 +1309,12 @@ export class AddmusicKParser {
 				this.error("AMK0104", "Error parsing the noise portion of #instruments.");
 				return null;
 			}
+
 			if (pitch >= 0x20) {
 				this.error("AMK0105", "Invalid noise pitch; it must be a hex value from $00 to $1F.");
 				return null;
 			}
+
 			// The high bit is what tells the driver this is noise, not a sample.
 			return pitch | 0x80;
 		}
@@ -1203,8 +1338,12 @@ export class AddmusicKParser {
 			);
 			return false;
 		}
+
 		// Group members are resolved unprefixed; `#path` does not apply to them.
-		for (const member of members) this.pushSample(member);
+		for (const member of members) {
+			this.pushSample(member);
+		}
+
 		return true;
 	}
 
@@ -1215,19 +1354,27 @@ export class AddmusicKParser {
 	private parseSpcInfo(): void {
 		const start = this.pos;
 		this.skipSpaces();
-		if (this.text[this.pos] !== "{") return this.error("AMK0060", 'Error parsing #spc; expected "{".');
+		if (this.text[this.pos] !== "{") {
+			return this.error("AMK0060", 'Error parsing #spc; expected "{".');
+		}
+
 		this.pos++;
 
 		for (;;) {
 			this.skipSpaces();
-			if (this.pos >= this.text.length) return this.error("AMK0061", "Unterminated #spc block.");
+			if (this.pos >= this.text.length) {
+				return this.error("AMK0061", "Unterminated #spc block.");
+			}
+
 			if (this.text[this.pos] === "}") {
 				this.pos++;
 				break;
 			}
+
 			if (this.text[this.pos] !== "#") {
 				return this.error("AMK0062", 'Error parsing #spc; expected a field name or "}".');
 			}
+
 			this.pos++;
 
 			// Music.cpp:3468 reads to the next whitespace, so `#titlex` is reported
@@ -1237,13 +1384,17 @@ export class AddmusicKParser {
 				field += this.text[this.pos].toLowerCase();
 				this.pos++;
 			}
+
 			this.skipSpaces();
 			if (this.text[this.pos] !== '"') {
 				return this.error("AMK0063", `Error parsing #spc; field "${field}" is missing its quoted value.`);
 			}
+
 			this.pos++;
 			const value = this.getQuotedString();
-			if (value === null) return;
+			if (value === null) {
+				return;
+			}
 
 			switch (field) {
 				case "title":
@@ -1260,7 +1411,10 @@ export class AddmusicKParser {
 					break;
 				case "length":
 					this.tags.length = value;
-					if (!this.parseLengthField(value, start)) return;
+					if (!this.parseLengthField(value, start)) {
+						return;
+					}
+
 					break;
 				default:
 					this.error("AMK0065", `Unknown #spc field "#${field}".`);
@@ -1307,7 +1461,10 @@ export class AddmusicKParser {
 
 	private truncateTag(field: "title" | "game" | "author" | "comment", start: number): void {
 		const value = this.tags[field];
-		if (value === undefined || value.length <= AddmusicKParser.TAG_LIMIT) return;
+		if (value === undefined || value.length <= AddmusicKParser.TAG_LIMIT) {
+			return;
+		}
+
 		this.tags[field] = value.slice(0, AddmusicKParser.TAG_LIMIT);
 		this.warn(
 			start,
@@ -1332,17 +1489,21 @@ export class AddmusicKParser {
 					this.error("AMK0068", 'The only escape sequence allowed inside a string is \\".');
 					return null;
 				}
+
 				out += '"';
 				this.pos += 2;
 				continue;
 			}
+
 			out += this.text[this.pos];
 			this.pos++;
 		}
+
 		if (this.pos >= this.text.length) {
 			this.error("AMK0064", "Unterminated string.");
 			return null;
 		}
+
 		this.pos++;
 		return out;
 	}
@@ -1353,7 +1514,10 @@ export class AddmusicKParser {
 		if (n === -1 && this.text[this.pos] === "=" && this.targetAMKVersion >= 4) {
 			this.pos++;
 			n = this.getInt();
-			if (n === -1) return this.error("AMK0070", 'Error parsing "l" directive.');
+			if (n === -1) {
+				return this.error("AMK0070", 'Error parsing "l" directive.');
+			}
+
 			this.defaultNoteLength = n;
 		} else if (n === -1) {
 			return this.error("AMK0070", 'Error parsing "l" directive.');
@@ -1363,8 +1527,10 @@ export class AddmusicKParser {
 			if (TICKS_PER_WHOLE % n !== 0) {
 				this.warnOnce("fraction", "AMK0200", "A default note length was used that is not divisible by 192 ticks.");
 			}
+
 			this.defaultNoteLength = Math.floor(TICKS_PER_WHOLE / n);
 		}
+
 		if (this.targetAMKVersion >= 4) {
 			this.defaultNoteLength = this.getNoteLengthModifier(this.defaultNoteLength, false);
 		}
@@ -1373,7 +1539,10 @@ export class AddmusicKParser {
 	private parseGlobalVolume(): void {
 		this.pos++;
 		const [duration, volume, ok] = this.parseFadeableValue("global volume", "w", "AMK0072");
-		if (!ok) return;
+		if (!ok) {
+			return;
+		}
+
 		if (duration === -1) {
 			this.append(0xe0);
 			this.append(volume);
@@ -1387,7 +1556,10 @@ export class AddmusicKParser {
 	private parseVolume(): void {
 		this.pos++;
 		const [duration, volume, ok] = this.parseFadeableValue("volume", "v", "AMK0073");
-		if (!ok) return;
+		if (!ok) {
+			return;
+		}
+
 		if (duration === -1) {
 			this.append(0xe7);
 			this.append(volume);
@@ -1406,6 +1578,7 @@ export class AddmusicKParser {
 			this.error(code, `Error parsing ${label} ("${letter}") command.`);
 			return [-1, -1, false];
 		}
+
 		if (this.targetAMKVersion >= 3) {
 			this.skipSpaces();
 			if (this.text[this.pos] === ",") {
@@ -1419,14 +1592,17 @@ export class AddmusicKParser {
 				}
 			}
 		}
+
 		if (value < 0 || value > 255) {
 			this.error(code, `Illegal value for ${label} ("${letter}") command.`);
 			return [-1, -1, false];
 		}
+
 		if (duration !== -1 && (duration < 0 || duration > 255)) {
 			this.error(code, `Illegal duration for ${label} ("${letter}") command.`);
 			return [-1, -1, false];
 		}
+
 		return [duration, value, true];
 	}
 
@@ -1436,6 +1612,7 @@ export class AddmusicKParser {
 		if (n === -1 || n < 1 || n > 0x7f) {
 			return this.error("AMK0074", 'Error parsing quantization ("q") command; expected a hex value from 01 to 7F.');
 		}
+
 		if (this.channel === 8) {
 			this.q[this.prevChannel] = n;
 			this.updateQ[this.prevChannel] = true;
@@ -1443,6 +1620,7 @@ export class AddmusicKParser {
 			this.q[this.channel] = n;
 			this.updateQ[this.channel] = true;
 		}
+
 		this.q[8] = n;
 		this.updateQ[8] = true;
 	}
@@ -1450,23 +1628,44 @@ export class AddmusicKParser {
 	private parsePan(): void {
 		this.pos++;
 		let n = this.getInt();
-		if (n === -1) return this.error("AMK0075", 'Error parsing pan ("y") command.');
-		if (n < 0 || n > 20) return this.error("AMK0076", 'Illegal value for pan ("y") command; must be 0 to 20.');
+		if (n === -1) {
+			return this.error("AMK0075", 'Error parsing pan ("y") command.');
+		}
+
+		if (n < 0 || n > 20) {
+			return this.error("AMK0076", 'Illegal value for pan ("y") command; must be 0 to 20.');
+		}
+
 		let pan = n;
 
 		this.skipSpaces();
 		if (this.text[this.pos] === ",") {
 			this.pos++;
 			n = this.getInt();
-			if (n === -1) return this.error("AMK0075", 'Error parsing pan ("y") command.');
-			if (n > 2) return this.error("AMK0076", 'Illegal value for pan ("y") command.');
+			if (n === -1) {
+				return this.error("AMK0075", 'Error parsing pan ("y") command.');
+			}
+
+			if (n > 2) {
+				return this.error("AMK0076", 'Illegal value for pan ("y") command.');
+			}
+
 			pan |= n << 7;
 			this.skipSpaces();
-			if (this.text[this.pos] !== ",") return this.error("AMK0075", 'Error parsing pan ("y") command.');
+			if (this.text[this.pos] !== ",") {
+				return this.error("AMK0075", 'Error parsing pan ("y") command.');
+			}
+
 			this.pos++;
 			n = this.getInt();
-			if (n === -1) return this.error("AMK0075", 'Error parsing pan ("y") command.');
-			if (n > 2) return this.error("AMK0076", 'Illegal value for pan ("y") command.');
+			if (n === -1) {
+				return this.error("AMK0075", 'Error parsing pan ("y") command.');
+			}
+
+			if (n > 2) {
+				return this.error("AMK0076", 'Illegal value for pan ("y") command.');
+			}
+
 			pan |= n << 6;
 		}
 
@@ -1475,7 +1674,9 @@ export class AddmusicKParser {
 	}
 
 	private parseIntro(): void {
-		if (this.channel === 8) return this.error("AMK0080", "Intro directive found within a loop.");
+		if (this.channel === 8) {
+			return this.error("AMK0080", "Intro directive found within a loop.");
+		}
 
 		if (!this.hasIntro) {
 			this.tempoChanges.push([this.channelLengths[this.channel], -this.tempo]);
@@ -1492,7 +1693,9 @@ export class AddmusicKParser {
 			this.introTicks = this.channelLengths[this.channel];
 		} else {
 			for (const change of this.tempoChanges) {
-				if (change[1] < 0) change[1] = -this.tempo;
+				if (change[1] < 0) {
+					change[1] = -this.tempo;
+				}
 			}
 		}
 
@@ -1506,14 +1709,19 @@ export class AddmusicKParser {
 
 	private parseT(): void {
 		this.pos++;
-		if (this.text.startsWith("uning[", this.pos)) this.parseTuningDirective();
-		else this.parseTempo();
+		if (this.text.startsWith("uning[", this.pos)) {
+			this.parseTuningDirective();
+		} else {
+			this.parseTempo();
+		}
 	}
 
 	private parseTempo(): void {
 		let duration = -1;
 		let value = this.getInt();
-		if (value === -1) return this.error("AMK0077", 'Error parsing tempo ("t") command.');
+		if (value === -1) {
+			return this.error("AMK0077", 'Error parsing tempo ("t") command.');
+		}
 
 		if (this.targetAMKVersion >= 3) {
 			this.skipSpaces();
@@ -1522,10 +1730,15 @@ export class AddmusicKParser {
 				this.skipSpaces();
 				duration = value;
 				value = this.getInt();
-				if (value === -1) return this.error("AMK0077", 'Error parsing tempo ("t") command.');
+				if (value === -1) {
+					return this.error("AMK0077", 'Error parsing tempo ("t") command.');
+				}
 			}
 		}
-		if (value < 0 || value > 255) return this.error("AMK0078", 'Illegal value for tempo ("t") command.');
+
+		if (value < 0 || value > 255) {
+			return this.error("AMK0078", 'Illegal value for tempo ("t") command.');
+		}
 
 		this.tempo = this.divideByTempoRatio(value, false);
 		if (this.tempo === 0) {
@@ -1539,10 +1752,14 @@ export class AddmusicKParser {
 			} else {
 				this.tempoChanges.push([this.channelLengths[this.channel], this.tempo]);
 			}
+
 			this.append(0xe2);
 			this.append(this.tempo);
 		} else {
-			if (duration < 0 || duration > 255) return this.error("AMK0078", 'Illegal duration for tempo ("t") command.');
+			if (duration < 0 || duration > 255) {
+				return this.error("AMK0078", 'Illegal duration for tempo ("t") command.');
+			}
+
 			this.guessLength = false;
 			this.append(0xe3);
 			this.append(this.divideByTempoRatio(duration, false));
@@ -1553,39 +1770,67 @@ export class AddmusicKParser {
 	private parseTuningDirective(): void {
 		this.pos += 6;
 		let index = this.getInt();
-		if (index === -1) return this.error("AMK0081", "Error parsing tuning directive.");
-		if (index < 0 || index > 255) return this.error("AMK0082", "Illegal instrument value for tuning directive.");
-		if (this.text[this.pos] !== "]") return this.error("AMK0081", "Error parsing tuning directive.");
+		if (index === -1) {
+			return this.error("AMK0081", "Error parsing tuning directive.");
+		}
+
+		if (index < 0 || index > 255) {
+			return this.error("AMK0082", "Illegal instrument value for tuning directive.");
+		}
+
+		if (this.text[this.pos] !== "]") {
+			return this.error("AMK0081", "Error parsing tuning directive.");
+		}
+
 		this.pos++;
 		this.skipSpaces();
-		if (this.text[this.pos] !== "=") return this.error("AMK0081", "Error parsing tuning directive.");
+		if (this.text[this.pos] !== "=") {
+			return this.error("AMK0081", "Error parsing tuning directive.");
+		}
+
 		this.pos++;
 
 		for (;;) {
 			this.skipSpaces();
 			let plus = true;
-			if (this.text[this.pos] === "+") this.pos++;
-			else if (this.text[this.pos] === "-") {
+			if (this.text[this.pos] === "+") {
+				this.pos++;
+			} else if (this.text[this.pos] === "-") {
 				this.pos++;
 				plus = false;
 			}
+
 			const value = this.getInt();
-			if (value === -1) return this.error("AMK0081", "Error parsing tuning directive.");
+			if (value === -1) {
+				return this.error("AMK0081", "Error parsing tuning directive.");
+			}
+
 			this.transposeMap[index] = plus ? value : -value;
 
 			this.skipSpaces();
-			if (this.text[this.pos] !== ",") break;
+			if (this.text[this.pos] !== ",") {
+				break;
+			}
+
 			this.pos++;
 			index++;
-			if (index >= 256) return this.error("AMK0082", "Illegal value for tuning directive.");
+			if (index >= 256) {
+				return this.error("AMK0082", "Illegal value for tuning directive.");
+			}
 		}
 	}
 
 	private parseOctave(): void {
 		this.pos++;
 		const n = this.getInt();
-		if (n === -1) return this.error("AMK0083", 'Error parsing octave ("o") directive.');
-		if (n < 0 || n > 6) return this.error("AMK0084", 'Illegal value for octave ("o") directive; must be 0 to 6.');
+		if (n === -1) {
+			return this.error("AMK0083", 'Error parsing octave ("o") directive.');
+		}
+
+		if (n < 0 || n > 6) {
+			return this.error("AMK0084", 'Illegal value for octave ("o") directive; must be 0 to 6.');
+		}
+
 		this.octave = n;
 	}
 
@@ -1618,13 +1863,20 @@ export class AddmusicKParser {
 		}
 
 		let n = this.getInt();
-		if (n === -1) return this.error("AMK0090", 'Error parsing instrument ("@") command.');
-		if (n < 0 || n > 255) return this.error("AMK0091", 'Illegal value for instrument ("@") command.');
+		if (n === -1) {
+			return this.error("AMK0090", 'Error parsing instrument ("@") command.');
+		}
+
+		if (n < 0 || n > 255) {
+			return this.error("AMK0091", 'Illegal value for instrument ("@") command.');
+		}
 
 		if (n <= 18 || direct || n >= FIRST_CUSTOM_INSTRUMENT) {
 			// Music.cpp:880 — Addmusic 4.05/M numbered custom instruments from $13;
 			// AddmusicK starts them at 30.
-			if (n >= 0x13 && n < FIRST_CUSTOM_INSTRUMENT) n = n - 0x13 + FIRST_CUSTOM_INSTRUMENT;
+			if (n >= 0x13 && n < FIRST_CUSTOM_INSTRUMENT) {
+				n = n - 0x13 + FIRST_CUSTOM_INSTRUMENT;
+			}
 
 			if (n >= FIRST_CUSTOM_INSTRUMENT) {
 				// Music.cpp:889. AMK only performs this check when
@@ -1641,10 +1893,13 @@ export class AddmusicKParser {
 							`the first entry there is @30.`,
 					);
 				}
+
 				this.noteSampleUse(this.instrumentData[entry]);
 			}
 
-			if (this.songTargetProgram === 1) this.ignoreTuning[this.channel] = false;
+			if (this.songTargetProgram === 1) {
+				this.ignoreTuning[this.channel] = false;
+			}
 
 			this.append(0xda);
 			this.append(n);
@@ -1665,8 +1920,10 @@ export class AddmusicKParser {
 						`${this.sampleList.length}. Include a group that covers the stock instruments, such as #default.`,
 				);
 			}
+
 			this.noteSampleUse(srcn);
 		}
+
 		this.instrument[this.channel] = n;
 
 		// Music.cpp:910 — AddmusicM resets tuning when a stock instrument is set.
@@ -1682,6 +1939,7 @@ export class AddmusicKParser {
 		if (this.songTargetProgram === 1) {
 			this.warnOnce("nonNativeCmd", "AMK0205", 'The "h" command is not native to Addmusic 4.05. Did you mean #amm?');
 		}
+
 		try {
 			this.hTranspose = this.getIntWithNegative();
 			this.usingHTranspose = true;
@@ -1696,6 +1954,7 @@ export class AddmusicKParser {
 		if (n < 0 || n > 0x1f) {
 			return this.error("AMK0094", 'Invalid value for the "n" command; must be a hex value from 0 to 1F.');
 		}
+
 		this.append(0xf8);
 		this.append(n);
 	}
@@ -1703,30 +1962,57 @@ export class AddmusicKParser {
 	private parseVibrato(): void {
 		this.pos++;
 		const t1 = this.getInt();
-		if (t1 === -1) return this.error("AMK0095", "Error parsing vibrato command.");
+		if (t1 === -1) {
+			return this.error("AMK0095", "Error parsing vibrato command.");
+		}
+
 		this.skipSpaces();
-		if (this.text[this.pos] !== ",") return this.error("AMK0095", "Error parsing vibrato command.");
+		if (this.text[this.pos] !== ",") {
+			return this.error("AMK0095", "Error parsing vibrato command.");
+		}
+
 		this.pos++;
 		this.skipSpaces();
 		const t2 = this.getInt();
-		if (t2 === -1) return this.error("AMK0095", "Error parsing vibrato command.");
+		if (t2 === -1) {
+			return this.error("AMK0095", "Error parsing vibrato command.");
+		}
+
 		this.skipSpaces();
 
 		if (this.text[this.pos] === ",") {
 			this.pos++;
 			this.skipSpaces();
 			const t3 = this.getInt();
-			if (t3 === -1) return this.error("AMK0095", "Error parsing vibrato command.");
-			if (t1 < 0 || t1 > 255) return this.error("AMK0096", "Illegal value for vibrato delay.");
-			if (t2 < 0 || t2 > 255) return this.error("AMK0096", "Illegal value for vibrato rate.");
-			if (t3 < 0 || t3 > 255) return this.error("AMK0096", "Illegal value for vibrato extent.");
+			if (t3 === -1) {
+				return this.error("AMK0095", "Error parsing vibrato command.");
+			}
+
+			if (t1 < 0 || t1 > 255) {
+				return this.error("AMK0096", "Illegal value for vibrato delay.");
+			}
+
+			if (t2 < 0 || t2 > 255) {
+				return this.error("AMK0096", "Illegal value for vibrato rate.");
+			}
+
+			if (t3 < 0 || t3 > 255) {
+				return this.error("AMK0096", "Illegal value for vibrato extent.");
+			}
+
 			this.append(0xde);
 			this.append(this.divideByTempoRatio(t1, false));
 			this.append(this.multiplyByTempoRatio(t2));
 			this.append(t3);
 		} else {
-			if (t1 < 0 || t1 > 255) return this.error("AMK0096", "Illegal value for vibrato rate.");
-			if (t2 < 0 || t2 > 255) return this.error("AMK0096", "Illegal value for vibrato extent.");
+			if (t1 < 0 || t1 > 255) {
+				return this.error("AMK0096", "Illegal value for vibrato rate.");
+			}
+
+			if (t2 < 0 || t2 > 255) {
+				return this.error("AMK0096", "Illegal value for vibrato extent.");
+			}
+
 			this.append(0xde);
 			this.append(0x00);
 			this.append(this.multiplyByTempoRatio(t1));
@@ -1736,19 +2022,28 @@ export class AddmusicKParser {
 
 	private parseTripletOpen(): void {
 		this.pos++;
-		if (this.triplet) return this.error("AMK0097", "Triplet-open directive found within a triplet block.");
+		if (this.triplet) {
+			return this.error("AMK0097", "Triplet-open directive found within a triplet block.");
+		}
+
 		this.triplet = true;
 	}
 
 	private parseTripletClose(): void {
 		this.pos++;
-		if (!this.triplet) return this.error("AMK0098", "Triplet-close directive found outside a triplet block.");
+		if (!this.triplet) {
+			return this.error("AMK0098", "Triplet-close directive found outside a triplet block.");
+		}
+
 		this.triplet = false;
 	}
 
 	private parsePitchSlide(): void {
 		this.pos++;
-		if (this.inPitchSlide) return this.error("AMK0099", "Pitch slide directive specified multiple times in a row.");
+		if (this.inPitchSlide) {
+			return this.error("AMK0099", "Pitch slide directive specified multiple times in a row.");
+		}
+
 		this.inPitchSlide = true;
 	}
 
@@ -1759,8 +2054,11 @@ export class AddmusicKParser {
 	/** Music.cpp:917 — a `(` is either a sample load or a label loop. */
 	private parseOpenParen(): void {
 		const next = this.text[this.pos + 1];
-		if (next === '"' || next === "@") this.parseSampleLoad();
-		else this.parseLabelLoop();
+		if (next === '"' || next === "@") {
+			this.parseSampleLoad();
+		} else {
+			this.parseLabelLoop();
+		}
 	}
 
 	/**
@@ -1788,6 +2086,7 @@ export class AddmusicKParser {
 					"A sample load must name a stock instrument between @0 and @29, as in (@1, $02).",
 				);
 			}
+
 			srcn = INSTRUMENT_TO_SAMPLE[n];
 		} else {
 			this.pos++;
@@ -1795,7 +2094,10 @@ export class AddmusicKParser {
 			// `getQuotedString`, so it has no escape handling. Using the shared
 			// reader is harmless: a name containing a quote could never resolve.
 			const quoted = this.getQuotedString();
-			if (quoted === null) return;
+			if (quoted === null) {
+				return;
+			}
+
 			const name = this.basepath + quoted;
 			const found = this.sampleList.indexOf(name);
 			if (found === -1) {
@@ -1806,6 +2108,7 @@ export class AddmusicKParser {
 					`The sample "${name}" was not included in this song; add it to #samples first.`,
 				);
 			}
+
 			srcn = found;
 		}
 
@@ -1817,6 +2120,7 @@ export class AddmusicKParser {
 				'Error parsing the sample load command; expected a comma, as in ("kick.brr", $02).',
 			);
 		}
+
 		this.pos++;
 		this.skipSpaces();
 
@@ -1828,6 +2132,7 @@ export class AddmusicKParser {
 				"Error parsing the sample load command; the tuning multiplier must be a $xx value.",
 			);
 		}
+
 		this.pos++;
 		const tuning = this.getHex();
 		if (tuning === -1 || tuning > 0xff) {
@@ -1837,6 +2142,7 @@ export class AddmusicKParser {
 		if (this.text[this.pos] !== ")") {
 			return this.errorAt(start, this.pos, "AMK0136", 'Error parsing the sample load command; expected ")".');
 		}
+
 		this.pos++;
 
 		this.noteSampleUse(srcn);
@@ -1853,24 +2159,40 @@ export class AddmusicKParser {
 			if (this.targetAMKVersion < 2) {
 				return this.errorAt(start, this.pos + 1, "AMK0117", "Unrecognized character '!'.");
 			}
+
 			this.pos++;
 			this.skipSpaces();
 
 			// Music.cpp:1015 — definitions and calls are told apart by *where they
 			// are*, not by syntax. `channelDefined` latches on the first `#N` and
 			// never clears, so every definition has to precede every channel.
-			if (this.channelDefined) this.parseRemoteCall(start);
-			else this.parseRemoteDefinition(start);
+			if (this.channelDefined) {
+				this.parseRemoteCall(start);
+			} else {
+				this.parseRemoteDefinition(start);
+			}
+
 			return;
 		}
 
-		if (this.channel === 8) return this.error("AMK0112", "Nested loops are not allowed.");
+		if (this.channel === 8) {
+			return this.error("AMK0112", "Nested loops are not allowed.");
+		}
 
 		let label = this.getInt();
-		if (label === -1) return this.error("AMK0113", "Error parsing label loop.");
+		if (label === -1) {
+			return this.error("AMK0113", "Error parsing label loop.");
+		}
+
 		label++; // Music.cpp offsets by one so that label 0 is usable.
-		if (label <= 0 || label >= 0x10000) return this.error("AMK0114", "Illegal value for loop label.");
-		if (this.text[this.pos] !== ")") return this.error("AMK0113", "Error parsing label loop.");
+		if (label <= 0 || label >= 0x10000) {
+			return this.error("AMK0114", "Illegal value for loop label.");
+		}
+
+		if (this.text[this.pos] !== ")") {
+			return this.error("AMK0113", "Error parsing label loop.");
+		}
+
 		this.pos++;
 
 		this.updateQ[this.channel] = true;
@@ -1890,7 +2212,10 @@ export class AddmusicKParser {
 		}
 
 		let count = this.getInt();
-		if (count === -1) count = 1;
+		if (count === -1) {
+			count = 1;
+		}
+
 		if (count < 1 || count > 255) {
 			this.error("AMK0116", "Invalid loop count.");
 			count = 1;
@@ -1918,12 +2243,15 @@ export class AddmusicKParser {
 	 */
 	private parseRemoteDefinition(start: number): void {
 		const label = this.getInt();
-		if (label === -1) return this.errorAt(start, this.pos, "AMK0111", "Error parsing remote code definition.");
+		if (label === -1) {
+			return this.errorAt(start, this.pos, "AMK0111", "Error parsing remote code definition.");
+		}
 
 		this.skipSpaces();
 		if (this.text[this.pos] !== ")") {
 			return this.errorAt(start, this.pos, "AMK0111", 'Error parsing remote code definition; expected ")".');
 		}
+
 		this.pos++;
 
 		if (this.text[this.pos] !== "[") {
@@ -1956,10 +2284,12 @@ export class AddmusicKParser {
 			if (which === null) {
 				return this.errorAt(start, this.pos, "AMK0138", "Error parsing remote code reset; expected a number.");
 			}
+
 			this.skipSpaces();
 			if (this.text[this.pos] !== ")") {
 				return this.errorAt(start, this.pos, "AMK0139", 'Error parsing remote code reset; expected ")".');
 			}
+
 			this.pos++;
 
 			// Music.cpp:1037. 0 disables both kinds, -1 the key-on kind, anything
@@ -1973,12 +2303,15 @@ export class AddmusicKParser {
 		}
 
 		const label = this.getInt();
-		if (label === -1) return this.errorAt(start, this.pos, "AMK0143", "Error parsing remote code setup.");
+		if (label === -1) {
+			return this.errorAt(start, this.pos, "AMK0143", "Error parsing remote code setup.");
+		}
 
 		this.skipSpaces();
 		if (this.text[this.pos] !== ",") {
 			return this.errorAt(start, this.pos, "AMK0144", "Error parsing remote code setup; expected a comma.");
 		}
+
 		this.pos++;
 		this.skipSpaces();
 
@@ -1991,6 +2324,7 @@ export class AddmusicKParser {
 				"Error parsing remote code setup; the event type was missing. Remote code cannot be defined inside a channel.",
 			);
 		}
+
 		this.skipSpaces();
 
 		// Event types 1 and 2 fire relative to a note, so they carry a duration.
@@ -2004,6 +2338,7 @@ export class AddmusicKParser {
 					"Error parsing remote code setup; the third argument is missing.",
 				);
 			}
+
 			this.pos++;
 			this.skipSpaces();
 
@@ -2023,15 +2358,20 @@ export class AddmusicKParser {
 				if (argument > 0x100) {
 					return this.errorAt(start, this.pos, "AMK0148", "The note length specified was too large.");
 				}
+
 				// A full 256 ticks wraps to zero in one byte (Music.cpp:1101).
-				if (argument === 0x100) argument = 0;
+				if (argument === 0x100) {
+					argument = 0;
+				}
 			}
+
 			this.skipSpaces();
 		}
 
 		if (this.text[this.pos] !== ")") {
 			return this.errorAt(start, this.pos, "AMK0149", 'Error parsing remote code setup; expected ")".');
 		}
+
 		this.pos++;
 
 		if (this.text[this.pos] === "[") {
@@ -2065,7 +2405,10 @@ export class AddmusicKParser {
 
 	private parseLoopStart(): void {
 		this.pos++;
-		if (this.channel < 8) this.updateQ[this.channel] = true;
+		if (this.channel < 8) {
+			this.updateQ[this.channel] = true;
+		}
+
 		this.updateQ[8] = true;
 		this.prevNoteLength = -1;
 
@@ -2074,7 +2417,11 @@ export class AddmusicKParser {
 			if (this.text[this.pos] === "[") {
 				return this.error("AMK0120", 'Ambiguous use of "[[[" — separate the "[[" and "[" to clarify your intent.');
 			}
-			if (this.inE6Loop) return this.error("AMK0121", "You cannot nest a subloop within another subloop.");
+
+			if (this.inE6Loop) {
+				return this.error("AMK0121", "You cannot nest a subloop within another subloop.");
+			}
+
 			// Music.cpp:1217 guards this with `text[pos - 2] == ')'` as well, and
 			// that lookbehind is all but unreachable: both brackets have been
 			// consumed by now, so `pos - 2` is the first '[', never the ')' of a
@@ -2084,13 +2431,16 @@ export class AddmusicKParser {
 			if (this.loopLabel > 0 && this.text[this.pos - 2] === ")") {
 				return this.error("AMK0122", "A label loop cannot define a subloop. Use a standard or remote loop instead.");
 			}
+
 			this.handleSuperLoopEnter();
 			this.append(0xe6);
 			this.append(0x00);
 			return;
 		}
 
-		if (this.channel === 8) return this.error("AMK0123", "You cannot nest standard [ ] loops.");
+		if (this.channel === 8) {
+			return this.error("AMK0123", "You cannot nest standard [ ] loops.");
+		}
 
 		this.prevLoop = this.data[8].length;
 		this.prevChannel = this.channel;
@@ -2098,10 +2448,15 @@ export class AddmusicKParser {
 		this.prevNoteLength = -1;
 		this.instrument[8] = this.instrument[this.prevChannel];
 		// Music.cpp:1240 — the loop block inherits the channel's tuning state.
-		if (this.songTargetProgram === 1) this.ignoreTuning[8] = this.ignoreTuning[this.prevChannel];
+		if (this.songTargetProgram === 1) {
+			this.ignoreTuning[8] = this.ignoreTuning[this.prevChannel];
+		}
 
 		if (this.loopLabel > 0) {
-			if (this.loopPointers.has(this.loopLabel)) return this.error("AMK0124", "Label redefinition.");
+			if (this.loopPointers.has(this.loopLabel)) {
+				return this.error("AMK0124", "Label redefinition.");
+			}
+
 			this.loopPointers.set(this.loopLabel, this.prevLoop);
 		}
 
@@ -2110,7 +2465,10 @@ export class AddmusicKParser {
 
 	private parseLoopEnd(): void {
 		this.pos++;
-		if (this.channel < 8) this.updateQ[this.channel] = true;
+		if (this.channel < 8) {
+			this.updateQ[this.channel] = true;
+		}
+
 		this.updateQ[8] = true;
 		this.prevNoteLength = -1;
 
@@ -2119,10 +2477,19 @@ export class AddmusicKParser {
 			if (this.text[this.pos] === "]") {
 				return this.error("AMK0125", 'Ambiguous use of "]]]" — separate the "]]" and "]" to clarify your intent.');
 			}
+
 			const count = this.getInt();
-			if (count === 1) return this.error("AMK0126", "A subloop cannot repeat only once.");
-			if (!this.inE6Loop) return this.error("AMK0127", "A subloop end was found outside of a subloop.");
-			if (count === -1) return this.error("AMK0128", "Error parsing subloop command; the loop count was missing.");
+			if (count === 1) {
+				return this.error("AMK0126", "A subloop cannot repeat only once.");
+			}
+
+			if (!this.inE6Loop) {
+				return this.error("AMK0127", "A subloop end was found outside of a subloop.");
+			}
+
+			if (count === -1) {
+				return this.error("AMK0128", "Error parsing subloop command; the loop count was missing.");
+			}
 
 			this.inE6Loop = false;
 			this.handleSuperLoopExit(count);
@@ -2131,7 +2498,9 @@ export class AddmusicKParser {
 			return;
 		}
 
-		if (this.channel !== 8) return this.error("AMK0129", "Loop end found outside of a loop.");
+		if (this.channel !== 8) {
+			return this.error("AMK0129", "Loop end found outside of a loop.");
+		}
 
 		let count = this.getInt();
 		// Music.cpp:1293 — a remote body is jumped into by the driver, not looped
@@ -2139,8 +2508,14 @@ export class AddmusicKParser {
 		if (count !== -1 && this.inRemoteDefinition) {
 			return this.error("AMK0164", "Remote code definitions cannot repeat.");
 		}
-		if (count === -1) count = 1;
-		if (count < 1 || count > 255) return this.error("AMK0116", "Invalid loop count.");
+
+		if (count === -1) {
+			count = 1;
+		}
+
+		if (count < 1 || count > 255) {
+			return this.error("AMK0116", "Invalid loop count.");
+		}
 
 		this.append(0);
 		this.channel = this.prevChannel;
@@ -2164,19 +2539,27 @@ export class AddmusicKParser {
 
 	private parseStarLoop(): void {
 		this.pos++;
-		if (this.channel === 8) return this.error("AMK0112", "Nested loops are not allowed.");
+		if (this.channel === 8) {
+			return this.error("AMK0112", "Nested loops are not allowed.");
+		}
+
 		// Deliberately stricter than the reference. Music.cpp:1321 has no such
 		// check, so `*` before any `[ ]` emits `$E9` against an uninitialised
 		// `prevLoop` of -1 — two 0xFF bytes that relocation turns into a pointer
 		// to nowhere. There is no reading of that as intentional.
-		if (this.prevLoop === -1) return this.error("AMK0130", "No previous loop to recall.");
+		if (this.prevLoop === -1) {
+			return this.error("AMK0130", "No previous loop to recall.");
+		}
 
 		this.updateQ[this.channel] = true;
 		this.updateQ[8] = true;
 		this.prevNoteLength = -1;
 
 		let count = this.getInt();
-		if (count === -1) count = 1;
+		if (count === -1) {
+			count = 1;
+		}
+
 		if (count < 1 || count > 255) {
 			this.error("AMK0116", "Invalid loop count.");
 			count = 1;
@@ -2233,7 +2616,10 @@ export class AddmusicKParser {
 			this.baseLoopIsSuper = false;
 			this.channelLengths[this.channel] += this.normalLoopLength * count;
 		}
-		if (this.loopLabel > 0) this.loopLengths.set(this.loopLabel, this.normalLoopLength);
+
+		if (this.loopLabel > 0) {
+			this.loopLengths.set(this.loopLabel, this.normalLoopLength);
+		}
 	}
 
 	private handleSuperLoopExit(count: number): void {
@@ -2250,16 +2636,25 @@ export class AddmusicKParser {
 	}
 
 	private handleNormalLoopRemoteCall(count: number): void {
-		if (this.loopLabel === 0) this.addNoteLength(this.normalLoopLength * count);
-		else this.addNoteLength((this.loopLengths.get(this.loopLabel) ?? 0) * count);
+		if (this.loopLabel === 0) {
+			this.addNoteLength(this.normalLoopLength * count);
+		} else {
+			this.addNoteLength((this.loopLengths.get(this.loopLabel) ?? 0) * count);
+		}
 	}
 
 	private addNoteLength(ticks: number): void {
-		if (this.extraLoopIsNormal) this.normalLoopLength += ticks;
-		else if (this.extraLoopIsSuper) this.superLoopLength += ticks;
-		else if (this.baseLoopIsNormal) this.normalLoopLength += ticks;
-		else if (this.baseLoopIsSuper) this.superLoopLength += ticks;
-		else this.channelLengths[this.channel] += ticks;
+		if (this.extraLoopIsNormal) {
+			this.normalLoopLength += ticks;
+		} else if (this.extraLoopIsSuper) {
+			this.superLoopLength += ticks;
+		} else if (this.baseLoopIsNormal) {
+			this.normalLoopLength += ticks;
+		} else if (this.baseLoopIsSuper) {
+			this.superLoopLength += ticks;
+		} else {
+			this.channelLengths[this.channel] += ticks;
+		}
 	}
 
 	// =========================================================================
@@ -2268,8 +2663,11 @@ export class AddmusicKParser {
 
 	private parseNote(): void {
 		const start = this.pos;
-		if (this.channel !== 8) this.passedNote[this.channel] = true;
-		else this.passedNote[this.prevChannel] = true;
+		if (this.channel !== 8) {
+			this.passedNote[this.channel] = true;
+		} else {
+			this.passedNote[this.prevChannel] = true;
+		}
 
 		const raw = this.text[this.pos];
 		const letter = raw.toLowerCase();
@@ -2336,7 +2734,9 @@ export class AddmusicKParser {
 					this.channel === 6 ||
 					this.channel === 7 ||
 					(this.channel === 8 && (this.prevChannel === 6 || this.prevChannel === 7));
-				if (this.songTargetProgram !== 0 || !isSfxChannel) this.instrument[this.channel] = 0xff;
+				if (this.songTargetProgram !== 0 || !isSfxChannel) {
+					this.instrument[this.channel] = 0xff;
+				}
 			}
 		}
 
@@ -2385,9 +2785,12 @@ export class AddmusicKParser {
 				this.pos = savedPos;
 				break;
 			}
+
 			okayToRewind = true;
 
-			if (this.pos >= this.text.length) break;
+			if (this.pos >= this.text.length) {
+				break;
+			}
 		} while (this.text[this.pos] === "^" || (note === NOTE_REST && this.text[this.pos] === "r"));
 
 		return ticks;
@@ -2407,16 +2810,24 @@ export class AddmusicKParser {
 				this.append(NOTE_TIE);
 				ticks -= chunk;
 			}
+
 			if (ticks > 0) {
-				if (ticks !== chunk) this.append(ticks);
+				if (ticks !== chunk) {
+					this.append(ticks);
+				}
+
 				this.append(NOTE_TIE);
 			}
+
 			this.prevNoteLength = ticks;
 			return;
 		}
 
 		if (ticks > 0) {
-			if (ticks !== this.prevNoteLength || this.updateQ[this.channel]) this.append(ticks);
+			if (ticks !== this.prevNoteLength || this.updateQ[this.channel]) {
+				this.append(ticks);
+			}
+
 			this.prevNoteLength = ticks;
 			this.emitPendingQuantization();
 			this.append(note);
@@ -2424,7 +2835,10 @@ export class AddmusicKParser {
 	}
 
 	private emitPendingQuantization(): void {
-		if (!this.updateQ[this.channel]) return;
+		if (!this.updateQ[this.channel]) {
+			return;
+		}
+
 		this.append(this.q[this.channel]);
 		this.updateQ[this.channel] = false;
 		this.updateQ[8] = false;
@@ -2461,6 +2875,7 @@ export class AddmusicKParser {
 					"A hex command was used that is not native to Addmusic 4.05. Did you mean #amm?",
 				);
 			}
+
 			if (i > 0xfa && this.songTargetProgram === 2) {
 				this.warnOnce(
 					"nonNativeHex",
@@ -2502,10 +2917,16 @@ export class AddmusicKParser {
 			} else if (i === 0xfb) {
 				// Arpeggio: the following byte is a count that sets the length.
 				this.skipSpaces();
-				if (this.text[this.pos] !== "$") return this.error("AMK0154", "$FB is missing its length argument.");
+				if (this.text[this.pos] !== "$") {
+					return this.error("AMK0154", "$FB is missing its length argument.");
+				}
+
 				this.pos++;
 				const count = this.getHex();
-				if (count === -1) return this.error("AMK0154", "$FB is missing its length argument.");
+				if (count === -1) {
+					return this.error("AMK0154", "$FB is missing its length argument.");
+				}
+
 				this.hexLeft = count >= 0x80 ? 2 : count + 1;
 				this.nextHexIsArpeggioNoteLength = true;
 				this.append(i);
@@ -2523,7 +2944,9 @@ export class AddmusicKParser {
 				return;
 			} else {
 				this.hexLeft = HEX_LENGTHS[this.currentHex - FIRST_VCMD] - 1;
-				if (this.currentHex === 0xe3) this.guessLength = false;
+				if (this.currentHex === 0xe3) {
+					this.guessLength = false;
+				}
 			}
 
 			if (this.targetAMKVersion > 1 && this.targetAMKVersion < 4 && this.currentHex === 0xfc) {
@@ -2540,13 +2963,21 @@ export class AddmusicKParser {
 				this.hexLeft = 0;
 				return this.error("AMK0156", "This historical AddmusicM hex command is not implemented in AddmusicK.");
 			}
-			if (this.hexLeft === 1 && this.currentHex === 0xfa) this.currentHexSub = i;
+
+			if (this.hexLeft === 1 && this.currentHex === 0xfa) {
+				this.currentHexSub = i;
+			}
+
 			if (this.hexLeft === 0 && this.currentHex === 0xfa && this.currentHexSub === 0x7f) {
 				this.markEchoBufferAllocVCMD();
 			}
+
 			if (this.hexLeft === 0 && this.currentHex === 0xfa && this.currentHexSub === 0xfe) {
-				if (i >= 0x80) this.hexLeft++;
-				else this.markEchoBufferAllocVCMD();
+				if (i >= 0x80) {
+					this.hexLeft++;
+				} else {
+					this.markEchoBufferAllocVCMD();
+				}
 			}
 
 			// Music.cpp:1820 — Addmusic 4.05 overloaded $E5: a high bit on the
@@ -2562,11 +2993,13 @@ export class AddmusicKParser {
 							"This song uses custom samples, but has not yet defined its samples with the #samples command.",
 						);
 					}
+
 					this.append(0xf3);
 					this.append(i - 0x80);
 					this.noteSampleUse(i - 0x80);
 					return;
 				}
+
 				this.append(0xe5);
 			}
 
@@ -2588,6 +3021,7 @@ export class AddmusicKParser {
 				if (this.songTargetProgram === 1) {
 					return this.error("AMK0158", `$${hex2(i)} is not a valid FIR filter for $F1. Must be $00 or $01.`);
 				}
+
 				this.warnOnce(
 					"firTable",
 					"AMK0212",
@@ -2609,8 +3043,10 @@ export class AddmusicKParser {
 				} else {
 					this.lastFCDelayValue[target] = this.divideByTempoRatio(i, false);
 				}
+
 				return;
 			}
+
 			if (this.hexLeft === 0 && this.currentHex === 0xfc && this.targetAMKVersion === 1) {
 				const target = this.channel === 8 ? this.prevChannel : this.channel;
 				this.lastFCGainValue[target] = i;
@@ -2628,13 +3064,16 @@ export class AddmusicKParser {
 					this.append(0x07);
 					this.append(0x00);
 				}
+
 				return;
 			}
 
 			// Music.cpp:1964 — `hexLeft == 1` is the sample number. `hexLeft == 0`
 			// is the pitch multiplier that follows it, so recording usage there
 			// marked the wrong sample entirely.
-			if (this.hexLeft === 1 && this.currentHex === 0xf3) this.noteSampleUse(i);
+			if (this.hexLeft === 1 && this.currentHex === 0xf3) {
+				this.noteSampleUse(i);
+			}
 
 			if (this.hexLeft === 2 && this.currentHex === 0xf1) {
 				this.echoBufferSize = Math.max(this.echoBufferSize, i);
@@ -2652,13 +3091,17 @@ export class AddmusicKParser {
 					this.noteSampleUse(INSTRUMENT_TO_SAMPLE[i]);
 				} else {
 					const custom = (i - 30) * 6;
-					if (custom < this.instrumentData.length) this.noteSampleUse(this.instrumentData[custom]);
+					if (custom < this.instrumentData.length) {
+						this.noteSampleUse(this.instrumentData[custom]);
+					}
 				}
 			}
 
 			// Music.cpp:1976 — Addmusic 4.05 numbered custom instruments from $13.
 			if (this.currentHex === 0xda && this.songTargetProgram === 1) {
-				if (i >= 0x13) i = i - 0x13 + FIRST_CUSTOM_INSTRUMENT;
+				if (i >= 0x13) {
+					i = i - 0x13 + FIRST_CUSTOM_INSTRUMENT;
+				}
 
 				// Two deliberate deviations from Music.cpp:1981. AMK indexes
 				// `instrumentData[(i - 30) * 5]` unconditionally, so a `$DA` below
@@ -2673,11 +3116,17 @@ export class AddmusicKParser {
 
 			if (this.hexLeft === 0 && this.currentHex === 0xe6) {
 				if (i === 0) {
-					if (this.inE6Loop) return this.error("AMK0159", "Cannot nest $E6 loops within other $E6 loops.");
+					if (this.inE6Loop) {
+						return this.error("AMK0159", "Cannot nest $E6 loops within other $E6 loops.");
+					}
+
 					this.inE6Loop = true;
 					this.handleSuperLoopEnter();
 				} else {
-					if (!this.inE6Loop) return this.error("AMK0160", "An $E6 loop starting point has not yet been declared.");
+					if (!this.inE6Loop) {
+						return this.error("AMK0160", "An $E6 loop starting point has not yet been declared.");
+					}
+
 					this.inE6Loop = false;
 					this.handleSuperLoopExit(i + 1);
 				}
@@ -2702,6 +3151,7 @@ export class AddmusicKParser {
 								"You cannot use a note as the last parameter of $DD if qXX was used just before it.",
 							);
 						}
+
 						this.hexLeft = 0;
 						this.nextNoteIsForDD = true;
 						break;
@@ -2711,13 +3161,17 @@ export class AddmusicKParser {
 						break;
 					}
 				}
+
 				this.pos = backup;
 			}
 
 			i = this.applyTempoRatioToHexArgument(i);
 		}
 
-		if (i < 0 || i > 255) return this.error("AMK0162", "Illegal value for hex command.");
+		if (i < 0 || i > 255) {
+			return this.error("AMK0162", "Illegal value for hex command.");
+		}
+
 		this.append(i);
 	}
 
@@ -2726,24 +3180,67 @@ export class AddmusicKParser {
 		const divide = (): number => this.divideByTempoRatio(i, false);
 		const multiply = (): number => this.multiplyByTempoRatio(i);
 
-		if (this.currentHex === 0xdc && this.hexLeft === 1) return divide();
-		if (this.currentHex === 0xdd && (this.hexLeft === 2 || this.hexLeft === 1)) return divide();
-		if (this.currentHex === 0xde && this.hexLeft === 2) return divide();
-		if (this.currentHex === 0xde && this.hexLeft === 1) return multiply();
-		if (this.currentHex === 0xe1 && this.hexLeft === 1) return divide();
-		if (this.currentHex === 0xe2 && this.hexLeft === 0) return divide();
-		if (this.currentHex === 0xe3 && this.hexLeft === 1) return divide();
-		if (this.currentHex === 0xe5 && this.hexLeft === 2) return divide();
-		if (this.currentHex === 0xe5 && this.hexLeft === 1) return multiply();
-		if (this.currentHex === 0xe8 && this.hexLeft === 1) return divide();
-		if (this.currentHex === 0xea && this.hexLeft === 0) return divide();
-		if (this.currentHex === 0xeb && (this.hexLeft === 2 || this.hexLeft === 1)) return divide();
-		if (this.currentHex === 0xec && (this.hexLeft === 2 || this.hexLeft === 1)) return divide();
-		if (this.currentHex === 0xf2 && this.hexLeft === 2) return divide();
+		if (this.currentHex === 0xdc && this.hexLeft === 1) {
+			return divide();
+		}
+
+		if (this.currentHex === 0xdd && (this.hexLeft === 2 || this.hexLeft === 1)) {
+			return divide();
+		}
+
+		if (this.currentHex === 0xde && this.hexLeft === 2) {
+			return divide();
+		}
+
+		if (this.currentHex === 0xde && this.hexLeft === 1) {
+			return multiply();
+		}
+
+		if (this.currentHex === 0xe1 && this.hexLeft === 1) {
+			return divide();
+		}
+
+		if (this.currentHex === 0xe2 && this.hexLeft === 0) {
+			return divide();
+		}
+
+		if (this.currentHex === 0xe3 && this.hexLeft === 1) {
+			return divide();
+		}
+
+		if (this.currentHex === 0xe5 && this.hexLeft === 2) {
+			return divide();
+		}
+
+		if (this.currentHex === 0xe5 && this.hexLeft === 1) {
+			return multiply();
+		}
+
+		if (this.currentHex === 0xe8 && this.hexLeft === 1) {
+			return divide();
+		}
+
+		if (this.currentHex === 0xea && this.hexLeft === 0) {
+			return divide();
+		}
+
+		if (this.currentHex === 0xeb && (this.hexLeft === 2 || this.hexLeft === 1)) {
+			return divide();
+		}
+
+		if (this.currentHex === 0xec && (this.hexLeft === 2 || this.hexLeft === 1)) {
+			return divide();
+		}
+
+		if (this.currentHex === 0xf2 && this.hexLeft === 2) {
+			return divide();
+		}
+
 		if (this.nextHexIsArpeggioNoteLength) {
 			this.nextHexIsArpeggioNoteLength = false;
 			return divide();
 		}
+
 		return i;
 	}
 
@@ -2757,10 +3254,15 @@ export class AddmusicKParser {
 	 */
 	private parseHFDHex(): void {
 		this.skipSpaces();
-		if (this.text[this.pos] !== "$") return this.error("AMK0163", "Unknown HFD hex command.");
+		if (this.text[this.pos] !== "$") {
+			return this.error("AMK0163", "Unknown HFD hex command.");
+		}
+
 		this.pos++;
 		const kind = this.getHex();
-		if (kind === -1) return this.error("AMK0150", "Error parsing hex command.");
+		if (kind === -1) {
+			return this.error("AMK0150", "Error parsing hex command.");
+		}
 
 		const nextByte = (): number | null => {
 			this.skipSpaces();
@@ -2768,20 +3270,27 @@ export class AddmusicKParser {
 				this.error("AMK0163", "Unknown HFD hex command.");
 				return null;
 			}
+
 			this.pos++;
 			const value = this.getHex();
 			if (value === -1) {
 				this.error("AMK0163", "Unknown HFD hex command.");
 				return null;
 			}
+
 			return value;
 		};
 
 		if (kind === 0x80) {
 			const reg = nextByte();
-			if (reg === null) return;
+			if (reg === null) {
+				return;
+			}
+
 			const val = nextByte();
-			if (val === null) return;
+			if (val === null) {
+				return;
+			}
 
 			if (reg === 0x6d || reg === 0x7d) {
 				// The HFD header bytes; their presence is what marks the song as
@@ -2795,13 +3304,17 @@ export class AddmusicKParser {
 				this.append(reg);
 				this.append(val);
 			}
+
 			this.hexLeft = 0;
 			return;
 		}
 
 		if (kind === 0x81) {
 			const value = nextByte();
-			if (value === null) return;
+			if (value === null) {
+				return;
+			}
+
 			this.append(0xfa);
 			this.append(0x02);
 			this.append(value);
@@ -2815,25 +3328,42 @@ export class AddmusicKParser {
 
 		if (kind === 0x82) {
 			const addrHi = nextByte();
-			if (addrHi === null) return;
+			if (addrHi === null) {
+				return;
+			}
+
 			const addrLo = nextByte();
-			if (addrLo === null) return;
+			if (addrLo === null) {
+				return;
+			}
+
 			const bytesHi = nextByte();
-			if (bytesHi === null) return;
+			if (bytesHi === null) {
+				return;
+			}
+
 			const bytesLo = nextByte();
-			if (bytesLo === null) return;
+			if (bytesLo === null) {
+				return;
+			}
 
 			const address = (addrHi << 8) | addrLo;
 			let remaining = (bytesHi << 8) | bytesLo;
 
-			if (address === 0x6136) return this.parseHFDInstrumentHack(remaining);
+			if (address === 0x6136) {
+				return this.parseHFDInstrumentHack(remaining);
+			}
 
 			// Any other block write is discarded: we cannot know what it would
 			// clobber, and AddmusicK drops it too.
 			do {
-				if (nextByte() === null) return;
+				if (nextByte() === null) {
+					return;
+				}
+
 				remaining--;
 			} while (remaining >= 0);
+
 			this.hexLeft = 0;
 			return;
 		}
@@ -2851,15 +3381,23 @@ export class AddmusicKParser {
 		let remaining = bytes;
 		do {
 			this.skipSpaces();
-			if (this.text[this.pos] !== "$") return this.error("AMK0163", "Unknown HFD hex command.");
+			if (this.text[this.pos] !== "$") {
+				return this.error("AMK0163", "Unknown HFD hex command.");
+			}
+
 			this.pos++;
 			const value = this.getHex();
-			if (value === -1 || value > 0xff) return this.error("AMK0163", "Unknown HFD hex command.");
+			if (value === -1 || value > 0xff) {
+				return this.error("AMK0163", "Unknown HFD hex command.");
+			}
 
 			this.instrumentData.push(value);
 			remaining--;
 			byteNum++;
-			if (byteNum === 1) this.noteSampleUse(value);
+			if (byteNum === 1) {
+				this.noteSampleUse(value);
+			}
+
 			if (byteNum === 5) {
 				this.instrumentData.push(0); // AddmusicK's extra sub-multiplier byte
 				byteNum = 0;
@@ -2894,16 +3432,26 @@ export class AddmusicKParser {
 	 * `introSeconds + mainSeconds * 2` — the loop played twice, then faded.
 	 */
 	private estimateSeconds(): { estimated: SongLength; played: SongLength } | null {
-		if (!this.guessLength) return null;
+		if (!this.guessLength) {
+			return null;
+		}
 
 		let totalLength = Infinity;
 		for (const length of this.channelLengths) {
-			if (length !== 0) totalLength = Math.min(totalLength, Math.floor(length));
+			if (length !== 0) {
+				totalLength = Math.min(totalLength, Math.floor(length));
+			}
 		}
-		if (!Number.isFinite(totalLength)) return null;
+
+		if (!Number.isFinite(totalLength)) {
+			return null;
+		}
 
 		const changes = [...this.tempoChanges].sort((a, b) => (a[0] === b[0] ? a[1] - b[1] : a[0] - b[0]));
-		if (changes.length === 0 || changes[0][0] !== 0) changes.unshift([0, 0x36]);
+		if (changes.length === 0 || changes[0][0] !== 0) {
+			changes.unshift([0, 0x36]);
+		}
+
 		changes.push([totalLength, 0]);
 
 		let beforeLoop = 0;
@@ -2919,7 +3467,11 @@ export class AddmusicKParser {
 				this.warnOnce("tempoPastEnd", "AMK0217", "A tempo change was found beyond the end of the song.");
 				break;
 			}
-			if (changes[z][1] < 0) onIntro = false;
+
+			if (changes[z][1] < 0) {
+				onIntro = false;
+			}
+
 			const tempo = Math.abs(changes[z][1]);
 			const span = changes[z + 1][0] - changes[z][0];
 			// The two rates have to be summed side by side rather than scaled at the
@@ -2956,7 +3508,9 @@ export class AddmusicKParser {
 	 * list of names are two different things, so they are two fields now.
 	 */
 	private noteSampleUse(srcn: number): void {
-		if (srcn >= 0 && srcn < this.usedSamples.length) this.usedSamples[srcn] = true;
+		if (srcn >= 0 && srcn < this.usedSamples.length) {
+			this.usedSamples[srcn] = true;
+		}
 	}
 
 	/**
@@ -2973,14 +3527,19 @@ export class AddmusicKParser {
 	 * apart from "this compiler was given no library to look names up in".
 	 */
 	private requestedSampleList(): readonly string[] | null {
-		if (this.sampleList.length > 0) return [...this.sampleList];
+		if (this.sampleList.length > 0) {
+			return [...this.sampleList];
+		}
+
 		const fallback = this.options?.sampleGroups["default"];
 		return fallback && fallback.length > 0 ? [...fallback] : null;
 	}
 
 	private resolveSampleList(): readonly string[] | null {
 		const names = this.requestedSampleList();
-		if (!names) return null;
+		if (!names) {
+			return null;
+		}
 
 		// The implicit `#default` fallback never went through `pushSample`, so it
 		// has no recorded importance — it has to be looked up the same way, or
@@ -2989,7 +3548,10 @@ export class AddmusicKParser {
 		const important =
 			this.sampleList.length > 0 ? this.sampleImportant : names.map((name) => this.isImportantName(name));
 
-		if (this.options?.optimizeSampleUsage === false) return names;
+		if (this.options?.optimizeSampleUsage === false) {
+			return names;
+		}
+
 		return this.optimizeSamples([...names], important);
 	}
 
@@ -3039,11 +3601,15 @@ export class AddmusicKParser {
 		let to = end > start ? this.originAt(end - 1) + 1 : from;
 		// Text that came from a replacement collapses to a single point, which
 		// would select nothing; give it one character so it can still be seen.
-		if (to <= from && end > start) to = Math.min(from + 1, this.scanned.length);
+		if (to <= from && end > start) {
+			to = Math.min(from + 1, this.scanned.length);
+		}
 
 		let line = 1;
 		for (let n = 0; n < from && n < this.scanned.length; n++) {
-			if (this.scanned[n] === "\n") line++;
+			if (this.scanned[n] === "\n") {
+				line++;
+			}
 		}
 
 		return { start: from + this.bomOffset, end: Math.max(to, from) + this.bomOffset, line };
@@ -3051,8 +3617,14 @@ export class AddmusicKParser {
 
 	/** {@link origins} with the ends clamped, for positions past the buffer. */
 	private originAt(index: number): number {
-		if (index <= 0) return 0;
-		if (index >= this.origins.length) return this.scanned.length;
+		if (index <= 0) {
+			return 0;
+		}
+
+		if (index >= this.origins.length) {
+			return this.scanned.length;
+		}
+
 		return this.origins[index];
 	}
 
@@ -3070,7 +3642,10 @@ export class AddmusicKParser {
 	}
 
 	private warnOnce(key: string, code: string, message: string): void {
-		if (this.warnedOnce.has(key)) return;
+		if (this.warnedOnce.has(key)) {
+			return;
+		}
+
 		this.warnedOnce.add(key);
 		this.warn(this.pos, this.pos + 1, code, message);
 	}
@@ -3086,7 +3661,9 @@ export class AddmusicKParser {
 	 */
 	private lengths(): Pick<ParseOutput, "tagSeconds" | "introSeconds" | "mainSeconds" | "playback"> {
 		const unknown = { tagSeconds: null, introSeconds: null, mainSeconds: null, playback: null };
-		if (this.errorCount > 0) return unknown;
+		if (this.errorCount > 0) {
+			return unknown;
+		}
 
 		if (this.declaredSeconds !== null) {
 			// Nothing to time against: the declared value is all there is, so it
@@ -3096,7 +3673,9 @@ export class AddmusicKParser {
 		}
 
 		const split = this.estimateSeconds();
-		if (!split) return unknown;
+		if (!split) {
+			return unknown;
+		}
 
 		return {
 			...split.estimated,

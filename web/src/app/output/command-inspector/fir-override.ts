@@ -33,15 +33,27 @@ export function firOverriddenBy(fir: Command, commands: Command[]): Command | nu
 export function firOverriddenBefore(echo: Command, commands: Command[]): Command | null {
   let found: Command | null = null;
   for (const other of commands) {
-    if (other.span.start >= echo.span.start) break;
-    if (other.vcmd === 0xf5 && other.channel === echo.channel) found = other;
+    if (other.span.start >= echo.span.start) {
+      break;
+    }
+
+    if (other.vcmd === 0xf5 && other.channel === echo.channel) {
+      found = other;
+    }
   }
+
   return found;
 }
 
 /** `0` or `1` — which built-in table, for naming it in the warning. */
 export function builtInFilterName(which: number): string {
-  if (which === 0) return 'filter 0, the SMW low-pass';
-  if (which === 1) return 'filter 1, flat';
+  if (which === 0) {
+    return 'filter 0, the SMW low-pass';
+  }
+
+  if (which === 1) {
+    return 'filter 1, flat';
+  }
+
   return `filter ${which}, which is out of range`;
 }

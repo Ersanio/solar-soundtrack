@@ -45,11 +45,15 @@ export function stackSegments(
   { width, gap, minWidth }: StackOptions,
 ): StackPlacement[] {
   const count = segments.length;
-  if (count === 0) return [];
+  if (count === 0) {
+    return [];
+  }
 
   const available = width - gap * (count - 1);
   const total = segments.reduce((sum, segment) => sum + segment.value, 0);
-  if (available <= 0 || total <= 0) return [];
+  if (available <= 0 || total <= 0) {
+    return [];
+  }
 
   const scale = scaleLinear().domain([0, total]).range([0, available]);
   let widths = segments.map((segment) => scale(segment.value));

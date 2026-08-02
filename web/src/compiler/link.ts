@@ -40,9 +40,13 @@ export function link(parsed: ParseOutput, aramAddress: number): LinkResult {
 	// Lay the channels out end to end and record where each one starts.
 	let offset = 0;
 	for (let channel = 0; channel < 8; channel++) {
-		if (data[channel].length) phrasePointers[channel][0] = offset;
+		if (data[channel].length) {
+			phrasePointers[channel][0] = offset;
+		}
+
 		offset += data[channel].length;
 	}
+
 	for (let channel = 0; channel < 8; channel++) {
 		phrasePointers[channel][1] += phrasePointers[channel][0];
 	}
@@ -52,7 +56,9 @@ export function link(parsed: ParseOutput, aramAddress: number): LinkResult {
 	relocateLoopPointers(data, loopLocations, header.length, aramAddress);
 
 	const blob: number[] = [...header];
-	for (let channel = 0; channel < 9; channel++) blob.push(...data[channel]);
+	for (let channel = 0; channel < 9; channel++) {
+		blob.push(...data[channel]);
+	}
 
 	const end = aramAddress + blob.length;
 	if (end > 0x10000) {
@@ -85,7 +91,9 @@ function prependBlobPrefix(
 	phrasePointers: number[][],
 ): void {
 	const channel = parsed.resizedChannel;
-	if (channel === -1) return;
+	if (channel === -1) {
+		return;
+	}
 
 	let shift = 0;
 
@@ -96,6 +104,7 @@ function prependBlobPrefix(
 		data[channel].unshift(0xfa, 0x06, 0x01);
 		shift += 3;
 	}
+
 	if (parsed.targetAMKVersion === 1) {
 		data[channel].unshift(0xfa, 0x7f, 0x02);
 		shift += 3;
@@ -118,12 +127,18 @@ function prependBlobPrefix(
 		const target = parsed.echoBufferAllocVCMDChannel;
 		const at = parsed.echoBufferAllocVCMDLoc + 3;
 		data[target].splice(at, 0, 0xfa, 0x04, parsed.echoBufferSize);
-		for (let n = 0; n < loopLocations[target].length; n++) loopLocations[target][n] += 3;
+		for (let n = 0; n < loopLocations[target].length; n++) {
+			loopLocations[target][n] += 3;
+		}
+
 		phrasePointers[target][0] += 3;
 		phrasePointers[target][1] += 3;
 	}
 
-	for (let n = 0; n < loopLocations[channel].length; n++) loopLocations[channel][n] += shift;
+	for (let n = 0; n < loopLocations[channel].length; n++) {
+		loopLocations[channel][n] += shift;
+	}
+
 	phrasePointers[channel][0] += shift;
 	phrasePointers[channel][1] += shift;
 }
@@ -133,8 +148,14 @@ function buildHeader(parsed: ParseOutput, phrasePointers: number[][], data: numb
 	const instrLen = parsed.instrumentData.length;
 
 	let size = 20;
-	if (parsed.hasIntro) size += 18;
-	if (!parsed.doesntLoop) size += 2;
+	if (parsed.hasIntro) {
+		size += 18;
+	}
+
+	if (!parsed.doesntLoop) {
+		size += 2;
+	}
+
 	size += instrLen;
 
 	const header = new Array<number>(size).fill(0);
@@ -145,7 +166,9 @@ function buildHeader(parsed: ParseOutput, phrasePointers: number[][], data: numb
 
 	let add = (parsed.hasIntro ? 2 : 0) + (parsed.doesntLoop ? 0 : 2) + 4;
 
-	for (let n = 0; n < instrLen; n++) header[n + add] = parsed.instrumentData[n];
+	for (let n = 0; n < instrLen; n++) {
+		header[n + add] = parsed.instrumentData[n];
+	}
 
 	writeWord(0, add + instrLen);
 
@@ -156,7 +179,9 @@ function buildHeader(parsed: ParseOutput, phrasePointers: number[][], data: numb
 		writeWord(add - 2, parsed.hasIntro ? SENTINEL_SONG_PLUS_2 : SENTINEL_SONG);
 	}
 
-	if (parsed.hasIntro) writeWord(2, add + instrLen + 16);
+	if (parsed.hasIntro) {
+		writeWord(2, add + instrLen + 16);
+	}
 
 	add += instrLen;
 
@@ -189,7 +214,9 @@ function relocate(header: number[], parsed: ParseOutput, aramAddress: number): v
 		if (untilJump === 0) {
 			j += instrLen;
 			untilJump = -1;
-			if (j >= header.length) break;
+			if (j >= header.length) {
+				break;
+			}
 		}
 
 		const word = header[j] | (header[j + 1] << 8);
@@ -235,7 +262,9 @@ function relocateLoopPointers(
 	aramAddress: number,
 ): void {
 	let normalChannelsSize = 0;
-	for (let channel = 0; channel < 8; channel++) normalChannelsSize += data[channel].length;
+	for (let channel = 0; channel < 8; channel++) {
+		normalChannelsSize += data[channel].length;
+	}
 
 	const base = aramAddress + normalChannelsSize + headerSize;
 

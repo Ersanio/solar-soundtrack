@@ -42,11 +42,13 @@ function open(): Promise<IDBDatabase | null> {
         request.result.createObjectStore(STORE);
       }
     };
+
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => {
       failure = 'IndexedDB is unavailable (private browsing blocks it); samples will not persist.';
       resolve(null);
     };
+
     // Another tab holding an old version open. Don't hang the app waiting.
     request.onblocked = () => {
       failure = 'Another tab is holding the sample database open; samples will not persist here.';
@@ -72,6 +74,7 @@ function run<T>(
           resolve(null);
           return;
         }
+
         try {
           const request = body(db.transaction(STORE, mode).objectStore(STORE));
           request.onsuccess = () => resolve(request.result);
@@ -91,11 +94,15 @@ function run<T>(
 export async function loadAll(): Promise<Map<string, Uint8Array>> {
   const out = new Map<string, Uint8Array>();
   const db = await open();
-  if (!db) return out;
+  if (!db) {
+    return out;
+  }
 
   const keys = await run<IDBValidKey[]>('readonly', (store) => store.getAllKeys());
   const values = await run<unknown[]>('readonly', (store) => store.getAll());
-  if (!keys || !values) return out;
+  if (!keys || !values) {
+    return out;
+  }
 
   for (let index = 0; index < keys.length; index++) {
     const value = values[index];
@@ -105,6 +112,7 @@ export async function loadAll(): Promise<Map<string, Uint8Array>> {
       out.set(keys[index] as string, value);
     }
   }
+
   return out;
 }
 

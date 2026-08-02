@@ -37,6 +37,7 @@ console.log("\nevery region that exists stays visible");
 			`${placed[1].width.toFixed(2)}px`,
 		);
 	}
+
 	check(
 		"no segment is ever wider than the bar",
 		place(REALISTIC).every((p) => p.width <= OPTS.width),

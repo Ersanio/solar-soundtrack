@@ -116,11 +116,17 @@ export class AdsrGraph {
   private readonly points = computed<EnvelopePoint[]>(() => {
     const envelope = this.envelope();
     const raw = envelope.adsrEnabled ? envelopeAdsr(envelope) : envelopeGain(this.gain());
-    if (raw.length <= MAX_POINTS) return raw;
+    if (raw.length <= MAX_POINTS) {
+      return raw;
+    }
+
     // Stride, keeping the last point so the curve still ends where it ends.
     const stride = Math.ceil(raw.length / MAX_POINTS);
     const out = raw.filter((_, i) => i % stride === 0);
-    if (out[out.length - 1] !== raw[raw.length - 1]) out.push(raw[raw.length - 1]);
+    if (out[out.length - 1] !== raw[raw.length - 1]) {
+      out.push(raw[raw.length - 1]);
+    }
+
     return out;
   });
 
@@ -140,7 +146,10 @@ export class AdsrGraph {
   private readonly drawn = computed<EnvelopePoint[]>(() => {
     const points = this.points();
     const last = points[points.length - 1];
-    if (!last || last.level <= 0 || last.t >= this.duration()) return points;
+    if (!last || last.level <= 0 || last.t >= this.duration()) {
+      return points;
+    }
+
     return [...points, { t: this.duration(), level: last.level }];
   });
 
@@ -157,14 +166,20 @@ export class AdsrGraph {
 
   protected readonly sustainY = computed(() => {
     const envelope = this.envelope();
-    if (!envelope.adsrEnabled) return null;
+    if (!envelope.adsrEnabled) {
+      return null;
+    }
+
     return this.yOf(sustainLevel(envelope.sustain));
   });
 
   /** Where attack gives way to decay, and decay to the sustain fall. */
   protected readonly phaseMarks = computed(() => {
     const envelope = this.envelope();
-    if (!envelope.adsrEnabled) return [];
+    if (!envelope.adsrEnabled) {
+      return [];
+    }
+
     const attack = attackSeconds(envelope.attack);
     const decay = attack + decaySeconds(envelope.decay, envelope.sustain);
     return [
@@ -182,6 +197,7 @@ export class AdsrGraph {
         ? `Envelope: fixed GAIN at ${Math.round((gain.level ?? 0) * 100)} percent of full volume.`
         : `Envelope: GAIN ${gain.mode} at rate ${gain.rate}.`;
     }
+
     const release = releaseSeconds(envelope.release, envelope.sustain);
     return (
       `Envelope: attack ${seconds(attackSeconds(envelope.attack))}, ` +

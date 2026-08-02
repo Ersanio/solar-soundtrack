@@ -757,7 +757,9 @@ console.log("\n#instruments and @30+");
 			result.stats?.headerSize === headerSize,
 			`${result.stats?.headerSize}`,
 		);
-		if (!result.data) continue;
+		if (!result.data) {
+			continue;
+		}
 
 		// Wherever the block landed, word 0 must point just past it, and every
 		// channel pointer must land inside the song rather than in the header.
@@ -956,7 +958,10 @@ console.log("\nremote code");
 	] as const) {
 		const result = compile(source);
 		check(`${label}: compiles`, result.ok, result.diagnostics.map((d) => `${d.code} ${d.message}`).join("; "));
-		if (!result.data) continue;
+		if (!result.data) {
+			continue;
+		}
+
 		const bytes = [...result.data];
 		const fc = bytes.indexOf(0xfc);
 		check(

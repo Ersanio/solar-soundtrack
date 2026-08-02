@@ -53,13 +53,20 @@ const ID666_FADE = 0xac; // 5 digits, milliseconds
 const MAX_VOLUME = 5;
 
 function readDigits(spc: Uint8Array, offset: number, length: number): number {
-	if (spc.length < offset + length) return 0;
+	if (spc.length < offset + length) {
+		return 0;
+	}
+
 	let text = "";
 	for (let index = 0; index < length; index++) {
 		const code = spc[offset + index];
-		if (code < 0x30 || code > 0x39) break; // NUL- or space-padded
+		if (code < 0x30 || code > 0x39) {
+			break;
+		} // NUL- or space-padded
+
 		text += String.fromCharCode(code);
 	}
+
 	const value = Number.parseInt(text, 10);
 	return Number.isFinite(value) ? value : 0;
 }
@@ -119,10 +126,14 @@ export class SpcPlayer {
 	 * is blocked by autoplay policy otherwise.
 	 */
 	async init(): Promise<void> {
-		if (this.node) return;
+		if (this.node) {
+			return;
+		}
+
 		if (typeof WebAssembly === "undefined") {
 			throw new PlayerError("This browser has no WebAssembly support.");
 		}
+
 		if (typeof AudioContext === "undefined") {
 			throw new PlayerError("This browser has no Web Audio support.");
 		}
@@ -167,6 +178,7 @@ export class SpcPlayer {
 		if (!response.ok) {
 			throw new PlayerError(`Could not load ${url} (HTTP ${response.status}). The emulator lives in public/player/.`);
 		}
+
 		return await WebAssembly.compile(await response.arrayBuffer());
 	}
 
@@ -208,7 +220,10 @@ export class SpcPlayer {
 	}
 
 	stop(): void {
-		if (!this.node) return;
+		if (!this.node) {
+			return;
+		}
+
 		this.post({ type: "stop" });
 		this.state = "idle";
 		this.position = 0;
@@ -218,13 +233,19 @@ export class SpcPlayer {
 	}
 
 	pause(): void {
-		if (!this.node || this.state !== "playing") return;
+		if (!this.node || this.state !== "playing") {
+			return;
+		}
+
 		this.post({ type: "paused", paused: true });
 		this.state = "paused";
 	}
 
 	resume(): void {
-		if (!this.node || this.state !== "paused") return;
+		if (!this.node || this.state !== "paused") {
+			return;
+		}
+
 		this.post({ type: "paused", paused: false });
 		this.state = "playing";
 	}
@@ -235,7 +256,10 @@ export class SpcPlayer {
 	 * long song takes a moment.
 	 */
 	seek(seconds: number): void {
-		if (!this.node || this.state === "idle") return;
+		if (!this.node || this.state === "idle") {
+			return;
+		}
+
 		this.position = Math.max(0, seconds);
 		this.epoch++;
 		this.post({ type: "seek", seconds: this.position, epoch: this.epoch });
@@ -243,7 +267,9 @@ export class SpcPlayer {
 
 	setLoop(loop: boolean): void {
 		this.looping = loop;
-		if (this.node) this.post({ type: "loop", loop });
+		if (this.node) {
+			this.post({ type: "loop", loop });
+		}
 	}
 
 	/**
@@ -255,7 +281,9 @@ export class SpcPlayer {
 	 */
 	setMute(mask: number): void {
 		this.muteMask = mask;
-		if (this.node) this.post({ type: "mute", mask });
+		if (this.node) {
+			this.post({ type: "mute", mask });
+		}
 	}
 
 	/** Emulated seconds since the song was loaded, or 0 when nothing is loaded. */
@@ -294,7 +322,9 @@ export class SpcPlayer {
 		this.gain = null;
 		this.context = null;
 		this.state = "idle";
-		if (context) await context.close();
+		if (context) {
+			await context.close();
+		}
 	}
 
 	private receive(message: FromWorklet): void {
@@ -303,7 +333,10 @@ export class SpcPlayer {
 				// Posted before the seek that overtook it: it describes a playhead
 				// that no longer exists, and reporting it would drag the transport
 				// back to where the song was until the next update landed.
-				if (message.epoch !== this.epoch) return;
+				if (message.epoch !== this.epoch) {
+					return;
+				}
+
 				this.position = message.seconds;
 				this.ticks = message.ticks;
 				this.songTicks = message.songTicks;
@@ -327,7 +360,10 @@ export class SpcPlayer {
 	}
 
 	private require(): AudioWorkletNode {
-		if (!this.node) throw new PlayerError("The player has not been initialised yet.");
+		if (!this.node) {
+			throw new PlayerError("The player has not been initialised yet.");
+		}
+
 		return this.node;
 	}
 }

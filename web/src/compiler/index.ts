@@ -76,7 +76,9 @@ export class AddmusicKCompiler {
 		// populated while a song is mid-edit and not compiling.
 		const sampleList = parsed.sampleList;
 
-		if (parsed.errorCount > 0) return failure(parsed.diagnostics, stats, sampleList);
+		if (parsed.errorCount > 0) {
+			return failure(parsed.diagnostics, stats, sampleList);
+		}
 
 		const hasData = parsed.data.slice(0, 8).some((channel) => channel.length > 0);
 		if (!hasData) {
@@ -133,11 +135,15 @@ export class AddmusicKCompiler {
  * compiler behaves as it did before options existed.
  */
 function readOptions(options: CompileRequest["options"]): AddmusicKOptions | undefined {
-	if (!options) return undefined;
+	if (!options) {
+		return undefined;
+	}
 
 	const names = options["sampleNames"];
 	const groups = options["sampleGroups"];
-	if (!Array.isArray(names) || typeof groups !== "object" || groups === null) return undefined;
+	if (!Array.isArray(names) || typeof groups !== "object" || groups === null) {
+		return undefined;
+	}
 
 	const optimize = options["optimizeSampleUsage"];
 	const important = options["importantSamples"];

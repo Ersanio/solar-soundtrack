@@ -83,7 +83,9 @@ export class EditorStore {
   /** `null` until a driver supplies a load address — never a guessed one. */
   private readonly compilation = computed(() => {
     const plan = this.drivers.plan();
-    if (!plan) return null;
+    if (!plan) {
+      return null;
+    }
 
     const started = performance.now();
     const result = compiler.compile({
@@ -128,14 +130,20 @@ export class EditorStore {
    */
   private readonly samples = computed(() => {
     const named = this.result()?.sampleList;
-    if (named) return this.library.resolve(named);
+    if (named) {
+      return this.library.resolve(named);
+    }
+
     return this.drivers.driver()?.samples ?? [];
   });
 
   readonly budget = computed<AramBudget | null>(() => {
     const driver = this.drivers.driver();
     const plan = this.drivers.plan();
-    if (!driver || !plan) return null;
+    if (!driver || !plan) {
+      return null;
+    }
+
     const result = this.result();
     return computeBudget(
       driver,
@@ -148,8 +156,14 @@ export class EditorStore {
 
   readonly freeLabel = computed(() => {
     const budget = this.budget();
-    if (!budget) return '';
-    if (budget.overflowBytes > 0) return `over by ${budget.overflowBytes.toLocaleString()} B`;
+    if (!budget) {
+      return '';
+    }
+
+    if (budget.overflowBytes > 0) {
+      return `over by ${budget.overflowBytes.toLocaleString()} B`;
+    }
+
     const percent = ((budget.freeBytes / ARAM_SIZE) * 100).toFixed(0);
     return `${budget.freeBytes.toLocaleString()} B free (${percent}%)`;
   });
@@ -179,14 +193,23 @@ export class EditorStore {
 
   readonly status = computed<Status>(() => {
     const override = this.override();
-    if (override) return override;
+    if (override) {
+      return override;
+    }
 
     const driverError = this.drivers.loadError();
-    if (driverError) return { kind: 'error', text: driverError };
-    if (!this.drivers.ready()) return { kind: 'busy', text: 'loading driver…' };
+    if (driverError) {
+      return { kind: 'error', text: driverError };
+    }
+
+    if (!this.drivers.ready()) {
+      return { kind: 'busy', text: 'loading driver…' };
+    }
 
     const compilation = this.compilation();
-    if (!compilation) return { kind: 'busy', text: 'waiting for a driver' };
+    if (!compilation) {
+      return { kind: 'busy', text: 'waiting for a driver' };
+    }
 
     const { result, elapsedMs } = compilation;
     if (result.ok && result.data) {
@@ -195,6 +218,7 @@ export class EditorStore {
         text: `${result.data.length} bytes · ${elapsedMs.toFixed(1)} ms`,
       };
     }
+
     const errors = this.errorCount();
     return { kind: 'error', text: `${errors} error${errors === 1 ? '' : 's'}` };
   });
@@ -215,7 +239,10 @@ export class EditorStore {
     this.source.set(text);
     this.override.set(null);
     clearTimeout(this.timer);
-    if (!this.autoCompile()) return;
+    if (!this.autoCompile()) {
+      return;
+    }
+
     this.timer = setTimeout(() => this.committed.set(text), DEBOUNCE_MS);
   }
 
@@ -242,7 +269,9 @@ export class EditorStore {
     const driver = this.drivers.driver();
     const plan = this.drivers.plan();
     const result = this.result();
-    if (!driver || !plan || !result?.ok || !result.data) return null;
+    if (!driver || !plan || !result?.ok || !result.data) {
+      return null;
+    }
 
     try {
       return buildSpc({
@@ -262,7 +291,10 @@ export class EditorStore {
 
   downloadBin(): void {
     const result = this.result();
-    if (!result?.data) return;
+    if (!result?.data) {
+      return;
+    }
+
     const name = (result.stats?.tags.title ?? 'song').replace(/[^\w.-]+/g, '_');
     downloadBlob(`${name}.bin`, result.data);
   }
@@ -278,6 +310,7 @@ export class EditorStore {
       this.override.set({ kind: 'error', text: 'cannot export: song has errors' });
       return;
     }
+
     downloadBlob(spcFilename(this.result()?.stats?.tags ?? {}), spc);
     this.override.set({ kind: 'ok', text: `SPC written · ${spc.length.toLocaleString()} bytes` });
   }

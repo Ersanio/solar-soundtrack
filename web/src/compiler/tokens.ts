@@ -221,10 +221,17 @@ function withReplacement(table: ReplacementTable, find: string, value: string): 
 	const byFirstChar = new Map<string, Replacement[]>();
 	for (const entry of entries) {
 		const bucket = byFirstChar.get(entry.find[0]);
-		if (bucket) bucket.push(entry);
-		else byFirstChar.set(entry.find[0], [entry]);
+		if (bucket) {
+			bucket.push(entry);
+		} else {
+			byFirstChar.set(entry.find[0], [entry]);
+		}
 	}
-	for (const bucket of byFirstChar.values()) bucket.sort((a, b) => b.find.length - a.find.length);
+
+	for (const bucket of byFirstChar.values()) {
+		bucket.sort((a, b) => b.find.length - a.find.length);
+	}
+
 	return { entries, byFirstChar };
 }
 
@@ -237,10 +244,16 @@ function withReplacement(table: ReplacementTable, find: string, value: string): 
  */
 function matchReplacement(line: string, at: number, table: ReplacementTable): Replacement | null {
 	const bucket = table.byFirstChar.get(line[at]);
-	if (!bucket) return null;
-	for (const entry of bucket) {
-		if (line.startsWith(entry.find, at)) return entry;
+	if (!bucket) {
+		return null;
 	}
+
+	for (const entry of bucket) {
+		if (line.startsWith(entry.find, at)) {
+			return entry;
+		}
+	}
+
 	return null;
 }
 
@@ -402,7 +415,9 @@ function stepInner(
 
 	// A string may run past the end of a line, so it is checked before anything
 	// else can claim the character.
-	if (state.inString) return scanString(line, at, state, sampleName);
+	if (state.inString) {
+		return scanString(line, at, state, sampleName);
+	}
 
 	// `doReplacement` sits at the top of the dispatch loop (`parser.ts:415`),
 	// ahead of the whitespace and `"` arms alike, so a replacement may match on
@@ -426,14 +441,20 @@ function stepInner(
 		if (isHexDigit(c)) {
 			let end = at;
 			// `getHex` stops at two digits (`parser.ts:536`).
-			while (end < line.length && end - at < 2 && isHexDigit(line[end])) end++;
+			while (end < line.length && end - at < 2 && isHexDigit(line[end])) {
+				end++;
+			}
+
 			return { kind: "hexNumber", end };
 		}
 	}
 
 	if (isSpace(c)) {
 		let end = at + 1;
-		while (end < line.length && isSpace(line[end])) end++;
+		while (end < line.length && isSpace(line[end])) {
+			end++;
+		}
+
 		return { kind: null, end };
 	}
 
@@ -473,7 +494,10 @@ function stepInner(
 			return { kind: "loopStart", end: at + 1 };
 
 		case "]":
-			if (state.loopDepth > 0) state.loopDepth--;
+			if (state.loopDepth > 0) {
+				state.loopDepth--;
+			}
+
 			return { kind: "loopEnd", end: at + 1 };
 
 		case "*":
@@ -490,7 +514,10 @@ function stepInner(
 			// `(@5, $02)` loads instrument 5's *sample* (`parser.ts:1743`); the `@`
 			// is part of that command and not an instrument change, so it is taken
 			// here rather than left to open one.
-			if (line[at + 1] === "@") return { kind: "label", end: at + 2 };
+			if (line[at + 1] === "@") {
+				return { kind: "label", end: at + 2 };
+			}
+
 			return { kind: "label", end: at + 1 };
 
 		// `parser.ts:1585` — a second `@` is the "direct" form, which forces the
@@ -520,6 +547,7 @@ function stepInner(
 				state.currentHex = 0;
 				state.awaitingArpCount = false;
 			}
+
 			return { kind: "operator", end: at + 1 };
 
 		case "}":
@@ -540,16 +568,26 @@ function stepInner(
 
 	// `=48` is an exact tick count attached to the note before it, and dots
 	// extend a duration, so both belong to the number rather than floating free.
-	if (isDigit(c) || (c === "=" && isDigit(line[at + 1]))) return scanNumber(line, at);
+	if (isDigit(c) || (c === "=" && isDigit(line[at + 1]))) {
+		return scanNumber(line, at);
+	}
 
 	const lower = c.toLowerCase();
 
-	if (lower === "r") return { kind: "rest", end: scanNoteBody(line, at + 1) };
-	if (isNoteLetter(lower)) return { kind: "note", end: scanNoteBody(line, at + 1) };
+	if (lower === "r") {
+		return { kind: "rest", end: scanNoteBody(line, at + 1) };
+	}
+
+	if (isNoteLetter(lower)) {
+		return { kind: "note", end: scanNoteBody(line, at + 1) };
+	}
 
 	const kind = LETTER_KINDS[lower] ?? LETTER_KINDS[c];
 	if (kind) {
-		if (HEX_ARG_LETTERS.has(lower)) state.hexArgNext = true;
+		if (HEX_ARG_LETTERS.has(lower)) {
+			state.hexArgNext = true;
+		}
+
 		return { kind, end: at + 1 };
 	}
 
@@ -563,10 +601,19 @@ function scanNoteBody(line: string, at: number): number {
 
 function scanNumber(line: string, at: number): StepResult {
 	let end = at;
-	if (line[end] === "=") end++;
-	while (end < line.length && isDigit(line[end])) end++;
+	if (line[end] === "=") {
+		end++;
+	}
+
+	while (end < line.length && isDigit(line[end])) {
+		end++;
+	}
+
 	// Dotted durations. `..` is legal and doubles down, so the run is greedy.
-	while (end < line.length && line[end] === ".") end++;
+	while (end < line.length && line[end] === ".") {
+		end++;
+	}
+
 	return { kind: "number", end };
 }
 
@@ -576,14 +623,21 @@ function scanNumber(line: string, at: number): StepResult {
 function scanHash(line: string, at: number, state: ScanState): StepResult {
 	let end = at + 1;
 	if (isAlpha(line[end])) {
-		while (end < line.length && isAlpha(line[end])) end++;
+		while (end < line.length && isAlpha(line[end])) {
+			end++;
+		}
+
 		// `parser.ts:797` matches this case-insensitively. Every other directive
 		// clears the flag, so an `#instruments` with no block cannot arm the next
 		// unrelated `{`.
 		state.pendingInstruments = line.slice(at, end).toLowerCase() === "#instruments";
 		return { kind: "directive", end };
 	}
-	while (end < line.length && isDigit(line[end])) end++;
+
+	while (end < line.length && isDigit(line[end])) {
+		end++;
+	}
+
 	return { kind: "channel", end };
 }
 
@@ -605,18 +659,25 @@ function scanString(line: string, at: number, state: ScanState, sampleName: bool
 		end++; // the opening quote
 		state.inString = true;
 	}
+
 	while (end < line.length) {
 		if (line[end] === "\\" && end + 1 < line.length) {
 			end += 2;
 			continue;
 		}
+
 		if (line[end] === '"') {
 			state.inString = false;
-			if (opened && !sampleName) define(line.slice(at + 1, end), state);
+			if (opened && !sampleName) {
+				define(line.slice(at + 1, end), state);
+			}
+
 			return { kind: "string", end: end + 1 };
 		}
+
 		end++;
 	}
+
 	return { kind: "string", end: line.length };
 }
 
@@ -633,9 +694,15 @@ function define(body: string, state: ScanState): void {
 	// value containing quotes rather than one containing backslashes.
 	const unescaped = body.replace(/\\"/g, '"');
 	const eq = unescaped.indexOf("=");
-	if (eq === -1) return;
+	if (eq === -1) {
+		return;
+	}
+
 	const find = unescaped.slice(0, eq).replace(/\s+$/, "");
-	if (find.length === 0) return;
+	if (find.length === 0) {
+		return;
+	}
+
 	const value = unescaped.slice(eq + 1).replace(/^\s+/, "");
 	state.replacements = withReplacement(state.replacements, find, value);
 }
@@ -655,9 +722,14 @@ function scanExpansion(
 	active: string[],
 	budget: { chars: number },
 ): void {
-	if (active.length > MAX_EXPANSION_DEPTH) return;
+	if (active.length > MAX_EXPANSION_DEPTH) {
+		return;
+	}
+
 	budget.chars -= text.length;
-	if (budget.chars < 0) return;
+	if (budget.chars < 0) {
+		return;
+	}
 
 	let at = 0;
 	while (at < text.length) {
@@ -667,10 +739,13 @@ function scanExpansion(
 			// `push(...expansion)` would put the whole array on the argument stack,
 			// and this runs on user-supplied text — the same care `parser.ts:693`
 			// takes with `concat` over `splice`.
-			for (const token of expansion) out.push(token);
+			for (const token of expansion) {
+				out.push(token);
+			}
 		} else if (kind) {
 			out.push({ kind, text: text.slice(at, next) });
 		}
+
 		at = next;
 	}
 }
@@ -694,12 +769,16 @@ function scanHex(line: string, at: number, state: ScanState): StepResult {
 	}
 
 	// A bare `$` with nothing behind it: half-typed, not yet meaningful.
-	if (digits === 0) return { kind: "unknown", end };
+	if (digits === 0) {
+		return { kind: "unknown", end };
+	}
 
 	// Inside `#instruments` every `$xx` is one of an entry's five bytes, whatever
 	// it happens to equal. `parseInstrumentDefinitions` reads them positionally
 	// (`Music.cpp:2638-2645`) and never consults the VCMD table.
-	if (state.inInstruments) return { kind: "hexArg", end };
+	if (state.inInstruments) {
+		return { kind: "hexArg", end };
+	}
 
 	if (state.awaitingArpCount) {
 		// `parser.ts:2420` — `$FB`'s length byte. A high bit means the two-byte
@@ -715,6 +794,7 @@ function scanHex(line: string, at: number, state: ScanState): StepResult {
 			// sample load reads as one.
 			return { kind: "hexArg", end };
 		}
+
 		state.currentHex = value;
 		state.currentHexSub = 0;
 		if (value === 0xfb) {
@@ -723,15 +803,20 @@ function scanHex(line: string, at: number, state: ScanState): StepResult {
 		} else {
 			state.hexLeft = HEX_LENGTHS[value - FIRST_VCMD] - 1;
 		}
+
 		return { kind: "hex", end };
 	}
 
 	state.hexLeft -= 1;
-	if (state.hexLeft === 1 && state.currentHex === 0xfa) state.currentHexSub = value;
+	if (state.hexLeft === 1 && state.currentHex === 0xfa) {
+		state.currentHexSub = value;
+	}
+
 	// `parser.ts:2458` — `$FA $FE` takes a further byte when the high bit is set.
 	if (state.hexLeft === 0 && state.currentHex === 0xfa && state.currentHexSub === 0xfe && value >= 0x80) {
 		state.hexLeft++;
 	}
+
 	return { kind: "hexArg", end };
 }
 
@@ -885,7 +970,10 @@ export function tokenize(text: string): TokenIndex {
 	let lineNumber = 1;
 	while (offset <= text.length) {
 		let lineEnd = text.indexOf("\n", offset);
-		if (lineEnd === -1) lineEnd = text.length;
+		if (lineEnd === -1) {
+			lineEnd = text.length;
+		}
+
 		const line = text.slice(offset, lineEnd);
 
 		let at = 0;
@@ -905,12 +993,17 @@ export function tokenize(text: string): TokenIndex {
 				} else {
 					stream?.push(token);
 				}
+
 				tokens.push(token);
 			}
+
 			at = next;
 		}
 
-		if (lineEnd === text.length) break;
+		if (lineEnd === text.length) {
+			break;
+		}
+
 		offset = lineEnd + 1;
 		lineNumber++;
 	}
@@ -938,15 +1031,24 @@ function gatherInstruments(tokens: GatherToken[], text: string): InstrumentDefin
 	let number = FIRST_CUSTOM_INSTRUMENT;
 
 	for (let i = 0; i < tokens.length; i++) {
-		if (tokens[i].kind !== "directive") continue;
-		if (textOf(tokens[i]).toLowerCase() !== "#instruments") continue;
+		if (tokens[i].kind !== "directive") {
+			continue;
+		}
+
+		if (textOf(tokens[i]).toLowerCase() !== "#instruments") {
+			continue;
+		}
 
 		let j = i + 1;
-		while (j < tokens.length && tokens[j].kind === "comment") j++;
+		while (j < tokens.length && tokens[j].kind === "comment") {
+			j++;
+		}
+
 		if (j >= tokens.length || textOf(tokens[j]) !== "{") {
 			i = j - 1;
 			continue;
 		}
+
 		j++;
 
 		while (j < tokens.length && textOf(tokens[j]) !== "}") {
@@ -995,6 +1097,7 @@ function gatherInstruments(tokens: GatherToken[], text: string): InstrumentDefin
 				span: { start: start.start, end: last.end, line: start.line },
 			});
 		}
+
 		i = j;
 	}
 
@@ -1017,7 +1120,10 @@ function gather(tokens: GatherToken[], text: string): Command[] {
 			// `#0`-`#7`. A malformed one leaves the previous channel standing,
 			// which is also what the parser does — it reports and carries on.
 			const parsed = Number.parseInt(textOf(token).slice(1), 10);
-			if (!Number.isNaN(parsed)) channel = parsed;
+			if (!Number.isNaN(parsed)) {
+				channel = parsed;
+			}
+
 			continue;
 		}
 
@@ -1033,6 +1139,7 @@ function gather(tokens: GatherToken[], text: string): Command[] {
 				last = tokens[j];
 				j++;
 			}
+
 			const expected = expectedArgs(vcmd, args);
 			commands.push({
 				kind: "hex",
@@ -1048,7 +1155,9 @@ function gather(tokens: GatherToken[], text: string): Command[] {
 			continue;
 		}
 
-		if (!LETTER_COMMAND_KINDS.has(token.kind)) continue;
+		if (!LETTER_COMMAND_KINDS.has(token.kind)) {
+			continue;
+		}
 
 		// `y10,1,2` and `t144` alike: consecutive numbers, optionally separated by
 		// commas, belong to the command that opened them.
@@ -1065,10 +1174,12 @@ function gather(tokens: GatherToken[], text: string): Command[] {
 				j++;
 				continue;
 			}
+
 			if (next.kind === "operator" && textOf(next) === "," && tokens[j + 1]?.kind === "number") {
 				j++;
 				continue;
 			}
+
 			break;
 		}
 
@@ -1091,14 +1202,23 @@ function gather(tokens: GatherToken[], text: string): Command[] {
 }
 
 function nameForNote(kind: TokenKind): string {
-	if (kind === "rest") return "rest";
-	if (kind === "tie") return "tie";
+	if (kind === "rest") {
+		return "rest";
+	}
+
+	if (kind === "tie") {
+		return "tie";
+	}
+
 	return "note";
 }
 
 /** The radix comes from the kind, which keeps {@link gather} a pure function of the stream. */
 function numberValue(raw: string, kind: TokenKind): number {
-	if (kind === "hexNumber") return raw.length === 0 ? -1 : parseInt(raw, 16);
+	if (kind === "hexNumber") {
+		return raw.length === 0 ? -1 : parseInt(raw, 16);
+	}
+
 	const digits = raw.replace(/^=/, "").replace(/\.+$/, "");
 	return digits.length === 0 ? -1 : parseInt(digits, 10);
 }
@@ -1112,12 +1232,19 @@ function numberValue(raw: string, kind: TokenKind): number {
  * AddmusicK's, so those are reported as complete rather than falsely flagged.
  */
 function expectedArgs(vcmd: number, args: { value: number }[]): number | null {
-	if (vcmd < FIRST_VCMD || vcmd > LAST_VCMD) return null;
+	if (vcmd < FIRST_VCMD || vcmd > LAST_VCMD) {
+		return null;
+	}
+
 	if (vcmd === 0xfb) {
-		if (args.length === 0) return null;
+		if (args.length === 0) {
+			return null;
+		}
+
 		const count = args[0].value;
 		return count >= 0x80 ? 3 : count + 2;
 	}
+
 	return HEX_LENGTHS[vcmd - FIRST_VCMD] - 1;
 }
 
@@ -1144,18 +1271,25 @@ export function commandAt(commands: Command[], offset: number): Command | null {
 	while (low <= high) {
 		const mid = (low + high) >> 1;
 		const { span } = commands[mid];
-		if (offset < span.start) high = mid - 1;
-		else if (offset > span.end) low = mid + 1;
-		else {
+		if (offset < span.start) {
+			high = mid - 1;
+		} else if (offset > span.end) {
+			low = mid + 1;
+		} else {
 			let index = mid;
 			while (index > 0) {
 				const previous = commands[index - 1].span;
-				if (offset < previous.start || offset > previous.end) break;
+				if (offset < previous.start || offset > previous.end) {
+					break;
+				}
+
 				index--;
 			}
+
 			return commands[index];
 		}
 	}
+
 	return null;
 }
 
@@ -1173,9 +1307,14 @@ export function tokenAt(tokens: Token[], offset: number): Token | null {
 	while (low <= high) {
 		const mid = (low + high) >> 1;
 		const token = tokens[mid];
-		if (offset < token.start) high = mid - 1;
-		else if (offset >= token.end) low = mid + 1;
-		else return token;
+		if (offset < token.start) {
+			high = mid - 1;
+		} else if (offset >= token.end) {
+			low = mid + 1;
+		} else {
+			return token;
+		}
 	}
+
 	return null;
 }

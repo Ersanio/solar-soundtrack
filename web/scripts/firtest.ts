@@ -59,6 +59,7 @@ console.log("\nthe manual's flat filter is flat");
 	for (const hz of [0, 100, 1000, 4000, 8000, 16000]) {
 		check(`${hz} Hz is unity`, Math.abs(firMagnitude(FLAT, hz) - unity) < 1e-9, `${firMagnitude(FLAT, hz)}`);
 	}
+
 	check("its DC gain is 127/128", Math.abs(firDcGain(FLAT) - unity) < 1e-9);
 	check("it is described as flat", describeFir(FLAT).shape === "flat", describeFir(FLAT).shape);
 	check("its tilt is nil", Math.abs(describeFir(FLAT).tiltDb) < 0.1);
@@ -163,7 +164,10 @@ console.log("\nintermediate overflow — bsnes SPC_DSP.cpp:668-678");
 
 	// Nothing designed here should be anywhere near the bound.
 	for (const preset of FIR_PRESETS) {
-		if (preset.name === "Classic") continue;
+		if (preset.name === "Classic") {
+			continue;
+		}
+
 		check(
 			`${preset.name} stays inside the DSP's arithmetic`,
 			!firHeadroom(preset.taps).mayWrap,
@@ -284,9 +288,13 @@ console.log("\nquantisation earns its keep");
 	const fitted = fitToTarget(points);
 	const error = (taps: number[]) => {
 		let sum = 0;
-		for (let hz = 200; hz <= 16000; hz += 200) sum += (firMagnitude(taps, hz) - target(hz)) ** 2;
+		for (let hz = 200; hz <= 16000; hz += 200) {
+			sum += (firMagnitude(taps, hz) - target(hz)) ** 2;
+		}
+
 		return sum;
 	};
+
 	check("the fitted filter beats doing nothing", error(fitted) < error(FLAT), `${error(fitted)} vs ${error(FLAT)}`);
 }
 

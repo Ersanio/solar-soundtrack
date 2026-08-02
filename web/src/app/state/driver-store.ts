@@ -45,7 +45,10 @@ export class DriverStore {
    */
   readonly instruments = computed<InstrumentTables>(() => {
     const driver = this.driver();
-    if (!driver) return bundledInstrumentTables();
+    if (!driver) {
+      return bundledInstrumentTables();
+    }
+
     return readInstrumentTables(driver.programData, driver.programPos);
   });
 
@@ -71,7 +74,10 @@ export class DriverStore {
   /** Swaps in an install's own `main.bin`, so the ARAM figures are exact. */
   async useCustom(file: File): Promise<void> {
     const bundled = this.bundled();
-    if (!bundled) return;
+    if (!bundled) {
+      return;
+    }
+
     try {
       const bytes = new Uint8Array(await file.arrayBuffer());
       this.uploaded.set(withCustomProgram(bundled, bytes, file.name));

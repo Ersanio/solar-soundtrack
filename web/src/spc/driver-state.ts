@@ -98,8 +98,11 @@ export function readDriverState(aram: Uint8Array): DriverState {
  */
 export function tickVoice(aram: Uint8Array): number {
 	for (let voice = 0; voice < VOICES; voice++) {
-		if (word(aram, Addr.TrackPointers + voice * 2) !== 0) return voice;
+		if (word(aram, Addr.TrackPointers + voice * 2) !== 0) {
+			return voice;
+		}
 	}
+
 	return -1;
 }
 
@@ -132,7 +135,10 @@ export function readNoteDuration(aram: Uint8Array, voice: number): number {
  * and count as one. {@link TICK_POLL_HZ} is the rate that keeps that safe.
  */
 export function sawTick(previous: number, current: number): number {
-	if (current < previous) return 1;
+	if (current < previous) {
+		return 1;
+	}
+
 	return current > previous && previous !== 0 ? 1 : 0;
 }
 
@@ -200,7 +206,9 @@ export function resetMuteShadow(shadow: MuteShadow): void {
  */
 export function applyChannelMutes(aram: Uint8Array, mask: number, shadow: MuteShadow): void {
 	const wanted = mask & ALL_VOICES;
-	if (wanted === 0 && shadow.applied === 0 && shadow.restoring === 0) return;
+	if (wanted === 0 && shadow.applied === 0 && shadow.restoring === 0) {
+		return;
+	}
 
 	// Voices let go of since the last call owe their volume back; ones muted
 	// again before that happened can keep waiting.
@@ -225,10 +233,13 @@ export function applyChannelMutes(aram: Uint8Array, mask: number, shadow: MuteSh
 				aram[at] = 0;
 				dirty |= bit;
 			}
+
 			continue;
 		}
 
-		if (!(shadow.restoring & bit)) continue;
+		if (!(shadow.restoring & bit)) {
+			continue;
+		}
 
 		// Done once the value is back and the driver has consumed the flag. It
 		// can be cleared out from under a write that lands mid-loop, in which
@@ -237,6 +248,7 @@ export function applyChannelMutes(aram: Uint8Array, mask: number, shadow: MuteSh
 			shadow.restoring &= ~bit;
 			continue;
 		}
+
 		aram[at] = shadow.saved[voice];
 		dirty |= bit;
 	}

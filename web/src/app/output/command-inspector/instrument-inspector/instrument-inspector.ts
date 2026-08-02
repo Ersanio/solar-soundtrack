@@ -74,11 +74,18 @@ export class InstrumentInspector {
    */
   protected readonly emitted = computed<number | null>(() => {
     const n = this.written();
-    if (n < 0) return null;
-    if (this.raw()) return n;
+    if (n < 0) {
+      return null;
+    }
+
+    if (this.raw()) {
+      return n;
+    }
+
     if (n <= 18 || this.direct() || n >= FIRST_CUSTOM_INSTRUMENT) {
       return n >= 0x13 && n < FIRST_CUSTOM_INSTRUMENT ? n - 0x13 + FIRST_CUSTOM_INSTRUMENT : n;
     }
+
     return null;
   });
 
@@ -98,11 +105,18 @@ export class InstrumentInspector {
   /** The sample form of the entry the caret is defining, said in words. */
   protected readonly definitionSample = computed(() => {
     const sample = this.definingEntry()?.sample;
-    if (!sample) return '';
-    if (sample.form === 'file') return `"${sample.name}"`;
+    if (!sample) {
+      return '';
+    }
+
+    if (sample.form === 'file') {
+      return `"${sample.name}"`;
+    }
+
     if (sample.form === 'copy') {
       return `@${sample.instrument}'s sample, $${hex2(sample.srcn)}`;
     }
+
     return `noise at clock $${hex2(sample.clock)} — ${Math.round(noiseHz(sample.clock)).toLocaleString()} Hz`;
   });
 
@@ -116,17 +130,27 @@ export class InstrumentInspector {
       const written = this.written();
       return written >= FIRST_PERCUSSION_INSTRUMENT ? 'percussion' : 'unsupported';
     }
-    if (n < MELODIC_SLOTS) return 'melodic';
+
+    if (n < MELODIC_SLOTS) {
+      return 'melodic';
+    }
+
     // Only a raw `$DA` can land here: 20-29 is past the table, and where it
     // reads is a property of the driver's indexing code, which is not in the
     // AddmusicK sources this port was written against.
-    if (n < FIRST_CUSTOM_INSTRUMENT) return 'beyond';
+    if (n < FIRST_CUSTOM_INSTRUMENT) {
+      return 'beyond';
+    }
+
     return this.custom() ? 'custom' : 'undefined';
   });
 
   private readonly custom = computed(() => {
     const n = this.emitted();
-    if (n === null || n < FIRST_CUSTOM_INSTRUMENT) return null;
+    if (n === null || n < FIRST_CUSTOM_INSTRUMENT) {
+      return null;
+    }
+
     return this.store.tokens().instruments.find((entry) => entry.number === n) ?? null;
   });
 
@@ -148,8 +172,12 @@ export class InstrumentInspector {
     if (this.band() === 'percussion') {
       return tables.percussion[this.written() - FIRST_PERCUSSION_INSTRUMENT] ?? null;
     }
+
     const n = this.emitted();
-    if (n === null || this.band() !== 'melodic') return null;
+    if (n === null || this.band() !== 'melodic') {
+      return null;
+    }
+
     return tables.melodic[n] ?? null;
   });
 
@@ -157,9 +185,13 @@ export class InstrumentInspector {
   protected readonly bytes = computed<number[] | null>(() => {
     const custom = this.custom();
     if (custom) {
-      if (!custom.complete) return null;
+      if (!custom.complete) {
+        return null;
+      }
+
       return [sampleByte(custom.sample), ...custom.bytes];
     }
+
     const entry = this.entry();
     return entry ? [...entry.bytes] : null;
   });
@@ -175,7 +207,10 @@ export class InstrumentInspector {
 
   protected readonly byteLabel = computed(() => {
     const bytes = this.bytes();
-    if (!bytes) return null;
+    if (!bytes) {
+      return null;
+    }
+
     return bytes.map((byte, i) => (i === 0 && !this.sampleKnown() ? '··' : hex2(byte))).join(' ');
   });
 
@@ -196,7 +231,9 @@ export class InstrumentInspector {
 
   protected readonly rows = computed<DetailRow[]>(() => {
     const bytes = this.bytes();
-    if (!bytes) return [];
+    if (!bytes) {
+      return [];
+    }
 
     const rows: DetailRow[] = [];
     if (this.isNoise()) {
@@ -297,9 +334,15 @@ export class InstrumentInspector {
    */
   private readonly sampleName = computed(() => {
     const srcn = this.srcn();
-    if (srcn < 0) return undefined;
+    if (srcn < 0) {
+      return undefined;
+    }
+
     const list = this.store.result()?.sampleList;
-    if (list) return list[srcn] ?? 'past the end of this song’s sample list';
+    if (list) {
+      return list[srcn] ?? 'past the end of this song’s sample list';
+    }
+
     return this.drivers.driver()?.samples[srcn]?.sampleName ?? 'not in the driver’s default set';
   });
 
@@ -310,11 +353,19 @@ export class InstrumentInspector {
   /** For `@30+`: the sample form as written in the block. */
   protected readonly customSample = computed(() => {
     const custom = this.custom();
-    if (!custom) return null;
+    if (!custom) {
+      return null;
+    }
+
     const sample = custom.sample;
-    if (sample.form === 'file') return `"${sample.name}"`;
-    if (sample.form === 'copy')
+    if (sample.form === 'file') {
+      return `"${sample.name}"`;
+    }
+
+    if (sample.form === 'copy') {
       return `@${sample.instrument}, whose sample is $${hex2(sample.srcn)}`;
+    }
+
     return `noise at clock $${hex2(sample.clock)}`;
   });
 
@@ -338,15 +389,24 @@ export class InstrumentInspector {
 }
 
 function sampleByte(sample: { form: string; srcn?: number; byte?: number }): number {
-  if (sample.form === 'copy') return sample.srcn ?? 0;
-  if (sample.form === 'noise') return sample.byte ?? 0;
+  if (sample.form === 'copy') {
+    return sample.srcn ?? 0;
+  }
+
+  if (sample.form === 'noise') {
+    return sample.byte ?? 0;
+  }
+
   // A named file's SRCN is decided by the resolved `#samples` list, which the
   // scanner cannot know; the panel shows the name instead.
   return -1;
 }
 
 function semitones(value: number): string {
-  if (!Number.isFinite(value)) return 'silent';
+  if (!Number.isFinite(value)) {
+    return 'silent';
+  }
+
   const rounded = value.toFixed(1);
   return `${value > 0 ? '+' : ''}${rounded} semitones`;
 }

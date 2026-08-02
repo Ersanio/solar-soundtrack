@@ -189,6 +189,7 @@ function findMainLoop(programData: Uint8Array, programPos: number): number | nul
 			return programPos + i;
 		}
 	}
+
 	return null;
 }
 
@@ -220,10 +221,14 @@ function findSongTable(
 		// invariant that holds no matter how many slots there are.
 		const first = word(programData, start);
 		const tableBytes = first - (programPos + start);
-		if (tableBytes < 2 || tableBytes % 2 !== 0) continue;
+		if (tableBytes < 2 || tableBytes % 2 !== 0) {
+			continue;
+		}
 
 		const entries = tableBytes / 2;
-		if (entries > MAX_ENTRIES || start + tableBytes > programData.length) continue;
+		if (entries > MAX_ENTRIES || start + tableBytes > programData.length) {
+			continue;
+		}
 
 		// Entries are laid out in song order, and so is their data.
 		let ascending = true;
@@ -234,9 +239,13 @@ function findSongTable(
 				ascending = false;
 				break;
 			}
+
 			previous = value;
 		}
-		if (!ascending) continue;
+
+		if (!ascending) {
+			continue;
+		}
 
 		// The last entry is the local song's slot. It lands at the end of the
 		// image — but not always exactly: AddmusicK.cpp:1147 sizes the table as
@@ -246,7 +255,9 @@ function findSongTable(
 		// candidate lands nearest the end rather than demanding an exact hit.
 		const localPos = previous;
 		const distance = Math.abs(localPos - imageEnd);
-		if (distance > 0x100) continue;
+		if (distance > 0x100) {
+			continue;
+		}
 
 		if (distance < bestDistance) {
 			bestDistance = distance;
@@ -279,7 +290,10 @@ export function encodePathSegment(name: string): string {
 
 async function fetchBytes(url: string): Promise<Uint8Array> {
 	const response = await fetch(url);
-	if (!response.ok) throw new DriverError(`Could not load ${url} (HTTP ${response.status}).`);
+	if (!response.ok) {
+		throw new DriverError(`Could not load ${url} (HTTP ${response.status}).`);
+	}
+
 	assertNotHtmlFallback(response, url);
 	return new Uint8Array(await response.arrayBuffer());
 }
@@ -326,11 +340,14 @@ async function load(baseUrl: string, sampleGroup: string): Promise<DriverBundle>
 				`The driver bundle lives in public/driver/.`,
 		);
 	}
+
 	assertNotHtmlFallback(manifestResponse, manifestUrl);
 	const manifest = (await manifestResponse.json()) as DriverManifest;
 
 	const names = manifest.sampleGroups[sampleGroup];
-	if (!names) throw new DriverError(`Sample group "${sampleGroup}" is not defined in the manifest.`);
+	if (!names) {
+		throw new DriverError(`Sample group "${sampleGroup}" is not defined in the manifest.`);
+	}
 
 	const [spcBase, dspBase, rawProgram, ...sampleBlobs] = await Promise.all([
 		fetchBytes(`${baseUrl}/${manifest.spcBase}`),
@@ -366,6 +383,7 @@ export function withCustomProgram(bundle: DriverBundle, raw: Uint8Array, name: s
 	if (raw.length < 64) {
 		throw new DriverError(`"${name}" is only ${raw.length} bytes — that is not a driver image.`);
 	}
+
 	if (raw.length > ARAM_SIZE - 0x200) {
 		throw new DriverError(`"${name}" is ${raw.length} bytes, which cannot fit in ARAM alongside anything else.`);
 	}

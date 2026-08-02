@@ -166,7 +166,10 @@ export function buildSpc(request: SpcExportRequest): SpcExportResult {
 	spc[DSP_BASE + DSP_DIR] = (tablePos >> 8) & 0xff;
 
 	aram[ARAM.flgMirror] = 0x20;
-	if (yoshiDrums) aram[ARAM.port1] = 2;
+	if (yoshiDrums) {
+		aram[ARAM.port1] = 2;
+	}
+
 	aram[ARAM.port2] = plan.songIndex;
 
 	if (samplePos > layout.echoStart) {
@@ -188,7 +191,10 @@ export function spcFilename(tags: SongTags): string {
 
 function totalSampleBytes(samples: BrrSample[]): number {
 	let total = 0;
-	for (const sample of samples) total += sample.data.length + 4;
+	for (const sample of samples) {
+		total += sample.data.length + 4;
+	}
+
 	return total;
 }
 
@@ -220,11 +226,17 @@ function formatDate(date: Date): string {
 
 /** Prefer the compiler's estimate; fall back to parsing a `#length "m:ss"` tag. */
 function resolveSeconds(estimated: number | null | undefined, tag: string | undefined): number {
-	if (typeof estimated === "number" && Number.isFinite(estimated)) return estimated;
+	if (typeof estimated === "number" && Number.isFinite(estimated)) {
+		return estimated;
+	}
+
 	if (tag) {
 		const match = /^\s*(?:(\d+):)?(\d+)\s*$/.exec(tag);
-		if (match) return Number(match[1] ?? 0) * 60 + Number(match[2]);
+		if (match) {
+			return Number(match[1] ?? 0) * 60 + Number(match[2]);
+		}
 	}
+
 	return 0;
 }
 
