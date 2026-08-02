@@ -274,7 +274,9 @@ export class Playback {
       return (songTicks / stats.introTicks) * played.introSeconds;
     }
     if (stats.loopTicks <= 0) return played.introSeconds;
-    return played.introSeconds + ((songTicks - stats.introTicks) / stats.loopTicks) * played.mainSeconds;
+    return (
+      played.introSeconds + ((songTicks - stats.introTicks) / stats.loopTicks) * played.mainSeconds
+    );
   }
 
   private reload(result: CompileResult | null): void {

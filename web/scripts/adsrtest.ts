@@ -52,8 +52,8 @@ console.log("\nCLOCKS, checked against the published noise ladder");
 	// The SNES noise frequencies for NCK $00-$1F, as documented for the DSP's FLG
 	// register. Independent of everything else here.
 	const LADDER = [
-		0, 16, 21, 25, 31, 42, 50, 63, 83, 100, 125, 167, 200, 250, 333, 400,
-		500, 667, 800, 1000, 1333, 1600, 2000, 2667, 3200, 4000, 5333, 6400, 8000, 10667, 16000, 32000,
+		0, 16, 21, 25, 31, 42, 50, 63, 83, 100, 125, 167, 200, 250, 333, 400, 500, 667, 800, 1000, 1333, 1600, 2000, 2667,
+		3200, 4000, 5333, 6400, 8000, 10667, 16000, 32000,
 	];
 
 	check("the table has 32 entries", CLOCKS.length === 32);
@@ -147,9 +147,15 @@ console.log("\nthe stepped envelope");
 
 	const points = envelopeAdsr(envelope);
 	check("the curve starts at silence", points[0].level === 0);
-	check("it reaches full level", points.some((p) => p.level >= 1));
+	check(
+		"it reaches full level",
+		points.some((p) => p.level >= 1),
+	);
 	check("it ends at silence", points[points.length - 1].level === 0);
-	check("time never goes backwards", points.every((p, i) => i === 0 || p.t >= points[i - 1].t));
+	check(
+		"time never goes backwards",
+		points.every((p, i) => i === 0 || p.t >= points[i - 1].t),
+	);
 	check(
 		"the attack ends where attackSeconds says",
 		Math.abs((points.find((p) => p.level >= 1)?.t ?? -1) - attackSeconds(envelope.attack)) < 1e-12,
@@ -174,7 +180,10 @@ console.log("\nGAIN");
 	check("the rate is the low five bits", decodeGain(0xb8).rate === 0x18);
 
 	const flat = envelopeGain(0x7f);
-	check("a direct GAIN draws a level", flat.every((p) => p.level === 1));
+	check(
+		"a direct GAIN draws a level",
+		flat.every((p) => p.level === 1),
+	);
 	const rise = envelopeGain(0xc4);
 	check("a rising ramp starts at silence", rise[0].level === 0);
 	check("and gets somewhere", rise[rise.length - 1].level > rise[0].level);
@@ -225,9 +234,7 @@ console.log("\nthe stock table decodes");
 	);
 	check(
 		"and a sane tuning",
-		[...tables.melodic, ...tables.percussion].every(
-			(entry) => tuningMultiplier(entry.tuning, entry.subTuning) > 0,
-		),
+		[...tables.melodic, ...tables.percussion].every((entry) => tuningMultiplier(entry.tuning, entry.subTuning) > 0),
 	);
 }
 

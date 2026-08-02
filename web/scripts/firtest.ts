@@ -64,11 +64,7 @@ console.log("\nthe manual's flat filter is flat");
 	// $7F is 127/128, so it is a hair under unity rather than exactly at it.
 	const unity = 127 / 128;
 	for (const hz of [0, 100, 1000, 4000, 8000, 16000]) {
-		check(
-			`${hz} Hz is unity`,
-			Math.abs(firMagnitude(FLAT, hz) - unity) < 1e-9,
-			`${firMagnitude(FLAT, hz)}`,
-		);
+		check(`${hz} Hz is unity`, Math.abs(firMagnitude(FLAT, hz) - unity) < 1e-9, `${firMagnitude(FLAT, hz)}`);
 	}
 	check("its DC gain is 127/128", Math.abs(firDcGain(FLAT) - unity) < 1e-9);
 	check("it is described as flat", describeFir(FLAT).shape === "flat", describeFir(FLAT).shape);
@@ -134,7 +130,10 @@ console.log("\nagainst bsnes's SPC_DSP.cpp, the emulator's own echo stage");
 	const reversed = [...CLASSIC].reverse();
 	const forward = firCurve(CLASSIC, { fromHz: 100, toHz: 16000, points: 50 });
 	const backward = firCurve(reversed, { fromHz: 100, toHz: 16000, points: 50 });
-	check("a reversed filter has the same magnitude", forward.every((v, i) => Math.abs(v - backward[i]) < 1e-9));
+	check(
+		"a reversed filter has the same magnitude",
+		forward.every((v, i) => Math.abs(v - backward[i]) < 1e-9),
+	);
 
 	// An asymmetric filter, so this is not passing by accident on a palindrome.
 	const asymmetric = [0x50, 0x20, -0x10, 0x08, 0, 0, 0, 0];
@@ -216,7 +215,10 @@ console.log("\nrepeat curves darken pass by pass");
 		repeats.every((curve, k) => k === 0 || curve[index] < repeats[k - 1][index]),
 		repeats.map((c) => c[index].toFixed(3)).join(" > "),
 	);
-	check("the first repeat is the plain response", repeats[0].every((v, i) => Math.abs(v - firCurve(CLASSIC, options)[i]) < 1e-12));
+	check(
+		"the first repeat is the plain response",
+		repeats[0].every((v, i) => Math.abs(v - firCurve(CLASSIC, options)[i]) < 1e-12),
+	);
 }
 
 console.log("\ndesigning from a tone control");
@@ -262,16 +264,8 @@ console.log("\nfitting a drawn curve");
 	const fitted = fitToTarget(target);
 	check("the fit is eight in-range bytes", fitted.length === FIR_TAPS && fitted.every((t) => t >= -128 && t <= 127));
 	check("and it comes out a low-pass", describeFir(fitted).shape === "low-pass", describeFir(fitted).shape);
-	check(
-		"it passes the low end",
-		Math.abs(firMagnitude(fitted, 1000)) > 0.7,
-		String(firMagnitude(fitted, 1000)),
-	);
-	check(
-		"and stops the top end",
-		firMagnitude(fitted, 14000) < 0.35,
-		String(firMagnitude(fitted, 14000)),
-	);
+	check("it passes the low end", Math.abs(firMagnitude(fitted, 1000)) > 0.7, String(firMagnitude(fitted, 1000)));
+	check("and stops the top end", firMagnitude(fitted, 14000) < 0.35, String(firMagnitude(fitted, 14000)));
 
 	// A flat target should come back flat.
 	const flat = fitToTarget([
@@ -309,8 +303,7 @@ console.log("\npresets");
 	for (const preset of FIR_PRESETS) {
 		check(
 			`${preset.name} is eight in-range signed bytes`,
-			preset.taps.length === FIR_TAPS &&
-				preset.taps.every((t) => Number.isInteger(t) && t >= -128 && t <= 127),
+			preset.taps.length === FIR_TAPS && preset.taps.every((t) => Number.isInteger(t) && t >= -128 && t <= 127),
 			preset.taps.join(", "),
 		);
 		check(`${preset.name} says what it does`, preset.note.length > 10);
@@ -320,7 +313,11 @@ console.log("\npresets");
 	const flat = FIR_PRESETS.find((p) => p.name === "Flat");
 	check("Flat is EchoFilter1 verbatim", JSON.stringify(flat?.taps) === JSON.stringify(FLAT), flat?.taps.join(", "));
 	const classic = FIR_PRESETS.find((p) => p.name === "Classic");
-	check("Classic is EchoFilter0 verbatim", JSON.stringify(classic?.taps) === JSON.stringify(CLASSIC), classic?.taps.join(", "));
+	check(
+		"Classic is EchoFilter0 verbatim",
+		JSON.stringify(classic?.taps) === JSON.stringify(CLASSIC),
+		classic?.taps.join(", "),
+	);
 
 	check("a preset recognises itself", matchPreset(CLASSIC)?.name === "Classic");
 	check("an unrelated filter matches nothing", matchPreset([1, 2, 3, 4, 5, 6, 7, 8]) === null);
@@ -380,7 +377,10 @@ console.log("\ncurve sampling");
 {
 	const curve = firCurve(CLASSIC, { fromHz: 20, toHz: 16000, points: 100 });
 	check("a curve has the points asked for", curve.length === 100);
-	check("every point is a finite gain", curve.every((v) => Number.isFinite(v) && v >= 0));
+	check(
+		"every point is a finite gain",
+		curve.every((v) => Number.isFinite(v) && v >= 0),
+	);
 	check("two points is the floor, not a crash", firCurve(CLASSIC, { fromHz: 20, toHz: 16000, points: 1 }).length === 2);
 	check("a linear axis works too", firCurve(CLASSIC, { fromHz: 0, toHz: 16000, points: 10, log: false }).length === 10);
 }

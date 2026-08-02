@@ -26,22 +26,36 @@ export class StatsGrid {
     const echoBytes = stats.echoBufferSize << 11;
     const end = base + stats.totalSize;
     const playSeconds =
-      stats.introSeconds === null || stats.mainSeconds === null ? null : stats.introSeconds + stats.mainSeconds;
+      stats.introSeconds === null || stats.mainSeconds === null
+        ? null
+        : stats.introSeconds + stats.mainSeconds;
 
     const cells: Cell[] = [
-      { label: 'Total size', value: stats.totalSize ? `0x${hex4(stats.totalSize)}` : '—', dim: !stats.totalSize },
+      {
+        label: 'Total size',
+        value: stats.totalSize ? `0x${hex4(stats.totalSize)}` : '—',
+        dim: !stats.totalSize,
+      },
       {
         label: 'ARAM range',
         value: stats.totalSize ? `${hex4(base)}–${hex4(end - 1)}` : '—',
         dim: !stats.totalSize,
       },
-      { label: 'Header', value: stats.headerSize ? `0x${hex4(stats.headerSize)}` : '—', dim: !stats.headerSize },
+      {
+        label: 'Header',
+        value: stats.headerSize ? `0x${hex4(stats.headerSize)}` : '—',
+        dim: !stats.headerSize,
+      },
       {
         label: 'Loop block',
         value: stats.loopDataSize ? `0x${hex4(stats.loopDataSize)}` : '—',
         dim: !stats.loopDataSize,
       },
-      { label: 'Echo buffer', value: echoBytes ? `0x${hex4(echoBytes)}` : '0', dim: echoBytes === 0 },
+      {
+        label: 'Echo buffer',
+        value: echoBytes ? `0x${hex4(echoBytes)}` : '0',
+        dim: echoBytes === 0,
+      },
       // One pass through the song, as AddmusicK itself reports it. Not the ID666
       // header field, which doubles the loop and is not shown here.
       {

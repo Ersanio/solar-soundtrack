@@ -17,13 +17,7 @@ import { join } from "node:path";
 
 import { compiler } from "../src/compiler";
 import { EMPTY_SAMPLE_NAME, bankSlotName } from "../src/compiler/tables";
-import {
-	SAMPLE_BANK_BYTES,
-	SAMPLE_BANK_SLOTS,
-	type BrrSample,
-	emptySample,
-	parseSampleBank,
-} from "../src/spc/brr";
+import { SAMPLE_BANK_BYTES, SAMPLE_BANK_SLOTS, type BrrSample, emptySample, parseSampleBank } from "../src/spc/brr";
 import { loadDriver } from "../src/spc/driver";
 import { buildSpc } from "../src/spc/export";
 import { planAram } from "../src/spc/layout";
@@ -222,7 +216,11 @@ console.log("\nnotes differ audibly from each other");
 		}
 	}
 	check("o2 and o5 render differently", !identical);
-	check("both are audible", peak(low) > 0.01 && peak(high) > 0.01, `${peak(low).toFixed(3)} / ${peak(high).toFixed(3)}`);
+	check(
+		"both are audible",
+		peak(low) > 0.01 && peak(high) > 0.01,
+		`${peak(low).toFixed(3)} / ${peak(high).toFixed(3)}`,
+	);
 }
 
 console.log("\nfast-forward lands somewhere different");
@@ -294,9 +292,21 @@ console.log("\nmuting a channel takes it out of the mix");
 	const noFirst = render(0b01);
 	const neither = render(0b11);
 
-	check("muting one channel lowers the level", rms(noSecond) < rms(both), `${rms(noSecond).toFixed(5)} vs ${rms(both).toFixed(5)}`);
-	check("muting the other channel also lowers it", rms(noFirst) < rms(both), `${rms(noFirst).toFixed(5)} vs ${rms(both).toFixed(5)}`);
-	check("each channel is still audible alone", peak(noSecond) > 0.01 && peak(noFirst) > 0.01, `${peak(noSecond).toFixed(3)} / ${peak(noFirst).toFixed(3)}`);
+	check(
+		"muting one channel lowers the level",
+		rms(noSecond) < rms(both),
+		`${rms(noSecond).toFixed(5)} vs ${rms(both).toFixed(5)}`,
+	);
+	check(
+		"muting the other channel also lowers it",
+		rms(noFirst) < rms(both),
+		`${rms(noFirst).toFixed(5)} vs ${rms(both).toFixed(5)}`,
+	);
+	check(
+		"each channel is still audible alone",
+		peak(noSecond) > 0.01 && peak(noFirst) > 0.01,
+		`${peak(noSecond).toFixed(3)} / ${peak(noFirst).toFixed(3)}`,
+	);
 	check("muting either leaves a different mix", rms(noFirst).toFixed(6) !== rms(noSecond).toFixed(6));
 	check("muting every used channel is silent", peak(neither) < 0.01, `peak ${peak(neither).toFixed(4)}`);
 
@@ -421,7 +431,10 @@ console.log("\nmuting cuts a note that is already ringing");
 
 	check("the note is ringing to begin with", peak(after(open)) > 0.02, `peak ${peak(after(open)).toFixed(4)}`);
 	check("and the mute silences it", peak(after(cut)) < 0.002, `peak ${peak(after(cut)).toFixed(4)}`);
-	check("without touching what came before", rms(cut.subarray(0, 3200 * SPC_CHANNELS)) === rms(open.subarray(0, 3200 * SPC_CHANNELS)));
+	check(
+		"without touching what came before",
+		rms(cut.subarray(0, 3200 * SPC_CHANNELS)) === rms(open.subarray(0, 3200 * SPC_CHANNELS)),
+	);
 }
 
 console.log("\nunmuting gives the channel its volume back");
@@ -537,8 +550,11 @@ console.log("\noptimizeSampleUsage does not silence the song");
 	const full = render(false);
 
 	check("an optimised song is still audible", peak(lean) > 0.01, `peak ${peak(lean).toFixed(4)}`);
-	check("at the same level as the full build", Math.abs(rms(lean) - rms(full)) < 0.0005,
-		`rms ${rms(lean).toFixed(5)} vs ${rms(full).toFixed(5)}`);
+	check(
+		"at the same level as the full build",
+		Math.abs(rms(lean) - rms(full)) < 0.0005,
+		`rms ${rms(lean).toFixed(5)} vs ${rms(full).toFixed(5)}`,
+	);
 
 	// Dropping only unplayed samples must not change a single sample of output.
 	let identical = lean.length === full.length;
@@ -563,17 +579,22 @@ console.log("\noptimizeSampleUsage does not silence the song");
 	// every later SRCN down, so the song plays the wrong samples. The two lists
 	// must be the same length and the kept sample must stay at its own index.
 	const holding = resolveSamples(hexSelected.sampleList ?? []);
-	check("resolving preserves every slot", holding.length === (hexSelected.sampleList ?? []).length,
-		`${holding.length} of ${(hexSelected.sampleList ?? []).length}`);
+	check(
+		"resolving preserves every slot",
+		holding.length === (hexSelected.sampleList ?? []).length,
+		`${holding.length} of ${(hexSelected.sampleList ?? []).length}`,
+	);
 
 	// And a name that resolves to nothing at all must still hold its position,
 	// rather than collapsing the list and renumbering every SRCN after it.
 	const withUnknown = resolveSamples([driver.samples[0].sampleName, "no-such-file.brr", driver.samples[1].sampleName]);
 	check("an unresolvable name still occupies its slot", withUnknown.length === 3, `${withUnknown.length}`);
-	check("the samples around it keep their indices",
+	check(
+		"the samples around it keep their indices",
 		withUnknown[0].sampleName === driver.samples[0].sampleName &&
 			withUnknown[2].sampleName === driver.samples[1].sampleName,
-		withUnknown.map((s) => s.sampleName).join(", "));
+		withUnknown.map((s) => s.sampleName).join(", "),
+	);
 
 	const hexSamples = holding;
 	emu.loadSpc(
@@ -655,9 +676,7 @@ console.log("\na .bnk sample bank plays through the emulator");
 	check("a bank slot is audible", peak(fromBank) > 0.01, `peak ${peak(fromBank).toFixed(4)}`);
 
 	// The same sample, reached the ordinary way, at the same SRCN.
-	const direct = render(
-		`#amk 4\n#samples { #default }\n#0 t40 o4 v220 q7F $F3 $09 $02 l1 c c\n`,
-	);
+	const direct = render(`#amk 4\n#samples { #default }\n#0 t40 o4 v220 q7F $F3 $09 $02 l1 c c\n`);
 	check("so is the same sample played directly", peak(direct) > 0.01, `peak ${peak(direct).toFixed(4)}`);
 	check(
 		"and the bank slot sounds identical to it",
@@ -666,10 +685,9 @@ console.log("\na .bnk sample bank plays through the emulator");
 	);
 
 	// Optimisation must not disturb a slot the song actually plays.
-	const unoptimised = render(
-		`#amk 4\n#samples { "test.bnk" }\n#0 t40 o4 v220 q7F $F3 $0${SLOT} $02 l1 c c\n`,
-		{ optimizeSampleUsage: false },
-	);
+	const unoptimised = render(`#amk 4\n#samples { "test.bnk" }\n#0 t40 o4 v220 q7F $F3 $0${SLOT} $02 l1 c c\n`, {
+		optimizeSampleUsage: false,
+	});
 	check(
 		"optimising a bank leaves the played slot untouched",
 		fromBank.every((value, index) => value === unoptimised[index]),

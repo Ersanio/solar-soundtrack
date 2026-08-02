@@ -128,7 +128,7 @@ console.log("\nnames that MML could not survive are rejected");
 {
 	check("a '#' is rejected", validateName("kick#1.brr") !== null);
 	check("a ';' is rejected", validateName("kick;1.brr") !== null);
-	check('a \'"\' is rejected', validateName('kick".brr') !== null);
+	check("a '\"' is rejected", validateName('kick".brr') !== null);
 	check("an empty name is rejected", validateName("   ") !== null);
 	check("a stock name with '@' and spaces is fine", validateName("00 SMW @0.brr") === null);
 	check("a path-prefixed name is fine", validateName("drums/kick.brr") === null);
@@ -161,8 +161,7 @@ console.log("\nthe invalid shifts collapse the way the hardware does");
 	for (const shift of [13, 14, 15]) {
 		const pcm = decodeBrr(parseBrr("t.brr", block(shift, 0, [0, 1, 7, 8, 9, 15, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])));
 		// Non-negative nibbles give 0; negative ones give -2048, doubled to -4096.
-		const ok =
-			pcm[0] === 0 && pcm[1] === 0 && pcm[2] === 0 && pcm[3] === -4096 && pcm[4] === -4096 && pcm[5] === -4096;
+		const ok = pcm[0] === 0 && pcm[1] === 0 && pcm[2] === 0 && pcm[3] === -4096 && pcm[4] === -4096 && pcm[5] === -4096;
 		check(`shift ${shift} yields 0 or -4096, never overflow`, ok, `[${pcm.slice(0, 6).join(", ")}]`);
 	}
 }
@@ -256,7 +255,7 @@ console.log("\nit matches snes_spc's decode_brr exactly");
 					}
 				} else if (filter) {
 					s += p1 >> 1;
-					s += (-p1) >> 5;
+					s += -p1 >> 5;
 				}
 
 				// CLAMP16 then (int16_t)(s * 2)
@@ -325,7 +324,7 @@ console.log("\nthe twenty bundled samples decode");
 	const manifest = JSON.parse(readFileSync(join(PUBLIC, "driver", "manifest.json"), "utf8")) as {
 		sampleGroups: Record<string, string[]>;
 	};
-	const names = manifest.sampleGroups['default'];
+	const names = manifest.sampleGroups["default"];
 	check("the default group has 20 names", names.length === 20, `${names.length}`);
 
 	let allValid = true;
@@ -379,7 +378,10 @@ console.log("\npeaks reduces without lying");
 	for (const value of wide) if (value !== 0) anyNonZero = true;
 	check("more buckets than samples still produces signal", anyNonZero);
 
-	check("no samples gives no geometry", peaks(new Int16Array(0), 8).every((v) => v === 0));
+	check(
+		"no samples gives no geometry",
+		peaks(new Int16Array(0), 8).every((v) => v === 0),
+	);
 	check("zero buckets is handled", peaks(pcm, 0).length === 0);
 }
 
@@ -388,7 +390,11 @@ console.log("\nsample banks split into their slots");
 	const names = (bank: string) => (slot: number) => bankSlotName(bank, slot);
 	const ramp = [7, 6, 4, 1, 15, 13, 10, 8, 9, 11, 14, 2, 5, 7, 3, 0];
 
-	check("the two slot counts agree", BANK_SLOT_COUNT === SAMPLE_BANK_SLOTS, `${BANK_SLOT_COUNT} vs ${SAMPLE_BANK_SLOTS}`);
+	check(
+		"the two slot counts agree",
+		BANK_SLOT_COUNT === SAMPLE_BANK_SLOTS,
+		`${BANK_SLOT_COUNT} vs ${SAMPLE_BANK_SLOTS}`,
+	);
 
 	check("a bank must be exactly 32 KB", validateSampleBank(new Uint8Array(0x4000)) !== null);
 	check("32 KB passes", validateSampleBank(new Uint8Array(SAMPLE_BANK_BYTES)) === null);
@@ -416,8 +422,11 @@ console.log("\nsample banks split into their slots");
 		three.set(bareBlock(8, 0, ramp, true), BRR_BLOCK_BYTES * 2);
 
 		const slots = parseSampleBank(bankFixture({ 5: three }), names("t.bnk"));
-		check("the walk runs to the END flag, inclusive", slots[5].data.length === BRR_BLOCK_BYTES * 3,
-			`${slots[5].data.length}`);
+		check(
+			"the walk runs to the END flag, inclusive",
+			slots[5].data.length === BRR_BLOCK_BYTES * 3,
+			`${slots[5].data.length}`,
+		);
 		check("and stops there", blockCount(slots[5]) === 3, `${blockCount(slots[5])}`);
 	}
 
@@ -428,8 +437,11 @@ console.log("\nsample banks split into their slots");
 		two.set(bareBlock(8, 0, ramp, true), BRR_BLOCK_BYTES);
 
 		const slots = parseSampleBank(bankFixture({ 2: two }, { 2: BRR_BLOCK_BYTES }), names("t.bnk"));
-		check("loopOffset is the loop address minus the start", slots[2].loopOffset === BRR_BLOCK_BYTES,
-			`${slots[2].loopOffset}`);
+		check(
+			"loopOffset is the loop address minus the start",
+			slots[2].loopOffset === BRR_BLOCK_BYTES,
+			`${slots[2].loopOffset}`,
+		);
 	}
 
 	{
@@ -442,9 +454,11 @@ console.log("\nsample banks split into their slots");
 		standalone.set(data, 2);
 		const fromFile = decodeBrr(parseBrr("t.brr", standalone));
 
-		check("a slot decodes like the equivalent .brr", fromBank.length === fromFile.length &&
-			fromBank.every((value, index) => value === fromFile[index]),
-			`${fromBank.length} vs ${fromFile.length} samples`);
+		check(
+			"a slot decodes like the equivalent .brr",
+			fromBank.length === fromFile.length && fromBank.every((value, index) => value === fromFile[index]),
+			`${fromBank.length} vs ${fromFile.length} samples`,
+		);
 	}
 
 	{
@@ -458,18 +472,24 @@ console.log("\nsample banks split into their slots");
 		image[3] = 0x00;
 
 		const slots = parseSampleBank(bank, names("t.bnk"));
-		check("an out-of-range address yields an empty slot, not a crash", slots.length === SAMPLE_BANK_SLOTS &&
-			slots[0].data.length === 0, `${slots.length} slots, slot 0 has ${slots[0].data.length} bytes`);
+		check(
+			"an out-of-range address yields an empty slot, not a crash",
+			slots.length === SAMPLE_BANK_SLOTS && slots[0].data.length === 0,
+			`${slots.length} slots, slot 0 has ${slots[0].data.length} bytes`,
+		);
 	}
 
-	check("a wrong-sized bank throws rather than guessing", (() => {
-		try {
-			parseSampleBank(new Uint8Array(16), names("t.bnk"));
-			return false;
-		} catch {
-			return true;
-		}
-	})());
+	check(
+		"a wrong-sized bank throws rather than guessing",
+		(() => {
+			try {
+				parseSampleBank(new Uint8Array(16), names("t.bnk"));
+				return false;
+			} catch {
+				return true;
+			}
+		})(),
+	);
 }
 
 console.log(`\n${failures === 0 ? "all checks passed" : `${failures} check(s) failed`}\n`);

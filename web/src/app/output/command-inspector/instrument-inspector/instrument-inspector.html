@@ -30,9 +30,7 @@
     </p>
   }
 } @else if (written() < 0) {
-  <p class="text-ink-muted text-xs leading-relaxed">
-    No number given, so this changes nothing.
-  </p>
+  <p class="text-ink-muted text-xs leading-relaxed">No number given, so this changes nothing.</p>
 } @else {
   <div class="space-y-3">
     @switch (band()) {
@@ -40,15 +38,19 @@
         <div class="text-warn space-y-2 text-xs leading-relaxed">
           <p>
             <code class="text-ink">&#64;{{ written() }}</code> emits nothing. AddmusicK writes a
-            <code class="text-ink">$DA</code> only for
-            <code class="text-ink">&#64;0</code>–<code class="text-ink">&#64;18</code> and
-            <code class="text-ink">&#64;30</code> upward, so the sound does not change — the channel
-            keeps whatever instrument it already had, or instrument 0 if none was ever set. That is
-            why it appears to be the same as <code class="text-ink">&#64;0</code>.
+            <code class="text-ink">$DA</code> only for <code class="text-ink">&#64;0</code>–<code
+              class="text-ink"
+              >&#64;18</code
+            >
+            and <code class="text-ink">&#64;30</code> upward, so the sound does not change — the
+            channel keeps whatever instrument it already had, or instrument 0 if none was ever set.
+            That is why it appears to be the same as <code class="text-ink">&#64;0</code>.
           </p>
           <p>
             It is not inert, though. It still records itself as the channel's instrument, which
-            cancels a pending <code class="text-ink">&#64;21</code>–<code class="text-ink">&#64;29</code>
+            cancels a pending <code class="text-ink">&#64;21</code>–<code class="text-ink"
+              >&#64;29</code
+            >
             drum and clears the current instrument's built-in transposition. So
             <code class="text-ink">&#64;2 c4 &#64;19 c4</code> plays one timbre at two different
             pitches.
@@ -57,8 +59,9 @@
           @if (!direct()) {
             <p>
               <code class="text-ink">&#64;&#64;{{ written() }}</code> does not help: the direct form
-              is remapped to <code class="text-ink">&#64;{{ written() + 11 }}</code>, a custom
-              instrument. Only a raw <code class="text-ink">$DA ${{ written().toString(16).toUpperCase() }}</code>
+              is remapped to <code class="text-ink">&#64;{{ written() + 11 }}</code
+              >, a custom instrument. Only a raw
+              <code class="text-ink">$DA ${{ written().toString(16).toUpperCase() }}</code>
               reaches the driver's own entry.
             </p>
           }
@@ -80,7 +83,8 @@
         <p class="text-warn text-xs leading-relaxed">
           @if (direct()) {
             The direct form <code class="text-ink">&#64;&#64;{{ written() }}</code> is remapped to
-            <code class="text-ink">&#64;{{ emitted() }}</code>, a custom instrument —
+            <code class="text-ink">&#64;{{ emitted() }}</code
+            >, a custom instrument —
           } @else {
             <code class="text-ink">&#64;{{ written() }}</code> is a custom instrument, but
           }
@@ -89,7 +93,8 @@
             first entry is <code class="text-ink">&#64;30</code>.
           } @else {
             this song defines {{ customCount() }}, so the highest is
-            <code class="text-ink">&#64;{{ 29 + customCount() }}</code>.
+            <code class="text-ink">&#64;{{ 29 + customCount() }}</code
+            >.
           }
         </p>
       }
@@ -165,8 +170,9 @@
 
         @if (band() === 'percussion') {
           <p class="text-ink-muted text-xs leading-relaxed">
-            The pitch you write is discarded — <code class="text-ink">&#64;{{ written() }} c4</code>
-            and <code class="text-ink">&#64;{{ written() }} g4</code> are the same drum at the same
+            The pitch you write is discarded —
+            <code class="text-ink">&#64;{{ written() }} c4</code> and
+            <code class="text-ink">&#64;{{ written() }} g4</code> are the same drum at the same
             pitch, and only the length differs. It applies to the next note only, then the channel
             reverts.
           </p>
@@ -174,7 +180,9 @@
 
         @if (direct() && written() <= 18) {
           <p class="text-ink-muted text-xs leading-relaxed">
-            The direct form. For <code class="text-ink">&#64;0</code>–<code class="text-ink">&#64;18</code>
+            The direct form. For <code class="text-ink">&#64;0</code>–<code class="text-ink"
+              >&#64;18</code
+            >
             it does exactly what the plain form does.
           </p>
         }

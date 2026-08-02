@@ -106,7 +106,9 @@ export class SampleStore {
   readonly storageError = signal<string | null>(null);
 
   /** The bundled samples, in manifest order. */
-  private readonly stock = computed<readonly BrrSample[]>(() => this.drivers.driver()?.samples ?? []);
+  private readonly stock = computed<readonly BrrSample[]>(
+    () => this.drivers.driver()?.samples ?? [],
+  );
 
   /** Named sample groups from the driver manifest — `#default` and friends. */
   readonly groups = computed<Readonly<Record<string, readonly string[]>>>(
@@ -183,7 +185,11 @@ export class SampleStore {
   });
 
   /** Filenames that are safe to reference from MML, in library order. */
-  readonly names = computed(() => this.files().filter((file) => file.error === null).map((file) => file.name));
+  readonly names = computed(() =>
+    this.files()
+      .filter((file) => file.error === null)
+      .map((file) => file.name),
+  );
 
   /** Bytes the library would contribute to ARAM if every sample were used. */
   readonly totalBytes = computed(() =>
@@ -196,7 +202,9 @@ export class SampleStore {
     }, 0),
   );
 
-  readonly overrideCount = computed(() => this.files().filter((file) => file.source !== 'stock').length);
+  readonly overrideCount = computed(
+    () => this.files().filter((file) => file.source !== 'stock').length,
+  );
 
   /**
    * Name → sample, rebuilt only when a file actually changes.
@@ -409,7 +417,10 @@ export class SampleStore {
    * 64 waveforms is wasted work while a bank sits collapsed, which is most of
    * the time. `important` is read live, so ticking a slot does not rebuild this.
    */
-  private readonly slotCache = new Map<string, { bytes: Uint8Array; slots: readonly BrrSample[] }>();
+  private readonly slotCache = new Map<
+    string,
+    { bytes: Uint8Array; slots: readonly BrrSample[] }
+  >();
 
   bankSlots(name: string): SampleSlot[] {
     const bytes = this.overrides().get(name);

@@ -79,7 +79,9 @@ export class SampleBrowser {
    * and `keep` on such a row would be a control with nothing to do — so rows say
    * which side of that line they are on.
    */
-  private readonly requested = computed(() => new Set(this.editor.result()?.stats?.sampleNames ?? []));
+  private readonly requested = computed(
+    () => new Set(this.editor.result()?.stats?.sampleNames ?? []),
+  );
 
   protected isRequested(name: string): boolean {
     return this.requested().has(name);
@@ -92,7 +94,9 @@ export class SampleBrowser {
    * plays is loaded whatever else is true, one it only includes survives just
    * while `keep` is ticked, and one it never mentions costs nothing either way.
    */
-  private readonly used = computed(() => new Set(this.editor.result()?.stats?.usedSampleNames ?? []));
+  private readonly used = computed(
+    () => new Set(this.editor.result()?.stats?.usedSampleNames ?? []),
+  );
 
   protected isUsed(name: string): boolean {
     return this.used().has(name);
@@ -142,7 +146,8 @@ export class SampleBrowser {
   protected detailLabel(file: SampleFile | SampleSlot): string {
     if ('error' in file && file.error) return file.error;
     const seconds = (file.frames / 32000).toFixed(2);
-    const loop = file.loopOffset > 0 ? `loop @ ${file.loopOffset.toLocaleString()}` : 'no loop point';
+    const loop =
+      file.loopOffset > 0 ? `loop @ ${file.loopOffset.toLocaleString()}` : 'no loop point';
     return `${file.blocks.toLocaleString()} blocks · ${seconds}s · ${loop}`;
   }
 

@@ -83,10 +83,7 @@ console.log("\nURL encoding");
 		encodePathSegment("00 SMW @0.brr") === "00%20SMW%20@0.brr",
 		encodePathSegment("00 SMW @0.brr"),
 	);
-	check(
-		"round-trips through decodeURI",
-		decodeURI(encodePathSegment("00 SMW @0.brr")) === "00 SMW @0.brr",
-	);
+	check("round-trips through decodeURI", decodeURI(encodePathSegment("00 SMW @0.brr")) === "00 SMW @0.brr");
 	check("# is escaped", encodePathSegment("a#b.brr") === "a%23b.brr", encodePathSegment("a#b.brr"));
 	check("? is escaped", encodePathSegment("a?b.brr") === "a%3Fb.brr", encodePathSegment("a?b.brr"));
 	check(
@@ -140,8 +137,7 @@ console.log("\ndriver bundle");
 		);
 		check(
 			"0D, 0F and 11 are the unimportant ones",
-			group.filter((name) => !important.includes(name)).join(", ") ===
-				"0D SMW @14.brr, 0F SMW @21.brr, 11 SMW @17.brr",
+			group.filter((name) => !important.includes(name)).join(", ") === "0D SMW @14.brr, 0F SMW @21.brr, 11 SMW @17.brr",
 			group.filter((name) => !important.includes(name)).join(", "),
 		);
 	}
@@ -244,7 +240,11 @@ console.log("\nsong table survives pointer-like bytes before it");
 
 		const found = withCustomProgram(driver, raw, "main.bin");
 		check("table found when the slot overshoots the image end", found.embedded !== null);
-		check("localPos follows the slot, not the image length", found.embedded?.localPos === slot, hex(found.embedded?.localPos ?? 0));
+		check(
+			"localPos follows the slot, not the image length",
+			found.embedded?.localPos === slot,
+			hex(found.embedded?.localPos ?? 0),
+		);
 		check("9 globals still detected", found.embedded?.globalSongCount === 9, `${found.embedded?.globalSongCount}`);
 	}
 
@@ -264,7 +264,11 @@ console.log("\nsong table survives pointer-like bytes before it");
 		raw.set(body, 4);
 		return withCustomProgram(driver, raw, "main.bin").embedded;
 	})();
-	check("zero-global table is one entry", single?.globalSongCount === 0 && single?.songIndex === 1, `${single?.globalSongCount}`);
+	check(
+		"zero-global table is one entry",
+		single?.globalSongCount === 0 && single?.songIndex === 1,
+		`${single?.globalSongCount}`,
+	);
 }
 
 console.log("\ncustom driver: a final-pass build is read as-is");
@@ -358,7 +362,11 @@ console.log("\nupload header detection is the size rule alone");
 		const bad = raw.slice();
 		bad[0] = (0x100 + wrong) & 0xff;
 		const analysis = analyzeDriver(bad, driver.manifest, true);
-		check(`size off by ${wrong} -> no header`, analysis.programData.length === raw.length, `${analysis.programData.length}`);
+		check(
+			`size off by ${wrong} -> no header`,
+			analysis.programData.length === raw.length,
+			`${analysis.programData.length}`,
+		);
 	}
 
 	// The stock second-pass driver starts with SPC700 code, not a header.
@@ -413,7 +421,9 @@ const { spc, layout } = buildSpc({
 console.log("\nfile structure");
 {
 	const text = (at: number, len: number) =>
-		Buffer.from(spc.subarray(at, at + len)).toString("latin1").replace(/\0+$/, "");
+		Buffer.from(spc.subarray(at, at + len))
+			.toString("latin1")
+			.replace(/\0+$/, "");
 
 	check("size is 0x10200", spc.length === 0x10200, `0x${spc.length.toString(16)}`);
 	check("signature", text(0, 33) === "SNES-SPC700 Sound File Data v0.30");
@@ -446,7 +456,10 @@ console.log("\nARAM contents");
 	const songBytes = compiled.data!;
 	let matches = true;
 	for (let i = 0; i < songBytes.length; i++) {
-		if (aram[plan.localPos + i] !== songBytes[i]) { matches = false; break; }
+		if (aram[plan.localPos + i] !== songBytes[i]) {
+			matches = false;
+			break;
+		}
 	}
 	check("song data at localPos", matches);
 
@@ -464,7 +477,7 @@ console.log("\nsample directory");
 	const aram = spc.subarray(0x100, 0x10100);
 	const dir = spc[0x10100 + 0x5d];
 
-	check("DIR register set", dir === (layout.sampleTablePos >> 8), `0x${dir.toString(16)}`);
+	check("DIR register set", dir === layout.sampleTablePos >> 8, `0x${dir.toString(16)}`);
 	check("table is page-aligned", (layout.sampleTablePos & 0xff) === 0, hex(layout.sampleTablePos));
 	check("table starts after the song", layout.sampleTablePos >= layout.songEnd);
 
@@ -475,9 +488,15 @@ console.log("\nsample directory");
 		const start = aram[entry] | (aram[entry + 1] << 8);
 		const loop = aram[entry + 2] | (aram[entry + 3] << 8);
 		const sample = driver.samples[index];
-		if (start !== expected || loop !== expected + sample.loopOffset) { ok = false; break; }
+		if (start !== expected || loop !== expected + sample.loopOffset) {
+			ok = false;
+			break;
+		}
 		// Spot-check that the BRR actually got copied.
-		if (aram[start] !== sample.data[0] || aram[start + sample.data.length - 1] !== sample.data[sample.data.length - 1]) {
+		if (
+			aram[start] !== sample.data[0] ||
+			aram[start + sample.data.length - 1] !== sample.data[sample.data.length - 1]
+		) {
 			ok = false;
 			break;
 		}
@@ -564,10 +583,16 @@ console.log("\n#samples reaches the sample directory");
 	// And the budget must agree with what was written, since they are computed
 	// from the same layout but by different call sites.
 	const budget = computeBudget(driver, samples, plan, one.data!.length, one.stats?.echoBufferSize ?? 0);
-	check("the budget agrees with the built file", budget.layout.sampleDataEnd === built.layout.sampleDataEnd,
-		`${budget.layout.sampleDataEnd} vs ${built.layout.sampleDataEnd}`);
-	check("the samples row counts one", budget.rows.find((row) => row.key === "samples")?.detail === "1 sample",
-		budget.rows.find((row) => row.key === "samples")?.detail);
+	check(
+		"the budget agrees with the built file",
+		budget.layout.sampleDataEnd === built.layout.sampleDataEnd,
+		`${budget.layout.sampleDataEnd} vs ${built.layout.sampleDataEnd}`,
+	);
+	check(
+		"the samples row counts one",
+		budget.rows.find((row) => row.key === "samples")?.detail === "1 sample",
+		budget.rows.find((row) => row.key === "samples")?.detail,
+	);
 }
 
 console.log("\nthe budget says how many samples are really loaded");
@@ -586,7 +611,11 @@ console.log("\nthe budget says how many samples are really loaded");
 	const source = "#amk 4\n#0 t40 o4 v220 q7F @0 l8 c d e f\n";
 
 	const detail = (optimize: boolean): string => {
-		const result = compiler.compile({ source, aramAddress: plan.localPos, options: { ...options, optimizeSampleUsage: optimize } });
+		const result = compiler.compile({
+			source,
+			aramAddress: plan.localPos,
+			options: { ...options, optimizeSampleUsage: optimize },
+		});
 		const samples = (result.sampleList ?? []).map((name) => byName.get(name) ?? emptySample(name));
 		const budget = computeBudget(driver, samples, plan, result.data!.length, result.stats?.echoBufferSize ?? 0);
 		return budget.rows.find((row) => row.key === "samples")?.detail ?? "";
@@ -611,10 +640,24 @@ console.log("\noptimizeSampleUsage frees real ARAM");
 	const source = "#amk 4\n#0 t40 o4 v220 q7F @0 l8 c d e f\n#1 o3 v200 @1 l4 c e g\n";
 
 	const build = (optimize: boolean) => {
-		const result = compiler.compile({ source, aramAddress: plan.localPos, options: { ...options, optimizeSampleUsage: optimize } });
+		const result = compiler.compile({
+			source,
+			aramAddress: plan.localPos,
+			options: { ...options, optimizeSampleUsage: optimize },
+		});
 		if (!result.ok || !result.data) throw new Error(result.diagnostics.map((d) => d.message).join("; "));
 		const samples = (result.sampleList ?? []).map((name) => byName.get(name) ?? emptySample(name));
-		return { result, built: buildSpc({ songData: result.data, driver, samples, plan, echoBufferSize: result.stats?.echoBufferSize, date: new Date(2026, 6, 28) }) };
+		return {
+			result,
+			built: buildSpc({
+				songData: result.data,
+				driver,
+				samples,
+				plan,
+				echoBufferSize: result.stats?.echoBufferSize,
+				date: new Date(2026, 6, 28),
+			}),
+		};
 	};
 
 	const lean = build(true);
@@ -623,25 +666,37 @@ console.log("\noptimizeSampleUsage frees real ARAM");
 	const leanBytes = lean.built.layout.sampleDataEnd - lean.built.layout.sampleDataPos;
 	const fullBytes = full.built.layout.sampleDataEnd - full.built.layout.sampleDataPos;
 
-	check("the directory is the same length either way",
+	check(
+		"the directory is the same length either way",
 		lean.built.layout.sampleTableEnd - lean.built.layout.sampleTablePos ===
-			full.built.layout.sampleTableEnd - full.built.layout.sampleTablePos);
+			full.built.layout.sampleTableEnd - full.built.layout.sampleTablePos,
+	);
 	check("optimising uploads far fewer sample bytes", leanBytes < fullBytes / 4, `${leanBytes} vs ${fullBytes}`);
-	check("it frees that ARAM", lean.built.layout.freeBytes > full.built.layout.freeBytes,
-		`${lean.built.layout.freeBytes} vs ${full.built.layout.freeBytes}`);
+	check(
+		"it frees that ARAM",
+		lean.built.layout.freeBytes > full.built.layout.freeBytes,
+		`${lean.built.layout.freeBytes} vs ${full.built.layout.freeBytes}`,
+	);
 
 	// Emptied slots all name one sample, so its zero bytes are stored once and
 	// every other entry is a copy of that entry's four bytes.
 	const aram = lean.built.spc.subarray(0x100, 0x100 + 0x10000);
 	const table = lean.built.layout.sampleTablePos;
 	const entryOf = (srcn: number) => aram[table + srcn * 4] | (aram[table + srcn * 4 + 1] << 8);
-	const emptied = (lean.result.sampleList ?? []).map((name, srcn) => ({ name, srcn })).filter((s) => s.name === EMPTY_SAMPLE_NAME);
+	const emptied = (lean.result.sampleList ?? [])
+		.map((name, srcn) => ({ name, srcn }))
+		.filter((s) => s.name === EMPTY_SAMPLE_NAME);
 	check("some slots really were emptied", emptied.length > 15, `${emptied.length}`);
-	check("every emptied slot shares one pointer",
+	check(
+		"every emptied slot shares one pointer",
 		emptied.every((slot) => entryOf(slot.srcn) === entryOf(emptied[0].srcn)),
-		`first ${hex(entryOf(emptied[0].srcn))}`);
-	check("a kept sample points somewhere else", entryOf(0) !== entryOf(emptied[0].srcn),
-		`kept ${hex(entryOf(0))} vs empty ${hex(entryOf(emptied[0].srcn))}`);
+		`first ${hex(entryOf(emptied[0].srcn))}`,
+	);
+	check(
+		"a kept sample points somewhere else",
+		entryOf(0) !== entryOf(emptied[0].srcn),
+		`kept ${hex(entryOf(0))} vs empty ${hex(entryOf(emptied[0].srcn))}`,
+	);
 }
 
 console.log(`\n${failures === 0 ? "all checks passed" : `${failures} check(s) failed`}\n`);

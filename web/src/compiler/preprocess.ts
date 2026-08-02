@@ -149,67 +149,119 @@ export function preprocess(source: string): PreprocessResult {
 
 		switch (directive.toLowerCase()) {
 			case "define": {
-				if (!okayToAdd) { level++; break; }
+				if (!okayToAdd) {
+					level++;
+					break;
+				}
 				skipSpaces();
 				const name = getArgument(" ", true);
-				if (name.length === 0) { fail("#define was missing its argument."); break; }
+				if (name.length === 0) {
+					fail("#define was missing its argument.");
+					break;
+				}
 				skipSpaces();
 				const value = getArgument(" ", true);
 				defines.set(name, value.length === 0 ? 1 : parseNumber(value, "#define"));
 				break;
 			}
 			case "undef": {
-				if (!okayToAdd) { level++; break; }
+				if (!okayToAdd) {
+					level++;
+					break;
+				}
 				skipSpaces();
 				const name = getArgument(" ", true);
-				if (name.length === 0) { fail("#undef was missing its argument."); break; }
+				if (name.length === 0) {
+					fail("#undef was missing its argument.");
+					break;
+				}
 				defines.delete(name);
 				break;
 			}
 			case "ifdef": {
-				if (!okayToAdd) { level++; break; }
+				if (!okayToAdd) {
+					level++;
+					break;
+				}
 				skipSpaces();
 				const name = getArgument(" ", true);
-				if (name.length === 0) { fail("#ifdef was missing its argument."); break; }
+				if (name.length === 0) {
+					fail("#ifdef was missing its argument.");
+					break;
+				}
 				okayStatus.push(okayToAdd);
 				okayToAdd = defines.has(name);
 				level++;
 				break;
 			}
 			case "ifndef": {
-				if (!okayToAdd) { level++; break; }
+				if (!okayToAdd) {
+					level++;
+					break;
+				}
 				skipSpaces();
 				const name = getArgument(" ", true);
 				okayStatus.push(okayToAdd);
-				if (name.length === 0) { fail("#ifndef was missing its argument."); break; }
+				if (name.length === 0) {
+					fail("#ifndef was missing its argument.");
+					break;
+				}
 				okayToAdd = !defines.has(name);
 				level++;
 				break;
 			}
 			case "if": {
-				if (!okayToAdd) { level++; break; }
+				if (!okayToAdd) {
+					level++;
+					break;
+				}
 				skipSpaces();
 				const name = getArgument(" ", true);
-				if (name.length === 0) { fail("#if was missing its first argument."); break; }
-				if (!defines.has(name)) { fail("First argument for #if was never defined."); break; }
+				if (name.length === 0) {
+					fail("#if was missing its first argument.");
+					break;
+				}
+				if (!defines.has(name)) {
+					fail("First argument for #if was never defined.");
+					break;
+				}
 				skipSpaces();
 				const operator = getArgument(" ", true);
-				if (operator.length === 0) { fail("#if was missing its comparison operator."); break; }
+				if (operator.length === 0) {
+					fail("#if was missing its comparison operator.");
+					break;
+				}
 				skipSpaces();
 				const rhsText = getArgument(" ", true);
-				if (rhsText.length === 0) { fail("#if was missing its second argument."); break; }
+				if (rhsText.length === 0) {
+					fail("#if was missing its second argument.");
+					break;
+				}
 
 				okayStatus.push(okayToAdd);
 				const lhs = defines.get(name) ?? 0;
 				const rhs = parseNumber(rhsText, "#if");
 				switch (operator) {
-					case "==": okayToAdd = lhs === rhs; break;
-					case ">": okayToAdd = lhs > rhs; break;
-					case "<": okayToAdd = lhs < rhs; break;
-					case "!=": okayToAdd = lhs !== rhs; break;
-					case ">=": okayToAdd = lhs >= rhs; break;
-					case "<=": okayToAdd = lhs <= rhs; break;
-					default: fail("Unknown operator for #if.");
+					case "==":
+						okayToAdd = lhs === rhs;
+						break;
+					case ">":
+						okayToAdd = lhs > rhs;
+						break;
+					case "<":
+						okayToAdd = lhs < rhs;
+						break;
+					case "!=":
+						okayToAdd = lhs !== rhs;
+						break;
+					case ">=":
+						okayToAdd = lhs >= rhs;
+						break;
+					case "<=":
+						okayToAdd = lhs <= rhs;
+						break;
+					default:
+						fail("Unknown operator for #if.");
 				}
 				level++;
 				break;

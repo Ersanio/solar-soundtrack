@@ -50,7 +50,9 @@ export class Tabs {
 
   protected buttonClass(selected: boolean): string {
     return `${Tabs.BASE} ${
-      selected ? 'bg-surface text-ink border-edge border-x border-t' : 'text-ink-muted hover:text-ink'
+      selected
+        ? 'bg-surface text-ink border-edge border-x border-t'
+        : 'text-ink-muted hover:text-ink'
     }`;
   }
 

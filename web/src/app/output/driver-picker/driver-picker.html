@@ -6,7 +6,12 @@
     class="border-edge bg-inset text-ink hover:border-accent cursor-pointer rounded-md border px-3 py-1.5 text-sm"
   >
     Load main.bin…
-    <input type="file" class="hidden" accept=".bin,application/octet-stream" (change)="onFile($event)" />
+    <input
+      type="file"
+      class="hidden"
+      accept=".bin,application/octet-stream"
+      (change)="onFile($event)"
+    />
   </label>
 
   @if (drivers.isCustom()) {

@@ -19,8 +19,8 @@
   <p class="text-danger text-xs leading-relaxed">
     With the echo feedback at
     <span class="font-mono">${{ feedback().toString(16).toUpperCase().padStart(2, '0') }}</span>
-    this filter has a loop gain of {{ stability().loopGain.toFixed(2) }} — the echo will build up
-    on itself instead of dying away, and clip. Lower the feedback, or pull the marked band down.
+    this filter has a loop gain of {{ stability().loopGain.toFixed(2) }} — the echo will build up on
+    itself instead of dying away, and clip. Lower the feedback, or pull the marked band down.
   </p>
 }
 
@@ -34,8 +34,8 @@
 @if (headroom().mayWrap) {
   <p class="text-warn text-xs leading-relaxed">
     The first seven coefficients sum to {{ headroom().sum }}, over the 128 the DSP can add up
-    without wrapping. A loud echo may crackle. (Super Mario World's own filter does this too, so
-    it is only worth worrying about well past the limit.)
+    without wrapping. A loud echo may crackle. (Super Mario World's own filter does this too, so it
+    is only worth worrying about well past the limit.)
   </p>
 }
 
@@ -52,10 +52,20 @@
      writable: the span under the caret is the macro, not the command. -->
 <fieldset class="contents" [disabled]="readOnly()">
   <div class="border-edge flex gap-1 border-b pb-2">
-    <button amk-button variant="ghost" [class.text-accent]="mode() === 'presets'" (click)="mode.set('presets')">
+    <button
+      amk-button
+      variant="ghost"
+      [class.text-accent]="mode() === 'presets'"
+      (click)="mode.set('presets')"
+    >
       Presets
     </button>
-    <button amk-button variant="ghost" [class.text-accent]="mode() === 'draw'" (click)="mode.set('draw')">
+    <button
+      amk-button
+      variant="ghost"
+      [class.text-accent]="mode() === 'draw'"
+      (click)="mode.set('draw')"
+    >
       Draw
     </button>
   </div>
@@ -82,14 +92,16 @@
     @case ('draw') {
       <div class="flex flex-col gap-2">
         <p class="text-ink-muted text-xs leading-relaxed">
-          Click the plot to place points, then fit. Eight taps cannot follow a shape below about
-          2 kHz — the shaded part of the plot — so nothing drawn there will come back.
+          Click the plot to place points, then fit. Eight taps cannot follow a shape below about 2
+          kHz — the shaded part of the plot — so nothing drawn there will come back.
         </p>
         <div class="flex gap-1.5">
           <button amk-button variant="primary" [disabled]="target().length < 2" (click)="fit()">
             Fit to curve
           </button>
-          <button amk-button [disabled]="target().length === 0" (click)="clearTarget()">Clear</button>
+          <button amk-button [disabled]="target().length === 0" (click)="clearTarget()">
+            Clear
+          </button>
           <span class="text-ink-muted self-center font-mono text-xs">
             {{ target().length }} point{{ target().length === 1 ? '' : 's' }}
           </span>
@@ -104,7 +116,9 @@
     <div class="grid grid-cols-4 gap-1">
       @for (row of rows(); track row.index) {
         <label class="flex flex-col gap-0.5">
-          <span class="text-ink-muted font-mono text-[10px]">C{{ row.index }} · ${{ row.hex }}</span>
+          <span class="text-ink-muted font-mono text-[10px]"
+            >C{{ row.index }} · ${{ row.hex }}</span
+          >
           <input
             type="number"
             class="bg-inset border-edge text-ink w-full rounded-sm border px-1 py-0.5 font-mono text-xs tabular-nums"

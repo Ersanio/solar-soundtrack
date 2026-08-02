@@ -61,7 +61,10 @@ export function storageFailure(): string | null {
   return failure;
 }
 
-function run<T>(mode: IDBTransactionMode, body: (store: IDBObjectStore) => IDBRequest<T>): Promise<T | null> {
+function run<T>(
+  mode: IDBTransactionMode,
+  body: (store: IDBObjectStore) => IDBRequest<T>,
+): Promise<T | null> {
   return open().then(
     (db) =>
       new Promise<T | null>((resolve) => {

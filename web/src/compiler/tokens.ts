@@ -362,12 +362,10 @@ const MAX_EXPANSION_DEPTH = 8;
  */
 const MAX_EXPANSION_CHARS = 1024;
 
-const isSpace = (c: string): boolean =>
-	c === " " || c === "\t" || c === "\r" || c === "\v" || c === "\f";
+const isSpace = (c: string): boolean => c === " " || c === "\t" || c === "\r" || c === "\v" || c === "\f";
 const isDigit = (c: string): boolean => c >= "0" && c <= "9";
 const isAlpha = (c: string): boolean => (c >= "a" && c <= "z") || (c >= "A" && c <= "Z");
-const isHexDigit = (c: string): boolean =>
-	isDigit(c) || (c >= "a" && c <= "f") || (c >= "A" && c <= "F");
+const isHexDigit = (c: string): boolean => isDigit(c) || (c >= "a" && c <= "f") || (c >= "A" && c <= "F");
 
 /** Notes, rests and ties — the `parser.ts:437-439` arm of the dispatch. */
 const isNoteLetter = (c: string): boolean =>

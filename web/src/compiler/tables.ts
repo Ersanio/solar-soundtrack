@@ -6,16 +6,12 @@
  */
 
 /** `tmpTrans[19]` — default per-instrument transposition. Music.cpp:57 */
-export const DEFAULT_TRANSPOSE: readonly number[] = [
-	0, 0, 5, 0, 0, 0, 0, 0, 0, -5, 6, 0, -5, 0, 0, 8, 0, 0, 0,
-];
+export const DEFAULT_TRANSPOSE: readonly number[] = [0, 0, 5, 0, 0, 0, 0, 0, 0, -5, 6, 0, -5, 0, 0, 8, 0, 0, 0];
 
 /** `instrToSample[30]` — default instrument to SRCN mapping. Music.cpp:58 */
 export const INSTRUMENT_TO_SAMPLE: readonly number[] = [
-	0x00, 0x01, 0x02, 0x03, 0x04, 0x07, 0x08, 0x09, 0x05, 0x0a,
-	0x0b, 0x01, 0x10, 0x0c, 0x0d, 0x12, 0x0c, 0x11, 0x01,
-	0x00, 0x00,
-	0x0f, 0x06, 0x06, 0x0e, 0x0e, 0x0b, 0x0b, 0x0b, 0x0e,
+	0x00, 0x01, 0x02, 0x03, 0x04, 0x07, 0x08, 0x09, 0x05, 0x0a, 0x0b, 0x01, 0x10, 0x0c, 0x0d, 0x12, 0x0c, 0x11, 0x01,
+	0x00, 0x00, 0x0f, 0x06, 0x06, 0x0e, 0x0e, 0x0b, 0x0b, 0x0b, 0x0e,
 ];
 
 /**
@@ -25,9 +21,7 @@ export const INSTRUMENT_TO_SAMPLE: readonly number[] = [
  * `$FB` (arpeggio) is variable-length and handled separately by the parser.
  */
 export const HEX_LENGTHS: readonly number[] = [
-	2, 2, 3, 4, 4, 1,
-	2, 3, 2, 3, 2, 4, 2, 2, 3, 4, 2, 4, 4, 3, 2, 4,
-	1, 4, 4, 3, 2, 9, 3, 4, 2, 3, 3, 2, 5, 1, 1,
+	2, 2, 3, 4, 4, 1, 2, 3, 2, 3, 2, 4, 2, 2, 3, 4, 2, 4, 4, 3, 2, 4, 1, 4, 4, 3, 2, 9, 3, 4, 2, 3, 3, 2, 5, 1, 1,
 ];
 
 /**

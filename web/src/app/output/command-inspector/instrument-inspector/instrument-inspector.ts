@@ -94,7 +94,9 @@ export class InstrumentInspector {
    */
   protected readonly definingEntry = computed(() => {
     const at = this.command().span.start;
-    return this.store.tokens().instruments.find((d) => at >= d.span.start && at < d.span.end) ?? null;
+    return (
+      this.store.tokens().instruments.find((d) => at >= d.span.start && at < d.span.end) ?? null
+    );
   });
 
   /** The sample form of the entry the caret is defining, said in words. */
@@ -108,8 +110,8 @@ export class InstrumentInspector {
     return `noise at clock $${hex2(sample.clock)} — ${Math.round(noiseHz(sample.clock)).toLocaleString()} Hz`;
   });
 
-  protected readonly definitionBytes = computed(() =>
-    this.definingEntry()?.bytes.map(hex2).join(' ') ?? '',
+  protected readonly definitionBytes = computed(
+    () => this.definingEntry()?.bytes.map(hex2).join(' ') ?? '',
   );
 
   protected readonly band = computed<Band>(() => {
@@ -129,9 +131,7 @@ export class InstrumentInspector {
   private readonly custom = computed(() => {
     const n = this.emitted();
     if (n === null || n < FIRST_CUSTOM_INSTRUMENT) return null;
-    return (
-      this.store.tokens().instruments.find((entry) => entry.number === n) ?? null
-    );
+    return this.store.tokens().instruments.find((entry) => entry.number === n) ?? null;
   });
 
   /** How many entries the song's `#instruments` blocks define. */
@@ -238,7 +238,11 @@ export class InstrumentInspector {
       });
       rows.push(
         gain.mode === 'direct'
-          ? { label: 'Level', value: `${Math.round((gain.level ?? 0) * 100)}% of full`, note: 'fixed' }
+          ? {
+              label: 'Level',
+              value: `${Math.round((gain.level ?? 0) * 100)}% of full`,
+              note: 'fixed',
+            }
           : {
               label: 'Mode',
               value: gainModeName(gain.mode),
@@ -304,7 +308,8 @@ export class InstrumentInspector {
     if (!custom) return null;
     const sample = custom.sample;
     if (sample.form === 'file') return `"${sample.name}"`;
-    if (sample.form === 'copy') return `@${sample.instrument}, whose sample is $${hex2(sample.srcn)}`;
+    if (sample.form === 'copy')
+      return `@${sample.instrument}, whose sample is $${hex2(sample.srcn)}`;
     return `noise at clock $${hex2(sample.clock)}`;
   });
 

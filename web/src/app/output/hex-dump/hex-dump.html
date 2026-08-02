@@ -3,7 +3,9 @@
   <span class="text-ink-muted font-mono text-xs">{{ range() }}</span>
 </div>
 
-<pre class="text-ink overflow-x-auto p-3 font-mono text-xs leading-snug">@for (row of rows(); track row.address) {<span
+<pre
+  class="text-ink overflow-x-auto p-3 font-mono text-xs leading-snug"
+>@for (row of rows(); track row.address) {<span
     class="text-ink-muted"
   >{{ row.address }}  </span><span class="text-accent">{{ row.header }}</span>{{ row.rest }}
 }@if (truncated(); as more) {<span class="text-ink-muted">… {{ more }} more bytes</span>

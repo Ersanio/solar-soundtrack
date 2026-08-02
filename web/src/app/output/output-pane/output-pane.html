@@ -5,8 +5,9 @@
 
   @if (blocked()) {
     <p class="text-danger m-3 text-xs leading-relaxed">
-      Cannot compile without a driver — {{ drivers.loadError() ?? 'still loading…' }} The song's load
-      address comes from the driver's song pointer table, so there is nothing to compile against.
+      Cannot compile without a driver — {{ drivers.loadError() ?? 'still loading…' }} The song's
+      load address comes from the driver's song pointer table, so there is nothing to compile
+      against.
     </p>
   } @else {
     <amk-stats-grid />

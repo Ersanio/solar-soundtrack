@@ -92,9 +92,7 @@ export class EchoInspector {
     return preset?.taps ?? null;
   });
 
-  protected readonly feedback = computed(() =>
-    this.vcmd() === 0xf1 ? (this.args()[1] ?? 0) : 0,
-  );
+  protected readonly feedback = computed(() => (this.vcmd() === 0xf1 ? (this.args()[1] ?? 0) : 0));
 
   /** `$F0` has nothing to say beyond its own name. */
   protected readonly isEchoOff = computed(() => this.vcmd() === 0xf0);

@@ -79,7 +79,12 @@ export class LetterCommand {
             {
               label: 'Position',
               // AddmusicK's pan runs 0 (hard right) to 20 (hard left), 10 centre.
-              value: first === 10 ? 'centre' : first < 10 ? `right ${10 - first}/10` : `left ${first - 10}/10`,
+              value:
+                first === 10
+                  ? 'centre'
+                  : first < 10
+                    ? `right ${10 - first}/10`
+                    : `left ${first - 10}/10`,
             },
           ];
 
@@ -96,11 +101,19 @@ export class LetterCommand {
           return [{ label: 'Transpose', value: `${first > 0 ? '+' : ''}${first} semitones` }];
 
         case 'q':
-          return [{ label: 'Quantization', value: `$${first.toString(16).toUpperCase().padStart(2, '0')}` }];
+          return [
+            {
+              label: 'Quantization',
+              value: `$${first.toString(16).toUpperCase().padStart(2, '0')}`,
+            },
+          ];
 
         case 'n':
           return [
-            { label: 'Noise clock', value: `$${first.toString(16).toUpperCase().padStart(2, '0')} of $1F` },
+            {
+              label: 'Noise clock',
+              value: `$${first.toString(16).toUpperCase().padStart(2, '0')} of $1F`,
+            },
             {
               label: 'Frequency',
               value: first === 0 ? 'silent' : `${Math.round(noiseHz(first)).toLocaleString()} Hz`,
@@ -127,7 +140,6 @@ export class LetterCommand {
       }
     },
   );
-
 }
 
 /**

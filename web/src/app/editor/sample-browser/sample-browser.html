@@ -14,7 +14,9 @@
     </button>
   }
 
-  <span class="ml-auto font-mono text-xs" [class.text-danger]="overflowing()">{{ freeLabel() }}</span>
+  <span class="ml-auto font-mono text-xs" [class.text-danger]="overflowing()">{{
+    freeLabel()
+  }}</span>
 </div>
 
 @if (library.storageError(); as storageError) {
@@ -32,8 +34,8 @@
 @if (customDriver()) {
   <p class="border-edge text-ink-muted border-b px-3 py-2 text-xs leading-relaxed">
     A custom <code class="text-ink font-mono">main.bin</code> is loaded. Instruments
-    <code class="text-ink font-mono">&#64;0</code>–<code class="text-ink font-mono">&#64;29</code> are resolved by
-    the driver's own table, so they may not map to the samples listed here.
+    <code class="text-ink font-mono">&#64;0</code>–<code class="text-ink font-mono">&#64;29</code>
+    are resolved by the driver's own table, so they may not map to the samples listed here.
   </p>
 }
 
@@ -52,7 +54,9 @@
             {{ isOpen(file.name) ? '▾' : '▸' }}
           </button>
         } @else {
-          <span class="text-ink-muted w-6 shrink-0 text-right font-mono text-xs tabular-nums">{{ $index }}</span>
+          <span class="text-ink-muted w-6 shrink-0 text-right font-mono text-xs tabular-nums">{{
+            $index
+          }}</span>
         }
 
         @if (file.kind === 'sample') {
@@ -60,7 +64,9 @@
             type="button"
             class="border-edge bg-inset text-ink-muted hover:text-ink hover:border-accent shrink-0 cursor-pointer rounded border px-2 py-1 font-mono text-xs disabled:cursor-not-allowed disabled:opacity-40"
             [disabled]="file.error !== null"
-            [attr.aria-label]="(playback.auditioning() === file.name ? 'Stop ' : 'Play ') + file.name"
+            [attr.aria-label]="
+              (playback.auditioning() === file.name ? 'Stop ' : 'Play ') + file.name
+            "
             (click)="onAudition(file.name)"
           >
             {{ playback.auditioning() === file.name ? '■' : '▶' }}
@@ -89,7 +95,9 @@
                 >used</span
               >
             }
-            <span class="text-ink-muted ml-auto shrink-0 font-mono text-xs tabular-nums">{{ sizeLabel(file) }}</span>
+            <span class="text-ink-muted ml-auto shrink-0 font-mono text-xs tabular-nums">{{
+              sizeLabel(file)
+            }}</span>
           </div>
 
           @if (file.error) {
@@ -97,7 +105,9 @@
           } @else if (file.kind === 'bank') {
             <p class="text-ink-muted mt-0.5 font-mono text-xs">{{ bankLabel(file) }}</p>
           } @else if (!isRequested(file.name)) {
-            <p class="text-ink-muted mt-0.5 font-mono text-xs">{{ detailLabel(file) }} · not in this song</p>
+            <p class="text-ink-muted mt-0.5 font-mono text-xs">
+              {{ detailLabel(file) }} · not in this song
+            </p>
           } @else {
             <svg
               class="text-accent mt-1 h-8 w-full"
@@ -160,7 +170,9 @@
                 type="button"
                 class="border-edge bg-inset text-ink-muted hover:text-ink hover:border-accent shrink-0 cursor-pointer rounded border px-2 py-1 font-mono text-xs disabled:cursor-not-allowed disabled:opacity-40"
                 [disabled]="slot.empty"
-                [attr.aria-label]="(playback.auditioning() === slot.name ? 'Stop slot ' : 'Play slot ') + slot.index"
+                [attr.aria-label]="
+                  (playback.auditioning() === slot.name ? 'Stop slot ' : 'Play slot ') + slot.index
+                "
                 (click)="onAudition(slot.name)"
               >
                 {{ playback.auditioning() === slot.name ? '■' : '▶' }}
@@ -185,7 +197,9 @@
                 }
               </div>
 
-              <span class="text-ink-muted shrink-0 font-mono text-xs tabular-nums">{{ slotSizeLabel(slot) }}</span>
+              <span class="text-ink-muted shrink-0 font-mono text-xs tabular-nums">{{
+                slotSizeLabel(slot)
+              }}</span>
 
               @if (isRequested(slot.name)) {
                 <amk-checkbox
@@ -210,11 +224,13 @@
 </ul>
 
 <p class="border-edge text-ink-muted shrink-0 border-t px-3 py-2 text-xs leading-relaxed">
-  <strong class="text-good font-semibold">used</strong> means the song plays it, so it is loaded whatever else is
-  true. <strong class="text-ink font-semibold">keep</strong> holds a sample the song includes but never plays, which
-  <strong class="text-ink font-semibold">Optimize samples</strong> would otherwise replace with an empty one to free
-  its ARAM — the bundled set arrives kept where AddmusicK marks it important.
+  <strong class="text-good font-semibold">used</strong> means the song plays it, so it is loaded
+  whatever else is true. <strong class="text-ink font-semibold">keep</strong> holds a sample the
+  song includes but never plays, which
+  <strong class="text-ink font-semibold">Optimize samples</strong> would otherwise replace with an
+  empty one to free its ARAM — the bundled set arrives kept where AddmusicK marks it important.
   <strong class="text-ink font-semibold">not in song</strong> costs nothing either way: name it in
-  <code class="text-ink font-mono">#samples</code> to load it. Bank slots are addressed by position, with
-  <code class="text-ink font-mono">$F3</code> or <code class="text-ink font-mono">&#64;n</code>.
+  <code class="text-ink font-mono">#samples</code> to load it. Bank slots are addressed by position,
+  with <code class="text-ink font-mono">$F3</code> or
+  <code class="text-ink font-mono">&#64;n</code>.
 </p>

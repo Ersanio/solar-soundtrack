@@ -208,7 +208,20 @@ console.log("\nit reaches for nothing the audio thread lacks");
 {
 	// A worklet scope has none of these. Catching them here rather than in the
 	// browser is the whole point of this file.
-	const forbidden = ["TextDecoder", "TextEncoder", "fetch", "setTimeout", "setInterval", "XMLHttpRequest", "document", "window", "Blob", "URL", "crypto", "performance"];
+	const forbidden = [
+		"TextDecoder",
+		"TextEncoder",
+		"fetch",
+		"setTimeout",
+		"setInterval",
+		"XMLHttpRequest",
+		"document",
+		"window",
+		"Blob",
+		"URL",
+		"crypto",
+		"performance",
+	];
 	for (const name of forbidden) {
 		const defined = runInContext(`typeof ${name} !== "undefined"`, createContext({})) as boolean;
 		check(`${name} is absent from the scope`, !defined);
@@ -230,7 +243,11 @@ console.log("\na loaded song renders audio through the resampler");
 	render(processor, 200); // let the driver key on
 	const samples = render(processor, 400); // ~1.07 s at 48 kHz
 
-	check("no error was reported", !sent.some((m) => m.type === "error"), JSON.stringify(sent.filter((m) => m.type === "error")));
+	check(
+		"no error was reported",
+		!sent.some((m) => m.type === "error"),
+		JSON.stringify(sent.filter((m) => m.type === "error")),
+	);
 	check("output is not silent", peak(samples) > 0.01, `peak ${peak(samples).toFixed(4)}`);
 	check("output stays inside full scale", peak(samples) <= 1.0, `peak ${peak(samples).toFixed(4)}`);
 
@@ -321,7 +338,10 @@ console.log("\nthe end of a song is reported");
 	const { processor: fresh, sent: freshSent } = restart();
 
 	render(fresh, 700); // past 40 ticks at t40 plus 0.5 s of fade
-	check("it reports the song ended", freshSent.some((m) => m.type === "ended"));
+	check(
+		"it reports the song ended",
+		freshSent.some((m) => m.type === "ended"),
+	);
 
 	const after = render(fresh, 20);
 	check("nothing is rendered after the end", peak(after) === 0, `peak ${peak(after)}`);
@@ -348,8 +368,11 @@ console.log("\nthe playhead is counted off the driver, not predicted");
 	// song is t40 and the register reads 41, because the driver stores the `t`
 	// value plus one — which is exactly why reading it beats computing it.
 	check("the driver state comes with it", last.driver.tempo === 41, `tempo ${last.driver.tempo}`);
-	check("including where voice 0 is reading from", last.driver.trackPointers[0] > 0,
-		`0x${last.driver.trackPointers[0].toString(16)}`);
+	check(
+		"including where voice 0 is reading from",
+		last.driver.trackPointers[0] > 0,
+		`0x${last.driver.trackPointers[0].toString(16)}`,
+	);
 }
 
 console.log("\nlooping leaves the song running for the emulator to repeat");
@@ -386,7 +409,10 @@ console.log("\nunticking loop finishes the pass rather than cutting out");
 	check("and keeps playing to the loop point", peak(rest) > 0.01, `peak ${peak(rest).toFixed(4)}`);
 
 	render(fresh, 900); // out past the next loop point and the fade
-	check("then it ends", freshSent.some((m) => m.type === "ended"));
+	check(
+		"then it ends",
+		freshSent.some((m) => m.type === "ended"),
+	);
 }
 
 console.log("\na song with no loop point is restarted by hand");
@@ -420,15 +446,31 @@ console.log("\nmuting a channel without breaking stride");
 	port.onmessage!({ data: { type: "mute", mask: 0 } });
 	const back = render(fresh, 300);
 
-	check("muting one channel lowers the level", rms(one) < rms(both), `${rms(one).toFixed(5)} vs ${rms(both).toFixed(5)}`);
+	check(
+		"muting one channel lowers the level",
+		rms(one) < rms(both),
+		`${rms(one).toFixed(5)} vs ${rms(both).toFixed(5)}`,
+	);
 	check("muting both silences it", peak(none) < 0.005, `peak ${peak(none).toFixed(4)}`);
 	check("unmuting brings the song back", peak(back) > 0.01, `peak ${peak(back).toFixed(4)}`);
-	check("no error was reported", !freshSent.some((m) => m.type === "error"), JSON.stringify(freshSent.filter((m) => m.type === "error")));
+	check(
+		"no error was reported",
+		!freshSent.some((m) => m.type === "error"),
+		JSON.stringify(freshSent.filter((m) => m.type === "error")),
+	);
 
 	// The point of muting this way: the playhead never notices.
 	const ticks = positions(freshSent).map((p) => p.ticks);
-	check("the tick count never goes backwards", ticks.every((t, i) => i === 0 || t >= ticks[i - 1]), ticks.join(", "));
-	check("and it kept advancing throughout", ticks.length > 1 && ticks.at(-1)! > ticks[0], `${ticks[0]} -> ${ticks.at(-1)}`);
+	check(
+		"the tick count never goes backwards",
+		ticks.every((t, i) => i === 0 || t >= ticks[i - 1]),
+		ticks.join(", "),
+	);
+	check(
+		"and it kept advancing throughout",
+		ticks.length > 1 && ticks.at(-1)! > ticks[0],
+		`${ticks[0]} -> ${ticks.at(-1)}`,
+	);
 }
 
 console.log(`\n${failures === 0 ? "all checks passed" : `${failures} check(s) failed`}\n`);

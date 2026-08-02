@@ -350,9 +350,7 @@ export class AddmusicKParser {
 		// AddmusicK pads the buffer so lookahead never runs off the end.
 		this.text = `${pre.text}                       `;
 		// The padding is not in the source, so it maps to its end.
-		this.origins = pre.origins.concat(
-			new Array<number>(this.text.length - pre.text.length).fill(text.length),
-		);
+		this.origins = pre.origins.concat(new Array<number>(this.text.length - pre.text.length).fill(text.length));
 
 		if (this.errorCount === 0 && this.applyTarget(pre.version)) {
 			this.detectStartingChannel();
@@ -838,7 +836,12 @@ export class AddmusicKParser {
 				this.usingSMWVTable = true;
 			} else {
 				// Music.cpp:2354
-				this.warn(start, this.pos, "AMK0203", "This song already uses the SMW velocity table; this command wastes three bytes.");
+				this.warn(
+					start,
+					this.pos,
+					"AMK0203",
+					"This song already uses the SMW velocity table; this command wastes three bytes.",
+				);
 			}
 		} else if (this.matchWord("nspcvtable")) {
 			this.pos += 10;
@@ -846,7 +849,12 @@ export class AddmusicKParser {
 			this.append(0x06);
 			this.append(0x01);
 			this.usingSMWVTable = false;
-			this.warn(start, this.pos, "AMK0202", "Songs use the N-SPC velocity table by default; this command wastes three bytes.");
+			this.warn(
+				start,
+				this.pos,
+				"AMK0202",
+				"Songs use the N-SPC velocity table by default; this command wastes three bytes.",
+			);
 		} else if (this.matchWord("tempoimmunity")) {
 			this.pos += 13;
 			this.append(0xf4);
@@ -894,7 +902,10 @@ export class AddmusicKParser {
 		const dir = this.getQuotedString();
 		if (dir === null) return;
 
-		const trimmed = dir.replace(/^[.\\/]+/, "").replace(/[\\/]+$/, "").replace(/\\/g, "/");
+		const trimmed = dir
+			.replace(/^[.\\/]+/, "")
+			.replace(/[\\/]+$/, "")
+			.replace(/\\/g, "/");
 		this.basepath = trimmed.length === 0 ? "" : `${trimmed}/`;
 	}
 
@@ -928,7 +939,12 @@ export class AddmusicKParser {
 	 */
 	private checkTempoRatio(start: number): boolean {
 		if (this.tempoRatio > 0 && this.tempoRatio <= 0x8000) return true;
-		this.errorAt(start, this.pos, "AMK0215", "The tempo divisor has grown too large — #halvetempo was used too many times.");
+		this.errorAt(
+			start,
+			this.pos,
+			"AMK0215",
+			"The tempo divisor has grown too large — #halvetempo was used too many times.",
+		);
 		return false;
 	}
 
@@ -1228,10 +1244,18 @@ export class AddmusicKParser {
 			if (value === null) return;
 
 			switch (field) {
-				case "title": this.tags.title = value; break;
-				case "game": this.tags.game = value; break;
-				case "author": this.tags.author = value; break;
-				case "comment": this.tags.comment = value; break;
+				case "title":
+					this.tags.title = value;
+					break;
+				case "game":
+					this.tags.game = value;
+					break;
+				case "author":
+					this.tags.author = value;
+					break;
+				case "comment":
+					this.tags.comment = value;
+					break;
 				case "length":
 					this.tags.length = value;
 					if (!this.parseLengthField(value, start)) return;
@@ -1896,7 +1920,7 @@ export class AddmusicKParser {
 
 		this.skipSpaces();
 		if (this.text[this.pos] !== ")") {
-			return this.errorAt(start, this.pos, "AMK0111", "Error parsing remote code definition; expected \")\".");
+			return this.errorAt(start, this.pos, "AMK0111", 'Error parsing remote code definition; expected ")".');
 		}
 		this.pos++;
 
@@ -1932,7 +1956,7 @@ export class AddmusicKParser {
 			}
 			this.skipSpaces();
 			if (this.text[this.pos] !== ")") {
-				return this.errorAt(start, this.pos, "AMK0139", "Error parsing remote code reset; expected \")\".");
+				return this.errorAt(start, this.pos, "AMK0139", 'Error parsing remote code reset; expected ")".');
 			}
 			this.pos++;
 
@@ -1971,7 +1995,12 @@ export class AddmusicKParser {
 		let argument = 0;
 		if (type === 1 || type === 2) {
 			if (this.text[this.pos] !== ",") {
-				return this.errorAt(start, this.pos, "AMK0146", "Error parsing remote code setup; the third argument is missing.");
+				return this.errorAt(
+					start,
+					this.pos,
+					"AMK0146",
+					"Error parsing remote code setup; the third argument is missing.",
+				);
 			}
 			this.pos++;
 			this.skipSpaces();
@@ -1999,7 +2028,7 @@ export class AddmusicKParser {
 		}
 
 		if (this.text[this.pos] !== ")") {
-			return this.errorAt(start, this.pos, "AMK0149", "Error parsing remote code setup; expected \")\".");
+			return this.errorAt(start, this.pos, "AMK0149", 'Error parsing remote code setup; expected ")".');
 		}
 		this.pos++;
 
@@ -2421,10 +2450,18 @@ export class AddmusicKParser {
 			this.currentHex = i;
 
 			if (i > 0xf2 && this.songTargetProgram === 1) {
-				this.warnOnce("nonNativeHex", "AMK0207", "A hex command was used that is not native to Addmusic 4.05. Did you mean #amm?");
+				this.warnOnce(
+					"nonNativeHex",
+					"AMK0207",
+					"A hex command was used that is not native to Addmusic 4.05. Did you mean #amm?",
+				);
 			}
 			if (i > 0xfa && this.songTargetProgram === 2) {
-				this.warnOnce("nonNativeHex", "AMK0207", "A hex command was used that is not native to AddmusicM. Did you mean #amk 1?");
+				this.warnOnce(
+					"nonNativeHex",
+					"AMK0207",
+					"A hex command was used that is not native to AddmusicM. Did you mean #amk 1?",
+				);
 			}
 
 			if (i < FIRST_VCMD) {
@@ -2432,19 +2469,26 @@ export class AddmusicKParser {
 				// warns for them, and errors for its own targets.
 				if (this.targetAMKVersion === 0) {
 					if (i >= 0x80) {
-						this.warnOnce("manualNote", "AMK0208", "A hex command was found that will act as a note rather than an effect.");
+						this.warnOnce(
+							"manualNote",
+							"AMK0208",
+							"A hex command was found that will act as a note rather than an effect.",
+						);
 					} else if (i > 0x00) {
-						this.warnOnce("manualDur", "AMK0209", "A hex command was found that will act as a duration or quantization byte.");
+						this.warnOnce(
+							"manualDur",
+							"AMK0209",
+							"A hex command was found that will act as a duration or quantization byte.",
+						);
 					} else {
-						this.warnOnce("manualEnd", "AMK0210", "A hex command was found that will act as a phrase end marker; the song may terminate early.");
+						this.warnOnce(
+							"manualEnd",
+							"AMK0210",
+							"A hex command was found that will act as a phrase end marker; the song may terminate early.",
+						);
 					}
 				} else {
-					return this.errorAt(
-						start,
-						this.pos,
-						"AMK0151",
-						`$${hex2(i)} is not a command byte (commands are $DA-$FE).`,
-					);
+					return this.errorAt(start, this.pos, "AMK0151", `$${hex2(i)} is not a command byte (commands are $DA-$FE).`);
 				}
 			} else if (i > 0xfe) {
 				return this.errorAt(start, this.pos, "AMK0152", `$${hex2(i)} is not a valid command.`);
@@ -2524,7 +2568,11 @@ export class AddmusicKParser {
 			// Music.cpp:1784 — the third `nonNativeHexWarning` trigger. Shares the
 			// warn-once key with the other two, as AMK shares the flag.
 			if (this.hexLeft === 0 && this.currentHex === 0xf4 && i >= 0x07 && this.songTargetProgram === 2) {
-				this.warnOnce("nonNativeHex", "AMK0207", "A hex command was used that is not native to AddmusicM. Did you mean #amk 1?");
+				this.warnOnce(
+					"nonNativeHex",
+					"AMK0207",
+					"A hex command was used that is not native to AddmusicM. Did you mean #amk 1?",
+				);
 			}
 
 			if (this.hexLeft === 1 && this.targetAMKVersion > 1 && this.currentHex === 0xfa && i === 0x05) {
@@ -2644,7 +2692,10 @@ export class AddmusicKParser {
 						this.getInt();
 					} else if (isNoteLetter(this.text[this.pos])) {
 						if (this.updateQ[this.channel]) {
-							this.error("AMK0161", "You cannot use a note as the last parameter of $DD if qXX was used just before it.");
+							this.error(
+								"AMK0161",
+								"You cannot use a note as the last parameter of $DD if qXX was used just before it.",
+							);
 						}
 						this.hexLeft = 0;
 						this.nextNoteIsForDD = true;

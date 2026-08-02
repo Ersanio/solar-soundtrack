@@ -97,11 +97,7 @@ console.log("\nnote encoding");
 	// Second c4 reuses the previous length, so no duration byte is emitted.
 	// Note bytes: c in octave 4 = 0 + 3*12 + 0x80 = 0xA4, d = 0xA6.
 	// Instrument 0 has transpose 0, so no adjustment.
-	expectBytes(
-		"duration is omitted when unchanged",
-		result.data!.slice(28),
-		[0x30, 0x7f, 0xa4, 0xa4, 0x18, 0xa6, 0x00],
-	);
+	expectBytes("duration is omitted when unchanged", result.data!.slice(28), [0x30, 0x7f, 0xa4, 0xa4, 0x18, 0xa6, 0x00]);
 }
 
 console.log("\nlong notes split into ties");
@@ -127,8 +123,16 @@ console.log("\nintro changes the header shape");
 	check("hasIntro", result.stats?.hasIntro === true);
 	if (result.data) {
 		const view = new DataView(result.data.buffer, result.data.byteOffset);
-		check("word 0 -> main pointer block", view.getUint16(0, true) === 0x3e00 + 8, `got ${view.getUint16(0, true).toString(16)}`);
-		check("word 1 -> intro pointer block", view.getUint16(2, true) === 0x3e00 + 8 + 16, `got ${view.getUint16(2, true).toString(16)}`);
+		check(
+			"word 0 -> main pointer block",
+			view.getUint16(0, true) === 0x3e00 + 8,
+			`got ${view.getUint16(0, true).toString(16)}`,
+		);
+		check(
+			"word 1 -> intro pointer block",
+			view.getUint16(2, true) === 0x3e00 + 8 + 16,
+			`got ${view.getUint16(2, true).toString(16)}`,
+		);
 		check("loop marker", view.getUint16(4, true) === 0x00ff);
 		check("loop target = base + 2", view.getUint16(6, true) === 0x3e02);
 	}
@@ -204,7 +208,10 @@ console.log("\nlegacy targets compile");
 
 	const noMarker = compile("#0 c4\n");
 	check("missing marker still rejected", !noMarker.ok);
-	check("missing marker reports AMK0002", noMarker.diagnostics.some((d) => d.code === "AMK0002"));
+	check(
+		"missing marker reports AMK0002",
+		noMarker.diagnostics.some((d) => d.code === "AMK0002"),
+	);
 
 	// #amk 3 is unimplemented in AddmusicK itself.
 	const amk3 = compile("#amk 3\n#0 o4 c4\n");
@@ -292,7 +299,11 @@ console.log("\nlegacy hex translation");
 console.log("\npreprocessor");
 {
 	const ifdef = compile("#amk 4\n#define LOUD\n#0 o4\n#ifdef LOUD\nv200\n#endif\nc4\n");
-	check("#ifdef true branch kept", ifdef.ok && [...ifdef.data!].includes(0xe7), ifdef.diagnostics.map((d) => d.message).join("; "));
+	check(
+		"#ifdef true branch kept",
+		ifdef.ok && [...ifdef.data!].includes(0xe7),
+		ifdef.diagnostics.map((d) => d.message).join("; "),
+	);
 
 	const ifndef = compile("#amk 4\n#0 o4\n#ifdef LOUD\nv200\n#endif\nc4\n");
 	check("#ifdef false branch dropped", ifndef.ok && ![...ifndef.data!].includes(0xe7));
@@ -417,9 +428,7 @@ console.log("\ndiagnostic spans point into the source the author wrote");
 	for (const diagnostic of compile(messy).diagnostics) {
 		check(
 			`${diagnostic.code} span is inside the source`,
-			diagnostic.span.start >= 0 &&
-				diagnostic.span.end <= messy.length &&
-				diagnostic.span.start <= diagnostic.span.end,
+			diagnostic.span.start >= 0 && diagnostic.span.end <= messy.length && diagnostic.span.start <= diagnostic.span.end,
 			JSON.stringify(diagnostic.span),
 		);
 		const upTo = messy.slice(0, diagnostic.span.start);
@@ -447,8 +456,11 @@ console.log("\nparity fixes against AddmusicKsrc");
 	const one = compile("#amk 4\n#0 ?1 o4 c4\n");
 	const two = compile("#amk 4\n#0 ?2 o4 c4\n");
 	check("? compiles", bare.ok, bare.diagnostics.map((d) => d.message).join("; "));
-	check("?1 compiles with no stray-character diagnostic", one.ok && one.diagnostics.length === 0,
-		one.diagnostics.map((d) => `${d.code} ${d.message}`).join("; "));
+	check(
+		"?1 compiles with no stray-character diagnostic",
+		one.ok && one.diagnostics.length === 0,
+		one.diagnostics.map((d) => `${d.code} ${d.message}`).join("; "),
+	);
 	check("? stops the song looping", bare.stats?.loops === false);
 	check("?0 stops the song looping", zero.stats?.loops === false);
 	check("?1 leaves looping alone", one.stats?.loops === true, `loops=${one.stats?.loops}`);
@@ -457,19 +469,25 @@ console.log("\nparity fixes against AddmusicKsrc");
 	// Music.cpp:1217 guards this with a lookbehind that can never be true, so
 	// the reference compiles a subloop inside a label-loop definition.
 	const labelSubloop = compile("#amk 4\n#0 o4 (5)[ c4 [[d4]]4 ]\n");
-	check("a subloop inside a label loop compiles, as in AMK", labelSubloop.ok,
-		labelSubloop.diagnostics.map((d) => `${d.code} ${d.message}`).join("; "));
+	check(
+		"a subloop inside a label loop compiles, as in AMK",
+		labelSubloop.ok,
+		labelSubloop.diagnostics.map((d) => `${d.code} ${d.message}`).join("; "),
+	);
 
 	// Music.cpp:3493 — a declared length must switch guessing off, or the
 	// estimate wins and the declared value is recorded but never used.
 	const declared = compile('#amk 4\n#spc { #length "1:30" }\n#0 o4 c4\n');
-	check("#length \"1:30\" is 90 seconds", declared.stats?.tagSeconds === 90, `${declared.stats?.tagSeconds}`);
+	check('#length "1:30" is 90 seconds', declared.stats?.tagSeconds === 90, `${declared.stats?.tagSeconds}`);
 	// AMK leaves intro/main at zero for a declared length, so its own readout
 	// prints 0:00. We report what the author wrote instead; the tag is untouched.
-	check("a declared #length is also the play length", declared.stats?.introSeconds === 90 && declared.stats?.mainSeconds === 0,
-		`${declared.stats?.introSeconds}+${declared.stats?.mainSeconds}`);
+	check(
+		"a declared #length is also the play length",
+		declared.stats?.introSeconds === 90 && declared.stats?.mainSeconds === 0,
+		`${declared.stats?.introSeconds}+${declared.stats?.mainSeconds}`,
+	);
 	const auto = compile('#amk 4\n#spc { #length "auto" }\n#0 o4 c1 c1 c1\n');
-	check("#length \"auto\" still estimates", (auto.stats?.tagSeconds ?? 0) > 0, `${auto.stats?.tagSeconds}`);
+	check('#length "auto" still estimates', (auto.stats?.tagSeconds ?? 0) > 0, `${auto.stats?.tagSeconds}`);
 	const badLength = compile('#amk 4\n#spc { #length "90" }\n#0 o4 c4\n');
 	check("a malformed #length is rejected", !badLength.ok && badLength.diagnostics.some((d) => d.code === "AMK0066"));
 	const tooLong = compile('#amk 4\n#spc { #length "20:00" }\n#0 o4 c4\n');
@@ -479,51 +497,68 @@ console.log("\nparity fixes against AddmusicKsrc");
 	// whole notes at t96 are 4*192 ticks / (2*96) = 4 seconds of music, and the
 	// ID666 tag carries 8 because it counts the loop twice before the fade.
 	const plain = compile("#amk 4\n#0 o4 t96 a1 g1 e1 e1\n");
-	check("a 4-second loop estimates as 4 seconds",
+	check(
+		"a 4-second loop estimates as 4 seconds",
 		plain.stats?.introSeconds === 0 && plain.stats?.mainSeconds === 4,
-		`intro=${plain.stats?.introSeconds} main=${plain.stats?.mainSeconds}`);
+		`intro=${plain.stats?.introSeconds} main=${plain.stats?.mainSeconds}`,
+	);
 	check("its ID666 tag counts the loop twice", plain.stats?.tagSeconds === 8, `${plain.stats?.tagSeconds}`);
 
 	// An intro is counted once and the loop twice, so 2+2 seconds tags as 6.
 	const intro = compile("#amk 4\n#0 o4 t96 a1 a1 / a1 a1\n");
-	check("an intro and its loop are reported apart",
+	check(
+		"an intro and its loop are reported apart",
 		intro.stats?.introSeconds === 2 && intro.stats?.mainSeconds === 2,
-		`intro=${intro.stats?.introSeconds} main=${intro.stats?.mainSeconds}`);
+		`intro=${intro.stats?.introSeconds} main=${intro.stats?.mainSeconds}`,
+	);
 	check("an intro tags as intro + two loops", intro.stats?.tagSeconds === 6, `${intro.stats?.tagSeconds}`);
 
 	// Music.cpp:809 — a tempo fade makes the length unguessable, and all of the
 	// figures have to go, not just the tag.
 	const faded = compile("#amk 4\n#0 o4 t20,96 c1\n");
-	check("a tempo fade leaves every length unknown",
-		faded.ok && faded.stats?.tagSeconds === null && faded.stats?.introSeconds === null && faded.stats?.mainSeconds === null,
-		`${faded.stats?.tagSeconds}/${faded.stats?.introSeconds}/${faded.stats?.mainSeconds}`);
+	check(
+		"a tempo fade leaves every length unknown",
+		faded.ok &&
+			faded.stats?.tagSeconds === null &&
+			faded.stats?.introSeconds === null &&
+			faded.stats?.mainSeconds === null,
+		`${faded.stats?.tagSeconds}/${faded.stats?.introSeconds}/${faded.stats?.mainSeconds}`,
+	);
 	check("and no playback timing either", faded.stats?.playback === null, `${JSON.stringify(faded.stats?.playback)}`);
 
 	// The driver's real rate is (tempo + 1) * 500/256 ticks a second, not the
 	// 2 * tempo AddmusicK rounds it to — 768 ticks at t96 run 4.0538s, not 4.
 	// `audiotest` measures this against the emulator; here it is just arithmetic.
 	const played = (ticks: number, tempo: number) => (ticks * 256) / (500 * (tempo + 1));
-	check("playback timing uses the driver's rate, not the estimate",
+	check(
+		"playback timing uses the driver's rate, not the estimate",
 		Math.abs(plain.stats!.playback!.mainSeconds - played(768, 96)) < 1e-9,
-		`${plain.stats?.playback?.mainSeconds} vs ${played(768, 96)}`);
+		`${plain.stats?.playback?.mainSeconds} vs ${played(768, 96)}`,
+	);
 	const drift = plain.stats!.playback!.mainSeconds / plain.stats!.mainSeconds!;
 	check("which runs longer than AddmusicK's figure", drift > 1.01 && drift < 1.03, `${drift}`);
-	check("the intro is timed the same way",
+	check(
+		"the intro is timed the same way",
 		Math.abs(intro.stats!.playback!.introSeconds - played(384, 96)) < 1e-9 &&
 			Math.abs(intro.stats!.playback!.mainSeconds - played(384, 96)) < 1e-9,
-		JSON.stringify(intro.stats?.playback));
+		JSON.stringify(intro.stats?.playback),
+	);
 
 	// Each segment carries its own tempo, so the two rates cannot differ by one
 	// constant factor across a song that changes tempo part-way.
 	const shifting = compile("#amk 4\n#0 o4 t192 c1 c1 t16 c1 c1\n");
-	check("a tempo change is timed segment by segment",
+	check(
+		"a tempo change is timed segment by segment",
 		Math.abs(shifting.stats!.playback!.mainSeconds - (played(384, 192) + played(384, 16))) < 1e-9,
-		`${shifting.stats?.playback?.mainSeconds}`);
+		`${shifting.stats?.playback?.mainSeconds}`,
+	);
 
 	// A declared length has no ticks to time, so it stands in for itself.
-	check("a declared #length is its own playback length",
+	check(
+		"a declared #length is its own playback length",
 		declared.stats?.playback?.introSeconds === 90 && declared.stats?.playback?.mainSeconds === 0,
-		JSON.stringify(declared.stats?.playback));
+		JSON.stringify(declared.stats?.playback),
+	);
 
 	// Channels may carry their `/` at different points. AddmusicK reassigns
 	// introLength on every one and so ends up holding whichever channel was parsed
@@ -535,48 +570,71 @@ console.log("\nparity fixes against AddmusicKsrc");
 	// Channel 0 turns over at 384 ticks here and channel 1 at 192, so the two
 	// rules disagree and the wrong one shows.
 	const staggered = compile("#amk 4\n#0 t192 @0 o4 q7F a1 a1 / g1 g1\n#1 @1 o3 q7F c1 / d1 d1 d1\n");
-	check("the intro ends at the first / in the file", staggered.stats?.introTicks === 384,
-		`${staggered.stats?.introTicks} ticks`);
-	check("and the loop is what is left of the shortest channel", staggered.stats?.loopTicks === 384,
-		`${staggered.stats?.loopTicks} ticks`);
+	check(
+		"the intro ends at the first / in the file",
+		staggered.stats?.introTicks === 384,
+		`${staggered.stats?.introTicks} ticks`,
+	);
+	check(
+		"and the loop is what is left of the shortest channel",
+		staggered.stats?.loopTicks === 384,
+		`${staggered.stats?.loopTicks} ticks`,
+	);
 	// Two views of one boundary, so they have to land in the same place.
 	const split = staggered.stats!.playback!;
-	check("the tick split agrees with the seconds split",
+	check(
+		"the tick split agrees with the seconds split",
 		Math.abs(
 			staggered.stats!.introTicks / (staggered.stats!.introTicks + staggered.stats!.loopTicks) -
 				split.introSeconds / (split.introSeconds + split.mainSeconds),
 		) < 1e-9,
-		`${staggered.stats?.introTicks}/${staggered.stats?.loopTicks} vs ${split.introSeconds}/${split.mainSeconds}`);
-
+		`${staggered.stats?.introTicks}/${staggered.stats?.loopTicks} vs ${split.introSeconds}/${split.mainSeconds}`,
+	);
 
 	// Music.cpp:3528 — ID666 gives each text field 32 bytes.
 	const longTitle = compile(`#amk 4\n#spc { #title "${"x".repeat(40)}" }\n#0 o4 c4\n`);
-	check("an over-long title is truncated to 32", longTitle.stats?.tags.title?.length === 32,
-		`${longTitle.stats?.tags.title?.length}`);
-	check("truncation warns", longTitle.diagnostics.some((d) => d.code === "AMK0205"));
+	check(
+		"an over-long title is truncated to 32",
+		longTitle.stats?.tags.title?.length === 32,
+		`${longTitle.stats?.tags.title?.length}`,
+	);
+	check(
+		"truncation warns",
+		longTitle.diagnostics.some((d) => d.code === "AMK0205"),
+	);
 
 	// globals.cpp:667 — the one escape the format allows.
 	const escaped = compile('#amk 4\n#spc { #title "a \\"b\\" c" }\n#0 o4 c4\n');
-	check('\\" survives inside a quoted string', escaped.stats?.tags.title === 'a "b" c',
-		JSON.stringify(escaped.stats?.tags.title));
+	check(
+		'\\" survives inside a quoted string',
+		escaped.stats?.tags.title === 'a "b" c',
+		JSON.stringify(escaped.stats?.tags.title),
+	);
 	const badEscape = compile('#amk 4\n#spc { #title "a \\n b" }\n#0 o4 c4\n');
 	check("any other escape is rejected", !badEscape.ok && badEscape.diagnostics.some((d) => d.code === "AMK0068"));
 
 	// Music.cpp:1826 — a sample load past the stock group needs #samples first.
 	const am4Sample = compile("#am4\n#0 o4 $E5 $94 $02 c4\n");
-	check("am4 $E5 sample load past $13 without #samples is rejected",
+	check(
+		"am4 $E5 sample load past $13 without #samples is rejected",
 		!am4Sample.ok && am4Sample.diagnostics.some((d) => d.code === "AMK0131"),
-		am4Sample.diagnostics.map((d) => `${d.code} ${d.message}`).join("; "));
+		am4Sample.diagnostics.map((d) => `${d.code} ${d.message}`).join("; "),
+	);
 	const am4Stock = compile("#am4\n#0 o4 $E5 $85 $02 c4\n");
-	check("am4 $E5 sample load within the stock group is fine", am4Stock.ok,
-		am4Stock.diagnostics.map((d) => `${d.code} ${d.message}`).join("; "));
+	check(
+		"am4 $E5 sample load within the stock group is fine",
+		am4Stock.ok,
+		am4Stock.diagnostics.map((d) => `${d.code} ${d.message}`).join("; "),
+	);
 
 	// A failing block directive must consume the rest of its block, or the scanner
 	// reads the body as MML and buries the real diagnostic in nonsense.
 	const unsupported = compile('#amk 4\n#samples { "x.wav" }\n#0 o4 c4\n', 0x3e00, LIBRARY);
-	check("a bad #samples entry reports exactly one error",
+	check(
+		"a bad #samples entry reports exactly one error",
 		unsupported.diagnostics.filter((d) => d.severity === "error").length === 1,
-		unsupported.diagnostics.map((d) => `${d.code} ${d.message}`).join("; "));
+		unsupported.diagnostics.map((d) => `${d.code} ${d.message}`).join("; "),
+	);
 }
 
 console.log("\n#samples and #path");
@@ -599,8 +657,11 @@ console.log("\n#samples and #path");
 	const resolved = (source: string) => compile(source, 0x3e00, { ...LIBRARY, optimizeSampleUsage: false });
 
 	const explicitDefault = compile("#amk 4\n#samples { #default }\n#0 o4 @0 c4\n", 0x3e00, LIBRARY);
-	check("#samples { #default } resolves to 20", names(explicitDefault).length === 20,
-		`${names(explicitDefault).length}`);
+	check(
+		"#samples { #default } resolves to 20",
+		names(explicitDefault).length === 20,
+		`${names(explicitDefault).length}`,
+	);
 
 	// AMK pushes onto mySamples per occurrence and only avoids duplicating the
 	// bytes, so the directory really does grow. buildSpc dedupes the blobs.
@@ -608,20 +669,29 @@ console.log("\n#samples and #path");
 	check("#default twice gives 40 entries", names(twice).length === 40, `${names(twice).length}`);
 
 	const extra = resolved('#amk 4\n#samples { #default "kick.brr" }\n#0 o4 @0 c4\n');
-	check("an added file lands after the group", names(extra).length === 21 && names(extra)[20] === "kick.brr",
-		names(extra).slice(19).join(", "));
+	check(
+		"an added file lands after the group",
+		names(extra).length === 21 && names(extra)[20] === "kick.brr",
+		names(extra).slice(19).join(", "),
+	);
 
 	const otherGroup = compile("#amk 4\n#samples { #optimized }\n#0 o4 c4\n", 0x3e00, LIBRARY);
-	check("#optimized resolves too, so #default is not special", names(otherGroup).length === 5,
-		`${names(otherGroup).length}`);
+	check(
+		"#optimized resolves too, so #default is not special",
+		names(otherGroup).length === 5,
+		`${names(otherGroup).length}`,
+	);
 
 	// #path prefixes quoted names, replaces rather than stacks, and never
 	// applies to group members.
 	const pathed = resolved('#amk 4\n#path "drums"\n#samples { "snare.brr" }\n#0 o4 c4\n');
 	check("#path prefixes a quoted name", names(pathed)[0] === "drums/snare.brr", names(pathed).join(", "));
 	const repathed = resolved('#amk 4\n#path "wrong"\n#path "drums"\n#samples { "snare.brr" }\n#0 o4 c4\n');
-	check("a second #path replaces the first", repathed.sampleList?.[0] === "drums/snare.brr",
-		names(repathed).join(", "));
+	check(
+		"a second #path replaces the first",
+		repathed.sampleList?.[0] === "drums/snare.brr",
+		names(repathed).join(", "),
+	);
 	const groupUnprefixed = compile('#amk 4\n#path "drums"\n#samples { #default }\n#0 o4 @0 c4\n', 0x3e00, LIBRARY);
 	check("#path does not touch group members", names(groupUnprefixed)[0] === STOCK[0], names(groupUnprefixed)[0]);
 
@@ -644,8 +714,11 @@ console.log("\n#samples and #path");
 
 	// A short list is fine as long as nothing reaches past it.
 	const shortButSafe = compile('#amk 4\n#samples { "kick.brr" }\n#0 o4 $F3 $00 $02 c4\n', 0x3e00, LIBRARY);
-	check("a one-sample list compiles when nothing exceeds it", shortButSafe.ok,
-		shortButSafe.diagnostics.map((d) => `${d.code} ${d.message}`).join("; "));
+	check(
+		"a one-sample list compiles when nothing exceeds it",
+		shortButSafe.ok,
+		shortButSafe.diagnostics.map((d) => `${d.code} ${d.message}`).join("; "),
+	);
 }
 
 console.log("\n#instruments and @30+");
@@ -661,13 +734,19 @@ console.log("\n#instruments and @30+");
 	check("the header grew by exactly six bytes", one.stats?.headerSize === 28, `${one.stats?.headerSize}`);
 	if (one.data) {
 		// @0's sample is instrToSample[0] = 0x00.
-		expectBytes("the instrument block is sample + five bytes", one.data.slice(6, 12),
-			[0x00, 0x8f, 0xe0, 0x00, 0x02, 0xb0]);
+		expectBytes(
+			"the instrument block is sample + five bytes",
+			one.data.slice(6, 12),
+			[0x00, 0x8f, 0xe0, 0x00, 0x02, 0xb0],
+		);
 		const word0 = one.data[0] | (one.data[1] << 8);
 		check("header word 0 points past the instrument block", word0 === 0x3e00 + 12, `0x${word0.toString(16)}`);
 		const channel0 = one.data[12] | (one.data[13] << 8);
-		check("the channel pointer relocated correctly", channel0 === 0x3e00 + one.stats!.headerSize,
-			`0x${channel0.toString(16)}`);
+		check(
+			"the channel pointer relocated correctly",
+			channel0 === 0x3e00 + one.stats!.headerSize,
+			`0x${channel0.toString(16)}`,
+		);
 		check("@30 emits $DA $1E", [...one.data].includes(0x1e) && [...one.data].includes(0xda));
 	}
 
@@ -682,25 +761,38 @@ console.log("\n#instruments and @30+");
 	] as const) {
 		const result = compile(withDefault(body), 0x3e00, LIBRARY);
 		check(`${label}: compiles`, result.ok, result.diagnostics.map((d) => `${d.code} ${d.message}`).join("; "));
-		check(`${label}: header is ${headerSize} bytes`, result.stats?.headerSize === headerSize,
-			`${result.stats?.headerSize}`);
+		check(
+			`${label}: header is ${headerSize} bytes`,
+			result.stats?.headerSize === headerSize,
+			`${result.stats?.headerSize}`,
+		);
 		if (!result.data) continue;
 
 		// Wherever the block landed, word 0 must point just past it, and every
 		// channel pointer must land inside the song rather than in the header.
 		const add = (result.stats!.hasIntro ? 2 : 0) + (result.stats!.loops ? 2 : 0) + 4;
-		expectBytes(`${label}: block sits at header[${add}]`, result.data.slice(add, add + 6),
-			[0x00, 0x8f, 0xe0, 0x00, 0x02, 0xb0]);
+		expectBytes(
+			`${label}: block sits at header[${add}]`,
+			result.data.slice(add, add + 6),
+			[0x00, 0x8f, 0xe0, 0x00, 0x02, 0xb0],
+		);
 		const word0 = result.data[0] | (result.data[1] << 8);
 		check(`${label}: word 0 = base + ${add + 6}`, word0 === 0x3e00 + add + 6, `0x${word0.toString(16)}`);
 		const channel0 = result.data[add + 6] | (result.data[add + 7] << 8);
-		check(`${label}: channel 0 points into the song`, channel0 >= 0x3e00 + result.stats!.headerSize,
-			`0x${channel0.toString(16)} vs header end 0x${(0x3e00 + result.stats!.headerSize).toString(16)}`);
+		check(
+			`${label}: channel 0 points into the song`,
+			channel0 >= 0x3e00 + result.stats!.headerSize,
+			`0x${channel0.toString(16)} vs header end 0x${(0x3e00 + result.stats!.headerSize).toString(16)}`,
+		);
 	}
 
 	// Two entries, so @31 is reachable and the stride is verifiable.
 	const two = compile(withDefault(`#instruments { @0 ${ENTRY} n05 ${ENTRY} }\n#0 o4 @31 c4\n`), 0x3e00, LIBRARY);
-	check("two entries compile and @31 resolves", two.ok, two.diagnostics.map((d) => `${d.code} ${d.message}`).join("; "));
+	check(
+		"two entries compile and @31 resolves",
+		two.ok,
+		two.diagnostics.map((d) => `${d.code} ${d.message}`).join("; "),
+	);
 	check("the block is twelve bytes", two.stats?.headerSize === 34, `${two.stats?.headerSize}`);
 	if (two.data) {
 		// Noise sets the high bit: $05 | $80 = $85 (Music.cpp:2618).
@@ -736,8 +828,11 @@ console.log("\n#instruments and @30+");
 	// Music.cpp:880 — the convert remap turns @@19 into @30, so it starts
 	// resolving against #instruments the moment @30+ is allowed at all.
 	const doubleAt = compile(withDefault(`#instruments { @0 ${ENTRY} }\n#0 o4 @@19 c4\n`), 0x3e00, LIBRARY);
-	check("@@19 remaps to @30 and resolves", doubleAt.ok,
-		doubleAt.diagnostics.map((d) => `${d.code} ${d.message}`).join("; "));
+	check(
+		"@@19 remaps to @30 and resolves",
+		doubleAt.ok,
+		doubleAt.diagnostics.map((d) => `${d.code} ${d.message}`).join("; "),
+	);
 	check("@@19 emits $DA $1E", doubleAt.data ? [...doubleAt.data.slice(12)].includes(0x1e) : false);
 }
 
@@ -751,8 +846,11 @@ console.log("\nthe sample load command");
 	if (byNumber.data) {
 		const bytes = [...byNumber.data];
 		const at = bytes.indexOf(0xf3);
-		check("it emits $F3 $01 $02", at !== -1 && bytes[at + 1] === 0x01 && bytes[at + 2] === 0x02,
-			at === -1 ? "no $F3" : `$F3 ${hex(Uint8Array.from(bytes.slice(at + 1, at + 3)))}`);
+		check(
+			"it emits $F3 $01 $02",
+			at !== -1 && bytes[at + 1] === 0x01 && bytes[at + 2] === 0x02,
+			at === -1 ? "no $F3" : `$F3 ${hex(Uint8Array.from(bytes.slice(at + 1, at + 3)))}`,
+		);
 	}
 
 	const byName = compile(withDefault(`#0 o4 ("${STOCK[1]}", $02) c4\n`), 0x3e00, LIBRARY);
@@ -760,8 +858,11 @@ console.log("\nthe sample load command");
 	if (byName.data) {
 		const bytes = [...byName.data];
 		const at = bytes.indexOf(0xf3);
-		check("a name resolves to its slot in this song", at !== -1 && bytes[at + 1] === 0x01,
-			at === -1 ? "no $F3" : `srcn ${bytes[at + 1]}`);
+		check(
+			"a name resolves to its slot in this song",
+			at !== -1 && bytes[at + 1] === 0x01,
+			at === -1 ? "no $F3" : `srcn ${bytes[at + 1]}`,
+		);
 	}
 
 	// #path applies here too (Music.cpp:958).
@@ -770,7 +871,11 @@ console.log("\nthe sample load command");
 		0x3e00,
 		LIBRARY,
 	);
-	check("#path applies to a sample load", pathed.ok, pathed.diagnostics.map((d) => `${d.code} ${d.message}`).join("; "));
+	check(
+		"#path applies to a sample load",
+		pathed.ok,
+		pathed.diagnostics.map((d) => `${d.code} ${d.message}`).join("; "),
+	);
 
 	// A `(` that is not a sample load must still reach the label-loop parser.
 	const label = compile("#amk 4\n#0 o4 (1)[c4 d4]2 (1)3\n", 0x3e00, LIBRARY);
@@ -795,12 +900,19 @@ console.log("\nthe sample load command");
 	// Stage C's fix: $F3's *first* argument is the sample, so usage tracking must
 	// read that rather than the tuning byte. The am4 $E5 bridge builds one by hand.
 	const am4 = compile("#am4\n#0 o4 $E5 $81 $02 c4\n", 0x3e00, LIBRARY);
-	check("am4 $E5 $81 still becomes $F3 $01 $02", am4.ok, am4.diagnostics.map((d) => `${d.code} ${d.message}`).join("; "));
+	check(
+		"am4 $E5 $81 still becomes $F3 $01 $02",
+		am4.ok,
+		am4.diagnostics.map((d) => `${d.code} ${d.message}`).join("; "),
+	);
 	if (am4.data) {
 		const bytes = [...am4.data];
 		const at = bytes.indexOf(0xf3);
-		check("the am4 bridge emits the right bytes", at !== -1 && bytes[at + 1] === 0x01 && bytes[at + 2] === 0x02,
-			at === -1 ? "no $F3" : `$F3 ${bytes[at + 1]} ${bytes[at + 2]}`);
+		check(
+			"the am4 bridge emits the right bytes",
+			at !== -1 && bytes[at + 1] === 0x01 && bytes[at + 2] === 0x02,
+			at === -1 ? "no $F3" : `$F3 ${bytes[at + 1]} ${bytes[at + 2]}`,
+		);
 	}
 }
 
@@ -817,12 +929,18 @@ console.log("\nremote code");
 		check("the call emits $FC", fc !== -1);
 		// $FC <ptr lo> <ptr hi> <type> <arg>. Type 1, and `8` is an eighth note:
 		// getNoteLength(8) = 192/8 = 24 ticks.
-		check("event type and argument are carried", fc !== -1 && bytes[fc + 3] === 1 && bytes[fc + 4] === 24,
-			fc === -1 ? "no $FC" : `type ${bytes[fc + 3]}, arg ${bytes[fc + 4]}`);
+		check(
+			"event type and argument are carried",
+			fc !== -1 && bytes[fc + 3] === 1 && bytes[fc + 4] === 24,
+			fc === -1 ? "no $FC" : `type ${bytes[fc + 3]}, arg ${bytes[fc + 4]}`,
+		);
 		// The definition body lives in the loop block and must NOT be followed by
 		// an $E9 back-call, which is what separates it from a label loop.
-		check("the body is stored, not called", bytes.filter((b) => b === 0xe9).length === 0,
-			`${bytes.filter((b) => b === 0xe9).length} $E9 bytes`);
+		check(
+			"the body is stored, not called",
+			bytes.filter((b) => b === 0xe9).length === 0,
+			`${bytes.filter((b) => b === 0xe9).length} $E9 bytes`,
+		);
 	}
 
 	// A label loop still emits its $E9, so the two paths really do differ.
@@ -846,9 +964,11 @@ console.log("\nremote code");
 		if (!result.data) continue;
 		const bytes = [...result.data];
 		const fc = bytes.indexOf(0xfc);
-		check(`${label}: emits $FC 00 00 ${expected.toString(16).padStart(2, "0")} 00`,
+		check(
+			`${label}: emits $FC 00 00 ${expected.toString(16).padStart(2, "0")} 00`,
 			fc !== -1 && bytes[fc + 1] === 0 && bytes[fc + 2] === 0 && bytes[fc + 3] === expected && bytes[fc + 4] === 0,
-			fc === -1 ? "no $FC" : hex(Uint8Array.from(bytes.slice(fc, fc + 5))));
+			fc === -1 ? "no $FC" : hex(Uint8Array.from(bytes.slice(fc, fc + 5))),
+		);
 	}
 
 	for (const [source, code, label] of [
@@ -878,33 +998,51 @@ console.log("\n#pad and the remaining warnings");
 	check("#pad compiles", padded.ok, padded.diagnostics.map((d) => `${d.code} ${d.message}`).join("; "));
 	check("#pad does not inflate the song", (padded.stats?.totalSize ?? 0) < 0x2000, `${padded.stats?.totalSize}`);
 	const outgrown = compile("#amk 4\n#pad $10\n#0 o4 [c4 d4 e4 f4]8\n");
-	check("outgrowing #pad warns", outgrown.diagnostics.some((d) => d.code === "AMK0213"),
-		outgrown.diagnostics.map((d) => d.code).join(", "));
+	check(
+		"outgrowing #pad warns",
+		outgrown.diagnostics.some((d) => d.code === "AMK0213"),
+		outgrown.diagnostics.map((d) => d.code).join(", "),
+	);
 	const badPad = compile("#amk 4\n#pad 100\n#0 o4 c4\n");
 	check("#pad without $ is rejected", !badPad.ok && badPad.diagnostics.some((d) => d.code === "AMK0053"));
 
 	const twiceVTable = compile("#amk 4\n#option smwvtable\n#option smwvtable\n#0 o4 c4\n");
-	check("a repeated #option smwvtable warns", twiceVTable.diagnostics.some((d) => d.code === "AMK0203"),
-		twiceVTable.diagnostics.map((d) => d.code).join(", "));
+	check(
+		"a repeated #option smwvtable warns",
+		twiceVTable.diagnostics.some((d) => d.code === "AMK0203"),
+		twiceVTable.diagnostics.map((d) => d.code).join(", "),
+	);
 
 	const divideOne = compile("#amk 4\n#option dividetempo 1\n#0 o4 c4\n");
-	check("#option dividetempo 1 warns", divideOne.diagnostics.some((d) => d.code === "AMK0214"),
-		divideOne.diagnostics.map((d) => d.code).join(", "));
+	check(
+		"#option dividetempo 1 warns",
+		divideOne.diagnostics.some((d) => d.code === "AMK0214"),
+		divideOne.diagnostics.map((d) => d.code).join(", "),
+	);
 
 	const runaway = compile(`#amk 4\n${"#halvetempo\n".repeat(20)}#0 o4 c4\n`);
-	check("a runaway tempo divisor is rejected", !runaway.ok && runaway.diagnostics.some((d) => d.code === "AMK0215"),
-		runaway.diagnostics.map((d) => d.code).join(", "));
+	check(
+		"a runaway tempo divisor is rejected",
+		!runaway.ok && runaway.diagnostics.some((d) => d.code === "AMK0215"),
+		runaway.diagnostics.map((d) => d.code).join(", "),
+	);
 
 	const upperCase = compile("#amk 2\n#0 o4 C4\n");
-	check("upper-case notes warn below #amk 4", upperCase.diagnostics.some((d) => d.code === "AMK0216"),
-		upperCase.diagnostics.map((d) => d.code).join(", "));
+	check(
+		"upper-case notes warn below #amk 4",
+		upperCase.diagnostics.some((d) => d.code === "AMK0216"),
+		upperCase.diagnostics.map((d) => d.code).join(", "),
+	);
 	const upperCaseModern = compile("#amk 4\n#0 o4 C4\n");
 	check("but not on #amk 4", !upperCaseModern.diagnostics.some((d) => d.code === "AMK0216"));
 
 	// A tempo change after the shortest channel has ended never executes.
 	const lateTempo = compile("#amk 4\n#0 o4 c4\n#1 o4 c1 c1 t60 c1\n");
-	check("a tempo change past the end warns", lateTempo.diagnostics.some((d) => d.code === "AMK0217"),
-		lateTempo.diagnostics.map((d) => d.code).join(", "));
+	check(
+		"a tempo change past the end warns",
+		lateTempo.diagnostics.some((d) => d.code === "AMK0217"),
+		lateTempo.diagnostics.map((d) => d.code).join(", "),
+	);
 }
 
 console.log("\noptimizeSampleUsage");
@@ -933,8 +1071,11 @@ console.log("\noptimizeSampleUsage");
 
 	// Nothing is important by default here, so an unplayed group member goes.
 	const group = run("#amk 4\n#samples { #optimized }\n#0 o4 @0 c4\n");
-	check("an unplayed group member is dropped", kept(group) === 1 && names(group).length === 5,
-		`${kept(group)} of ${names(group).length}`);
+	check(
+		"an unplayed group member is dropped",
+		kept(group) === 1 && names(group).length === 5,
+		`${kept(group)} of ${names(group).length}`,
+	);
 
 	// Every path that selects a sample has to mark it, or the pass silences it.
 	for (const [source, expected, label] of [
@@ -980,20 +1121,28 @@ console.log("\n#samples with a .bnk sample bank");
 	// A bank is addressed positionally. Referencing one by name where a single
 	// sample is expected has to fail, because only slot names are in the list.
 	for (const [source, code, label] of [
-		['#amk 4\n#samples { "zelda.bnk" }\n#instruments { "zelda.bnk" $8F $E0 $00 $02 $B0 }\n#0 c4\n',
-			"AMK0089", "a bank as an #instruments base"],
+		[
+			'#amk 4\n#samples { "zelda.bnk" }\n#instruments { "zelda.bnk" $8F $E0 $00 $02 $B0 }\n#0 c4\n',
+			"AMK0089",
+			"a bank as an #instruments base",
+		],
 		['#amk 4\n#samples { "zelda.bnk" }\n#0 o4 ("zelda.bnk", $02) c4\n', "AMK0132", "a bank as a sample load"],
 	] as const) {
 		const result = run(source);
-		check(`${label} is rejected with ${code}`,
+		check(
+			`${label} is rejected with ${code}`,
 			!result.ok && result.diagnostics.some((d) => d.code === code),
-			result.diagnostics.map((d) => `${d.code} ${d.message}`).join("; "));
+			result.diagnostics.map((d) => `${d.code} ${d.message}`).join("; "),
+		);
 	}
 
 	// $F3 addresses a slot by SRCN, which is the only way to reach one.
 	const played = run('#amk 4\n#samples { "zelda.bnk" }\n#0 o4 $F3 $05 $02 c4\n');
-	check("a slot reached by $F3 survives optimisation",
-		played.ok && names(played)[5] === "zelda.bnk:05", `${names(played)[5]}`);
+	check(
+		"a slot reached by $F3 survives optimisation",
+		played.ok && names(played)[5] === "zelda.bnk:05",
+		`${names(played)[5]}`,
+	);
 	check("its unplayed neighbours do not", names(played)[6] === "EMPTY.brr", names(played)[6]);
 }
 
@@ -1009,9 +1158,7 @@ console.log("\nimportance comes from the host, not from the syntax");
 	const unmarked = run('#amk 4\n#samples { "kick.brr" "drums/snare.brr" }\n#0 o4 $F3 $00 $02 c4\n');
 	check("an unmarked named sample is reclaimed when unplayed", kept(unmarked) === 1, `${kept(unmarked)} kept`);
 
-	const marked = run('#amk 4\n#samples { "kick.brr" "drums/snare.brr" }\n#0 o4 $F3 $00 $02 c4\n', [
-		"drums/snare.brr",
-	]);
+	const marked = run('#amk 4\n#samples { "kick.brr" "drums/snare.brr" }\n#0 o4 $F3 $00 $02 c4\n', ["drums/snare.brr"]);
 	check("marking it important keeps it", kept(marked) === 2, `${kept(marked)} kept`);
 	check("and it stays at its own SRCN", names(marked)[1] === "drums/snare.brr", names(marked)[1]);
 
@@ -1029,20 +1176,26 @@ console.log("\nimportance comes from the host, not from the syntax");
 	// so it briefly had no importance at all and reclaimed every important sample
 	// in any song that omitted `#samples` — which is most songs.
 	const implicitImportant = run("#amk 4\n#0 o4 @0 c4\n", [STOCK[9], STOCK[12]]);
-	check("the implicit #default fallback honours importance",
+	check(
+		"the implicit #default fallback honours importance",
 		names(implicitImportant)[9] === STOCK[9] && names(implicitImportant)[12] === STOCK[12],
-		`[9]=${names(implicitImportant)[9]} [12]=${names(implicitImportant)[12]}`);
+		`[9]=${names(implicitImportant)[9]} [12]=${names(implicitImportant)[12]}`,
+	);
 	check("and still reclaims the rest", names(implicitImportant)[11] === "EMPTY.brr", names(implicitImportant)[11]);
-	check("an explicit #samples { #default } agrees with it",
+	check(
+		"an explicit #samples { #default } agrees with it",
 		names(run("#amk 4\n#samples { #default }\n#0 o4 @0 c4\n", [STOCK[9], STOCK[12]])).join() ===
-			names(implicitImportant).join());
+			names(implicitImportant).join(),
+	);
 
 	// `stats.sampleNames` is what the song asked for, before anything was emptied —
 	// which is how the browser can say a sample is not in the song at all.
 	const asked = run("#amk 4\n#0 o4 @0 c4\n");
-	check("stats.sampleNames is the pre-optimisation list",
+	check(
+		"stats.sampleNames is the pre-optimisation list",
 		asked.stats?.sampleNames.length === 20 && !asked.stats?.sampleNames.includes("EMPTY.brr"),
-		`${asked.stats?.sampleNames.length} names, EMPTY present: ${asked.stats?.sampleNames.includes("EMPTY.brr")}`);
+		`${asked.stats?.sampleNames.length} names, EMPTY present: ${asked.stats?.sampleNames.includes("EMPTY.brr")}`,
+	);
 	check("while sampleList is the optimised one", names(asked).includes("EMPTY.brr"));
 }
 

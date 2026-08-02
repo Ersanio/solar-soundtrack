@@ -24,9 +24,7 @@ export function firOverriddenBy(fir: Command, commands: Command[]): Command | nu
   return (
     commands.find(
       (other) =>
-        other.vcmd === 0xf1 &&
-        other.channel === fir.channel &&
-        other.span.start > fir.span.start,
+        other.vcmd === 0xf1 && other.channel === fir.channel && other.span.start > fir.span.start,
     ) ?? null
   );
 }

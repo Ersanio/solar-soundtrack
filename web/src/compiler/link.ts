@@ -107,8 +107,7 @@ function prependBlobPrefix(
 		shift += 3;
 	}
 
-	const echoInline =
-		parsed.echoBufferSize > 0 || !parsed.echoBufferAllocVCMDIsSet || parsed.hasEchoBufferCommand;
+	const echoInline = parsed.echoBufferSize > 0 || !parsed.echoBufferAllocVCMDIsSet || parsed.hasEchoBufferCommand;
 
 	if (echoInline) {
 		data[channel].unshift(0xfa, 0x04, parsed.echoBufferSize);

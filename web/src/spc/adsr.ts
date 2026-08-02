@@ -43,10 +43,8 @@ import { DSP_RATE } from "./fir";
  * noise clock of 0 is silence. `hex_command_reference.html:9-13`.
  */
 export const CLOCKS: readonly number[] = [
-	0, 2048, 1536, 1280, 1024, 768, 640, 512,
-	384, 320, 256, 192, 160, 128, 96, 80,
-	64, 48, 40, 32, 24, 20, 16, 12,
-	10, 8, 6, 5, 4, 3, 2, 1,
+	0, 2048, 1536, 1280, 1024, 768, 640, 512, 384, 320, 256, 192, 160, 128, 96, 80, 64, 48, 40, 32, 24, 20, 16, 12, 10, 8,
+	6, 5, 4, 3, 2, 1,
 ];
 
 /** Peak envelope level. The DSP's envelope is 11 bits. */
@@ -218,7 +216,7 @@ export function envelopeGain(gain: number): EnvelopePoint[] {
 		return points;
 	}
 
-	const done = () => (env <= 0 || env >= ENVELOPE_MAX);
+	const done = () => env <= 0 || env >= ENVELOPE_MAX;
 	// Bounded independently of the rules above, so a mode that cannot converge
 	// still returns a curve rather than spinning.
 	for (let i = 0; i < 0x1000 && !(i > 0 && done()); i++) {
@@ -246,12 +244,7 @@ export function envelopeGain(gain: number): EnvelopePoint[] {
 }
 
 /** How a GAIN byte behaves when ADSR is switched off. */
-export type GainMode =
-	| "direct"
-	| "linearDecrease"
-	| "expDecrease"
-	| "linearIncrease"
-	| "bentIncrease";
+export type GainMode = "direct" | "linearDecrease" | "expDecrease" | "linearIncrease" | "bentIncrease";
 
 export interface Gain {
 	mode: GainMode;
@@ -273,9 +266,7 @@ export function decodeGain(gain: number): Gain {
 		return { mode: "direct", level: (gain & 0x7f) / 0x7f, rate: null };
 	}
 	const rate = gain & 0x1f;
-	const mode = (["linearDecrease", "expDecrease", "linearIncrease", "bentIncrease"] as const)[
-		(gain >> 5) & 0x03
-	];
+	const mode = (["linearDecrease", "expDecrease", "linearIncrease", "bentIncrease"] as const)[(gain >> 5) & 0x03];
 	return { mode, level: null, rate };
 }
 

@@ -63,9 +63,7 @@ export class AddmusicKCompiler {
 		stats.sampleNames = [...(parsed.requestedSamples ?? [])];
 		// `usedSamples` is indexed by SRCN, which is a position in that same list.
 		// Collapsing to names loses nothing the UI needs and spares it the mapping.
-		stats.usedSampleNames = [
-			...new Set(stats.sampleNames.filter((_, srcn) => parsed.usedSamples[srcn])),
-		];
+		stats.usedSampleNames = [...new Set(stats.sampleNames.filter((_, srcn) => parsed.usedSamples[srcn]))];
 		stats.hasIntro = parsed.hasIntro;
 		stats.loops = !parsed.doesntLoop;
 		stats.tagSeconds = parsed.tagSeconds;

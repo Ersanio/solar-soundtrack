@@ -298,10 +298,10 @@ export function decodeBrr(sample: BrrSample): Int16Array {
 			} else if (filter) {
 				// p1 * 0.46875
 				s += p1 >> 1;
-				s += (-p1) >> 5;
+				s += -p1 >> 5;
 			}
 
-			const value = (clamp16(s) * 2) << 16 >> 16;
+			const value = ((clamp16(s) * 2) << 16) >> 16;
 			previous2 = previous1;
 			previous1 = value;
 			out[at++] = value;

@@ -81,7 +81,11 @@ const word = (bytes: Uint8Array, at: number): number => bytes[at] | (bytes[at + 
  * own song table, so none of the manifest's constants can be assumed. They are
  * recovered here instead, falling back to the manifest only when detection fails.
  */
-export function analyzeDriver(raw: Uint8Array, manifest: DriverManifest, custom: boolean): {
+export function analyzeDriver(
+	raw: Uint8Array,
+	manifest: DriverManifest,
+	custom: boolean,
+): {
 	programData: Uint8Array;
 	programPos: number;
 	mainLoopPos: number;
@@ -151,9 +155,7 @@ export function analyzeDriver(raw: Uint8Array, manifest: DriverManifest, custom:
 		// Say what was looked for, so a build we cannot read is diagnosable
 		// rather than just silently downgraded.
 		const localPos = programPos + programData.length;
-		notes.push(
-			`no song table found (nothing points at $${hex(localPos)}); treating this as a build without one`,
-		);
+		notes.push(`no song table found (nothing points at $${hex(localPos)}); treating this as a build without one`);
 	}
 
 	// Second-pass build: `SongPointers:` is the last label in main.asm, so the
@@ -177,7 +179,12 @@ export function analyzeDriver(raw: Uint8Array, manifest: DriverManifest, custom:
  */
 function findMainLoop(programData: Uint8Array, programPos: number): number | null {
 	for (let i = 0; i + 3 < programData.length; i++) {
-		if (programData[i] === 0xeb && programData[i + 1] === 0xfd && programData[i + 2] === 0xf0 && programData[i + 3] === 0xfc) {
+		if (
+			programData[i] === 0xeb &&
+			programData[i + 1] === 0xfd &&
+			programData[i + 2] === 0xf0 &&
+			programData[i + 3] === 0xfc
+		) {
 			return programPos + i;
 		}
 	}

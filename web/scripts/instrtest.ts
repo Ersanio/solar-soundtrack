@@ -136,11 +136,12 @@ console.log("\nentry shape");
 	);
 	check(
 		"a percussion entry carries seven, the last being its note",
-		tables.percussion.every(
-			(entry) => entry.bytes.length === PERCUSSION_ENTRY_BYTES && entry.note === entry.bytes[6],
-		),
+		tables.percussion.every((entry) => entry.bytes.length === PERCUSSION_ENTRY_BYTES && entry.note === entry.bytes[6]),
 	);
-	check("a melodic entry has no note", tables.melodic.every((entry) => entry.note === undefined));
+	check(
+		"a melodic entry has no note",
+		tables.melodic.every((entry) => entry.note === undefined),
+	);
 	check(
 		"every drum note is a real note byte",
 		tables.percussion.every((entry) => (entry.note ?? 0) >= 0x80 && (entry.note ?? 0) < 0xc6),

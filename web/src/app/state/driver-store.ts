@@ -51,7 +51,9 @@ export class DriverStore {
 
   readonly summary = computed(() => {
     const driver = this.driver();
-    return driver ? `${driver.source.name} · ${driver.programData.length.toLocaleString()} B` : null;
+    return driver
+      ? `${driver.source.name} · ${driver.programData.length.toLocaleString()} B`
+      : null;
   });
 
   constructor() {
