@@ -32,6 +32,9 @@ import {
 	toSigned,
 } from "../src/spc/fir";
 
+import { builtInTaps, echoHazards, feedbackBefore } from "../src/app/util/echo-hazards";
+import { tokenize } from "../src/compiler/tokens";
+
 import { check, summarise } from "./harness";
 
 const dB = (gain: number) => 20 * Math.log10(Math.max(gain, 1e-9));
@@ -384,6 +387,134 @@ console.log("\ncurve sampling");
 	);
 	check("two points is the floor, not a crash", firCurve(CLASSIC, { fromHz: 20, toHz: 16000, points: 1 }).length === 2);
 	check("a linear axis works too", firCurve(CLASSIC, { fromHz: 0, toHz: 16000, points: 10, log: false }).length === 10);
+}
+
+// ---------------------------------------------------------------------------
+// The diagnostic built on all of the above.
+//
+// `echoStability` only ever saw the one filter under the caret. `echoHazards`
+// walks the whole document, which means it has to decide which feedback each
+// filter is running at and which commands are allowed to see each other — and
+// those decisions, not the maths, are what can quietly regress.
+// ---------------------------------------------------------------------------
+
+/** Taps whose gain exceeds unity; the same ones the loop-gain check above uses. */
+const HOT = "$F5 $7F $30 $20 $00 $00 $00 $00 $00";
+
+function hazards(source: string) {
+	return echoHazards(tokenize(source).commands);
+}
+
+console.log("\nrunaway echo diagnostics");
+{
+	const custom = hazards(`#amk 2\n\n#0 $F1 $08 $7F $00 ${HOT}\nc4\n`);
+	check(
+		"a hot $F5 under high feedback is reported",
+		custom.some((d) => d.code === "AMK0500"),
+	);
+	check(
+		"and it is severe rather than an error",
+		custom.every((d) => d.severity === "severe"),
+	);
+
+	// The case the FIR designer could never have shown: no $F5 anywhere, so
+	// nothing to put a caret on. Filter 0 peaks at 132/128, which $7F feedback
+	// pushes past unity on its own.
+	const builtIn = hazards("#amk 2\n\n#0 $F1 $08 $7F $00\nc4\n");
+	check("$F1's own filter 0 at full feedback is reported", builtIn.length === 1 && builtIn[0].code === "AMK0501");
+	check("filter 1 is flat and cannot run away", hazards("#amk 2\n\n#0 $F1 $08 $7F $01\nc4\n").length === 0);
+
+	check("no feedback means no runaway", hazards(`#amk 2\n\n#0 $F1 $08 $00 $00 ${HOT}\nc4\n`).length === 0);
+	check("a $F5 before any $F1 is judged at zero feedback", hazards(`#amk 2\n\n#0 ${HOT}\nc4\n`).length === 0);
+	check("a stable filter says nothing", hazards("#amk 2\n\n#0 $F1 $08 $40 $00\nc4\n").length === 0);
+	check("a song with no echo at all says nothing", hazards("#amk 2\n\n#0 o4 c4 d4 e4\n").length === 0);
+}
+
+console.log("\nthe diagnostic points at the command that causes it");
+{
+	const source = `#amk 2\n\n#0 $F1 $08 $7F $00 ${HOT}\nc4\n`;
+	const fir = hazards(source).find((d) => d.code === "AMK0500");
+	check(
+		"the span covers the whole $F5 run",
+		fir !== undefined && source.slice(fir.span.start, fir.span.end) === HOT,
+		fir && JSON.stringify(source.slice(fir.span.start, fir.span.end)),
+	);
+	check("and carries the line it is on", fir?.span.line === 3);
+	check(
+		"the message names the feedback and stays dry about the consequences",
+		fir?.message.includes("$7F") === true && !/ear|speaker|damage/i.test(fir.message),
+		fir?.message,
+	);
+}
+
+console.log("\nmultiple filters are judged one at a time");
+{
+	// AddmusicK emits every $F5 verbatim (`Music.cpp:63`, `:1770`), so both of
+	// these run — the first under $7F feedback, the second under $20.
+	const both = hazards(`#amk 2\n\n#0 $F1 $08 $7F $00 ${HOT} $F1 $08 $20 $01 ${HOT}\nc4\n`);
+	check(
+		"only the one whose feedback makes it diverge is reported",
+		both.filter((d) => d.code === "AMK0500").length === 1,
+		`${both.length} diagnostics: ${both.map((d) => d.code).join(", ")}`,
+	);
+
+	// A later $F1 reloads a built-in table and throws the coefficients away, but
+	// they were live until it ran.
+	const overridden = hazards(`#amk 2\n\n#0 $F1 $08 $7F $00 ${HOT} $F1 $08 $00 $01\nc4\n`);
+	check(
+		"a $F5 a later $F1 discards is still reported",
+		overridden.some((d) => d.code === "AMK0500"),
+	);
+
+	const twice = hazards(`#amk 2\n\n#0 $F1 $08 $7F $00 ${HOT} ${HOT}\nc4\n`);
+	check("two runaway filters give two diagnostics, not one", twice.filter((d) => d.code === "AMK0500").length === 2);
+}
+
+console.log("\nchannels are read separately");
+{
+	// Source order is execution order within a channel and nothing between them,
+	// so these two must not pair up — the same rule `fir-override.ts` enforces.
+	// It under-reports: the DSP has one echo unit and they really do interact.
+	// Reaching across channels would be guesswork, and the FIR designer sitting
+	// beside this would disagree with it.
+	const split = hazards(`#amk 2\n\n#0 $F1 $08 $7F $01\nc4\n\n#1 ${HOT}\nc4\n`);
+	check("a $F1 in one channel does not arm a $F5 in another", split.length === 0);
+
+	const together = hazards(`#amk 2\n\n#0 $F1 $08 $7F $01 ${HOT}\nc4\n`);
+	check("the same two in one channel do pair up", together.length === 1);
+}
+
+console.log("\nhalf-written commands are left alone");
+{
+	// Three bytes into typing eight, the filter is not yet what it will be — and
+	// the flat table it is replacing keeps the $F1 above quiet, so a diagnostic
+	// here could only have come from the half-written run.
+	check("an incomplete $F5 is not judged", hazards("#amk 2\n\n#0 $F1 $08 $7F $01 $F5 $7F $30\nc4\n").length === 0);
+	// One argument short of a $F1 that would be reported, which is also the case
+	// that would read past the end of `args` if it were judged anyway.
+	check("an incomplete $F1 is not judged", hazards(`#amk 2\n\n#0 $F1 $08 $7F\nc4\n`).length === 0);
+}
+
+console.log("\nthe pieces the inspectors share");
+{
+	const source = `#amk 2\n\n#0 $F1 $08 $60 $00 ${HOT}\nc4\n`;
+	const commands = tokenize(source).commands;
+	const fir = commands.find((c) => c.vcmd === 0xf5);
+	check("feedbackBefore finds the $F1 ahead of a $F5", fir !== undefined && feedbackBefore(fir, commands) === 0x60);
+	check(
+		"and answers zero when there is none",
+		feedbackBefore(
+			tokenize(`#amk 2\n\n#0 ${HOT}\nc4\n`).commands[0],
+			tokenize(`#amk 2\n\n#0 ${HOT}\nc4\n`).commands,
+		) === 0,
+	);
+
+	check("builtInTaps 0 is the SMW low-pass", JSON.stringify(builtInTaps(0)) === JSON.stringify(CLASSIC));
+	check("builtInTaps 1 is flat", JSON.stringify(builtInTaps(1)) === JSON.stringify(FLAT));
+	// $02 and up read past the end of the table; the parser reports that as
+	// AMK0158/AMK0212 and nothing here should invent an answer for it.
+	check("an out-of-range table ID has no answer", builtInTaps(2) === null);
+	check("nor does a runaway verdict", hazards("#amk 2\n\n#0 $F1 $08 $7F $02\nc4\n").length === 0);
 }
 
 summarise();

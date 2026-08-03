@@ -28,6 +28,7 @@ import { EditorStore } from '../../../state/editor-store';
 import { Playback } from '../../../state/playback';
 import { builtInFilterName, firOverriddenBy } from '../fir-override';
 import { FirGraph } from '../fir-graph/fir-graph';
+import { feedbackBefore } from '../../../util/echo-hazards';
 import { Hex2Pipe } from '../../../util/hex.pipe';
 
 type Mode = 'presets' | 'draw';
@@ -100,28 +101,13 @@ export class FirDesigner {
    * The feedback the echo is running at, taken from the nearest preceding `$F1`
    * in the source — its second argument. Without it there is no way to say
    * whether this filter makes the echo run away, since that depends on both.
+   *
+   * Shared with the diagnostic that reports the same filter in the output pane,
+   * so the two can never put a different number on it.
    */
-  protected readonly feedback = computed(() => {
-    const self = this.command();
-    let found = 0;
-    for (const command of this.store.tokens().commands) {
-      if (command.span.start >= self.span.start) {
-        break;
-      }
-
-      // Same channel only: source order is execution order within a channel,
-      // and means nothing between them.
-      if (command.channel !== self.channel) {
-        continue;
-      }
-
-      if (command.vcmd === 0xf1 && command.args.length >= 2) {
-        found = command.args[1].value;
-      }
-    }
-
-    return found;
-  });
+  protected readonly feedback = computed(() =>
+    feedbackBefore(this.command(), this.store.tokens().commands),
+  );
 
   protected readonly stability = computed(() => echoStability(this.taps(), this.feedback()));
 

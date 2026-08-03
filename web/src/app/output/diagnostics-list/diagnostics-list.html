@@ -12,7 +12,7 @@
           >line {{ diagnostic.span.line }}</span
         >
         <span class="shrink-0 font-mono text-xs" [class]="severityClass[diagnostic.severity]">
-          {{ diagnostic.code }}
+          {{ diagnostic.severity }} {{ diagnostic.code }}
         </span>
         <span class="text-ink">{{ diagnostic.message }}</span>
       </button>

@@ -19,6 +19,14 @@
 
   --color-accent: #6ea8fe;
   --color-danger: #ff7b72;
+  /*
+   * Between danger and warn, and its own hue rather than a shade of either: it marks the
+   * diagnostics that compile cleanly and then misbehave on playback, which is a different kind of
+   * problem from both "this will not build" and "you may not have meant this". 7.1:1 against
+   * --color-surface. The three warm hues are close together, so the diagnostics list spells the
+   * severity out as well — colour is not carrying this on its own.
+   */
+  --color-severe: #f0883e;
   --color-warn: #e3b341;
   --color-good: #7ee787;
 

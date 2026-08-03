@@ -1,8 +1,9 @@
 import { Component, computed, inject, input } from '@angular/core';
 
 import type { Command } from '@compiler/tokens';
+import { builtInTaps } from '../../../util/echo-hazards';
 import { hex2 } from '../../../util/format';
-import { FIR_PRESETS, type FirTaps, toSigned } from '@spc/fir';
+import { type FirTaps, toSigned } from '@spc/fir';
 import { EditorStore } from '../../../state/editor-store';
 import { firOverriddenBefore } from '../fir-override';
 import { FirGraph } from '../fir-graph/fir-graph';
@@ -92,10 +93,9 @@ export class EchoInspector {
       return null;
     }
 
-    const which = this.args()[2] ?? 0;
-    // main.asm:3507 — filter 0 is SMW's low-pass, filter 1 is flat.
-    const preset = FIR_PRESETS.find((p) => p.name === (which === 0 ? 'Classic' : 'Flat'));
-    return preset?.taps ?? null;
+    // Shared with the runaway-echo diagnostic, so the picture here and the
+    // verdict in the output pane are drawn from the same coefficients.
+    return builtInTaps(this.args()[2] ?? 0);
   });
 
   protected readonly feedback = computed(() => (this.vcmd() === 0xf1 ? (this.args()[1] ?? 0) : 0));

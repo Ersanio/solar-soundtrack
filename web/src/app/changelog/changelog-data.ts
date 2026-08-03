@@ -28,6 +28,7 @@ export const CHANGELOG: readonly ChangelogEntry[] = [
   {
     date: '3 August 2026',
     items: [
+      'Runaway echo filters are now flagged in Diagnostics',
       'Draggable divider between the editor and output panes',
       "SPC-700's main.bin now carries the default global songs",
       'Removed uploading main.bin, for simplicity',

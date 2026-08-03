@@ -10,9 +10,16 @@ import { EditorStore } from '../../state/editor-store';
 export class DiagnosticsList {
   protected readonly store = inject(EditorStore);
 
-  /** Severity carries a text badge too, so it is never colour alone. */
+  /**
+   * Severity is spelled out beside the code as well, so it is never colour alone.
+   *
+   * Three of the four are warm and now sit close together — red, orange, yellow — which is exactly
+   * the pairing that goes flat under the common colour vision deficiencies. The word carries it;
+   * the colour only makes it quicker to scan.
+   */
   protected readonly severityClass: Record<Severity, string> = {
     error: 'text-danger',
+    severe: 'text-severe',
     warning: 'text-warn',
     info: 'text-ink-muted',
   };
