@@ -26,6 +26,10 @@ export interface ChangelogEntry {
 export const CHANGELOG: readonly ChangelogEntry[] = [
   // ─── newest first; add new blocks here ──────────────────────────────────
   {
+    date: '3 August 2026',
+    items: ['Draggable divider between the editor and output panes'],
+  },
+  {
     date: '2 August 2026',
     items: ['This changelog'],
   },
