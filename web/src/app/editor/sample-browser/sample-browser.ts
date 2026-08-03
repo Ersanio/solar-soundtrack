@@ -3,7 +3,6 @@ import { Component, computed, inject, signal } from '@angular/core';
 import { ARAM_SIZE } from '@spc/layout';
 import { Button } from '../../shared/button/button';
 import { Checkbox } from '../../shared/checkbox/checkbox';
-import { DriverStore } from '../../state/driver-store';
 import { EditorStore } from '../../state/editor-store';
 import { Playback } from '../../state/playback';
 import { type SampleFile, type SampleSlot, SampleStore } from '../../state/sample-store';
@@ -26,7 +25,6 @@ import { Hex2Pipe } from '../../util/hex.pipe';
 export class SampleBrowser {
   protected readonly library = inject(SampleStore);
   protected readonly playback = inject(Playback);
-  protected readonly drivers = inject(DriverStore);
   protected readonly editor = inject(EditorStore);
 
   /** Names rejected on the last upload, shown until the next one. */
@@ -34,13 +32,6 @@ export class SampleBrowser {
 
   protected readonly freeBytes = computed(() => this.editor.budget()?.freeBytes ?? 0);
   protected readonly overflowing = computed(() => this.freeBytes() < 0);
-
-  /**
-   * `@0`-`@29` are `$DA n` bytes the *driver* resolves against its own built-in
-   * instrument table, so a driver built from a modified `InstrumentData.asm`
-   * can map them to different samples than the bundled one does.
-   */
-  protected readonly customDriver = computed(() => this.drivers.isCustom());
 
   protected async onFiles(event: Event): Promise<void> {
     const input = event.target as HTMLInputElement;

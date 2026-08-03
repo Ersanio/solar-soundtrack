@@ -4,7 +4,6 @@ import { DriverStore } from '../../state/driver-store';
 import { EditorStore } from '../../state/editor-store';
 import { hex4 } from '../../util/format';
 import { AramBar, type Group, type Segment } from '../aram-bar/aram-bar';
-import { DriverPicker } from '../driver-picker/driver-picker';
 
 /** A budget row as the table renders it: a bar segment plus its text columns. */
 interface TableRow extends Segment {
@@ -15,7 +14,7 @@ interface TableRow extends Segment {
 
 @Component({
   selector: 'amk-aram-budget',
-  imports: [DriverPicker, AramBar],
+  imports: [AramBar],
   templateUrl: './aram-budget.html',
 })
 export class AramBudget {
@@ -69,15 +68,20 @@ export class AramBudget {
 
   protected readonly overflowing = computed(() => (this.store.budget()?.overflowBytes ?? 0) > 0);
 
+  /**
+   * The song's load address, which is the driver's local-song slot.
+   *
+   * In the header rather than the table because it is a property of the driver
+   * and is worth reading even when nothing compiles — the table's `your song`
+   * row only exists once there is a song.
+   */
+  protected readonly loadAddress = computed(() => {
+    const plan = this.drivers.plan();
+    return plan ? `$${hex4(plan.localPos)}` : '—';
+  });
+
   protected readonly notes = computed(() => {
     const notes: string[] = [];
-    if (this.drivers.plan()?.fromEmbeddedTable === false) {
-      notes.push(
-        'This driver has no song table of its own, so nothing is set aside for global songs — ' +
-          'a real install will have less room than shown. Load your own main.bin for exact figures.',
-      );
-    }
-
     if (this.overflowing()) {
       notes.push(
         'This will not fit in ARAM. Reduce samples, shorten the song, or lower the echo buffer.',

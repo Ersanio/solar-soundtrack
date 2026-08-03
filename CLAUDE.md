@@ -111,9 +111,14 @@ is the shared vocabulary and deliberately knows nothing about the SPC layer.
 ### The pipeline
 
 1. **`DriverStore`** loads `public/driver/` (manifest, `main.bin`, SPC/DSP base images, the
-   `#default` BRR group), or a user-uploaded `main.bin`. `planAram()` derives the song's ARAM load
-   address from the driver's song pointer table. **There is no fallback address** — until a driver
-   loads, compilation is blocked rather than run against a guess.
+   `#default` BRR group). `planAram()` derives the song's ARAM load address from the driver's song
+   pointer table. **There is no fallback address** — until the driver loads, compilation is blocked
+   rather than run against a guess. `main.bin` is a *final-pass* AddmusicK build: it carries its own
+   upload header, song pointer table and global songs, so the ARAM budget is exact by construction
+   and nothing has to be modelled. The song lands in the table's last slot (`$2996`, index 9), which
+   sits *inside* the image — AddmusicK leaves the last song it compiled there — so the song data
+   overwrites it rather than following it. Swap that file for a second-pass build and `planAram()`
+   falls back to appending a one-slot table, which `spctest` asserts against.
 2. **`EditorStore`** debounces typing (150 ms) into a `committed` signal that a `computed` compiles.
    Diagnostics, stats, the ARAM budget and the hex dump are all `computed` off that one result.
 3. **`buildSpc()`** assembles the fixed 0x10200-byte SPC. It is a method rather than a `computed`

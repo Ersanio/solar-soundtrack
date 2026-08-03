@@ -111,7 +111,8 @@ export interface CompileRequest {
 	/**
 	 * ARAM address the emitted blob will be loaded at. All internal pointers are
 	 * relocated against this, so it must match where you paste the blob into the
-	 * SPC. In AddmusicK this is `programPos + main.bin.length - 4`.
+	 * SPC. It comes from the driver's own song pointer table — the slot the local
+	 * song occupies — which is what `planAram` reads out of `main.bin`.
 	 */
 	aramAddress: number;
 	/** Compiler-specific knobs. Unknown keys must be ignored, not rejected. */

@@ -47,8 +47,6 @@ games, and even for homebrew. A huge library of music is available at [SMW Centr
   make an echo that builds up instead of dying away. Edits go straight back into the MML, so with
   **Live** on you hear the change on the running song.
 - **A hex dump** of the compiled song data, just because.
-- **Bring your own main.bin** by uploading your own `main.bin` from your own AddmusicK, or
-  use the bundled default one.
 - **Export** a finished `.spc`, or the raw song-data `.bin`.
 - Your draft and your sample library are kept locally, so closing the tab does not lose
   your work.

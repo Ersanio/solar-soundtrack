@@ -27,7 +27,11 @@ export const CHANGELOG: readonly ChangelogEntry[] = [
   // ─── newest first; add new blocks here ──────────────────────────────────
   {
     date: '3 August 2026',
-    items: ['Draggable divider between the editor and output panes'],
+    items: [
+      'Draggable divider between the editor and output panes',
+      "SPC-700's main.bin now carries the default global songs",
+      'Removed uploading main.bin, for simplicity',
+    ],
   },
   {
     date: '2 August 2026',

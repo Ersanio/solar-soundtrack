@@ -1,6 +1,6 @@
 import { Service, computed, signal } from '@angular/core';
 
-import { type DriverBundle, loadDriver, withCustomProgram } from '@spc/driver';
+import { type DriverBundle, loadDriver } from '@spc/driver';
 import {
   type InstrumentTables,
   bundledInstrumentTables,
@@ -10,24 +10,25 @@ import { type AramPlan, planAram } from '@spc/layout';
 import { errorMessage } from '../util/format';
 
 /**
- * The loaded N-SPC driver and the ARAM layout derived from it.
+ * The N-SPC driver and the ARAM layout derived from it.
  *
  * Everything downstream depends on this: the song's load address comes from the
  * driver's song pointer table, and every pointer the compiler emits is relocated
  * against it. So there is no "no driver" fallback — until one loads, compilation
  * is blocked rather than run against a guessed address.
+ *
+ * There is exactly one driver, `public/driver/main.bin`, and it is a final-pass
+ * AddmusicK build carrying its own song table and global songs. So there is no
+ * state to track here beyond "has it arrived yet": what ships is what a stock
+ * install has, and the ARAM figures are exact without anyone supplying anything.
  */
 @Service()
 export class DriverStore {
-  /** The bundled default, loaded once at startup. */
-  private readonly bundled = signal<DriverBundle | null>(null);
-  /** A user-supplied `main.bin`, which wins while it is set. */
-  private readonly uploaded = signal<DriverBundle | null>(null);
+  private readonly loaded = signal<DriverBundle | null>(null);
 
   readonly loadError = signal<string | null>(null);
 
-  readonly driver = computed(() => this.uploaded() ?? this.bundled());
-  readonly isCustom = computed(() => this.uploaded() !== null);
+  readonly driver = this.loaded.asReadonly();
   readonly ready = computed(() => this.driver() !== null);
 
   /** Where the song lands and which `$F6` index selects it. */
@@ -39,9 +40,9 @@ export class DriverStore {
   /**
    * The instrument and percussion tables this driver actually carries.
    *
-   * Read out of `main.bin` rather than stated, so an uploaded driver reports its
+   * Read out of `main.bin` rather than stated, so replacing the image reports its
    * own instruments; falls back to the bundled tables, labelled, when the search
-   * cannot make sense of the image. See `spc/instruments.ts`.
+   * cannot make sense of it. See `spc/instruments.ts`.
    */
   readonly instruments = computed<InstrumentTables>(() => {
     const driver = this.driver();
@@ -52,43 +53,15 @@ export class DriverStore {
     return readInstrumentTables(driver.programData, driver.programPos);
   });
 
-  readonly summary = computed(() => {
-    const driver = this.driver();
-    return driver
-      ? `${driver.source.name} · ${driver.programData.length.toLocaleString()} B`
-      : null;
-  });
-
   constructor() {
-    void this.loadBundled();
+    void this.load();
   }
 
-  private async loadBundled(): Promise<void> {
+  private async load(): Promise<void> {
     try {
-      this.bundled.set(await loadDriver());
+      this.loaded.set(await loadDriver());
     } catch (error) {
       this.loadError.set(errorMessage(error));
     }
-  }
-
-  /** Swaps in an install's own `main.bin`, so the ARAM figures are exact. */
-  async useCustom(file: File): Promise<void> {
-    const bundled = this.bundled();
-    if (!bundled) {
-      return;
-    }
-
-    try {
-      const bytes = new Uint8Array(await file.arrayBuffer());
-      this.uploaded.set(withCustomProgram(bundled, bytes, file.name));
-      this.loadError.set(null);
-    } catch (error) {
-      this.loadError.set(errorMessage(error));
-    }
-  }
-
-  reset(): void {
-    this.uploaded.set(null);
-    this.loadError.set(null);
   }
 }

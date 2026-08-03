@@ -348,7 +348,6 @@ export class InstrumentInspector {
 
   /** Set when the tables came from the bundled copy rather than the loaded driver. */
   protected readonly fallback = computed(() => this.drivers.instruments().source === 'bundled');
-  protected readonly customDriver = computed(() => this.drivers.isCustom());
 
   /** For `@30+`: the sample form as written in the block. */
   protected readonly customSample = computed(() => {

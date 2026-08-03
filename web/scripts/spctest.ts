@@ -9,7 +9,7 @@
 import { compiler } from "../src/compiler";
 import { EMPTY_SAMPLE_NAME } from "../src/compiler/tables";
 import { emptySample } from "../src/spc/brr";
-import { analyzeDriver, encodePathSegment, loadDriver, withCustomProgram } from "../src/spc/driver";
+import { analyzeDriver, encodePathSegment, loadDriver } from "../src/spc/driver";
 import { buildSpc } from "../src/spc/export";
 import { computeBudget, planAram } from "../src/spc/layout";
 
@@ -99,27 +99,62 @@ console.log("\ndriver bundle");
 		);
 	}
 
-	check("no embedded song table", driver.embedded === null);
-	check("SongPointers is $236D", driver.manifest.songPointers === 0x236d, hex(driver.manifest.songPointers));
+	// The shipped main.bin is a final-pass build, so everything AddmusicK
+	// occupies is physically present and the ARAM budget is exact without
+	// modelling. This is the assertion that notices if it is ever swapped for a
+	// second-pass image again, which would silently understate the budget.
+	check("the shipped driver carries its own song table", driver.embedded !== null);
+	check("SongPointers is $236D", driver.songPointers === 0x236d, hex(driver.songPointers));
 	check(
-		"SongPointers sits at the end of main.bin",
-		driver.manifest.songPointers === driver.manifest.programPos + 8045,
-		hex(driver.manifest.songPointers),
+		"it is where the manifest says",
+		driver.songPointers === driver.manifest.songPointers,
+		hex(driver.songPointers),
 	);
 	check("MainLoop auto-detected", driver.mainLoopPos === 0x042e, hex(driver.mainLoopPos));
 }
 
-console.log("\ndefault driver: one-slot table appended");
+console.log("\ndefault driver: the embedded table is used as-is");
 const plan = planAram(driver);
 {
-	check("localPos is $236F", plan.localPos === 0x236f, hex(plan.localPos));
-	check("songIndex is 1", plan.songIndex === 1, `${plan.songIndex}`);
-	check("2-byte table appended", plan.appendedTableBytes === 2, `${plan.appendedTableBytes}`);
+	check("localPos is $2996", plan.localPos === 0x2996, hex(plan.localPos));
+	check("songIndex is 9", plan.songIndex === 9, `${plan.songIndex}`);
+	check("nothing appended", plan.appendedTableBytes === 0, `${plan.appendedTableBytes}`);
+	check("plan uses the embedded table", plan.fromEmbeddedTable);
 
 	// Song numbers are 1-based: song N's entry is at songPointers + 2*(N-1).
-	const at = driver.songPointers - driver.programPos;
+	const at = driver.songPointers - driver.programPos + (plan.songIndex - 1) * 2;
 	const entry = plan.programImage[at] | (plan.programImage[at + 1] << 8);
-	check("song table slot 1 points at localPos", entry === plan.localPos, hex(entry));
+	check("the slot songIndex selects points at localPos", entry === plan.localPos, hex(entry));
+
+	// The local song's slot is inside the image — AddmusicK leaves the last song
+	// it compiled sitting there — so the song data overwrites it rather than
+	// following it. Nothing the driver reads lives past localPos.
+	check(
+		"localPos sits inside the image, not past it",
+		plan.localPos < driver.programPos + driver.programData.length,
+		`${hex(plan.localPos)} vs ${hex(driver.programPos + driver.programData.length)}`,
+	);
+}
+
+console.log("\na second-pass build still gets a slot appended");
+{
+	// No upload header, so findSongTable is never consulted and planAram takes
+	// the append branch. `custom` skips the manifest cross-check, which exists to
+	// stop the *bundled* driver being loaded against stale manifest constants.
+	const body = Uint8Array.from(driver.programData);
+	const secondPass = analyzeDriver(body, driver.manifest, true);
+	check("no table detected", secondPass.embedded === null);
+
+	const appended = planAram({ ...driver, ...secondPass });
+	const songPointers = driver.programPos + body.length;
+	check("songPointers is the image end", secondPass.songPointers === songPointers, hex(secondPass.songPointers));
+	check("localPos is one slot past it", appended.localPos === songPointers + 2, hex(appended.localPos));
+	check("songIndex is 1", appended.songIndex === 1, `${appended.songIndex}`);
+	check("2-byte table appended", appended.appendedTableBytes === 2, `${appended.appendedTableBytes}`);
+
+	const at = songPointers - driver.programPos;
+	const entry = appended.programImage[at] | (appended.programImage[at + 1] << 8);
+	check("slot 1 points at localPos", entry === appended.localPos, hex(entry));
 }
 
 console.log("\nsong table survives pointer-like bytes before it");
@@ -162,11 +197,11 @@ console.log("\nsong table survives pointer-like bytes before it");
 	};
 
 	for (const tail of [null, 0x0401, 0x1000, 0x2000, 0x236c] as const) {
-		const found = withCustomProgram(driver, build(tail), "main.bin").embedded;
+		const found = analyzeDriver(build(tail), driver.manifest, true).embedded;
 		check(
 			`table found with tail ${tail === null ? "unchanged" : `$${tail.toString(16).toUpperCase().padStart(4, "0")}`}`,
-			found?.globalSongCount === 9,
-			`${found?.globalSongCount}`,
+			found?.songIndex === 10,
+			`${found?.songIndex}`,
 		);
 	}
 
@@ -199,14 +234,14 @@ console.log("\nsong table survives pointer-like bytes before it");
 		raw[3] = driver.programPos >> 8;
 		raw.set(body, 4);
 
-		const found = withCustomProgram(driver, raw, "main.bin");
+		const found = analyzeDriver(raw, driver.manifest, true);
 		check("table found when the slot overshoots the image end", found.embedded !== null);
 		check(
 			"localPos follows the slot, not the image length",
 			found.embedded?.localPos === slot,
 			hex(found.embedded?.localPos ?? 0),
 		);
-		check("9 globals still detected", found.embedded?.globalSongCount === 9, `${found.embedded?.globalSongCount}`);
+		check("all 10 slots still detected", found.embedded?.songIndex === 10, `${found.embedded?.songIndex}`);
 	}
 
 	// A build with no global songs at all is a one-entry table.
@@ -223,13 +258,9 @@ console.log("\nsong table survives pointer-like bytes before it");
 		raw[2] = driver.programPos & 0xff;
 		raw[3] = driver.programPos >> 8;
 		raw.set(body, 4);
-		return withCustomProgram(driver, raw, "main.bin").embedded;
+		return analyzeDriver(raw, driver.manifest, true).embedded;
 	})();
-	check(
-		"zero-global table is one entry",
-		single?.globalSongCount === 0 && single?.songIndex === 1,
-		`${single?.globalSongCount}`,
-	);
+	check("zero-global table is one entry", single?.songIndex === 1, `${single?.songIndex}`);
 }
 
 console.log("\ncustom driver: a final-pass build is read as-is");
@@ -264,17 +295,23 @@ console.log("\ncustom driver: a final-pass build is read as-is");
 	withHeader[3] = driver.programPos >> 8;
 	withHeader.set(body, 4);
 
-	const custom = withCustomProgram(driver, withHeader, "main.bin");
+	const custom = { ...driver, ...analyzeDriver(withHeader, driver.manifest, true) };
 	check("upload header stripped", custom.programData.length === body.length, `${custom.programData.length}`);
 	check("programPos read from header", custom.programPos === 0x0400, hex(custom.programPos));
 	check("MainLoop still found", custom.mainLoopPos === 0x042e, hex(custom.mainLoopPos));
 	check("song table located", custom.embedded !== null);
-	check("9 global songs detected", custom.embedded?.globalSongCount === 9, `${custom.embedded?.globalSongCount}`);
-	check("song index is 10", custom.embedded?.songIndex === 10, `${custom.embedded?.songIndex}`);
+	check(
+		"song index is 10, the slot after the 9 globals",
+		custom.embedded?.songIndex === 10,
+		`${custom.embedded?.songIndex}`,
+	);
 	check("songPointers located", custom.songPointers === songPointers, hex(custom.songPointers ?? 0));
 
 	const customPlan = planAram(custom);
-	check("localPos is $2A54", customPlan.localPos === 0x2a54, hex(customPlan.localPos));
+	// Derived rather than written out: the base image's size is incidental to
+	// what this checks, and a literal here goes stale the next time main.bin is
+	// rebuilt. The point is that the slot is followed, not what it happens to be.
+	check("localPos is the slot's value", customPlan.localPos === localPos, hex(customPlan.localPos));
 	check("nothing appended", customPlan.appendedTableBytes === 0);
 	check("plan uses the embedded table", customPlan.fromEmbeddedTable);
 
@@ -331,10 +368,11 @@ console.log("\nupload header detection is the size rule alone");
 		);
 	}
 
-	// The stock second-pass driver starts with SPC700 code, not a header.
+	// The shipped main.bin is a final-pass build, so it really does start with
+	// one — 0x2656 bytes at $0400, the worked example above.
 	check(
-		"stock main.bin has no upload header",
-		driver.programData.length === 8045 && driver.programPos === 0x0400,
+		"stock main.bin has an upload header",
+		driver.programData.length === 0x2652 && driver.programPos === 0x0400,
 		`${driver.programData.length}`,
 	);
 
@@ -350,20 +388,25 @@ console.log("\nupload header detection is the size rule alone");
 	check("header that overruns ARAM is rejected", threw);
 }
 
-console.log("\ncustom driver: bad input is rejected");
+console.log("\na nonsense main.bin is diagnosed, not compiled against");
 {
+	// Nothing supplies a driver at runtime any more, so the image that has to be
+	// trusted is the one in public/driver/. An image with no upload header and no
+	// table falls through to the manifest cross-check, which is what stops a bad
+	// swap being loaded against stale constants and quietly relocating every
+	// pointer to the wrong place.
 	for (const [bytes, label] of [
 		[new Uint8Array(8), "too small"],
 		[new Uint8Array(0x10000), "too large for ARAM"],
 	] as const) {
-		let threw = false;
+		let message = "";
 		try {
-			withCustomProgram(driver, bytes, "bad.bin");
-		} catch {
-			threw = true;
+			analyzeDriver(bytes, driver.manifest, false);
+		} catch (error) {
+			message = error instanceof Error ? error.message : String(error);
 		}
 
-		check(`${label} rejected`, threw);
+		check(`${label} rejected`, message.includes("SongPointers"), message || "(no error thrown)");
 	}
 }
 

@@ -24,13 +24,17 @@ const place = (values: number[], options = OPTS) =>
 		options,
 	);
 
-/** driver, song, samples, free, echo — the shape the ARAM budget produces. */
-const REALISTIC = [9069, 700, 21000, 30731, 4096];
+/**
+ * driver, song, samples, free, echo — the shape the ARAM budget produces, summing
+ * to 64 KiB. The driver figure is the shipped `main.bin`'s: it ends at `$2996`,
+ * where the song's slot in its own table starts.
+ */
+const REALISTIC = [10646, 700, 21000, 29094, 4096];
 
 console.log("\nevery region that exists stays visible");
 {
 	for (const songBytes of [1, 120, 218, 700]) {
-		const placed = place([9069, songBytes, 21000, 31431 - songBytes, 4096]);
+		const placed = place([10646, songBytes, 21000, 29794 - songBytes, 4096]);
 		check(
 			`a ${songBytes} byte song is at least ${OPTS.minWidth}px`,
 			placed[1].width >= OPTS.minWidth - EPSILON,
