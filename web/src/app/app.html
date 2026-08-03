@@ -1,7 +1,42 @@
 <amk-update-banner />
 <amk-top-bar />
 
-<main class="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-2">
-  <amk-editor-pane class="border-edge min-h-0 lg:border-r" />
+<!--
+  The seam between the panes is a real grid track, not a border: `--amk-split`
+  carries the live width and the `lg:` utility below is what applies it, so the
+  breakpoint stays Tailwind's business and the stacked layout ignores it.
+-->
+<main
+  #shell
+  class="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[var(--amk-split,50%)_auto_1fr]"
+  [style.--amk-split]="splitCss()"
+  [class.select-none]="dragging()"
+>
+  <amk-editor-pane id="editor-pane" class="min-h-0" />
+
+  <!--
+    Hidden below `lg`, where the panes stack and there is no middle to drag —
+    `display:none` takes it out of the grid entirely, so that layout stays two
+    rows. The line itself stays 1px wide, as the border it replaces was, while
+    `before:-inset-x-1` widens the grab zone to something a pointer can hit.
+  -->
+  <div
+    role="separator"
+    tabindex="0"
+    aria-orientation="vertical"
+    aria-controls="editor-pane"
+    aria-valuemin="50"
+    aria-valuemax="75"
+    aria-label="Resize the editor and output panes"
+    class="bg-edge hover:bg-accent relative hidden w-px cursor-col-resize touch-none before:absolute before:inset-y-0 before:-inset-x-1 before:content-[''] lg:block"
+    [attr.aria-valuenow]="splitNow()"
+    [class.bg-accent]="dragging()"
+    (pointerdown)="onGrab($event)"
+    (pointermove)="onDrag($event)"
+    (pointerup)="onRelease()"
+    (pointercancel)="onRelease()"
+    (dblclick)="split.set(DEFAULT_SPLIT)"
+  ></div>
+
   <amk-output-pane class="border-edge min-h-0 max-lg:border-t" />
 </main>
