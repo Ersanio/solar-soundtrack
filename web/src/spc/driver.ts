@@ -27,8 +27,9 @@ export interface DriverManifest {
 	mainLoopPos: number;
 	/**
 	 * ARAM address of the `SongPointers:` label, which AddmusicK appends the
-	 * song pointer table to. It is the last label in `main.asm`, so it always
-	 * sits at the very end of the driver image.
+	 * song pointer table to. It is the last label in `main.asm`, so in a
+	 * second-pass build with no table it sits at the very end of the image; in a
+	 * final-pass build the table is there and the global songs follow it.
 	 *
 	 * Song numbers are 1-based: the driver reads
 	 * `mov a, SongPointers-$02+y` with `y = songNumber * 2`, so song N's entry
@@ -54,8 +55,6 @@ export interface DriverBundle {
 	dspBase: Uint8Array;
 	samples: BrrSample[];
 
-	/** Where this driver image came from. */
-	source: { name: string; custom: boolean };
 	/** main.bin as it sits in ARAM at `programPos`, upload header stripped. */
 	programData: Uint8Array;
 	programPos: number;
@@ -66,7 +65,7 @@ export interface DriverBundle {
 	 * pointer table and global song data — everything AddmusicK will occupy is
 	 * then physically present, so the ARAM budget is exact.
 	 */
-	embedded: { localPos: number; songIndex: number; globalSongCount: number } | null;
+	embedded: { localPos: number; songIndex: number } | null;
 	/** Human-readable account of what was auto-detected, for the UI. */
 	notes: string[];
 }
@@ -78,8 +77,9 @@ const word = (bytes: Uint8Array, at: number): number => bytes[at] | (bytes[at + 
 /**
  * Everything the SPC writer needs about a `main.bin`, derived from the bytes.
  *
- * A custom driver has its own size, its own `MainLoop:` address and possibly its
- * own song table, so none of the manifest's constants can be assumed. They are
+ * A driver has its own size, its own `MainLoop:` address and possibly its own
+ * song table, so none of the manifest's constants can be assumed — swapping the
+ * bundled image for a different AddmusicK build changes all three. They are
  * recovered here instead, falling back to the manifest only when detection fails.
  */
 export function analyzeDriver(
@@ -91,7 +91,7 @@ export function analyzeDriver(
 	programPos: number;
 	mainLoopPos: number;
 	songPointers: number;
-	embedded: { localPos: number; songIndex: number; globalSongCount: number } | null;
+	embedded: { localPos: number; songIndex: number } | null;
 	notes: string[];
 } {
 	const notes: string[] = [];
@@ -100,7 +100,8 @@ export function analyzeDriver(
 	// address`, written at AddmusicK.cpp:1394-1397 and stripped again at :1453.
 	// `size` is the image length measured before the header was prepended, so
 	// the header is present exactly when the first word equals length - 4.
-	// A 0x2656-byte file therefore starts `52 26` (0x2652 = 0x2656 - 4).
+	// A 0x2656-byte file therefore starts `52 26` (0x2652 = 0x2656 - 4) — which
+	// is exactly what the bundled main.bin is.
 	const declaredSize = word(raw, 0);
 	const declaredAddress = word(raw, 2);
 	const hasUploadHeader = raw.length > 4 && declaredSize === raw.length - 4;
@@ -133,7 +134,7 @@ export function analyzeDriver(
 	const table = hasUploadHeader ? findSongTable(programData, programPos) : null;
 	if (table) {
 		notes.push(
-			`song table at $${hex(table.songPointers)} with ${table.globalSongCount} global song(s); ` +
+			`song table at $${hex(table.songPointers)}; ` +
 				`your song takes slot ${table.songIndex} at $${hex(table.localPos)}`,
 		);
 		// Follow the table, not the image length: the driver jumps wherever this
@@ -143,11 +144,7 @@ export function analyzeDriver(
 			programPos,
 			mainLoopPos,
 			songPointers: table.songPointers,
-			embedded: {
-				localPos: table.localPos,
-				songIndex: table.songIndex,
-				globalSongCount: table.globalSongCount,
-			},
+			embedded: { localPos: table.localPos, songIndex: table.songIndex },
 			notes,
 		};
 	}
@@ -204,14 +201,14 @@ function findMainLoop(programData: Uint8Array, programPos: number): number | nul
 function findSongTable(
 	programData: Uint8Array,
 	programPos: number,
-): { songPointers: number; songIndex: number; globalSongCount: number; localPos: number } | null {
+): { songPointers: number; songIndex: number; localPos: number } | null {
 	const imageEnd = programPos + programData.length;
 
 	// Song numbers go into CPUIO $F6, one byte, so a table cannot usefully hold
 	// more than 256 slots.
 	const MAX_ENTRIES = 256;
 
-	let best: { songPointers: number; songIndex: number; globalSongCount: number; localPos: number } | null = null;
+	let best: { songPointers: number; songIndex: number; localPos: number } | null = null;
 	let bestDistance = Infinity;
 
 	// `start + 1` only: a build with no global songs has a one-entry table.
@@ -261,12 +258,9 @@ function findSongTable(
 
 		if (distance < bestDistance) {
 			bestDistance = distance;
-			best = {
-				songPointers: programPos + start,
-				songIndex: entries,
-				globalSongCount: entries - 1,
-				localPos,
-			};
+			// The last slot is the local song's, so its index is the entry count and
+			// every slot before it is a global song.
+			best = { songPointers: programPos + start, songIndex: entries, localPos };
 		}
 	}
 
@@ -367,39 +361,6 @@ async function load(baseUrl: string, sampleGroup: string): Promise<DriverBundle>
 		spcBase,
 		dspBase,
 		samples: names.map((name, index) => parseBrr(name, sampleBlobs[index])),
-		source: { name: manifest.driver, custom: false },
-		...analysis,
-	};
-}
-
-/**
- * Swaps in a user-supplied main.bin, keeping the base images and samples.
- *
- * A driver from a real AddmusicK install already contains its sound effects,
- * song pointer table and every global song, so the ARAM budget computed against
- * it is exact — no modelling required.
- */
-export function withCustomProgram(bundle: DriverBundle, raw: Uint8Array, name: string): DriverBundle {
-	if (raw.length < 64) {
-		throw new DriverError(`"${name}" is only ${raw.length} bytes — that is not a driver image.`);
-	}
-
-	if (raw.length > ARAM_SIZE - 0x200) {
-		throw new DriverError(`"${name}" is ${raw.length} bytes, which cannot fit in ARAM alongside anything else.`);
-	}
-
-	const analysis = analyzeDriver(raw, bundle.manifest, true);
-
-	if (analysis.programPos + analysis.programData.length >= ARAM_SIZE) {
-		throw new DriverError(`"${name}" would end past the top of ARAM.`);
-	}
-
-	return {
-		manifest: bundle.manifest,
-		spcBase: bundle.spcBase,
-		dspBase: bundle.dspBase,
-		samples: bundle.samples,
-		source: { name, custom: true },
 		...analysis,
 	};
 }

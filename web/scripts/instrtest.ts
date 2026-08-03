@@ -25,6 +25,7 @@ import {
 	FIRST_PERCUSSION_INSTRUMENT as COMPILER_FIRST_PERCUSSION,
 	INSTRUMENT_TO_SAMPLE,
 } from "../src/compiler/tables";
+import { type DriverManifest, analyzeDriver } from "../src/spc/driver";
 import {
 	FIRST_CUSTOM_INSTRUMENT,
 	FIRST_PERCUSSION_INSTRUMENT,
@@ -41,9 +42,17 @@ import {
 import { check, summarise } from "./harness";
 
 const here = dirname(fileURLToPath(import.meta.url));
-const program = new Uint8Array(readFileSync(join(here, "..", "public", "driver", "main.bin")));
-/** `manifest.json`'s `programPos`; where `main.bin` sits in ARAM. */
-const PROGRAM_POS = 1024;
+const driverDir = join(here, "..", "public", "driver");
+const manifest = JSON.parse(readFileSync(join(driverDir, "manifest.json"), "utf8")) as DriverManifest;
+
+// Through `analyzeDriver`, exactly as `DriverStore` does it. main.bin is a
+// final-pass build carrying a 4-byte upload header, and searching the raw file
+// would put every offset four bytes out — the tables would still be found, and
+// every address reported about them would be wrong.
+const analysis = analyzeDriver(new Uint8Array(readFileSync(join(driverDir, "main.bin"))), manifest, false);
+const program = analysis.programData;
+/** Where `main.bin` sits in ARAM, from its own upload header. */
+const PROGRAM_POS = analysis.programPos;
 
 console.log("\nfinding the tables in the shipped driver");
 {

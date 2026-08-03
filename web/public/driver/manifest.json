@@ -1,7 +1,7 @@
 {
-  "//": "Default driver bundle. Users can load their own main.bin at runtime; these values are only the fallback for the bundled one.",
-  "//verified": "programPos, mainLoopPos and songPointers verified against asm/main.asm: base $0400 (line 145), MainLoop/print MainLoopPos (line 184), SongPointers as the final label (line 3636).",
-  "amkVersion": "user build, 2026-07-28",
+  "//": "The driver bundle. main.bin is a final-pass AddmusicK build: it carries its own upload header, song pointer table and global songs, so analyzeDriver derives all three values below from the bytes and never reads them. They are the fallback for a build it cannot make sense of.",
+  "//verified": "Originally verified against asm/main.asm: base $0400 (line 145), MainLoop/print MainLoopPos (line 184), SongPointers as the final label (line 3636). SongPointers is no longer the end of the image — the table sits at $236D with 8 global songs after it — but $236D is still where it is.",
+  "amkVersion": "final-pass build, 2026-08-03",
   "driver": "main.bin",
   "spcBase": "SPCBase.bin",
   "dspBase": "SPCDSPBase.bin",

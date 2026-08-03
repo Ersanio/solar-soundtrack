@@ -1,10 +1,8 @@
 import { Component, computed, inject } from '@angular/core';
 
-import { DriverStore } from '../../state/driver-store';
 import { EditorStore } from '../../state/editor-store';
 import { hex4 } from '../../util/format';
 import { AramBar, type Group, type Segment } from '../aram-bar/aram-bar';
-import { DriverPicker } from '../driver-picker/driver-picker';
 
 /** A budget row as the table renders it: a bar segment plus its text columns. */
 interface TableRow extends Segment {
@@ -15,12 +13,11 @@ interface TableRow extends Segment {
 
 @Component({
   selector: 'amk-aram-budget',
-  imports: [DriverPicker, AramBar],
+  imports: [AramBar],
   templateUrl: './aram-budget.html',
 })
 export class AramBudget {
   protected readonly store = inject(EditorStore);
-  private readonly drivers = inject(DriverStore);
 
   /**
    * Legend swatches. The bar itself fills via `fill-seg-*` inside the SVG; these
@@ -71,13 +68,6 @@ export class AramBudget {
 
   protected readonly notes = computed(() => {
     const notes: string[] = [];
-    if (this.drivers.plan()?.fromEmbeddedTable === false) {
-      notes.push(
-        'This driver has no song table of its own, so nothing is set aside for global songs — ' +
-          'a real install will have less room than shown. Load your own main.bin for exact figures.',
-      );
-    }
-
     if (this.overflowing()) {
       notes.push(
         'This will not fit in ARAM. Reduce samples, shorten the song, or lower the echo buffer.',

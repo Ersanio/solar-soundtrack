@@ -31,14 +31,6 @@
   </ul>
 }
 
-@if (customDriver()) {
-  <p class="border-edge text-ink-muted border-b px-3 py-2 text-xs leading-relaxed">
-    A custom <code class="text-ink font-mono">main.bin</code> is loaded. Instruments
-    <code class="text-ink font-mono">&#64;0</code>–<code class="text-ink font-mono">&#64;29</code>
-    are resolved by the driver's own table, so they may not map to the samples listed here.
-  </p>
-}
-
 <ul class="divide-edge min-h-0 flex-1 divide-y overflow-auto">
   @for (row of rows(); track row.file.name) {
     @let file = row.file;

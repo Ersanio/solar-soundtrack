@@ -3,12 +3,15 @@
  *
  * Everything AddmusicK occupies before your song — the driver, its sound
  * effects, the song pointer table and every global song — lives inside
- * `main.bin`. So the budget needs no modelling: load the driver from the install
- * you are targeting and the numbers are exact by construction.
+ * `main.bin`. So the budget needs no modelling: the numbers are exact by
+ * construction, because the bytes that would need modelling are physically
+ * present in the image.
  *
- * The bundled driver is a second-pass build with no song table, so for that one
- * we append a single-slot table. Load your own `asm/SNES/bin/main.bin` to see
- * the real figures.
+ * The bundled `main.bin` is a final-pass build, so that is the case here. A
+ * second-pass build carries no song table — `SongPointers:` is the last label in
+ * `main.asm`, so the table would begin exactly where the image ends — and for
+ * one of those {@link planAram} appends a single slot and the figures understate
+ * what a real install occupies.
  */
 
 import type { BrrSample, DriverBundle } from "./driver";
@@ -193,16 +196,6 @@ export function computeBudget(
 	/** Directory entries that actually carry data, i.e. were not emptied. */
 	const loaded = samples.reduce((count, sample) => (sample.data.length > 0 ? count + 1 : count), 0);
 
-	// Everything below the song is one line item, because it is one file — its
-	// zero-page variables included. The detail names only what we can actually
-	// verify from the bytes — whether the image carries its own song table and
-	// global songs — since that is what decides whether this figure matches a
-	// real install. Sound effects are in there too, but nothing here confirms it
-	// (a !noSFX build has none).
-	const driverDetail = driver.embedded
-		? `song table + ${driver.embedded.globalSongCount} global song(s) included`
-		: "song table appended; no global songs";
-
 	// Directory entries and actual samples are not the same number once
 	// optimisation has emptied the unplayed ones. Reporting only the entry count
 	// reads as "the whole default set is loaded" no matter what was really
@@ -213,7 +206,22 @@ export function computeBudget(
 			: `${loaded} of ${samples.length} loaded`;
 
 	const rows: BudgetRow[] = [
-		{ key: "driver", label: "SPC-700 engine", detail: driverDetail, start: 0, bytes: layout.programEnd },
+		{
+			// Everything below the song is one line item, because it is one file —
+			// the driver, its zero-page variables, its sound effects, the song
+			// pointer table and every global song.
+			//
+			// Up to the song, not to the end of the image. In a final-pass build the
+			// local song's slot is *inside* the image — AddmusicK leaves the last
+			// song it compiled sitting there — so `programEnd` runs past `songPos`
+			// and the two rows would double-count the difference. Everything from
+			// `localPos` up belongs to the song, whatever is currently in it. With
+			// an appended table the two are equal, so this is the same figure there.
+			key: "driver",
+			label: "SPC-700 engine",
+			start: 0,
+			bytes: layout.songPos,
+		},
 		{ key: "song", label: "your song", start: layout.songPos, bytes: songBytes },
 		{
 			// Song end rather than sampleDataPos: the directory must start on a page
