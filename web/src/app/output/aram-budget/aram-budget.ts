@@ -1,6 +1,5 @@
 import { Component, computed, inject } from '@angular/core';
 
-import { DriverStore } from '../../state/driver-store';
 import { EditorStore } from '../../state/editor-store';
 import { hex4 } from '../../util/format';
 import { AramBar, type Group, type Segment } from '../aram-bar/aram-bar';
@@ -19,7 +18,6 @@ interface TableRow extends Segment {
 })
 export class AramBudget {
   protected readonly store = inject(EditorStore);
-  private readonly drivers = inject(DriverStore);
 
   /**
    * Legend swatches. The bar itself fills via `fill-seg-*` inside the SVG; these
@@ -67,18 +65,6 @@ export class AramBudget {
   );
 
   protected readonly overflowing = computed(() => (this.store.budget()?.overflowBytes ?? 0) > 0);
-
-  /**
-   * The song's load address, which is the driver's local-song slot.
-   *
-   * In the header rather than the table because it is a property of the driver
-   * and is worth reading even when nothing compiles — the table's `your song`
-   * row only exists once there is a song.
-   */
-  protected readonly loadAddress = computed(() => {
-    const plan = this.drivers.plan();
-    return plan ? `$${hex4(plan.localPos)}` : '—';
-  });
 
   protected readonly notes = computed(() => {
     const notes: string[] = [];
