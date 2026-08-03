@@ -5,6 +5,7 @@ import { commandAt, tokenize } from '@compiler/tokens';
 import type { CompileResult, Diagnostic, Span } from '@core/types';
 import { buildSpc, spcFilename } from '@spc/export';
 import { ARAM_SIZE, type AramBudget, computeBudget } from '@spc/layout';
+import { echoHazards } from '../util/echo-hazards';
 import { caretPosition, downloadBlob, errorMessage } from '../util/format';
 import { DriverStore } from './driver-store';
 import { SampleStore } from './sample-store';
@@ -107,12 +108,20 @@ export class EditorStore {
   readonly result = computed<CompileResult | null>(() => this.compilation()?.result ?? null);
   readonly aramAddress = computed(() => this.compilation()?.aramAddress ?? null);
 
-  /** Errors first, then by position — the order you want to fix them in. */
+  /**
+   * Errors first, then by position — the order you want to fix them in.
+   *
+   * Two sources, running at different speeds on purpose. The compiler's come off `committed` and so
+   * lag by the typing debounce; the echo hazards are scanned from {@link tokens}, which does not,
+   * so a runaway echo is reported by the keystroke or paste that writes it and stays live even with
+   * auto-compile switched off. A warning about what the song will do the moment you press play is
+   * not worth holding back 150 ms, and the compiler could not produce it anyway — `$F5` never
+   * reaches it.
+   */
   readonly diagnostics = computed<Diagnostic[]>(() => {
-    const order = { error: 0, warning: 1, info: 2 } as const;
-    return [...(this.result()?.diagnostics ?? [])].sort(
-      (a, b) => order[a.severity] - order[b.severity] || a.span.start - b.span.start,
-    );
+    const order = { error: 0, severe: 1, warning: 2, info: 3 } as const;
+    const all = [...(this.result()?.diagnostics ?? []), ...echoHazards(this.tokens().commands)];
+    return all.sort((a, b) => order[a.severity] - order[b.severity] || a.span.start - b.span.start);
   });
 
   readonly errorCount = computed(

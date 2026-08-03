@@ -5,7 +5,16 @@
  * rendered — so they live here rather than inside `compiler/`.
  */
 
-export type Severity = "error" | "warning" | "info";
+/**
+ * How badly a diagnostic wants attention, worst first — the order the UI sorts by.
+ *
+ * `"severe"` sits below `"error"` because the song still compiles and still exports; it is for the
+ * things that go wrong when the song *plays*, which no amount of reading the bytes would reveal. A
+ * runaway echo is the case it exists for.
+ *
+ * `"info"` is declared and never produced. Nothing emits one yet.
+ */
+export type Severity = "error" | "severe" | "warning" | "info";
 
 /** A half-open byte range `[start, end)` into the *source text*. */
 export interface Span {
