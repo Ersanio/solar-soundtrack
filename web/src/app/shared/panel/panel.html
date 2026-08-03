@@ -1,9 +1,9 @@
 <div
-    class="border-edge bg-raised flex shrink-0 items-center justify-between gap-3 border-b px-3 py-2"
+  class="border-edge bg-raised flex shrink-0 items-center justify-between gap-3 border-b px-3 py-2"
 >
-    <h2 class="text-ink-muted text-xs font-semibold tracking-wide uppercase">{{ heading() }}</h2>
-    <ng-content select="[panelAside]" />
+  <h2 class="text-ink-muted text-xs font-semibold tracking-wide uppercase">{{ heading() }}</h2>
+  <ng-content select="[panelAside]" />
 </div>
 <div class="min-h-0 flex-1 overflow-auto">
-    <ng-content />
+  <ng-content />
 </div>

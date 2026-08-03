@@ -1,28 +1,28 @@
 @if (command().args.length === 0) {
-    <p class="text-ink-muted text-xs">This command takes no arguments.</p>
+  <p class="text-ink-muted text-xs">This command takes no arguments.</p>
 } @else {
-    <table class="w-full border-collapse text-xs">
+  <table class="w-full border-collapse text-xs">
     <thead>
-        <tr class="text-ink-muted text-[11px] tracking-wide uppercase">
+      <tr class="text-ink-muted text-[11px] tracking-wide uppercase">
         <th scope="col" class="py-1 text-left font-semibold">Arg</th>
         <th scope="col" class="py-1 text-right font-semibold">Hex</th>
         <th scope="col" class="py-1 text-right font-semibold">Dec</th>
         <th scope="col" class="py-1 text-right font-semibold">Signed</th>
         <th scope="col" class="py-1 text-right font-semibold">Binary</th>
-        </tr>
+      </tr>
     </thead>
     <tbody class="font-mono tabular-nums">
-        @for (row of rows(); track row.index) {
+      @for (row of rows(); track row.index) {
         <tr class="border-edge/60 border-t">
-            <td class="text-ink-muted py-1">{{ row.index }}</td>
-            <td class="py-1 text-right">{{ row.hex }}</td>
-            <td class="py-1 text-right">{{ row.decimal }}</td>
-            <td class="py-1 text-right" [class.text-ink-muted]="row.signed === row.decimal">
+          <td class="text-ink-muted py-1">{{ row.index }}</td>
+          <td class="py-1 text-right">{{ row.hex }}</td>
+          <td class="py-1 text-right">{{ row.decimal }}</td>
+          <td class="py-1 text-right" [class.text-ink-muted]="row.signed === row.decimal">
             {{ row.signed }}
-            </td>
-            <td class="text-ink-muted py-1 text-right">{{ row.binary }}</td>
+          </td>
+          <td class="text-ink-muted py-1 text-right">{{ row.binary }}</td>
         </tr>
-        }
+      }
     </tbody>
-    </table>
+  </table>
 }

@@ -1,5 +1,5 @@
 <figure class="m-0">
-    <svg
+  <svg
     preserveAspectRatio="none"
     class="bg-inset border-edge h-32 w-full rounded-sm border"
     role="img"
@@ -7,77 +7,77 @@
     [class.cursor-crosshair]="drawable()"
     [attr.aria-label]="description()"
     (pointerdown)="drawable() && onPick($event)"
-    >
+  >
     <!-- Where eight taps at 32 kHz have no real say. Drawn first, so
             everything else sits on top of it. -->
     <rect
-        x="0"
-        y="0"
-        class="fill-ink-muted/15"
-        [attr.width]="authorityWidth()"
-        [attr.height]="VIEW_H"
+      x="0"
+      y="0"
+      class="fill-ink-muted/15"
+      [attr.width]="authorityWidth()"
+      [attr.height]="VIEW_H"
     />
 
     @for (line of gridLines(); track line.hz) {
-        <line
+      <line
         y1="0"
         class="stroke-edge"
         stroke-width="0.5"
         [attr.x1]="line.x"
         [attr.x2]="line.x"
         [attr.y2]="VIEW_H"
-        />
+      />
     }
 
     <!-- Unity, so "louder or quieter than what went in" reads at a glance. -->
     <line
-        x1="0"
-        class="stroke-edge"
-        stroke-width="1"
-        stroke-dasharray="3 3"
-        [attr.x2]="VIEW_W"
-        [attr.y1]="unityY()"
-        [attr.y2]="unityY()"
+      x1="0"
+      class="stroke-edge"
+      stroke-width="1"
+      stroke-dasharray="3 3"
+      [attr.x2]="VIEW_W"
+      [attr.y1]="unityY()"
+      [attr.y2]="unityY()"
     />
 
     @if (runawayBand(); as band) {
-        <rect
+      <rect
         y="0"
         class="fill-danger/20"
         [attr.x]="band.x"
         [attr.width]="band.width"
         [attr.height]="VIEW_H"
-        />
+      />
     }
 
     <!-- Successive echo repeats, fading back. The filter is inside the
             feedback loop, so this is the tail getting darker pass by pass. -->
     @for (ghost of repeatPaths(); track ghost.pass) {
-        <path
+      <path
         fill="none"
         class="stroke-accent"
         stroke-width="1"
         [attr.d]="ghost.d"
         [attr.stroke-opacity]="ghost.opacity"
-        />
+      />
     }
 
     @if (targetPath(); as target) {
-        <path
+      <path
         fill="none"
         class="stroke-warn"
         stroke-width="1.5"
         stroke-dasharray="4 3"
         [attr.d]="target"
-        />
+      />
     }
 
     <path fill="none" class="stroke-accent" stroke-width="2" [attr.d]="responsePath()" />
-    </svg>
+  </svg>
 
-    <figcaption class="text-ink-muted mt-1 flex justify-between font-mono text-[10px]">
+  <figcaption class="text-ink-muted mt-1 flex justify-between font-mono text-[10px]">
     @for (line of gridLines(); track line.hz) {
-        <span>{{ line.label }}</span>
+      <span>{{ line.label }}</span>
     }
-    </figcaption>
+  </figcaption>
 </figure>

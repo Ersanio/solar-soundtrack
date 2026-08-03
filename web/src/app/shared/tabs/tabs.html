@@ -1,5 +1,5 @@
 @for (tab of tabs(); track tab.id) {
-    <button
+  <button
     #tabButton
     type="button"
     role="tab"
@@ -10,7 +10,7 @@
     [class]="buttonClass(tab.id === active())"
     (click)="active.set(tab.id)"
     (keydown)="onKeydown($event, $index)"
-    >
+  >
     {{ tab.label }}
-    </button>
+  </button>
 }
