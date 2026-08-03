@@ -19,9 +19,6 @@ const MIN_SPLIT = 25;
 const MAX_SPLIT = 75;
 const DEFAULT_SPLIT = 50;
 
-/** How far one arrow key moves the seam, in percentage points. */
-const KEY_STEP = 1;
-
 function clampSplit(value: number): number {
   return Math.min(MAX_SPLIT, Math.max(MIN_SPLIT, value));
 }
@@ -115,29 +112,5 @@ export class App {
     // only the drag state to drop.
     this.track = null;
     this.dragging.set(false);
-  }
-
-  protected onKeydown(event: KeyboardEvent): void {
-    let next: number;
-
-    switch (event.key) {
-      case 'ArrowLeft':
-        next = this.split() - KEY_STEP;
-        break;
-      case 'ArrowRight':
-        next = this.split() + KEY_STEP;
-        break;
-      case 'Home':
-        next = MIN_SPLIT;
-        break;
-      case 'End':
-        next = MAX_SPLIT;
-        break;
-      default:
-        return;
-    }
-
-    event.preventDefault();
-    this.split.set(clampSplit(next));
   }
 }
