@@ -68,8 +68,7 @@ export class StatsGrid {
       { label: 'Intro', value: stats.hasIntro ? 'yes' : 'no', dim: !stats.hasIntro },
     ];
 
-    // A channel with no data gets no tile at all — eight permanent placeholders
-    // said nothing, and the grid reflows as channels come into use.
+    // Only show the channels practically in use
     for (let channel = 0; channel < 8; channel++) {
       const size = stats.channelSizes[channel] ?? 0;
       if (size === 0) {

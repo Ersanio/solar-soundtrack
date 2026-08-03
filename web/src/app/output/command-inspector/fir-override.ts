@@ -1,5 +1,7 @@
 import type { Command } from '@compiler/tokens';
 
+// TODO: should this stay in its own file?
+
 /**
  * The `$F1`/`$F5` override, looked at from either end.
  *

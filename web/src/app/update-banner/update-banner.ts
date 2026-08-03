@@ -4,10 +4,11 @@ import { SwUpdate, type VersionReadyEvent } from '@angular/service-worker';
 import { filter } from 'rxjs';
 
 import { Button } from '../shared/button/button';
+import { IconClose } from '../shared/icons/icon-close';
 
 @Component({
   selector: 'amk-update-banner',
-  imports: [Button],
+  imports: [Button, IconClose],
   templateUrl: './update-banner.html',
 })
 export class UpdateBanner {

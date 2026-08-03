@@ -6,10 +6,8 @@
     }
   </div>
 
-  <!-- Bound to a @let so the template type-checker can narrow it: `@default
-       never` needs a reference, not a call it has to assume varies. -->
-  @let current = tab();
-  @switch (current) {
+  @let currentTab = tab();
+  @switch (currentTab) {
     @case ('source') {
       <div id="panel-source" role="tabpanel" aria-labelledby="tab-source" class="h-full">
         <textarea

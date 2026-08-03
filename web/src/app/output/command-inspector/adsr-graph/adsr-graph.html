@@ -1,0 +1,49 @@
+<figure class="m-0">
+    <svg
+    preserveAspectRatio="none"
+    class="bg-inset border-edge h-24 w-full rounded-sm border"
+    role="img"
+    [attr.viewBox]="VIEW_BOX"
+    [attr.aria-label]="description()"
+    >
+    <!-- Full level, so a GAIN that never reaches it reads as not reaching it. -->
+    <line
+        x1="0"
+        y1="2"
+        y2="2"
+        class="stroke-edge"
+        stroke-width="0.5"
+        stroke-dasharray="3 3"
+        [attr.x2]="VIEW_W"
+    />
+
+    @if (sustainY(); as y) {
+        <line
+        x1="0"
+        class="stroke-edge"
+        stroke-width="0.5"
+        [attr.x2]="VIEW_W"
+        [attr.y1]="y"
+        [attr.y2]="y"
+        />
+    }
+
+    @for (mark of phaseMarks(); track mark.label) {
+        <line
+        y1="0"
+        class="stroke-edge"
+        stroke-width="0.5"
+        [attr.x1]="mark.x"
+        [attr.x2]="mark.x"
+        [attr.y2]="VIEW_H"
+        />
+    }
+
+    <path fill="none" class="stroke-accent" stroke-width="2" [attr.d]="path()" />
+    </svg>
+
+    <figcaption class="text-ink-muted mt-1 flex justify-between font-mono text-[10px]">
+    <span>0</span>
+    <span>{{ durationLabel() }}</span>
+    </figcaption>
+</figure>

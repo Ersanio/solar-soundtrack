@@ -19,24 +19,8 @@ export interface DetailRow {
  */
 @Component({
   selector: 'amk-detail-table',
+  templateUrl: './detail-table.html',
   host: { class: 'block' },
-  template: `
-    <table class="w-full border-collapse text-xs">
-      <tbody>
-        @for (row of rows(); track row.label) {
-          <tr class="border-edge/60 border-t first:border-t-0">
-            <td class="text-ink-muted py-1 pr-3 whitespace-nowrap">{{ row.label }}</td>
-            <td class="py-1 font-mono tabular-nums">
-              {{ row.value }}
-              @if (row.note) {
-                <span class="text-ink-muted block font-sans text-[11px]">{{ row.note }}</span>
-              }
-            </td>
-          </tr>
-        }
-      </tbody>
-    </table>
-  `,
 })
 export class DetailTable {
   readonly rows = input.required<readonly DetailRow[]>();

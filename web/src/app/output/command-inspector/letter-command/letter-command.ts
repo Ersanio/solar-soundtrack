@@ -14,16 +14,8 @@ import { type DetailRow, DetailTable } from '../../../shared/detail-table/detail
 @Component({
   selector: 'amk-letter-command',
   imports: [DetailTable],
+  templateUrl: './letter-command.html',
   host: { class: 'block' },
-  template: `
-    @if (readout(); as lines) {
-      <amk-detail-table [rows]="lines" />
-    } @else {
-      <p class="text-ink-muted text-xs">
-        No argument given, so this uses whatever is currently in effect.
-      </p>
-    }
-  `,
 })
 export class LetterCommand {
   readonly command = input.required<Command>();

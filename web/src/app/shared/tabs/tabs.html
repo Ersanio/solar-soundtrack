@@ -1,0 +1,16 @@
+@for (tab of tabs(); track tab.id) {
+    <button
+    #tabButton
+    type="button"
+    role="tab"
+    [id]="`tab-${tab.id}`"
+    [attr.aria-selected]="tab.id === active()"
+    [attr.aria-controls]="`panel-${tab.id}`"
+    [tabindex]="tab.id === active() ? 0 : -1"
+    [class]="buttonClass(tab.id === active())"
+    (click)="active.set(tab.id)"
+    (keydown)="onKeydown($event, $index)"
+    >
+    {{ tab.label }}
+    </button>
+}

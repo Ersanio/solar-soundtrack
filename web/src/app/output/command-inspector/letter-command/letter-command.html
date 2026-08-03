@@ -1,0 +1,7 @@
+@if (readout(); as lines) {
+    <amk-detail-table [rows]="lines" />
+} @else {
+    <p class="text-ink-muted text-xs">
+    No argument given, so this uses whatever is currently in effect.
+    </p>
+}

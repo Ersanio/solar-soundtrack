@@ -9,7 +9,7 @@ import { EditorStore } from './editor-store';
 
 /** N-SPC songs have eight music channels. */
 const CHANNELS = 8;
-const ALL_CHANNELS = 0xff;
+const ALL_CHANNELS = 0b11111111;
 
 export interface ChannelState {
   index: number;

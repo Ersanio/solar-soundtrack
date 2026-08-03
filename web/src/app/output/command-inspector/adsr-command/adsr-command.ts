@@ -26,29 +26,8 @@ import { type DetailRow, DetailTable } from '../../../shared/detail-table/detail
 @Component({
   selector: 'amk-adsr-command',
   imports: [AdsrGraph, DetailTable],
+  templateUrl: './adsr-command.html',
   host: { class: 'block' },
-  template: `
-    @if (args().length < 2) {
-      <p class="text-ink-muted text-xs leading-relaxed">
-        Needs two arguments: either <code class="text-ink">$80</code> and a GAIN value, or an ADSR
-        pair.
-      </p>
-    } @else {
-      <div class="space-y-3">
-        <amk-detail-table [rows]="rows()" />
-
-        <div>
-          <div class="text-ink-muted mb-1 text-[11px] tracking-wide uppercase">Envelope</div>
-          <amk-adsr-graph [adsr1]="adsr1()" [adsr2]="adsr2()" [gain]="gain()" />
-        </div>
-
-        <p class="text-ink-muted text-xs leading-relaxed">
-          This overrides the current instrument's own envelope until the next
-          <code class="text-ink">&#64;</code> resets it.
-        </p>
-      </div>
-    }
-  `,
 })
 export class AdsrCommand {
   readonly command = input.required<Command>();
