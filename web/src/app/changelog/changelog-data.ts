@@ -27,7 +27,10 @@ export const CHANGELOG: readonly ChangelogEntry[] = [
   // ─── newest first; add new blocks here ──────────────────────────────────
   {
     date: '4 August 2026',
-    items: ['Syntax highlighting, with line numbers'],
+    items: [
+      'Syntax highlighting, with line numbers',
+      'Errors and warnings underlined in the source',
+    ],
   },
   {
     date: '3 August 2026',
