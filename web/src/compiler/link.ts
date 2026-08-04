@@ -11,14 +11,16 @@
  * step-for-step against each other.
  */
 
-import type { Diagnostic } from "../core/types";
-import type { ParseOutput } from "./parser";
+import type { Diagnostic, NoteAddress } from "../core/types";
+import type { NoteEvent, ParseOutput } from "./parser";
 
 export interface LinkResult {
 	data: Uint8Array;
 	headerSize: number;
 	channelSizes: number[];
 	loopDataSize: number;
+	/** The parser's note events with their offsets relocated to ARAM addresses, sorted by address. */
+	noteMap: NoteAddress[];
 	diagnostics: Diagnostic[];
 }
 
@@ -34,8 +36,9 @@ export function link(parsed: ParseOutput, aramAddress: number): LinkResult {
 	const data = parsed.data.map((channel) => [...channel]);
 	const loopLocations = parsed.loopLocations.map((locations) => [...locations]);
 	const phrasePointers = parsed.phrasePointers.map((pair) => [...pair]);
+	const noteEvents = parsed.noteEvents.map((event) => ({ ...event }));
 
-	prependBlobPrefix(parsed, data, loopLocations, phrasePointers);
+	prependBlobPrefix(parsed, data, loopLocations, phrasePointers, noteEvents);
 
 	// Lay the channels out end to end and record where each one starts.
 	let offset = 0;
@@ -60,6 +63,27 @@ export function link(parsed: ParseOutput, aramAddress: number): LinkResult {
 		blob.push(...data[channel]);
 	}
 
+	// Where each channel starts within the data area, off the *final* channel
+	// lengths — `phrasePointers[ch][0]` is only written for non-empty channels.
+	// The loop block is channel 8 and sits after the eight music channels, so
+	// one cumulative pass covers it too, matching `relocateLoopPointers`.
+	const channelStart: number[] = [];
+	{
+		let start = 0;
+		for (let channel = 0; channel < 9; channel++) {
+			channelStart[channel] = start;
+			start += data[channel].length;
+		}
+	}
+
+	const noteMap: NoteAddress[] = noteEvents
+		.map((event) => ({
+			channel: event.channel,
+			address: aramAddress + header.length + channelStart[event.channel] + event.offset,
+			span: event.span,
+		}))
+		.sort((a, b) => a.address - b.address);
+
 	const end = aramAddress + blob.length;
 	if (end > 0x10000) {
 		diagnostics.push({
@@ -75,6 +99,7 @@ export function link(parsed: ParseOutput, aramAddress: number): LinkResult {
 		headerSize: header.length,
 		channelSizes: data.slice(0, 8).map((channel) => channel.length),
 		loopDataSize: data[8].length,
+		noteMap,
 		diagnostics,
 	};
 }
@@ -89,6 +114,7 @@ function prependBlobPrefix(
 	data: number[][],
 	loopLocations: number[][],
 	phrasePointers: number[][],
+	noteEvents: NoteEvent[],
 ): void {
 	const channel = parsed.resizedChannel;
 	if (channel === -1) {
@@ -118,6 +144,9 @@ function prependBlobPrefix(
 
 	const echoInline = parsed.echoBufferSize > 0 || !parsed.echoBufferAllocVCMDIsSet || parsed.hasEchoBufferCommand;
 
+	let spliceTarget = -1;
+	let spliceAt = 0;
+
 	if (echoInline) {
 		data[channel].unshift(0xfa, 0x04, parsed.echoBufferSize);
 		shift += 3;
@@ -127,6 +156,8 @@ function prependBlobPrefix(
 		const target = parsed.echoBufferAllocVCMDChannel;
 		const at = parsed.echoBufferAllocVCMDLoc + 3;
 		data[target].splice(at, 0, 0xfa, 0x04, parsed.echoBufferSize);
+		spliceTarget = target;
+		spliceAt = at;
 		for (let n = 0; n < loopLocations[target].length; n++) {
 			loopLocations[target][n] += 3;
 		}
@@ -141,6 +172,23 @@ function prependBlobPrefix(
 
 	phrasePointers[channel][0] += shift;
 	phrasePointers[channel][1] += shift;
+
+	// Mirror onto the note events what the operations above did to the bytes:
+	// the unshifts move everything on the resized channel, and the hot-patch
+	// splice moves whatever sat at or past it. The unshift is applied first so
+	// the splice comparison happens in the coordinates of the buffer the splice
+	// actually ran on. Unlike `loopLocations[target]`, which shifts
+	// unconditionally because no loop call can precede the hot-patch VCMD, a
+	// note can — hence the `>=` rather than a blanket shift.
+	for (const event of noteEvents) {
+		if (event.channel === channel) {
+			event.offset += shift;
+		}
+
+		if (event.channel === spliceTarget && event.offset >= spliceAt) {
+			event.offset += 3;
+		}
+	}
 }
 
 /** Music.cpp:3110-3200. */

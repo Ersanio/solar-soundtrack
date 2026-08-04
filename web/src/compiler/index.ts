@@ -114,7 +114,7 @@ export class AddmusicKCompiler {
 			return failure(diagnostics, stats, sampleList);
 		}
 
-		return { ok: true, data: linked.data, sampleList, diagnostics, stats };
+		return { ok: true, data: linked.data, noteMap: linked.noteMap, sampleList, diagnostics, stats };
 	}
 }
 
