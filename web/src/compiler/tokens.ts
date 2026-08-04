@@ -65,6 +65,7 @@ import {
 	HEX_LENGTHS,
 	INSTRUMENT_TO_SAMPLE,
 	LAST_VCMD,
+	TICKS_PER_WHOLE,
 	VCMD_NAMES,
 } from "./tables";
 
@@ -472,6 +473,13 @@ const isWordChar = (c: string): boolean => isAlpha(c) || isDigit(c) || c === "_"
  * {@link ScanState.directiveWord} so the word is not scanned as music.
  */
 const WORD_ARG_DIRECTIVES = new Set(["#option", "#define", "#undef", "#ifdef", "#ifndef", "#if"]);
+
+/**
+ * The three directives followed by a `{ }` block (`parser.ts:823-856`). Their
+ * brace is consumed by `parseBlock` and never reaches `parseTripletOpen`, so
+ * `gather` has to tell it apart from a triplet's.
+ */
+const BLOCK_DIRECTIVES = new Set(["#spc", "#samples", "#instruments"]);
 
 /** Notes, rests and ties — the `parser.ts:437-439` arm of the dispatch. */
 const isNoteLetter = (c: string): boolean =>
@@ -1040,6 +1048,38 @@ export interface Token {
 	line: number;
 }
 
+/**
+ * One length segment of a note or rest — the initial one, then one more per
+ * `^` tie. Mirrors `accumulateTiedLength` (`parser.ts:2794`), which plays
+ * every segment as part of one continuous note rather than a fresh one.
+ */
+export interface NoteLengthSegment {
+	/** Resolved ticks this segment contributes, its own dots already folded in. */
+	ticks: number;
+	/**
+	 * Dots that lengthened this segment. Written after its digits, but counted
+	 * as the parser counts them, so Addmusic 4.05's two-dot ceiling
+	 * (`Music.cpp:2960`) shows here as well as in {@link ticks}.
+	 */
+	dots: number;
+	/**
+	 * No digits were written for this segment, so {@link ticks} came from
+	 * whatever length was already in effect — the song's last `l`, or
+	 * AddmusicK's own default before any (`parser.ts:198`).
+	 */
+	implicit: boolean;
+	/** `true` for `=NN` — an exact tick count rather than a whole-note denominator (`parser.ts:610-621`). */
+	exact: boolean;
+	/**
+	 * This segment was written inside a `{ }` triplet, so {@link ticks} is its
+	 * written length scaled by two thirds (`parser.ts:661-667`) — the number the
+	 * driver plays, not the one on the page.
+	 */
+	triplet: boolean;
+	/** The denominator or exact count as written, digits only — `""` when {@link implicit}. */
+	written: string;
+}
+
 /** A command with its arguments gathered: `$F5 $7F …`, or `t144`. */
 export interface Command {
 	/** `"hex"` for a `$XX` run, otherwise the letter — `"t"`, `"@"`, `"v"`. */
@@ -1088,6 +1128,15 @@ export interface Command {
 	 * rather than re-deriving the marker rules.
 	 */
 	target: CommandTarget;
+	/**
+	 * For a note or rest (`name` is `"note"`/`"rest"`): every length segment in
+	 * source order. `undefined` for every other command.
+	 *
+	 * Repeated bare `r`s are not folded together the way `accumulateTiedLength`
+	 * does for rests (`parser.ts:2802`) — only explicit `^` ties are, a
+	 * deliberate, narrower approximation.
+	 */
+	noteLength?: NoteLengthSegment[];
 }
 
 /** Where a custom instrument's sample byte came from. */
@@ -1340,6 +1389,197 @@ function gatherInstruments(tokens: GatherToken[], text: string): InstrumentDefin
 	return out;
 }
 
+/** `scanNumber` always writes dots straight after the digits, so splitting off a trailing run always finds the right boundary. */
+function splitLengthText(raw: string): { digits: string; dots: number } {
+	let end = raw.length;
+	while (end > 0 && raw[end - 1] === ".") {
+		end--;
+	}
+
+	return { digits: raw.slice(0, end), dots: raw.length - end };
+}
+
+/** Music.cpp:2960 — Addmusic 4.05 stops adding dots after the second, so the rest are written but never heard. */
+function dotsApplied(dots: number, target: CommandTarget): number {
+	return target.program === 1 ? Math.min(dots, 2) : dots;
+}
+
+/**
+ * The dot half of `getNoteLengthModifier` (`parser.ts:639-659`). `dots` has
+ * already been through {@link dotsApplied}.
+ */
+function applyDots(ticks: number, dots: number): number {
+	let frac = ticks;
+	let total = ticks;
+	for (let i = 0; i < dots; i++) {
+		frac = Math.floor(frac / 2);
+		total += frac;
+	}
+
+	return total;
+}
+
+/**
+ * The triplet half (`parser.ts:661-667`), which runs after the dots: two thirds,
+ * rounded half up. `l` never reaches it — `parseDefaultLength` is the one caller
+ * that passes `allowTriplet: false` (`parser.ts:1549`).
+ */
+function applyTriplet(ticks: number, triplet: boolean): number {
+	return triplet ? Math.floor((ticks * 2) / 3 + 0.5) : ticks;
+}
+
+/**
+ * One length segment of a note or a rest — `getNoteLength`
+ * (`parser.ts:607-637`). `raw` is the segment's number-token text, `""` when
+ * it wrote no digits of its own; `defaultTicks` is the `l` length currently in
+ * effect, `triplet` whether a `{ }` block is open, and `target` picks the same
+ * forks {@link Command.target} carries everywhere else.
+ */
+function resolveNoteSegment(
+	raw: string,
+	defaultTicks: number,
+	triplet: boolean,
+	target: CommandTarget,
+): NoteLengthSegment {
+	const exact = raw.startsWith("=");
+	const { digits, dots: written } = splitLengthText(exact ? raw.slice(1) : raw);
+	const dots = dotsApplied(written, target);
+	// `c.` writes no digits but is still dotted — `getInt` returns -1 and
+	// `getNoteLengthModifier` runs on the default anyway (`parser.ts:622-637`).
+	const implicit = digits.length === 0;
+
+	if (exact && !implicit) {
+		// parser.ts:610-621 — an exact tick count, skipping the /192 division.
+		const ticks = Number.parseInt(digits, 10);
+		if (target.amkVersion < 4) {
+			// Exact counts predate the modifiers entirely: the early return is
+			// ahead of both the dots and the triplet.
+			return { ticks, dots: 0, implicit, exact, triplet: false, written: digits };
+		}
+
+		return { ticks: applyTriplet(applyDots(ticks, dots), triplet), dots, implicit, exact, triplet, written: digits };
+	}
+
+	const n = implicit ? -1 : Number.parseInt(digits, 10);
+	const plain = n < 1 || n > TICKS_PER_WHOLE ? defaultTicks : Math.floor(TICKS_PER_WHOLE / n);
+	return {
+		ticks: applyTriplet(applyDots(plain, dots), triplet),
+		dots,
+		implicit,
+		exact,
+		triplet,
+		written: digits,
+	};
+}
+
+/**
+ * `parseDefaultLength` (`parser.ts:1524-1550`), which is *not* `getNoteLength`:
+ * `l=NN` and dots on `l` are both `#amk 4` and above, and every error path
+ * leaves the standing length alone rather than replacing it.
+ */
+function resolveDefaultLength(raw: string, current: number, target: CommandTarget): number {
+	const exact = raw.startsWith("=");
+	const { digits, dots } = splitLengthText(exact ? raw.slice(1) : raw);
+
+	const n = digits.length === 0 ? -1 : Number.parseInt(digits, 10);
+
+	if (target.amkVersion < 4) {
+		// AMK0070 for `l=NN`, and no dots below #amk 4 (`parser.ts:1548`).
+		return exact || n < 1 || n > TICKS_PER_WHOLE ? current : Math.floor(TICKS_PER_WHOLE / n);
+	}
+
+	if (exact) {
+		return applyDots(n, dotsApplied(dots, target));
+	}
+
+	// AMK0071 — an illegal denominator is an error, and the old length stands.
+	if (n < 1 || n > TICKS_PER_WHOLE) {
+		return current;
+	}
+
+	return applyDots(Math.floor(TICKS_PER_WHOLE / n), dotsApplied(dots, target));
+}
+
+/**
+ * A note or rest's length segments, off the tokens starting at `startIndex` —
+ * the one right after the note letter. Mirrors `accumulateTiedLength`
+ * (`parser.ts:2794`)'s do-while: the first segment is read unconditionally,
+ * then one more for every `^` that follows, each optionally digit-less.
+ */
+function gatherNoteLength(
+	tokens: GatherToken[],
+	startIndex: number,
+	defaultTicks: number,
+	triplet: boolean,
+	target: CommandTarget,
+	textOf: (token: GatherToken) => string,
+	spanOf: (token: Token) => Span,
+): {
+	segments: NoteLengthSegment[];
+	args: { value: number; span: Span }[];
+	last: GatherToken | undefined;
+	from: string | undefined;
+	nextIndex: number;
+} {
+	const segments: NoteLengthSegment[] = [];
+	const args: { value: number; span: Span }[] = [];
+	let last: GatherToken | undefined;
+	let from: string | undefined;
+	let index = startIndex;
+
+	// One segment's worth of tokens, gathered the same generous way the
+	// generic letter-command loop below gathers any command's numbers — so the
+	// two never disagree about where a note ends, even in the pathological
+	// case a mid-digit macro splits one written number into several tokens
+	// (`tokentest`'s "a macro inside a number" case). Only the run's first
+	// token is read as the segment's length; AMK's own getInt would have
+	// folded the rest into it, which this scanner cannot do.
+	const readSegment = (): void => {
+		let first: GatherToken | undefined;
+		let dots = "";
+		while (index < tokens.length) {
+			const next = tokens[index];
+			if (next.kind === "number" || next.kind === "hexNumber") {
+				first ??= next;
+				args.push({ value: numberValue(textOf(next), next.kind), span: spanOf(next) });
+				from ??= next.replacement;
+				last = next;
+				index++;
+				continue;
+			}
+
+			// `l8 c.` is a dotted default-length note (`parser.ts:622-637`), but a
+			// lone `.` is a length only where one has just ended, which `step` — one
+			// character at a time, with no memory of the token before — cannot know.
+			// So it scans as `unknown` and is claimed back here.
+			if (next.kind === "unknown" && textOf(next) === ".") {
+				dots += ".";
+				last = next;
+				index++;
+				continue;
+			}
+
+			if (next.kind === "operator" && textOf(next) === "," && tokens[index + 1]?.kind === "number") {
+				index++;
+				continue;
+			}
+
+			break;
+		}
+
+		segments.push(resolveNoteSegment((first ? textOf(first) : "") + dots, defaultTicks, triplet, target));
+	};
+
+	readSegment();
+	while (tokens[index]?.kind === "tie") {
+		last = tokens[index];
+		index++;
+		readSegment();
+	}
+
+	return { segments, args, last, from, nextIndex: index };
+}
+
 /** Groups the flat token list into commands with their arguments. */
 function gather(tokens: GatherToken[], text: string, transitions: TargetTransition[]): Command[] {
 	const commands: Command[] = [];
@@ -1350,6 +1590,18 @@ function gather(tokens: GatherToken[], text: string, transitions: TargetTransiti
 	let channel: number | undefined;
 	let target = DEFAULT_TARGET;
 	let transition = 0;
+	// parser.ts:198 — what a note or rest falls back to when it carries no
+	// digits of its own; `l` updates it below, positionally, the same way.
+	let defaultNoteLength = TICKS_PER_WHOLE / 8;
+	// parser.ts:199 — one flag for the whole song, never reset at a channel, so
+	// following it here in source order is what the parser does too.
+	let triplet = false;
+	// A block directive's brace never reaches `parseTripletOpen` — `parseBlock`
+	// eats it (`parser.ts:823-856`). It matters while the block is being typed:
+	// an unclosed `#samples {` above would otherwise make every note below read
+	// two thirds of its length.
+	let pendingBlock = false;
+	let inBlock = false;
 
 	for (let i = 0; i < tokens.length; i++) {
 		const token = tokens[i];
@@ -1359,6 +1611,33 @@ function gather(tokens: GatherToken[], text: string, transitions: TargetTransiti
 		while (transition < transitions.length && transitions[transition].at <= token.start) {
 			target = transitions[transition].target;
 			transition++;
+		}
+
+		if (token.kind === "directive") {
+			// Matched case-insensitively, as `matchWord` does; every other directive
+			// disarms the flag, so one with no block cannot arm an unrelated `{`.
+			pendingBlock = BLOCK_DIRECTIVES.has(textOf(token).toLowerCase());
+		} else if (token.kind === "operator") {
+			const brace = textOf(token);
+			if (brace === "{") {
+				if (pendingBlock) {
+					pendingBlock = false;
+					inBlock = true;
+				} else if (!inBlock) {
+					// A nested `{` is AMK0097 and leaves the block open
+					// (`parser.ts:2037-2044`), so this is a set rather than a toggle.
+					triplet = true;
+				}
+			} else if (brace === "}") {
+				if (inBlock) {
+					// None of the three blocks nests (`Music.cpp:2570`), so the first
+					// `}` closes it.
+					inBlock = false;
+				} else {
+					// An unopened `}` is AMK0098, and the block stays closed.
+					triplet = false;
+				}
+			}
 		}
 
 		if (token.kind === "channel") {
@@ -1401,6 +1680,32 @@ function gather(tokens: GatherToken[], text: string, transitions: TargetTransiti
 			continue;
 		}
 
+		if (token.kind === "note" || token.kind === "rest") {
+			const { segments, args, last, from, nextIndex } = gatherNoteLength(
+				tokens,
+				i + 1,
+				defaultNoteLength,
+				triplet,
+				target,
+				textOf,
+				spanOf,
+			);
+			const raw = textOf(token);
+			commands.push({
+				kind: raw[0],
+				name: nameForNote(token.kind),
+				span: { start: token.start, end: (last ?? token).end, line: token.line },
+				args,
+				complete: true,
+				replacement: token.replacement ?? from,
+				channel,
+				target,
+				noteLength: segments,
+			});
+			i = nextIndex - 1;
+			continue;
+		}
+
 		if (!LETTER_COMMAND_KINDS.has(token.kind)) {
 			continue;
 		}
@@ -1408,6 +1713,7 @@ function gather(tokens: GatherToken[], text: string, transitions: TargetTransiti
 		// `y10,1,2` and `t144` alike: consecutive numbers, optionally separated by
 		// commas, belong to the command that opened them.
 		const args: { value: number; span: Span }[] = [];
+		let firstArgToken: GatherToken | undefined;
 		let from = token.replacement;
 		let last: GatherToken = token;
 		let j = i + 1;
@@ -1415,6 +1721,7 @@ function gather(tokens: GatherToken[], text: string, transitions: TargetTransiti
 			const next = tokens[j];
 			if (next.kind === "number" || next.kind === "hexNumber") {
 				args.push({ value: numberValue(textOf(next), next.kind), span: spanOf(next) });
+				firstArgToken ??= next;
 				from ??= next.replacement;
 				last = next;
 				j++;
@@ -1442,6 +1749,13 @@ function gather(tokens: GatherToken[], text: string, transitions: TargetTransiti
 			direct: raw.startsWith("@@") || undefined,
 			target,
 		});
+
+		if (token.kind === "defaultLength" && firstArgToken) {
+			// parser.ts:1524-1550 — updates the length later notes fall back to
+			// when they carry no digits of their own.
+			defaultNoteLength = resolveDefaultLength(textOf(firstArgToken), defaultNoteLength, target);
+		}
+
 		i = j - 1;
 	}
 
