@@ -26,6 +26,10 @@ export interface ChangelogEntry {
 export const CHANGELOG: readonly ChangelogEntry[] = [
   // ─── newest first; add new blocks here ──────────────────────────────────
   {
+    date: '4 August 2026',
+    items: ['Syntax highlighting, with line numbers'],
+  },
+  {
     date: '3 August 2026',
     items: [
       'Runaway echo filters are now flagged in Diagnostics',

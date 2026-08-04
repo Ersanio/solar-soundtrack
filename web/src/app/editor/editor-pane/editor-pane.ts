@@ -1,18 +1,27 @@
 import {
+  afterNextRender,
   Component,
+  DestroyRef,
   type ElementRef,
   effect,
   inject,
+  Injector,
   signal,
   untracked,
   viewChild,
 } from '@angular/core';
+
+import { defaultKeymap, history, historyKeymap, insertTab } from '@codemirror/commands';
+import { EditorState } from '@codemirror/state';
+import { EditorView, keymap, lineNumbers } from '@codemirror/view';
 
 import { Panel } from '../../shared/panel/panel';
 import { type TabDef, Tabs } from '../../shared/tabs/tabs';
 import { EditorStore } from '../../state/editor-store';
 import { ChannelMixer } from '../channel-mixer/channel-mixer';
 import { SampleBrowser } from '../sample-browser/sample-browser';
+import { mmlLanguage } from '../codemirror/mml-language';
+import { mmlTheme } from '../codemirror/mml-theme';
 
 type EditorTab = 'source' | 'samples';
 
@@ -23,9 +32,15 @@ type EditorTab = 'source' | 'samples';
  * ARAM budget stays visible on the right while samples are being added — the
  * moment a sample set stops fitting is the moment you want to see it.
  *
- * The source view is still a plain `<textarea>`, as the prototype was;
- * CodeMirror and syntax highlighting are a later milestone, and everything is
- * arranged so that swap only has to touch this component.
+ * The source view is a CodeMirror `EditorView`, and its document is the text
+ * authority: `EditorStore.source` remains the signal everything else reads,
+ * but it is written only from the view's update listener. Programmatic changes
+ * — `reveal`, `replace` — go *into* the view as transactions and come back out
+ * through that listener, so the sync is strictly one-way and there is no
+ * store→view mirror to feed back through.
+ *
+ * The source panel is hidden rather than destroyed while the Samples tab is
+ * open, so undo history, scroll position and selection survive the round trip.
  */
 @Component({
   selector: 'amk-editor-pane',
@@ -35,6 +50,7 @@ type EditorTab = 'source' | 'samples';
 })
 export class EditorPane {
   protected readonly store = inject(EditorStore);
+  private readonly injector = inject(Injector);
 
   protected readonly TABS: readonly TabDef<EditorTab>[] = [
     { id: 'source', label: 'Source' },
@@ -42,119 +58,121 @@ export class EditorPane {
   ];
   protected readonly tab = signal<EditorTab>('source');
 
-  /**
-   * Optional, not required: the textarea only exists while the Source tab is
-   * showing, and `viewChild.required` throws when it is not.
-   */
-  private readonly area = viewChild<ElementRef<HTMLTextAreaElement>>('area');
+  private readonly host = viewChild.required<ElementRef<HTMLDivElement>>('editorHost');
+  private readonly view: EditorView;
 
   constructor() {
-    // Sanctioned effect: driving an imperative DOM API (selection) from state.
+    // Built detached, so the sanctioned effects below never race its
+    // existence; afterNextRender only attaches it.
+    this.view = new EditorView({
+      state: EditorState.create({
+        doc: this.store.source(),
+        extensions: [
+          keymap.of([
+            // Before defaultKeymap, which binds Mod-Enter to insertBlankLine.
+            {
+              key: 'Mod-Enter',
+              run: () => {
+                this.store.compileNow();
+                return true;
+              },
+            },
+            // Tab inserts; Shift-Tab stays unbound so keyboard focus can
+            // escape backwards, exactly as the textarea behaved.
+            { key: 'Tab', run: insertTab },
+            ...defaultKeymap,
+            ...historyKeymap,
+          ]),
+          history(),
+          lineNumbers(),
+          mmlLanguage,
+          mmlTheme,
+          EditorState.tabSize.of(8),
+          EditorView.contentAttributes.of({
+            'aria-label': 'MML source',
+            spellcheck: 'false',
+            autocorrect: 'off',
+            autocapitalize: 'off',
+          }),
+          EditorView.updateListener.of((update) => {
+            if (update.docChanged) {
+              this.store.edit(update.state.doc.toString());
+            }
+
+            if (update.docChanged || update.selectionSet) {
+              this.store.caret.set(update.state.selection.main.head);
+            }
+          }),
+        ],
+      }),
+    });
+
+    afterNextRender(() => {
+      this.host().nativeElement.appendChild(this.view.dom);
+      this.view.requestMeasure();
+    });
+
+    inject(DestroyRef).onDestroy(() => this.view.destroy());
+
+    // Sanctioned effect: driving an imperative view API (selection) from state.
     //
-    // Depends on `area()` as well as `reveal()` so that revealing a span while
-    // the Samples tab is open works: switching the tab renders the textarea,
-    // which populates the view child, which re-runs this and does the focus.
+    // The work happens after the next render rather than here: revealing a span
+    // while the Samples tab is open first has to make the editor visible, and
+    // focusing or measuring a `display: none` view is a no-op. afterNextRender
+    // is the render barrier the old viewChild dependency used to provide.
     effect(() => {
       const span = this.store.reveal();
       if (!span) {
         return;
       }
 
-      if (this.tab() !== 'source') {
-        this.tab.set('source');
-        return;
-      }
-
-      const element = this.area()?.nativeElement;
-      if (!element) {
-        return;
-      }
-
       untracked(() => {
-        // Consumed on the spot, for the same reason `replace` below is: this
-        // effect also depends on `area()` and `tab()`, so a later tab switch
-        // re-runs it. Left set, revealing a diagnostic and then flipping to
-        // Samples and back would re-select that span and pull the caret out of
-        // wherever the author had since put it.
+        // Consumed on the spot: a reveal describes one moment, and leaving it
+        // set would let a later re-run select it again long after the author
+        // has moved on.
         this.store.reveal.set(null);
-
-        element.focus();
-        element.setSelectionRange(span.start, Math.max(span.end, span.start + 1));
-        this.store.caret.set(span.start);
+        this.tab.set('source');
+        afterNextRender(() => this.revealSpan(span), { injector: this.injector });
       });
     });
 
-    // Sanctioned effect: the same imperative-DOM job as `reveal` above, for a
-    // panel that changes text rather than selecting it.
-    //
-    // The splice is applied here rather than through `store.edit` alone
-    // because a one-way `[value]` binding rewrites the whole textarea, which
-    // drops the caret to the end. The Tab handler below has the same problem
-    // and solves it the same way.
+    // Sanctioned effect: the same imperative-view job as `reveal` above, for a
+    // panel that changes text rather than selecting it. The dispatch maps the
+    // selection through the change, which is the caret preservation the old
+    // textarea code did by hand; the update listener then propagates the new
+    // document and caret back into the store.
     effect(() => {
       const edit = this.store.replace();
       if (!edit) {
         return;
       }
 
-      const element = this.area()?.nativeElement;
-      if (!element) {
-        return;
-      }
-
       untracked(() => {
-        // Consumed on the spot. A splice describes one moment in one document,
-        // so leaving it set would let any later re-run of this effect — a tab
-        // switch, say — apply it a second time to text it no longer fits.
+        // Consumed on the spot: a splice describes one document, and a re-run
+        // must never apply it a second time to text it no longer fits.
         this.store.replace.set(null);
 
-        const { span, text } = edit;
-        const next = `${element.value.slice(0, span.start)}${text}${element.value.slice(span.end)}`;
-        element.value = next;
-
-        // The caret stays where it was unless the edit moved the ground under
-        // it, so dragging a slider does not drag the caret out of the command
-        // being edited — which would swap the panel out mid-gesture. Read
-        // untracked, or moving the caret would itself re-trigger this effect.
-        const caret = Math.min(this.store.caret(), span.start + text.length);
-        element.selectionStart = element.selectionEnd = Math.max(caret, span.start);
-
-        this.store.edit(next);
-        this.store.caret.set(element.selectionStart);
+        const length = this.view.state.doc.length;
+        this.view.dispatch({
+          changes: {
+            from: Math.min(edit.span.start, length),
+            to: Math.min(edit.span.end, length),
+            insert: edit.text,
+          },
+        });
       });
     });
   }
 
-  protected onInput(event: Event): void {
-    const element = event.target as HTMLTextAreaElement;
-    this.store.edit(element.value);
-    this.store.caret.set(element.selectionStart);
-  }
-
-  protected syncCaret(event: Event): void {
-    this.store.caret.set((event.target as HTMLTextAreaElement).selectionStart);
-  }
-
-  protected onKeydown(event: KeyboardEvent): void {
-    // Ctrl/Cmd+Enter compiles; Tab inserts a tab instead of moving focus.
-    if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
-      event.preventDefault();
-      this.store.compileNow();
-      return;
-    }
-
-    if (event.key !== 'Tab' || event.shiftKey) {
-      return;
-    }
-
-    event.preventDefault();
-
-    const element = event.target as HTMLTextAreaElement;
-    const { selectionStart, selectionEnd, value } = element;
-    const next = `${value.slice(0, selectionStart)}\t${value.slice(selectionEnd)}`;
-    element.value = next;
-    element.selectionStart = element.selectionEnd = selectionStart + 1;
-    this.store.edit(next);
-    this.store.caret.set(selectionStart + 1);
+  /** Selects and centers `span`, clamped to the document as it stands now. */
+  private revealSpan(span: { start: number; end: number }): void {
+    const length = this.view.state.doc.length;
+    const anchor = Math.min(span.start, length);
+    const head = Math.min(Math.max(span.end, span.start + 1), length);
+    this.view.dispatch({
+      selection: { anchor, head },
+      effects: EditorView.scrollIntoView(anchor, { y: 'center' }),
+    });
+    this.view.focus();
   }
 }

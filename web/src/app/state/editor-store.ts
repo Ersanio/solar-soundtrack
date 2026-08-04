@@ -52,13 +52,20 @@ export class EditorStore {
   private readonly drivers = inject(DriverStore);
   private readonly library = inject(SampleStore);
 
+  /**
+   * The source as typed. The editor's CodeMirror document is the text
+   * authority: this signal is written only from the editor's update listener
+   * (via {@link edit}), and programmatic changes reach the document through
+   * {@link replace} rather than by writing here — one-way sync, so there is no
+   * mirror to feed back through.
+   */
   readonly source = signal(localStorage.getItem(STORAGE_KEY) ?? SAMPLE_SONG);
   readonly autoCompile = signal(true);
   readonly caret = signal(0);
 
   /**
    * A range the editor should select and scroll to, set when a diagnostic is
-   * clicked. The editor owns the textarea, so this is how a sibling panel asks
+   * clicked. The editor owns the view, so this is how a sibling panel asks
    * for a selection without reaching across the component tree.
    */
   readonly reveal = signal<Span | null>(null);
@@ -67,7 +74,7 @@ export class EditorStore {
    * A splice the editor should apply, set when a panel edits a command in
    * place. The counterpart to {@link reveal}: that one asks for a selection,
    * this one asks for a change, and both exist because the editor owns the
-   * textarea and nothing else may reach into it.
+   * view and nothing else may reach into it.
    *
    * A fresh object each time, so writing the same edit twice still takes.
    */
