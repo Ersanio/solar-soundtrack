@@ -6,38 +6,26 @@
     }
   </div>
 
-  @let currentTab = tab();
-  @switch (currentTab) {
-    @case ('source') {
-      <div id="panel-source" role="tabpanel" aria-labelledby="tab-source" class="h-full">
-        <textarea
-          #area
-          class="bg-surface text-ink h-full w-full resize-none border-0 p-3 font-mono text-[13px] leading-relaxed whitespace-pre focus:outline-none"
-          spellcheck="false"
-          autocomplete="off"
-          autocapitalize="off"
-          wrap="off"
-          aria-label="MML source"
-          [value]="store.source()"
-          (input)="onInput($event)"
-          (keydown)="onKeydown($event)"
-          (keyup)="syncCaret($event)"
-          (click)="syncCaret($event)"
-          (select)="syncCaret($event)"
-        ></textarea>
-      </div>
-    }
-    @case ('samples') {
-      <div
-        id="panel-samples"
-        role="tabpanel"
-        aria-labelledby="tab-samples"
-        class="flex h-full min-h-0 flex-col"
-      >
-        <amk-sample-browser class="min-h-0 flex-1" />
-      </div>
-    }
-    @default never;
+  <!-- Hidden rather than destroyed on tab switch, so the CodeMirror view keeps
+       its undo history, scroll position and selection. -->
+  <div
+    id="panel-source"
+    role="tabpanel"
+    aria-labelledby="tab-source"
+    class="h-full"
+    [class.hidden]="tab() !== 'source'"
+  >
+    <div #editorHost class="h-full"></div>
+  </div>
+  @if (tab() === 'samples') {
+    <div
+      id="panel-samples"
+      role="tabpanel"
+      aria-labelledby="tab-samples"
+      class="flex h-full min-h-0 flex-col"
+    >
+      <amk-sample-browser class="min-h-0 flex-1" />
+    </div>
   }
 </amk-panel>
 

@@ -12,6 +12,8 @@
  *   npm run tokentest
  */
 
+import { Tag, tags } from "@lezer/highlight";
+
 import {
 	type ScanState,
 	type Token,
@@ -225,6 +227,17 @@ console.log("\nevery kind has a highlight tag");
 		"a replacement token has a tag too",
 		used.some((t) => t.kind === "replacement" && TOKEN_TAGS[t.kind] !== undefined),
 	);
+}
+
+console.log("\nevery tag name resolves against @lezer/highlight");
+{
+	// The editor builds its tokenTable by looking TOKEN_TAGS values up on
+	// `tags`. A name that misses — or that lands on one of the helper
+	// *functions* that object also carries — would drop the highlight silently,
+	// so this pins the name-resolution contract the adapter relies on.
+	const names = [...new Set(Object.values(TOKEN_TAGS))];
+	const unresolved = names.filter((name) => !((tags as unknown as Record<string, unknown>)[name] instanceof Tag));
+	check("every TOKEN_TAGS value is a real Tag", unresolved.length === 0, unresolved.join(", "));
 }
 
 console.log("\nreplacements are expanded at the use site");
