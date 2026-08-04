@@ -28,11 +28,9 @@ export const CHANGELOG: readonly ChangelogEntry[] = [
   {
     date: '4 August 2026',
     items: [
-      'Syntax highlighting, with line numbers',
-      'Errors and warnings underlined in the source',
-      'Hover over any command for a quick explanation',
-      'The editor highlights the notes being played, in every channel',
-      'Correct highlighting and command info for #am4, #amm and #amk 1 songs',
+      'Rich, interactive editor with syntax highlighting',
+      'Current notes being played are highlighted',
+      'Correct highlighting and command info for all Addmusic dialects',
     ],
   },
   {

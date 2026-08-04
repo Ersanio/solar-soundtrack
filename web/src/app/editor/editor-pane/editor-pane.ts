@@ -1,6 +1,7 @@
 import {
   afterNextRender,
   Component,
+  computed,
   DestroyRef,
   type ElementRef,
   effect,
@@ -13,10 +14,11 @@ import {
 
 import { defaultKeymap, history, historyKeymap, insertTab } from '@codemirror/commands';
 import { setDiagnostics } from '@codemirror/lint';
-import { EditorState } from '@codemirror/state';
+import { Compartment, EditorState } from '@codemirror/state';
 import { EditorView, keymap, lineNumbers } from '@codemirror/view';
 
 import type { Severity } from '@core/types';
+import { IconWrap } from '../../shared/icons/icon-wrap';
 import { Panel } from '../../shared/panel/panel';
 import { type TabDef, Tabs } from '../../shared/tabs/tabs';
 import { EditorStore } from '../../state/editor-store';
@@ -62,7 +64,7 @@ const LINT_SEVERITY: Record<Severity, 'error' | 'warning' | 'info'> = {
  */
 @Component({
   selector: 'amk-editor-pane',
-  imports: [Panel, Tabs, ChannelMixer, SampleBrowser],
+  imports: [Panel, Tabs, ChannelMixer, SampleBrowser, IconWrap],
   templateUrl: './editor-pane.html',
   host: { class: 'flex min-h-0 min-w-0 flex-col' },
 })
@@ -76,6 +78,22 @@ export class EditorPane {
     { id: 'samples', label: 'Samples' },
   ];
   protected readonly tab = signal<EditorTab>('source');
+
+  /**
+   * Off by default, matching the editor's prior behaviour. A `Compartment`
+   * rather than a plain extension: word wrap has to flip without tearing down
+   * the view, which would lose undo history, scroll position and selection.
+   */
+  protected readonly wordWrap = signal(false);
+  private readonly wrapCompartment = new Compartment();
+
+  /** Mirrors the mute/solo toggles' own on/off styling in `channel-mixer.html`. */
+  protected readonly wrapButtonClass = computed(
+    () =>
+      `border-edge cursor-pointer rounded-md border px-1.5 py-1.5 transition-colors ${
+        this.wordWrap() ? 'bg-accent/20 text-accent font-semibold' : 'text-ink-muted hover:text-ink'
+      }`,
+  );
 
   private readonly host = viewChild.required<ElementRef<HTMLDivElement>>('editorHost');
   private readonly view: EditorView;
@@ -104,6 +122,7 @@ export class EditorPane {
           ]),
           history(),
           lineNumbers(),
+          this.wrapCompartment.of(this.wordWrap() ? EditorView.lineWrapping : []),
           mmlLanguage,
           mmlTheme,
           commandHover(() => this.store.tokens().commands),
@@ -214,6 +233,15 @@ export class EditorPane {
     effect(() => {
       const spans = this.playback.playheadSpans();
       untracked(() => this.view.dispatch({ effects: setPlayhead.of(spans) }));
+    });
+  }
+
+  /** Flips word wrap without rebuilding the view. */
+  protected toggleWordWrap(): void {
+    const wrap = !this.wordWrap();
+    this.wordWrap.set(wrap);
+    this.view.dispatch({
+      effects: this.wrapCompartment.reconfigure(wrap ? EditorView.lineWrapping : []),
     });
   }
 
