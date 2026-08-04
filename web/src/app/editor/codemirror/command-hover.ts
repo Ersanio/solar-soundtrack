@@ -21,11 +21,15 @@ function renderCommand(command: Command): HTMLElement {
   dom.appendChild(line('cm-amk-hover-name', `${label} ${command.name}${via}`));
 
   if (command.args.length > 0) {
+    // Capped like the generic view: an #am4 `$ED $82` upload can carry a
+    // 16-bit count of data bytes, and a tooltip is a glance, not a dump.
+    const shown = command.args.slice(0, 16);
     const args =
       command.vcmd !== undefined
-        ? command.args.map((arg) => `$${hex2(arg.value & 0xff)}`).join(' ')
-        : command.args.map((arg) => arg.value).join(', ');
-    dom.appendChild(line('cm-amk-hover-args', args));
+        ? shown.map((arg) => `$${hex2(arg.value & 0xff)}`).join(' ')
+        : shown.map((arg) => arg.value).join(', ');
+    const more = command.args.length - shown.length;
+    dom.appendChild(line('cm-amk-hover-args', more > 0 ? `${args} … ${more} more` : args));
   }
 
   if (!command.complete) {
