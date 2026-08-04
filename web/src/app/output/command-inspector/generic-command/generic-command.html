@@ -25,4 +25,7 @@
       }
     </tbody>
   </table>
+  @if (omitted() > 0) {
+    <p class="text-ink-muted py-1 text-xs">… and {{ omitted() }} more arguments not shown</p>
+  }
 }
