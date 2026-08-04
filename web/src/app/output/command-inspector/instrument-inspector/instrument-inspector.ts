@@ -62,6 +62,9 @@ export class InstrumentInspector {
   /** Written as `$DA $xx` rather than `@n`, which skips every rule below. */
   protected readonly raw = computed(() => this.command().vcmd === 0xda);
 
+  /** A raw `$DA` whose byte meant something else — #am4's `$13`-up numbering. */
+  protected readonly rawRemapped = computed(() => this.raw() && this.emitted() !== this.written());
+
   /**
    * The number that reaches `$DA`, or `null` when nothing is emitted.
    *
@@ -79,6 +82,12 @@ export class InstrumentInspector {
     }
 
     if (this.raw()) {
+      // parser.ts:3131-3135 (Music.cpp:1976) — Addmusic 4.05 numbered custom
+      // instruments from $13, so a raw $DA remaps before any band is judged.
+      if (this.command().target.program === 1 && n >= 0x13) {
+        return n - 0x13 + FIRST_CUSTOM_INSTRUMENT;
+      }
+
       return n;
     }
 

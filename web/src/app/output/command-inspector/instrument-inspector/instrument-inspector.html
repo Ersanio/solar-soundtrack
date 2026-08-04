@@ -86,6 +86,11 @@
             The direct form <code class="text-ink">&#64;&#64;{{ written() }}</code> is remapped to
             <code class="text-ink">&#64;{{ emitted() }}</code
             >, a custom instrument —
+          } @else if (rawRemapped()) {
+            Under <code class="text-ink">#am4</code>,
+            <code class="text-ink">$DA ${{ written() | hex }}</code> means
+            <code class="text-ink">&#64;{{ emitted() }}</code
+            >, a custom instrument —
           } @else {
             <code class="text-ink">&#64;{{ written() }}</code> is a custom instrument, but
           }

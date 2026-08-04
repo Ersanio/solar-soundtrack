@@ -32,6 +32,7 @@ export const CHANGELOG: readonly ChangelogEntry[] = [
       'Errors and warnings underlined in the source',
       'Hover over any command for a quick explanation',
       'The editor highlights the notes being played, in every channel',
+      'Correct highlighting and command info for #am4, #amm and #amk 1 songs',
     ],
   },
   {

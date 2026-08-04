@@ -106,6 +106,14 @@ export class CommandInspector {
     }
 
     if (command.vcmd !== undefined) {
+      // parser.ts:3286 — under #am4, $ED is HFD's escape: only the plain-ADSR
+      // shape earns the envelope view, and $80-$83 fall to the generic
+      // readout. A bare $ED keeps the view, as an incomplete one always has.
+      if (command.vcmd === 0xed && command.target.program === 1) {
+        const sub = command.args[0]?.value;
+        return sub !== undefined && sub >= 0x80 && sub <= 0x83 ? null : 'adsr';
+      }
+
       return VIEWS[command.vcmd] ?? null;
     }
 
