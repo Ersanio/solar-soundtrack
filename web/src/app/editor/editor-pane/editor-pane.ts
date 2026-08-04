@@ -22,6 +22,7 @@ import { type TabDef, Tabs } from '../../shared/tabs/tabs';
 import { EditorStore } from '../../state/editor-store';
 import { ChannelMixer } from '../channel-mixer/channel-mixer';
 import { SampleBrowser } from '../sample-browser/sample-browser';
+import { commandHover } from '../codemirror/command-hover';
 import { mmlLanguage } from '../codemirror/mml-language';
 import { mmlTheme } from '../codemirror/mml-theme';
 
@@ -102,6 +103,7 @@ export class EditorPane {
           lineNumbers(),
           mmlLanguage,
           mmlTheme,
+          commandHover(() => this.store.tokens().commands),
           EditorState.tabSize.of(8),
           EditorView.contentAttributes.of({
             'aria-label': 'MML source',

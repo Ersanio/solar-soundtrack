@@ -30,6 +30,7 @@ export const CHANGELOG: readonly ChangelogEntry[] = [
     items: [
       'Syntax highlighting, with line numbers',
       'Errors and warnings underlined in the source',
+      'Hover over any command for a quick explanation',
     ],
   },
   {
