@@ -133,6 +133,207 @@ console.log("\nletter commands carry their arguments");
 	check("an exact tick count is the note's argument", exact?.args[0].value === 48);
 }
 
+/** The length of the note or rest written at `needle` — `undefined` for anything else. */
+const lengthOf = (source: string, needle: string) => at(source, source.indexOf(needle))?.noteLength;
+
+console.log("\nnotes and rests resolve their length");
+{
+	// getNoteLength (parser.ts:607-637), over the 192 ticks of a whole note. The
+	// tooltip states the tick count outright, so a wrong fork here is a wrong
+	// number on screen rather than a wrong colour.
+	const plain = lengthOf("#0 c4\n", "c4");
+	check("c4 is one segment", plain?.length === 1, `got ${plain?.length}`);
+	check("of 48 ticks", plain?.[0].ticks === 48, String(plain?.[0].ticks));
+	check("written as the denominator it was", plain?.[0].written === "4", plain?.[0].written);
+	check("with no dots, no =, and nothing implied", plain?.[0].dots === 0 && !plain[0].exact && !plain[0].implicit);
+
+	// parser.ts:198 — what the parser starts at, before any `l`.
+	const bare = lengthOf("#0 c\n", "c");
+	check("a bare c takes the standing default", bare?.[0].ticks === 24, String(bare?.[0].ticks));
+	check("and says the length was implied", bare?.[0].implicit === true && bare[0].written === "");
+
+	check("c8. is dotted", lengthOf("#0 c8.\n", "c8")?.[0].ticks === 36, String(lengthOf("#0 c8.\n", "c8")?.[0].ticks));
+	check("c8.. doubles down", lengthOf("#0 c8..\n", "c8")?.[0].dots === 2);
+	check("to 42 ticks", lengthOf("#0 c8..\n", "c8")?.[0].ticks === 42, String(lengthOf("#0 c8..\n", "c8")?.[0].ticks));
+
+	const exact = lengthOf("#0 c=48\n", "c=48");
+	check("c=48 is 48 ticks exactly", exact?.[0].ticks === 48 && exact[0].exact === true);
+	check("c=48. dots an exact count under #amk 4", lengthOf("#0 c=48.\n", "c=48")?.[0].ticks === 72);
+
+	check("a rest carries a length too", lengthOf("#0 r2\n", "r2")?.[0].ticks === 96);
+	check("an accidental does not disturb it", lengthOf("#0 c+4\n", "c+4")?.[0].ticks === 48);
+	// parser.ts:622 — outside 1..192 the written length is discarded entirely.
+	check("c200 falls back to the default length", lengthOf("#0 c200\n", "c200")?.[0].ticks === 24);
+	check("a command that is not a note carries none", at("#0 t144\n", 4)?.noteLength === undefined);
+}
+
+console.log("\na tie plays as one note");
+{
+	// accumulateTiedLength (parser.ts:2794) — every segment after a `^` belongs
+	// to the note that opened the run, which is why the tooltip totals them
+	// rather than describing the `^` on its own.
+	const source = "#0 c4^8\n";
+	const tied = lengthOf(source, "c4");
+	check("c4^8 has two segments", tied?.length === 2, `got ${tied?.length}`);
+	check("48 then 24", tied?.[0].ticks === 48 && tied[1].ticks === 24);
+	check(
+		"and one span over both",
+		source.slice(at(source, 3)!.span.start, at(source, 3)!.span.end) === "c4^8",
+		source.slice(at(source, 3)!.span.start, at(source, 3)!.span.end),
+	);
+	check("so the caret on the ^ finds the note", at(source, source.indexOf("^"))?.noteLength?.length === 2);
+
+	const open = lengthOf("#0 c4^\n", "c4");
+	check("a ^ with no digits continues at the default", open?.[1].ticks === 24 && open[1].implicit === true);
+
+	const three = lengthOf("#0 c4^8^16\n", "c4");
+	check("ties accumulate without limit", three?.length === 3, `got ${three?.length}`);
+	check("48 + 24 + 12", three?.map((s) => s.ticks).join() === "48,24,12", three?.map((s) => s.ticks).join());
+
+	check("spacing does not break the run", lengthOf("#0 c4 ^ 8\n", "c4")?.length === 2);
+	check("a rest ties too", lengthOf("#0 r4^8\n", "r4")?.length === 2);
+
+	// The note after a tie is a fresh command, and the segment the `^` opened
+	// took the default rather than reaching forward for the `8`.
+	const next = tokenize("#0 c4^d8\n").commands.filter((c) => c.noteLength);
+	check("a note after a tie is its own command", next.length === 2 && next[1].kind === "d");
+	check("and the tie's segment is implied, not the d's length", next[0].noteLength?.[1].implicit === true);
+}
+
+console.log("\nthe default length follows `l`");
+{
+	// parseDefaultLength (parser.ts:1524-1550). One field on the parser, never
+	// reset — so it is one running value here, not one per channel.
+	check("l16 makes a bare note 12 ticks", lengthOf("#0 l16 c\n", "c")?.[0].ticks === 12);
+	check("l8. dots the default", lengthOf("#0 l8. c\n", "c")?.[0].ticks === 36);
+	check("l=48 sets it exactly", lengthOf("#0 l=48 c\n", "c")?.[0].ticks === 48);
+	check("l=48. dots that", lengthOf("#0 l=48. c\n", "c")?.[0].ticks === 72);
+
+	// AMK0071 and AMK0070 are errors, and an error leaves the old length standing.
+	check("l0 is an error, so the previous length stands", lengthOf("#0 l16 l0 c\n", "c")?.[0].ticks === 12);
+	check("l200 likewise", lengthOf("#0 l16 l200 c\n", "c")?.[0].ticks === 12);
+
+	check("the length crosses lines and channels", lengthOf("#0 l16\n#1 c\n", "c")?.[0].ticks === 12);
+	check("and a written length still wins over it", lengthOf("#0 l16 c4\n", "c4")?.[0].ticks === 48);
+	check("the l command itself carries no note length", at("#0 l16\n", 3)?.noteLength === undefined);
+}
+
+console.log("\ndots and exact lengths fork by dialect");
+{
+	// Music.cpp:2960 — Addmusic 4.05 stops after the second dot.
+	const am4 = lengthOf("#am4\n#0 c8...\n", "c8");
+	check("#am4 stops adding after two dots", am4?.[0].ticks === 42, String(am4?.[0].ticks));
+	check("and counts only the dots it applied", am4?.[0].dots === 2, String(am4?.[0].dots));
+	check("#amk 4 applies every one", lengthOf("#0 c8...\n", "c8")?.[0].ticks === 45);
+
+	// parser.ts:619 — exact counts predate dots, so below #amk 4 the dot is not
+	// theirs to take.
+	check("under #am4 an exact count takes no dots", lengthOf("#am4\n#0 c=48.\n", "c=48")?.[0].ticks === 48);
+	check("under #amk 4 it does", lengthOf("#0 c=48.\n", "c=48")?.[0].ticks === 72);
+
+	// parser.ts:1548 and :1528 — `l`'s dots and its `=` form are both #amk 4 and
+	// above, and neither is the same fork a note takes.
+	check("under #am4, l ignores its dots", lengthOf("#am4\n#0 l8. c\n", "c")?.[0].ticks === 24);
+	check("under #amk 1 too", lengthOf("#amk 1\n#0 l8. c\n", "c")?.[0].ticks === 24);
+	check(
+		"while l= is an error there, leaving the length standing",
+		lengthOf("#am4\n#0 l16 l=48 c\n", "c")?.[0].ticks === 12,
+	);
+	check("and a note's own = still works", lengthOf("#am4\n#0 c=48\n", "c=48")?.[0].ticks === 48);
+}
+
+console.log("\na lone dot still lengthens the note before it");
+{
+	// `l8 c.` is ordinary MML: getInt finds no digits and getNoteLengthModifier
+	// dots the standing default anyway (parser.ts:622-637). A lone `.` scans as
+	// unknown — `step` reads one character with no memory of the token before it
+	// — so `gather` is where it rejoins the note.
+	const dotted = lengthOf("#0 c.\n", "c.");
+	check("c. is the dotted default", dotted?.[0].ticks === 36, String(dotted?.[0].ticks));
+	check("implied, and dotted once", dotted?.[0].implicit === true && dotted[0].dots === 1);
+	check("c.. doubles down", lengthOf("#0 c..\n", "c.")?.[0].ticks === 42);
+	check("it follows the standing length", lengthOf("#0 l4 c.\n", "c.")?.[0].ticks === 72);
+	check("a rest takes one too", lengthOf("#0 r.\n", "r.")?.[0].ticks === 36);
+
+	const tie = lengthOf("#0 c4^.\n", "c4");
+	check("a tie's segment can be dotted alone", tie?.[1].ticks === 36, String(tie?.[1].ticks));
+
+	const source = "#0 c.\n";
+	check(
+		"the span covers the dot",
+		source.slice(at(source, 3)!.span.start, at(source, 3)!.span.end) === "c.",
+		source.slice(at(source, 3)!.span.start, at(source, 3)!.span.end),
+	);
+}
+
+console.log("\na triplet scales the notes inside it");
+{
+	// getNoteLengthModifier's second half (parser.ts:661-667): two thirds,
+	// rounded half up, applied after the dots. A reader hovering a note wants
+	// the length it plays at, so the brace state is followed here even though
+	// the per-line colouring pass cannot carry it.
+	const triplet = tokenize("#0 {c4 c4 c4}\n").commands.filter((c) => c.noteLength);
+	check(
+		"each note of {c4 c4 c4} plays 32 ticks",
+		triplet.length === 3 && triplet.every((c) => c.noteLength?.[0].ticks === 32),
+		triplet.map((c) => c.noteLength?.[0].ticks).join(),
+	);
+	check("and says so", triplet[0]?.noteLength?.[0].triplet === true);
+	check("while the written denominator is untouched", triplet[0]?.noteLength?.[0].written === "4");
+
+	const around = tokenize("#0 c4 {c4} c4\n").commands.filter((c) => c.noteLength);
+	check(
+		"the brace opens and closes",
+		around.map((c) => c.noteLength?.[0].ticks).join() === "48,32,48",
+		around.map((c) => c.noteLength?.[0].ticks).join(),
+	);
+	check("and only the middle one is flagged", around[2]?.noteLength?.[0].triplet === false);
+
+	check("the default length is scaled too", lengthOf("#0 l4 {c}\n", "c}")?.[0].ticks === 32);
+	check("dots go first, the triplet after", lengthOf("#0 {c4.}\n", "c4.")?.[0].ticks === 48);
+	check(
+		"a tie scales segment by segment",
+		lengthOf("#0 {c4^8}\n", "c4")
+			?.map((s) => s.ticks)
+			.join() === "32,16",
+	);
+	check("a rest is a note here as anywhere", lengthOf("#0 {r4}\n", "r4")?.[0].ticks === 32);
+
+	// floor(x * 2/3 + 0.5), so 7 ticks is 5 rather than 4.
+	check("the two thirds round half up", lengthOf("#0 {c=7}\n", "c=7")?.[0].ticks === 5);
+
+	// parser.ts:1549 is the one call that passes allowTriplet: false, so an `l`
+	// inside a triplet sets the plain length and the notes scale it themselves.
+	check("l is not scaled", lengthOf("#0 {l4}c\n", "c\n")?.[0].ticks === 48);
+
+	// The early return at parser.ts:619-621 is ahead of both modifiers.
+	const old = lengthOf("#am4\n#0 {c=48}\n", "c=48");
+	check("an exact count below #amk 4 escapes it", old?.[0].ticks === 48 && old[0].triplet === false);
+
+	check("the state crosses lines", lengthOf("#0 {\nc4\n", "c4")?.[0].ticks === 32);
+	check("and channels, as the parser's own flag does", lengthOf("#0 {\n#1 c4\n", "c4")?.[0].ticks === 32);
+
+	// AMK0097 reports the second `{` and leaves the one block open, so the
+	// first `}` closes it (parser.ts:2037-2052).
+	const nested = tokenize("#0 {{c4}c4\n").commands.filter((c) => c.noteLength);
+	check(
+		"a nested brace does not need two to close",
+		nested.map((c) => c.noteLength?.[0].ticks).join() === "32,48",
+		nested.map((c) => c.noteLength?.[0].ticks).join(),
+	);
+	check("and an unopened } leaves the note alone", lengthOf("#0 }c4\n", "c4")?.[0].ticks === 48);
+
+	// #spc, #samples and #instruments are read by parseBlock, which eats their
+	// brace before parseTripletOpen could see it (parser.ts:823-856).
+	const block = '#instruments\n{\n\t"kick.brr" $FE $6A $B8 $03 $00\n}\n#0 c4\n';
+	check("a block directive's brace is not a triplet", lengthOf(block, "c4")?.[0].ticks === 48);
+	check("nor #samples'", lengthOf('#samples\n{\n\t"kick.brr"\n}\n#0 c4\n', "c4")?.[0].ticks === 48);
+	// The case that makes the distinction worth drawing: half-typed, the block
+	// never closes, and a plain toggle would two-thirds the rest of the song.
+	check("an unclosed one does not either", lengthOf('#samples\n{\n\t"kick.brr"\n#0 c4\n', "c4")?.[0].ticks === 48);
+	check("and a real triplet after one still works", lengthOf(`${block}#0 {c4}\n`, "c4}")?.[0].ticks === 32);
+}
+
 console.log("\ncomments and strings");
 {
 	const { tokens } = tokenize("; a comment with $F5 in it\n#0 c4\n");
@@ -542,6 +743,20 @@ console.log("\nknown divergences from AddmusicK, pinned on purpose");
 		"a spaced argument is still gathered, where AMK would error",
 		tokenize("#0 n 1F\n").commands.find((c) => c.kind === "n")?.args[0]?.value === 1,
 	);
+
+	// accumulateTiedLength folds consecutive rests into one the way it folds
+	// ties (parser.ts:2802). Only `^` is folded here, so a rest's tooltip stays
+	// about the rest under the caret.
+	const rests = tokenize("#0 r4 r8\n").commands.filter((c) => c.noteLength);
+	check("consecutive rests stay separate", rests.length === 2 && rests[0].noteLength?.length === 1);
+
+	// A pitch bend ahead makes AMK rewind the last tied segment and emit it as
+	// its own note (parser.ts:2810-2817). The scanner ties regardless.
+	check("a $DD ahead does not break the tie", lengthOf("#0 c4^8 $DD $00 $00 $00\n", "c4")?.length === 2);
+
+	// The same whitespace generosity as `t 144` above, and getNoteLength reads
+	// digits at the cursor — so AMK sees a bare `c` and a stray `4` here.
+	check("a spaced length is still the note's", lengthOf("#0 c 4\n", "c 4")?.[0].ticks === 48);
 
 	// preprocess.ts resolves the target markers before the parser runs, so the
 	// file's *last* effective marker governs the whole song — but a resumable
