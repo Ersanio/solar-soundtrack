@@ -544,6 +544,36 @@ console.log("\nknown divergences from AddmusicK, pinned on purpose");
 	);
 }
 
+console.log("\na directive's bare-word argument is not music");
+{
+	// `#option smwvtable` used to colour as s, m, a global volume, a volume,
+	// two notes and a default length — the report that added directiveWord.
+	const source = "#amk 4\n#option smwvtable\n#0 w255 c4\n";
+	const { tokens } = tokenize(source);
+	const word = tokenAt(tokens, source.indexOf("smwvtable"));
+	check("smwvtable is one directive token", word?.kind === "directive", word?.kind);
+	check("all of it", word !== null && word.end - word.start === "smwvtable".length, `${word?.start}-${word?.end}`);
+	check("the w after it is still a global volume", tokenAt(tokens, source.indexOf("w255"))?.kind === "globalVolume");
+	check("and the note is still a note", tokenAt(tokens, source.indexOf("c4"))?.kind === "note");
+
+	const divide = tokenize("#option dividetempo 3\n").tokens;
+	check("dividetempo is a directive word", tokenAt(divide, "#option ".length)?.kind === "directive");
+	check("its count stays a number", tokenAt(divide, "#option dividetempo ".length)?.kind === "number");
+
+	const defines = tokenize("#define !loud 1\n#ifdef !loud\n#0 c4\n#endif\n").tokens;
+	check("a define's name is part of the directive", tokenAt(defines, "#define ".length)?.kind === "directive");
+	check("its value stays a number", tokenAt(defines, "#define !loud ".length)?.kind === "number");
+
+	// The flag is consumed by whatever token comes next, word or not, so it
+	// cannot lie in wait and swallow music further down.
+	const cleared = tokenize("#option\n$EF $01 $02 $03 c4\n").tokens;
+	check("a non-word consumes the flag", tokenAt(cleared, "#option\n".length)?.kind === "hex");
+	check(
+		"music after it is untouched",
+		cleared.some((t) => t.kind === "note"),
+	);
+}
+
 console.log("\nrestartability — the property CodeMirror relies on");
 {
 	const sources = [
@@ -567,6 +597,10 @@ console.log("\nrestartability — the property CodeMirror relies on");
 		"#0 q7F n1F\n#0 c4\n",
 		// Left open at EOF, which is what a half-typed block looks like.
 		'#instruments\n{\n\t"kick.brr" $FE $6A\n',
+		// A directive's word argument on the next line — the parser's skipSpaces
+		// crosses the break, so the flag must too, and a restart between the two
+		// must still colour the word as part of the directive.
+		"#option\nsmwvtable\n#0 c4\n",
 	];
 
 	for (const [index, source] of sources.entries()) {

@@ -304,6 +304,18 @@ export interface ScanState {
 	 */
 	hexArgNext: boolean;
 	/**
+	 * The next bare word is a directive's argument, not music.
+	 *
+	 * `#option smwvtable` reaches `matchWord` through the parser's own
+	 * `skipSpaces` (`parser.ts:871-926`), which crosses line breaks — so without
+	 * this the argument would scan as `s`, `m`, a global volume, a volume, two
+	 * notes… Set for the directives whose argument is a bare word — `#option`,
+	 * and the preprocessor's `#define`/`#undef`/`#ifdef`/`#ifndef`/`#if`
+	 * (`preprocess.ts:175`) — and consumed by the next non-whitespace token,
+	 * word or not, so it cannot leak onto later music.
+	 */
+	directiveWord: boolean;
+	/**
 	 * `#instruments` has been seen and the block's `{` has not.
 	 *
 	 * Not a one-shot: the brace is usually on the following line.
@@ -331,6 +343,7 @@ export function startState(): ScanState {
 		replacements: NO_REPLACEMENTS,
 		sampleName: false,
 		hexArgNext: false,
+		directiveWord: false,
 		pendingInstruments: false,
 		inInstruments: false,
 	};
@@ -377,6 +390,20 @@ const isSpace = (c: string): boolean => c === " " || c === "\t" || c === "\r" ||
 const isDigit = (c: string): boolean => c >= "0" && c <= "9";
 const isAlpha = (c: string): boolean => (c >= "a" && c <= "z") || (c >= "A" && c <= "Z");
 const isHexDigit = (c: string): boolean => isDigit(c) || (c >= "a" && c <= "f") || (c >= "A" && c <= "F");
+/**
+ * A character a directive's bare-word argument may contain. Wider than
+ * {@link isAlpha} because `#option amk109hotpatch` carries digits and a
+ * preprocessor define is conventionally named `!like_this`.
+ */
+const isWordChar = (c: string): boolean => isAlpha(c) || isDigit(c) || c === "_" || c === "!";
+
+/**
+ * Directives whose first argument is a bare word rather than a number, a `$`
+ * value or a string — `#option`'s keyword (`parser.ts:926-982`) and the
+ * preprocessor's define names (`preprocess.ts:175`). They set
+ * {@link ScanState.directiveWord} so the word is not scanned as music.
+ */
+const WORD_ARG_DIRECTIVES = new Set(["#option", "#define", "#undef", "#ifdef", "#ifndef", "#if"]);
 
 /** Notes, rests and ties — the `parser.ts:437-439` arm of the dispatch. */
 const isNoteLetter = (c: string): boolean =>
@@ -456,6 +483,22 @@ function stepInner(
 		}
 
 		return { kind: null, end };
+	}
+
+	// Below the whitespace arm on purpose: the argument is separated from its
+	// directive by spaces — or a line break, since the parser reaches it through
+	// its newline-crossing `skipSpaces` — and none of that may consume the flag.
+	// Any other token does, word or not, so it never leaks onto later music.
+	if (state.directiveWord) {
+		state.directiveWord = false;
+		if (isWordChar(c)) {
+			let end = at;
+			while (end < line.length && isWordChar(line[end])) {
+				end++;
+			}
+
+			return { kind: "directive", end };
+		}
 	}
 
 	// `parser.ts:399` reports a stray character inside an unfinished hex command
@@ -627,10 +670,14 @@ function scanHash(line: string, at: number, state: ScanState): StepResult {
 			end++;
 		}
 
+		const name = line.slice(at, end).toLowerCase();
 		// `parser.ts:797` matches this case-insensitively. Every other directive
 		// clears the flag, so an `#instruments` with no block cannot arm the next
 		// unrelated `{`.
-		state.pendingInstruments = line.slice(at, end).toLowerCase() === "#instruments";
+		state.pendingInstruments = name === "#instruments";
+		// See {@link ScanState.directiveWord}. The set is every directive whose
+		// argument is a bare word rather than a number, a `$` value or a string.
+		state.directiveWord = WORD_ARG_DIRECTIVES.has(name);
 		return { kind: "directive", end };
 	}
 
