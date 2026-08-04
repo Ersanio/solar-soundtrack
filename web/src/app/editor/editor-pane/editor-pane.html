@@ -1,4 +1,17 @@
 <amk-panel heading="Editor" class="min-h-0 flex-1">
+  <button
+    panelHeadingAside
+    type="button"
+    [class]="wrapButtonClass()"
+    [title]="wordWrap() ? 'Word wrap: on' : 'Word wrap: off'"
+    [attr.aria-label]="wordWrap() ? 'Disable word wrap' : 'Enable word wrap'"
+    [attr.aria-pressed]="wordWrap()"
+    (click)="toggleWordWrap()"
+  >
+    <amk-icon-wrap />
+  </button>
+
+  <!-- Will grow into a toolbar; the caret readout is the only occupant for now. -->
   <div panelAside class="flex items-center gap-3">
     <amk-tabs [tabs]="TABS" [(active)]="tab" />
     @if (tab() === 'source') {
