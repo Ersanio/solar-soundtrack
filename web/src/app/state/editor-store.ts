@@ -109,11 +109,23 @@ export class EditorStore {
         optimizeSampleUsage: this.library.optimize(),
       },
     });
-    return { result, elapsedMs: performance.now() - started, aramAddress: plan.localPos };
+    return {
+      result,
+      elapsedMs: performance.now() - started,
+      aramAddress: plan.localPos,
+      text: this.committed(),
+    };
   });
 
   readonly result = computed<CompileResult | null>(() => this.compilation()?.result ?? null);
   readonly aramAddress = computed(() => this.compilation()?.aramAddress ?? null);
+
+  /**
+   * The text {@link result} was compiled from. The playhead compares it against
+   * {@link source} to know whether what the editor shows is what is audible —
+   * usually by reference, since {@link edit} commits the same string instance.
+   */
+  readonly compiledText = computed(() => this.compilation()?.text ?? null);
 
   /**
    * Errors first, then by position — the order you want to fix them in.
