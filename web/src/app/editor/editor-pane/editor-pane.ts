@@ -12,9 +12,11 @@ import {
 } from '@angular/core';
 
 import { defaultKeymap, history, historyKeymap, insertTab } from '@codemirror/commands';
+import { setDiagnostics } from '@codemirror/lint';
 import { EditorState } from '@codemirror/state';
 import { EditorView, keymap, lineNumbers } from '@codemirror/view';
 
+import type { Severity } from '@core/types';
 import { Panel } from '../../shared/panel/panel';
 import { type TabDef, Tabs } from '../../shared/tabs/tabs';
 import { EditorStore } from '../../state/editor-store';
@@ -24,6 +26,19 @@ import { mmlLanguage } from '../codemirror/mml-language';
 import { mmlTheme } from '../codemirror/mml-theme';
 
 type EditorTab = 'source' | 'samples';
+
+/**
+ * CodeMirror's lint severities are a smaller set than ours: `severe` renders
+ * as a warning whose squiggle the theme re-tints via `cm-amk-severe`. The
+ * diagnostics list still spells every severity out in words, so the colour is
+ * never the only channel.
+ */
+const LINT_SEVERITY: Record<Severity, 'error' | 'warning' | 'info'> = {
+  error: 'error',
+  severe: 'warning',
+  warning: 'warning',
+  info: 'info',
+};
 
 /**
  * The MML source editor and the sample library, as two tabs.
@@ -160,6 +175,32 @@ export class EditorPane {
             insert: edit.text,
           },
         });
+      });
+    });
+
+    // Sanctioned effect: mirroring diagnostics into the CodeMirror view.
+    //
+    // Compiler spans can lag the document by the typing debounce, so every
+    // position is clamped; a span the document has since shrunk away from
+    // still underlines something sensible rather than throwing.
+    effect(() => {
+      const diagnostics = this.store.diagnostics();
+      untracked(() => {
+        const length = this.view.state.doc.length;
+        this.view.dispatch(
+          setDiagnostics(
+            this.view.state,
+            diagnostics
+              .filter((diagnostic) => diagnostic.span.start <= length)
+              .map((diagnostic) => ({
+                from: Math.min(diagnostic.span.start, length),
+                to: Math.min(Math.max(diagnostic.span.end, diagnostic.span.start + 1), length),
+                severity: LINT_SEVERITY[diagnostic.severity],
+                message: `${diagnostic.code}: ${diagnostic.message}`,
+                markClass: diagnostic.severity === 'severe' ? 'cm-amk-severe' : undefined,
+              })),
+          ),
+        );
       });
     });
   }
