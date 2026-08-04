@@ -1,6 +1,6 @@
 import { DestroyRef, Service, computed, effect, inject, signal, untracked } from '@angular/core';
 
-import type { CompileResult } from '@core/types';
+import { type CompileResult, type NoteAddress, type Span, noteAddressAt } from '@core/types';
 import { SpcPlayer, type SongTiming } from '@spc/player';
 import type { DriverState } from '@spc/driver-state';
 import { SPC_SAMPLE_RATE } from '@spc/wasm-host';
@@ -10,6 +10,10 @@ import { EditorStore } from './editor-store';
 /** N-SPC songs have eight music channels. */
 const CHANNELS = 8;
 const ALL_CHANNELS = 0b11111111;
+/** In the note map, the loop/subroutine block counts as a ninth channel. */
+const LOOP_BLOCK = 8;
+
+const NO_SPANS: readonly Span[] = [];
 
 export interface ChannelState {
   index: number;
@@ -51,6 +55,13 @@ export class Playback {
 
   /** Where the seek bar is being dragged to, while the drag is still going on. */
   private readonly scrubbing = signal<number | null>(null);
+
+  /**
+   * The note map and source text of the song the player is actually holding —
+   * snapshotted when an SPC is handed over, because the editor may compile any
+   * number of songs while an older one goes on playing.
+   */
+  private readonly loaded = signal<{ map: readonly NoteAddress[]; text: string } | null>(null);
 
   readonly isPlaying = computed(() => this.state() === 'playing');
   readonly isIdle = computed(() => this.state() === 'idle');
@@ -136,6 +147,59 @@ export class Playback {
   readonly isSoloing = computed(() => this.soloedChannel() !== null);
   readonly hasChannelOverrides = computed(() => this.mutedMask() !== 0 || this.isSoloing());
 
+  /**
+   * The source spans being sounded right now, one per audible voice — the
+   * playhead the editor decorates. Follows the driver's own read pointers
+   * rather than any clock, so loops, tempo changes and dropped ticks cost it
+   * nothing.
+   *
+   * Empty unless the editor shows exactly the text that is playing: while an
+   * edit is mid-debounce, after editing with live reload off, or on a failed
+   * compile, a highlight would point into the wrong document, so there is
+   * none. The comparison is by reference in the common case, since `edit()`
+   * commits the same string instance `source` holds.
+   *
+   * A voice's pointer resolving into another voice's region is a mid-update
+   * artefact of reading ARAM between driver writes; those are dropped rather
+   * than shown. The custom `equal` keeps the 10 Hz stream quiescent whenever
+   * nothing has moved.
+   */
+  readonly playheadSpans = computed<readonly Span[]>(
+    () => {
+      const loaded = this.loaded();
+      const driver = this.driver();
+      if (!loaded || !driver || loaded.text !== this.editor.source()) {
+        return NO_SPANS;
+      }
+
+      const silenced = this.silenced();
+      const spans: Span[] = [];
+      for (let voice = 0; voice < CHANNELS; voice++) {
+        const pointer = driver.trackPointers[voice];
+        if (pointer === 0 || (silenced & (1 << voice)) !== 0) {
+          continue;
+        }
+
+        const entry = noteAddressAt(loaded.map, pointer);
+        if (entry && (entry.channel === voice || entry.channel === LOOP_BLOCK)) {
+          spans.push(entry.span);
+        }
+      }
+
+      return spans
+        .sort((a, b) => a.start - b.start || a.end - b.end)
+        .filter(
+          (span, n, all) =>
+            n === 0 || span.start !== all[n - 1].start || span.end !== all[n - 1].end,
+        );
+    },
+    {
+      equal: (a, b) =>
+        a.length === b.length &&
+        a.every((span, n) => span.start === b[n].start && span.end === b[n].end),
+    },
+  );
+
   constructor() {
     effect(() => this.player.setVolume(this.volume() / 100));
     effect(() => this.player.setLoop(this.loop()));
@@ -163,6 +227,7 @@ export class Playback {
       this.elapsed.set(0);
       this.scrubbing.set(null);
       this.driver.set(null);
+      this.loaded.set(null);
     };
 
     this.player.onError = (error) => {
@@ -306,7 +371,15 @@ export class Playback {
     // long looping session does not re-emulate every pass to get back.
     if (spc) {
       this.player.play(spc, this.secondsAt(this.player.getSongTicks()), this.timing());
+      this.loaded.set(this.captureLoaded());
     }
+  }
+
+  /** What {@link loaded} should hold for the compilation just handed to the player. */
+  private captureLoaded(): { map: readonly NoteAddress[]; text: string } | null {
+    const map = this.editor.result()?.noteMap;
+    const text = this.editor.compiledText();
+    return map && text !== null ? { map, text } : null;
   }
 
   /** Play, pause or resume. The first press doubles as the audio unlock gesture. */
@@ -342,6 +415,7 @@ export class Playback {
     }
 
     this.player.play(spc, 0, this.timing());
+    this.loaded.set(this.captureLoaded());
     this.state.set('playing');
   }
 
@@ -351,6 +425,7 @@ export class Playback {
     this.elapsed.set(0);
     this.scrubbing.set(null);
     this.driver.set(null);
+    this.loaded.set(null);
   }
 
   /**

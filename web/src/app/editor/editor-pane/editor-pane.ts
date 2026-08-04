@@ -20,11 +20,13 @@ import type { Severity } from '@core/types';
 import { Panel } from '../../shared/panel/panel';
 import { type TabDef, Tabs } from '../../shared/tabs/tabs';
 import { EditorStore } from '../../state/editor-store';
+import { Playback } from '../../state/playback';
 import { ChannelMixer } from '../channel-mixer/channel-mixer';
 import { SampleBrowser } from '../sample-browser/sample-browser';
 import { commandHover } from '../codemirror/command-hover';
 import { mmlLanguage } from '../codemirror/mml-language';
 import { mmlTheme } from '../codemirror/mml-theme';
+import { playheadField, setPlayhead } from '../codemirror/playhead';
 
 type EditorTab = 'source' | 'samples';
 
@@ -66,6 +68,7 @@ const LINT_SEVERITY: Record<Severity, 'error' | 'warning' | 'info'> = {
 })
 export class EditorPane {
   protected readonly store = inject(EditorStore);
+  private readonly playback = inject(Playback);
   private readonly injector = inject(Injector);
 
   protected readonly TABS: readonly TabDef<EditorTab>[] = [
@@ -104,6 +107,7 @@ export class EditorPane {
           mmlLanguage,
           mmlTheme,
           commandHover(() => this.store.tokens().commands),
+          playheadField,
           EditorState.tabSize.of(8),
           EditorView.contentAttributes.of({
             'aria-label': 'MML source',
@@ -204,6 +208,12 @@ export class EditorPane {
           ),
         );
       });
+    });
+
+    // Sanctioned effect: mirroring the playhead into the CodeMirror view.
+    effect(() => {
+      const spans = this.playback.playheadSpans();
+      untracked(() => this.view.dispatch({ effects: setPlayhead.of(spans) }));
     });
   }
 
