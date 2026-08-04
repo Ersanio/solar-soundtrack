@@ -128,10 +128,27 @@ export interface CompileRequest {
 	options?: Readonly<Record<string, unknown>>;
 }
 
+/** One emitted note, rest or tie: where its first byte landed in ARAM, and the source that wrote it. */
+export interface NoteAddress {
+	/** Absolute ARAM address of the first byte the note's emission wrote. */
+	address: number;
+	/** 0-7 for the music channels; 8 for the loop/subroutine block. */
+	channel: number;
+	span: Span;
+}
+
 export interface CompileResult {
 	ok: boolean;
 	/** Relocated song data, ready to paste at `aramAddress`. Null if `!ok`. */
 	data: Uint8Array | null;
+	/**
+	 * Every note, rest and tie by the ARAM address of its first byte, sorted by
+	 * address — what a playhead joins against the driver's per-voice track
+	 * pointers. Loop bodies live in the loop block (channel 8), so a pointer
+	 * inside a loop call still resolves to the body's source span, on every
+	 * pass. Null if `!ok`.
+	 */
+	noteMap: readonly NoteAddress[] | null;
 	/**
 	 * The sample set this song needs, by filename, in SRCN order — index 0 is
 	 * directory entry 0. `null` means the compiler has no opinion and the host
@@ -180,5 +197,32 @@ export function failure(
 	stats: CompileStats | null = null,
 	sampleList: readonly string[] | null = null,
 ): CompileResult {
-	return { ok: false, data: null, sampleList, diagnostics, stats };
+	return { ok: false, data: null, noteMap: null, sampleList, diagnostics, stats };
+}
+
+/**
+ * The entry a voice is sounding while its track pointer sits at `pointer`.
+ *
+ * The N-SPC driver reads ahead: while a note rings, the pointer is parked just
+ * past the bytes it consumed, so every address in `[entry.address, pointer)`
+ * belongs to that entry — the last one *strictly below* the pointer. Binary
+ * search; `map` must be sorted by address, which {@link CompileResult.noteMap}
+ * is.
+ */
+export function noteAddressAt(map: readonly NoteAddress[], pointer: number): NoteAddress | null {
+	let low = 0;
+	let high = map.length - 1;
+	let found = -1;
+
+	while (low <= high) {
+		const mid = (low + high) >> 1;
+		if (map[mid].address < pointer) {
+			found = mid;
+			low = mid + 1;
+		} else {
+			high = mid - 1;
+		}
+	}
+
+	return found >= 0 ? map[found] : null;
 }

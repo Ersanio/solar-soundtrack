@@ -71,11 +71,24 @@ export interface AddmusicKOptions {
 	optimizeSampleUsage?: boolean;
 }
 
+/**
+ * One note, rest or standalone tie, in emission order: which channel vector it
+ * was appended to (8 is the loop/subroutine block), the offset of its first
+ * byte there, and the source span that wrote it. `link.ts` relocates the
+ * offsets into ARAM addresses for the playhead's note map.
+ */
+export interface NoteEvent {
+	channel: number;
+	offset: number;
+	span: Span;
+}
+
 /** Raw output of the scan, before pointers are resolved. See `link.ts`. */
 export interface ParseOutput {
 	data: number[][];
 	loopLocations: number[][];
 	phrasePointers: number[][];
+	noteEvents: NoteEvent[];
 	instrumentData: number[];
 	hasIntro: boolean;
 	doesntLoop: boolean;
@@ -175,6 +188,7 @@ export class AddmusicKParser {
 	private readonly data: number[][] = Array.from({ length: 9 }, () => []);
 	private readonly loopLocations: number[][] = Array.from({ length: 9 }, () => []);
 	private readonly phrasePointers: number[][] = Array.from({ length: 8 }, () => [0, 0]);
+	private readonly noteEvents: NoteEvent[] = [];
 	private readonly passedNote = new Array<boolean>(8).fill(false);
 	private readonly passedIntro = new Array<boolean>(8).fill(false);
 
@@ -2757,6 +2771,23 @@ export class AddmusicKParser {
 		let ticks = this.accumulateTiedLength(note);
 		ticks = this.divideByTempoRatio(ticks, true);
 		this.addNoteLength(ticks);
+
+		// The note map: `emitNote` writes this note's first byte next, so the
+		// current end of the channel vector is that byte's offset. The ties
+		// `accumulateTiedLength` consumed belong to the note; the trailing
+		// whitespace its `skipSpaces` walked past does not, so the span is
+		// trimmed back to the text.
+		let end = this.pos;
+		while (end > start && isSpace(this.text[end - 1])) {
+			end--;
+		}
+
+		this.noteEvents.push({
+			channel: this.channel,
+			offset: this.data[this.channel].length,
+			span: this.spanAt(start, end),
+		});
+
 		this.emitNote(note, ticks);
 	}
 
@@ -3691,6 +3722,7 @@ export class AddmusicKParser {
 			data: this.data,
 			loopLocations: this.loopLocations,
 			phrasePointers: this.phrasePointers,
+			noteEvents: this.noteEvents,
 			instrumentData: this.instrumentData,
 			hasIntro: this.hasIntro,
 			doesntLoop: this.doesntLoop,
