@@ -542,6 +542,39 @@ console.log("\nknown divergences from AddmusicK, pinned on purpose");
 		"a spaced argument is still gathered, where AMK would error",
 		tokenize("#0 n 1F\n").commands.find((c) => c.kind === "n")?.args[0]?.value === 1,
 	);
+
+	// preprocess.ts resolves the target markers before the parser runs, so the
+	// file's *last* effective marker governs the whole song — but a resumable
+	// scanner can only apply one from its line down. Well-formed songs put the
+	// marker before any music, where the two agree.
+	const positional = tokenize("#0 $FC $05 $7F $01 $02\n#amk 1\n#1 $FC $05 $7F\n").commands.filter(
+		(c) => c.vcmd === 0xfc,
+	);
+	check(
+		"a mid-file marker applies from its line down, not to the whole file",
+		positional[0]?.args.length === 4 && positional[1]?.args.length === 2,
+		`got ${positional[0]?.args.length} and ${positional[1]?.args.length}`,
+	);
+
+	// preprocess's argument read stops at a line end (preprocess.ts:79-101), so
+	// a real `#amk\n1` fails AMK0401 and compiles nothing; the one-shot here
+	// cannot see line breaks. Harmless: it only recolours a broken song.
+	const split = tokenize("#amk\n1\n#0 $FC $05 $7F\n").commands.find((c) => c.vcmd === 0xfc);
+	check("the #amk version one-shot crosses a newline", split?.args.length === 2, `got ${split?.args.length}`);
+
+	// An $ED $82 upload aimed at $6136 appends to the compiler's instrument
+	// table (parser.ts:3384-3385), shifting `@30 + k` numbering; this pass
+	// counts only #instruments blocks. Error-truncation shapes are not mirrored
+	// either — e.g. $FA under #amm zeroes hexLeft on its error path
+	// (parser.ts:2993-2996) — the compiler squiggles those, and the scanner
+	// keeps AddmusicK's grouping.
+	const hacked = tokenize(
+		'#am4\n#0 $ED $82 $61 $36 $00 $05 $04 $FE $6A $B8 $03 $00\n#instruments\n{\n\t"kick.brr" $FE $6A $B8 $03 $00\n}\n',
+	);
+	check(
+		"the HFD instrument hack does not shift @ numbering",
+		hacked.instruments.length === 1 && hacked.instruments[0].number === 30,
+	);
 }
 
 console.log("\na directive's bare-word argument is not music");
@@ -574,6 +607,112 @@ console.log("\na directive's bare-word argument is not music");
 	);
 }
 
+console.log("\nthe target markers pick the dialect");
+{
+	// parser.ts:2970 — #amk 1's $FC is remote gain and takes two arguments.
+	const amk1 = tokenize("#amk 1\n#0 $FC $05 $7F c4\n").commands;
+	const gain = amk1.find((c) => c.vcmd === 0xfc);
+	check("under #amk 1, $FC takes two arguments", gain?.args.length === 2, `got ${gain?.args.length}`);
+	check("and is complete", gain?.complete === true);
+	check("and is named remote gain", gain?.name === "remote gain", gain?.name);
+	check("and carries its dialect", gain?.target.amkVersion === 1 && gain.target.program === 0);
+	check(
+		"the note after it survives",
+		amk1.some((c) => c.kind === "c"),
+	);
+
+	// The flip point pins scanHex and expectedArgs against each other.
+	const short = tokenize("#amk 1\n#0 $FC $05\n").commands.find((c) => c.vcmd === 0xfc);
+	check("one argument short is incomplete", short?.complete === false);
+
+	const amk4 = tokenize("#amk 4\n#0 $FC $05 $7F $01 $02\n").commands.find((c) => c.vcmd === 0xfc);
+	check("under #amk 4, $FC takes four", amk4?.args.length === 4, `got ${amk4?.args.length}`);
+	check("and is named remote code", amk4?.name === "remote code", amk4?.name);
+
+	// The pre-spaced form (preprocess.ts:163-171) arrives as the number `=1`.
+	const eq = tokenize("#amk=1\n#0 $FC $05 $7F c4\n").commands.find((c) => c.vcmd === 0xfc);
+	check("#amk=1 selects version 1", eq?.args.length === 2, `got ${eq?.args.length}`);
+
+	// preprocess reads the directive word whole (preprocess.ts:173), so `#amk4`
+	// is an unknown directive, not a marker.
+	const glued = tokenize("#amk4\n#0 $FC $05 $7F $01 $02\n").commands.find((c) => c.vcmd === 0xfc);
+	check("#amk4 without a space is no marker", glued?.args.length === 4, `got ${glued?.args.length}`);
+
+	// preprocess.ts:323 — once a legacy marker is seen, a later #amk is ignored…
+	const guarded = tokenize("#am4\n#amk 4\n#0 $ED $80 $6C $20 c4\n").commands.find((c) => c.vcmd === 0xed);
+	check("#amk after #am4 is ignored", guarded?.args.length === 3, `got ${guarded?.args.length}`);
+
+	// …while a later legacy marker always wins (preprocess.ts:340-345).
+	const amm = tokenize("#amk 4\n#amm\n#0 $E7 $10\n").commands.find((c) => c.vcmd === 0xe7);
+	check("a later #amm wins over #amk", amm?.target.program === 2, String(amm?.target.program));
+
+	const flipped = tokenize("#amm\n#am4\n#0 $ED $81 $05 c4\n").commands.find((c) => c.vcmd === 0xed);
+	check("a later #am4 wins over #amm", flipped?.args.length === 2 && flipped.name === "tune", flipped?.name);
+
+	// parser.ts:181-182 — before any marker, the parser assumes #amk 4.
+	const bare = tokenize("#0 $FC $01 $02 $03 $04\n").commands.find((c) => c.vcmd === 0xfc);
+	check("no marker means the #amk 4 default", bare?.target.program === 0 && bare.target.amkVersion === 4);
+}
+
+console.log("\n#am4's $ED is HFD's escape");
+{
+	// parseHFDHex (parser.ts:3286, Music.cpp:1466) — the sub-byte picks the form.
+	const dsp = tokenize("#am4\n#0 $ED $80 $6C $20 c4\n").commands.find((c) => c.vcmd === 0xed);
+	check("$ED $80 takes a register and a value", dsp?.args.length === 3, `got ${dsp?.args.length}`);
+	check("and is complete", dsp?.complete === true);
+	check("and is named as the DSP write it compiles to", dsp?.name === "DSP write", dsp?.name);
+
+	const tune = tokenize("#am4\n#0 $ED $81 $05 $E7 $10\n").commands;
+	const tuned = tune.find((c) => c.vcmd === 0xed);
+	check("$ED $81 takes one value", tuned?.args.length === 2, `got ${tuned?.args.length}`);
+	check("and is named tune", tuned?.name === "tune", tuned?.name);
+	check("the byte after it opens its own command", tune.find((c) => c.vcmd === 0xe7)?.args.length === 1);
+
+	// $ED $82: address, then a big-endian count of the data bytes that follow —
+	// count+1 of them, the do-while at parser.ts:3390.
+	const upload = tokenize("#am4\n#0 $ED $82 $61 $00 $00 $02 $AA $BB $CC c4\n").commands;
+	const block = upload.find((c) => c.vcmd === 0xed);
+	check("$ED $82 reads its count and the data", block?.args.length === 8, `got ${block?.args.length}`);
+	check("and is complete", block?.complete === true);
+	check("and is named ARAM upload", block?.name === "ARAM upload", block?.name);
+	check(
+		"the note after the data survives",
+		upload.some((c) => c.kind === "c"),
+	);
+
+	const shortData = tokenize("#am4\n#0 $ED $82 $61 $00 $00 $02 $AA $BB\n").commands.find((c) => c.vcmd === 0xed);
+	check("one data byte short is incomplete", shortData?.complete === false);
+
+	const noCount = tokenize("#am4\n#0 $ED $82 $61 $00\n").commands.find((c) => c.vcmd === 0xed);
+	check("a header cut before its count is incomplete", noCount?.complete === false);
+
+	const adsr = tokenize("#am4\n#0 $ED $05 $7F c4\n").commands.find((c) => c.vcmd === 0xed);
+	check("a low sub-byte is the plain ADSR form", adsr?.args.length === 2 && adsr.complete, `got ${adsr?.args.length}`);
+	check("named as such", adsr?.name === "ADSR / GAIN", adsr?.name);
+
+	// AMK0163 is the compiler's diagnostic; the scanner just ends the run.
+	const bad = tokenize("#am4\n#0 $ED $83 c4\n").commands.find((c) => c.vcmd === 0xed);
+	check("$ED $83 takes nothing further", bad?.args.length === 1 && bad.complete === true);
+
+	const amk = tokenize("#amk 4\n#0 $ED $80 $A0 c4\n").commands.find((c) => c.vcmd === 0xed);
+	check("under #amk 4, $ED is two-argument ADSR", amk?.args.length === 2, `got ${amk?.args.length}`);
+}
+
+console.log("\n#am4's $E5 forks on its first argument");
+{
+	// Music.cpp:1820, parser.ts:3014-3031 — a high bit means "load sample".
+	const load = tokenize("#am4\n#0 $E5 $85 $04 c4\n").commands.find((c) => c.vcmd === 0xe5);
+	check("a high first argument is a sample load", load?.args.length === 2, `got ${load?.args.length}`);
+	check("named as the $F3 it compiles to", load?.name === "sample load", load?.name);
+	check("and complete", load?.complete === true);
+
+	const trem = tokenize("#am4\n#0 $E5 $20 $30 $40 c4\n").commands.find((c) => c.vcmd === 0xe5);
+	check("a low first argument stays tremolo", trem?.args.length === 3 && trem.name === "tremolo", trem?.name);
+
+	const amk = tokenize("#amk 4\n#0 $E5 $85 $04 $01\n").commands.find((c) => c.vcmd === 0xe5);
+	check("no fork outside #am4", amk?.args.length === 3, `got ${amk?.args.length}`);
+}
+
 console.log("\nrestartability — the property CodeMirror relies on");
 {
 	const sources = [
@@ -601,6 +740,22 @@ console.log("\nrestartability — the property CodeMirror relies on");
 		// crosses the break, so the flag must too, and a restart between the two
 		// must still colour the word as part of the directive.
 		"#option\nsmwvtable\n#0 c4\n",
+		// The dialect fields cross every line below the marker.
+		"#am4\n#0 $ED $80 $6C\n$E7 $10 c4\n",
+		// awaitingHfdSub itself crosses the break — the parser's skipSpaces allows it.
+		"#am4\n#0 $ED\n$80 $6C $20 c4\n",
+		// An $ED $82 split inside its header: hfdCountHi crosses the break…
+		"#am4\n#0 $ED $82 $61 $00\n$00 $02 $AA $BB $CC c4\n",
+		// …and split between the count bytes, so the extension lands right after a restart.
+		"#am4\n#0 $ED $82 $61 $00 $00\n$02 $AA $BB $CC c4\n",
+		// The #amk version one-shot crossing the break (the pinned approximation).
+		"#amk\n1\n#0 $FC $05 $7F c4\n",
+		// A mid-file #amm: the dialect changes partway down the document.
+		"#amk 4\n#0 c4\n#amm\n$FA $02 $05 c4\n",
+		// #am4's shortened sample-load form split at the break.
+		"#am4\n#0 $E5 $85\n$04 c4\n",
+		// #amk 1's two-argument $FC split, with a fresh command right after.
+		"#amk 1\n#0 $FC $05\n$7F $E7 $10\n",
 	];
 
 	for (const [index, source] of sources.entries()) {

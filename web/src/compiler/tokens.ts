@@ -25,10 +25,13 @@
  * The dispatch mirrors `Music::parseHexCommand` / `Music::scan` as ported in
  * `parser.ts` — in particular the `hexLeft` / `currentHex` / `currentHexSub`
  * state machine at `parser.ts:195-199`, which is why a hex command split across
- * a line break still resolves. What it does not mirror is the target-program
- * forks (`#am4`'s `$ED` and `$E5`, `#amk 1`'s `$FC`): those need the directives
- * parsed, and getting them wrong costs a mis-coloured argument rather than a
- * wrong byte.
+ * a line break still resolves. The target-program forks (`#am4`'s `$ED` and
+ * `$E5`, `#amk 1`'s `$FC`) are mirrored too, off the markers scanned in place —
+ * with one deliberate difference: `preprocess.ts` resolves the markers before
+ * the parser runs, so the file's last effective marker governs the *whole*
+ * song, where a resumable scanner can only apply a marker from its line down.
+ * Well-formed songs put the marker before any music, where the two agree; the
+ * mid-file divergence is pinned in `tokentest`.
  *
  * Replacements — `"echo1=$EF"` and then a bare `echo1` — are followed, because
  * writing commands that way is ordinary and an inspector that went blank on
@@ -258,6 +261,22 @@ function matchReplacement(line: string, at: number, table: ReplacementTable): Re
 }
 
 /**
+ * The dialect in force where a command was written, in the parser's vocabulary
+ * (`parser.ts:181-182`, `applyTarget` at `parser.ts:389-417`). The scanner
+ * carries the same two numbers flat in {@link ScanState}; this is the gathered,
+ * per-command form the inspector dispatches on.
+ */
+export interface CommandTarget {
+	/** 0 = AddmusicK, 1 = Addmusic 4.05 (`#am4`), 2 = AddmusicM (`#amm`). */
+	readonly program: number;
+	/** The `#amk` version; 0 for the legacy programs. */
+	readonly amkVersion: number;
+}
+
+/** What the parser assumes before any marker (`parser.ts:181-182`). */
+const DEFAULT_TARGET: CommandTarget = { program: 0, amkVersion: 4 };
+
+/**
  * Everything the scanner must carry across a line boundary.
  *
  * Flat and small on purpose: CodeMirror copies it once per line, and anything
@@ -270,7 +289,10 @@ export interface ScanState {
 	hexLeft: number;
 	/** The `$XX` those arguments belong to; `0` when none is open. */
 	currentHex: number;
-	/** Second byte, tracked only for `$FA`, as `parser.ts:2454` does. */
+	/**
+	 * Second byte, tracked for `$FA` as `parser.ts:2454` does — and, under
+	 * `#am4`, for `$ED`, whose sub-byte picks the HFD form (`parser.ts:3286`).
+	 */
 	currentHexSub: number;
 	/**
 	 * `$FB` takes its length from the byte after it (`parser.ts:2413-2424`), so
@@ -330,6 +352,47 @@ export interface ScanState {
 	 * of the entry as its arguments.
 	 */
 	inInstruments: boolean;
+	/**
+	 * The target program in force at this point, in the parser's vocabulary
+	 * (`parser.ts:181-182`): 0 = AddmusicK, 1 = Addmusic 4.05 (`#am4`),
+	 * 2 = AddmusicM (`#amm`).
+	 *
+	 * Positional, where the compiler's is final: `preprocess.ts` resolves the
+	 * markers before the parser runs, so the file's *last* effective marker
+	 * governs the whole song — but a resumable scanner can only apply a marker
+	 * from its line down. Well-formed songs put the marker before any music,
+	 * where the two agree; the mid-file divergence is pinned in `tokentest`.
+	 */
+	songTargetProgram: number;
+	/**
+	 * The `#amk` version; 0 under `#am4`/`#amm`, and 4 before any marker, both
+	 * matching the parser (`parser.ts:181`, `applyTarget` at `parser.ts:389`).
+	 */
+	targetAMKVersion: number;
+	/**
+	 * A `#amk` directive was seen and its version number has not.
+	 *
+	 * One-shot in the {@link directiveWord} mould: the number is a separate
+	 * token, reached through whitespace. It also survives a line break, which
+	 * `preprocess.ts`'s newline-bounded argument read does not — an accepted
+	 * approximation pinned in `tokentest`, since a real `#amk` with its number
+	 * on the next line fails AMK0401 and compiles nothing.
+	 */
+	awaitingAmkVersion: boolean;
+	/**
+	 * The next `$xx` is the sub-byte of an `#am4` `$ED` — `parseHFDHex`
+	 * (`parser.ts:3286`, Music.cpp:1466): `$80` writes a DSP register, `$81`
+	 * tunes, `$82` uploads a block, `$83` is an error, and anything else is a
+	 * plain ADSR command. One-shot like {@link awaitingArpCount}, because the
+	 * sub-byte picks how many arguments follow.
+	 */
+	awaitingHfdSub: boolean;
+	/**
+	 * High byte of an `$ED $82` upload's 16-bit data count, held from the third
+	 * header argument until the fourth extends the run by count+1 data bytes
+	 * (`parser.ts:3381-3396`).
+	 */
+	hfdCountHi: number;
 }
 
 export function startState(): ScanState {
@@ -346,6 +409,11 @@ export function startState(): ScanState {
 		directiveWord: false,
 		pendingInstruments: false,
 		inInstruments: false,
+		songTargetProgram: DEFAULT_TARGET.program,
+		targetAMKVersion: DEFAULT_TARGET.amkVersion,
+		awaitingAmkVersion: false,
+		awaitingHfdSub: false,
+		hfdCountHi: 0,
 	};
 }
 
@@ -501,6 +569,28 @@ function stepInner(
 		}
 	}
 
+	// `#amk`'s version argument — preprocess.ts:323-338 — read here because it
+	// is a separate token. Guarded the way preprocess guards it: once `#am4` or
+	// `#amm` has been seen (`version < 0` there, a non-zero program here), a
+	// later `#amk` is ignored. `#amk=1` (preprocess.ts:163-171) arrives as the
+	// number token `=1`, which `scanNumber` already reads. Falls through so the
+	// token still scans as the plain number it is.
+	if (state.awaitingAmkVersion) {
+		state.awaitingAmkVersion = false;
+		if (isDigit(c) || (c === "=" && isDigit(line[at + 1]))) {
+			let digit = c === "=" ? at + 1 : at;
+			let version = 0;
+			while (digit < line.length && isDigit(line[digit])) {
+				version = version * 10 + (line.charCodeAt(digit) - 0x30);
+				digit++;
+			}
+
+			if (state.songTargetProgram === 0) {
+				state.targetAMKVersion = version;
+			}
+		}
+	}
+
 	// `parser.ts:399` reports a stray character inside an unfinished hex command
 	// and then dispatches it anyway — `hexLeft` is left standing rather than the
 	// character being skipped. That is deliberately not special-cased here: the
@@ -530,6 +620,7 @@ function stepInner(
 			state.hexLeft = 0;
 			state.currentHex = 0;
 			state.awaitingArpCount = false;
+			state.awaitingHfdSub = false;
 			return { kind: "operator", end: at + 1 };
 
 		case "[":
@@ -589,6 +680,7 @@ function stepInner(
 				state.hexLeft = 0;
 				state.currentHex = 0;
 				state.awaitingArpCount = false;
+				state.awaitingHfdSub = false;
 			}
 
 			return { kind: "operator", end: at + 1 };
@@ -666,7 +758,10 @@ function scanNumber(line: string, at: number): StepResult {
 function scanHash(line: string, at: number, state: ScanState): StepResult {
 	let end = at + 1;
 	if (isAlpha(line[end])) {
-		while (end < line.length && isAlpha(line[end])) {
+		// Alphanumeric after the first letter, so `#am4` is one directive — as
+		// `preprocess.ts:173` reads it, one word up to whitespace. The first
+		// character stays alphabetic so `#0`-`#7` remain channels.
+		while (end < line.length && (isAlpha(line[end]) || isDigit(line[end]))) {
 			end++;
 		}
 
@@ -678,6 +773,22 @@ function scanHash(line: string, at: number, state: ScanState): StepResult {
 		// See {@link ScanState.directiveWord}. The set is every directive whose
 		// argument is a bare word rather than a number, a `$` value or a string.
 		state.directiveWord = WORD_ARG_DIRECTIVES.has(name);
+
+		// The target markers — preprocess.ts:340-345. `#am4`/`#amm` are
+		// unguarded there, so a later one always wins, even over an earlier
+		// `#amk`; `#amk`'s own guard sits where its version number is read.
+		if (name === "#am4") {
+			state.songTargetProgram = 1;
+			state.targetAMKVersion = 0;
+		} else if (name === "#amm") {
+			state.songTargetProgram = 2;
+			state.targetAMKVersion = 0;
+		}
+
+		// Assigned rather than or-ed, like the flags above: any other directive
+		// disarms it. Note `#amk4` without a space is one (unknown) directive —
+		// preprocess reads the word whole — and must not arm this.
+		state.awaitingAmkVersion = name === "#amk";
 		return { kind: "directive", end };
 	}
 
@@ -835,6 +946,26 @@ function scanHex(line: string, at: number, state: ScanState): StepResult {
 		return { kind: "hexArg", end };
 	}
 
+	if (state.awaitingHfdSub) {
+		// `parseHFDHex` (`parser.ts:3286`, Music.cpp:1466) — the byte after an
+		// `#am4` `$ED` picks the form, and with it how many arguments follow.
+		state.awaitingHfdSub = false;
+		state.currentHexSub = value;
+		if (value === 0x80) {
+			state.hexLeft = 2; // DSP register and value (parser.ts:3315)
+		} else if (value === 0x81) {
+			state.hexLeft = 1; // semitone tune (parser.ts:3343)
+		} else if (value === 0x82) {
+			state.hexLeft = 4; // address and count; the data follows (parser.ts:3360)
+		} else if (value === 0x83) {
+			state.hexLeft = 0; // AMK0163 — nothing follows (parser.ts:3356)
+		} else {
+			state.hexLeft = 1; // plain ADSR, the sub being its first argument
+		}
+
+		return { kind: "hexArg", end };
+	}
+
 	if (state.hexLeft === 0) {
 		if (value < FIRST_VCMD || value > LAST_VCMD) {
 			// Not a command byte. Left as a plain hex literal so the argument of a
@@ -844,10 +975,21 @@ function scanHex(line: string, at: number, state: ScanState): StepResult {
 
 		state.currentHex = value;
 		state.currentHexSub = 0;
-		if (value === 0xfb) {
+		if (value === 0xed && state.songTargetProgram === 1) {
+			// `parser.ts:2946` — #am4 sends $ED to the HFD translator; the next
+			// byte picks the form, exactly as `$FB`'s count picks its length.
+			state.awaitingHfdSub = true;
+			state.hexLeft = 0;
+		} else if (value === 0xfb) {
 			state.awaitingArpCount = true;
 			state.hexLeft = 0;
+		} else if (value === 0xfc && state.targetAMKVersion === 1) {
+			// `parser.ts:2970-2975` — #amk 1's $FC is remote gain: two arguments.
+			state.hexLeft = 2;
 		} else {
+			// #am4's $E5 needs no fork here — the parser's explicit 3
+			// (parser.ts:2968) equals the table's; its overload is decided on the
+			// first argument, below.
 			state.hexLeft = HEX_LENGTHS[value - FIRST_VCMD] - 1;
 		}
 
@@ -862,6 +1004,25 @@ function scanHex(line: string, at: number, state: ScanState): StepResult {
 	// `parser.ts:2458` — `$FA $FE` takes a further byte when the high bit is set.
 	if (state.hexLeft === 0 && state.currentHex === 0xfa && state.currentHexSub === 0xfe && value >= 0x80) {
 		state.hexLeft++;
+	}
+
+	// `parser.ts:3014-3031` (Music.cpp:1820) — under #am4 a high bit on $E5's
+	// first argument means "load sample": one fewer argument follows.
+	if (state.hexLeft === 2 && state.currentHex === 0xe5 && state.songTargetProgram === 1 && value >= 0x80) {
+		state.hexLeft -= 1;
+	}
+
+	// `parser.ts:3381-3396` — `$ED $82`'s third and fourth arguments are a
+	// big-endian data count, and count+1 data bytes follow the four header
+	// arguments (the do-while at parser.ts:3390 runs count+1 times). The sub is
+	// cleared once the count is folded in, so data bytes cannot re-trigger it.
+	if (state.currentHex === 0xed && state.currentHexSub === 0x82) {
+		if (state.hexLeft === 1) {
+			state.hfdCountHi = value;
+		} else if (state.hexLeft === 0) {
+			state.hexLeft = ((state.hfdCountHi << 8) | value) + 1;
+			state.currentHexSub = 0;
+		}
 	}
 
 	return { kind: "hexArg", end };
@@ -920,6 +1081,13 @@ export interface Command {
 	 * the unconditional remap at `parser.ts:1597`, means custom instrument 30.
 	 */
 	direct?: boolean;
+	/**
+	 * The dialect in force where this was written. Positional — the marker's
+	 * line down — where the compiler applies the file's final marker throughout;
+	 * the divergence is pinned in `tokentest`. The inspector dispatches on this
+	 * rather than re-deriving the marker rules.
+	 */
+	target: CommandTarget;
 }
 
 /** Where a custom instrument's sample byte came from. */
@@ -979,6 +1147,12 @@ interface GatherToken extends Token {
 	replacement?: string;
 }
 
+/** A point in the document where the dialect changed. See {@link tokenize}. */
+interface TargetTransition {
+	at: number;
+	target: CommandTarget;
+}
+
 /** Kinds that introduce a letter command and can therefore take arguments. */
 const LETTER_COMMAND_KINDS = new Set<TokenKind>([
 	"tempo",
@@ -1013,6 +1187,14 @@ export function tokenize(text: string): TokenIndex {
 	let stream: GatherToken[] | null = null;
 	const state = startState();
 
+	// Where the dialect changed, recorded off the very ScanState the stepper
+	// mutates — so `gather` replays the same positional model the highlighter
+	// colours by, and the marker precedence rules live in one place (`scanHash`
+	// and the `#amk` one-shot) rather than being re-derived here.
+	const transitions: TargetTransition[] = [];
+	let program = DEFAULT_TARGET.program;
+	let amkVersion = DEFAULT_TARGET.amkVersion;
+
 	let offset = 0;
 	let lineNumber = 1;
 	while (offset <= text.length) {
@@ -1029,6 +1211,13 @@ export function tokenize(text: string): TokenIndex {
 			// `step` is contractually required to advance; this is the belt to that
 			// brace, so a bug there cannot hang the editor.
 			const next = end > at ? end : at + 1;
+
+			if (state.songTargetProgram !== program || state.targetAMKVersion !== amkVersion) {
+				program = state.songTargetProgram;
+				amkVersion = state.targetAMKVersion;
+				transitions.push({ at: offset + at, target: { program, amkVersion } });
+			}
+
 			if (kind) {
 				const token: Token = { kind, start: offset + at, end: offset + next, line: lineNumber };
 				if (expansion) {
@@ -1058,7 +1247,7 @@ export function tokenize(text: string): TokenIndex {
 	const stream_ = stream ?? tokens;
 	return {
 		tokens,
-		commands: gather(stream_, text),
+		commands: gather(stream_, text, transitions),
 		instruments: gatherInstruments(stream_, text),
 	};
 }
@@ -1152,16 +1341,25 @@ function gatherInstruments(tokens: GatherToken[], text: string): InstrumentDefin
 }
 
 /** Groups the flat token list into commands with their arguments. */
-function gather(tokens: GatherToken[], text: string): Command[] {
+function gather(tokens: GatherToken[], text: string, transitions: TargetTransition[]): Command[] {
 	const commands: Command[] = [];
 	const spanOf = (token: Token): Span => ({ start: token.start, end: token.end, line: token.line });
 	// A token from an expansion stands for text that is not in the document, so
 	// its own `text` wins over the span it was stamped with.
 	const textOf = (token: GatherToken): string => token.text ?? text.slice(token.start, token.end);
 	let channel: number | undefined;
+	let target = DEFAULT_TARGET;
+	let transition = 0;
 
 	for (let i = 0; i < tokens.length; i++) {
 		const token = tokens[i];
+
+		// Transitions land on directive and number tokens, never on a token a
+		// command opens with, so the `<=` tie cannot mis-attribute one.
+		while (transition < transitions.length && transitions[transition].at <= token.start) {
+			target = transitions[transition].target;
+			transition++;
+		}
 
 		if (token.kind === "channel") {
 			// `#0`-`#7`. A malformed one leaves the previous channel standing,
@@ -1187,16 +1385,17 @@ function gather(tokens: GatherToken[], text: string): Command[] {
 				j++;
 			}
 
-			const expected = expectedArgs(vcmd, args);
+			const expected = expectedArgs(vcmd, args, target);
 			commands.push({
 				kind: "hex",
 				vcmd,
-				name: VCMD_NAMES[vcmd] ?? "unknown command",
+				name: vcmdName(vcmd, args, target),
 				span: { start: token.start, end: last.end, line: token.line },
 				args,
 				complete: expected !== null && args.length >= expected,
 				replacement: from,
 				channel,
+				target,
 			});
 			i = j - 1;
 			continue;
@@ -1241,6 +1440,7 @@ function gather(tokens: GatherToken[], text: string): Command[] {
 			replacement: from,
 			channel,
 			direct: raw.startsWith("@@") || undefined,
+			target,
 		});
 		i = j - 1;
 	}
@@ -1271,16 +1471,101 @@ function numberValue(raw: string, kind: TokenKind): number {
 }
 
 /**
- * How many arguments a VCMD takes, or `null` when it cannot be known here.
+ * The command's name under the dialect it was written for.
  *
- * `$FB`'s length lives in its first argument, so it is derived rather than
- * looked up. The target-program forks are the `null` cases: without the
- * directives parsed there is no way to tell `#am4`'s three-argument `$E5` from
- * AddmusicK's, so those are reported as complete rather than falsely flagged.
+ * `VCMD_NAMES` states the AddmusicK/N-SPC reading, which is also what compiled
+ * output always is; the forks here follow what the *parser* makes of the bytes
+ * as written. Where a form compiles into another command, its name is that
+ * command's — a `$E5` sample load really emits `$F3` (`parser.ts:3028`).
  */
-function expectedArgs(vcmd: number, args: { value: number }[]): number | null {
+function vcmdName(vcmd: number, args: { value: number }[], target: CommandTarget): string {
+	if (vcmd === 0xed && target.program === 1) {
+		// `parseHFDHex` (`parser.ts:3286`) — the sub-byte picks the form.
+		const sub = args[0]?.value;
+		if (sub === 0x80) {
+			return VCMD_NAMES[0xf6]; // what it compiles to (parser.ts:3334)
+		}
+
+		if (sub === 0x81) {
+			return "tune"; // parser.ts:3343-3354
+		}
+
+		if (sub === 0x82) {
+			return "ARAM upload"; // parser.ts:3360-3400
+		}
+
+		if (sub === 0x83) {
+			return "unknown command"; // AMK0163 (parser.ts:3356)
+		}
+
+		return VCMD_NAMES[0xed]; // the plain form, a bare `$ED` included
+	}
+
+	if (vcmd === 0xe5 && target.program === 1 && (args[0]?.value ?? 0) >= 0x80) {
+		return VCMD_NAMES[0xf3]; // sample load in disguise (parser.ts:3016-3031)
+	}
+
+	if (vcmd === 0xfc && target.amkVersion === 1) {
+		return "remote gain"; // parser.ts:2970, rebuilt at parser.ts:3068-3100
+	}
+
+	return VCMD_NAMES[vcmd] ?? "unknown command";
+}
+
+/**
+ * How many arguments a VCMD takes, or `null` when it cannot be known yet.
+ *
+ * `$FB`'s length lives in its first argument, and the dialect forks live in
+ * the first argument plus {@link CommandTarget}, so both are derived rather
+ * than looked up. This deliberately restates what `scanHex` expresses as
+ * `hexLeft` mutations: neither side can call the other — the scanner has no
+ * argument history (carrying one would break `copyState`'s O(1) contract) and
+ * this is a pure function with no stream state — so, as with
+ * `BANK_SLOT_COUNT`, the two statements share their citations and `tokentest`
+ * pins them against each other at each fork's flip point.
+ */
+function expectedArgs(vcmd: number, args: { value: number }[], target: CommandTarget): number | null {
 	if (vcmd < FIRST_VCMD || vcmd > LAST_VCMD) {
 		return null;
+	}
+
+	if (vcmd === 0xed && target.program === 1) {
+		// `parseHFDHex` (`parser.ts:3286`) — the same forks as `awaitingHfdSub`.
+		if (args.length === 0) {
+			return null;
+		}
+
+		const sub = args[0].value;
+		if (sub === 0x80) {
+			return 3;
+		}
+
+		if (sub === 0x81) {
+			return 2;
+		}
+
+		if (sub === 0x83) {
+			return 1;
+		}
+
+		if (sub === 0x82) {
+			if (args.length < 5) {
+				return null; // the count is not written yet
+			}
+
+			// Sub + four header bytes, then count+1 data bytes (parser.ts:3390).
+			return 5 + ((args[3].value << 8) | args[4].value) + 1;
+		}
+
+		return 2; // plain ADSR
+	}
+
+	if (vcmd === 0xe5 && target.program === 1 && args.length > 0 && args[0].value >= 0x80) {
+		return 2; // sample load (parser.ts:3016-3031)
+	}
+
+	if (vcmd === 0xfc && target.amkVersion === 1) {
+		return 2; // remote gain (parser.ts:2970)
 	}
 
 	if (vcmd === 0xfb) {
