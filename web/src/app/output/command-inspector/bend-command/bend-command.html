@@ -3,9 +3,10 @@
     Needs three arguments: a delay, a duration and a target.
   </p>
 } @else {
+  <!-- The dragged values, so the curve follows the pointer. -->
   <amk-bend-graph
-    [delay]="delay()"
-    [duration]="duration()"
+    [delay]="shownDelay()"
+    [duration]="shownDuration()"
     [from]="from()"
     [to]="to()"
     [tempo]="tempo()"
@@ -18,6 +19,7 @@
     [valueLabel]="delayLabel()"
     [note]="lockedBecause(0)"
     [disabled]="!editable(0)"
+    (preview)="preview(0, $event)"
     (commit)="setArg(0, $event)"
   />
 
@@ -28,10 +30,12 @@
     [valueLabel]="durationLabel()"
     [note]="lockedBecause(1)"
     [disabled]="!editable(1)"
+    (preview)="preview(1, $event)"
     (commit)="setArg(1, $event)"
   />
 
   @if (isPitchBend()) {
+    <!-- A dropdown, so there is no drag to preview: it commits on choosing. -->
     <amk-note-picker
       label="Target note"
       [value]="target()"

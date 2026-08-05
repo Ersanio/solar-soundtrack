@@ -5,6 +5,7 @@ import type { Command } from '@compiler/tokens';
 import { Slider } from '../../../shared/slider/slider';
 import { EditorStore } from '../../../state/editor-store';
 import { tempoBefore } from '../../../util/dialect';
+import { dragPreview } from '../commands/preview';
 import { ticksLabel } from '../commands/units';
 import { VibratoGraph } from '../vibrato-graph/vibrato-graph';
 
@@ -53,20 +54,43 @@ export class VibratoCommand {
   protected readonly rateIndex = computed(() => (this.hasDelay() ? 1 : 0));
   protected readonly depthIndex = computed(() => (this.hasDelay() ? 2 : 1));
 
+  /**
+   * Dropped whenever the command is re-scanned, which a commit guarantees — so
+   * the graph follows the pointer and then goes back to reading the document.
+   *
+   * Only the graph and the readouts see it. The sliders keep reading the
+   * *document*, because `amk-slider` tracks its own drag internally and compares
+   * against the value bound to it to decide whether a gesture changed anything —
+   * feed the preview back in and the slider concludes nothing moved and never
+   * commits.
+   */
+  private readonly drag = dragPreview(this.command);
+
   protected readonly delay = computed(() => (this.hasDelay() ? (this.args()[0] ?? 0) : 0));
   protected readonly rate = computed(() => this.args()[this.rateIndex()] ?? 0);
   protected readonly depth = computed(() => this.args()[this.depthIndex()] ?? 0);
+
+  /** The same three as the drag is showing them, for the graph and the labels. */
+  protected readonly shownDelay = computed(() =>
+    this.hasDelay() ? this.drag.at(0, this.delay()) : 0,
+  );
+  protected readonly shownRate = computed(() => this.drag.at(this.rateIndex(), this.rate()));
+  protected readonly shownDepth = computed(() => this.drag.at(this.depthIndex(), this.depth()));
+
+  protected preview(index: number, value: number): void {
+    this.drag.set(index, value);
+  }
 
   protected readonly tempo = computed(() =>
     tempoBefore(this.command(), this.store.tokens().commands),
   );
 
-  protected readonly delayLabel = computed(() => ticksLabel(this.delay(), this.tempo()));
+  protected readonly delayLabel = computed(() => ticksLabel(this.shownDelay(), this.tempo()));
 
   protected readonly rateNote = computed(() =>
-    this.rate() === 0
+    this.shownRate() === 0
       ? 'a rate of 0 never advances, so nothing wobbles'
-      : `higher is faster — one cycle every ${Math.round(256 / this.rate())} ticks`,
+      : `higher is faster — one cycle every ${Math.round(256 / this.shownRate())} ticks`,
   );
 
   protected readonly formNote = computed(() =>

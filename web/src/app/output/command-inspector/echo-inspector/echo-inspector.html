@@ -23,6 +23,7 @@
       [max]="127"
       [note]="lockedBecause(1) ?? signedNote(1)"
       [disabled]="!editable(1)"
+      (preview)="preview(1, $event)"
       (commit)="setArg(1, $event)"
     />
     <amk-slider
@@ -33,6 +34,7 @@
       [max]="127"
       [note]="lockedBecause(2) ?? signedNote(2)"
       [disabled]="!editable(2)"
+      (preview)="preview(2, $event)"
       (commit)="setArg(2, $event)"
     />
   }
@@ -44,6 +46,7 @@
       [max]="15"
       [note]="lockedBecause(0) ?? delayNote()"
       [disabled]="!editable(0)"
+      (preview)="preview(0, $event)"
       (commit)="setArg(0, $event)"
     />
     <amk-slider
@@ -54,6 +57,7 @@
       [max]="127"
       [note]="lockedBecause(1) ?? signedNote(1)"
       [disabled]="!editable(1)"
+      (preview)="preview(1, $event)"
       (commit)="setArg(1, $event)"
     />
 
@@ -89,6 +93,7 @@
       [max]="255"
       [note]="lockedBecause(0) ?? fadeLabel()"
       [disabled]="!editable(0)"
+      (preview)="preview(0, $event)"
       (commit)="setArg(0, $event)"
     />
     <amk-slider
@@ -99,6 +104,7 @@
       [max]="127"
       [note]="lockedBecause(1) ?? signedNote(1)"
       [disabled]="!editable(1)"
+      (preview)="preview(1, $event)"
       (commit)="setArg(1, $event)"
     />
     <amk-slider
@@ -109,6 +115,7 @@
       [max]="127"
       [note]="lockedBecause(2) ?? signedNote(2)"
       [disabled]="!editable(2)"
+      (preview)="preview(2, $event)"
       (commit)="setArg(2, $event)"
     />
   }

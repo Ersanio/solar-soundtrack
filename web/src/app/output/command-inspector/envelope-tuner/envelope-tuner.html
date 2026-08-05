@@ -50,6 +50,7 @@
       [max]="15"
       [valueLabel]="attackLabel()"
       [disabled]="disabled()"
+      (preview)="preview('attack', $event)"
       (commit)="setField('attack', $event)"
     />
     <amk-slider
@@ -58,6 +59,7 @@
       [max]="7"
       [valueLabel]="decayLabel()"
       [disabled]="disabled()"
+      (preview)="preview('decay', $event)"
       (commit)="setField('decay', $event)"
     />
     <amk-slider
@@ -67,6 +69,7 @@
       [max]="7"
       [valueLabel]="sustainLabel()"
       [disabled]="disabled()"
+      (preview)="preview('sustain', $event)"
       (commit)="setField('sustain', $event)"
     />
     <amk-slider
@@ -76,6 +79,7 @@
       [valueLabel]="releaseLabel()"
       [note]="releaseNote()"
       [disabled]="disabled()"
+      (preview)="preview('release', $event)"
       (commit)="setField('release', $event)"
     />
   } @else {
@@ -96,6 +100,7 @@
         [max]="127"
         [valueLabel]="gainLevelLabel()"
         [disabled]="disabled()"
+        (preview)="preview('level', $event)"
         (commit)="setGainLevel($event)"
       />
     } @else {
@@ -105,6 +110,7 @@
         [max]="31"
         [valueLabel]="gainRateLabel()"
         [disabled]="disabled()"
+        (preview)="preview('rate', $event)"
         (commit)="setGainRate($event)"
       />
     }

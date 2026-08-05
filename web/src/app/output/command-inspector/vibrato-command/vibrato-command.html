@@ -3,10 +3,11 @@
     Needs a rate and a depth, and optionally a delay before them.
   </p>
 } @else {
+  <!-- The dragged values, so the shape follows the pointer. -->
   <amk-vibrato-graph
-    [delay]="delay()"
-    [rate]="rate()"
-    [depth]="depth()"
+    [delay]="shownDelay()"
+    [rate]="shownRate()"
+    [depth]="shownDepth()"
     [tempo]="tempo()"
     [axis]="axis()"
   />
@@ -23,6 +24,7 @@
       [valueLabel]="delayLabel()"
       [note]="lockedBecause(delayIndex())"
       [disabled]="!editable(delayIndex())"
+      (preview)="preview(delayIndex(), $event)"
       (commit)="setArg(delayIndex(), $event)"
     />
   }
@@ -33,6 +35,7 @@
     [max]="255"
     [note]="lockedBecause(rateIndex()) ?? rateNote()"
     [disabled]="!editable(rateIndex())"
+    (preview)="preview(rateIndex(), $event)"
     (commit)="setArg(rateIndex(), $event)"
   />
 
@@ -42,6 +45,7 @@
     [max]="255"
     [note]="lockedBecause(depthIndex())"
     [disabled]="!editable(depthIndex())"
+    (preview)="preview(depthIndex(), $event)"
     (commit)="setArg(depthIndex(), $event)"
   />
 }

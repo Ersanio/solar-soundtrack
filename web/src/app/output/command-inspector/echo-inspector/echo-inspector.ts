@@ -11,6 +11,7 @@ import { tempoBefore } from '../../../util/dialect';
 import { builtInTaps } from '../../../util/echo-hazards';
 import { hex2 } from '../../../util/format';
 import { ticksLabel } from '../commands/units';
+import { dragPreview } from '../commands/preview';
 import { firOverriddenBefore } from '../fir-override';
 import { FirGraph } from '../fir-graph/fir-graph';
 
@@ -48,7 +49,30 @@ export class EchoInspector {
   protected readonly FILTERS = FILTERS;
 
   protected readonly vcmd = computed(() => this.command().vcmd ?? 0);
+
+  /**
+   * What the document says. The sliders bind to these; only the graph and the
+   * readouts use {@link shown}. Binding the preview back into a slider makes it
+   * conclude the gesture changed nothing, and nothing is ever written.
+   */
   protected readonly args = computed(() => this.command().args.map((a) => a.value));
+
+  private readonly drag = dragPreview(this.command);
+
+  /**
+   * The arguments as the controls are showing them.
+   *
+   * Worth having for more than the graph: `$F1`'s delay readout counts its ARAM
+   * cost in KiB, and that is the number that decides whether the song still
+   * fits — watching it climb as you drag is the point of the control.
+   */
+  protected readonly shown = computed(() =>
+    this.args().map((value, index) => this.drag.at(index, value)),
+  );
+
+  protected preview(index: number, value: number): void {
+    this.drag.set(index, value < 0 ? value + 0x100 : value);
+  }
 
   /** `$F0` has nothing to say beyond its own name. */
   protected readonly isEchoOff = computed(() => this.vcmd() === 0xf0);
@@ -72,7 +96,7 @@ export class EchoInspector {
    * toolchain does.
    */
   protected readonly delayNote = computed(() => {
-    const written = this.delay();
+    const written = this.shown()[0] ?? 0;
     const masked = written & 0x0f;
     if (written > 0x0f) {
       return `$${hex2(written)} is out of range; the driver masks it to $${hex2(masked)}`;
@@ -89,7 +113,7 @@ export class EchoInspector {
 
   /** The same ticks/note-length/seconds sentence every other duration gets. */
   protected readonly fadeLabel = computed(() =>
-    ticksLabel(this.fadeTicks(), tempoBefore(this.command(), this.store.tokens().commands)),
+    ticksLabel(this.shown()[0] ?? 0, tempoBefore(this.command(), this.store.tokens().commands)),
   );
 
   protected readonly filterNote = computed(() =>
@@ -98,17 +122,22 @@ export class EchoInspector {
 
   // --- shared ---------------------------------------------------------------
 
-  /** Echo volumes and feedback are signed, and negative means phase-inverted. */
+  /** A slider's position, from the document. */
   protected signedOf(index: number): number {
     return toSigned(this.args()[index] ?? 0);
   }
 
+  /** Its readout, from whatever is being dragged. */
   protected signedNote(index: number): string {
-    const byte = this.args()[index] ?? 0;
+    const byte = this.shown()[index] ?? 0;
     return `$${hex2(byte)}${byte >= 0x80 ? ' — negative, so phase-inverted' : ''}`;
   }
 
-  protected readonly feedback = computed(() => (this.isF1() ? (this.args()[1] ?? 0) : 0));
+  /**
+   * Feeds the FIR graph's repeat curves, so dragging the feedback shows the echo
+   * building up or dying away as you move rather than after you let go.
+   */
+  protected readonly feedback = computed(() => (this.isF1() ? (this.shown()[1] ?? 0) : 0));
 
   /**
    * The filter this command implies, so `$F1` shows the same picture the FIR

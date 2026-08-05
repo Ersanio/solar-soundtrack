@@ -17,6 +17,7 @@ import { type EnumOption, EnumSelect } from '../../../shared/enum-select/enum-se
 import { Slider } from '../../../shared/slider/slider';
 import { duration, hex2 } from '../../../util/format';
 import { AdsrGraph } from '../adsr-graph/adsr-graph';
+import { dragPreview } from '../commands/preview';
 
 /** The three bytes an envelope is written as, wherever it is written. */
 export interface EnvelopeValue {
@@ -122,34 +123,73 @@ export class EnvelopeTuner {
     this.commit.emit({ ...this.value(), adsr1: preset.adsr1, adsr2: preset.adsr2 });
   }
 
+  /**
+   * Values a slider is showing mid-drag, dropped once the commit lands.
+   *
+   * The sliders bind to {@link envelope} and {@link gain} — the *document* — and
+   * the graph and the time readouts bind to {@link shown} and {@link shownGain}.
+   * That split is not cosmetic: `amk-slider` decides whether a gesture changed
+   * anything by comparing against the value bound to it, so binding the preview
+   * back into it would make every drag look like a no-op and nothing would ever
+   * be written.
+   */
+  private readonly drag = dragPreview(this.value);
+
+  /** What the document says. The sliders' positions come from here. */
   protected readonly envelope = computed(() => decodeAdsr(this.value().adsr1, this.value().adsr2));
   protected readonly usingAdsr = computed(() => this.envelope().adsrEnabled);
   protected readonly gain = computed(() => decodeGain(this.value().gain));
 
+  /** What the controls are showing, which mid-drag is not the same thing. */
+  protected readonly shown = computed(() => {
+    const committed = this.envelope();
+    return {
+      ...committed,
+      attack: this.drag.at('attack', committed.attack),
+      decay: this.drag.at('decay', committed.decay),
+      sustain: this.drag.at('sustain', committed.sustain),
+      release: this.drag.at('release', committed.release),
+    };
+  });
+
+  protected readonly shownGain = computed(() => {
+    const committed = this.gain();
+    if (committed.mode === 'direct') {
+      const level = this.drag.at('level', Math.round((committed.level ?? 0) * 0x7f));
+      return { ...committed, level: level / 0x7f };
+    }
+
+    return { ...committed, rate: this.drag.at('rate', committed.rate ?? 0) };
+  });
+
+  protected preview(field: string, value: number): void {
+    this.drag.set(field, value);
+  }
+
   // --- ADSR readouts ---------------------------------------------------------
 
-  protected readonly attackLabel = computed(() => duration(attackSeconds(this.envelope().attack)));
+  protected readonly attackLabel = computed(() => duration(attackSeconds(this.shown().attack)));
 
   protected readonly decayLabel = computed(() => {
-    const { decay, sustain } = this.envelope();
+    const { decay, sustain } = this.shown();
     return sustain >= 7
       ? 'instant — sustain is already at full level'
       : duration(decaySeconds(decay, sustain));
   });
 
   protected readonly sustainLabel = computed(
-    () => `${Math.round(sustainLevel(this.envelope().sustain) * 100)}% of full`,
+    () => `${Math.round(sustainLevel(this.shown().sustain) * 100)}% of full`,
   );
 
   protected readonly releaseLabel = computed(() => {
-    const { release, sustain } = this.envelope();
+    const { release, sustain } = this.shown();
     const seconds = releaseSeconds(release, sustain);
     return Number.isFinite(seconds) ? duration(seconds) : 'held indefinitely';
   });
 
   /** AddmusicK calls this release; on the DSP it is the sustain-phase fall. */
   protected readonly releaseNote = computed(() =>
-    this.envelope().release === 0 ? 'a rate of 0 never decays, so the note holds' : null,
+    this.shown().release === 0 ? 'a rate of 0 never decays, so the note holds' : null,
   );
 
   // --- GAIN readouts ---------------------------------------------------------
@@ -160,23 +200,36 @@ export class EnvelopeTuner {
   });
 
   protected readonly gainIsDirect = computed(() => this.gain().mode === 'direct');
+
+  /** The slider's position: the document's level. */
   protected readonly gainLevel = computed(() => Math.round((this.gain().level ?? 0) * 0x7f));
 
   protected readonly gainLevelLabel = computed(
-    () => `${Math.round((this.gain().level ?? 0) * 100)}% of full`,
+    () => `${Math.round((this.shownGain().level ?? 0) * 100)}% of full`,
   );
 
   protected readonly gainRateLabel = computed(() => {
-    const rate = this.gain().rate ?? 0;
+    const rate = this.shownGain().rate ?? 0;
     return rate === 0 ? 'a rate of 0 never advances, so the level holds' : `rate $${hex2(rate)}`;
   });
 
   protected readonly gainByteLabel = computed(() => `$${hex2(this.value().gain)}`);
 
-  /** What the graph should draw: the GAIN path takes over when ADSR1's top bit is clear. */
-  protected readonly graphAdsr1 = computed(() => (this.usingAdsr() ? this.value().adsr1 : 0));
-  protected readonly graphAdsr2 = computed(() => (this.usingAdsr() ? this.value().adsr2 : 0));
-  protected readonly graphGain = computed(() => (this.usingAdsr() ? 0 : this.value().gain));
+  /**
+   * What the graph should draw: the GAIN path takes over when ADSR1's top bit is
+   * clear.
+   *
+   * Re-encoded from {@link envelope} and {@link gain} rather than read off the
+   * input, which is what lets the curve follow a drag — those two are where the
+   * previewed values live.
+   */
+  private readonly encoded = computed(() => encodeAdsr(this.shown()));
+
+  protected readonly graphAdsr1 = computed(() => (this.usingAdsr() ? this.encoded().adsr1 : 0));
+  protected readonly graphAdsr2 = computed(() => (this.usingAdsr() ? this.encoded().adsr2 : 0));
+  protected readonly graphGain = computed(() =>
+    this.usingAdsr() ? 0 : encodeGain(this.shownGain()),
+  );
 
   // --- editing ---------------------------------------------------------------
 

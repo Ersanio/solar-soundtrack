@@ -7,6 +7,7 @@ import { EditorStore } from '../../../state/editor-store';
 import { tempoBefore } from '../../../util/dialect';
 import { BendGraph } from '../bend-graph/bend-graph';
 import { toSigned } from '../commands/param';
+import { dragPreview } from '../commands/preview';
 import { noteName, ticksLabel } from '../commands/units';
 import { NotePicker } from '../note-picker/note-picker';
 
@@ -38,19 +39,36 @@ export class BendCommand {
   /** `$DD` names a note; `$EB`/`$EC` name a distance from one. */
   protected readonly isPitchBend = computed(() => this.vcmd() === 0xdd);
 
+  /**
+   * Cleared by the re-scan a commit causes; see `dragPreview`. The sliders bind
+   * to the committed values below, not to these — see the note in
+   * `vibrato-command` for why that matters.
+   */
+  private readonly drag = dragPreview(this.command);
+
   protected readonly delay = computed(() => this.args()[0] ?? 0);
   protected readonly duration = computed(() => this.args()[1] ?? 0);
   protected readonly target = computed(() => this.args()[2] ?? 0);
+
+  protected readonly shownDelay = computed(() => this.drag.at(0, this.delay()));
+  protected readonly shownDuration = computed(() => this.drag.at(1, this.duration()));
+  protected readonly shownTarget = computed(() => this.drag.at(2, this.target()));
+
+  protected preview(index: number, value: number): void {
+    // The semitone slider reports a signed value; the graph reads the byte.
+    this.drag.set(index, index === 2 && !this.isPitchBend() && value < 0 ? value + 0x100 : value);
+  }
 
   protected readonly tempo = computed(() =>
     tempoBefore(this.command(), this.store.tokens().commands),
   );
 
-  protected readonly delayLabel = computed(() => ticksLabel(this.delay(), this.tempo()));
-  protected readonly durationLabel = computed(() => ticksLabel(this.duration(), this.tempo()));
+  protected readonly delayLabel = computed(() => ticksLabel(this.shownDelay(), this.tempo()));
+  protected readonly durationLabel = computed(() => ticksLabel(this.shownDuration(), this.tempo()));
 
-  protected readonly noteLabel = computed(() => noteName(this.target()));
+  protected readonly noteLabel = computed(() => noteName(this.shownTarget()));
 
+  /** What the slider binds to: the document's value, signed. */
   protected readonly semitones = computed(() => toSigned(this.target()));
 
   /**
@@ -67,15 +85,15 @@ export class BendCommand {
       return 0;
     }
 
-    return this.vcmd() === 0xec ? this.semitones() : 0;
+    return this.vcmd() === 0xec ? toSigned(this.shownTarget()) : 0;
   });
 
   protected readonly to = computed(() => {
     if (this.isPitchBend()) {
-      return this.target() - 0xa4; // relative to o4 c, the graph's stand-in
+      return this.shownTarget() - 0xa4; // relative to o4 c, the graph's stand-in
     }
 
-    return this.vcmd() === 0xec ? 0 : this.semitones();
+    return this.vcmd() === 0xec ? 0 : toSigned(this.shownTarget());
   });
 
   protected readonly note = computed(() =>
