@@ -28,8 +28,16 @@ import {
 	decaySeconds,
 	decodeAdsr,
 	decodeGain,
+	encodeAdsr,
+	encodeGain,
+	encodeTuning,
 	envelopeAdsr,
 	envelopeGain,
+	nearestAttack,
+	nearestDecay,
+	nearestNoiseClock,
+	nearestRelease,
+	nearestSustain,
 	noiseHz,
 	releaseSeconds,
 	sustainLevel,
@@ -244,6 +252,102 @@ console.log("\nthe stock table decodes");
 	check(
 		"and a sane tuning",
 		[...tables.melodic, ...tables.percussion].every((entry) => tuningMultiplier(entry.tuning, entry.subTuning) > 0),
+	);
+}
+
+console.log("\nthe inverses round-trip");
+{
+	// The envelope tuner is driven in seconds and percent, so every control has
+	// to turn a number back into the field that produces it. A round trip is a
+	// real assertion rather than a tautology — it catches a transposed nibble
+	// shift, a swapped field and a tie broken the wrong way — and it introduces
+	// no new magic numbers, which is the property this whole harness is built on.
+	check(
+		"every attack rate is the nearest to its own duration",
+		Array.from({ length: 16 }, (_, a) => a).every((a) => nearestAttack(attackSeconds(a)) === a),
+	);
+
+	// Sustain 7 makes every decay exactly 0 s, so there is nothing to choose
+	// between; that degenerate case is asserted rather than skipped silently.
+	check(
+		"every decay rate is the nearest to its own duration",
+		Array.from({ length: 7 }, (_, s) => s).every((s) =>
+			Array.from({ length: 8 }, (_, d) => d).every((d) => nearestDecay(decaySeconds(d, s), s) === d),
+		),
+	);
+	check(
+		"at sustain 7 every decay is instant, and 0 is returned",
+		Array.from({ length: 8 }, (_, d) => decaySeconds(d, 7)).every((t) => t === 0) && nearestDecay(0, 7) === 0,
+	);
+
+	check(
+		"every sustain level is the nearest to its own fraction",
+		Array.from({ length: 8 }, (_, s) => s).every((s) => nearestSustain(sustainLevel(s)) === s),
+	);
+
+	check(
+		"every release rate is the nearest to its own duration",
+		Array.from({ length: 8 }, (_, s) => s).every((s) =>
+			Array.from({ length: 31 }, (_, i) => i + 1).every((r) => nearestRelease(releaseSeconds(r, s), s) === r),
+		),
+	);
+	// Rate 0 means "never", which is the opposite of "very slow" — a finite
+	// target must never land on it, and an infinite one must always.
+	check(
+		"a held-forever release is the only way to reach rate 0",
+		Array.from({ length: 8 }, (_, s) => s).every((s) => nearestRelease(Infinity, s) === 0) &&
+			Array.from({ length: 8 }, (_, s) => s).every((s) => nearestRelease(1e6, s) !== 0),
+	);
+
+	check(
+		"every noise clock is the nearest to its own frequency",
+		Array.from({ length: 31 }, (_, i) => i + 1).every((n) => nearestNoiseClock(noiseHz(n)) === n),
+	);
+	check("silence is the only way to reach clock 0", nearestNoiseClock(0) === 0 && nearestNoiseClock(1) !== 0);
+
+	// All 65 536 pairs, because a swapped field is invisible on any one of them.
+	// Every bit of both bytes belongs to a field — attack 0-3, decay 4-6, enable
+	// 7; release 0-4, sustain 5-7 — so the trip is exact, with nothing masked.
+	let adsrOk = true;
+	for (let adsr1 = 0; adsr1 < 256 && adsrOk; adsr1++) {
+		for (let adsr2 = 0; adsr2 < 256; adsr2++) {
+			const encoded = encodeAdsr(decodeAdsr(adsr1, adsr2));
+			if (encoded.adsr1 !== adsr1 || encoded.adsr2 !== adsr2) {
+				adsrOk = false;
+				break;
+			}
+		}
+	}
+
+	check("decodeAdsr and encodeAdsr round-trip over every byte pair", adsrOk);
+
+	check(
+		"decodeGain and encodeGain round-trip over every byte",
+		Array.from({ length: 256 }, (_, g) => g).every((g) => encodeGain(decodeGain(g)) === g),
+	);
+
+	let tuningOk = true;
+	for (let tuning = 0; tuning < 256 && tuningOk; tuning++) {
+		for (let sub = 0; sub < 256; sub++) {
+			const encoded = encodeTuning(tuningMultiplier(tuning, sub));
+			if (encoded.tuning !== tuning || encoded.subTuning !== sub) {
+				tuningOk = false;
+				break;
+			}
+		}
+	}
+
+	check("tuningMultiplier and encodeTuning round-trip over every byte pair", tuningOk);
+
+	// The one non-round-trip fact worth pinning: a target between two rungs picks
+	// the nearer in *log* space. CLOCKS is geometric, so a linear metric would
+	// make the fast end of every ladder unreachable by dragging a control.
+	const fast = attackSeconds(15);
+	const slower = attackSeconds(14);
+	check(
+		"a target between two attack rungs picks the nearer in log space",
+		nearestAttack(Math.sqrt(fast * slower) * 1.01) === 14 && nearestAttack(Math.sqrt(fast * slower) * 0.99) === 15,
+		`${fast} .. ${slower}`,
 	);
 }
 

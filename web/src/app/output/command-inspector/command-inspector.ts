@@ -5,6 +5,7 @@ import { hex2 } from '../../util/format';
 import { AdsrCommand } from './adsr-command/adsr-command';
 import { EchoInspector } from './echo-inspector/echo-inspector';
 import { FirDesigner } from './fir-designer/fir-designer';
+import { InstrumentEntryEditor } from './instrument-entry/instrument-entry';
 import { InstrumentInspector } from './instrument-inspector/instrument-inspector';
 import { ParamTable } from './param-table/param-table';
 
@@ -52,7 +53,14 @@ const LETTER_VIEWS: Readonly<Record<string, string>> = {
  */
 @Component({
   selector: 'amk-command-inspector',
-  imports: [AdsrCommand, EchoInspector, FirDesigner, InstrumentInspector, ParamTable],
+  imports: [
+    AdsrCommand,
+    EchoInspector,
+    FirDesigner,
+    InstrumentEntryEditor,
+    InstrumentInspector,
+    ParamTable,
+  ],
   templateUrl: './command-inspector.html',
   host: { class: 'block' },
 })
@@ -62,32 +70,27 @@ export class CommandInspector {
   protected readonly command = this.store.commandAtCaret;
 
   /**
-   * Whether the caret is inside an `#instruments` entry.
+   * The `#instruments` entry the caret is in, which wins over everything else.
    *
-   * A definition and a use are written identically — `@5` and `n1F` mean one
-   * thing in a channel and quite another in the block — so this has to win over
-   * the letter the command starts with, and it is decided here rather than in
-   * each view that could be fooled by it.
+   * Two reasons it is asked first. A definition and a use are written
+   * identically — `@5` and `n1F` mean one thing in a channel and quite another
+   * in the block — so the entry has to beat the letter the command starts with.
+   * And most of an entry is not a command at all: `"kick.brr" $FF $E0 …` is a
+   * string and five hex arguments, none of which `gather` turns into one, so
+   * without this the editor would be reachable only from the two sample forms
+   * that happen to scan as commands.
    */
-  private readonly defining = computed(() => {
-    const command = this.command();
-    if (!command) {
-      return false;
+  protected readonly entry = this.store.instrumentAtCaret;
+
+  /** Which view to render; `null` falls through to the parameter table. */
+  protected readonly view = computed(() => {
+    if (this.entry()) {
+      return 'entry';
     }
 
-    const at = command.span.start;
-    return this.store.tokens().instruments.some((d) => at >= d.span.start && at < d.span.end);
-  });
-
-  /** Which view to render; `null` leaves the generic readout standing. */
-  protected readonly view = computed(() => {
     const command = this.command();
     if (!command) {
       return null;
-    }
-
-    if (this.defining()) {
-      return 'instrument';
     }
 
     if (command.vcmd !== undefined) {
@@ -126,6 +129,11 @@ export class CommandInspector {
 
   /** Shown in the summary row, so the section reads without being opened. */
   protected readonly summary = computed(() => {
+    const entry = this.entry();
+    if (entry) {
+      return `@${entry.number} instrument definition`;
+    }
+
     const command = this.command();
     if (!command) {
       return 'nothing at the caret';

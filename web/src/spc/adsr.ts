@@ -326,3 +326,134 @@ export function noiseHz(clock: number): number {
 	const period = CLOCKS[clock & 0x1f];
 	return period === 0 ? 0 : DSP_RATE / period;
 }
+
+// ===========================================================================
+// Going the other way
+// ===========================================================================
+//
+// Everything below turns a number a musician chose back into the field that
+// produces it, so the envelope tuner can be driven in seconds and percent
+// rather than in rate indices.
+//
+// Every `nearest*` is an exhaustive search over its 8, 16 or 32 candidates
+// using the forward function above — never a closed-form inverse. The tables
+// are tiny, so it costs nothing, and it means the inverse cannot drift from the
+// decoder or have to restate the attack-15 divergence that `attackSeconds`
+// documents. `adsrtest` pins the round trips.
+
+/**
+ * Nearest in *log* space, because {@link CLOCKS} is roughly geometric.
+ *
+ * A linear metric makes the fast end of every ladder unreachable by dragging:
+ * the gap from 1 ms to 2 ms is a factor of two and, in absolute terms, smaller
+ * than the rounding on a single step at the slow end.
+ */
+function nearestBy(count: number, target: number, seconds: (index: number) => number, from = 0): number {
+	let best = from;
+	let error = Infinity;
+	for (let index = from; index < count; index++) {
+		const candidate = seconds(index);
+		if (!Number.isFinite(candidate)) {
+			continue;
+		}
+
+		// Both clamped away from zero: an instant phase and a 1-sample phase are
+		// the same choice as far as a control is concerned.
+		const distance = Math.abs(Math.log(Math.max(candidate, 1e-6)) - Math.log(Math.max(target, 1e-6)));
+		if (distance < error) {
+			error = distance;
+			best = index;
+		}
+	}
+
+	return best;
+}
+
+/** The attack rate whose duration is closest to `seconds`. 0-15. */
+export function nearestAttack(seconds: number): number {
+	return nearestBy(16, seconds, attackSeconds);
+}
+
+/**
+ * The decay rate closest to `seconds` at this sustain level. 0-7.
+ *
+ * Sustain 7 makes every decay exactly 0 s ({@link decaySeconds}'s fall table
+ * ends in 0), so there is nothing to choose between and rate 0 is returned.
+ */
+export function nearestDecay(seconds: number, sustain: number): number {
+	if (sustain >= 7) {
+		return 0;
+	}
+
+	return nearestBy(8, seconds, (decay) => decaySeconds(decay, sustain));
+}
+
+/** The sustain level closest to `level`, a fraction of full. 0-7. */
+export function nearestSustain(level: number): number {
+	let best = 0;
+	let error = Infinity;
+	for (let sustain = 0; sustain < 8; sustain++) {
+		const distance = Math.abs(sustainLevel(sustain) - level);
+		if (distance < error) {
+			error = distance;
+			best = sustain;
+		}
+	}
+
+	return best;
+}
+
+/**
+ * The release rate closest to `seconds` at this sustain level. 0-31.
+ *
+ * Rate 0 is "never", so it is reachable only by asking for it: searching from 1
+ * keeps a finite target from landing on the one value that means the opposite.
+ */
+export function nearestRelease(seconds: number, sustain: number): number {
+	if (!Number.isFinite(seconds)) {
+		return 0;
+	}
+
+	return nearestBy(32, seconds, (release) => releaseSeconds(release, sustain), 1);
+}
+
+/** The noise clock closest to `hz`. 0-31; 0 is silence and is never chosen. */
+export function nearestNoiseClock(hz: number): number {
+	if (hz <= 0) {
+		return 0;
+	}
+
+	return nearestBy(32, hz, noiseHz, 1);
+}
+
+/** ADSR1 and ADSR2 from the four fields. The inverse of {@link decodeAdsr}. */
+export function encodeAdsr(envelope: Envelope): { adsr1: number; adsr2: number } {
+	const adsr1 = (envelope.adsrEnabled ? 0x80 : 0) | ((envelope.decay & 0x07) << 4) | (envelope.attack & 0x0f);
+	const adsr2 = ((envelope.sustain & 0x07) << 5) | (envelope.release & 0x1f);
+	return { adsr1, adsr2 };
+}
+
+/** A GAIN byte from a decoded one. The inverse of {@link decodeGain}. */
+export function encodeGain(gain: Gain): number {
+	if (gain.mode === "direct") {
+		return Math.round((gain.level ?? 0) * 0x7f) & 0x7f;
+	}
+
+	const mode = (["linearDecrease", "expDecrease", "linearIncrease", "bentIncrease"] as const).indexOf(gain.mode);
+	return 0x80 | (mode << 5) | ((gain.rate ?? 0) & 0x1f);
+}
+
+/**
+ * The two tuning bytes closest to a multiplier. The inverse of
+ * {@link tuningMultiplier}, and exact for anything the pair can express.
+ */
+export function encodeTuning(multiplier: number): { tuning: number; subTuning: number } {
+	const clamped = Math.min(255 + 255 / 256, Math.max(0, multiplier));
+	const whole = Math.floor(clamped);
+	const fraction = Math.round((clamped - whole) * 256);
+	// A fraction that rounds up to a whole 256 carries, exactly as 0.999 → 1.0
+	// would in decimal; without this, `$01.$100` is not a byte pair.
+	return fraction === 256
+		? { tuning: (whole + 1) & 0xff, subTuning: 0 }
+		: { tuning: whole & 0xff, subTuning: fraction };
+}

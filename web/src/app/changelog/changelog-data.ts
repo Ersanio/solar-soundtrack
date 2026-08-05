@@ -30,6 +30,9 @@ export const CHANGELOG: readonly ChangelogEntry[] = [
     items: [
       'Every command is now editable from the inspector',
       'Command arguments are named and shown in real units',
+      'Envelope tuner for ADSR and GAIN',
+      'Echo channels, feedback and filter set from the panel',
+      'Instrument definitions are editable, sample and all',
     ],
   },
   {

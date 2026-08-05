@@ -1,34 +1,5 @@
 @if (definingEntry(); as entry) {
-  <table class="w-full border-collapse text-xs">
-    <tbody>
-      <tr class="border-edge/60 border-t first:border-t-0">
-        <td class="text-ink-muted py-1 pr-3 whitespace-nowrap">Defines</td>
-        <td class="py-1 font-mono tabular-nums">
-          &#64;{{ entry.number }}
-          <span class="text-ink-muted block font-sans text-[11px]">
-            inside <code>#instruments</code>, so this names a sample rather than selecting an
-            instrument
-          </span>
-        </td>
-      </tr>
-      <tr class="border-edge/60 border-t">
-        <td class="text-ink-muted py-1 pr-3 whitespace-nowrap">Sample</td>
-        <td class="py-1 font-mono tabular-nums">{{ definitionSample() }}</td>
-      </tr>
-      @if (entry.complete) {
-        <tr class="border-edge/60 border-t">
-          <td class="text-ink-muted py-1 pr-3 whitespace-nowrap">Bytes</td>
-          <td class="py-1 font-mono tabular-nums">{{ definitionBytes() }}</td>
-        </tr>
-      }
-    </tbody>
-  </table>
-  @if (!entry.complete) {
-    <p class="text-warn mt-3 text-xs leading-relaxed">
-      This entry is unfinished. Each one needs a sample and five
-      <code class="text-ink">$xx</code> bytes.
-    </p>
-  }
+  <amk-instrument-entry [entry]="entry" />
 } @else if (written() < 0) {
   <p class="text-ink-muted text-xs leading-relaxed">No number given, so this changes nothing.</p>
 } @else {

@@ -239,6 +239,25 @@ export class EditorStore {
   /** The command the caret is in, which the command inspector renders. */
   readonly commandAtCaret = computed(() => commandAt(this.tokens().commands, this.caret()));
 
+  /**
+   * The `#instruments` entry the caret is in, if any.
+   *
+   * Needed alongside {@link commandAtCaret} rather than derived from it: most of
+   * an entry is not a command at all. `"kick.brr" $FF $E0 $B8 $02 $F0` is a
+   * string token and five `hexArg`s, and `gather` builds commands from neither —
+   * so a caret anywhere in that line finds nothing, and the entry editor would
+   * be reachable only for the `@n` and `nXX` sample forms, which do happen to
+   * scan as commands. End-exclusive, matching how the definition's span is
+   * built.
+   */
+  readonly instrumentAtCaret = computed(() => {
+    const at = this.caret();
+    return (
+      this.tokens().instruments.find((entry) => at >= entry.span.start && at <= entry.span.end) ??
+      null
+    );
+  });
+
   /** Set by actions that can fail outside compilation (export, driver upload). */
   private readonly override = signal<Status | null>(null);
 

@@ -4,12 +4,119 @@
     <code class="text-ink">$FA $04</code> changes that, and the compiler writes it for you.
   </p>
 } @else {
-  <amk-detail-table [rows]="rows()" />
+  @if (isEf()) {
+    <amk-bit-toggles
+      legend="Channels"
+      [value]="mask()"
+      [labels]="VOICE_LABELS"
+      [valueLabel]="maskLabel()"
+      [disabled]="!editable(0)"
+      [note]="lockedBecause(0)"
+      (changed)="setArg(0, $event)"
+    />
 
-  @if (taps(); as filter) {
+    <amk-slider
+      label="Volume L"
+      [signed]="true"
+      [value]="signedOf(1)"
+      [min]="-128"
+      [max]="127"
+      [note]="lockedBecause(1) ?? signedNote(1)"
+      [disabled]="!editable(1)"
+      (commit)="setArg(1, $event)"
+    />
+    <amk-slider
+      label="Volume R"
+      [signed]="true"
+      [value]="signedOf(2)"
+      [min]="-128"
+      [max]="127"
+      [note]="lockedBecause(2) ?? signedNote(2)"
+      [disabled]="!editable(2)"
+      (commit)="setArg(2, $event)"
+    />
+  }
+
+  @if (isF1()) {
+    <amk-slider
+      label="Delay"
+      [value]="delay()"
+      [max]="15"
+      [note]="lockedBecause(0) ?? delayNote()"
+      [disabled]="!editable(0)"
+      (commit)="setArg(0, $event)"
+    />
+    <amk-slider
+      label="Feedback"
+      [signed]="true"
+      [value]="signedOf(1)"
+      [min]="-128"
+      [max]="127"
+      [note]="lockedBecause(1) ?? signedNote(1)"
+      [disabled]="!editable(1)"
+      (commit)="setArg(1, $event)"
+    />
+
+    <!-- Two presets, because the driver ships exactly two filter tables. -->
+    <div class="flex flex-col gap-1">
+      <span class="text-ink-muted text-[11px]">Filter</span>
+      <div class="flex flex-wrap gap-1.5">
+        @for (choice of FILTERS; track choice.value) {
+          <button
+            amk-button
+            [variant]="filter() === choice.value ? 'primary' : 'default'"
+            [title]="choice.note"
+            [disabled]="!editable(2)"
+            (click)="setArg(2, choice.value)"
+          >
+            {{ choice.name }}
+          </button>
+        }
+      </div>
+      @if (lockedBecause(2); as reason) {
+        <span class="text-ink-muted text-[11px] leading-snug italic">{{ reason }}</span>
+      }
+      @if (filterNote(); as note) {
+        <span class="text-warn text-[11px] leading-snug">{{ note }}</span>
+      }
+    </div>
+  }
+
+  @if (isFade()) {
+    <amk-slider
+      label="Over"
+      [value]="args()[0] ?? 0"
+      [max]="255"
+      [note]="lockedBecause(0)"
+      [disabled]="!editable(0)"
+      (commit)="setArg(0, $event)"
+    />
+    <amk-slider
+      label="To volume L"
+      [signed]="true"
+      [value]="signedOf(1)"
+      [min]="-128"
+      [max]="127"
+      [note]="lockedBecause(1) ?? signedNote(1)"
+      [disabled]="!editable(1)"
+      (commit)="setArg(1, $event)"
+    />
+    <amk-slider
+      label="To volume R"
+      [signed]="true"
+      [value]="signedOf(2)"
+      [min]="-128"
+      [max]="127"
+      [note]="lockedBecause(2) ?? signedNote(2)"
+      [disabled]="!editable(2)"
+      (commit)="setArg(2, $event)"
+    />
+  }
+
+  @if (taps(); as filterTaps) {
     <div>
       <div class="text-ink-muted mb-1 text-[11px] tracking-wide uppercase">Filter this selects</div>
-      <amk-fir-graph [taps]="filter" [feedback]="feedback()" />
+      <amk-fir-graph [taps]="filterTaps" [feedback]="feedback()" />
     </div>
 
     @if (overrides(); as earlier) {

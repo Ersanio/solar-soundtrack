@@ -25,6 +25,7 @@ import { DriverStore } from '../../../state/driver-store';
 import { EditorStore } from '../../../state/editor-store';
 import { duration, hex2 } from '../../../util/format';
 import { AdsrGraph } from '../adsr-graph/adsr-graph';
+import { InstrumentEntryEditor } from '../instrument-entry/instrument-entry';
 import type { DetailRow } from '../../../shared/detail-table/detail-table';
 import { HexPipe } from '../../../util/hex.pipe';
 
@@ -41,7 +42,7 @@ type Band = 'melodic' | 'unsupported' | 'percussion' | 'custom' | 'undefined' | 
  */
 @Component({
   selector: 'amk-instrument-inspector',
-  imports: [AdsrGraph, HexPipe],
+  imports: [AdsrGraph, HexPipe, InstrumentEntryEditor],
   templateUrl: './instrument-inspector.html',
   host: { class: 'block' },
 })
@@ -110,31 +111,6 @@ export class InstrumentInspector {
       this.store.tokens().instruments.find((d) => at >= d.span.start && at < d.span.end) ?? null
     );
   });
-
-  /** The sample form of the entry the caret is defining, said in words. */
-  protected readonly definitionSample = computed(() => {
-    const sample = this.definingEntry()?.sample;
-    if (!sample) {
-      return '';
-    }
-
-    if (sample.form === 'file') {
-      return `"${sample.name}"`;
-    }
-
-    if (sample.form === 'copy') {
-      return `@${sample.instrument}'s sample, $${hex2(sample.srcn)}`;
-    }
-
-    return `noise at clock $${hex2(sample.clock)} — ${Math.round(noiseHz(sample.clock)).toLocaleString()} Hz`;
-  });
-
-  protected readonly definitionBytes = computed(
-    () =>
-      this.definingEntry()
-        ?.bytes.map((byte) => hex2(byte.value))
-        .join(' ') ?? '',
-  );
 
   protected readonly band = computed<Band>(() => {
     const n = this.emitted();
