@@ -1,6 +1,7 @@
 import { Service, computed, effect, inject, signal } from '@angular/core';
 
 import { compiler } from '@compiler';
+import type { Edit } from '@compiler/edits';
 import { commandAt, tokenize } from '@compiler/tokens';
 import type { CompileResult, Diagnostic, Span } from '@core/types';
 import { buildSpc, spcFilename } from '@spc/export';
@@ -77,8 +78,30 @@ export class EditorStore {
    * view and nothing else may reach into it.
    *
    * A fresh object each time, so writing the same edit twice still takes.
+   *
+   * `expect` is what the splice believes occupies the span. Panels read the
+   * *undebounced* scan, so their spans agree with the document — but only up to
+   * the microtask that carries the edit across, and a control that fires on
+   * `pointerup` is one gesture away from a document that has moved. The editor
+   * compares before it dispatches, which turns that whole class of race from
+   * silent corruption into an edit that simply does not take.
    */
-  readonly replace = signal<{ span: Span; text: string } | null>(null);
+  readonly replace = signal<Edit | null>(null);
+
+  /**
+   * Applies a splice built by `compiler/edits.ts`, ignoring the `null` those
+   * builders return when nothing would change.
+   *
+   * Here rather than in each panel so the no-op check and the defensive copy are
+   * stated once: a slider fires per frame of a drag, and the builders answering
+   * "that is the text already there" is what keeps a drag from pushing dozens of
+   * identical recompiles through the typing debounce.
+   */
+  apply(edit: Edit | null): void {
+    if (edit) {
+      this.replace.set({ ...edit, span: { ...edit.span } });
+    }
+  }
 
   /**
    * The text the compiler last ran on. It lags `source` by the typing debounce,

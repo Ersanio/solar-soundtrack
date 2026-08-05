@@ -130,7 +130,10 @@ export class InstrumentInspector {
   });
 
   protected readonly definitionBytes = computed(
-    () => this.definingEntry()?.bytes.map(hex2).join(' ') ?? '',
+    () =>
+      this.definingEntry()
+        ?.bytes.map((byte) => hex2(byte.value))
+        .join(' ') ?? '',
   );
 
   protected readonly band = computed<Band>(() => {
@@ -198,7 +201,7 @@ export class InstrumentInspector {
         return null;
       }
 
-      return [sampleByte(custom.sample), ...custom.bytes];
+      return [sampleByte(custom.sample), ...custom.bytes.map((byte) => byte.value)];
     }
 
     const entry = this.entry();

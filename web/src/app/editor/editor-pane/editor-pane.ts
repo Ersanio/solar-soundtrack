@@ -193,13 +193,19 @@ export class EditorPane {
         this.store.replace.set(null);
 
         const length = this.view.state.doc.length;
-        this.view.dispatch({
-          changes: {
-            from: Math.min(edit.span.start, length),
-            to: Math.min(edit.span.end, length),
-            insert: edit.text,
-          },
-        });
+        const from = Math.min(edit.span.start, length);
+        const to = Math.min(edit.span.end, length);
+
+        // The span was worked out against a scan of `source`, which is written
+        // from the update listener below and so *is* the document — but only up
+        // to the microtask that carried this edit across. Checking the text
+        // rather than trusting the offsets is what makes a stale splice a
+        // no-op instead of an overwrite of whatever moved into its place.
+        if (this.view.state.doc.sliceString(from, to) !== edit.expect) {
+          return;
+        }
+
+        this.view.dispatch({ changes: { from, to, insert: edit.text } });
       });
     });
 

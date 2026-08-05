@@ -46,6 +46,12 @@
     cursor is the macro's name rather than the bytes. Editing here would write the expansion out in
     its place, so it is turned off — change the definition instead.
   </p>
+} @else if (command().headReplacement) {
+  <p class="text-ink-muted text-xs leading-relaxed">
+    The <code class="text-ink">$F5</code> itself comes from the
+    <code class="text-ink">"{{ command().headReplacement }}"</code> replacement, but these eight
+    bytes are written here, so they can still be tuned.
+  </p>
 }
 
 <!-- Two ways in, more abstract first. A macro's bytes stay readable but not

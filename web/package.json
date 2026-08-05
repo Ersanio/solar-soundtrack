@@ -29,7 +29,8 @@
     "firtest": "esbuild scripts/firtest.ts --bundle --platform=node --format=esm --outfile=.selftest/firtest.mjs --log-level=warning && node .selftest/firtest.mjs",
     "instrtest": "esbuild scripts/instrtest.ts --bundle --platform=node --format=esm --outfile=.selftest/instrtest.mjs --log-level=warning && node .selftest/instrtest.mjs",
     "adsrtest": "esbuild scripts/adsrtest.ts --bundle --platform=node --format=esm --outfile=.selftest/adsrtest.mjs --log-level=warning && node .selftest/adsrtest.mjs",
-    "check": "npm run format:check && npm run typecheck && npm run typecheck:scripts && npm run selftest && npm run spctest && npm run audiotest && npm run worklettest && npm run charttest && npm run brrtest && npm run tokentest && npm run firtest && npm run instrtest && npm run adsrtest",
+    "edittest": "esbuild scripts/edittest.ts --bundle --platform=node --format=esm --outfile=.selftest/edittest.mjs --log-level=warning && node .selftest/edittest.mjs",
+    "check": "npm run format:check && npm run typecheck && npm run typecheck:scripts && npm run selftest && npm run spctest && npm run audiotest && npm run worklettest && npm run charttest && npm run brrtest && npm run tokentest && npm run firtest && npm run instrtest && npm run adsrtest && npm run edittest",
     "lint": "ng lint",
     "lint:fix": "ng lint --fix"
   },

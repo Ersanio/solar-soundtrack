@@ -538,6 +538,39 @@ console.log("\na replacement can supply arguments, or take them");
 	);
 }
 
+console.log("\na command knows which of its parts came through a macro");
+{
+	// The whole point of carrying provenance per part rather than per command:
+	// `replacement` alone cannot tell "the bytes are not in the document" from
+	// "the command byte is a macro and every argument is literal text", and only
+	// the second of those can be rewritten in place. `compiler/edits.ts` asks
+	// this question; here is where the answer is pinned.
+	const head = tokenize('"ech=$EF"\n#0 ech $80 $10 $10\n').commands.find((c) => c.vcmd === 0xef);
+	check("the aggregate still fires", head?.replacement === "ech");
+	check("the command byte names the macro", head?.headReplacement === "ech");
+	check("and every argument is literal", head !== undefined && head.args.every((a) => a.replacement === undefined));
+
+	const arg = tokenize('"lo=$2b"\n#0 $EF lo $2d $2d\n').commands.find((c) => c.vcmd === 0xef);
+	check("a macro standing in for one argument marks only that one", arg?.args[0].replacement === "lo");
+	check("leaving the others literal", arg?.args[1].replacement === undefined && arg?.args[2].replacement === undefined);
+	check("and the command byte untouched", arg?.headReplacement === undefined);
+
+	const whole = tokenize('"x=$EF $2b $2d $2d"\n#0 x\n').commands.find((c) => c.vcmd === 0xef);
+	check(
+		"a macro carrying the whole command marks every part",
+		whole?.headReplacement === "x" && whole.args.every((a) => a.replacement === "x"),
+	);
+
+	// `head` is what lets an editor append a missing argument rather than only
+	// overwrite the ones that are there, so it must stop at the command itself.
+	const source = "#0 $F5 $7F $00 $00 $00 $00 $00 $00 $00\n@@19\n";
+	const { commands } = tokenize(source);
+	const fir = commands.find((c) => c.vcmd === 0xf5);
+	check("head covers the command byte alone", source.slice(fir!.head.start, fir!.head.end) === "$F5");
+	const direct = commands.find((c) => c.direct === true);
+	check("and the whole of the direct form's @@", source.slice(direct!.head.start, direct!.head.end) === "@@");
+}
+
 console.log("\nreplacements are transitive");
 {
 	// parser.ts:687 re-runs the match on the text it just spliced in.
@@ -688,7 +721,31 @@ console.log("\n#instruments is scanned as a block, not as commands");
 	check("the third is noise", index.instruments[2]?.sample.form === "noise");
 	// parser.ts:1162 — the high bit is what marks it noise.
 	check("with the high bit set", (index.instruments[2]?.sample as { byte: number }).byte === 0x9f);
-	check("the bytes are the ones written", index.instruments[0]?.bytes.join() === [0xfe, 0x6a, 0xb8, 0x03, 0x00].join());
+	check(
+		"the bytes are the ones written",
+		index.instruments[0]?.bytes.map((b) => b.value).join() === [0xfe, 0x6a, 0xb8, 0x03, 0x00].join(),
+	);
+
+	// Every byte carries its own span, which is what makes one of them editable
+	// without rewriting the entry around it. Slicing the span back out of the
+	// source is the assertion: an off-by-one would still be a plausible-looking
+	// number, and only the text can tell.
+	check(
+		"each byte's span slices back to its own $XX",
+		index.instruments[0]?.bytes.map((b) => source.slice(b.span.start, b.span.end)).join(" ") === "$FE $6A $B8 $03 $00",
+	);
+	check(
+		"the sample span covers the name and nothing else",
+		source.slice(index.instruments[0].sampleSpan.start, index.instruments[0].sampleSpan.end) === '"kick.brr"',
+	);
+	check(
+		"and covers both tokens of the @n form",
+		source.slice(index.instruments[1].sampleSpan.start, index.instruments[1].sampleSpan.end) === "@5",
+	);
+	check(
+		"and of the noise form",
+		source.slice(index.instruments[2].sampleSpan.start, index.instruments[2].sampleSpan.end) === "n1F",
+	);
 
 	// Outside the block, hex commands work as before.
 	check(

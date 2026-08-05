@@ -32,14 +32,14 @@ All from `web/`. Node 24 is what CI uses.
 | `npm run lint` | `ng lint` over `src/**` and `scripts/**`. |
 | `npm run lint:fix` | The same with `--fix`. Follow it with `npm run format`. |
 | `npm run format` | Prettier over the workspace. |
-| `npm run check` | The merge gate: formatting, both typechecks, all ten byte-level harnesses. |
+| `npm run check` | The merge gate: formatting, both typechecks, all eleven byte-level harnesses. |
 
 CI runs `npm run lint` then `npm run check`.
 
 ### Tests
 
 There are no `.spec.ts` files in the repository — `npm run test` (`ng test`, Vitest) is scaffolding
-and currently runs nothing. The real suite is ten harnesses under `scripts/`, each a standalone
+and currently runs nothing. The real suite is eleven harnesses under `scripts/`, each a standalone
 esbuild-bundled Node script with its own npm script. To run one, run its script; they take no
 filter flags, so narrowing a run means editing the harness.
 
@@ -75,6 +75,15 @@ not run the template compiler, so a bad binding (`viewBox=` instead of `[attr.vi
   ladder*, because the DSP uses the same table for noise and every other function here is defined in
   terms of it; nothing else could catch a transposed digit. It also asserts that the two magic tables
   in AddmusicK's readme calculator are exactly the step counts of bsnes's envelope stepping.
+- `npm run edittest` — `compiler/edits.ts`, the splices the command inspector writes back into the
+  source. Two load-bearing assertions, and both compare whole strings rather than numbers because
+  numbers cannot see either failure. **Gap preservation**: a splice replaces the parts that changed
+  and copies the text *between* them out of the source, so a tab, a column of aligned bytes or a
+  mid-run `; comment` survives an edit to the byte beside it — re-rendering a command from its values
+  gets every number right and destroys all three. **The macro interlock, per part**: `"ech=$EF"` used
+  as `ech $80 $10 $10` has a macro for its command byte and literal text for every argument, so the
+  arguments are writable and the byte is not; asking that of the whole command, which is all
+  `Command.replacement` can answer, refuses an edit that is perfectly safe.
 
 Separately, `scripts/Compare-Spc.ps1` and `scripts/Compare-SongBin.ps1` diff output against a real
 AddmusicK build, region-aware so ID666 noise does not drown the real differences. Those are what

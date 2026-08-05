@@ -153,10 +153,10 @@ export const TOKEN_TAGS: Readonly<Record<TokenKind, string>> = {
  * (`parser.ts:1665`), so reading either as decimal is wrong twice over: the value
  * is wrong, and `F` would otherwise be taken for a note.
  */
-const HEX_ARG_LETTERS = new Set(["q", "n"]);
+export const HEX_ARG_LETTERS = new Set(["q", "n"]);
 
 /** Human names for the single-letter commands, to match {@link VCMD_NAMES}. */
-const LETTER_NAMES: Readonly<Record<string, string>> = {
+export const LETTER_NAMES: Readonly<Record<string, string>> = {
 	t: "tempo",
 	v: "volume",
 	w: "global volume",
@@ -176,7 +176,7 @@ const LETTER_NAMES: Readonly<Record<string, string>> = {
 };
 
 /** Which `TokenKind` a command letter introduces. */
-const LETTER_KINDS: Readonly<Record<string, TokenKind>> = {
+export const LETTER_KINDS: Readonly<Record<string, TokenKind>> = {
 	t: "tempo",
 	v: "volume",
 	w: "globalVolume",
@@ -1090,18 +1090,49 @@ export interface Command {
 	name: string;
 	/** The whole run, including its arguments. */
 	span: Span;
-	args: { value: number; span: Span }[];
+	/**
+	 * The command byte or letter alone — `$F5` out of a `$F5 $7F …` run, `@@`
+	 * out of `@@19`.
+	 *
+	 * {@link span}`.start` already equals this one's start; the *end* is what is
+	 * new, and it is what lets an editor append an argument a half-written
+	 * command is missing rather than only overwrite the ones that are there.
+	 */
+	head: Span;
+	/**
+	 * The replacement the command *byte* came through, if any.
+	 *
+	 * Separate from {@link replacement} because the two permit different edits:
+	 * `"ech=$EF"` used as `ech $80 $10 $10` sets this and leaves every argument
+	 * literal, so the arguments can still be rewritten in place even though the
+	 * command byte cannot.
+	 */
+	headReplacement?: string;
+	args: {
+		value: number;
+		span: Span;
+		/**
+		 * The replacement this argument came through, if any.
+		 *
+		 * The interlock `compiler/edits.ts` tests. Every token from one expansion
+		 * is stamped with the use site's span, so two arguments out of one macro
+		 * share a single span and writing over either would clobber the other —
+		 * which is why provenance per part is the right primitive here rather
+		 * than a span-overlap check.
+		 */
+		replacement?: string;
+	}[];
 	/** Every argument the command expects is present. */
 	complete: boolean;
 	/**
 	 * The replacement this was written as, when any part of it came through one.
 	 *
-	 * A safety interlock as much as a label: the parts that came from the macro
-	 * collapse onto the use site, so {@link span} covers the name the author
-	 * typed rather than the bytes. Anything that *rewrites* a command in place —
-	 * the FIR designer does — must refuse when this is set, or it would inline
-	 * the macro and, if the expansion carried anything past the command, delete
-	 * that too.
+	 * A label, and the coarse half of a safety interlock: the parts that came
+	 * from the macro collapse onto the use site, so {@link span} covers the name
+	 * the author typed rather than the bytes. Anything that rewrites the *whole*
+	 * run must refuse when this is set, or it would inline the macro and, if the
+	 * expansion carried anything past the command, delete that too. Rewriting
+	 * one argument asks the narrower question — see {@link headReplacement}.
 	 */
 	replacement?: string;
 	/**
@@ -1154,8 +1185,20 @@ export interface InstrumentDefinition {
 	number: number;
 	/** Always one of the three forms; an entry that opens as none is not one. */
 	sample: InstrumentSample;
-	/** ADSR1, ADSR2, GAIN, tuning, subtuning. Short while half-written. */
-	bytes: number[];
+	/**
+	 * Where the sample form was written — the whole of `"kick.brr"`, `@1` or
+	 * `n1F`, so an editor can swap one form for another.
+	 */
+	sampleSpan: Span;
+	/**
+	 * ADSR1, ADSR2, GAIN, tuning, subtuning. Short while half-written.
+	 *
+	 * Each byte carries its own span rather than the entry holding a parallel
+	 * array of them: a malformed entry is recorded rather than abandoned
+	 * (see below), and two arrays that may each stop early would drift the first
+	 * time one of those paths was touched.
+	 */
+	bytes: { value: number; span: Span; replacement?: string }[];
 	/** A sample form and all five bytes are present. */
 	complete: boolean;
 	span: Span;
@@ -1367,9 +1410,17 @@ function gatherInstruments(tokens: GatherToken[], text: string): InstrumentDefin
 				continue;
 			}
 
-			const bytes: number[] = [];
+			// `last` is the sample form's final token until a byte moves it on, so
+			// this is the whole of `"kick.brr"` / `@1` / `n1F` and nothing more.
+			const sampleSpan: Span = { start: start.start, end: last.end, line: start.line };
+
+			const bytes: InstrumentDefinition["bytes"] = [];
 			while (j < tokens.length && bytes.length < 5 && tokens[j].kind === "hexArg") {
-				bytes.push(parseInt(textOf(tokens[j]).slice(1), 16));
+				bytes.push({
+					value: parseInt(textOf(tokens[j]).slice(1), 16),
+					span: { start: tokens[j].start, end: tokens[j].end, line: tokens[j].line },
+					replacement: tokens[j].replacement,
+				});
 				last = tokens[j];
 				j++;
 			}
@@ -1377,6 +1428,7 @@ function gatherInstruments(tokens: GatherToken[], text: string): InstrumentDefin
 			out.push({
 				number: number++,
 				sample,
+				sampleSpan,
 				bytes,
 				complete: bytes.length === 5,
 				span: { start: start.start, end: last.end, line: start.line },
@@ -1516,13 +1568,13 @@ function gatherNoteLength(
 	spanOf: (token: Token) => Span,
 ): {
 	segments: NoteLengthSegment[];
-	args: { value: number; span: Span }[];
+	args: Command["args"];
 	last: GatherToken | undefined;
 	from: string | undefined;
 	nextIndex: number;
 } {
 	const segments: NoteLengthSegment[] = [];
-	const args: { value: number; span: Span }[] = [];
+	const args: Command["args"] = [];
 	let last: GatherToken | undefined;
 	let from: string | undefined;
 	let index = startIndex;
@@ -1541,7 +1593,7 @@ function gatherNoteLength(
 			const next = tokens[index];
 			if (next.kind === "number" || next.kind === "hexNumber") {
 				first ??= next;
-				args.push({ value: numberValue(textOf(next), next.kind), span: spanOf(next) });
+				args.push({ value: numberValue(textOf(next), next.kind), span: spanOf(next), replacement: next.replacement });
 				from ??= next.replacement;
 				last = next;
 				index++;
@@ -1653,12 +1705,16 @@ function gather(tokens: GatherToken[], text: string, transitions: TargetTransiti
 
 		if (token.kind === "hex") {
 			const vcmd = parseInt(textOf(token).slice(1), 16);
-			const args: { value: number; span: Span }[] = [];
+			const args: Command["args"] = [];
 			let from = token.replacement;
 			let last: GatherToken = token;
 			let j = i + 1;
 			while (j < tokens.length && tokens[j].kind === "hexArg") {
-				args.push({ value: parseInt(textOf(tokens[j]).slice(1), 16), span: spanOf(tokens[j]) });
+				args.push({
+					value: parseInt(textOf(tokens[j]).slice(1), 16),
+					span: spanOf(tokens[j]),
+					replacement: tokens[j].replacement,
+				});
 				from ??= tokens[j].replacement;
 				last = tokens[j];
 				j++;
@@ -1670,6 +1726,8 @@ function gather(tokens: GatherToken[], text: string, transitions: TargetTransiti
 				vcmd,
 				name: vcmdName(vcmd, args, target),
 				span: { start: token.start, end: last.end, line: token.line },
+				head: spanOf(token),
+				headReplacement: token.replacement,
 				args,
 				complete: expected !== null && args.length >= expected,
 				replacement: from,
@@ -1695,6 +1753,8 @@ function gather(tokens: GatherToken[], text: string, transitions: TargetTransiti
 				kind: raw[0],
 				name: nameForNote(token.kind),
 				span: { start: token.start, end: (last ?? token).end, line: token.line },
+				head: spanOf(token),
+				headReplacement: token.replacement,
 				args,
 				complete: true,
 				replacement: token.replacement ?? from,
@@ -1712,7 +1772,7 @@ function gather(tokens: GatherToken[], text: string, transitions: TargetTransiti
 
 		// `y10,1,2` and `t144` alike: consecutive numbers, optionally separated by
 		// commas, belong to the command that opened them.
-		const args: { value: number; span: Span }[] = [];
+		const args: Command["args"] = [];
 		let firstArgToken: GatherToken | undefined;
 		let from = token.replacement;
 		let last: GatherToken = token;
@@ -1720,7 +1780,7 @@ function gather(tokens: GatherToken[], text: string, transitions: TargetTransiti
 		while (j < tokens.length) {
 			const next = tokens[j];
 			if (next.kind === "number" || next.kind === "hexNumber") {
-				args.push({ value: numberValue(textOf(next), next.kind), span: spanOf(next) });
+				args.push({ value: numberValue(textOf(next), next.kind), span: spanOf(next), replacement: next.replacement });
 				firstArgToken ??= next;
 				from ??= next.replacement;
 				last = next;
@@ -1742,6 +1802,8 @@ function gather(tokens: GatherToken[], text: string, transitions: TargetTransiti
 			kind: letter,
 			name: LETTER_NAMES[letter.toLowerCase()] ?? nameForNote(token.kind),
 			span: { start: token.start, end: last.end, line: token.line },
+			head: spanOf(token),
+			headReplacement: token.replacement,
 			args,
 			complete: true,
 			replacement: from,
@@ -1792,7 +1854,7 @@ function numberValue(raw: string, kind: TokenKind): number {
  * as written. Where a form compiles into another command, its name is that
  * command's — a `$E5` sample load really emits `$F3` (`parser.ts:3028`).
  */
-function vcmdName(vcmd: number, args: { value: number }[], target: CommandTarget): string {
+export function vcmdName(vcmd: number, args: { value: number }[], target: CommandTarget): string {
 	if (vcmd === 0xed && target.program === 1) {
 		// `parseHFDHex` (`parser.ts:3286`) — the sub-byte picks the form.
 		const sub = args[0]?.value;
@@ -1838,7 +1900,7 @@ function vcmdName(vcmd: number, args: { value: number }[], target: CommandTarget
  * `BANK_SLOT_COUNT`, the two statements share their citations and `tokentest`
  * pins them against each other at each fork's flip point.
  */
-function expectedArgs(vcmd: number, args: { value: number }[], target: CommandTarget): number | null {
+export function expectedArgs(vcmd: number, args: { value: number }[], target: CommandTarget): number | null {
 	if (vcmd < FIRST_VCMD || vcmd > LAST_VCMD) {
 		return null;
 	}

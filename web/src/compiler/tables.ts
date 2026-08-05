@@ -77,6 +77,37 @@ export function bankSlotName(bank: string, slot: number): string {
 	return `${bank}:${slot.toString(16).toUpperCase().padStart(2, "0")}`;
 }
 
+/**
+ * `NoteDurations` — what `q`'s high nibble means. `main.asm:3477`
+ *
+ * The readme calls the nibble "how long of a delay there is between each note"
+ * and says no more. The driver (`main.asm:2365-2379`) masks it to three bits,
+ * indexes this table, and multiplies the note's own duration by the result
+ * before taking the high byte — so it is a *gate time in 256ths of the note*,
+ * and the "delay" is trailing silence proportional to how long the note is.
+ * `aram_map.html:666` says so outright: "quantization, which is in 256ths of a
+ * note". `q7` is $FF, so a note is never quite held for its full length.
+ */
+export const NOTE_DURATIONS: readonly number[] = [0x33, 0x66, 0x80, 0x99, 0xb3, 0xcc, 0xe6, 0xff];
+
+/**
+ * `VelocityValues` — what `q`'s low nibble means. `main.asm:3481-3483`
+ *
+ * Two tables of sixteen, SMW's first and N-SPC's second, indexed by the nibble
+ * with `+0x10` when the driver's `!SecondVTable` is set (`main.asm:2374-2378`).
+ * Which one is live is a property of the *song*, not of the byte: `#amk 2` moved
+ * the default from SMW's to N-SPC's (`parser.ts:415`) and `#option smwvtable` /
+ * `nspcvtable` switch it mid-file (`parser.ts:926-953`). Neither is linear, so
+ * the nibble is an index and not a volume.
+ */
+export const VELOCITY_VALUES: readonly number[] = [
+	0x08, 0x12, 0x1b, 0x24, 0x2c, 0x35, 0x3e, 0x47, 0x51, 0x5a, 0x62, 0x6b, 0x7d, 0x8f, 0xa1, 0xb3, 0x19, 0x33, 0x4c,
+	0x66, 0x72, 0x7f, 0x8c, 0x99, 0xa5, 0xb2, 0xbf, 0xcc, 0xd8, 0xe5, 0xf2, 0xfc,
+];
+
+/** Where {@link VELOCITY_VALUES}' N-SPC half begins — the driver's own `or a, #$10`. */
+export const NSPC_VELOCITY_OFFSET = 0x10;
+
 export const FIRST_VCMD = 0xda;
 export const LAST_VCMD = 0xfe;
 

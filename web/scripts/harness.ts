@@ -1,5 +1,5 @@
 /**
- * What the ten byte-level harnesses share.
+ * What the eleven byte-level harnesses share.
  *
  * Each of them is a standalone esbuild-bundled Node script, and each used to
  * carry its own byte-identical copy of `check`, its own exit epilogue and — for

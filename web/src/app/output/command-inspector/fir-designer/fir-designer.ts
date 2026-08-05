@@ -9,6 +9,7 @@ import {
   untracked,
 } from '@angular/core';
 
+import { argsRewritable, commandRewritable, spliceArgs, spliceCommand } from '@compiler/edits';
 import type { Command } from '@compiler/tokens';
 import {
   FIR_PRESETS,
@@ -243,22 +244,34 @@ export class FirDesigner {
   }
 
   /**
-   * A `$F5` reached through a replacement is readable but not writable.
+   * Coefficients reached through a replacement are readable but not writable.
    *
-   * Its span covers the macro's name, not the bytes — everything the expansion
-   * produced collapses onto the use site — so writing over it would inline the
-   * macro, and would silently swallow anything the same expansion carried past
-   * the command. The definition is the only honest place to edit.
+   * The question is asked of the arguments alone, not of the whole command: a
+   * `"fir"=$F5` followed by eight literal bytes is the common shape, and those
+   * bytes are text the author typed and can be written over. Only when the
+   * *coefficients themselves* came out of an expansion is there nothing to
+   * write — they collapse onto the use site, so a splice would inline the macro
+   * and swallow anything it carried past the command.
    */
-  protected readonly readOnly = computed(() => this.command().replacement !== undefined);
+  protected readonly readOnly = computed(
+    () => !argsRewritable(this.command()) && !commandRewritable(this.command()),
+  );
 
-  /** Writes the eight bytes back over the `$F5` run they came from. */
+  /** Writes the eight bytes back over the arguments they came from. */
   private commit(taps: number[]): void {
-    if (this.readOnly()) {
+    const command = this.command();
+    const source = this.store.source();
+    const bytes = taps.map((tap) => `$${toHexByte(tap)}`);
+
+    // A half-written `$F5` has fewer argument spans than there are coefficients,
+    // so there is nowhere to splice the missing ones — the run is rewritten
+    // whole instead, which is the one case where losing the author's spacing is
+    // unavoidable rather than careless.
+    if (!command.complete) {
+      this.store.apply(spliceCommand(source, command, `$F5 ${bytes.join(' ')}`));
       return;
     }
 
-    const text = `$F5 ${taps.map((tap) => `$${toHexByte(tap)}`).join(' ')}`;
-    this.store.replace.set({ span: { ...this.command().span }, text });
+    this.store.apply(spliceArgs(source, command, bytes));
   }
 }

@@ -24,6 +24,9 @@ import {
 	FIRST_CUSTOM_INSTRUMENT as COMPILER_FIRST_CUSTOM,
 	FIRST_PERCUSSION_INSTRUMENT as COMPILER_FIRST_PERCUSSION,
 	INSTRUMENT_TO_SAMPLE,
+	NOTE_DURATIONS,
+	NSPC_VELOCITY_OFFSET,
+	VELOCITY_VALUES,
 } from "../src/compiler/tables";
 import { type DriverManifest, analyzeDriver } from "../src/spc/driver";
 import {
@@ -179,6 +182,52 @@ console.log("\nentry shape");
 		COMPILER_FIRST_PERCUSSION === FIRST_PERCUSSION_INSTRUMENT,
 		`${COMPILER_FIRST_PERCUSSION} vs ${FIRST_PERCUSSION_INSTRUMENT}`,
 	);
+}
+
+console.log("\nthe quantization tables against the shipped driver");
+{
+	// `NOTE_DURATIONS` and `VELOCITY_VALUES` are hand-copied out of `main.asm`,
+	// which is not in an AddmusicK release's `AddmusicKsrc/` — so, exactly as
+	// with the instrument tables above, the only thing that can verify them is
+	// the driver binary itself. They sit adjacent in the source
+	// (`main.asm:3477-3483`), so searching for the 40 bytes as one run also pins
+	// their order, and a *unique* hit is what makes it a check rather than a
+	// coincidence: eight bytes alone would be findable almost anywhere.
+	const run = Uint8Array.from([...NOTE_DURATIONS, ...VELOCITY_VALUES]);
+
+	let hits = 0;
+	let at = -1;
+	for (let i = 0; i + run.length <= program.length; i++) {
+		let match = true;
+		for (let j = 0; j < run.length; j++) {
+			if (program[i + j] !== run[j]) {
+				match = false;
+				break;
+			}
+		}
+
+		if (match) {
+			hits++;
+			at = i;
+		}
+	}
+
+	check("the 40 bytes appear in main.bin", hits > 0);
+	check("and appear exactly once, so this is not a coincidence", hits === 1, `${hits} matches`);
+	if (at >= 0) {
+		console.log(`        NoteDurations at $${(PROGRAM_POS + at).toString(16).toUpperCase().padStart(4, "0")}`);
+	}
+
+	// The two halves are the whole reason the table is 32 entries: the driver
+	// picks between them with `or a, #$10` (`main.asm:2374-2378`).
+	check("the N-SPC half begins where the driver's offset says", NSPC_VELOCITY_OFFSET === 0x10);
+	check("so the table holds both halves", VELOCITY_VALUES.length === NSPC_VELOCITY_OFFSET * 2);
+	check("and the duration table has one entry per value of a 3-bit nibble", NOTE_DURATIONS.length === 8);
+
+	// The two facts a reader of `q` needs, and the two that would be wrong if a
+	// digit were transposed at either end of the ladder.
+	check("q0 gates a note to a fifth of its length", Math.round((NOTE_DURATIONS[0] / 256) * 100) === 20);
+	check("and q7 never quite reaches the whole of it", NOTE_DURATIONS[7] === 0xff);
 }
 
 summarise();
