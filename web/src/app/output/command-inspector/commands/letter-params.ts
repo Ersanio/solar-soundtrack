@@ -1,11 +1,5 @@
-import {
-  NOTE_DURATIONS,
-  NSPC_VELOCITY_OFFSET,
-  TICKS_PER_WHOLE,
-  VELOCITY_VALUES,
-} from '@compiler/tables';
+import { TICKS_PER_WHOLE } from '@compiler/tables';
 import { noiseHz } from '@spc/adsr';
-import { hex2 } from '../../../util/format';
 import { type Resolver, choice, fixed, s8, ticks, u8 } from './param';
 import { bpm, panLabel, percentOf255 } from './units';
 
@@ -32,43 +26,6 @@ function fadeable(name: string, describe: (value: number) => string | null): Res
     };
   };
 }
-
-/**
- * `q` — the one command whose readme entry is wrong.
- *
- * The readme calls the high nibble "how long of a delay there is between each
- * note". The driver (`main.asm:2365-2379`) masks it to three bits, indexes
- * `NoteDurations`, and multiplies the note's own duration by the result before
- * taking the high byte: it is a *gate time in 256ths of the note*, so the delay
- * is trailing silence proportional to how long the note is, not a fixed count.
- * `aram_map.html:666` says so — "quantization, which is in 256ths of a note".
- *
- * The low nibble is an index into one of two velocity tables, not a volume, and
- * which table is live is a property of the song: `#amk 2` moved the default from
- * SMW's to N-SPC's, and `#option smwvtable` / `nspcvtable` switch it mid-file.
- */
-const quantization: Resolver = (command) => {
-  // `parser.ts:415` — the positional half of the answer, the `#option` half
-  // being a later refinement. `#am4` and `#amm` both report amkVersion 0.
-  const nspc = command.target.program === 0 && command.target.amkVersion >= 2;
-  const table = nspc ? 'N-SPC' : 'SMW';
-
-  return {
-    params: [
-      u8('Quantization', 'index', {
-        min: 0x01,
-        max: 0x7f,
-        describe: (value) => {
-          const gate = NOTE_DURATIONS[(value >> 4) & 0x07];
-          const velocity = VELOCITY_VALUES[(value & 0x0f) + (nspc ? NSPC_VELOCITY_OFFSET : 0)];
-          const percent = Math.round((gate / 256) * 100);
-          return `plays for ${percent}% of the note ($${hex2(gate)}), at velocity $${hex2(velocity)} of the ${table} table`;
-        },
-      }),
-    ],
-    note: `The first digit is a gate time in 256ths of the note, not a fixed delay; the second indexes the ${table} velocity table.`,
-  };
-};
 
 /** `p` — `pRate,Extent` or `pDelay,Rate,Extent` (`parser.ts:1976-2035`). */
 const vibrato: Resolver = (command) =>
@@ -134,7 +91,8 @@ export const LETTER_PARAMS: Readonly<Record<string, Resolver>> = {
   v: fadeable('Volume', percentOf255),
   w: fadeable('Global volume', percentOf255),
   y: pan,
-  q: quantization,
+  // `q` has a view of its own: two nibbles that mean two unrelated things, the
+  // second read against a table the song chooses. See `quantization-command/`.
   l: defaultLength,
   o: fixed([u8('Octave', 'index', { min: 0, max: 6 })]),
   '@': fixed([u8('Instrument', 'index')]),

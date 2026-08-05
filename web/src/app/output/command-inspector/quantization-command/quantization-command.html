@@ -1,0 +1,37 @@
+@if (!written()) {
+  <p class="text-ink-muted text-xs leading-relaxed">
+    Needs a two-digit hex value, as in <code class="text-ink">q7F</code>.
+  </p>
+} @else {
+  <amk-slider
+    label="Note length"
+    [value]="gateIndex()"
+    [max]="7"
+    [valueLabel]="gateLabel()"
+    [note]="lockedBecause() ?? gateNote()"
+    [disabled]="!editable()"
+    (commit)="setGate($event)"
+  />
+
+  <amk-slider
+    label="Velocity"
+    [value]="velocityIndex()"
+    [max]="15"
+    [valueLabel]="velocityLabel()"
+    [note]="velocityNote()"
+    [disabled]="!editable()"
+    (commit)="setVelocity($event)"
+  />
+
+  <p class="text-ink-muted text-xs leading-relaxed">{{ example() }}</p>
+
+  @if (outOfRange(); as problem) {
+    <p class="text-warn text-xs leading-relaxed">{{ problem }}</p>
+  }
+
+  <p class="text-ink-muted text-xs leading-relaxed">
+    The readme calls the first digit a delay between notes. It is a gate time in 256ths of the note,
+    so it scales with how long the note is; the second digit is an index into the
+    {{ tableName() }} velocity table, not a volume.
+  </p>
+}

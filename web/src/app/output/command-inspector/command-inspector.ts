@@ -3,11 +3,13 @@ import { Component, computed, inject } from '@angular/core';
 import { EditorStore } from '../../state/editor-store';
 import { hex2 } from '../../util/format';
 import { AdsrCommand } from './adsr-command/adsr-command';
+import { ArpeggioCommand } from './arpeggio-command/arpeggio-command';
 import { EchoInspector } from './echo-inspector/echo-inspector';
 import { FirDesigner } from './fir-designer/fir-designer';
 import { InstrumentEntryEditor } from './instrument-entry/instrument-entry';
 import { InstrumentInspector } from './instrument-inspector/instrument-inspector';
 import { ParamTable } from './param-table/param-table';
+import { QuantizationCommand } from './quantization-command/quantization-command';
 
 /**
  * Which view a hex command gets.
@@ -25,6 +27,9 @@ const VIEWS: Readonly<Record<number, string>> = {
   0xf1: 'echo',
   0xf2: 'echo',
   0xf5: 'fir',
+  // Its length is one of its arguments, so the notes are a list you add to
+  // rather than a count you type and then have to match.
+  0xfb: 'arpeggio',
 };
 
 /**
@@ -38,6 +43,9 @@ const VIEWS: Readonly<Record<number, string>> = {
  */
 const LETTER_VIEWS: Readonly<Record<string, string>> = {
   '@': 'instrument',
+  // Two nibbles that mean two unrelated things, one of which is read against a
+  // table the song chooses — a single row could state neither.
+  q: 'quantization',
 };
 
 /**
@@ -55,11 +63,13 @@ const LETTER_VIEWS: Readonly<Record<string, string>> = {
   selector: 'amk-command-inspector',
   imports: [
     AdsrCommand,
+    ArpeggioCommand,
     EchoInspector,
     FirDesigner,
     InstrumentEntryEditor,
     InstrumentInspector,
     ParamTable,
+    QuantizationCommand,
   ],
   templateUrl: './command-inspector.html',
   host: { class: 'block' },

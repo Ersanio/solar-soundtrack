@@ -1,0 +1,85 @@
+<amk-enum-select
+  label="Arpeggio"
+  [value]="mode()"
+  [options]="MODES"
+  [disabled]="!canResize()"
+  [note]="countNote()"
+  (commit)="setMode($event)"
+/>
+
+@if (lockedBecause(); as reason) {
+  <p class="text-ink-muted text-xs leading-relaxed">{{ reason }}</p>
+}
+
+@if (isOff()) {
+  <p class="text-ink-muted text-xs leading-relaxed">
+    Turns arpeggio off. Notes after this play at their written pitch again.
+  </p>
+} @else {
+  <amk-slider
+    label="Note duration"
+    [value]="duration()"
+    [max]="255"
+    [valueLabel]="`${duration()} ticks`"
+    [disabled]="!editable()"
+    (commit)="setDuration($event)"
+  />
+
+  @if (isSequence()) {
+    <div class="flex flex-col gap-2">
+      <div class="flex items-baseline justify-between gap-2">
+        <span class="text-ink-muted text-[11px]">
+          Notes — semitones from the note being played
+        </span>
+        <span class="text-ink font-mono text-[11px] tabular-nums">{{ notes().length }}</span>
+      </div>
+
+      @for (note of notes(); track note.index) {
+        <div class="flex items-end gap-1.5">
+          <amk-slider
+            class="flex-1"
+            [label]="`Note ${note.index + 1}`"
+            [signed]="true"
+            [value]="note.value"
+            [min]="-128"
+            [max]="127"
+            [valueLabel]="note.hex"
+            [disabled]="!editable()"
+            (commit)="setNote(note.index, $event)"
+          />
+          <button
+            amk-button
+            variant="ghost"
+            title="Remove this note"
+            [disabled]="!canResize()"
+            (click)="removeNote(note.index)"
+          >
+            Remove
+          </button>
+        </div>
+      }
+
+      <!-- The count byte is never typed: it is however many rows there are. -->
+      <div class="flex items-center gap-2">
+        <button amk-button [disabled]="!canResize()" (click)="addNote()">Add note</button>
+        <span class="text-ink-muted text-[11px]"> the count byte follows the number of notes </span>
+      </div>
+
+      @if (omitted() > 0) {
+        <p class="text-ink-muted text-[11px] leading-snug">
+          … and {{ omitted() }} further note{{ omitted() === 1 ? '' : 's' }} not shown.
+        </p>
+      }
+    </div>
+  } @else {
+    <amk-slider
+      [label]="extraLabel()"
+      [signed]="true"
+      [value]="extra()"
+      [min]="-128"
+      [max]="127"
+      [disabled]="!editable()"
+      (commit)="setExtra($event)"
+    />
+  }
+}

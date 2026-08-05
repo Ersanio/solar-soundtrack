@@ -48,6 +48,12 @@
         @case ('adsr') {
           <amk-adsr-command [command]="current" />
         }
+        @case ('arpeggio') {
+          <amk-arpeggio-command [command]="current" />
+        }
+        @case ('quantization') {
+          <amk-quantization-command [command]="current" />
+        }
         @default {
           <amk-param-table [command]="current" />
         }

@@ -82,12 +82,6 @@ const HOT_PATCH_PRESETS = [
   { value: 0x07, label: '$07 — Vanilla SMW' },
 ] as const;
 
-const ARPEGGIO_MODES = [
-  { value: 0x00, label: '$00 — off' },
-  { value: 0x80, label: '$80 — trill (two notes)' },
-  { value: 0x81, label: '$81 — glissando' },
-] as const;
-
 /** `$FC`'s event types, from the syntax reference's remote-code entry. */
 const REMOTE_TYPES = [
   { value: 0, label: '0 — cancel any remote code' },
@@ -219,57 +213,6 @@ const tremolo: Resolver = (command) => {
 
   return {
     params: [ticks('Delay'), ticks('Duration'), u8('Amplitude', 'level')],
-  };
-};
-
-/**
- * `$FB`'s first byte is a count, and everything after the duration is a note in
- * the sequence — so the descriptor list grows with the command.
- */
-const arpeggio: Resolver = (command) => {
-  const count = command.args[0]?.value;
-
-  if (count === 0x80 || count === 0x81) {
-    return {
-      params: [
-        choice('Mode', ARPEGGIO_MODES, { structural: true }),
-        ticks('Note duration'),
-        s8(count === 0x80 ? 'Pitch change' : 'Semitones per step', 'semitones'),
-      ],
-    };
-  }
-
-  // `expectedArgs` gives `count + 2` arguments in total — the count, the
-  // duration, and then exactly `count` notes.
-  const notes: ParamDescriptor[] = [];
-  for (let i = 0; i < Math.max(0, count ?? 0); i++) {
-    notes.push(
-      s8(`Note ${i + 1}`, 'semitones', {
-        describe: (value) =>
-          value === 0x80
-            ? 'a loop point — the sequence restarts here'
-            : 'semitones from the played note',
-      }),
-    );
-  }
-
-  return {
-    params: [
-      // A count, not a mode: `$80` and `$81` are the two values that mean
-      // something else, and this arm has already ruled them out. Still a number
-      // field rather than a slider, because dragging it would reinterpret the
-      // notes after it as music at every value on the way past.
-      u8('Notes in the sequence', 'index', {
-        max: 0x7f,
-        structural: true,
-        describe: (value) =>
-          value === 0
-            ? 'arpeggio off'
-            : `${value} note${value === 1 ? '' : 's'} follow the duration`,
-      }),
-      ticks('Note duration'),
-      ...notes,
-    ],
   };
 };
 
@@ -441,7 +384,9 @@ export const HEX_PARAMS: Readonly<Record<number, Resolver>> = {
     'Sent to the SNES side; what it means is the patch’s business.',
   ),
   0xfa: misc,
-  0xfb: arpeggio,
+  // `$FB` has a view of its own: its length is one of its arguments, so the
+  // notes are a list you add to rather than a count you type. See
+  // `arpeggio-command/`.
   0xfc: remote,
   0xfd: fixed([]),
   0xfe: fixed([]),
