@@ -7,8 +7,10 @@ import { BitToggles } from '../../../shared/bit-toggles/bit-toggles';
 import { Button } from '../../../shared/button/button';
 import { Slider } from '../../../shared/slider/slider';
 import { EditorStore } from '../../../state/editor-store';
+import { tempoBefore } from '../../../util/dialect';
 import { builtInTaps } from '../../../util/echo-hazards';
 import { hex2 } from '../../../util/format';
+import { ticksLabel } from '../commands/units';
 import { firOverriddenBefore } from '../fir-override';
 import { FirGraph } from '../fir-graph/fir-graph';
 
@@ -80,6 +82,15 @@ export class EchoInspector {
   });
 
   protected readonly filter = computed(() => this.args()[2] ?? 0);
+
+  // --- $F2 ------------------------------------------------------------------
+
+  protected readonly fadeTicks = computed(() => this.args()[0] ?? 0);
+
+  /** The same ticks/note-length/seconds sentence every other duration gets. */
+  protected readonly fadeLabel = computed(() =>
+    ticksLabel(this.fadeTicks(), tempoBefore(this.command(), this.store.tokens().commands)),
+  );
 
   protected readonly filterNote = computed(() =>
     this.filter() > 1 ? 'Only $00 and $01 exist; anything else reads past the table.' : null,

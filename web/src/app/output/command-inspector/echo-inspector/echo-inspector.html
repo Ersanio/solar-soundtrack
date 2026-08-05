@@ -85,9 +85,9 @@
   @if (isFade()) {
     <amk-slider
       label="Over"
-      [value]="args()[0] ?? 0"
+      [value]="fadeTicks()"
       [max]="255"
-      [note]="lockedBecause(0)"
+      [note]="lockedBecause(0) ?? fadeLabel()"
       [disabled]="!editable(0)"
       (commit)="setArg(0, $event)"
     />

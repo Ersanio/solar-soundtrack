@@ -36,27 +36,52 @@
 
       @for (note of notes(); track note.index) {
         <div class="flex items-end gap-1.5">
-          <amk-slider
-            class="flex-1"
-            [label]="`Note ${note.index + 1}`"
-            [signed]="true"
-            [value]="note.value"
-            [min]="-128"
-            [max]="127"
-            [valueLabel]="note.hex"
-            [disabled]="!editable()"
-            (commit)="setNote(note.index, $event)"
-          />
+          @if (note.isMarker) {
+            <!-- A marker occupies the slot rather than sitting between two, so
+                 it replaces the row rather than decorating it. -->
+            <span class="flex-1 py-1 text-xs" [class.text-accent]="note.isLive">
+              <span class="font-mono">$80</span>
+              —
+              {{
+                note.isLive ? 'the sequence restarts here' : 'a loop point a later one overrides'
+              }}
+            </span>
+          } @else {
+            <amk-slider
+              class="flex-1"
+              [label]="`Note ${note.index + 1}`"
+              [signed]="true"
+              [value]="note.value"
+              [min]="-128"
+              [max]="127"
+              [valueLabel]="note.hex"
+              [disabled]="!editable()"
+              (commit)="setNote(note.index, $event)"
+            />
+          }
           <button
             amk-button
             variant="ghost"
-            title="Remove this note"
+            [title]="note.isMarker ? 'Clear the loop point' : 'Restart the sequence here'"
+            [disabled]="!canMark(note.index) && !note.isMarker"
+            (click)="toggleLoop(note.index)"
+          >
+            {{ note.isMarker ? 'Unloop' : 'Loop' }}
+          </button>
+          <button
+            amk-button
+            variant="ghost"
+            title="Remove this entry"
             [disabled]="!canResize()"
             (click)="removeNote(note.index)"
           >
             Remove
           </button>
         </div>
+      }
+
+      @if (hazard(); as problem) {
+        <p class="text-warn text-xs leading-relaxed">{{ problem }}</p>
       }
 
       <!-- The count byte is never typed: it is however many rows there are. -->

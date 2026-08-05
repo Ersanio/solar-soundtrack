@@ -27,7 +27,29 @@
  */
 
 import type { Span } from "../core/types";
-import type { Command, InstrumentDefinition } from "./tokens";
+import { type Command, HEX_ARG_LETTERS, type InstrumentDefinition } from "./tokens";
+
+/**
+ * How one of this command's arguments must be spelled to mean `byte`.
+ *
+ * Three radices, not two. A hex command's arguments are `$XX`; most letter
+ * commands' are decimal; and `q` and `n` are **bare hex**, because `parser.ts`
+ * reads those two with `getHex` rather than `getInt` ({@link HEX_ARG_LETTERS}).
+ * So `n10` means `$10` — sixteen — and writing ten as `"10"` is wrong twice
+ * over: the value is wrong, and it is wrong *silently*, since a decimal string
+ * contains no hex letters to trip an error.
+ *
+ * Here rather than in the panel that happens to need it because it is a fact
+ * about the language, and because this is the layer `edittest` can gate.
+ */
+export function argumentText(command: Command, byte: number): string {
+	const hex = (byte & 0xff).toString(16).toUpperCase().padStart(2, "0");
+	if (command.vcmd !== undefined) {
+		return `$${hex}`;
+	}
+
+	return HEX_ARG_LETTERS.has(command.kind.toLowerCase()) ? hex : String(byte);
+}
 
 /**
  * A splice to apply to the document.

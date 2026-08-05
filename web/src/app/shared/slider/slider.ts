@@ -34,11 +34,11 @@ import { Component, computed, input, linkedSignal, output, signal } from '@angul
       <input
         type="range"
         class="accent-accent w-full cursor-pointer disabled:cursor-not-allowed disabled:opacity-40"
-        [min]="min()"
-        [max]="max()"
+        [min]="lowerBound()"
+        [max]="upperBound()"
         [step]="step()"
         [disabled]="disabled()"
-        [value]="shown()"
+        [value]="position()"
         (input)="onInput($event)"
         (change)="onCommit()"
         (pointerup)="onCommit()"
@@ -59,6 +59,20 @@ export class Slider {
   readonly max = input(255);
   readonly step = input(1);
   readonly disabled = input(false);
+
+  /**
+   * The only values the slider may land on, in ascending order.
+   *
+   * For a scale that is not linear and not complete — `l`'s note denominators
+   * are 1, 2, 3, 4, 6, 8, 12 … 192, and dragging through the 180 numbers between
+   * 12 and 192 to find `l16` would be absurd. When set, the track runs over
+   * *indices* into this list and `min`/`max` are ignored.
+   *
+   * A value that is not one of the stops still displays as itself; the thumb
+   * sits on the nearest stop, and moving it commits a real one. Snapping the
+   * document to the nearest stop on arrival would edit text nobody touched.
+   */
+  readonly stops = input<readonly number[] | null>(null);
 
   /**
    * Draws a sign on the readout, for a value whose zero is the middle rather
@@ -95,6 +109,38 @@ export class Slider {
 
   protected readonly shown = computed(() => this.pending() ?? this.value());
 
+  protected readonly lowerBound = computed(() => (this.stops() ? 0 : this.min()));
+  protected readonly upperBound = computed(() => {
+    const stops = this.stops();
+    return stops ? Math.max(0, stops.length - 1) : this.max();
+  });
+
+  /**
+   * Where the thumb sits: the value itself, or its index among the stops.
+   *
+   * A value that is not a stop takes the nearest index, so the thumb is never
+   * left somewhere the track cannot represent.
+   */
+  protected readonly position = computed(() => {
+    const stops = this.stops();
+    if (!stops) {
+      return this.shown();
+    }
+
+    const value = this.shown();
+    let best = 0;
+    let error = Infinity;
+    for (let i = 0; i < stops.length; i++) {
+      const distance = Math.abs(stops[i] - value);
+      if (distance < error) {
+        error = distance;
+        best = i;
+      }
+    }
+
+    return best;
+  });
+
   protected readonly display = computed(() => {
     const pending = this.pending();
     if (pending === null && this.valueLabel() !== null) {
@@ -106,7 +152,9 @@ export class Slider {
   });
 
   protected onInput(event: Event): void {
-    const value = Number((event.target as HTMLInputElement).value);
+    const raw = Number((event.target as HTMLInputElement).value);
+    const stops = this.stops();
+    const value = stops ? (stops[raw] ?? this.value()) : raw;
     this.dragging.set(true);
     this.pending.set(value);
     this.preview.emit(value);

@@ -3,7 +3,14 @@ import { type Command, expectedArgs } from '@compiler/tokens';
 import { hex2 } from '../../../util/format';
 import { HEX_PARAMS } from './hex-params';
 import { LETTER_PARAMS } from './letter-params';
-import { type Control, type ParamDescriptor, type ParamChoice, raw, toSigned } from './param';
+import {
+  type Control,
+  type ParamChoice,
+  type ParamContext,
+  type ParamDescriptor,
+  raw,
+  toSigned,
+} from './param';
 
 /** One row of the parameter table: a descriptor bound to the value it describes. */
 export interface ParamRow {
@@ -16,6 +23,8 @@ export interface ParamRow {
   control: Control;
   min: number;
   max: number;
+  /** Slider stops, for a scale that is not linear. `null` for an ordinary range. */
+  stops: readonly number[] | null;
   choices: readonly ParamChoice[];
   /** `$7F` / `20` — the raw form, always shown so the source stays readable off the panel. */
   raw: string;
@@ -78,13 +87,13 @@ function rangeFor(descriptor: ParamDescriptor): { min: number; max: number } {
  * per argument, and a command whose dialect fork the table has not caught up
  * with shows the extra arguments rather than hiding them.
  */
-export function resolveCommand(command: Command): ResolvedCommand {
+export function resolveCommand(command: Command, context: ParamContext): ResolvedCommand {
   const resolver =
     command.vcmd !== undefined
       ? HEX_PARAMS[command.vcmd]
       : LETTER_PARAMS[command.kind.toLowerCase()];
 
-  const shape = resolver ? resolver(command) : { params: [], note: undefined };
+  const shape = resolver ? resolver(command, context) : { params: [], note: undefined };
 
   const expected =
     command.vcmd !== undefined ? expectedArgs(command.vcmd, command.args, command.target) : null;
@@ -110,9 +119,10 @@ export function resolveCommand(command: Command): ResolvedCommand {
       control: missing ? 'readonly' : controlFor(descriptor),
       min,
       max,
+      stops: descriptor.stops ?? null,
       choices: descriptor.choices ?? [],
       raw: byte === null ? '—' : command.vcmd !== undefined ? `$${hex2(byte)}` : String(byte),
-      note: byte === null ? null : (descriptor.describe?.(byte, command) ?? null),
+      note: byte === null ? null : (descriptor.describe?.(byte, command, context) ?? null),
       editable: !missing && argEditable(command, index),
       lockedBecause: missing
         ? 'not written yet'

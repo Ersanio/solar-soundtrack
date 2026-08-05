@@ -29,6 +29,21 @@
 
 <fieldset class="contents" [disabled]="disabled()">
   @if (usingAdsr()) {
+    <!-- Somewhere to start. Six shapes rather than four sliders at zero. -->
+    <div class="flex flex-wrap gap-1.5">
+      @for (preset of PRESETS; track preset.name) {
+        <button
+          amk-button
+          [variant]="activePreset()?.name === preset.name ? 'primary' : 'default'"
+          [title]="preset.note"
+          [disabled]="disabled()"
+          (click)="applyPreset(preset)"
+        >
+          {{ preset.name }}
+        </button>
+      }
+    </div>
+
     <amk-slider
       label="Attack"
       [value]="envelope().attack"

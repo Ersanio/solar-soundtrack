@@ -5,12 +5,23 @@ import { TICKS_PER_WHOLE } from '@compiler/tables';
  *
  * Shared by the descriptor tables and the bespoke panels so that a tempo, a tick
  * count or a note byte is never spelled two ways in one screen.
+ *
+ * How a value is *written back* is not here — that is `argumentText` in
+ * `compiler/edits.ts`, because the radix is a fact about the language rather
+ * than about presentation, and that layer is the one a harness can gate.
  */
 
 /**
  * Seconds per driver tick at a tempo byte.
  *
  * `parser.ts:151-153` — a tick is `256 / (500 × (tempo + 1))` seconds.
+ *
+ * That `+ 1` is not a fudge. Every vcmd handler is entered with the carry set,
+ * because the dispatcher's `asl a` (`main.asm:2659`) shifts out bit 7 of a byte
+ * that is always `$DA` or above and nothing clears it before the jump; `$E2`'s
+ * handler then does a carry-less `adc a, $0387` and stores the result. So the
+ * driver runs one faster than the number written — which is also why `t255`
+ * stores 0 and freezes the song outright.
  */
 export function tickSeconds(tempo: number): number {
   return 256 / (500 * (tempo + 1));
@@ -42,13 +53,65 @@ export function nearestTempo(target: number): number {
   return best;
 }
 
-/** `48 ticks · 0.51 s` — a duration said both ways, when a tempo is known. */
+/**
+ * Every tick count the readme's Length table names, and the five dotted ones.
+ *
+ * `hex_command_reference.html`'s `#LengthInfo` is exactly `192 / n` for the plain
+ * notes and two thirds of that for the triplets, which is what makes a duration
+ * byte a plain tick count — and the readme says so itself: "any value in between
+ * these may be used as well. For example, $48 is equal to a quarter note tied to
+ * an eighth note" (72 = 48 + 24). The dotted rows are not in the readme's table;
+ * they are the same arithmetic, and they come up constantly in real songs.
+ */
+const NOTE_LENGTHS: Readonly<Record<number, string>> = {
+  192: 'a whole note',
+  144: 'a dotted half note',
+  128: 'a whole triplet',
+  96: 'a half note',
+  72: 'a dotted quarter note',
+  64: 'a half triplet',
+  48: 'a quarter note',
+  36: 'a dotted eighth note',
+  32: 'a quarter triplet',
+  24: 'an eighth note',
+  18: 'a dotted 16th note',
+  16: 'an eighth triplet',
+  12: 'a 16th note',
+  9: 'a dotted 32nd note',
+  8: 'a 16th triplet',
+  6: 'a 32nd note',
+  4: 'a 32nd triplet',
+  3: 'a 64th note',
+  2: 'a 64th triplet',
+};
+
+/** The note length a tick count is exactly, or `null` for one that falls between. */
+export function noteLengthName(ticks: number): string | null {
+  return NOTE_LENGTHS[ticks] ?? null;
+}
+
+/**
+ * A duration said in all the ways it can be: ticks, the note length it comes to,
+ * and the seconds it lasts at the tempo in force.
+ *
+ * Ticks first because that is the byte; seconds last because they are the part
+ * that depends on something written elsewhere, and naming the tempo is what lets
+ * a reader check it. With no tempo set there is no honest seconds figure, so it
+ * says nothing rather than assuming the driver's power-on default.
+ */
 export function ticksLabel(ticks: number, tempo: number | null): string {
-  if (tempo === null) {
-    return `${ticks} ticks`;
+  const parts = [`${ticks} tick${ticks === 1 ? '' : 's'}`];
+
+  const named = noteLengthName(ticks);
+  if (named) {
+    parts.push(named);
   }
 
-  return `${ticks} ticks · ${(ticks * tickSeconds(tempo)).toFixed(2)} s`;
+  if (tempo !== null) {
+    parts.push(`${(ticks * tickSeconds(tempo)).toFixed(2)} s at t${tempo}`);
+  }
+
+  return parts.join(' · ');
 }
 
 /** `1/8` when the tick count is a whole-note fraction exactly, else `null`. */

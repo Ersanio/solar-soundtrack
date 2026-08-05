@@ -20,6 +20,15 @@ const MODES: readonly EnumOption[] = [
 const MAX_ROWS = 24;
 
 /**
+ * The byte that marks where the sequence restarts.
+ *
+ * Never a note: the driver tests for it before reading anything as a delta, and
+ * there is no escape. Nothing is lost — the entries are *offsets* from the note
+ * being played, and −128 semitones was never a real one.
+ */
+const LOOP_MARKER = 0x80;
+
+/**
  * `$FB` — arpeggio, and the one command whose *length* you edit.
  *
  * Its first byte is a count, and `count` note bytes follow the duration. So the
@@ -60,12 +69,70 @@ export class ArpeggioCommand {
 
   protected readonly duration = computed(() => this.args()[1] ?? 0);
 
+  /**
+   * Where the sequence restarts, or `-1` for "at the beginning".
+   *
+   * The driver finds this lazily rather than by scanning: stepping onto a `$80`
+   * sets the loop index to the position *after* it and immediately advances
+   * again ($125F-$1261 in the assembled driver). So after one full pass the
+   * **last** marker is the one in force, and every earlier one is unreachable —
+   * which is why the panel offers exactly one and reports rather than rewrites a
+   * source that has several.
+   */
+  private readonly markers = computed(() =>
+    this.args()
+      .slice(2)
+      .map((value, index) => (value === LOOP_MARKER ? index : -1))
+      .filter((index) => index >= 0),
+  );
+
+  protected readonly loopAt = computed(() => {
+    const markers = this.markers();
+    return markers.length === 0 ? -1 : markers[markers.length - 1];
+  });
+
   /** One row per note actually written, capped so a huge sequence stays readable. */
   protected readonly notes = computed(() =>
     this.args()
       .slice(2, 2 + MAX_ROWS)
-      .map((value, index) => ({ index, value: toSigned(value), hex: `$${hex2(value)}` })),
+      .map((value, index) => ({
+        index,
+        value: toSigned(value),
+        hex: `$${hex2(value)}`,
+        isMarker: value === LOOP_MARKER,
+        /** Only the last marker is live; an earlier one is dead weight. */
+        isLive: value === LOOP_MARKER && index === this.loopAt(),
+      })),
   );
+
+  /**
+   * The two shapes that break the driver rather than merely surprising it.
+   *
+   * A marker in the last slot sets the loop index past the end of the list, and
+   * the walker then reads the song data after the command as note deltas. A list
+   * of nothing but markers never lands on a note at all and spins forever with
+   * the driver wedged. Neither is worth letting a button produce.
+   */
+  protected readonly hazard = computed(() => {
+    const notes = this.args().slice(2);
+    if (notes.length === 0) {
+      return null;
+    }
+
+    if (notes.every((value) => value === LOOP_MARKER)) {
+      return 'Every entry is a loop point, so the driver never reaches a note and hangs.';
+    }
+
+    if (notes[notes.length - 1] === LOOP_MARKER) {
+      return 'A loop point in the last slot points past the end of the sequence, and the driver reads the song after this command as notes.';
+    }
+
+    if (this.markers().length > 1) {
+      return `${this.markers().length} loop points are written; only the last takes effect, and the notes before it play once and never again.`;
+    }
+
+    return null;
+  });
 
   protected readonly omitted = computed(() => Math.max(0, this.args().length - 2 - MAX_ROWS));
 
@@ -137,6 +204,42 @@ export class ArpeggioCommand {
   protected addNote(): void {
     const notes = this.args().slice(2);
     this.rewrite([notes.length + 1, this.duration(), ...notes, 0x00]);
+  }
+
+  /**
+   * Whether marking this row would produce a sequence the driver cannot play.
+   *
+   * The last slot is refused because a marker there sends the loop index past
+   * the end; a list with only one other entry is refused because clearing that
+   * one later would leave nothing but markers. Both are hangs, not surprises.
+   */
+  protected canMark(index: number): boolean {
+    const notes = this.args().slice(2);
+    return this.canResize() && index < notes.length - 1;
+  }
+
+  /**
+   * Moves the loop point to this row, or clears it if it is already there.
+   *
+   * Exactly one at a time: a second marker silently disables the first, so
+   * offering two would be offering a shape whose earlier notes play once and are
+   * then unreachable. Marking replaces the row's note, which is what the byte
+   * does — the marker occupies a slot rather than sitting between them.
+   */
+  protected toggleLoop(index: number): void {
+    const notes = this.args().slice(2);
+    const already = notes[index] === LOOP_MARKER;
+
+    const next = notes.map((value, i) => {
+      if (i === index) {
+        // Clearing puts a plain unison back, since the slot still counts.
+        return already ? 0x00 : LOOP_MARKER;
+      }
+
+      return value === LOOP_MARKER ? 0x00 : value;
+    });
+
+    this.rewrite([next.length, this.duration(), ...next]);
   }
 
   protected removeNote(index: number): void {

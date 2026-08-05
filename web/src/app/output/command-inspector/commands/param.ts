@@ -1,4 +1,6 @@
 import type { Command } from '@compiler/tokens';
+import type { EnumOption } from '../../../shared/enum-select/enum-select';
+import { ticksLabel } from './units';
 
 /**
  * What a command's arguments *mean*, in a form the panel can render and edit.
@@ -43,6 +45,23 @@ export interface ParamChoice {
   label: string;
 }
 
+/**
+ * What a descriptor needs to know that is not in the command itself.
+ *
+ * A resolver used to take only the `Command`, which meant a descriptor could
+ * never reach the store — so a duration could not say how many seconds it was
+ * (that needs the tempo set earlier in the song) and `$F3`'s sample argument
+ * could only be a number where a list of names belonged. Both are properties of
+ * the song around the command rather than of the command, so they arrive here
+ * rather than being looked up per descriptor.
+ */
+export interface ParamContext {
+  /** The tempo in force where this command sits, or `null` before any is set. */
+  tempo: number | null;
+  /** The song's resolved `#samples` list, in SRCN order. */
+  samples: readonly EnumOption[];
+}
+
 /** One argument of a command, said in what it does. */
 export interface ParamDescriptor {
   /** Shown as the control's label — "Feedback", "Volume L", "Over". */
@@ -53,13 +72,19 @@ export interface ParamDescriptor {
   /** Inclusive, in the units the control edits. Defaults to the codec's own range. */
   min?: number;
   max?: number;
+  /**
+   * The only values a slider may land on, ascending — for a scale that is not
+   * linear and not complete, like `l`'s note denominators. `min`/`max` still
+   * bound what the *source* may legally hold.
+   */
+  stops?: readonly number[];
   choices?: readonly ParamChoice[];
   /**
    * The consequence the number does not state — "16 ms steps; 2 KiB of ARAM",
    * "$0A is centre". Runs against the whole command, since several of these
    * depend on a sibling argument.
    */
-  describe?: (value: number, command: Command) => string | null;
+  describe?: (value: number, command: Command, context: ParamContext) => string | null;
   /**
    * This argument decides how many bytes after the command belong to it.
    *
@@ -77,8 +102,8 @@ export interface CommandShape {
   note?: string;
 }
 
-/** A command's parameters, given the arguments it has and the dialect it is in. */
-export type Resolver = (command: Command) => CommandShape;
+/** A command's parameters, given the arguments it has and the song around it. */
+export type Resolver = (command: Command, context: ParamContext) => CommandShape;
 
 // ---------------------------------------------------------------------------
 // Builders
@@ -116,9 +141,22 @@ export function choice(
   return { name, codec: 'u8', role: 'index', control: 'select', choices, ...extra };
 }
 
-/** A duration in driver ticks. */
+/**
+ * A duration in driver ticks, read out as ticks, note length and seconds.
+ *
+ * Every command that takes one gets the same sentence, which is the point: a
+ * duration byte is a plain tick count with 192 to a whole note wherever it
+ * appears, so `$DC`'s and `$EB`'s should not read differently. Pass `note` for
+ * anything that is true of this command's duration in particular.
+ */
 export function ticks(name: string, extra: Partial<ParamDescriptor> = {}): ParamDescriptor {
-  return { name, codec: 'u8', role: 'ticks', ...extra };
+  return {
+    name,
+    codec: 'u8',
+    role: 'ticks',
+    describe: (value, _command, context) => ticksLabel(value, context.tempo),
+    ...extra,
+  };
 }
 
 /** A byte the inspector has nothing to say about, shown but not interpreted. */

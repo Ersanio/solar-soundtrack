@@ -22,6 +22,7 @@
 import {
 	argEditable,
 	argsRewritable,
+	argumentText,
 	commandRewritable,
 	spliceArg,
 	spliceArgs,
@@ -48,7 +49,36 @@ function applied(source: string, edit: { span: { start: number; end: number }; t
 	return edit === null ? source : source.slice(0, edit.span.start) + edit.text + source.slice(edit.span.end);
 }
 
-console.log("an edit replaces the part that changed and nothing else");
+console.log("an argument is written in the radix its own command reads");
+{
+	// The bug this exists to stop: `q` and `n` are read with `getHex`, not
+	// `getInt` (`HEX_ARG_LETTERS`), so writing their argument as decimal is wrong
+	// *silently* — a decimal string carries no hex letters to trip an error, it
+	// just means a different number. The assertion is a round trip through
+	// `tokenize`, because that is the only thing that can catch it: any
+	// assertion about the *text* would have agreed with the broken version.
+	const roundTrip = (letter: string, value: number): number => {
+		const source = `#0 ${letter}00\n`;
+		const command = tokenize(source).commands.find((c) => c.kind === letter);
+		const edit = spliceArg(source, command!, 0, argumentText(command!, value));
+		const after = applied(source, edit);
+		return tokenize(after).commands.find((c) => c.kind === letter)?.args[0].value ?? -1;
+	};
+
+	check("n survives a round trip at 10", roundTrip("n", 10) === 10, `got ${roundTrip("n", 10)}`);
+	check("and at 31, its maximum", roundTrip("n", 31) === 31, `got ${roundTrip("n", 31)}`);
+	check("q survives one too", roundTrip("q", 0x7f) === 0x7f, `got ${roundTrip("q", 0x7f)}`);
+	check("as does a decimal letter command", roundTrip("v", 200) === 200, `got ${roundTrip("v", 200)}`);
+
+	// The spelling itself, so the intent is legible next to the round trip.
+	const noise = tokenize("#0 n00\n").commands.find((c) => c.kind === "n");
+	check("a hex-argument letter writes bare hex", argumentText(noise!, 10) === "0A", argumentText(noise!, 10));
+	const volume = tokenize("#0 v0\n").commands.find((c) => c.kind === "v");
+	check("a decimal one writes decimal", argumentText(volume!, 10) === "10", argumentText(volume!, 10));
+	check("and a hex command keeps its $", argumentText(hexCommand("#0 $EF $80 $10 $10\n", 0xef), 10) === "$0A");
+}
+
+console.log("\nan edit replaces the part that changed and nothing else");
 {
 	const source = "#0 $EF   $80 $10\t$10\n";
 	const command = hexCommand(source, 0xef);

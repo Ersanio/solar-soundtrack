@@ -54,6 +54,12 @@
         @case ('quantization') {
           <amk-quantization-command [command]="current" />
         }
+        @case ('vibrato') {
+          <amk-vibrato-command [command]="current" />
+        }
+        @case ('bend') {
+          <amk-bend-command [command]="current" />
+        }
         @default {
           <amk-param-table [command]="current" />
         }

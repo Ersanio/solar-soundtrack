@@ -1,7 +1,10 @@
 import { TICKS_PER_WHOLE } from '@compiler/tables';
 import { noiseHz } from '@spc/adsr';
 import { type Resolver, choice, fixed, s8, ticks, u8 } from './param';
-import { bpm, panLabel, percentOf255 } from './units';
+import { bpm, noteLengthName, panLabel, percentOf255 } from './units';
+
+/** See `MAX_TEMPO` in `hex-params.ts`: the driver stores one more than you write. */
+const MAX_TEMPO = 254;
 
 /**
  * What each single-letter command's arguments mean.
@@ -27,11 +30,33 @@ function fadeable(name: string, describe: (value: number) => string | null): Res
   };
 }
 
-/** `p` — `pRate,Extent` or `pDelay,Rate,Extent` (`parser.ts:1976-2035`). */
+/**
+ * The vibrato speed, which `$DE`'s readme entry calls a "Duration" and is not.
+ *
+ * The driver adds this byte to a phase accumulator once a tick
+ * (`main.asm:3166-3169`), so it is a speed and bigger is faster. `p`'s own entry
+ * gets it right — "the rate (speed)".
+ */
+const RATE = u8('Rate', 'rate', {
+  min: 1,
+  describe: (value) =>
+    value === 0 ? 'a rate of 0 never advances, so the vibrato stays still' : 'higher is faster',
+});
+
+/**
+ * `p` — `pRate,Extent` or `pDelay,Rate,Extent` (`parser.ts:1976-2035`).
+ *
+ * Adding a third argument moves the first one's meaning from rate to delay: the
+ * same position says two different things depending on how many there are. That
+ * is `p`'s own doing and not something the panel can smooth over, so it says so.
+ */
 const vibrato: Resolver = (command) =>
   command.args.length >= 3
-    ? { params: [ticks('Delay'), ticks('Rate'), u8('Extent', 'level')] }
-    : { params: [ticks('Rate'), u8('Extent', 'level')] };
+    ? { params: [ticks('Delay'), RATE, u8('Depth', 'level')] }
+    : {
+        params: [RATE, u8('Depth', 'level')],
+        note: 'With two arguments the first is the rate. Add a third and the first becomes a delay instead.',
+      };
 
 /** `y` — pan, then up to two surround flags (`parser.ts:1642-1689`). */
 const pan: Resolver = (command) => {
@@ -55,19 +80,31 @@ const pan: Resolver = (command) => {
   };
 };
 
+/**
+ * The denominators worth stopping on: every one that divides 192 evenly, so
+ * every one that lands on a whole number of ticks, plus 128 to complete the
+ * doubling. Between `l12` and `l192` there are 180 numbers that are not music,
+ * and a slider that has to be dragged through them to reach `l16` is no use.
+ */
+const NOTE_DENOMINATORS = [1, 2, 3, 4, 6, 8, 12, 16, 24, 32, 48, 64, 96, 128, 192] as const;
+
 /** `l` — the length later notes fall back to (`parser.ts:1525-1552`). */
 const defaultLength: Resolver = (command) => ({
   params: [
-    u8('Denominator', 'index', {
+    u8('Length', 'index', {
       min: 1,
       max: TICKS_PER_WHOLE,
+      stops: NOTE_DENOMINATORS,
       describe: (value) => {
         if (value < 1 || value > TICKS_PER_WHOLE) {
           return 'out of range, so the standing length is kept';
         }
 
+        // parser.ts:1531 floors, so l128 and l192 both come to a single tick.
         const resolved = Math.floor(TICKS_PER_WHOLE / value);
-        return `1/${value} — ${resolved} tick${resolved === 1 ? '' : 's'}`;
+        const named = noteLengthName(resolved);
+        const rounded = TICKS_PER_WHOLE % value === 0 ? '' : ', rounded down';
+        return `1/${value}${named ? ` — ${named}` : ''} · ${resolved} tick${resolved === 1 ? '' : 's'}${rounded}`;
       },
     }),
   ],
@@ -80,13 +117,25 @@ const defaultLength: Resolver = (command) => ({
 export const LETTER_PARAMS: Readonly<Record<string, Resolver>> = {
   t: (command) => {
     const target = u8('Tempo', 'rate', {
+      // `parser.ts:1766` rejects a zero outright — AMK0079 — where the raw
+      // `$E2 $00` it compiles to is legal and means the slowest tempo there is.
       min: 1,
+      max: MAX_TEMPO,
       describe: (value) => `about ${bpm(value).toFixed(1)} BPM`,
     });
 
+    // Confirmed against the emulator: the driver stores one more than the byte
+    // written, so t253 is $FE, t254 is $FF, and t255 is $00 — at which the tick
+    // accumulator can never carry and the song stops advancing entirely.
+    const ceiling =
+      'Stops at 254: the driver adds one, so t255 would be tempo 0 and the song would freeze.';
+
     return command.args.length >= 2
-      ? { params: [ticks('Over'), target], note: 'A tempo fade, which needs #amk 3 or above.' }
-      : { params: [target] };
+      ? {
+          params: [ticks('Over'), target],
+          note: `A tempo fade, which needs #amk 3 or above. ${ceiling}`,
+        }
+      : { params: [target], note: ceiling };
   },
   v: fadeable('Volume', percentOf255),
   w: fadeable('Global volume', percentOf255),

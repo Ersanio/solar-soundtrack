@@ -351,4 +351,70 @@ console.log("\nthe inverses round-trip");
 	);
 }
 
+console.log("\nthe envelope tuner's presets are the times they claim");
+{
+	// The six preset buttons name a shape — "Pluck", "Pad" — and the byte pairs
+	// behind them were derived from the functions above rather than picked to
+	// look plausible. Pinning the two extremes is what stops a change to the
+	// envelope maths from quietly relabelling every button: nothing else in the
+	// app would notice that "Percussive" had become a two-second pad.
+	//
+	// Stated here rather than imported from `app/`, which this harness cannot
+	// reach — so a preset that moves has to be moved in both places, and the
+	// failure says so.
+	const decode = (adsr1: number, adsr2: number) => decodeAdsr(adsr1, adsr2);
+
+	const percussive = decode(0xff, 0x14);
+	// Attack 15 is the fast path: two samples of `0x400` rather than 64 of
+	// `0x20`, so 62.5 µs — "instant" to a listener and to the panel's rounding,
+	// but not literally zero.
+	check(
+		"Percussive attacks instantly",
+		attackSeconds(percussive.attack) < 0.001,
+		`${attackSeconds(percussive.attack)}`,
+	);
+	check(
+		"and is gone inside a fifth of a second",
+		releaseSeconds(percussive.release, percussive.sustain) < 0.25,
+		`${releaseSeconds(percussive.release, percussive.sustain)}`,
+	);
+	check("at an eighth of full", Math.round(sustainLevel(percussive.sustain) * 100) === 13);
+
+	const pad = decode(0x86, 0xe9);
+	check(
+		"Pad swells over a quarter second",
+		Math.abs(attackSeconds(pad.attack) - 0.256) < 0.01,
+		`${attackSeconds(pad.attack)}`,
+	);
+	check("holds at full level", sustainLevel(pad.sustain) === 1);
+	check(
+		"and takes several seconds to go",
+		releaseSeconds(pad.release, pad.sustain) > 5,
+		`${releaseSeconds(pad.release, pad.sustain)}`,
+	);
+
+	// Every preset must be a real byte pair, or a button would write something
+	// the envelope cannot hold.
+	const presets: [string, number, number][] = [
+		["Pluck", 0xdf, 0x31],
+		["Piano", 0xbf, 0x4d],
+		["Pad", 0x86, 0xe9],
+		["Organ", 0x8f, 0xf3],
+		["Strings", 0x99, 0xcc],
+		["Percussive", 0xff, 0x14],
+	];
+
+	check(
+		"every preset round-trips through encodeAdsr",
+		presets.every(([, a1, a2]) => {
+			const encoded = encodeAdsr(decodeAdsr(a1, a2));
+			return encoded.adsr1 === a1 && encoded.adsr2 === a2;
+		}),
+	);
+	check(
+		"and every one enables ADSR rather than GAIN",
+		presets.every(([, a1]) => (a1 & 0x80) !== 0),
+	);
+}
+
 summarise();

@@ -30,9 +30,14 @@ export const CHANGELOG: readonly ChangelogEntry[] = [
     items: [
       'Every command is now editable from the inspector',
       'Command arguments are named and shown in real units',
-      'Envelope tuner for ADSR and GAIN',
+      'Envelope tuner for ADSR and GAIN, with six presets',
       'Echo channels, feedback and filter set from the panel',
       'Instrument definitions are editable, sample and all',
+      'Vibrato, tremolo and pitch bends are drawn as shapes',
+      'Delays and fades read in note lengths and seconds',
+      'Note picker for pitch bends, sample picker for $F3',
+      'Arpeggio loop points can be set from the note list',
+      'Fixed the noise clock control writing the wrong value',
     ],
   },
   {

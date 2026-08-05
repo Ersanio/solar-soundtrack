@@ -4,12 +4,14 @@ import { EditorStore } from '../../state/editor-store';
 import { hex2 } from '../../util/format';
 import { AdsrCommand } from './adsr-command/adsr-command';
 import { ArpeggioCommand } from './arpeggio-command/arpeggio-command';
+import { BendCommand } from './bend-command/bend-command';
 import { EchoInspector } from './echo-inspector/echo-inspector';
 import { FirDesigner } from './fir-designer/fir-designer';
 import { InstrumentEntryEditor } from './instrument-entry/instrument-entry';
 import { InstrumentInspector } from './instrument-inspector/instrument-inspector';
 import { ParamTable } from './param-table/param-table';
 import { QuantizationCommand } from './quantization-command/quantization-command';
+import { VibratoCommand } from './vibrato-command/vibrato-command';
 
 /**
  * Which view a hex command gets.
@@ -21,6 +23,12 @@ const VIEWS: Readonly<Record<number, string>> = {
   // `$DA` is the hex form of `@`, and the only way to reach the driver's own
   // instrument table entry 19 — so it gets the same view.
   0xda: 'instrument',
+  // A delay, a speed and a depth that only make sense together.
+  0xdd: 'bend',
+  0xde: 'vibrato',
+  0xe5: 'vibrato',
+  0xeb: 'bend',
+  0xec: 'bend',
   0xed: 'adsr',
   0xef: 'echo',
   0xf0: 'echo',
@@ -43,6 +51,7 @@ const VIEWS: Readonly<Record<number, string>> = {
  */
 const LETTER_VIEWS: Readonly<Record<string, string>> = {
   '@': 'instrument',
+  p: 'vibrato',
   // Two nibbles that mean two unrelated things, one of which is read against a
   // table the song chooses — a single row could state neither.
   q: 'quantization',
@@ -70,6 +79,8 @@ const LETTER_VIEWS: Readonly<Record<string, string>> = {
     InstrumentInspector,
     ParamTable,
     QuantizationCommand,
+    BendCommand,
+    VibratoCommand,
   ],
   templateUrl: './command-inspector.html',
   host: { class: 'block' },
@@ -110,6 +121,12 @@ export class CommandInspector {
       if (command.vcmd === 0xed && command.target.program === 1) {
         const sub = command.args[0]?.value;
         return sub !== undefined && sub >= 0x80 && sub <= 0x83 ? null : 'adsr';
+      }
+
+      // parser.ts:3016 — the other #am4 overload: a high first byte turns $E5
+      // from tremolo into a sample load, which has no shape to draw.
+      if (command.vcmd === 0xe5 && command.target.program === 1) {
+        return (command.args[0]?.value ?? 0) >= 0x80 ? null : 'vibrato';
       }
 
       return VIEWS[command.vcmd] ?? null;

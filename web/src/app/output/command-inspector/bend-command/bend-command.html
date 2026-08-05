@@ -1,0 +1,56 @@
+@if (args().length < 3) {
+  <p class="text-ink-muted text-xs leading-relaxed">
+    Needs three arguments: a delay, a duration and a target.
+  </p>
+} @else {
+  <amk-bend-graph
+    [delay]="delay()"
+    [duration]="duration()"
+    [from]="from()"
+    [to]="to()"
+    [tempo]="tempo()"
+  />
+
+  <amk-slider
+    label="Delay"
+    [value]="delay()"
+    [max]="255"
+    [valueLabel]="delayLabel()"
+    [note]="lockedBecause(0)"
+    [disabled]="!editable(0)"
+    (commit)="setArg(0, $event)"
+  />
+
+  <amk-slider
+    label="Over"
+    [value]="duration()"
+    [max]="255"
+    [valueLabel]="durationLabel()"
+    [note]="lockedBecause(1)"
+    [disabled]="!editable(1)"
+    (commit)="setArg(1, $event)"
+  />
+
+  @if (isPitchBend()) {
+    <amk-note-picker
+      label="Target note"
+      [value]="target()"
+      [disabled]="!editable(2)"
+      (commit)="setArg(2, $event)"
+    />
+    <span class="text-ink-muted font-mono text-[11px]">{{ noteLabel() }}</span>
+  } @else {
+    <amk-slider
+      label="Semitones"
+      [signed]="true"
+      [value]="semitones()"
+      [min]="-128"
+      [max]="127"
+      [note]="lockedBecause(2)"
+      [disabled]="!editable(2)"
+      (commit)="setArg(2, $event)"
+    />
+  }
+
+  <p class="text-ink-muted text-xs leading-relaxed">{{ note() }}</p>
+}

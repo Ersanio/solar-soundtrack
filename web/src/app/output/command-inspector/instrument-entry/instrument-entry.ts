@@ -8,6 +8,7 @@ import { Slider } from '../../../shared/slider/slider';
 import { EditorStore } from '../../../state/editor-store';
 import { SampleStore } from '../../../state/sample-store';
 import { hex2 } from '../../../util/format';
+import { sampleOptions } from '../commands/context';
 import { type EnvelopeValue, EnvelopeTuner } from '../envelope-tuner/envelope-tuner';
 
 /** The three things an entry's sample byte can be (`parser.ts:1224-1341`). */
@@ -57,10 +58,9 @@ export class InstrumentEntryEditor {
   });
 
   /** The names this song could name — its own `#samples` list, or the library's. */
-  protected readonly sampleOptions = computed<EnumOption[]>(() => {
-    const names = this.store.result()?.sampleList ?? this.library.names();
-    return names.map((name, index) => ({ value: index, label: name }));
-  });
+  protected readonly sampleOptions = computed<EnumOption[]>(() =>
+    sampleOptions(this.store, this.library),
+  );
 
   protected readonly currentSampleIndex = computed(() => {
     const sample = this.entry().sample;

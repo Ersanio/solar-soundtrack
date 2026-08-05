@@ -52,6 +52,35 @@ const RAMP_MODES: readonly GainMode[] = [
 const DEFAULT_ADSR1 = 0xff;
 const DEFAULT_ADSR2 = 0xe0;
 
+/** One named starting point. */
+export interface AdsrPreset {
+  name: string;
+  adsr1: number;
+  adsr2: number;
+  /** The shape in words, for the button's tooltip. */
+  note: string;
+}
+
+/**
+ * Six envelopes worth starting from.
+ *
+ * Chosen by working backwards from `attackSeconds`/`decaySeconds`/
+ * `releaseSeconds` rather than by picking bytes that looked plausible, and
+ * spread across the ladders so no two are a nudge apart: instant-attack short
+ * decay against slow-attack long release, sustain at full against sustain at an
+ * eighth. `adsrtest` pins the two extremes, so a change to the envelope maths
+ * that moved these out of their stated times fails rather than quietly
+ * relabelling the buttons.
+ */
+const PRESETS: readonly AdsrPreset[] = [
+  { name: 'Pluck', adsr1: 0xdf, adsr2: 0x31, note: 'instant attack, 59 ms to a quarter level' },
+  { name: 'Piano', adsr1: 0xbf, adsr2: 0x4d, note: 'instant attack, 114 ms decay, long tail' },
+  { name: 'Pad', adsr1: 0x86, adsr2: 0xe9, note: '256 ms swell, holds, ~7 s release' },
+  { name: 'Organ', adsr1: 0x8f, adsr2: 0xf3, note: 'instant on, holds, ~0.7 s release' },
+  { name: 'Strings', adsr1: 0x99, adsr2: 0xcc, note: '64 ms swell, sustains near full' },
+  { name: 'Percussive', adsr1: 0xff, adsr2: 0x14, note: 'instant attack, gone in ~200 ms' },
+];
+
 /**
  * The envelope, tuned in the units it is heard in.
  *
@@ -80,6 +109,18 @@ export class EnvelopeTuner {
   readonly commit = output<EnvelopeValue>();
 
   protected readonly GAIN_MODES = GAIN_MODES;
+  protected readonly PRESETS = PRESETS;
+
+  /** Which preset the bytes currently are, so the active one can be marked. */
+  protected readonly activePreset = computed(() => {
+    const { adsr1, adsr2 } = this.value();
+    return PRESETS.find((p) => p.adsr1 === adsr1 && p.adsr2 === adsr2) ?? null;
+  });
+
+  /** Applying one always turns ADSR on — its bytes have the top bit set. */
+  protected applyPreset(preset: AdsrPreset): void {
+    this.commit.emit({ ...this.value(), adsr1: preset.adsr1, adsr2: preset.adsr2 });
+  }
 
   protected readonly envelope = computed(() => decodeAdsr(this.value().adsr1, this.value().adsr2));
   protected readonly usingAdsr = computed(() => this.envelope().adsrEnabled);

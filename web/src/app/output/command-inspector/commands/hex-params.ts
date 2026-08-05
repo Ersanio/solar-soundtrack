@@ -1,6 +1,23 @@
 import { hex2 } from '../../../util/format';
 import { type ParamDescriptor, type Resolver, choice, fixed, raw, s8, ticks, u8 } from './param';
-import { bpm, noteName, panLabel, percentOf255 } from './units';
+import { bpm, noteName, panLabel, percentOf255, ticksLabel } from './units';
+
+/**
+ * The highest tempo that is not a freeze.
+ *
+ * Every vcmd handler is entered with the carry set — the dispatcher's `asl a`
+ * (`main.asm:2659`) shifts out bit 7 of a byte that is always `$DA` or above,
+ * and nothing clears it — and `$E2`'s handler is a carry-less
+ * `adc a, $0387` / `mov $51, a`. So the driver stores one more than you write,
+ * and `$FF` stores `$00`. At tempo 0 the tick accumulator (`main.asm:220-238`)
+ * can never carry, so the song stops advancing altogether.
+ *
+ * Confirmed against the emulator: `t40` stores `$29`, `t192` stores `$C1`,
+ * `t254` stores `$FF` and plays, `t255` stores `$00` and the track pointer never
+ * moves again. Note the raw form accepts `$00` quite happily — it means tempo 1,
+ * the slowest there is — where the letter `t0` is a compile error (AMK0079).
+ */
+const MAX_TEMPO = 254;
 
 /**
  * What each hex command's arguments mean, `$DA` through `$FE`.
@@ -21,9 +38,28 @@ import { bpm, noteName, panLabel, percentOf255 } from './units';
 // ---------------------------------------------------------------------------
 
 const DURATION = ticks('Over', {
-  describe: (value) =>
-    value === 0 ? 'instant — a duration of 0 applies the target at once' : null,
+  describe: (value, _command, context) =>
+    value === 0
+      ? 'instant — a duration of 0 applies the target at once'
+      : ticksLabel(value, context.tempo),
 });
+
+/**
+ * The vibrato and tremolo speed — `$DE`'s and `$E5`'s second byte.
+ *
+ * The readme calls this "Duration" and links it to the note-length table, which
+ * is wrong in both halves. `aram_map.html` calls the byte it lands in
+ * (`$0331+x`, `$0361+x`) an "offset per music tempo tick", and the driver adds
+ * it to an 8-bit phase accumulator once a tick (`main.asm:3166-3169`) — so it is
+ * a speed, bigger is faster, and it is not measured in ticks at all. The `p`
+ * command's own entry gets it right, calling the same value "the rate (speed)".
+ */
+const RATE = (what: string): ParamDescriptor =>
+  u8('Rate', 'rate', {
+    min: 1,
+    describe: (value) =>
+      value === 0 ? `a rate of 0 never advances, so the ${what} stays still` : 'higher is faster',
+  });
 
 const PAN = u8('Pan', 'pan', {
   max: 20,
@@ -212,7 +248,7 @@ const tremolo: Resolver = (command) => {
   }
 
   return {
-    params: [ticks('Delay'), ticks('Duration'), u8('Amplitude', 'level')],
+    params: [ticks('Delay'), RATE('tremolo'), u8('Depth', 'level')],
   };
 };
 
@@ -295,7 +331,18 @@ const remote: Resolver = (command) => {
 // ---------------------------------------------------------------------------
 
 export const HEX_PARAMS: Readonly<Record<number, Resolver>> = {
-  0xda: fixed([u8('Instrument', 'index')]),
+  0xda: fixed([
+    u8('Instrument', 'index', {
+      describe: (value) =>
+        value === 0x13
+          ? // spc/instruments.ts:55 — the driver has a real 20th slot, SRCN $0F,
+            // that AddmusicK's own instrToSample marks as "Nothing". Nothing ever
+            // marks $0F used, so optimizeSampleUsage (Music.cpp:3074) swaps it for
+            // the zero-byte EMPTY.brr.
+            'the driver’s 20th slot, reachable only this way — but its sample is dropped as unused, so it plays silence unless the song also uses @21 or @26–@29'
+          : null,
+    }),
+  ]),
   0xdb: fixed([PAN], 'Bits 6 and 7 enable surround for the right and left speaker.'),
   0xdc: fixed([DURATION, PAN]),
   0xdd: fixed([
@@ -303,21 +350,30 @@ export const HEX_PARAMS: Readonly<Record<number, Resolver>> = {
     ticks('Duration'),
     u8('Target note', 'note', { min: 0x80, max: 0xc5, describe: (value) => noteName(value) }),
   ]),
-  0xde: fixed([ticks('Delay'), ticks('Duration'), u8('Amplitude', 'level')]),
+  0xde: fixed([ticks('Delay'), RATE('vibrato'), u8('Depth', 'level')]),
   0xdf: fixed([]),
   0xe0: fixed([u8('Global volume', 'level', { describe: percentOf255 })]),
   0xe1: fixed([DURATION, u8('Global volume', 'level', { describe: percentOf255 })]),
-  0xe2: fixed([
-    u8('Tempo', 'rate', {
-      min: 1,
-      describe: (value) =>
-        `about ${bpm(value).toFixed(1)} BPM — estimated; the driver drops ticks when it is busy`,
-    }),
-  ]),
-  0xe3: fixed([
-    DURATION,
-    u8('Tempo', 'rate', { min: 1, describe: (value) => `about ${bpm(value).toFixed(1)} BPM` }),
-  ]),
+  0xe2: fixed(
+    [
+      u8('Tempo', 'rate', {
+        max: MAX_TEMPO,
+        describe: (value) =>
+          `about ${bpm(value).toFixed(1)} BPM — estimated; the driver drops ticks when it is busy`,
+      }),
+    ],
+    'The driver stores one more than you write, so $FF would be tempo 0 and the song would stop advancing.',
+  ),
+  0xe3: fixed(
+    [
+      DURATION,
+      u8('Tempo', 'rate', {
+        max: MAX_TEMPO,
+        describe: (value) => `about ${bpm(value).toFixed(1)} BPM`,
+      }),
+    ],
+    'Its handler has the same carry-less add as $E2, so a target of $FF fades the song to a stop.',
+  ),
   0xe4: fixed([SEMITONES]),
   0xe5: tremolo,
   0xe6: subloop,
@@ -367,7 +423,26 @@ export const HEX_PARAMS: Readonly<Record<number, Resolver>> = {
     ]),
   ]),
   0xf2: fixed([DURATION, ECHO_VOLUME('L'), ECHO_VOLUME('R')]),
-  0xf3: fixed([u8('Sample', 'srcn'), u8('Multiplication pitch', 'opaque')]),
+  // The handler at $0DBE forges a six-byte instrument entry in the channel's
+  // backup table: byte 0 is the sample, byte 4 the tuning multiplier. It writes
+  // neither byte 5 (the fraction) nor bytes 1-3 (the envelope), so both carry
+  // over from whatever played last.
+  0xf3: (_command, context) => ({
+    params: [
+      u8('Sample', 'srcn', {
+        control: 'select',
+        choices: context.samples,
+        max: Math.max(0, context.samples.length - 1),
+      }),
+      u8('Tuning multiplier', 'rate', {
+        describe: (value) =>
+          value === 0
+            ? 'a multiplier of 0 is silence'
+            : `×${value} — the whole part only; the fraction carries over from the last instrument`,
+      }),
+    ],
+    note: 'Changes the sample and coarse pitch only: the envelope and the fractional tuning are left as the previous instrument set them. $FA $FE’s third bit makes $F3 zero the fraction instead.',
+  }),
   0xf4: fixed([choice('Sub-command', F4_SUBCOMMANDS, { structural: true })]),
   0xf5: fixed(
     Array.from({ length: 8 }, (_, i) => s8(`Coefficient ${i + 1}`, 'level')),
@@ -379,9 +454,12 @@ export const HEX_PARAMS: Readonly<Record<number, Resolver>> = {
     'AddmusicM’s write-byte command.',
   ),
   0xf8: fixed([u8('Noise clock', 'rate', { max: 0x1f })]),
+  // The handler at $1083 writes the first argument to $0167 and the second to
+  // $0166 — inverted — and the main loop pushes both to the ports every tick
+  // (main.asm:248-256).
   0xf9: fixed(
-    [raw('First byte'), raw('Second byte')],
-    'Sent to the SNES side; what it means is the patch’s business.',
+    [u8('To $2141', 'opaque'), u8('To $2140', 'opaque')],
+    'The two bytes land on the SNES’s APU ports the other way round from how they are written, and stay there until another $F9 changes them. What the ROM does with them is its own business. $F4 $05 reuses the same two bytes as a tick counter, so the two commands cannot both be used.',
   ),
   0xfa: misc,
   // `$FB` has a view of its own: its length is one of its arguments, so the
