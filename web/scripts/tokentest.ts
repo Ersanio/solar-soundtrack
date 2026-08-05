@@ -548,11 +548,11 @@ console.log("\na command knows which of its parts came through a macro");
 	const head = tokenize('"ech=$EF"\n#0 ech $80 $10 $10\n').commands.find((c) => c.vcmd === 0xef);
 	check("the aggregate still fires", head?.replacement === "ech");
 	check("the command byte names the macro", head?.headReplacement === "ech");
-	check("and every argument is literal", head !== undefined && head.args.every((a) => a.replacement === undefined));
+	check("and every argument is literal", head?.args.every((a) => a.replacement === undefined) === true);
 
 	const arg = tokenize('"lo=$2b"\n#0 $EF lo $2d $2d\n').commands.find((c) => c.vcmd === 0xef);
 	check("a macro standing in for one argument marks only that one", arg?.args[0].replacement === "lo");
-	check("leaving the others literal", arg?.args[1].replacement === undefined && arg?.args[2].replacement === undefined);
+	check("leaving the others literal", arg?.args.slice(1).every((a) => a.replacement === undefined) === true);
 	check("and the command byte untouched", arg?.headReplacement === undefined);
 
 	const whole = tokenize('"x=$EF $2b $2d $2d"\n#0 x\n').commands.find((c) => c.vcmd === 0xef);

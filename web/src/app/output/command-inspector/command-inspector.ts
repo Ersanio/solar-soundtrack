@@ -5,9 +5,8 @@ import { hex2 } from '../../util/format';
 import { AdsrCommand } from './adsr-command/adsr-command';
 import { EchoInspector } from './echo-inspector/echo-inspector';
 import { FirDesigner } from './fir-designer/fir-designer';
-import { GenericCommand } from './generic-command/generic-command';
 import { InstrumentInspector } from './instrument-inspector/instrument-inspector';
-import { LetterCommand } from './letter-command/letter-command';
+import { ParamTable } from './param-table/param-table';
 
 /**
  * Which view a hex command gets.
@@ -28,22 +27,15 @@ const VIEWS: Readonly<Record<number, string>> = {
 };
 
 /**
- * Letter commands worth spelling out; the rest fall through to the generic view.
+ * Letter commands with a view of their own.
  *
- * A map rather than a set now that `@` earns a view of its own.
+ * Only `@` is left. The rest used to have a read-only readout each — tempo in
+ * BPM, pan as a position, noise in hertz — and every one of those readings now
+ * lives in `commands/letter-params.ts`, where the parameter table both states it
+ * *and* lets it be edited. Two implementations of the same sentence would only
+ * drift.
  */
 const LETTER_VIEWS: Readonly<Record<string, string>> = {
-  t: 'letter',
-  v: 'letter',
-  w: 'letter',
-  y: 'letter',
-  o: 'letter',
-  l: 'letter',
-  h: 'letter',
-  q: 'letter',
-  n: 'letter',
-  '*': 'letter',
-  '[': 'letter',
   '@': 'instrument',
 };
 
@@ -60,14 +52,7 @@ const LETTER_VIEWS: Readonly<Record<string, string>> = {
  */
 @Component({
   selector: 'amk-command-inspector',
-  imports: [
-    AdsrCommand,
-    EchoInspector,
-    FirDesigner,
-    GenericCommand,
-    InstrumentInspector,
-    LetterCommand,
-  ],
+  imports: [AdsrCommand, EchoInspector, FirDesigner, InstrumentInspector, ParamTable],
   templateUrl: './command-inspector.html',
   host: { class: 'block' },
 })

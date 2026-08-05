@@ -42,11 +42,8 @@
         @case ('adsr') {
           <amk-adsr-command [command]="current" />
         }
-        @case ('letter') {
-          <amk-letter-command [command]="current" />
-        }
         @default {
-          <amk-generic-command [command]="current" />
+          <amk-param-table [command]="current" />
         }
       }
     } @else {
