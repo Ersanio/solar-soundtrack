@@ -21,15 +21,8 @@ const STEPS = 160;
 
 /**
  * The depth that fills the plot.
- *
- * The byte runs to 255, but scaling against that would be honest and useless:
- * real songs use single digits to about `$20`, and at 8 of 255 the wave is three
- * percent of half the height — a straight line with a wobble you have to be told
- * about. `$40` fills the plot instead, and anything above it clamps, which keeps
- * the common range legible at the cost of flattening a handful of extreme
- * settings against the top.
  */
-const FULL_DEPTH = 0x40;
+const FULL_DEPTH = 0xFF;
 
 /**
  * What a vibrato or tremolo setting looks like, as a shape.
