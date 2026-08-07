@@ -2,7 +2,7 @@ import { Component, computed, inject, input } from '@angular/core';
 
 import { argEditable, spliceArg } from '@compiler/edits';
 import type { Command } from '@compiler/tokens';
-import { type FirTaps, toSigned } from '@spc/fir';
+import { type FirTaps, echoStability, toSigned } from '@spc/fir';
 import { BitToggles } from '../../../shared/bit-toggles/bit-toggles';
 import { Button } from '../../../shared/button/button';
 import { Slider } from '../../../shared/slider/slider';
@@ -14,6 +14,7 @@ import { ticksLabel } from '../commands/units';
 import { dragPreview, shownArgs } from '../commands/preview';
 import { firOverriddenBefore } from '../fir-override';
 import { FirGraph } from '../fir-graph/fir-graph';
+import { stopWhenRunaway } from '../runaway-guard';
 
 /** LSB first, matching the readme's own "(76543210)". */
 const VOICE_LABELS = ['0', '1', '2', '3', '4', '5', '6', '7'];
@@ -153,6 +154,43 @@ export class EchoInspector {
   protected readonly taps = computed<FirTaps | null>(() =>
     this.isF1() ? builtInTaps(this.filter()) : null,
   );
+
+  /**
+   * Whether the feedback under the pointer makes the echo build on itself.
+   *
+   * `$F1` reloads one of the driver's two built-in tables, so the filter it
+   * selects *is* the filter — an earlier `$F5` is overridden by the time this
+   * runs. Judged with the same `echoStability` and the same operands
+   * `echo-hazards.ts` uses for `AMK0501`, so the panel and the output pane can
+   * never disagree about whether a setting is safe.
+   */
+  private readonly stability = computed(() => {
+    const taps = this.taps();
+    return taps === null ? null : echoStability(taps, this.feedback());
+  });
+
+  private readonly runaway = computed(() => this.stability()?.runaway === true);
+
+  /** The same sentence the FIR designer prints, said while the slider moves. */
+  protected readonly runawayNote = computed(() => {
+    const stability = this.stability();
+    if (!stability?.runaway) {
+      return null;
+    }
+
+    return (
+      `This feedback and filter ${this.filter()} give a loop gain of ` +
+      `${stability.loopGain.toFixed(2)} — the echo will grow instead of fade. Lower the feedback` +
+      `${this.filter() === 0 ? ', or select filter 1' : ''}.`
+    );
+  });
+
+  constructor() {
+    // The feedback is a slider and the player keeps running through a drag, so
+    // the runaway arrives while the pointer is still moving — several seconds
+    // before a commit could produce the AMK0501 that describes it.
+    stopWhenRunaway(this.command, this.runaway, 'echo');
+  }
 
   /**
    * A `$F5` earlier in this channel whose coefficients this command discards.

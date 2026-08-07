@@ -36,6 +36,7 @@ export const CHANGELOG: readonly ChangelogEntry[] = [
       'The ARAM bar follows the echo delay as you set it',
       'Pitch bends say when they are too long for the note they ride on',
       'Note lengths, $F8 noise clocks and $FA values are named instead of numbered',
+      'Playback stops on a runaway echo from the feedback slider too, not just the filter',
     ],
   },
   {

@@ -17,6 +17,7 @@
 
     <amk-slider
       label="Volume L"
+      origin="centre"
       [signed]="true"
       [value]="signedOf(1)"
       [min]="-128"
@@ -28,6 +29,7 @@
     />
     <amk-slider
       label="Volume R"
+      origin="centre"
       [signed]="true"
       [value]="signedOf(2)"
       [min]="-128"
@@ -51,6 +53,7 @@
     />
     <amk-slider
       label="Feedback"
+      origin="centre"
       [signed]="true"
       [value]="signedOf(1)"
       [min]="-128"
@@ -60,6 +63,11 @@
       (preview)="preview(1, $event)"
       (commit)="setArg(1, $event)"
     />
+
+    <!-- Above the filter buttons, since selecting the other one is half the fix. -->
+    @if (runawayNote(); as problem) {
+      <p class="text-danger text-xs leading-relaxed">{{ problem }}</p>
+    }
 
     <!-- Two presets, because the driver ships exactly two filter tables. -->
     <div class="flex flex-col gap-1">
@@ -98,6 +106,7 @@
     />
     <amk-slider
       label="To volume L"
+      origin="centre"
       [signed]="true"
       [value]="signedOf(1)"
       [min]="-128"
@@ -109,6 +118,7 @@
     />
     <amk-slider
       label="To volume R"
+      origin="centre"
       [signed]="true"
       [value]="signedOf(2)"
       [min]="-128"

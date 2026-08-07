@@ -1,13 +1,4 @@
-import {
-  Component,
-  computed,
-  effect,
-  inject,
-  input,
-  linkedSignal,
-  signal,
-  untracked,
-} from '@angular/core';
+import { Component, computed, inject, input, signal } from '@angular/core';
 
 import { argsRewritable, commandRewritable, spliceArgs, spliceCommand } from '@compiler/edits';
 import type { Command } from '@compiler/tokens';
@@ -27,20 +18,14 @@ import {
 import { Button } from '../../../shared/button/button';
 import { Slider } from '../../../shared/slider/slider';
 import { EditorStore } from '../../../state/editor-store';
-import { Playback } from '../../../state/playback';
 import { dragPreview } from '../commands/preview';
 import { builtInFilterName, firOverriddenBy } from '../fir-override';
 import { FirGraph } from '../fir-graph/fir-graph';
+import { stopWhenRunaway } from '../runaway-guard';
 import { feedbackBefore } from '../../../util/echo-hazards';
 import { Hex2Pipe } from '../../../util/hex.pipe';
 
 type Mode = 'presets' | 'draw';
-
-/** Which `$F5` the echo was last judged on, and what the verdict was. */
-interface Reading {
-  start: number;
-  runaway: boolean;
-}
 
 /**
  * How close two drawn points have to be to count as the same one — about 3% of
@@ -75,7 +60,6 @@ const MERGE_HZ = 500;
 })
 export class FirDesigner {
   private readonly store = inject(EditorStore);
-  private readonly playback = inject(Playback);
 
   readonly command = input.required<Command>();
 
@@ -133,7 +117,7 @@ export class FirDesigner {
   protected readonly stability = computed(() => echoStability(this.shownTaps(), this.feedback()));
 
   /**
-   * Just the flag, so the effect below runs on a genuine change.
+   * Just the flag, so the interlock runs on a genuine change.
    *
    * Read off the **shown** taps, not the committed ones. The coefficients are
    * sliders, so a drag passes through every value between where it started and
@@ -149,53 +133,8 @@ export class FirDesigner {
    */
   private readonly runaway = computed(() => this.stability().runaway);
 
-  /**
-   * The current reading, and whether it is one an edit just produced.
-   *
-   * `became` is the whole question: an edit to *this* `$F5` that turned a sane
-   * filter into a runaway one. Moving the caret between two `$F5` commands
-   * reuses this component with a new input rather than building a new one, so
-   * the span is what tells arriving at a filter apart from editing it, and the
-   * previous reading is what tells a new warning from a standing one.
-   *
-   * A `linkedSignal` rather than fields mutated inside the effect: the previous
-   * value then lives in the signal graph, where it is derived in one place and
-   * readable, instead of in instance state whose answer depends on how many
-   * times the effect happened to have run.
-   */
-  private readonly reading = linkedSignal<Reading, Reading & { became: boolean }>({
-    source: () => ({ start: this.command().span.start, runaway: this.runaway() }),
-    computation: (next, previous) => ({
-      ...next,
-      became: next.runaway && previous?.value.start === next.start && !previous.value.runaway,
-    }),
-  });
-
   constructor() {
-    // The song stops the moment a filter runs away — including mid-drag, before
-    // anything is written — so the warning beside the graph is never left
-    // sitting next to a song building towards the clip it describes. Only the
-    // transition acts: opening the inspector on a filter that is already bad is
-    // not an edit, and pressing play again with the warning still up is a
-    // decision the user is entitled to make.
-    effect(() => {
-      if (!this.reading().became) {
-        return;
-      }
-
-      untracked(() => {
-        // A paused song is not audible, and resuming one is as deliberate an act
-        // as pressing play.
-        if (!this.playback.isPlaying()) {
-          return;
-        }
-
-        this.playback.stop();
-        this.store.fail(
-          'playback automatically stopped to protect your ears and speakers due to a runaway FIR filter',
-        );
-      });
-    });
+    stopWhenRunaway(this.command, this.runaway, 'FIR filter');
   }
 
   /**
