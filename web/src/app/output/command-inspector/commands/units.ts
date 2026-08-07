@@ -131,9 +131,12 @@ export function noteName(byte: number): string {
   return `o${Math.floor(pitch / 12) + 1} ${NOTE_NAMES[pitch % 12]}`;
 }
 
-/** The twelve intervals within an octave, by the number of semitones. */
+/**
+ * The eleven intervals inside an octave, by semitone. Index 0 is unused — a
+ * distance of nothing is not an interval, and {@link intervalName} says so.
+ */
 const INTERVALS = [
-  'unison',
+  '',
   'minor 2nd',
   'major 2nd',
   'minor 3rd',
@@ -151,28 +154,46 @@ const INTERVALS = [
  * A signed semitone count as the interval it is.
  *
  * For the arpeggio list, whose entries are distances from the note being played
- * rather than notes. `+7` is a number you have to work out; "a perfect 5th up"
- * is the thing you were trying to write, and the two together mean the reader
- * never has to trust the translation.
+ * rather than notes. `+7` is a number you have to work out; "a perfect 5th
+ * higher" is the thing you were trying to write.
+ *
+ * Higher and lower rather than up and down, because these are pitches rather
+ * than positions in a list — nothing moves.
  */
 export function intervalName(semitones: number): string {
   if (semitones === 0) {
     return 'the note itself';
   }
 
-  const direction = semitones > 0 ? 'up' : 'down';
+  const direction = semitones > 0 ? 'higher' : 'lower';
   const size = Math.abs(semitones);
   const octaves = Math.floor(size / 12);
   const rest = size % 12;
 
   if (octaves === 0) {
-    return `${INTERVALS[rest]} ${direction}`;
+    return `a ${INTERVALS[rest]} ${direction}`;
   }
 
   const octaveText = octaves === 1 ? 'an octave' : `${octaves} octaves`;
   return rest === 0
     ? `${octaveText} ${direction}`
     : `${octaveText} and a ${INTERVALS[rest]} ${direction}`;
+}
+
+/**
+ * The same, with the number in front — `+4 — a major 3rd higher`.
+ *
+ * Both halves, because they answer different questions: the semitones are what
+ * the byte says and what a second entry is counted against, and the name is what
+ * it will sound like. Zero reads as itself; "0 — the note itself" is a sum
+ * nobody needed to see.
+ */
+export function intervalLabel(semitones: number): string {
+  if (semitones === 0) {
+    return intervalName(0);
+  }
+
+  return `${semitones > 0 ? '+' : ''}${semitones} — ${intervalName(semitones)}`;
 }
 
 /**

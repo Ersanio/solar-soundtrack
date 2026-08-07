@@ -31,7 +31,7 @@ export const CHANGELOG: readonly ChangelogEntry[] = [
       'Inspector readouts update as you drag a slider or type a value',
       'Pan and every ±value get a mixer-style control that fills from the centre',
       'Pan sliders now run the way they sound, left to right',
-      'Arpeggio notes are picked as named intervals',
+      'Arpeggio notes slide from the centre and name the interval they make',
       'FIR coefficients are sliders, and the curve follows them',
       'The ARAM bar follows the echo delay as you set it',
       'Pitch bends say when they are too long for the note they ride on',

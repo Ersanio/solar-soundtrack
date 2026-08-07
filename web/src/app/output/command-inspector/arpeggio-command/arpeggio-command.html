@@ -35,8 +35,11 @@
         <span class="text-ink font-mono text-[11px] tabular-nums">{{ notes().length }}</span>
       </div>
 
+      <!-- Aligned to the top, not the bottom: the row is now a label, a track
+           and a line of prose, and buttons hung off its bottom edge read as
+           belonging to the interval text rather than to the note. -->
       @for (note of notes(); track note.index) {
-        <div class="flex items-end gap-1.5">
+        <div class="flex items-start gap-1.5">
           @if (note.isMarker) {
             <!-- A marker occupies the slot rather than sitting between two, so
                  it replaces the row rather than decorating it. -->
@@ -48,15 +51,18 @@
               }}
             </span>
           } @else {
-            <!-- A dropdown, not a slider: dragging one sweeps the document
-                 through every wrong note on the way, and it commits on choosing
-                 so there is nothing to preview. -->
-            <amk-interval-picker
+            <amk-slider
               class="flex-1"
+              origin="centre"
               [label]="`Note ${note.index + 1}`"
+              [signed]="true"
               [value]="note.value"
-              [note]="note.hex"
+              [min]="-127"
+              [max]="127"
+              [valueLabel]="note.hex"
+              [note]="note.meaning"
               [disabled]="!editable()"
+              (preview)="preview(note.index + 2, $event)"
               (commit)="setNote(note.index, $event)"
             />
           }

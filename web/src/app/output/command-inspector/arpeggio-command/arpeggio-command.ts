@@ -9,8 +9,7 @@ import { EditorStore } from '../../../state/editor-store';
 import { hex2 } from '../../../util/format';
 import { fromSigned, toSigned } from '../commands/param';
 import { dragPreview, shownArgs } from '../commands/preview';
-import { intervalName } from '../commands/units';
-import { IntervalPicker } from '../interval-picker/interval-picker';
+import { intervalLabel } from '../commands/units';
 
 const MODES: readonly EnumOption[] = [
   { value: 0x00, label: 'off' },
@@ -47,7 +46,7 @@ const LOOP_MARKER = 0x80;
  */
 @Component({
   selector: 'amk-arpeggio-command',
-  imports: [Button, EnumSelect, IntervalPicker, Slider],
+  imports: [Button, EnumSelect, Slider],
   templateUrl: './arpeggio-command.html',
   host: { class: 'flex flex-col gap-3' },
 })
@@ -75,12 +74,13 @@ export class ArpeggioCommand {
   /**
    * The arguments as the sliders are showing them, keyed by argument index.
    *
-   * Only the readouts read these. Note in particular that {@link notes} keeps
-   * deriving its *shape* — marker or slider, live or overridden — from the
-   * document: dragging a note to `-128` makes it `$80`, and a row that decided
-   * mid-drag it was a loop marker would replace the slider under the pointer
-   * with a line of text. The value it is heading for shows in the readout; what
-   * it *becomes* waits for the commit, which is also when the driver would care.
+   * Only the readouts read these — {@link notes} keeps deriving its *shape*,
+   * marker or slider, from the document. The note sliders stop at `-127` rather
+   * than `-128` so that shape cannot change under the pointer at all: `$80` is
+   * the loop marker and never a note, so a slider reaching it would turn the row
+   * being dragged into a line of text. Nothing is lost, since the entries are
+   * offsets from the note playing and 128 semitones down was never one; marking
+   * a loop point is what the button beside the row is for.
    */
   private readonly drag = dragPreview(this.command);
   private readonly shown = computed(() => shownArgs(this.command(), this.drag));
@@ -118,15 +118,19 @@ export class ArpeggioCommand {
     const shown = this.shown();
     return this.args()
       .slice(2, 2 + MAX_ROWS)
-      .map((value, index) => ({
-        index,
-        value: toSigned(value),
-        /** The only field that follows a drag; see {@link shown} for why. */
-        hex: `$${hex2(shown[index + 2] ?? value)}`,
-        isMarker: value === LOOP_MARKER,
-        /** Only the last marker is live; an earlier one is dead weight. */
-        isLive: value === LOOP_MARKER && index === this.loopAt(),
-      }));
+      .map((value, index) => {
+        const showing = shown[index + 2] ?? value;
+        return {
+          index,
+          value: toSigned(value),
+          /** These two follow a drag; the rest do not — see {@link shown} for why. */
+          hex: `$${hex2(showing)}`,
+          meaning: intervalLabel(toSigned(showing)),
+          isMarker: value === LOOP_MARKER,
+          /** Only the last marker is live; an earlier one is dead weight. */
+          isLive: value === LOOP_MARKER && index === this.loopAt(),
+        };
+      });
   });
 
   /**
@@ -178,10 +182,7 @@ export class ArpeggioCommand {
   );
 
   /** The interval, said the same way the note rows say theirs. */
-  protected readonly extraNote = computed(() => {
-    const semitones = toSigned(this.shown()[2] ?? 0);
-    return `${semitones > 0 ? '+' : ''}${semitones} — ${intervalName(semitones)}`;
-  });
+  protected readonly extraNote = computed(() => intervalLabel(toSigned(this.shown()[2] ?? 0)));
 
   protected readonly editable = computed(() => argsRewritable(this.command()));
 
