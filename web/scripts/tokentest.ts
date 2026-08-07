@@ -985,6 +985,46 @@ console.log("\n#am4's $E5 forks on its first argument");
 	check("no fork outside #am4", amk?.args.length === 3, `got ${amk?.args.length}`);
 }
 
+console.log("\na command takes its arguments and stops");
+{
+	// `scanHex` emits `hexArg` for any byte below $DA even with `hexLeft` at 0
+	// (tokens.ts:977-982), because a sample load's tuning byte has to read as one.
+	// So a byte standing after a full command looks exactly like an argument, and
+	// `gather` used to claim it. The parser does not: `parser.ts:2918-2943` reads
+	// it as a standalone literal and reports AMK0151 under #amk. Two things go
+	// wrong if the scanner disagrees — the inspector draws a row for an argument
+	// that is not one, and `spliceArg` writes over a byte the command does not own.
+	const one = tokenize("#amk 2\n#0 $E7 $FF $00 c4\n").commands.find((c) => c.vcmd === 0xe7);
+	check("a trailing byte is not claimed as an argument", one?.args.length === 1, `got ${one?.args.length}`);
+	check("the command still ends at its own last argument", one?.span.end === one?.args[0]?.span.end);
+
+	const two = tokenize("#amk 2\n#0 $E0 $C0 $12 $34 c4\n").commands.find((c) => c.vcmd === 0xe0);
+	check("nor are two of them", two?.args.length === 1, `got ${two?.args.length}`);
+
+	// The stop must not fire early on the commands whose length is decided by
+	// their own arguments — `expectedArgs` returns null until the deciding byte
+	// has been read, and null has to mean "keep going".
+	const arp = tokenize("#amk 2\n#0 $FB $03 $10 $01 $02 $03 c4\n").commands.find((c) => c.vcmd === 0xfb);
+	check("an arpeggio still gathers its whole list", arp?.args.length === 5, `got ${arp?.args.length}`);
+
+	const upload = tokenize("#am4\n#0 $ED $82 $20 $00 $00 $02 $11 $22 $33 c4\n").commands.find((c) => c.vcmd === 0xed);
+	check("an HFD upload still gathers its payload", upload?.args.length === 8, `got ${upload?.args.length}`);
+
+	// parser.ts:3006-3012 / tokens.ts:1013 — $FA $FE's toggle byte takes a
+	// further byte when its high bit is set. `expectedArgs` did not fork here
+	// while `scanHex` did, which is exactly the disagreement this pair of
+	// statements exists to prevent.
+	const bits = tokenize("#amk 2\n#0 $FA $FE $81 $02 c4\n").commands.find((c) => c.vcmd === 0xfa);
+	check("$FA $FE takes a third byte when the high bit is set", bits?.args.length === 3, `got ${bits?.args.length}`);
+	check("and is complete with it", bits?.complete === true);
+
+	const short = tokenize("#amk 2\n#0 $FA $FE $81\n").commands.find((c) => c.vcmd === 0xfa);
+	check("and incomplete without it", short?.complete === false);
+
+	const plain = tokenize("#amk 2\n#0 $FA $FE $01 $02 c4\n").commands.find((c) => c.vcmd === 0xfa);
+	check("a low toggle byte takes no third", plain?.args.length === 2, `got ${plain?.args.length}`);
+}
+
 console.log("\nrestartability — the property CodeMirror relies on");
 {
 	const sources = [

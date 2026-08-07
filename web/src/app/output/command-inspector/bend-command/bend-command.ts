@@ -4,7 +4,7 @@ import { argEditable, argumentText, spliceArg } from '@compiler/edits';
 import type { Command } from '@compiler/tokens';
 import { Slider } from '../../../shared/slider/slider';
 import { EditorStore } from '../../../state/editor-store';
-import { tempoBefore } from '../../../util/dialect';
+import { noteTicksBefore, tempoBefore } from '../../../util/dialect';
 import { BendGraph } from '../bend-graph/bend-graph';
 import { toSigned } from '../commands/param';
 import { dragPreview } from '../commands/preview';
@@ -98,11 +98,54 @@ export class BendCommand {
 
   protected readonly note = computed(() =>
     this.isPitchBend()
-      ? 'The slide starts from whatever note is playing; the shape above is drawn against o4 c as a stand-in.'
+      ? 'The slide rides on the note before it and starts on that note’s second tick, so the shape above is drawn against o4 c as a stand-in.'
       : this.vcmd() === 0xec
         ? 'Every later note starts this far away and arrives at its written pitch.'
         : 'Every later note starts at its written pitch and departs by this much.',
   );
+
+  /**
+   * Ticks of the note this bend rides on that it can actually use.
+   *
+   * One less than the note's own length: the driver's read-ahead cannot run on
+   * the tick a note begins (`main.asm:2338`), so the slide starts on the second.
+   */
+  private readonly window = computed(() => {
+    const ticks = noteTicksBefore(this.command(), this.store.tokens().commands);
+    return ticks === null ? null : ticks - 1;
+  });
+
+  /**
+   * Whether the bend fits in the note it rides on, and what is lost if not.
+   *
+   * The seconds beside the two sliders are honest arithmetic and were still
+   * misleading, because they are unconditional: the next key-on overwrites the
+   * slide state outright (`main.asm:465-466`), so a `$DD` that outlasts its note
+   * is simply cut off mid-slide and never reaches the target. That is the gap
+   * between what the panel said and what the song did.
+   */
+  protected readonly reachability = computed(() => {
+    if (!this.isPitchBend()) {
+      return null;
+    }
+
+    const window = this.window();
+    if (window === null) {
+      return 'No note precedes this on the channel, so there is nothing for the slide to ride on and nothing is heard.';
+    }
+
+    const delay = this.shownDelay();
+    const span = delay + this.shownDuration();
+    if (delay >= window) {
+      return `The note before this is ${window + 1} ticks, so the slide has ${window} to run in — the delay alone uses them all and none of the bend is heard.`;
+    }
+
+    if (span > window) {
+      return `The note before this gives the slide ${window} ticks; this asks for ${span}, so it is cut off partway and never reaches the target.`;
+    }
+
+    return null;
+  });
 
   protected editable(index: number): boolean {
     return argEditable(this.command(), index);

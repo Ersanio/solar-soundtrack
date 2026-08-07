@@ -25,6 +25,12 @@ export interface ParamRow {
   max: number;
   /** Slider stops, for a scale that is not linear. `null` for an ordinary range. */
   stops: readonly number[] | null;
+  /** Fill the track from the middle — a balance rather than a level. */
+  centred: boolean;
+  /** Reverse the track, for a value that counts against the direction it means. */
+  invert: boolean;
+  /** Marks under the ends of the track, for a control whose extremes have names. */
+  ends: readonly [string, string] | null;
   choices: readonly ParamChoice[];
   /** `$7F` / `20` — the raw form, always shown so the source stays readable off the panel. */
   raw: string;
@@ -41,6 +47,8 @@ export interface ResolvedCommand {
   note: string | null;
   /** More arguments than the table names, and how many are not shown. */
   omitted: number;
+  /** What those are, singular, when they are a payload rather than parameters. */
+  tail: string | null;
 }
 
 /**
@@ -79,6 +87,19 @@ function rangeFor(descriptor: ParamDescriptor): { min: number; max: number } {
 }
 
 /**
+ * Whether the slider should fill from the middle rather than from the left.
+ *
+ * Two kinds of number want it, and they are the same kind underneath: anything
+ * signed, where zero is neutral and the sign is a direction, and pan, which is
+ * unsigned only because AddmusicK counts it from one speaker to the other. Both
+ * are balances rather than levels, and a level's fill misreads them — it draws
+ * the neutral value as half full and one extreme as empty.
+ */
+function centredFor(descriptor: ParamDescriptor): boolean {
+  return descriptor.codec === 's8' || descriptor.role === 'pan';
+}
+
+/**
  * The command's parameters, bound to what it actually says.
  *
  * The descriptor table names as many arguments as it can; how many there *are*
@@ -98,7 +119,9 @@ export function resolveCommand(command: Command, context: ParamContext): Resolve
   const expected =
     command.vcmd !== undefined ? expectedArgs(command.vcmd, command.args, command.target) : null;
   const total = Math.max(command.args.length, shape.params.length, expected ?? 0);
-  const shown = Math.min(total, MAX_ROWS);
+  // A payload stops at the last named row: the rest is bulk, and forty number
+  // fields called "Argument 7" onwards are a hex dump with worse spacing.
+  const shown = Math.min(total, shape.tail !== undefined ? shape.params.length : MAX_ROWS);
 
   const rows: ParamRow[] = [];
   for (let index = 0; index < shown; index++) {
@@ -120,6 +143,11 @@ export function resolveCommand(command: Command, context: ParamContext): Resolve
       min,
       max,
       stops: descriptor.stops ?? null,
+      centred: centredFor(descriptor),
+      // Pan is the only value in the language that counts backwards from what
+      // it does; `main.asm:3486`'s table runs from hard right to hard left.
+      invert: descriptor.role === 'pan',
+      ends: descriptor.role === 'pan' ? ['L', 'R'] : null,
       choices: descriptor.choices ?? [],
       raw: byte === null ? '—' : command.vcmd !== undefined ? `$${hex2(byte)}` : String(byte),
       note: byte === null ? null : (descriptor.describe?.(byte, command, context) ?? null),
@@ -132,5 +160,5 @@ export function resolveCommand(command: Command, context: ParamContext): Resolve
     });
   }
 
-  return { rows, note: shape.note ?? null, omitted: total - shown };
+  return { rows, note: shape.note ?? null, omitted: total - shown, tail: shape.tail ?? null };
 }

@@ -25,6 +25,7 @@ import {
   toSigned,
 } from '@spc/fir';
 import { Button } from '../../../shared/button/button';
+import { Slider } from '../../../shared/slider/slider';
 import { EditorStore } from '../../../state/editor-store';
 import { Playback } from '../../../state/playback';
 import { dragPreview } from '../commands/preview';
@@ -68,7 +69,7 @@ const MERGE_HZ = 500;
  */
 @Component({
   selector: 'amk-fir-designer',
-  imports: [Button, FirGraph, Hex2Pipe],
+  imports: [Button, FirGraph, Hex2Pipe, Slider],
   templateUrl: './fir-designer.html',
   host: { class: 'flex flex-col gap-3' },
 })
@@ -128,25 +129,25 @@ export class FirDesigner {
     feedbackBefore(this.command(), this.store.tokens().commands),
   );
 
-  /** The verdict the panel prints, so a filter is called dangerous as it is typed. */
+  /** The verdict the panel prints, and the one the interlock acts on. */
   protected readonly stability = computed(() => echoStability(this.shownTaps(), this.feedback()));
 
   /**
-   * Just the flag, so the effect below runs on a genuine change — and read off
-   * the **committed** taps, which is the whole of why this is not
-   * `stability().runaway`.
+   * Just the flag, so the effect below runs on a genuine change.
    *
-   * The effect stops playback. A `3` typed on the way to `32` is a filter
-   * nobody asked for and nobody wrote, and halting the song over one would make
-   * the field unusable. So the warning goes live and the interlock does not: the
-   * panel says a filter will run away while you are still typing it, and only
-   * ever stops the music over one that is actually in the document.
+   * Read off the **shown** taps, not the committed ones. The coefficients are
+   * sliders, so a drag passes through every value between where it started and
+   * where it is going — and the player is running the whole time, since a
+   * preview does not recompile. A filter that runs away halfway across the
+   * track is one you can hear, and waiting for the pointer to come up before
+   * stopping is waiting through exactly the noise the interlock exists to
+   * prevent.
    *
    * `echoStability` returns a fresh object each time, since the taps rebuild
    * from `command().args`. A `computed` over the boolean compares by value and
    * only notifies when it actually flips.
    */
-  private readonly runaway = computed(() => echoStability(this.taps(), this.feedback()).runaway);
+  private readonly runaway = computed(() => this.stability().runaway);
 
   /**
    * The current reading, and whether it is one an edit just produced.
@@ -171,11 +172,12 @@ export class FirDesigner {
   });
 
   constructor() {
-    // The song stops the moment an edit makes the echo run away, so the warning
-    // beside the graph is never left sitting next to a song building towards
-    // the clip it describes. Only the transition acts: opening the inspector on
-    // a filter that is already bad is not an edit, and pressing play again with
-    // the warning still up is a decision the user is entitled to make.
+    // The song stops the moment a filter runs away — including mid-drag, before
+    // anything is written — so the warning beside the graph is never left
+    // sitting next to a song building towards the clip it describes. Only the
+    // transition acts: opening the inspector on a filter that is already bad is
+    // not an edit, and pressing play again with the warning still up is a
+    // decision the user is entitled to make.
     effect(() => {
       if (!this.reading().became) {
         return;
@@ -219,7 +221,7 @@ export class FirDesigner {
     return this.taps().map((tap, index) => ({
       index,
       tap,
-      hex: toHexByte(shown[index] ?? tap),
+      hex: `$${toHexByte(shown[index] ?? tap)}`,
     }));
   });
 
@@ -243,28 +245,20 @@ export class FirDesigner {
     this.commit(taps);
   }
 
-  /** Per keystroke. Half-typed text parses to `NaN` and the last reading stands. */
-  protected previewTap(index: number, value: string): void {
-    const parsed = Number.parseInt(value, 10);
-    if (!Number.isNaN(parsed)) {
-      this.drag.set(index, clampTap(parsed));
-    }
+  /** Every frame of a drag: redraws the curve, and arms the interlock below. */
+  protected previewTap(index: number, value: number): void {
+    this.drag.set(index, clampTap(value));
   }
 
-  protected setTap(index: number, value: string): void {
-    const parsed = Number.parseInt(value, 10);
-    if (Number.isNaN(parsed)) {
-      return;
-    }
-
-    // Set here as well as on `input`, because a field typed away from and back
-    // to its own value commits nothing — and a preview map is cleared by the
-    // re-scan a commit causes, so without this it would keep showing the number
-    // that was abandoned.
-    this.drag.set(index, clampTap(parsed));
+  protected setTap(index: number, value: number): void {
+    // Set here as well as on `preview`, because a slider dragged away from and
+    // back to its own value commits nothing — and the preview map is cleared by
+    // the re-scan a commit causes, so without this it would keep showing the
+    // number that was abandoned.
+    this.drag.set(index, clampTap(value));
 
     const next = [...this.taps()];
-    next[index] = clampTap(parsed);
+    next[index] = clampTap(value);
     this.commit(next);
   }
 

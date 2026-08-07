@@ -131,6 +131,50 @@ export function noteName(byte: number): string {
   return `o${Math.floor(pitch / 12) + 1} ${NOTE_NAMES[pitch % 12]}`;
 }
 
+/** The twelve intervals within an octave, by the number of semitones. */
+const INTERVALS = [
+  'unison',
+  'minor 2nd',
+  'major 2nd',
+  'minor 3rd',
+  'major 3rd',
+  'perfect 4th',
+  'tritone',
+  'perfect 5th',
+  'minor 6th',
+  'major 6th',
+  'minor 7th',
+  'major 7th',
+];
+
+/**
+ * A signed semitone count as the interval it is.
+ *
+ * For the arpeggio list, whose entries are distances from the note being played
+ * rather than notes. `+7` is a number you have to work out; "a perfect 5th up"
+ * is the thing you were trying to write, and the two together mean the reader
+ * never has to trust the translation.
+ */
+export function intervalName(semitones: number): string {
+  if (semitones === 0) {
+    return 'the note itself';
+  }
+
+  const direction = semitones > 0 ? 'up' : 'down';
+  const size = Math.abs(semitones);
+  const octaves = Math.floor(size / 12);
+  const rest = size % 12;
+
+  if (octaves === 0) {
+    return `${INTERVALS[rest]} ${direction}`;
+  }
+
+  const octaveText = octaves === 1 ? 'an octave' : `${octaves} octaves`;
+  return rest === 0
+    ? `${octaveText} ${direction}`
+    : `${octaveText} and a ${INTERVALS[rest]} ${direction}`;
+}
+
 /**
  * AddmusicK's pan, which runs 0 (hard right) to 20 (hard left) with 10 centre.
  *

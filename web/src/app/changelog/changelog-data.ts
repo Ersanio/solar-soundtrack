@@ -27,7 +27,16 @@ export const CHANGELOG: readonly ChangelogEntry[] = [
   // ─── newest first; add new blocks here ──────────────────────────────────
   {
     date: '7 August 2026',
-    items: ['Inspector readouts update as you drag a slider or type a value'],
+    items: [
+      'Inspector readouts update as you drag a slider or type a value',
+      'Pan and every ±value get a mixer-style control that fills from the centre',
+      'Pan sliders now run the way they sound, left to right',
+      'Arpeggio notes are picked as named intervals',
+      'FIR coefficients are sliders, and the curve follows them',
+      'The ARAM bar follows the echo delay as you set it',
+      'Pitch bends say when they are too long for the note they ride on',
+      'Note lengths, $F8 noise clocks and $FA values are named instead of numbered',
+    ],
   },
   {
     date: '5 August 2026',

@@ -1,4 +1,4 @@
-import { Service, computed, effect, inject, signal } from '@angular/core';
+import { Service, computed, effect, inject, linkedSignal, signal } from '@angular/core';
 
 import { compiler } from '@compiler';
 import type { Edit } from '@compiler/edits';
@@ -188,6 +188,25 @@ export class EditorStore {
     return this.drivers.driver()?.samples ?? [];
   });
 
+  /**
+   * An echo delay being dragged, before the document has it.
+   *
+   * The echo buffer is the largest single thing a song can spend ARAM on — 2 KiB
+   * per step of `$F1`'s first argument — so the delay control is really an
+   * allocator, and the number it moves lives in the output pane rather than
+   * beside it. Set from the inspector; nobody else may write it.
+   *
+   * A `linkedSignal` over {@link result}, so it clears itself the moment a
+   * compile has seen the real value — the same self-clearing the command
+   * inspector's own `dragPreview` uses, and for the same reason: there is no
+   * drag-ended event to forget, and it cannot be left showing a delay the song
+   * does not have.
+   */
+  readonly echoDelayPreview = linkedSignal<CompileResult | null, number | null>({
+    source: () => this.result(),
+    computation: () => null,
+  });
+
   readonly budget = computed<AramBudget | null>(() => {
     const driver = this.drivers.driver();
     const plan = this.drivers.plan();
@@ -201,7 +220,7 @@ export class EditorStore {
       this.samples(),
       plan,
       result?.data?.length ?? 0,
-      result?.stats?.echoBufferSize ?? 0,
+      this.echoDelayPreview() ?? result?.stats?.echoBufferSize ?? 0,
     );
   });
 

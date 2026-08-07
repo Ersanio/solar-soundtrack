@@ -70,6 +70,14 @@ export class EchoInspector {
 
   protected preview(index: number, value: number): void {
     this.drag.set(index, value < 0 ? value + 0x100 : value);
+
+    // `$F1`'s delay is an ARAM allocation as much as a setting, and the number
+    // that decides whether the song still fits is the bar in the output pane,
+    // not the sentence under this slider. So the dragged value goes to the store
+    // too — which clears it itself once a compile has seen the real one.
+    if (this.isF1() && index === 0) {
+      this.store.echoDelayPreview.set(value & 0x0f);
+    }
   }
 
   /** `$F0` has nothing to say beyond its own name. */

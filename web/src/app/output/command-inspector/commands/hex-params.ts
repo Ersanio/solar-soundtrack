@@ -1,3 +1,5 @@
+import { EMPTY_SAMPLE_NAME } from '@compiler/tables';
+import { noiseHz } from '@spc/adsr';
 import { hex2 } from '../../../util/format';
 import { type ParamDescriptor, type Resolver, choice, fixed, raw, s8, ticks, u8 } from './param';
 import { bpm, noteName, panLabel, percentOf255, ticksLabel } from './units';
@@ -201,6 +203,7 @@ const envelope: Resolver = (command) => {
           u8('Count, low', 'index', { structural: true }),
         ],
         note: 'An ARAM upload: the two count bytes decide how many of the bytes after it belong to this command.',
+        tail: 'data byte',
       };
     }
 
@@ -289,20 +292,35 @@ const misc: Resolver = (command) => {
       };
     case 0x7f:
       return { params: [selector, choice('Preset', HOT_PATCH_PRESETS)] };
-    case 0xfe:
-      return {
-        params: [
-          selector,
-          u8('Bits', 'opaque', {
-            control: 'toggles',
-            structural: true,
-            describe: (value) =>
-              (value & 0x80) !== 0 ? 'the high bit defines a further byte of bits' : null,
-          }),
-        ],
-      };
+    case 0xfe: {
+      const bits = [
+        selector,
+        u8('Bits', 'opaque', {
+          control: 'toggles',
+          structural: true,
+          describe: (value) =>
+            (value & 0x80) !== 0 ? 'the high bit defines a further byte of bits' : null,
+        }),
+      ];
+
+      // Named only when it exists. A descriptor listing more parameters than the
+      // command has does not go unnoticed — `describe.ts` gives every named one a
+      // row, so an unconditional third would draw an empty "not written yet"
+      // line under every ordinary `$FA $FE`.
+      if (((command.args[1]?.value ?? 0) & 0x80) !== 0) {
+        bits.push(u8('More bits', 'opaque', { control: 'toggles' }));
+      }
+
+      return { params: bits };
+    }
+
     default:
-      return { params: [selector] };
+      // `HEX_LENGTHS` gives `$FA` three bytes whatever the sub-command is, and
+      // `parser.ts:3047` only *rejects* an unknown one after reading both. So the
+      // second byte is really there even when nothing here knows what it means,
+      // and saying "Value" is more honest than letting it fall through to
+      // "Argument 2".
+      return { params: [selector, raw('Value')] };
   }
 };
 
@@ -346,8 +364,13 @@ export const HEX_PARAMS: Readonly<Record<number, Resolver>> = {
   0xdb: fixed([PAN], 'Bits 6 and 7 enable surround for the right and left speaker.'),
   0xdc: fixed([DURATION, PAN]),
   0xdd: fixed([
+    // Both really are tick counts — `aram_map.html:444` calls the first "pitch
+    // slide delay in music tempo ticks", and the second is the divisor
+    // `CalcPortamentoDelta` (ARAM `$131B`) divides the pitch distance by, not a
+    // rate like `$DE`'s second byte. The delay is counted from the *second* tick
+    // of the note this rides on, which is what `bend-command` warns about.
     ticks('Delay'),
-    ticks('Duration'),
+    DURATION,
     u8('Target note', 'note', { min: 0x80, max: 0xc5, describe: (value) => noteName(value) }),
   ]),
   0xde: fixed([ticks('Delay'), RATE('vibrato'), u8('Depth', 'level')]),
@@ -431,7 +454,13 @@ export const HEX_PARAMS: Readonly<Record<number, Resolver>> = {
     params: [
       u8('Sample', 'srcn', {
         control: 'select',
-        choices: context.samples,
+        // `EMPTY.brr` is the zero-byte file the compiler *substitutes* for a
+        // sample nothing plays (`parser.ts:3594`). Offering it would offer
+        // silence: every slot holding one is a slot whose real sample was
+        // dropped, and pointing `$F3` at one plays nothing. A song that has one
+        // written already still shows it, through the picker's unknown-value
+        // arm — this hides it from the list, not from the source.
+        choices: context.samples.filter((option) => option.label !== EMPTY_SAMPLE_NAME),
         max: Math.max(0, context.samples.length - 1),
       }),
       u8('Tuning multiplier', 'rate', {
@@ -453,7 +482,15 @@ export const HEX_PARAMS: Readonly<Record<number, Resolver>> = {
     [raw('Address, low'), raw('Address, high'), raw('Value')],
     'AddmusicM’s write-byte command.',
   ),
-  0xf8: fixed([u8('Noise clock', 'rate', { max: 0x1f })]),
+  // The same clock the `n` command sets, so it reads out the same way: the
+  // driver writes both to the DSP's `FLG` register and the ladder is the DSP's.
+  0xf8: fixed([
+    u8('Noise clock', 'rate', {
+      max: 0x1f,
+      describe: (value) =>
+        value === 0 ? 'silent' : `${Math.round(noiseHz(value)).toLocaleString()} Hz`,
+    }),
+  ]),
   // The handler at $1083 writes the first argument to $0167 and the second to
   // $0166 — inverted — and the main loop pushes both to the ports every tick
   // (main.asm:248-256).

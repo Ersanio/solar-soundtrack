@@ -100,6 +100,16 @@ export interface CommandShape {
   params: ParamDescriptor[];
   /** A sentence about the command as a whole, usually a dialect fork. */
   note?: string;
+  /**
+   * What the arguments past the named ones are, in the singular — `'data byte'`.
+   *
+   * For a command carrying a *payload* rather than more parameters: `#am4`
+   * `$ED $82` uploads a block of ARAM whose length is two of its own header
+   * bytes, so past the header there is nothing to name and nothing gained by a
+   * number field each. Set this and the table stops at the named rows and counts
+   * the rest instead of drawing "Argument 7" forty times.
+   */
+  tail?: string;
 }
 
 /** A command's parameters, given the arguments it has and the song around it. */

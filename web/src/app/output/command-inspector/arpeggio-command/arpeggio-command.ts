@@ -9,6 +9,8 @@ import { EditorStore } from '../../../state/editor-store';
 import { hex2 } from '../../../util/format';
 import { fromSigned, toSigned } from '../commands/param';
 import { dragPreview, shownArgs } from '../commands/preview';
+import { intervalName } from '../commands/units';
+import { IntervalPicker } from '../interval-picker/interval-picker';
 
 const MODES: readonly EnumOption[] = [
   { value: 0x00, label: 'off' },
@@ -45,7 +47,7 @@ const LOOP_MARKER = 0x80;
  */
 @Component({
   selector: 'amk-arpeggio-command',
-  imports: [Button, EnumSelect, Slider],
+  imports: [Button, EnumSelect, IntervalPicker, Slider],
   templateUrl: './arpeggio-command.html',
   host: { class: 'flex flex-col gap-3' },
 })
@@ -174,6 +176,12 @@ export class ArpeggioCommand {
   protected readonly extraLabel = computed(() =>
     this.mode() === 0x80 ? 'Pitch change' : 'Semitones per step',
   );
+
+  /** The interval, said the same way the note rows say theirs. */
+  protected readonly extraNote = computed(() => {
+    const semitones = toSigned(this.shown()[2] ?? 0);
+    return `${semitones > 0 ? '+' : ''}${semitones} — ${intervalName(semitones)}`;
+  });
 
   protected readonly editable = computed(() => argsRewritable(this.command()));
 

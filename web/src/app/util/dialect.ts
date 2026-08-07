@@ -40,6 +40,45 @@ export function tempoBefore(command: Command, commands: readonly Command[]): num
   return found;
 }
 
+/** Note and rest letters, whose commands carry a resolved `noteLength`. */
+const NOTE_KINDS = new Set(['c', 'd', 'e', 'f', 'g', 'a', 'b', 'r']);
+
+/**
+ * The tick length of the note a command rides on — the nearest one *before* it
+ * on the same channel.
+ *
+ * `$DD` is the reason this exists. The driver reads it by peeking ahead from the
+ * note already playing (`L_10A1` at ARAM `$15FE`, reached from `main.asm:2452`),
+ * and that read-ahead is unreachable on the tick a note begins, because
+ * `main.asm:2338`'s `dec $70+x` returns zero there. So a pitch slide starts on
+ * the *second* tick of the note before it, and every key-on then overwrites the
+ * slide state unconditionally (`main.asm:465-466`) — meaning the whole of a
+ * `$DD` has to fit in `noteLength - 1` ticks or the rest of it is never heard.
+ *
+ * Returns `null` when no note precedes it on this channel, which is a `$DD` that
+ * does nothing at all.
+ */
+export function noteTicksBefore(command: Command, commands: readonly Command[]): number | null {
+  let found: number | null = null;
+
+  for (const other of commands) {
+    if (other.span.start >= command.span.start) {
+      break;
+    }
+
+    if (other.channel !== command.channel) {
+      continue;
+    }
+
+    if (NOTE_KINDS.has(other.kind.toLowerCase()) && other.noteLength) {
+      // Tied segments are one note to the driver: `c4^8` keys on once.
+      found = other.noteLength.reduce((total, segment) => total + segment.ticks, 0);
+    }
+  }
+
+  return found;
+}
+
 /**
  * Which velocity table is live where a command was written.
  *

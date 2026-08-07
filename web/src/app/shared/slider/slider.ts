@@ -33,18 +33,39 @@ import { Component, computed, input, linkedSignal, output, signal } from '@angul
       </span>
       <input
         type="range"
-        class="accent-accent w-full cursor-pointer disabled:cursor-not-allowed disabled:opacity-40"
+        class="h-4 w-full cursor-pointer appearance-none bg-transparent bg-[length:100%_6px]
+               bg-center bg-no-repeat disabled:cursor-not-allowed disabled:opacity-40
+               [&::-moz-range-thumb]:h-3.5 [&::-moz-range-thumb]:w-3.5
+               [&::-moz-range-thumb]:cursor-pointer [&::-moz-range-thumb]:rounded-full
+               [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-(--color-surface)
+               [&::-moz-range-thumb]:bg-(--color-accent)
+               [&::-moz-range-track]:h-1.5 [&::-moz-range-track]:bg-transparent
+               [&::-webkit-slider-runnable-track]:h-1.5
+               [&::-webkit-slider-runnable-track]:bg-transparent
+               [&::-webkit-slider-thumb]:mt-[-4px] [&::-webkit-slider-thumb]:h-3.5
+               [&::-webkit-slider-thumb]:w-3.5 [&::-webkit-slider-thumb]:cursor-pointer
+               [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full
+               [&::-webkit-slider-thumb]:border-2
+               [&::-webkit-slider-thumb]:border-(--color-surface)
+               [&::-webkit-slider-thumb]:bg-(--color-accent)"
+        [style.background-image]="trackImage()"
         [min]="lowerBound()"
         [max]="upperBound()"
         [step]="step()"
         [disabled]="disabled()"
-        [value]="position()"
+        [value]="trackPosition()"
         (input)="onInput($event)"
         (change)="onCommit()"
         (pointerup)="onCommit()"
         (pointercancel)="onCommit()"
         (blur)="onCommit()"
       />
+      @if (endLabels(); as ends) {
+        <span class="text-ink-muted flex justify-between font-mono text-[10px]">
+          <span>{{ ends.low }}</span>
+          <span>{{ ends.high }}</span>
+        </span>
+      }
       @if (note(); as text) {
         <span class="text-ink-muted text-[11px] leading-snug">{{ text }}</span>
       }
@@ -82,6 +103,30 @@ export class Slider {
    * plain one in the readout and nothing else, and two components would drift.
    */
   readonly signed = input(false);
+
+  /**
+   * Where the filled part of the track starts.
+   *
+   * `'start'` is a level: none of it at the left, all of it at the right, and
+   * the fill is how much you have. `'centre'` is a *balance* — pan, a signed
+   * echo volume, a transpose — where the middle is the neutral value and the
+   * fill says how far from it you are and in which direction. Filling those
+   * from the left draws hard-left pan as "empty" and centre as "half on", which
+   * is the reading a mixer spends its whole design not giving you.
+   */
+  readonly origin = input<'start' | 'centre'>('start');
+
+  /**
+   * Reverses the track, for a value that counts the opposite way to the control.
+   *
+   * AddmusicK's pan runs 0 at hard *right* to 20 at hard *left* (`main.asm:3486`),
+   * so a plain slider moves the sound the other way from the thumb. Only the
+   * control is reversed; the value written is untouched.
+   */
+  readonly invert = input(false);
+
+  /** Marks under the ends of the track — `['L', 'R']` for a pan. */
+  readonly ends = input<readonly [string, string] | null>(null);
 
   /**
    * Pre-formatted readout — "132.2 BPM", "80% of full". Falls back to the number.
@@ -150,6 +195,69 @@ export class Slider {
     return best;
   });
 
+  /**
+   * {@link position} mirrored when {@link invert} is set — where the thumb
+   * physically sits.
+   *
+   * Mirroring the coordinate rather than setting `direction: rtl`, which is the
+   * other way to reverse a range input and is honoured inconsistently: Firefox
+   * and WebKit disagree about whether it also flips the keyboard arrows. Doing
+   * the arithmetic means every browser and every input method agrees, at the
+   * cost of one line here and one in {@link onInput}.
+   */
+  protected readonly trackPosition = computed(() => this.mirror(this.position()));
+
+  /** Its own inverse — the mirror of a mirror is the original. */
+  private mirror(coordinate: number): number {
+    return this.invert() ? this.lowerBound() + this.upperBound() - coordinate : coordinate;
+  }
+
+  /** The thumb's place along the track, 0–1, as drawn. */
+  private readonly fraction = computed(() => {
+    const span = this.upperBound() - this.lowerBound();
+    return span === 0 ? 0 : (this.trackPosition() - this.lowerBound()) / span;
+  });
+
+  /**
+   * The whole track, as one gradient on the input itself.
+   *
+   * Drawn here rather than through `::-webkit-slider-runnable-track` and
+   * `::-moz-range-track`, which cannot be given the same declaration in one rule
+   * — a browser drops a whole selector list it does not recognise, so styling
+   * both means writing everything twice and keeping the copies in step. A
+   * background on the element is one declaration every browser already agrees
+   * about, and the vendor tracks are only made transparent so it shows through.
+   *
+   * The centre tick is part of the same gradient rather than an element beside
+   * it, so it cannot drift out of alignment with the fill it marks.
+   */
+  protected readonly trackImage = computed(() => {
+    const track = 'var(--color-edge)';
+    const fill = 'var(--color-accent)';
+    const at = Math.max(0, Math.min(100, this.fraction() * 100));
+
+    if (this.origin() !== 'centre') {
+      return `linear-gradient(to right, ${fill} 0 ${at}%, ${track} ${at}% 100%)`;
+    }
+
+    const [from, to] = at < 50 ? [at, 50] : [50, at];
+
+    // The detent is listed first, which in CSS puts it *over* the fill — and it
+    // has to be, because the fill always reaches the centre by definition, so a
+    // mark underneath it could never be seen at any value.
+    return (
+      `linear-gradient(to right, transparent 0 calc(50% - 1px),` +
+      ` var(--color-ink-muted) calc(50% - 1px) calc(50% + 1px), transparent calc(50% + 1px) 100%),` +
+      ` linear-gradient(to right, ${track} 0 ${from}%, ${fill} ${from}% ${to}%,` +
+      ` ${track} ${to}% 100%)`
+    );
+  });
+
+  protected readonly endLabels = computed(() => {
+    const ends = this.ends();
+    return ends ? { low: ends[0], high: ends[1] } : null;
+  });
+
   protected readonly display = computed(() => {
     const label = this.valueLabel();
     if (label !== null) {
@@ -161,7 +269,7 @@ export class Slider {
   });
 
   protected onInput(event: Event): void {
-    const raw = Number((event.target as HTMLInputElement).value);
+    const raw = this.mirror(Number((event.target as HTMLInputElement).value));
     const stops = this.stops();
     const value = stops ? (stops[raw] ?? this.value()) : raw;
     this.dragging.set(true);

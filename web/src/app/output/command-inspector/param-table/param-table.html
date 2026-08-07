@@ -20,6 +20,9 @@
                 [max]="row.max"
                 [stops]="row.stops"
                 [signed]="row.descriptor.codec === 's8'"
+                [origin]="row.centred ? 'centre' : 'start'"
+                [invert]="row.invert"
+                [ends]="row.ends"
                 [disabled]="!row.editable"
                 [note]="row.note"
                 (preview)="preview(row, $event)"
@@ -88,7 +91,12 @@
 
   @if (shape.omitted > 0) {
     <p class="text-ink-muted pt-2 text-[11px] leading-snug">
-      … and {{ shape.omitted }} further argument{{ shape.omitted === 1 ? '' : 's' }} not shown.
+      @if (shape.tail; as what) {
+        Carries {{ shape.omitted }} {{ what }}{{ shape.omitted === 1 ? '' : 's' }}, shown in the hex
+        dump below.
+      } @else {
+        … and {{ shape.omitted }} further argument{{ shape.omitted === 1 ? '' : 's' }} not shown.
+      }
     </p>
   }
 }

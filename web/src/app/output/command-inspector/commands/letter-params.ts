@@ -76,7 +76,7 @@ const pan: Resolver = (command) => {
       u8('Pan', 'pan', { max: 20, describe: panLabel }),
       ...surround.slice(0, Math.max(0, command.args.length - 1)),
     ],
-    note: '0 is hard right and 20 is hard left, which is the opposite way round from most pan controls.',
+    note: 'The slider runs left to right; the byte counts the other way, 0 being hard right and 20 hard left.',
   };
 };
 
@@ -112,6 +112,38 @@ const defaultLength: Resolver = (command) => ({
     command.target.amkVersion >= 4
       ? 'l=NN writes an exact tick count instead, and dots are allowed — both need #amk 4.'
       : undefined,
+});
+
+/**
+ * A note or rest, whose arguments are the lengths of its tied segments.
+ *
+ * `c4^8` is one command with two of them, and the scanner has already worked out
+ * what each comes to in ticks (`Command.noteLength`). So the row says the
+ * denominator you wrote *and* the ticks it resolved to, which is the pair that
+ * makes a tie legible — `c4^8` is 48 + 24, and nothing else on screen says so.
+ *
+ * The first segment may be absent (`c` alone takes the standing `l`), in which
+ * case the command has no arguments and the table says so.
+ */
+const noteLength: Resolver = (command) => ({
+  params: command.args.map((_argument, index) =>
+    u8(index === 0 ? 'Length' : `Tied to`, 'index', {
+      min: 1,
+      max: TICKS_PER_WHOLE,
+      stops: NOTE_DENOMINATORS,
+      describe: (value) => {
+        const resolved = command.noteLength?.[index]?.ticks;
+        const named = resolved === undefined ? null : noteLengthName(resolved);
+        return [
+          `1/${value}`,
+          named,
+          resolved === undefined ? null : `${resolved} tick${resolved === 1 ? '' : 's'}`,
+        ]
+          .filter((part) => part !== null)
+          .join(' · ');
+      },
+    }),
+  ),
 });
 
 export const LETTER_PARAMS: Readonly<Record<string, Resolver>> = {
@@ -159,6 +191,18 @@ export const LETTER_PARAMS: Readonly<Record<string, Resolver>> = {
     'Replaces the instrument’s sample until the next instrument change. One register serves every channel, so a later n retunes this one too.',
   ),
   p: vibrato,
+  // Notes and rests are commands too, and `gather` builds one for each. Without
+  // an entry here every `c4` drew a row called "Argument 1" — a 0-255 number
+  // field over a note length, next to a panel that knows exactly what it is.
+  c: noteLength,
+  d: noteLength,
+  e: noteLength,
+  f: noteLength,
+  g: noteLength,
+  a: noteLength,
+  b: noteLength,
+  r: noteLength,
+  '^': noteLength,
   '[': fixed([u8('Repeats', 'index', { min: 1, describe: (n) => `plays ${n} times` })]),
   ']': fixed([u8('Repeats', 'index', { min: 1, describe: (n) => `plays ${n} times` })]),
   '*': fixed([

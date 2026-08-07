@@ -124,24 +124,20 @@
   <!-- The raw truth, always. -->
   <div class="border-edge border-t pt-2">
     <div class="text-ink-muted mb-1 text-[11px] tracking-wide uppercase">Coefficients</div>
-    <div class="grid grid-cols-4 gap-1">
+    <div class="grid grid-cols-2 gap-x-3">
       @for (row of rows(); track row.index) {
-        <label class="flex flex-col gap-0.5">
-          <span class="text-ink-muted font-mono text-[10px]"
-            >C{{ row.index }} · ${{ row.hex }}</span
-          >
-          <input
-            type="number"
-            class="bg-inset border-edge text-ink w-full rounded-sm border px-1 py-0.5 font-mono text-xs tabular-nums"
-            min="-128"
-            max="127"
-            step="1"
-            [attr.aria-label]="`Coefficient ${row.index}`"
-            [value]="row.tap"
-            (input)="previewTap(row.index, $any($event.target).value)"
-            (change)="setTap(row.index, $any($event.target).value)"
-          />
-        </label>
+        <amk-slider
+          origin="centre"
+          [label]="`C${row.index}`"
+          [signed]="true"
+          [value]="row.tap"
+          [min]="-128"
+          [max]="127"
+          [valueLabel]="row.hex"
+          [disabled]="readOnly()"
+          (preview)="previewTap(row.index, $event)"
+          (commit)="setTap(row.index, $event)"
+        />
       }
     </div>
   </div>

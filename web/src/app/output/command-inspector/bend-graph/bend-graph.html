@@ -26,6 +26,8 @@
 
   <figcaption class="text-ink-muted mt-1 flex justify-between gap-2 font-mono text-[10px]">
     <span>{{ reachLabel() }}</span>
+    <!-- The scale is fixed, so saying it is what makes the height readable. -->
+    <span>±{{ axisLabel() }}</span>
     <span>{{ durationLabel() }}</span>
   </figcaption>
 </figure>

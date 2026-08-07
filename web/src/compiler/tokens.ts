@@ -1710,6 +1710,24 @@ function gather(tokens: GatherToken[], text: string, transitions: TargetTransiti
 			let last: GatherToken = token;
 			let j = i + 1;
 			while (j < tokens.length && tokens[j].kind === "hexArg") {
+				// Stop once the command has all its arguments, rather than taking
+				// every `hexArg` in reach. `scanHex` emits that kind for any byte
+				// below `$DA` even with `hexLeft` at 0 (see the comment there), so a
+				// `$00` standing after a full command is one — but it is not an
+				// argument: `parser.ts:2918-2943` reads such a byte as a standalone
+				// literal and reports it, as AMK0151 under `#amk`. Claiming it here
+				// made a one-argument command look like a two-argument one, gave the
+				// inspector a row to name, and pointed `spliceArg` at a byte the
+				// command does not own.
+				//
+				// Asked once per token because the answer changes as they arrive:
+				// `$FB`'s count and `#am4 $ED`'s sub decide the length, and `null`
+				// means the deciding byte is the one about to be read.
+				const wanted = expectedArgs(vcmd, args, target);
+				if (wanted !== null && args.length >= wanted) {
+					break;
+				}
+
 				args.push({
 					value: parseInt(textOf(tokens[j]).slice(1), 16),
 					span: spanOf(tokens[j]),
@@ -1951,6 +1969,16 @@ export function expectedArgs(vcmd: number, args: { value: number }[], target: Co
 
 		const count = args[0].value;
 		return count >= 0x80 ? 3 : count + 2;
+	}
+
+	// `parser.ts:3006-3012` — `$FA $FE`'s toggle byte takes a further byte when
+	// its high bit is set, which `scanHex` forks on at `tokens.ts:1013`. This side
+	// of the pair was missing it, so the two statements the doc comment above
+	// claims are pinned against each other disagreed at exactly this flip point:
+	// the scanner scanned three bytes and this returned two, which also made
+	// `complete` true for a command still missing its last one.
+	if (vcmd === 0xfa && args.length > 1 && args[0].value === 0xfe && args[1].value >= 0x80) {
+		return 3;
 	}
 
 	return HEX_LENGTHS[vcmd - FIRST_VCMD] - 1;

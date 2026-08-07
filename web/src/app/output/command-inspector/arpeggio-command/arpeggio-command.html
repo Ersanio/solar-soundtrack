@@ -48,16 +48,15 @@
               }}
             </span>
           } @else {
-            <amk-slider
+            <!-- A dropdown, not a slider: dragging one sweeps the document
+                 through every wrong note on the way, and it commits on choosing
+                 so there is nothing to preview. -->
+            <amk-interval-picker
               class="flex-1"
               [label]="`Note ${note.index + 1}`"
-              [signed]="true"
               [value]="note.value"
-              [min]="-128"
-              [max]="127"
-              [valueLabel]="note.hex"
+              [note]="note.hex"
               [disabled]="!editable()"
-              (preview)="preview(note.index + 2, $event)"
               (commit)="setNote(note.index, $event)"
             />
           }
@@ -100,12 +99,15 @@
     </div>
   } @else {
     <amk-slider
+      origin="centre"
       [label]="extraLabel()"
       [signed]="true"
       [value]="extra()"
       [min]="-128"
       [max]="127"
+      [valueLabel]="extraNote()"
       [disabled]="!editable()"
+      (preview)="preview(2, $event)"
       (commit)="setExtra($event)"
     />
   }

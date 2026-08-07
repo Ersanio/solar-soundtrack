@@ -57,5 +57,9 @@
     />
   }
 
+  @if (reachability(); as problem) {
+    <p class="text-warn text-xs leading-relaxed">{{ problem }}</p>
+  }
+
   <p class="text-ink-muted text-xs leading-relaxed">{{ note() }}</p>
 }

@@ -8,6 +8,9 @@ const VIEW_H = 120;
 /** Ticks of flat line drawn after the bend, so it does not end at the edge. */
 const TAIL_TICKS = 8;
 
+/** The plot's default half-height, so the axis means the same thing every time. */
+const SEMITONES_PER_OCTAVE = 12;
+
 /**
  * A pitch slide, as a shape: hold, then ramp, then hold.
  *
@@ -42,14 +45,23 @@ export class BendGraph {
   );
 
   /**
-   * Semitones per viewBox unit.
+   * Semitones from the written note to the top of the plot.
    *
-   * Scaled to whichever end is further from the note, with a floor of one
-   * semitone so a one-semitone bend does not fill the plot and read as an
-   * octave. Symmetric about the written note, so an upward and a downward bend
-   * of the same size are mirror images rather than differently scaled.
+   * Fixed at an octave, and stepped up by whole octaves only when a bend
+   * genuinely goes further. It used to scale to whichever end was further out,
+   * which kept every bend filling the plot and made the picture say nothing:
+   * one semitone and two octaves drew the identical shape, sliding the control
+   * never moved the line, and crossing zero flipped it end for end. Now the
+   * written note stays on the centre line and the ramp moves against it, which
+   * is the only way the height means anything.
    */
-  private readonly reach = computed(() => Math.max(1, Math.abs(this.from()), Math.abs(this.to())));
+  private readonly reach = computed(() => {
+    const furthest = Math.max(Math.abs(this.from()), Math.abs(this.to()));
+    return Math.max(
+      SEMITONES_PER_OCTAVE,
+      Math.ceil(furthest / SEMITONES_PER_OCTAVE) * SEMITONES_PER_OCTAVE,
+    );
+  });
 
   private y(semitones: number): number {
     const half = VIEW_H / 2 - 6;
@@ -83,6 +95,11 @@ export class BendGraph {
   protected readonly durationLabel = computed(() =>
     this.duration() === 0 ? 'instant' : `over ${ticksLabel(this.duration(), this.tempo())}`,
   );
+
+  protected readonly axisLabel = computed(() => {
+    const reach = this.reach();
+    return reach === SEMITONES_PER_OCTAVE ? 'an octave' : `${reach / SEMITONES_PER_OCTAVE} octaves`;
+  });
 
   protected readonly reachLabel = computed(() => {
     const semitones = this.to() - this.from();
