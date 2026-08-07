@@ -1,5 +1,6 @@
+<!-- The typed coefficients, so the curve follows the keyboard. -->
 <amk-fir-graph
-  [taps]="taps()"
+  [taps]="shownTaps()"
   [feedback]="feedback()"
   [target]="mode() === 'draw' && !readOnly() ? target() : null"
   [drawable]="mode() === 'draw' && !readOnly()"
@@ -137,6 +138,7 @@
             step="1"
             [attr.aria-label]="`Coefficient ${row.index}`"
             [value]="row.tap"
+            (input)="previewTap(row.index, $any($event.target).value)"
             (change)="setTap(row.index, $any($event.target).value)"
           />
         </label>

@@ -11,7 +11,7 @@ import { tempoBefore } from '../../../util/dialect';
 import { builtInTaps } from '../../../util/echo-hazards';
 import { hex2 } from '../../../util/format';
 import { ticksLabel } from '../commands/units';
-import { dragPreview } from '../commands/preview';
+import { dragPreview, shownArgs } from '../commands/preview';
 import { firOverriddenBefore } from '../fir-override';
 import { FirGraph } from '../fir-graph/fir-graph';
 
@@ -66,9 +66,7 @@ export class EchoInspector {
    * cost in KiB, and that is the number that decides whether the song still
    * fits — watching it climb as you drag is the point of the control.
    */
-  protected readonly shown = computed(() =>
-    this.args().map((value, index) => this.drag.at(index, value)),
-  );
+  protected readonly shown = computed(() => shownArgs(this.command(), this.drag));
 
   protected preview(index: number, value: number): void {
     this.drag.set(index, value < 0 ? value + 0x100 : value);

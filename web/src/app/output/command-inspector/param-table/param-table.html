@@ -3,11 +3,13 @@
     <p class="text-ink-muted pb-2 text-xs leading-relaxed">{{ note }}</p>
   }
 
-  @if (shape.rows.length === 0) {
+  @if (rows().length === 0) {
     <p class="text-ink-muted text-xs leading-relaxed">This command takes no arguments.</p>
   } @else {
     <div class="flex flex-col gap-2.5">
-      @for (row of shape.rows; track row.index) {
+      <!-- `rows()`, not `shape.rows`: the same rows with every readout re-read
+           from what its control is showing rather than from the document. -->
+      @for (row of rows(); track row.index) {
         <div class="flex flex-col gap-0.5">
           @switch (row.control) {
             @case ('slider') {
@@ -20,6 +22,7 @@
                 [signed]="row.descriptor.codec === 's8'"
                 [disabled]="!row.editable"
                 [note]="row.note"
+                (preview)="preview(row, $event)"
                 (commit)="commit(row, $event)"
               />
             }
@@ -33,6 +36,7 @@
                 [disabled]="!row.editable"
                 [valueLabel]="row.raw"
                 [note]="row.note"
+                (preview)="preview(row, $event)"
                 (commit)="commit(row, $event)"
               />
             }

@@ -52,6 +52,7 @@
       [max]="127"
       [note]="lockedBecause(2)"
       [disabled]="!editable(2)"
+      (preview)="preview(2, $event)"
       (commit)="setArg(2, $event)"
     />
   }

@@ -22,7 +22,7 @@ const STEPS = 160;
 /**
  * The depth that fills the plot.
  */
-const FULL_DEPTH = 0xFF;
+const FULL_DEPTH = 0xff;
 
 /**
  * What a vibrato or tremolo setting looks like, as a shape.

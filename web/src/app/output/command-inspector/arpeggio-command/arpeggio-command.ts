@@ -7,7 +7,8 @@ import { type EnumOption, EnumSelect } from '../../../shared/enum-select/enum-se
 import { Slider } from '../../../shared/slider/slider';
 import { EditorStore } from '../../../state/editor-store';
 import { hex2 } from '../../../util/format';
-import { toSigned } from '../commands/param';
+import { fromSigned, toSigned } from '../commands/param';
+import { dragPreview, shownArgs } from '../commands/preview';
 
 const MODES: readonly EnumOption[] = [
   { value: 0x00, label: 'off' },
@@ -70,6 +71,25 @@ export class ArpeggioCommand {
   protected readonly duration = computed(() => this.args()[1] ?? 0);
 
   /**
+   * The arguments as the sliders are showing them, keyed by argument index.
+   *
+   * Only the readouts read these. Note in particular that {@link notes} keeps
+   * deriving its *shape* — marker or slider, live or overridden — from the
+   * document: dragging a note to `-128` makes it `$80`, and a row that decided
+   * mid-drag it was a loop marker would replace the slider under the pointer
+   * with a line of text. The value it is heading for shows in the readout; what
+   * it *becomes* waits for the commit, which is also when the driver would care.
+   */
+  private readonly drag = dragPreview(this.command);
+  private readonly shown = computed(() => shownArgs(this.command(), this.drag));
+
+  protected preview(index: number, value: number): void {
+    this.drag.set(index, fromSigned(value));
+  }
+
+  protected readonly durationLabel = computed(() => `${this.shown()[1] ?? 0} ticks`);
+
+  /**
    * Where the sequence restarts, or `-1` for "at the beginning".
    *
    * The driver finds this lazily rather than by scanning: stepping onto a `$80`
@@ -92,18 +112,20 @@ export class ArpeggioCommand {
   });
 
   /** One row per note actually written, capped so a huge sequence stays readable. */
-  protected readonly notes = computed(() =>
-    this.args()
+  protected readonly notes = computed(() => {
+    const shown = this.shown();
+    return this.args()
       .slice(2, 2 + MAX_ROWS)
       .map((value, index) => ({
         index,
         value: toSigned(value),
-        hex: `$${hex2(value)}`,
+        /** The only field that follows a drag; see {@link shown} for why. */
+        hex: `$${hex2(shown[index + 2] ?? value)}`,
         isMarker: value === LOOP_MARKER,
         /** Only the last marker is live; an earlier one is dead weight. */
         isLive: value === LOOP_MARKER && index === this.loopAt(),
-      })),
-  );
+      }));
+  });
 
   /**
    * The two shapes that break the driver rather than merely surprising it.

@@ -20,8 +20,9 @@
     label="Note duration"
     [value]="duration()"
     [max]="255"
-    [valueLabel]="`${duration()} ticks`"
+    [valueLabel]="durationLabel()"
     [disabled]="!editable()"
+    (preview)="preview(1, $event)"
     (commit)="setDuration($event)"
   />
 
@@ -56,6 +57,7 @@
               [max]="127"
               [valueLabel]="note.hex"
               [disabled]="!editable()"
+              (preview)="preview(note.index + 2, $event)"
               (commit)="setNote(note.index, $event)"
             />
           }

@@ -1,6 +1,7 @@
 import { Component, computed, inject, input } from '@angular/core';
 
 import { spliceInstrumentBytes, spliceInstrumentSample } from '@compiler/edits';
+import { INSTRUMENT_TO_SAMPLE } from '@compiler/tables';
 import type { InstrumentDefinition } from '@compiler/tokens';
 import { encodeTuning, noiseHz, tuningMultiplier, tuningSemitones } from '@spc/adsr';
 import { type EnumOption, EnumSelect } from '../../../shared/enum-select/enum-select';
@@ -9,6 +10,7 @@ import { EditorStore } from '../../../state/editor-store';
 import { SampleStore } from '../../../state/sample-store';
 import { hex2 } from '../../../util/format';
 import { sampleOptions } from '../commands/context';
+import { dragPreview } from '../commands/preview';
 import { type EnvelopeValue, EnvelopeTuner } from '../envelope-tuner/envelope-tuner';
 
 /** The three things an entry's sample byte can be (`parser.ts:1224-1341`). */
@@ -87,6 +89,22 @@ export class InstrumentEntryEditor {
     () => `"${this.sampleName()}" — not in this song’s #samples`,
   );
 
+  /**
+   * What the sliders are showing, dropped the moment the entry is re-scanned.
+   *
+   * Keyed by field rather than by byte index, because two of the three are not
+   * bytes of the entry at all — the sample form is written before them, and the
+   * tuning slider spans a pair. The sliders themselves bind to the committed
+   * values below; only the readouts read these, since `amk-slider` compares a
+   * gesture against the value bound to it and a preview fed back in never
+   * commits.
+   */
+  private readonly drag = dragPreview(this.entry);
+
+  protected preview(field: 'copy' | 'noise' | 'tuning', value: number): void {
+    this.drag.set(field, value);
+  }
+
   protected readonly copyFrom = computed(() => {
     const sample = this.entry().sample;
     return sample.form === 'copy' ? sample.instrument : 0;
@@ -97,18 +115,28 @@ export class InstrumentEntryEditor {
     return sample.form === 'noise' ? sample.clock : 0;
   });
 
+  private readonly shownCopyFrom = computed(() => this.drag.at('copy', this.copyFrom()));
+  private readonly shownNoiseClock = computed(() => this.drag.at('noise', this.noiseClock()));
+
   protected readonly noiseLabel = computed(() => {
-    const clock = this.noiseClock();
+    const clock = this.shownNoiseClock();
     return clock === 0 ? 'silent' : `${Math.round(noiseHz(clock)).toLocaleString()} Hz`;
   });
 
+  /** `@n` as the slider is showing it, so the label keeps up with the thumb. */
+  protected readonly copyLabel = computed(() => `@${this.shownCopyFrom()}`);
+
   protected readonly copyNote = computed(() => {
-    const sample = this.entry().sample;
+    if (this.entry().sample.form !== 'copy') {
+      return null;
+    }
+
     // `parser.ts:1147` — a custom instrument cannot be based on another, so the
-    // number is a stock one and its SRCN is fixed by AddmusicK's own table.
-    return sample.form === 'copy'
-      ? `takes @${sample.instrument}'s sample, $${hex2(sample.srcn)}`
-      : null;
+    // number is a stock one and its SRCN is fixed by AddmusicK's own table. The
+    // scanner's own `srcn` is that same lookup, redone here because the dragged
+    // number has not been scanned yet.
+    const srcn = INSTRUMENT_TO_SAMPLE[this.shownCopyFrom()] ?? -1;
+    return `takes @${this.shownCopyFrom()}'s sample, $${hex2(srcn)}`;
   });
 
   // --- envelope --------------------------------------------------------------
@@ -142,15 +170,27 @@ export class InstrumentEntryEditor {
    */
   protected readonly tuningRaw = computed(() => Math.round(this.multiplier() * 256));
 
-  protected readonly tuningLabel = computed(() => `×${this.multiplier().toFixed(3)}`);
+  /**
+   * The same 16-bit number as the slider is showing it, and the two bytes it
+   * would be written as — so the `$04.$00` form follows the drag as well as the
+   * multiplier does. Re-encoded through {@link encodeTuning}, which is the
+   * function the commit path uses, so the readout cannot promise a pair the
+   * write would not produce.
+   */
+  private readonly shownTuning = computed(() => {
+    const raw = this.drag.at('tuning', this.tuningRaw());
+    return { raw, multiplier: raw / 256, ...encodeTuning(raw / 256) };
+  });
+
+  protected readonly tuningLabel = computed(() => `×${this.shownTuning().multiplier.toFixed(3)}`);
 
   protected readonly tuningNote = computed(() => {
-    const [, , , tuning = 0, sub = 0] = this.bytes();
-    const semitones = tuningSemitones(this.multiplier());
+    const { multiplier, tuning, subTuning } = this.shownTuning();
+    const semitones = tuningSemitones(multiplier);
     const said = Number.isFinite(semitones)
       ? `${semitones > 0 ? '+' : ''}${semitones.toFixed(1)} semitones`
       : 'silent';
-    return `$${hex2(tuning)}.$${hex2(sub)} — ${said}`;
+    return `$${hex2(tuning)}.$${hex2(subTuning)} — ${said}`;
   });
 
   protected readonly tuningLocked = computed(() =>

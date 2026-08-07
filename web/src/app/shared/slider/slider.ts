@@ -83,7 +83,16 @@ export class Slider {
    */
   readonly signed = input(false);
 
-  /** Pre-formatted readout — "132.2 BPM", "80% of full". Falls back to the number. */
+  /**
+   * Pre-formatted readout — "132.2 BPM", "80% of full". Falls back to the number.
+   *
+   * **Compute it from the previewed value, not the committed one.** It is shown
+   * throughout a gesture, so a label derived from the document would sit there
+   * describing the value you started from — which is exactly the number you are
+   * dragging away from. It used to be hidden mid-drag for that reason; every
+   * caller now feeds it a `dragPreview`, so hiding it would only throw away the
+   * live reading.
+   */
   readonly valueLabel = input<string | null>(null);
 
   /** A sentence under the track, for the consequence the number does not state. */
@@ -142,9 +151,9 @@ export class Slider {
   });
 
   protected readonly display = computed(() => {
-    const pending = this.pending();
-    if (pending === null && this.valueLabel() !== null) {
-      return this.valueLabel();
+    const label = this.valueLabel();
+    if (label !== null) {
+      return label;
     }
 
     const value = this.shown();

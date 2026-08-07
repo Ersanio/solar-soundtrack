@@ -10,6 +10,7 @@
     [valueLabel]="gateLabel()"
     [note]="lockedBecause() ?? gateNote()"
     [disabled]="!editable()"
+    (preview)="preview('gate', $event)"
     (commit)="setGate($event)"
   />
 
@@ -20,6 +21,7 @@
     [valueLabel]="velocityLabel()"
     [note]="velocityNote()"
     [disabled]="!editable()"
+    (preview)="preview('velocity', $event)"
     (commit)="setVelocity($event)"
   />
 

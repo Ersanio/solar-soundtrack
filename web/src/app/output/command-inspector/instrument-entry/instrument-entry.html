@@ -36,8 +36,9 @@
       label="Copies the sample of"
       [value]="copyFrom()"
       [max]="29"
-      [valueLabel]="`@${copyFrom()}`"
+      [valueLabel]="copyLabel()"
       [note]="copyNote()"
+      (preview)="preview('copy', $event)"
       (commit)="setCopy($event)"
     />
   }
@@ -49,6 +50,7 @@
       [value]="noiseClock()"
       [max]="31"
       [valueLabel]="noiseLabel()"
+      (preview)="preview('noise', $event)"
       (commit)="setNoise($event)"
     />
   }
@@ -79,6 +81,7 @@
     [valueLabel]="tuningLabel()"
     [note]="tuningNote()"
     [disabled]="tuningLocked()"
+    (preview)="preview('tuning', $event)"
     (commit)="setTuning($event)"
   />
 }

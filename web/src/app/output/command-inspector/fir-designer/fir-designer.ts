@@ -27,6 +27,7 @@ import {
 import { Button } from '../../../shared/button/button';
 import { EditorStore } from '../../../state/editor-store';
 import { Playback } from '../../../state/playback';
+import { dragPreview } from '../commands/preview';
 import { builtInFilterName, firOverriddenBy } from '../fir-override';
 import { FirGraph } from '../fir-graph/fir-graph';
 import { feedbackBefore } from '../../../util/echo-hazards';
@@ -60,8 +61,10 @@ const MERGE_HZ = 500;
  *
  * The taps come from the `$F5` under the caret and go back to the same place.
  * Committing them recompiles, and because the player already reloads a
- * recompiled song in place, that is also how the filter gets auditioned — there
- * is no separate preview path.
+ * recompiled song in place, that is also how the filter gets *auditioned* — what
+ * you hear is only ever the document. Seeing it is a separate matter, and the
+ * plot follows the coefficient fields as they are typed; see {@link
+ * FirDesigner.shownTaps}.
  */
 @Component({
   selector: 'amk-fir-designer',
@@ -79,24 +82,39 @@ export class FirDesigner {
   protected readonly mode = signal<Mode>('presets');
 
   /**
-   * The eight coefficients, as the DSP would read them.
+   * The eight coefficients as the document holds them.
    *
-   * Read straight from the text with nothing held in front of it. The tone
-   * slider needed a pending-edit signal here, because a drag fires continuously
-   * and committing each frame would push a recompile through the typing debounce
-   * dozens of times a second. Every control that is left commits once per
-   * gesture, so the text can be the only source of truth again.
+   * What gets written, and — the part that matters — what the runaway interlock
+   * below judges. See {@link shownTaps} for the pair to this.
    */
   protected readonly taps = computed<FirTaps>(() => {
     const args = this.command().args;
     return Array.from({ length: FIR_TAPS }, (_, i) => toSigned(args[i]?.value ?? 0));
   });
 
+  /**
+   * The eight as the fields are showing them, per keystroke.
+   *
+   * A coefficient field commits on blur, which left the curve describing the
+   * filter you were replacing for the whole time you were replacing it. These
+   * feed the plot and every reading beside it, so the response, the corner, the
+   * tilt and the headroom warning all answer for what is typed.
+   *
+   * They deliberately do **not** feed the `[value]` binding on the inputs
+   * themselves: writing a parsed number back into a field mid-word rewrites
+   * `03` as `3` and takes the caret with it.
+   */
+  private readonly drag = dragPreview(this.command);
+
+  protected readonly shownTaps = computed<FirTaps>(() =>
+    this.taps().map((tap, index) => this.drag.at(index, tap)),
+  );
+
   protected readonly target = signal<{ hz: number; gain: number }[]>([]);
 
-  protected readonly description = computed(() => describeFir(this.taps()));
-  protected readonly activePreset = computed(() => matchPreset(this.taps()));
-  protected readonly headroom = computed(() => firHeadroom(this.taps()));
+  protected readonly description = computed(() => describeFir(this.shownTaps()));
+  protected readonly activePreset = computed(() => matchPreset(this.shownTaps()));
+  protected readonly headroom = computed(() => firHeadroom(this.shownTaps()));
 
   /**
    * The feedback the echo is running at, taken from the nearest preceding `$F1`
@@ -110,16 +128,25 @@ export class FirDesigner {
     feedbackBefore(this.command(), this.store.tokens().commands),
   );
 
-  protected readonly stability = computed(() => echoStability(this.taps(), this.feedback()));
+  /** The verdict the panel prints, so a filter is called dangerous as it is typed. */
+  protected readonly stability = computed(() => echoStability(this.shownTaps(), this.feedback()));
 
   /**
-   * Just the flag, so the effect below runs on a genuine change.
+   * Just the flag, so the effect below runs on a genuine change — and read off
+   * the **committed** taps, which is the whole of why this is not
+   * `stability().runaway`.
    *
-   * `stability()` is a fresh object on every keystroke, since `taps()` rebuilds
+   * The effect stops playback. A `3` typed on the way to `32` is a filter
+   * nobody asked for and nobody wrote, and halting the song over one would make
+   * the field unusable. So the warning goes live and the interlock does not: the
+   * panel says a filter will run away while you are still typing it, and only
+   * ever stops the music over one that is actually in the document.
+   *
+   * `echoStability` returns a fresh object each time, since the taps rebuild
    * from `command().args`. A `computed` over the boolean compares by value and
    * only notifies when it actually flips.
    */
-  private readonly runaway = computed(() => this.stability().runaway);
+  private readonly runaway = computed(() => echoStability(this.taps(), this.feedback()).runaway);
 
   /**
    * The current reading, and whether it is one an edit just produced.
@@ -186,9 +213,15 @@ export class FirDesigner {
     };
   });
 
-  protected readonly rows = computed(() =>
-    this.taps().map((tap, index) => ({ index, tap, hex: toHexByte(tap) })),
-  );
+  /** `tap` positions the field and comes from the document; `hex` follows the typing. */
+  protected readonly rows = computed(() => {
+    const shown = this.shownTaps();
+    return this.taps().map((tap, index) => ({
+      index,
+      tap,
+      hex: toHexByte(shown[index] ?? tap),
+    }));
+  });
 
   protected readonly cornerLabel = computed(() => {
     const corner = this.description().cornerHz;
@@ -210,11 +243,25 @@ export class FirDesigner {
     this.commit(taps);
   }
 
+  /** Per keystroke. Half-typed text parses to `NaN` and the last reading stands. */
+  protected previewTap(index: number, value: string): void {
+    const parsed = Number.parseInt(value, 10);
+    if (!Number.isNaN(parsed)) {
+      this.drag.set(index, clampTap(parsed));
+    }
+  }
+
   protected setTap(index: number, value: string): void {
     const parsed = Number.parseInt(value, 10);
     if (Number.isNaN(parsed)) {
       return;
     }
+
+    // Set here as well as on `input`, because a field typed away from and back
+    // to its own value commits nothing — and a preview map is cleared by the
+    // re-scan a commit causes, so without this it would keep showing the number
+    // that was abandoned.
+    this.drag.set(index, clampTap(parsed));
 
     const next = [...this.taps()];
     next[index] = clampTap(parsed);

@@ -1,5 +1,7 @@
 import { type Signal, linkedSignal } from '@angular/core';
 
+import type { Command } from '@compiler/tokens';
+
 /** What a drag is showing, keyed however the caller finds convenient. */
 export interface DragPreview {
   /** The value to draw: the one being dragged, or the committed one. */
@@ -39,4 +41,15 @@ export function dragPreview(source: Signal<unknown>): DragPreview {
       pending.update((current) => ({ ...current, [key]: value }));
     },
   };
+}
+
+/**
+ * A command's arguments as the controls are showing them.
+ *
+ * For the views keyed by argument index, which is most of them — a panel that
+ * draws several readouts off the same run of bytes wants the whole run in the
+ * units it is being edited in, not one `at()` call per reader.
+ */
+export function shownArgs(command: Command, drag: DragPreview): number[] {
+  return command.args.map((arg, index) => drag.at(index, arg.value));
 }

@@ -26,6 +26,10 @@ export interface ChangelogEntry {
 export const CHANGELOG: readonly ChangelogEntry[] = [
   // ─── newest first; add new blocks here ──────────────────────────────────
   {
+    date: '7 August 2026',
+    items: ['Inspector readouts update as you drag a slider or type a value'],
+  },
+  {
     date: '5 August 2026',
     items: [
       'Every command is now editable from the inspector',

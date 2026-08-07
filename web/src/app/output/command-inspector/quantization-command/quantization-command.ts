@@ -12,6 +12,7 @@ import { Slider } from '../../../shared/slider/slider';
 import { EditorStore } from '../../../state/editor-store';
 import { velocityTableAt } from '../../../util/dialect';
 import { hex2 } from '../../../util/format';
+import { dragPreview } from '../commands/preview';
 
 /**
  * `q` — the one command whose readme entry is wrong, in both halves.
@@ -50,17 +51,39 @@ export class QuantizationCommand {
   protected readonly gateIndex = computed(() => (this.byte() >> 4) & 0x07);
   protected readonly velocityIndex = computed(() => this.byte() & 0x0f);
 
+  /**
+   * The two nibbles as the sliders are showing them.
+   *
+   * Every readout below reads these rather than the committed pair, so the
+   * percentage, the example and the out-of-range warning all answer for the
+   * value under the pointer. The sliders themselves keep binding to the
+   * committed nibbles — `amk-slider` compares against the value bound to it to
+   * decide whether a gesture changed anything, and a preview fed back in reads
+   * as a no-op that never writes.
+   *
+   * Keyed by nibble rather than by argument index: both halves are the same
+   * byte, and a drag on one must leave the other reading the document.
+   */
+  private readonly drag = dragPreview(this.command);
+
+  protected readonly shownGate = computed(() => this.drag.at('gate', this.gateIndex()));
+  protected readonly shownVelocity = computed(() => this.drag.at('velocity', this.velocityIndex()));
+
+  protected preview(nibble: 'gate' | 'velocity', value: number): void {
+    this.drag.set(nibble, value);
+  }
+
   protected readonly table = computed(() =>
     velocityTableAt(this.command(), this.store.tokens().tokens, this.store.source()),
   );
 
   protected readonly tableName = computed(() => (this.table() === 'smw' ? 'SMW' : 'N-SPC'));
 
-  private readonly gateByte = computed(() => NOTE_DURATIONS[this.gateIndex()]);
+  private readonly gateByte = computed(() => NOTE_DURATIONS[this.shownGate()]);
 
   private readonly velocityByte = computed(
     () =>
-      VELOCITY_VALUES[this.velocityIndex() + (this.table() === 'nspc' ? NSPC_VELOCITY_OFFSET : 0)],
+      VELOCITY_VALUES[this.shownVelocity() + (this.table() === 'nspc' ? NSPC_VELOCITY_OFFSET : 0)],
   );
 
   protected readonly gateLabel = computed(
@@ -92,9 +115,14 @@ export class QuantizationCommand {
     return `at l8 (${ticks} ticks) a note sounds for ${sounding}, then ${ticks - sounding} of silence`;
   });
 
-  /** `parser.ts:1626` — `q00` is an error, so the gate never reaches index 0 alone. */
+  /**
+   * `parser.ts:1626` — `q00` is an error, so the gate never reaches index 0 alone.
+   *
+   * Read off the dragged nibbles, so the warning arrives while there is still
+   * time to not let go.
+   */
   protected readonly outOfRange = computed(() => {
-    const value = this.byte();
+    const value = (this.shownGate() << 4) | this.shownVelocity();
     return value < 1 || value > 0x7f
       ? `q must be between $01 and $7F; $${hex2(value)} is an error at compile time`
       : null;
