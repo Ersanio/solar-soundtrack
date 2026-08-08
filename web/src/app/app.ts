@@ -4,6 +4,7 @@ import { EditorPane } from './editor/editor-pane/editor-pane';
 import { TopBar } from './editor/top-bar/top-bar';
 import { OutputPane } from './output/output-pane/output-pane';
 import { UpdateBanner } from './update-banner/update-banner';
+import { clamp } from './util/math';
 
 const STORAGE_KEY = 'solar-soundtrack.split';
 
@@ -20,7 +21,7 @@ const MAX_SPLIT = 75;
 const DEFAULT_SPLIT = 50;
 
 function clampSplit(value: number): number {
-  return Math.min(MAX_SPLIT, Math.max(MIN_SPLIT, value));
+  return clamp(value, MIN_SPLIT, MAX_SPLIT);
 }
 
 /**

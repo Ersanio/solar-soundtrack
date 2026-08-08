@@ -47,6 +47,8 @@
  * guess — see {@link firHeadroom}.
  */
 
+import { hex2 } from "@amk/core/hex";
+
 /** Coefficients per filter, and DSP registers `$0F, $1F, … $7F`. */
 export const FIR_TAPS = 8;
 
@@ -81,7 +83,7 @@ export function toSigned(byte: number): number {
 
 /** Renders a coefficient the way `$F5` wants it written. */
 export function toHexByte(tap: number): string {
-	return (tap & 0xff).toString(16).toUpperCase().padStart(2, "0");
+	return hex2(tap & 0xff);
 }
 
 /**

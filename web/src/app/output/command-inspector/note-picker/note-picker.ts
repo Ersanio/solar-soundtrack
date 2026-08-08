@@ -1,26 +1,15 @@
 import { Component, computed, input, output } from '@angular/core';
 
+import { NOTE_NAMES } from '@amk/tokens/commands/units';
 import { type EnumOption, EnumSelect } from '../../../shared/enum-select/enum-select';
+import { clamp } from '../../../util/math';
 
 /** The lowest note byte, `$80` = `o1 c` (`hex_command_reference.html`'s note table). */
 const FIRST_NOTE = 0x80;
 /** The highest the table goes: `$C5` = `o6 a`. `o6 a+` and `o6 b` do not exist. */
 const LAST_NOTE = 0xc5;
 
-const PITCHES: readonly EnumOption[] = [
-  'c',
-  'c+',
-  'd',
-  'd+',
-  'e',
-  'f',
-  'f+',
-  'g',
-  'g+',
-  'a',
-  'a+',
-  'b',
-].map((label, value) => ({ value, label }));
+const PITCHES: readonly EnumOption[] = NOTE_NAMES.map((label, value) => ({ value, label }));
 
 const OCTAVES: readonly EnumOption[] = [1, 2, 3, 4, 5, 6].map((n) => ({
   value: n,
@@ -71,9 +60,7 @@ export class NotePicker {
 
   protected readonly OCTAVES = OCTAVES;
 
-  private readonly clamped = computed(() =>
-    Math.min(LAST_NOTE, Math.max(FIRST_NOTE, this.value())),
-  );
+  private readonly clamped = computed(() => clamp(this.value(), FIRST_NOTE, LAST_NOTE));
 
   protected readonly octave = computed(() => Math.floor((this.clamped() - FIRST_NOTE) / 12) + 1);
   protected readonly pitch = computed(() => (this.clamped() - FIRST_NOTE) % 12);

@@ -3,7 +3,7 @@
     preserveAspectRatio="none"
     class="bg-inset border-edge h-24 w-full rounded-sm border"
     role="img"
-    [attr.viewBox]="VIEW_BOX"
+    [attr.viewBox]="plot.box"
     [attr.aria-label]="description()"
   >
     <!-- The written note, so the bend reads as a departure from it. -->
@@ -12,13 +12,13 @@
       class="stroke-edge"
       stroke-width="0.5"
       stroke-dasharray="3 3"
-      [attr.x2]="VIEW_W"
+      [attr.x2]="plot.w"
       [attr.y1]="centreY"
       [attr.y2]="centreY"
     />
 
     @if (delayX() > 0) {
-      <rect x="0" y="0" class="fill-ink-muted/15" [attr.width]="delayX()" [attr.height]="VIEW_H" />
+      <rect x="0" y="0" class="fill-ink-muted/15" [attr.width]="delayX()" [attr.height]="plot.h" />
     }
 
     <path fill="none" class="stroke-accent" stroke-width="0.5" [attr.d]="path()" />

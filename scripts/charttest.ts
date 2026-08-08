@@ -1,5 +1,5 @@
 /**
- * Stacked-bar geometry.
+ * Chart geometry: the stacked bar, the plot space and `clamp`.
  *
  * The ARAM bar spans all 64 KiB, so real regions are routinely a fraction of a
  * percent of it and land on sub-pixel widths. That arithmetic has already gone
@@ -11,7 +11,9 @@
  *   npm run charttest
  */
 
+import { PLOT, plot } from "../web/src/app/shared/chart/plot";
 import { stackSegments } from "../web/src/app/shared/chart/stack";
+import { clamp } from "../web/src/app/util/math";
 
 import { check, summarise } from "./harness";
 
@@ -89,6 +91,26 @@ console.log("\ndegenerate input produces no geometry rather than bad geometry");
 	);
 	const end = cramped[cramped.length - 1];
 	check("a cramped bar does not overflow", end.x + end.width <= 20 + EPSILON, `${(end.x + end.width).toFixed(2)}`);
+}
+
+console.log("\nthe plot space reads back as its own viewBox");
+{
+	check("the shared plot is 320 by 120", PLOT.w === 320 && PLOT.h === 120, `${PLOT.w}x${PLOT.h}`);
+	check("its box states the same numbers", PLOT.box === `0 0 ${PLOT.w} ${PLOT.h}`, PLOT.box);
+	// The FIR plot is the one graph that differs, and only in height.
+	check("a taller plot keeps the width", plot(320, 150).box === "0 0 320 150", plot(320, 150).box);
+}
+
+console.log("\nclamp holds a value inside its bounds");
+{
+	check("inside is untouched", clamp(5, 0, 10) === 5);
+	check("below floors", clamp(-1, 0, 10) === 0);
+	check("above ceilings", clamp(11, 0, 10) === 10);
+	check("the bounds themselves are inside", clamp(0, 0, 10) === 0 && clamp(10, 0, 10) === 10);
+	// A degenerate range still answers with a number in it, which is what the
+	// editor-pane spans rely on: `clamp(end, start + 1, length)` with an empty
+	// document has `min` above `max`.
+	check("an inverted range answers with max", clamp(5, 10, 0) === 0, String(clamp(5, 10, 0)));
 }
 
 summarise();

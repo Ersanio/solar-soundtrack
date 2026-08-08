@@ -119,7 +119,8 @@ export function wholeNoteFraction(ticks: number): string | null {
 	return ticks > 0 && TICKS_PER_WHOLE % ticks === 0 ? `1/${TICKS_PER_WHOLE / ticks}` : null;
 }
 
-const NOTE_NAMES = ["c", "c+", "d", "d+", "e", "f", "f+", "g", "g+", "a", "a+", "b"];
+/** The twelve chromatic pitches, as MML writes them. Index is the semitone. */
+export const NOTE_NAMES = ["c", "c+", "d", "d+", "e", "f", "f+", "g", "g+", "a", "a+", "b"];
 
 /**
  * A note byte as it would be written in MML.

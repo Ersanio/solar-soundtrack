@@ -29,6 +29,7 @@ import { commandHover } from '../codemirror/command-hover';
 import { mmlLanguage } from '../codemirror/mml-language';
 import { mmlTheme } from '../codemirror/mml-theme';
 import { playheadField, setPlayhead } from '../codemirror/playhead';
+import { clamp } from '../../util/math';
 
 type EditorTab = 'source' | 'samples';
 
@@ -225,7 +226,7 @@ export class EditorPane {
               .filter((diagnostic) => diagnostic.span.start <= length)
               .map((diagnostic) => ({
                 from: Math.min(diagnostic.span.start, length),
-                to: Math.min(Math.max(diagnostic.span.end, diagnostic.span.start + 1), length),
+                to: clamp(diagnostic.span.end, diagnostic.span.start + 1, length),
                 severity: LINT_SEVERITY[diagnostic.severity],
                 message: `${diagnostic.code}: ${diagnostic.message}`,
                 markClass: diagnostic.severity === 'severe' ? 'cm-amk-severe' : undefined,
@@ -255,7 +256,7 @@ export class EditorPane {
   private revealSpan(span: { start: number; end: number }): void {
     const length = this.view.state.doc.length;
     const anchor = Math.min(span.start, length);
-    const head = Math.min(Math.max(span.end, span.start + 1), length);
+    const head = clamp(span.end, span.start + 1, length);
     this.view.dispatch({
       selection: { anchor, head },
       effects: EditorView.scrollIntoView(anchor, { y: 'center' }),

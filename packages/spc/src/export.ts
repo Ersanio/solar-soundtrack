@@ -14,6 +14,7 @@
  *   0x10100  DSP registers and IPL area       (from SPCDSPBase.bin)
  */
 
+import { hex4 as hex } from "@amk/core/hex";
 import type { SongTags } from "@amk/core/types";
 import type { BrrSample, DriverBundle } from "./driver";
 import { ARAM_SIZE, type AramPlan, type SpcLayout, computeSpcLayout } from "./layout";
@@ -238,8 +239,4 @@ function resolveSeconds(estimated: number | null | undefined, tag: string | unde
 	}
 
 	return 0;
-}
-
-function hex(value: number): string {
-	return value.toString(16).toUpperCase().padStart(4, "0");
 }

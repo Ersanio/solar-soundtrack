@@ -35,6 +35,8 @@
  * of the block data. `parseBrr` strips it into {@link BrrSample.loopOffset}.
  */
 
+import { hex } from "@amk/core/hex";
+
 /** Frames per BRR block. */
 export const BRR_BLOCK_SAMPLES = 16;
 
@@ -76,7 +78,7 @@ export function validateBrr(bytes: Uint8Array): string | null {
 	const loopOffset = bytes[0] | (bytes[1] << 8);
 	const dataLength = bytes.length - 2;
 	if (loopOffset >= dataLength) {
-		return `The loop point (0x${loopOffset.toString(16).toUpperCase()}) is past the end of the ${dataLength}-byte sample.`;
+		return `The loop point (0x${hex(loopOffset)}) is past the end of the ${dataLength}-byte sample.`;
 	}
 
 	if (loopOffset % BRR_BLOCK_BYTES !== 0) {

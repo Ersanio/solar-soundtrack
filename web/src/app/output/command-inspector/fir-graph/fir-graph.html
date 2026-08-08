@@ -3,7 +3,7 @@
     preserveAspectRatio="none"
     class="bg-inset border-edge h-32 w-full rounded-sm border"
     role="img"
-    [attr.viewBox]="VIEW_BOX"
+    [attr.viewBox]="plot.box"
     [class.cursor-crosshair]="drawable()"
     [attr.aria-label]="description()"
     (pointerdown)="drawable() && onPick($event)"
@@ -15,7 +15,7 @@
       y="0"
       class="fill-ink-muted/15"
       [attr.width]="authorityWidth()"
-      [attr.height]="VIEW_H"
+      [attr.height]="plot.h"
     />
 
     @for (line of gridLines(); track line.hz) {
@@ -25,7 +25,7 @@
         stroke-width="0.5"
         [attr.x1]="line.x"
         [attr.x2]="line.x"
-        [attr.y2]="VIEW_H"
+        [attr.y2]="plot.h"
       />
     }
 
@@ -35,7 +35,7 @@
       class="stroke-edge"
       stroke-width="1"
       stroke-dasharray="3 3"
-      [attr.x2]="VIEW_W"
+      [attr.x2]="plot.w"
       [attr.y1]="unityY()"
       [attr.y2]="unityY()"
     />
@@ -46,7 +46,7 @@
         class="fill-danger/20"
         [attr.x]="band.x"
         [attr.width]="band.width"
-        [attr.height]="VIEW_H"
+        [attr.height]="plot.h"
       />
     }
 

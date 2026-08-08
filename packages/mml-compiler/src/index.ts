@@ -1,3 +1,4 @@
+import { hex } from "@amk/core/hex";
 import type { CompileRequest, CompileResult } from "@amk/core/types";
 import { emptyStats, failure } from "@amk/core/types";
 import { link } from "./link";
@@ -33,7 +34,7 @@ export class AddmusicKCompiler {
 				{
 					severity: "error",
 					code: "AMK0301",
-					message: `ARAM address 0x${aramAddress.toString(16)} is outside the 64 KiB address space.`,
+					message: `ARAM address 0x${hex(aramAddress)} is outside the 64 KiB address space.`,
 					span: { start: 0, end: 0, line: 1 },
 				},
 			]);
@@ -104,8 +105,8 @@ export class AddmusicKCompiler {
 				severity: "warning",
 				code: "AMK0213",
 				message:
-					`This song is 0x${(stats.totalSize - parsed.minSize).toString(16).toUpperCase()} bytes larger ` +
-					`than the 0x${parsed.minSize.toString(16).toUpperCase()} it asked #pad to reserve.`,
+					`This song is 0x${hex(stats.totalSize - parsed.minSize)} bytes larger ` +
+					`than the 0x${hex(parsed.minSize)} it asked #pad to reserve.`,
 				span: { start: 0, end: 0, line: 1 },
 			});
 		}

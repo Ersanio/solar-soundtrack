@@ -8,6 +8,7 @@ import {
   VELOCITY_VALUES,
 } from '@amk/core/tables';
 import type { Command } from '@amk/tokens';
+import { argLockedBecause } from '../commands/context';
 import { Slider } from '../../../shared/slider/slider';
 import { EditorStore } from '../../../state/editor-store';
 import { velocityTableAt } from '@amk/tokens/dialect';
@@ -130,10 +131,7 @@ export class QuantizationCommand {
 
   protected readonly editable = computed(() => argEditable(this.command(), 0));
 
-  protected readonly lockedBecause = computed(() => {
-    const macro = this.command().args[0]?.replacement;
-    return macro === undefined ? null : `comes from the "${macro}" replacement`;
-  });
+  protected readonly lockedBecause = computed(() => argLockedBecause(this.command(), 0));
 
   // --- editing ---------------------------------------------------------------
 

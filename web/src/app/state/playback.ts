@@ -6,6 +6,7 @@ import type { DriverState } from '@amk/spc/driver-state';
 import { SPC_SAMPLE_RATE } from '@amk/spc/wasm-host';
 import { errorMessage, formatTime } from '../util/format';
 import { EditorStore } from './editor-store';
+import { clamp } from '../util/math';
 
 /** N-SPC songs have eight music channels. */
 const CHANNELS = 8;
@@ -105,7 +106,7 @@ export class Playback {
    */
   private readonly fadeSeconds = computed(() => {
     const total = this.duration();
-    return total > 0 ? Math.min(Math.max(total / 8, 1), 3) : 0;
+    return total > 0 ? clamp(total / 8, 1, 3) : 0;
   });
 
   /**
@@ -440,7 +441,7 @@ export class Playback {
       return;
     }
 
-    this.scrubbing.set(Math.max(0, Math.min(seconds, this.duration())));
+    this.scrubbing.set(clamp(seconds, 0, this.duration()));
   }
 
   /**
@@ -469,7 +470,7 @@ export class Playback {
       return;
     }
 
-    const target = Math.max(0, Math.min(seconds, this.duration()));
+    const target = clamp(seconds, 0, this.duration());
     this.elapsed.set(target);
     this.player.seek(target);
   }

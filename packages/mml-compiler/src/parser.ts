@@ -19,6 +19,7 @@
  * too; comments cite the reference line numbers so the two can be diffed.
  */
 
+import { hex2 } from "@amk/core/hex";
 import type { Diagnostic, SongLength, Span, SongTags } from "@amk/core/types";
 import { TARGET_AM4, TARGET_AMM, TARGET_NONE, preprocess } from "./preprocess";
 import {
@@ -3748,8 +3749,4 @@ export class AddmusicKParser {
 			errorCount: this.errorCount,
 		};
 	}
-}
-
-function hex2(value: number): string {
-	return value.toString(16).toUpperCase().padStart(2, "0");
 }

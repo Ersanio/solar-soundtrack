@@ -5,6 +5,8 @@
  * re-verified when the reference implementation moves.
  */
 
+import { hex2 } from "./hex";
+
 /** `tmpTrans[19]` — default per-instrument transposition. Music.cpp:57 */
 export const DEFAULT_TRANSPOSE: readonly number[] = [0, 0, 5, 0, 0, 0, 0, 0, 0, -5, 6, 0, -5, 0, 0, 8, 0, 0, 0];
 
@@ -74,7 +76,7 @@ export const FIRST_CUSTOM_INSTRUMENT = 30;
  * typed by hand.
  */
 export function bankSlotName(bank: string, slot: number): string {
-	return `${bank}:${slot.toString(16).toUpperCase().padStart(2, "0")}`;
+	return `${bank}:${hex2(slot)}`;
 }
 
 /**

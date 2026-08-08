@@ -11,6 +11,7 @@
  * step-for-step against each other.
  */
 
+import { hex, hex4 } from "@amk/core/hex";
 import type { Diagnostic, NoteAddress } from "@amk/core/types";
 import type { NoteEvent, ParseOutput } from "./parser";
 
@@ -89,7 +90,7 @@ export function link(parsed: ParseOutput, aramAddress: number): LinkResult {
 		diagnostics.push({
 			severity: "error",
 			code: "AMK0300",
-			message: `Song data runs past the end of ARAM (0x${hex4(aramAddress)} + 0x${hex4(blob.length)} = 0x${end.toString(16).toUpperCase()}).`,
+			message: `Song data runs past the end of ARAM (0x${hex4(aramAddress)} + 0x${hex4(blob.length)} = 0x${hex(end)}).`,
 			span: { start: 0, end: 0, line: 1 },
 		});
 	}
@@ -324,8 +325,4 @@ function relocateLoopPointers(
 			data[channel][at + 1] = (value >> 8) & 0xff;
 		}
 	}
-}
-
-function hex4(value: number): string {
-	return value.toString(16).toUpperCase().padStart(4, "0");
 }

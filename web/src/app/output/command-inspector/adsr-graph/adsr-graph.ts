@@ -11,13 +11,13 @@ import {
   releaseSeconds,
   sustainLevel,
 } from '@amk/spc/adsr';
+import { PLOT } from '../../../shared/chart/plot';
+import { clamp } from '../../../util/math';
 
 /**
  * Drawn in a fixed coordinate space and stretched to fit, as `fir-graph` is.
  * Stroke widths are therefore in viewBox units, not pixels.
  */
-const VIEW_W = 320;
-const VIEW_H = 120;
 
 /**
  * Points kept from the stepped envelope.
@@ -56,9 +56,7 @@ export class AdsrGraph {
   readonly adsr2 = input.required<number>();
   readonly gain = input.required<number>();
 
-  protected readonly VIEW_W = VIEW_W;
-  protected readonly VIEW_H = VIEW_H;
-  protected readonly VIEW_BOX = `0 0 ${VIEW_W} ${VIEW_H}`;
+  protected readonly plot = PLOT;
 
   private readonly envelope = computed(() => decodeAdsr(this.adsr1(), this.adsr2()));
 
@@ -135,7 +133,7 @@ export class AdsrGraph {
     return [
       { label: 'attack', x: this.xOf(attack) },
       { label: 'decay', x: this.xOf(decay) },
-    ].filter((mark) => mark.x > 1 && mark.x < VIEW_W - 1);
+    ].filter((mark) => mark.x > 1 && mark.x < PLOT.w - 1);
   });
 
   /** What a screen reader gets instead of the picture. */
@@ -158,12 +156,12 @@ export class AdsrGraph {
   });
 
   private xOf(t: number): number {
-    return (t / this.duration()) * VIEW_W;
+    return (t / this.duration()) * PLOT.w;
   }
 
   /** Level to plot y, with two units of headroom so full level is not clipped. */
   private yOf(level: number): number {
-    return VIEW_H - 2 - Math.min(Math.max(level, 0), 1) * (VIEW_H - 4);
+    return PLOT.h - 2 - clamp(level, 0, 1) * (PLOT.h - 4);
   }
 }
 

@@ -3,7 +3,7 @@
     preserveAspectRatio="none"
     class="bg-inset border-edge h-24 w-full rounded-sm border"
     role="img"
-    [attr.viewBox]="VIEW_BOX"
+    [attr.viewBox]="plot.box"
     [attr.aria-label]="description()"
   >
     <!-- Full level, so a GAIN that never reaches it reads as not reaching it. -->
@@ -14,7 +14,7 @@
       class="stroke-edge"
       stroke-width="0.5"
       stroke-dasharray="3 3"
-      [attr.x2]="VIEW_W"
+      [attr.x2]="plot.w"
     />
 
     @if (sustainY(); as y) {
@@ -22,7 +22,7 @@
         x1="0"
         class="stroke-edge"
         stroke-width="0.5"
-        [attr.x2]="VIEW_W"
+        [attr.x2]="plot.w"
         [attr.y1]="y"
         [attr.y2]="y"
       />
@@ -35,7 +35,7 @@
         stroke-width="0.5"
         [attr.x1]="mark.x"
         [attr.x2]="mark.x"
-        [attr.y2]="VIEW_H"
+        [attr.y2]="plot.h"
       />
     }
 

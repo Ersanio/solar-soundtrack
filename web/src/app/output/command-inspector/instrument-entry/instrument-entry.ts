@@ -229,13 +229,7 @@ export class InstrumentEntryEditor {
   }
 
   protected setNoise(clock: number): void {
-    this.write(
-      spliceInstrumentSample(
-        this.store.source(),
-        this.entry(),
-        `n${clock.toString(16).toUpperCase().padStart(2, '0')}`,
-      ),
-    );
+    this.write(spliceInstrumentSample(this.store.source(), this.entry(), `n${hex2(clock)}`));
   }
 
   protected applyEnvelope(next: EnvelopeValue): void {

@@ -2,6 +2,7 @@ import { Component, computed, inject, input } from '@angular/core';
 
 import { argEditable, argumentText, spliceArg } from '@amk/tokens/edits';
 import type { Command } from '@amk/tokens';
+import { argLockedBecause } from '../commands/context';
 import { Slider } from '../../../shared/slider/slider';
 import { EditorStore } from '../../../state/editor-store';
 import { noteTicksBefore, tempoBefore } from '@amk/tokens/dialect';
@@ -152,8 +153,7 @@ export class BendCommand {
   }
 
   protected lockedBecause(index: number): string | null {
-    const macro = this.command().args[index]?.replacement;
-    return macro === undefined ? null : `comes from the "${macro}" replacement`;
+    return argLockedBecause(this.command(), index);
   }
 
   protected setArg(index: number, value: number): void {

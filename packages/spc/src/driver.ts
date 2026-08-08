@@ -6,6 +6,7 @@
  * here assembles anything — asar is not involved at runtime.
  */
 
+import { hex4 as hex } from "@amk/core/hex";
 import { type BrrSample, parseBrr } from "./brr";
 import { ARAM_SIZE } from "./layout";
 
@@ -363,8 +364,4 @@ async function load(baseUrl: string, sampleGroup: string): Promise<DriverBundle>
 		samples: names.map((name, index) => parseBrr(name, sampleBlobs[index])),
 		...analysis,
 	};
-}
-
-function hex(value: number): string {
-	return value.toString(16).toUpperCase().padStart(4, "0");
 }

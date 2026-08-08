@@ -8,6 +8,8 @@ import {
   firCurveFrequencies,
   firMagnitude,
 } from '@amk/spc/fir';
+import { plot } from '../../../shared/chart/plot';
+import { clamp } from '../../../util/math';
 
 /** Plot bounds. The floor is deep enough to show a real stopband. */
 const TOP_DB = 12;
@@ -44,8 +46,8 @@ const REPEATS = 4;
  * is that stroke widths scale with it — which is why they are set in the
  * viewBox's own units rather than pixels.
  */
-const VIEW_W = 320;
-const VIEW_H = 150;
+/** Taller than the others: the readable range of a filter is wider than a curve. */
+const PLOT = plot(320, 150);
 
 /** Every 2 kHz, so the ticks are evenly spaced and land on both plot edges. */
 const TICKS = [0, 2000, 4000, 6000, 8000, 10000, 12000, 14000, 16000];
@@ -66,9 +68,7 @@ export class FirGraph {
   /** Fired with a frequency and gain when the plot is clicked in draw mode. */
   readonly picked = output<{ hz: number; gain: number }>();
 
-  protected readonly VIEW_W = VIEW_W;
-  protected readonly VIEW_H = VIEW_H;
-  protected readonly VIEW_BOX = `0 0 ${VIEW_W} ${VIEW_H}`;
+  protected readonly plot = PLOT;
 
   private readonly frequencies = firCurveFrequencies({
     fromHz: FROM_HZ,
@@ -79,7 +79,7 @@ export class FirGraph {
 
   /** Frequency to plot x. */
   private readonly xOf = (hz: number): number => {
-    return ((hz - FROM_HZ) / (TO_HZ - FROM_HZ)) * VIEW_W;
+    return ((hz - FROM_HZ) / (TO_HZ - FROM_HZ)) * PLOT.w;
   };
 
   /**
@@ -92,8 +92,8 @@ export class FirGraph {
    */
   private readonly yOf = (gain: number): number => {
     const db = 20 * Math.log10(Math.max(gain, 1e-9));
-    const clamped = Math.min(Math.max(db, FLOOR_DB), TOP_DB);
-    return ((TOP_DB - clamped) / (TOP_DB - FLOOR_DB)) * VIEW_H;
+    const clamped = clamp(db, FLOOR_DB, TOP_DB);
+    return ((TOP_DB - clamped) / (TOP_DB - FLOOR_DB)) * PLOT.h;
   };
 
   protected readonly unityY = computed(() => this.yOf(1));
@@ -147,7 +147,7 @@ export class FirGraph {
     const drawn = sorted.map((p) => `L${this.xOf(p.hz)} ${this.yOf(p.gain)}`).join(' ');
     const first = this.yOf(sorted[0].gain);
     const last = this.yOf(sorted[sorted.length - 1].gain);
-    return `M0 ${first} ${drawn} L${VIEW_W} ${last}`;
+    return `M0 ${first} ${drawn} L${PLOT.w} ${last}`;
   });
 
   protected readonly runawayBand = computed(() => {
@@ -182,8 +182,8 @@ export class FirGraph {
     const tx = (event.clientX - rect.left) / rect.width;
     const ty = (event.clientY - rect.top) / rect.height;
 
-    const hz = FROM_HZ + Math.min(Math.max(tx, 0), 1) * (TO_HZ - FROM_HZ);
-    const db = TOP_DB - Math.min(Math.max(ty, 0), 1) * (TOP_DB - FLOOR_DB);
+    const hz = FROM_HZ + clamp(tx, 0, 1) * (TO_HZ - FROM_HZ);
+    const db = TOP_DB - clamp(ty, 0, 1) * (TOP_DB - FLOOR_DB);
     this.picked.emit({ hz, gain: 10 ** (db / 20) });
   }
 

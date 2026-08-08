@@ -1,10 +1,9 @@
 import { Component, computed, input } from '@angular/core';
 
 import { ticksLabel } from '@amk/tokens/commands/units';
+import { PLOT } from '../../../shared/chart/plot';
 
 /** Drawn in a fixed coordinate space and stretched to fit, as the other graphs are. */
-const VIEW_W = 320;
-const VIEW_H = 120;
 
 /**
  * Ticks the plot covers.
@@ -53,16 +52,14 @@ export class VibratoGraph {
   /** What the vertical axis means — "pitch" for vibrato, "volume" for tremolo. */
   readonly axis = input('pitch');
 
-  protected readonly VIEW_W = VIEW_W;
-  protected readonly VIEW_H = VIEW_H;
-  protected readonly VIEW_BOX = `0 0 ${VIEW_W} ${VIEW_H}`;
+  protected readonly plot = PLOT;
 
   /** Where the delay ends, in viewBox units, for the shaded run before the wobble. */
   protected readonly delayX = computed(() =>
-    Math.min(VIEW_W, (Math.min(this.delay(), SPAN_TICKS) / SPAN_TICKS) * VIEW_W),
+    Math.min(PLOT.w, (Math.min(this.delay(), SPAN_TICKS) / SPAN_TICKS) * PLOT.w),
   );
 
-  protected readonly centreY = VIEW_H / 2;
+  protected readonly centreY = PLOT.h / 2;
 
   /**
    * The wave, in viewBox units.
@@ -82,7 +79,7 @@ export class VibratoGraph {
     let d = '';
     for (let i = 0; i <= STEPS; i++) {
       const tick = (i / STEPS) * SPAN_TICKS;
-      const x = (i / STEPS) * VIEW_W;
+      const x = (i / STEPS) * PLOT.w;
 
       // Before the delay elapses the offset is zero — the note plays flat.
       let offset = 0;
@@ -94,7 +91,7 @@ export class VibratoGraph {
       }
 
       const scaled = Math.min(1, depth / FULL_DEPTH);
-      const y = this.centreY - offset * scaled * (VIEW_H / 2 - 4);
+      const y = this.centreY - offset * scaled * (PLOT.h / 2 - 4);
       d += `${i === 0 ? 'M' : 'L'}${x.toFixed(1)} ${y.toFixed(1)}`;
     }
 

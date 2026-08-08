@@ -26,6 +26,7 @@
  * document, and putting it here is what lets `edittest` gate it.
  */
 
+import { hex2 } from "@amk/core/hex";
 import type { Span } from "@amk/core/types";
 import { type Command, HEX_ARG_LETTERS, type InstrumentDefinition } from "./tokens";
 
@@ -43,7 +44,7 @@ import { type Command, HEX_ARG_LETTERS, type InstrumentDefinition } from "./toke
  * about the language, and because this is the layer `edittest` can gate.
  */
 export function argumentText(command: Command, byte: number): string {
-	const hex = (byte & 0xff).toString(16).toUpperCase().padStart(2, "0");
+	const hex = hex2(byte & 0xff);
 	if (command.vcmd !== undefined) {
 		return `$${hex}`;
 	}

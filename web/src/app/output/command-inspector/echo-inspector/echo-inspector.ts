@@ -2,6 +2,7 @@ import { Component, computed, inject, input } from '@angular/core';
 
 import { argEditable, spliceArg } from '@amk/tokens/edits';
 import type { Command } from '@amk/tokens';
+import { argLockedBecause } from '../commands/context';
 import { type FirTaps, echoStability, toSigned } from '@amk/spc/fir';
 import { BitToggles } from '../../../shared/bit-toggles/bit-toggles';
 import { Button } from '../../../shared/button/button';
@@ -212,8 +213,7 @@ export class EchoInspector {
   }
 
   protected lockedBecause(index: number): string | null {
-    const macro = this.command().args[index]?.replacement;
-    return macro === undefined ? null : `comes from the "${macro}" replacement`;
+    return argLockedBecause(this.command(), index);
   }
 
   /** Writes one argument back as `$XX`, leaving the rest of the run alone. */

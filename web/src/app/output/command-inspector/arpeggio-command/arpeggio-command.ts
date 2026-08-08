@@ -2,6 +2,7 @@ import { Component, computed, inject, input } from '@angular/core';
 
 import { argsRewritable, commandRewritable, spliceArg, spliceCommand } from '@amk/tokens/edits';
 import type { Command } from '@amk/tokens';
+import { commandLockedBecause } from '../commands/context';
 import { Button } from '../../../shared/button/button';
 import { type EnumOption, EnumSelect } from '../../../shared/enum-select/enum-select';
 import { Slider } from '../../../shared/slider/slider';
@@ -190,9 +191,7 @@ export class ArpeggioCommand {
   protected readonly canResize = computed(() => commandRewritable(this.command()));
 
   protected readonly lockedBecause = computed(() =>
-    this.editable()
-      ? null
-      : `These bytes come from the "${this.command().replacement}" replacement, so they cannot be set here.`,
+    this.editable() ? null : commandLockedBecause(this.command()),
   );
 
   // --- editing ---------------------------------------------------------------

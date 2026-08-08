@@ -1,5 +1,7 @@
 import { Component, computed, input, linkedSignal, output, signal } from '@angular/core';
 
+import { clamp } from '../../util/math';
+
 /**
  * A labelled range input that reports a drag and a commit separately.
  *
@@ -242,7 +244,7 @@ export class Slider {
   protected readonly trackImage = computed(() => {
     const track = 'var(--color-edge)';
     const fill = 'var(--color-accent)';
-    const at = Math.max(0, Math.min(100, this.fraction() * 100));
+    const at = clamp(this.fraction() * 100, 0, 100);
 
     if (this.origin() !== 'centre') {
       return `linear-gradient(to right, ${fill} 0 ${at}%, ${track} ${at}% 100%)`;

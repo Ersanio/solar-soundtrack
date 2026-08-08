@@ -1,9 +1,7 @@
 import { Component, computed, input } from '@angular/core';
 
 import { ticksLabel } from '@amk/tokens/commands/units';
-
-const VIEW_W = 320;
-const VIEW_H = 120;
+import { PLOT } from '../../../shared/chart/plot';
 
 /** Ticks of flat line drawn after the bend, so it does not end at the edge. */
 const TAIL_TICKS = 8;
@@ -36,9 +34,7 @@ export class BendGraph {
   readonly to = input.required<number>();
   readonly tempo = input<number | null>(null);
 
-  protected readonly VIEW_W = VIEW_W;
-  protected readonly VIEW_H = VIEW_H;
-  protected readonly VIEW_BOX = `0 0 ${VIEW_W} ${VIEW_H}`;
+  protected readonly plot = PLOT;
 
   private readonly span = computed(() =>
     Math.max(1, this.delay() + Math.max(this.duration(), 1) + TAIL_TICKS),
@@ -64,15 +60,15 @@ export class BendGraph {
   });
 
   private y(semitones: number): number {
-    const half = VIEW_H / 2 - 6;
-    return VIEW_H / 2 - (semitones / this.reach()) * half;
+    const half = PLOT.h / 2 - 6;
+    return PLOT.h / 2 - (semitones / this.reach()) * half;
   }
 
   private x(tick: number): number {
-    return (tick / this.span()) * VIEW_W;
+    return (tick / this.span()) * PLOT.w;
   }
 
-  protected readonly centreY = VIEW_H / 2;
+  protected readonly centreY = PLOT.h / 2;
 
   protected readonly delayX = computed(() => this.x(this.delay()));
 
@@ -88,7 +84,7 @@ export class BendGraph {
       `M0 ${startY.toFixed(1)}` +
       `L${bendStart.toFixed(1)} ${startY.toFixed(1)}` +
       `L${bendEnd.toFixed(1)} ${endY.toFixed(1)}` +
-      `L${VIEW_W} ${endY.toFixed(1)}`
+      `L${PLOT.w} ${endY.toFixed(1)}`
     );
   });
 

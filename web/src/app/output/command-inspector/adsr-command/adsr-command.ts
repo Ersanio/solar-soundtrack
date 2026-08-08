@@ -2,6 +2,7 @@ import { Component, computed, inject, input } from '@angular/core';
 
 import { argsRewritable, commandRewritable, spliceArgs, spliceCommand } from '@amk/tokens/edits';
 import type { Command } from '@amk/tokens';
+import { commandLockedBecause } from '../commands/context';
 import { EditorStore } from '../../../state/editor-store';
 import { hex2 } from '../../../util/format';
 import { type EnvelopeValue, EnvelopeTuner } from '../envelope-tuner/envelope-tuner';
@@ -50,14 +51,11 @@ export class AdsrCommand {
 
   protected readonly editable = computed(() => argsRewritable(this.command()));
 
-  protected readonly lockedBecause = computed(() => {
-    const command = this.command();
-    if (this.editable() || commandRewritable(command)) {
-      return null;
-    }
-
-    return `These bytes come from the "${command.replacement}" replacement, so the cursor is on the macro's name rather than on them. Change the definition instead.`;
-  });
+  protected readonly lockedBecause = computed(() =>
+    this.editable() || commandRewritable(this.command())
+      ? null
+      : commandLockedBecause(this.command()),
+  );
 
   /** Writes the two arguments back, in `$ED`'s own encoding of the mode. */
   protected apply(next: EnvelopeValue): void {

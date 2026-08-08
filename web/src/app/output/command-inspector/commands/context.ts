@@ -35,3 +35,33 @@ export function paramContext(
     samples: sampleOptions(store, library),
   };
 }
+
+/**
+ * Why one argument cannot be edited, or `null` when it can.
+ *
+ * A fragment, meant to follow the argument's own name: "Depth comes from the
+ * …". Four panels stated this for themselves and three of them said it
+ * differently, which read as three different rules rather than one.
+ */
+export function argLockedBecause(command: Command, index: number): string | null {
+  const macro = index >= 0 ? command.args[index]?.replacement : undefined;
+  return macro === undefined ? null : `comes from the "${macro}" replacement`;
+}
+
+/**
+ * The same for a whole command run, as a sentence.
+ *
+ * Says where the cursor actually is, because that is the part that is not
+ * obvious: the caret sits on the macro's name, and the bytes it stands for are
+ * somewhere else entirely.
+ */
+export function commandLockedBecause(command: Command): string | null {
+  if (command.replacement === undefined) {
+    return null;
+  }
+
+  return (
+    `These bytes come from the "${command.replacement}" replacement, so the cursor is on ` +
+    `the macro's name rather than on them. Change the definition instead.`
+  );
+}
