@@ -16,8 +16,6 @@
       type="button"
       [class]="`${toggleClass}disabled:cursor-not-allowed disabled:opacity-40${channel.muted ? ' bg-danger/20 text-danger font-semibold' : ' text-ink-muted hover:not-disabled:text-ink'}`"
       [disabled]="playback.isSoloing()"
-      [attr.aria-pressed]="channel.muted"
-      [attr.aria-label]="`Mute channel ${channel.index}`"
       [title]="`Mute channel ${channel.index}`"
       (click)="playback.toggleMute(channel.index)"
     >
@@ -32,8 +30,6 @@
           ? ' bg-accent/20 text-accent font-semibold'
           : ' text-ink-muted hover:not-disabled:text-ink')
       "
-      [attr.aria-pressed]="channel.soloed"
-      [attr.aria-label]="`Solo channel ${channel.index}`"
       [title]="`Solo channel ${channel.index}`"
       (click)="playback.toggleSolo(channel.index)"
     >

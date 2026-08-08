@@ -40,8 +40,6 @@
           <button
             type="button"
             class="text-ink-muted hover:text-ink w-6 shrink-0 cursor-pointer text-right font-mono text-xs"
-            [attr.aria-expanded]="row.expanded"
-            [attr.aria-label]="(row.expanded ? 'Collapse ' : 'Expand ') + file.name"
             (click)="toggleOpen(file.name)"
           >
             {{ row.expanded ? '▾' : '▸' }}
@@ -57,9 +55,6 @@
             type="button"
             class="border-edge bg-inset text-ink-muted hover:text-ink hover:border-accent shrink-0 cursor-pointer rounded border px-2 py-1 font-mono text-xs disabled:cursor-not-allowed disabled:opacity-40"
             [disabled]="file.error !== null"
-            [attr.aria-label]="
-              (playback.auditioning() === file.name ? 'Stop ' : 'Play ') + file.name
-            "
             (click)="onAudition(file.name)"
           >
             {{ playback.auditioning() === file.name ? '■' : '▶' }}
@@ -106,7 +101,6 @@
               class="text-accent mt-1 h-8 w-full"
               viewBox="0 0 1 2"
               preserveAspectRatio="none"
-              aria-hidden="true"
               focusable="false"
             >
               <g transform="translate(0,1)">
@@ -164,9 +158,6 @@
                 type="button"
                 class="border-edge bg-inset text-ink-muted hover:text-ink hover:border-accent shrink-0 cursor-pointer rounded border px-2 py-1 font-mono text-xs disabled:cursor-not-allowed disabled:opacity-40"
                 [disabled]="slot.empty"
-                [attr.aria-label]="
-                  (playback.auditioning() === slot.name ? 'Stop slot ' : 'Play slot ') + slot.index
-                "
                 (click)="onAudition(slot.name)"
               >
                 {{ playback.auditioning() === slot.name ? '■' : '▶' }}
@@ -180,7 +171,6 @@
                     class="text-accent h-6 w-full"
                     viewBox="0 0 1 2"
                     preserveAspectRatio="none"
-                    aria-hidden="true"
                     focusable="false"
                   >
                     <g transform="translate(0,1)">

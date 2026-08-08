@@ -130,7 +130,6 @@ export class EditorPane {
           playheadField,
           EditorState.tabSize.of(8),
           EditorView.contentAttributes.of({
-            'aria-label': 'MML source',
             spellcheck: 'false',
             autocorrect: 'off',
             autocapitalize: 'off',

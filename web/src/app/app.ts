@@ -55,13 +55,6 @@ export class App {
 
   protected readonly splitCss = computed(() => `${this.split()}%`);
 
-  /**
-   * `aria-valuenow` wants a number, and a whole percent is what a screen reader
-   * should read out. The signal itself stays fractional: rounding the drag would
-   * make every step a ~19px jump on a 1920px window.
-   */
-  protected readonly splitNow = computed(() => Math.round(this.split()));
-
   private readonly shell = viewChild.required<ElementRef<HTMLElement>>('shell');
 
   /**

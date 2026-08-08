@@ -2,10 +2,8 @@
   <svg
     preserveAspectRatio="none"
     class="bg-inset border-edge h-32 w-full rounded-sm border"
-    role="img"
     [attr.viewBox]="plot.box"
     [class.cursor-crosshair]="drawable()"
-    [attr.aria-label]="description()"
     (pointerdown)="drawable() && onPick($event)"
   >
     <!-- Where eight taps at 32 kHz have no real say. Drawn first, so

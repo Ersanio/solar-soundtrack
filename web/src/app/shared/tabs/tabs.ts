@@ -6,14 +6,11 @@ export interface TabDef<Id extends string = string> {
 }
 
 /**
- * An ARIA tab strip.
+ * A tab strip.
  *
- * Follows the APG tabs pattern rather than being a row of buttons that look
- * like tabs: exactly one tab is in the focus order at a time and the arrow keys
- * move between them, so a keyboard user tabs *past* the strip rather than
- * through every tab. Panels are the caller's business — it renders them with
- * `@switch` and gives each `role="tabpanel"` plus `id="panel-<id>"`, which is
- * what `aria-controls` here points at.
+ * The arrow keys move between tabs and selection follows focus, so a keyboard
+ * only ever needs one key per tab rather than a click. Panels are the caller's
+ * business — it renders them with `@switch`.
  *
  * Generic over the id so a caller can pass a union rather than `string`, and
  * have the compiler check that its `@switch` covers every tab.
@@ -21,7 +18,7 @@ export interface TabDef<Id extends string = string> {
 @Component({
   selector: 'amk-tabs',
   templateUrl: './tabs.html',
-  host: { class: 'flex items-center gap-1', role: 'tablist' },
+  host: { class: 'flex items-center gap-1' },
 })
 export class Tabs<Id extends string = string> {
   readonly tabs = input.required<readonly TabDef<Id>[]>();
@@ -65,8 +62,8 @@ export class Tabs<Id extends string = string> {
 
     event.preventDefault();
     this.active.set(this.tabs()[next].id);
-    // Selection follows focus, so the newly selected tab must actually take it
-    // — otherwise focus stays on a tab that is now `tabindex="-1"`.
+    // Selection follows focus, so the newly selected tab has to actually take
+    // it — otherwise the arrow keys move the highlight and leave focus behind.
     this.buttons()[next]?.nativeElement.focus();
   }
 }

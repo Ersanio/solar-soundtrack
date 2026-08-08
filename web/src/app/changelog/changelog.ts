@@ -9,9 +9,9 @@ import { CHANGELOG } from './changelog-data';
  * The top bar's changelog link and the panel it drops down.
  *
  * The first floating layer in the app, so it sets the pattern rather than
- * following one: a trigger carrying `aria-expanded`, a `role="dialog"` panel
- * under `@if`, and the three ways out a dropdown is expected to have — Escape,
- * a click outside, and a second click on the trigger.
+ * following one: a trigger, a panel under `@if`, and the three ways out a
+ * dropdown is expected to have — Escape, a click outside, and a second click on
+ * the trigger.
  *
  * Not a native `<dialog>`: `showModal()` traps focus and dims the page, which is
  * more interruption than a "what changed" list warrants, and a non-modal
@@ -31,8 +31,6 @@ import { CHANGELOG } from './changelog-data';
       #trigger
       type="button"
       class="text-ink-muted hover:text-ink flex cursor-pointer items-center gap-1.5 text-sm hover:underline"
-      aria-haspopup="dialog"
-      [attr.aria-expanded]="open()"
       (click)="toggle()"
       (keydown)="onKeydown($event)"
     >
@@ -42,8 +40,6 @@ import { CHANGELOG } from './changelog-data';
 
     @if (open()) {
       <div
-        role="dialog"
-        aria-label="Changelog"
         class="border-edge bg-raised text-ink absolute top-full right-0 z-20 mt-2 flex max-h-[70vh]
                w-80 max-w-[calc(100vw-2rem)] flex-col rounded-md border shadow-lg"
         (keydown)="onKeydown($event)"
@@ -52,7 +48,7 @@ import { CHANGELOG } from './changelog-data';
           class="border-edge bg-raised flex shrink-0 items-center justify-between gap-3 rounded-t-md border-b px-3 py-2"
         >
           <h2 class="text-ink-muted text-xs font-semibold tracking-wide uppercase">Changelog</h2>
-          <button amk-button variant="ghost" aria-label="Close the changelog" (click)="dismiss()">
+          <button amk-button variant="ghost" (click)="dismiss()">
             <amk-icon-close />
           </button>
         </div>

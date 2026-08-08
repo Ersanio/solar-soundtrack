@@ -1,12 +1,5 @@
 <!-- d3 owns everything inside this element; Angular never templates into it. -->
-<svg
-  #svg
-  class="block w-full"
-  role="img"
-  [attr.height]="height"
-  [attr.aria-label]="label()"
-  (mouseleave)="hover.set(null)"
-></svg>
+<svg #svg class="block w-full" [attr.height]="height" (mouseleave)="hover.set(null)"></svg>
 
 @if (tooltip(); as tip) {
   <div

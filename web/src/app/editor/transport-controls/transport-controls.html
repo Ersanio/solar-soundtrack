@@ -1,22 +1,8 @@
-<button
-  amk-button
-  variant="primary"
-  [disabled]="!store.canCompile()"
-  [attr.aria-label]="playback.isPlaying() ? 'Pause' : 'Compile and play'"
-  (click)="playback.toggle()"
->
+<button amk-button variant="primary" [disabled]="!store.canCompile()" (click)="playback.toggle()">
   {{ playback.isPlaying() ? '❚❚ Pause' : '▶ Play' }}
 </button>
 
-<button
-  amk-button
-  aria-label="Stop"
-  title="Stop"
-  [disabled]="playback.isIdle()"
-  (click)="playback.stop()"
->
-  ■
-</button>
+<button amk-button title="Stop" [disabled]="playback.isIdle()" (click)="playback.stop()">■</button>
 
 <!--
   Two halves to a drag. `input` only parks the displayed position under the
@@ -34,7 +20,6 @@
   min="0"
   step="0.1"
   class="accent-accent w-24 cursor-pointer disabled:cursor-not-allowed disabled:opacity-40"
-  aria-label="Seek"
   title="Seek — the song replays silently to reach the new position"
   [max]="playback.duration()"
   [value]="playback.position()"
@@ -65,7 +50,6 @@
   min="0"
   max="500"
   class="accent-accent w-20 cursor-pointer"
-  aria-label="Volume"
   title="Volume"
   [value]="playback.volume()"
   (input)="onVolume($event)"

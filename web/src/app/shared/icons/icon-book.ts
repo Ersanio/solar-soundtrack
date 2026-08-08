@@ -10,7 +10,7 @@ import { Component } from '@angular/core';
 @Component({
   selector: 'amk-icon-book',
   template: `
-    <svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor" aria-hidden="true">
+    <svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor">
       <path
         d="M2 2.5A1.5 1.5 0 0 1 3.5 1h9A1.5 1.5 0 0 1 14 2.5v11a1.5 1.5 0 0 1-1.5 1.5h-9A1.5
            1.5 0 0 1 2 13.5v-11zm1.5-.5a.5.5 0 0 0-.5.5v11a.5.5 0 0 0 .5.5h9a.5.5 0 0 0
