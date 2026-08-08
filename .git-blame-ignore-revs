@@ -7,3 +7,6 @@
 # Reformat with Prettier (2026-08-02). The first run of a formatter that had
 # been configured but never invoked.
 7357fdc9acd2b669bb01176287db0e25cb10cc27
+
+# Reformat the eight scanner files moved out of app/ to the package profile.
+92ab7ab5d26e0aa68ede035396eed64f0ccc759e
