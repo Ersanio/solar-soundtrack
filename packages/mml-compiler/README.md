@@ -51,9 +51,8 @@ unimplemented, report it — never guess, and never silently mis-compile.
 
 `#amk 3` (Codec's beta) is rejected — AddmusicK itself does not implement it.
 
-One deliberate divergence: an unknown `#directive` is an error here, where `parseSpecialDirective`
-(`Music.cpp:2413`) has no else branch and lets the scanner read `#foo` as a note. The comment at
-that branch in `parser.ts` says so. Any other divergence is either a bug or needs a comment like it.
+There are no deliberate divergences in what this compiles or what it rejects. `AUDIT.md` is the
+record; a divergence found is a bug, and gets a test before it gets a fix.
 
 ## Diagnostics are mapped back to the source the author wrote
 

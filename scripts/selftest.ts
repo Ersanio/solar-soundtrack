@@ -1447,4 +1447,37 @@ console.log("\naudit: ;title= sets the ID666 title");
 	check("and no marker leaves it empty", none.stats?.tags.title === undefined, String(none.stats?.tags.title));
 }
 
+console.log("\naudit: the two constructs AddmusicK lets through are let through");
+{
+	// Music.cpp:2413-2506 has no final else, so `pos` stays on the first letter
+	// and the scan loop reads it as music. `#c4` really is a quarter-note C.
+	const asMusic = compile("#amk 4\n#0 c4 #d4\n");
+	check("an unknown # directive is read as music", asMusic.ok, asMusic.diagnostics.map((d) => d.code).join(", "));
+	check("and its letters become notes", asMusic.stats?.channelTicks[0] === 96, String(asMusic.stats?.channelTicks[0]));
+
+	// Music.cpp:1321 has no check that a previous loop exists, and `prevLoop` is
+	// an unsigned int at -1 (Music.cpp:240) — so this emits `$E9 FF FF 02` and
+	// relocation turns it into a pointer to nowhere. It compiles there, and the
+	// point of this tool is that what compiles here compiles there.
+	const noLoop = compile("#amk 4\n#0 *2 c4\n");
+	check(
+		"a * with no previous loop compiles",
+		noLoop.ok,
+		noLoop.diagnostics.map((d) => `${d.code} ${d.message}`).join("; "),
+	);
+
+	const bytes = [...(noLoop.data ?? [])];
+	const call = bytes.indexOf(0xe9);
+	check("it emits the whole four-byte call", call !== -1 && bytes[call + 3] === 2, hex(Uint8Array.from(bytes)));
+	// The stored word was $FFFF, so relocation lands it one byte *below* the loop
+	// block — which is the pointer to nowhere, arriving intact.
+	const pointer = call === -1 ? -1 : (bytes[call + 2] << 8) | bytes[call + 1];
+	const blockAt = 0x3e00 + (noLoop.stats?.totalSize ?? 0) - (noLoop.stats?.loopDataSize ?? 0);
+	check(
+		"pointing one byte below the loop block, as -1 does",
+		pointer !== -1 && ((pointer + 1) & 0xffff) === (blockAt & 0xffff),
+		`pointer $${pointer.toString(16)}, block $${blockAt.toString(16)}`,
+	);
+}
+
 summarise();

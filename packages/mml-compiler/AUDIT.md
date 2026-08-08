@@ -11,7 +11,7 @@ lines or fewer, and an observed result from actually running it. Anything alread
 deliberate divergence, and anything where AddmusicK is simply buggy and the port reproduces the bug
 faithfully, was not a finding.
 
-**All twenty-five confirmed divergences are fixed.** Each has a `selftest` or `tokentest` case,
+**All twenty-seven confirmed divergences are fixed.** Each has a `selftest` or `tokentest` case,
 written before the fix and failing without it.
 
 ## The standard this holds to
@@ -79,21 +79,30 @@ None of these reached compiled bytes; they made the command inspector misread so
 `;title=…` in the raw source sets the ID666 title — a plain substring search before preprocessing,
 so it counts inside a false `#if` too, and `#spc { #title }` overrides it. `Music.cpp:297-306`.
 
-## Deliberate divergences that remain
+## Deliberate divergences
 
-Two, both stricter than the reference, both commented where they live:
+**None.** There were two, both stricter than the reference, and both are gone — the fidelity
+argument wins even where the reference is doing something plainly unhelpful:
 
-- **An unknown `#directive` is an error.** `parseSpecialDirective` has no else branch, so AddmusicK
-  leaves `pos` on the first letter and the scanner reads `#foo` as the note `f` followed by an `o`
-  octave directive — silently turning a typo into music. See `parser.ts`.
-- **`*` before any `[ ]` is an error.** `Music.cpp:1321` has no such check, so it emits `$E9`
-  against an uninitialised `prevLoop` of -1 — two `$FF` bytes that relocation turns into a pointer
-  to nowhere.
+- **An unknown `#directive` is read as music.** `parseSpecialDirective` (`Music.cpp:2413-2506`) has
+  no final else, so `pos` is left on the first letter and the scan loop dispatches it: `#c4` is a
+  quarter-note C, and `#foo` is the note `f` followed by an `o` with no number. Reporting it would
+  have been more helpful and would reject a song AddmusicK builds.
+- **`*` before any `[ ]` emits a call to nowhere.** `Music.cpp:1321` has no check that a previous
+  loop exists, and `prevLoop` is an `unsigned int` initialised to -1 (`Music.cpp:240`), so `$E9 FF
+FF <count>` goes out and relocation lands the pointer one byte below the loop block. `selftest`
+  pins that address, so the shape of the breakage is now a fact rather than an accident.
 
-Both reject songs AddmusicK would accept, which by the standard above is a divergence. They are
-kept because in each case AddmusicK's behaviour is not a feature anyone relies on but a way to
-silently produce a broken song, and this tool's whole purpose is to catch that before it reaches
-AddmusicK. If either turns out to reject a real song, remove it — the fidelity argument wins.
+## One divergence left, and it is not in the compiled output
+
+`lengths()` reports a declared `#length` as `introSeconds` / `mainSeconds`. AddmusicK leaves both at
+zero there, so its own readout prints `0:00` for such a song.
+
+This does not reach AddmusicK: the emitted bytes are identical, and so is the ID666 tag — the
+declared length is what goes into the header either way. What differs is two numbers the editor
+shows in its stats panel. Kept because the alternative is showing `0:00` for a song whose author
+stated its length, which is worse for no fidelity gain. Flagged here rather than left implicit, so
+it is a decision rather than an oversight.
 
 ## Checked and not confirmed
 

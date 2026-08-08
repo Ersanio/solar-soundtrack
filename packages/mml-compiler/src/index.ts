@@ -19,10 +19,8 @@ export type { AddmusicKOptions };
  *
  * `#amk 3` (Codec's beta) is rejected — AddmusicK itself does not implement it.
  *
- *
- * One deliberate divergence: an unknown `#directive` is an error here, where
- * `parseSpecialDirective` (Music.cpp:2413) has no else branch and lets the
- * scanner read `#foo` as a note. See the comment at that branch in `parser.ts`.
+ * Nothing here is more permissive than the reference, and nothing is stricter.
+ * See README.md and AUDIT.md.
  */
 export class AddmusicKCompiler {
 	compile(request: CompileRequest): CompileResult {

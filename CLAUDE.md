@@ -93,8 +93,10 @@ either direction is a bug: accepting what AddmusicK rejects means it compiles, p
 real tool refuses it; rejecting what AddmusicK accepts means a working song is turned away. Where
 AddmusicK is case-sensitive, so is this — `#Title`, `"kick.BRR"` and `#DEFINE` are all errors, and
 `#SAMPLES` is not, because `strnicmp` is what the reference uses there. Convenience is never a
-reason to widen what is accepted. `packages/mml-compiler/AUDIT.md` is the record of the last
-line-by-line comparison and lists the only two deliberate divergences left, both stricter.
+reason to widen what is accepted, and neither is helpfulness a reason to narrow it: an unknown
+`#directive` is read as music and `*` with no previous loop emits a call to nowhere, because that is
+what the reference does. `packages/mml-compiler/AUDIT.md` is the record of the last line-by-line
+comparison; there are no deliberate divergences left.
 
 **`packages/mml-compiler` is not linted, and its comments are not thinned.** It is a port, and style
 rules would make it harder to diff against the C++ that is the only check on its faithfulness. It

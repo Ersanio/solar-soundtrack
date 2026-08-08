@@ -970,17 +970,15 @@ export class AddmusicKParser {
 				}
 			}
 
-			const end = this.text.indexOf("\n", this.pos);
-			// Deliberately stricter than the reference. `parseSpecialDirective`
-			// (Music.cpp:2413-2509) has no else branch at all, so AMK leaves `pos`
-			// on the first letter and the scanner reads `#foo` as the note `f`
-			// followed by an `o` octave directive — silently turning a typo into
-			// music. Reporting it costs compatibility with songs that only work by
-			// accident, which is a trade worth making.
-			this.errorAt(start, end === -1 ? this.text.length : end, "AMK0055", "Unknown # directive.");
-			while (this.pos < this.text.length && this.text[this.pos] !== "\n") {
-				this.pos++;
-			}
+			// And nothing else. Music.cpp:2413-2506 has no final else, so `pos` is
+			// left sitting on the first letter and `scan` dispatches it as music:
+			// `#c4` is the note `c4`, and `#foo` is the note `f` followed by an `o`
+			// octave directive with no number.
+			//
+			// Reporting an unknown directive here instead would have been the more
+			// helpful thing to do, and it is not what the reference does — a song
+			// that leans on this, deliberately or not, has to compile the same way
+			// in both.
 		}
 	}
 
@@ -2638,14 +2636,11 @@ export class AddmusicKParser {
 			return this.error("AMK0112", "Nested loops are not allowed.");
 		}
 
-		// Deliberately stricter than the reference. Music.cpp:1321 has no such
-		// check, so `*` before any `[ ]` emits `$E9` against an uninitialised
-		// `prevLoop` of -1 — two 0xFF bytes that relocation turns into a pointer
-		// to nowhere. There is no reading of that as intentional.
-		if (this.prevLoop === -1) {
-			return this.error("AMK0130", "No previous loop to recall.");
-		}
-
+		// No check that there *is* a previous loop, because Music.cpp:1321 has
+		// none. `prevLoop` is an `unsigned int` initialised to -1 (Music.cpp:240),
+		// so `*` before any `[ ]` emits `$E9 FF FF <count>` and relocation turns
+		// those two bytes into a pointer to nowhere. Rejecting it would be the
+		// kinder thing to do and would reject a song AddmusicK builds.
 		this.updateQ[this.channel] = true;
 		this.updateQ[8] = true;
 		this.prevNoteLength = -1;
