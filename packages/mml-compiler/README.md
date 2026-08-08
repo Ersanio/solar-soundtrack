@@ -20,6 +20,8 @@ the C++.
 
 **Read the cited lines before changing behaviour, and cite the lines you port.** Behaviour that
 looks strange is almost always strange in the original too — reproduce it and say so in a comment.
+`AUDIT.md` is the record of the last line-by-line comparison: what was fixed, and what is still
+known to diverge.
 `link.ts` keeps AddmusicK's redundant two-stage sentinel/relocation dance for exactly this reason:
 so the two implementations can be stepped through side by side.
 
