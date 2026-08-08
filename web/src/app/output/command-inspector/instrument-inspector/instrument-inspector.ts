@@ -11,16 +11,16 @@ import {
   sustainLevel,
   tuningMultiplier,
   tuningSemitones,
-} from '@spc/adsr';
+} from '@amk/spc/adsr';
 import {
   FIRST_CUSTOM_INSTRUMENT,
   FIRST_PERCUSSION_INSTRUMENT,
   type InstrumentEntry,
   MELODIC_SLOTS,
   NOISE_FLAG,
-} from '@spc/instruments';
-import type { Command } from '@compiler/tokens';
-import { DEFAULT_TRANSPOSE, INSTRUMENT_TO_SAMPLE } from '@compiler/tables';
+} from '@amk/spc/instruments';
+import type { Command } from '@amk/tokens';
+import { DEFAULT_TRANSPOSE, INSTRUMENT_TO_SAMPLE } from '@amk/core/tables';
 import { DriverStore } from '../../../state/driver-store';
 import { EditorStore } from '../../../state/editor-store';
 import { duration, hex2 } from '../../../util/format';

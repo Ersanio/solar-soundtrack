@@ -1,8 +1,8 @@
 import type { Extension } from '@codemirror/state';
 import { hoverTooltip } from '@codemirror/view';
 
-import { type Command, type NoteLengthSegment, commandAt } from '@compiler/tokens';
-import { TICKS_PER_WHOLE } from '@compiler/tables';
+import { type Command, type NoteLengthSegment, commandAt } from '@amk/tokens';
+import { TICKS_PER_WHOLE } from '@amk/core/tables';
 import { hex2 } from '../../util/format';
 
 /** One line of the tooltip, styled by the classes the theme defines. */

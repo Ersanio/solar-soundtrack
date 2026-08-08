@@ -1,16 +1,16 @@
 import { Component, computed, inject, input } from '@angular/core';
 
-import { argEditable, spliceArg } from '@compiler/edits';
+import { argEditable, spliceArg } from '@amk/tokens/edits';
 import {
   NOTE_DURATIONS,
   NSPC_VELOCITY_OFFSET,
   TICKS_PER_WHOLE,
   VELOCITY_VALUES,
-} from '@compiler/tables';
-import type { Command } from '@compiler/tokens';
+} from '@amk/core/tables';
+import type { Command } from '@amk/tokens';
 import { Slider } from '../../../shared/slider/slider';
 import { EditorStore } from '../../../state/editor-store';
-import { velocityTableAt } from '../../../util/dialect';
+import { velocityTableAt } from '@amk/tokens/dialect';
 import { hex2 } from '../../../util/format';
 import { dragPreview } from '../commands/preview';
 

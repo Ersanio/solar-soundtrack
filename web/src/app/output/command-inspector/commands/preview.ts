@@ -1,6 +1,6 @@
 import { type Signal, linkedSignal } from '@angular/core';
 
-import type { Command } from '@compiler/tokens';
+import type { Command } from '@amk/tokens';
 
 /** What a drag is showing, keyed however the caller finds convenient. */
 export interface DragPreview {

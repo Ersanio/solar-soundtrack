@@ -1,6 +1,6 @@
 import { Component, computed, input } from '@angular/core';
 
-import { ticksLabel } from '../commands/units';
+import { ticksLabel } from '@amk/tokens/commands/units';
 
 /** Drawn in a fixed coordinate space and stretched to fit, as the other graphs are. */
 const VIEW_W = 320;

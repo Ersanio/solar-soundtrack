@@ -1,10 +1,9 @@
 import { Component, input, output } from '@angular/core';
 
-/** One choice, named as the reader would say it rather than as the byte reads. */
-export interface EnumOption {
-  value: number;
-  label: string;
-}
+/** Declared beside the descriptors that produce it; re-exported so callers of
+    this component import one name from one place. */
+export type { EnumOption } from '@amk/tokens/commands/param';
+import type { EnumOption } from '@amk/tokens/commands/param';
 
 /**
  * A native `<select>` over a named set of byte values.

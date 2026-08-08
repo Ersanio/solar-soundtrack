@@ -17,7 +17,7 @@ import { setDiagnostics } from '@codemirror/lint';
 import { Compartment, EditorState } from '@codemirror/state';
 import { EditorView, keymap, lineNumbers } from '@codemirror/view';
 
-import type { Severity } from '@core/types';
+import type { Severity } from '@amk/core/types';
 import { IconWrap } from '../../shared/icons/icon-wrap';
 import { Panel } from '../../shared/panel/panel';
 import { type TabDef, Tabs } from '../../shared/tabs/tabs';

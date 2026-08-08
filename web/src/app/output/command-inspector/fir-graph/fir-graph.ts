@@ -7,7 +7,7 @@ import {
   echoStability,
   firCurveFrequencies,
   firMagnitude,
-} from '@spc/fir';
+} from '@amk/spc/fir';
 
 /** Plot bounds. The floor is deep enough to show a real stopband. */
 const TOP_DB = 12;

@@ -1,12 +1,12 @@
 import { Service, computed, effect, inject, linkedSignal, signal } from '@angular/core';
 
-import { compiler } from '@compiler';
-import type { Edit } from '@compiler/edits';
-import { commandAt, tokenize } from '@compiler/tokens';
-import type { CompileResult, Diagnostic, Span } from '@core/types';
-import { buildSpc, spcFilename } from '@spc/export';
-import { ARAM_SIZE, type AramBudget, computeBudget } from '@spc/layout';
-import { echoHazards } from '../util/echo-hazards';
+import { compiler } from '@amk/compiler';
+import type { Edit } from '@amk/tokens/edits';
+import { commandAt, tokenize } from '@amk/tokens';
+import type { CompileResult, Diagnostic, Span } from '@amk/core/types';
+import { buildSpc, spcFilename } from '@amk/spc/export';
+import { ARAM_SIZE, type AramBudget, computeBudget } from '@amk/spc/layout';
+import { echoHazards } from '@amk/tokens/echo-hazards';
 import { caretPosition, downloadBlob, errorMessage } from '../util/format';
 import { DriverStore } from './driver-store';
 import { SampleStore } from './sample-store';

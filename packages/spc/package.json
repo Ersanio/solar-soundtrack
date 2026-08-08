@@ -1,0 +1,20 @@
+{
+  "name": "@amk/spc",
+  "version": "0.0.0",
+  "description": "SPC assembly, BRR, echo FIR, driver bundle, SPC700 emulator host and audio worklet",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./*": "./src/*.ts"
+  },
+  "sideEffects": false,
+  "scripts": {
+    "build": "esbuild src/worklet.ts --bundle --format=esm --target=es2022 --outfile=assets/player/spc-worklet.js --log-level=warning"
+  },
+  "dependencies": {
+    "@amk/core": "*"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.1"
+  }
+}

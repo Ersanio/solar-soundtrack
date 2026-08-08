@@ -1,0 +1,15 @@
+{
+  "name": "@amk/compiler",
+  "version": "0.0.0",
+  "description": "AddmusicK 1.0.11 MML to N-SPC song data. A port of Music.cpp, and lint-exempt because of it",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./*": "./src/*.ts"
+  },
+  "sideEffects": false,
+  "dependencies": {
+    "@amk/core": "*"
+  }
+}

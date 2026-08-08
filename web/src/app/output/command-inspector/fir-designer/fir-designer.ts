@@ -1,7 +1,7 @@
 import { Component, computed, inject, input, signal } from '@angular/core';
 
-import { argsRewritable, commandRewritable, spliceArgs, spliceCommand } from '@compiler/edits';
-import type { Command } from '@compiler/tokens';
+import { argsRewritable, commandRewritable, spliceArgs, spliceCommand } from '@amk/tokens/edits';
+import type { Command } from '@amk/tokens';
 import {
   FIR_PRESETS,
   FIR_TAPS,
@@ -14,15 +14,15 @@ import {
   matchPreset,
   toHexByte,
   toSigned,
-} from '@spc/fir';
+} from '@amk/spc/fir';
 import { Button } from '../../../shared/button/button';
 import { Slider } from '../../../shared/slider/slider';
 import { EditorStore } from '../../../state/editor-store';
 import { dragPreview } from '../commands/preview';
-import { builtInFilterName, firOverriddenBy } from '../fir-override';
+import { builtInFilterName, firOverriddenBy } from '@amk/tokens/fir-override';
 import { FirGraph } from '../fir-graph/fir-graph';
 import { stopWhenRunaway } from '../runaway-guard';
-import { feedbackBefore } from '../../../util/echo-hazards';
+import { feedbackBefore } from '@amk/tokens/echo-hazards';
 import { Hex2Pipe } from '../../../util/hex.pipe';
 
 type Mode = 'presets' | 'draw';

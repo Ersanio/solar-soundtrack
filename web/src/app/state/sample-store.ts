@@ -1,6 +1,6 @@
 import { Service, computed, effect, inject, signal } from '@angular/core';
 
-import { EMPTY_SAMPLE_NAME, bankSlotName } from '@compiler/tables';
+import { EMPTY_SAMPLE_NAME, bankSlotName } from '@amk/core/tables';
 import {
   type BrrSample,
   blockCount,
@@ -12,7 +12,7 @@ import {
   validateBrr,
   validateSampleBank,
   validateName,
-} from '@spc/brr';
+} from '@amk/spc/brr';
 import { clear, del, loadAll, put, storageFailure } from '../util/idb';
 import { DriverStore } from './driver-store';
 

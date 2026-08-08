@@ -1,18 +1,18 @@
 import { Component, computed, inject, input } from '@angular/core';
 
-import { argEditable, spliceArg } from '@compiler/edits';
-import type { Command } from '@compiler/tokens';
-import { type FirTaps, echoStability, toSigned } from '@spc/fir';
+import { argEditable, spliceArg } from '@amk/tokens/edits';
+import type { Command } from '@amk/tokens';
+import { type FirTaps, echoStability, toSigned } from '@amk/spc/fir';
 import { BitToggles } from '../../../shared/bit-toggles/bit-toggles';
 import { Button } from '../../../shared/button/button';
 import { Slider } from '../../../shared/slider/slider';
 import { EditorStore } from '../../../state/editor-store';
-import { tempoBefore } from '../../../util/dialect';
-import { builtInTaps } from '../../../util/echo-hazards';
+import { tempoBefore } from '@amk/tokens/dialect';
+import { builtInTaps } from '@amk/tokens/echo-hazards';
 import { hex2 } from '../../../util/format';
-import { ticksLabel } from '../commands/units';
+import { ticksLabel } from '@amk/tokens/commands/units';
 import { dragPreview, shownArgs } from '../commands/preview';
-import { firOverriddenBefore } from '../fir-override';
+import { firOverriddenBefore } from '@amk/tokens/fir-override';
 import { FirGraph } from '../fir-graph/fir-graph';
 import { stopWhenRunaway } from '../runaway-guard';
 

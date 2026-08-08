@@ -1,14 +1,14 @@
 import { Component, computed, inject, input } from '@angular/core';
 
-import { argEditable, argumentText, spliceArg } from '@compiler/edits';
-import type { Command } from '@compiler/tokens';
+import { argEditable, argumentText, spliceArg } from '@amk/tokens/edits';
+import type { Command } from '@amk/tokens';
 import { Slider } from '../../../shared/slider/slider';
 import { EditorStore } from '../../../state/editor-store';
-import { noteTicksBefore, tempoBefore } from '../../../util/dialect';
+import { noteTicksBefore, tempoBefore } from '@amk/tokens/dialect';
 import { BendGraph } from '../bend-graph/bend-graph';
-import { toSigned } from '../commands/param';
+import { toSigned } from '@amk/tokens/commands/param';
 import { dragPreview } from '../commands/preview';
-import { noteName, ticksLabel } from '../commands/units';
+import { noteName, ticksLabel } from '@amk/tokens/commands/units';
 import { NotePicker } from '../note-picker/note-picker';
 
 /**

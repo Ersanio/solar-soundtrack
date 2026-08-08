@@ -16,7 +16,7 @@ to actually _hear_ a port, you had to insert it into the ROM, open an emulator, 
 that plays it. When you change around notes, you have to repeat this process. Nowadays, AddmusicK
 has a "porter mode" that makes this process easier, but still requires switching windows.
 
-So the idea was to make a single tool for *everything* custom music-related. Write it, hear
+So the idea was to make a single tool for _everything_ custom music-related. Write it, hear
 it, edit it, even export it, without leaving this one window. I hope to make custom music
 more accessible to people, this way.
 
@@ -77,15 +77,15 @@ Node 24 is what CI uses.
 
 ### npm scripts
 
-| Command | What it does |
-| --- | --- |
-| `npm start` | Angular dev server (`ng serve`) on `http://localhost:4200/`. |
-| `npm run build` | Production build via `ng build`, output in `dist/`. |
-| `npm run watch` | Dev-configuration build with `--watch`, no server. |
-| `npm run typecheck` | `tsc --noEmit`, no build output. |
-| `npm run lint` | `ng lint` (ESLint). |
-| `npm run test` | `ng test` (Vitest). |
-| `npm run check` | What CI runs to gate a merge: typecheck plus six byte-level harnesses (`selftest`, `spctest`, `audiotest`, `worklettest`, `charttest`, `brrtest`) that pin the compiler, SPC assembly, the headless audio chain, the worklet, chart helpers and BRR/bank decoding against known-good byte output. |
+| Command             | What it does                                                                                                                                                                                                                                                                                      |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `npm start`         | Angular dev server (`ng serve`) on `http://localhost:4200/`.                                                                                                                                                                                                                                      |
+| `npm run build`     | Production build via `ng build`, output in `dist/`.                                                                                                                                                                                                                                               |
+| `npm run watch`     | Dev-configuration build with `--watch`, no server.                                                                                                                                                                                                                                                |
+| `npm run typecheck` | `tsc --noEmit`, no build output.                                                                                                                                                                                                                                                                  |
+| `npm run lint`      | `ng lint` (ESLint).                                                                                                                                                                                                                                                                               |
+| `npm run test`      | `ng test` (Vitest).                                                                                                                                                                                                                                                                               |
+| `npm run check`     | What CI runs to gate a merge: typecheck plus six byte-level harnesses (`selftest`, `spctest`, `audiotest`, `worklettest`, `charttest`, `brrtest`) that pin the compiler, SPC assembly, the headless audio chain, the worklet, chart helpers and BRR/bank decoding against known-good byte output. |
 
 Two things run automatically before the commands above (via `pre*` npm hooks), so you never
 need to invoke them yourself:
@@ -107,11 +107,11 @@ at runtime.
 
 There are three layers, roughly:
 
-| Path                           | What lives there                                                    |
-| ------------------------------ | ------------------------------------------------------------------- |
-| `web/src/compiler/`            | The MML compiler - preprocessor, parser, linker                     |
-| `web/src/spc/`                 | SPC assembly, BRR handling, the emulator host and the audio worklet |
-| `web/src/app/`                 | The Angular UI                                                      |
+| Path                | What lives there                                                    |
+| ------------------- | ------------------------------------------------------------------- |
+| `web/src/compiler/` | The MML compiler - preprocessor, parser, linker                     |
+| `web/src/spc/`      | SPC assembly, BRR handling, the emulator host and the audio worklet |
+| `web/src/app/`      | The Angular UI                                                      |
 
 On testing: `npm run check` runs byte-level harnesses that pin the compiler's output,
 SPC assembly, the full headless MML → SPC → PCM chain, BRR and bank decoding. Separately,

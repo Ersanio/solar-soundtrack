@@ -1,7 +1,7 @@
 import { Component, computed, inject, input } from '@angular/core';
 
-import { argsRewritable, commandRewritable, spliceArgs, spliceCommand } from '@compiler/edits';
-import type { Command } from '@compiler/tokens';
+import { argsRewritable, commandRewritable, spliceArgs, spliceCommand } from '@amk/tokens/edits';
+import type { Command } from '@amk/tokens';
 import { EditorStore } from '../../../state/editor-store';
 import { hex2 } from '../../../util/format';
 import { type EnvelopeValue, EnvelopeTuner } from '../envelope-tuner/envelope-tuner';

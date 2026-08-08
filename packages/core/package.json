@@ -1,0 +1,11 @@
+{
+  "name": "@amk/core",
+  "version": "0.0.0",
+  "description": "Shared vocabulary: compiler I/O types, AddmusicK's constant tables, hex formatting",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./*": "./src/*.ts"
+  },
+  "sideEffects": false
+}

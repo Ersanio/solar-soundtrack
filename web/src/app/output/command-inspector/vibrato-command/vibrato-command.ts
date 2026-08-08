@@ -1,12 +1,12 @@
 import { Component, computed, inject, input } from '@angular/core';
 
-import { argEditable, argumentText, spliceArg } from '@compiler/edits';
-import type { Command } from '@compiler/tokens';
+import { argEditable, argumentText, spliceArg } from '@amk/tokens/edits';
+import type { Command } from '@amk/tokens';
 import { Slider } from '../../../shared/slider/slider';
 import { EditorStore } from '../../../state/editor-store';
-import { tempoBefore } from '../../../util/dialect';
+import { tempoBefore } from '@amk/tokens/dialect';
 import { dragPreview } from '../commands/preview';
-import { ticksLabel } from '../commands/units';
+import { ticksLabel } from '@amk/tokens/commands/units';
 import { VibratoGraph } from '../vibrato-graph/vibrato-graph';
 
 /**

@@ -1,9 +1,9 @@
 import { DestroyRef, Service, computed, effect, inject, signal, untracked } from '@angular/core';
 
-import { type CompileResult, type NoteAddress, type Span, noteAddressAt } from '@core/types';
-import { SpcPlayer, type SongTiming } from '@spc/player';
-import type { DriverState } from '@spc/driver-state';
-import { SPC_SAMPLE_RATE } from '@spc/wasm-host';
+import { type CompileResult, type NoteAddress, type Span, noteAddressAt } from '@amk/core/types';
+import { SpcPlayer, type SongTiming } from '@amk/spc/player';
+import type { DriverState } from '@amk/spc/driver-state';
+import { SPC_SAMPLE_RATE } from '@amk/spc/wasm-host';
 import { errorMessage, formatTime } from '../util/format';
 import { EditorStore } from './editor-store';
 

@@ -1,17 +1,7 @@
 /** Formatting helpers shared by the editor's panels. */
 
-/** Upper-case hex, as many digits as the value needs. */
-export function hex(value: number): string {
-  return value.toString(16).toUpperCase();
-}
-
-export function hex2(value: number): string {
-  return hex(value).padStart(2, '0');
-}
-
-export function hex4(value: number): string {
-  return hex(value).padStart(4, '0');
-}
+/** Hex lives in `@amk/core`, where the compiler and the scanner also read it from. */
+export { hex, hex2, hex4 } from '@amk/core/hex';
 
 /**
  * A short duration, in whichever unit reads better. `∞` for a rate of 0, which

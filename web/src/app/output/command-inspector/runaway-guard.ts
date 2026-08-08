@@ -1,6 +1,6 @@
 import { type Signal, effect, inject, linkedSignal, untracked } from '@angular/core';
 
-import type { Command } from '@compiler/tokens';
+import type { Command } from '@amk/tokens';
 import { EditorStore } from '../../state/editor-store';
 import { Playback } from '../../state/playback';
 

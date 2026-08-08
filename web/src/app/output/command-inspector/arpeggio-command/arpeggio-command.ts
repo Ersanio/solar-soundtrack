@@ -1,15 +1,15 @@
 import { Component, computed, inject, input } from '@angular/core';
 
-import { argsRewritable, commandRewritable, spliceArg, spliceCommand } from '@compiler/edits';
-import type { Command } from '@compiler/tokens';
+import { argsRewritable, commandRewritable, spliceArg, spliceCommand } from '@amk/tokens/edits';
+import type { Command } from '@amk/tokens';
 import { Button } from '../../../shared/button/button';
 import { type EnumOption, EnumSelect } from '../../../shared/enum-select/enum-select';
 import { Slider } from '../../../shared/slider/slider';
 import { EditorStore } from '../../../state/editor-store';
 import { hex2 } from '../../../util/format';
-import { fromSigned, toSigned } from '../commands/param';
+import { fromSigned, toSigned } from '@amk/tokens/commands/param';
 import { dragPreview, shownArgs } from '../commands/preview';
-import { intervalLabel } from '../commands/units';
+import { intervalLabel } from '@amk/tokens/commands/units';
 
 const MODES: readonly EnumOption[] = [
   { value: 0x00, label: 'off' },

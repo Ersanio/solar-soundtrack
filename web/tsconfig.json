@@ -1,46 +1,12 @@
-/* To learn more about Typescript configuration file: https://www.typescriptlang.org/docs/handbook/tsconfig-json.html. */
 /* To learn more about Angular compiler options: https://angular.dev/reference/configs/angular-compiler-options. */
 {
+  "extends": "../tsconfig.base.json",
   "compileOnSave": false,
-  "compilerOptions": {
-    "strict": true,
-    "noImplicitOverride": true,
-    "noPropertyAccessFromIndexSignature": true,
-    "noImplicitReturns": true,
-    "noFallthroughCasesInSwitch": true,
-    "noUnusedLocals": true,
-    "noUnusedParameters": true,
-    "skipLibCheck": true,
-    "isolatedModules": true,
-    "experimentalDecorators": true,
-    "importHelpers": true,
-    "target": "ES2022",
-    "module": "preserve",
-    /* The compiler, SPC assembly and driver layers are framework-free and were
-       ported verbatim from the prototype. Aliases keep component imports from
-       turning into ../../.. chains and mark the boundary. */
-    "paths": {
-      "@compiler": ["./src/compiler/index.ts"],
-      "@compiler/*": ["./src/compiler/*"],
-      "@core/*": ["./src/core/*"],
-      "@spc/*": ["./src/spc/*"]
-    }
-  },
   "angularCompilerOptions": {
     "enableI18nLegacyMessageIdFormat": false,
     "strictInjectionParameters": true,
     "strictInputAccessModifiers": true
   },
   "files": [],
-  "references": [
-    {
-      "path": "./tsconfig.app.json"
-    },
-    {
-      "path": "./tsconfig.spec.json"
-    },
-    {
-      "path": "./tsconfig.scripts.json"
-    }
-  ]
+  "references": [{ "path": "./tsconfig.app.json" }, { "path": "./tsconfig.spec.json" }]
 }

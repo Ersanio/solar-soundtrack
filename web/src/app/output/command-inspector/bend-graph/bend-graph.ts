@@ -1,6 +1,6 @@
 import { Component, computed, input } from '@angular/core';
 
-import { ticksLabel } from '../commands/units';
+import { ticksLabel } from '@amk/tokens/commands/units';
 
 const VIEW_W = 320;
 const VIEW_H = 120;

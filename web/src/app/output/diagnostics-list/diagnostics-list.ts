@@ -1,6 +1,6 @@
 import { Component, inject } from '@angular/core';
 
-import type { Diagnostic, Severity } from '@core/types';
+import type { Diagnostic, Severity } from '@amk/core/types';
 import { EditorStore } from '../../state/editor-store';
 
 @Component({

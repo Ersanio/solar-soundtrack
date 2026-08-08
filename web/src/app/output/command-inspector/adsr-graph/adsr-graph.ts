@@ -10,7 +10,7 @@ import {
   envelopeGain,
   releaseSeconds,
   sustainLevel,
-} from '@spc/adsr';
+} from '@amk/spc/adsr';
 
 /**
  * Drawn in a fixed coordinate space and stretched to fit, as `fir-graph` is.

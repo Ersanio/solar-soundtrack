@@ -1,12 +1,12 @@
 import { Service, computed, signal } from '@angular/core';
 
-import { type DriverBundle, loadDriver } from '@spc/driver';
+import { type DriverBundle, loadDriver } from '@amk/spc/driver';
 import {
   type InstrumentTables,
   bundledInstrumentTables,
   readInstrumentTables,
-} from '@spc/instruments';
-import { type AramPlan, planAram } from '@spc/layout';
+} from '@amk/spc/instruments';
+import { type AramPlan, planAram } from '@amk/spc/layout';
 import { errorMessage } from '../util/format';
 
 /**

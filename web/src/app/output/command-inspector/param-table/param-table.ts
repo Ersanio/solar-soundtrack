@@ -1,7 +1,7 @@
 import { Component, computed, inject, input } from '@angular/core';
 
-import { argumentText, spliceArg } from '@compiler/edits';
-import type { Command } from '@compiler/tokens';
+import { argumentText, spliceArg } from '@amk/tokens/edits';
+import type { Command } from '@amk/tokens';
 import { BitToggles } from '../../../shared/bit-toggles/bit-toggles';
 import { EnumSelect } from '../../../shared/enum-select/enum-select';
 import { NumberField } from '../../../shared/number-field/number-field';
@@ -10,8 +10,8 @@ import { EditorStore } from '../../../state/editor-store';
 import { SampleStore } from '../../../state/sample-store';
 import { hex2 } from '../../../util/format';
 import { paramContext } from '../commands/context';
-import { type ParamRow, resolveCommand } from '../commands/describe';
-import { fromSigned } from '../commands/param';
+import { type ParamRow, resolveCommand } from '@amk/tokens/commands/describe';
+import { fromSigned } from '@amk/tokens/commands/param';
 import { dragPreview } from '../commands/preview';
 
 /** LSB first, because every mask in the language is documented that way. */

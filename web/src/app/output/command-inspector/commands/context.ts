@@ -1,9 +1,9 @@
-import type { Command } from '@compiler/tokens';
+import type { Command } from '@amk/tokens';
 import type { EnumOption } from '../../../shared/enum-select/enum-select';
 import type { EditorStore } from '../../../state/editor-store';
 import type { SampleStore } from '../../../state/sample-store';
-import { tempoBefore } from '../../../util/dialect';
-import type { ParamContext } from './param';
+import { tempoBefore } from '@amk/tokens/dialect';
+import type { ParamContext } from '@amk/tokens/commands/param';
 
 /**
  * The song's samples in SRCN order, as a picker's options.

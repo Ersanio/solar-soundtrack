@@ -22,17 +22,17 @@ from an AddmusicK release if they are missing.
 
 All from `web/`. Node 24 is what CI uses.
 
-| Command | What it does |
-| --- | --- |
-| `npm start` | Dev server on `http://localhost:4200/`. |
-| `npm run build` | Production build into `dist/`. |
-| `npm run watch` | Dev-configuration build with `--watch`, no server. |
-| `npm run typecheck` | `tsc -p tsconfig.app.json --noEmit`. |
-| `npm run typecheck:scripts` | The same for `scripts/`, which the app tsconfig does not cover. |
-| `npm run lint` | `ng lint` over `src/**` and `scripts/**`. |
-| `npm run lint:fix` | The same with `--fix`. Follow it with `npm run format`. |
-| `npm run format` | Prettier over the workspace. |
-| `npm run check` | The merge gate: formatting, both typechecks, all eleven byte-level harnesses. |
+| Command                     | What it does                                                                  |
+| --------------------------- | ----------------------------------------------------------------------------- |
+| `npm start`                 | Dev server on `http://localhost:4200/`.                                       |
+| `npm run build`             | Production build into `dist/`.                                                |
+| `npm run watch`             | Dev-configuration build with `--watch`, no server.                            |
+| `npm run typecheck`         | `tsc -p tsconfig.app.json --noEmit`.                                          |
+| `npm run typecheck:scripts` | The same for `scripts/`, which the app tsconfig does not cover.               |
+| `npm run lint`              | `ng lint` over `src/**` and `scripts/**`.                                     |
+| `npm run lint:fix`          | The same with `--fix`. Follow it with `npm run format`.                       |
+| `npm run format`            | Prettier over the workspace.                                                  |
+| `npm run check`             | The merge gate: formatting, both typechecks, all eleven byte-level harnesses. |
 
 CI runs `npm run lint` then `npm run check`.
 
@@ -71,14 +71,14 @@ not run the template compiler, so a bad binding (`viewBox=` instead of `[attr.vi
   `AddmusicKsrc/`), so they are located by matching the SRCN column against `INSTRUMENT_TO_SAMPLE`,
   and a second candidate would make that a guess. It also pins the one index where the driver and
   `Music.cpp`'s `instrToSample` disagree — 19, which is the whole `@19` story.
-- `npm run adsrtest` — the envelope maths. `CLOCKS` is checked against the *published SNES noise
-  ladder*, because the DSP uses the same table for noise and every other function here is defined in
+- `npm run adsrtest` — the envelope maths. `CLOCKS` is checked against the _published SNES noise
+  ladder_, because the DSP uses the same table for noise and every other function here is defined in
   terms of it; nothing else could catch a transposed digit. It also asserts that the two magic tables
   in AddmusicK's readme calculator are exactly the step counts of bsnes's envelope stepping.
 - `npm run edittest` — `compiler/edits.ts`, the splices the command inspector writes back into the
   source. Two load-bearing assertions, and both compare whole strings rather than numbers because
   numbers cannot see either failure. **Gap preservation**: a splice replaces the parts that changed
-  and copies the text *between* them out of the source, so a tab, a column of aligned bytes or a
+  and copies the text _between_ them out of the source, so a tab, a column of aligned bytes or a
   mid-run `; comment` survives an edit to the byte beside it — re-rendering a command from its values
   gets every number right and destroys all three. **The macro interlock, per part**: `"ech=$EF"` used
   as `ech $80 $10 $10` has a macro for its command byte and literal text for every argument, so the
@@ -105,11 +105,11 @@ by hand:
 
 Three layers, and the boundary between them is the part that matters.
 
-| Path | Layer |
-| --- | --- |
-| `web/src/compiler/` | MML compiler: `preprocess.ts` → `parser.ts` → `link.ts`, plus `tokens.ts` |
-| `web/src/spc/` | SPC assembly, BRR, echo FIR maths, driver bundle, emulator host, audio worklet |
-| `web/src/app/` | Angular UI |
+| Path                | Layer                                                                          |
+| ------------------- | ------------------------------------------------------------------------------ |
+| `web/src/compiler/` | MML compiler: `preprocess.ts` → `parser.ts` → `link.ts`, plus `tokens.ts`      |
+| `web/src/spc/`      | SPC assembly, BRR, echo FIR maths, driver bundle, emulator host, audio worklet |
+| `web/src/app/`      | Angular UI                                                                     |
 
 `compiler/` and `spc/` are **framework-free and DOM-free** — no Angular, no `document`, no
 `window`, no `fetch` outside `driver.ts`. That is load-bearing, not stylistic: it is why the same
@@ -122,10 +122,10 @@ is the shared vocabulary and deliberately knows nothing about the SPC layer.
 1. **`DriverStore`** loads `public/driver/` (manifest, `main.bin`, SPC/DSP base images, the
    `#default` BRR group). `planAram()` derives the song's ARAM load address from the driver's song
    pointer table. **There is no fallback address** — until the driver loads, compilation is blocked
-   rather than run against a guess. `main.bin` is a *final-pass* AddmusicK build: it carries its own
+   rather than run against a guess. `main.bin` is a _final-pass_ AddmusicK build: it carries its own
    upload header, song pointer table and global songs, so the ARAM budget is exact by construction
    and nothing has to be modelled. The song lands in the table's last slot (`$2996`, index 9), which
-   sits *inside* the image — AddmusicK leaves the last song it compiled there — so the song data
+   sits _inside_ the image — AddmusicK leaves the last song it compiled there — so the song data
    overwrites it rather than following it. Swap that file for a second-pass build and `planAram()`
    falls back to appending a one-slot table, which `spctest` asserts against.
 2. **`EditorStore`** debounces typing (150 ms) into a `committed` signal that a `computed` compiles.
@@ -164,8 +164,8 @@ register and are never baked into song data, so preview and export build identic
 playback does not break stride.
 
 **`sampleList: null` is not `[]`.** `null` means the compiler had no opinion and the driver's default
-set stands; `[]` means the song genuinely asks for no samples. The list's *order is the SRCN
-assignment*, so building an SPC against a different set produces a valid-looking file that plays the
+set stands; `[]` means the song genuinely asks for no samples. The list's _order is the SRCN
+assignment_, so building an SPC against a different set produces a valid-looking file that plays the
 wrong sounds. It is a correctness-critical output, not a statistic.
 
 **Diagnostics carry source spans** (`{start, end, line}`) and stable `AMK####` codes, and are carried
@@ -191,7 +191,7 @@ dependency.
 
 **The echo FIR sits inside the feedback loop.** `spc/fir.ts` is checked against bsnes's own DSP
 (`AddmusicKsrc/SPC_DSP.cpp:610-700`): a coefficient is worth `c/128`, a repeat is scaled by
-`EFB/128 · H(f)` so repeat *k* has gain `|H|^k`, and taps 0–6 are summed into a value that *wraps*
+`EFB/128 · H(f)` so repeat _k_ has gain `|H|^k`, and taps 0–6 are summed into a value that _wraps_
 at 16 bits before tap 7 is added and clamped — so `Σ|c₀…c₆| > 128` can crackle. C7 multiplies the
 newest sample and C0 the oldest, which does not affect any plot here because magnitude is blind to
 tap reversal.

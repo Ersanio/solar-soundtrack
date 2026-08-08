@@ -1,7 +1,7 @@
 import { StateEffect, StateField } from '@codemirror/state';
 import { Decoration, type DecorationSet, EditorView } from '@codemirror/view';
 
-import type { Span } from '@core/types';
+import type { Span } from '@amk/core/types';
 
 /** Replaces the playhead marks wholesale; the field below renders them. */
 export const setPlayhead = StateEffect.define<readonly Span[]>();

@@ -1,0 +1,32 @@
+/* Compiler options and package resolution shared by every workspace.
+   Angular-specific settings live in web/tsconfig.json. */
+{
+  "compilerOptions": {
+    "strict": true,
+    "noImplicitOverride": true,
+    "noPropertyAccessFromIndexSignature": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "skipLibCheck": true,
+    "isolatedModules": true,
+    "experimentalDecorators": true,
+    "importHelpers": true,
+    "target": "ES2022",
+    "module": "preserve",
+    /* The packages are consumed as TypeScript source, so the same modules run in
+		   Node under the harnesses, on the main thread and inside an
+		   AudioWorkletGlobalScope — one compile step fewer is one place fewer for
+		   them to diverge. Which package may import which is a lint rule; see the
+		   package-boundary blocks in eslint.config.js. */
+    "paths": {
+      "@amk/core/*": ["./packages/core/src/*.ts"],
+      "@amk/compiler": ["./packages/mml-compiler/src/index.ts"],
+      "@amk/compiler/*": ["./packages/mml-compiler/src/*.ts"],
+      "@amk/tokens": ["./packages/mml-tokens/src/index.ts"],
+      "@amk/tokens/*": ["./packages/mml-tokens/src/*.ts"],
+      "@amk/spc/*": ["./packages/spc/src/*.ts"]
+    }
+  }
+}

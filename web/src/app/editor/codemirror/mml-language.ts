@@ -1,7 +1,7 @@
 import { StreamLanguage } from '@codemirror/language';
 import { type Tag, tags } from '@lezer/highlight';
 
-import { TOKEN_TAGS, copyState, type ScanState, startState, step } from '@compiler/tokens';
+import { TOKEN_TAGS, copyState, type ScanState, startState, step } from '@amk/tokens';
 
 /**
  * `TOKEN_TAGS` holds `@lezer/highlight` tag *names*, so that `compiler/` never

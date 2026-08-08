@@ -11,7 +11,7 @@ import {
   gainModeName,
   releaseSeconds,
   sustainLevel,
-} from '@spc/adsr';
+} from '@amk/spc/adsr';
 import { Button } from '../../../shared/button/button';
 import { type EnumOption, EnumSelect } from '../../../shared/enum-select/enum-select';
 import { Slider } from '../../../shared/slider/slider';

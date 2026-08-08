@@ -12,7 +12,7 @@ import {
 // transfer for these same two symbols.
 import { select } from 'd3-selection';
 
-import type { BudgetRow } from '@spc/layout';
+import type { BudgetRow } from '@amk/spc/layout';
 import { elementSize } from '../../shared/chart/element-size';
 import { stackSegments } from '../../shared/chart/stack';
 

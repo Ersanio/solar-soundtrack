@@ -1,0 +1,11 @@
+/* The esbuild-run CLI harnesses. They reach across every package on purpose —
+   six of the eleven test a seam between two of them — so this is the one project
+   that inherits the full set of `@amk/*` aliases. */
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "types": ["node"]
+  },
+  "include": ["**/*.ts"]
+}
