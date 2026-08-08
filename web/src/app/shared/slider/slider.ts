@@ -33,21 +33,22 @@ import { Component, computed, input, linkedSignal, output, signal } from '@angul
       </span>
       <input
         type="range"
-        class="h-4 w-full cursor-pointer appearance-none bg-transparent bg-[length:100%_6px]
-               bg-center bg-no-repeat disabled:cursor-not-allowed disabled:opacity-40
+        class="h-4 w-full cursor-pointer appearance-none rounded-full bg-transparent
+               bg-clip-content bg-origin-content py-0.5 disabled:cursor-not-allowed
+               disabled:opacity-40
                [&::-moz-range-thumb]:h-3.5 [&::-moz-range-thumb]:w-3.5
                [&::-moz-range-thumb]:cursor-pointer [&::-moz-range-thumb]:rounded-full
-               [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-(--color-surface)
-               [&::-moz-range-thumb]:bg-(--color-accent)
+               [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-surface
+               [&::-moz-range-thumb]:bg-accent
                [&::-moz-range-track]:h-1.5 [&::-moz-range-track]:bg-transparent
                [&::-webkit-slider-runnable-track]:h-1.5
                [&::-webkit-slider-runnable-track]:bg-transparent
-               [&::-webkit-slider-thumb]:mt-[-4px] [&::-webkit-slider-thumb]:h-3.5
+               [&::-webkit-slider-thumb]:-mt-1 [&::-webkit-slider-thumb]:h-3.5
                [&::-webkit-slider-thumb]:w-3.5 [&::-webkit-slider-thumb]:cursor-pointer
                [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full
                [&::-webkit-slider-thumb]:border-2
-               [&::-webkit-slider-thumb]:border-(--color-surface)
-               [&::-webkit-slider-thumb]:bg-(--color-accent)"
+               [&::-webkit-slider-thumb]:border-surface
+               [&::-webkit-slider-thumb]:bg-accent"
         [style.background-image]="trackImage()"
         [min]="lowerBound()"
         [max]="upperBound()"
@@ -227,6 +228,13 @@ export class Slider {
    * both means writing everything twice and keeping the copies in step. A
    * background on the element is one declaration every browser already agrees
    * about, and the vendor tracks are only made transparent so it shows through.
+   *
+   * The stripe *is* the input's content box — 6px of it, held there by 5px of
+   * vertical padding — and the background is clipped to it. That is what rounds
+   * the ends: `border-radius` clips a background at the content edge with the
+   * radius reduced by the padding, so a pill on the 16px box arrives at the
+   * stripe as exactly half its height. Sizing the stripe with `background-size`
+   * instead paints the same pixels but leaves nothing to round them against.
    *
    * The centre tick is part of the same gradient rather than an element beside
    * it, so it cannot drift out of alignment with the fill it marks.
