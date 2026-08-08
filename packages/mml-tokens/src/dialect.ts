@@ -1,4 +1,4 @@
-import type { Command, Token } from './tokens';
+import type { Command, Token } from "./tokens";
 
 /**
  * The tempo in force where a command sits, as it was *written*, or `null` when
@@ -19,29 +19,29 @@ import type { Command, Token } from './tokens';
  * said how long a tick is.
  */
 export function tempoBefore(command: Command, commands: readonly Command[]): number | null {
-  let found: number | null = null;
+	let found: number | null = null;
 
-  for (const other of commands) {
-    if (other.span.start >= command.span.start) {
-      break;
-    }
+	for (const other of commands) {
+		if (other.span.start >= command.span.start) {
+			break;
+		}
 
-    if (other.vcmd === 0xe2) {
-      found = other.args[0]?.value ?? found;
-    } else if (other.vcmd === 0xe3) {
-      // `$E3 <duration> <tempo>` — the target is what stands afterwards.
-      found = other.args[1]?.value ?? found;
-    } else if (other.kind.toLowerCase() === 't' && other.args.length > 0) {
-      // `t144` and `t30,80`: the tempo is last either way (`parser.ts:1740-1760`).
-      found = other.args[other.args.length - 1].value;
-    }
-  }
+		if (other.vcmd === 0xe2) {
+			found = other.args[0]?.value ?? found;
+		} else if (other.vcmd === 0xe3) {
+			// `$E3 <duration> <tempo>` — the target is what stands afterwards.
+			found = other.args[1]?.value ?? found;
+		} else if (other.kind.toLowerCase() === "t" && other.args.length > 0) {
+			// `t144` and `t30,80`: the tempo is last either way (`parser.ts:1740-1760`).
+			found = other.args[other.args.length - 1].value;
+		}
+	}
 
-  return found;
+	return found;
 }
 
 /** Note and rest letters, whose commands carry a resolved `noteLength`. */
-const NOTE_KINDS = new Set(['c', 'd', 'e', 'f', 'g', 'a', 'b', 'r']);
+const NOTE_KINDS = new Set(["c", "d", "e", "f", "g", "a", "b", "r"]);
 
 /**
  * The tick length of the note a command rides on — the nearest one *before* it
@@ -59,24 +59,24 @@ const NOTE_KINDS = new Set(['c', 'd', 'e', 'f', 'g', 'a', 'b', 'r']);
  * does nothing at all.
  */
 export function noteTicksBefore(command: Command, commands: readonly Command[]): number | null {
-  let found: number | null = null;
+	let found: number | null = null;
 
-  for (const other of commands) {
-    if (other.span.start >= command.span.start) {
-      break;
-    }
+	for (const other of commands) {
+		if (other.span.start >= command.span.start) {
+			break;
+		}
 
-    if (other.channel !== command.channel) {
-      continue;
-    }
+		if (other.channel !== command.channel) {
+			continue;
+		}
 
-    if (NOTE_KINDS.has(other.kind.toLowerCase()) && other.noteLength) {
-      // Tied segments are one note to the driver: `c4^8` keys on once.
-      found = other.noteLength.reduce((total, segment) => total + segment.ticks, 0);
-    }
-  }
+		if (NOTE_KINDS.has(other.kind.toLowerCase()) && other.noteLength) {
+			// Tied segments are one note to the driver: `c4^8` keys on once.
+			found = other.noteLength.reduce((total, segment) => total + segment.ticks, 0);
+		}
+	}
 
-  return found;
+	return found;
 }
 
 /**
@@ -98,32 +98,32 @@ export function noteTicksBefore(command: Command, commands: readonly Command[]):
  * The scanner does tokenise the directive's argument word (`ScanState.
  * directiveWord`), which is what makes a text scan possible at all.
  */
-export function velocityTableAt(command: Command, tokens: Token[], text: string): 'smw' | 'nspc' {
-  // parser.ts:415 — the default the dialect sets, before any #option.
-  let smw = command.target.program !== 0 || command.target.amkVersion < 2;
+export function velocityTableAt(command: Command, tokens: Token[], text: string): "smw" | "nspc" {
+	// parser.ts:415 — the default the dialect sets, before any #option.
+	let smw = command.target.program !== 0 || command.target.amkVersion < 2;
 
-  for (const token of tokens) {
-    if (token.start >= command.span.start) {
-      break;
-    }
+	for (const token of tokens) {
+		if (token.start >= command.span.start) {
+			break;
+		}
 
-    if (token.kind !== 'directive') {
-      continue;
-    }
+		if (token.kind !== "directive") {
+			continue;
+		}
 
-    // `matchWord` is case-insensitive (`parser.ts:845`), and `#option` and its
-    // keyword are two tokens, so the word is read from the one after.
-    if (text.slice(token.start, token.end).toLowerCase() !== '#option') {
-      continue;
-    }
+		// `matchWord` is case-insensitive (`parser.ts:845`), and `#option` and its
+		// keyword are two tokens, so the word is read from the one after.
+		if (text.slice(token.start, token.end).toLowerCase() !== "#option") {
+			continue;
+		}
 
-    const rest = text.slice(token.end).trimStart().toLowerCase();
-    if (rest.startsWith('smwvtable')) {
-      smw = true;
-    } else if (rest.startsWith('nspcvtable')) {
-      smw = false;
-    }
-  }
+		const rest = text.slice(token.end).trimStart().toLowerCase();
+		if (rest.startsWith("smwvtable")) {
+			smw = true;
+		} else if (rest.startsWith("nspcvtable")) {
+			smw = false;
+		}
+	}
 
-  return smw ? 'smw' : 'nspc';
+	return smw ? "smw" : "nspc";
 }

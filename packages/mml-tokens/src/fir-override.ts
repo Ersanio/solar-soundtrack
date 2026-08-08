@@ -1,4 +1,4 @@
-import type { Command } from './tokens';
+import type { Command } from "./tokens";
 
 // TODO: should this stay in its own file?
 
@@ -23,39 +23,38 @@ import type { Command } from './tokens';
  * every command just for this — costs more than the warning is worth.
  */
 export function firOverriddenBy(fir: Command, commands: Command[]): Command | null {
-  return (
-    commands.find(
-      (other) =>
-        other.vcmd === 0xf1 && other.channel === fir.channel && other.span.start > fir.span.start,
-    ) ?? null
-  );
+	return (
+		commands.find(
+			(other) => other.vcmd === 0xf1 && other.channel === fir.channel && other.span.start > fir.span.start,
+		) ?? null
+	);
 }
 
 /** The `$F5` this `$F1` discards, if there is one before it in the channel. */
 export function firOverriddenBefore(echo: Command, commands: Command[]): Command | null {
-  let found: Command | null = null;
-  for (const other of commands) {
-    if (other.span.start >= echo.span.start) {
-      break;
-    }
+	let found: Command | null = null;
+	for (const other of commands) {
+		if (other.span.start >= echo.span.start) {
+			break;
+		}
 
-    if (other.vcmd === 0xf5 && other.channel === echo.channel) {
-      found = other;
-    }
-  }
+		if (other.vcmd === 0xf5 && other.channel === echo.channel) {
+			found = other;
+		}
+	}
 
-  return found;
+	return found;
 }
 
 /** `0` or `1` — which built-in table, for naming it in the warning. */
 export function builtInFilterName(which: number): string {
-  if (which === 0) {
-    return 'filter 0, the SMW low-pass';
-  }
+	if (which === 0) {
+		return "filter 0, the SMW low-pass";
+	}
 
-  if (which === 1) {
-    return 'filter 1, flat';
-  }
+	if (which === 1) {
+		return "filter 1, flat";
+	}
 
-  return `filter ${which}, which is out of range`;
+	return `filter ${which}, which is out of range`;
 }
