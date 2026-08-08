@@ -1,17 +1,11 @@
 /**
  * ARAM layout and budgeting.
  *
- * Everything AddmusicK occupies before your song — the driver, its sound
- * effects, the song pointer table and every global song — lives inside
- * `main.bin`. So the budget needs no modelling: the numbers are exact by
- * construction, because the bytes that would need modelling are physically
- * present in the image.
- *
- * The bundled `main.bin` is a final-pass build, so that is the case here. A
- * second-pass build carries no song table — `SongPointers:` is the last label in
- * `main.asm`, so the table would begin exactly where the image ends — and for
- * one of those {@link planAram} appends a single slot and the figures understate
- * what a real install occupies.
+ * Everything AddmusicK occupies before your song lives inside `main.bin`, so the
+ * budget needs no modelling — the bytes that would have to be modelled are
+ * physically present in the image. That holds for a final-pass build, which the
+ * bundled one is; see README.md for what {@link planAram} does with a second-pass
+ * build instead.
  */
 
 import type { BrrSample, DriverBundle } from "./driver";

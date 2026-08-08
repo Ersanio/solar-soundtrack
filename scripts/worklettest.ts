@@ -8,7 +8,7 @@
  *
  * Node has all of them globally, so `audiotest` cannot catch a worklet reaching
  * for one; the failure only appears in a browser, as a dead play button. This
- * evaluates `public/player/spc-worklet.js` inside a `vm` context holding
+ * evaluates `packages/spc/assets/player/spc-worklet.js` inside a `vm` context holding
  * nothing but that permitted set, then drives the real processor through real
  * render quanta and listens to what comes out.
  *
@@ -43,11 +43,6 @@ interface Processor {
 }
 
 /**
- * Everything an AudioWorkletGlobalScope offers, and nothing else. A bare `vm`
- * context starts with only the ECMAScript intrinsics — crucially it has no Node
- * globals — so anything the bundle needs has to be listed here explicitly.
- */
-/**
  * The port the next processor will pick up. The scope's `AudioWorkletProcessor`
  * reads it at construction, which is how each processor gets its own.
  */
@@ -69,6 +64,11 @@ let shared: {
 	scope: object;
 } | null = null;
 
+/**
+ * Everything an AudioWorkletGlobalScope offers, and nothing else. A bare `vm`
+ * context starts with only the ECMAScript intrinsics — crucially it has no Node
+ * globals — so anything the bundle needs has to be listed here explicitly.
+ */
 function setupScope(bundle: string, wasm: Uint8Array): NonNullable<typeof shared> {
 	let registered: (new (options: unknown) => Processor) | null = null;
 

@@ -6,21 +6,14 @@ import { hex2 } from "@amk/core/hex";
 /**
  * Diagnostics for an echo that compounds instead of decaying.
  *
- * The FIR sits inside the echo's feedback loop, so repeat *k* comes back at `(EFB/128 · |H(f)|)^k`
- * — and once that reaches 1 the echo builds on itself for as long as the song plays. `spc/fir.ts`
- * has known how to spot this for a while, but only the FIR designer asked it, and only about the
- * `$F5` under the caret. A song that was pasted in whole, restored from the last session, or is
- * simply being edited somewhere else said nothing at all.
+ * The FIR sits inside the feedback loop, so repeat *k* comes back at
+ * `(EFB/128 · |H(f)|)^k` — and once that reaches 1 the echo builds on itself for as long as the
+ * song plays. `echoStability` has known how to spot this for a while, but only the FIR designer
+ * asked it, and only about the `$F5` under the caret.
  *
- * So the same verdict is computed here over the whole document and reported as a diagnostic. Two
- * things follow from that, and both are deliberate:
- *
- * - It runs on {@link Command}s from `tokens.ts`, not on compiler output. `$F5` is invisible to
- *   this compiler and to AddmusicK — `Music.cpp` has no `$F5` code at all, only the length table
- *   entry at `Music.cpp:63`, so every instance is copied through verbatim and nothing upstream has
- *   an opinion to report.
- * - It therefore has no AddmusicK counterpart, which is why these carry their own `AMK05xx` range
- *   rather than extending the parser's.
+ * Runs on {@link Command}s rather than compiler output, because `$F5` is invisible to AddmusicK —
+ * `Music.cpp` has no `$F5` code at all, only the length table entry at `Music.cpp:63`. Hence the
+ * `AMK05xx` range of its own rather than an extension of the parser's.
  */
 
 /** Runaway echo through custom `$F5` coefficients. */

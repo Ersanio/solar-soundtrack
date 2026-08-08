@@ -1,37 +1,11 @@
 /**
  * The DSP's volume envelope: what an instrument's ADSR, GAIN and tuning bytes do.
  *
- * Three of the six bytes in an instrument entry describe an envelope, and the
- * language gives you no help with any of them — `$FE $6A $B8` is the most common
- * setting in the stock table and says nothing at all out loud.
- *
- * ```
- *   ADSR1  %eddd aaaa   e: use ADSR at all; ddd: decay rate; aaaa: attack rate
- *   ADSR2  %sss rrrrr   sss: sustain level; rrrrr: sustain/release rate
- *   GAIN                used when ADSR1's top bit is clear
- * ```
- *
- * The bit layout is AddmusicK's own
- * (`AddmusicKreadme/readme_files/hex_command_reference.html:446-456`, and the
- * `#instruments` byte list at `syntax_reference.html:258-263`: "to use ADSR,
- * make sure that it is >= $80. Otherwise GAIN is used"). Note that the GAIN byte
- * is always *written* when an instrument is initialised — the `$FA $FE` hot-patch
- * bit only reorders the ADSR and GAIN writes (`hex_command_reference.html:344`) —
- * so it is inert while ADSR1's top bit is set, not absent.
- *
- * ## Where the numbers come from
- *
- * The timings are a port of AddmusicK's own ADSR calculator, the `<script>` at
- * `hex_command_reference.html:7-95`, rather than analysis this project invented.
- * That makes the readme the citable authority for every constant here, which is
- * the same footing `fir.ts` stands on with bsnes.
- *
- * {@link CLOCKS} is the DSP's rate table, and it earns its keep twice: the
- * envelope rates index it, and so does the noise clock — `n$1F` is
- * `32000 / CLOCKS[0x1F]` = 32 kHz, `n$01` is 15.6 Hz. Reproducing the published
- * SNES noise ladder from the same table an envelope reads is the one check that
- * can catch a transposed digit in it, since every other function here is defined
- * *in terms of* the table. `adsrtest` does exactly that.
+ * A port of AddmusicK's own ADSR calculator, the `<script>` at
+ * `AddmusicKreadme/readme_files/hex_command_reference.html:7-95`, so the readme is
+ * the citable authority for every constant here. {@link CLOCKS} is the DSP's rate
+ * table, read by both the envelope rates and the noise clock — see README.md for
+ * why that dual use is the only check that can catch a transposed digit in it.
  */
 
 import { DSP_RATE } from "./fir";

@@ -1,7 +1,7 @@
 /**
  * End-to-end check: compile MML -> assemble an SPC -> verify its structure.
  *
- * Runs in node, so it stubs `fetch` over the local public/driver directory.
+ * Runs in node, so it stubs `fetch` over the SPC package's assets.
  *
  *   npm run spctest
  */
@@ -391,7 +391,7 @@ console.log("\nupload header detection is the size rule alone");
 console.log("\na nonsense main.bin is diagnosed, not compiled against");
 {
 	// Nothing supplies a driver at runtime any more, so the image that has to be
-	// trusted is the one in public/driver/. An image with no upload header and no
+	// trusted is the bundled one. An image with no upload header and no
 	// table falls through to the manifest cross-check, which is what stops a bad
 	// swap being loaded against stale constants and quietly relocating every
 	// pointer to the wrong place.

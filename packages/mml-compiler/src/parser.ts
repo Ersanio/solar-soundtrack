@@ -162,7 +162,7 @@ export interface ParseOutput {
  * enough to slow the driver down loses ticks outright — around 0.8% on eight
  * active channels, which no function of tempo can predict. Anything that has to
  * stay in step with the audio counts the driver's own ticks instead; see
- * `spc/driver-state.ts`.
+ * `@amk/spc/driver-state`.
  */
 const TIMER_HZ = 500;
 const TEMPO_UNIT = 256;
@@ -289,7 +289,7 @@ export class AddmusicKParser {
 	 * byte-level divergence left.
 	 *
 	 * Implementing it needs two things this project does not have. `EMPTY.brr` is
-	 * not in `public/driver/samples/`, and the pass skips any sample marked
+	 * not in `the driver bundle's samples/`, and the pass skips any sample marked
 	 * `important` — a per-sample flag AddmusicK reads from
 	 * `Addmusic_sample groups.txt` and that `manifest.json` has no equivalent of.
 	 * Guessing at those flags would drop samples AMK keeps, which is worse than

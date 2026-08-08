@@ -305,7 +305,7 @@ function assertNotHtmlFallback(response: Response, url: string): void {
 		throw new DriverError(
 			`${url} returned an HTML page instead of a file, which means it does not exist ` +
 				`(the dev server's SPA fallback answers 200 for unknown paths). ` +
-				`Check that it is present under public/driver/.`,
+				`Check that it is present in the driver bundle.`,
 		);
 	}
 }
@@ -332,7 +332,7 @@ async function load(baseUrl: string, sampleGroup: string): Promise<DriverBundle>
 	if (!manifestResponse.ok) {
 		throw new DriverError(
 			`Could not load ${manifestUrl} (HTTP ${manifestResponse.status}). ` +
-				`The driver bundle lives in public/driver/.`,
+				`The driver bundle lives in packages/spc/assets/driver/.`,
 		);
 	}
 

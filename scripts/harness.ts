@@ -1,14 +1,6 @@
 /**
- * What the eleven byte-level harnesses share.
- *
- * Each of them is a standalone esbuild-bundled Node script, and each used to
- * carry its own byte-identical copy of `check`, its own exit epilogue and — for
- * the three that load the driver bundle — its own `fetch` stub. The copies had
- * already drifted: `worklettest.ts` said "same shim as spctest" above a shim
- * that had lost both of the behaviours `spctest.ts` documents as load-bearing.
- *
- * Nothing here knows what is being tested, so it stays out of the way of the
- * assertions, which are the point.
+ * What the eleven byte-level harnesses share. Nothing here knows what is being
+ * tested, so it stays out of the way of the assertions. See README.md.
  */
 
 import { readFileSync } from "node:fs";
@@ -68,20 +60,11 @@ function response(body: Buffer | string, contentType: string) {
 }
 
 /**
- * Serve the SPC package's assets over `fetch`, the way Vite's dev server does —
- * they are copied to the site root as `/driver` and `/player`, which is exactly
- * what `loadDriver` and `SpcPlayer` ask for.
+ * Serve the SPC package's assets over `fetch`, the way Vite's dev server does.
  *
- * Both behaviours here are deliberate, and between them they produced the
- * "invalid BRR length 2205" bug:
- *
- *   1. paths are decoded with `decodeURI`, which leaves `%40` untouched, so an
- *      over-encoded `@` never resolves to a real file;
- *   2. an unresolved path is answered 200 with index.html, not 404 — so code
- *      that trusts `response.ok` gets HTML where it expected bytes.
- *
- * A harness that threw on a missing file instead would pass while the browser
- * failed, which is exactly the drift this module exists to stop.
+ * Two behaviours here are deliberate and between them produced a real bug: paths
+ * are decoded with `decodeURI`, and an unresolved path is answered 200 with
+ * index.html rather than 404. README.md has why both matter.
  */
 export function stubFetch(): void {
 	globalThis.fetch = ((input: string) => {

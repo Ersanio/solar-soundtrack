@@ -8,11 +8,9 @@
 /**
  * How badly a diagnostic wants attention, worst first — the order the UI sorts by.
  *
- * `"severe"` sits below `"error"` because the song still compiles and still exports; it is for the
- * things that go wrong when the song *plays*, which no amount of reading the bytes would reveal. A
- * runaway echo is the case it exists for.
- *
- * `"info"` is declared and never produced. Nothing emits one yet.
+ * `"severe"` sits below `"error"` because the song still compiles and still exports; it is for what
+ * goes wrong when the song *plays*, which reading the bytes would never reveal. `"info"` is declared
+ * and never produced.
  */
 export type Severity = "error" | "severe" | "warning" | "info";
 
@@ -52,13 +50,8 @@ export interface CompileStats {
 	channelTicks: number[];
 	/**
 	 * The song's shape in music ticks — the intro, played once, and the loop that
-	 * follows it. Taken from the shortest channel, which is where the song turns
-	 * over, so `introTicks + loopTicks` is one pass.
-	 *
-	 * These are what the player follows. Ticks survive the trip into the driver
-	 * intact, whereas the seconds they take cannot be predicted exactly: a busy
-	 * song makes the driver drop ticks, so any figure in seconds is an estimate
-	 * and a playhead built on one drifts.
+	 * follows it. Taken from the shortest channel, so `introTicks + loopTicks` is
+	 * one pass. Exact, where every field in seconds below is not.
 	 */
 	introTicks: number;
 	loopTicks: number;
@@ -82,11 +75,9 @@ export interface CompileStats {
 	loops: boolean;
 	/**
 	 * The length written to the ID666 tag: the intro plus *two* passes of the main
-	 * loop, which is the SPC convention of looping once before the fade.
-	 *
-	 * This is a header field, not a song length — feed it to the SPC writer and
-	 * nothing else. What to show a listener is {@link introSeconds} plus
-	 * {@link mainSeconds}. `null` when the compiler could not guess.
+	 * loop, the SPC convention of looping once before the fade. A header field,
+	 * not a song length — feed it to the SPC writer and nothing else. `null` when
+	 * the compiler could not guess.
 	 */
 	tagSeconds: number | null;
 	/** Estimated intro seconds, one pass. `null` when the compiler could not guess. */
@@ -94,13 +85,8 @@ export interface CompileStats {
 	/** Estimated main-loop seconds, one pass. `null` when the compiler could not guess. */
 	mainSeconds: number | null;
 	/**
-	 * The same split measured against the driver's real tick rate instead of
-	 * AddmusicK's rounded one — what anything following the audio must use.
-	 *
-	 * {@link introSeconds} and {@link mainSeconds} are AddmusicK's arithmetic, and
-	 * that is deliberate: they are what it prints and what the ID666 tag is built
-	 * from. They are also 2-6% out, which is fine for a label and useless for a
-	 * playhead, since the error compounds on every pass round the loop.
+	 * The same split against the driver's real tick rate rather than AddmusicK's
+	 * rounded one — what anything following the audio must use. See README.md.
 	 */
 	playback: SongLength | null;
 	/** ID666 tags parsed out of `#spc { }`. */
@@ -151,14 +137,11 @@ export interface CompileResult {
 	noteMap: readonly NoteAddress[] | null;
 	/**
 	 * The sample set this song needs, by filename, in SRCN order — index 0 is
-	 * directory entry 0. `null` means the compiler has no opinion and the host
-	 * should use whatever default its driver ships; `[]` means the song genuinely
-	 * asks for no samples at all, which is why the two cannot be conflated.
+	 * directory entry 0. `null` means the compiler had no opinion and the driver's
+	 * default stands; `[]` means the song genuinely asks for none.
 	 *
-	 * This is a correctness-critical output, not a statistic. Building an SPC
-	 * against a different set than the compiler resolved produces a file that
-	 * looks valid and plays the wrong sounds, so hosts must feed this to the SPC
-	 * writer rather than assuming.
+	 * Correctness-critical, not a statistic: building an SPC against a different
+	 * set produces a file that looks valid and plays the wrong sounds.
 	 */
 	sampleList: readonly string[] | null;
 	diagnostics: Diagnostic[];

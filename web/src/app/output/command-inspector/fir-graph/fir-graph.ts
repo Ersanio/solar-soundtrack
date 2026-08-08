@@ -15,23 +15,9 @@ import { clamp } from '../../../util/math';
 const TOP_DB = 12;
 const FLOOR_DB = -48;
 /**
- * The frequency axis is **linear**, DC to Nyquist, which is not what an audio
- * plot usually does and is deliberate.
- *
- * An 8-tap response is a degree-7 polynomial in `cos(ω)`, so its nulls and
- * ripples are spaced evenly in frequency. Every feature of AddmusicK's own
- * `EchoFilter0` — both nulls, both ripple peaks — sits above 8.7 kHz, which a
- * log axis over the same range squeezes into its rightmost seventh while
- * spending four octaves on a region {@link FIR_AUTHORITY_HZ} says the filter
- * cannot shape at all. Linear gives that top octave half the width instead.
- *
- * It also makes DC drawable. `firDcGain` is a real quantity — the manual's
- * low-pass sums to 132 and so lifts steady tones by 3% — and a log axis can
- * never show 0 Hz at all.
- *
- * The cost is that hearing is logarithmic and this is not. That argument is at
- * its weakest here: the octaves it would buy space for are exactly the ones the
- * filter has no authority over.
+ * The frequency axis is **linear**, DC to Nyquist — deliberate, and README.md
+ * says why. It also makes DC drawable, which matters because `firDcGain` is a
+ * real quantity: the manual's low-pass sums to 132 and lifts steady tones by 3%.
  */
 const FROM_HZ = 0;
 const TO_HZ = DSP_RATE / 2;

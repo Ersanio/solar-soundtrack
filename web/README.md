@@ -1,90 +1,112 @@
-# Solar Soundtrack
+# The editor
 
-A browser-based AddmusicK 1.0.11 MML editor. It compiles MML to N-SPC song data, assembles a
-playable `.spc`, and plays it through an emulated SPC700 — entirely client-side. No ROM, no
-AddmusicK install, no server.
+The Angular application. Everything it compiles, assembles and plays lives in `../packages`; what is
+here is the UI, the four state services, and the adapters that join CodeMirror and Web Audio to
+framework-free code.
 
-## Working in this repository
+Run everything from the repository root, not from here. `npm start`, `npm run build` and
+`npm run watch` each have a pre-hook that bundles the worklet, mirrors the SPC package's assets into
+`public/`, and writes the commit SHA — none of the three is checked in, and `ng serve` skips all of
+them.
 
-The Angular workspace is one level down, in `web/`. **Every npm command runs from `web/`, not the
-repository root.** Node 24 is what CI uses.
+## Layout
 
-```bash
-cd web
-npm ci
-npm start          # dev server on http://localhost:4200/
-```
+| Path              | What it is                                                    |
+| ----------------- | ------------------------------------------------------------- |
+| `src/app/state/`  | Four `@Service()` singletons, in dependency order             |
+| `src/app/editor/` | The source pane: CodeMirror, transport, mixer, sample browser |
+| `src/app/output/` | Diagnostics, stats, the ARAM bar, the command inspector       |
+| `src/app/shared/` | Form controls, panels, icons, chart helpers                   |
+| `src/app/util/`   | Formatting, IndexedDB, `clamp`                                |
 
-### Use the npm scripts, not `ng` directly
+State flows one way: `DriverStore` → `SampleStore` → `EditorStore` → `Playback`.
 
-`npm start`, `npm run build` and `npm run watch` each have a pre-hook that generates two files
-which are **not** checked in:
+`DriverStore` loads `packages/spc/assets/driver/` and derives the song's ARAM load address from the
+driver's own song pointer table. **There is no fallback address** — until the driver loads,
+compilation is blocked rather than run against a guess.
 
-- `public/player/spc-worklet.js`, bundled from `src/spc/worklet.ts`. An AudioWorklet is loaded by
-  URL from the audio thread, so the Angular builder cannot produce it as part of the app bundle.
-- `src/app/git-info.generated.ts`, holding the commit SHA for the toolbar's commit link.
+`EditorStore` debounces typing (150 ms) into a `committed` signal that a `computed` compiles.
+Diagnostics, stats, the ARAM budget and the hex dump are all `computed` off that one result.
+`buildSpc` is a method rather than a `computed` because it copies 64 KiB of ARAM plus every sample —
+wasted work on each keystroke.
 
-Running `ng serve` or `ng build` skips those hooks, and the result is an app that builds and then
-fails at runtime with a play button that does nothing. Reach for `npm run ...` every time.
+## Preview and commit
 
-`git-info.generated.ts` is captured once at startup, so it goes stale if you commit while
-`npm start` is running. Restart to refresh it.
+Everything that edits MML writes back through `EditorStore.replace`, which recompiles. So a control
+that committed on every `input` event would push a recompile through the typing debounce once per
+frame of a drag, and the commit's own recompile would feed a new value back down and yank the thumb
+out from under the pointer.
 
-| Command          | What it does                                                        |
-| ---------------- | ------------------------------------------------------------------- |
-| `npm start`      | Dev server.                                                         |
-| `npm run build`  | Production build into `dist/`.                                      |
-| `npm run watch`  | Dev-configuration build with `--watch`, no server.                  |
-| `npm run format` | Prettier over the workspace.                                        |
-| `npm run lint`   | ESLint over `src/`, `scripts/` and the templates.                   |
-| `npm run check`  | **The merge gate.** Formatting, both typechecks, all ten harnesses. |
+`amk-slider` is where that contract lives:
 
-CI runs `npm run lint` then `npm run check` on every push and pull request.
+- `preview` fires continuously, for anything cheap and local — a graph redrawing, a readout counting.
+- `commit` fires once, when the gesture ends.
+- `pending` holds the dragged value in front of the bound one until it does.
 
-## Tests
+`value` is an `input`, not a `model`: a commit is a gesture, not a change, and a two-way binding
+cannot express "the source of truth updates when I let go". Readouts are computed from the
+_previewed_ value — a label derived from the document would sit there describing the number you are
+dragging away from.
 
-There are no `.spec.ts` files — `npm run test` is scaffolding and runs nothing. The real suite is
-ten byte-level harnesses under `scripts/`, each a standalone Node script with its own npm script:
+## Reaching into the editor
 
-`selftest` (compiler output, byte for byte) · `spctest` (MML → `.spc` structure) · `audiotest`
-(MML → SPC → real PCM through the wasm host — this is what proves the whole pipeline) ·
-`worklettest` (the shipped worklet bundle, inside a scope holding only what an
-AudioWorkletGlobalScope really has) · `charttest` · `brrtest` · `tokentest` · `firtest` ·
-`instrtest` · `adsrtest`.
+The editor owns the CodeMirror view, so nothing else may touch it. Two signals on `EditorStore` are
+how a sibling panel asks:
 
-They share `scripts/harness.ts`. Use it rather than writing another copy of `check` or the `fetch`
-stub — the stub reproduces two dev-server behaviours that once caused a real bug.
+- `reveal` — select and scroll to a span, set when a diagnostic is clicked.
+- `replace` — apply a splice, set when a panel edits a command in place.
 
-**None of them compiles Angular templates, and neither does `npm run typecheck`.** A bad binding
-passes `npm run check` and fails only at `npm run build` or `npm start`, so run one of those before
-believing a UI change.
+`replace` carries `expect`, the text the splice believes occupies the span. Panels read the
+_undebounced_ scan, so their spans agree with the document — but only up to the microtask that
+carries the edit across, and a control that fires on `pointerup` is one gesture away from a document
+that has moved. The editor compares before it dispatches, which turns that whole class of race from
+silent corruption into an edit that simply does not take.
 
-`scripts/Compare-Spc.ps1` and `scripts/Compare-SongBin.ps1` diff output against a real AddmusicK
-build. Those are what establish fidelity; the harnesses only catch gross breakage.
+`EditorStore.apply` ignores the `null` the splice builders return when nothing would change. A
+slider fires per frame of a drag, and "that is the text already there" is what keeps a drag from
+pushing dozens of identical recompiles through the debounce.
 
-## Formatting
+## The CodeMirror adapter
 
-Prettier owns the workspace in two profiles: `app/` at 2 spaces and single quotes, and `compiler/`,
-`spc/`, `core/` and `scripts/` at tabs and double quotes, carried over from the pre-Angular
-prototype. Run `npm run format`; `npm run check` fails on anything it would rewrite.
+`editor/codemirror/` is the only place that knows CodeMirror exists. `mml-language.ts` is 40 lines:
+`@amk/tokens` exposes `step` / `startState` / `copyState` in exactly the shape `StreamLanguage`
+wants, and `TOKEN_TAGS` holds `@lezer/highlight` tag _names_ as strings so the package itself stays
+CodeMirror-free. This is the one place those names resolve to `Tag` values, and `tokentest` asserts
+every one of them is real, so the cast is a checked one.
 
-`git blame` should skip the commit that first ran Prettier over the tree:
+## Accessibility
 
-```bash
-git config blame.ignoreRevsFile .git-blame-ignore-revs
-```
+**This app ships no ARIA attributes and no `role` or `tabindex`.** That is a deferral, not an
+oversight — see the note in the root `CLAUDE.md`. The global `:focus-visible` outline in
+`styles.css` is a different concern and must not be removed by components.
 
-## Architecture
+## Two AudioContexts
 
-`CLAUDE.md` at the repository root is the long version — the pipeline, the AddmusicK citation
-convention, and what to read before changing compiler behaviour. In short:
+`SpcPlayer` owns one for song playback. `Playback` owns a second for one-shot sample audition. They
+are separate on purpose: auditioning a sample must not interrupt or be interrupted by the song.
 
-| Path                | Layer                                                                    |
-| ------------------- | ------------------------------------------------------------------------ |
-| `web/src/compiler/` | MML compiler                                                             |
-| `web/src/spc/`      | SPC assembly, BRR, echo FIR, driver bundle, emulator host, audio worklet |
-| `web/src/app/`      | Angular UI                                                               |
+## Persistence is optional
 
-`compiler/` and `spc/` are framework-free and DOM-free, which is what lets the same modules run in
-Node under the harnesses, on the main thread, and inside an AudioWorkletGlobalScope. Keep it that
-way.
+The MML draft goes to `localStorage`; the sample library to IndexedDB via `util/idb.ts`, which
+resolves rather than rejects on every path. Storage is genuinely optional — private browsing, an
+exhausted quota — and must never stop someone compiling a song.
+
+## Charts
+
+Only `aram-bar` draws with d3, and it is the only component that needs `shared/chart/stack.ts` and
+`element-size.ts`. The four inspector graphs are Angular-templated SVG over a fixed viewBox from
+`shared/chart/plot.ts`, stretched to their container, so stroke widths and offsets are in viewBox
+units rather than pixels.
+
+`fir-graph`'s frequency axis is **linear**, DC to Nyquist, which is not what an audio plot usually
+does. Eight taps at 32 kHz have no authority below a couple of kHz, so a log axis would spend most
+of its width on the part of the spectrum the filter cannot address, and push the nulls and ripple
+that actually distinguish one filter from another into a corner. The cost is that hearing is
+logarithmic and this is not.
+
+## Panels build view models, not methods
+
+A `computed` of rows with everything resolved, rather than a method called per row in the template —
+see `sample-browser.ts`, `aram-budget.ts` and `stats-grid.ts`. `@angular-eslint`'s
+`template/no-call-expression` is the rule that would enforce this, and it cannot be used in a signals
+codebase where every read is a call; the structure is what keeps the bug out instead.

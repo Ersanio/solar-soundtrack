@@ -11,17 +11,8 @@ export interface DragPreview {
 }
 
 /**
- * Values a slider is showing mid-drag, before anything has been written.
- *
- * `amk-slider` deliberately commits once per gesture — dragging a slider that
- * recompiled per frame would push a recompile through the typing debounce dozens
- * of times a second. But that also meant the graphs sat still until the pointer
- * came up, which is exactly backwards: the picture is the thing you are dragging
- * *towards*, and it is most useful while you are still moving.
- *
- * So the slider's `(preview)` output feeds this, and anything drawn from it
- * follows the drag while the document does not. Nothing here writes; the commit
- * path is untouched.
+ * Values a slider is showing mid-drag, before anything has been written. The
+ * receiving end of the preview/commit split — see README.md.
  *
  * `source` is what makes it self-clearing: pass the command (or entry) the view
  * is rendering, and the moment a commit lands and the scan produces a new one,

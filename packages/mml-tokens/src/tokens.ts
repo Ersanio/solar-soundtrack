@@ -1,61 +1,15 @@
 /**
  * A resumable scanner over MML source.
  *
- * Two things want to know what is written where: the command inspector, which
- * asks "what is under the caret", and — later — syntax highlighting. Rather
- * than write that twice, the core here is a line-oriented stepper carrying a
- * small copyable state, which is the shape CodeMirror's `StreamLanguage`
- * wants. `tokenize` below is one wrapper over it; the editor will be another.
+ * A line-oriented stepper carrying a small copyable state, which is the shape
+ * CodeMirror's `StreamLanguage` wants; {@link tokenize} is one wrapper over it and
+ * the editor's `mmlLanguage` is the other. Two properties are load-bearing and
+ * `tokentest` checks both: {@link step} never looks behind its own `at` or at
+ * another line, and {@link copyState} is a real copy.
  *
- * Two properties are load-bearing and `tokentest` checks both:
- *
- *   1. `step` never looks behind its own `at`, and never at another line. All
- *      context crosses a line boundary inside {@link ScanState}. That is what
- *      lets CodeMirror restart scanning at any line it likes.
- *   2. {@link copyState} is a real copy. CodeMirror keeps one state per line and
- *      would otherwise see them all mutate together.
- *
- * This deliberately does *not* go through the compiler. Compiler spans are
- * offsets into the preprocessed text — `preprocess.ts` drops the `#amk` marker,
- * `#define` lines and comments without preserving positions — whereas the
- * editor needs offsets into what the user actually typed. Scanning the raw text
- * also keeps working while the song does not compile, which is most of the time
- * while someone is typing.
- *
- * The dispatch mirrors `Music::parseHexCommand` / `Music::scan` as ported in
- * `parser.ts` — in particular the `hexLeft` / `currentHex` / `currentHexSub`
- * state machine at `parser.ts:195-199`, which is why a hex command split across
- * a line break still resolves. The target-program forks (`#am4`'s `$ED` and
- * `$E5`, `#amk 1`'s `$FC`) are mirrored too, off the markers scanned in place —
- * with one deliberate difference: `preprocess.ts` resolves the markers before
- * the parser runs, so the file's last effective marker governs the *whole*
- * song, where a resumable scanner can only apply a marker from its line down.
- * Well-formed songs put the marker before any music, where the two agree; the
- * mid-file divergence is pinned in `tokentest`.
- *
- * Replacements — `"echo1=$EF"` and then a bare `echo1` — are followed, because
- * writing commands that way is ordinary and an inspector that went blank on
- * them would be blind to whole songs. {@link ScanState} carries the definitions
- * visible at each point as an immutable value, so `copyState` stays a shallow
- * copy and rule 1 above still holds: a state captured at line 40 *is* the set
- * of replacements in scope at line 40, with nothing from line 90 leaking back.
- *
- * Three deliberate departures from `parser.ts` there, none of them free:
- *
- *   - Only a definition that opens and closes on one line registers. AMK's
- *     `getQuotedString` runs happily past a newline, but carrying a partial
- *     body across lines would put a growing string in the copied state, and one
- *     stray `"` near the top of a long file would then make every keystroke
- *     quadratic.
- *   - `getInt` / `getHex` (`parser.ts:502-532`) expand mid-token, so AMK reads
- *     `"4=8"` + `c44` as `c84` and `"2b=EF"` + `$2b` as `$EF`. Both need a
- *     rewrite *inside* a token, which a model whose tokens are spans cannot
- *     express. `tokentest` pins both divergences so neither gets "fixed".
- *   - Recursion is bounded by an active set and a character budget rather than
- *     by AMK's 500 iterations at one position (`parser.ts:687`). That count
- *     limits chain length; expansion here is a tree, and `"g=g g"` would be
- *     exponential under any depth-only cap. This runs on every keystroke, so
- *     the guard has to bound total work.
+ * Deliberately not routed through the compiler — its spans are offsets into
+ * preprocessed text, and the editor needs offsets into what was typed. README.md
+ * has where this mirrors `parser.ts`, and the three places it cannot.
  */
 
 import type { Span } from "@amk/core/types";
@@ -1114,7 +1068,7 @@ export interface Command {
 		/**
 		 * The replacement this argument came through, if any.
 		 *
-		 * The interlock `compiler/edits.ts` tests. Every token from one expansion
+		 * The interlock `@amk/tokens`'s `edits.ts` tests. Every token from one expansion
 		 * is stamped with the use site's span, so two arguments out of one macro
 		 * share a single span and writing over either would clobber the other —
 		 * which is why provenance per part is the right primitive here rather

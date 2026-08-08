@@ -7,10 +7,10 @@
  * of several candidates would be a guess wearing a checked answer's clothes —
  * so the count is asserted, not just the contents.
  *
- * The second is the cross-check between `compiler/tables.ts`'s
+ * The second is the cross-check between `@amk/core`'s `tables.ts`'s
  * `INSTRUMENT_TO_SAMPLE` and the bytes actually in the driver. They are separate
  * statements of the same fact, kept apart because `compiler/` does not depend on
- * `spc/`, and they agree on 29 of 30 entries. The 30th — index 19 — is pinned
+ * `@amk/spc`, and they agree on 29 of 30 entries. The 30th — index 19 — is pinned
  * here rather than smoothed over, because that disagreement *is* the `@19` story.
  *
  *   npm run instrtest

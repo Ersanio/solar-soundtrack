@@ -7,7 +7,7 @@ import { TICKS_PER_WHOLE } from "@amk/core/tables";
  * count or a note byte is never spelled two ways in one screen.
  *
  * How a value is *written back* is not here — that is `argumentText` in
- * `compiler/edits.ts`, because the radix is a fact about the language rather
+ * `@amk/tokens`'s `edits.ts`, because the radix is a fact about the language rather
  * than about presentation, and that layer is the one a harness can gate.
  */
 

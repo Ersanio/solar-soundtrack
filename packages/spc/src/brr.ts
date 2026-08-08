@@ -1,38 +1,15 @@
 /**
  * BRR — the SNES's ADPCM sample format.
  *
- * Everything here is pure: no DOM, no fetch, no framework. It runs in Node, on
- * the main thread and inside a worklet, and `scripts/brrtest.ts` drives it
- * headlessly.
+ * Pure: no DOM, no fetch, no framework. It runs in Node, on the main thread and
+ * inside a worklet, and `scripts/brrtest.ts` drives it headlessly.
  *
- * AddmusicK itself has no BRR codec — it copies `.brr` files around as opaque
- * blobs (`globals.cpp:addSample`) and lets the DSP do the decoding. The decoder
- * here is instead a transcription of `SPC_DSP::decode_brr` from Blargg's
- * snes_spc, which is the authoritative reference for this project specifically:
- * `public/player/spc.wasm` is that same core, so matching it means the waveform
- * drawn in the sample browser is the waveform the player will produce.
- *
- * Keep it a transcription. The published coefficients are ratios (15/16, 61/32,
- * 115/64, 13/16) and there are several integer forms that hit them, but they
- * are not interchangeable — `(-(p + (p >> 1))) >> 5` and `(p * -3) >> 6` differ
- * for odd `p`, and only agree here because the stored history is always even.
- * Deriving a form from the ratios rather than copying one lands on arithmetic
- * that is right for the wrong reason.
- *
- * Format, per snes.nesdev.org/wiki/BRR_samples and
- * wiki.superfamicom.org/bit-rate-reduction-(brr):
- *
- *   A sample is a run of 9-byte blocks. Byte 0 is a header, `SSSS FFLE`:
- *
- *     bits 7-4  S  left shift applied to each nibble
- *     bits 3-2  F  filter, 0-3
- *     bit  1    L  loop — on the final block, playback jumps to the loop point
- *     bit  0    E  end — the last block of the sample
- *
- *   Bytes 1-8 hold 16 samples as signed 4-bit nibbles, high nibble first.
- *
- * A `.brr` *file* additionally carries a 2-byte little-endian loop offset ahead
- * of the block data. `parseBrr` strips it into {@link BrrSample.loopOffset}.
+ * The decoder is a transcription of `SPC_DSP::decode_brr` from Blargg's snes_spc,
+ * which is what `assets/player/spc.wasm` is — so matching it means the waveform
+ * drawn in the sample browser is the one the player will produce. **Keep it a
+ * transcription**: several integer forms hit the published coefficient ratios and
+ * they are not interchangeable. README.md has the block format and the case where
+ * two forms diverge.
  */
 
 import { hex } from "@amk/core/hex";

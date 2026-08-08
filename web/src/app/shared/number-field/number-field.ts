@@ -9,10 +9,7 @@ import { Component, input, output } from '@angular/core';
  * blur or Enter — and fires only when the text parses, which also means one undo
  * step per edit rather than one per keystroke.
  *
- * That guard was never a reason to stay silent, though, and `preview` is the
- * separation: it fires per keystroke for anything cheap and local, on the same
- * terms as the slider's. Nothing it reports is written, so a value typed on the
- * way to another costs a redrawn curve and nothing else.
+ * `preview` still fires per keystroke, on the same terms as the slider's.
  *
  * The right control for anything that decides how the *rest* of a command is
  * read — an arpeggio's count, an `#am4` `$ED` sub-byte — where a slider would

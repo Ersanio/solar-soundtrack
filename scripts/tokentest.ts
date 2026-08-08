@@ -543,7 +543,7 @@ console.log("\na command knows which of its parts came through a macro");
 	// The whole point of carrying provenance per part rather than per command:
 	// `replacement` alone cannot tell "the bytes are not in the document" from
 	// "the command byte is a macro and every argument is literal text", and only
-	// the second of those can be rewritten in place. `compiler/edits.ts` asks
+	// the second of those can be rewritten in place. `@amk/tokens`'s `edits.ts` asks
 	// this question; here is where the answer is pinned.
 	const head = tokenize('"ech=$EF"\n#0 ech $80 $10 $10\n').commands.find((c) => c.vcmd === 0xef);
 	check("the aggregate still fires", head?.replacement === "ech");

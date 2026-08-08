@@ -89,7 +89,7 @@ export class EditorStore {
   readonly replace = signal<Edit | null>(null);
 
   /**
-   * Applies a splice built by `compiler/edits.ts`, ignoring the `null` those
+   * Applies a splice built by `@amk/tokens`'s `edits.ts`, ignoring the `null` those
    * builders return when nothing would change.
    *
    * Here rather than in each panel so the no-op check and the defensive copy are

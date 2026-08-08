@@ -1,3 +1,12 @@
+/**
+ * What was in force at a point in the song: tempo, and which velocity table `q`
+ * reads against.
+ *
+ * A positional walk over the scanner's commands, not compiler output, so it
+ * answers while the song is mid-edit. Same-channel only where that matters —
+ * see README.md.
+ */
+
 import type { Command, Token } from "./tokens";
 
 /**

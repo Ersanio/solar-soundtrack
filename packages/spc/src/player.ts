@@ -2,12 +2,9 @@
  * SPC700 playback.
  *
  * Owns an AudioContext, a GainNode for volume, and an AudioWorkletNode running
- * `worklet.ts`, which holds the emulator. Everything below the Web Audio graph
- * is ours; the only vendored piece left is `public/player/spc.wasm` itself.
- *
- * The wasm is compiled here and posted to the worklet because an
- * AudioWorkletGlobalScope cannot fetch. Playback state lives on the audio
- * thread, so position arrives as events rather than being polled off the
+ * `worklet.ts`, which holds the emulator. The wasm is compiled here and posted
+ * across because an AudioWorkletGlobalScope cannot fetch. Playback state lives on
+ * the audio thread, so position arrives as events rather than being polled off the
  * context clock — which stays accurate across pause and seek.
  */
 
@@ -176,7 +173,9 @@ export class SpcPlayer {
 		const url = `${this.baseUrl}/spc.wasm`;
 		const response = await fetch(url);
 		if (!response.ok) {
-			throw new PlayerError(`Could not load ${url} (HTTP ${response.status}). The emulator lives in public/player/.`);
+			throw new PlayerError(
+				`Could not load ${url} (HTTP ${response.status}). The emulator lives in packages/spc/assets/player/.`,
+			);
 		}
 
 		return await WebAssembly.compile(await response.arrayBuffer());

@@ -5,20 +5,10 @@ import { clamp } from '../../util/math';
 /**
  * A labelled range input that reports a drag and a commit separately.
  *
- * The separation is the whole component. Everything that edits MML writes back
- * through `EditorStore.replace`, which recompiles — so a control that committed
- * on every `input` event would push a recompile through the 150 ms typing
- * debounce once per frame of a drag, and the commit's own recompile would then
- * feed a new value back down and yank the thumb out from under the pointer.
- *
- * So: `preview` fires continuously and is for anything cheap and local (a graph
- * redrawing, a readout counting), `commit` fires once when the gesture ends, and
- * `pending` holds the dragged value in front of the bound one until it does.
- * That contract lived as a comment on the transport's seek bar and had to be
- * re-derived by every panel that wanted a slider; it lives here now.
- *
- * `value` is an `input`, not a `model`: a commit is a gesture, not a change, and
- * a two-way binding cannot express "the source of truth updates when I let go".
+ * The separation is the whole component, and README.md has why: `preview` fires
+ * continuously and is for anything cheap and local, `commit` fires once when the
+ * gesture ends, and `pending` holds the dragged value in front of the bound one
+ * until it does.
  *
  * ```html
  * <amk-slider label="Global volume" [value]="volume()" [max]="255"

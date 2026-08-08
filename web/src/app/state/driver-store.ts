@@ -17,7 +17,7 @@ import { errorMessage } from '../util/format';
  * against it. So there is no "no driver" fallback — until one loads, compilation
  * is blocked rather than run against a guessed address.
  *
- * There is exactly one driver, `public/driver/main.bin`, and it is a final-pass
+ * There is exactly one driver, `packages/spc/assets/driver/main.bin`, and it is a final-pass
  * AddmusicK build carrying its own song table and global songs. So there is no
  * state to track here beyond "has it arrived yet": what ships is what a stock
  * install has, and the ARAM figures are exact without anyone supplying anything.
@@ -42,7 +42,7 @@ export class DriverStore {
    *
    * Read out of `main.bin` rather than stated, so replacing the image reports its
    * own instruments; falls back to the bundled tables, labelled, when the search
-   * cannot make sense of it. See `spc/instruments.ts`.
+   * cannot make sense of it. See `@amk/spc/instruments`.
    */
   readonly instruments = computed<InstrumentTables>(() => {
     const driver = this.driver();

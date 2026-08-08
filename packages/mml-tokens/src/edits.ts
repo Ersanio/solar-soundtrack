@@ -2,28 +2,11 @@
  * Rewriting a command in the source it was scanned from — the inverse of
  * `gather`.
  *
- * The command inspector edits MML by replacing text, not by re-emitting it, and
- * the two rules that make that safe both live here rather than in the panels:
- *
- * 1. **Only the parts that changed are replaced.** A splice runs from the first
- *    changed part to the last, and the text *between* the parts is copied out of
- *    the source verbatim. Column alignment, tabs and a `; comment` written
- *    mid-run all survive an edit to the byte beside them. Re-rendering the whole
- *    command from its values — which is what the FIR designer used to do — is
- *    two characters shorter to write and destroys all three.
- *
- * 2. **A part that came through a `"find=value"` replacement is not writable.**
- *    Every token from one expansion is stamped with the use site's span
- *    (`tokens.ts:1276`), so two arguments out of one macro share a single span
- *    and writing over either would clobber the other — and, if the expansion
- *    carried anything past the command, delete that too. `Command` carries
- *    provenance per part precisely so this can be asked per part: the common
- *    `"ech=$EF"` case, where the command byte is a macro and every argument is
- *    literal text, stays editable.
- *
- * Framework-free and DOM-free like the rest of `compiler/`, and deliberately so:
- * this is the one piece of the inspector that does arithmetic on the user's
- * document, and putting it here is what lets `edittest` gate it.
+ * Two rules make that safe, and both live here rather than in the panels so
+ * `edittest` can gate them: a splice replaces only the parts that changed and
+ * copies the text *between* them out of the source verbatim, and a part that
+ * came through a `"find=value"` replacement is not writable. README.md has why
+ * each matters and what each costs.
  */
 
 import { hex2 } from "@amk/core/hex";

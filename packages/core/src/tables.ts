@@ -39,7 +39,7 @@ export const EMPTY_SAMPLE_NAME = "EMPTY.brr";
  * Entries a `.bnk` bank contributes to the sample list, blanks included
  * (`addSampleBank`, globals.cpp:581).
  *
- * Deliberately stated here rather than imported from `spc/brr.ts`, which has its
+ * Deliberately stated here rather than imported from `@amk/spc/brr`, which has its
  * own `SAMPLE_BANK_SLOTS` for reading the directory: the compiler layer does not
  * depend on the SPC layer, and this is the AddmusicK-side statement of the same
  * number. `brrtest` asserts the two agree so they cannot drift apart.
@@ -54,7 +54,7 @@ export const BANK_SLOT_COUNT = 0x40;
  * drum on the next note without emitting anything, and `@30` up are the song's
  * own `#instruments` entries (`Music.cpp:1594`, ported at `parser.ts:1622`).
  *
- * Stated here for the same reason as `BANK_SLOT_COUNT` above: `spc/instruments.ts`
+ * Stated here for the same reason as `BANK_SLOT_COUNT` above: `@amk/spc/instruments`
  * names the same two numbers for the driver-table side, `compiler/` does not
  * depend on the SPC layer, and `instrtest` asserts the two agree.
  */
@@ -71,7 +71,7 @@ export const FIRST_CUSTOM_INSTRUMENT = 30;
  * the slot instead makes it deterministic, which is what lets the two sides
  * agree without sharing any mutable state.
  *
- * The `:` cannot collide with a real filename: `validateName` in `spc/brr.ts`
+ * The `:` cannot collide with a real filename: `validateName` in `@amk/spc/brr`
  * already refuses the characters that would matter, and a slot name is never
  * typed by hand.
  */

@@ -1,50 +1,15 @@
 /**
  * The DSP's echo FIR filter: what eight signed bytes actually do to a sound.
  *
- * The SNES runs its echo through an 8-tap FIR whose coefficients live in DSP
- * registers `$0F, $1F, … $7F`, one filter shared by both channels. The SNES
- * Development Manual §7.2.2.11 describes each as "eight bits including a sign
- * bit"; the DSP multiplies by them and shifts down by seven, so a coefficient
- * counts as `c / 128` and `$7F` is very nearly unity.
+ * Analysis this project adds rather than a port — `Music.cpp` has no `$F5` code at
+ * all, and the readme documents the arguments as "Coefficient 1 … Coefficient 8"
+ * with no ranges and no defaults. Everything here is checked against the echo
+ * stage of bsnes's DSP core (`AddmusicKsrc/SPC_DSP.cpp:610-700`).
  *
- * AddmusicK sets them with `$F5 $c0 … $c7` and validates nothing whatsoever —
- * there is no `$F5` code in `Music.cpp` at all, and its readme documents the
- * arguments as "Coefficient 1 … Coefficient 8" with no ranges and no defaults.
- * So everything here is analysis this project is adding, not a port.
- *
- * Two facts drive most of what follows:
- *
- *   - The filter sits *inside* the echo's feedback loop. Whatever comes back
- *     round has been filtered again, so repeat *k* of the echo has gain
- *     `|H|^k`. A gentle low-pass therefore darkens the tail as it decays, which
- *     is what makes it sound like a room, and a filter with gain above unity
- *     compounds instead of decaying.
- *   - Eight taps at 32 kHz span 219 µs. The filter simply has no authority over
- *     anything much below a couple of kHz, whatever the numbers say.
- *
- * Everything here has been checked against the echo stage of bsnes's DSP core
- * (`AddmusicKsrc/SPC_DSP.cpp:610-700`, from the bsnes source), which settles
- * three things the manual leaves to inference:
- *
- *   - **The scale really is 1/128.** `echo_read` stores the buffer sample
- *     halved (`s >> 1`, :629) and `CALC_FIR` shifts the product down six more
- *     (:621), so a tap contributes `sample × c / 128` and unity is `Σc = 128`.
- *     `$7F` alone is 127/128, a hair under.
- *   - **C7 multiplies the newest sample, C0 the oldest.** `CALC_FIR(i)` pairs
- *     coefficient *i* with history entry *i + 1* (:621) out of a window whose
- *     last entry is the sample just read (:629, :635). So the impulse response
- *     in time order is C7…C0, the reverse of register order. It does not matter
- *     here — reversing a response conjugates its spectrum and leaves the
- *     magnitude alone — but it is now a fact rather than an assumption, and
- *     `firtest` pins it.
- *   - **The feedback path is exactly `EFB/128 × H`.** What goes back into the
- *     buffer is the voice sends plus `(echo_in × EFB) >> 7` (:697), and
- *     `echo_in` is the FIR's output. So a repeat is scaled by `EFB/128 · H(f)`
- *     each time round, which is what {@link echoStability} tests against unity
- *     and what {@link firRepeatCurves} raises to successive powers.
- *
- * The same source shows where a filter clips, which is not where you would
- * guess — see {@link firHeadroom}.
+ * The one fact to carry into every function below: **the filter sits inside the
+ * feedback loop**, so repeat *k* of the echo has gain `|H|^k` and a filter above
+ * unity compounds instead of decaying. README.md has the three things the SNES
+ * Development Manual leaves to inference, and where a filter clips.
  */
 
 import { hex2 } from "@amk/core/hex";

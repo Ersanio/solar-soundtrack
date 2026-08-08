@@ -1,5 +1,5 @@
 /**
- * `compiler/edits.ts` — the splices the command inspector writes back.
+ * `@amk/tokens`'s `edits.ts` — the splices the command inspector writes back.
  *
  * This is the one part of the inspector that does arithmetic on the user's
  * document, so it is the part that gets a harness. Two properties carry the

@@ -1,28 +1,12 @@
 /**
- * Reading what the N-SPC driver is doing, out of the emulator's APU RAM — and,
- * in one place, telling it what to do.
+ * Reading what the N-SPC driver is doing, out of the emulator's APU RAM — and, in
+ * one place, telling it what to do.
  *
- * Everything else in this app predicts playback: the compiler works out how long
- * a song should take, and the transport follows that prediction. This module
- * observes it instead. The driver keeps its whole working state in the zero
- * page, and `readme/readme_files/aram_map.html` documents every byte of it, so
- * the current tempo, the position of each voice in its music data and the tick
- * accumulator can simply be read.
- *
- * {@link applyChannelMutes} is the exception, and it lives here because it is
- * the same knowledge pointed the other way: APU RAM is a live window into the
- * emulator's heap, so the driver's own mute register can be written as easily as
- * its tempo can be read.
- *
- * That matters because prediction is not exact and cannot be made exact. The
- * driver's main loop (`AddmusicKsrc/main.asm`, `MainLoop`) processes at most one
- * music tick per iteration, so a song that gives it enough work to do drops
- * ticks — measurably, around 0.8% on eight busy channels. No formula over tempo
- * can account for that, and a progress bar built on one drifts away from the
- * music it is supposed to be following.
- *
- * Intended to be useful beyond the transport: a piano roll or a tracker view
- * needs exactly this — where each voice is, right now, and at what tempo.
+ * The driver keeps its whole working state in the zero page, and
+ * `AddmusicKreadme/readme_files/aram_map.html` documents every byte, so tempo,
+ * per-voice position and the tick accumulator can simply be read rather than
+ * predicted. {@link applyChannelMutes} is the same knowledge pointed the other
+ * way. README.md has why observing beats predicting here, and by how much.
  */
 
 /** Zero-page addresses, from the ARAM map. */

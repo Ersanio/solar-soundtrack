@@ -1,7 +1,7 @@
 /**
  * End-to-end audio check: MML -> SPC -> actual PCM samples.
  *
- * Runs the emulator through `src/spc/wasm-host.ts`, the same host the browser
+ * Runs the emulator through `@amk/spc/wasm-host`, the same host the browser
  * uses — it is deliberately DOM-free so the audio path can be tested headless.
  * That means this script covers the real glue rather than a stand-in.
  *

@@ -1,27 +1,15 @@
-import type { Command } from "./tokens";
-
-// TODO: should this stay in its own file?
-
 /**
  * The `$F1`/`$F5` override, looked at from either end.
  *
  * `$F1`'s third argument reloads one of the driver's two built-in filter tables
  * (`main.asm:3507`), so it overwrites whatever coefficients a `$F5` put in the
- * DSP. AddmusicK does this silently — there is no `$F5` code in `Music.cpp` at
- * all — and it is easy to spend a while tuning eight bytes that a later command
- * throws away.
+ * DSP. AddmusicK does this silently, and it is easy to spend a while tuning
+ * eight bytes that a later command throws away.
  *
- * Only commands in the same channel are compared. Within one channel source
- * order is execution order; across channels the driver interleaves by time, so
- * "later in the file" would not mean "runs afterwards" and the warning would be
- * guesswork. A `$F5` and a `$F1` in different channels are left alone.
- *
- * One blind spot, left alone deliberately: a replacement collapses everything
- * it expands to onto its use site, so a `$F5` and a `$F1` written inside the
- * *same* macro share a `span.start` and neither of these sees the other. That
- * is an edge of an edge, and the alternative — a secondary order carried on
- * every command just for this — costs more than the warning is worth.
+ * Same channel only, with one blind spot around macros — both in README.md.
  */
+
+import type { Command } from "./tokens";
 export function firOverriddenBy(fir: Command, commands: Command[]): Command | null {
 	return (
 		commands.find(

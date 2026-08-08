@@ -1,29 +1,14 @@
 /**
- * Host for `public/player/spc.wasm` — Blargg's snes_spc, Emscripten-built.
+ * Host for `assets/player/spc.wasm` — Blargg's snes_spc, Emscripten-built.
  *
  * The binary is vendored; everything that talks to it is ours. It imports eight
- * functions from a single module `a` and exports ten items under minified
- * names, and it touches nothing outside that surface: no DOM, no globals, no
- * reference to the SMW Central player it originally shipped with. So the same
- * host runs unchanged in Node, on the main thread, and inside an
- * AudioWorkletGlobalScope.
+ * functions from a single module `a`, exports ten items under minified names, and
+ * touches nothing outside that surface — so the same host runs unchanged in Node,
+ * on the main thread and inside an AudioWorkletGlobalScope.
  *
- * Import mapping, read out of the upstream glue's `wasmImports`:
- *
- *   a ___assert_fail            e _fd_seek
- *   b _emscripten_asm_const_int f _emscripten_resize_heap
- *   c _exit                     g _fd_close
- *   d _fd_write                 h __emscripten_memcpy_js
- *
- * Export mapping, read out of its `wasmExports[...]` bindings:
- *
- *   i memory                j __wasm_call_ctors   k _main(argc,argv)
- *   l _loadSPC(ptr,len)     m _playSPC(ptr,count) n _skipSPC(seconds)
- *   p _malloc(size)         q _free(ptr)          r stack_alloc
- *
- * Both are pinned to the vendored binary. Swapping in a different build means
- * re-reading them; `instantiate` fails loudly rather than silently mis-calling
- * if an expected export is missing.
+ * Both mappings are pinned to the vendored binary and written out in README.md.
+ * Swapping in a different build means re-reading them; {@link instantiate} fails
+ * loudly rather than silently mis-calling if an export is missing.
  */
 
 /** The SPC700 DSP runs at a fixed rate; everything downstream resamples. */

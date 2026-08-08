@@ -1,17 +1,9 @@
 /**
- * Assembles a playable .spc file from compiled song data plus the prebuilt
- * driver bundle.
+ * Assembles a playable .spc file from compiled song data plus the prebuilt driver
+ * bundle.
  *
- * Direct port of `generateSPCs` (AddmusicK.cpp:1445). The file is a fixed
- * 0x10200 bytes:
- *
- *   0x00000  SPC header + ARAM $0000-$00FF   (from SPCBase.bin)
- *   0x00100  ARAM $0000-$FFFF
- *              + programPos   driver image
- *              + localPos     song data
- *              + tablePos     sample directory, 4 bytes/entry, 0x100-aligned
- *              + samplePos    BRR blocks
- *   0x10100  DSP registers and IPL area       (from SPCDSPBase.bin)
+ * Direct port of `generateSPCs` (AddmusicK.cpp:1445). The file is a fixed 0x10200
+ * bytes; README.md has the map.
  */
 
 import { hex4 as hex } from "@amk/core/hex";

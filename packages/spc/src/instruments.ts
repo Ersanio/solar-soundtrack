@@ -1,62 +1,12 @@
 /**
  * The driver's own instrument and percussion tables: what `@n` actually selects.
  *
- * `@n` is not a sample reference. It selects a fixed-size entry in a table the
- * driver carries, and only that entry's *first* byte is a sample (SRCN). The
- * rest is voice setup: ADSR, GAIN, and a pitch multiplier. Percussion entries
- * carry one byte more, the drum's own note.
- *
- * ```
- *   byte 0  SRCN            sample index; bit 7 set means noise, low 5 bits the clock
- *   byte 1  ADSR1  %eddd aaaa   bit 7 clear => GAIN is used instead of ADSR
- *   byte 2  ADSR2  %sss rrrrr
- *   byte 3  GAIN
- *   byte 4  tuning           integer part of the pitch multiplier
- *   byte 5  subtuning        fractional part, /256 — "dd.ee"
- *   byte 6  note             percussion only
- * ```
- *
- * The byte meanings are AddmusicK's own, documented for `#instruments` in
- * `AddmusicKreadme/readme_files/syntax_reference.html:257-263`. The 6- and
- * 7-byte strides come from the vanilla driver, which is where this layout
- * started: `AddmusicKsrc/Super Mario World.s:1029-1069` applies an instrument as
- * "set sample A in bank at $14/15 width Y" with `y = #$05` — four bytes to DSP
- * registers, then the multiplier — and `:103-118` takes the percussion path with
- * `y = #$06`, then does `inc y` to fetch "perc note num from instr tbl". AMK
- * widens both by one byte for the sub-multiplier, giving 6 and 7.
- * `AddmusicKsrc/main.asm:383-388` is the same code in AMK's own source.
- *
- * ## Why these bytes are read out of the driver rather than stated here
- *
- * The tables are assembled from `InstrumentData.asm`, which `main.asm:3618`
- * `incsrc`s and which is **not in this repository** — nor is `Commands.asm`,
- * which holds the routine that indexes them, so there is no citable address
- * either. What there *is* is the assembled `main.bin`, and the tables can be
- * found in it without knowing where they live: byte 0 of each entry has to
- * reproduce AddmusicK's `instrToSample`, so a stride-6 column matching it is the
- * table. On the bundled driver that match is unique (`instrtest` asserts it) and
- * lands at ARAM `$1893`, with percussion at `$190B`.
- *
- * Reading rather than restating also means a **user-supplied `main.bin` reports
- * its own instruments**, which a hardcoded copy could only get wrong, and it
- * keeps 129 hand-transcribed bytes out of the tree. The bundled tables below are
- * a labelled fallback for a driver the search cannot make sense of, not the
- * primary source; `instrtest` pins them against the shipped binary so they
- * cannot drift.
- *
- * ## The search key, and the one place the two tables disagree
- *
- * {@link MELODIC_SRCN} and {@link PERCUSSION_SRCN} restate the SRCN column that
- * `compiler/tables.ts` already holds as `INSTRUMENT_TO_SAMPLE`. That is
- * deliberate duplication, for the reason given at `tables.ts:42-51` for
- * `BANK_SLOT_COUNT`: the compiler layer does not depend on the SPC layer, so
- * each side states the constant and a harness asserts they agree.
- *
- * They agree on 29 of 30 bytes. At index 19 the driver holds `$0F` and
- * `instrToSample[19]` holds `$00`, because AMK's array marks 19 and 20 as
- * "Nothing" (`Music.cpp:60`) while the driver still has a real 20th slot there.
- * Nothing can reach it — see {@link MELODIC_SLOTS} — so the divergence is
- * harmless, but it is why the search key stops at 18.
+ * Not a sample reference — `@n` selects a fixed-size entry whose first byte is an
+ * SRCN and whose remaining five or six are voice setup. The entries are located in
+ * `main.bin` by matching that first column against `INSTRUMENT_TO_SAMPLE`, because
+ * the tables carry no citable address: `InstrumentData.asm` is not in an AddmusicK
+ * release. README.md has the layout, the strides, and the one index where the
+ * driver and `Music.cpp` disagree.
  */
 
 /** Bytes per melodic entry. */

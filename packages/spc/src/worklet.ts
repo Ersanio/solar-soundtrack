@@ -1,13 +1,12 @@
 /**
  * The SPC700 renderer, running on the audio thread.
  *
- * Bundled to `public/player/spc-worklet.js` by `npm run build:worklet`, because
- * `audioWorklet.addModule` needs a real URL and the Angular builder does not
- * treat worklets as entry points. Nothing in the app imports this module.
+ * Bundled to `assets/player/spc-worklet.js` by this package's `npm run build`,
+ * because `audioWorklet.addModule` needs a real URL. Nothing imports this module.
  *
- * Rendering here rather than on the page is the point of the exercise: the
- * editor recompiles MML on the main thread while a song is playing, and any
- * main-thread renderer drops out every time it does.
+ * Rendering here rather than on the page is the point: the editor recompiles MML
+ * on the main thread while a song is playing, and any main-thread renderer drops
+ * out every time it does.
  */
 
 import { SPC_CHANNELS, SPC_SAMPLE_RATE, type SpcCore, instantiate } from "./wasm-host";

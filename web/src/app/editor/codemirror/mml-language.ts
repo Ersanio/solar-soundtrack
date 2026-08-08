@@ -17,7 +17,7 @@ const tokenTable = Object.fromEntries(
 );
 
 /**
- * The MML scanner in `@compiler/tokens`, adapted to CodeMirror.
+ * The MML scanner in `@amk/tokens`, adapted to CodeMirror.
  *
  * `step` was shaped for exactly this contract — a line-oriented stepper with a
  * small copyable state — so the adapter only translates between the stream and
