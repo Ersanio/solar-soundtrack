@@ -1310,4 +1310,141 @@ console.log("\naudit: a source that ends on a directive is not truncated");
 	}
 }
 
+console.log("\naudit: nothing is accepted that AddmusicK would reject");
+{
+	// The point of the tool is that a song written here works in AddmusicK, so
+	// being more permissive than the reference is the failure that matters most:
+	// it compiles, it plays, and then the real thing refuses it.
+	const rejects = (name: string, source: string, because: string) => {
+		const result = compile(source, 0x3e00, LIBRARY);
+		check(name, !result.ok, `${because}; got ${result.diagnostics.map((d) => d.code).join(", ") || "no diagnostics"}`);
+	};
+
+	// globals.cpp:788-956 compares the directive against lowercase literals.
+	// Music.cpp:2432-2456 then catches the capitalised spelling and names the
+	// stage rather than calling it unknown.
+	const capitalised = compile("#amk 4\n#DEFINE FOO 1\n#0 c4\n");
+	check(
+		"#DEFINE is rejected, by the branch that names the stage",
+		capitalised.diagnostics.some((d) => d.message.includes("after the preprocessing stage")),
+		capitalised.diagnostics.map((d) => `${d.code} ${d.message}`).join("; "),
+	);
+	rejects("#IFDEF is rejected", "#amk 4\n#IFDEF FOO\n#0 c4\n#ENDIF\n", "the preprocessor is case-sensitive");
+
+	// Music.cpp:3471 — `typeName != "title"` and friends, so the field name is
+	// case-sensitive even though the directive keyword before it is not.
+	rejects("#Title inside #spc is rejected", '#amk 4\n#spc { #Title "x" }\n#0 c4\n', "Music.cpp:3471 compares with !=");
+	const lower = compile('#amk 4\n#spc { #title "x" }\n#0 c4\n');
+	check("#title still works", lower.ok, lower.diagnostics.map((d) => d.code).join(", "));
+
+	// Music.cpp:2723-2728 — `extension == ".brr"`.
+	rejects(
+		"an upper-case .BRR is rejected",
+		'#amk 4\n#samples { "kick.BRR" }\n#0 c4\n',
+		"the extension compares with ==",
+	);
+
+	// Music.cpp:2421 — `isspace(text[pos + 7])`, so `{` does not terminate a
+	// directive keyword and `#samples{` is not a directive at all.
+	rejects("#samples{ is not a directive", '#amk 4\n#samples{ "kick.brr" }\n#0 c4\n', "the terminator is whitespace");
+	const spaced = compile('#amk 4\n#samples { "kick.brr" }\n#0 c4\n', 0x3e00, LIBRARY);
+	check("#samples { still works", spaced.ok, spaced.diagnostics.map((d) => d.code).join(", "));
+
+	// globals.cpp:716-726 — `strToInt` reads through a stringstream into an int
+	// and throws when it overflows.
+	rejects("an out-of-range #define operand is rejected", "#amk 4\n#define FOO 99999999999\n#0 c4\n", "strToInt throws");
+}
+
+console.log("\naudit: nothing is rejected that AddmusicK would accept");
+{
+	// Music.cpp:2493 — `#halvetempo` is matched on prefix alone, with no
+	// trailing-whitespace test, so it may butt straight up against what follows.
+	const butted = compile("#amk 4\n#halvetempo#0 c4\n");
+	check(
+		"#halvetempo needs no terminator",
+		butted.ok,
+		butted.diagnostics.map((d) => `${d.code} ${d.message}`).join("; "),
+	);
+
+	// Music.cpp:2488 — `#amk=N` for N other than 1 is read and thrown away.
+	const equals = compile("#amk 4\n#amk=2\n#0 c4\n");
+	check("#amk=2 is consumed silently", equals.ok, equals.diagnostics.map((d) => `${d.code} ${d.message}`).join("; "));
+
+	// Music.cpp:2480-2486 — a capitalised marker reaches the parser, which
+	// consumes it without complaint.
+	const marker = compile("#amk 4\n#AM4\n#0 c4\n");
+	check("#AM4 is consumed silently", marker.ok, marker.diagnostics.map((d) => `${d.code} ${d.message}`).join("; "));
+}
+
+console.log("\naudit: the diagnostics AddmusicK produces, produced here too");
+{
+	// Music.cpp:1181 and 1332 — `error()` returns, so no `$E9` is written and the
+	// dead `j = 1` after it never runs. Forcing the count to 1 and carrying on put
+	// a loop call in the song that AddmusicK does not.
+	const badCall = compile("#amk 4\n#0 (1)[ c4 ] (1)0\n");
+	check(
+		"an out-of-range label-loop count aborts the call",
+		!badCall.ok,
+		badCall.diagnostics.map((d) => d.code).join(", "),
+	);
+	const badStar = compile("#amk 4\n#0 [ c4 ]2 *300\n");
+	check(
+		"an out-of-range star-loop count aborts the call",
+		!badStar.ok,
+		badStar.diagnostics.map((d) => d.code).join(", "),
+	);
+
+	// Music.cpp:3210-3214 — the shortest non-zero channel. A song can emit plenty
+	// of bytes and still run for no time at all; an unclosed `[[` does exactly
+	// that, parking every note in the superloop accumulator.
+	const noTicks = compile("#amk 4\n#0 [[ c4 d4\n");
+	check(
+		"a song with bytes but no ticks is rejected",
+		noTicks.diagnostics.some((d) => d.code === "AMK0303"),
+		noTicks.diagnostics.map((d) => `${d.code} ${d.message}`).join("; "),
+	);
+
+	// Music.cpp:1699-1713 folds the warn-once flag into the condition, so the
+	// second raw byte >= $80 falls through to the *duration* warning as well.
+	// `#am4` is one of the two markers that leave `targetAMKVersion` at 0, which
+	// is the only target that warns here rather than erroring.
+	const twoRaw = compile("#am4\n#0 $80 $80 c4\n");
+	const codes = twoRaw.diagnostics.map((d) => d.code);
+	check("the first raw byte warns about notes", codes.includes("AMK0208"), codes.join(", "));
+	check("the second falls through to the duration warning", codes.includes("AMK0209"), codes.join(", "));
+
+	// Music.cpp:2020 — 1.0.8 and earlier freeze on hex validation here.
+	const octaveDD = compile("#amk 2\n#0 $DD $00 $10 o4 c4\n");
+	check(
+		"o after $DD warns on a pre-1.0.9 target",
+		octaveDD.diagnostics.some((d) => d.code === "AMK0218"),
+		octaveDD.diagnostics.map((d) => d.code).join(", "),
+	);
+	const octaveDDCurrent = compile("#amk 4\n#0 $DD $00 $10 o4 c4\n");
+	check(
+		"and not on #amk 4",
+		!octaveDDCurrent.diagnostics.some((d) => d.code === "AMK0218"),
+		octaveDDCurrent.diagnostics.map((d) => d.code).join(", "),
+	);
+}
+
+console.log("\naudit: ;title= sets the ID666 title");
+{
+	// Music.cpp:297-306 — a plain substring search of the raw source, before
+	// preprocessing, taking everything to the end of the line.
+	const plain = compile("#amk 4\n;title=Green Hill Zone\n#0 c4\n");
+	check("a ;title= comment becomes the title", plain.stats?.tags.title === "Green Hill Zone", plain.stats?.tags.title);
+
+	// It runs before preprocessing, so a false `#if` does not hide it.
+	const hidden = compile("#amk 4\n#if 0\n;title=Still Counts\n#endif\n#0 c4\n");
+	check("even inside a false #if", hidden.stats?.tags.title === "Still Counts", hidden.stats?.tags.title);
+
+	// `#spc { #title }` is parsed later and wins, as it does in Music.cpp:3490.
+	const both = compile('#amk 4\n;title=Ignored\n#spc { #title "Wins" }\n#0 c4\n');
+	check("#spc #title overrides it", both.stats?.tags.title === "Wins", both.stats?.tags.title);
+
+	const none = compile("#amk 4\n#0 c4\n");
+	check("and no marker leaves it empty", none.stats?.tags.title === undefined, String(none.stats?.tags.title));
+}
+
 summarise();

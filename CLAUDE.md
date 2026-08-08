@@ -88,6 +88,14 @@ build. Those are what establish fidelity; the harnesses only catch gross breakag
 lines before changing compiler behaviour, and cite the lines you port. Behaviour that looks strange
 is almost always strange in the original too — reproduce it and say so in a comment.
 
+**The compiler is not permissive.** A song written here is going into AddmusicK, so a divergence in
+either direction is a bug: accepting what AddmusicK rejects means it compiles, plays, and then the
+real tool refuses it; rejecting what AddmusicK accepts means a working song is turned away. Where
+AddmusicK is case-sensitive, so is this — `#Title`, `"kick.BRR"` and `#DEFINE` are all errors, and
+`#SAMPLES` is not, because `strnicmp` is what the reference uses there. Convenience is never a
+reason to widen what is accepted. `packages/mml-compiler/AUDIT.md` is the record of the last
+line-by-line comparison and lists the only two deliberate divergences left, both stricter.
+
 **`packages/mml-compiler` is not linted, and its comments are not thinned.** It is a port, and style
 rules would make it harder to diff against the C++ that is the only check on its faithfulness. It
 gets one ESLint rule, an import boundary. Prettier still runs.

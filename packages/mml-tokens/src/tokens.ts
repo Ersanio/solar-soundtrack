@@ -281,6 +281,24 @@ export interface ScanState {
 	 */
 	hexArgNext: boolean;
 	/**
+	 * The next number may carry a leading `-`.
+	 *
+	 * `h` is the one letter command whose argument goes through
+	 * `getIntWithNegative` (Music.cpp:2310), so `h-3` is one argument of -3.
+	 * Without this the minus scans as its own unknown token and the inspector
+	 * reads `h` as taking no argument at all.
+	 */
+	signedArgNext: boolean;
+	/**
+	 * The next `$` value is `#pad`'s, and is read at any length.
+	 *
+	 * `parsePadDefinition` uses `getHex(true)` (Music.cpp:2762), so `#pad $1FF0`
+	 * is one four-digit number. {@link scanHex} otherwise stops at two digits,
+	 * which would read `$DA0` as the VCMD `$DA` plus a stray `0` — opening a
+	 * command that is not there and swallowing the next real one as its argument.
+	 */
+	padArgNext: boolean;
+	/**
 	 * The next bare word is a directive's argument, not music.
 	 *
 	 * `#option smwvtable` reaches `matchWord` through the parser's own
@@ -361,6 +379,8 @@ export function startState(): ScanState {
 		replacements: NO_REPLACEMENTS,
 		sampleName: false,
 		hexArgNext: false,
+		signedArgNext: false,
+		padArgNext: false,
 		directiveWord: false,
 		pendingInstruments: false,
 		inInstruments: false,
@@ -492,6 +512,20 @@ function stepInner(
 		}
 	}
 
+	if (state.signedArgNext) {
+		state.signedArgNext = false;
+		// `getIntWithNegative` takes a sign then digits, and no dotted tail, so
+		// this is deliberately not `scanNumber`.
+		if (c === "-" && isDigit(line[at + 1])) {
+			let end = at + 1;
+			while (end < line.length && isDigit(line[end])) {
+				end++;
+			}
+
+			return { kind: "number", end };
+		}
+	}
+
 	// Deliberately below the replacement arm; see `ScanState.hexArgNext`.
 	if (state.hexArgNext) {
 		state.hexArgNext = false;
@@ -551,6 +585,16 @@ function stepInner(
 				state.targetAMKVersion = version;
 			}
 		}
+	}
+
+	// Music.cpp:433 — under `#am4`, an unfinished `$E6` met by anything that is
+	// not a hex byte is not unfinished at all: it is a one-byte Tremolo Off, and
+	// AddmusicK rewrites the emitted byte to `$FD` and clears `hexLeft`. Leaving
+	// the count standing made the next real command scan as `$E6`'s argument and
+	// disappear from the gathered list.
+	if (state.hexLeft !== 0 && state.currentHex === 0xe6 && state.songTargetProgram === 1 && c !== "$") {
+		state.hexLeft = 0;
+		state.currentHex = 0;
 	}
 
 	// `parser.ts:399` reports a stray character inside an unfinished hex command
@@ -685,6 +729,10 @@ function stepInner(
 			state.hexArgNext = true;
 		}
 
+		if (lower === "h") {
+			state.signedArgNext = true;
+		}
+
 		return { kind, end: at + 1 };
 	}
 
@@ -751,6 +799,7 @@ function scanHash(line: string, at: number, state: ScanState): StepResult {
 		// disarms it. Note `#amk4` without a space is one (unknown) directive —
 		// preprocess reads the word whole — and must not arm this.
 		state.awaitingAmkVersion = name === "#amk";
+		state.padArgNext = name === "#pad";
 		return { kind: "directive", end };
 	}
 
@@ -879,6 +928,18 @@ function scanExpansion(
  * inside `("kick.brr", $02)` from being mistaken for a command.
  */
 function scanHex(line: string, at: number, state: ScanState): StepResult {
+	// `#pad`'s argument has no two-digit cap and is never a command byte. See
+	// {@link ScanState.padArgNext}.
+	if (state.padArgNext) {
+		state.padArgNext = false;
+		let padEnd = at + 1;
+		while (padEnd < line.length && isHexDigit(line[padEnd])) {
+			padEnd++;
+		}
+
+		return { kind: padEnd === at + 1 ? "unknown" : "hexArg", end: padEnd };
+	}
+
 	let end = at + 1;
 	let digits = 0;
 	let value = 0;
@@ -1925,17 +1986,24 @@ export function expectedArgs(vcmd: number, args: { value: number }[], target: Co
 		return count >= 0x80 ? 3 : count + 2;
 	}
 
-	// `parser.ts:3006-3012` — `$FA $FE`'s toggle byte takes a further byte when
-	// its high bit is set, which `scanHex` forks on at `tokens.ts:1013`. This side
-	// of the pair was missing it, so the two statements the doc comment above
-	// claims are pinned against each other disagreed at exactly this flip point:
-	// the scanner scanned three bytes and this returned two, which also made
-	// `complete` true for a command still missing its last one.
-	if (vcmd === 0xfa && args.length > 1 && args[0].value === 0xfe && args[1].value >= 0x80) {
-		return 3;
+	const base = HEX_LENGTHS[vcmd - FIRST_VCMD] - 1;
+
+	// Music.cpp:1807-1813 — `$FA $FE`'s hot patch takes one further byte for
+	// *every* trailing byte whose high bit is set, not only the first: `hexLeft++`
+	// runs again each time the chain reaches its end still set, which is what
+	// `scanHex` mirrors. Returning a flat 3 here made the two statements this
+	// module deliberately keeps disagree past the second link, so a longer chain
+	// lost its last byte and went `complete` early.
+	if (vcmd === 0xfa && args.length > 0 && args[0].value === 0xfe) {
+		let expected = base;
+		while (args.length >= expected && args[expected - 1].value >= 0x80) {
+			expected++;
+		}
+
+		return expected;
 	}
 
-	return HEX_LENGTHS[vcmd - FIRST_VCMD] - 1;
+	return base;
 }
 
 // ===========================================================================

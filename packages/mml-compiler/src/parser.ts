@@ -164,6 +164,22 @@ export interface ParseOutput {
  * stay in step with the audio counts the driver's own ticks instead; see
  * `@amk/spc/driver-state`.
  */
+/**
+ * Preprocessor directives that reach the parser, and what AddmusicK says about
+ * them (Music.cpp:2432-2456, via `parseDefine` and friends at Music.cpp:3348+).
+ *
+ * They only get here when the spelling did not match `preprocess`'s
+ * case-sensitive comparison but does match this stage's case-insensitive one —
+ * which is to say, when someone capitalised one.
+ */
+const LEFTOVER_PREPROCESSOR: readonly (readonly [word: string, article: string, code: string])[] = [
+	["define", "A", "AMK0046"],
+	["undef", "An", "AMK0047"],
+	["ifdef", "An", "AMK0048"],
+	["ifndef", "An", "AMK0049"],
+	["endif", "An", "AMK0054"],
+];
+
 const TIMER_HZ = 500;
 const TEMPO_UNIT = 256;
 const TEMPO_TICK_SECONDS = (tempo: number): number => TEMPO_UNIT / (TIMER_HZ * (tempo + 1));
@@ -361,6 +377,19 @@ export class AddmusicKParser {
 		// again at the end.
 		this.bomOffset = this.source.length - text.length;
 		this.scanned = text;
+
+		// Music.cpp:297-306 — a plain substring search of the *raw* source, before
+		// preprocessing, so a `;title=` inside a false `#if` or a quoted string
+		// counts just the same. Everything to the end of the line is the title.
+		// AddmusicK falls back to the filename when there is none; there is no
+		// filename here, so the tag stays empty and the SPC writer decides.
+		// A `#spc { #title }` later overwrites this, as it does there.
+		const titleAt = text.indexOf(";title=");
+		if (titleAt !== -1) {
+			const from = titleAt + ";title=".length;
+			const end = text.slice(from).search(/[\r\n]/);
+			this.tags.title = end === -1 ? text.slice(from) : text.slice(from, from + end);
+		}
 
 		// Music.cpp:286 — AddmusicK pads the buffer in `init()`, which runs *before*
 		// the preprocessor, so `getArgument` (globals.cpp:706) never reaches the end
@@ -849,6 +878,15 @@ export class AddmusicKParser {
 		this.channelDefined = true;
 	}
 
+	/**
+	 * `strnicmp(text + pos, word, n) == 0 && isspace(text[pos + n])`, which is the
+	 * shape of every branch in `parseSpecialDirective` (Music.cpp:2415-2506) bar
+	 * two — see {@link matchPrefix} for those.
+	 *
+	 * Case-insensitive because `strnicmp` is: `#SAMPLES` really does work. The
+	 * terminator really is whitespace only, so `#samples{` is *not* a directive
+	 * to AddmusicK, and accepting `{` here compiled songs it rejects.
+	 */
 	private matchWord(word: string): boolean {
 		const slice = this.text.slice(this.pos, this.pos + word.length);
 		if (slice.toLowerCase() !== word) {
@@ -856,7 +894,12 @@ export class AddmusicKParser {
 		}
 
 		const after = this.text[this.pos + word.length];
-		return after === undefined || isSpace(after) || after === "{";
+		return after === undefined || isSpace(after);
+	}
+
+	/** The two directives AddmusicK matches on prefix alone: `amk=` and `halvetempo`. */
+	private matchPrefix(word: string): boolean {
+		return this.text.slice(this.pos, this.pos + word.length).toLowerCase() === word;
 	}
 
 	private parseSpecialDirective(): void {
@@ -865,7 +908,15 @@ export class AddmusicKParser {
 		if (this.matchWord("spc")) {
 			this.pos += 3;
 			this.parseBlock(() => this.parseSpcInfo());
-		} else if (this.matchWord("halvetempo")) {
+		} else if (this.matchPrefix("amk=")) {
+			// Music.cpp:2488 — read and thrown away. `#amk=1` is handled by the
+			// preprocessor before this; any other version reaches here and is
+			// consumed silently rather than being a directive nobody knows.
+			this.pos += 4;
+			this.getInt();
+		} else if (this.matchPrefix("halvetempo")) {
+			// Music.cpp:2493 — the one directive with no terminator test, so
+			// `#halvetempo#0` is legal.
 			this.pos += 10;
 			if (this.channelDefined) {
 				return this.error("AMK0040", "#halvetempo must be used before any and all channels.");
@@ -902,7 +953,23 @@ export class AddmusicKParser {
 		} else if (this.matchWord("pad")) {
 			this.pos += 3;
 			this.parsePadDefinition();
+		} else if (this.matchWord("am4") || this.matchWord("amm")) {
+			// Music.cpp:2480-2486 — consumed and ignored. The preprocessor has
+			// already read the marker; a capitalised one reaches here instead,
+			// because `preprocess` compares case-sensitively and this does not.
+			this.pos += 3;
 		} else {
+			// Music.cpp:2432-2456 — `preprocess` is case-sensitive and this is not,
+			// so a capitalised `#DEFINE` survives preprocessing and lands here.
+			// AddmusicK names the stage rather than calling the directive unknown,
+			// which is the more useful thing to say to whoever typed it.
+			for (const [word, article, code] of LEFTOVER_PREPROCESSOR) {
+				if (this.matchWord(word)) {
+					this.pos += word.length;
+					return this.errorAt(start, this.pos, code, `${article} #${word} was found after the preprocessing stage.`);
+				}
+			}
+
 			const end = this.text.indexOf("\n", this.pos);
 			// Deliberately stricter than the reference. `parseSpecialDirective`
 			// (Music.cpp:2413-2509) has no else branch at all, so AMK leaves `pos`
@@ -1172,7 +1239,9 @@ export class AddmusicKParser {
 			return false;
 		}
 
-		const extension = name.slice(dot).toLowerCase();
+		// Music.cpp:2723-2728 compares with `==`, so the extension is case-
+		// sensitive and `"kick.BRR"` is not a sample AddmusicK will take.
+		const extension = name.slice(dot);
 		if (extension !== ".brr" && extension !== ".bnk") {
 			this.error("AMK0056", `"${name}" is not a valid sample; only ".brr" and ".bnk" are allowed.`);
 			return false;
@@ -1400,9 +1469,11 @@ export class AddmusicKParser {
 
 			// Music.cpp:3468 reads to the next whitespace, so `#titlex` is reported
 			// as the unknown field `titlex` rather than as `title` with a stray `x`.
+			// Music.cpp:3471 then compares with `!=`, so the name is case-sensitive
+			// and `#Title` is an unknown field, not a title.
 			let field = "";
 			while (this.pos < this.text.length && !isSpace(this.text[this.pos])) {
-				field += this.text[this.pos].toLowerCase();
+				field += this.text[this.pos];
 				this.pos++;
 			}
 
@@ -2238,8 +2309,11 @@ export class AddmusicKParser {
 		}
 
 		if (count < 1 || count > 255) {
-			this.error("AMK0116", "Invalid loop count.");
-			count = 1;
+			// Music.cpp:1181 — `error()` expands to `{ printError(…); return; }`,
+			// so the `j = 1` written after it is unreachable and no `$E9` is
+			// emitted at all. Carrying on with a count of 1 would put a loop call
+			// in the song that AddmusicK does not.
+			return this.error("AMK0116", "Invalid loop count.");
 		}
 
 		this.handleNormalLoopRemoteCall(count);
@@ -2582,8 +2656,9 @@ export class AddmusicKParser {
 		}
 
 		if (count < 1 || count > 255) {
-			this.error("AMK0116", "Invalid loop count.");
-			count = 1;
+			// Music.cpp:1332, and the same dead assignment as the label-loop call
+			// above: nothing is emitted.
+			return this.error("AMK0116", "Invalid loop count.");
 		}
 
 		this.handleNormalLoopRemoteCall(count);
@@ -2935,19 +3010,25 @@ export class AddmusicKParser {
 				// Legacy songs wrote raw bytes here on purpose; AddmusicK only
 				// warns for them, and errors for its own targets.
 				if (this.targetAMKVersion === 0) {
-					if (i >= 0x80) {
+					// Music.cpp:1699-1713 folds each "already said this" flag into the
+					// *condition* rather than guarding the warning inside the branch,
+					// so a second byte >= $80 finds the note warning spent and falls
+					// through to the duration one — and says both things about a song
+					// that only ever did the first. Reproduced, oddity and all,
+					// because it is what a porter comparing output will see.
+					if (!this.warnedOnce.has("manualNote") && i >= 0x80) {
 						this.warnOnce(
 							"manualNote",
 							"AMK0208",
 							"A hex command was found that will act as a note rather than an effect.",
 						);
-					} else if (i > 0x00) {
+					} else if (!this.warnedOnce.has("manualDur") && i > 0x00) {
 						this.warnOnce(
 							"manualDur",
 							"AMK0209",
 							"A hex command was found that will act as a duration or quantization byte.",
 						);
-					} else {
+					} else if (!this.warnedOnce.has("manualEnd") && i === 0x00) {
 						this.warnOnce(
 							"manualEnd",
 							"AMK0210",
@@ -3227,6 +3308,16 @@ export class AddmusicKParser {
 				for (;;) {
 					this.skipSpaces();
 					if (this.text[this.pos] === "o") {
+						// Music.cpp:2020 — 1.0.8 and earlier freeze on hex validation
+						// here, so a song targeting one of them is worth warning about.
+						if (this.targetAMKVersion < 4) {
+							this.warnOnce(
+								"octaveForDD",
+								"AMK0218",
+								"Using o after $DD freezes hex validation in AddmusicK 1.0.8 and lower.",
+							);
+						}
+
 						this.pos++;
 						this.getInt();
 					} else if (isNoteLetter(this.text[this.pos])) {

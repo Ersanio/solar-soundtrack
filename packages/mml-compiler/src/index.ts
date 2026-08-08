@@ -90,6 +90,27 @@ export class AddmusicKCompiler {
 			);
 		}
 
+		// Music.cpp:3210-3214 — `mainLength` is the shortest non-zero channel, and
+		// staying at its `-1` sentinel is an error in `pointersFirstPass`. Distinct
+		// from the check above: a song can emit plenty of bytes and still run for
+		// no time at all, which is what an unclosed `[[` does — every note after it
+		// is parked in the superloop's accumulator and never flushed.
+		if (!stats.channelTicks.some((ticks) => ticks !== 0)) {
+			return failure(
+				[
+					...parsed.diagnostics,
+					{
+						severity: "error",
+						code: "AMK0303",
+						message: "This song doesn't seem to have any data.",
+						span: { start: 0, end: 0, line: 1 },
+					},
+				],
+				stats,
+				sampleList,
+			);
+		}
+
 		const linked = link(parsed, aramAddress);
 		const diagnostics = [...parsed.diagnostics, ...linked.diagnostics];
 

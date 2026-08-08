@@ -25,6 +25,20 @@ known to diverge.
 `link.ts` keeps AddmusicK's redundant two-stage sentinel/relocation dance for exactly this reason:
 so the two implementations can be stepped through side by side.
 
+## Not permissive, in either direction
+
+A song written in this editor is going into AddmusicK, so matching it is the whole job. Accepting
+what AddmusicK rejects is the dangerous failure — it compiles here, plays here, and the real tool
+refuses it. Rejecting what AddmusicK accepts is merely annoying, and still wrong.
+
+**Where AddmusicK is case-sensitive, so is this.** `#Title` is not a title, `"kick.BRR"` is not a
+sample, and `#DEFINE` is not a define. Where it is case-*in*sensitive — `strnicmp` on a directive
+keyword, a hex digit — so is this. Neither is a matter of taste; both are observable behaviour, and
+`AUDIT.md` records where each was checked.
+
+Being friendlier is never a reason to widen what is accepted. If a construct is ambiguous or
+unimplemented, report it — never guess, and never silently mis-compile.
+
 ## Targets
 
 | Marker   | Target                     |

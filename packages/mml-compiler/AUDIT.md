@@ -11,63 +11,89 @@ lines or fewer, and an observed result from actually running it. Anything alread
 deliberate divergence, and anything where AddmusicK is simply buggy and the port reproduces the bug
 faithfully, was not a finding.
 
-## Fixed
+**All twenty-five confirmed divergences are fixed.** Each has a `selftest` or `tokentest` case,
+written before the fix and failing without it.
 
-Each has a `selftest` case, written before the fix and failing without it.
+## The standard this holds to
 
-| What                                                                            | Reference                    | Cost            |
-| ------------------------------------------------------------------------------- | ---------------------------- | --------------- |
-| `$Dd` / `$dD` split the tie off; the canonical spellings fold it in             | `Music.cpp:2224`             | wrong bytes     |
-| `#amk 1`'s `$FA $05` emitted literally instead of as a remote code event        | `Music.cpp:1925-1962`        | wrong bytes     |
-| `#option dividetempo 64` failed every short note                                | `Music.cpp:2252-2274`        | compile aborted |
-| A source ending on a directive with no trailing newline failed                  | `Music.cpp:286`              | compile aborted |
-| `$FD`/`$FE` labelled "(reserved)" — they are Tremolo Off and Pitch Envelope Off | `hex_command_reference.html` | wrong label     |
+The point of the editor is that a song written in it goes into AddmusicK. So a divergence in
+_either_ direction is a bug:
 
-## Outstanding — the port is more permissive than AddmusicK
+- More permissive than AddmusicK is the dangerous one — it compiles here, plays here, and then the
+  real tool refuses it.
+- Stricter than AddmusicK is merely annoying, but still wrong: it rejects a song that works.
 
-These all accept a song AddmusicK would reject. That is the dangerous direction: it compiles here,
-plays here, and then the real tool refuses it. But closing them means _adding_ errors to input that
-works today, so each is a decision rather than a fix.
+**Where AddmusicK is case-sensitive, so is this.** Where it is case-*in*sensitive — `strnicmp` on a
+directive keyword, `strtol` on a hex digit — so is this. The two are not a matter of taste; they are
+observable behaviour.
 
-| What the port accepts                                               | AddmusicK                                               | Reference             |
-| ------------------------------------------------------------------- | ------------------------------------------------------- | --------------------- |
-| `#AMK 4`, `#DEFINE`, `#IFDEF` — preprocessor directives in any case | compares case-sensitively; these fall through and error | `globals.cpp:788-947` |
-| `#Title`, `#LENGTH` inside `#spc`                                   | case-sensitive                                          | `Music.cpp:3465-3471` |
-| `"Foo.BRR"` in `#samples`                                           | lower-cases nothing; rejects the extension              | `Music.cpp:2722-2728` |
-| `#samples{`, `#spc{`, `#instruments{` — `{` as a keyword terminator | requires `isspace` after the keyword                    | `Music.cpp:2415-2489` |
-| an out-of-range `#define`/`#if` operand                             | `strToInt` throws, "Could not parse integer"            | `globals.cpp:716-726` |
+## Wrong bytes
 
-And one in the other direction: `#halvetempo` is the single directive AddmusicK matches on prefix
-alone, with no trailing-whitespace test, so `#halvetempo#0` is legal there and rejected here
-(`Music.cpp:2493`). Likewise `#amk=N` for N other than 1 is consumed silently by AddmusicK
-(`Music.cpp:2488-2492`) and reported here as an unknown directive.
+| What                                                                                                                                     | Reference                 |
+| ---------------------------------------------------------------------------------------------------------------------------------------- | ------------------------- |
+| `$Dd` / `$dD` split the tie off; the canonical spellings fold it in                                                                      | `Music.cpp:2224`          |
+| `#amk 1`'s `$FA $05` emitted literally instead of as a type 6 / type 8 remote code event                                                 | `Music.cpp:1925-1962`     |
+| An out-of-range repeat count on `(n)N` or `*N` emitted a `$E9` with the count forced to 1; `error()` returns, so AddmusicK emits nothing | `Music.cpp:1181`, `:1332` |
 
-## Outstanding — diagnostics AddmusicK produces and the port does not
+## Compiled what AddmusicK rejects
 
-| What                                                                                                                 | Reference             |
-| -------------------------------------------------------------------------------------------------------------------- | --------------------- |
-| A second raw byte ≥ `$80` falls through to AddmusicK's duration/quantization warning; the port stays silent          | `Music.cpp:1699-1713` |
-| An `o` octave directive after `$DD`'s third byte warns on a pre-1.0.9 target                                         | `Music.cpp:2018-2026` |
-| A song where every channel ends on a zero tick length is rejected                                                    | `Music.cpp:3210-3214` |
-| An out-of-range repeat count on `(n)N` or `*N` aborts the command; the port forces it to 1 and emits the call anyway | `Music.cpp:1181-1185` |
+| What the port accepted                                                                          | AddmusicK                                                                                       | Reference                                    |
+| ----------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- | -------------------------------------------- |
+| `#AMK 4`, `#DEFINE`, `#IFDEF` — preprocessor directives in any case                             | compares case-sensitively; the parser then catches the capitalised spelling and names the stage | `globals.cpp:788-956`, `Music.cpp:2432-2456` |
+| `#Title`, `#LENGTH` inside `#spc`                                                               | `typeName != "title"` — case-sensitive                                                          | `Music.cpp:3471`                             |
+| `"kick.BRR"` in `#samples`                                                                      | `extension == ".brr"` — case-sensitive                                                          | `Music.cpp:2723-2728`                        |
+| `#samples{`, `#spc{`, `#instruments{`                                                           | every branch requires `isspace` after the keyword                                               | `Music.cpp:2415-2506`                        |
+| an out-of-range `#define`/`#if` operand                                                         | `strToInt` reads through a `stringstream` into an `int` and throws                              | `globals.cpp:716-726`                        |
+| a song with bytes but no ticks — an unclosed `[[` parks every note in the superloop accumulator | `mainLength` stays at its `-1` sentinel and `pointersFirstPass` errors                          | `Music.cpp:3210-3214`                        |
 
-The last is the one worth looking at first: it changes what gets emitted, not just what gets said.
+## Rejected what AddmusicK compiles
 
-## Outstanding — the scanner only
+| What                                                                                                                          | Reference             |
+| ----------------------------------------------------------------------------------------------------------------------------- | --------------------- |
+| `#halvetempo#0` — the one directive matched on prefix alone, with no terminator test                                          | `Music.cpp:2493`      |
+| `#amk=N` for N other than 1 — read and thrown away                                                                            | `Music.cpp:2488-2492` |
+| `#AM4` / `#AMM` — consumed silently by the parser when the preprocessor's case-sensitive match misses them                    | `Music.cpp:2480-2486` |
+| `#option dividetempo 64` failed every short note; `emitNote` hoisted `divideByTempoRatio(0x60)` above the branch that uses it | `Music.cpp:2252-2274` |
+| a source ending on a directive with no trailing newline — AddmusicK pads the buffer in `init()`, before the preprocessor runs | `Music.cpp:286`       |
 
-None of these reach compiled bytes; they make the command inspector misread source it is shown.
+## Diagnostics that were missing
 
-| What                                                                                                                                 | Reference        |
-| ------------------------------------------------------------------------------------------------------------------------------------ | ---------------- |
-| `$FA $FE` hot-patch chains lose their last byte — `expectedArgs` allows one continuation, the driver allows one per high-bit byte    | `Music.cpp:1811` |
-| `h-3` scans as a bare `h` plus an unrelated number; the parser reads the negative                                                    | `Music.cpp:2310` |
-| A three-digit `#pad` argument whose first two digits land in `$DA`-`$FE` opens a phantom VCMD and swallows the next real command     | `Music.cpp:2762` |
-| Under `#am4`, `$E6` with no hex byte after it is a one-byte Tremolo Off; the scanner leaves `hexLeft` at 1 and eats the next command | `Music.cpp:433`  |
+| What                                                                                                                                                                                  | Reference             |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------- |
+| A second raw byte ≥ `$80` falls through to the duration/quantization warning, because AddmusicK folds each warn-once flag into the _condition_ rather than guarding inside the branch | `Music.cpp:1699-1713` |
+| An `o` octave directive after `$DD`'s third byte freezes hex validation on 1.0.8 and lower                                                                                            | `Music.cpp:2018-2026` |
 
-## Unimplemented
+## The scanner
 
-`;title=…` as a comment in the raw source sets the ID666 title (`Music.cpp:297-306`). The port has
-no equivalent, so the tag stays empty. A feature rather than a divergence.
+None of these reached compiled bytes; they made the command inspector misread source it was shown.
+
+| What                                                                                                                                                                          | Reference             |
+| ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------- |
+| `$FA $FE` hot-patch chains lost their last byte — the driver takes one further byte per high-bit byte, not just the first                                                     | `Music.cpp:1807-1813` |
+| `h-3` scanned as a bare `h` plus an unrelated number; `h` reads through `getIntWithNegative`                                                                                  | `Music.cpp:2310`      |
+| A three-digit `#pad` argument whose first two digits landed in `$DA`-`$FE` opened a phantom VCMD and swallowed the next real command; `#pad` reads `getHex(true)`, any length | `Music.cpp:2762`      |
+| Under `#am4`, `$E6` with no hex byte after it is a one-byte Tremolo Off; the scanner left `hexLeft` standing and ate the next command                                         | `Music.cpp:433`       |
+
+## Unimplemented, now implemented
+
+`;title=…` in the raw source sets the ID666 title — a plain substring search before preprocessing,
+so it counts inside a false `#if` too, and `#spc { #title }` overrides it. `Music.cpp:297-306`.
+
+## Deliberate divergences that remain
+
+Two, both stricter than the reference, both commented where they live:
+
+- **An unknown `#directive` is an error.** `parseSpecialDirective` has no else branch, so AddmusicK
+  leaves `pos` on the first letter and the scanner reads `#foo` as the note `f` followed by an `o`
+  octave directive — silently turning a typo into music. See `parser.ts`.
+- **`*` before any `[ ]` is an error.** `Music.cpp:1321` has no such check, so it emits `$E9`
+  against an uninitialised `prevLoop` of -1 — two `$FF` bytes that relocation turns into a pointer
+  to nowhere.
+
+Both reject songs AddmusicK would accept, which by the standard above is a divergence. They are
+kept because in each case AddmusicK's behaviour is not a feature anyone relies on but a way to
+silently produce a broken song, and this tool's whole purpose is to catch that before it reaches
+AddmusicK. If either turns out to reject a real song, remove it — the fidelity argument wins.
 
 ## Checked and not confirmed
 

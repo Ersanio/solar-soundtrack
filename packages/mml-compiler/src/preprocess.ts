@@ -119,9 +119,17 @@ export function preprocess(source: string): PreprocessResult {
 		}
 	};
 
+	/**
+	 * `strToInt`, globals.cpp:716-726.
+	 *
+	 * It reads through a `stringstream` into an `int` and throws when the stream
+	 * fails, which it does on a value too large to fit — so the 32-bit range is
+	 * part of the check, not an implementation detail. `Number.parseInt` would
+	 * carry a `#define FOO 99999999999` straight through into an `#if`.
+	 */
 	const parseNumber = (text: string, what: string): number => {
 		const value = Number.parseInt(text, 10);
-		if (!Number.isFinite(value)) {
+		if (!Number.isFinite(value) || value < -0x80000000 || value > 0x7fffffff) {
 			fail(`Could not parse integer for ${what}.`);
 			return 0;
 		}
@@ -172,7 +180,11 @@ export function preprocess(source: string): PreprocessResult {
 
 		const directive = getArgument(" ", true);
 
-		switch (directive.toLowerCase()) {
+		// globals.cpp:788-956 compares this against lowercase literals with `==`,
+		// so `#AMK` and `#Define` are not directives at all there — they fall
+		// through to the parser, which has its own opinion. Matching them
+		// case-insensitively would compile a song AddmusicK refuses.
+		switch (directive) {
 			case "define": {
 				if (!okayToAdd) {
 					level++;
