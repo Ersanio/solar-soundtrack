@@ -1235,4 +1235,79 @@ console.log("\nwhich samples the song actually plays");
 	check("a song playing nothing reports nothing used", used(silent).length === 0, used(silent).join(", "));
 }
 
+// ---------------------------------------------------------------------------
+// Divergences found by reading the port against AddmusicK 1.0.11 line by line.
+// Every one of these compiled to the wrong thing before its case existed here.
+// ---------------------------------------------------------------------------
+
+/** The last `n` bytes of a compile, which is where the channel data ends up. */
+function tailOf(source: string, n: number): string {
+	const data = compile(source).data;
+	return data ? hex(data.subarray(Math.max(0, data.length - n))) : "(no data)";
+}
+
+console.log("\naudit: the tie lookahead is as case-sensitive as AddmusicK's");
+{
+	// Music.cpp:2224 strncmps against exactly "$DD" and "$dd". A mixed-case `$Dd`
+	// matches neither, so AddmusicK does *not* rewind and the tie folds into the
+	// note length — even though getHex (Music.cpp:2876) reads the spelling as a
+	// perfectly good command byte.
+	const canonical = tailOf("#amk 4\n#0 c8^8 $DD $00 $10 $C0\n", 9);
+	check("$DD splits the tie off", canonical === "18 7F A4 C6 DD 00 10 C0 00", canonical);
+
+	for (const spelling of ["$Dd", "$dD"]) {
+		const mixed = tailOf(`#amk 4\n#0 c8^8 ${spelling} $00 $10 $C0\n`, 8);
+		check(`${spelling} folds the tie in, as AddmusicK does`, mixed === "30 7F A4 DD 00 10 C0 00", mixed);
+	}
+}
+
+console.log("\naudit: #amk 1's $FA $05 becomes remote code");
+{
+	// Music.cpp:1925-1962 pops the `$FA $05` back off and writes a type 6 remote
+	// code event in its place, or a type 8 cancel when the gain is zero.
+	const set = tailOf("#amk 1\n#0 $FA $05 $10 c4\n", 9);
+	check("a non-zero gain becomes a type 6 event", set.startsWith("FC 10 01 06 00"), set);
+
+	const clear = tailOf("#amk 1\n#0 $FA $05 $00 c4\n", 9);
+	check("a zero gain becomes a type 8 cancel", clear.startsWith("FC 00 00 08 00"), clear);
+
+	// Still an error on every later target — the branch that already existed.
+	const later = compile("#amk 2\n#0 $FA $05 $10 c4\n");
+	check(
+		"$FA $05 is still rejected under #amk 2",
+		later.diagnostics.some((d) => d.code === "AMK0157"),
+		later.diagnostics.map((d) => d.code).join(", "),
+	);
+}
+
+console.log("\naudit: the tempo ratio divides 0x60 only where AddmusicK does");
+{
+	// Music.cpp:2252 divides 0x80 on every note but reaches 0x60 only inside the
+	// long-note branch. Hoisting the 0x60 out of that branch made every short
+	// note a hard error under a ratio that divides 128 but not 96 — 64 and 128.
+	const short = compile("#amk 4\n#option dividetempo 64\n#0 c3\n");
+	check("a short note compiles under dividetempo 64", short.ok, short.diagnostics.map((d) => d.code).join(", "));
+	check("and keeps its tick count", short.stats?.channelTicks[0] === 1, String(short.stats?.channelTicks[0]));
+
+	// A long note does reach the 0x60 division, and still reports it.
+	const long = compile("#amk 4\n#option dividetempo 64\n#0 c1\n");
+	check("a long note still reports the fractional value", !long.ok, "");
+}
+
+console.log("\naudit: a source that ends on a directive is not truncated");
+{
+	// Music.cpp:286 pads the buffer with 16 spaces in init(), *before* the
+	// preprocessor runs, so getArgument (globals.cpp:706) never reaches the end
+	// of the file. Padding afterwards instead made a source with no trailing
+	// newline fail outright.
+	for (const ending of ["#define FOO 1", "#if FOO", "; a trailing comment"]) {
+		const result = compile(`#amk 4\n#0 c4\n${ending}`);
+		check(
+			`no end-of-file error for a source ending "${ending}"`,
+			!result.diagnostics.some((d) => d.message.includes("end of file")),
+			result.diagnostics.map((d) => `${d.code} ${d.message}`).join("; "),
+		);
+	}
+}
+
 summarise();

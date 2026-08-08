@@ -169,6 +169,9 @@ export const VCMD_NAMES: Readonly<Record<number, string>> = {
 	0xfa: "misc",
 	0xfb: "arpeggio",
 	0xfc: "remote code",
-	0xfd: "(reserved)",
-	0xfe: "(reserved)",
+	// Both are real zero-argument commands as of AddmusicK 1.0.9, relocated from
+	// vanilla's $E6 and $ED (`hex_command_reference.html`; dispatched through
+	// `main.asm`'s CommandDispatchTable).
+	0xfd: "tremolo off",
+	0xfe: "pitch envelope off",
 };

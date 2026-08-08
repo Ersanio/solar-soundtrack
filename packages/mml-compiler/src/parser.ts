@@ -362,14 +362,20 @@ export class AddmusicKParser {
 		this.bomOffset = this.source.length - text.length;
 		this.scanned = text;
 
-		const pre = preprocess(text);
+		// Music.cpp:286 — AddmusicK pads the buffer in `init()`, which runs *before*
+		// the preprocessor, so `getArgument` (globals.cpp:706) never reaches the end
+		// of the file. Padding afterwards instead made a source whose last line is a
+		// directive, with no trailing newline, fail outright.
+		const pre = preprocess(`${text}                `);
 		this.diagnostics.push(...pre.diagnostics);
 		this.errorCount += pre.diagnostics.filter((d) => d.severity === "error").length;
 
-		// AddmusicK pads the buffer so lookahead never runs off the end.
+		// More of the same, so the parser's own lookahead never runs off the end.
 		this.text = `${pre.text}                       `;
-		// The padding is not in the source, so it maps to its end.
-		this.origins = pre.origins.concat(new Array<number>(this.text.length - pre.text.length).fill(text.length));
+		// Neither run of padding is in the source, so both map to its end.
+		this.origins = pre.origins
+			.map((origin) => Math.min(origin, text.length))
+			.concat(new Array<number>(this.text.length - pre.text.length).fill(text.length));
 
 		if (this.errorCount === 0 && this.applyTarget(pre.version)) {
 			this.detectStartingChannel();
@@ -2809,9 +2815,14 @@ export class AddmusicKParser {
 
 			// A pitch bend ahead forces the tie to be emitted separately. Legacy
 			// songs use `&` where AddmusicK uses `$DD`.
-			const aheadIsDD =
-				(this.text[this.pos] === "$" && this.text.slice(this.pos + 1, this.pos + 3).toLowerCase() === "dd") ||
-				(this.songTargetProgram !== 0 && this.text[this.pos] === "&");
+			//
+			// Music.cpp:2224 strncmps against exactly "$DD" and "$dd", so a
+			// mixed-case `$Dd` matches neither and the tie folds into the note
+			// instead — even though getHex (Music.cpp:2876) reads that spelling as
+			// a perfectly good command byte. Matching case-insensitively here
+			// would be the more sensible rule and would emit different music.
+			const ahead = this.text.slice(this.pos, this.pos + 3);
+			const aheadIsDD = ahead === "$DD" || ahead === "$dd" || (this.songTargetProgram !== 0 && ahead[0] === "&");
 			if (aheadIsDD && okayToRewind) {
 				ticks = savedTicks;
 				this.pos = savedPos;
@@ -2830,9 +2841,13 @@ export class AddmusicKParser {
 
 	private emitNote(note: number, ticks: number): void {
 		const limit = this.divideByTempoRatio(0x80, true);
-		const chunk = this.divideByTempoRatio(0x60, true);
 
 		if (ticks >= limit) {
+			// Music.cpp:2254 — inside the branch, not above it. `divideByTempoRatio`
+			// errors on a fractional result, and a ratio that divides 0x80 exactly
+			// but not 0x60 (64, or 128) would otherwise fail every short note in a
+			// song AddmusicK compiles without complaint.
+			const chunk = this.divideByTempoRatio(0x60, true);
 			this.append(chunk);
 			this.emitPendingQuantization();
 			this.append(note);
@@ -3047,6 +3062,44 @@ export class AddmusicKParser {
 
 			if (this.hexLeft === 1 && this.targetAMKVersion > 1 && this.currentHex === 0xfa && i === 0x05) {
 				return this.error("AMK0157", "$FA $05 was replaced with remote code in #amk 2 and above.");
+			}
+
+			// Music.cpp:1925-1962 — #amk 1's remote gain. The `$FA $05` pair is
+			// popped back off and rewritten as a remote code event: type 6, which
+			// rides along with type 5 and restores the instrument, or type 8, which
+			// cancels it. Emitting the literal bytes instead would upload a command
+			// the driver no longer has.
+			if (
+				this.hexLeft === 0 &&
+				this.currentHex === 0xfa &&
+				this.currentHexSub === 0x05 &&
+				this.targetAMKVersion === 1
+			) {
+				// Music.cpp:1928-1929 — the `$FA $05` already appended comes back off.
+				this.data[this.channel].pop();
+				this.data[this.channel].pop();
+
+				if (i !== 0) {
+					// Type 6: a type-3-like event that runs alongside type 5 and
+					// restores the instrument itself (Music.cpp:1941-1946).
+					this.append(0xfc);
+					this.append(i);
+					this.append(0x01);
+					this.append(0x06);
+					this.append(0x00);
+				} else {
+					// Type 8 cancels type 6 and key-on events (Music.cpp:1952-1957).
+					this.append(0xfc);
+					this.append(0x00);
+					this.append(0x00);
+					this.append(0x08);
+					this.append(0x00);
+				}
+
+				// AddmusicK also sets `usingFA[channel]` here. It is written in both
+				// branches and read nowhere in the whole of Music.cpp, so there is
+				// no state to carry.
+				return;
 			}
 
 			if (this.hexLeft === 0 && this.currentHex === 0xf1 && i > 1) {
