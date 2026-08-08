@@ -1,0 +1,23 @@
+<label class="flex flex-col gap-0.5">
+  <span class="text-ink-muted text-[11px]">{{ label() }}</span>
+  <select
+    class="bg-inset border-edge text-ink w-full rounded-sm border px-1.5 py-0.5 text-xs disabled:cursor-not-allowed disabled:opacity-40"
+    [disabled]="disabled()"
+    [value]="value()"
+    (change)="onCommit($event)"
+  >
+    @for (option of options(); track option.value) {
+      <option [value]="option.value" [selected]="option.value === value()">
+        {{ option.label }}
+      </option>
+    }
+    <!-- A byte nobody named is still a byte in the document, and hiding it
+         would make the control show a value the source does not have. -->
+    @if (!known()) {
+      <option selected [value]="value()">{{ unknownLabel() }}</option>
+    }
+  </select>
+  @if (note(); as text) {
+    <span class="text-ink-muted text-[11px] leading-snug">{{ text }}</span>
+  }
+</label>

@@ -31,24 +31,7 @@ const OCTAVES: readonly EnumOption[] = [1, 2, 3, 4, 5, 6].map((n) => ({
 @Component({
   selector: 'amk-note-picker',
   imports: [EnumSelect],
-  template: `
-    <div class="grid grid-cols-2 gap-2">
-      <amk-enum-select
-        label="Octave"
-        [value]="octave()"
-        [options]="OCTAVES"
-        [disabled]="disabled()"
-        (commit)="setOctave($event)"
-      />
-      <amk-enum-select
-        [label]="label()"
-        [value]="pitch()"
-        [options]="pitches()"
-        [disabled]="disabled()"
-        (commit)="setPitch($event)"
-      />
-    </div>
-  `,
+  templateUrl: './note-picker.html',
   host: { class: 'block' },
 })
 export class NotePicker {

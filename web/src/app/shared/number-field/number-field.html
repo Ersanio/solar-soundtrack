@@ -1,0 +1,22 @@
+<label class="flex flex-col gap-0.5">
+  <span class="flex items-baseline justify-between gap-2">
+    <span class="text-ink-muted text-[11px]">{{ label() }}</span>
+    @if (valueLabel(); as text) {
+      <span class="text-ink font-mono text-[11px] tabular-nums">{{ text }}</span>
+    }
+  </span>
+  <input
+    type="number"
+    class="bg-inset border-edge text-ink w-full rounded-sm border px-1.5 py-0.5 font-mono text-xs tabular-nums disabled:cursor-not-allowed disabled:opacity-40"
+    [min]="min()"
+    [max]="max()"
+    [step]="step()"
+    [disabled]="disabled()"
+    [value]="value()"
+    (input)="onPreview($event)"
+    (change)="onCommit($event)"
+  />
+  @if (note(); as text) {
+    <span class="text-ink-muted text-[11px] leading-snug">{{ text }}</span>
+  }
+</label>

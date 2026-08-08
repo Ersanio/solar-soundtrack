@@ -20,30 +20,7 @@ import { Component, computed, input, output } from '@angular/core';
  */
 @Component({
   selector: 'amk-bit-toggles',
-  template: `
-    <fieldset [disabled]="disabled()">
-      <legend class="flex w-full items-baseline justify-between gap-2 pb-1">
-        <span class="text-ink-muted text-[11px]">{{ legend() }}</span>
-        <span class="text-ink font-mono text-[11px] tabular-nums">{{ valueLabel() }}</span>
-      </legend>
-      <div class="grid grid-cols-4 gap-x-2 gap-y-0.5">
-        @for (bit of bits(); track bit.index) {
-          <label class="flex cursor-pointer items-center gap-1 select-none">
-            <input
-              type="checkbox"
-              class="accent-accent size-3 cursor-pointer disabled:cursor-not-allowed"
-              [checked]="bit.on"
-              (change)="toggle(bit.index)"
-            />
-            <span class="text-ink-muted font-mono text-[11px]">{{ bit.label }}</span>
-          </label>
-        }
-      </div>
-      @if (note(); as text) {
-        <p class="text-ink-muted pt-1 text-[11px] leading-snug">{{ text }}</p>
-      }
-    </fieldset>
-  `,
+  templateUrl: './bit-toggles.html',
   host: { class: 'block' },
 })
 export class BitToggles {

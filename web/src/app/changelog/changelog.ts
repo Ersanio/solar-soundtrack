@@ -26,50 +26,7 @@ import { CHANGELOG } from './changelog-data';
     class: 'relative',
     '(document:pointerdown)': 'onDocumentPointerDown($event)',
   },
-  template: `
-    <button
-      #trigger
-      type="button"
-      class="text-ink-muted hover:text-ink flex cursor-pointer items-center gap-1.5 text-sm hover:underline"
-      (click)="toggle()"
-      (keydown)="onKeydown($event)"
-    >
-      <amk-icon-book />
-      changelog
-    </button>
-
-    @if (open()) {
-      <div
-        class="border-edge bg-raised text-ink absolute top-full right-0 z-20 mt-2 flex max-h-[70vh]
-               w-80 max-w-[calc(100vw-2rem)] flex-col rounded-md border shadow-lg"
-        (keydown)="onKeydown($event)"
-      >
-        <div
-          class="border-edge bg-raised flex shrink-0 items-center justify-between gap-3 rounded-t-md border-b px-3 py-2"
-        >
-          <h2 class="text-ink-muted text-xs font-semibold tracking-wide uppercase">Changelog</h2>
-          <button amk-button variant="ghost" (click)="dismiss()">
-            <amk-icon-close />
-          </button>
-        </div>
-
-        <div class="min-h-0 flex-1 overflow-auto px-3 py-2 text-sm">
-          @for (entry of entries; track entry.date) {
-            <h3
-              class="text-ink-muted mt-3 text-xs font-semibold tracking-wide uppercase first:mt-0"
-            >
-              {{ entry.date }}
-            </h3>
-            <ul class="mt-1 list-disc space-y-1 pl-4">
-              @for (item of entry.items; track item) {
-                <li>{{ item }}</li>
-              }
-            </ul>
-          }
-        </div>
-      </div>
-    }
-  `,
+  templateUrl: './changelog.html',
 })
 export class Changelog {
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);

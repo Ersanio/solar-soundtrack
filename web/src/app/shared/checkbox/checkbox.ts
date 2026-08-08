@@ -13,17 +13,7 @@ import { Component, model } from '@angular/core';
  */
 @Component({
   selector: 'amk-checkbox',
-  template: `
-    <label class="flex cursor-pointer items-center gap-1.5 select-none">
-      <input
-        type="checkbox"
-        class="accent-accent size-3.5 cursor-pointer"
-        [checked]="checked()"
-        (change)="toggle($event)"
-      />
-      <span class="text-ink-muted"><ng-content /></span>
-    </label>
-  `,
+  templateUrl: './checkbox.html',
 })
 export class Checkbox {
   readonly checked = model(false);
