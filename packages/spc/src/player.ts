@@ -305,7 +305,7 @@ export class SpcPlayer {
 		return this.driver;
 	}
 
-	/** 0 to 1.5. */
+	/** 0 to 5. */
 	setVolume(volume: number): void {
 		this.volume = Math.min(Math.max(volume, 0), MAX_VOLUME);
 		if (this.gain && this.context) {

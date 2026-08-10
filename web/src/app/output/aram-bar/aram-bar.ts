@@ -84,7 +84,7 @@ let nextId = 0;
 })
 export class AramBar {
   readonly segments = input.required<Segment[]>();
-  /** Announced to screen readers, which cannot read the marks. */
+  /** A name for the bar. */
   readonly label = input('ARAM usage by region');
 
   private readonly svg = viewChild.required<ElementRef<SVGSVGElement>>('svg');

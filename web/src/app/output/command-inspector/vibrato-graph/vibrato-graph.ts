@@ -28,7 +28,7 @@ const FULL_DEPTH = 0xff;
  *
  * Three numbers that no readout makes vivid: how long before it starts, how fast
  * it wobbles, how far. The driver's own waveform is a triangle, not a sine — it
- * doubles the 8-bit phase and folds the sign (`main.asm:3170-3178`) — so this
+ * doubles the 8-bit phase and folds the sign (`main.asm:3327-3331`) — so this
  * draws a triangle, because drawing a sine would be prettier and wrong.
  *
  * Shared between `$DE`, `p` and `$E5`. The only difference for tremolo is what
@@ -43,7 +43,7 @@ const FULL_DEPTH = 0xff;
 export class VibratoGraph {
   /** Ticks before the wobble starts. */
   readonly delay = input.required<number>();
-  /** Phase added per tick — bigger is faster (`main.asm:3166-3169`). */
+  /** Phase added per tick — bigger is faster (`main.asm:3321-3324`). */
   readonly rate = input.required<number>();
   /** Peak offset, as the driver's `$A1+x` / `$B1+x`. */
   readonly depth = input.required<number>();
@@ -85,7 +85,7 @@ export class VibratoGraph {
       let offset = 0;
       if (tick >= delay && rate > 0) {
         const phase = ((tick - delay) * rate) % 256;
-        // main.asm:3170-3178 — double the phase, fold the top half back down.
+        // main.asm:3327-3331 — double the phase, fold the top half back down.
         const folded = phase < 128 ? phase : 255 - phase;
         offset = (folded / 128) * 2 - 1;
       }

@@ -59,8 +59,9 @@ UI change.
 
 ### Automatic pre-hooks
 
-`prestart` / `prebuild` / `prewatch` / `pretypecheck` in `web/package.json` run these, so never
-invoke them by hand:
+Never invoke these by hand. `prestart` / `prebuild` / `prewatch` in `web/package.json` run the first
+two and the third; `pretypecheck` there and `prelint` at the root run `generate-git-info` alone,
+which is all either needs:
 
 - **`build:worklet`** — `@amk/spc`'s own build; esbuild bundles `worklet.ts` into
   `assets/player/spc-worklet.js` (generated, gitignored). An AudioWorklet is loaded by URL from the
@@ -83,7 +84,7 @@ build. Those are what establish fidelity; the harnesses only catch gross breakag
 
 ## Rules
 
-**The port cites its source.** Around 250 comments reference `Music.cpp:3209`, `AddmusicK.cpp:1138`,
+**The port cites its source.** Around 350 comments reference `Music.cpp:3209`, `AddmusicK.cpp:1138`,
 `globals.cpp:735`, `main.asm` and so on, against AddmusicK 1.0.11 in `AddmusicKsrc/`. Read the cited
 lines before changing compiler behaviour, and cite the lines you port. Behaviour that looks strange
 is almost always strange in the original too — reproduce it and say so in a comment.
@@ -96,7 +97,7 @@ AddmusicK is case-sensitive, so is this — `#Title`, `"kick.BRR"` and `#DEFINE`
 reason to widen what is accepted, and neither is helpfulness a reason to narrow it: an unknown
 `#directive` is read as music and `*` with no previous loop emits a call to nowhere, because that is
 what the reference does. `packages/mml-compiler/AUDIT.md` is the record of the last line-by-line
-comparison; there are no deliberate divergences left.
+comparison; there are no deliberate divergences left in the compiled output.
 
 **`packages/mml-compiler` is not linted, and its comments are not thinned.** It is a port, and style
 rules would make it harder to diff against the C++ that is the only check on its faithfulness. It
@@ -191,12 +192,13 @@ from `web/`, so a second config there would drift.
 
 Rules that exist to hold a property the codebase already has (`prefer-signals`,
 `prefer-service-decorator`, `inject-at-top`, `consistent-type-imports`, and the template rules) are
-set to `error`, and `--max-warnings 0` means a `warn` would never fail CI anyway.
+set to `error` rather than `warn` — though `--max-warnings 0` means a warning would fail the run
+just the same, so the level says which of the two a rule is rather than whether it bites.
 
 Several rules are deliberately **off**, each with its reasoning inline in the config. Read that
 before switching one on: `no-unnecessary-condition`, `template/no-duplicate-attributes` and
 `template/button-has-type` report only false positives here, and `template/no-call-expression`
-cannot tell a signal read from a method call, so it flags 178 correct lines. The bug that last rule
+cannot tell a signal read from a method call, so it flags 405 correct lines. The bug that last rule
 would catch is kept out structurally instead.
 
 One block sits **after `eslintConfigPrettier`**, and has to: it holds `curly` and
@@ -207,7 +209,7 @@ silently undone. `npm run lint:fix` fixes both; run `npm run format` after it.
 
 To prove the scoping is what you think it is, diff `npx eslint --print-config` over
 `packages/mml-compiler/src/parser.ts`, `packages/spc/src/fir.ts` and `web/src/app/app.ts`. Those
-resolve 1, 121 and 145 rules respectively.
+resolve 1, 121 and 146 rules respectively.
 
 ## Deployment
 

@@ -13,7 +13,7 @@ import { sampleOptions } from '../commands/context';
 import { dragPreview } from '../commands/preview';
 import { type EnvelopeValue, EnvelopeTuner } from '../envelope-tuner/envelope-tuner';
 
-/** The three things an entry's sample byte can be (`parser.ts:1224-1341`). */
+/** The three things an entry's sample byte can be (`parser.ts`'s `readInstrumentSample`). */
 const SAMPLE_FORMS: readonly EnumOption[] = [
   { value: 0, label: 'a .brr file' },
   { value: 1, label: "a stock instrument's sample (@n)" },
@@ -82,7 +82,7 @@ export class InstrumentEntryEditor {
    * What the picker calls a name the song does not list.
    *
    * An entry may name a `.brr` that no `#samples` block loads — that is an
-   * AMK0104 at compile time, and hiding it here would make the control show a
+   * AMK0089 at compile time, and hiding it here would make the control show a
    * file the source does not name.
    */
   protected readonly unknownSampleLabel = computed(
@@ -131,10 +131,10 @@ export class InstrumentEntryEditor {
       return null;
     }
 
-    // `parser.ts:1147` — a custom instrument cannot be based on another, so the
-    // number is a stock one and its SRCN is fixed by AddmusicK's own table. The
-    // scanner's own `srcn` is that same lookup, redone here because the dragged
-    // number has not been scanned yet.
+    // `parser.ts`'s `readInstrumentSample` — a custom instrument cannot be based
+    // on another, so the number is a stock one and its SRCN is fixed by
+    // AddmusicK's own table. The scanner's own `srcn` is that same lookup,
+    // redone here because the dragged number has not been scanned yet.
     const srcn = INSTRUMENT_TO_SAMPLE[this.shownCopyFrom()] ?? -1;
     return `takes @${this.shownCopyFrom()}'s sample, $${hex2(srcn)}`;
   });

@@ -14,7 +14,7 @@ import { TICKS_PER_WHOLE } from "@amk/core/tables";
 /**
  * Seconds per driver tick at a tempo byte.
  *
- * `parser.ts:151-153` — a tick is `256 / (500 × (tempo + 1))` seconds.
+ * `parser.ts:TEMPO_TICK_SECONDS` — a tick is `256 / (500 × (tempo + 1))` seconds.
  *
  * That `+ 1` is not a fudge. Every vcmd handler is entered with the carry set,
  * because the dispatcher's `asl a` (`main.asm:2659`) shifts out bit 7 of a byte

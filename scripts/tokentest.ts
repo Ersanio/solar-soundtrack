@@ -84,7 +84,7 @@ console.log("\na byte outside $DA-$FE opens no command");
 
 console.log("\n$FB takes its length from its first argument");
 {
-	// `parser.ts:2420` — the count byte is itself an argument, and `count + 1`
+	// `parseHexCommand`'s `$FB` branch — the count byte is itself an argument, and `count + 1`
 	// more follow it, so `$FB $02` wants four arguments in total.
 	const short = tokenize("#0 $FB $02 $01 $02 $03\n").commands.find((c) => c.vcmd === 0xfb);
 	check("count 2 means four arguments", short?.args.length === 4, `got ${short?.args.length}`);
@@ -99,13 +99,13 @@ console.log("\n$FB takes its length from its first argument");
 
 console.log("\na bar line abandons a half-written command");
 {
-	// parser.ts:435 resets hexLeft on `|`, so the bytes after one are fresh.
+	// parser.ts's dispatch loop resets hexLeft on `|`, so the bytes after one are fresh.
 	const { commands } = tokenize("#0 $F5 $7F | $E7 $10\n");
 	const volume = commands.find((c) => c.vcmd === 0xe7);
 	check("$E7 after the bar is its own command", volume !== undefined);
 	check("and took its argument", volume?.args.length === 1);
 
-	// parser.ts:399 reports a stray character mid-command but still dispatches
+	// parser.ts's dispatch loop reports a stray character mid-command but still dispatches
 	// it, so the note here is a note rather than being swallowed as an argument.
 	const stray = tokenize("#0 $F5 $7F c4\n");
 	check(
@@ -138,7 +138,7 @@ const lengthOf = (source: string, needle: string) => at(source, source.indexOf(n
 
 console.log("\nnotes and rests resolve their length");
 {
-	// getNoteLength (parser.ts:607-637), over the 192 ticks of a whole note. The
+	// getNoteLength (parser.ts), over the 192 ticks of a whole note. The
 	// tooltip states the tick count outright, so a wrong fork here is a wrong
 	// number on screen rather than a wrong colour.
 	const plain = lengthOf("#0 c4\n", "c4");
@@ -147,7 +147,7 @@ console.log("\nnotes and rests resolve their length");
 	check("written as the denominator it was", plain?.[0].written === "4", plain?.[0].written);
 	check("with no dots, no =, and nothing implied", plain?.[0].dots === 0 && !plain[0].exact && !plain[0].implicit);
 
-	// parser.ts:198 — what the parser starts at, before any `l`.
+	// parser.ts's `defaultNoteLength` — what the parser starts at, before any `l`.
 	const bare = lengthOf("#0 c\n", "c");
 	check("a bare c takes the standing default", bare?.[0].ticks === 24, String(bare?.[0].ticks));
 	check("and says the length was implied", bare?.[0].implicit === true && bare[0].written === "");
@@ -162,14 +162,14 @@ console.log("\nnotes and rests resolve their length");
 
 	check("a rest carries a length too", lengthOf("#0 r2\n", "r2")?.[0].ticks === 96);
 	check("an accidental does not disturb it", lengthOf("#0 c+4\n", "c+4")?.[0].ticks === 48);
-	// parser.ts:622 — outside 1..192 the written length is discarded entirely.
+	// getNoteLength — outside 1..192 the written length is discarded entirely.
 	check("c200 falls back to the default length", lengthOf("#0 c200\n", "c200")?.[0].ticks === 24);
 	check("a command that is not a note carries none", at("#0 t144\n", 4)?.noteLength === undefined);
 }
 
 console.log("\na tie plays as one note");
 {
-	// accumulateTiedLength (parser.ts:2794) — every segment after a `^` belongs
+	// accumulateTiedLength (parser.ts) — every segment after a `^` belongs
 	// to the note that opened the run, which is why the tooltip totals them
 	// rather than describing the `^` on its own.
 	const source = "#0 c4^8\n";
@@ -202,7 +202,7 @@ console.log("\na tie plays as one note");
 
 console.log("\nthe default length follows `l`");
 {
-	// parseDefaultLength (parser.ts:1524-1550). One field on the parser, never
+	// parseDefaultLength (parser.ts). One field on the parser, never
 	// reset — so it is one running value here, not one per channel.
 	check("l16 makes a bare note 12 ticks", lengthOf("#0 l16 c\n", "c")?.[0].ticks === 12);
 	check("l8. dots the default", lengthOf("#0 l8. c\n", "c")?.[0].ticks === 36);
@@ -226,12 +226,12 @@ console.log("\ndots and exact lengths fork by dialect");
 	check("and counts only the dots it applied", am4?.[0].dots === 2, String(am4?.[0].dots));
 	check("#amk 4 applies every one", lengthOf("#0 c8...\n", "c8")?.[0].ticks === 45);
 
-	// parser.ts:619 — exact counts predate dots, so below #amk 4 the dot is not
+	// getNoteLength's `=` arm — exact counts predate dots, so below #amk 4 the dot is not
 	// theirs to take.
 	check("under #am4 an exact count takes no dots", lengthOf("#am4\n#0 c=48.\n", "c=48")?.[0].ticks === 48);
 	check("under #amk 4 it does", lengthOf("#0 c=48.\n", "c=48")?.[0].ticks === 72);
 
-	// parser.ts:1548 and :1528 — `l`'s dots and its `=` form are both #amk 4 and
+	// parseDefaultLength — `l`'s dots and its `=` form are both #amk 4 and
 	// above, and neither is the same fork a note takes.
 	check("under #am4, l ignores its dots", lengthOf("#am4\n#0 l8. c\n", "c")?.[0].ticks === 24);
 	check("under #amk 1 too", lengthOf("#amk 1\n#0 l8. c\n", "c")?.[0].ticks === 24);
@@ -245,7 +245,7 @@ console.log("\ndots and exact lengths fork by dialect");
 console.log("\na lone dot still lengthens the note before it");
 {
 	// `l8 c.` is ordinary MML: getInt finds no digits and getNoteLengthModifier
-	// dots the standing default anyway (parser.ts:622-637). A lone `.` scans as
+	// dots the standing default anyway (getNoteLength). A lone `.` scans as
 	// unknown — `step` reads one character with no memory of the token before it
 	// — so `gather` is where it rejoins the note.
 	const dotted = lengthOf("#0 c.\n", "c.");
@@ -268,7 +268,7 @@ console.log("\na lone dot still lengthens the note before it");
 
 console.log("\na triplet scales the notes inside it");
 {
-	// getNoteLengthModifier's second half (parser.ts:661-667): two thirds,
+	// getNoteLengthModifier's second half (parser.ts): two thirds,
 	// rounded half up, applied after the dots. A reader hovering a note wants
 	// the length it plays at, so the brace state is followed here even though
 	// the per-line colouring pass cannot carry it.
@@ -302,11 +302,11 @@ console.log("\na triplet scales the notes inside it");
 	// floor(x * 2/3 + 0.5), so 7 ticks is 5 rather than 4.
 	check("the two thirds round half up", lengthOf("#0 {c=7}\n", "c=7")?.[0].ticks === 5);
 
-	// parser.ts:1549 is the one call that passes allowTriplet: false, so an `l`
+	// parseDefaultLength is the one call that passes allowTriplet: false, so an `l`
 	// inside a triplet sets the plain length and the notes scale it themselves.
 	check("l is not scaled", lengthOf("#0 {l4}c\n", "c\n")?.[0].ticks === 48);
 
-	// The early return at parser.ts:619-621 is ahead of both modifiers.
+	// The early return in getNoteLength's `=` arm is ahead of both modifiers.
 	const old = lengthOf("#am4\n#0 {c=48}\n", "c=48");
 	check("an exact count below #amk 4 escapes it", old?.[0].ticks === 48 && old[0].triplet === false);
 
@@ -314,7 +314,7 @@ console.log("\na triplet scales the notes inside it");
 	check("and channels, as the parser's own flag does", lengthOf("#0 {\n#1 c4\n", "c4")?.[0].ticks === 32);
 
 	// AMK0097 reports the second `{` and leaves the one block open, so the
-	// first `}` closes it (parser.ts:2037-2052).
+	// first `}` closes it (parseTripletOpen and parseTripletClose).
 	const nested = tokenize("#0 {{c4}c4\n").commands.filter((c) => c.noteLength);
 	check(
 		"a nested brace does not need two to close",
@@ -323,8 +323,9 @@ console.log("\na triplet scales the notes inside it");
 	);
 	check("and an unopened } leaves the note alone", lengthOf("#0 }c4\n", "c4")?.[0].ticks === 48);
 
-	// #spc, #samples and #instruments are read by parseBlock, which eats their
-	// brace before parseTripletOpen could see it (parser.ts:823-856).
+	// #spc, #samples and #instruments are read by parseBlock, whose readers eat
+	// their brace before parseTripletOpen could see it (parseSampleDefinitions,
+	// parseInstrumentDefinitions and parseSpcInfo).
 	const block = '#instruments\n{\n\t"kick.brr" $FE $6A $B8 $03 $00\n}\n#0 c4\n';
 	check("a block directive's brace is not a triplet", lengthOf(block, "c4")?.[0].ticks === 48);
 	check("nor #samples'", lengthOf('#samples\n{\n\t"kick.brr"\n}\n#0 c4\n', "c4")?.[0].ticks === 48);
@@ -477,7 +478,7 @@ console.log("\nreplacements are expanded at the use site");
 
 console.log("\na definition only applies below itself");
 {
-	// `doReplacement` runs at the cursor and never behind it (parser.ts:415), so
+	// `doReplacement` runs at the cursor and never behind it (parser.ts), so
 	// there is no hoisting. A whole-document pre-pass would fail this.
 	const { commands } = tokenize('echo1 $2b\n"echo1=$EF"\n#0 echo1 $2b $2d $2d\n');
 	check("exactly one $EF", commands.filter((c) => c.vcmd === 0xef).length === 1);
@@ -492,7 +493,7 @@ console.log("\nlongest match wins, and there is no word boundary");
 	);
 	check("the shorter one does not fire inside it", !commands.some((c) => c.vcmd === 0xe7));
 
-	// parser.ts:690 is a bare `startsWith`. `"c=…"` really does eat every note c.
+	// doReplacement matches with a bare `startsWith`. `"c=…"` really does eat every note c.
 	// It looks like a bug in this scanner and is not one.
 	const shadowed = tokenize('"c=$E7 $10"\n#0 c4\n');
 	check(
@@ -573,7 +574,7 @@ console.log("\na command knows which of its parts came through a macro");
 
 console.log("\nreplacements are transitive");
 {
-	// parser.ts:687 re-runs the match on the text it just spliced in.
+	// doReplacement re-runs the match on the text it just spliced in.
 	const { commands } = tokenize('"a1=a2 $2d"\n"a2=$EF $2b"\n#0 a1 $2d\n');
 	const echo = commands.find((c) => c.vcmd === 0xef);
 	check("a macro naming another resolves through it", echo !== undefined);
@@ -604,7 +605,7 @@ console.log("\na recursive replacement cannot hang the editor");
 
 console.log("\na sample load is not a replacement definition");
 {
-	// parser.ts:1732 hands `("` to parseSampleLoad, which reads the name itself,
+	// parseOpenParen hands `("` to parseSampleLoad, which reads the name itself,
 	// so that quote never reaches the directive arm.
 	const loaded = tokenize('#0 ("kick=x.brr", $02) c4\n');
 	check("no macro is defined by a sample name", !loaded.tokens.some((t) => t.kind === "replacement"));
@@ -654,7 +655,7 @@ console.log("\nreplacement edge cases");
 
 console.log("\nq and n read their arguments as hex");
 {
-	// parser.ts:1405 and :1665 both use getHex. Reading either as decimal is
+	// parseQuantization and parseNoise both use getHex. Reading either as decimal is
 	// wrong twice over: the value, and the `F` that would become a note.
 	const q = tokenize("#0 q7F\n").commands.find((c) => c.kind === "q");
 	check("q7F is $7F, not 7", q?.args[0]?.value === 0x7f, `got ${q?.args[0]?.value}`);
@@ -663,9 +664,9 @@ console.log("\nq and n read their arguments as hex");
 	check("and the F is not a note", !tokenize("#0 n1F\n").tokens.some((t) => t.kind === "note"));
 	check("nA-nF scan at all", tokenize("#0 nA\n").commands.find((c) => c.kind === "n")?.args[0]?.value === 0xa);
 	check("q10 is $10, not ten", tokenize("#0 q10\n").commands.find((c) => c.kind === "q")?.args[0]?.value === 0x10);
-	// getHex stops at two digits (parser.ts:536).
+	// getHex stops at two digits (parser.ts).
 	check("only two digits are taken", tokenize("#0 q7F0\n").tokens.filter((t) => t.kind === "hexNumber").length === 1);
-	// getHex opens with doReplacement (parser.ts:532), so a macro really can
+	// getHex opens with doReplacement (parser.ts), so a macro really can
 	// supply the digits.
 	check(
 		"a macro can supply the digits, as getHex allows",
@@ -683,7 +684,7 @@ console.log("\nthe @ forms");
 	check("with the number intact", direct[0]?.args[0]?.value === 19);
 	check("a plain @19 is not direct", tokenize("#0 @19\n").commands.find((c) => c.kind === "@")?.direct === undefined);
 
-	// parser.ts:1743 — `(@5, $02)` loads instrument 5's sample. The `@` belongs
+	// parseSampleLoad — `(@5, $02)` loads instrument 5's sample. The `@` belongs
 	// to that command and does not change the instrument.
 	check("(@5, $02) opens no instrument command", !tokenize("#0 (@5, $02) c4\n").commands.some((c) => c.kind === "@"));
 	check(
@@ -716,10 +717,10 @@ console.log("\n#instruments is scanned as a block, not as commands");
 	check("the first is a named file", index.instruments[0]?.sample.form === "file");
 	check("with its name unquoted", (index.instruments[0]?.sample as { name: string }).name === "kick.brr");
 	check("the second copies an instrument", index.instruments[1]?.sample.form === "copy");
-	// parser.ts:1147 — @5's sample is $07, which is the whole point of the fix.
+	// readInstrumentSample — @5's sample is $07, which is the whole point of the fix.
 	check("resolving @5 to SRCN $07", (index.instruments[1]?.sample as { srcn: number }).srcn === 0x07);
 	check("the third is noise", index.instruments[2]?.sample.form === "noise");
-	// parser.ts:1162 — the high bit is what marks it noise.
+	// readInstrumentSample — the high bit is what marks it noise.
 	check("with the high bit set", (index.instruments[2]?.sample as { byte: number }).byte === 0x9f);
 	check(
 		"the bytes are the ones written",
@@ -769,7 +770,7 @@ console.log("\n#instruments is scanned as a block, not as commands");
 
 console.log("\nknown divergences from AddmusicK, pinned on purpose");
 {
-	// Both come from the same root: `getInt`/`getHex` (parser.ts:502-532) expand
+	// Both come from the same root: `getInt`/`getHex` (parser.ts) expand
 	// *inside* a token, which a model whose tokens are spans cannot express.
 
 	// AMK's getInt expands once at the first digit, reading c44 as c84. The
@@ -802,13 +803,13 @@ console.log("\nknown divergences from AddmusicK, pinned on purpose");
 	);
 
 	// accumulateTiedLength folds consecutive rests into one the way it folds
-	// ties (parser.ts:2802). Only `^` is folded here, so a rest's tooltip stays
+	// ties (parser.ts). Only `^` is folded here, so a rest's tooltip stays
 	// about the rest under the caret.
 	const rests = tokenize("#0 r4 r8\n").commands.filter((c) => c.noteLength);
 	check("consecutive rests stay separate", rests.length === 2 && rests[0].noteLength?.length === 1);
 
 	// A pitch bend ahead makes AMK rewind the last tied segment and emit it as
-	// its own note (parser.ts:2810-2817). The scanner ties regardless.
+	// its own note (accumulateTiedLength's rewind). The scanner ties regardless.
 	check("a $DD ahead does not break the tie", lengthOf("#0 c4^8 $DD $00 $00 $00\n", "c4")?.length === 2);
 
 	// The same whitespace generosity as `t 144` above, and getNoteLength reads
@@ -828,17 +829,17 @@ console.log("\nknown divergences from AddmusicK, pinned on purpose");
 		`got ${positional[0]?.args.length} and ${positional[1]?.args.length}`,
 	);
 
-	// preprocess's argument read stops at a line end (preprocess.ts:79-101), so
+	// preprocess's argument read stops at a line end (its getArgument), so
 	// a real `#amk\n1` fails AMK0401 and compiles nothing; the one-shot here
 	// cannot see line breaks. Harmless: it only recolours a broken song.
 	const split = tokenize("#amk\n1\n#0 $FC $05 $7F\n").commands.find((c) => c.vcmd === 0xfc);
 	check("the #amk version one-shot crosses a newline", split?.args.length === 2, `got ${split?.args.length}`);
 
 	// An $ED $82 upload aimed at $6136 appends to the compiler's instrument
-	// table (parser.ts:3384-3385), shifting `@30 + k` numbering; this pass
+	// table (parseHFDInstrumentHack), shifting `@30 + k` numbering; this pass
 	// counts only #instruments blocks. Error-truncation shapes are not mirrored
 	// either — e.g. $FA under #amm zeroes hexLeft on its error path
-	// (parser.ts:2993-2996) — the compiler squiggles those, and the scanner
+	// (parseHexCommand's AMK0156 path) — the compiler squiggles those, and the scanner
 	// keeps AddmusicK's grouping.
 	const hacked = tokenize(
 		'#am4\n#0 $ED $82 $61 $36 $00 $05 $04 $FE $6A $B8 $03 $00\n#instruments\n{\n\t"kick.brr" $FE $6A $B8 $03 $00\n}\n',
@@ -881,7 +882,7 @@ console.log("\na directive's bare-word argument is not music");
 
 console.log("\nthe target markers pick the dialect");
 {
-	// parser.ts:2970 — #amk 1's $FC is remote gain and takes two arguments.
+	// parseHexCommand — #amk 1's $FC is remote gain and takes two arguments.
 	const amk1 = tokenize("#amk 1\n#0 $FC $05 $7F c4\n").commands;
 	const gain = amk1.find((c) => c.vcmd === 0xfc);
 	check("under #amk 1, $FC takes two arguments", gain?.args.length === 2, `got ${gain?.args.length}`);
@@ -901,34 +902,34 @@ console.log("\nthe target markers pick the dialect");
 	check("under #amk 4, $FC takes four", amk4?.args.length === 4, `got ${amk4?.args.length}`);
 	check("and is named remote code", amk4?.name === "remote code", amk4?.name);
 
-	// The pre-spaced form (preprocess.ts:163-171) arrives as the number `=1`.
+	// The pre-spaced form (preprocess.ts's `amk=1` special case) arrives as the number `=1`.
 	const eq = tokenize("#amk=1\n#0 $FC $05 $7F c4\n").commands.find((c) => c.vcmd === 0xfc);
 	check("#amk=1 selects version 1", eq?.args.length === 2, `got ${eq?.args.length}`);
 
-	// preprocess reads the directive word whole (preprocess.ts:173), so `#amk4`
+	// preprocess reads the directive word whole (its getArgument), so `#amk4`
 	// is an unknown directive, not a marker.
 	const glued = tokenize("#amk4\n#0 $FC $05 $7F $01 $02\n").commands.find((c) => c.vcmd === 0xfc);
 	check("#amk4 without a space is no marker", glued?.args.length === 4, `got ${glued?.args.length}`);
 
-	// preprocess.ts:323 — once a legacy marker is seen, a later #amk is ignored…
+	// preprocess.ts's `amk` case — once a legacy marker is seen, a later #amk is ignored…
 	const guarded = tokenize("#am4\n#amk 4\n#0 $ED $80 $6C $20 c4\n").commands.find((c) => c.vcmd === 0xed);
 	check("#amk after #am4 is ignored", guarded?.args.length === 3, `got ${guarded?.args.length}`);
 
-	// …while a later legacy marker always wins (preprocess.ts:340-345).
+	// …while a later legacy marker always wins (its `amm` and `am4` cases).
 	const amm = tokenize("#amk 4\n#amm\n#0 $E7 $10\n").commands.find((c) => c.vcmd === 0xe7);
 	check("a later #amm wins over #amk", amm?.target.program === 2, String(amm?.target.program));
 
 	const flipped = tokenize("#amm\n#am4\n#0 $ED $81 $05 c4\n").commands.find((c) => c.vcmd === 0xed);
 	check("a later #am4 wins over #amm", flipped?.args.length === 2 && flipped.name === "tune", flipped?.name);
 
-	// parser.ts:181-182 — before any marker, the parser assumes #amk 4.
+	// parser.ts's initial targetAMKVersion — before any marker, the parser assumes #amk 4.
 	const bare = tokenize("#0 $FC $01 $02 $03 $04\n").commands.find((c) => c.vcmd === 0xfc);
 	check("no marker means the #amk 4 default", bare?.target.program === 0 && bare.target.amkVersion === 4);
 }
 
 console.log("\n#am4's $ED is HFD's escape");
 {
-	// parseHFDHex (parser.ts:3286, Music.cpp:1466) — the sub-byte picks the form.
+	// parseHFDHex (parser.ts, Music.cpp:1466) — the sub-byte picks the form.
 	const dsp = tokenize("#am4\n#0 $ED $80 $6C $20 c4\n").commands.find((c) => c.vcmd === 0xed);
 	check("$ED $80 takes a register and a value", dsp?.args.length === 3, `got ${dsp?.args.length}`);
 	check("and is complete", dsp?.complete === true);
@@ -941,7 +942,7 @@ console.log("\n#am4's $ED is HFD's escape");
 	check("the byte after it opens its own command", tune.find((c) => c.vcmd === 0xe7)?.args.length === 1);
 
 	// $ED $82: address, then a big-endian count of the data bytes that follow —
-	// count+1 of them, the do-while at parser.ts:3390.
+	// count+1 of them, the do-while in parseHFDHex.
 	const upload = tokenize("#am4\n#0 $ED $82 $61 $00 $00 $02 $AA $BB $CC c4\n").commands;
 	const block = upload.find((c) => c.vcmd === 0xed);
 	check("$ED $82 reads its count and the data", block?.args.length === 8, `got ${block?.args.length}`);
@@ -972,7 +973,7 @@ console.log("\n#am4's $ED is HFD's escape");
 
 console.log("\n#am4's $E5 forks on its first argument");
 {
-	// Music.cpp:1820, parser.ts:3014-3031 — a high bit means "load sample".
+	// Music.cpp:1820, parseHexCommand's $E5 fork — a high bit means "load sample".
 	const load = tokenize("#am4\n#0 $E5 $85 $04 c4\n").commands.find((c) => c.vcmd === 0xe5);
 	check("a high first argument is a sample load", load?.args.length === 2, `got ${load?.args.length}`);
 	check("named as the $F3 it compiles to", load?.name === "sample load", load?.name);
@@ -988,9 +989,9 @@ console.log("\n#am4's $E5 forks on its first argument");
 console.log("\na command takes its arguments and stops");
 {
 	// `scanHex` emits `hexArg` for any byte below $DA even with `hexLeft` at 0
-	// (tokens.ts:977-982), because a sample load's tuning byte has to read as one.
+	// (tokens.ts), because a sample load's tuning byte has to read as one.
 	// So a byte standing after a full command looks exactly like an argument, and
-	// `gather` used to claim it. The parser does not: `parser.ts:2918-2943` reads
+	// `gather` used to claim it. The parser does not: `parseHexCommand` reads
 	// it as a standalone literal and reports AMK0151 under #amk. Two things go
 	// wrong if the scanner disagrees — the inspector draws a row for an argument
 	// that is not one, and `spliceArg` writes over a byte the command does not own.
@@ -1010,7 +1011,7 @@ console.log("\na command takes its arguments and stops");
 	const upload = tokenize("#am4\n#0 $ED $82 $20 $00 $00 $02 $11 $22 $33 c4\n").commands.find((c) => c.vcmd === 0xed);
 	check("an HFD upload still gathers its payload", upload?.args.length === 8, `got ${upload?.args.length}`);
 
-	// parser.ts:3006-3012 / tokens.ts:1013 — $FA $FE's toggle byte takes a
+	// parseHexCommand / scanHex — $FA $FE's toggle byte takes a
 	// further byte when its high bit is set. `expectedArgs` did not fork here
 	// while `scanHex` did, which is exactly the disagreement this pair of
 	// statements exists to prevent.

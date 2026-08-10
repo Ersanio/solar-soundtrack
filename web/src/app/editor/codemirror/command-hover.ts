@@ -13,7 +13,7 @@ function line(className: string, text: string): HTMLElement {
   return element;
 }
 
-/** `, dotted` / `, double-dotted` — how `letter-command.ts` would say it, extended past two. */
+/** `, dotted` / `, double-dotted` — how `letter-params.ts` would say it, extended past two. */
 function dotsLabel(dots: number): string {
   switch (dots) {
     case 0:
@@ -37,7 +37,7 @@ function modifiersLabel(segment: NoteLengthSegment): string {
   return `${dotsLabel(segment.dots)}${segment.triplet ? ', triplet' : ''}`;
 }
 
-/** One note or rest length segment, in the same "written form (ticks)" vocabulary `letter-command.ts` uses for `l`. */
+/** One note or rest length segment, in the same "written form (ticks)" vocabulary `letter-params.ts` uses for `l`. */
 function segmentLabel(segment: NoteLengthSegment): string {
   const modifiers = modifiersLabel(segment);
 
@@ -58,7 +58,7 @@ function segmentLabel(segment: NoteLengthSegment): string {
 
 /**
  * A note or rest's full duration, ties included — `accumulateTiedLength`
- * (`parser.ts:2794`) plays every segment as one continuous note, which is why
+ * (`parser.ts`) plays every segment as one continuous note, which is why
  * a `^`'s tooltip has to say more than "tie".
  */
 function noteLengthLine(segments: readonly NoteLengthSegment[]): string {

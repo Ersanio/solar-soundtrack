@@ -175,7 +175,7 @@ export class Slider {
    * background on the element is one declaration every browser already agrees
    * about, and the vendor tracks are only made transparent so it shows through.
    *
-   * The stripe *is* the input's content box — 6px of it, held there by 5px of
+   * The stripe *is* the input's content box — 12px of it, held there by 2px of
    * vertical padding — and the background is clipped to it. That is what rounds
    * the ends: `border-radius` clips a background at the content edge with the
    * radius reduced by the padding, so a pill on the 16px box arrives at the

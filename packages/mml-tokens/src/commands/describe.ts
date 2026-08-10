@@ -48,7 +48,7 @@ export interface ResolvedCommand {
  * The most rows worth drawing.
  *
  * An `#am4` `$ED $82` upload carries a 16-bit count of data bytes and `$FB $7F`
- * carries 130 notes; past a couple of dozen the table stops being a readout and
+ * carries 127 notes; past a couple of dozen the table stops being a readout and
  * starts being a hex dump, which the panel below it already is.
  */
 const MAX_ROWS = 24;

@@ -44,7 +44,7 @@ import {
 /**
  * What the host knows about the sample library that the compiler cannot.
  *
- * Filenames only — `core/types.ts` keeps the compiler free of any dependency on
+ * Filenames only — `@amk/core/types` keeps the compiler free of any dependency on
  * the SPC layer, so resolving a name to bytes stays the host's job. Groups come
  * through too because `#default` is not special: it is one entry in a table that
  * an install can extend, and `#samples { #optimized }` is just as valid.
@@ -110,14 +110,14 @@ export interface ParseOutput {
 	 */
 	sampleList: readonly string[] | null;
 	/**
-	 * Which SRCNs the song actually plays, by index. AMK's `usedSamples`, which
-	 * `optimizeSampleUsage` uses to swap unreferenced samples for `EMPTY.brr`.
-	 */
-	/**
 	 * The set before optimisation — what the song asked for, whether or not each
 	 * entry survived. `sampleList` is what to build; this is what to explain.
 	 */
 	requestedSamples: readonly string[] | null;
+	/**
+	 * Which SRCNs the song actually plays, by index. AMK's `usedSamples`, which
+	 * `optimizeSampleUsage` uses to swap unreferenced samples for `EMPTY.brr`.
+	 */
 	usedSamples: boolean[];
 	/** `#pad` target size, 0 when the song did not ask for one. */
 	minSize: number;
@@ -145,6 +145,22 @@ export interface ParseOutput {
 }
 
 /**
+ * Preprocessor directives that reach the parser, and what AddmusicK says about
+ * them (Music.cpp:2432-2456, via `parseDefine` and friends at Music.cpp:3348+).
+ *
+ * They only get here when the spelling did not match `preprocess`'s
+ * case-sensitive comparison but does match this stage's case-insensitive one —
+ * which is to say, when someone capitalised one.
+ */
+const LEFTOVER_PREPROCESSOR: readonly (readonly [word: string, article: string, code: string])[] = [
+	["define", "A", "AMK0046"],
+	["undef", "An", "AMK0047"],
+	["ifdef", "An", "AMK0048"],
+	["ifndef", "An", "AMK0049"],
+	["endif", "An", "AMK0054"],
+];
+
+/**
  * How long one tick lasts, in seconds, at a given tempo.
  *
  * AddmusicK's `1 / (2 * tempo)` is a rounding, and it says so — Music.cpp:3255
@@ -164,22 +180,6 @@ export interface ParseOutput {
  * stay in step with the audio counts the driver's own ticks instead; see
  * `@amk/spc/driver-state`.
  */
-/**
- * Preprocessor directives that reach the parser, and what AddmusicK says about
- * them (Music.cpp:2432-2456, via `parseDefine` and friends at Music.cpp:3348+).
- *
- * They only get here when the spelling did not match `preprocess`'s
- * case-sensitive comparison but does match this stage's case-insensitive one —
- * which is to say, when someone capitalised one.
- */
-const LEFTOVER_PREPROCESSOR: readonly (readonly [word: string, article: string, code: string])[] = [
-	["define", "A", "AMK0046"],
-	["undef", "An", "AMK0047"],
-	["ifdef", "An", "AMK0048"],
-	["ifndef", "An", "AMK0049"],
-	["endif", "An", "AMK0054"],
-];
-
 const TIMER_HZ = 500;
 const TEMPO_UNIT = 256;
 const TEMPO_TICK_SECONDS = (tempo: number): number => TEMPO_UNIT / (TIMER_HZ * (tempo + 1));
@@ -278,8 +278,9 @@ export class AddmusicKParser {
 	 * Whether each `sampleList` entry must be kept even if unplayed — AMK's
 	 * `Sample::important`.
 	 *
-	 * A name written out in `#samples` is always important (`Music.cpp:2726`
-	 * passes `true`), as is every sample lifted out of a `.bnk` bank.
+	 * In AddmusicK a name written out in `#samples` is always important
+	 * (`Music.cpp:2726` passes `true`), as is every sample lifted out of a `.bnk`
+	 * bank.
 	 *
 	 * Group members carry per-sample flags AddmusicK reads from
 	 * `Addmusic_sample groups.txt`, where a trailing `!` marks a sample as
@@ -288,28 +289,21 @@ export class AddmusicKParser {
 	 * things a per-song usage scan cannot see, since `usedSamples` is per-song and
 	 * nothing in AddmusicK combines it across songs.
 	 *
-	 * We export a standalone SPC of a single song with no sound effects and no
-	 * global songs, so there is nothing outside the song to protect and group
-	 * members are treated as unimportant. That is the right answer here rather
-	 * than a concession: the flags would only start to matter if this ever grew a
-	 * ROM-insertion path.
+	 * Here the host owns the whole answer instead, per sample rather than per
+	 * group membership — see {@link pushSample} — so none of those inferences are
+	 * made.
 	 */
 	private readonly sampleImportant: boolean[] = [];
 	/**
 	 * AMK's `usedSamples`, a `bool[256]` indexed by SRCN (Music.h:83).
 	 *
-	 * Collected but not yet acted on. AMK's `optimizeSampleUsage`
-	 * (Music.cpp:3074) uses it to replace every unreferenced sample with
-	 * `EMPTY.brr`, and it is on by default — `-u` turns it off — so our exports
-	 * carry samples that real AddmusicK would have dropped. That is the one known
-	 * byte-level divergence left.
+	 * What `optimizeSampleUsage` (Music.cpp:3074) acts on: every unreferenced
+	 * sample is replaced with `EMPTY.brr`, and it is on by default — `-u` turns
+	 * it off. See {@link optimizeSamples}.
 	 *
-	 * Implementing it needs two things this project does not have. `EMPTY.brr` is
-	 * not in `the driver bundle's samples/`, and the pass skips any sample marked
-	 * `important` — a per-sample flag AddmusicK reads from
-	 * `Addmusic_sample groups.txt` and that `manifest.json` has no equivalent of.
-	 * Guessing at those flags would drop samples AMK keeps, which is worse than
-	 * carrying a few spare ones, so the pass waits for the metadata.
+	 * The pass skips any sample marked `important` — a per-sample flag AddmusicK
+	 * reads from `Addmusic_sample groups.txt`, which the driver manifest carries
+	 * through and the host passes in as {@link AddmusicKOptions.importantSamples}.
 	 */
 	private readonly usedSamples = new Array<boolean>(256).fill(false);
 	/**

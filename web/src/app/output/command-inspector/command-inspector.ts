@@ -43,11 +43,11 @@ const VIEWS: Readonly<Record<number, string>> = {
 /**
  * Letter commands with a view of their own.
  *
- * Only `@` is left. The rest used to have a read-only readout each — tempo in
- * BPM, pan as a position, noise in hertz — and every one of those readings now
- * lives in `commands/letter-params.ts`, where the parameter table both states it
- * *and* lets it be edited. Two implementations of the same sentence would only
- * drift.
+ * Only `@`, `p` and `q` are left. The rest used to have a read-only readout each
+ * — tempo in BPM, pan as a position, noise in hertz — and every one of those
+ * readings now lives in `@amk/tokens/commands/letter-params.ts`, where the
+ * parameter table both states it *and* lets it be edited. Two implementations of
+ * the same sentence would only drift.
  */
 const LETTER_VIEWS: Readonly<Record<string, string>> = {
   '@': 'instrument',
@@ -115,7 +115,7 @@ export class CommandInspector {
     }
 
     if (command.vcmd !== undefined) {
-      // parser.ts:3286 — under #am4, $ED is HFD's escape: only the plain-ADSR
+      // parser.ts's parseHFDHex — under #am4, $ED is HFD's escape: only the plain-ADSR
       // shape earns the envelope view, and $80-$83 fall to the generic
       // readout. A bare $ED keeps the view, as an incomplete one always has.
       if (command.vcmd === 0xed && command.target.program === 1) {
@@ -123,7 +123,7 @@ export class CommandInspector {
         return sub !== undefined && sub >= 0x80 && sub <= 0x83 ? null : 'adsr';
       }
 
-      // parser.ts:3016 — the other #am4 overload: a high first byte turns $E5
+      // parser.ts's parseHexCommand — the other #am4 overload: a high first byte turns $E5
       // from tremolo into a sample load, which has no shape to draw.
       if (command.vcmd === 0xe5 && command.target.program === 1) {
         return (command.args[0]?.value ?? 0) >= 0x80 ? null : 'vibrato';

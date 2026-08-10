@@ -614,7 +614,7 @@ console.log("\na .bnk sample bank plays through the emulator");
 	// The bank is built here from a bundled sample's own blocks, so the audio has
 	// a known-good reference: playing slot 3 of the bank must sound exactly like
 	// playing that sample directly.
-	const source = driver.samples[9]; // 0A SMW @9.brr — long enough to hear
+	const source = driver.samples[9]; // 09 SMW @7.brr — long enough to hear
 	const SLOT = 3;
 
 	const bank = new Uint8Array(SAMPLE_BANK_BYTES);

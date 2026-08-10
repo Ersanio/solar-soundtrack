@@ -17,8 +17,8 @@ export const PERCUSSION_ENTRY_BYTES = 7;
 /**
  * Slots in the melodic table.
  *
- * Twenty are present, but only `@0`-`@18` are reachable by name: `parser.ts:1594`
- * emits no `$DA` for 19-29, and `parser.ts:1597` remaps the `@@n` direct form's
+ * Twenty are present, but only `@0`-`@18` are reachable by name: `parser.ts:parseInstrument`
+ * emits no `$DA` for 19-29, and `parser.ts:parseInstrument` remaps the `@@n` direct form's
  * 19-29 to custom instruments 30-40. Slot 19 is reachable only as a raw
  * `$DA $13`, and slot 20 does not exist — `20 * 6 = 120` is where the percussion
  * table starts, so `@@20`'s bytes would be percussion entry 0's first six.

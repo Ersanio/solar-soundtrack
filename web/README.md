@@ -68,7 +68,7 @@ pushing dozens of identical recompiles through the debounce.
 
 ## The CodeMirror adapter
 
-`editor/codemirror/` is the only place that knows CodeMirror exists. `mml-language.ts` is 40 lines:
+`editor/codemirror/` is the only place that knows CodeMirror exists. `mml-language.ts` is 44 lines:
 `@amk/tokens` exposes `step` / `startState` / `copyState` in exactly the shape `StreamLanguage`
 wants, and `TOKEN_TAGS` holds `@lezer/highlight` tag _names_ as strings so the package itself stays
 CodeMirror-free. This is the one place those names resolve to `Tag` values, and `tokentest` asserts

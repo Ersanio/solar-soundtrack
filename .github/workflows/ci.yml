@@ -25,7 +25,7 @@ jobs:
 
       - run: npm run lint
 
-      # Formatting, four typechecks (packages, harnesses, app) and the eleven
+      # Formatting, three typechecks (packages, harnesses, app) and the eleven
       # byte-level harnesses: the compiler self-test, the scanner and its
       # splices, ADSR/instrument tables/BRR/echo FIR, the SPC assembly, the
       # headless MML -> SPC -> PCM audio chain, the worklet, and the chart

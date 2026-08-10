@@ -122,7 +122,7 @@ export function buildSpc(request: SpcExportRequest): SpcExportResult {
 	let samplePos = layout.sampleDataPos;
 
 	// Deduplicate identical samples: reuse the earlier entry's pointers rather
-	// than embedding the data twice (AddmusicK.cpp:1570).
+	// than embedding the data twice (AddmusicK.cpp:1581).
 	const writtenAt = new Map<BrrSample, number>();
 
 	for (let index = 0; index < samples.length; index++) {
@@ -201,7 +201,7 @@ function writeText(spc: Uint8Array, offset: number, length: number, value: strin
 
 /**
  * ID666 stores length and fade as ASCII digits, not integers
- * ("Why on Earth is the value stored as plain text...?" — AddmusicK.cpp:1620).
+ * ("Why on Earth is the value stored as plain text...?" — AddmusicK.cpp:1614).
  */
 function writeDigits(spc: Uint8Array, offset: number, length: number, value: number): void {
 	const clamped = Math.max(0, Math.min(value, 10 ** length - 1));

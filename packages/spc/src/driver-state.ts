@@ -199,7 +199,7 @@ export function applyChannelMutes(aram: Uint8Array, mask: number, shadow: MuteSh
 	shadow.restoring = (shadow.restoring | (shadow.applied & ~wanted)) & ~wanted;
 
 	// Composed rather than assigned, so a song muting its own channels with
-	// `$FA $05` keeps those bits.
+	// `$F4 $06` keeps those bits.
 	aram[Addr.MuteMask] = (aram[Addr.MuteMask] & ~shadow.applied) | wanted;
 	shadow.applied = wanted;
 

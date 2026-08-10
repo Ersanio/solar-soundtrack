@@ -30,7 +30,7 @@ const MAX_TEMPO = 254;
  * the driver actually does and cites it.
  *
  * Nothing here states an argument *count*: `expectedArgs` owns that, and
- * `shapeOf` pads whatever this table is short of. A resolver may therefore
+ * `resolveCommand` pads whatever this table is short of. A resolver may therefore
  * describe only the arguments it can name, which is what makes the
  * value-dependent forms below expressible at all.
  */
@@ -50,7 +50,7 @@ const DURATION = ticks("Over", {
  * The readme calls this "Duration" and links it to the note-length table, which
  * is wrong in both halves. `aram_map.html` calls the byte it lands in
  * (`$0331+x`, `$0361+x`) an "offset per music tempo tick", and the driver adds
- * it to an 8-bit phase accumulator once a tick (`main.asm:3166-3169`) — so it is
+ * it to an 8-bit phase accumulator once a tick (`main.asm:3321-3324`) — so it is
  * a speed, bigger is faster, and it is not measured in ticks at all. The `p`
  * command's own entry gets it right, calling the same value "the rate (speed)".
  */
@@ -95,7 +95,7 @@ const F4_SUBCOMMANDS = [
 	{ value: 0x09, label: "$09 — restore instrument" },
 ] as const;
 
-/** `$FA`'s sub-commands. `$05` is an error at `#amk 2`+ (`parser.ts:3047`). */
+/** `$FA`'s sub-commands. `$05` is an error at `#amk 2`+ (`parser.ts:parseHexCommand`). */
 const FA_SUBCOMMANDS = [
 	{ value: 0x00, label: "$00 — pitch modulation" },
 	{ value: 0x01, label: "$01 — GAIN" },
@@ -134,7 +134,7 @@ const REMOTE_TYPES = [
 
 /**
  * `$E6` is two commands sharing a byte: `$00` opens a subloop, anything else
- * closes one and repeats it `n + 1` times (`parser.ts:3148-3164`).
+ * closes one and repeats it `n + 1` times (`parser.ts:parseHexCommand`).
  */
 const subloop: Resolver = (command) => {
 	const value = command.args[0]?.value;
@@ -159,7 +159,7 @@ const subloop: Resolver = (command) => {
 
 /**
  * `$ED` is ADSR, GAIN, or — under `#am4` — HFD's escape into four other
- * commands entirely (`parser.ts:3286`).
+ * commands entirely (`parser.ts:parseHFDHex`).
  */
 const envelope: Resolver = (command) => {
 	const sub = command.args[0]?.value;
@@ -307,7 +307,7 @@ const misc: Resolver = (command) => {
 
 		default:
 			// `HEX_LENGTHS` gives `$FA` three bytes whatever the sub-command is, and
-			// `parser.ts:3047` only *rejects* an unknown one after reading both. So the
+			// `parser.ts:parseHexCommand` only *rejects* an unknown one after reading both. So the
 			// second byte is really there even when nothing here knows what it means,
 			// and saying "Value" is more honest than letting it fall through to
 			// "Argument 2".
@@ -315,7 +315,7 @@ const misc: Resolver = (command) => {
 	}
 };
 
-/** `#amk 1`'s `$FC` is remote *gain* — two arguments, not four (`parser.ts:2970`). */
+/** `#amk 1`'s `$FC` is remote *gain* — two arguments, not four (`parser.ts:parseHexCommand`). */
 const remote: Resolver = (command) => {
 	if (command.target.amkVersion === 1) {
 		return {
@@ -344,7 +344,7 @@ export const HEX_PARAMS: Readonly<Record<number, Resolver>> = {
 		u8("Instrument", "index", {
 			describe: (value) =>
 				value === 0x13
-					? // spc/instruments.ts:55 — the driver has a real 20th slot, SRCN $0F,
+					? // `@amk/spc`'s README.md — the driver has a real 20th slot, SRCN $0F,
 						// that AddmusicK's own instrToSample marks as "Nothing". Nothing ever
 						// marks $0F used, so optimizeSampleUsage (Music.cpp:3074) swaps it for
 						// the zero-byte EMPTY.brr.
@@ -439,7 +439,7 @@ export const HEX_PARAMS: Readonly<Record<number, Resolver>> = {
 			u8("Sample", "srcn", {
 				control: "select",
 				// `EMPTY.brr` is the zero-byte file the compiler *substitutes* for a
-				// sample nothing plays (`parser.ts:3594`). Offering it would offer
+				// sample nothing plays (`parser.ts:optimizeSamples`). Offering it would offer
 				// silence: every slot holding one is a slot whose real sample was
 				// dropped, and pointing `$F3` at one plays nothing. A song that has one
 				// written already still shows it, through the picker's unknown-value

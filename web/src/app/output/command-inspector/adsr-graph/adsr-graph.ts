@@ -136,7 +136,7 @@ export class AdsrGraph {
     ].filter((mark) => mark.x > 1 && mark.x < PLOT.w - 1);
   });
 
-  /** What a screen reader gets instead of the picture. */
+  /** The envelope in words. */
   protected readonly description = computed(() => {
     const envelope = this.envelope();
     if (!envelope.adsrEnabled) {

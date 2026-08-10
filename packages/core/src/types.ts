@@ -2,7 +2,7 @@
  * What goes into the compiler and what comes out of it.
  *
  * The UI reads these types too — diagnostics, stats and the sample list are all
- * rendered — so they live here rather than inside `compiler/`.
+ * rendered — so they live here rather than inside `@amk/compiler`.
  */
 
 /**

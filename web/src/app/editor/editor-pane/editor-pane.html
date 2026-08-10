@@ -9,7 +9,7 @@
     <amk-icon-wrap />
   </button>
 
-  <!-- Will grow into a toolbar; the caret readout is the only occupant for now. -->
+  <!-- Will grow into a toolbar; the tabs and the caret readout are all it holds for now. -->
   <div panelAside class="flex items-center gap-3">
     <amk-tabs [tabs]="TABS" [(active)]="tab" />
     @if (tab() === 'source') {

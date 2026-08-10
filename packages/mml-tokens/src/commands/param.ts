@@ -20,7 +20,7 @@ export interface EnumOption {
  * purpose — as `scanHex`'s `hexLeft` mutations and as `expectedArgs`, pinned
  * against each other by `tokentest` — and a third statement here would be
  * invisible to every harness. Descriptors describe as many parameters as they
- * know about and no more; {@link shapeOf} takes the count from `expectedArgs`
+ * know about and no more; `resolveCommand` takes the count from `expectedArgs`
  * and pads the tail with raw rows.
  */
 
@@ -90,7 +90,7 @@ export interface ParamDescriptor {
 	structural?: boolean;
 }
 
-/** What {@link shapeOf} resolves a command to. */
+/** What `resolveCommand` resolves a command to. */
 export interface CommandShape {
 	params: ParamDescriptor[];
 	/** A sentence about the command as a whole, usually a dialect fork. */

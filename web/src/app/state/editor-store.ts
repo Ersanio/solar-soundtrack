@@ -105,7 +105,7 @@ export class EditorStore {
 
   /**
    * The text the compiler last ran on. It lags `source` by the typing debounce,
-   * which is why the two are separate signals: the textarea stays responsive at
+   * which is why the two are separate signals: the editor stays responsive at
    * keystroke speed while compilation runs at most every {@link DEBOUNCE_MS}.
    */
   private readonly committed = signal(this.source());
@@ -157,8 +157,8 @@ export class EditorStore {
    * lag by the typing debounce; the echo hazards are scanned from {@link tokens}, which does not,
    * so a runaway echo is reported by the keystroke or paste that writes it and stays live even with
    * auto-compile switched off. A warning about what the song will do the moment you press play is
-   * not worth holding back 150 ms, and the compiler could not produce it anyway — `$F5` never
-   * reaches it.
+   * not worth holding back 150 ms, and the compiler has no opinion to offer anyway: it copies `$F5`
+   * through on its length alone, because `Music.cpp` has no `$F5` code to port.
    */
   readonly diagnostics = computed<Diagnostic[]>(() => {
     const order = { error: 0, severe: 1, warning: 2, info: 3 } as const;
@@ -266,8 +266,9 @@ export class EditorStore {
    * string token and five `hexArg`s, and `gather` builds commands from neither —
    * so a caret anywhere in that line finds nothing, and the entry editor would
    * be reachable only for the `@n` and `nXX` sample forms, which do happen to
-   * scan as commands. End-exclusive, matching how the definition's span is
-   * built.
+   * scan as commands. End-*inclusive*, like `commandAt`: a `Span` is half-open,
+   * so a caret resting immediately after the entry is one past `span.end` and
+   * would otherwise find nothing to edit.
    */
   readonly instrumentAtCaret = computed(() => {
     const at = this.caret();

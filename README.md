@@ -113,7 +113,7 @@ Four packages, and an editor that imports them. Each has a `README.md` of its ow
 | `packages/spc/`          | SPC assembly, BRR, the echo FIR, the emulator host and the worklet |
 | `web/`                   | The Angular editor                                                 |
 
-Nothing in `packages/` touches a framework or the DOM beyond two `fetch` calls, which is what lets
+Nothing in `packages/` touches a framework or the DOM beyond three `fetch` calls, which is what lets
 the same modules run in Node under the test harnesses, on the main thread, and inside an audio
 worklet.
 

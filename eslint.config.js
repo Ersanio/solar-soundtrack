@@ -242,9 +242,9 @@ module.exports = defineConfig([
       //
       // `button-has-type` cannot see through a component. Every `<button
       // amk-button>` already gets `type="button"` from Button's host binding
-      // (shared/button/button.ts), so the rule found sixteen buttons and only
-      // one of them — a raw `<button>` in the changelog trigger, now fixed —
-      // was actually missing a type.
+      // (shared/button/button.ts), so all twenty-four buttons the rule reports
+      // are false positives — the one that really was missing a type, a raw
+      // `<button>` in the changelog trigger, has since been fixed.
 
       // Styling is Tailwind utility classes throughout; an inline style is a
       // theme variable that escaped styles.css. `[style.x.px]` bindings, which
@@ -255,10 +255,9 @@ module.exports = defineConfig([
       // per change-detection pass — the sample browser's decode-the-whole-
       // library bug was exactly its target. It cannot be used here: it matches
       // every `Call` node in a template, and in a signals codebase every read
-      // is one. It reports 178 problems, and the first is
-      // `library.overrideCount() > 0`. Its `allowList`/`allowPrefix` options
-      // match on the callee's name, and nothing in a name distinguishes a
-      // signal from a method.
+      // is one. It reports 405 problems, and the first is `splitCss()` in
+      // app.html. Its `allowList`/`allowPrefix` options match on the callee's
+      // name, and nothing in a name distinguishes a signal from a method.
       //
       // So that class of bug is kept out structurally instead: panels build a
       // `computed` of view models with everything resolved — see the `rows` in

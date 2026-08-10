@@ -156,7 +156,7 @@ footing `fir.ts` stands on with bsnes.
 The bit layout is AddmusicK's own (`hex_command_reference.html:446-456`, and the `#instruments` byte
 list at `syntax_reference.html:258-263`: "to use ADSR, make sure that it is >= $80. Otherwise GAIN is
 used"). The GAIN byte is always *written* when an instrument is initialised — the `$FA $FE`
-hot-patch bit only reorders the ADSR and GAIN writes (`hex_command_reference.html:344`) — so it is
+hot-patch bit only reorders the ADSR and GAIN writes (`hex_command_reference.html:782`) — so it is
 inert while ADSR1's top bit is set, not absent.
 
 `CLOCKS` is the DSP's rate table and earns its keep twice: the envelope rates index it, and so does

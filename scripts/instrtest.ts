@@ -107,8 +107,8 @@ console.log("\nthe SRCN column against AddmusicK's own table");
 
 	// The one disagreement, and the reason the search key stops at 18. AMK's
 	// array marks 19 and 20 "Nothing" (Music.cpp:60) while the driver still has a
-	// real 20th slot. Nothing in MML can reach it: `parser.ts:1594` emits no
-	// `$DA` for @19, and `parser.ts:1597` sends `@@19` to custom instrument 30.
+	// real 20th slot. Nothing in MML can reach it: `parseInstrument` emits no
+	// `$DA` for @19, and its 4.05 remap sends `@@19` to custom instrument 30.
 	check("index 19 disagrees, and that is the @19 story", INSTRUMENT_TO_SAMPLE[19] === 0x00);
 	check("the driver's own entry 19 is a real one", tables.melodic[19].srcn === 0x0f);
 	check(

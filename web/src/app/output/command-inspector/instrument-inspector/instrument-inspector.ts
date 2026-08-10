@@ -38,7 +38,7 @@ type Band = 'melodic' | 'unsupported' | 'percussion' | 'custom' | 'undefined' | 
  * The number bands are AddmusicK's, and they are not contiguous: `@0`-`@18` set
  * an instrument, `@19` and `@20` do nothing audible at all, `@21`-`@29` arm a
  * drum on the next note without emitting anything, and `@30` up are the song's
- * own. `parser.ts:1594` is the one line that splits them.
+ * own. `parser.ts`'s `parseInstrument` has the one line that splits them.
  */
 @Component({
   selector: 'amk-instrument-inspector',
@@ -69,9 +69,10 @@ export class InstrumentInspector {
   /**
    * The number that reaches `$DA`, or `null` when nothing is emitted.
    *
-   * `parser.ts:1597` remaps the direct form's 19-29 to custom instruments, and
-   * it does so unconditionally — AddmusicK guards it with `convert`, which is on
-   * unless its CLI is given `-c`. So `@@19` is `@30`, not driver entry 19.
+   * `parser.ts`'s `parseInstrument` remaps the direct form's 19-29 to custom
+   * instruments, and it does so unconditionally — AddmusicK guards it with
+   * `convert`, which is on unless its CLI is given `-c`. So `@@19` is `@30`, not
+   * driver entry 19.
    *
    * A hand-written `$DA` goes through none of this: the byte is the byte, which
    * is what makes it the only way to reach table entry 19.
@@ -83,7 +84,7 @@ export class InstrumentInspector {
     }
 
     if (this.raw()) {
-      // parser.ts:3131-3135 (Music.cpp:1976) — Addmusic 4.05 numbered custom
+      // parser.ts's $DA remap in parseHexCommand (Music.cpp:1976) — Addmusic 4.05 numbered custom
       // instruments from $13, so a raw $DA remaps before any band is judged.
       if (this.command().target.program === 1 && n >= 0x13) {
         return n - 0x13 + FIRST_CUSTOM_INSTRUMENT;
@@ -304,7 +305,7 @@ export class InstrumentInspector {
       const t = DEFAULT_TRANSPOSE[n];
       rows.push({
         label: 'Transposes',
-        // `parser.ts:2278` subtracts, so a positive entry moves notes *down*.
+        // `parser.ts`'s `parseNote` subtracts, so a positive entry moves notes *down*.
         value: `${t > 0 ? '−' : '+'}${Math.abs(t)} semitones`,
         note: 'applied to every note written under it',
       });

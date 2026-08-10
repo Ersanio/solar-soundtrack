@@ -26,13 +26,7 @@ const POINTS = 160;
 /** How many echo repeats to ghost in behind the main curve. */
 const REPEATS = 4;
 
-/**
- * Drawn in a fixed coordinate space and stretched to fit, the way the sample
- * browser's waveform is. Cheaper than measuring the element, and the only cost
- * is that stroke widths scale with it — which is why they are set in the
- * viewBox's own units rather than pixels.
- */
-/** Taller than the others: the readable range of a filter is wider than a curve. */
+/** Taller than the shared space: a filter's readable range is wider than a curve. */
 const PLOT = plot(320, 150);
 
 /** Every 2 kHz, so the ticks are evenly spaced and land on both plot edges. */
@@ -173,7 +167,7 @@ export class FirGraph {
     this.picked.emit({ hz, gain: 10 ** (db / 20) });
   }
 
-  /** What a screen reader gets instead of the picture. */
+  /** The curve in words: the response in decibels at four frequencies. */
   protected readonly description = computed(() => {
     const at = (hz: number) =>
       (20 * Math.log10(Math.max(firMagnitude(this.taps(), hz), 1e-9))).toFixed(0);

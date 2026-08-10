@@ -64,7 +64,7 @@ export class ParamTable {
    * comparing against the value bound to it, so a previewed `value` would make
    * every drag read as a no-op and nothing would ever be written. And the *row
    * set* has to stay put: every descriptor that forks on an argument's value is
-   * `structural`, which `describe.ts` draws as a number field, so re-resolving
+   * `structural`, which `describe.ts` never draws as a slider, so re-resolving
    * against a half-typed count would delete and rebuild the rows under the
    * pointer. Resolving from the document and re-describing from the preview
    * gets the live reading without either.

@@ -1,9 +1,9 @@
 /**
  * Byte-level sanity checks for the AddmusicK compiler.
  *
- * This is NOT the differential harness described in PLAN.md §3 — that one diffs
- * against a native AddmusicK build over a real song corpus and is what actually
- * establishes fidelity. This just catches gross breakage while iterating.
+ * This is NOT the differential harness — `Compare-Spc.ps1` and `Compare-SongBin.ps1`
+ * diff against a native AddmusicK build and are what actually establish fidelity.
+ * This just catches gross breakage while iterating.
  *
  *   npm run selftest
  */

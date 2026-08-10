@@ -70,7 +70,7 @@ export interface SpcCore {
 	 * data, what tempo it is running at, how far its tick accumulator has got —
 	 * and reading it is the only way to know what the song is actually doing
 	 * rather than what it was predicted to do. See `driver-state.ts` for the
-	 * addresses; `readme/readme_files/aram_map.html` documents all of them.
+	 * addresses; `AddmusicKreadme/readme_files/aram_map.html` documents all of them.
 	 *
 	 * A window onto the heap rather than a copy, so it can be written as well as
 	 * read and the SPC700 sees the change on its next instruction — which is how

@@ -41,7 +41,7 @@ export function tempoBefore(command: Command, commands: readonly Command[]): num
 			// `$E3 <duration> <tempo>` — the target is what stands afterwards.
 			found = other.args[1]?.value ?? found;
 		} else if (other.kind.toLowerCase() === "t" && other.args.length > 0) {
-			// `t144` and `t30,80`: the tempo is last either way (`parser.ts:1740-1760`).
+			// `t144` and `t30,80`: the tempo is last either way (`parser.ts:parseTempo`).
 			found = other.args[other.args.length - 1].value;
 		}
 	}
@@ -59,7 +59,7 @@ const NOTE_KINDS = new Set(["c", "d", "e", "f", "g", "a", "b", "r"]);
  * `$DD` is the reason this exists. The driver reads it by peeking ahead from the
  * note already playing (`L_10A1` at ARAM `$15FE`, reached from `main.asm:2452`),
  * and that read-ahead is unreachable on the tick a note begins, because
- * `main.asm:2338`'s `dec $70+x` returns zero there. So a pitch slide starts on
+ * `main.asm:2337`'s `dec $70+x` returns zero there. So a pitch slide starts on
  * the *second* tick of the note before it, and every key-on then overwrites the
  * slide state unconditionally (`main.asm:465-466`) — meaning the whole of a
  * `$DD` has to fit in `noteLength - 1` ticks or the rest of it is never heard.
@@ -92,23 +92,23 @@ export function noteTicksBefore(command: Command, commands: readonly Command[]):
  * Which velocity table is live where a command was written.
  *
  * `q`'s low nibble is an index, and the table it indexes is a property of the
- * *song*: `#amk 2` moved the default from SMW's to N-SPC's (`parser.ts:415`),
+ * *song*: `#amk 2` moved the default from SMW's to N-SPC's (`parser.ts:applyTarget`),
  * and `#option smwvtable` / `nspcvtable` switch it mid-file
- * (`parser.ts:926-953`). Without this the panel would put a number on the
+ * (`parser.ts:parseOptionDirective`). Without this the panel would put a number on the
  * velocity that is simply the wrong number for half the songs in the wild.
  *
- * Positional, and in `app/` for the same reason `feedbackBefore` and
+ * Positional, and here for the same reason `feedbackBefore` and
  * `firOverriddenBefore` are: the scanner does not track `#option` — it has no
  * argument history, which is what keeps `copyState` O(1) — and the compiler
  * applies the file's markers rather than reading them where they sit. So this is
  * an approximation the compiler deliberately does not make, kept out of
- * `compiler/` so it cannot be mistaken for one it does.
+ * `@amk/compiler` so it cannot be mistaken for one it does.
  *
  * The scanner does tokenise the directive's argument word (`ScanState.
  * directiveWord`), which is what makes a text scan possible at all.
  */
 export function velocityTableAt(command: Command, tokens: Token[], text: string): "smw" | "nspc" {
-	// parser.ts:415 — the default the dialect sets, before any #option.
+	// parser.ts:applyTarget — the default the dialect sets, before any #option.
 	let smw = command.target.program !== 0 || command.target.amkVersion < 2;
 
 	for (const token of tokens) {
@@ -120,7 +120,7 @@ export function velocityTableAt(command: Command, tokens: Token[], text: string)
 			continue;
 		}
 
-		// `matchWord` is case-insensitive (`parser.ts:845`), and `#option` and its
+		// `matchWord` is case-insensitive (`parser.ts`), and `#option` and its
 		// keyword are two tokens, so the word is read from the one after.
 		if (text.slice(token.start, token.end).toLowerCase() !== "#option") {
 			continue;

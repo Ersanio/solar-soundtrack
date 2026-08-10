@@ -11,7 +11,7 @@ lines or fewer, and an observed result from actually running it. Anything alread
 deliberate divergence, and anything where AddmusicK is simply buggy and the port reproduces the bug
 faithfully, was not a finding.
 
-**All twenty-seven confirmed divergences are fixed.** Each has a `selftest` or `tokentest` case,
+**All twenty-three confirmed divergences are fixed.** Each has a `selftest` or `tokentest` case,
 written before the fix and failing without it.
 
 ## The standard this holds to
@@ -24,14 +24,14 @@ _either_ direction is a bug:
 - Stricter than AddmusicK is merely annoying, but still wrong: it rejects a song that works.
 
 **Where AddmusicK is case-sensitive, so is this.** Where it is case-*in*sensitive — `strnicmp` on a
-directive keyword, `strtol` on a hex digit — so is this. The two are not a matter of taste; they are
+directive keyword, `getHex` on a hex digit — so is this. The two are not a matter of taste; they are
 observable behaviour.
 
 ## Wrong bytes
 
 | What                                                                                                                                     | Reference                 |
 | ---------------------------------------------------------------------------------------------------------------------------------------- | ------------------------- |
-| `$Dd` / `$dD` split the tie off; the canonical spellings fold it in                                                                      | `Music.cpp:2224`          |
+| `$Dd` / `$dD` split the tie off; only the canonical spellings do                                                                         | `Music.cpp:2224`          |
 | `#amk 1`'s `$FA $05` emitted literally instead of as a type 6 / type 8 remote code event                                                 | `Music.cpp:1925-1962`     |
 | An out-of-range repeat count on `(n)N` or `*N` emitted a `$E9` with the count forced to 1; `error()` returns, so AddmusicK emits nothing | `Music.cpp:1181`, `:1332` |
 
@@ -42,7 +42,7 @@ observable behaviour.
 | `#AMK 4`, `#DEFINE`, `#IFDEF` — preprocessor directives in any case                             | compares case-sensitively; the parser then catches the capitalised spelling and names the stage | `globals.cpp:788-956`, `Music.cpp:2432-2456` |
 | `#Title`, `#LENGTH` inside `#spc`                                                               | `typeName != "title"` — case-sensitive                                                          | `Music.cpp:3471`                             |
 | `"kick.BRR"` in `#samples`                                                                      | `extension == ".brr"` — case-sensitive                                                          | `Music.cpp:2723-2728`                        |
-| `#samples{`, `#spc{`, `#instruments{`                                                           | every branch requires `isspace` after the keyword                                               | `Music.cpp:2415-2506`                        |
+| `#samples{`, `#spc{`, `#instruments{`                                                           | every branch but two requires `isspace` after the keyword                                       | `Music.cpp:2415-2506`                        |
 | an out-of-range `#define`/`#if` operand                                                         | `strToInt` reads through a `stringstream` into an `int` and throws                              | `globals.cpp:716-726`                        |
 | a song with bytes but no ticks — an unclosed `[[` parks every note in the superloop accumulator | `mainLength` stays at its `-1` sentinel and `pointersFirstPass` errors                          | `Music.cpp:3210-3214`                        |
 
@@ -50,7 +50,7 @@ observable behaviour.
 
 | What                                                                                                                          | Reference             |
 | ----------------------------------------------------------------------------------------------------------------------------- | --------------------- |
-| `#halvetempo#0` — the one directive matched on prefix alone, with no terminator test                                          | `Music.cpp:2493`      |
+| `#halvetempo#0` — one of the two directives matched on prefix alone, with no terminator test                                  | `Music.cpp:2493`      |
 | `#amk=N` for N other than 1 — read and thrown away                                                                            | `Music.cpp:2488-2492` |
 | `#AM4` / `#AMM` — consumed silently by the parser when the preprocessor's case-sensitive match misses them                    | `Music.cpp:2480-2486` |
 | `#option dividetempo 64` failed every short note; `emitNote` hoisted `divideByTempoRatio(0x60)` above the branch that uses it | `Music.cpp:2252-2274` |

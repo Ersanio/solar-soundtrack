@@ -11,7 +11,7 @@ MML to N-SPC song data. A port of AddmusicK 1.0.11's `Music.cpp`, and shaped by 
 read a certain way, and the way this code should read is _like `Music.cpp`_. A rule that pushes a
 method to be shorter, a condition to be inverted, or a loop to become a `map` makes the two
 implementations harder to diff, which is the only tool there is for establishing that the port is
-faithful. The same argument covers the comments: roughly 80 of them cite a `Music.cpp` line, and
+faithful. The same argument covers the comments: roughly 100 of them cite a `Music.cpp` line, and
 they are the port's audit trail rather than explanations of TypeScript.
 
 Prettier still runs. Formatting does not change what the code says, and the tabs/double-quotes/120

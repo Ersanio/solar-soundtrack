@@ -18,7 +18,7 @@ export const INSTRUMENT_TO_SAMPLE: readonly number[] = [
 
 /**
  * `hexLengths[]` — total byte length (command + arguments) of each VCMD,
- * indexed by `command - 0xDA`. Music.cpp:62
+ * indexed by `command - 0xDA`. Music.cpp:63
  *
  * `$FB` (arpeggio) is variable-length and handled separately by the parser.
  */
@@ -52,10 +52,11 @@ export const BANK_SLOT_COUNT = 0x40;
  * The bands are not contiguous and the boundaries are not derivable: `@0`-`@18`
  * select a driver instrument, `@19`/`@20` do nothing audible, `@21`-`@29` arm a
  * drum on the next note without emitting anything, and `@30` up are the song's
- * own `#instruments` entries (`Music.cpp:1594`, ported at `parser.ts:1622`).
+ * own `#instruments` entries (`Music.cpp:878`, ported in `parser.ts`'s
+ * `parseInstrument`).
  *
  * Stated here for the same reason as `BANK_SLOT_COUNT` above: `@amk/spc/instruments`
- * names the same two numbers for the driver-table side, `compiler/` does not
+ * names the same two numbers for the driver-table side, `@amk/compiler` does not
  * depend on the SPC layer, and `instrtest` asserts the two agree.
  */
 export const FIRST_PERCUSSION_INSTRUMENT = 21;
@@ -98,8 +99,8 @@ export const NOTE_DURATIONS: readonly number[] = [0x33, 0x66, 0x80, 0x99, 0xb3, 
  * Two tables of sixteen, SMW's first and N-SPC's second, indexed by the nibble
  * with `+0x10` when the driver's `!SecondVTable` is set (`main.asm:2374-2378`).
  * Which one is live is a property of the *song*, not of the byte: `#amk 2` moved
- * the default from SMW's to N-SPC's (`parser.ts:415`) and `#option smwvtable` /
- * `nspcvtable` switch it mid-file (`parser.ts:926-953`). Neither is linear, so
+ * the default from SMW's to N-SPC's (`parser.ts:applyTarget`) and `#option smwvtable` /
+ * `nspcvtable` switch it mid-file (`parser.ts:parseOptionDirective`). Neither is linear, so
  * the nibble is an index and not a volume.
  */
 export const VELOCITY_VALUES: readonly number[] = [
@@ -130,7 +131,7 @@ export const TICKS_PER_WHOLE = 192;
 /** The parser version this implementation targets. */
 export const PARSER_VERSION = 4;
 
-/** Human-readable names for the VCMDs, used in hover text and hex dumps. */
+/** Human-readable names for the VCMDs, used in hover text and the command inspector. */
 export const VCMD_NAMES: Readonly<Record<number, string>> = {
 	0xda: "set instrument",
 	0xdb: "pan",

@@ -60,7 +60,7 @@ export type TokenKind =
 /**
  * `TokenKind` to the `@lezer/highlight` tag that should colour it.
  *
- * Named rather than imported: `compiler/` runs under plain Node in the
+ * Named rather than imported: `@amk/tokens` runs under plain Node in the
  * harnesses and must not depend on CodeMirror. The editor resolves these
  * against `tags` when it builds the `tokenTable`.
  */
@@ -103,8 +103,8 @@ export const TOKEN_TAGS: Readonly<Record<TokenKind, string>> = {
 /**
  * Letters whose argument `parser.ts` reads with `getHex` rather than `getInt`.
  *
- * `q7F` is quantization `$7F` (`parser.ts:1405`) and `n1F` is noise clock `$1F`
- * (`parser.ts:1665`), so reading either as decimal is wrong twice over: the value
+ * `q7F` is quantization `$7F` (`parser.ts:parseQuantization`) and `n1F` is noise clock `$1F`
+ * (`parser.ts:parseNoise`), so reading either as decimal is wrong twice over: the value
  * is wrong, and `F` would otherwise be taken for a note.
  */
 export const HEX_ARG_LETTERS = new Set(["q", "n"]);
@@ -144,7 +144,7 @@ export const LETTER_KINDS: Readonly<Record<string, TokenKind>> = {
 	p: "vibrato",
 };
 
-/** One `"find=value"` definition — `parser.ts:664`. */
+/** One `"find=value"` definition — `parser.ts:parseReplacementDirective`. */
 export interface Replacement {
 	find: string;
 	value: string;
@@ -159,10 +159,10 @@ export interface Replacement {
  * pointed at it, including states for lines above the definition.
  *
  * `byFirstChar` is the whole reason lookup is affordable. `tokenize` runs on
- * every keystroke, undebounced (`editor-store.ts:172`), and the match is tried
+ * every keystroke, undebounced (`editor-store.ts:tokens`), and the match is tried
  * at every dispatch position; a linear pass over every definition each time is
  * tens of milliseconds on a large song. Buckets are sorted longest-first, which
- * is exactly equivalent to AMK's global longest-first sort (`parser.ts:682`) —
+ * is exactly equivalent to AMK's global longest-first sort (`parser.ts:doReplacement`) —
  * two entries that can both match at one position necessarily share a first
  * character, so a global sort would never break a tie differently.
  */
@@ -173,7 +173,7 @@ export interface ReplacementTable {
 
 export const NO_REPLACEMENTS: ReplacementTable = { entries: [], byFirstChar: new Map() };
 
-/** `parser.ts:664` — a repeated `find` overwrites, as `Map.set` does. */
+/** `parser.ts:parseReplacementDirective` — a repeated `find` overwrites, as `Map.set` does. */
 function withReplacement(table: ReplacementTable, find: string, value: string): ReplacementTable {
 	const entries = table.entries.filter((entry) => entry.find !== find).concat({ find, value });
 	const byFirstChar = new Map<string, Replacement[]>();
@@ -196,7 +196,7 @@ function withReplacement(table: ReplacementTable, find: string, value: string): 
 /**
  * The longest definition matching at `at`, or `null`.
  *
- * A bare `startsWith` with no word boundary, because `parser.ts:690` has none:
+ * A bare `startsWith` with no word boundary, because `parser.ts:doReplacement` has none:
  * `"e=$EF"` really does replace every `e` in the song. It looks like a bug and
  * is not one.
  */
@@ -217,7 +217,7 @@ function matchReplacement(line: string, at: number, table: ReplacementTable): Re
 
 /**
  * The dialect in force where a command was written, in the parser's vocabulary
- * (`parser.ts:181-182`, `applyTarget` at `parser.ts:389-417`). The scanner
+ * (`parser.ts:targetAMKVersion`/`songTargetProgram`, `applyTarget` in `parser.ts`). The scanner
  * carries the same two numbers flat in {@link ScanState}; this is the gathered,
  * per-command form the inspector dispatches on.
  */
@@ -228,7 +228,7 @@ export interface CommandTarget {
 	readonly amkVersion: number;
 }
 
-/** What the parser assumes before any marker (`parser.ts:181-182`). */
+/** What the parser assumes before any marker (`parser.ts:targetAMKVersion`/`songTargetProgram`). */
 const DEFAULT_TARGET: CommandTarget = { program: 0, amkVersion: 4 };
 
 /**
@@ -245,12 +245,12 @@ export interface ScanState {
 	/** The `$XX` those arguments belong to; `0` when none is open. */
 	currentHex: number;
 	/**
-	 * Second byte, tracked for `$FA` as `parser.ts:2454` does — and, under
-	 * `#am4`, for `$ED`, whose sub-byte picks the HFD form (`parser.ts:3286`).
+	 * Second byte, tracked for `$FA` as `parser.ts:parseHexCommand` does — and, under
+	 * `#am4`, for `$ED`, whose sub-byte picks the HFD form (`parser.ts:parseHFDHex`).
 	 */
 	currentHexSub: number;
 	/**
-	 * `$FB` takes its length from the byte after it (`parser.ts:2413-2424`), so
+	 * `$FB` takes its length from the byte after it (`parser.ts:parseHexCommand`), so
 	 * that one byte has to be recognised as a count rather than an argument.
 	 */
 	awaitingArpCount: boolean;
@@ -263,7 +263,7 @@ export interface ScanState {
 	/**
 	 * The next token is the `"` of a sample load, not a replacement directive.
 	 *
-	 * `parser.ts:1732` sends a `("` straight to `parseSampleLoad`, which reads
+	 * `parser.ts:parseOpenParen` sends a `("` straight to `parseSampleLoad`, which reads
 	 * the name itself, so that quote never reaches the `"` arm of the dispatch
 	 * and never defines anything. Carried as a one-shot flag set by `(` because
 	 * `step` may not look behind its own `at` to find the paren.
@@ -274,7 +274,7 @@ export interface ScanState {
 	 *
 	 * One-shot, like {@link sampleName}, but consumed *after* the replacement
 	 * arm rather than before it: `getHex` opens with `doReplacement`
-	 * (`parser.ts:532`), so `nx` with `"x=1F"` really does read `$1F`. Letting
+	 * (`parser.ts`), so `nx` with `"x=1F"` really does read `$1F`. Letting
 	 * the flag survive into the expansion is what reproduces that. It is cleared
 	 * by whatever token comes next whether or not that token is a hex digit,
 	 * which reproduces the other half: `getHex` skips no spaces, so `n 1F` fails.
@@ -302,11 +302,11 @@ export interface ScanState {
 	 * The next bare word is a directive's argument, not music.
 	 *
 	 * `#option smwvtable` reaches `matchWord` through the parser's own
-	 * `skipSpaces` (`parser.ts:871-926`), which crosses line breaks — so without
+	 * `skipSpaces` (`parser.ts:parseOptionDirective`), which crosses line breaks — so without
 	 * this the argument would scan as `s`, `m`, a global volume, a volume, two
 	 * notes… Set for the directives whose argument is a bare word — `#option`,
 	 * and the preprocessor's `#define`/`#undef`/`#ifdef`/`#ifndef`/`#if`
-	 * (`preprocess.ts:175`) — and consumed by the next non-whitespace token,
+	 * (`preprocess.ts:getArgument`) — and consumed by the next non-whitespace token,
 	 * word or not, so it cannot leak onto later music.
 	 */
 	directiveWord: boolean;
@@ -327,7 +327,7 @@ export interface ScanState {
 	inInstruments: boolean;
 	/**
 	 * The target program in force at this point, in the parser's vocabulary
-	 * (`parser.ts:181-182`): 0 = AddmusicK, 1 = Addmusic 4.05 (`#am4`),
+	 * (`parser.ts:songTargetProgram`): 0 = AddmusicK, 1 = Addmusic 4.05 (`#am4`),
 	 * 2 = AddmusicM (`#amm`).
 	 *
 	 * Positional, where the compiler's is final: `preprocess.ts` resolves the
@@ -339,7 +339,7 @@ export interface ScanState {
 	songTargetProgram: number;
 	/**
 	 * The `#amk` version; 0 under `#am4`/`#amm`, and 4 before any marker, both
-	 * matching the parser (`parser.ts:181`, `applyTarget` at `parser.ts:389`).
+	 * matching the parser (`parser.ts:targetAMKVersion`, `applyTarget` in `parser.ts`).
 	 */
 	targetAMKVersion: number;
 	/**
@@ -354,7 +354,7 @@ export interface ScanState {
 	awaitingAmkVersion: boolean;
 	/**
 	 * The next `$xx` is the sub-byte of an `#am4` `$ED` — `parseHFDHex`
-	 * (`parser.ts:3286`, Music.cpp:1466): `$80` writes a DSP register, `$81`
+	 * (`parser.ts`, Music.cpp:1466): `$80` writes a DSP register, `$81`
 	 * tunes, `$82` uploads a block, `$83` is an error, and anything else is a
 	 * plain ADSR command. One-shot like {@link awaitingArpCount}, because the
 	 * sub-byte picks how many arguments follow.
@@ -363,7 +363,7 @@ export interface ScanState {
 	/**
 	 * High byte of an `$ED $82` upload's 16-bit data count, held from the third
 	 * header argument until the fourth extends the run by count+1 data bytes
-	 * (`parser.ts:3381-3396`).
+	 * (`parser.ts:parseHFDHex`).
 	 */
 	hfdCountHi: number;
 }
@@ -412,8 +412,7 @@ export interface StepResult {
 	 *
 	 * Positions are gone by design. The text came from a definition somewhere
 	 * else entirely, so the caller stamps every one of these with the use site's
-	 * span — the collapse `doReplacement` performs on `origins` at
-	 * `parser.ts:691-698`.
+	 * span — the collapse `doReplacement` performs on `origins` in `parser.ts`.
 	 */
 	expansion?: ExpandedToken[];
 }
@@ -442,20 +441,20 @@ const isWordChar = (c: string): boolean => isAlpha(c) || isDigit(c) || c === "_"
 
 /**
  * Directives whose first argument is a bare word rather than a number, a `$`
- * value or a string — `#option`'s keyword (`parser.ts:926-982`) and the
- * preprocessor's define names (`preprocess.ts:175`). They set
+ * value or a string — `#option`'s keyword (`parser.ts:parseOptionDirective`) and the
+ * preprocessor's define names (`preprocess.ts:getArgument`). They set
  * {@link ScanState.directiveWord} so the word is not scanned as music.
  */
 const WORD_ARG_DIRECTIVES = new Set(["#option", "#define", "#undef", "#ifdef", "#ifndef", "#if"]);
 
 /**
- * The three directives followed by a `{ }` block (`parser.ts:823-856`). Their
- * brace is consumed by `parseBlock` and never reaches `parseTripletOpen`, so
+ * The three directives followed by a `{ }` block (`parser.ts:parseSpecialDirective`). Their
+ * brace is consumed by the block parser and never reaches `parseTripletOpen`, so
  * `gather` has to tell it apart from a triplet's.
  */
 const BLOCK_DIRECTIVES = new Set(["#spc", "#samples", "#instruments"]);
 
-/** Notes, rests and ties — the `parser.ts:437-439` arm of the dispatch. */
+/** Notes, rests and ties — the `parser.ts:scan` arm of the dispatch. */
 const isNoteLetter = (c: string): boolean =>
 	c === "c" || c === "d" || c === "e" || c === "f" || c === "g" || c === "a" || c === "b";
 
@@ -496,7 +495,7 @@ function stepInner(
 		return scanString(line, at, state, sampleName);
 	}
 
-	// `doReplacement` sits at the top of the dispatch loop (`parser.ts:415`),
+	// `doReplacement` sits at the top of the dispatch loop (`parser.ts:scan`),
 	// ahead of the whitespace and `"` arms alike, so a replacement may match on
 	// the opening quote of a directive. A sample load is the one exception:
 	// `parseSampleLoad` walks past `("` itself without expanding anything.
@@ -531,7 +530,7 @@ function stepInner(
 		state.hexArgNext = false;
 		if (isHexDigit(c)) {
 			let end = at;
-			// `getHex` stops at two digits (`parser.ts:536`).
+			// `getHex` stops at two digits (`parser.ts`).
 			while (end < line.length && end - at < 2 && isHexDigit(line[end])) {
 				end++;
 			}
@@ -565,10 +564,10 @@ function stepInner(
 		}
 	}
 
-	// `#amk`'s version argument — preprocess.ts:323-338 — read here because it
+	// `#amk`'s version argument — preprocess.ts:preprocess — read here because it
 	// is a separate token. Guarded the way preprocess guards it: once `#am4` or
 	// `#amm` has been seen (`version < 0` there, a non-zero program here), a
-	// later `#amk` is ignored. `#amk=1` (preprocess.ts:163-171) arrives as the
+	// later `#amk` is ignored. `#amk=1` (preprocess.ts:preprocess) arrives as the
 	// number token `=1`, which `scanNumber` already reads. Falls through so the
 	// token still scans as the plain number it is.
 	if (state.awaitingAmkVersion) {
@@ -597,11 +596,11 @@ function stepInner(
 		state.currentHex = 0;
 	}
 
-	// `parser.ts:399` reports a stray character inside an unfinished hex command
+	// `parser.ts:scan` reports a stray character inside an unfinished hex command
 	// and then dispatches it anyway — `hexLeft` is left standing rather than the
 	// character being skipped. That is deliberately not special-cased here: the
 	// compiler already raises AMK0155, and letting the character take its normal
-	// arm is what lets `|` clear a half-written run (`parser.ts:435`), and what
+	// arm is what lets `|` clear a half-written run (`parser.ts:scan`), and what
 	// colours the note in `$F5 $7F c4` as a note.
 
 	switch (c) {
@@ -622,7 +621,7 @@ function stepInner(
 			return scanHash(line, at, state);
 
 		case "|":
-			// `parser.ts:435` — a bar line abandons any half-written hex command.
+			// `parser.ts:scan` — a bar line abandons any half-written hex command.
 			state.hexLeft = 0;
 			state.currentHex = 0;
 			state.awaitingArpCount = false;
@@ -643,15 +642,15 @@ function stepInner(
 		case "*":
 			return { kind: "loopCall", end: at + 1 };
 
-		// `(` opens either a label loop or a sample load (`parser.ts:1694`). Both
+		// `(` opens either a label loop or a sample load (`parser.ts:parseOpenParen`). Both
 		// are left to tokenise from their parts, so `("kick.brr", $02)` colours
 		// its name as a string and its tuning as a number without this having to
 		// know which form it is looking at.
 		case "(":
-			// The one thing the two forms must be told apart for: `parser.ts:1732`
+			// The one thing the two forms must be told apart for: `parser.ts:parseOpenParen`
 			// tests exactly this character, and a sample name is not a definition.
 			state.sampleName = line[at + 1] === '"';
-			// `(@5, $02)` loads instrument 5's *sample* (`parser.ts:1743`); the `@`
+			// `(@5, $02)` loads instrument 5's *sample* (`parser.ts:parseSampleLoad`); the `@`
 			// is part of that command and not an instrument change, so it is taken
 			// here rather than left to open one.
 			if (line[at + 1] === "@") {
@@ -660,7 +659,7 @@ function stepInner(
 
 			return { kind: "label", end: at + 1 };
 
-		// `parser.ts:1585` — a second `@` is the "direct" form, which forces the
+		// `parser.ts:parseInstrument` — a second `@` is the "direct" form, which forces the
 		// `$DA` that `@19`-`@29` would otherwise not emit. One token, so `gather`
 		// can tell the two apart from the text alone.
 		case "@":
@@ -677,7 +676,7 @@ function stepInner(
 			return { kind: "tie", end: at + 1 };
 
 		case "{":
-			// `parser.ts:1071` — the brace after `#instruments` opens the block.
+			// `parser.ts:parseInstrumentDefinitions` — the brace after `#instruments` opens the block.
 			// Any half-written hex run is abandoned rather than carried into it,
 			// so a stray `$EF` above cannot eat the first entry's bytes.
 			if (state.pendingInstruments) {
@@ -739,7 +738,7 @@ function stepInner(
 	return { kind: "unknown", end: at + 1 };
 }
 
-/** A note's accidental, if it has one — `getPitch`, `parser.ts:529-535`. */
+/** A note's accidental, if it has one — `parser.ts:getPitch`. */
 function scanNoteBody(line: string, at: number): number {
 	return line[at] === "+" || line[at] === "-" ? at + 1 : at;
 }
@@ -763,20 +762,20 @@ function scanNumber(line: string, at: number): StepResult {
 }
 
 /**
- * `#amk 4` and friends versus a `#0` channel directive — `parser.ts:707-712`.
+ * `#amk 4` and friends versus a `#0` channel directive — `parser.ts:parseHash`.
  */
 function scanHash(line: string, at: number, state: ScanState): StepResult {
 	let end = at + 1;
 	if (isAlpha(line[end])) {
 		// Alphanumeric after the first letter, so `#am4` is one directive — as
-		// `preprocess.ts:173` reads it, one word up to whitespace. The first
+		// `preprocess.ts:getArgument` reads it, one word up to whitespace. The first
 		// character stays alphabetic so `#0`-`#7` remain channels.
 		while (end < line.length && (isAlpha(line[end]) || isDigit(line[end]))) {
 			end++;
 		}
 
 		const name = line.slice(at, end).toLowerCase();
-		// `parser.ts:797` matches this case-insensitively. Every other directive
+		// `parser.ts:matchWord` matches this case-insensitively. Every other directive
 		// clears the flag, so an `#instruments` with no block cannot arm the next
 		// unrelated `{`.
 		state.pendingInstruments = name === "#instruments";
@@ -784,7 +783,7 @@ function scanHash(line: string, at: number, state: ScanState): StepResult {
 		// argument is a bare word rather than a number, a `$` value or a string.
 		state.directiveWord = WORD_ARG_DIRECTIVES.has(name);
 
-		// The target markers — preprocess.ts:340-345. `#am4`/`#amm` are
+		// The target markers — preprocess.ts:preprocess. `#am4`/`#amm` are
 		// unguarded there, so a later one always wins, even over an earlier
 		// `#amk`; `#amk`'s own guard sits where its version number is read.
 		if (name === "#am4") {
@@ -814,7 +813,7 @@ function scanHash(line: string, at: number, state: ScanState): StepResult {
  * A quoted run, which is either a replacement directive or a sample name.
  *
  * `\"` escapes a quote inside the body, as `getQuotedString` allows
- * (`parser.ts:620-622`). An unterminated string stays open into the next line,
+ * (`parser.ts`). An unterminated string stays open into the next line,
  * which is why `inString` is part of the state.
  *
  * A directive that both opens and closes here defines a replacement. "Both
@@ -851,14 +850,14 @@ function scanString(line: string, at: number, state: ScanState, sampleName: bool
 }
 
 /**
- * `parseReplacementDirective`, `parser.ts:640-666`.
+ * `parser.ts:parseReplacementDirective`.
  *
  * Split on the *first* `=`, right-trim the name, left-trim the value. A body
  * with no `=` or an empty name is an error there (AMK0021 / AMK0022) and simply
  * defines nothing here — the compiler is where diagnostics belong.
  */
 function define(body: string, state: ScanState): void {
-	// `getQuotedString` (`parser.ts:1297-1318`) resolves the one escape the
+	// `getQuotedString` (`parser.ts`) resolves the one escape the
 	// format has before the body is ever split, so `"foo=\"bar\""` defines a
 	// value containing quotes rather than one containing backslashes.
 	const unescaped = body.replace(/\\"/g, '"');
@@ -906,7 +905,7 @@ function scanExpansion(
 		const next = end > at ? end : at + 1;
 		if (expansion) {
 			// `push(...expansion)` would put the whole array on the argument stack,
-			// and this runs on user-supplied text — the same care `parser.ts:693`
+			// and this runs on user-supplied text — the same care `parser.ts:doReplacement`
 			// takes with `concat` over `splice`.
 			for (const token of expansion) {
 				out.push(token);
@@ -922,7 +921,7 @@ function scanExpansion(
 /**
  * One `$XX` token, and the argument bookkeeping that goes with it.
  *
- * Mirrors `parseHexCommand` (`parser.ts:2372`): the first `$XX` of a run is the
+ * Mirrors `parseHexCommand` (`parser.ts`): the first `$XX` of a run is the
  * command and sets how many arguments follow, and each one after that counts
  * down. A byte outside `$DA-$FE` opens nothing — that is what keeps the `$02`
  * inside `("kick.brr", $02)` from being mistaken for a command.
@@ -962,7 +961,7 @@ function scanHex(line: string, at: number, state: ScanState): StepResult {
 	}
 
 	if (state.awaitingArpCount) {
-		// `parser.ts:2420` — `$FB`'s length byte. A high bit means the two-byte
+		// `parser.ts:parseHexCommand` — `$FB`'s length byte. A high bit means the two-byte
 		// form; otherwise the count is the number of note bytes that follow.
 		state.awaitingArpCount = false;
 		state.hexLeft = value >= 0x80 ? 2 : value + 1;
@@ -970,18 +969,18 @@ function scanHex(line: string, at: number, state: ScanState): StepResult {
 	}
 
 	if (state.awaitingHfdSub) {
-		// `parseHFDHex` (`parser.ts:3286`, Music.cpp:1466) — the byte after an
+		// `parseHFDHex` (`parser.ts`, Music.cpp:1466) — the byte after an
 		// `#am4` `$ED` picks the form, and with it how many arguments follow.
 		state.awaitingHfdSub = false;
 		state.currentHexSub = value;
 		if (value === 0x80) {
-			state.hexLeft = 2; // DSP register and value (parser.ts:3315)
+			state.hexLeft = 2; // DSP register and value (parser.ts:parseHFDHex)
 		} else if (value === 0x81) {
-			state.hexLeft = 1; // semitone tune (parser.ts:3343)
+			state.hexLeft = 1; // semitone tune (parser.ts:parseHFDHex)
 		} else if (value === 0x82) {
-			state.hexLeft = 4; // address and count; the data follows (parser.ts:3360)
+			state.hexLeft = 4; // address and count; the data follows (parser.ts:parseHFDHex)
 		} else if (value === 0x83) {
-			state.hexLeft = 0; // AMK0163 — nothing follows (parser.ts:3356)
+			state.hexLeft = 0; // AMK0163 — nothing follows (parser.ts:parseHFDHex)
 		} else {
 			state.hexLeft = 1; // plain ADSR, the sub being its first argument
 		}
@@ -999,7 +998,7 @@ function scanHex(line: string, at: number, state: ScanState): StepResult {
 		state.currentHex = value;
 		state.currentHexSub = 0;
 		if (value === 0xed && state.songTargetProgram === 1) {
-			// `parser.ts:2946` — #am4 sends $ED to the HFD translator; the next
+			// `parser.ts:parseHexCommand` — #am4 sends $ED to the HFD translator; the next
 			// byte picks the form, exactly as `$FB`'s count picks its length.
 			state.awaitingHfdSub = true;
 			state.hexLeft = 0;
@@ -1007,11 +1006,11 @@ function scanHex(line: string, at: number, state: ScanState): StepResult {
 			state.awaitingArpCount = true;
 			state.hexLeft = 0;
 		} else if (value === 0xfc && state.targetAMKVersion === 1) {
-			// `parser.ts:2970-2975` — #amk 1's $FC is remote gain: two arguments.
+			// `parser.ts:parseHexCommand` — #amk 1's $FC is remote gain: two arguments.
 			state.hexLeft = 2;
 		} else {
 			// #am4's $E5 needs no fork here — the parser's explicit 3
-			// (parser.ts:2968) equals the table's; its overload is decided on the
+			// (parser.ts:parseHexCommand) equals the table's; its overload is decided on the
 			// first argument, below.
 			state.hexLeft = HEX_LENGTHS[value - FIRST_VCMD] - 1;
 		}
@@ -1024,20 +1023,20 @@ function scanHex(line: string, at: number, state: ScanState): StepResult {
 		state.currentHexSub = value;
 	}
 
-	// `parser.ts:2458` — `$FA $FE` takes a further byte when the high bit is set.
+	// `parser.ts:parseHexCommand` — `$FA $FE` takes a further byte when the high bit is set.
 	if (state.hexLeft === 0 && state.currentHex === 0xfa && state.currentHexSub === 0xfe && value >= 0x80) {
 		state.hexLeft++;
 	}
 
-	// `parser.ts:3014-3031` (Music.cpp:1820) — under #am4 a high bit on $E5's
+	// `parser.ts:parseHexCommand` (Music.cpp:1820) — under #am4 a high bit on $E5's
 	// first argument means "load sample": one fewer argument follows.
 	if (state.hexLeft === 2 && state.currentHex === 0xe5 && state.songTargetProgram === 1 && value >= 0x80) {
 		state.hexLeft -= 1;
 	}
 
-	// `parser.ts:3381-3396` — `$ED $82`'s third and fourth arguments are a
+	// `parser.ts:parseHFDHex` — `$ED $82`'s third and fourth arguments are a
 	// big-endian data count, and count+1 data bytes follow the four header
-	// arguments (the do-while at parser.ts:3390 runs count+1 times). The sub is
+	// arguments (the do-while at parser.ts:parseHFDHex runs count+1 times). The sub is
 	// cleared once the count is folded in, so data bytes cannot re-trigger it.
 	if (state.currentHex === 0xed && state.currentHexSub === 0x82) {
 		if (state.hexLeft === 1) {
@@ -1065,7 +1064,7 @@ export interface Token {
 
 /**
  * One length segment of a note or rest — the initial one, then one more per
- * `^` tie. Mirrors `accumulateTiedLength` (`parser.ts:2794`), which plays
+ * `^` tie. Mirrors `accumulateTiedLength` (`parser.ts`), which plays
  * every segment as part of one continuous note rather than a fresh one.
  */
 export interface NoteLengthSegment {
@@ -1080,14 +1079,14 @@ export interface NoteLengthSegment {
 	/**
 	 * No digits were written for this segment, so {@link ticks} came from
 	 * whatever length was already in effect — the song's last `l`, or
-	 * AddmusicK's own default before any (`parser.ts:198`).
+	 * AddmusicK's own default before any (`parser.ts:defaultNoteLength`).
 	 */
 	implicit: boolean;
-	/** `true` for `=NN` — an exact tick count rather than a whole-note denominator (`parser.ts:610-621`). */
+	/** `true` for `=NN` — an exact tick count rather than a whole-note denominator (`parser.ts:getNoteLength`). */
 	exact: boolean;
 	/**
 	 * This segment was written inside a `{ }` triplet, so {@link ticks} is its
-	 * written length scaled by two thirds (`parser.ts:661-667`) — the number the
+	 * written length scaled by two thirds (`parser.ts:getNoteLengthModifier`) — the number the
 	 * driver plays, not the one on the page.
 	 */
 	triplet: boolean;
@@ -1160,11 +1159,11 @@ export interface Command {
 	 */
 	channel?: number;
 	/**
-	 * Written as `@@n`, the "direct" form (`parser.ts:1585`).
+	 * Written as `@@n`, the "direct" form (`parser.ts:parseInstrument`).
 	 *
 	 * Worth carrying because it changes what the command *means*, not just how it
 	 * looks: `@19` emits nothing at all, while `@@19` emits `$DA` — and, through
-	 * the unconditional remap at `parser.ts:1597`, means custom instrument 30.
+	 * the unconditional remap at `parser.ts:parseInstrument`, means custom instrument 30.
 	 */
 	direct?: boolean;
 	/**
@@ -1179,7 +1178,7 @@ export interface Command {
 	 * source order. `undefined` for every other command.
 	 *
 	 * Repeated bare `r`s are not folded together the way `accumulateTiedLength`
-	 * does for rests (`parser.ts:2802`) — only explicit `^` ties are, a
+	 * does for rests (`parser.ts`) — only explicit `^` ties are, a
 	 * deliberate, narrower approximation.
 	 */
 	noteLength?: NoteLengthSegment[];
@@ -1189,7 +1188,7 @@ export interface Command {
 export type InstrumentSample =
 	/** `"kick.brr"` — an index into this song's own sample list. */
 	| { form: "file"; name: string }
-	/** `@n` with `n < 30`: that stock instrument's sample. `parser.ts:1147`. */
+	/** `@n` with `n < 30`: that stock instrument's sample. `parser.ts:readInstrumentSample`. */
 	| { form: "copy"; instrument: number; srcn: number }
 	/** `nXX`: noise at that clock, flagged by the sample byte's high bit. */
 	| { form: "noise"; clock: number; byte: number };
@@ -1362,7 +1361,7 @@ export function tokenize(text: string): TokenIndex {
 /**
  * The `#instruments` entries, read off the gathered stream.
  *
- * Mirrors `parseInstrumentDefinitions` (`parser.ts:1068`, `Music.cpp:2560`): a
+ * Mirrors `parseInstrumentDefinitions` (`parser.ts`, `Music.cpp:2551`): a
  * sample in one of three forms, then exactly five `$xx` bytes, repeated until
  * the closing brace. Anything malformed is recorded as an incomplete entry
  * rather than abandoning the block, because this runs on half-typed source by
@@ -1408,13 +1407,13 @@ function gatherInstruments(tokens: GatherToken[], text: string): InstrumentDefin
 				j++;
 			} else if (start.kind === "instrument" && tokens[j + 1]?.kind === "number") {
 				const n = numberValue(textOf(tokens[j + 1]), "number");
-				// `parser.ts:1147` — a custom instrument cannot be based on another.
+				// `parser.ts:readInstrumentSample` — a custom instrument cannot be based on another.
 				sample = { form: "copy", instrument: n, srcn: INSTRUMENT_TO_SAMPLE[n] ?? -1 };
 				last = tokens[j + 1];
 				j += 2;
 			} else if (start.kind === "noise" && tokens[j + 1]?.kind === "hexNumber") {
 				const clock = numberValue(textOf(tokens[j + 1]), "hexNumber");
-				// `parser.ts:1162` — the high bit is what tells the driver it is noise.
+				// `parser.ts:readInstrumentSample` — the high bit is what tells the driver it is noise.
 				sample = { form: "noise", clock, byte: clock | 0x80 };
 				last = tokens[j + 1];
 				j += 2;
@@ -1472,7 +1471,7 @@ function dotsApplied(dots: number, target: CommandTarget): number {
 }
 
 /**
- * The dot half of `getNoteLengthModifier` (`parser.ts:639-659`). `dots` has
+ * The dot half of `getNoteLengthModifier` (`parser.ts`). `dots` has
  * already been through {@link dotsApplied}.
  */
 function applyDots(ticks: number, dots: number): number {
@@ -1487,9 +1486,9 @@ function applyDots(ticks: number, dots: number): number {
 }
 
 /**
- * The triplet half (`parser.ts:661-667`), which runs after the dots: two thirds,
+ * The triplet half (`parser.ts:getNoteLengthModifier`), which runs after the dots: two thirds,
  * rounded half up. `l` never reaches it — `parseDefaultLength` is the one caller
- * that passes `allowTriplet: false` (`parser.ts:1549`).
+ * that passes `allowTriplet: false` (`parser.ts`).
  */
 function applyTriplet(ticks: number, triplet: boolean): number {
 	return triplet ? Math.floor((ticks * 2) / 3 + 0.5) : ticks;
@@ -1497,7 +1496,7 @@ function applyTriplet(ticks: number, triplet: boolean): number {
 
 /**
  * One length segment of a note or a rest — `getNoteLength`
- * (`parser.ts:607-637`). `raw` is the segment's number-token text, `""` when
+ * (`parser.ts`). `raw` is the segment's number-token text, `""` when
  * it wrote no digits of its own; `defaultTicks` is the `l` length currently in
  * effect, `triplet` whether a `{ }` block is open, and `target` picks the same
  * forks {@link Command.target} carries everywhere else.
@@ -1512,11 +1511,11 @@ function resolveNoteSegment(
 	const { digits, dots: written } = splitLengthText(exact ? raw.slice(1) : raw);
 	const dots = dotsApplied(written, target);
 	// `c.` writes no digits but is still dotted — `getInt` returns -1 and
-	// `getNoteLengthModifier` runs on the default anyway (`parser.ts:622-637`).
+	// `getNoteLengthModifier` runs on the default anyway (`parser.ts:getNoteLength`).
 	const implicit = digits.length === 0;
 
 	if (exact && !implicit) {
-		// parser.ts:610-621 — an exact tick count, skipping the /192 division.
+		// parser.ts:getNoteLength — an exact tick count, skipping the /192 division.
 		const ticks = Number.parseInt(digits, 10);
 		if (target.amkVersion < 4) {
 			// Exact counts predate the modifiers entirely: the early return is
@@ -1540,7 +1539,7 @@ function resolveNoteSegment(
 }
 
 /**
- * `parseDefaultLength` (`parser.ts:1524-1550`), which is *not* `getNoteLength`:
+ * `parseDefaultLength` (`parser.ts`), which is *not* `getNoteLength`:
  * `l=NN` and dots on `l` are both `#amk 4` and above, and every error path
  * leaves the standing length alone rather than replacing it.
  */
@@ -1551,7 +1550,7 @@ function resolveDefaultLength(raw: string, current: number, target: CommandTarge
 	const n = digits.length === 0 ? -1 : Number.parseInt(digits, 10);
 
 	if (target.amkVersion < 4) {
-		// AMK0070 for `l=NN`, and no dots below #amk 4 (`parser.ts:1548`).
+		// AMK0070 for `l=NN`, and no dots below #amk 4 (`parser.ts:parseDefaultLength`).
 		return exact || n < 1 || n > TICKS_PER_WHOLE ? current : Math.floor(TICKS_PER_WHOLE / n);
 	}
 
@@ -1570,7 +1569,7 @@ function resolveDefaultLength(raw: string, current: number, target: CommandTarge
 /**
  * A note or rest's length segments, off the tokens starting at `startIndex` —
  * the one right after the note letter. Mirrors `accumulateTiedLength`
- * (`parser.ts:2794`)'s do-while: the first segment is read unconditionally,
+ * (`parser.ts`)'s do-while: the first segment is read unconditionally,
  * then one more for every `^` that follows, each optionally digit-less.
  */
 function gatherNoteLength(
@@ -1615,7 +1614,7 @@ function gatherNoteLength(
 				continue;
 			}
 
-			// `l8 c.` is a dotted default-length note (`parser.ts:622-637`), but a
+			// `l8 c.` is a dotted default-length note (`parser.ts:getNoteLength`), but a
 			// lone `.` is a length only where one has just ended, which `step` — one
 			// character at a time, with no memory of the token before — cannot know.
 			// So it scans as `unknown` and is claimed back here.
@@ -1657,16 +1656,16 @@ function gather(tokens: GatherToken[], text: string, transitions: TargetTransiti
 	let channel: number | undefined;
 	let target = DEFAULT_TARGET;
 	let transition = 0;
-	// parser.ts:198 — what a note or rest falls back to when it carries no
+	// parser.ts:defaultNoteLength — what a note or rest falls back to when it carries no
 	// digits of its own; `l` updates it below, positionally, the same way.
 	let defaultNoteLength = TICKS_PER_WHOLE / 8;
-	// parser.ts:199 — one flag for the whole song, never reset at a channel, so
+	// parser.ts:triplet — one flag for the whole song, never reset at a channel, so
 	// following it here in source order is what the parser does too.
 	let triplet = false;
-	// A block directive's brace never reaches `parseTripletOpen` — `parseBlock`
-	// eats it (`parser.ts:823-856`). It matters while the block is being typed:
-	// an unclosed `#samples {` above would otherwise make every note below read
-	// two thirds of its length.
+	// A block directive's brace never reaches `parseTripletOpen` — its block
+	// parser eats it (`parser.ts:parseSampleDefinitions`, `:parseInstrumentDefinitions`, `:parseSpcInfo`). It matters while the
+	// block is being typed: an unclosed `#samples {` above would otherwise make
+	// every note below read two thirds of its length.
 	let pendingBlock = false;
 	let inBlock = false;
 
@@ -1692,7 +1691,7 @@ function gather(tokens: GatherToken[], text: string, transitions: TargetTransiti
 					inBlock = true;
 				} else if (!inBlock) {
 					// A nested `{` is AMK0097 and leaves the block open
-					// (`parser.ts:2037-2044`), so this is a set rather than a toggle.
+					// (`parser.ts:parseTripletOpen`), so this is a set rather than a toggle.
 					triplet = true;
 				}
 			} else if (brace === "}") {
@@ -1729,7 +1728,7 @@ function gather(tokens: GatherToken[], text: string, transitions: TargetTransiti
 				// every `hexArg` in reach. `scanHex` emits that kind for any byte
 				// below `$DA` even with `hexLeft` at 0 (see the comment there), so a
 				// `$00` standing after a full command is one — but it is not an
-				// argument: `parser.ts:2918-2943` reads such a byte as a standalone
+				// argument: `parser.ts:parseHexCommand` reads such a byte as a standalone
 				// literal and reports it, as AMK0151 under `#amk`. Claiming it here
 				// made a one-argument command look like a two-argument one, gave the
 				// inspector a row to name, and pointed `spliceArg` at a byte the
@@ -1846,7 +1845,7 @@ function gather(tokens: GatherToken[], text: string, transitions: TargetTransiti
 		});
 
 		if (token.kind === "defaultLength" && firstArgToken) {
-			// parser.ts:1524-1550 — updates the length later notes fall back to
+			// parser.ts:parseDefaultLength — updates the length later notes fall back to
 			// when they carry no digits of their own.
 			defaultNoteLength = resolveDefaultLength(textOf(firstArgToken), defaultNoteLength, target);
 		}
@@ -1885,37 +1884,37 @@ function numberValue(raw: string, kind: TokenKind): number {
  * `VCMD_NAMES` states the AddmusicK/N-SPC reading, which is also what compiled
  * output always is; the forks here follow what the *parser* makes of the bytes
  * as written. Where a form compiles into another command, its name is that
- * command's — a `$E5` sample load really emits `$F3` (`parser.ts:3028`).
+ * command's — a `$E5` sample load really emits `$F3` (`parser.ts:parseHexCommand`).
  */
 export function vcmdName(vcmd: number, args: { value: number }[], target: CommandTarget): string {
 	if (vcmd === 0xed && target.program === 1) {
-		// `parseHFDHex` (`parser.ts:3286`) — the sub-byte picks the form.
+		// `parseHFDHex` (`parser.ts`) — the sub-byte picks the form.
 		const sub = args[0]?.value;
 		if (sub === 0x80) {
-			return VCMD_NAMES[0xf6]; // what it compiles to (parser.ts:3334)
+			return VCMD_NAMES[0xf6]; // what it compiles to (parser.ts:parseHFDHex)
 		}
 
 		if (sub === 0x81) {
-			return "tune"; // parser.ts:3343-3354
+			return "tune"; // parser.ts:parseHFDHex
 		}
 
 		if (sub === 0x82) {
-			return "ARAM upload"; // parser.ts:3360-3400
+			return "ARAM upload"; // parser.ts:parseHFDHex
 		}
 
 		if (sub === 0x83) {
-			return "unknown command"; // AMK0163 (parser.ts:3356)
+			return "unknown command"; // AMK0163 (parser.ts:parseHFDHex)
 		}
 
 		return VCMD_NAMES[0xed]; // the plain form, a bare `$ED` included
 	}
 
 	if (vcmd === 0xe5 && target.program === 1 && (args[0]?.value ?? 0) >= 0x80) {
-		return VCMD_NAMES[0xf3]; // sample load in disguise (parser.ts:3016-3031)
+		return VCMD_NAMES[0xf3]; // sample load in disguise (parser.ts:parseHexCommand)
 	}
 
 	if (vcmd === 0xfc && target.amkVersion === 1) {
-		return "remote gain"; // parser.ts:2970, rebuilt at parser.ts:3068-3100
+		return "remote gain"; // parser.ts:parseHexCommand, which rebuilds it as a type 5 remote code event
 	}
 
 	return VCMD_NAMES[vcmd] ?? "unknown command";
@@ -1939,7 +1938,7 @@ export function expectedArgs(vcmd: number, args: { value: number }[], target: Co
 	}
 
 	if (vcmd === 0xed && target.program === 1) {
-		// `parseHFDHex` (`parser.ts:3286`) — the same forks as `awaitingHfdSub`.
+		// `parseHFDHex` (`parser.ts`) — the same forks as `awaitingHfdSub`.
 		if (args.length === 0) {
 			return null;
 		}
@@ -1962,7 +1961,7 @@ export function expectedArgs(vcmd: number, args: { value: number }[], target: Co
 				return null; // the count is not written yet
 			}
 
-			// Sub + four header bytes, then count+1 data bytes (parser.ts:3390).
+			// Sub + four header bytes, then count+1 data bytes (parser.ts:parseHFDHex).
 			return 5 + ((args[3].value << 8) | args[4].value) + 1;
 		}
 
@@ -1970,11 +1969,11 @@ export function expectedArgs(vcmd: number, args: { value: number }[], target: Co
 	}
 
 	if (vcmd === 0xe5 && target.program === 1 && args.length > 0 && args[0].value >= 0x80) {
-		return 2; // sample load (parser.ts:3016-3031)
+		return 2; // sample load (parser.ts:parseHexCommand)
 	}
 
 	if (vcmd === 0xfc && target.amkVersion === 1) {
-		return 2; // remote gain (parser.ts:2970)
+		return 2; // remote gain (parser.ts:parseHexCommand)
 	}
 
 	if (vcmd === 0xfb) {

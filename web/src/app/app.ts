@@ -11,10 +11,10 @@ const STORAGE_KEY = 'solar-soundtrack.split';
 /**
  * How much of the width the editor may take, as a percentage.
  *
- * The floor is half because the output pane holds the hex dump and the ARAM
- * budget, which stop being readable much below it; the ceiling leaves the right
- * column wide enough to still be worth looking at. Between them the author
- * chooses.
+ * The ceiling is three quarters because the output pane holds the hex dump and
+ * the ARAM budget, which stop being readable much below the quarter it leaves
+ * them; the floor keeps the editor wide enough to still be worth typing in.
+ * Between them the author chooses.
  */
 const MIN_SPLIT = 25;
 const MAX_SPLIT = 75;

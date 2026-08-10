@@ -60,7 +60,7 @@ export function decodeAdsr(adsr1: number, adsr2: number): Envelope {
  * 0x400` (`AddmusicKsrc/SPC_DSP.cpp:259-260`) — so attack 15, whose rate index
  * is 31, climbs in steps of `0x400` and is done in two samples rather than 64.
  * The readme's calculator compares the attack nibble to `0x1F` instead
- * (readme:64, :89), which nothing in a 4-bit field can equal, so its own fast
+ * (readme:64, :88), which nothing in a 4-bit field can equal, so its own fast
  * attack is drawn and timed as though it were slow. `adsrtest` pins the
  * divergence.
  */
@@ -115,7 +115,7 @@ export interface EnvelopePoint {
  * (:295), which is the same test as the readme's `env >= 0x100 * (sustain + 1)`.
  *
  * A sustain rate of 0 never advances, so the curve stops at the plateau instead
- * of running to silence — the readme guards this at :92, and a port that drops
+ * of running to silence — the readme guards this at :91, and a port that drops
  * the guard hangs the thread rather than drawing anything. Note that this is the
  * *sustain* fall, which is what AddmusicK's readme calls release; the DSP's
  * key-off ramp is a separate fixed slope (:237-242) that no instrument byte
@@ -236,8 +236,9 @@ export interface Gain {
  * Split a GAIN byte.
  *
  * `%0vvvvvvv` holds a fixed level; the four `%1` forms ramp instead, at a rate
- * in the low five bits. The stock table uses `$B8` (a fixed level) almost
- * everywhere, and `$7F` where it wants full volume with no envelope at all.
+ * in the low five bits. The stock table uses `$B8` (an exponential decrease)
+ * almost everywhere, and `$7F` where it wants full volume with no envelope at
+ * all.
  */
 export function decodeGain(gain: number): Gain {
 	if ((gain & 0x80) === 0) {

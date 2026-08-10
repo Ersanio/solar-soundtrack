@@ -35,10 +35,10 @@ declare function registerProcessor(
 ): void;
 
 /**
- * Emulator frames per refill, which is also how often the driver's tick
- * accumulator gets read.
+ * Emulator frames per refill, which is also how often the driver's note
+ * duration counter gets read.
  *
- * 1 ms, so `$49` is sampled at {@link TICK_POLL_HZ} — twice the driver's main
+ * 1 ms, so `$70` is sampled at {@link TICK_POLL_HZ} — twice the driver's main
  * loop rate, which is what makes the tick count exact. This used to be 1024
  * frames to amortise the call overhead; measured against the vendored core,
  * dropping to 32 costs about 4% more emulator time and still runs 355x faster
@@ -224,8 +224,8 @@ class SpcProcessor extends AudioWorkletProcessor {
 	/**
 	 * Everything that happens in APU RAM between emulated blocks.
 	 *
-	 * Two things, sharing the one look at it: the driver's tick accumulator is
-	 * folded into the running count, and the mixer's mute mask is pressed back
+	 * Two things, sharing the one look at it: the driver's note duration counter
+	 * is folded into the running count, and the mixer's mute mask is pressed back
 	 * onto the driver. Running at the block rate is what keeps tick sampling
 	 * above the driver's iteration rate, and it is also what makes the mute
 	 * stick — see {@link applyChannelMutes}.

@@ -12,7 +12,7 @@ The vocabulary every other package shares. Depends on nothing.
 list are all rendered — and `@amk/spc` needs `SongTags` for the ID666 header, so it lives at the
 bottom rather than inside `@amk/compiler`.
 
-`tables.ts` is here rather than in `@amk/compiler` because `@amk/tokens` needs seven of its
+`tables.ts` is here rather than in `@amk/compiler` because `@amk/tokens` needs eight of its
 constants, and that is what keeps the scanner off the compiler entirely. Its line references are to
 AddmusicK 1.0.11's `Music.cpp` so they can be re-verified when the reference implementation moves.
 

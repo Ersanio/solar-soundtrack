@@ -34,11 +34,11 @@ Two properties are load-bearing, and `tokentest` checks both:
 2. `copyState` is a real copy. CodeMirror keeps one state per line and would otherwise see them all
    mutate together.
 
-**This deliberately does not go through the compiler.** Compiler spans are offsets into preprocessed
-text — `preprocess.ts` drops the `#amk` marker, `#define` lines and comments without preserving
-positions — whereas the editor needs offsets into what the user actually typed. Scanning the raw
-text also keeps working while the song does not compile, which is most of the time while someone is
-typing.
+**This deliberately does not go through the compiler.** The parser works on preprocessed text —
+`preprocess.ts` drops the `#amk` marker, `#define` lines and comments — and maps its spans back to
+what the user typed through `origins`, but there are spans to map only once a compile has run.
+Scanning the raw text keeps working while the song does not compile, which is most of the time while
+someone is typing.
 
 ## Where it mirrors the parser, and where it cannot
 
@@ -121,4 +121,4 @@ One rule keeps the tables honest: **a descriptor never states how many arguments
 `tokens.ts` already carries that twice on purpose — as `scanHex`'s `hexLeft` mutations and as
 `expectedArgs`, pinned against each other by `tokentest` — and a third statement here would be
 invisible to every harness. Descriptors describe as many parameters as they know about and no more;
-`shapeOf` takes the count from `expectedArgs` and pads the tail with raw rows.
+`resolveCommand` takes the count from `expectedArgs` and pads the tail with raw rows.

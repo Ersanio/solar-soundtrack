@@ -24,7 +24,7 @@ export class BrrError extends Error {}
 
 export interface BrrSample {
 	sampleName: string;
-	/** BRR blocks with the 2-byte loop header stripped (globals.cpp:470). */
+	/** BRR blocks with the 2-byte loop header stripped (globals.cpp:466). */
 	data: Uint8Array;
 	/** Byte offset of the loop point, relative to the start of `data`. */
 	loopOffset: number;

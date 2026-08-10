@@ -4,7 +4,7 @@ import { type Tag, tags } from '@lezer/highlight';
 import { TOKEN_TAGS, copyState, type ScanState, startState, step } from '@amk/tokens';
 
 /**
- * `TOKEN_TAGS` holds `@lezer/highlight` tag *names*, so that `compiler/` never
+ * `TOKEN_TAGS` holds `@lezer/highlight` tag *names*, so that `@amk/tokens` never
  * depends on CodeMirror; this is the one place they are resolved to `Tag`
  * values. `tokentest` asserts every name really is a tag, so the cast is a
  * checked one.

@@ -5,7 +5,7 @@
 .DESCRIPTION
     AddmusicK writes asm/SNES/bin/musicXX.bin for every song it compiles. That
     file is a 12-byte RATS header followed by exactly the blob this editor's
-    ".bin" export produces (AddmusicK.cpp:1268 assigns finalData from byte 12).
+    ".bin" export produces (AddmusicK.cpp:1274 assigns finalData from byte 12).
 
         bytes 0-3    "STAR"
         bytes 4-5    RATS size
@@ -123,7 +123,7 @@ function Split-SongFile {
     $payload = New-Object byte[] ($Bytes.Length - 12)
     [Array]::Copy($Bytes, 12, $payload, 0, $payload.Length)
 
-    # RATSSize is totalSize + 3 (AddmusicK.cpp:1245), so the payload should be
+    # RATSSize is totalSize + 3 (AddmusicK.cpp:1239), so the payload should be
     # RATSSize - 3 bytes long.
     $expected = $ratsSize - 3
     if ($payload.Length -ne $expected) {

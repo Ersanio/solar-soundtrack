@@ -25,7 +25,7 @@ import { dragPreview } from '../commands/preview';
  * `NoteDurations`, and multiplies the note's own duration by the result before
  * taking the high byte — so it is a **gate time in 256ths of the note**, and the
  * "delay" is trailing silence proportional to how long the note is rather than a
- * fixed count. `aram_map.html:666` states it outright: "quantization, which is
+ * fixed count. `aram_map.html:667` states it outright: "quantization, which is
  * in 256ths of a note".
  *
  * The low nibble indexes `VelocityValues`, which is two tables of sixteen and
@@ -117,7 +117,8 @@ export class QuantizationCommand {
   });
 
   /**
-   * `parser.ts:1626` — `q00` is an error, so the gate never reaches index 0 alone.
+   * `parser.ts`'s `parseQuantization` — `q00` is an error, so the gate never
+   * reaches index 0 alone.
    *
    * Read off the dragged nibbles, so the warning arrives while there is still
    * time to not let go.
@@ -143,7 +144,7 @@ export class QuantizationCommand {
     this.write((this.gateIndex() << 4) | index);
   }
 
-  /** `q`'s argument is read with `getHex` (`parser.ts:1625`), so it is written bare. */
+  /** `q`'s argument is read with `getHex` (`parser.ts`'s `parseQuantization`), so it is written bare. */
   private write(value: number): void {
     this.store.apply(spliceArg(this.store.source(), this.command(), 0, hex2(value)));
   }

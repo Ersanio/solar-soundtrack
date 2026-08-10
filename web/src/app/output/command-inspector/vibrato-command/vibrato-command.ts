@@ -20,7 +20,7 @@ import { VibratoGraph } from '../vibrato-graph/vibrato-graph';
  * `p` is the reason the rate is labelled as one. Its own documentation calls the
  * value "the rate (speed)" while `$DE`'s calls it a "Duration" and links it to
  * the note-length table; the driver settles it by adding the byte to a phase
- * accumulator every tick (`main.asm:3166-3169`), so bigger is faster and it is
+ * accumulator every tick (`main.asm:3321-3324`), so bigger is faster and it is
  * not a duration at all.
  */
 @Component({
@@ -43,7 +43,7 @@ export class VibratoCommand {
   /**
    * Which argument is which.
    *
-   * `p` with two arguments has no delay — `parser.ts:2049` writes `$DE $00` — so
+   * `p` with two arguments has no delay — `parseVibrato` writes `$DE $00` — so
    * the same position means the rate there and a delay in every other form. That
    * shift is `p`'s own doing; the panel's job is to not repeat it.
    */

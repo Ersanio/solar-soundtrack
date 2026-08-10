@@ -10,12 +10,12 @@ const MAX_TEMPO = 254;
  * What each single-letter command's arguments mean.
  *
  * The comma forms (`w40,180`, `v20,255`, `t30,80`) are `#amk 3` and above
- * (`parser.ts:1596`, `parser.ts:1740`), and the parser reads the *first* number
+ * (`parser.ts:parseFadeableValue`, `parser.ts:parseTempo`), and the parser reads the *first* number
  * as the duration when there are two — so the descriptor list has to be chosen
  * by how many arguments were written, not by the letter alone.
  */
 
-/** `v`, `w` and `t`: one argument sets, two fade. `parser.ts:1553-1610`, `1724-1760`. */
+/** `v`, `w` and `t`: one argument sets, two fade. `parser.ts:parseFadeableValue`, `parseTempo`. */
 function fadeable(name: string, describe: (value: number) => string | null): Resolver {
 	return (command) => {
 		const target = u8(name, "level", { describe });
@@ -34,7 +34,7 @@ function fadeable(name: string, describe: (value: number) => string | null): Res
  * The vibrato speed, which `$DE`'s readme entry calls a "Duration" and is not.
  *
  * The driver adds this byte to a phase accumulator once a tick
- * (`main.asm:3166-3169`), so it is a speed and bigger is faster. `p`'s own entry
+ * (`main.asm:3321-3324`), so it is a speed and bigger is faster. `p`'s own entry
  * gets it right — "the rate (speed)".
  */
 const RATE = u8("Rate", "rate", {
@@ -43,7 +43,7 @@ const RATE = u8("Rate", "rate", {
 });
 
 /**
- * `p` — `pRate,Extent` or `pDelay,Rate,Extent` (`parser.ts:1976-2035`).
+ * `p` — `pRate,Extent` or `pDelay,Rate,Extent` (`parser.ts:parseVibrato`).
  *
  * Adding a third argument moves the first one's meaning from rate to delay: the
  * same position says two different things depending on how many there are. That
@@ -57,7 +57,7 @@ const vibrato: Resolver = (command) =>
 				note: "With two arguments the first is the rate. Add a third and the first becomes a delay instead.",
 			};
 
-/** `y` — pan, then up to two surround flags (`parser.ts:1642-1689`). */
+/** `y` — pan, then up to two surround flags (`parser.ts:parsePan`). */
 const pan: Resolver = (command) => {
 	const surround = [
 		choice("Surround, left", [
@@ -87,7 +87,7 @@ const pan: Resolver = (command) => {
  */
 const NOTE_DENOMINATORS = [1, 2, 3, 4, 6, 8, 12, 16, 24, 32, 48, 64, 96, 128, 192] as const;
 
-/** `l` — the length later notes fall back to (`parser.ts:1525-1552`). */
+/** `l` — the length later notes fall back to (`parser.ts:parseDefaultLength`). */
 const defaultLength: Resolver = (command) => ({
 	params: [
 		u8("Length", "index", {
@@ -99,7 +99,7 @@ const defaultLength: Resolver = (command) => ({
 					return "out of range, so the standing length is kept";
 				}
 
-				// parser.ts:1531 floors, so l128 and l192 both come to a single tick.
+				// parser.ts:parseDefaultLength floors, so l128 and l192 both come to a single tick.
 				const resolved = Math.floor(TICKS_PER_WHOLE / value);
 				const named = noteLengthName(resolved);
 				const rounded = TICKS_PER_WHOLE % value === 0 ? "" : ", rounded down";
@@ -144,7 +144,7 @@ const noteLength: Resolver = (command) => ({
 export const LETTER_PARAMS: Readonly<Record<string, Resolver>> = {
 	t: (command) => {
 		const target = u8("Tempo", "rate", {
-			// `parser.ts:1766` rejects a zero outright — AMK0079 — where the raw
+			// `parser.ts:parseTempo` rejects a zero outright — AMK0079 — where the raw
 			// `$E2 $00` it compiles to is legal and means the slowest tempo there is.
 			min: 1,
 			max: MAX_TEMPO,
@@ -179,7 +179,7 @@ export const LETTER_PARAMS: Readonly<Record<string, Resolver>> = {
 				describe: (value) => (value === 0 ? "silent" : `${Math.round(noiseHz(value)).toLocaleString()} Hz`),
 			}),
 		],
-		// One DSP register drives every voice's noise (`main.asm:2552` ModifyNoise),
+		// One DSP register drives every voice's noise (`main.asm:2554` ModifyNoise),
 		// so this is not a per-channel setting even though it is written on one.
 		"Replaces the instrument’s sample until the next instrument change. One register serves every channel, so a later n retunes this one too.",
 	),
