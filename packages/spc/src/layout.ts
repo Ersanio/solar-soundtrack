@@ -8,7 +8,8 @@
  * build instead.
  */
 
-import type { BrrSample, DriverBundle } from "./driver";
+import type { BrrSample } from "./brr";
+import type { DriverBundle } from "./driver";
 
 export const ARAM_SIZE = 0x10000;
 

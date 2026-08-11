@@ -7,7 +7,7 @@
  * of several candidates would be a guess wearing a checked answer's clothes —
  * so the count is asserted, not just the contents.
  *
- * The second is the cross-check between `@amk/core`'s `tables.ts`'s
+ * The second is the cross-check between `@amk/core`'s `hardcoded-tables.ts`'s
  * `INSTRUMENT_TO_SAMPLE` and the bytes actually in the driver. They are separate
  * statements of the same fact, kept apart because `compiler/` does not depend on
  * `@amk/spc`, and they agree on 29 of 30 entries. The 30th — index 19 — is pinned
@@ -26,7 +26,7 @@ import {
 	NOTE_DURATIONS,
 	NSPC_VELOCITY_OFFSET,
 	VELOCITY_VALUES,
-} from "@amk/core/tables";
+} from "@amk/core/hardcoded-tables";
 import { type DriverManifest, analyzeDriver } from "@amk/spc/driver";
 import {
 	FIRST_CUSTOM_INSTRUMENT,
@@ -168,7 +168,7 @@ console.log("\nentry shape");
 	);
 	check("the first custom instrument is @30", FIRST_CUSTOM_INSTRUMENT === 30);
 
-	// tables.ts and instruments.ts each state these for their own layer, because
+	// hardcoded-tables.ts and instruments.ts each state these for their own layer, because
 	// compiler/ does not depend on spc/. That is only safe if they agree.
 	check(
 		"the compiler and the SPC layer agree on where the custom band starts",

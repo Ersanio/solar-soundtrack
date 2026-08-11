@@ -39,7 +39,7 @@ import {
 	usedBankSlots,
 	validateSampleBank,
 } from "@amk/spc/brr";
-import { BANK_SLOT_COUNT, bankSlotName } from "@amk/core/tables";
+import { BANK_SLOT_COUNT, bankSlotName } from "@amk/core/hardcoded-tables";
 
 import { SPC_ASSETS, check, summarise } from "./harness";
 

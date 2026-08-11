@@ -39,45 +39,15 @@ import {
 	PARSER_VERSION,
 	PITCH_TABLE,
 	TICKS_PER_WHOLE,
-} from "@amk/core/tables";
+} from "@amk/core/hardcoded-tables";
 
-/**
- * What the host knows about the sample library that the compiler cannot.
- *
- * Filenames only — `@amk/core/types` keeps the compiler free of any dependency on
- * the SPC layer, so resolving a name to bytes stays the host's job. Groups come
- * through too because `#default` is not special: it is one entry in a table that
- * an install can extend, and `#samples { #optimized }` is just as valid.
- */
 export interface AddmusicKOptions {
-	/** Every sample name the host can resolve. */
 	sampleNames: readonly string[];
-	/** Named groups from the driver manifest, e.g. `default`. */
 	sampleGroups: Readonly<Record<string, readonly string[]>>;
-	/**
-	 * Names never to replace with `EMPTY.brr`, however they entered the list —
-	 * AMK's `Sample::important`.
-	 *
-	 * In AddmusicK this is per group *membership*, read from the `!` marks in
-	 * `Addmusic_sample groups.txt`. Here it is per sample and the host owns it, so
-	 * that whatever the user marked wins over any inference the parser might make.
-	 */
 	importantSamples?: readonly string[];
-	/**
-	 * Replace samples the song never plays with `EMPTY.brr`, freeing the ARAM
-	 * they would occupy. AddmusicK's `optimizeSampleUsage`, which defaults to on
-	 * there too (`globals.cpp:40`; its `-u` flag turns it off). Defaults to `true`
-	 * when omitted.
-	 */
 	optimizeSampleUsage?: boolean;
 }
 
-/**
- * One note, rest or standalone tie, in emission order: which channel vector it
- * was appended to (8 is the loop/subroutine block), the offset of its first
- * byte there, and the source span that wrote it. `link.ts` relocates the
- * offsets into ARAM addresses for the playhead's note map.
- */
 export interface NoteEvent {
 	channel: number;
 	offset: number;
@@ -104,41 +74,17 @@ export interface ParseOutput {
 	introLength: number;
 	/** Where the intro actually ends, in ticks: the first `/` in the file. */
 	introTicks: number;
-	/**
-	 * Sample filenames in SRCN order, or `null` when nothing could be resolved
-	 * (no `#samples` and no host-supplied groups to fall back on).
-	 */
 	sampleList: readonly string[] | null;
-	/**
-	 * The set before optimisation — what the song asked for, whether or not each
-	 * entry survived. `sampleList` is what to build; this is what to explain.
-	 */
 	requestedSamples: readonly string[] | null;
-	/**
-	 * Which SRCNs the song actually plays, by index. AMK's `usedSamples`, which
-	 * `optimizeSampleUsage` uses to swap unreferenced samples for `EMPTY.brr`.
-	 */
 	usedSamples: boolean[];
-	/** `#pad` target size, 0 when the song did not ask for one. */
 	minSize: number;
 	tags: SongTags;
-	/**
-	 * ID666 tag length — intro plus *two* passes of the main loop, AddmusicK's
-	 * `Music::seconds` (Music.cpp:3255). This is what goes in the SPC header, and
-	 * it is not how long the song is: for that, add {@link introSeconds} and
-	 * {@link mainSeconds}.
-	 */
 	tagSeconds: number | null;
-	/** Intro length in seconds, one pass. AddmusicK's `Music::introSeconds`. */
 	introSeconds: number | null;
-	/** Main loop length in seconds, one pass. AddmusicK's `Music::mainSeconds`. */
 	mainSeconds: number | null;
-	/** The same split at the driver's real tick rate. See {@link TEMPO_TICK_SECONDS}. */
 	playback: SongLength | null;
 	hasYoshiDrums: boolean;
-	/** 0 for #am4/#amm, otherwise the `#amk` parser version. */
 	targetAMKVersion: number;
-	/** 0 = AddmusicK, 1 = Addmusic 4.05, 2 = AddmusicM. */
 	songTargetProgram: number;
 	diagnostics: Diagnostic[];
 	errorCount: number;
@@ -149,8 +95,7 @@ export interface ParseOutput {
  * them (Music.cpp:2432-2456, via `parseDefine` and friends at Music.cpp:3348+).
  *
  * They only get here when the spelling did not match `preprocess`'s
- * case-sensitive comparison but does match this stage's case-insensitive one —
- * which is to say, when someone capitalised one.
+ * case-sensitive comparison but does match this stage's case-insensitive one
  */
 const LEFTOVER_PREPROCESSOR: readonly (readonly [word: string, article: string, code: string])[] = [
 	["define", "A", "AMK0046"],
@@ -163,22 +108,14 @@ const LEFTOVER_PREPROCESSOR: readonly (readonly [word: string, article: string, 
 /**
  * How long one tick lasts, in seconds, at a given tempo.
  *
- * AddmusicK's `1 / (2 * tempo)` is a rounding, and it says so — Music.cpp:3255
- * asks "Just 2? Not 2.012584 or something?". The driver's timer 0 runs at
- * 8000/16 = 500 Hz (`mov $fa,#$10`, main.asm, commented "2 ms") and its ticker
- * adds the tempo to `$49` once per pass of the main loop, playing a tick when
- * that carries — so a tick every 256 units, and the divisor is 1.953125.
+ * AddmusicK's `1 / (2 * tempo)` is a rounding, and says so — Music.cpp:3255 asks
+ * "Just 2? Not 2.012584 or something?". Timer 0 runs at SPC-700's 8000hz/16 = 500 Hz
+ * (main.asm:176, commented "2 ms") and the ticker adds the tempo to `$49` once
+ * per pass of the main loop, ticking on carry — one tick per 256 units, so the
+ * divisor is 500/256 = 1.953125.
  *
- * The `+ 1` is not a fudge: the driver stores the `t` value plus one. Reading
- * `$51` back out of the emulator gives 41 for `t40`, 193 for `t192` and 255 for
- * `t254`, and it is that register the ticker multiplies by.
- *
- * Even so this is an estimate, and deliberately only used for labels. The main
- * loop plays at most one tick per pass however many are due, so a song busy
- * enough to slow the driver down loses ticks outright — around 0.8% on eight
- * active channels, which no function of tempo can predict. Anything that has to
- * stay in step with the audio counts the driver's own ticks instead; see
- * `@amk/spc/driver-state`.
+ * An estimate, and used only for labels. Anything that must stay in step
+ * with the audio counts the driver's own ticks; see `@amk/spc/driver-state`.
  */
 const TIMER_HZ = 500;
 const TEMPO_UNIT = 256;
@@ -264,64 +201,13 @@ export class AddmusicKParser {
 	private introLength = 0;
 	private introTicks = 0;
 	private guessLength = true;
-	/** Seconds from `#spc { #length "m:ss" }`, which overrides the estimate. */
 	private declaredSeconds: number | null = null;
 	private readonly tempoChanges: [number, number][] = [];
-	/**
-	 * Sample filenames in SRCN order, as `#samples` declared them — AMK's
-	 * `mySamples`. Empty means the song has not declared a set, which is what
-	 * the `$E5` and `$F3` guards test for; the implicit `#default` fallback is
-	 * applied at the end of compilation (Music.cpp:3064), not here.
-	 */
 	private readonly sampleList: string[] = [];
-	/**
-	 * Whether each `sampleList` entry must be kept even if unplayed — AMK's
-	 * `Sample::important`.
-	 *
-	 * In AddmusicK a name written out in `#samples` is always important
-	 * (`Music.cpp:2726` passes `true`), as is every sample lifted out of a `.bnk`
-	 * bank.
-	 *
-	 * Group members carry per-sample flags AddmusicK reads from
-	 * `Addmusic_sample groups.txt`, where a trailing `!` marks a sample as
-	 * "important; i.e. it should always be in ARAM no matter what". Its documented
-	 * purpose is protecting samples that *sound effects and global songs* need —
-	 * things a per-song usage scan cannot see, since `usedSamples` is per-song and
-	 * nothing in AddmusicK combines it across songs.
-	 *
-	 * Here the host owns the whole answer instead, per sample rather than per
-	 * group membership — see {@link pushSample} — so none of those inferences are
-	 * made.
-	 */
 	private readonly sampleImportant: boolean[] = [];
-	/**
-	 * AMK's `usedSamples`, a `bool[256]` indexed by SRCN (Music.h:83).
-	 *
-	 * What `optimizeSampleUsage` (Music.cpp:3074) acts on: every unreferenced
-	 * sample is replaced with `EMPTY.brr`, and it is on by default — `-u` turns
-	 * it off. See {@link optimizeSamples}.
-	 *
-	 * The pass skips any sample marked `important` — a per-sample flag AddmusicK
-	 * reads from `Addmusic_sample groups.txt`, which the driver manifest carries
-	 * through and the host passes in as {@link AddmusicKOptions.importantSamples}.
-	 */
 	private readonly usedSamples = new Array<boolean>(256).fill(false);
-	/**
-	 * `#path` prefix for quoted sample names, `""` when unset.
-	 *
-	 * AMK builds `"./" + dir + "/"` (Music.cpp:2786) because it resolves against
-	 * a real working directory. The library here is a flat namespace, so the
-	 * prefix is normalised to `dir/`.
-	 */
 	private basepath = "";
-	/**
-	 * Inside a `(!n)[ … ]` body, between the `[` and its `]`.
-	 *
-	 * Set by `parseRemoteDefinition` and cleared by `parseLoopEnd`, which are the
-	 * only two places that need to tell a remote body from an ordinary label loop.
-	 */
 	private inRemoteDefinition = false;
-	/** `#pad` minimum song size in bytes, 0 when unset (AMK's `minSize`). */
 	private minSize = 0;
 	private readonly tags: SongTags = {};
 	private readonly instrumentData: number[] = [];
@@ -336,13 +222,7 @@ export class AddmusicKParser {
 	private errorCount = 0;
 	private readonly warnedOnce = new Set<string>();
 
-	/**
-	 * Where each character of `this.text` came from in the source.
-	 *
-	 * Kept in step with `this.text` through preprocessing and through
-	 * replacement expansion, so every diagnostic can be reported at a position
-	 * the editor can actually select. See {@link spanAt}.
-	 */
+	/** Where each character of `this.text` came from in the source. */
 	private origins: number[] = [];
 	/** The source as the preprocessor saw it: BOM stripped, nothing else. */
 	private scanned = "";
@@ -361,23 +241,9 @@ export class AddmusicKParser {
 	// =========================================================================
 
 	parse(): ParseOutput {
-		let text = this.source;
-		if (text.charCodeAt(0) === 0xfeff) {
-			text = text.slice(1);
-		}
+		let text = this.stripBOM();
 
-		// A stripped BOM shifts everything after it, so spans are mapped back
-		// through the text the preprocessor actually saw and the byte is added
-		// again at the end.
-		this.bomOffset = this.source.length - text.length;
-		this.scanned = text;
-
-		// Music.cpp:297-306 — a plain substring search of the *raw* source, before
-		// preprocessing, so a `;title=` inside a false `#if` or a quoted string
-		// counts just the same. Everything to the end of the line is the title.
-		// AddmusicK falls back to the filename when there is none; there is no
-		// filename here, so the tag stays empty and the SPC writer decides.
-		// A `#spc { #title }` later overwrites this, as it does there.
+		// Music.cpp:297-306 - substring search of the raw* source, before preprocessing
 		const titleAt = text.indexOf(";title=");
 		if (titleAt !== -1) {
 			const from = titleAt + ";title=".length;
@@ -385,17 +251,14 @@ export class AddmusicKParser {
 			this.tags.title = end === -1 ? text.slice(from) : text.slice(from, from + end);
 		}
 
-		// Music.cpp:286 — AddmusicK pads the buffer in `init()`, which runs *before*
-		// the preprocessor, so `getArgument` (globals.cpp:706) never reaches the end
-		// of the file. Padding afterwards instead made a source whose last line is a
-		// directive, with no trailing newline, fail outright.
+		// Music.cpp:286 - Add some spaces to the end before preprocessing
 		const pre = preprocess(`${text}                `);
 		this.diagnostics.push(...pre.diagnostics);
 		this.errorCount += pre.diagnostics.filter((d) => d.severity === "error").length;
 
 		// More of the same, so the parser's own lookahead never runs off the end.
 		this.text = `${pre.text}                       `;
-		// Neither run of padding is in the source, so both map to its end.
+
 		this.origins = pre.origins
 			.map((origin) => Math.min(origin, text.length))
 			.concat(new Array<number>(this.text.length - pre.text.length).fill(text.length));
@@ -406,7 +269,7 @@ export class AddmusicKParser {
 				this.transposeMap[z] = DEFAULT_TRANSPOSE[z];
 			}
 
-			// Music.cpp:410 — Addmusic 4.05 suppresses tuning until an instrument
+			// Music.cpp:410 - Addmusic 4.05 suppresses tuning until an instrument
 			// is explicitly declared on a channel.
 			this.ignoreTuning.fill(this.songTargetProgram === 1);
 			this.scan();
@@ -414,6 +277,20 @@ export class AddmusicKParser {
 
 		this.terminateChannels();
 		return this.output();
+	}
+
+	private stripBOM() {
+		let text = this.source;
+		if (text.charCodeAt(0) === 0xfeff) {
+			text = text.slice(1);
+		}
+
+		// A stripped BOM shifts everything after it, so spans are mapped back
+		// through the text the preprocessor actually saw and the byte is added
+		// again at the end.
+		this.bomOffset = this.source.length - text.length;
+		this.scanned = text;
+		return text;
 	}
 
 	/** Music.cpp:337-380. Returns false when the song cannot be compiled. */
@@ -440,8 +317,7 @@ export class AddmusicKParser {
 			}
 		}
 
-		// Music.cpp:377 — #amk 2 moved the default from SMW's velocity table to
-		// N-SPC's; the older targets keep SMW's.
+		// Music.cpp:377 - #amk 2 and beyond use N-SPC velocity tables, not SMW's
 		this.usingSMWVTable = this.targetAMKVersion < 2;
 		return true;
 	}
@@ -478,9 +354,6 @@ export class AddmusicKParser {
 				}
 			}
 
-			// One line per MML command keeps this readable as the lookup table it
-			// is. Prettier expands `case "x": f(); break;` to three lines each,
-			// which turns 40 lines into 280 and hides the shape of the dispatch.
 			// prettier-ignore
 			switch (lower) {
 				case "?": this.parseQMark(); break;
@@ -761,13 +634,6 @@ export class AddmusicKParser {
 	/**
 	 * Greedy, longest-match-first, applied repeatedly so replacements can be
 	 * transitive. Like the original this rewrites the buffer in place.
-	 *
-	 * Expanded text has no source of its own — it came from a `"a=b"` definition
-	 * somewhere else entirely — so all of it is given the position of the use
-	 * site. A diagnostic inside an expansion then points at the thing that was
-	 * written rather than at text the author cannot see, and everything after
-	 * the splice keeps its own origin instead of sliding by the length
-	 * difference.
 	 */
 	private doReplacement(): void {
 		if (this.replacements.size === 0) {
@@ -875,11 +741,7 @@ export class AddmusicKParser {
 	/**
 	 * `strnicmp(text + pos, word, n) == 0 && isspace(text[pos + n])`, which is the
 	 * shape of every branch in `parseSpecialDirective` (Music.cpp:2415-2506) bar
-	 * two — see {@link matchPrefix} for those.
-	 *
-	 * Case-insensitive because `strnicmp` is: `#SAMPLES` really does work. The
-	 * terminator really is whitespace only, so `#samples{` is *not* a directive
-	 * to AddmusicK, and accepting `{` here compiled songs it rejects.
+	 * two — see {@link matchPrefix} for those. Case-insensitive.
 	 */
 	private matchWord(word: string): boolean {
 		const slice = this.text.slice(this.pos, this.pos + word.length);
@@ -903,14 +765,11 @@ export class AddmusicKParser {
 			this.pos += 3;
 			this.parseBlock(() => this.parseSpcInfo());
 		} else if (this.matchPrefix("amk=")) {
-			// Music.cpp:2488 — read and thrown away. `#amk=1` is handled by the
-			// preprocessor before this; any other version reaches here and is
-			// consumed silently rather than being a directive nobody knows.
+			// Music.cpp:2488 — read and thrown away.
 			this.pos += 4;
 			this.getInt();
 		} else if (this.matchPrefix("halvetempo")) {
-			// Music.cpp:2493 — the one directive with no terminator test, so
-			// `#halvetempo#0` is legal.
+			// Music.cpp:2493 — the one directive with no terminator test, so `#halvetempo#0` is legal.
 			this.pos += 10;
 			if (this.channelDefined) {
 				return this.error("AMK0040", "#halvetempo must be used before any and all channels.");
@@ -948,15 +807,10 @@ export class AddmusicKParser {
 			this.pos += 3;
 			this.parsePadDefinition();
 		} else if (this.matchWord("am4") || this.matchWord("amm")) {
-			// Music.cpp:2480-2486 — consumed and ignored. The preprocessor has
-			// already read the marker; a capitalised one reaches here instead,
-			// because `preprocess` compares case-sensitively and this does not.
 			this.pos += 3;
 		} else {
 			// Music.cpp:2432-2456 — `preprocess` is case-sensitive and this is not,
 			// so a capitalised `#DEFINE` survives preprocessing and lands here.
-			// AddmusicK names the stage rather than calling the directive unknown,
-			// which is the more useful thing to say to whoever typed it.
 			for (const [word, article, code] of LEFTOVER_PREPROCESSOR) {
 				if (this.matchWord(word)) {
 					this.pos += word.length;

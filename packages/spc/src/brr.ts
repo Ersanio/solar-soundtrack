@@ -1,15 +1,9 @@
 /**
  * BRR — the SNES's ADPCM sample format.
  *
- * Pure: no DOM, no fetch, no framework. It runs in Node, on the main thread and
- * inside a worklet, and `scripts/brrtest.ts` drives it headlessly.
- *
  * The decoder is a transcription of `SPC_DSP::decode_brr` from Blargg's snes_spc,
- * which is what `assets/player/spc.wasm` is — so matching it means the waveform
- * drawn in the sample browser is the one the player will produce. **Keep it a
- * transcription**: several integer forms hit the published coefficient ratios and
- * they are not interchangeable. README.md has the block format and the case where
- * two forms diverge.
+ * which is what `assets/player/spc.wasm` is - so matching it means the waveform
+ * drawn in the sample browser is the one the player will produce.
  */
 
 import { hex } from "@amk/core/hex";
@@ -20,7 +14,7 @@ export const BRR_BLOCK_SAMPLES = 16;
 /** Bytes per BRR block: one header plus eight of nibble pairs. */
 export const BRR_BLOCK_BYTES = 9;
 
-export class BrrError extends Error {}
+export class BrrError extends Error { }
 
 export interface BrrSample {
 	sampleName: string;
@@ -97,14 +91,7 @@ export function validateName(name: string): string | null {
 
 /**
  * A zero-length sample, for a directory slot that must exist but is never keyed.
- *
- * AddmusicK's `EMPTY.brr` is a genuinely zero-byte file, and `globals.cpp:453`
- * special-cases that with `if (sample.size() != 0)` — skipping the loop-header
- * check every other sample must pass. So there is nothing to ship as an asset:
- * an empty sample is entirely synthesisable.
- *
- * The name is the caller's to choose, because which name means "empty" is a
- * convention of the compiler front-end rather than of the BRR format.
+ * AddmusicK's `EMPTY.brr`.
  */
 export function emptySample(name: string): BrrSample {
 	return { sampleName: name, data: new Uint8Array(0), loopOffset: 0 };
@@ -133,10 +120,7 @@ export function blockCount(sample: BrrSample): number {
 // Sample banks
 // ---------------------------------------------------------------------------
 
-/**
- * A `.bnk` is exactly 32 KB — the upper half of a real cartridge's ARAM, dumped.
- * `globals.cpp:575` rejects any other size outright.
- */
+/** A `.bnk` is exactly 32 KB. Any other size is rejected, as per `globals.cpp:575`. */
 export const SAMPLE_BANK_BYTES = 0x8000;
 
 /** A bank always carries a 64-entry sample directory, empty slots included. */
@@ -160,22 +144,7 @@ export function validateSampleBank(bytes: Uint8Array): string | null {
 	return null;
 }
 
-/**
- * Splits a `.bnk` sample bank into its slots — `addSampleBank`, globals.cpp:551.
- *
- * A bank is how a song ported from another SNES game gets that game's
- * instruments: the 64 slots keep their original SRCNs, so sequence data lifted
- * from the original finds each sample exactly where it expects it. Which is why
- * this always returns {@link SAMPLE_BANK_SLOTS} entries, empty ones included —
- * dropping the blanks would renumber everything after them.
- *
- * Slot data carries **no** 2-byte loop header. AMK takes the `noLoopHeader`
- * path for banks (`globals.cpp:468-472`), reading the loop point out of the
- * directory instead, so {@link parseBrr} is not usable here.
- *
- * `names(slot)` supplies each slot's name; the convention belongs to the
- * compiler front-end, not to the format.
- */
+/** Splits a `.bnk` sample bank into its slots — `addSampleBank`, globals.cpp:551. */
 export function parseSampleBank(bytes: Uint8Array, names: (slot: number) => string): BrrSample[] {
 	const problem = validateSampleBank(bytes);
 	if (problem) {
@@ -221,8 +190,8 @@ export function parseSampleBank(bytes: Uint8Array, names: (slot: number) => stri
 			from >= 0 && at > from
 				? { sampleName: name, data: image.subarray(from, at), loopOffset }
 				: // An address outside the image is not recoverable, and an empty
-					// slot is the one representation that cannot corrupt the directory.
-					emptySample(name),
+				// slot is the one representation that cannot corrupt the directory.
+				emptySample(name),
 		);
 	}
 
@@ -234,10 +203,7 @@ export function usedBankSlots(slots: readonly BrrSample[]): number {
 	return slots.reduce((count, slot) => (slot.data.length > 0 ? count + 1 : count), 0);
 }
 
-/**
- * Saturate to signed 16 bits — snes_spc's `CLAMP16`, which is
- * `if ((int16_t) io != io) io = (io >> 31) ^ 0x7FFF`.
- */
+/** Clamp to signed 16 bits */
 function clamp16(value: number): number {
 	if (value > 0x7fff) {
 		return 0x7fff;
@@ -252,15 +218,8 @@ function clamp16(value: number): number {
 
 /**
  * Decodes a sample to PCM, one pass, ignoring the loop and end flags.
- *
  * Returns 16-bit samples at the DSP's native 32000 Hz. Pitch is not applied —
  * this is the sample as stored, not as any instrument would play it.
- *
- * The history is kept in the *doubled* domain the DSP stores it in — each entry
- * is `(int16_t)(sample * 2)` — and the older of the two is halved on the way
- * into the filter, exactly as the reference does. That doubling is also what
- * makes the history always even, which several of the shift forms quietly
- * depend on.
  */
 export function decodeBrr(sample: BrrSample): Int16Array {
 	const blocks = blockCount(sample);
@@ -324,13 +283,7 @@ export function decodeBrr(sample: BrrSample): Int16Array {
 	return out;
 }
 
-/**
- * Reduces PCM to a min/max envelope for drawing.
- *
- * A four-second sample is 128k values; nothing in a template should ever see
- * that. Returns `buckets * 2` values as `[min, max, min, max, …]`, normalised
- * to -1..1.
- */
+/** Reduces PCM to a min/max envelope for drawing. Peaks are grouped in "buckets". */
 export function peaks(pcm: Int16Array, buckets: number): Float32Array {
 	const out = new Float32Array(buckets * 2);
 	if (buckets <= 0) {

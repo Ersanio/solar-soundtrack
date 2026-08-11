@@ -1,4 +1,4 @@
-import { TICKS_PER_WHOLE } from "@amk/core/tables";
+import { TICKS_PER_WHOLE } from "@amk/core/hardcoded-tables";
 import { noiseHz } from "@amk/spc/adsr";
 import { type Resolver, choice, fixed, s8, ticks, u8 } from "./param";
 import { bpm, noteLengthName, panLabel, percentOf255 } from "./units";
@@ -6,14 +6,7 @@ import { bpm, noteLengthName, panLabel, percentOf255 } from "./units";
 /** See `MAX_TEMPO` in `hex-params.ts`: the driver stores one more than you write. */
 const MAX_TEMPO = 254;
 
-/**
- * What each single-letter command's arguments mean.
- *
- * The comma forms (`w40,180`, `v20,255`, `t30,80`) are `#amk 3` and above
- * (`parser.ts:parseFadeableValue`, `parser.ts:parseTempo`), and the parser reads the *first* number
- * as the duration when there are two — so the descriptor list has to be chosen
- * by how many arguments were written, not by the letter alone.
- */
+/** What each single-letter command's arguments mean. */
 
 /** `v`, `w` and `t`: one argument sets, two fade. `parser.ts:parseFadeableValue`, `parseTempo`. */
 function fadeable(name: string, describe: (value: number) => string | null): Resolver {
@@ -30,13 +23,7 @@ function fadeable(name: string, describe: (value: number) => string | null): Res
 	};
 }
 
-/**
- * The vibrato speed, which `$DE`'s readme entry calls a "Duration" and is not.
- *
- * The driver adds this byte to a phase accumulator once a tick
- * (`main.asm:3321-3324`), so it is a speed and bigger is faster. `p`'s own entry
- * gets it right — "the rate (speed)".
- */
+/** The vibrato rate. */
 const RATE = u8("Rate", "rate", {
 	min: 1,
 	describe: (value) => (value === 0 ? "a rate of 0 never advances, so the vibrato stays still" : "higher is faster"),
@@ -79,15 +66,10 @@ const pan: Resolver = (command) => {
 	};
 };
 
-/**
- * The denominators worth stopping on: every one that divides 192 evenly, so
- * every one that lands on a whole number of ticks, plus 128 to complete the
- * doubling. Between `l12` and `l192` there are 180 numbers that are not music,
- * and a slider that has to be dragged through them to reach `l16` is no use.
- */
+/** The length denominators worth stopping on: every one that divides 192 evenly + 128 */
 const NOTE_DENOMINATORS = [1, 2, 3, 4, 6, 8, 12, 16, 24, 32, 48, 64, 96, 128, 192] as const;
 
-/** `l` — the length later notes fall back to (`parser.ts:parseDefaultLength`). */
+/** `l` — the length later notes fall back to (`parser.ts:parseDefaultLength`). Default: l8 */
 const defaultLength: Resolver = (command) => ({
 	params: [
 		u8("Length", "index", {
@@ -113,17 +95,7 @@ const defaultLength: Resolver = (command) => ({
 			: undefined,
 });
 
-/**
- * A note or rest, whose arguments are the lengths of its tied segments.
- *
- * `c4^8` is one command with two of them, and the scanner has already worked out
- * what each comes to in ticks (`Command.noteLength`). So the row says the
- * denominator you wrote *and* the ticks it resolved to, which is the pair that
- * makes a tie legible — `c4^8` is 48 + 24, and nothing else on screen says so.
- *
- * The first segment may be absent (`c` alone takes the standing `l`), in which
- * case the command has no arguments and the table says so.
- */
+/** A note or rest, whose arguments are the lengths of its tied segments. */
 const noteLength: Resolver = (command) => ({
 	params: command.args.map((_argument, index) =>
 		u8(index === 0 ? "Length" : `Tied to`, "index", {
@@ -151,11 +123,7 @@ export const LETTER_PARAMS: Readonly<Record<string, Resolver>> = {
 			describe: (value) => `about ${bpm(value).toFixed(1)} BPM`,
 		});
 
-		// Confirmed against the emulator: the driver stores one more than the byte
-		// written, so t253 is $FE, t254 is $FF, and t255 is $00 — at which the tick
-		// accumulator can never carry and the song stops advancing entirely.
 		const ceiling = "Stops at 254: the driver adds one, so t255 would be tempo 0 and the song would freeze.";
-
 		return command.args.length >= 2
 			? {
 					params: [ticks("Over"), target],
@@ -166,8 +134,7 @@ export const LETTER_PARAMS: Readonly<Record<string, Resolver>> = {
 	v: fadeable("Volume", percentOf255),
 	w: fadeable("Global volume", percentOf255),
 	y: pan,
-	// `q` has a view of its own: two nibbles that mean two unrelated things, the
-	// second read against a table the song chooses. See `quantization-command/`.
+	// `q` has a view of its own: two nibbles that mean two unrelated things
 	l: defaultLength,
 	o: fixed([u8("Octave", "index", { min: 0, max: 6 })]),
 	"@": fixed([u8("Instrument", "index")]),
@@ -181,12 +148,9 @@ export const LETTER_PARAMS: Readonly<Record<string, Resolver>> = {
 		],
 		// One DSP register drives every voice's noise (`main.asm:2554` ModifyNoise),
 		// so this is not a per-channel setting even though it is written on one.
-		"Replaces the instrument’s sample until the next instrument change. One register serves every channel, so a later n retunes this one too.",
+		"Replaces the instrument’s sample with noise until the next instrument change. The value of the latest n-command being played takes precedence.",
 	),
 	p: vibrato,
-	// Notes and rests are commands too, and `gather` builds one for each. Without
-	// an entry here every `c4` drew a row called "Argument 1" — a 0-255 number
-	// field over a note length, next to a panel that knows exactly what it is.
 	c: noteLength,
 	d: noteLength,
 	e: noteLength,

@@ -17,7 +17,7 @@ import { join } from "node:path";
 
 import { compiler } from "@amk/compiler";
 import { noteAddressAt } from "@amk/core/types";
-import { EMPTY_SAMPLE_NAME, bankSlotName } from "@amk/core/tables";
+import { EMPTY_SAMPLE_NAME, bankSlotName } from "@amk/core/hardcoded-tables";
 import { SAMPLE_BANK_BYTES, SAMPLE_BANK_SLOTS, type BrrSample, emptySample, parseSampleBank } from "@amk/spc/brr";
 import { loadDriver } from "@amk/spc/driver";
 import { buildSpc } from "@amk/spc/export";
@@ -26,7 +26,7 @@ import { SPC_CHANNELS, SPC_SAMPLE_RATE, instantiate } from "@amk/spc/wasm-host";
 import {
 	TICK_POLL_HZ,
 	applyChannelMutes,
-	createMuteShadow,
+	createMuteBackup,
 	readDriverState,
 	readNoteDuration,
 	sawTick,
@@ -118,7 +118,7 @@ const BLOCK = SPC_SAMPLE_RATE / TICK_POLL_HZ;
  */
 function renderMuted(spc: Uint8Array, warmup: number, frames: number, maskAt: (frame: number) => number): Int16Array {
 	emu.loadSpc(spc);
-	const shadow = createMuteShadow();
+	const backup = createMuteBackup();
 	const out = new Int16Array(frames * SPC_CHANNELS);
 
 	let written = 0;
@@ -131,7 +131,7 @@ function renderMuted(spc: Uint8Array, warmup: number, frames: number, maskAt: (f
 
 		// After the block, like the worklet: a mask posted now takes effect on
 		// the next one.
-		applyChannelMutes(emu.aram(), maskAt(done), shadow);
+		applyChannelMutes(emu.aram(), maskAt(done), backup);
 	}
 
 	return out.subarray(0, written);
@@ -236,27 +236,27 @@ console.log("\nthe mute register is composed, not assigned");
 	// its own channels through `$FA $05`, and taking a mixer mute away must not
 	// take those with it.
 	const aram = new Uint8Array(0x10000);
-	const shadow = createMuteShadow();
+	const backup = createMuteBackup();
 
 	aram[0x5e] = 0b0000_1000; // the song's own doing
 	aram[0x0241 + 2 * 1] = 200;
 
-	applyChannelMutes(aram, 0b0000_0010, shadow);
+	applyChannelMutes(aram, 0b0000_0010, backup);
 	check("a mixer mute joins the song's own", aram[0x5e] === 0b0000_1010, `$5E = ${aram[0x5e].toString(2)}`);
 	check("the muted channel's volume is taken", aram[0x0241 + 2 * 1] === 0);
 	check("and its bit is flagged for rewriting", (aram[0x5c] & 0b10) !== 0);
 
 	aram[0x5c] = 0;
-	applyChannelMutes(aram, 0, shadow);
+	applyChannelMutes(aram, 0, backup);
 	check("lifting it leaves the song's own mute", aram[0x5e] === 0b0000_1000, `$5E = ${aram[0x5e].toString(2)}`);
 	check("and hands the volume back", aram[0x0241 + 2 * 1] === 200);
 
 	// A volume written while muted is the one that comes back.
-	applyChannelMutes(aram, 0b0000_0010, shadow);
+	applyChannelMutes(aram, 0b0000_0010, backup);
 	aram[0x0241 + 2 * 1] = 90; // as a `v` command mid-mute would
-	applyChannelMutes(aram, 0b0000_0010, shadow);
+	applyChannelMutes(aram, 0b0000_0010, backup);
 	aram[0x5c] = 0;
-	applyChannelMutes(aram, 0, shadow);
+	applyChannelMutes(aram, 0, backup);
 	check("a volume set during the mute survives it", aram[0x0241 + 2 * 1] === 90, `got ${aram[0x0241 + 2 * 1]}`);
 }
 
@@ -319,12 +319,12 @@ console.log("\na muted channel goes on carrying the song");
 	/** Ticks counted and loop turnovers seen over `seconds`, with `mask` held. */
 	function follow(mask: number, seconds: number) {
 		emu.loadSpc(spc);
-		const shadow = createMuteShadow();
+		const backup = createMuteBackup();
 
 		// Let the song key on, so there is a voice to count off.
 		for (let done = 0; done < SPC_SAMPLE_RATE / 20; done += BLOCK) {
 			emu.renderView(BLOCK);
-			applyChannelMutes(emu.aram(), mask, shadow);
+			applyChannelMutes(emu.aram(), mask, backup);
 		}
 
 		const voice = tickVoice(emu.aram());
@@ -338,7 +338,7 @@ console.log("\na muted channel goes on carrying the song");
 		for (let frame = 0; frame < SPC_SAMPLE_RATE * seconds; frame += BLOCK) {
 			emu.renderView(BLOCK);
 			const aram = emu.aram();
-			applyChannelMutes(aram, mask, shadow);
+			applyChannelMutes(aram, mask, backup);
 
 			const now = readNoteDuration(aram, voice);
 			ticks += sawTick(previous, now);

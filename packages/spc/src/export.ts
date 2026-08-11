@@ -8,7 +8,8 @@
 
 import { hex4 as hex } from "@amk/core/hex";
 import type { SongTags } from "@amk/core/types";
-import type { BrrSample, DriverBundle } from "./driver";
+import type { BrrSample } from "./brr";
+import type { DriverBundle } from "./driver";
 import { ARAM_SIZE, type AramPlan, type SpcLayout, computeSpcLayout } from "./layout";
 
 export type { SpcLayout } from "./layout";

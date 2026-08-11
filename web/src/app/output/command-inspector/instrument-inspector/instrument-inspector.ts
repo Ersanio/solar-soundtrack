@@ -20,7 +20,7 @@ import {
   NOISE_FLAG,
 } from '@amk/spc/instruments';
 import type { Command } from '@amk/tokens';
-import { DEFAULT_TRANSPOSE, INSTRUMENT_TO_SAMPLE } from '@amk/core/tables';
+import { DEFAULT_TRANSPOSE, INSTRUMENT_TO_SAMPLE } from '@amk/core/hardcoded-tables';
 import { DriverStore } from '../../../state/driver-store';
 import { EditorStore } from '../../../state/editor-store';
 import { duration, hex2 } from '../../../util/format';

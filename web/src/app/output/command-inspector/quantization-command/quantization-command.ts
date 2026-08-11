@@ -6,7 +6,7 @@ import {
   NSPC_VELOCITY_OFFSET,
   TICKS_PER_WHOLE,
   VELOCITY_VALUES,
-} from '@amk/core/tables';
+} from '@amk/core/hardcoded-tables';
 import type { Command } from '@amk/tokens';
 import { argLockedBecause } from '../commands/context';
 import { Slider } from '../../../shared/slider/slider';
@@ -78,7 +78,7 @@ export class QuantizationCommand {
     velocityTableAt(this.command(), this.store.tokens().tokens, this.store.source()),
   );
 
-  protected readonly tableName = computed(() => (this.table() === 'smw' ? 'SMW' : 'N-SPC'));
+  private readonly tableName = computed(() => (this.table() === 'smw' ? 'SMW' : 'N-SPC'));
 
   private readonly gateByte = computed(() => NOTE_DURATIONS[this.shownGate()]);
 

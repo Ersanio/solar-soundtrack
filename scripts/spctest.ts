@@ -7,7 +7,7 @@
  */
 
 import { compiler } from "@amk/compiler";
-import { EMPTY_SAMPLE_NAME } from "@amk/core/tables";
+import { EMPTY_SAMPLE_NAME } from "@amk/core/hardcoded-tables";
 import { emptySample } from "@amk/spc/brr";
 import { analyzeDriver, encodePathSegment, loadDriver } from "@amk/spc/driver";
 import { buildSpc } from "@amk/spc/export";

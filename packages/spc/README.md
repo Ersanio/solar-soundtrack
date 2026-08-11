@@ -96,7 +96,7 @@ Reading rather than restating also means a user-supplied `main.bin` reports its 
 which a hardcoded copy could only get wrong. The bundled tables in `instruments.ts` are a labelled
 fallback for a driver the search cannot make sense of, not the primary source.
 
-`MELODIC_SRCN` and `PERCUSSION_SRCN` restate the SRCN column that `@amk/core`'s `tables.ts` already
+`MELODIC_SRCN` and `PERCUSSION_SRCN` restate the SRCN column that `@amk/core`'s `hardcoded-tables.ts` already
 holds as `INSTRUMENT_TO_SAMPLE`. That duplication is deliberate, for the same reason as
 `BANK_SLOT_COUNT`: each side states the constant and a harness asserts they agree. They agree on 29
 of 30 bytes. At index 19 the driver holds `$0F` and `instrToSample[19]` holds `$00`, because AMK's

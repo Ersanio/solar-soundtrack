@@ -1,4 +1,4 @@
-import { EMPTY_SAMPLE_NAME } from "@amk/core/tables";
+import { EMPTY_SAMPLE_NAME } from "@amk/core/hardcoded-tables";
 import { noiseHz } from "@amk/spc/adsr";
 import { hex2 } from "@amk/core/hex";
 import { type ParamDescriptor, type Resolver, choice, fixed, raw, s8, ticks, u8 } from "./param";
@@ -6,33 +6,17 @@ import { bpm, noteName, panLabel, percentOf255, ticksLabel } from "./units";
 
 /**
  * The highest tempo that is not a freeze.
- *
- * Every vcmd handler is entered with the carry set — the dispatcher's `asl a`
- * (`main.asm:2659`) shifts out bit 7 of a byte that is always `$DA` or above,
- * and nothing clears it — and `$E2`'s handler is a carry-less
- * `adc a, $0387` / `mov $51, a`. So the driver stores one more than you write,
- * and `$FF` stores `$00`. At tempo 0 the tick accumulator (`main.asm:220-238`)
- * can never carry, so the song stops advancing altogether.
- *
- * Confirmed against the emulator: `t40` stores `$29`, `t192` stores `$C1`,
- * `t254` stores `$FF` and plays, `t255` stores `$00` and the track pointer never
- * moves again. Note the raw form accepts `$00` quite happily — it means tempo 1,
- * the slowest there is — where the letter `t0` is a compile error (AMK0079).
+ * Every vcmd handler is entered with the carry set (`main.asm:2659`).
+ * A tempo of `$FF` stores `$00`, which stops advancing the song altogether.
  */
 const MAX_TEMPO = 254;
 
 /**
  * What each hex command's arguments mean, `$DA` through `$FE`.
- *
  * Names follow `hex_command_reference.html` so that a reader with the readme
  * open sees the same words; where the readme is wrong or silent — `$DB`'s
  * range, `$F1`'s delay, the `$F5` coefficients' interaction — the note says what
  * the driver actually does and cites it.
- *
- * Nothing here states an argument *count*: `expectedArgs` owns that, and
- * `resolveCommand` pads whatever this table is short of. A resolver may therefore
- * describe only the arguments it can name, which is what makes the
- * value-dependent forms below expressible at all.
  */
 
 // ---------------------------------------------------------------------------
@@ -44,16 +28,7 @@ const DURATION = ticks("Over", {
 		value === 0 ? "instant — a duration of 0 applies the target at once" : ticksLabel(value, context.tempo),
 });
 
-/**
- * The vibrato and tremolo speed — `$DE`'s and `$E5`'s second byte.
- *
- * The readme calls this "Duration" and links it to the note-length table, which
- * is wrong in both halves. `aram_map.html` calls the byte it lands in
- * (`$0331+x`, `$0361+x`) an "offset per music tempo tick", and the driver adds
- * it to an 8-bit phase accumulator once a tick (`main.asm:3321-3324`) — so it is
- * a speed, bigger is faster, and it is not measured in ticks at all. The `p`
- * command's own entry gets it right, calling the same value "the rate (speed)".
- */
+/** The vibrato and tremolo rate — `$DE`'s and `$E5`'s second byte. */
 const RATE = (what: string): ParamDescriptor =>
 	u8("Rate", "rate", {
 		min: 1,
@@ -438,12 +413,6 @@ export const HEX_PARAMS: Readonly<Record<number, Resolver>> = {
 		params: [
 			u8("Sample", "srcn", {
 				control: "select",
-				// `EMPTY.brr` is the zero-byte file the compiler *substitutes* for a
-				// sample nothing plays (`parser.ts:optimizeSamples`). Offering it would offer
-				// silence: every slot holding one is a slot whose real sample was
-				// dropped, and pointing `$F3` at one plays nothing. A song that has one
-				// written already still shows it, through the picker's unknown-value
-				// arm — this hides it from the list, not from the source.
 				choices: context.samples.filter((option) => option.label !== EMPTY_SAMPLE_NAME),
 				max: Math.max(0, context.samples.length - 1),
 			}),

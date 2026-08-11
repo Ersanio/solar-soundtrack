@@ -14,21 +14,44 @@
 
 import { Tag, tags } from "@lezer/highlight";
 
-import {
-	type ScanState,
-	type Token,
-	commandAt,
-	copyState,
-	startState,
-	step,
-	tokenAt,
-	tokenize,
-	TOKEN_TAGS,
-} from "@amk/tokens";
+import { type ScanState, type Token, commandAt, copyState, startState, step, tokenize, TOKEN_TAGS } from "@amk/tokens";
 
 import { check, summarise } from "./harness";
 
 const at = (text: string, offset: number) => commandAt(tokenize(text).commands, offset);
+
+/**
+ * The token containing `offset`, notes included.
+ *
+ * Lives here because only these checks ask the question. The app maps a
+ * position to a whole *command* through {@link commandAt} — that is what the
+ * inspector and the hover show — and nothing in it needs a single token back
+ * out of the list. Most of what follows is phrased as "what did the scanner
+ * call this character", though, so the harness needs the lookup even when the
+ * package does not.
+ *
+ * Half-open, unlike {@link commandAt}, which is end-inclusive so a caret parked
+ * after the last argument still inspects the command it just finished. Here the
+ * boundary belongs to exactly one token, which the pair of checks either side of
+ * a note's end pins.
+ */
+function tokenAt(tokens: Token[], offset: number): Token | null {
+	let low = 0;
+	let high = tokens.length - 1;
+	while (low <= high) {
+		const mid = (low + high) >> 1;
+		const token = tokens[mid];
+		if (offset < token.start) {
+			high = mid - 1;
+		} else if (offset >= token.end) {
+			low = mid + 1;
+		} else {
+			return token;
+		}
+	}
+
+	return null;
+}
 
 console.log("\nhex commands gather their arguments");
 {
@@ -1122,7 +1145,7 @@ console.log("\ncopyState really copies");
 console.log("\nthe scanner always makes progress");
 {
 	// Garbage in must not hang the editor.
-	const nasty = " ~`%:!\\\n#0 éé $ $$ $Z c\n";
+	const nasty = "\0\x1b~`%:!\\\n#0 éé $ $$ $Z c\n";
 	const { tokens } = tokenize(nasty);
 	check("a hostile document terminates and yields tokens", tokens.length > 0);
 	check(

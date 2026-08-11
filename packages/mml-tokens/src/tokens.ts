@@ -20,8 +20,7 @@ import {
 	INSTRUMENT_TO_SAMPLE,
 	LAST_VCMD,
 	TICKS_PER_WHOLE,
-	VCMD_NAMES,
-} from "@amk/core/tables";
+} from "@amk/core/hardcoded-tables";
 
 export type TokenKind =
 	| "comment"
@@ -52,7 +51,6 @@ export type TokenKind =
 	| "hex"
 	| "hexArg"
 	| "number"
-	/** A letter command's argument that is read as hex — see {@link HEX_ARG_LETTERS}. */
 	| "hexNumber"
 	| "operator"
 	| "unknown";
@@ -93,21 +91,51 @@ export const TOKEN_TAGS: Readonly<Record<TokenKind, string>> = {
 	hex: "keyword",
 	hexArg: "number",
 	number: "number",
-	// Same colour as a decimal argument: the radix is a fact about the command,
-	// not something the reader should have to notice from the highlighting.
 	hexNumber: "number",
 	operator: "operator",
 	unknown: "invalid",
 };
 
-/**
- * Letters whose argument `parser.ts` reads with `getHex` rather than `getInt`.
- *
- * `q7F` is quantization `$7F` (`parser.ts:parseQuantization`) and `n1F` is noise clock `$1F`
- * (`parser.ts:parseNoise`), so reading either as decimal is wrong twice over: the value
- * is wrong, and `F` would otherwise be taken for a note.
- */
-export const HEX_ARG_LETTERS = new Set(["q", "n"]);
+/** Human-readable names for the VCMDs, used in hover text and the command inspector. */
+export const VCMD_NAMES: Readonly<Record<number, string>> = {
+	0xda: "set instrument",
+	0xdb: "pan",
+	0xdc: "pan fade",
+	0xdd: "pitch bend",
+	0xde: "vibrato",
+	0xdf: "vibrato off",
+	0xe0: "global volume",
+	0xe1: "global volume fade",
+	0xe2: "tempo",
+	0xe3: "tempo fade",
+	0xe4: "global transpose",
+	0xe5: "tremolo",
+	0xe6: "subloop",
+	0xe7: "volume",
+	0xe8: "volume fade",
+	0xe9: "call loop",
+	0xea: "vibrato fade",
+	0xeb: "pitch envelope (release)",
+	0xec: "pitch envelope (attack)",
+	0xed: "ADSR / GAIN",
+	0xee: "fine tune",
+	0xef: "echo parameters",
+	0xf0: "echo off",
+	0xf1: "echo parameters",
+	0xf2: "echo fade",
+	0xf3: "sample load",
+	0xf4: "misc",
+	0xf5: "FIR filter",
+	0xf6: "DSP write",
+	0xf7: "write byte",
+	0xf8: "noise",
+	0xf9: "data send",
+	0xfa: "misc",
+	0xfb: "arpeggio",
+	0xfc: "remote code",
+	0xfd: "tremolo off",
+	0xfe: "pitch envelope off",
+};
 
 /** Human names for the single-letter commands, to match {@link VCMD_NAMES}. */
 export const LETTER_NAMES: Readonly<Record<string, string>> = {
@@ -144,34 +172,20 @@ export const LETTER_KINDS: Readonly<Record<string, TokenKind>> = {
 	p: "vibrato",
 };
 
+/** Letters whose argument `parser.ts` reads with `getHex` rather than `getInt`. */
+export const HEX_ARG_LETTERS = new Set(["q", "n"]);
+
 /** One `"find=value"` definition — `parser.ts:parseReplacementDirective`. */
 export interface Replacement {
 	find: string;
 	value: string;
 }
 
-/**
- * The replacements in scope at one point in the document.
- *
- * Immutable: {@link withReplacement} returns a new table rather than mutating
- * this one, which is what lets {@link copyState} keep sharing the reference and
- * stay O(1). A table that grew in place would be seen by every state that ever
- * pointed at it, including states for lines above the definition.
- *
- * `byFirstChar` is the whole reason lookup is affordable. `tokenize` runs on
- * every keystroke, undebounced (`editor-store.ts:tokens`), and the match is tried
- * at every dispatch position; a linear pass over every definition each time is
- * tens of milliseconds on a large song. Buckets are sorted longest-first, which
- * is exactly equivalent to AMK's global longest-first sort (`parser.ts:doReplacement`) —
- * two entries that can both match at one position necessarily share a first
- * character, so a global sort would never break a tie differently.
- */
+/** The replacements in scope at one point in the document. */
 export interface ReplacementTable {
 	readonly entries: readonly Replacement[];
 	readonly byFirstChar: ReadonlyMap<string, readonly Replacement[]>;
 }
-
-export const NO_REPLACEMENTS: ReplacementTable = { entries: [], byFirstChar: new Map() };
 
 /** `parser.ts:parseReplacementDirective` — a repeated `find` overwrites, as `Map.set` does. */
 function withReplacement(table: ReplacementTable, find: string, value: string): ReplacementTable {
@@ -376,7 +390,7 @@ export function startState(): ScanState {
 		awaitingArpCount: false,
 		inString: false,
 		loopDepth: 0,
-		replacements: NO_REPLACEMENTS,
+		replacements: { entries: [], byFirstChar: new Map() },
 		sampleName: false,
 		hexArgNext: false,
 		signedArgNext: false,
@@ -761,9 +775,7 @@ function scanNumber(line: string, at: number): StepResult {
 	return { kind: "number", end };
 }
 
-/**
- * `#amk 4` and friends versus a `#0` channel directive — `parser.ts:parseHash`.
- */
+/** `#amk 4` and friends versus a `#0` channel directive — `parser.ts:parseHash`. */
 function scanHash(line: string, at: number, state: ScanState): StepResult {
 	let end = at + 1;
 	if (isAlpha(line[end])) {
@@ -1058,7 +1070,6 @@ export interface Token {
 	kind: TokenKind;
 	start: number;
 	end: number;
-	/** 1-based, matching `Span`. */
 	line: number;
 }
 
@@ -1240,11 +1251,6 @@ export interface TokenIndex {
 /**
  * What {@link gather} reads: a token stream in which an expansion has been
  * spliced in, in place of the `replacement` token that produced it.
- *
- * Kept out of {@link TokenIndex.tokens} on purpose. That list is what a
- * highlighter consumes and what {@link tokenAt} binary-searches, so it must
- * stay ordered and non-overlapping — whereas every token from one expansion
- * shares a single span by design.
  */
 interface GatherToken extends Token {
 	/** Literal text, for a token with no source of its own. */
@@ -2044,32 +2050,6 @@ export function commandAt(commands: Command[], offset: number): Command | null {
 			}
 
 			return commands[index];
-		}
-	}
-
-	return null;
-}
-
-/**
- * The token containing `offset`, notes included.
- *
- * The inspector does not need this — it works in whole commands — but mapping a
- * position back to something highlightable does, which is what a playhead
- * following the driver would want. Half-open, unlike {@link commandAt}: a
- * playhead is a position in the music, not a caret between characters.
- */
-export function tokenAt(tokens: Token[], offset: number): Token | null {
-	let low = 0;
-	let high = tokens.length - 1;
-	while (low <= high) {
-		const mid = (low + high) >> 1;
-		const token = tokens[mid];
-		if (offset < token.start) {
-			high = mid - 1;
-		} else if (offset >= token.end) {
-			low = mid + 1;
-		} else {
-			return token;
 		}
 	}
 

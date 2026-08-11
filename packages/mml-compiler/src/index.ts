@@ -1,6 +1,5 @@
 import { hex } from "@amk/core/hex";
-import type { CompileRequest, CompileResult } from "@amk/core/types";
-import { emptyStats, failure } from "@amk/core/types";
+import type { CompileRequest, CompileResult, CompileStats, Diagnostic } from "@amk/core/types";
 import { link } from "./link";
 import { type AddmusicKOptions, AddmusicKParser } from "./parser";
 
@@ -9,18 +8,12 @@ export type { AddmusicKOptions };
 /**
  * AddmusicK, covering every target it accepts.
  *
- * | Marker | Target |
- * |---|---|
- * | `#amk 4` | AddmusicK 1.0.9+ (current) |
- * | `#amk 2` | AddmusicK 1.0-1.0.8 |
- * | `#amk 1` | AddmusicK Beta |
- * | `#am4`   | Addmusic 4.05 |
- * | `#amm`   | AddmusicM |
- *
- * `#amk 3` (Codec's beta) is rejected — AddmusicK itself does not implement it.
- *
- * Nothing here is more permissive than the reference, and nothing is stricter.
- * See README.md and AUDIT.md.
+ * `#amk 4`:  AddmusicK 1.0.9+ (current)
+ * `#amk 2`:  AddmusicK 1.0-1.0.8
+ * `#amk 1`:  AddmusicK Beta
+ * `#am4`  :  Addmusic 4.05
+ * `#amm`  :  AddmusicM
+ * `#amk 3` (Codec's beta) is rejected. AddmusicK itself does not implement it.
  */
 export class AddmusicKCompiler {
 	compile(request: CompileRequest): CompileResult {
@@ -28,7 +21,7 @@ export class AddmusicKCompiler {
 		const options = readOptions(request.options);
 
 		if (!Number.isInteger(aramAddress) || aramAddress < 0 || aramAddress > 0xffff) {
-			return failure([
+			return this.failure([
 				{
 					severity: "error",
 					code: "AMK0301",
@@ -40,20 +33,14 @@ export class AddmusicKCompiler {
 
 		const parsed = new AddmusicKParser(source, options).parse();
 
-		const stats = emptyStats();
+		const stats = this.initStats();
 		stats.channelTicks = parsed.channelLengths.map((ticks) => Math.floor(ticks));
-		// Music.cpp:3209 — the song turns over when its *shortest* channel runs out,
-		// so that is the pass length however long the other channels are.
+		// Music.cpp:3209 — the song is as long as its shortest channel
 		const played = stats.channelTicks.filter((ticks) => ticks !== 0);
 		stats.introTicks = Math.floor(parsed.introTicks);
 		stats.loopTicks = played.length ? Math.min(...played) - stats.introTicks : 0;
 		stats.echoBufferSize = parsed.echoBufferSize;
-		// What the song asked for, before optimisation replaced anything unplayed —
-		// which is what the field has always claimed to be, and what the UI needs
-		// to explain why a sample is or is not in ARAM.
 		stats.sampleNames = [...(parsed.requestedSamples ?? [])];
-		// `usedSamples` is indexed by SRCN, which is a position in that same list.
-		// Collapsing to names loses nothing the UI needs and spares it the mapping.
 		stats.usedSampleNames = [...new Set(stats.sampleNames.filter((_, srcn) => parsed.usedSamples[srcn]))];
 		stats.hasIntro = parsed.hasIntro;
 		stats.loops = !parsed.doesntLoop;
@@ -63,17 +50,15 @@ export class AddmusicKCompiler {
 		stats.playback = parsed.playback;
 		stats.tags = parsed.tags;
 
-		// Carried on every return, including the failures: the sample panel stays
-		// populated while a song is mid-edit and not compiling.
 		const sampleList = parsed.sampleList;
-
 		if (parsed.errorCount > 0) {
-			return failure(parsed.diagnostics, stats, sampleList);
+			return this.failure(parsed.diagnostics, stats, sampleList);
 		}
 
+		// Check if song has musical data.
 		const hasData = parsed.data.slice(0, 8).some((channel) => channel.length > 0);
 		if (!hasData) {
-			return failure(
+			return this.failure(
 				[
 					...parsed.diagnostics,
 					{
@@ -88,13 +73,11 @@ export class AddmusicKCompiler {
 			);
 		}
 
-		// Music.cpp:3210-3214 — `mainLength` is the shortest non-zero channel, and
-		// staying at its `-1` sentinel is an error in `pointersFirstPass`. Distinct
-		// from the check above: a song can emit plenty of bytes and still run for
-		// no time at all, which is what an unclosed `[[` does — every note after it
-		// is parked in the superloop's accumulator and never flushed.
+		// Music.cpp:3210-3214 — Check if song's data has a musical duration
+		// Distinct from the check above: a song can
+		// emit plenty of bytes and still run for no time at all
 		if (!stats.channelTicks.some((ticks) => ticks !== 0)) {
-			return failure(
+			return this.failure(
 				[
 					...parsed.diagnostics,
 					{
@@ -117,8 +100,7 @@ export class AddmusicKCompiler {
 		stats.headerSize = linked.headerSize;
 		stats.totalSize = linked.data.length;
 
-		// Music.cpp:3286 — `#pad` reserves ARAM for a song that is still growing,
-		// so outgrowing the reservation is worth saying out loud.
+		// Music.cpp:3286 — Check if song data has grown larger than `#pad` reserved
 		if (parsed.minSize > 0 && stats.totalSize > parsed.minSize) {
 			diagnostics.push({
 				severity: "warning",
@@ -131,10 +113,40 @@ export class AddmusicKCompiler {
 		}
 
 		if (linked.diagnostics.some((d) => d.severity === "error")) {
-			return failure(diagnostics, stats, sampleList);
+			return this.failure(diagnostics, stats, sampleList);
 		}
 
 		return { ok: true, data: linked.data, noteMap: linked.noteMap, sampleList, diagnostics, stats };
+	}
+
+	private initStats(): CompileStats {
+		return {
+			channelSizes: [0, 0, 0, 0, 0, 0, 0, 0],
+			loopDataSize: 0,
+			headerSize: 0,
+			totalSize: 0,
+			channelTicks: [0, 0, 0, 0, 0, 0, 0, 0],
+			introTicks: 0,
+			loopTicks: 0,
+			echoBufferSize: 0,
+			sampleNames: [],
+			usedSampleNames: [],
+			hasIntro: false,
+			loops: true,
+			tagSeconds: null,
+			introSeconds: null,
+			mainSeconds: null,
+			playback: null,
+			tags: {},
+		};
+	}
+
+	private failure(
+		diagnostics: Diagnostic[],
+		stats: CompileStats | null = null,
+		sampleList: readonly string[] | null = null,
+	): CompileResult {
+		return { ok: false, data: null, noteMap: null, sampleList, diagnostics, stats };
 	}
 }
 

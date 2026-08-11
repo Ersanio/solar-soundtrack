@@ -1,13 +1,4 @@
-/**
- * The `$F1`/`$F5` override, looked at from either end.
- *
- * `$F1`'s third argument reloads one of the driver's two built-in filter tables
- * (`main.asm:3507`), so it overwrites whatever coefficients a `$F5` put in the
- * DSP. AddmusicK does this silently, and it is easy to spend a while tuning
- * eight bytes that a later command throws away.
- *
- * Same channel only, with one blind spot around macros — both in README.md.
- */
+/** The `$F1`/`$F5` override, looked at from either end. */
 
 import type { Command } from "./tokens";
 export function firOverriddenBy(fir: Command, commands: Command[]): Command | null {

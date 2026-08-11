@@ -1,31 +1,13 @@
 /**
  * Rewriting a command in the source it was scanned from — the inverse of
- * `gather`.
- *
- * Two rules make that safe, and both live here rather than in the panels so
- * `edittest` can gate them: a splice replaces only the parts that changed and
- * copies the text *between* them out of the source verbatim, and a part that
- * came through a `"find=value"` replacement is not writable. README.md has why
- * each matters and what each costs.
+ * `gather`. Enables you to edit commands from the inspector.
  */
 
 import { hex2 } from "@amk/core/hex";
 import type { Span } from "@amk/core/types";
 import { type Command, HEX_ARG_LETTERS, type InstrumentDefinition } from "./tokens";
 
-/**
- * How one of this command's arguments must be spelled to mean `byte`.
- *
- * Three radices, not two. A hex command's arguments are `$XX`; most letter
- * commands' are decimal; and `q` and `n` are **bare hex**, because `parser.ts`
- * reads those two with `getHex` rather than `getInt` ({@link HEX_ARG_LETTERS}).
- * So `n10` means `$10` — sixteen — and writing ten as `"10"` is wrong twice
- * over: the value is wrong, and it is wrong *silently*, since a decimal string
- * contains no hex letters to trip an error.
- *
- * Here rather than in the panel that happens to need it because it is a fact
- * about the language, and because this is the layer `edittest` can gate.
- */
+/** An 8-bit hex argument, used by q and n. */
 export function argumentText(command: Command, byte: number): string {
 	const hex = hex2(byte & 0xff);
 	if (command.vcmd !== undefined) {
@@ -35,15 +17,7 @@ export function argumentText(command: Command, byte: number): string {
 	return HEX_ARG_LETTERS.has(command.kind.toLowerCase()) ? hex : String(byte);
 }
 
-/**
- * A splice to apply to the document.
- *
- * {@link expect} is what the edit believes currently occupies {@link span}. The
- * scan the inspector reads is undebounced and so agrees with the document, but
- * only up to the microtask that carries the edit across — so the consumer
- * compares before it dispatches, and a span that has gone stale drops the edit
- * instead of corrupting text that moved underneath it.
- */
+/** A splice to apply to the document. */
 export interface Edit {
 	span: Span;
 	text: string;
@@ -62,12 +36,7 @@ export function argEditable(command: Command, index: number): boolean {
 	return arg !== undefined && arg.replacement === undefined;
 }
 
-/**
- * Every argument is literal, whatever the command byte is.
- *
- * The `"ech=$EF"` case: the head names a macro, the arguments do not, and
- * rewriting them touches only text the author typed.
- */
+/** Every argument is literal, and not a replacement, and may be rewritten */
 export function argsRewritable(command: Command): boolean {
 	return command.args.length > 0 && command.args.every((arg) => arg.replacement === undefined);
 }
@@ -77,15 +46,7 @@ export function commandRewritable(command: Command): boolean {
 	return command.replacement === undefined;
 }
 
-/**
- * Joins `parts` back together, taking the gaps between them from the source.
- *
- * `texts[i] === null` means "leave this part as written", which is how a
- * single-argument edit is expressed without the caller having to re-render the
- * ones either side of it. Returns `null` when nothing would change, so a control
- * that fires on every frame of a drag cannot push a no-op edit through the
- * compile debounce.
- */
+/** Joins `parts` back together without changing the spacing of the text source. */
 function splice(source: string, parts: Part[], texts: (string | null)[]): Edit | null {
 	let first = -1;
 	let last = -1;
@@ -148,12 +109,7 @@ export function spliceArg(source: string, command: Command, index: number, text:
 	return splice(source, partsOf(command), texts);
 }
 
-/**
- * Rewrites the arguments, leaving the command byte as written.
- *
- * `texts` is one entry per argument; a `null` leaves that one alone. Shorter
- * than the argument list is fine — the rest are left as written.
- */
+/** Rewrites the arguments only, leaving the command byte as written. */
 export function spliceArgs(source: string, command: Command, texts: (string | null)[]): Edit | null {
 	return splice(source, partsOf(command), [null, ...texts]);
 }
@@ -165,12 +121,7 @@ export function spliceHead(source: string, command: Command, text: string): Edit
 	return splice(source, partsOf(command), texts);
 }
 
-/**
- * Replaces the whole run — command byte, arguments and the text between them.
- *
- * The blunt instrument, for the cases where a command's *shape* changes and no
- * part-by-part edit could express it. Refuses unless the entire run is literal.
- */
+/** Replaces the whole run — command byte, arguments and the text between them. */
 export function spliceCommand(source: string, command: Command, text: string): Edit | null {
 	if (!commandRewritable(command)) {
 		return null;
@@ -217,12 +168,7 @@ export function spliceInstrumentBytes(
 	return splice(source, instrumentParts(entry), [null, ...texts]);
 }
 
-/**
- * Swaps the entry's sample form — `"kick.brr"` for `@1` for `n1F`.
- *
- * The five bytes after it are untouched, which is the point: changing what a
- * drum is sampled from should not reset the envelope somebody tuned.
- */
+/** Swaps an #instrument entry's sample without touching the hex parameters */
 export function spliceInstrumentSample(source: string, entry: InstrumentDefinition, text: string): Edit | null {
 	const texts: (string | null)[] = new Array<string | null>(entry.bytes.length + 1).fill(null);
 	texts[0] = text;

@@ -6,9 +6,7 @@
  *   - `fixMusicPointers`          (AddmusicK.cpp:1138) — resolves the sentinels
  *
  * The header is built with placeholder words `0xFFFB`-`0xFFFF`, which the
- * relocation pass then swaps for real addresses. That two-stage dance looks
- * redundant here, but keeping it means the two implementations can be diffed
- * step-for-step against each other.
+ * relocation pass then swaps for real addresses.
  */
 
 import { hex, hex4 } from "@amk/core/hex";
@@ -26,11 +24,11 @@ export interface LinkResult {
 }
 
 /** Sentinel values written by the header builder, resolved during relocation. */
-const SENTINEL_ZERO_SKIP1 = 0xffff; // -> 0x0000, then skip the instrument block
-const SENTINEL_00FF = 0xfffe; // -> 0x00FF
-const SENTINEL_SONG_PLUS_2 = 0xfffd; // -> aramAddress + 2
-const SENTINEL_SONG = 0xfffc; // -> aramAddress
-const SENTINEL_ZERO = 0xfffb; // -> 0x0000
+const SENTINEL_NO_LOOP = 0xffff; // Will be re-evaluated to 0000
+const SENTINEL_LOOP_MARKER = 0xfffe; // Will be re-evaluated to FF00
+const SENTINEL_LOOP_TARGET_INTRO = 0xfffd; // Will be re-evaluated to 0002 + ARAMPos
+const SENTINEL_LOOP_TARGET_NO_INTRO = 0xfffc; // Will be re-evaluated to ARAMPos
+const SENTINEL_UNUSED_CHANNEL_SLOTS = 0xfffb; // -> 0x0000
 
 export function link(parsed: ParseOutput, aramAddress: number): LinkResult {
 	const diagnostics: Diagnostic[] = [];
@@ -174,13 +172,6 @@ function prependBlobPrefix(
 	phrasePointers[channel][0] += shift;
 	phrasePointers[channel][1] += shift;
 
-	// Mirror onto the note events what the operations above did to the bytes:
-	// the unshifts move everything on the resized channel, and the hot-patch
-	// splice moves whatever sat at or past it. The unshift is applied first so
-	// the splice comparison happens in the coordinates of the buffer the splice
-	// actually ran on. Unlike `loopLocations[target]`, which shifts
-	// unconditionally because no loop call can precede the hot-patch VCMD, a
-	// note can — hence the `>=` rather than a blanket shift.
 	for (const event of noteEvents) {
 		if (event.channel === channel) {
 			event.offset += shift;
@@ -222,10 +213,10 @@ function buildHeader(parsed: ParseOutput, phrasePointers: number[][], data: numb
 	writeWord(0, add + instrLen);
 
 	if (parsed.doesntLoop) {
-		writeWord(add - 2, SENTINEL_ZERO_SKIP1);
+		writeWord(add - 2, SENTINEL_NO_LOOP);
 	} else {
-		writeWord(add - 4, SENTINEL_00FF);
-		writeWord(add - 2, parsed.hasIntro ? SENTINEL_SONG_PLUS_2 : SENTINEL_SONG);
+		writeWord(add - 4, SENTINEL_LOOP_MARKER);
+		writeWord(add - 2, parsed.hasIntro ? SENTINEL_LOOP_TARGET_INTRO : SENTINEL_LOOP_TARGET_NO_INTRO);
 	}
 
 	if (parsed.hasIntro) {
@@ -236,25 +227,20 @@ function buildHeader(parsed: ParseOutput, phrasePointers: number[][], data: numb
 
 	for (let channel = 0; channel < 8; channel++) {
 		const used = data[channel].length !== 0;
-		writeWord(add + channel * 2, used ? phrasePointers[channel][0] + size : SENTINEL_ZERO);
+		writeWord(add + channel * 2, used ? phrasePointers[channel][0] + size : SENTINEL_UNUSED_CHANNEL_SLOTS);
 	}
 
 	if (parsed.hasIntro) {
 		for (let channel = 0; channel < 8; channel++) {
 			const used = data[channel].length !== 0;
-			writeWord(add + 16 + channel * 2, used ? phrasePointers[channel][1] + size : SENTINEL_ZERO);
+			writeWord(add + 16 + channel * 2, used ? phrasePointers[channel][1] + size : SENTINEL_UNUSED_CHANNEL_SLOTS);
 		}
 	}
 
 	return header;
 }
 
-/**
- * Walk the header two bytes at a time, swapping sentinels for real addresses
- * and adding the song's base address to everything else. The `untilJump`
- * counter is what steps over the custom instrument block, which is raw data
- * rather than pointers. AddmusicK.cpp:1170-1216.
- */
+/** Walk the header and replace sentinels with real addresses. AddmusicK.cpp:1170-1216. */
 function relocate(header: number[], parsed: ParseOutput, aramAddress: number): void {
 	const instrLen = parsed.instrumentData.length;
 	let untilJump = -1;
@@ -275,21 +261,21 @@ function relocate(header: number[], parsed: ParseOutput, aramAddress: number): v
 		};
 
 		switch (word) {
-			case SENTINEL_ZERO_SKIP1:
+			case SENTINEL_NO_LOOP:
 				writeWord(0x0000);
 				untilJump = 1;
 				break;
-			case SENTINEL_00FF:
+			case SENTINEL_LOOP_MARKER:
 				writeWord(0x00ff);
 				untilJump = 2;
 				break;
-			case SENTINEL_SONG_PLUS_2:
+			case SENTINEL_LOOP_TARGET_INTRO:
 				writeWord(aramAddress + 2);
 				break;
-			case SENTINEL_SONG:
+			case SENTINEL_LOOP_TARGET_NO_INTRO:
 				writeWord(aramAddress);
 				break;
-			case SENTINEL_ZERO:
+			case SENTINEL_UNUSED_CHANNEL_SLOTS:
 				writeWord(0x0000);
 				break;
 			default:

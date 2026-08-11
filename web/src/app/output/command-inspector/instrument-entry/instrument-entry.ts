@@ -1,7 +1,7 @@
 import { Component, computed, inject, input } from '@angular/core';
 
 import { spliceInstrumentBytes, spliceInstrumentSample } from '@amk/tokens/edits';
-import { INSTRUMENT_TO_SAMPLE } from '@amk/core/tables';
+import { INSTRUMENT_TO_SAMPLE } from '@amk/core/hardcoded-tables';
 import type { InstrumentDefinition } from '@amk/tokens';
 import { encodeTuning, noiseHz, tuningMultiplier, tuningSemitones } from '@amk/spc/adsr';
 import { type EnumOption, EnumSelect } from '../../../shared/enum-select/enum-select';

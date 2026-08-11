@@ -2,17 +2,12 @@
  * Loads the prebuilt AddmusicK driver bundle: the SPC700 program, the SPC/DSP
  * base images, and the `#default` BRR sample group.
  *
- * These are build-time artifacts produced by running AddmusicK once. Nothing
- * here assembles anything — asar is not involved at runtime.
+ * These are build-time artifacts produced by running AddmusicK once.
  */
 
 import { hex4 as hex } from "@amk/core/hex";
 import { type BrrSample, parseBrr } from "./brr";
 import { ARAM_SIZE } from "./layout";
-
-// Re-exported because the SPC writer and the ARAM budget have always imported
-// it from here; the type itself now lives with the rest of the BRR handling.
-export type { BrrSample };
 
 export interface DriverManifest {
 	amkVersion: string;
@@ -38,13 +33,6 @@ export interface DriverManifest {
 	 */
 	songPointers: number;
 	sampleGroups: Record<string, string[]>;
-	/**
-	 * Samples that must stay in ARAM even when a song never plays them — the
-	 * names carrying a trailing `!` in AddmusicK's `Addmusic_sample groups.txt`.
-	 *
-	 * Optional: a hand-built bundle without it simply has no important samples,
-	 * which means sample optimisation is free to reclaim any of them.
-	 */
 	importantSamples?: string[];
 }
 

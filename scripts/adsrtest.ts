@@ -32,11 +32,6 @@ import {
 	encodeTuning,
 	envelopeAdsr,
 	envelopeGain,
-	nearestAttack,
-	nearestDecay,
-	nearestNoiseClock,
-	nearestRelease,
-	nearestSustain,
 	noiseHz,
 	releaseSeconds,
 	sustainLevel,
@@ -253,13 +248,119 @@ console.log("\nthe stock table decodes");
 	);
 }
 
+// ===========================================================================
+// The inverse search, which lives here because only this harness uses it
+// ===========================================================================
+//
+// Turning a duration back into a rate index is not something the app does. The
+// envelope tuner's sliders are over the rate index itself, labelled with the
+// time that rate produces (`envelope-tuner.ts:93-96`), because the ladder is
+// geometric and a slider in seconds would spend most of its travel inside the
+// last few milliseconds.
+//
+// What the search is still good for is the section below. An exhaustive
+// nearest-match returns the rate it started from only if no two rates produce
+// the same duration, so those round trips are an injectivity test on the
+// forward ladders: a transposed digit in CLOCKS, a fall table with a repeated
+// entry, or a step count that collapses two rungs all fail here.
+//
+// Each one searches its 8, 16 or 32 candidates using the forward function
+// itself — never a closed-form inverse — so it cannot drift from the decoder or
+// have to restate the attack-15 divergence that `attackSeconds` documents.
+
+/**
+ * Nearest in *log* space, because {@link CLOCKS} is roughly geometric.
+ *
+ * The crossover between two rungs then sits at their geometric mean rather than
+ * their arithmetic one, which is the difference between a sensible answer and a
+ * useless one wherever the ladder is widely spaced: attack 15 is 62.5 µs and
+ * attack 14 is 6 ms, so a linear metric answers "instant" to a request for 1 ms
+ * where a ratio answers 6 ms.
+ */
+function nearestBy(count: number, target: number, seconds: (index: number) => number, from = 0): number {
+	let best = from;
+	let error = Infinity;
+	for (let index = from; index < count; index++) {
+		const candidate = seconds(index);
+		if (!Number.isFinite(candidate)) {
+			continue;
+		}
+
+		// Both clamped away from zero: an instant phase and a 1-sample phase are
+		// the same choice as far as a control is concerned.
+		const distance = Math.abs(Math.log(Math.max(candidate, 1e-6)) - Math.log(Math.max(target, 1e-6)));
+		if (distance < error) {
+			error = distance;
+			best = index;
+		}
+	}
+
+	return best;
+}
+
+/** The attack rate whose duration is closest to `seconds`. 0-15. */
+function nearestAttack(seconds: number): number {
+	return nearestBy(16, seconds, attackSeconds);
+}
+
+/**
+ * The decay rate closest to `seconds` at this sustain level. 0-7.
+ *
+ * Sustain 7 makes every decay exactly 0 s ({@link decaySeconds}'s fall table
+ * ends in 0), so there is nothing to choose between and rate 0 is returned.
+ */
+function nearestDecay(seconds: number, sustain: number): number {
+	if (sustain >= 7) {
+		return 0;
+	}
+
+	return nearestBy(8, seconds, (decay) => decaySeconds(decay, sustain));
+}
+
+/** The sustain level closest to `level`, a fraction of full. 0-7. */
+function nearestSustain(level: number): number {
+	let best = 0;
+	let error = Infinity;
+	for (let sustain = 0; sustain < 8; sustain++) {
+		const distance = Math.abs(sustainLevel(sustain) - level);
+		if (distance < error) {
+			error = distance;
+			best = sustain;
+		}
+	}
+
+	return best;
+}
+
+/**
+ * The release rate closest to `seconds` at this sustain level. 0-31.
+ *
+ * Rate 0 is "never", so it is reachable only by asking for it: searching from 1
+ * keeps a finite target from landing on the one value that means the opposite.
+ */
+function nearestRelease(seconds: number, sustain: number): number {
+	if (!Number.isFinite(seconds)) {
+		return 0;
+	}
+
+	return nearestBy(32, seconds, (release) => releaseSeconds(release, sustain), 1);
+}
+
+/** The noise clock closest to `hz`. 0-31; 0 is silence and is never chosen. */
+function nearestNoiseClock(hz: number): number {
+	if (hz <= 0) {
+		return 0;
+	}
+
+	return nearestBy(32, hz, noiseHz, 1);
+}
+
 console.log("\nthe inverses round-trip");
 {
-	// The envelope tuner is driven in seconds and percent, so every control has
-	// to turn a number back into the field that produces it. A round trip is a
-	// real assertion rather than a tautology — it catches a transposed nibble
-	// shift, a swapped field and a tie broken the wrong way — and it introduces
-	// no new magic numbers, which is the property this whole harness is built on.
+	// A round trip is a real assertion rather than a tautology — it catches a
+	// transposed nibble shift, a swapped field and a tie broken the wrong way —
+	// and it introduces no new magic numbers, which is the property this whole
+	// harness is built on.
 	check(
 		"every attack rate is the nearest to its own duration",
 		Array.from({ length: 16 }, (_, a) => a).every((a) => nearestAttack(attackSeconds(a)) === a),
@@ -338,8 +439,9 @@ console.log("\nthe inverses round-trip");
 	check("tuningMultiplier and encodeTuning round-trip over every byte pair", tuningOk);
 
 	// The one non-round-trip fact worth pinning: a target between two rungs picks
-	// the nearer in *log* space. CLOCKS is geometric, so a linear metric would
-	// make the fast end of every ladder unreachable by dragging a control.
+	// the nearer in *log* space. CLOCKS is geometric, so a linear metric would put
+	// the crossover at the arithmetic mean of these two rungs — 3 ms — where the
+	// geometric mean is 0.6 ms.
 	const fast = attackSeconds(15);
 	const slower = attackSeconds(14);
 	check(

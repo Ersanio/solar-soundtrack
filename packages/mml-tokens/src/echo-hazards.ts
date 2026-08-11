@@ -7,13 +7,7 @@ import { hex2 } from "@amk/core/hex";
  * Diagnostics for an echo that compounds instead of decaying.
  *
  * The FIR sits inside the feedback loop, so repeat *k* comes back at
- * `(EFB/128 · |H(f)|)^k` — and once that reaches 1 the echo builds on itself for as long as the
- * song plays. `echoStability` has known how to spot this for a while, but only the FIR designer
- * asked it, and only about the `$F5` under the caret.
- *
- * Runs on {@link Command}s rather than compiler output, because `$F5` is invisible to AddmusicK —
- * `Music.cpp` has no `$F5` code at all, only the length table entry at `Music.cpp:63`. Hence the
- * `AMK05xx` range of its own rather than an extension of the parser's.
+ * `(EFB/128 · |H(f)|)^k` — and once that reaches 1 the echo builds on itself.
  */
 
 /** Runaway echo through custom `$F5` coefficients. */
@@ -24,10 +18,7 @@ const CODE_BUILT_IN = "AMK0501";
 
 /**
  * The coefficients `$F1`'s third argument loads, or `null` for anything else.
- *
- * `main.asm:3507` — filter 0 is Super Mario World's low-pass, filter 1 is flat, and they are the
- * only two that exist. A higher ID reads past the end of the table, so there is no honest answer
- * for it; the parser already reports that as `AMK0158`/`AMK0212` and nothing here should guess.
+ * `main.asm:3507` — filter 0 is Super Mario World's low-pass, filter 1 is flat.
  */
 export function builtInTaps(which: number): FirTaps | null {
 	if (which !== 0 && which !== 1) {
@@ -69,27 +60,7 @@ interface EchoState {
 	feedback: number;
 }
 
-/**
- * Every runaway echo in the document, one diagnostic per command that causes one.
- *
- * The walk carries `{ taps, feedback }` per channel and judges each command as it applies it, which
- * is what makes repeats come out right without a special case for them: a second `$F5` is measured
- * against the feedback *its* channel is running at by then, and a `$F1` is measured against the
- * built-in table it reloads. A `$F5` that a later `$F1` overrides is still reported — it really
- * does run until that `$F1` executes. AddmusicK emits all of them in order and says nothing about
- * any of it.
- *
- * **Per channel, because source order is only execution order within one.** Across channels the
- * driver interleaves by time, so "later in the file" would mean nothing — the same rule
- * `fir-override.ts` states and enforces. The cost is real: the DSP has a single echo unit, so a
- * `$F1` in `#0` and a `$F5` in `#1` do interact, and that pairing is missed here. Reaching across
- * channels would be guesswork, and a diagnostic that contradicted the FIR designer sitting next to
- * it would be worse than the gap.
- *
- * Not modelled, equally deliberately: `$EF`'s echo volume, `$F0` and `$F2`. Whether the loop
- * diverges is a property of the loop, not of how loudly it is being monitored, and
- * `echoStability()` is defined on exactly the two values tracked here.
- */
+/** Every runaway echo in the document, one diagnostic per command that causes one. */
 export function echoHazards(commands: readonly Command[]): Diagnostic[] {
 	const diagnostics: Diagnostic[] = [];
 	const states = new Map<number, EchoState>();
@@ -131,12 +102,7 @@ export function echoHazards(commands: readonly Command[]): Diagnostic[] {
 	return diagnostics;
 }
 
-/**
- * Cause, effect, and the way out, in one line.
- *
- * Says what the song will do and nothing more. There is no reason to describe how bad it can get,
- * and every reason not to make it sound worth hearing.
- */
+/** Cause, effect, and the way out, in one line. Says what the song will do and nothing more. */
 function describe(command: Command, feedback: number): string {
 	const effect = `make the echo grow instead of fade, so the song will get loud and distorted.`;
 

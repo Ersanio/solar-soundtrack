@@ -11,13 +11,13 @@
 
 import { SPC_CHANNELS, SPC_SAMPLE_RATE, type SpcCore, instantiate } from "./wasm-host";
 import {
-	type MuteShadow,
+	type MuteBackup,
 	TICK_POLL_HZ,
 	applyChannelMutes,
-	createMuteShadow,
+	createMuteBackup,
 	readDriverState,
 	readNoteDuration,
-	resetMuteShadow,
+	resetMuteBackup,
 	sawTick,
 	tickVoice,
 } from "./driver-state";
@@ -65,7 +65,7 @@ class SpcProcessor extends AudioWorkletProcessor {
 
 	/** Voices the mixer has silenced, and the volumes taken off them. */
 	private muteMask = 0;
-	private readonly muteShadow: MuteShadow = createMuteShadow();
+	private readonly MuteBackup: MuteBackup = createMuteBackup();
 
 	/** One pass through the song, in ticks: the intro plus one trip round. */
 	private introTicks = 0;
@@ -166,7 +166,7 @@ class SpcProcessor extends AudioWorkletProcessor {
 					this.spc = null;
 					this.frames = 0;
 					this.postedAt = -1;
-					resetMuteShadow(this.muteShadow);
+					resetMuteBackup(this.MuteBackup);
 					break;
 			}
 		} catch (error) {
@@ -199,7 +199,7 @@ class SpcProcessor extends AudioWorkletProcessor {
 		// The reload puts the pristine image back, so `$5E` and every track
 		// volume are the song's own again. A volume saved from the position just
 		// left would be restored into a song that has moved on.
-		resetMuteShadow(this.muteShadow);
+		resetMuteBackup(this.MuteBackup);
 
 		const wanted = Math.round(target * SPC_SAMPLE_RATE);
 		for (let done = 0; done < wanted; done += SOURCE_BLOCK) {
@@ -236,7 +236,7 @@ class SpcProcessor extends AudioWorkletProcessor {
 		}
 
 		const aram = this.core.aram();
-		applyChannelMutes(aram, this.muteMask, this.muteShadow);
+		applyChannelMutes(aram, this.muteMask, this.MuteBackup);
 
 		// The song has not keyed on yet at load; latch the voice once it has.
 		if (this.voice < 0) {
