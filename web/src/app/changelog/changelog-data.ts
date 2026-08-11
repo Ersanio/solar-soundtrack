@@ -11,12 +11,13 @@ export const CHANGELOG: readonly ChangelogEntry[] = [
   {
     date: '11 August 2026',
     items: [
-      'Pan and every ±value get a mixer-style control',
+      'Signed values (such as pan left/right) get a mixer-style control',
       'Arpeggio notes name the interval they make',
       'FIR coefficients are changed to sliders',
-      'Playback stops on a runaway echo from the feedback slider too, not just the filter',
-      '"q" reads the right velocity table when a song switches it with hex',
+      'Adjusting echo feedback auto-stops playback when a runaway echo is detected',
+      '"q" reads the correct velocity table when a song switches it with various commands',
       '"y" added the missing surround L/R speaker options',
+      'Anything that sets the tempo, also shows the ticks per second',
     ],
   },
   {
