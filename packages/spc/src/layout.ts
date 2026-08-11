@@ -3,59 +3,13 @@
  *
  * Everything AddmusicK occupies before your song lives inside `main.bin`, so the
  * budget needs no modelling — the bytes that would have to be modelled are
- * physically present in the image. That holds for a final-pass build, which the
- * bundled one is; see README.md for what {@link planAram} does with a second-pass
- * build instead.
+ * physically present in the image.
  */
 
 import type { BrrSample } from "./brr";
 import type { DriverBundle } from "./driver";
 
 export const ARAM_SIZE = 0x10000;
-
-export interface AramPlan {
-	/** Driver image, plus a song pointer table if the build lacked one. */
-	programImage: Uint8Array;
-	/** ARAM address the song is compiled and loaded at. */
-	localPos: number;
-	/** Value for CPUIO $F6. */
-	songIndex: number;
-	/** Bytes of song pointer table we appended; 0 when the driver had its own. */
-	appendedTableBytes: number;
-	/** True when main.bin already carried its own table and global songs. */
-	fromEmbeddedTable: boolean;
-}
-
-/**
- * Works out where the song goes.
- *
- * With a driver that already has a song table we simply use it — the local song
- * slot is whatever AddmusicK reserved, and everything before it is real data.
- * Otherwise `SongPointers:` is the last label in `main.asm`, so the table begins
- * exactly where the image ends; we append one slot pointing just past itself.
- */
-export function planAram(driver: DriverBundle): AramPlan {
-	const { programData, embedded } = driver;
-
-	if (embedded) {
-		return {
-			programImage: programData,
-			localPos: embedded.localPos,
-			songIndex: embedded.songIndex,
-			appendedTableBytes: 0,
-			fromEmbeddedTable: true,
-		};
-	}
-
-	const localPos = driver.songPointers + 2;
-	const programImage = new Uint8Array(programData.length + 2);
-	programImage.set(programData, 0);
-	programImage[programData.length] = localPos & 0xff;
-	programImage[programData.length + 1] = (localPos >> 8) & 0xff;
-
-	// Song numbers are 1-based, so the slot we just wrote is song 1.
-	return { programImage, localPos, songIndex: 1, appendedTableBytes: 2, fromEmbeddedTable: false };
-}
 
 // ---------------------------------------------------------------------------
 // Address layout
@@ -72,7 +26,6 @@ export interface SpcLayout {
 	sampleDataEnd: number;
 	echoStart: number;
 	echoEnd: number;
-	/** Bytes between the end of sample data and the echo buffer. Negative = overflow. */
 	freeBytes: number;
 }
 
@@ -81,13 +34,13 @@ export interface SpcLayout {
  * so the two can never disagree.
  */
 export function computeSpcLayout(
-	plan: AramPlan,
-	programPos: number,
+	driver: DriverBundle,
 	samples: BrrSample[],
 	songBytes: number,
 	echoBufferSize: number,
 ): SpcLayout {
-	const songPos = plan.localPos;
+	const { programPos, localPos } = driver.manifest;
+	const songPos = localPos;
 	const songEnd = songPos + songBytes;
 
 	// The sample directory must start on a page boundary — the DSP's DIR register
@@ -127,7 +80,7 @@ export function computeSpcLayout(
 
 	return {
 		programPos,
-		programEnd: programPos + plan.programImage.length,
+		programEnd: programPos + driver.programData.length,
 		songPos,
 		songEnd,
 		sampleTablePos,
@@ -144,15 +97,7 @@ export function computeSpcLayout(
 // Budget breakdown
 // ---------------------------------------------------------------------------
 
-/**
- * The five regions of ARAM, in memory order.
- *
- * One row per stacked-bar segment and no finer: the panel draws these five and
- * lists these five, so there is no second granularity for it to roll up from.
- * Sub-allocations that used to be their own rows — driver variables, the page
- * gap after the song, the sample directory — are folded into the region they
- * belong to, because none of them is separately actionable.
- */
+/** The five regions of ARAM, in memory order. */
 export type BudgetKey = "driver" | "song" | "samples" | "free" | "echo";
 
 export interface BudgetRow {
@@ -160,7 +105,6 @@ export interface BudgetRow {
 	label: string;
 	start: number;
 	bytes: number;
-	/** Extra context shown beside the label. */
 	detail?: string;
 }
 
@@ -169,7 +113,6 @@ export interface AramBudget {
 	layout: SpcLayout;
 	usedBytes: number;
 	freeBytes: number;
-	/** Bytes over budget; 0 when everything fits. */
 	overflowBytes: number;
 }
 
@@ -182,11 +125,10 @@ export interface AramBudget {
 export function computeBudget(
 	driver: DriverBundle,
 	samples: BrrSample[],
-	plan: AramPlan,
 	songBytes: number,
 	echoBufferSize: number,
 ): AramBudget {
-	const layout = computeSpcLayout(plan, driver.programPos, samples, songBytes, echoBufferSize);
+	const layout = computeSpcLayout(driver, samples, songBytes, echoBufferSize);
 
 	/** Directory entries that actually carry data, i.e. were not emptied. */
 	const loaded = samples.reduce((count, sample) => (sample.data.length > 0 ? count + 1 : count), 0);
@@ -206,12 +148,11 @@ export function computeBudget(
 			// the driver, its zero-page variables, its sound effects, the song
 			// pointer table and every global song.
 			//
-			// Up to the song, not to the end of the image. In a final-pass build the
-			// local song's slot is *inside* the image — AddmusicK leaves the last
-			// song it compiled sitting there — so `programEnd` runs past `songPos`
-			// and the two rows would double-count the difference. Everything from
-			// `localPos` up belongs to the song, whatever is currently in it. With
-			// an appended table the two are equal, so this is the same figure there.
+			// Up to the song, not to the end of the image. The local song's slot is
+			// *inside* the image — AddmusicK leaves the last song it compiled
+			// sitting there — so `programEnd` runs past `songPos` and the two rows
+			// would double-count the difference. Everything from `localPos` up
+			// belongs to the song, whatever is currently in it.
 			key: "driver",
 			label: "SPC-700 engine",
 			start: 0,

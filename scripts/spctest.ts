@@ -6,14 +6,17 @@
  *   npm run spctest
  */
 
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
 import { compiler } from "@amk/compiler";
 import { EMPTY_SAMPLE_NAME } from "@amk/core/hardcoded-tables";
 import { emptySample } from "@amk/spc/brr";
-import { analyzeDriver, encodePathSegment, loadDriver } from "@amk/spc/driver";
+import { encodePathSegment, loadDriver } from "@amk/spc/driver";
 import { buildSpc } from "@amk/spc/export";
-import { computeBudget, planAram } from "@amk/spc/layout";
+import { computeBudget } from "@amk/spc/layout";
 
-import { check, stubFetch, summarise } from "./harness";
+import { SPC_ASSETS, check, stubFetch, summarise } from "./harness";
 
 stubFetch();
 
@@ -61,10 +64,58 @@ console.log("\nmissing files are diagnosed, not misread");
 
 const driver = await loadDriver();
 
+console.log("\nmanifest.json still describes the shipped main.bin");
+{
+	// Nothing derives these from the image any more, so this is the only place a
+	// stale manifest is caught. Every address it states is checked against the
+	// bytes it claims to describe: a regenerated main.bin that nobody re-measured
+	// fails here, rather than producing an .spc that assembles cleanly and plays
+	// the wrong memory.
+	//
+	// `raw` still carries the 4-byte upload header, so an ARAM address A sits at
+	// `4 + A - programPos`.
+	const raw = new Uint8Array(readFileSync(join(SPC_ASSETS, "driver", "main.bin")));
+	const { programPos, mainLoopPos, songPointers, localPos, songIndex } = driver.manifest;
+	const word = (at: number) => raw[at] | (raw[at + 1] << 8);
+
+	// AddmusicK.cpp:1394-1397 prepends `dw size, dw address`, with `size` measured
+	// before the header existed — so it is the length less those four bytes.
+	check("the upload header sizes the image", word(0) === raw.length - 4, `${word(0)} vs ${raw.length - 4}`);
+	check("and loads it at programPos", word(2) === programPos, hex(word(2)));
+
+	// `mov y,$fd / beq MainLoop`, the timer-tick wait at the head of the driver's
+	// main loop. This is the label the SPC's PC register is set to.
+	const loop = 4 + mainLoopPos - programPos;
+	check(
+		"MainLoop is where the manifest says",
+		raw[loop] === 0xeb && raw[loop + 1] === 0xfd && raw[loop + 2] === 0xf0 && raw[loop + 3] === 0xfc,
+		[...raw.subarray(loop, loop + 4)].map((byte) => byte.toString(16).padStart(2, "0")).join(" "),
+	);
+
+	// The table is `dw song01 … dw localSong` with each song's data following it,
+	// so the first entry points just past the table and thereby states its own
+	// length, and the last entry is the local song's slot.
+	const entries = Array.from({ length: songIndex }, (_, k) => word(4 + songPointers - programPos + k * 2));
+	check("the song table holds songIndex entries", entries[0] === songPointers + songIndex * 2, hex(entries[0]));
+	check(
+		"they ascend, one song's data after another",
+		entries.every((entry, k) => k === 0 || entry > entries[k - 1]),
+		entries.map(hex).join(" "),
+	);
+	check("and the last of them is localPos", entries[songIndex - 1] === localPos, hex(entries[songIndex - 1]));
+}
+
 console.log("\ndriver bundle");
 {
+	// The five addresses this build was measured at. The section above proves the
+	// manifest agrees with the image; these say which image it is meant to be, so
+	// a rebuilt driver trips them even in the unlikely event its addresses landed
+	// somewhere self-consistent.
 	check("programPos is $0400", driver.manifest.programPos === 0x0400, hex(driver.manifest.programPos));
 	check("mainLoopPos is $042E", driver.manifest.mainLoopPos === 0x042e, hex(driver.manifest.mainLoopPos));
+	check("songPointers is $236D", driver.manifest.songPointers === 0x236d, hex(driver.manifest.songPointers));
+	check("localPos is $2996", driver.manifest.localPos === 0x2996, hex(driver.manifest.localPos));
+	check("songIndex is 9, after eight global songs", driver.manifest.songIndex === 9, `${driver.manifest.songIndex}`);
 	check("20 default samples", driver.samples.length === 20, `${driver.samples.length}`);
 	{
 		// The app resolves its sample set by looking the `#default` group's names
@@ -99,326 +150,36 @@ console.log("\ndriver bundle");
 		);
 	}
 
-	// The shipped main.bin is a final-pass build, so everything AddmusicK
-	// occupies is physically present and the ARAM budget is exact without
-	// modelling. This is the assertion that notices if it is ever swapped for a
-	// second-pass image again, which would silently understate the budget.
-	check("the shipped driver carries its own song table", driver.embedded !== null);
-	check("SongPointers is $236D", driver.songPointers === 0x236d, hex(driver.songPointers));
+	// The upload header is stripped on load, so what the rest of the app sees is
+	// the image as it sits in ARAM.
 	check(
-		"it is where the manifest says",
-		driver.songPointers === driver.manifest.songPointers,
-		hex(driver.songPointers),
+		"programData is the file past the upload header",
+		driver.programData.length === 9810,
+		`${driver.programData.length}`,
 	);
-	check("MainLoop auto-detected", driver.mainLoopPos === 0x042e, hex(driver.mainLoopPos));
 }
 
-console.log("\ndefault driver: the embedded table is used as-is");
-const plan = planAram(driver);
+console.log("\nthe song goes in the driver's own slot");
 {
-	check("localPos is $2996", plan.localPos === 0x2996, hex(plan.localPos));
-	check("songIndex is 9", plan.songIndex === 9, `${plan.songIndex}`);
-	check("nothing appended", plan.appendedTableBytes === 0, `${plan.appendedTableBytes}`);
-	check("plan uses the embedded table", plan.fromEmbeddedTable);
-
-	// Song numbers are 1-based: song N's entry is at songPointers + 2*(N-1).
-	const at = driver.songPointers - driver.programPos + (plan.songIndex - 1) * 2;
-	const entry = plan.programImage[at] | (plan.programImage[at + 1] << 8);
-	check("the slot songIndex selects points at localPos", entry === plan.localPos, hex(entry));
-
 	// The local song's slot is inside the image — AddmusicK leaves the last song
 	// it compiled sitting there — so the song data overwrites it rather than
 	// following it. Nothing the driver reads lives past localPos.
+	const imageEnd = driver.manifest.programPos + driver.programData.length;
 	check(
 		"localPos sits inside the image, not past it",
-		plan.localPos < driver.programPos + driver.programData.length,
-		`${hex(plan.localPos)} vs ${hex(driver.programPos + driver.programData.length)}`,
+		driver.manifest.localPos < imageEnd,
+		`${hex(driver.manifest.localPos)} vs ${hex(imageEnd)}`,
 	);
-}
-
-console.log("\na second-pass build still gets a slot appended");
-{
-	// No upload header, so findSongTable is never consulted and planAram takes
-	// the append branch. `custom` skips the manifest cross-check, which exists to
-	// stop the *bundled* driver being loaded against stale manifest constants.
-	const body = Uint8Array.from(driver.programData);
-	const secondPass = analyzeDriver(body, driver.manifest, true);
-	check("no table detected", secondPass.embedded === null);
-
-	const appended = planAram({ ...driver, ...secondPass });
-	const songPointers = driver.programPos + body.length;
-	check("songPointers is the image end", secondPass.songPointers === songPointers, hex(secondPass.songPointers));
-	check("localPos is one slot past it", appended.localPos === songPointers + 2, hex(appended.localPos));
-	check("songIndex is 1", appended.songIndex === 1, `${appended.songIndex}`);
-	check("2-byte table appended", appended.appendedTableBytes === 2, `${appended.appendedTableBytes}`);
-
-	const at = songPointers - driver.programPos;
-	const entry = appended.programImage[at] | (appended.programImage[at + 1] << 8);
-	check("slot 1 points at localPos", entry === appended.localPos, hex(entry));
-}
-
-console.log("\nsong table survives pointer-like bytes before it");
-{
-	// Regression: the table start used to be found by walking back while the
-	// words looked like ascending pointers. The bytes immediately before the
-	// table are driver code / SFX data, and if they happen to read as a valid
-	// pointer that walk overshoots and the table is lost. Whether detection
-	// worked then depended on the driver's sound effect set.
-	const build = (tailWord: number | null) => {
-		const G = 9;
-		const GB = 1747;
-		const tableBytes = (G + 1) * 2;
-		const base = Uint8Array.from(driver.programData);
-		if (tailWord !== null) {
-			base[base.length - 2] = tailWord & 0xff;
-			base[base.length - 1] = tailWord >> 8;
-		}
-
-		const body = new Uint8Array(base.length + tableBytes + GB);
-		body.set(base, 0);
-		const firstGlobal = driver.programPos + base.length + tableBytes;
-		for (let i = 0; i < G; i++) {
-			const address = firstGlobal + Math.floor((GB / G) * i);
-			body[base.length + i * 2] = address & 0xff;
-			body[base.length + i * 2 + 1] = address >> 8;
-		}
-
-		const localPos = driver.programPos + body.length;
-		body[base.length + G * 2] = localPos & 0xff;
-		body[base.length + G * 2 + 1] = localPos >> 8;
-
-		const raw = new Uint8Array(body.length + 4);
-		raw[0] = body.length & 0xff;
-		raw[1] = body.length >> 8;
-		raw[2] = driver.programPos & 0xff;
-		raw[3] = driver.programPos >> 8;
-		raw.set(body, 4);
-		return raw;
-	};
-
-	for (const tail of [null, 0x0401, 0x1000, 0x2000, 0x236c] as const) {
-		const found = analyzeDriver(build(tail), driver.manifest, true).embedded;
-		check(
-			`table found with tail ${tail === null ? "unchanged" : `$${tail.toString(16).toUpperCase().padStart(4, "0")}`}`,
-			found?.songIndex === 10,
-			`${found?.songIndex}`,
-		);
-	}
-
-	// AddmusicK.cpp:1147 sizes the table as `highestGlobalSong * 2 + 2`, which
-	// over-counts when the Globals list has a gap, so the local song slot can
-	// point a little past where the image actually ends. Follow the slot.
-	{
-		const G = 9;
-		const GB = 1747;
-		const SLACK = 2;
-		const tableBytes = (G + 1) * 2;
-		const base = driver.programData;
-		const body = new Uint8Array(base.length + tableBytes + GB);
-		body.set(base, 0);
-		const firstGlobal = driver.programPos + base.length + tableBytes;
-		for (let i = 0; i < G; i++) {
-			const address = firstGlobal + Math.floor((GB / G) * i);
-			body[base.length + i * 2] = address & 0xff;
-			body[base.length + i * 2 + 1] = address >> 8;
-		}
-
-		const slot = driver.programPos + body.length + SLACK;
-		body[base.length + G * 2] = slot & 0xff;
-		body[base.length + G * 2 + 1] = slot >> 8;
-
-		const raw = new Uint8Array(body.length + 4);
-		raw[0] = body.length & 0xff;
-		raw[1] = body.length >> 8;
-		raw[2] = driver.programPos & 0xff;
-		raw[3] = driver.programPos >> 8;
-		raw.set(body, 4);
-
-		const found = analyzeDriver(raw, driver.manifest, true);
-		check("table found when the slot overshoots the image end", found.embedded !== null);
-		check(
-			"localPos follows the slot, not the image length",
-			found.embedded?.localPos === slot,
-			hex(found.embedded?.localPos ?? 0),
-		);
-		check("all 10 slots still detected", found.embedded?.songIndex === 10, `${found.embedded?.songIndex}`);
-	}
-
-	// A build with no global songs at all is a one-entry table.
-	const single = (() => {
-		const base = driver.programData;
-		const body = new Uint8Array(base.length + 2);
-		body.set(base, 0);
-		const localPos = driver.programPos + body.length;
-		body[base.length] = localPos & 0xff;
-		body[base.length + 1] = localPos >> 8;
-		const raw = new Uint8Array(body.length + 4);
-		raw[0] = body.length & 0xff;
-		raw[1] = body.length >> 8;
-		raw[2] = driver.programPos & 0xff;
-		raw[3] = driver.programPos >> 8;
-		raw.set(body, 4);
-		return analyzeDriver(raw, driver.manifest, true).embedded;
-	})();
-	check("zero-global table is one entry", single?.songIndex === 1, `${single?.songIndex}`);
-}
-
-console.log("\ncustom driver: a final-pass build is read as-is");
-{
-	// Synthesize what AddmusicK's asm/SNES/bin/main.bin looks like: the stock
-	// second-pass image, then a 10-slot table, then 9 global songs' data, then a
-	// 4-byte upload header on the front.
-	const GLOBALS = 9;
-	const GLOBAL_BYTES = 1747;
-	const base = driver.programData;
-	const tableBytes = (GLOBALS + 1) * 2;
-	const body = new Uint8Array(base.length + tableBytes + GLOBAL_BYTES);
-	body.set(base, 0);
-
-	const songPointers = driver.programPos + base.length;
-	const firstGlobal = songPointers + tableBytes;
-	for (let i = 0; i < GLOBALS; i++) {
-		// Global songs laid out consecutively, ~194 bytes apart.
-		const address = firstGlobal + Math.floor((GLOBAL_BYTES / GLOBALS) * i);
-		body[base.length + i * 2] = address & 0xff;
-		body[base.length + i * 2 + 1] = address >> 8;
-	}
-
-	const localPos = driver.programPos + body.length;
-	body[base.length + GLOBALS * 2] = localPos & 0xff;
-	body[base.length + GLOBALS * 2 + 1] = localPos >> 8;
-
-	const withHeader = new Uint8Array(body.length + 4);
-	withHeader[0] = body.length & 0xff;
-	withHeader[1] = body.length >> 8;
-	withHeader[2] = driver.programPos & 0xff;
-	withHeader[3] = driver.programPos >> 8;
-	withHeader.set(body, 4);
-
-	const custom = { ...driver, ...analyzeDriver(withHeader, driver.manifest, true) };
-	check("upload header stripped", custom.programData.length === body.length, `${custom.programData.length}`);
-	check("programPos read from header", custom.programPos === 0x0400, hex(custom.programPos));
-	check("MainLoop still found", custom.mainLoopPos === 0x042e, hex(custom.mainLoopPos));
-	check("song table located", custom.embedded !== null);
-	check(
-		"song index is 10, the slot after the 9 globals",
-		custom.embedded?.songIndex === 10,
-		`${custom.embedded?.songIndex}`,
-	);
-	check("songPointers located", custom.songPointers === songPointers, hex(custom.songPointers ?? 0));
-
-	const customPlan = planAram(custom);
-	// Derived rather than written out: the base image's size is incidental to
-	// what this checks, and a literal here goes stale the next time main.bin is
-	// rebuilt. The point is that the slot is followed, not what it happens to be.
-	check("localPos is the slot's value", customPlan.localPos === localPos, hex(customPlan.localPos));
-	check("nothing appended", customPlan.appendedTableBytes === 0);
-	check("plan uses the embedded table", customPlan.fromEmbeddedTable);
-
-	// The whole point: a real driver makes the budget exact without modelling.
-	const customBudget = computeBudget(custom, custom.samples, customPlan, 100, 0);
-	const rows = customBudget.rows.reduce((sum, row) => sum + row.bytes, 0);
-	check("custom budget accounts for all 64 KiB", rows === 0x10000, `${rows}`);
-	check(
-		"driver row covers variables + code + SFX + table + globals",
-		customBudget.rows.find((r) => r.key === "driver")?.bytes === custom.programPos + body.length,
-		`${customBudget.rows.find((r) => r.key === "driver")?.bytes} vs ${custom.programPos + body.length}`,
-	);
-}
-
-console.log("\nupload header detection is the size rule alone");
-{
-	// AddmusicK.cpp:1394 stores the image length measured BEFORE the header was
-	// prepended, so a final-pass file's first word is always length - 4.
-	const withHeader = (bodyLength: number, address: number) => {
-		const raw = new Uint8Array(bodyLength + 4);
-		raw[0] = bodyLength & 0xff;
-		raw[1] = (bodyLength >> 8) & 0xff;
-		raw[2] = address & 0xff;
-		raw[3] = (address >> 8) & 0xff;
-		return raw;
-	};
-
-	// The worked example: a 0x2656-byte file starts `52 26`.
-	const example = withHeader(0x2656 - 4, 0x0400);
-	check("0x2656-byte file starts 52 26", example[0] === 0x52 && example[1] === 0x26, `${example[0]},${example[1]}`);
-	check("and is detected as final-pass", analyzeDriver(example, driver.manifest, true).programPos === 0x0400);
-
-	// Load addresses outside any range we might have guessed are still accepted.
-	for (const address of [0x0200, 0x0400, 0x1000, 0x8000, 0xc000]) {
-		const raw = withHeader(0x100, address);
-		const analysis = analyzeDriver(raw, driver.manifest, true);
-		check(
-			`header honoured at $${address.toString(16).toUpperCase().padStart(4, "0")}`,
-			analysis.programPos === address && analysis.programData.length === 0x100,
-			`${hex(analysis.programPos)}`,
-		);
-	}
-
-	// One byte off in either direction means no header.
-	for (const wrong of [-1, 1]) {
-		const raw = withHeader(0x100, 0x0400);
-		const bad = raw.slice();
-		bad[0] = (0x100 + wrong) & 0xff;
-		const analysis = analyzeDriver(bad, driver.manifest, true);
-		check(
-			`size off by ${wrong} -> no header`,
-			analysis.programData.length === raw.length,
-			`${analysis.programData.length}`,
-		);
-	}
-
-	// The shipped main.bin is a final-pass build, so it really does start with
-	// one — 0x2656 bytes at $0400, the worked example above.
-	check(
-		"stock main.bin has an upload header",
-		driver.programData.length === 0x2652 && driver.programPos === 0x0400,
-		`${driver.programData.length}`,
-	);
-
-	// A header claiming an address the image cannot fit at is an error, not a
-	// silent fallback to "second-pass".
-	let threw = false;
-	try {
-		analyzeDriver(withHeader(0x8000, 0xc000), driver.manifest, true);
-	} catch {
-		threw = true;
-	}
-
-	check("header that overruns ARAM is rejected", threw);
-}
-
-console.log("\na nonsense main.bin is diagnosed, not compiled against");
-{
-	// Nothing supplies a driver at runtime any more, so the image that has to be
-	// trusted is the bundled one. An image with no upload header and no
-	// table falls through to the manifest cross-check, which is what stops a bad
-	// swap being loaded against stale constants and quietly relocating every
-	// pointer to the wrong place.
-	for (const [bytes, label] of [
-		[new Uint8Array(8), "too small"],
-		[new Uint8Array(0x10000), "too large for ARAM"],
-	] as const) {
-		let message = "";
-		try {
-			analyzeDriver(bytes, driver.manifest, false);
-		} catch (error) {
-			message = error instanceof Error ? error.message : String(error);
-		}
-
-		check(`${label} rejected`, message.includes("SongPointers"), message || "(no error thrown)");
-	}
 }
 
 console.log("\ncompile + export");
-const compiled = compiler.compile({ source: SONG, aramAddress: plan.localPos });
+const compiled = compiler.compile({ source: SONG, aramAddress: driver.manifest.localPos });
 check("song compiles", compiled.ok, compiled.diagnostics.map((d) => `${d.code} ${d.message}`).join("; "));
 
 const { spc, layout } = buildSpc({
 	songData: compiled.data!,
 	driver,
 	samples: driver.samples,
-	plan,
 	tags: compiled.stats!.tags,
 	seconds: compiled.stats!.tagSeconds,
 	echoBufferSize: compiled.stats!.echoBufferSize,
@@ -457,13 +218,13 @@ console.log("\nARAM contents");
 	);
 	check("tempo mirror $51 = $36", aram[0x51] === 0x36, `0x${aram[0x51].toString(16)}`);
 	check("FLG mirror $5F = $20", aram[0x5f] === 0x20, `0x${aram[0x5f].toString(16)}`);
-	check("$F6 = songIndex", aram[0xf6] === plan.songIndex, `${aram[0xf6]}`);
+	check("$F6 = songIndex", aram[0xf6] === driver.manifest.songIndex, `${aram[0xf6]}`);
 
 	// Song data must land exactly where the pointer table says it does.
 	const songBytes = compiled.data!;
 	let matches = true;
 	for (let i = 0; i < songBytes.length; i++) {
-		if (aram[plan.localPos + i] !== songBytes[i]) {
+		if (aram[driver.manifest.localPos + i] !== songBytes[i]) {
 			matches = false;
 			break;
 		}
@@ -472,10 +233,10 @@ console.log("\nARAM contents");
 	check("song data at localPos", matches);
 
 	// The song header's first word points at its own phrase pointer block.
-	const firstWord = aram[plan.localPos] | (aram[plan.localPos + 1] << 8);
+	const firstWord = aram[driver.manifest.localPos] | (aram[driver.manifest.localPos + 1] << 8);
 	check(
 		"song header pointer is inside the song",
-		firstWord >= plan.localPos && firstWord < layout.songEnd,
+		firstWord >= driver.manifest.localPos && firstWord < layout.songEnd,
 		hex(firstWord),
 	);
 }
@@ -519,7 +280,7 @@ console.log("\nsample directory");
 
 console.log("\nARAM budget");
 {
-	const budget = computeBudget(driver, driver.samples, plan, compiled.data!.length, compiled.stats!.echoBufferSize);
+	const budget = computeBudget(driver, driver.samples, compiled.data!.length, compiled.stats!.echoBufferSize);
 
 	// Every byte of ARAM must be accounted for exactly once.
 	const total = budget.rows.reduce((sum, row) => sum + row.bytes, 0);
@@ -556,7 +317,7 @@ console.log("\n#samples reaches the sample directory");
 	const only = driver.samples[0];
 
 	const source = `#amk 4\n#samples { "${only.sampleName}" }\n#0 o4 $F3 $00 $02 c4\n`;
-	const one = compiler.compile({ source, aramAddress: plan.localPos, options });
+	const one = compiler.compile({ source, aramAddress: driver.manifest.localPos, options });
 	check("a one-sample song compiles", one.ok, one.diagnostics.map((d) => `${d.code} ${d.message}`).join("; "));
 	check("it resolves exactly one name", one.sampleList?.length === 1, `${one.sampleList?.length}`);
 
@@ -567,7 +328,6 @@ console.log("\n#samples reaches the sample directory");
 		songData: one.data!,
 		driver,
 		samples,
-		plan,
 		echoBufferSize: one.stats?.echoBufferSize,
 		date: new Date(2026, 6, 28),
 	});
@@ -593,7 +353,7 @@ console.log("\n#samples reaches the sample directory");
 
 	// And the budget must agree with what was written, since they are computed
 	// from the same layout but by different call sites.
-	const budget = computeBudget(driver, samples, plan, one.data!.length, one.stats?.echoBufferSize ?? 0);
+	const budget = computeBudget(driver, samples, one.data!.length, one.stats?.echoBufferSize ?? 0);
 	check(
 		"the budget agrees with the built file",
 		budget.layout.sampleDataEnd === built.layout.sampleDataEnd,
@@ -624,11 +384,11 @@ console.log("\nthe budget says how many samples are really loaded");
 	const detail = (optimize: boolean): string => {
 		const result = compiler.compile({
 			source,
-			aramAddress: plan.localPos,
+			aramAddress: driver.manifest.localPos,
 			options: { ...options, optimizeSampleUsage: optimize },
 		});
 		const samples = (result.sampleList ?? []).map((name) => byName.get(name) ?? emptySample(name));
-		const budget = computeBudget(driver, samples, plan, result.data!.length, result.stats?.echoBufferSize ?? 0);
+		const budget = computeBudget(driver, samples, result.data!.length, result.stats?.echoBufferSize ?? 0);
 		return budget.rows.find((row) => row.key === "samples")?.detail ?? "";
 	};
 
@@ -653,7 +413,7 @@ console.log("\noptimizeSampleUsage frees real ARAM");
 	const build = (optimize: boolean) => {
 		const result = compiler.compile({
 			source,
-			aramAddress: plan.localPos,
+			aramAddress: driver.manifest.localPos,
 			options: { ...options, optimizeSampleUsage: optimize },
 		});
 		if (!result.ok || !result.data) {
@@ -667,7 +427,6 @@ console.log("\noptimizeSampleUsage frees real ARAM");
 				songData: result.data,
 				driver,
 				samples,
-				plan,
 				echoBufferSize: result.stats?.echoBufferSize,
 				date: new Date(2026, 6, 28),
 			}),

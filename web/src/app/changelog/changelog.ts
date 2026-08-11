@@ -7,16 +7,6 @@ import { CHANGELOG } from './changelog-data';
 
 /**
  * The top bar's changelog link and the panel it drops down.
- *
- * The first floating layer in the app, so it sets the pattern rather than
- * following one: a trigger, a panel under `@if`, and the three ways out a
- * dropdown is expected to have — Escape, a click outside, and a second click on
- * the trigger.
- *
- * Not a native `<dialog>`: `showModal()` traps focus and dims the page, which is
- * more interruption than a "what changed" list warrants, and a non-modal
- * `<dialog>` gives none of Escape, backdrop or focus handling anyway.
- *
  * The entries themselves live in `changelog-data.ts`, which is the file to edit.
  */
 @Component({

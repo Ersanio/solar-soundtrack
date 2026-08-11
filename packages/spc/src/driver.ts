@@ -5,9 +5,7 @@
  * These are build-time artifacts produced by running AddmusicK once.
  */
 
-import { hex4 as hex } from "@amk/core/hex";
 import { type BrrSample, parseBrr } from "./brr";
-import { ARAM_SIZE } from "./layout";
 
 export interface DriverManifest {
 	amkVersion: string;
@@ -22,20 +20,36 @@ export interface DriverManifest {
 	 */
 	mainLoopPos: number;
 	/**
-	 * ARAM address of the `SongPointers:` label, which AddmusicK appends the
-	 * song pointer table to. It is the last label in `main.asm`, so in a
-	 * second-pass build with no table it sits at the very end of the image; in a
-	 * final-pass build the table is there and the global songs follow it.
+	 * ARAM address of the `SongPointers:` label, which AddmusicK appends the song
+	 * pointer table to. The table is present in this build and the global songs
+	 * follow it.
 	 *
 	 * Song numbers are 1-based: the driver reads
 	 * `mov a, SongPointers-$02+y` with `y = songNumber * 2`, so song N's entry
 	 * is at `songPointers + 2 * (N - 1)` and song 1 is the first slot.
 	 */
 	songPointers: number;
+	/**
+	 * ARAM address the song is compiled and loaded at: the last entry of the song
+	 * pointer table, which is the slot AddmusicK reserved for the local song.
+	 *
+	 * Inside the image rather than past it — AddmusicK leaves the last song it
+	 * compiled sitting in that slot, and this song overwrites it.
+	 */
+	localPos: number;
+	/** The local song's 1-based slot in that table, and so its CPUIO `$F6` value. */
+	songIndex: number;
 	sampleGroups: Record<string, string[]>;
 	importantSamples?: string[];
 }
 
+/**
+ * The fetched bytes and the manifest that describes them, and nothing else.
+ *
+ * Addresses are read from `manifest` at the point of use rather than copied out
+ * here, so there is no second statement of them to fall out of step with the
+ * first — a bundle cannot disagree with itself.
+ */
 export interface DriverBundle {
 	manifest: DriverManifest;
 	/** SPC file header + ARAM $0000-$00FF (512 bytes). */
@@ -43,218 +57,20 @@ export interface DriverBundle {
 	/** DSP registers + IPL area, written at SPC offset 0x10100 (256 bytes). */
 	dspBase: Uint8Array;
 	samples: BrrSample[];
-
-	/** main.bin as it sits in ARAM at `programPos`, upload header stripped. */
+	/** main.bin as it sits in ARAM at `manifest.programPos`, upload header stripped. */
 	programData: Uint8Array;
-	programPos: number;
-	mainLoopPos: number;
-	songPointers: number;
-	/**
-	 * Set when main.bin is a final-pass build that already carries its own song
-	 * pointer table and global song data — everything AddmusicK will occupy is
-	 * then physically present, so the ARAM budget is exact.
-	 */
-	embedded: { localPos: number; songIndex: number } | null;
-	/** Human-readable account of what was auto-detected, for the UI. */
-	notes: string[];
 }
 
 export class DriverError extends Error {}
 
+/**
+ * `dw size, dw address`, prepended to a final-pass image at
+ * `AddmusicK.cpp:1394-1397` and stripped again at `:1453`. `size` is measured
+ * before the header existed, so it is the file's length less these four bytes.
+ */
+export const UPLOAD_HEADER_BYTES = 4;
+
 const word = (bytes: Uint8Array, at: number): number => bytes[at] | (bytes[at + 1] << 8);
-
-/**
- * Everything the SPC writer needs about a `main.bin`, derived from the bytes.
- *
- * A driver has its own size, its own `MainLoop:` address and possibly its own
- * song table, so none of the manifest's constants can be assumed — swapping the
- * bundled image for a different AddmusicK build changes all three. They are
- * recovered here instead, falling back to the manifest only when detection fails.
- */
-export function analyzeDriver(
-	raw: Uint8Array,
-	manifest: DriverManifest,
-	custom: boolean,
-): {
-	programData: Uint8Array;
-	programPos: number;
-	mainLoopPos: number;
-	songPointers: number;
-	embedded: { localPos: number; songIndex: number } | null;
-	notes: string[];
-} {
-	const notes: string[] = [];
-
-	// A final-pass build carries a 4-byte SNES upload header — `dw size, dw
-	// address`, written at AddmusicK.cpp:1394-1397 and stripped again at :1453.
-	// `size` is the image length measured before the header was prepended, so
-	// the header is present exactly when the first word equals length - 4.
-	// A 0x2656-byte file therefore starts `52 26` (0x2652 = 0x2656 - 4) — which
-	// is exactly what the bundled main.bin is.
-	const declaredSize = word(raw, 0);
-	const declaredAddress = word(raw, 2);
-	const hasUploadHeader = raw.length > 4 && declaredSize === raw.length - 4;
-
-	// The size match is the criterion; this only catches a header that says the
-	// image loads somewhere it physically cannot fit, which would otherwise be
-	// mishandled silently.
-	if (hasUploadHeader && declaredAddress + declaredSize > ARAM_SIZE) {
-		throw new DriverError(
-			`This driver declares that it loads at $${hex(declaredAddress)} and is ` +
-				`0x${hex(declaredSize)} bytes, which runs past the end of ARAM.`,
-		);
-	}
-
-	const programData = hasUploadHeader ? raw.subarray(4) : raw;
-	const programPos = hasUploadHeader ? declaredAddress : manifest.programPos;
-	if (hasUploadHeader) {
-		notes.push(`upload header: 0x${hex(declaredSize)} bytes at $${hex(programPos)}`);
-	} else {
-		notes.push(`no upload header`);
-	}
-
-	const mainLoopPos = findMainLoop(programData, programPos) ?? manifest.mainLoopPos;
-	if (mainLoopPos !== manifest.mainLoopPos) {
-		notes.push(`MainLoop found at $${hex(mainLoopPos)}`);
-	} else if (findMainLoop(programData, programPos) === null) {
-		notes.push(`MainLoop not found; using the manifest value $${hex(mainLoopPos)}`);
-	}
-
-	const table = hasUploadHeader ? findSongTable(programData, programPos) : null;
-	if (table) {
-		notes.push(
-			`song table at $${hex(table.songPointers)}; ` +
-				`your song takes slot ${table.songIndex} at $${hex(table.localPos)}`,
-		);
-		// Follow the table, not the image length: the driver jumps wherever this
-		// slot points, so that is where the song has to be.
-		return {
-			programData,
-			programPos,
-			mainLoopPos,
-			songPointers: table.songPointers,
-			embedded: { localPos: table.localPos, songIndex: table.songIndex },
-			notes,
-		};
-	}
-
-	if (hasUploadHeader) {
-		// Say what was looked for, so a build we cannot read is diagnosable
-		// rather than just silently downgraded.
-		const localPos = programPos + programData.length;
-		notes.push(`no song table found (nothing points at $${hex(localPos)}); treating this as a build without one`);
-	}
-
-	// Second-pass build: `SongPointers:` is the last label in main.asm, so the
-	// table begins exactly where the image ends. `planAram` appends it.
-	const songPointers = programPos + programData.length;
-	if (!custom && songPointers !== manifest.songPointers) {
-		throw new DriverError(
-			`main.bin ends at $${hex(songPointers)}, but manifest.json puts SongPointers at ` +
-				`$${hex(manifest.songPointers)}. Since SongPointers is the last label in main.asm, ` +
-				`those must match — set songPointers to $${hex(songPointers)} for this driver build.`,
-		);
-	}
-
-	return { programData, programPos, mainLoopPos, songPointers, embedded: null, notes };
-}
-
-/**
- * `MainLoop:` is `mov y,$fd / beq MainLoop` — the timer-tick wait at the head of
- * the driver's loop. That is `EB FD F0 FC`, which occurs exactly once in the
- * stock driver, so it identifies the label without needing asar's symbol output.
- */
-function findMainLoop(programData: Uint8Array, programPos: number): number | null {
-	for (let i = 0; i + 3 < programData.length; i++) {
-		if (
-			programData[i] === 0xeb &&
-			programData[i + 1] === 0xfd &&
-			programData[i + 2] === 0xf0 &&
-			programData[i + 3] === 0xfc
-		) {
-			return programPos + i;
-		}
-	}
-
-	return null;
-}
-
-/**
- * Recovers the song pointer table from a final-pass build.
- *
- * Layout is `[driver][SongPointers: dw song01…dw localSong][song data…]`, with
- * `localSong` labelling the very end of the image. So the table's last entry
- * equals `programPos + length`, entries strictly increase, and — the decisive
- * check — the first entry points at the byte just past the table.
- */
-function findSongTable(
-	programData: Uint8Array,
-	programPos: number,
-): { songPointers: number; songIndex: number; localPos: number } | null {
-	const imageEnd = programPos + programData.length;
-
-	// Song numbers go into CPUIO $F6, one byte, so a table cannot usefully hold
-	// more than 256 slots.
-	const MAX_ENTRIES = 256;
-
-	let best: { songPointers: number; songIndex: number; localPos: number } | null = null;
-	let bestDistance = Infinity;
-
-	// `start + 1` only: a build with no global songs has a one-entry table.
-	for (let start = 0; start + 1 < programData.length; start++) {
-		// The first global song's data begins immediately after the table, so the
-		// first entry's value states how long the table is. That is the one
-		// invariant that holds no matter how many slots there are.
-		const first = word(programData, start);
-		const tableBytes = first - (programPos + start);
-		if (tableBytes < 2 || tableBytes % 2 !== 0) {
-			continue;
-		}
-
-		const entries = tableBytes / 2;
-		if (entries > MAX_ENTRIES || start + tableBytes > programData.length) {
-			continue;
-		}
-
-		// Entries are laid out in song order, and so is their data.
-		let ascending = true;
-		let previous = -1;
-		for (let k = 0; k < entries; k++) {
-			const value = word(programData, start + k * 2);
-			if (value <= previous || value < programPos || value > ARAM_SIZE) {
-				ascending = false;
-				break;
-			}
-
-			previous = value;
-		}
-
-		if (!ascending) {
-			continue;
-		}
-
-		// The last entry is the local song's slot. It lands at the end of the
-		// image — but not always exactly: AddmusicK.cpp:1147 sizes the table as
-		// `highestGlobalSong * 2 + 2`, which over-counts by 2 for every gap in
-		// the Globals list, so the address it relocates songs against can sit a
-		// few bytes past where `localSong:` actually assembled. Take whichever
-		// candidate lands nearest the end rather than demanding an exact hit.
-		const localPos = previous;
-		const distance = Math.abs(localPos - imageEnd);
-		if (distance > 0x100) {
-			continue;
-		}
-
-		if (distance < bestDistance) {
-			bestDistance = distance;
-			// The last slot is the local song's, so its index is the entry count and
-			// every slot before it is a global song.
-			best = { songPointers: programPos + start, songIndex: entries, localPos };
-		}
-	}
-
-	return best;
-}
 
 /**
  * Percent-encode one path segment.
@@ -343,13 +159,23 @@ async function load(baseUrl: string, sampleGroup: string): Promise<DriverBundle>
 		throw new DriverError(`${manifest.spcBase} is only ${spcBase.length} bytes; expected at least 256.`);
 	}
 
-	const analysis = analyzeDriver(rawProgram, manifest, false);
+	// Every address below is stated by the manifest rather than recovered from the
+	// image, so this is the one thing worth confirming: that the bytes which
+	// arrived are the image those addresses describe. A truncated fetch or a
+	// swapped file fails here instead of relocating the song into whatever came
+	// back. `spctest` checks the addresses themselves against these bytes.
+	if (word(rawProgram, 0) !== rawProgram.length - UPLOAD_HEADER_BYTES) {
+		throw new DriverError(
+			`${manifest.driver} does not begin with AddmusicK's upload header, so it is not the final-pass ` +
+				`build the manifest describes.`,
+		);
+	}
 
 	return {
 		manifest,
 		spcBase,
 		dspBase,
 		samples: names.map((name, index) => parseBrr(name, sampleBlobs[index])),
-		...analysis,
+		programData: rawProgram.subarray(UPLOAD_HEADER_BYTES),
 	};
 }

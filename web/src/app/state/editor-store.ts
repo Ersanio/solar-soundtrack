@@ -113,15 +113,15 @@ export class EditorStore {
 
   /** `null` until a driver supplies a load address — never a guessed one. */
   private readonly compilation = computed(() => {
-    const plan = this.drivers.plan();
-    if (!plan) {
+    const driver = this.drivers.driver();
+    if (!driver) {
       return null;
     }
 
     const started = performance.now();
     const result = compiler.compile({
       source: this.committed(),
-      aramAddress: plan.localPos,
+      aramAddress: driver.manifest.localPos,
       // What the sample library holds, and what the user asked to be done with
       // it. A compiler that does not understand these keys ignores them, per the
       // `CompileRequest.options` contract.
@@ -135,7 +135,7 @@ export class EditorStore {
     return {
       result,
       elapsedMs: performance.now() - started,
-      aramAddress: plan.localPos,
+      aramAddress: driver.manifest.localPos,
       text: this.committed(),
     };
   });
@@ -209,8 +209,7 @@ export class EditorStore {
 
   readonly budget = computed<AramBudget | null>(() => {
     const driver = this.drivers.driver();
-    const plan = this.drivers.plan();
-    if (!driver || !plan) {
+    if (!driver) {
       return null;
     }
 
@@ -218,7 +217,6 @@ export class EditorStore {
     return computeBudget(
       driver,
       this.samples(),
-      plan,
       result?.data?.length ?? 0,
       this.echoDelayPreview() ?? result?.stats?.echoBufferSize ?? 0,
     );
@@ -278,7 +276,7 @@ export class EditorStore {
     );
   });
 
-  /** Set by actions that can fail outside compilation (export, driver upload). */
+  /** Set by actions that can fail outside compilation, such as export. */
   private readonly override = signal<Status | null>(null);
 
   readonly status = computed<Status>(() => {
@@ -357,9 +355,8 @@ export class EditorStore {
    */
   assembleSpc(): Uint8Array | null {
     const driver = this.drivers.driver();
-    const plan = this.drivers.plan();
     const result = this.result();
-    if (!driver || !plan || !result?.ok || !result.data) {
+    if (!driver || !result?.ok || !result.data) {
       return null;
     }
 
@@ -368,7 +365,6 @@ export class EditorStore {
         songData: result.data,
         driver,
         samples: this.samples(),
-        plan,
         tags: result.stats?.tags,
         seconds: result.stats?.tagSeconds,
         echoBufferSize: result.stats?.echoBufferSize,

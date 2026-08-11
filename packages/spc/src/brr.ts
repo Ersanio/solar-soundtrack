@@ -14,7 +14,7 @@ export const BRR_BLOCK_SAMPLES = 16;
 /** Bytes per BRR block: one header plus eight of nibble pairs. */
 export const BRR_BLOCK_BYTES = 9;
 
-export class BrrError extends Error { }
+export class BrrError extends Error {}
 
 export interface BrrSample {
 	sampleName: string;
@@ -190,8 +190,8 @@ export function parseSampleBank(bytes: Uint8Array, names: (slot: number) => stri
 			from >= 0 && at > from
 				? { sampleName: name, data: image.subarray(from, at), loopOffset }
 				: // An address outside the image is not recoverable, and an empty
-				// slot is the one representation that cannot corrupt the directory.
-				emptySample(name),
+					// slot is the one representation that cannot corrupt the directory.
+					emptySample(name),
 		);
 	}
 

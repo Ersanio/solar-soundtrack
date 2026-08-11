@@ -10,7 +10,7 @@ import { hex4 as hex } from "@amk/core/hex";
 import type { SongTags } from "@amk/core/types";
 import type { BrrSample } from "./brr";
 import type { DriverBundle } from "./driver";
-import { ARAM_SIZE, type AramPlan, type SpcLayout, computeSpcLayout } from "./layout";
+import { ARAM_SIZE, type SpcLayout, computeSpcLayout } from "./layout";
 
 export type { SpcLayout } from "./layout";
 
@@ -44,34 +44,17 @@ const ARAM = {
 const DSP_DIR = 0x5d;
 
 export interface SpcExportRequest {
-	/** Compiled song data, relocated for `plan.localPos`. */
+	/** Compiled song data, relocated for the driver manifest's `localPos`. */
 	songData: Uint8Array;
 	driver: DriverBundle;
-	/**
-	 * The sample set, in SRCN order — index 0 becomes directory entry 0.
-	 *
-	 * Deliberately required rather than defaulting to `driver.samples`. A song
-	 * can name its own samples with `#samples`, and a silent fallback here would
-	 * compile clean, budget plausibly, and export an SPC holding the wrong
-	 * sounds. Making every caller state the list turns that into a type error.
-	 *
-	 * Entries are compared by object identity: listing the same `BrrSample`
-	 * twice costs one copy in ARAM, two distinct objects with equal bytes cost
-	 * two. Resolvers should hand out stable instances.
-	 */
+	/** The sample set, in SRCN order — index 0 becomes directory entry 0. */
 	samples: BrrSample[];
-	/** Where the song sits in ARAM, from `planAram`. */
-	plan: AramPlan;
 	tags?: SongTags;
 	/** Estimated play length. Falls back to the `#length` tag, then 0. */
 	seconds?: number | null;
 	/** Fade length written to the ID666 tag. AddmusicK always writes 10000. */
 	fadeMs?: number;
-	/**
-	 * Echo buffer size in 2 KiB units, from the compiler's stats. Only used to
-	 * check that samples do not collide with the buffer — the driver does the
-	 * actual allocation when it reads the song's `$FA $04` command.
-	 */
+	/** Echo buffer size in 2 KiB units, from the compiler's stats. */
 	echoBufferSize?: number;
 	/** Emit the Yoshi drums variant ($F5 = 2). */
 	yoshiDrums?: boolean;
@@ -87,9 +70,9 @@ export interface SpcExportResult {
 export class SpcExportError extends Error {}
 
 export function buildSpc(request: SpcExportRequest): SpcExportResult {
-	const { songData, driver, samples, plan, tags = {}, yoshiDrums = false } = request;
-	const localPos = plan.localPos;
-	const layout = computeSpcLayout(plan, driver.programPos, samples, songData.length, request.echoBufferSize ?? 0);
+	const { songData, driver, samples, tags = {}, yoshiDrums = false } = request;
+	const { programPos, mainLoopPos, localPos, songIndex } = driver.manifest;
+	const layout = computeSpcLayout(driver, samples, songData.length, request.echoBufferSize ?? 0);
 
 	const spc = new Uint8Array(SPC_SIZE);
 	spc.set(driver.spcBase.subarray(0, Math.min(driver.spcBase.length, SPC_SIZE)), 0);
@@ -99,9 +82,6 @@ export function buildSpc(request: SpcExportRequest): SpcExportResult {
 	writeText(spc, HEADER.game, 32, tags.game ?? "Super Mario World (custom)");
 	writeText(spc, HEADER.comment, 32, tags.comment ?? "");
 	writeText(spc, HEADER.artist, 32, tags.author ?? "");
-	// Exactly fills the 16-byte field, so no terminator is written. ID666 text
-	// fields are fixed-width and a full one is read to its end, the same way a
-	// 32-character title already fills the field above.
 	writeText(spc, HEADER.dumper, 16, "Solar Soundtrack");
 	writeText(spc, HEADER.date, 11, formatDate(request.date ?? new Date()));
 
@@ -110,13 +90,13 @@ export function buildSpc(request: SpcExportRequest): SpcExportResult {
 	writeDigits(spc, HEADER.fade, 5, request.fadeMs ?? 10000);
 
 	// PC starts at the driver's main loop; the dump represents post-init state.
-	spc[HEADER.pc] = driver.mainLoopPos & 0xff;
-	spc[HEADER.pc + 1] = (driver.mainLoopPos >> 8) & 0xff;
+	spc[HEADER.pc] = mainLoopPos & 0xff;
+	spc[HEADER.pc + 1] = (mainLoopPos >> 8) & 0xff;
 
 	// --- ARAM ---------------------------------------------------------------
 	const aram = spc.subarray(ARAM_BASE, ARAM_BASE + ARAM_SIZE);
 
-	aram.set(plan.programImage, driver.programPos);
+	aram.set(driver.programData, programPos);
 	aram.set(songData, localPos);
 
 	const tablePos = layout.sampleTablePos;
@@ -164,7 +144,7 @@ export function buildSpc(request: SpcExportRequest): SpcExportResult {
 		aram[ARAM.port1] = 2;
 	}
 
-	aram[ARAM.port2] = plan.songIndex;
+	aram[ARAM.port2] = songIndex;
 
 	if (samplePos > layout.echoStart) {
 		throw new SpcExportError(

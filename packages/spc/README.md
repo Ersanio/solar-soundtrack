@@ -57,10 +57,16 @@ Everything AddmusicK occupies before your song — the driver, its sound effects
 table and every global song — lives inside `main.bin`. So the budget needs no modelling: the bytes
 that would have to be modelled are physically present in the image.
 
-The bundled `main.bin` is a _final-pass_ build, so that holds here. A second-pass build carries no
-song table — `SongPointers:` is the last label in `main.asm`, so the table would begin exactly where
-the image ends — and for one of those `planAram` appends a single slot and the figures understate
-what a real install occupies. `spctest` asserts against that fallback.
+The bundled `main.bin` is a _final-pass_ build, which is what makes that true: the song pointer table
+is in the image and the global songs follow it. The song goes into the slot AddmusicK reserved for
+the local song, which is _inside_ the image — it leaves the last song it compiled sitting there.
+
+Where that slot is, where the driver loads and where `MainLoop:` sits are read from
+`assets/driver/manifest.json` rather than recovered from the bytes. There is one driver, so there is
+nothing to discover; the cost is that the manifest has to be re-measured whenever `main.bin` is
+rebuilt, and `spctest` is what enforces it — it checks every address in the manifest against the
+image it describes, so a stale number fails the harness instead of shipping an `.spc` that assembles
+cleanly and plays the wrong memory.
 
 ## Why `@n` is read out of the driver rather than stated here
 
@@ -92,9 +98,11 @@ reproduce AddmusicK's `instrToSample`, so a stride-6 column matching it is the t
 driver that match is unique — `instrtest` asserts it — and lands at ARAM `$1893`, with percussion at
 `$190B`.
 
-Reading rather than restating also means a user-supplied `main.bin` reports its own instruments,
-which a hardcoded copy could only get wrong. The bundled tables in `instruments.ts` are a labelled
-fallback for a driver the search cannot make sense of, not the primary source.
+Reading rather than restating is the point: the tables have no citable address, so the image is the
+only authority on them, and a hardcoded copy could only ever be a guess that happened to be right.
+A search that does not land on exactly one candidate therefore throws rather than answering from
+memory — anything but one match means this is not the image the build ships, and reporting
+instruments the loaded driver does not have would be worse than refusing.
 
 `MELODIC_SRCN` and `PERCUSSION_SRCN` restate the SRCN column that `@amk/core`'s `hardcoded-tables.ts` already
 holds as `INSTRUMENT_TO_SAMPLE`. That duplication is deliberate, for the same reason as

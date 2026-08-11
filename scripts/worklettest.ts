@@ -22,7 +22,6 @@ import { createContext, runInContext } from "node:vm";
 import { compiler } from "@amk/compiler";
 import { loadDriver } from "@amk/spc/driver";
 import { buildSpc } from "@amk/spc/export";
-import { planAram } from "@amk/spc/layout";
 import type { FromWorklet, ToWorklet } from "@amk/spc/protocol";
 
 import { SPC_ASSETS, check, stubFetch, summarise } from "./harness";
@@ -151,10 +150,9 @@ function rms(samples: Float32Array): number {
 // ---------------------------------------------------------------------------
 
 const driver = await loadDriver();
-const plan = planAram(driver);
 
 function compileToSpc(source: string): Uint8Array {
-	const result = compiler.compile({ source, aramAddress: plan.localPos });
+	const result = compiler.compile({ source, aramAddress: driver.manifest.localPos });
 	if (!result.ok || !result.data) {
 		throw new Error("the test song did not compile");
 	}
@@ -163,7 +161,6 @@ function compileToSpc(source: string): Uint8Array {
 		songData: result.data,
 		driver,
 		samples: driver.samples,
-		plan,
 		tags: result.stats?.tags,
 		seconds: result.stats?.tagSeconds,
 		echoBufferSize: result.stats?.echoBufferSize,

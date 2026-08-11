@@ -27,7 +27,7 @@ import {
 	NSPC_VELOCITY_OFFSET,
 	VELOCITY_VALUES,
 } from "@amk/core/hardcoded-tables";
-import { type DriverManifest, analyzeDriver } from "@amk/spc/driver";
+import { type DriverManifest, UPLOAD_HEADER_BYTES } from "@amk/spc/driver";
 import {
 	FIRST_CUSTOM_INSTRUMENT,
 	FIRST_PERCUSSION_INSTRUMENT,
@@ -36,7 +36,7 @@ import {
 	NOISE_FLAG,
 	PERCUSSION_ENTRY_BYTES,
 	PERCUSSION_SLOTS,
-	bundledInstrumentTables,
+	InstrumentTableError,
 	findInstrumentTables,
 	readInstrumentTables,
 } from "@amk/spc/instruments";
@@ -46,14 +46,13 @@ import { SPC_ASSETS, check, summarise } from "./harness";
 const driverDir = join(SPC_ASSETS, "driver");
 const manifest = JSON.parse(readFileSync(join(driverDir, "manifest.json"), "utf8")) as DriverManifest;
 
-// Through `analyzeDriver`, exactly as `DriverStore` does it. main.bin is a
+// Header-stripped, exactly as `loadDriver` passes it on. main.bin is a
 // final-pass build carrying a 4-byte upload header, and searching the raw file
 // would put every offset four bytes out — the tables would still be found, and
 // every address reported about them would be wrong.
-const analysis = analyzeDriver(new Uint8Array(readFileSync(join(driverDir, "main.bin"))), manifest, false);
-const program = analysis.programData;
-/** Where `main.bin` sits in ARAM, from its own upload header. */
-const PROGRAM_POS = analysis.programPos;
+const program = new Uint8Array(readFileSync(join(driverDir, "main.bin"))).subarray(UPLOAD_HEADER_BYTES);
+/** Where `main.bin` sits in ARAM. `spctest` checks this against the image. */
+const PROGRAM_POS = manifest.programPos;
 
 console.log("\nfinding the tables in the shipped driver");
 {
@@ -61,7 +60,6 @@ console.log("\nfinding the tables in the shipped driver");
 	check("exactly one candidate, so the match is not a guess", hits.length === 1, `${hits.length} hit(s)`);
 
 	const tables = readInstrumentTables(program, PROGRAM_POS);
-	check("read from the driver rather than the fallback", tables.source === "driver");
 	check("the melodic table has 20 slots", tables.melodic.length === MELODIC_SLOTS);
 	check("the percussion table has 9", tables.percussion.length === PERCUSSION_SLOTS);
 	check("the strides are 6 and 7", INSTRUMENT_ENTRY_BYTES === 6 && PERCUSSION_ENTRY_BYTES === 7);
@@ -78,9 +76,10 @@ console.log("\nfinding the tables in the shipped driver");
 		tables.melodic[MELODIC_SLOTS - 1].bytes.join() ===
 			Array.from(program.subarray(percussionAt - INSTRUMENT_ENTRY_BYTES, percussionAt)).join(),
 	);
-	// Not a requirement, but if this moves the driver has been rebuilt and the
-	// bundled fallback below is the thing to re-check.
-	check("it lands where the bundled build puts it", tables.address === 0x1893, `$${tables.address?.toString(16)}`);
+	// Not a requirement, but if this moves the driver has been rebuilt, and then
+	// every address in manifest.json needs re-measuring too — `spctest` is where
+	// that is checked.
+	check("it lands where the bundled build puts it", tables.address === 0x1893, `$${tables.address.toString(16)}`);
 }
 
 console.log("\nthe SRCN column against AddmusicK's own table");
@@ -117,24 +116,30 @@ console.log("\nthe SRCN column against AddmusicK's own table");
 	);
 }
 
-console.log("\nthe bundled fallback");
+console.log("\nan image without the tables is refused, not guessed at");
 {
-	const fromDriver = readInstrumentTables(program, PROGRAM_POS);
-	const bundled = bundledInstrumentTables();
+	// There is one driver, so a search that comes back with anything other than a
+	// single hit means this is not the image the build ships — and then nothing it
+	// claims about itself is worth acting on. Answering with a remembered copy
+	// would report instruments the loaded driver does not have.
+	const refuses = (image: Uint8Array): boolean => {
+		try {
+			readInstrumentTables(image, PROGRAM_POS);
+			return false;
+		} catch (error) {
+			return error instanceof InstrumentTableError;
+		}
+	};
 
-	check("it is labelled as the fallback", bundled.source === "bundled" && bundled.address === null);
-	check(
-		"its melodic bytes are the shipped driver's",
-		bundled.melodic.every((entry, n) => entry.bytes.join() === fromDriver.melodic[n].bytes.join()),
-	);
-	check(
-		"its percussion bytes are too",
-		bundled.percussion.every((entry, k) => entry.bytes.join() === fromDriver.percussion[k].bytes.join()),
-	);
-	check(
-		"an image with no table falls back rather than throwing",
-		readInstrumentTables(new Uint8Array(64), PROGRAM_POS).source === "bundled",
-	);
+	check("an image with no table is rejected", refuses(new Uint8Array(64)));
+
+	// Two copies of the driver back to back: the SRCN columns match twice, so
+	// there is no way to say which one the driver indexes.
+	const doubled = new Uint8Array(program.length * 2);
+	doubled.set(program, 0);
+	doubled.set(program, program.length);
+	check("and so is an ambiguous one", refuses(doubled));
+	check("the shipped image is neither", findInstrumentTables(program).length === 1);
 }
 
 console.log("\nentry shape");

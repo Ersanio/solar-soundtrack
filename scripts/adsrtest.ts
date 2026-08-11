@@ -38,7 +38,7 @@ import {
 	tuningMultiplier,
 	tuningSemitones,
 } from "@amk/spc/adsr";
-import { type DriverManifest, analyzeDriver } from "@amk/spc/driver";
+import { type DriverManifest, UPLOAD_HEADER_BYTES } from "@amk/spc/driver";
 import { readInstrumentTables } from "@amk/spc/instruments";
 
 import { SPC_ASSETS, check, summarise } from "./harness";
@@ -213,9 +213,9 @@ console.log("\nthe stock table decodes");
 {
 	const driverDir = join(SPC_ASSETS, "driver");
 	const manifest = JSON.parse(readFileSync(join(driverDir, "manifest.json"), "utf8")) as DriverManifest;
-	// Header-stripped, as `DriverStore` passes it — see the note in instrtest.
-	const analysis = analyzeDriver(new Uint8Array(readFileSync(join(driverDir, "main.bin"))), manifest, false);
-	const tables = readInstrumentTables(analysis.programData, analysis.programPos);
+	// Header-stripped, as `loadDriver` passes it on — see the note in instrtest.
+	const program = new Uint8Array(readFileSync(join(driverDir, "main.bin"))).subarray(UPLOAD_HEADER_BYTES);
+	const tables = readInstrumentTables(program, manifest.programPos);
 
 	// Which stock entries run on GAIN rather than ADSR, enumerated. A slip in the
 	// ADSR1 column shows up here and nowhere else.

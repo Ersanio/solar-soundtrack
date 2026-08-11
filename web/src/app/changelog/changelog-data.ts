@@ -1,22 +1,5 @@
 /**
  * What the changelog popup in the top bar shows.
- *
- * **To add an entry:** put a new block at the *top* of `CHANGELOG`, newest
- * first. If today's date already has a block, add a string to its `items`
- * rather than a second block for the same date.
- *
- * **The audience is music porters, not developers.** Name the feature in a short
- * phrase — "Sample browser & importer", not a sentence about how it works. How
- * it is implemented never belongs here, however interesting: nobody writing MML
- * needs to know that the playhead follows the driver rather than estimating it.
- * Refactors, internal work and small fixes do not belong here at all.
- *
- * `date` is a display string and is printed verbatim, so it does not have to
- * parse.
- *
- * Hand-written on purpose: generating this from commit subjects would put
- * "Optimize user interface" in front of a user, and would be one more thing to
- * keep in sync.
  */
 export interface ChangelogEntry {
   readonly date: string;
@@ -28,14 +11,9 @@ export const CHANGELOG: readonly ChangelogEntry[] = [
   {
     date: '7 August 2026',
     items: [
-      'Inspector readouts update as you drag a slider or type a value',
       'Pan and every ±value get a mixer-style control that fills from the centre',
-      'Pan sliders now run the way they sound, left to right',
       'Arpeggio notes slide from the centre and name the interval they make',
       'FIR coefficients are sliders, and the curve follows them',
-      'The ARAM bar follows the echo delay as you set it',
-      'Pitch bends say when they are too long for the note they ride on',
-      'Note lengths, $F8 noise clocks and $FA values are named instead of numbered',
       'Playback stops on a runaway echo from the feedback slider too, not just the filter',
     ],
   },

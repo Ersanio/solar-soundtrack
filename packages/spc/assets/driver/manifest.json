@@ -1,6 +1,6 @@
 {
-  "//": "The driver bundle. main.bin is a final-pass AddmusicK build: it carries its own upload header, song pointer table and global songs, so analyzeDriver derives all three values below from the bytes and never reads them. They are the fallback for a build it cannot make sense of.",
-  "//verified": "Originally verified against asm/main.asm: base $0400 (line 145), MainLoop/print MainLoopPos (line 184), SongPointers as the final label (line 3636). SongPointers is no longer the end of the image — the table sits at $236D with 8 global songs after it — but $236D is still where it is.",
+  "//": "The driver bundle. main.bin is a final-pass AddmusicK build carrying its own upload header, song pointer table and global songs. The five addresses below describe this exact image and are read as given — nothing derives them from the bytes, so regenerating main.bin means updating them by hand. spctest checks every one against the image, which is what turns a stale number into a failed harness rather than a silently broken .spc.",
+  "//verified": "Originally verified against asm/main.asm: base $0400 (line 145), MainLoop/print MainLoopPos (line 184), SongPointers as the final label (line 3636). SongPointers is no longer the end of the image — the table sits at $236D with nine entries, eight global songs and the local song's slot last — but $236D is still where it is. localPos is that last entry, and songIndex its 1-based position, the value the driver takes in CPUIO $F6.",
   "amkVersion": "final-pass build, 2026-08-03",
   "driver": "main.bin",
   "spcBase": "SPCBase.bin",
@@ -8,6 +8,8 @@
   "programPos": 1024,
   "mainLoopPos": 1070,
   "songPointers": 9069,
+  "localPos": 10646,
+  "songIndex": 9,
   "sampleGroups": {
     "default": [
       "00 SMW @0.brr",

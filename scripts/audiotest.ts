@@ -21,7 +21,6 @@ import { EMPTY_SAMPLE_NAME, bankSlotName } from "@amk/core/hardcoded-tables";
 import { SAMPLE_BANK_BYTES, SAMPLE_BANK_SLOTS, type BrrSample, emptySample, parseSampleBank } from "@amk/spc/brr";
 import { loadDriver } from "@amk/spc/driver";
 import { buildSpc } from "@amk/spc/export";
-import { planAram } from "@amk/spc/layout";
 import { SPC_CHANNELS, SPC_SAMPLE_RATE, instantiate } from "@amk/spc/wasm-host";
 import {
 	TICK_POLL_HZ,
@@ -59,7 +58,6 @@ function rms(samples: Int16Array): number {
 // ---------------------------------------------------------------------------
 
 const driver = await loadDriver();
-const plan = planAram(driver);
 
 /** What the host would pass: every name the driver bundle can resolve. */
 const OPTIONS = {
@@ -82,7 +80,7 @@ function resolveSamples(names: readonly string[]): BrrSample[] {
 }
 
 function compileToSpc(source: string): Uint8Array {
-	const result = compiler.compile({ source, aramAddress: plan.localPos, options: OPTIONS });
+	const result = compiler.compile({ source, aramAddress: driver.manifest.localPos, options: OPTIONS });
 	if (!result.ok || !result.data) {
 		throw new Error(result.diagnostics.map((d) => `${d.code} ${d.message}`).join("; "));
 	}
@@ -95,7 +93,6 @@ function compileToSpc(source: string): Uint8Array {
 		songData: result.data,
 		driver,
 		samples,
-		plan,
 		tags: result.stats?.tags,
 		seconds: result.stats?.tagSeconds,
 		echoBufferSize: result.stats?.echoBufferSize,
@@ -310,7 +307,7 @@ console.log("\na muted channel goes on carrying the song");
 #0 t192 v200 @0 o4 q7F a1 / g1
 #1 v180 @1 o3 q7F c1 d1 e1
 `;
-	const stats = compiler.compile({ source, aramAddress: plan.localPos, options: OPTIONS }).stats!;
+	const stats = compiler.compile({ source, aramAddress: driver.manifest.localPos, options: OPTIONS }).stats!;
 	const spc = compileToSpc(source);
 	// Every pass after the first is the loop on its own — the intro is played
 	// once — so that is the gap between turnovers.
@@ -518,7 +515,7 @@ console.log("\noptimizeSampleUsage does not silence the song");
 	const render = (optimize: boolean): Int16Array => {
 		const result = compiler.compile({
 			source,
-			aramAddress: plan.localPos,
+			aramAddress: driver.manifest.localPos,
 			options: { ...OPTIONS, optimizeSampleUsage: optimize },
 		});
 		if (!result.ok || !result.data) {
@@ -530,7 +527,6 @@ console.log("\noptimizeSampleUsage does not silence the song");
 			songData: result.data,
 			driver,
 			samples,
-			plan,
 			echoBufferSize: result.stats?.echoBufferSize,
 			date: new Date(2026, 6, 28),
 		}).spc;
@@ -565,7 +561,7 @@ console.log("\noptimizeSampleUsage does not silence the song");
 	// A song reaching a sample only through raw `$DA` — the tracking hole AMK has.
 	const hexSelected = compiler.compile({
 		source: "#amk 4\n#0 t40 o4 v220 q7F $DA $01 l8 c d e f\n",
-		aramAddress: plan.localPos,
+		aramAddress: driver.manifest.localPos,
 		options: OPTIONS,
 	});
 	// Pins the hazard that made the check above fail while it was being written: a
@@ -596,7 +592,6 @@ console.log("\noptimizeSampleUsage does not silence the song");
 			songData: hexSelected.data!,
 			driver,
 			samples: hexSamples,
-			plan,
 			echoBufferSize: hexSelected.stats?.echoBufferSize,
 			date: new Date(2026, 6, 28),
 		}).spc,
@@ -650,7 +645,11 @@ console.log("\na .bnk sample bank plays through the emulator");
 	};
 
 	const render = (mml: string, extra: Record<string, unknown> = {}): Int16Array => {
-		const result = compiler.compile({ source: mml, aramAddress: plan.localPos, options: { ...options, ...extra } });
+		const result = compiler.compile({
+			source: mml,
+			aramAddress: driver.manifest.localPos,
+			options: { ...options, ...extra },
+		});
 		if (!result.ok || !result.data) {
 			throw new Error(result.diagnostics.map((d) => `${d.code} ${d.message}`).join("; "));
 		}
@@ -661,7 +660,6 @@ console.log("\na .bnk sample bank plays through the emulator");
 				songData: result.data,
 				driver,
 				samples,
-				plan,
 				echoBufferSize: result.stats?.echoBufferSize,
 				date: new Date(2026, 6, 28),
 			}).spc,
@@ -750,7 +748,7 @@ console.log("\nthe loop really lasts as long as the compiler says");
 		[192, 30],
 	] as const) {
 		const source = `#amk 4\n#0 t${tempo} v255 @0 o4 q7F c16 r16 r1 r1\n`;
-		const stats = compiler.compile({ source, aramAddress: plan.localPos, options: OPTIONS }).stats!;
+		const stats = compiler.compile({ source, aramAddress: driver.manifest.localPos, options: OPTIONS }).stats!;
 
 		const measured = measureLoop(source, seconds);
 		const claimed = stats.playback!.mainSeconds;
@@ -846,7 +844,7 @@ console.log("\nthe driver's own ticks are counted exactly");
 			24,
 		],
 	] as const) {
-		const stats = compiler.compile({ source, aramAddress: plan.localPos, options: OPTIONS }).stats!;
+		const stats = compiler.compile({ source, aramAddress: driver.manifest.localPos, options: OPTIONS }).stats!;
 		const expected = stats.introTicks + stats.loopTicks;
 		const { passes } = count(compileToSpc(source), seconds);
 		const gaps = passes.slice(1).map((v, i) => v - passes[i]);
@@ -908,7 +906,7 @@ console.log("\nthe note map lands on what the driver is playing");
 	// A loop, so the loop block is exercised: while a voice is inside `[ ]` its
 	// track pointer walks channel 8's bytes, and the map must resolve them.
 	const source = "#amk 4\n#0 t54 v200 @0 o4 q7F [c8 d8 e8]4 g2\n#1 v180 @1 o3 q7F c1c1\n";
-	const result = compiler.compile({ source, aramAddress: plan.localPos, options: OPTIONS });
+	const result = compiler.compile({ source, aramAddress: driver.manifest.localPos, options: OPTIONS });
 	const noteMap = result.noteMap ?? [];
 	check("a successful compile carries a note map", result.ok && noteMap.length > 0, `${noteMap.length} entries`);
 	check(

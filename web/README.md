@@ -21,9 +21,10 @@ them.
 
 State flows one way: `DriverStore` → `SampleStore` → `EditorStore` → `Playback`.
 
-`DriverStore` loads `packages/spc/assets/driver/` and derives the song's ARAM load address from the
-driver's own song pointer table. **There is no fallback address** — until the driver loads,
-compilation is blocked rather than run against a guess.
+`DriverStore` loads `packages/spc/assets/driver/`. The song's ARAM load address is the slot the
+driver's own song pointer table reserves, stated in the bundle's `manifest.json` and checked against
+the image by `spctest`. **There is no fallback address** — until the driver loads, compilation is
+blocked rather than run against a guess.
 
 `EditorStore` debounces typing (150 ms) into a `committed` signal that a `computed` compiles.
 Diagnostics, stats, the ARAM budget and the hex dump are all `computed` off that one result.

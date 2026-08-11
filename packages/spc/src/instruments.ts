@@ -1,28 +1,11 @@
-/**
- * The driver's own instrument and percussion tables: what `@n` actually selects.
- *
- * Not a sample reference — `@n` selects a fixed-size entry whose first byte is an
- * SRCN and whose remaining five or six are voice setup. The entries are located in
- * `main.bin` by matching that first column against `INSTRUMENT_TO_SAMPLE`, because
- * the tables carry no citable address: `InstrumentData.asm` is not in an AddmusicK
- * release. README.md has the layout, the strides, and the one index where the
- * driver and `Music.cpp` disagree.
- */
+/** The driver's own instrument and percussion tables: what `@n` actually selects. */
 
 /** Bytes per melodic entry. */
 export const INSTRUMENT_ENTRY_BYTES = 6;
 /** Bytes per percussion entry: the six above plus the drum's note. */
 export const PERCUSSION_ENTRY_BYTES = 7;
 
-/**
- * Slots in the melodic table.
- *
- * Twenty are present, but only `@0`-`@18` are reachable by name: `parser.ts:parseInstrument`
- * emits no `$DA` for 19-29, and `parser.ts:parseInstrument` remaps the `@@n` direct form's
- * 19-29 to custom instruments 30-40. Slot 19 is reachable only as a raw
- * `$DA $13`, and slot 20 does not exist — `20 * 6 = 120` is where the percussion
- * table starts, so `@@20`'s bytes would be percussion entry 0's first six.
- */
+/** Slots in the melodic table. Twenty are present, but only `@0`-`@18` are reachable. */
 export const MELODIC_SLOTS = 20;
 /** Entries in the percussion table, reached by `@21`-`@29`. */
 export const PERCUSSION_SLOTS = 9;
@@ -45,28 +28,7 @@ const MELODIC_SRCN: readonly number[] = [
 /** The SRCN column of `@21`-`@29`, used to confirm the table. `Music.cpp:61`. */
 const PERCUSSION_SRCN: readonly number[] = [0x0f, 0x06, 0x06, 0x0e, 0x0e, 0x0b, 0x0b, 0x0b, 0x0e];
 
-/**
- * The bundled driver's tables, as a fallback when the search fails.
- *
- * Flat bytes rather than decoded entries so `instrtest` can compare them to the
- * binary directly, with no decoding step in between to be wrong.
- */
-const BUNDLED_MELODIC: readonly number[] = [
-	0x00, 0xfe, 0x6a, 0xb8, 0x06, 0x00, 0x01, 0xfa, 0x6a, 0xb8, 0x03, 0x00, 0x02, 0xae, 0x2f, 0xb8, 0x04, 0x00, 0x03,
-	0xfe, 0x6a, 0xb8, 0x03, 0x00, 0x04, 0xa9, 0x6a, 0xb8, 0x03, 0x00, 0x07, 0xae, 0x26, 0xb8, 0x07, 0x00, 0x08, 0xfa,
-	0x6a, 0xb8, 0x03, 0x00, 0x09, 0x9e, 0x1f, 0xb8, 0x03, 0x00, 0x05, 0xae, 0x26, 0xb8, 0x1e, 0x00, 0x0a, 0xee, 0x6a,
-	0xb8, 0x02, 0x00, 0x0b, 0xfe, 0x6a, 0xb8, 0x08, 0x00, 0x01, 0xf7, 0x6a, 0xb8, 0x03, 0x00, 0x10, 0x0e, 0x6a, 0x7f,
-	0x04, 0x00, 0x0c, 0xfe, 0x6a, 0xb8, 0x03, 0x00, 0x0d, 0xae, 0x26, 0xb8, 0x07, 0x00, 0x12, 0x8e, 0xe0, 0xb8, 0x03,
-	0x00, 0x0c, 0xfe, 0x70, 0xb8, 0x03, 0x00, 0x11, 0xfe, 0x6a, 0xb8, 0x05, 0x00, 0x01, 0xe9, 0x6a, 0xb8, 0x03, 0x00,
-	0x0f, 0x0f, 0x6a, 0x7f, 0x03, 0x00,
-];
-
-const BUNDLED_PERCUSSION: readonly number[] = [
-	0x0f, 0x0f, 0x6a, 0x7f, 0x03, 0x00, 0xa8, 0x06, 0x0e, 0x6a, 0x40, 0x07, 0x00, 0xa4, 0x06, 0x8c, 0xe0, 0x70, 0x07,
-	0x00, 0xa1, 0x0e, 0xfe, 0x6a, 0xb8, 0x07, 0x00, 0xa4, 0x0e, 0xfe, 0x6a, 0xb8, 0x08, 0x00, 0xa4, 0x0b, 0xfe, 0x6a,
-	0xb8, 0x02, 0x00, 0x9c, 0x0b, 0x7e, 0x6a, 0x7f, 0x08, 0x00, 0xa6, 0x0b, 0x7e, 0x6a, 0x30, 0x08, 0x00, 0xa6, 0x0e,
-	0x0e, 0x6a, 0x7f, 0x03, 0x00, 0xa1,
-];
+export class InstrumentTableError extends Error {}
 
 /** One table entry, decoded. `note` is present only for percussion. */
 export interface InstrumentEntry {
@@ -90,10 +52,8 @@ export interface InstrumentTables {
 	melodic: readonly InstrumentEntry[];
 	/** `@21`-`@29`. */
 	percussion: readonly InstrumentEntry[];
-	/** Whether the search succeeded, so the UI can say which it is showing. */
-	source: "driver" | "bundled";
-	/** ARAM address of the melodic table, when it was found in a driver. */
-	address: number | null;
+	/** ARAM address of the melodic table. */
+	address: number;
 }
 
 function decode(bytes: readonly number[], at: number, size: number): InstrumentEntry {
@@ -157,27 +117,24 @@ export function findInstrumentTables(program: Uint8Array): number[] {
 	return hits;
 }
 
-/** The bundled tables, labelled as such. */
-export function bundledInstrumentTables(): InstrumentTables {
-	return {
-		melodic: decodeAll(BUNDLED_MELODIC, MELODIC_SLOTS, INSTRUMENT_ENTRY_BYTES),
-		percussion: decodeAll(BUNDLED_PERCUSSION, PERCUSSION_SLOTS, PERCUSSION_ENTRY_BYTES),
-		source: "bundled",
-		address: null,
-	};
-}
-
 /**
- * Read the tables out of a driver image, falling back to the bundled copy.
+ * Read the tables out of the driver image.
  *
- * An ambiguous match counts as a failure: with more than one candidate there is
- * no way to tell which the driver indexes, and answering with the wrong one
- * would misreport every instrument in the song.
+ * Throws rather than guessing. An ambiguous match is as bad as none: with more
+ * than one candidate there is no way to tell which the driver indexes, and
+ * answering with the wrong one would misreport every instrument in the song.
+ * There is one driver, so anything but a single hit means the image is not the
+ * one this build ships — and then its stated addresses are not to be trusted
+ * either.
  */
 export function readInstrumentTables(program: Uint8Array, programPos: number): InstrumentTables {
 	const hits = findInstrumentTables(program);
 	if (hits.length !== 1) {
-		return bundledInstrumentTables();
+		throw new InstrumentTableError(
+			`The driver's instrument tables were not found in main.bin (${hits.length} candidates). ` +
+				`They are located by matching the SRCN column against instrToSample, so anything but exactly ` +
+				`one match means this is not the image this build ships.`,
+		);
 	}
 
 	const at = hits[0];
@@ -190,7 +147,6 @@ export function readInstrumentTables(program: Uint8Array, programPos: number): I
 	return {
 		melodic: decodeAll(melodic, MELODIC_SLOTS, INSTRUMENT_ENTRY_BYTES),
 		percussion: decodeAll(percussion, PERCUSSION_SLOTS, PERCUSSION_ENTRY_BYTES),
-		source: "driver",
 		address: at + programPos,
 	};
 }

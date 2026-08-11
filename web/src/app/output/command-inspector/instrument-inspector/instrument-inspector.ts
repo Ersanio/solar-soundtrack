@@ -158,6 +158,10 @@ export class InstrumentInspector {
   /** The driver's own entry, for the melodic and percussion bands. */
   private readonly entry = computed<InstrumentEntry | null>(() => {
     const tables = this.drivers.instruments();
+    if (!tables) {
+      return null;
+    }
+
     if (this.band() === 'percussion') {
       return tables.percussion[this.written() - FIRST_PERCUSSION_INSTRUMENT] ?? null;
     }
@@ -334,9 +338,6 @@ export class InstrumentInspector {
 
     return this.drivers.driver()?.samples[srcn]?.sampleName ?? 'not in the driver’s default set';
   });
-
-  /** Set when the tables came from the bundled copy rather than the loaded driver. */
-  protected readonly fallback = computed(() => this.drivers.instruments().source === 'bundled');
 
   /** For `@30+`: the sample form as written in the block. */
   protected readonly customSample = computed(() => {
