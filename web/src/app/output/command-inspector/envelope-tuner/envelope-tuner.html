@@ -1,0 +1,118 @@
+<!-- Which of the two the DSP obeys. A pair of buttons rather than a select:
+     it is one binary choice and it changes everything below it. -->
+<div class="border-edge flex gap-1 border-b pb-2">
+  <button
+    amk-button
+    variant="ghost"
+    [class.text-accent]="usingAdsr()"
+    [disabled]="disabled()"
+    (click)="setMode(true)"
+  >
+    ADSR
+  </button>
+  <button
+    amk-button
+    variant="ghost"
+    [class.text-accent]="!usingAdsr()"
+    [disabled]="disabled()"
+    (click)="setMode(false)"
+  >
+    GAIN
+  </button>
+</div>
+
+<amk-adsr-graph [adsr1]="graphAdsr1()" [adsr2]="graphAdsr2()" [gain]="graphGain()" />
+
+@if (lockedBecause(); as reason) {
+  <p class="text-ink-muted text-xs leading-relaxed">{{ reason }}</p>
+}
+
+<fieldset class="contents" [disabled]="disabled()">
+  @if (usingAdsr()) {
+    <!-- Somewhere to start. Six shapes rather than four sliders at zero. -->
+    <div class="flex flex-wrap gap-1.5">
+      @for (preset of PRESETS; track preset.name) {
+        <button
+          amk-button
+          [variant]="activePreset()?.name === preset.name ? 'primary' : 'default'"
+          [title]="preset.note"
+          [disabled]="disabled()"
+          (click)="applyPreset(preset)"
+        >
+          {{ preset.name }}
+        </button>
+      }
+    </div>
+
+    <amk-slider
+      label="Attack"
+      [value]="envelope().attack"
+      [max]="15"
+      [valueLabel]="attackLabel()"
+      [disabled]="disabled()"
+      (preview)="preview('attack', $event)"
+      (commit)="setField('attack', $event)"
+    />
+    <amk-slider
+      label="Decay"
+      [value]="envelope().decay"
+      [max]="7"
+      [valueLabel]="decayLabel()"
+      [disabled]="disabled()"
+      (preview)="preview('decay', $event)"
+      (commit)="setField('decay', $event)"
+    />
+    <amk-slider
+      label="Sustain"
+      note="the level decay falls to, and holds at"
+      [value]="envelope().sustain"
+      [max]="7"
+      [valueLabel]="sustainLabel()"
+      [disabled]="disabled()"
+      (preview)="preview('sustain', $event)"
+      (commit)="setField('sustain', $event)"
+    />
+    <amk-slider
+      label="Release"
+      [value]="envelope().release"
+      [max]="31"
+      [valueLabel]="releaseLabel()"
+      [note]="releaseNote()"
+      [disabled]="disabled()"
+      (preview)="preview('release', $event)"
+      (commit)="setField('release', $event)"
+    />
+  } @else {
+    <amk-enum-select
+      label="GAIN mode"
+      [value]="gainModeIndex()"
+      [options]="GAIN_MODES"
+      [disabled]="disabled()"
+      [note]="gainByteLabel()"
+      (commit)="setGainMode($event)"
+    />
+
+    @if (gainIsDirect()) {
+      <amk-slider
+        label="Level"
+        note="a fixed level, with no envelope at all"
+        [value]="gainLevel()"
+        [max]="127"
+        [valueLabel]="gainLevelLabel()"
+        [disabled]="disabled()"
+        (preview)="preview('level', $event)"
+        (commit)="setGainLevel($event)"
+      />
+    } @else {
+      <amk-slider
+        label="Rate"
+        [value]="gain().rate ?? 0"
+        [max]="31"
+        [valueLabel]="gainRateLabel()"
+        [disabled]="disabled()"
+        (preview)="preview('rate', $event)"
+        (commit)="setGainRate($event)"
+      />
+    }
+  }
+</fieldset>

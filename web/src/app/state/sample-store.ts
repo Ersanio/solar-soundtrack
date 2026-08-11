@@ -1,6 +1,6 @@
 import { Service, computed, effect, inject, signal } from '@angular/core';
 
-import { EMPTY_SAMPLE_NAME, bankSlotName } from '@compiler/tables';
+import { EMPTY_SAMPLE_NAME, bankSlotName } from '@amk/core/hardcoded-tables';
 import {
   type BrrSample,
   blockCount,
@@ -12,7 +12,7 @@ import {
   validateBrr,
   validateSampleBank,
   validateName,
-} from '@spc/brr';
+} from '@amk/spc/brr';
 import { clear, del, loadAll, put, storageFailure } from '../util/idb';
 import { DriverStore } from './driver-store';
 
@@ -57,7 +57,7 @@ export interface SampleFile {
   /** The raw uploaded file. For a `.brr` that includes the loop header. */
   bytes: Uint8Array;
   /**
-   * `stock` — as shipped in `public/driver/samples/`.
+   * `stock` — as shipped in `the driver bundle's samples/`.
    * `override` — a stock name whose bytes the user replaced; revertable.
    * `user` — a name that does not exist in the bundle; deletable.
    */
@@ -85,13 +85,13 @@ export interface SampleFile {
  * The sample library: the bundled `.brr` files plus whatever the user has
  * uploaded over or alongside them.
  *
- * The bundle in `public/driver/` is never written to. A stock name the user
+ * The bundle in `packages/spc/assets/driver/` is never written to. A stock name the user
  * replaces gets an *override* stored in IndexedDB, and reverting drops the
  * override rather than restoring anything — so the shipped files stay the
  * source of truth and `spctest` can keep asserting on them.
  *
  * The bundled twenty keep their order and membership no matter what, because
- * `INSTRUMENT_TO_SAMPLE` (`compiler/tables.ts`) hardcodes that
+ * `INSTRUMENT_TO_SAMPLE` (`@amk/core`'s `hardcoded-tables.ts`) hardcodes that
  * `@0`-`@29` mean specific SRCNs. Replacing a file's *bytes* changes what `@0`
  * sounds like, which is the point; changing the *list* is `#samples`'s job.
  */

@@ -12,7 +12,7 @@ import {
 // transfer for these same two symbols.
 import { select } from 'd3-selection';
 
-import type { BudgetRow } from '@spc/layout';
+import type { BudgetRow } from '@amk/spc/layout';
 import { elementSize } from '../../shared/chart/element-size';
 import { stackSegments } from '../../shared/chart/stack';
 
@@ -84,7 +84,7 @@ let nextId = 0;
 })
 export class AramBar {
   readonly segments = input.required<Segment[]>();
-  /** Announced to screen readers, which cannot read the marks. */
+  /** A name for the bar. */
   readonly label = input('ARAM usage by region');
 
   private readonly svg = viewChild.required<ElementRef<SVGSVGElement>>('svg');

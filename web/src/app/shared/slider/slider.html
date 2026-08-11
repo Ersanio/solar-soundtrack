@@ -1,0 +1,30 @@
+<label class="flex flex-col gap-0.5">
+  <span class="flex items-baseline justify-between gap-2">
+    <span class="text-ink-muted text-[11px]">{{ label() }}</span>
+    <span class="text-ink font-mono text-[11px] tabular-nums">{{ display() }}</span>
+  </span>
+  <input
+    type="range"
+    class="h-4 w-full cursor-pointer appearance-none rounded-full bg-transparent bg-clip-content bg-origin-content py-0.5 disabled:cursor-not-allowed disabled:opacity-40 [&::-moz-range-thumb]:h-3.5 [&::-moz-range-thumb]:w-3.5 [&::-moz-range-thumb]:cursor-pointer [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-surface [&::-moz-range-thumb]:bg-accent [&::-moz-range-track]:h-1.5 [&::-moz-range-track]:bg-transparent [&::-webkit-slider-runnable-track]:h-1.5 [&::-webkit-slider-runnable-track]:bg-transparent [&::-webkit-slider-thumb]:-mt-1 [&::-webkit-slider-thumb]:h-3.5 [&::-webkit-slider-thumb]:w-3.5 [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-surface [&::-webkit-slider-thumb]:bg-accent"
+    [style.background-image]="trackImage()"
+    [min]="lowerBound()"
+    [max]="upperBound()"
+    [step]="step()"
+    [disabled]="disabled()"
+    [value]="trackPosition()"
+    (input)="onInput($event)"
+    (change)="onCommit()"
+    (pointerup)="onCommit()"
+    (pointercancel)="onCommit()"
+    (blur)="onCommit()"
+  />
+  @if (endLabels(); as ends) {
+    <span class="text-ink-muted flex justify-between font-mono text-[10px]">
+      <span>{{ ends.low }}</span>
+      <span>{{ ends.high }}</span>
+    </span>
+  }
+  @if (note(); as text) {
+    <span class="text-ink-muted text-[11px] leading-snug">{{ text }}</span>
+  }
+</label>

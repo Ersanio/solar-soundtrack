@@ -1,0 +1,12 @@
+/* Package boundaries are a lint rule, not a resolution trick: npm links every
+   workspace into node_modules/@amk, so TypeScript resolves a sibling package
+   whether or not `paths` names it. `no-restricted-imports` in eslint.config.js
+   is what actually holds the graph, and it is negative-tested. */
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "types": []
+  },
+  "include": ["src/**/*.ts"]
+}

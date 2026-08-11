@@ -1,10 +1,10 @@
 import { StreamLanguage } from '@codemirror/language';
 import { type Tag, tags } from '@lezer/highlight';
 
-import { TOKEN_TAGS, copyState, type ScanState, startState, step } from '@compiler/tokens';
+import { TOKEN_TAGS, copyState, type ScanState, startState, step } from '@amk/tokens';
 
 /**
- * `TOKEN_TAGS` holds `@lezer/highlight` tag *names*, so that `compiler/` never
+ * `TOKEN_TAGS` holds `@lezer/highlight` tag *names*, so that `@amk/tokens` never
  * depends on CodeMirror; this is the one place they are resolved to `Tag`
  * values. `tokentest` asserts every name really is a tag, so the cast is a
  * checked one.
@@ -17,7 +17,7 @@ const tokenTable = Object.fromEntries(
 );
 
 /**
- * The MML scanner in `@compiler/tokens`, adapted to CodeMirror.
+ * The MML scanner in `@amk/tokens`, adapted to CodeMirror.
  *
  * `step` was shaped for exactly this contract — a line-oriented stepper with a
  * small copyable state — so the adapter only translates between the stream and

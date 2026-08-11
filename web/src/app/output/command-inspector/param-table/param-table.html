@@ -1,0 +1,102 @@
+@if (resolved(); as shape) {
+  @if (shape.note; as note) {
+    <p class="text-ink-muted pb-2 text-xs leading-relaxed">{{ note }}</p>
+  }
+
+  @if (rows().length === 0) {
+    <p class="text-ink-muted text-xs leading-relaxed">This command takes no arguments.</p>
+  } @else {
+    <div class="flex flex-col gap-2.5">
+      <!-- `rows()`, not `shape.rows`: the same rows with every readout re-read
+           from what its control is showing rather than from the document. -->
+      @for (row of rows(); track row.index) {
+        <div class="flex flex-col gap-0.5">
+          @switch (row.control) {
+            @case ('slider') {
+              <amk-slider
+                [label]="row.descriptor.name"
+                [value]="row.value"
+                [min]="row.min"
+                [max]="row.max"
+                [stops]="row.stops"
+                [signed]="row.descriptor.codec === 's8'"
+                [origin]="row.centred ? 'centre' : 'start'"
+                [invert]="row.invert"
+                [ends]="row.ends"
+                [disabled]="!row.editable"
+                [note]="row.note"
+                (preview)="preview(row, $event)"
+                (commit)="commit(row, $event)"
+              />
+            }
+
+            @case ('number') {
+              <amk-number-field
+                [label]="row.descriptor.name"
+                [value]="row.value"
+                [min]="row.min"
+                [max]="row.max"
+                [disabled]="!row.editable"
+                [valueLabel]="row.raw"
+                [note]="row.note"
+                (preview)="preview(row, $event)"
+                (commit)="commit(row, $event)"
+              />
+            }
+
+            @case ('select') {
+              <amk-enum-select
+                [label]="row.descriptor.name"
+                [value]="row.value"
+                [options]="row.choices"
+                [disabled]="!row.editable"
+                [note]="row.note"
+                (commit)="commit(row, $event)"
+              />
+            }
+
+            @case ('toggles') {
+              <amk-bit-toggles
+                [legend]="row.descriptor.name"
+                [value]="row.value"
+                [labels]="VOICE_LABELS"
+                [disabled]="!row.editable"
+                [valueLabel]="hexLabel(row)"
+                [note]="row.note"
+                (changed)="commit(row, $event)"
+              />
+            }
+
+            @default {
+              <div class="flex items-baseline justify-between gap-2">
+                <span class="text-ink-muted text-[11px]">{{ row.descriptor.name }}</span>
+                <span class="text-ink font-mono text-[11px] tabular-nums">{{ row.raw }}</span>
+              </div>
+              @if (row.note; as note) {
+                <span class="text-ink-muted text-[11px] leading-snug">{{ note }}</span>
+              }
+            }
+          }
+
+          <!-- Why a control is disabled, said where the control is rather than
+               once at the top: a command can have one macro'd argument among
+               three literal ones. -->
+          @if (row.lockedBecause; as reason) {
+            <span class="text-ink-muted text-[11px] leading-snug italic">{{ reason }}</span>
+          }
+        </div>
+      }
+    </div>
+  }
+
+  @if (shape.omitted > 0) {
+    <p class="text-ink-muted pt-2 text-[11px] leading-snug">
+      @if (shape.tail; as what) {
+        Carries {{ shape.omitted }} {{ what }}{{ shape.omitted === 1 ? '' : 's' }}, shown in the hex
+        dump below.
+      } @else {
+        … and {{ shape.omitted }} further argument{{ shape.omitted === 1 ? '' : 's' }} not shown.
+      }
+    </p>
+  }
+}

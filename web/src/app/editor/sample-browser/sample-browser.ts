@@ -1,6 +1,6 @@
 import { Component, computed, inject, signal } from '@angular/core';
 
-import { ARAM_SIZE } from '@spc/layout';
+import { ARAM_SIZE } from '@amk/spc/layout';
 import { Button } from '../../shared/button/button';
 import { Checkbox } from '../../shared/checkbox/checkbox';
 import { EditorStore } from '../../state/editor-store';

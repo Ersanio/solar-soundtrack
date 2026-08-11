@@ -1,0 +1,16 @@
+{
+  "name": "@amk/tokens",
+  "version": "0.0.0",
+  "description": "MML scanner and command model: syntax highlighting, the command inspector, write-back splices",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./*": "./src/*.ts"
+  },
+  "sideEffects": false,
+  "dependencies": {
+    "@amk/core": "*",
+    "@amk/spc": "*"
+  }
+}

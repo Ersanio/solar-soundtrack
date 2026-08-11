@@ -12,7 +12,7 @@
   [style.--amk-split]="splitCss()"
   [class.select-none]="dragging()"
 >
-  <amk-editor-pane id="editor-pane" class="min-h-0" />
+  <amk-editor-pane class="min-h-0" />
 
   <!--
     Hidden below `lg`, where the panes stack and there is no middle to drag —
@@ -21,15 +21,7 @@
     `before:-inset-x-1` widens the grab zone to something a pointer can hit.
   -->
   <div
-    role="separator"
-    tabindex="0"
-    aria-orientation="vertical"
-    aria-controls="editor-pane"
-    aria-valuemin="50"
-    aria-valuemax="75"
-    aria-label="Resize the editor and output panes"
     class="bg-edge hover:bg-accent relative hidden w-px cursor-col-resize touch-none before:absolute before:inset-y-0 before:-inset-x-1 before:content-[''] lg:block"
-    [attr.aria-valuenow]="splitNow()"
     [class.bg-accent]="dragging()"
     (pointerdown)="onGrab($event)"
     (pointermove)="onDrag($event)"

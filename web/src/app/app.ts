@@ -4,23 +4,24 @@ import { EditorPane } from './editor/editor-pane/editor-pane';
 import { TopBar } from './editor/top-bar/top-bar';
 import { OutputPane } from './output/output-pane/output-pane';
 import { UpdateBanner } from './update-banner/update-banner';
+import { clamp } from './util/math';
 
 const STORAGE_KEY = 'solar-soundtrack.split';
 
 /**
  * How much of the width the editor may take, as a percentage.
  *
- * The floor is half because the output pane holds the hex dump and the ARAM
- * budget, which stop being readable much below it; the ceiling leaves the right
- * column wide enough to still be worth looking at. Between them the author
- * chooses.
+ * The ceiling is three quarters because the output pane holds the hex dump and
+ * the ARAM budget, which stop being readable much below the quarter it leaves
+ * them; the floor keeps the editor wide enough to still be worth typing in.
+ * Between them the author chooses.
  */
 const MIN_SPLIT = 25;
 const MAX_SPLIT = 75;
 const DEFAULT_SPLIT = 50;
 
 function clampSplit(value: number): number {
-  return Math.min(MAX_SPLIT, Math.max(MIN_SPLIT, value));
+  return clamp(value, MIN_SPLIT, MAX_SPLIT);
 }
 
 /**
@@ -53,13 +54,6 @@ export class App {
   protected readonly dragging = signal(false);
 
   protected readonly splitCss = computed(() => `${this.split()}%`);
-
-  /**
-   * `aria-valuenow` wants a number, and a whole percent is what a screen reader
-   * should read out. The signal itself stays fractional: rounding the drag would
-   * make every step a ~19px jump on a 1920px window.
-   */
-  protected readonly splitNow = computed(() => Math.round(this.split()));
 
   private readonly shell = viewChild.required<ElementRef<HTMLElement>>('shell');
 

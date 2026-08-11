@@ -1,0 +1,51 @@
+@if (args().length < 2) {
+  <p class="text-ink-muted text-xs leading-relaxed">
+    Needs a rate and a depth, and optionally a delay before them.
+  </p>
+} @else {
+  <!-- The dragged values, so the shape follows the pointer. -->
+  <amk-vibrato-graph
+    [delay]="shownDelay()"
+    [rate]="shownRate()"
+    [depth]="shownDepth()"
+    [tempo]="tempo()"
+    [axis]="axis()"
+  />
+
+  @if (formNote(); as note) {
+    <p class="text-ink-muted text-xs leading-relaxed">{{ note }}</p>
+  }
+
+  @if (delayIndex() >= 0) {
+    <amk-slider
+      label="Delay"
+      [value]="delay()"
+      [max]="255"
+      [valueLabel]="delayLabel()"
+      [note]="lockedBecause(delayIndex())"
+      [disabled]="!editable(delayIndex())"
+      (preview)="preview(delayIndex(), $event)"
+      (commit)="setArg(delayIndex(), $event)"
+    />
+  }
+
+  <amk-slider
+    label="Rate"
+    [value]="rate()"
+    [max]="255"
+    [note]="lockedBecause(rateIndex()) ?? rateNote()"
+    [disabled]="!editable(rateIndex())"
+    (preview)="preview(rateIndex(), $event)"
+    (commit)="setArg(rateIndex(), $event)"
+  />
+
+  <amk-slider
+    label="Depth"
+    [value]="depth()"
+    [max]="255"
+    [note]="lockedBecause(depthIndex())"
+    [disabled]="!editable(depthIndex())"
+    (preview)="preview(depthIndex(), $event)"
+    (commit)="setArg(depthIndex(), $event)"
+  />
+}

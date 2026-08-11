@@ -1,15 +1,7 @@
-import {
-  Component,
-  computed,
-  effect,
-  inject,
-  input,
-  linkedSignal,
-  signal,
-  untracked,
-} from '@angular/core';
+import { Component, computed, inject, input, signal } from '@angular/core';
 
-import type { Command } from '@compiler/tokens';
+import { argsRewritable, commandRewritable, spliceArgs, spliceCommand } from '@amk/tokens/edits';
+import type { Command } from '@amk/tokens';
 import {
   FIR_PRESETS,
   FIR_TAPS,
@@ -22,22 +14,18 @@ import {
   matchPreset,
   toHexByte,
   toSigned,
-} from '@spc/fir';
+} from '@amk/spc/fir';
 import { Button } from '../../../shared/button/button';
+import { Slider } from '../../../shared/slider/slider';
 import { EditorStore } from '../../../state/editor-store';
-import { Playback } from '../../../state/playback';
-import { builtInFilterName, firOverriddenBy } from '../fir-override';
+import { dragPreview } from '../commands/preview';
+import { builtInFilterName, firOverriddenBy } from '@amk/tokens/fir-override';
 import { FirGraph } from '../fir-graph/fir-graph';
-import { feedbackBefore } from '../../../util/echo-hazards';
+import { stopWhenRunaway } from '../runaway-guard';
+import { feedbackBefore } from '@amk/tokens/echo-hazards';
 import { Hex2Pipe } from '../../../util/hex.pipe';
 
 type Mode = 'presets' | 'draw';
-
-/** Which `$F5` the echo was last judged on, and what the verdict was. */
-interface Reading {
-  start: number;
-  runaway: boolean;
-}
 
 /**
  * How close two drawn points have to be to count as the same one — about 3% of
@@ -59,18 +47,19 @@ const MERGE_HZ = 500;
  *
  * The taps come from the `$F5` under the caret and go back to the same place.
  * Committing them recompiles, and because the player already reloads a
- * recompiled song in place, that is also how the filter gets auditioned — there
- * is no separate preview path.
+ * recompiled song in place, that is also how the filter gets *auditioned* — what
+ * you hear is only ever the document. Seeing it is a separate matter, and the
+ * plot follows the coefficient fields as they are typed; see {@link
+ * FirDesigner.shownTaps}.
  */
 @Component({
   selector: 'amk-fir-designer',
-  imports: [Button, FirGraph, Hex2Pipe],
+  imports: [Button, FirGraph, Hex2Pipe, Slider],
   templateUrl: './fir-designer.html',
   host: { class: 'flex flex-col gap-3' },
 })
 export class FirDesigner {
   private readonly store = inject(EditorStore);
-  private readonly playback = inject(Playback);
 
   readonly command = input.required<Command>();
 
@@ -78,24 +67,39 @@ export class FirDesigner {
   protected readonly mode = signal<Mode>('presets');
 
   /**
-   * The eight coefficients, as the DSP would read them.
+   * The eight coefficients as the document holds them.
    *
-   * Read straight from the text with nothing held in front of it. The tone
-   * slider needed a pending-edit signal here, because a drag fires continuously
-   * and committing each frame would push a recompile through the typing debounce
-   * dozens of times a second. Every control that is left commits once per
-   * gesture, so the text can be the only source of truth again.
+   * What gets written, and — the part that matters — what the runaway interlock
+   * below judges. See {@link shownTaps} for the pair to this.
    */
   protected readonly taps = computed<FirTaps>(() => {
     const args = this.command().args;
     return Array.from({ length: FIR_TAPS }, (_, i) => toSigned(args[i]?.value ?? 0));
   });
 
+  /**
+   * The eight as the fields are showing them, per keystroke.
+   *
+   * A coefficient field commits on blur, which left the curve describing the
+   * filter you were replacing for the whole time you were replacing it. These
+   * feed the plot and every reading beside it, so the response, the corner, the
+   * tilt and the headroom warning all answer for what is typed.
+   *
+   * They deliberately do **not** feed the `[value]` binding on the inputs
+   * themselves: writing a parsed number back into a field mid-word rewrites
+   * `03` as `3` and takes the caret with it.
+   */
+  private readonly drag = dragPreview(this.command);
+
+  protected readonly shownTaps = computed<FirTaps>(() =>
+    this.taps().map((tap, index) => this.drag.at(index, tap)),
+  );
+
   protected readonly target = signal<{ hz: number; gain: number }[]>([]);
 
-  protected readonly description = computed(() => describeFir(this.taps()));
-  protected readonly activePreset = computed(() => matchPreset(this.taps()));
-  protected readonly headroom = computed(() => firHeadroom(this.taps()));
+  protected readonly description = computed(() => describeFir(this.shownTaps()));
+  protected readonly activePreset = computed(() => matchPreset(this.shownTaps()));
+  protected readonly headroom = computed(() => firHeadroom(this.shownTaps()));
 
   /**
    * The feedback the echo is running at, taken from the nearest preceding `$F1`
@@ -109,63 +113,28 @@ export class FirDesigner {
     feedbackBefore(this.command(), this.store.tokens().commands),
   );
 
-  protected readonly stability = computed(() => echoStability(this.taps(), this.feedback()));
+  /** The verdict the panel prints, and the one the interlock acts on. */
+  protected readonly stability = computed(() => echoStability(this.shownTaps(), this.feedback()));
 
   /**
-   * Just the flag, so the effect below runs on a genuine change.
+   * Just the flag, so the interlock runs on a genuine change.
    *
-   * `stability()` is a fresh object on every keystroke, since `taps()` rebuilds
+   * Read off the **shown** taps, not the committed ones. The coefficients are
+   * sliders, so a drag passes through every value between where it started and
+   * where it is going — and the player is running the whole time, since a
+   * preview does not recompile. A filter that runs away halfway across the
+   * track is one you can hear, and waiting for the pointer to come up before
+   * stopping is waiting through exactly the noise the interlock exists to
+   * prevent.
+   *
+   * `echoStability` returns a fresh object each time, since the taps rebuild
    * from `command().args`. A `computed` over the boolean compares by value and
    * only notifies when it actually flips.
    */
   private readonly runaway = computed(() => this.stability().runaway);
 
-  /**
-   * The current reading, and whether it is one an edit just produced.
-   *
-   * `became` is the whole question: an edit to *this* `$F5` that turned a sane
-   * filter into a runaway one. Moving the caret between two `$F5` commands
-   * reuses this component with a new input rather than building a new one, so
-   * the span is what tells arriving at a filter apart from editing it, and the
-   * previous reading is what tells a new warning from a standing one.
-   *
-   * A `linkedSignal` rather than fields mutated inside the effect: the previous
-   * value then lives in the signal graph, where it is derived in one place and
-   * readable, instead of in instance state whose answer depends on how many
-   * times the effect happened to have run.
-   */
-  private readonly reading = linkedSignal<Reading, Reading & { became: boolean }>({
-    source: () => ({ start: this.command().span.start, runaway: this.runaway() }),
-    computation: (next, previous) => ({
-      ...next,
-      became: next.runaway && previous?.value.start === next.start && !previous.value.runaway,
-    }),
-  });
-
   constructor() {
-    // The song stops the moment an edit makes the echo run away, so the warning
-    // beside the graph is never left sitting next to a song building towards
-    // the clip it describes. Only the transition acts: opening the inspector on
-    // a filter that is already bad is not an edit, and pressing play again with
-    // the warning still up is a decision the user is entitled to make.
-    effect(() => {
-      if (!this.reading().became) {
-        return;
-      }
-
-      untracked(() => {
-        // A paused song is not audible, and resuming one is as deliberate an act
-        // as pressing play.
-        if (!this.playback.isPlaying()) {
-          return;
-        }
-
-        this.playback.stop();
-        this.store.fail(
-          'playback automatically stopped to protect your ears and speakers due to a runaway FIR filter',
-        );
-      });
-    });
+    stopWhenRunaway(this.command, this.runaway, 'FIR filter');
   }
 
   /**
@@ -185,9 +154,15 @@ export class FirDesigner {
     };
   });
 
-  protected readonly rows = computed(() =>
-    this.taps().map((tap, index) => ({ index, tap, hex: toHexByte(tap) })),
-  );
+  /** `tap` positions the field and comes from the document; `hex` follows the typing. */
+  protected readonly rows = computed(() => {
+    const shown = this.shownTaps();
+    return this.taps().map((tap, index) => ({
+      index,
+      tap,
+      hex: `$${toHexByte(shown[index] ?? tap)}`,
+    }));
+  });
 
   protected readonly cornerLabel = computed(() => {
     const corner = this.description().cornerHz;
@@ -209,14 +184,20 @@ export class FirDesigner {
     this.commit(taps);
   }
 
-  protected setTap(index: number, value: string): void {
-    const parsed = Number.parseInt(value, 10);
-    if (Number.isNaN(parsed)) {
-      return;
-    }
+  /** Every frame of a drag: redraws the curve, and arms the interlock below. */
+  protected previewTap(index: number, value: number): void {
+    this.drag.set(index, clampTap(value));
+  }
+
+  protected setTap(index: number, value: number): void {
+    // Set here as well as on `preview`, because a slider dragged away from and
+    // back to its own value commits nothing — and the preview map is cleared by
+    // the re-scan a commit causes, so without this it would keep showing the
+    // number that was abandoned.
+    this.drag.set(index, clampTap(value));
 
     const next = [...this.taps()];
-    next[index] = clampTap(parsed);
+    next[index] = clampTap(value);
     this.commit(next);
   }
 
@@ -243,22 +224,34 @@ export class FirDesigner {
   }
 
   /**
-   * A `$F5` reached through a replacement is readable but not writable.
+   * Coefficients reached through a replacement are readable but not writable.
    *
-   * Its span covers the macro's name, not the bytes — everything the expansion
-   * produced collapses onto the use site — so writing over it would inline the
-   * macro, and would silently swallow anything the same expansion carried past
-   * the command. The definition is the only honest place to edit.
+   * The question is asked of the arguments alone, not of the whole command: a
+   * `"fir"=$F5` followed by eight literal bytes is the common shape, and those
+   * bytes are text the author typed and can be written over. Only when the
+   * *coefficients themselves* came out of an expansion is there nothing to
+   * write — they collapse onto the use site, so a splice would inline the macro
+   * and swallow anything it carried past the command.
    */
-  protected readonly readOnly = computed(() => this.command().replacement !== undefined);
+  protected readonly readOnly = computed(
+    () => !argsRewritable(this.command()) && !commandRewritable(this.command()),
+  );
 
-  /** Writes the eight bytes back over the `$F5` run they came from. */
+  /** Writes the eight bytes back over the arguments they came from. */
   private commit(taps: number[]): void {
-    if (this.readOnly()) {
+    const command = this.command();
+    const source = this.store.source();
+    const bytes = taps.map((tap) => `$${toHexByte(tap)}`);
+
+    // A half-written `$F5` has fewer argument spans than there are coefficients,
+    // so there is nowhere to splice the missing ones — the run is rewritten
+    // whole instead, which is the one case where losing the author's spacing is
+    // unavoidable rather than careless.
+    if (!command.complete) {
+      this.store.apply(spliceCommand(source, command, `$F5 ${bytes.join(' ')}`));
       return;
     }
 
-    const text = `$F5 ${taps.map((tap) => `$${toHexByte(tap)}`).join(' ')}`;
-    this.store.replace.set({ span: { ...this.command().span }, text });
+    this.store.apply(spliceArgs(source, command, bytes));
   }
 }

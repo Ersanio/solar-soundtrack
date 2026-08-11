@@ -1,0 +1,68 @@
+# Harnesses
+
+Eleven byte-level checks, each a standalone esbuild-bundled Node script with its own npm script.
+There are no `.spec.ts` files anywhere in the repository — `npm run test` is Angular scaffolding and
+currently runs nothing. These are the real suite.
+
+Run one by name (`npm run selftest`). They take no filter flags, so narrowing a run means editing
+the harness. `npm run check` runs all eleven, grouped:
+
+| Group               | Harnesses                                     |
+| ------------------- | --------------------------------------------- |
+| `check:compiler`    | `selftest`                                    |
+| `check:tokens`      | `tokentest`, `edittest`                       |
+| `check:spc`         | `adsrtest`, `instrtest`, `brrtest`, `firtest` |
+| `check:integration` | `spctest`, `audiotest`, `worklettest`         |
+| `check:app`         | `charttest`                                   |
+
+Six of the eleven straddle two packages, which is why they all live here rather than one per
+package — and why they share `harness.ts` rather than each carrying a copy. They did carry copies
+once, and the copies had already drifted: `worklettest.ts` said "same shim as spctest" above a shim
+that had lost both of the behaviours `spctest.ts` documents as load-bearing.
+
+| Harness       | What it proves                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `selftest`    | Compiler output, byte for byte. Also that diagnostic spans land on the offending character, not merely near it.                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `spctest`     | MML → `.spc`, verifying the assembled file's structure. Stubs `fetch` over the SPC package's assets. Also pins every address in `assets/driver/manifest.json` against the bytes of the shipped `main.bin`: nothing derives those at runtime any more, so this is the only thing standing between a rebuilt driver and an `.spc` that assembles cleanly against the wrong addresses.                                                                                                                               |
+| `audiotest`   | MML → SPC → actual PCM through the real wasm host. **This is what proves the whole pipeline**: a wrong compiler, layout, sample directory or CPUIO handshake produces silence.                                                                                                                                                                                                                                                                                                                                    |
+| `worklettest` | Evaluates the _built_ `spc-worklet.js` inside a `vm` context holding only what an AudioWorkletGlobalScope really exposes — no `fetch`, no `setTimeout`, no `TextDecoder`. Node has all of those globally, so this catches worklet-only breakage that `audiotest` structurally cannot.                                                                                                                                                                                                                             |
+| `charttest`   | Stacked-bar geometry for the ARAM bar, the shared plot space, and `clamp`.                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| `brrtest`     | BRR container handling and the decoder. Cross-checks `BANK_SLOT_COUNT` against `@amk/spc`'s own `SAMPLE_BANK_SLOTS`.                                                                                                                                                                                                                                                                                                                                                                                              |
+| `tokentest`   | The MML scanner. Its load-bearing assertion is **restartability**: stepping line by line with the state carried across must equal scanning the whole document. CodeMirror restarts the scanner at arbitrary lines, so a state machine that secretly depended on having seen the top of the file would pass a whole-document test and mis-colour text much later.                                                                                                                                                  |
+| `firtest`     | The echo FIR maths, anchored on the two filters in the SNES manual that AddmusicK ships as `EchoFilter0`/`EchoFilter1`, and on bsnes's own DSP behaviour. Also the echo-hazard diagnostics built on it.                                                                                                                                                                                                                                                                                                           |
+| `instrtest`   | The driver's instrument and percussion tables. Its load-bearing assertion is that `instruments.ts` finds them in `main.bin` **uniquely** — the tables carry no citable address, so they are located by matching the SRCN column against `INSTRUMENT_TO_SAMPLE`, and a second candidate would make that a guess. It also pins the one index where the driver and `Music.cpp`'s `instrToSample` disagree: 19, which is the whole `@19` story.                                                                       |
+| `adsrtest`    | The envelope maths. `CLOCKS` is checked against the _published SNES noise ladder_, because the DSP uses the same table for noise and every other function there is defined in terms of it; nothing else could catch a transposed digit. It also asserts that the two magic tables in AddmusicK's readme calculator are exactly the step counts of bsnes's envelope stepping.                                                                                                                                      |
+| `edittest`    | The splices the command inspector writes back into the source. Two load-bearing assertions, both comparing whole strings rather than numbers because numbers cannot see either failure. **Gap preservation**: a tab, a column of aligned bytes or a mid-run `; comment` survives an edit to the byte beside it. **The macro interlock, per part**: `"ech=$EF"` used as `ech $80 $10 $10` has a macro for its command byte and literal text for every argument, so the arguments are writable and the byte is not. |
+
+## `harness.ts`
+
+`check`, `summarise`, `failureCount`, `SPC_ASSETS` and `stubFetch`. Use them rather than writing
+another copy.
+
+`stubFetch` reproduces two dev-server behaviours deliberately, and between them they produced the
+"invalid BRR length 2205" bug:
+
+1. paths are decoded with `decodeURI`, which leaves `%40` untouched, so an over-encoded `@` never
+   resolves to a real file;
+2. an unresolved path is answered 200 with index.html, not 404 — so code that trusts `response.ok`
+   gets HTML where it expected bytes.
+
+A harness that threw on a missing file instead would pass while the browser failed.
+
+## What none of them cover
+
+**Angular templates.** Neither these nor `npm run typecheck` run the template compiler, so a bad
+binding (`viewBox=` instead of `[attr.viewBox]=`) passes `npm run check` and fails only at
+`npm run build` / `npm start`. Run one of those before believing a UI change.
+
+## Establishing fidelity
+
+`Compare-Spc.ps1` and `Compare-SongBin.ps1` diff output against a real AddmusicK build, region-aware
+so ID666 noise does not drown the real differences. Those are what establish fidelity; the harnesses
+only catch gross breakage.
+
+`Compare-SongBin.ps1` is the sharper of the two: AddmusicK writes `asm/SNES/bin/musicXX.bin` for
+every song it compiles, and past its 12-byte RATS header that file is exactly the blob this editor's
+`.bin` export produces. Same song, same load address, so every difference is a real compiler
+difference rather than a layout artefact. Run it with one argument to read the header and see which
+address to compile at.

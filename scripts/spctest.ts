@@ -1,0 +1,475 @@
+/**
+ * End-to-end check: compile MML -> assemble an SPC -> verify its structure.
+ *
+ * Runs in node, so it stubs `fetch` over the SPC package's assets.
+ *
+ *   npm run spctest
+ */
+
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
+import { compiler } from "@amk/compiler";
+import { EMPTY_SAMPLE_NAME } from "@amk/core/hardcoded-tables";
+import { emptySample } from "@amk/spc/brr";
+import { encodePathSegment, loadDriver } from "@amk/spc/driver";
+import { buildSpc } from "@amk/spc/export";
+import { computeBudget } from "@amk/spc/layout";
+
+import { SPC_ASSETS, check, stubFetch, summarise } from "./harness";
+
+stubFetch();
+
+const hex = (n: number) => `$${n.toString(16).toUpperCase().padStart(4, "0")}`;
+
+const SONG = `#amk 4
+#spc
+{
+    #title  "Export Test"
+    #author "solar soundtrack"
+}
+#0 t40 o4 v200 q7F @0 l8 c d e f g4 e4 c4 r4
+#1 o2 v160 q7D @1 l8 [c c > c < c]4
+`;
+
+console.log("\nURL encoding");
+{
+	// Regression: encodeURIComponent escapes `@` to %40, which decodeURI does not
+	// undo, so the file never resolves and the SPA fallback returns index.html.
+	check(
+		"@ is left unescaped in path segments",
+		encodePathSegment("00 SMW @0.brr") === "00%20SMW%20@0.brr",
+		encodePathSegment("00 SMW @0.brr"),
+	);
+	check("round-trips through decodeURI", decodeURI(encodePathSegment("00 SMW @0.brr")) === "00 SMW @0.brr");
+	check("# is escaped", encodePathSegment("a#b.brr") === "a%23b.brr", encodePathSegment("a#b.brr"));
+	check("? is escaped", encodePathSegment("a?b.brr") === "a%3Fb.brr", encodePathSegment("a?b.brr"));
+	check(
+		"encodeURIComponent would have broken this",
+		encodeURIComponent("00 SMW @0.brr") !== encodePathSegment("00 SMW @0.brr"),
+	);
+}
+
+console.log("\nmissing files are diagnosed, not misread");
+{
+	let message = "";
+	try {
+		await loadDriver("does-not-exist");
+	} catch (error) {
+		message = error instanceof Error ? error.message : String(error);
+	}
+
+	check("HTML fallback is rejected", message.includes("HTML page"), message || "(no error thrown)");
+}
+
+const driver = await loadDriver();
+
+console.log("\nmanifest.json still describes the shipped main.bin");
+{
+	// Nothing derives these from the image any more, so this is the only place a
+	// stale manifest is caught. Every address it states is checked against the
+	// bytes it claims to describe: a regenerated main.bin that nobody re-measured
+	// fails here, rather than producing an .spc that assembles cleanly and plays
+	// the wrong memory.
+	//
+	// `raw` still carries the 4-byte upload header, so an ARAM address A sits at
+	// `4 + A - programPos`.
+	const raw = new Uint8Array(readFileSync(join(SPC_ASSETS, "driver", "main.bin")));
+	const { programPos, mainLoopPos, songPointers, localPos, songIndex } = driver.manifest;
+	const word = (at: number) => raw[at] | (raw[at + 1] << 8);
+
+	// AddmusicK.cpp:1394-1397 prepends `dw size, dw address`, with `size` measured
+	// before the header existed — so it is the length less those four bytes.
+	check("the upload header sizes the image", word(0) === raw.length - 4, `${word(0)} vs ${raw.length - 4}`);
+	check("and loads it at programPos", word(2) === programPos, hex(word(2)));
+
+	// `mov y,$fd / beq MainLoop`, the timer-tick wait at the head of the driver's
+	// main loop. This is the label the SPC's PC register is set to.
+	const loop = 4 + mainLoopPos - programPos;
+	check(
+		"MainLoop is where the manifest says",
+		raw[loop] === 0xeb && raw[loop + 1] === 0xfd && raw[loop + 2] === 0xf0 && raw[loop + 3] === 0xfc,
+		[...raw.subarray(loop, loop + 4)].map((byte) => byte.toString(16).padStart(2, "0")).join(" "),
+	);
+
+	// The table is `dw song01 … dw localSong` with each song's data following it,
+	// so the first entry points just past the table and thereby states its own
+	// length, and the last entry is the local song's slot.
+	const entries = Array.from({ length: songIndex }, (_, k) => word(4 + songPointers - programPos + k * 2));
+	check("the song table holds songIndex entries", entries[0] === songPointers + songIndex * 2, hex(entries[0]));
+	check(
+		"they ascend, one song's data after another",
+		entries.every((entry, k) => k === 0 || entry > entries[k - 1]),
+		entries.map(hex).join(" "),
+	);
+	check("and the last of them is localPos", entries[songIndex - 1] === localPos, hex(entries[songIndex - 1]));
+}
+
+console.log("\ndriver bundle");
+{
+	// The five addresses this build was measured at. The section above proves the
+	// manifest agrees with the image; these say which image it is meant to be, so
+	// a rebuilt driver trips them even in the unlikely event its addresses landed
+	// somewhere self-consistent.
+	check("programPos is $0400", driver.manifest.programPos === 0x0400, hex(driver.manifest.programPos));
+	check("mainLoopPos is $042E", driver.manifest.mainLoopPos === 0x042e, hex(driver.manifest.mainLoopPos));
+	check("songPointers is $236D", driver.manifest.songPointers === 0x236d, hex(driver.manifest.songPointers));
+	check("localPos is $2996", driver.manifest.localPos === 0x2996, hex(driver.manifest.localPos));
+	check("songIndex is 9, after eight global songs", driver.manifest.songIndex === 9, `${driver.manifest.songIndex}`);
+	check("20 default samples", driver.samples.length === 20, `${driver.samples.length}`);
+	{
+		// The app resolves its sample set by looking the `#default` group's names
+		// up in the library, so those names must match what `loadDriver` parsed —
+		// name for name, in order. If they ever drift, every export silently loses
+		// the samples that failed to resolve, and only the browser would show it.
+		const group = driver.manifest.sampleGroups["default"] ?? [];
+		const parsed = driver.samples.map((sample) => sample.sampleName);
+		check(
+			"the #default group names match the parsed samples, in order",
+			group.length === parsed.length && group.every((name, index) => name === parsed[index]),
+			`group [${group.slice(0, 3).join(", ")}…] vs parsed [${parsed.slice(0, 3).join(", ")}…]`,
+		);
+	}
+
+	{
+		// The `!`-marked names from AddmusicK's `Addmusic_sample groups.txt`. A name
+		// here that is not in the group would silently protect nothing, and the
+		// count is worth pinning so an edit to one list is noticed in the other.
+		const important = driver.manifest.importantSamples ?? [];
+		const group = driver.manifest.sampleGroups["default"] ?? [];
+		check("17 samples are marked important", important.length === 17, `${important.length}`);
+		check(
+			"every important name is in the #default group",
+			important.every((name) => group.includes(name)),
+			important.filter((name) => !group.includes(name)).join(", "),
+		);
+		check(
+			"0D, 0F and 11 are the unimportant ones",
+			group.filter((name) => !important.includes(name)).join(", ") === "0D SMW @14.brr, 0F SMW @21.brr, 11 SMW @17.brr",
+			group.filter((name) => !important.includes(name)).join(", "),
+		);
+	}
+
+	// The upload header is stripped on load, so what the rest of the app sees is
+	// the image as it sits in ARAM.
+	check(
+		"programData is the file past the upload header",
+		driver.programData.length === 9810,
+		`${driver.programData.length}`,
+	);
+}
+
+console.log("\nthe song goes in the driver's own slot");
+{
+	// The local song's slot is inside the image — AddmusicK leaves the last song
+	// it compiled sitting there — so the song data overwrites it rather than
+	// following it. Nothing the driver reads lives past localPos.
+	const imageEnd = driver.manifest.programPos + driver.programData.length;
+	check(
+		"localPos sits inside the image, not past it",
+		driver.manifest.localPos < imageEnd,
+		`${hex(driver.manifest.localPos)} vs ${hex(imageEnd)}`,
+	);
+}
+
+console.log("\ncompile + export");
+const compiled = compiler.compile({ source: SONG, aramAddress: driver.manifest.localPos });
+check("song compiles", compiled.ok, compiled.diagnostics.map((d) => `${d.code} ${d.message}`).join("; "));
+
+const { spc, layout } = buildSpc({
+	songData: compiled.data!,
+	driver,
+	samples: driver.samples,
+	tags: compiled.stats!.tags,
+	seconds: compiled.stats!.tagSeconds,
+	echoBufferSize: compiled.stats!.echoBufferSize,
+	date: new Date(2026, 6, 28),
+});
+
+console.log("\nfile structure");
+{
+	const text = (at: number, len: number) =>
+		Buffer.from(spc.subarray(at, at + len))
+			.toString("latin1")
+			.replace(/\0+$/, "");
+
+	check("size is 0x10200", spc.length === 0x10200, `0x${spc.length.toString(16)}`);
+	check("signature", text(0, 33) === "SNES-SPC700 Sound File Data v0.30");
+	check("has ID666 tags", spc[0x23] === 0x1a, `0x${spc[0x23].toString(16)}`);
+	check("PC = mainLoopPos", (spc[0x25] | (spc[0x26] << 8)) === 0x042e, hex(spc[0x25] | (spc[0x26] << 8)));
+	check("SP = $CF (post-init)", spc[0x2b] === 0xcf, `0x${spc[0x2b].toString(16)}`);
+	check("title tag", text(0x2e, 32) === "Export Test", text(0x2e, 32));
+	check("artist tag", text(0xb1, 32) === "solar soundtrack", text(0xb1, 32));
+	check("game defaults", text(0x4e, 32) === "Super Mario World (custom)", text(0x4e, 32));
+	check("date", text(0x9e, 10) === "07/28/2026", text(0x9e, 10));
+	check("length is ASCII digits", /^\d{3}$/.test(text(0xa9, 3)), text(0xa9, 3));
+	check("fade is 10000", text(0xac, 5) === "10000", text(0xac, 5));
+}
+
+console.log("\nARAM contents");
+{
+	const aram = spc.subarray(0x100, 0x10100);
+
+	check("driver at programPos", aram[0x400] === 0x20 && aram[0x401] === 0xcd, "expected CLRP / MOV X,#$CF");
+	check(
+		"main loop instruction at $042E",
+		aram[0x42e] === 0xeb && aram[0x42f] === 0xfd && aram[0x430] === 0xf0,
+		"expected MOV Y,$FD / BEQ",
+	);
+	check("tempo mirror $51 = $36", aram[0x51] === 0x36, `0x${aram[0x51].toString(16)}`);
+	check("FLG mirror $5F = $20", aram[0x5f] === 0x20, `0x${aram[0x5f].toString(16)}`);
+	check("$F6 = songIndex", aram[0xf6] === driver.manifest.songIndex, `${aram[0xf6]}`);
+
+	// Song data must land exactly where the pointer table says it does.
+	const songBytes = compiled.data!;
+	let matches = true;
+	for (let i = 0; i < songBytes.length; i++) {
+		if (aram[driver.manifest.localPos + i] !== songBytes[i]) {
+			matches = false;
+			break;
+		}
+	}
+
+	check("song data at localPos", matches);
+
+	// The song header's first word points at its own phrase pointer block.
+	const firstWord = aram[driver.manifest.localPos] | (aram[driver.manifest.localPos + 1] << 8);
+	check(
+		"song header pointer is inside the song",
+		firstWord >= driver.manifest.localPos && firstWord < layout.songEnd,
+		hex(firstWord),
+	);
+}
+
+console.log("\nsample directory");
+{
+	const aram = spc.subarray(0x100, 0x10100);
+	const dir = spc[0x10100 + 0x5d];
+
+	check("DIR register set", dir === layout.sampleTablePos >> 8, `0x${dir.toString(16)}`);
+	check("table is page-aligned", (layout.sampleTablePos & 0xff) === 0, hex(layout.sampleTablePos));
+	check("table starts after the song", layout.sampleTablePos >= layout.songEnd);
+
+	let ok = true;
+	let expected = layout.sampleDataPos;
+	for (let index = 0; index < driver.samples.length; index++) {
+		const entry = layout.sampleTablePos + index * 4;
+		const start = aram[entry] | (aram[entry + 1] << 8);
+		const loop = aram[entry + 2] | (aram[entry + 3] << 8);
+		const sample = driver.samples[index];
+		if (start !== expected || loop !== expected + sample.loopOffset) {
+			ok = false;
+			break;
+		}
+
+		// Spot-check that the BRR actually got copied.
+		if (
+			aram[start] !== sample.data[0] ||
+			aram[start + sample.data.length - 1] !== sample.data[sample.data.length - 1]
+		) {
+			ok = false;
+			break;
+		}
+
+		expected += sample.data.length;
+	}
+
+	check("all 20 directory entries and BRR blobs correct", ok);
+	check("sample data ends where layout says", expected === layout.sampleDataEnd, hex(expected));
+}
+
+console.log("\nARAM budget");
+{
+	const budget = computeBudget(driver, driver.samples, compiled.data!.length, compiled.stats!.echoBufferSize);
+
+	// Every byte of ARAM must be accounted for exactly once.
+	const total = budget.rows.reduce((sum, row) => sum + row.bytes, 0);
+	check("rows account for all 64 KiB", total === 0x10000, `${total}`);
+	check("no overflow with the stock set", budget.overflowBytes === 0, `${budget.overflowBytes}`);
+	check("free matches the layout", budget.freeBytes === budget.layout.freeBytes);
+	check(
+		"budget layout agrees with the exported SPC",
+		budget.layout.songPos === layout.songPos && budget.layout.sampleDataEnd === layout.sampleDataEnd,
+	);
+
+	console.log(`  ..    free ${budget.freeBytes} B`);
+}
+
+console.log("\nlayout");
+console.log(`  driver   ${hex(layout.programPos)} - ${hex(layout.programEnd)}`);
+console.log(`  song     ${hex(layout.songPos)} - ${hex(layout.songEnd)}`);
+console.log(`  smp tbl  ${hex(layout.sampleTablePos)} - ${hex(layout.sampleTableEnd)}`);
+console.log(`  samples  ${hex(layout.sampleDataPos)} - ${hex(layout.sampleDataEnd)}`);
+console.log(`  echo     ${hex(layout.echoStart)} - ${hex(layout.echoEnd)}`);
+console.log(`  free     ${layout.freeBytes} bytes`);
+
+console.log("\n#samples reaches the sample directory");
+{
+	// The decisive end-to-end check: a song that names its own sample set must
+	// produce an SPC built from *that* set. Every intermediate stage can look
+	// right while the writer quietly falls back to the driver's twenty, and the
+	// only symptom would be an SPC that plays the wrong sounds.
+	const byName = new Map(driver.samples.map((sample) => [sample.sampleName, sample]));
+	const options = {
+		sampleNames: driver.samples.map((sample) => sample.sampleName),
+		sampleGroups: driver.manifest.sampleGroups,
+	};
+	const only = driver.samples[0];
+
+	const source = `#amk 4\n#samples { "${only.sampleName}" }\n#0 o4 $F3 $00 $02 c4\n`;
+	const one = compiler.compile({ source, aramAddress: driver.manifest.localPos, options });
+	check("a one-sample song compiles", one.ok, one.diagnostics.map((d) => `${d.code} ${d.message}`).join("; "));
+	check("it resolves exactly one name", one.sampleList?.length === 1, `${one.sampleList?.length}`);
+
+	const samples = (one.sampleList ?? []).map((name) => byName.get(name) ?? emptySample(name));
+	check("that name resolves to a real sample", samples.length === 1);
+
+	const built = buildSpc({
+		songData: one.data!,
+		driver,
+		samples,
+		echoBufferSize: one.stats?.echoBufferSize,
+		date: new Date(2026, 6, 28),
+	});
+
+	const entries = (built.layout.sampleTableEnd - built.layout.sampleTablePos) / 4;
+	check("the directory holds one entry, not twenty", entries === 1, `${entries}`);
+	check(
+		"only that sample's bytes are stored",
+		built.layout.sampleDataEnd - built.layout.sampleDataPos === only.data.length,
+		`${built.layout.sampleDataEnd - built.layout.sampleDataPos} vs ${only.data.length}`,
+	);
+	check(
+		"it frees the ARAM the other nineteen were using",
+		built.layout.freeBytes > layout.freeBytes,
+		`${built.layout.freeBytes} vs ${layout.freeBytes} for the full set`,
+	);
+
+	// The directory entry must point at the sample, and DSP DIR at the table.
+	const aram = built.spc.subarray(0x100, 0x100 + 0x10000);
+	const start = aram[built.layout.sampleTablePos] | (aram[built.layout.sampleTablePos + 1] << 8);
+	check("the entry points at the sample data", start === built.layout.sampleDataPos, hex(start));
+	check("the stored bytes are that sample's", aram[start] === only.data[0], hex(aram[start]));
+
+	// And the budget must agree with what was written, since they are computed
+	// from the same layout but by different call sites.
+	const budget = computeBudget(driver, samples, one.data!.length, one.stats?.echoBufferSize ?? 0);
+	check(
+		"the budget agrees with the built file",
+		budget.layout.sampleDataEnd === built.layout.sampleDataEnd,
+		`${budget.layout.sampleDataEnd} vs ${built.layout.sampleDataEnd}`,
+	);
+	check(
+		"the samples row counts one",
+		budget.rows.find((row) => row.key === "samples")?.detail === "1 sample",
+		budget.rows.find((row) => row.key === "samples")?.detail,
+	);
+}
+
+console.log("\nthe budget says how many samples are really loaded");
+{
+	// "20 samples" for every possible song reads as "the default set is loaded"
+	// no matter what optimisation actually did, which is how a real bug in the
+	// importance fallback went unnoticed. The row has to distinguish the two.
+	const byName = new Map(driver.samples.map((sample) => [sample.sampleName, sample]));
+	byName.set(EMPTY_SAMPLE_NAME, emptySample(EMPTY_SAMPLE_NAME));
+
+	const options = {
+		sampleNames: driver.samples.map((sample) => sample.sampleName),
+		sampleGroups: driver.manifest.sampleGroups,
+		importantSamples: driver.manifest.importantSamples ?? [],
+	};
+	const source = "#amk 4\n#0 t40 o4 v220 q7F @0 l8 c d e f\n";
+
+	const detail = (optimize: boolean): string => {
+		const result = compiler.compile({
+			source,
+			aramAddress: driver.manifest.localPos,
+			options: { ...options, optimizeSampleUsage: optimize },
+		});
+		const samples = (result.sampleList ?? []).map((name) => byName.get(name) ?? emptySample(name));
+		const budget = computeBudget(driver, samples, result.data!.length, result.stats?.echoBufferSize ?? 0);
+		return budget.rows.find((row) => row.key === "samples")?.detail ?? "";
+	};
+
+	check("unoptimised reports the plain count", detail(false) === "20 samples", detail(false));
+	// 17 important plus @0's own sample, which is one of them.
+	check("optimised reports loaded of total", detail(true) === "17 of 20 loaded", detail(true));
+}
+
+console.log("\noptimizeSampleUsage frees real ARAM");
+{
+	// The point of the pass: a song using two instruments should not upload all
+	// twenty samples. Measured on the real bundle, through the real writer.
+	const byName = new Map(driver.samples.map((sample) => [sample.sampleName, sample]));
+	byName.set(EMPTY_SAMPLE_NAME, emptySample(EMPTY_SAMPLE_NAME));
+
+	const options = {
+		sampleNames: driver.samples.map((sample) => sample.sampleName),
+		sampleGroups: driver.manifest.sampleGroups,
+	};
+	const source = "#amk 4\n#0 t40 o4 v220 q7F @0 l8 c d e f\n#1 o3 v200 @1 l4 c e g\n";
+
+	const build = (optimize: boolean) => {
+		const result = compiler.compile({
+			source,
+			aramAddress: driver.manifest.localPos,
+			options: { ...options, optimizeSampleUsage: optimize },
+		});
+		if (!result.ok || !result.data) {
+			throw new Error(result.diagnostics.map((d) => d.message).join("; "));
+		}
+
+		const samples = (result.sampleList ?? []).map((name) => byName.get(name) ?? emptySample(name));
+		return {
+			result,
+			built: buildSpc({
+				songData: result.data,
+				driver,
+				samples,
+				echoBufferSize: result.stats?.echoBufferSize,
+				date: new Date(2026, 6, 28),
+			}),
+		};
+	};
+
+	const lean = build(true);
+	const full = build(false);
+
+	const leanBytes = lean.built.layout.sampleDataEnd - lean.built.layout.sampleDataPos;
+	const fullBytes = full.built.layout.sampleDataEnd - full.built.layout.sampleDataPos;
+
+	check(
+		"the directory is the same length either way",
+		lean.built.layout.sampleTableEnd - lean.built.layout.sampleTablePos ===
+			full.built.layout.sampleTableEnd - full.built.layout.sampleTablePos,
+	);
+	check("optimising uploads far fewer sample bytes", leanBytes < fullBytes / 4, `${leanBytes} vs ${fullBytes}`);
+	check(
+		"it frees that ARAM",
+		lean.built.layout.freeBytes > full.built.layout.freeBytes,
+		`${lean.built.layout.freeBytes} vs ${full.built.layout.freeBytes}`,
+	);
+
+	// Emptied slots all name one sample, so its zero bytes are stored once and
+	// every other entry is a copy of that entry's four bytes.
+	const aram = lean.built.spc.subarray(0x100, 0x100 + 0x10000);
+	const table = lean.built.layout.sampleTablePos;
+	const entryOf = (srcn: number) => aram[table + srcn * 4] | (aram[table + srcn * 4 + 1] << 8);
+	const emptied = (lean.result.sampleList ?? [])
+		.map((name, srcn) => ({ name, srcn }))
+		.filter((s) => s.name === EMPTY_SAMPLE_NAME);
+	check("some slots really were emptied", emptied.length > 15, `${emptied.length}`);
+	check(
+		"every emptied slot shares one pointer",
+		emptied.every((slot) => entryOf(slot.srcn) === entryOf(emptied[0].srcn)),
+		`first ${hex(entryOf(emptied[0].srcn))}`,
+	);
+	check(
+		"a kept sample points somewhere else",
+		entryOf(0) !== entryOf(emptied[0].srcn),
+		`kept ${hex(entryOf(0))} vs empty ${hex(entryOf(emptied[0].srcn))}`,
+	);
+}
+
+summarise();

@@ -1,0 +1,94 @@
+<div class="flex items-baseline gap-2">
+  <span class="text-accent font-mono text-sm">&#64;{{ entry().number }}</span>
+  <span class="text-ink-muted text-[11px]">
+    inside <code>#instruments</code>, so this defines a sample rather than selecting an instrument
+  </span>
+</div>
+
+<amk-enum-select
+  label="Sample"
+  [value]="form()"
+  [options]="SAMPLE_FORMS"
+  (commit)="setForm($event)"
+/>
+
+@switch (form()) {
+  @case (0) {
+    @if (sampleOptions().length > 0) {
+      <amk-enum-select
+        label="File"
+        note="its SRCN is decided by the resolved #samples list"
+        [value]="currentSampleIndex()"
+        [options]="sampleOptions()"
+        [unknownLabel]="unknownSampleLabel()"
+        (commit)="setSample($event)"
+      />
+    } @else {
+      <p class="text-ink-muted text-xs leading-relaxed">
+        <code class="text-ink">"{{ sampleName() }}"</code> — add samples to the song's
+        <code class="text-ink">#samples</code> block to pick from a list here.
+      </p>
+    }
+  }
+
+  @case (1) {
+    <amk-slider
+      label="Copies the sample of"
+      [value]="copyFrom()"
+      [max]="29"
+      [valueLabel]="copyLabel()"
+      [note]="copyNote()"
+      (preview)="preview('copy', $event)"
+      (commit)="setCopy($event)"
+    />
+  }
+
+  @default {
+    <amk-slider
+      label="Noise clock"
+      note="the high bit of the sample byte is what marks it noise"
+      [value]="noiseClock()"
+      [max]="31"
+      [valueLabel]="noiseLabel()"
+      (preview)="preview('noise', $event)"
+      (commit)="setNoise($event)"
+    />
+  }
+}
+
+@if (hasEnvelope()) {
+  <div class="border-edge border-t pt-3">
+    <div class="text-ink-muted mb-1 text-[11px] tracking-wide uppercase">Envelope</div>
+    <amk-envelope-tuner
+      [value]="envelope()"
+      [disabled]="envelopeLocked()"
+      [lockedBecause]="
+        envelopeLocked()
+          ? 'These bytes come through a replacement, so they cannot be set here.'
+          : null
+      "
+      (commit)="applyEnvelope($event)"
+    />
+  </div>
+}
+
+@if (hasTuning()) {
+  <amk-slider
+    label="Tuning"
+    [value]="tuningRaw()"
+    [min]="0"
+    [max]="65535"
+    [valueLabel]="tuningLabel()"
+    [note]="tuningNote()"
+    [disabled]="tuningLocked()"
+    (preview)="preview('tuning', $event)"
+    (commit)="setTuning($event)"
+  />
+}
+
+@if (!entry().complete) {
+  <p class="text-warn text-xs leading-relaxed">
+    This entry is unfinished. Each one needs a sample and five
+    <code class="text-ink">$xx</code> bytes.
+  </p>
+}

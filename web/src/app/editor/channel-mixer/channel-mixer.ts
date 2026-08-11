@@ -8,10 +8,7 @@ import { Playback } from '../../state/playback';
  *
  * The song is not rebuilt: the mask goes to the running emulator, which writes
  * the driver's own mute register in APU RAM (`applyChannelMutes` in
- * `spc/driver-state.ts`). A muted channel goes on being parsed and only loses
- * its sound, which is what keeps the song intact — tempo, echo settings and the
- * intro marker are all song-global but live in whichever channel the user typed
- * them in, so a channel that stops being read takes them with it.
+ * `@amk/spc/driver-state`).
  *
  * Toggling is immediate and costs no gap in playback.
  */

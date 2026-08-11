@@ -11,20 +11,21 @@ import {
   sustainLevel,
   tuningMultiplier,
   tuningSemitones,
-} from '@spc/adsr';
+} from '@amk/spc/adsr';
 import {
   FIRST_CUSTOM_INSTRUMENT,
   FIRST_PERCUSSION_INSTRUMENT,
   type InstrumentEntry,
   MELODIC_SLOTS,
   NOISE_FLAG,
-} from '@spc/instruments';
-import type { Command } from '@compiler/tokens';
-import { DEFAULT_TRANSPOSE, INSTRUMENT_TO_SAMPLE } from '@compiler/tables';
+} from '@amk/spc/instruments';
+import type { Command } from '@amk/tokens';
+import { DEFAULT_TRANSPOSE, INSTRUMENT_TO_SAMPLE } from '@amk/core/hardcoded-tables';
 import { DriverStore } from '../../../state/driver-store';
 import { EditorStore } from '../../../state/editor-store';
 import { duration, hex2 } from '../../../util/format';
 import { AdsrGraph } from '../adsr-graph/adsr-graph';
+import { InstrumentEntryEditor } from '../instrument-entry/instrument-entry';
 import type { DetailRow } from '../../../shared/detail-table/detail-table';
 import { HexPipe } from '../../../util/hex.pipe';
 
@@ -37,11 +38,11 @@ type Band = 'melodic' | 'unsupported' | 'percussion' | 'custom' | 'undefined' | 
  * The number bands are AddmusicK's, and they are not contiguous: `@0`-`@18` set
  * an instrument, `@19` and `@20` do nothing audible at all, `@21`-`@29` arm a
  * drum on the next note without emitting anything, and `@30` up are the song's
- * own. `parser.ts:1594` is the one line that splits them.
+ * own. `parser.ts`'s `parseInstrument` has the one line that splits them.
  */
 @Component({
   selector: 'amk-instrument-inspector',
-  imports: [AdsrGraph, HexPipe],
+  imports: [AdsrGraph, HexPipe, InstrumentEntryEditor],
   templateUrl: './instrument-inspector.html',
   host: { class: 'block' },
 })
@@ -68,9 +69,10 @@ export class InstrumentInspector {
   /**
    * The number that reaches `$DA`, or `null` when nothing is emitted.
    *
-   * `parser.ts:1597` remaps the direct form's 19-29 to custom instruments, and
-   * it does so unconditionally — AddmusicK guards it with `convert`, which is on
-   * unless its CLI is given `-c`. So `@@19` is `@30`, not driver entry 19.
+   * `parser.ts`'s `parseInstrument` remaps the direct form's 19-29 to custom
+   * instruments, and it does so unconditionally — AddmusicK guards it with
+   * `convert`, which is on unless its CLI is given `-c`. So `@@19` is `@30`, not
+   * driver entry 19.
    *
    * A hand-written `$DA` goes through none of this: the byte is the byte, which
    * is what makes it the only way to reach table entry 19.
@@ -82,7 +84,7 @@ export class InstrumentInspector {
     }
 
     if (this.raw()) {
-      // parser.ts:3131-3135 (Music.cpp:1976) — Addmusic 4.05 numbered custom
+      // parser.ts's $DA remap in parseHexCommand (Music.cpp:1976) — Addmusic 4.05 numbered custom
       // instruments from $13, so a raw $DA remaps before any band is judged.
       if (this.command().target.program === 1 && n >= 0x13) {
         return n - 0x13 + FIRST_CUSTOM_INSTRUMENT;
@@ -110,28 +112,6 @@ export class InstrumentInspector {
       this.store.tokens().instruments.find((d) => at >= d.span.start && at < d.span.end) ?? null
     );
   });
-
-  /** The sample form of the entry the caret is defining, said in words. */
-  protected readonly definitionSample = computed(() => {
-    const sample = this.definingEntry()?.sample;
-    if (!sample) {
-      return '';
-    }
-
-    if (sample.form === 'file') {
-      return `"${sample.name}"`;
-    }
-
-    if (sample.form === 'copy') {
-      return `@${sample.instrument}'s sample, $${hex2(sample.srcn)}`;
-    }
-
-    return `noise at clock $${hex2(sample.clock)} — ${Math.round(noiseHz(sample.clock)).toLocaleString()} Hz`;
-  });
-
-  protected readonly definitionBytes = computed(
-    () => this.definingEntry()?.bytes.map(hex2).join(' ') ?? '',
-  );
 
   protected readonly band = computed<Band>(() => {
     const n = this.emitted();
@@ -178,6 +158,10 @@ export class InstrumentInspector {
   /** The driver's own entry, for the melodic and percussion bands. */
   private readonly entry = computed<InstrumentEntry | null>(() => {
     const tables = this.drivers.instruments();
+    if (!tables) {
+      return null;
+    }
+
     if (this.band() === 'percussion') {
       return tables.percussion[this.written() - FIRST_PERCUSSION_INSTRUMENT] ?? null;
     }
@@ -198,7 +182,7 @@ export class InstrumentInspector {
         return null;
       }
 
-      return [sampleByte(custom.sample), ...custom.bytes];
+      return [sampleByte(custom.sample), ...custom.bytes.map((byte) => byte.value)];
     }
 
     const entry = this.entry();
@@ -325,7 +309,7 @@ export class InstrumentInspector {
       const t = DEFAULT_TRANSPOSE[n];
       rows.push({
         label: 'Transposes',
-        // `parser.ts:2278` subtracts, so a positive entry moves notes *down*.
+        // `parser.ts`'s `parseNote` subtracts, so a positive entry moves notes *down*.
         value: `${t > 0 ? '−' : '+'}${Math.abs(t)} semitones`,
         note: 'applied to every note written under it',
       });
@@ -354,9 +338,6 @@ export class InstrumentInspector {
 
     return this.drivers.driver()?.samples[srcn]?.sampleName ?? 'not in the driver’s default set';
   });
-
-  /** Set when the tables came from the bundled copy rather than the loaded driver. */
-  protected readonly fallback = computed(() => this.drivers.instruments().source === 'bundled');
 
   /** For `@30+`: the sample form as written in the block. */
   protected readonly customSample = computed(() => {

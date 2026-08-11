@@ -3,11 +3,17 @@
     <span class="text-ink-muted text-xs font-semibold tracking-wide uppercase">
       Command inspector
     </span>
-    <span class="font-mono text-xs" [class.text-ink-muted]="!command()">{{ summary() }}</span>
+    <span class="font-mono text-xs" [class.text-ink-muted]="!command() && !entry()">
+      {{ summary() }}
+    </span>
   </summary>
 
   <div class="flex flex-col gap-3 px-3 pt-1 pb-3">
-    @if (command(); as current) {
+    <!-- An entry wins over any command inside it: most of one is not a command
+         at all, and the two forms that are mean something else in a channel. -->
+    @if (entry(); as definition) {
+      <amk-instrument-entry [entry]="definition" />
+    } @else if (command(); as current) {
       <div class="flex items-baseline gap-2">
         <span class="text-accent font-mono text-sm">{{ label() }}</span>
         <span class="text-ink text-sm">{{ current.name }}</span>
@@ -42,11 +48,20 @@
         @case ('adsr') {
           <amk-adsr-command [command]="current" />
         }
-        @case ('letter') {
-          <amk-letter-command [command]="current" />
+        @case ('arpeggio') {
+          <amk-arpeggio-command [command]="current" />
+        }
+        @case ('quantization') {
+          <amk-quantization-command [command]="current" />
+        }
+        @case ('vibrato') {
+          <amk-vibrato-command [command]="current" />
+        }
+        @case ('bend') {
+          <amk-bend-command [command]="current" />
         }
         @default {
-          <amk-generic-command [command]="current" />
+          <amk-param-table [command]="current" />
         }
       }
     } @else {

@@ -1,5 +1,6 @@
+<!-- The typed coefficients, so the curve follows the keyboard. -->
 <amk-fir-graph
-  [taps]="taps()"
+  [taps]="shownTaps()"
   [feedback]="feedback()"
   [target]="mode() === 'draw' && !readOnly() ? target() : null"
   [drawable]="mode() === 'draw' && !readOnly()"
@@ -45,6 +46,12 @@
     <code class="text-ink">"{{ command().replacement }}"</code> replacement, so the text under the
     cursor is the macro's name rather than the bytes. Editing here would write the expansion out in
     its place, so it is turned off — change the definition instead.
+  </p>
+} @else if (command().headReplacement) {
+  <p class="text-ink-muted text-xs leading-relaxed">
+    The <code class="text-ink">$F5</code> itself comes from the
+    <code class="text-ink">"{{ command().headReplacement }}"</code> replacement, but these eight
+    bytes are written here, so they can still be tuned.
   </p>
 }
 
@@ -117,23 +124,20 @@
   <!-- The raw truth, always. -->
   <div class="border-edge border-t pt-2">
     <div class="text-ink-muted mb-1 text-[11px] tracking-wide uppercase">Coefficients</div>
-    <div class="grid grid-cols-4 gap-1">
+    <div class="grid grid-cols-2 gap-x-3">
       @for (row of rows(); track row.index) {
-        <label class="flex flex-col gap-0.5">
-          <span class="text-ink-muted font-mono text-[10px]"
-            >C{{ row.index }} · ${{ row.hex }}</span
-          >
-          <input
-            type="number"
-            class="bg-inset border-edge text-ink w-full rounded-sm border px-1 py-0.5 font-mono text-xs tabular-nums"
-            min="-128"
-            max="127"
-            step="1"
-            [attr.aria-label]="`Coefficient ${row.index}`"
-            [value]="row.tap"
-            (change)="setTap(row.index, $any($event.target).value)"
-          />
-        </label>
+        <amk-slider
+          origin="centre"
+          [label]="`C${row.index}`"
+          [signed]="true"
+          [value]="row.tap"
+          [min]="-128"
+          [max]="127"
+          [valueLabel]="row.hex"
+          [disabled]="readOnly()"
+          (preview)="previewTap(row.index, $event)"
+          (commit)="setTap(row.index, $event)"
+        />
       }
     </div>
   </div>

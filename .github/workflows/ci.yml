@@ -6,11 +6,6 @@ on:
   pull_request:
   workflow_dispatch:
 
-# The Angular workspace lives one level down, so every step runs from web/.
-defaults:
-  run:
-    working-directory: web
-
 jobs:
   check:
     name: Typecheck and tests
@@ -22,16 +17,19 @@ jobs:
         with:
           node-version: 24
           cache: npm
-          cache-dependency-path: web/package-lock.json
+          cache-dependency-path: package-lock.json
 
+      # One install at the root covers every workspace: the four packages and
+      # the Angular app.
       - run: npm ci
 
       - run: npm run lint
 
-      # Formatting, both typechecks (app and the CLI harnesses) and the ten
-      # byte-level harnesses: the compiler self-test, SPC assembly, the headless
-      # MML -> SPC -> PCM audio chain, the worklet, the chart helpers, BRR/bank
-      # decoding, the MML scanner, the echo FIR, the instrument tables and ADSR.
+      # Formatting, three typechecks (packages, harnesses, app) and the eleven
+      # byte-level harnesses: the compiler self-test, the scanner and its
+      # splices, ADSR/instrument tables/BRR/echo FIR, the SPC assembly, the
+      # headless MML -> SPC -> PCM audio chain, the worklet, and the chart
+      # helpers.
       - run: npm run check
 
   deploy:
@@ -61,13 +59,15 @@ jobs:
         with:
           node-version: 24
           cache: npm
-          cache-dependency-path: web/package-lock.json
+          cache-dependency-path: package-lock.json
 
       - run: npm ci
 
-      # `npm run build` (not `ng build`) so the prebuild hook still
-      # generates public/player/spc-worklet.js, which is not checked in.
+      # `npm run build` (not `ng build`) so the prebuild hook still bundles the
+      # worklet, mirrors the SPC package's assets into web/public/ and writes
+      # the commit SHA. None of the three is checked in.
       - name: Build
+        working-directory: web
         run: npm run build -- --base-href=/${{ github.event.repository.name }}/
 
       - uses: actions/configure-pages@v5

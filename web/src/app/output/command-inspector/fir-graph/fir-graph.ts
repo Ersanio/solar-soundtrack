@@ -7,29 +7,17 @@ import {
   echoStability,
   firCurveFrequencies,
   firMagnitude,
-} from '@spc/fir';
+} from '@amk/spc/fir';
+import { plot } from '../../../shared/chart/plot';
+import { clamp } from '../../../util/math';
 
 /** Plot bounds. The floor is deep enough to show a real stopband. */
 const TOP_DB = 12;
 const FLOOR_DB = -48;
 /**
- * The frequency axis is **linear**, DC to Nyquist, which is not what an audio
- * plot usually does and is deliberate.
- *
- * An 8-tap response is a degree-7 polynomial in `cos(ω)`, so its nulls and
- * ripples are spaced evenly in frequency. Every feature of AddmusicK's own
- * `EchoFilter0` — both nulls, both ripple peaks — sits above 8.7 kHz, which a
- * log axis over the same range squeezes into its rightmost seventh while
- * spending four octaves on a region {@link FIR_AUTHORITY_HZ} says the filter
- * cannot shape at all. Linear gives that top octave half the width instead.
- *
- * It also makes DC drawable. `firDcGain` is a real quantity — the manual's
- * low-pass sums to 132 and so lifts steady tones by 3% — and a log axis can
- * never show 0 Hz at all.
- *
- * The cost is that hearing is logarithmic and this is not. That argument is at
- * its weakest here: the octaves it would buy space for are exactly the ones the
- * filter has no authority over.
+ * The frequency axis is **linear**, DC to Nyquist — deliberate, and README.md
+ * says why. It also makes DC drawable, which matters because `firDcGain` is a
+ * real quantity: the manual's low-pass sums to 132 and lifts steady tones by 3%.
  */
 const FROM_HZ = 0;
 const TO_HZ = DSP_RATE / 2;
@@ -38,14 +26,8 @@ const POINTS = 160;
 /** How many echo repeats to ghost in behind the main curve. */
 const REPEATS = 4;
 
-/**
- * Drawn in a fixed coordinate space and stretched to fit, the way the sample
- * browser's waveform is. Cheaper than measuring the element, and the only cost
- * is that stroke widths scale with it — which is why they are set in the
- * viewBox's own units rather than pixels.
- */
-const VIEW_W = 320;
-const VIEW_H = 150;
+/** Taller than the shared space: a filter's readable range is wider than a curve. */
+const PLOT = plot(320, 150);
 
 /** Every 2 kHz, so the ticks are evenly spaced and land on both plot edges. */
 const TICKS = [0, 2000, 4000, 6000, 8000, 10000, 12000, 14000, 16000];
@@ -66,9 +48,7 @@ export class FirGraph {
   /** Fired with a frequency and gain when the plot is clicked in draw mode. */
   readonly picked = output<{ hz: number; gain: number }>();
 
-  protected readonly VIEW_W = VIEW_W;
-  protected readonly VIEW_H = VIEW_H;
-  protected readonly VIEW_BOX = `0 0 ${VIEW_W} ${VIEW_H}`;
+  protected readonly plot = PLOT;
 
   private readonly frequencies = firCurveFrequencies({
     fromHz: FROM_HZ,
@@ -79,7 +59,7 @@ export class FirGraph {
 
   /** Frequency to plot x. */
   private readonly xOf = (hz: number): number => {
-    return ((hz - FROM_HZ) / (TO_HZ - FROM_HZ)) * VIEW_W;
+    return ((hz - FROM_HZ) / (TO_HZ - FROM_HZ)) * PLOT.w;
   };
 
   /**
@@ -92,8 +72,8 @@ export class FirGraph {
    */
   private readonly yOf = (gain: number): number => {
     const db = 20 * Math.log10(Math.max(gain, 1e-9));
-    const clamped = Math.min(Math.max(db, FLOOR_DB), TOP_DB);
-    return ((TOP_DB - clamped) / (TOP_DB - FLOOR_DB)) * VIEW_H;
+    const clamped = clamp(db, FLOOR_DB, TOP_DB);
+    return ((TOP_DB - clamped) / (TOP_DB - FLOOR_DB)) * PLOT.h;
   };
 
   protected readonly unityY = computed(() => this.yOf(1));
@@ -147,7 +127,7 @@ export class FirGraph {
     const drawn = sorted.map((p) => `L${this.xOf(p.hz)} ${this.yOf(p.gain)}`).join(' ');
     const first = this.yOf(sorted[0].gain);
     const last = this.yOf(sorted[sorted.length - 1].gain);
-    return `M0 ${first} ${drawn} L${VIEW_W} ${last}`;
+    return `M0 ${first} ${drawn} L${PLOT.w} ${last}`;
   });
 
   protected readonly runawayBand = computed(() => {
@@ -182,12 +162,12 @@ export class FirGraph {
     const tx = (event.clientX - rect.left) / rect.width;
     const ty = (event.clientY - rect.top) / rect.height;
 
-    const hz = FROM_HZ + Math.min(Math.max(tx, 0), 1) * (TO_HZ - FROM_HZ);
-    const db = TOP_DB - Math.min(Math.max(ty, 0), 1) * (TOP_DB - FLOOR_DB);
+    const hz = FROM_HZ + clamp(tx, 0, 1) * (TO_HZ - FROM_HZ);
+    const db = TOP_DB - clamp(ty, 0, 1) * (TOP_DB - FLOOR_DB);
     this.picked.emit({ hz, gain: 10 ** (db / 20) });
   }
 
-  /** What a screen reader gets instead of the picture. */
+  /** The curve in words: the response in decibels at four frequencies. */
   protected readonly description = computed(() => {
     const at = (hz: number) =>
       (20 * Math.log10(Math.max(firMagnitude(this.taps(), hz), 1e-9))).toFixed(0);

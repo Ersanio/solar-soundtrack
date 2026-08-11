@@ -1,0 +1,65 @@
+@if (args().length < 3) {
+  <p class="text-ink-muted text-xs leading-relaxed">
+    Needs three arguments: a delay, a duration and a target.
+  </p>
+} @else {
+  <!-- The dragged values, so the curve follows the pointer. -->
+  <amk-bend-graph
+    [delay]="shownDelay()"
+    [duration]="shownDuration()"
+    [from]="from()"
+    [to]="to()"
+    [tempo]="tempo()"
+  />
+
+  <amk-slider
+    label="Delay"
+    [value]="delay()"
+    [max]="255"
+    [valueLabel]="delayLabel()"
+    [note]="lockedBecause(0)"
+    [disabled]="!editable(0)"
+    (preview)="preview(0, $event)"
+    (commit)="setArg(0, $event)"
+  />
+
+  <amk-slider
+    label="Over"
+    [value]="duration()"
+    [max]="255"
+    [valueLabel]="durationLabel()"
+    [note]="lockedBecause(1)"
+    [disabled]="!editable(1)"
+    (preview)="preview(1, $event)"
+    (commit)="setArg(1, $event)"
+  />
+
+  @if (isPitchBend()) {
+    <!-- A dropdown, so there is no drag to preview: it commits on choosing. -->
+    <amk-note-picker
+      label="Target note"
+      [value]="target()"
+      [disabled]="!editable(2)"
+      (commit)="setArg(2, $event)"
+    />
+    <span class="text-ink-muted font-mono text-[11px]">{{ noteLabel() }}</span>
+  } @else {
+    <amk-slider
+      label="Semitones"
+      [signed]="true"
+      [value]="semitones()"
+      [min]="-128"
+      [max]="127"
+      [note]="lockedBecause(2)"
+      [disabled]="!editable(2)"
+      (preview)="preview(2, $event)"
+      (commit)="setArg(2, $event)"
+    />
+  }
+
+  @if (reachability(); as problem) {
+    <p class="text-warn text-xs leading-relaxed">{{ problem }}</p>
+  }
+
+  <p class="text-ink-muted text-xs leading-relaxed">{{ note() }}</p>
+}

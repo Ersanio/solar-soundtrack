@@ -1,40 +1,14 @@
-<button
-  amk-button
-  variant="primary"
-  [disabled]="!store.canCompile()"
-  [attr.aria-label]="playback.isPlaying() ? 'Pause' : 'Compile and play'"
-  (click)="playback.toggle()"
->
+<button amk-button variant="primary" [disabled]="!store.canCompile()" (click)="playback.toggle()">
   {{ playback.isPlaying() ? '❚❚ Pause' : '▶ Play' }}
 </button>
 
-<button
-  amk-button
-  aria-label="Stop"
-  title="Stop"
-  [disabled]="playback.isIdle()"
-  (click)="playback.stop()"
->
-  ■
-</button>
+<button amk-button title="Stop" [disabled]="playback.isIdle()" (click)="playback.stop()">■</button>
 
-<!--
-  Two halves to a drag. `input` only parks the displayed position under the
-  pointer — the value is bound, so without it the next position update from the
-  audio thread would yank the thumb back mid-drag. The seek itself waits for the
-  release, because there is no snapshot to jump to and the emulator has to replay
-  the song silently to get there; firing per drag event would queue a
-  re-emulation per pixel.
-
-  `pointerup` alongside `change` so a drag that ends where it began still lets
-  go — see `Playback.commitScrub`.
--->
 <input
   type="range"
   min="0"
   step="0.1"
   class="accent-accent w-24 cursor-pointer disabled:cursor-not-allowed disabled:opacity-40"
-  aria-label="Seek"
   title="Seek — the song replays silently to reach the new position"
   [max]="playback.duration()"
   [value]="playback.position()"
@@ -65,7 +39,6 @@
   min="0"
   max="500"
   class="accent-accent w-20 cursor-pointer"
-  aria-label="Volume"
   title="Volume"
   [value]="playback.volume()"
   (input)="onVolume($event)"

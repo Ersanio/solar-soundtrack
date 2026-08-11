@@ -4,14 +4,12 @@
     type="button"
     [class]="wrapButtonClass()"
     [title]="wordWrap() ? 'Word wrap: on' : 'Word wrap: off'"
-    [attr.aria-label]="wordWrap() ? 'Disable word wrap' : 'Enable word wrap'"
-    [attr.aria-pressed]="wordWrap()"
     (click)="toggleWordWrap()"
   >
     <amk-icon-wrap />
   </button>
 
-  <!-- Will grow into a toolbar; the caret readout is the only occupant for now. -->
+  <!-- Will grow into a toolbar; the tabs and the caret readout are all it holds for now. -->
   <div panelAside class="flex items-center gap-3">
     <amk-tabs [tabs]="TABS" [(active)]="tab" />
     @if (tab() === 'source') {
@@ -21,22 +19,11 @@
 
   <!-- Hidden rather than destroyed on tab switch, so the CodeMirror view keeps
        its undo history, scroll position and selection. -->
-  <div
-    id="panel-source"
-    role="tabpanel"
-    aria-labelledby="tab-source"
-    class="h-full"
-    [class.hidden]="tab() !== 'source'"
-  >
+  <div class="h-full" [class.hidden]="tab() !== 'source'">
     <div #editorHost class="h-full"></div>
   </div>
   @if (tab() === 'samples') {
-    <div
-      id="panel-samples"
-      role="tabpanel"
-      aria-labelledby="tab-samples"
-      class="flex h-full min-h-0 flex-col"
-    >
+    <div class="flex h-full min-h-0 flex-col">
       <amk-sample-browser class="min-h-0 flex-1" />
     </div>
   }

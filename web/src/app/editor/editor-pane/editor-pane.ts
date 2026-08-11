@@ -17,7 +17,7 @@ import { setDiagnostics } from '@codemirror/lint';
 import { Compartment, EditorState } from '@codemirror/state';
 import { EditorView, keymap, lineNumbers } from '@codemirror/view';
 
-import type { Severity } from '@core/types';
+import type { Severity } from '@amk/core/types';
 import { IconWrap } from '../../shared/icons/icon-wrap';
 import { Panel } from '../../shared/panel/panel';
 import { type TabDef, Tabs } from '../../shared/tabs/tabs';
@@ -29,6 +29,7 @@ import { commandHover } from '../codemirror/command-hover';
 import { mmlLanguage } from '../codemirror/mml-language';
 import { mmlTheme } from '../codemirror/mml-theme';
 import { playheadField, setPlayhead } from '../codemirror/playhead';
+import { clamp } from '../../util/math';
 
 type EditorTab = 'source' | 'samples';
 
@@ -129,7 +130,6 @@ export class EditorPane {
           playheadField,
           EditorState.tabSize.of(8),
           EditorView.contentAttributes.of({
-            'aria-label': 'MML source',
             spellcheck: 'false',
             autocorrect: 'off',
             autocapitalize: 'off',
@@ -193,13 +193,19 @@ export class EditorPane {
         this.store.replace.set(null);
 
         const length = this.view.state.doc.length;
-        this.view.dispatch({
-          changes: {
-            from: Math.min(edit.span.start, length),
-            to: Math.min(edit.span.end, length),
-            insert: edit.text,
-          },
-        });
+        const from = Math.min(edit.span.start, length);
+        const to = Math.min(edit.span.end, length);
+
+        // The span was worked out against a scan of `source`, which is written
+        // from the update listener below and so *is* the document — but only up
+        // to the microtask that carried this edit across. Checking the text
+        // rather than trusting the offsets is what makes a stale splice a
+        // no-op instead of an overwrite of whatever moved into its place.
+        if (this.view.state.doc.sliceString(from, to) !== edit.expect) {
+          return;
+        }
+
+        this.view.dispatch({ changes: { from, to, insert: edit.text } });
       });
     });
 
@@ -219,7 +225,7 @@ export class EditorPane {
               .filter((diagnostic) => diagnostic.span.start <= length)
               .map((diagnostic) => ({
                 from: Math.min(diagnostic.span.start, length),
-                to: Math.min(Math.max(diagnostic.span.end, diagnostic.span.start + 1), length),
+                to: clamp(diagnostic.span.end, diagnostic.span.start + 1, length),
                 severity: LINT_SEVERITY[diagnostic.severity],
                 message: `${diagnostic.code}: ${diagnostic.message}`,
                 markClass: diagnostic.severity === 'severe' ? 'cm-amk-severe' : undefined,
@@ -249,7 +255,7 @@ export class EditorPane {
   private revealSpan(span: { start: number; end: number }): void {
     const length = this.view.state.doc.length;
     const anchor = Math.min(span.start, length);
-    const head = Math.min(Math.max(span.end, span.start + 1), length);
+    const head = clamp(span.end, span.start + 1, length);
     this.view.dispatch({
       selection: { anchor, head },
       effects: EditorView.scrollIntoView(anchor, { y: 'center' }),

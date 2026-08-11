@@ -16,7 +16,7 @@ to actually _hear_ a port, you had to insert it into the ROM, open an emulator, 
 that plays it. When you change around notes, you have to repeat this process. Nowadays, AddmusicK
 has a "porter mode" that makes this process easier, but still requires switching windows.
 
-So the idea was to make a single tool for *everything* custom music-related. Write it, hear
+So the idea was to make a single tool for _everything_ custom music-related. Write it, hear
 it, edit it, even export it, without leaving this one window. I hope to make custom music
 more accessible to people, this way.
 
@@ -46,6 +46,8 @@ games, and even for homebrew. A huge library of music is available at [SMW Centr
   eight taps at 32 kHz have no real say; and it warns when the feedback and the filter together
   make an echo that builds up instead of dying away. Edits go straight back into the MML, so with
   **Live** on you hear the change on the running song.
+- **Syntax highlighting**, and a **live playhead** that follows the driver rather than estimating —
+  so the highlighted note is the note you are hearing, in every channel.
 - **A hex dump** of the compiled song data, just because.
 - **Export** a finished `.spc`, or the raw song-data `.bin`.
 - Your draft and your sample library are kept locally, so closing the tab does not lose
@@ -55,20 +57,18 @@ games, and even for homebrew. A huge library of music is available at [SMW Centr
 
 ## What is not there yet
 
-- The editor is a plain text box. There is **no syntax highlighting** (yet).
-- **No playhead highlighting.** Showing which note is playing, in the editor, live, is the
-  feature I most want that can help debug music. This will be implemented in the future.
+- **No accessibility.** The app ships no ARIA attributes at all. That is a deferral rather than an
+  oversight, and it is next on the list once the codebase settles.
 
 See the [GitHub Issues](https://github.com/ersanio/solar-soundtrack/issues) for a list of
 ideas, planned features and known issues.
 
 ## Running it locally
 
-The application is written in Angular. The Angular workspace lives in `web/`,
-one level down from the repository root.
+An npm workspace: four framework-free packages and the Angular editor that imports them. Every
+command runs from the repository root.
 
 ```bash
-cd web
 npm install
 npm start          # dev server on http://localhost:4200/
 ```
@@ -77,26 +77,24 @@ Node 24 is what CI uses.
 
 ### npm scripts
 
-| Command | What it does |
-| --- | --- |
-| `npm start` | Angular dev server (`ng serve`) on `http://localhost:4200/`. |
-| `npm run build` | Production build via `ng build`, output in `dist/`. |
-| `npm run watch` | Dev-configuration build with `--watch`, no server. |
-| `npm run typecheck` | `tsc --noEmit`, no build output. |
-| `npm run lint` | `ng lint` (ESLint). |
-| `npm run test` | `ng test` (Vitest). |
-| `npm run check` | What CI runs to gate a merge: typecheck plus six byte-level harnesses (`selftest`, `spctest`, `audiotest`, `worklettest`, `charttest`, `brrtest`) that pin the compiler, SPC assembly, the headless audio chain, the worklet, chart helpers and BRR/bank decoding against known-good byte output. |
+| Command          | What it does                                                    |
+| ---------------- | --------------------------------------------------------------- |
+| `npm start`      | Dev server on `http://localhost:4200/`.                         |
+| `npm run build`  | Production build, output in `web/dist/`.                        |
+| `npm run watch`  | Dev-configuration build with `--watch`, no server.              |
+| `npm run lint`   | ESLint over every workspace.                                    |
+| `npm run format` | Prettier over the workspace.                                    |
+| `npm run check`  | The merge gate: formatting, three typechecks, eleven harnesses. |
 
-Two things run automatically before the commands above (via `pre*` npm hooks), so you never
-need to invoke them yourself:
+`npm run check` is what CI runs. The eleven harnesses pin the compiler, the scanner, SPC assembly,
+the headless MML → SPC → PCM chain, the worklet, BRR decoding, the echo FIR and the envelope maths
+against known-good byte output. `scripts/README.md` says what each one actually proves.
 
-- **`build:worklet`** bundles `web/src/spc/worklet.ts` with `esbuild` into
-  `public/player/spc-worklet.js`, since an `AudioWorklet` is loaded separately by the browser's
-  audio thread and isn't something Angular's own build produces.
-- **`generate-git-info`** writes the current `git rev-parse HEAD` SHA to a gitignored file, which
-  powers the GitHub commit link in the app's toolbar. It's captured once when the dev
-  server/build starts, so it goes stale if you commit while `npm start` keeps running - restart
-  to refresh it.
+Three things run automatically before the commands above (via `pre*` npm hooks), so you never need
+to invoke them yourself: the audio worklet is bundled with esbuild, the SPC package's driver and
+emulator assets are mirrored into `web/public/`, and the current commit SHA is written to a
+gitignored file that powers the toolbar's commit link. The SHA is captured once when the dev server
+starts, so it goes stale if you commit while `npm start` keeps running — restart to refresh it.
 
 ## How it works
 
@@ -105,18 +103,23 @@ data assembly. The driver, the SPC header and the sample set are all static byte
 already supplied by AddmusicK. The song data is the only thing that has to be compiled
 at runtime.
 
-There are three layers, roughly:
+Four packages, and an editor that imports them. Each has a `README.md` of its own.
 
-| Path                           | What lives there                                                    |
-| ------------------------------ | ------------------------------------------------------------------- |
-| `web/src/compiler/`            | The MML compiler - preprocessor, parser, linker                     |
-| `web/src/spc/`                 | SPC assembly, BRR handling, the emulator host and the audio worklet |
-| `web/src/app/`                 | The Angular UI                                                      |
+| Path                     | What lives there                                                   |
+| ------------------------ | ------------------------------------------------------------------ |
+| `packages/core/`         | Types, AddmusicK's constant tables, hex formatting                 |
+| `packages/mml-compiler/` | The MML compiler — preprocessor, parser, linker                    |
+| `packages/mml-tokens/`   | The scanner behind highlighting and the command inspector          |
+| `packages/spc/`          | SPC assembly, BRR, the echo FIR, the emulator host and the worklet |
+| `web/`                   | The Angular editor                                                 |
 
-On testing: `npm run check` runs byte-level harnesses that pin the compiler's output,
-SPC assembly, the full headless MML → SPC → PCM chain, BRR and bank decoding. Separately,
-`web/scripts/Compare-Spc.ps1` and `Compare-SongBin.ps1` diff this compiler's output
-against a native AddmusicK build, for byte-by-byte comparison.
+Nothing in `packages/` touches a framework or the DOM beyond three `fetch` calls, which is what lets
+the same modules run in Node under the test harnesses, on the main thread, and inside an audio
+worklet.
+
+On testing: `npm run check` runs eleven byte-level harnesses — see `scripts/README.md`. Separately,
+`scripts/Compare-Spc.ps1` and `Compare-SongBin.ps1` diff this compiler's output against a native
+AddmusicK build, byte for byte.
 
 ## Contributing
 
@@ -156,7 +159,7 @@ This project stands on other people's work:
 MIT - see [LICENSE](LICENSE).
 
 The bundled third-party material keeps its own terms. The emulator core is LGPL 2.1, and
-the driver bundle under `web/public/driver/` is AddmusicK output whose `#default` samples
+the driver bundle under `packages/spc/assets/driver/` is AddmusicK output whose `#default` samples
 originate from Super Mario World; `LICENSE` spells both out.
 
 ## Contact

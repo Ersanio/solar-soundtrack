@@ -1,11 +1,12 @@
-import { Service, computed, effect, inject, signal } from '@angular/core';
+import { Service, computed, effect, inject, linkedSignal, signal } from '@angular/core';
 
-import { compiler } from '@compiler';
-import { commandAt, tokenize } from '@compiler/tokens';
-import type { CompileResult, Diagnostic, Span } from '@core/types';
-import { buildSpc, spcFilename } from '@spc/export';
-import { ARAM_SIZE, type AramBudget, computeBudget } from '@spc/layout';
-import { echoHazards } from '../util/echo-hazards';
+import { compiler } from '@amk/compiler';
+import type { Edit } from '@amk/tokens/edits';
+import { commandAt, tokenize } from '@amk/tokens';
+import type { CompileResult, Diagnostic, Span } from '@amk/core/types';
+import { buildSpc, spcFilename } from '@amk/spc/export';
+import { ARAM_SIZE, type AramBudget, computeBudget } from '@amk/spc/layout';
+import { echoHazards } from '@amk/tokens/echo-hazards';
 import { caretPosition, downloadBlob, errorMessage } from '../util/format';
 import { DriverStore } from './driver-store';
 import { SampleStore } from './sample-store';
@@ -77,12 +78,34 @@ export class EditorStore {
    * view and nothing else may reach into it.
    *
    * A fresh object each time, so writing the same edit twice still takes.
+   *
+   * `expect` is what the splice believes occupies the span. Panels read the
+   * *undebounced* scan, so their spans agree with the document — but only up to
+   * the microtask that carries the edit across, and a control that fires on
+   * `pointerup` is one gesture away from a document that has moved. The editor
+   * compares before it dispatches, which turns that whole class of race from
+   * silent corruption into an edit that simply does not take.
    */
-  readonly replace = signal<{ span: Span; text: string } | null>(null);
+  readonly replace = signal<Edit | null>(null);
+
+  /**
+   * Applies a splice built by `@amk/tokens`'s `edits.ts`, ignoring the `null` those
+   * builders return when nothing would change.
+   *
+   * Here rather than in each panel so the no-op check and the defensive copy are
+   * stated once: a slider fires per frame of a drag, and the builders answering
+   * "that is the text already there" is what keeps a drag from pushing dozens of
+   * identical recompiles through the typing debounce.
+   */
+  apply(edit: Edit | null): void {
+    if (edit) {
+      this.replace.set({ ...edit, span: { ...edit.span } });
+    }
+  }
 
   /**
    * The text the compiler last ran on. It lags `source` by the typing debounce,
-   * which is why the two are separate signals: the textarea stays responsive at
+   * which is why the two are separate signals: the editor stays responsive at
    * keystroke speed while compilation runs at most every {@link DEBOUNCE_MS}.
    */
   private readonly committed = signal(this.source());
@@ -90,15 +113,15 @@ export class EditorStore {
 
   /** `null` until a driver supplies a load address — never a guessed one. */
   private readonly compilation = computed(() => {
-    const plan = this.drivers.plan();
-    if (!plan) {
+    const driver = this.drivers.driver();
+    if (!driver) {
       return null;
     }
 
     const started = performance.now();
     const result = compiler.compile({
       source: this.committed(),
-      aramAddress: plan.localPos,
+      aramAddress: driver.manifest.localPos,
       // What the sample library holds, and what the user asked to be done with
       // it. A compiler that does not understand these keys ignores them, per the
       // `CompileRequest.options` contract.
@@ -112,7 +135,7 @@ export class EditorStore {
     return {
       result,
       elapsedMs: performance.now() - started,
-      aramAddress: plan.localPos,
+      aramAddress: driver.manifest.localPos,
       text: this.committed(),
     };
   });
@@ -134,8 +157,8 @@ export class EditorStore {
    * lag by the typing debounce; the echo hazards are scanned from {@link tokens}, which does not,
    * so a runaway echo is reported by the keystroke or paste that writes it and stays live even with
    * auto-compile switched off. A warning about what the song will do the moment you press play is
-   * not worth holding back 150 ms, and the compiler could not produce it anyway — `$F5` never
-   * reaches it.
+   * not worth holding back 150 ms, and the compiler has no opinion to offer anyway: it copies `$F5`
+   * through on its length alone, because `Music.cpp` has no `$F5` code to port.
    */
   readonly diagnostics = computed<Diagnostic[]>(() => {
     const order = { error: 0, severe: 1, warning: 2, info: 3 } as const;
@@ -165,10 +188,28 @@ export class EditorStore {
     return this.drivers.driver()?.samples ?? [];
   });
 
+  /**
+   * An echo delay being dragged, before the document has it.
+   *
+   * The echo buffer is the largest single thing a song can spend ARAM on — 2 KiB
+   * per step of `$F1`'s first argument — so the delay control is really an
+   * allocator, and the number it moves lives in the output pane rather than
+   * beside it. Set from the inspector; nobody else may write it.
+   *
+   * A `linkedSignal` over {@link result}, so it clears itself the moment a
+   * compile has seen the real value — the same self-clearing the command
+   * inspector's own `dragPreview` uses, and for the same reason: there is no
+   * drag-ended event to forget, and it cannot be left showing a delay the song
+   * does not have.
+   */
+  readonly echoDelayPreview = linkedSignal<CompileResult | null, number | null>({
+    source: () => this.result(),
+    computation: () => null,
+  });
+
   readonly budget = computed<AramBudget | null>(() => {
     const driver = this.drivers.driver();
-    const plan = this.drivers.plan();
-    if (!driver || !plan) {
+    if (!driver) {
       return null;
     }
 
@@ -176,9 +217,8 @@ export class EditorStore {
     return computeBudget(
       driver,
       this.samples(),
-      plan,
       result?.data?.length ?? 0,
-      result?.stats?.echoBufferSize ?? 0,
+      this.echoDelayPreview() ?? result?.stats?.echoBufferSize ?? 0,
     );
   });
 
@@ -216,7 +256,27 @@ export class EditorStore {
   /** The command the caret is in, which the command inspector renders. */
   readonly commandAtCaret = computed(() => commandAt(this.tokens().commands, this.caret()));
 
-  /** Set by actions that can fail outside compilation (export, driver upload). */
+  /**
+   * The `#instruments` entry the caret is in, if any.
+   *
+   * Needed alongside {@link commandAtCaret} rather than derived from it: most of
+   * an entry is not a command at all. `"kick.brr" $FF $E0 $B8 $02 $F0` is a
+   * string token and five `hexArg`s, and `gather` builds commands from neither —
+   * so a caret anywhere in that line finds nothing, and the entry editor would
+   * be reachable only for the `@n` and `nXX` sample forms, which do happen to
+   * scan as commands. End-*inclusive*, like `commandAt`: a `Span` is half-open,
+   * so a caret resting immediately after the entry is one past `span.end` and
+   * would otherwise find nothing to edit.
+   */
+  readonly instrumentAtCaret = computed(() => {
+    const at = this.caret();
+    return (
+      this.tokens().instruments.find((entry) => at >= entry.span.start && at <= entry.span.end) ??
+      null
+    );
+  });
+
+  /** Set by actions that can fail outside compilation, such as export. */
   private readonly override = signal<Status | null>(null);
 
   readonly status = computed<Status>(() => {
@@ -295,9 +355,8 @@ export class EditorStore {
    */
   assembleSpc(): Uint8Array | null {
     const driver = this.drivers.driver();
-    const plan = this.drivers.plan();
     const result = this.result();
-    if (!driver || !plan || !result?.ok || !result.data) {
+    if (!driver || !result?.ok || !result.data) {
       return null;
     }
 
@@ -306,7 +365,6 @@ export class EditorStore {
         songData: result.data,
         driver,
         samples: this.samples(),
-        plan,
         tags: result.stats?.tags,
         seconds: result.stats?.tagSeconds,
         echoBufferSize: result.stats?.echoBufferSize,

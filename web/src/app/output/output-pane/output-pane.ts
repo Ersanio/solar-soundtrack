@@ -27,10 +27,5 @@ export class OutputPane {
 
   protected readonly statusColor = computed(() => this.statusClass[this.store.status().kind]);
 
-  /**
-   * Without a driver there is no load address, so there is nothing meaningful to
-   * compile against — the panel says so instead of showing stale or invented
-   * numbers.
-   */
   protected readonly blocked = computed(() => !this.drivers.ready());
 }

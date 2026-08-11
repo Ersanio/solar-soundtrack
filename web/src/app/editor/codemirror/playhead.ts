@@ -1,7 +1,8 @@
 import { StateEffect, StateField } from '@codemirror/state';
 import { Decoration, type DecorationSet, EditorView } from '@codemirror/view';
 
-import type { Span } from '@core/types';
+import type { Span } from '@amk/core/types';
+import { clamp } from '../../util/math';
 
 /** Replaces the playhead marks wholesale; the field below renders them. */
 export const setPlayhead = StateEffect.define<readonly Span[]>();
@@ -23,9 +24,7 @@ export const playheadField = StateField.define<DecorationSet>({
         return Decoration.set(
           effect.value
             .filter((span) => span.start < length)
-            .map((span) =>
-              mark.range(span.start, Math.min(Math.max(span.end, span.start + 1), length)),
-            ),
+            .map((span) => mark.range(span.start, clamp(span.end, span.start + 1, length))),
           true,
         );
       }
