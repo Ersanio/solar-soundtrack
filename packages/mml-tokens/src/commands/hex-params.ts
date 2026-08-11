@@ -2,7 +2,7 @@ import { EMPTY_SAMPLE_NAME } from "@amk/core/hardcoded-tables";
 import { noiseHz } from "@amk/spc/adsr";
 import { hex2 } from "@amk/core/hex";
 import { DURATION, type ParamDescriptor, type Resolver, choice, fixed, raw, s8, ticks, u8 } from "./param";
-import { bpm, noteName, panLabel, percentOf255 } from "./units";
+import { noteName, panLabel, percentOf255, tempoLabel } from "./units";
 
 /**
  * The highest tempo that is not a freeze.
@@ -378,7 +378,7 @@ export const HEX_PARAMS: Readonly<Record<number, Resolver>> = {
 		[
 			u8("Tempo", "rate", {
 				max: MAX_TEMPO,
-				describe: (value) => `about ${bpm(value).toFixed(1)} BPM — estimated; the driver drops ticks when it is busy`,
+				describe: tempoLabel,
 			}),
 		],
 		"The driver stores one more than you write, so $FF would be tempo 0 and the song would stop advancing.",
@@ -388,7 +388,7 @@ export const HEX_PARAMS: Readonly<Record<number, Resolver>> = {
 			DURATION,
 			u8("Tempo", "rate", {
 				max: MAX_TEMPO,
-				describe: (value) => `about ${bpm(value).toFixed(1)} BPM`,
+				describe: tempoLabel,
 			}),
 		],
 		"Its handler has the same carry-less add as $E2, so a target of $FF fades the song to a stop.",

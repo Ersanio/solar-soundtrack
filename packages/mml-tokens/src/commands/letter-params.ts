@@ -1,7 +1,7 @@
 import { TICKS_PER_WHOLE } from "@amk/core/hardcoded-tables";
 import { noiseHz } from "@amk/spc/adsr";
 import { DURATION, type Resolver, fixed, s8, ticks, u8 } from "./param";
-import { bpm, noteLengthName, percentOf255 } from "./units";
+import { noteLengthName, percentOf255, tempoLabel } from "./units";
 
 /** See `MAX_TEMPO` in `hex-params.ts`: the driver stores one more than you write. */
 const MAX_TEMPO = 254;
@@ -102,7 +102,7 @@ export const LETTER_PARAMS: Readonly<Record<string, Resolver>> = {
 			// `$E2 $00` it compiles to is legal and means the slowest tempo there is.
 			min: 1,
 			max: MAX_TEMPO,
-			describe: (value) => `about ${bpm(value).toFixed(1)} BPM`,
+			describe: tempoLabel,
 		});
 
 		const ceiling = "Stops at 254: the driver adds one, so t255 would be tempo 0 and the song would freeze.";

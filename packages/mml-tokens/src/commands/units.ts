@@ -17,6 +17,17 @@ export function bpm(tempo: number): number {
 	return 60 / (48 * tickSeconds(tempo));
 }
 
+/** Driver ticks per second at a tempo byte — {@link tickSeconds} the other way up. */
+export function ticksPerSecond(tempo: number): number {
+	return 1 / tickSeconds(tempo);
+}
+
+/** The caveat is the driver's, not one spelling's: `t` compiles to `$E2` and `t,` to `$E3`. */
+export function tempoLabel(tempo: number): string {
+	const rate = `about ${bpm(tempo).toFixed(1)} BPM · ${ticksPerSecond(tempo).toFixed(1)} ticks per second`;
+	return `${rate} — estimated; the driver drops ticks when it is busy`;
+}
+
 /** * Every tick count the readme's "Length" table names, and the five dotted ones. */
 const NOTE_LENGTHS: Readonly<Record<number, string>> = {
 	192: "a whole note",
