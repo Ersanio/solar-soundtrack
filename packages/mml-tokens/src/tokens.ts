@@ -89,7 +89,7 @@ export const TOKEN_TAGS: Readonly<Record<TokenKind, string>> = {
 	replacement: "string",
 	string: "string",
 	hex: "keyword",
-	hexArg: "number",
+	hexArg: "integer",
 	number: "number",
 	hexNumber: "number",
 	operator: "operator",

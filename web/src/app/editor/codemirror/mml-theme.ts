@@ -74,9 +74,15 @@ const structure = EditorView.theme(
 );
 
 /**
- * One entry per tag named in `TOKEN_TAGS`, existing theme colours only. Notes
- * and plain numbers stay primary ink on purpose — the melody is the text, and
- * everything else is annotation around it.
+ * One entry per tag named in `TOKEN_TAGS`. Notes and plain numbers stay primary
+ * ink on purpose — the melody is the text, and everything else is annotation
+ * around it.
+ *
+ * A hex command's argument bytes are the one tag that carries a colour of its
+ * own rather than one already spent elsewhere. They are not `--color-accent`:
+ * repeating the command byte's colour would flatten `$E7 $02` into one
+ * undifferentiated blue run, and leaving them on `tags.number` — which is where
+ * they were — made them indistinguishable from notes and body text.
  */
 const highlight = HighlightStyle.define([
   { tag: tags.comment, color: 'var(--color-ink-muted)', fontStyle: 'italic' },
@@ -89,6 +95,7 @@ const highlight = HighlightStyle.define([
   { tag: tags.string, color: 'var(--color-warn)' },
   { tag: tags.keyword, color: 'var(--color-accent)' },
   { tag: tags.number, color: 'var(--color-ink)' },
+  { tag: tags.integer, color: 'var(--color-accent-soft)' },
   { tag: tags.invalid, color: 'var(--color-danger)' },
 ]);
 

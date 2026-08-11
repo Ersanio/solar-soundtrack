@@ -18,6 +18,12 @@
   --color-ink-muted: #838b9b;
 
   --color-accent: #6ea8fe;
+  /*
+   * The argument bytes of a hex command, against --color-accent for the command byte itself, so
+   * that $E7 $02 reads as one run rather than a blue byte beside body text. Accent's hue with the
+   * saturation down about 40%: it is the drop in saturation that makes it recede.
+   */
+  --color-accent-soft: #a7c4e8;
   --color-danger: #ff7b72;
   /*
    * Between danger and warn, and its own hue rather than a shade of either: it marks the
