@@ -32,7 +32,8 @@ import { dragPreview } from '../commands/preview';
  * neither of them linear — so it is an index, not a volume, and *which* table
  * depends on the song. That is why this view exists rather than a descriptor
  * row: telling the two nibbles apart needs a control each, and naming the table
- * needs to look at the `#option` directives above the caret.
+ * needs to look at every `#option`, `#louder`, `$FA $06` and `$F4 $08` above the
+ * caret.
  */
 @Component({
   selector: 'amk-quantization-command',
@@ -75,7 +76,7 @@ export class QuantizationCommand {
   }
 
   protected readonly table = computed(() =>
-    velocityTableAt(this.command(), this.store.tokens().tokens, this.store.source()),
+    velocityTableAt(this.command(), this.store.tokens(), this.store.source()),
   );
 
   private readonly tableName = computed(() => (this.table() === 'smw' ? 'SMW' : 'N-SPC'));

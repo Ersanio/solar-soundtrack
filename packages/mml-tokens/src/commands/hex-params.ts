@@ -70,13 +70,16 @@ const F4_SUBCOMMANDS = [
 	{ value: 0x09, label: "$09 — restore instrument" },
 ] as const;
 
-/** `$FA`'s sub-commands. `$05` is an error at `#amk 2`+ (`parser.ts:parseHexCommand`). */
+/**
+ * `$FA`'s sub-commands. `$05` is an error at `#amk 2`+ (`parser.ts:parseHexCommand`).
+ */
 const FA_SUBCOMMANDS = [
 	{ value: 0x00, label: "$00 — pitch modulation" },
 	{ value: 0x01, label: "$01 — GAIN" },
 	{ value: 0x02, label: "$02 — semitone tune" },
 	{ value: 0x03, label: "$03 — amplify" },
 	{ value: 0x04, label: "$04 — echo buffer reserve" },
+	{ value: 0x06, label: "$06 — velocity table" },
 	{ value: 0x7f, label: "$7F — hot patch preset" },
 	{ value: 0xfe, label: "$FE — hot patch toggle bits" },
 ] as const;
@@ -90,6 +93,18 @@ const HOT_PATCH_PRESETS = [
 	{ value: 0x05, label: "$05 — AddmusicM" },
 	{ value: 0x06, label: "$06 — carol's MORE.bin" },
 	{ value: 0x07, label: "$07 — Vanilla SMW" },
+] as const;
+
+/** What `#option smwvtable` and `#option nspcvtable` compile to (`Music.cpp:2343-2367`). */
+const VELOCITY_TABLES = [
+	{ value: 0x00, label: "$00 — SMW (#option smwvtable)" },
+	{ value: 0x01, label: "$01 — N-SPC (#option nspcvtable)" },
+] as const;
+
+/** The same two, where `#option` is not available (`parser.ts:parseOptionDirective`, AMK0045). */
+const VELOCITY_TABLES_BARE = [
+	{ value: 0x00, label: "$00 — SMW" },
+	{ value: 0x01, label: "$01 — N-SPC" },
 ] as const;
 
 /** `$FC`'s event types, from the syntax reference's remote-code entry. */
@@ -256,6 +271,24 @@ const misc: Resolver = (command) => {
 			return {
 				params: [selector, u8("Largest delay", "index", { max: 0x0f })],
 				note: "Inserted by the compiler at the start of every song; there is rarely a reason to write it by hand.",
+			};
+		case 0x06:
+			return {
+				params: [
+					selector,
+					choice(
+						"Table",
+						// #option is an unknown command before #amk 2 (parser.ts:parseOptionDirective),
+						// so naming the directives there would point at a compile error.
+						command.target.program === 0 && command.target.amkVersion >= 2 ? VELOCITY_TABLES : VELOCITY_TABLES_BARE,
+						{
+							// main.asm:2373 tests the byte against zero rather than against 1.
+							describe: (value) =>
+								value > 1 ? "anything but $00 selects the N-SPC table; the driver only tests for zero" : null,
+						},
+					),
+				],
+				note: "The compiler already writes $FA $06 $01 at the start of every #amk 2 and up song.",
 			};
 		case 0x7f:
 			return { params: [selector, choice("Preset", HOT_PATCH_PRESETS)] };

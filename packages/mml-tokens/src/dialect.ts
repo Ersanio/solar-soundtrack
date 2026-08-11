@@ -1,14 +1,14 @@
 /**
  * What was in force at a point in the song:
  * - Tempo
- * - Wich velocity table `q` reads against
+ * - Which velocity table `q` reads against, from the hex as well as the directives
  *
  * A positional walk over the scanner's commands, not compiler output, so it
  * answers while the song is mid-edit. Same-channel only where that matters —
  * see README.md.
  */
 
-import type { Command, Token } from "./tokens";
+import type { Command, TokenIndex } from "./tokens";
 
 /**
  * The tempo in force where a command sits, as it was *written*, or `null` when
@@ -61,13 +61,24 @@ export function noteTicksBefore(command: Command, commands: readonly Command[]):
 	return found;
 }
 
-/** Which velocity table is live where a command was written; SMW's or N-SPC's. */
-export function velocityTableAt(command: Command, tokens: Token[], text: string): "smw" | "nspc" {
-	// parser.ts:applyTarget — the default the dialect sets, before any #option.
-	let smw = command.target.program !== 0 || command.target.amkVersion < 2;
+/**
+ * Which velocity table is live where a command was written; SMW's or N-SPC's.
+ *
+ * Four things write it, and this reads all four, because what it answers is the
+ * driver's `!SecondVTable` (ARAM `$6F`) rather than the compiler's own
+ * `usingSMWVTable` — which AddmusicK leaves stale when the song writes the hex
+ * by hand, and which is the one place the two disagree.
+ *
+ * Not filtered by channel: `$6F` is a single global byte, so a switch in `#1`
+ * is heard in `#0`. That takes the across-channel caveat README.md states, for
+ * the same reason {@link tempoBefore} takes it.
+ */
+export function velocityTableAt(command: Command, index: TokenIndex, text: string): "smw" | "nspc" {
+	const before = command.span.start;
+	const switches: { at: number; smw: boolean }[] = [];
 
-	for (const token of tokens) {
-		if (token.start >= command.span.start) {
+	for (const token of index.tokens) {
+		if (token.start >= before) {
 			break;
 		}
 
@@ -75,17 +86,47 @@ export function velocityTableAt(command: Command, tokens: Token[], text: string)
 			continue;
 		}
 
-		if (text.slice(token.start, token.end).toLowerCase() !== "#option") {
+		const word = text.slice(token.start, token.end).toLowerCase();
+		if (word === "#louder") {
+			// parser.ts:parseLouderCommand emits $F4 $08, which is N-SPC only.
+			switches.push({ at: token.start, smw: false });
+			continue;
+		}
+
+		if (word !== "#option") {
 			continue;
 		}
 
 		const rest = text.slice(token.end).trimStart().toLowerCase();
 		if (rest.startsWith("smwvtable")) {
-			smw = true;
+			switches.push({ at: token.start, smw: true });
 		} else if (rest.startsWith("nspcvtable")) {
-			smw = false;
+			switches.push({ at: token.start, smw: false });
 		}
 	}
 
-	return smw ? "smw" : "nspc";
+	for (const other of index.commands) {
+		if (other.span.start >= before) {
+			break;
+		}
+
+		if (other.vcmd === 0xfa && other.args[0]?.value === 0x06) {
+			// Commands.asm:1087 stores the argument as written, and main.asm:2373
+			// compares it against zero — so every other value is the N-SPC table.
+			switches.push({ at: other.span.start, smw: (other.args[1]?.value ?? 0) === 0 });
+		} else if (other.vcmd === 0xf4 && other.args[0]?.value === 0x08) {
+			// Commands.asm:610 stores #$01 outright, so this one cannot switch back.
+			switches.push({ at: other.span.start, smw: false });
+		}
+	}
+
+	// Both lists are sorted, but they interleave, and taking the later of two
+	// separate walks would answer a song that switches more than twice wrongly.
+	// Filtered first, so what gets sorted is the handful of switches, not the song.
+	switches.sort((a, b) => a.at - b.at);
+
+	// Nothing switched it, so it stands as parser.ts:applyTarget set it.
+	return (switches[switches.length - 1]?.smw ?? (command.target.program !== 0 || command.target.amkVersion < 2))
+		? "smw"
+		: "nspc";
 }

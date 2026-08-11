@@ -16,6 +16,8 @@ import { Tag, tags } from "@lezer/highlight";
 
 import { type ScanState, type Token, commandAt, copyState, startState, step, tokenize, TOKEN_TAGS } from "@amk/tokens";
 
+import { velocityTableAt } from "@amk/tokens/dialect";
+
 import { check, summarise } from "./harness";
 
 const at = (text: string, offset: number) => commandAt(tokenize(text).commands, offset);
@@ -901,6 +903,38 @@ console.log("\na directive's bare-word argument is not music");
 		"music after it is untouched",
 		cleared.some((t) => t.kind === "note"),
 	);
+}
+
+console.log("\nthe velocity table follows the hex, not just the directives");
+{
+	const tableAt = (source: string, needle: string) => {
+		const index = tokenize(source);
+		const command = commandAt(index.commands, source.indexOf(needle));
+		return command === null ? null : velocityTableAt(command, index, source);
+	};
+
+	check("#amk 4 starts on N-SPC", tableAt("#amk 4\n#0 q7F c4\n", "q7F") === "nspc");
+	check("#amk 1 starts on SMW", tableAt("#amk 1\n#0 q7F c4\n", "q7F") === "smw");
+	check("#option smwvtable switches", tableAt("#amk 4\n#option smwvtable\n#0 q7F c4\n", "q7F") === "smw");
+
+	// Commands.asm:1087 — the driver takes the hex as readily as the directive.
+	// AddmusicK's own usingSMWVTable is the thing that does not, which is why
+	// this walks the commands rather than mirroring the compiler's bookkeeping.
+	check("$FA $06 $00 switches", tableAt("#amk 4\n#0 $FA $06 $00 q7F c4\n", "q7F") === "smw");
+	check(
+		"and a later $FA $06 $01 switches back",
+		tableAt("#amk 4\n#option smwvtable\n#0 $FA $06 $01 q7F c4\n", "q7F") === "nspc",
+	);
+	// main.asm:2373 compares against zero, so $05 is as N-SPC as $01 is.
+	check("a value the driver does not test for is N-SPC", tableAt("#amk 4\n#0 $FA $06 $05 q7F c4\n", "q7F") === "nspc");
+
+	// Commands.asm:610 stores #$01 outright, so $F4 $08 only goes the one way.
+	check("$F4 $08 leaves SMW", tableAt("#amk 4\n#option smwvtable\n#0 $F4 $08 q7F c4\n", "q7F") === "nspc");
+	check("#louder does the same", tableAt("#amk 4\n#option smwvtable\n#louder\n#0 q7F c4\n", "q7F") === "nspc");
+
+	// $6F is one byte for the whole driver, so the walk does not stop at the
+	// channel boundary the way echo-hazards.ts and fir-override.ts do.
+	check("a switch in #1 is heard in #0", tableAt("#amk 4\n#1 $FA $06 $00\n#0 q7F c4\n", "q7F") === "smw");
 }
 
 console.log("\nthe target markers pick the dialect");
