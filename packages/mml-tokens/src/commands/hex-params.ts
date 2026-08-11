@@ -1,8 +1,8 @@
 import { EMPTY_SAMPLE_NAME } from "@amk/core/hardcoded-tables";
 import { noiseHz } from "@amk/spc/adsr";
 import { hex2 } from "@amk/core/hex";
-import { type ParamDescriptor, type Resolver, choice, fixed, raw, s8, ticks, u8 } from "./param";
-import { bpm, noteName, panLabel, percentOf255, ticksLabel } from "./units";
+import { DURATION, type ParamDescriptor, type Resolver, choice, fixed, raw, s8, ticks, u8 } from "./param";
+import { bpm, noteName, panLabel, percentOf255 } from "./units";
 
 /**
  * The highest tempo that is not a freeze.
@@ -22,11 +22,6 @@ const MAX_TEMPO = 254;
 // ---------------------------------------------------------------------------
 // Shared descriptors
 // ---------------------------------------------------------------------------
-
-const DURATION = ticks("Over", {
-	describe: (value, _command, context) =>
-		value === 0 ? "instant — a duration of 0 applies the target at once" : ticksLabel(value, context.tempo),
-});
 
 /** The vibrato and tremolo rate — `$DE`'s and `$E5`'s second byte. */
 const RATE = (what: string): ParamDescriptor =>
@@ -360,7 +355,10 @@ export const HEX_PARAMS: Readonly<Record<number, Resolver>> = {
 					: null,
 		}),
 	]),
-	0xdb: fixed([PAN], "Bits 6 and 7 enable surround for the right and left speaker."),
+	// `$DB` has a view of its own, shared with `y`: its one byte is a pan and two
+	// surround bits, which no single descriptor row can be. See `pan-command/`.
+	// `$DC` keeps this one — its target is a plain pan value that the driver
+	// slides towards, with no surround bits in it (`Commands.asm:264`).
 	0xdc: fixed([DURATION, PAN]),
 	0xdd: fixed([
 		// Both really are tick counts — `aram_map.html:444` calls the first "pitch

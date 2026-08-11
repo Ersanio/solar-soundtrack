@@ -157,6 +157,20 @@ export const LETTER_NAMES: Readonly<Record<string, string>> = {
 	"*": "loop call",
 };
 
+/**
+ * The fade each of `t`, `v` and `w` becomes when given a second argument.
+ *
+ * `parser.ts:parseFadeableValue` and `parseTempo` compile the comma form to
+ * `$E3` / `$E8` / `$E1`, so it is named as {@link VCMD_NAMES} names those —
+ * otherwise `w30,200` and the `$E1 $1E $C8` it produces read as two different
+ * commands in the inspector and the hover.
+ */
+const LETTER_FADE_NAMES: Readonly<Record<string, string>> = {
+	t: "tempo fade",
+	v: "volume fade",
+	w: "global volume fade",
+};
+
 /** Which `TokenKind` a command letter introduces. */
 export const LETTER_KINDS: Readonly<Record<string, TokenKind>> = {
 	t: "tempo",
@@ -1838,7 +1852,10 @@ function gather(tokens: GatherToken[], text: string, transitions: TargetTransiti
 		const letter = raw[0];
 		commands.push({
 			kind: letter,
-			name: LETTER_NAMES[letter.toLowerCase()] ?? nameForNote(token.kind),
+			name:
+				(args.length >= 2 ? LETTER_FADE_NAMES[letter.toLowerCase()] : undefined) ??
+				LETTER_NAMES[letter.toLowerCase()] ??
+				nameForNote(token.kind),
 			span: { start: token.start, end: last.end, line: token.line },
 			head: spanOf(token),
 			headReplacement: token.replacement,

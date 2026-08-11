@@ -1,0 +1,47 @@
+@if (!written()) {
+  <p class="text-ink-muted text-xs leading-relaxed">
+    Needs a pan value, as in <code class="text-ink">y10</code> or
+    <code class="text-ink">$DB $0A</code>.
+  </p>
+} @else {
+  <p class="text-ink-muted text-xs leading-relaxed">{{ note() }}</p>
+
+  <amk-slider
+    label="Pan"
+    origin="centre"
+    [value]="pan()"
+    [max]="20"
+    [invert]="true"
+    [ends]="['L', 'R']"
+    [valueLabel]="panLabel()"
+    [note]="panLocked() ?? panNote()"
+    [disabled]="!panEditable()"
+    (preview)="preview($event)"
+    (commit)="setPan($event)"
+  />
+
+  <amk-enum-select
+    label="Surround, left"
+    [value]="left()"
+    [options]="SURROUND"
+    [disabled]="!flagsEditable()"
+    (commit)="setLeft($event)"
+  />
+
+  <amk-enum-select
+    label="Surround, right"
+    [value]="right()"
+    [options]="SURROUND"
+    [note]="flagsLocked()"
+    [disabled]="!flagsEditable()"
+    (commit)="setRight($event)"
+  />
+
+  @if (overflowed(); as problem) {
+    <p class="text-warn text-xs leading-relaxed">{{ problem }}</p>
+  }
+
+  @if (unusedBit(); as unused) {
+    <p class="text-ink-muted text-xs leading-relaxed">{{ unused }}</p>
+  }
+}

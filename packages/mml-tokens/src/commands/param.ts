@@ -97,6 +97,20 @@ export function ticks(name: string, extra: Partial<ParamDescriptor> = {}): Param
 	};
 }
 
+/**
+ * The fade duration `$E1`, `$E3` and `$E8` share with `w`, `t` and `v`'s comma
+ * forms, which compile to exactly those three (`parser.ts:parseFadeableValue`,
+ * `parseTempo`). Shared rather than restated, so the two spellings of one
+ * command cannot drift apart.
+ *
+ * Not folded into {@link ticks}: a `$DD` or `$DE` delay of 0 means no delay,
+ * where a fade over 0 ticks is the target applied at once.
+ */
+export const DURATION = ticks("Over", {
+	describe: (value, _command, context) =>
+		value === 0 ? "instant — a duration of 0 applies the target at once" : ticksLabel(value, context.tempo),
+});
+
 /** A byte the inspector has nothing to say about, shown but not interpreted. */
 export function raw(name: string): ParamDescriptor {
 	return { name, codec: "u8", role: "opaque" };

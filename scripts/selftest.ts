@@ -228,6 +228,38 @@ console.log("\ntarget selects the compatibility prefix");
 	}
 }
 
+console.log("\ny packs its surround flags into the $DB byte");
+{
+	// Music.cpp:711-726 — `pan |= i << 7` for the second argument and
+	// `pan |= i << 6` for the third, and the readme names them "(left,right)"
+	// (`syntax_reference.html:101`). The driver splits the byte back apart with
+	// `and a, #$1f` and `and a, #$c0` (`Commands.asm:239-243`), and bit 7 negates
+	// the left output where bit 6 negates the right (`main.asm:2866`).
+	//
+	// Load-bearing: the command inspector reads a written `$DB` byte back into
+	// three controls, so swapping the two bits here would silently mirror the
+	// wrong speaker.
+	for (const [source, expected, label] of [
+		["#amk 4\n#0 y10 o4 c4\n", [0xdb, 0x0a], "y10 is a bare pan"],
+		["#amk 4\n#0 y10,1,0 o4 c4\n", [0xdb, 0x8a], "left surround is bit 7"],
+		["#amk 4\n#0 y10,0,1 o4 c4\n", [0xdb, 0x4a], "right surround is bit 6"],
+		["#amk 4\n#0 y10,1,1 o4 c4\n", [0xdb, 0xca], "both is $C0"],
+		["#amk 4\n#0 y20,0,0 o4 c4\n", [0xdb, 0x14], "the pan reaches $14, one past the readme's $13"],
+		// `if (i > 2)` is the whole check, so 2 compiles — and `2 << 7` is $100,
+		// which does not survive the byte. The flag reads as off, not on.
+		["#amk 4\n#0 y10,2,0 o4 c4\n", [0xdb, 0x0a], "a second argument of 2 shifts its bit off the byte"],
+	] as const) {
+		const result = compile(source);
+		const body = result.data!.slice(result.stats!.headerSize);
+		expectBytes(label, body.slice(6, 8), [...expected]);
+	}
+
+	check("y21 is out of range", !compile("#amk 4\n#0 y21 o4 c4\n").ok);
+	check("and so is a third argument of 3", !compile("#amk 4\n#0 y10,0,3 o4 c4\n").ok);
+	// Music.cpp:718 — the second argument without a third is an error, not a default.
+	check("a lone second argument is rejected", !compile("#amk 4\n#0 y10,1 o4 c4\n").ok);
+}
+
 console.log("\nlegacy note behaviour");
 {
 	// Addmusic 4.05 ignores instrument tuning until an instrument is declared,

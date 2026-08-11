@@ -1,14 +1,18 @@
 import { TICKS_PER_WHOLE } from "@amk/core/hardcoded-tables";
 import { noiseHz } from "@amk/spc/adsr";
-import { type Resolver, choice, fixed, s8, ticks, u8 } from "./param";
-import { bpm, noteLengthName, panLabel, percentOf255 } from "./units";
+import { DURATION, type Resolver, fixed, s8, ticks, u8 } from "./param";
+import { bpm, noteLengthName, percentOf255 } from "./units";
 
 /** See `MAX_TEMPO` in `hex-params.ts`: the driver stores one more than you write. */
 const MAX_TEMPO = 254;
 
 /** What each single-letter command's arguments mean. */
 
-/** `v`, `w` and `t`: one argument sets, two fade. `parser.ts:parseFadeableValue`, `parseTempo`. */
+/**
+ * `v`, `w` and `t`: one argument sets, two fade. `parser.ts:parseFadeableValue`,
+ * `parseTempo`. The comma form compiles to `$E8` / `$E1` / `$E3`, so it is shown
+ * as those are — same descriptors, same order, duration first.
+ */
 function fadeable(name: string, describe: (value: number) => string | null): Resolver {
 	return (command) => {
 		const target = u8(name, "level", { describe });
@@ -17,7 +21,7 @@ function fadeable(name: string, describe: (value: number) => string | null): Res
 		}
 
 		return {
-			params: [ticks("Over"), target],
+			params: [DURATION, target],
 			note: "Two arguments make this a fade, which needs #amk 3 or above.",
 		};
 	};
@@ -43,28 +47,6 @@ const vibrato: Resolver = (command) =>
 				params: [RATE, u8("Depth", "level")],
 				note: "With two arguments the first is the rate. Add a third and the first becomes a delay instead.",
 			};
-
-/** `y` — pan, then up to two surround flags (`parser.ts:parsePan`). */
-const pan: Resolver = (command) => {
-	const surround = [
-		choice("Surround, left", [
-			{ value: 0, label: "off" },
-			{ value: 1, label: "on" },
-		]),
-		choice("Surround, right", [
-			{ value: 0, label: "off" },
-			{ value: 1, label: "on" },
-		]),
-	];
-
-	return {
-		params: [
-			u8("Pan", "pan", { max: 20, describe: panLabel }),
-			...surround.slice(0, Math.max(0, command.args.length - 1)),
-		],
-		note: "The slider runs left to right; the byte counts the other way, 0 being hard right and 20 hard left.",
-	};
-};
 
 /** The length denominators worth stopping on: every one that divides 192 evenly + 128 */
 const NOTE_DENOMINATORS = [1, 2, 3, 4, 6, 8, 12, 16, 24, 32, 48, 64, 96, 128, 192] as const;
@@ -126,14 +108,15 @@ export const LETTER_PARAMS: Readonly<Record<string, Resolver>> = {
 		const ceiling = "Stops at 254: the driver adds one, so t255 would be tempo 0 and the song would freeze.";
 		return command.args.length >= 2
 			? {
-					params: [ticks("Over"), target],
+					params: [DURATION, target],
 					note: `A tempo fade, which needs #amk 3 or above. ${ceiling}`,
 				}
 			: { params: [target], note: ceiling };
 	},
 	v: fadeable("Volume", percentOf255),
 	w: fadeable("Global volume", percentOf255),
-	y: pan,
+	// `y` has a view of its own, shared with the `$DB` it compiles to: its two
+	// surround arguments are bits of that byte. See `pan-command/`.
 	// `q` has a view of its own: two nibbles that mean two unrelated things
 	l: defaultLength,
 	o: fixed([u8("Octave", "index", { min: 0, max: 6 })]),

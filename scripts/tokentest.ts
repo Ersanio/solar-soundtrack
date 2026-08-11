@@ -17,6 +17,7 @@ import { Tag, tags } from "@lezer/highlight";
 import { type ScanState, type Token, commandAt, copyState, startState, step, tokenize, TOKEN_TAGS } from "@amk/tokens";
 
 import { velocityTableAt } from "@amk/tokens/dialect";
+import { resolveCommand } from "@amk/tokens/commands/describe";
 
 import { check, summarise } from "./harness";
 
@@ -156,6 +157,59 @@ console.log("\nletter commands carry their arguments");
 
 	const exact = at("#0 c=48\n", 4);
 	check("an exact tick count is the note's argument", exact?.args[0].value === 48);
+}
+
+console.log("\na comma form of t, v or w is its hex fade, and reads as one");
+{
+	// parser.ts:parseFadeableValue and parseTempo compile `w30,200` to exactly
+	// `$E1 $1E $C8`, so the panel and the hover have to say the same thing about
+	// both. This pins the naming and the parameter rows together, because the two
+	// used to disagree: `w30,200` was "global volume" over a duration row that
+	// called 0 ticks "0.00 s", where `$E1 $00` called it "instant".
+	const CONTEXT = { tempo: 120, samples: [] };
+	const shapeOf = (body: string, needle: string) => {
+		const source = `#amk 4\n#0 ${body}\n`;
+		const command = commandAt(tokenize(source).commands, source.indexOf(needle));
+		if (command === null) {
+			return null;
+		}
+
+		const resolved = resolveCommand(command, CONTEXT);
+		return {
+			name: command.name,
+			// The raw column is decimal for a letter and `$xx` for a VCMD by design,
+			// so what is compared is the naming and the reading, not the spelling.
+			rows: resolved.rows.map((row) => `${row.descriptor.name}: ${row.note ?? ""}`),
+		};
+	};
+
+	for (const [letter, hex, name] of [
+		["w0,200", "$E1 $00 $C8", "global volume fade"],
+		["v0,200", "$E8 $00 $C8", "volume fade"],
+		["t0,200", "$E3 $00 $C8", "tempo fade"],
+	] as const) {
+		const written = shapeOf(letter, letter.slice(0, 2));
+		const compiled = shapeOf(hex, hex.slice(0, 3));
+		check(`${letter} is named "${name}"`, written?.name === name, written?.name);
+		check(`so is the ${hex.slice(0, 3)} it compiles to`, compiled?.name === name, compiled?.name);
+		check(
+			`and both read their arguments the same way`,
+			JSON.stringify(written?.rows) === JSON.stringify(compiled?.rows),
+			`${JSON.stringify(written?.rows)} vs ${JSON.stringify(compiled?.rows)}`,
+		);
+	}
+
+	// One argument is the plain set, and must not borrow the fade's name.
+	for (const [body, name] of [
+		["w200", "global volume"],
+		["v200", "volume"],
+		["t200", "tempo"],
+		// `y` has three arguments and no fade at all; `$DC` is pan fade, but nothing
+		// spells it with a letter, so the fade names must not reach it.
+		["y10,1,2", "pan"],
+	] as const) {
+		check(`${body} is still "${name}"`, at(`#0 ${body}\n`, 4)?.name === name, at(`#0 ${body}\n`, 4)?.name);
+	}
 }
 
 /** The length of the note or rest written at `needle` — `undefined` for anything else. */
