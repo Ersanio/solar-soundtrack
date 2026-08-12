@@ -38,7 +38,7 @@ e16 c16 < g16 > e16 c16 < g16 > f16 d16 < a16 > f16 d16 < a16 >
 f+16 d16 c16 f+16 d16 c16 g16 f16 d16 < b16 a+16 a16
 `;
 
-/** How long typing pauses before an auto-compile fires. */
+/** How long typing pauses before a compile fires. */
 const DEBOUNCE_MS = 150;
 
 export type StatusKind = 'ok' | 'error' | 'busy';
@@ -61,7 +61,6 @@ export class EditorStore {
    * mirror to feed back through.
    */
   readonly source = signal(localStorage.getItem(STORAGE_KEY) ?? SAMPLE_SONG);
-  readonly autoCompile = signal(true);
   readonly caret = signal(0);
 
   /**
@@ -154,11 +153,11 @@ export class EditorStore {
    * Errors first, then by position — the order you want to fix them in.
    *
    * Two sources, running at different speeds on purpose. The compiler's come off `committed` and so
-   * lag by the typing debounce; the echo hazards are scanned from {@link tokens}, which does not,
-   * so a runaway echo is reported by the keystroke or paste that writes it and stays live even with
-   * auto-compile switched off. A warning about what the song will do the moment you press play is
-   * not worth holding back 150 ms, and the compiler has no opinion to offer anyway: it copies `$F5`
-   * through on its length alone, because `Music.cpp` has no `$F5` code to port.
+   * lag by the typing debounce; the echo hazards are scanned from {@link tokens}, which does not, so
+   * a runaway echo is reported by the very keystroke or paste that writes it. A warning about what
+   * the song will do the moment you press play is not worth holding back 150 ms, and the compiler
+   * has no opinion to offer anyway: it copies `$F5` through on its length alone, because
+   * `Music.cpp` has no `$F5` code to port.
    */
   readonly diagnostics = computed<Diagnostic[]>(() => {
     const order = { error: 0, severe: 1, warning: 2, info: 3 } as const;
@@ -322,15 +321,11 @@ export class EditorStore {
 
   // --- editing --------------------------------------------------------------
 
-  /** Records a keystroke, and schedules a compile when auto-compile is on. */
+  /** Records a keystroke, and schedules the compile it will trigger. */
   edit(text: string): void {
     this.source.set(text);
     this.override.set(null);
     clearTimeout(this.timer);
-    if (!this.autoCompile()) {
-      return;
-    }
-
     this.timer = setTimeout(() => this.committed.set(text), DEBOUNCE_MS);
   }
 

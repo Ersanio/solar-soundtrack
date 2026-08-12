@@ -8,7 +8,7 @@ import { Component, model } from '@angular/core';
  * sync across call sites.
  *
  * ```html
- * <amk-checkbox [(checked)]="store.autoCompile">Compile as I type</amk-checkbox>
+ * <amk-checkbox [(checked)]="library.optimize">Optimize samples</amk-checkbox>
  * ```
  */
 @Component({

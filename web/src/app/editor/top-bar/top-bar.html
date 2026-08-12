@@ -1,12 +1,6 @@
 <h1 class="mr-2 text-base font-semibold">Solar Soundtrack</h1>
 
-<amk-checkbox [(checked)]="store.autoCompile">Compile as I type</amk-checkbox>
-
 <amk-transport-controls />
-
-<button amk-button variant="primary" [disabled]="!store.canCompile()" (click)="store.compileNow()">
-  Compile
-</button>
 
 <button amk-button [disabled]="!store.canDownload()" (click)="store.downloadBin()">
   Download .bin
