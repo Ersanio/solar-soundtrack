@@ -1,5 +1,30 @@
-<!-- d3 owns everything inside this element; Angular never templates into it. -->
-<svg #svg class="block w-full" [attr.height]="height" (mouseleave)="hover.set(null)"></svg>
+<svg
+  #svg
+  class="block w-full"
+  [attr.height]="height"
+  [attr.viewBox]="viewBox()"
+  (mouseleave)="hover.set(null)"
+>
+  <defs>
+    <clipPath [attr.id]="clipId">
+      <rect x="0" y="0" [attr.width]="width()" [attr.height]="height" [attr.rx]="radius" />
+    </clipPath>
+  </defs>
+
+  <g [attr.clip-path]="clipUrl">
+    @for (mark of marks(); track mark.group) {
+      <rect
+        y="0"
+        [class]="mark.fill"
+        [attr.x]="mark.x"
+        [attr.width]="mark.width"
+        [attr.height]="height"
+        (mouseenter)="hover.set(mark)"
+        (mouseleave)="hover.set(null)"
+      />
+    }
+  </g>
+</svg>
 
 @if (tooltip(); as tip) {
   <div

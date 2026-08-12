@@ -94,10 +94,14 @@ exhausted quota — and must never stop someone compiling a song.
 
 ## Charts
 
-Only `aram-bar` draws with d3, and it is the only component that needs `shared/chart/stack.ts` and
-`element-size.ts`. The four inspector graphs are Angular-templated SVG over a fixed viewBox from
-`shared/chart/plot.ts`, stretched to their container, so stroke widths and offsets are in viewBox
-units rather than pixels.
+Every chart here is Angular-templated SVG; nothing draws with a charting library. The four inspector
+graphs work in a fixed viewBox from `shared/chart/plot.ts`, stretched to their container, so stroke
+widths and offsets are in viewBox units rather than pixels.
+
+`aram-bar` is the one that does not. It is measured with `element-size.ts` and laid out in real
+pixels by `stack.ts`, because the surface gap between its fills and the floor under a small region
+are pixel sizes, not fractions of the bar that would vanish as it narrows. It is the only component
+that needs either file, and `stack.ts` is the only chart code with a harness — `npm run charttest`.
 
 `fir-graph`'s frequency axis is **linear**, DC to Nyquist, which is not what an audio plot usually
 does. Eight taps at 32 kHz have no authority below a couple of kHz, so a log axis would spend most

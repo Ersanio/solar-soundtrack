@@ -1,16 +1,4 @@
-import {
-  Component,
-  type ElementRef,
-  afterRenderEffect,
-  computed,
-  input,
-  signal,
-  viewChild,
-} from '@angular/core';
-// Import from d3 submodules, never the `d3` metapackage: it re-exports every
-// module and does not fully tree-shake, which measured +17 kB raw / +4.8 kB
-// transfer for these same two symbols.
-import { select } from 'd3-selection';
+import { Component, type ElementRef, computed, input, signal, viewChild } from '@angular/core';
 
 import type { BudgetRow } from '@amk/spc/layout';
 import { elementSize } from '../../shared/chart/element-size';
@@ -24,15 +12,14 @@ export interface Segment {
   bytes: number;
 }
 
-interface Placed extends Segment {
+/** A segment with its geometry resolved: everything one `<rect>` needs. */
+interface Mark extends Segment {
   x: number;
   width: number;
-}
-
-interface Hover {
-  segment: Segment;
-  /** Centre of the hovered mark, in px from the bar's left edge. */
-  x: number;
+  /** Centre of the mark, in px from the bar's left edge, where its tooltip points. */
+  centre: number;
+  /** The `fill-seg-*` utility this group is drawn in. */
+  fill: string;
 }
 
 const HEIGHT = 16;
@@ -66,16 +53,13 @@ const FILL: Record<Group, string> = {
 let nextId = 0;
 
 /**
- * The ARAM usage bar: a single stacked proportion bar drawn with d3.
+ * The ARAM usage bar: a single stacked proportion bar.
  *
- * d3 owns the `<svg>` subtree and Angular does not template into it — the two
- * would otherwise fight over the same nodes. Angular still renders the tooltip,
- * which is plain HTML positioned over the chart, so hover state stays a signal
- * rather than something d3 keeps privately.
- *
- * Redraw is driven by `afterRenderEffect`'s write phase: it tracks the segment
- * and size signals, and runs after Angular has laid the host element out, which
- * is what makes the measured width correct on the first pass.
+ * Angular-templated SVG, as the four inspector graphs are — but measured rather
+ * than drawn in a fixed viewBox. `stackSegments` lays the bar out in pixels, so
+ * the gap between fills and the floor under a small region are real sizes and
+ * not fractions that dwindle as the bar narrows; `elementSize` supplies the
+ * pixels as a signal, which lets the whole of the geometry be a `computed`.
  */
 @Component({
   selector: 'amk-aram-bar',
@@ -84,87 +68,64 @@ let nextId = 0;
 })
 export class AramBar {
   readonly segments = input.required<Segment[]>();
-  /** A name for the bar. */
-  readonly label = input('ARAM usage by region');
 
   private readonly svg = viewChild.required<ElementRef<SVGSVGElement>>('svg');
-  protected readonly size = elementSize(this.svg);
+  private readonly size = elementSize(this.svg);
 
-  protected readonly hover = signal<Hover | null>(null);
+  protected readonly hover = signal<Mark | null>(null);
   protected readonly clipId = `aram-bar-clip-${nextId++}`;
+  protected readonly clipUrl = `url(#${this.clipId})`;
   protected readonly height = HEIGHT;
+  protected readonly radius = RADIUS;
+
+  /** The measured width, which is also the bar's own coordinate space. */
+  protected readonly width = computed(() => this.size().width);
+
+  /**
+   * Absent until the bar has been measured.
+   *
+   * `null` removes the attribute, which keeps the first pass — before the
+   * `ResizeObserver` has reported anything — from declaring a coordinate space
+   * zero units wide.
+   */
+  protected readonly viewBox = computed(() => {
+    const width = this.width();
+    return width > 0 ? `0 0 ${width} ${HEIGHT}` : null;
+  });
+
+  /**
+   * Pixel geometry for each segment, gaps and the visibility floor applied.
+   *
+   * Empty until the bar has a width: `stackSegments` answers with no geometry
+   * rather than bad geometry, so the unmeasured pass simply draws nothing.
+   */
+  protected readonly marks = computed<Mark[]>(() => {
+    const segments = this.segments();
+    const placements = stackSegments(
+      segments.map((segment) => ({ value: segment.bytes })),
+      { width: this.width(), gap: GAP, minWidth: MIN_SEGMENT },
+    );
+
+    return placements.map((placement, index) => {
+      const segment = segments[index];
+      return {
+        ...segment,
+        ...placement,
+        centre: placement.x + placement.width / 2,
+        fill: FILL[segment.group],
+      };
+    });
+  });
 
   protected readonly tooltip = computed(() => {
-    const hover = this.hover();
-    if (!hover) {
+    const mark = this.hover();
+    if (!mark) {
       return null;
     }
 
     return {
-      x: hover.x,
-      text: `${hover.segment.label}: ${hover.segment.bytes.toLocaleString()} B`,
+      x: mark.centre,
+      text: `${mark.label}: ${mark.bytes.toLocaleString()} B`,
     };
   });
-
-  constructor() {
-    afterRenderEffect({ write: () => this.draw() });
-  }
-
-  /** Pixel geometry for each segment, gaps and the visibility floor applied. */
-  private place(width: number): Placed[] {
-    const segments = this.segments();
-    const placements = stackSegments(
-      segments.map((segment) => ({ value: segment.bytes })),
-      { width, gap: GAP, minWidth: MIN_SEGMENT },
-    );
-    return placements.map((placement, index) => ({ ...segments[index], ...placement }));
-  }
-
-  private draw(): void {
-    const element = this.svg().nativeElement;
-    const { width } = this.size();
-    const svg = select(element);
-
-    if (width <= 0) {
-      svg.selectAll('*').remove();
-      return;
-    }
-
-    svg.attr('viewBox', `0 0 ${width} ${HEIGHT}`);
-
-    // Rounding the outer ends only: a clip path over the whole bar, rather than
-    // per-rect corner radii, which would round the internal joins too.
-    let defs = svg.selectAll<SVGDefsElement, null>('defs').data([null]);
-    defs = defs.enter().append('defs').merge(defs);
-    defs
-      .selectAll<SVGClipPathElement, null>('clipPath')
-      .data([null])
-      .join((enter) => enter.append('clipPath').attr('id', this.clipId))
-      .selectAll<SVGRectElement, null>('rect')
-      .data([null])
-      .join('rect')
-      .attr('width', width)
-      .attr('height', HEIGHT)
-      .attr('rx', RADIUS);
-
-    let group = svg.selectAll<SVGGElement, null>('g').data([null]);
-    group = group.enter().append('g').merge(group);
-    group.attr('clip-path', `url(#${this.clipId})`);
-
-    group
-      .selectAll<SVGRectElement, Placed>('rect')
-      .data(this.place(width), (segment) => segment.group)
-      .join('rect')
-      // Fill comes from a Tailwind utility, so the palette stays in styles.css
-      // and is not duplicated as hex literals in the drawing code.
-      .attr('class', (segment) => FILL[segment.group])
-      .attr('x', (segment) => segment.x)
-      .attr('y', 0)
-      .attr('width', (segment) => segment.width)
-      .attr('height', HEIGHT)
-      .on('mouseenter', (_event, segment) =>
-        this.hover.set({ segment, x: segment.x + segment.width / 2 }),
-      )
-      .on('mouseleave', () => this.hover.set(null));
-  }
 }

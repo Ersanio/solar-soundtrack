@@ -8,16 +8,16 @@ export interface Size {
 /**
  * An element's content box, as a signal.
  *
- * d3 needs real pixel dimensions to build scales, and a chart that reads its
+ * A chart laid out in pixels needs real dimensions, and one that reads its
  * container once on init silently breaks on the first resize. This tracks the
- * box with a `ResizeObserver` and publishes it as a signal, so a chart's draw
- * routine can simply depend on it and re-run.
+ * box with a `ResizeObserver` and publishes it as a signal, so the geometry can
+ * simply be a `computed` over it.
  *
  * Call from an injection context:
  *
  * ```ts
  * private readonly host = viewChild.required<ElementRef<SVGSVGElement>>('svg');
- * protected readonly size = elementSize(this.host);
+ * private readonly size = elementSize(this.host);
  * ```
  */
 export function elementSize(target: Signal<ElementRef<Element> | undefined>): Signal<Size> {

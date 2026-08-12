@@ -19,7 +19,7 @@ const SPC_BEYOND_THE_MATHS = [
   '@amk/spc/worklet',
 ];
 
-const FRAMEWORKS = ['@angular/*', '@codemirror/*', '@lezer/*', 'd3', 'd3-*'];
+const FRAMEWORKS = ['@angular/*', '@codemirror/*', '@lezer/*'];
 
 /** A package boundary, stated as a rule rather than as a paragraph. */
 const forbid = (patterns, message) => ({

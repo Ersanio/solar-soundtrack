@@ -1,5 +1,3 @@
-import { scaleLinear } from 'd3-scale';
-
 export interface StackInput {
   /** The value driving the segment's share of the bar. */
   value: number;
@@ -55,8 +53,9 @@ export function stackSegments(
     return [];
   }
 
-  const scale = scaleLinear().domain([0, total]).range([0, available]);
-  let widths = segments.map((segment) => scale(segment.value));
+  // Each segment's share of what the gaps leave: a linear map of [0, total]
+  // onto [0, available]. The guard above is what makes the division safe.
+  let widths = segments.map((segment) => (segment.value / total) * available);
 
   // Too narrow to honour the floor at all: split evenly rather than emit
   // negative widths. Only reachable on a bar of a couple of dozen pixels.
