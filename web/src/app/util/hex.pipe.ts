@@ -1,6 +1,6 @@
 import { Pipe, type PipeTransform } from '@angular/core';
 
-import { hex, hex2, hex4 } from './format';
+import { hex, hex2 } from './format';
 
 /**
  * Hex formatting for templates.
@@ -23,13 +23,5 @@ export class HexPipe implements PipeTransform {
 export class Hex2Pipe implements PipeTransform {
   transform(value: number): string {
     return hex2(value);
-  }
-}
-
-/** An ARAM address: four digits, zero-padded. */
-@Pipe({ name: 'hex4' })
-export class Hex4Pipe implements PipeTransform {
-  transform(value: number): string {
-    return hex4(value);
   }
 }

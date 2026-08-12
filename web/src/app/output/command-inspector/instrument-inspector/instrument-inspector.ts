@@ -20,14 +20,21 @@ import {
   NOISE_FLAG,
 } from '@amk/spc/instruments';
 import type { Command } from '@amk/tokens';
-import { DEFAULT_TRANSPOSE, INSTRUMENT_TO_SAMPLE } from '@amk/core/hardcoded-tables';
+import { DEFAULT_TRANSPOSE } from '@amk/core/hardcoded-tables';
 import { DriverStore } from '../../../state/driver-store';
 import { EditorStore } from '../../../state/editor-store';
 import { duration, hex2 } from '../../../util/format';
 import { AdsrGraph } from '../adsr-graph/adsr-graph';
 import { InstrumentEntryEditor } from '../instrument-entry/instrument-entry';
-import type { DetailRow } from '../../../shared/detail-table/detail-table';
 import { HexPipe } from '../../../util/hex.pipe';
+
+/** One "what this argument means" line. */
+interface DetailRow {
+  label: string;
+  value: string;
+  /** A sentence under the value, in prose rather than mono. Optional. */
+  note?: string;
+}
 
 /** Which of the things `@n` — or a raw `$DA` — can mean. */
 type Band = 'melodic' | 'unsupported' | 'percussion' | 'custom' | 'undefined' | 'beyond';
@@ -372,9 +379,6 @@ export class InstrumentInspector {
   protected readonly validRanges = '@0–@18, @21–@29 and @30 upward';
 
   protected readonly drumIndex = computed(() => this.written() - FIRST_PERCUSSION_INSTRUMENT);
-
-  /** The SRCN a stock instrument would use, for the unsupported panel's example. */
-  protected readonly stockSrcn = INSTRUMENT_TO_SAMPLE;
 }
 
 function sampleByte(sample: { form: string; srcn?: number; byte?: number }): number {

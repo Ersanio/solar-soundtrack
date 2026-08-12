@@ -37,11 +37,6 @@ export function summarise(): never {
 	process.exit(failures === 0 ? 0 : 1);
 }
 
-/** How many assertions have failed so far, for a harness that wants to branch. */
-export function failureCount(): number {
-	return failures;
-}
-
 const FALLBACK_HTML = "<!doctype html><html><body>SPA fallback</body></html>";
 
 function response(body: Buffer | string, contentType: string) {

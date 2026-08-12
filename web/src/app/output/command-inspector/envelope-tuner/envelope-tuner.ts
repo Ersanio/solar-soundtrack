@@ -8,7 +8,6 @@ import {
   decodeGain,
   encodeAdsr,
   encodeGain,
-  gainModeName,
   releaseSeconds,
   sustainLevel,
 } from '@amk/spc/adsr';
@@ -287,9 +286,5 @@ export class EnvelopeTuner {
     }
 
     this.commit.emit({ ...this.value(), gain: encodeGain({ mode, level: null, rate }) });
-  }
-
-  protected gainModeText(): string {
-    return gainModeName(this.gain().mode);
   }
 }

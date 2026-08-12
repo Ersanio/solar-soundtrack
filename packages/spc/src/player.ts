@@ -76,8 +76,6 @@ export class SpcPlayer {
 	private state: PlayerState = "idle";
 	private position = 0;
 	private songTicks = 0;
-	private ticks = 0;
-	private driver: DriverState | null = null;
 	private volume = 1;
 	private looping = false;
 	private muteMask = 0;
@@ -202,7 +200,6 @@ export class SpcPlayer {
 		this.require();
 		this.position = Math.max(0, atSeconds);
 		this.songTicks = 0;
-		this.ticks = 0;
 		this.epoch++;
 		this.post({
 			type: "load",
@@ -227,8 +224,6 @@ export class SpcPlayer {
 		this.state = "idle";
 		this.position = 0;
 		this.songTicks = 0;
-		this.ticks = 0;
-		this.driver = null;
 	}
 
 	pause(): void {
@@ -285,24 +280,9 @@ export class SpcPlayer {
 		}
 	}
 
-	/** Emulated seconds since the song was loaded, or 0 when nothing is loaded. */
-	getTime(): number {
-		return this.position;
-	}
-
-	/** Music ticks counted since the song was loaded, past the end of the loop. */
-	getTicks(): number {
-		return this.ticks;
-	}
-
 	/** The playhead folded into one pass, in music ticks. */
 	getSongTicks(): number {
 		return this.songTicks;
-	}
-
-	/** The driver's last reported state, or null before playback has started. */
-	getDriverState(): DriverState | null {
-		return this.driver;
 	}
 
 	/** 0 to 5. */
@@ -337,9 +317,7 @@ export class SpcPlayer {
 				}
 
 				this.position = message.seconds;
-				this.ticks = message.ticks;
 				this.songTicks = message.songTicks;
-				this.driver = message.driver;
 				this.onPosition?.(message.songTicks);
 				this.onDriverState?.(message.driver);
 				break;

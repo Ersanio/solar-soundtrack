@@ -118,9 +118,6 @@ export class SampleStore {
     () => this.drivers.driver()?.manifest.sampleGroups ?? {},
   );
 
-  /** The `#default` group's names, in SRCN order. */
-  readonly defaultGroup = computed<readonly string[]>(() => this.groups()['default'] ?? []);
-
   // --- optimisation and importance -----------------------------------------
 
   /** Replace samples the song never plays with `EMPTY.brr`. */
@@ -220,23 +217,6 @@ export class SampleStore {
     this.files()
       .filter((file) => file.error === null)
       .map((file) => file.name),
-  );
-
-  /** Bytes the library would contribute to ARAM if every sample were used. */
-  readonly totalBytes = computed(() =>
-    this.files().reduce((sum, file) => {
-      if (file.error !== null) {
-        return sum;
-      }
-
-      // A `.brr` file is its 2-byte loop header plus block data; a bank's slots
-      // are already header-free, so only their data counts.
-      if (file.kind === 'sample') {
-        return sum + file.bytes.length - 2;
-      }
-
-      return sum + this.decodedSlots(file.name).reduce((bank, slot) => bank + slot.bytes, 0);
-    }, 0),
   );
 
   readonly overrideCount = computed(
