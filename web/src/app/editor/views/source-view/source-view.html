@@ -1,0 +1,32 @@
+<amk-toolbar>
+  <button
+    type="button"
+    [class]="wrapButtonClass()"
+    [title]="wordWrap() ? 'Word wrap: on' : 'Word wrap: off'"
+    (click)="toggleWordWrap()"
+  >
+    <amk-icon-wrap />
+  </button>
+
+  <button
+    type="button"
+    class="text-ink-muted hover:text-ink cursor-pointer text-xs font-semibold tracking-wide uppercase"
+    [title]="paletteOpen() ? 'Hide the command palette' : 'Show the command palette'"
+    (click)="paletteOpen.set(!paletteOpen())"
+  >
+    {{ paletteOpen() ? '▾' : '▸' }} Commands
+  </button>
+
+  <span class="text-ink-muted ml-auto font-mono text-xs">{{ store.caretLabel() }}</span>
+</amk-toolbar>
+
+<!-- Above the editor rather than beside it: what it writes lands at the caret,
+     and it reads the dialect there, so it belongs to the text below. Built only
+     while this view is showing, as it was when the pane still gated it. -->
+@if (active() && paletteOpen()) {
+  <amk-command-palette />
+}
+
+<div class="min-h-0 flex-1">
+  <div #editorHost class="h-full"></div>
+</div>

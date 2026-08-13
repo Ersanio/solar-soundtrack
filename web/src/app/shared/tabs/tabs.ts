@@ -18,7 +18,10 @@ export interface TabDef<Id extends string = string> {
 @Component({
   selector: 'amk-tabs',
   templateUrl: './tabs.html',
-  host: { class: 'flex items-center gap-1' },
+  // Wraps rather than overflows: the pane this sits in drags down to a quarter
+  // of the window, where a strip of more than about four tabs does not fit on
+  // one line. A second row is legible; a clipped one is not.
+  host: { class: 'flex flex-wrap items-center gap-1' },
 })
 export class Tabs<Id extends string = string> {
   readonly tabs = input.required<readonly TabDef<Id>[]>();
@@ -28,8 +31,10 @@ export class Tabs<Id extends string = string> {
 
   protected readonly count = computed(() => this.tabs().length);
 
+  // `whitespace-nowrap` so a two-word label wraps as a tab rather than as text:
+  // without it "Piano Roll" breaks in half and takes the whole strip with it.
   private static readonly BASE =
-    'cursor-pointer rounded-t-md px-3 py-1 text-xs font-semibold tracking-wide uppercase transition-colors';
+    'cursor-pointer rounded-t-md px-3 py-1 text-xs font-semibold tracking-wide whitespace-nowrap uppercase transition-colors';
 
   protected buttonClass(selected: boolean): string {
     return `${Tabs.BASE} ${

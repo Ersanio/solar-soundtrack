@@ -1,39 +1,27 @@
-<amk-panel heading="Editor" class="min-h-0 flex-1">
-  <button
-    panelHeadingAside
-    type="button"
-    [class]="wrapButtonClass()"
-    [title]="wordWrap() ? 'Word wrap: on' : 'Word wrap: off'"
-    (click)="toggleWordWrap()"
-  >
-    <amk-icon-wrap />
-  </button>
+<amk-panel class="min-h-0 flex-1">
+  <amk-tabs panelHeading [tabs]="VIEWS" [(active)]="view" />
 
-  <div panelAside class="flex items-center gap-3">
-    <amk-tabs [tabs]="TABS" [(active)]="tab" />
-    @if (tab() === 'source') {
-      <span class="text-ink-muted font-mono text-xs">{{ store.caretLabel() }}</span>
-    }
-  </div>
-
-  <!-- A column rather than the panel body's own block flow: the palette is a
-       fixed row above a view that takes the rest, and `h-full` on both would
-       overflow by exactly the palette's height. -->
   <div class="flex h-full min-h-0 flex-col">
-    <!-- Above the editor rather than beside it: what it writes lands at the
-         caret, and it reads the dialect there, so it belongs to the text below. -->
-    @if (tab() === 'source') {
-      <amk-command-palette />
-    }
-
-    <!-- Hidden rather than destroyed on tab switch, so the CodeMirror view keeps
-         its undo history, scroll position and selection. -->
-    <div class="min-h-0 flex-1" [class.hidden]="tab() !== 'source'">
-      <div #editorHost class="h-full"></div>
+    <!--
+      Hidden rather than destroyed, so the CodeMirror view keeps its undo
+      history, scroll position and selection. Every other view is built on
+      selection and thrown away again, having nothing that could not be rebuilt.
+    -->
+    <div class="flex min-h-0 flex-1 flex-col" [class.hidden]="view() !== 'source'">
+      <amk-source-view
+        class="min-h-0 flex-1"
+        [active]="view() === 'source'"
+        (activate)="view.set('source')"
+      />
     </div>
 
-    @if (tab() === 'samples') {
-      <amk-sample-browser class="min-h-0 flex-1" />
+    @switch (view()) {
+      @case ('samples') {
+        <amk-sample-browser class="min-h-0 flex-1" />
+      }
+      @default {
+        <!-- Source, which is rendered above and hidden rather than built. -->
+      }
     }
   </div>
 </amk-panel>
