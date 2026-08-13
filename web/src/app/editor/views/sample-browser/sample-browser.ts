@@ -1,12 +1,13 @@
 import { Component, computed, inject, signal } from '@angular/core';
 
 import { ARAM_SIZE } from '@amk/spc/layout';
-import { Button } from '../../shared/button/button';
-import { Checkbox } from '../../shared/checkbox/checkbox';
-import { EditorStore } from '../../state/editor-store';
-import { Playback } from '../../state/playback';
-import { type SampleFile, type SampleSlot, SampleStore } from '../../state/sample-store';
-import { Hex2Pipe } from '../../util/hex.pipe';
+import { Button } from '../../../shared/button/button';
+import { Checkbox } from '../../../shared/checkbox/checkbox';
+import { Toolbar } from '../../../shared/toolbar/toolbar';
+import { EditorStore } from '../../../state/editor-store';
+import { Playback } from '../../../state/playback';
+import { type SampleFile, type SampleSlot, SampleStore } from '../../../state/sample-store';
+import { Hex2Pipe } from '../../../util/hex.pipe';
 
 /**
  * The sample library, as a file browser.
@@ -18,7 +19,7 @@ import { Hex2Pipe } from '../../util/hex.pipe';
  */
 @Component({
   selector: 'amk-sample-browser',
-  imports: [Button, Checkbox, Hex2Pipe],
+  imports: [Button, Checkbox, Toolbar, Hex2Pipe],
   templateUrl: './sample-browser.html',
   host: { class: 'flex min-h-0 min-w-0 flex-col' },
 })

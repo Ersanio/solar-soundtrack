@@ -1,4 +1,4 @@
-<div class="border-edge flex shrink-0 flex-wrap items-center gap-3 border-b px-3 py-2">
+<amk-toolbar>
   <label
     class="border-edge bg-inset text-ink hover:border-accent cursor-pointer rounded-md border px-3 py-1.5 text-sm"
   >
@@ -17,7 +17,7 @@
   <span class="ml-auto font-mono text-xs" [class.text-danger]="overflowing()">{{
     freeLabel()
   }}</span>
-</div>
+</amk-toolbar>
 
 @if (library.storageError(); as storageError) {
   <p class="border-edge text-warn border-b px-3 py-2 text-xs leading-relaxed">{{ storageError }}</p>

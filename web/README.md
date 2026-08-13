@@ -11,13 +11,14 @@ them.
 
 ## Layout
 
-| Path              | What it is                                                    |
-| ----------------- | ------------------------------------------------------------- |
-| `src/app/state/`  | Four `@Service()` singletons, in dependency order             |
-| `src/app/editor/` | The source pane: CodeMirror, transport, mixer, sample browser |
-| `src/app/output/` | Diagnostics, stats, the ARAM bar, the command inspector       |
-| `src/app/shared/` | Form controls, panels, icons, chart helpers                   |
-| `src/app/util/`   | Formatting, IndexedDB, `clamp`                                |
+| Path                    | What it is                                                                           |
+| ----------------------- | ------------------------------------------------------------------------------------ |
+| `src/app/state/`        | Four `@Service()` singletons, in dependency order                                    |
+| `src/app/editor/`       | The left pane and its chrome: top bar, transport, mixer, palette, CodeMirror adapter |
+| `src/app/editor/views/` | What the pane's tabs switch between: the source, the sample library                  |
+| `src/app/output/`       | Diagnostics, stats, the ARAM bar, the command inspector                              |
+| `src/app/shared/`       | Form controls, panels, icons, chart helpers                                          |
+| `src/app/util/`         | Formatting, IndexedDB, `clamp`                                                       |
 
 State flows one way: `DriverStore` → `SampleStore` → `EditorStore` → `Playback`.
 
@@ -30,6 +31,25 @@ blocked rather than run against a guess.
 Diagnostics, stats, the ARAM budget and the hex dump are all `computed` off that one result.
 `buildSpc` is a method rather than a `computed` because it copies 64 KiB of ARAM plus every sample —
 wasted work on each keystroke.
+
+## Adding a view
+
+`editor-pane.ts` is a shell. It owns which tab is selected and nothing else, so a view is a folder
+under `editor/views/`, an entry in its `VIEWS` const and a `@case` in its template.
+
+**A view brings its own controls.** The panel header is the tab strip and only that; anything that is
+a setting on one view goes in an `<amk-toolbar>` as that view's first child. This is the point of the
+arrangement — word wrap is meaningless in the sample library, and a piano roll's zoom and snap will be
+meaningless in the source, so there is no honest way for one shared header to serve all of them. Host
+class is `flex min-h-0 min-w-0 flex-col`, as the panes' own is.
+
+**The source view is the one that is hidden rather than destroyed**, because CodeMirror holds undo
+history, scroll position and selection that nothing could restore. So it is alive while another tab is
+showing, and its effects still run: a diagnostic clicked from the Samples tab has to bring the source
+back. It asks for that with an `activate` output rather than reaching for the tab itself, and it is
+told whether it is showing with an `active` input, because measuring or focusing a `display: none`
+view is a no-op and the render barrier has to be taken first. Any later view with state worth keeping
+does the same; the rest are `@case`d and rebuilt.
 
 ## Preview and commit
 
@@ -51,8 +71,8 @@ dragging away from.
 
 ## Reaching into the editor
 
-The editor owns the CodeMirror view, so nothing else may touch it. Three signals on `EditorStore`
-are how a sibling panel asks:
+`editor/views/source-view/` owns the CodeMirror view, so nothing else may touch it — not even the
+pane it sits in. Three signals on `EditorStore` are how a sibling panel asks:
 
 - `reveal` — select and scroll to a span, set when a diagnostic is clicked.
 - `replace` — apply a splice, set when a panel edits a command in place.

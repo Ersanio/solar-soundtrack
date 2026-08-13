@@ -2,8 +2,10 @@
   class="border-edge bg-raised flex shrink-0 items-center justify-between gap-3 border-b px-3 py-2"
 >
   <div class="flex items-center gap-2">
-    <h2 class="text-ink-muted text-xs font-semibold tracking-wide uppercase">{{ heading() }}</h2>
-    <ng-content select="[panelHeadingAside]" />
+    @if (heading(); as heading) {
+      <h2 class="text-ink-muted text-xs font-semibold tracking-wide uppercase">{{ heading }}</h2>
+    }
+    <ng-content select="[panelHeading]" />
   </div>
   <ng-content select="[panelAside]" />
 </div>

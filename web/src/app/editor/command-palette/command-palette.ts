@@ -14,7 +14,6 @@ import { CommandIcon } from './command-icon';
 
 type Filter = Category | 'all';
 
-const OPEN_KEY = 'solar-soundtrack.palette';
 const FILTER_KEY = 'solar-soundtrack.palette-filter';
 
 /** Every value {@link Filter} can take, for reading one back out of storage. */
@@ -48,8 +47,6 @@ export class CommandPalette {
   private readonly store = inject(EditorStore);
 
   protected readonly CATEGORIES = CATEGORIES;
-
-  protected readonly open = signal(localStorage.getItem(OPEN_KEY) !== 'closed');
 
   /**
    * One category rather than all 59 buttons: the whole catalogue is eight rows
@@ -134,8 +131,7 @@ export class CommandPalette {
   });
 
   constructor() {
-    // Sanctioned effects: mirroring the two view preferences into localStorage.
-    effect(() => localStorage.setItem(OPEN_KEY, this.open() ? 'open' : 'closed'));
+    // Sanctioned effect: mirroring a view preference into localStorage.
     effect(() => localStorage.setItem(FILTER_KEY, this.filter()));
   }
 
