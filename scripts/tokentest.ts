@@ -18,6 +18,7 @@ import { type ScanState, type Token, commandAt, copyState, startState, step, tok
 
 import { velocityTableAt } from "@amk/tokens/dialect";
 import { resolveCommand } from "@amk/tokens/commands/describe";
+import { tempoFadeSeconds, tickSeconds } from "@amk/tokens/commands/units";
 
 import { check, summarise } from "./harness";
 
@@ -210,6 +211,103 @@ console.log("\na comma form of t, v or w is its hex fade, and reads as one");
 	] as const) {
 		check(`${body} is still "${name}"`, at(`#0 ${body}\n`, 4)?.name === name, at(`#0 ${body}\n`, 4)?.name);
 	}
+}
+
+console.log("\na tempo fade is priced across the tempo it changes, not the one it leaves");
+{
+	// $E3 steps the tempo once per tick (main.asm:2461) and a tick's length is
+	// what the tempo *is*, so the elapsed time is the sum of every step's own
+	// tick. The row used to multiply the count by the starting tick — the one
+	// thing the command exists to change — and read t255,254 from t144 as 0.90 s
+	// against the driver's 0.67, or 2.42 against 1.02 from the driver's default.
+	const naive = (ticks: number, tempo: number) => ticks * tickSeconds(tempo);
+
+	// The continuum the walk approximates, derived independently of it: ticks
+	// whose length runs linearly between two tempos take the count times their
+	// *logarithmic* mean. Undefined for a fade that changes nothing, which is why
+	// the flat case below is checked against `naive` instead.
+	const integral = (ticks: number, from: number, to: number) =>
+		((256 / 500) * ticks * Math.log((to + 1) / (from + 1))) / (to - from);
+
+	const near = (got: number | null, want: number, within: number) =>
+		got !== null && Math.abs(got - want) / want < within;
+
+	const up = tempoFadeSeconds(255, 144, 254) ?? 0;
+	const down = tempoFadeSeconds(255, 254, 144) ?? 0;
+	check("t255,254 out of t144 takes 0.67 s", near(up, integral(255, 144, 254), 0.02), `${up.toFixed(4)} s`);
+	check("which the tempo it leaves overstates by a third", naive(255, 144) / up > 1.3, `${naive(255, 144)} s`);
+	check("the same fade run backwards takes as long", near(down, up, 0.02), `${down.toFixed(4)} s vs ${up.toFixed(4)}`);
+	check("where the tempo it leaves understates it", naive(255, 254) / down < 0.8, `${naive(255, 254)} s`);
+
+	// The driver's own default, t53, which is where the gap is widest.
+	const slow = tempoFadeSeconds(255, 53, 254) ?? 0;
+	check("out of the driver's default it is 1.02 s", near(slow, integral(255, 53, 254), 0.02), `${slow.toFixed(4)} s`);
+	check("not the 2.42 s the old reading gave", naive(255, 53) / slow > 2.3, `${naive(255, 53)} s`);
+
+	// A fade to the tempo already in force has nothing to account for, and one
+	// tick is over before the snap, so both come back to the plain reading.
+	check(
+		"a fade to the standing tempo is the plain reading",
+		near(tempoFadeSeconds(96, 144, 144), naive(96, 144), 1e-12),
+		String(tempoFadeSeconds(96, 144, 144)),
+	);
+	check("and a one-tick fade is one tick of it", tempoFadeSeconds(1, 144, 254) === naive(1, 144));
+
+	// Commands.asm:330's carry-set adc makes $FF tempo 0, which stops the song.
+	check("a fade to a stop has no duration to give", tempoFadeSeconds(96, 144, 255) === null);
+	check("nor does one out of a stopped song", tempoFadeSeconds(96, 255, 144) === null);
+	check("nor does a fade over no ticks at all", tempoFadeSeconds(0, 144, 254) === null);
+}
+
+console.log("\na fade over 0 ticks is dropped, not applied");
+{
+	// Every fade counter is tested before it is decremented and branches past its
+	// own block on a zero — main.asm:2461 for $E3, :2472 for $F2, :2490 for $E1,
+	// :2785 and :2817 for $E8 and $DC, :3302 for $EA. The destination byte is read
+	// only where the counter *reaches* zero (main.asm:2464 for $E3), so `t0,200`
+	// stores a tempo the driver never looks at and the song carries on unchanged.
+	// The row used to call it instant, which is what a duration of 1 does.
+	const durationRow = (body: string, needle: string) => {
+		const source = `#amk 4\n#0 ${body}\n`;
+		const command = commandAt(tokenize(source).commands, source.indexOf(needle));
+		return command === null ? null : resolveCommand(command, { tempo: 144, samples: [] }).rows[0];
+	};
+
+	const durationNote = (body: string, needle: string) => durationRow(body, needle)?.note;
+
+	for (const [body, needle] of [
+		["t0,200", "t0"],
+		["$E3 $00 $C8", "$E3"],
+		["v0,200", "v0"],
+		["$E8 $00 $C8", "$E8"],
+		["w0,200", "w0"],
+		["$E1 $00 $C8", "$E1"],
+		["$DC $00 $14", "$DC"],
+		["$F2 $00 $10 $10", "$F2"],
+		["$EA $00", "$EA"],
+	] as const) {
+		const note = durationNote(body, needle);
+		check(`${body} says the fade is skipped`, note?.startsWith("no fade") === true, note ?? "no row");
+		check(`and does not call it instant`, note?.includes("instant") === false, note ?? "no row");
+	}
+
+	check(
+		"a duration of 1 still gets an ordinary reading",
+		durationNote("t1,200", "t1")?.startsWith("1 tick") === true,
+		durationNote("t1,200", "t1") ?? "no row",
+	);
+
+	// The control floors at 1 so a fade that never runs cannot be dragged into a
+	// song, in both spellings — but a 0 already written still shows as itself,
+	// which is the pair of checks above.
+	for (const [body, needle] of [
+		["t18,144", "t18"],
+		["$E3 $12 $90", "$E3"],
+	] as const) {
+		check(`${body} cannot be dragged down to no fade at all`, durationRow(body, needle)?.min === 1);
+	}
+
+	check("and a 0 in the source still reads as the 0 it is", durationRow("t0,200", "t0")?.value === 0);
 }
 
 /** The length of the note or rest written at `needle` — `undefined` for anything else. */

@@ -56,11 +56,8 @@ export function noteLengthName(ticks: number): string | null {
 	return NOTE_LENGTHS[ticks] ?? null;
 }
 
-/**
- * A duration said in all the ways it can be: ticks, the note length it comes to,
- * and the seconds it lasts at the tempo in force.
- */
-export function ticksLabel(ticks: number, tempo: number | null): string {
+/** The tick count and the note length it comes to — true whatever the tempo is. */
+function tickParts(ticks: number): string[] {
 	const parts = [`${ticks} tick${ticks === 1 ? "" : "s"}`];
 
 	const named = noteLengthName(ticks);
@@ -68,8 +65,68 @@ export function ticksLabel(ticks: number, tempo: number | null): string {
 		parts.push(named);
 	}
 
+	return parts;
+}
+
+/**
+ * A duration said in all the ways it can be: ticks, the note length it comes to,
+ * and the seconds it lasts at the tempo in force.
+ */
+export function ticksLabel(ticks: number, tempo: number | null): string {
+	const parts = tickParts(ticks);
+
 	if (tempo !== null) {
 		parts.push(`${(ticks * tickSeconds(tempo)).toFixed(2)} s at t${tempo}`);
+	}
+
+	return parts.join(" · ");
+}
+
+/**
+ * Seconds a tempo fade really takes, or `null` when it ends the song.
+ *
+ * {@link ticksLabel}'s arithmetic cannot answer this one: the tick length it
+ * multiplies by is the thing the command is changing. `main.asm:2461` steps the
+ * tempo once per tick by `Commands.asm:335`'s 8.8 delta and snaps to the target
+ * on the last, so the elapsed time is the sum of each step's own tick length —
+ * `t255,254` from t144 takes 0.67 s where 255 ticks at t144 would be 0.90 s, and
+ * a fade the other way is out by more than double.
+ *
+ * Walked rather than integrated because the walk is the driver's: 255 terms at
+ * most, and it lands on the same truncation the fixed-point delta does.
+ */
+export function tempoFadeSeconds(ticks: number, from: number, to: number): number | null {
+	// Both handlers are entered with the carry set, so the driver holds one more
+	// than either byte says (`Commands.asm:320`, `:330`).
+	const start = (from + 1) & 0xff;
+	const target = (to + 1) & 0xff;
+	if (start === 0 || target === 0 || ticks === 0) {
+		// A tempo of 0 stops the song advancing, so there is no duration to give.
+		return null;
+	}
+
+	// Commands.asm:332 — `Divide16` truncates towards zero, and $50/$51 keeps the
+	// fraction, so what the driver plays at is the whole part of the running sum.
+	const delta = Math.trunc(((target - start) * 256) / ticks) / 256;
+
+	let seconds = 0;
+	for (let step = 0; step < ticks; step++) {
+		seconds += 256 / (500 * Math.floor(start + step * delta));
+	}
+
+	return seconds;
+}
+
+/**
+ * A tempo fade's duration: ticks, as {@link ticksLabel} says them, then the
+ * seconds {@link tempoFadeSeconds} works out across the tempo change itself.
+ */
+export function tempoFadeLabel(ticks: number, from: number | null, to: number | null): string {
+	const parts = tickParts(ticks);
+
+	const seconds = from === null || to === null ? null : tempoFadeSeconds(ticks, from, to);
+	if (seconds !== null) {
+		parts.push(`${seconds.toFixed(2)} s, t${from} → t${to}`);
 	}
 
 	return parts.join(" · ");

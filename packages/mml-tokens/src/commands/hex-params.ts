@@ -1,7 +1,18 @@
 import { EMPTY_SAMPLE_NAME } from "@amk/core/hardcoded-tables";
 import { noiseHz } from "@amk/spc/adsr";
 import { hex2 } from "@amk/core/hex";
-import { DURATION, type ParamDescriptor, type Resolver, choice, fixed, raw, s8, ticks, u8 } from "./param";
+import {
+	DURATION,
+	type ParamDescriptor,
+	type Resolver,
+	TEMPO_FADE_DURATION,
+	choice,
+	fixed,
+	raw,
+	s8,
+	ticks,
+	u8,
+} from "./param";
 import { noteName, panLabel, percentOf255, tempoLabel } from "./units";
 
 /**
@@ -385,7 +396,7 @@ export const HEX_PARAMS: Readonly<Record<number, Resolver>> = {
 	),
 	0xe3: fixed(
 		[
-			DURATION,
+			TEMPO_FADE_DURATION,
 			u8("Tempo", "rate", {
 				max: MAX_TEMPO,
 				describe: tempoLabel,

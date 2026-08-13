@@ -1,6 +1,6 @@
 import { TICKS_PER_WHOLE } from "@amk/core/hardcoded-tables";
 import { noiseHz } from "@amk/spc/adsr";
-import { DURATION, type Resolver, fixed, s8, ticks, u8 } from "./param";
+import { DURATION, type Resolver, TEMPO_FADE_DURATION, fixed, s8, ticks, u8 } from "./param";
 import { noteLengthName, percentOf255, tempoLabel } from "./units";
 
 /** See `MAX_TEMPO` in `hex-params.ts`: the driver stores one more than you write. */
@@ -108,7 +108,7 @@ export const LETTER_PARAMS: Readonly<Record<string, Resolver>> = {
 		const ceiling = "Stops at 254: the driver adds one, so t255 would be tempo 0 and the song would freeze.";
 		return command.args.length >= 2
 			? {
-					params: [DURATION, target],
+					params: [TEMPO_FADE_DURATION, target],
 					note: `A tempo fade, which needs #amk 3 or above. ${ceiling}`,
 				}
 			: { params: [target], note: ceiling };

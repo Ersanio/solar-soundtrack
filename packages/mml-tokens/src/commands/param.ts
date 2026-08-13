@@ -1,5 +1,5 @@
 import type { Command } from "../tokens";
-import { ticksLabel } from "./units";
+import { tempoFadeLabel, ticksLabel } from "./units";
 
 export interface EnumOption {
 	value: number;
@@ -98,17 +98,38 @@ export function ticks(name: string, extra: Partial<ParamDescriptor> = {}): Param
 }
 
 /**
- * The fade duration `$E1`, `$E3` and `$E8` share with `w`, `t` and `v`'s comma
- * forms, which compile to exactly those three (`parser.ts:parseFadeableValue`,
- * `parseTempo`). Shared rather than restated, so the two spellings of one
- * command cannot drift apart.
+ * What a fade duration of 0 does, which is nothing at all.
+ *
+ * Every fade counter is tested before it is decremented — `main.asm:2461` for
+ * `$E3`, `:2472` for `$F2`, `:2490` for `$E1`, `:2785` and `:2817` for `$E8` and
+ * `$DC`, `:3302` for `$EA` — and each branches straight past its own block on a
+ * zero.
+ */
+const NO_FADE = "no fade — the driver skips a duration of 0, so the value stays put; 1 is what applies it at once";
+
+/**
+ * The fade duration `$E1` and `$E8` share with `w` and `v`'s comma forms, which
+ * compile to exactly those two (`parser.ts:parseFadeableValue`). Shared rather
+ * than restated, so the two spellings of one command cannot drift apart.
  *
  * Not folded into {@link ticks}: a `$DD` or `$DE` delay of 0 means no delay,
- * where a fade over 0 ticks is the target applied at once.
+ * where a fade over 0 ticks is dropped outright.
  */
 export const DURATION = ticks("Over", {
-	describe: (value, _command, context) =>
-		value === 0 ? "instant — a duration of 0 applies the target at once" : ticksLabel(value, context.tempo),
+	describe: (value, _command, context) => (value === 0 ? NO_FADE : ticksLabel(value, context.tempo)),
+});
+
+/**
+ * `$E3`'s, and `t`'s comma form with it (`parser.ts:parseTempo`).
+ *
+ * Separate from {@link DURATION} for one reason: every other fade leaves the
+ * clock alone, so pricing its ticks at the tempo in force is right. A tempo fade
+ * *is* the tempo in force, and `units.ts:tempoFadeSeconds` accounts for that.
+ */
+export const TEMPO_FADE_DURATION = ticks("Over", {
+	min: 1,
+	describe: (value, command, context) =>
+		value === 0 ? NO_FADE : tempoFadeLabel(value, context.tempo, command.args[1]?.value ?? null),
 });
 
 /** A byte the inspector has nothing to say about, shown but not interpreted. */
