@@ -1,5 +1,5 @@
 import type { Command } from "../tokens";
-import { tempoFadeLabel, ticksLabel } from "./units";
+import { fadeTicksLabel, tempoFadeLabel, ticksLabel } from "./units";
 
 export interface EnumOption {
 	value: number;
@@ -116,7 +116,7 @@ const NO_FADE = "no fade — the driver skips a duration of 0, so the value stay
  * where a fade over 0 ticks is dropped outright.
  */
 export const DURATION = ticks("Over", {
-	describe: (value, _command, context) => (value === 0 ? NO_FADE : ticksLabel(value, context.tempo)),
+	describe: (value, _command, context) => (value === 0 ? NO_FADE : fadeTicksLabel(value, context.tempo)),
 });
 
 /**

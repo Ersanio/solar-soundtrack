@@ -18,7 +18,7 @@ import { type ScanState, type Token, commandAt, copyState, startState, step, tok
 
 import { velocityTableAt } from "@amk/tokens/dialect";
 import { resolveCommand } from "@amk/tokens/commands/describe";
-import { tempoFadeSeconds, tickSeconds } from "@amk/tokens/commands/units";
+import { DEFAULT_TEMPO, tempoFadeSeconds, tickSeconds } from "@amk/tokens/commands/units";
 
 import { check, summarise } from "./harness";
 
@@ -257,6 +257,46 @@ console.log("\na tempo fade is priced across the tempo it changes, not the one i
 	check("a fade to a stop has no duration to give", tempoFadeSeconds(96, 144, 255) === null);
 	check("nor does one out of a stopped song", tempoFadeSeconds(96, 255, 144) === null);
 	check("nor does a fade over no ticks at all", tempoFadeSeconds(0, 144, 254) === null);
+}
+
+console.log("\na fade in a song with no tempo yet is read at the driver's default");
+{
+	// main.asm:177 puts #$36 into $51 before a song touches it, so "no tempo set"
+	// is not "no tempo" — the fade is audible and has a length. Only the rows
+	// named Over take the default; a $DD delay or a $DE one still says nothing,
+	// because those are read against the note they ride on rather than the clock.
+	const overNote = (body: string, needle: string) => {
+		const source = `#amk 4\n#0 ${body}\n`;
+		const command = commandAt(tokenize(source).commands, source.indexOf(needle));
+		return command === null ? null : resolveCommand(command, { tempo: null, samples: [] }).rows[0]?.note;
+	};
+
+	// 96 ticks at t53 — the tempo the driver is already running at, not the 0x36
+	// Music.cpp:207 assumes as a written byte, which would come to 0.89 s.
+	const plain = 96 * tickSeconds(DEFAULT_TEMPO);
+	check("t53 is what $51 already holds", DEFAULT_TEMPO === 53 && plain.toFixed(2) === "0.91", plain.toFixed(4));
+
+	for (const [body, needle] of [
+		["v96,200", "v96"],
+		["w96,200", "w96"],
+		["$E8 $60 $C8", "$E8"],
+		["$DC $60 $14", "$DC"],
+		["$F2 $60 $10 $10", "$F2"],
+		["$EA $60", "$EA"],
+	] as const) {
+		const note = overNote(body, needle);
+		check(`${body} gives its seconds anyway`, note?.endsWith("0.91 s at the default t53") === true, note ?? "no row");
+	}
+
+	// The tempo fade takes the default as the tempo it *leaves*, and walks from it:
+	// 1.08 s, between the 1.82 those ticks take at t53 and the 0.68 they take at t144.
+	const fade = overNote("t192,144", "t192");
+	check("a tempo fade walks from the default", fade?.endsWith("1.08 s, the default t53 → t144") === true, fade ?? "");
+
+	// Everything else keeps saying nothing, which is the honest answer for a
+	// duration that is not a fade: it has no tempo to be read against.
+	check("a $DD delay still gives no seconds", overNote("$DD $18 $18 $A4", "$DD") === "24 ticks · an eighth note");
+	check("nor does a $DE one", overNote("$DE $18 $02 $10", "$DE") === "24 ticks · an eighth note");
 }
 
 console.log("\na fade over 0 ticks is dropped, not applied");

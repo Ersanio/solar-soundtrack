@@ -56,6 +56,20 @@ export function noteLengthName(ticks: number): string | null {
 	return NOTE_LENGTHS[ticks] ?? null;
 }
 
+/**
+ * The tempo a song is already playing at before it sets one.
+ *
+ * `main.asm:177` puts `#$36` straight into `$51`, which holds one more than the
+ * MML byte would write — so t53, not the 0x36 `Music.cpp:207` assumes for its
+ * own length estimate.
+ */
+export const DEFAULT_TEMPO = 0x36 - 1;
+
+/** A tempo in a readout, marked where it is {@link DEFAULT_TEMPO} and not the song's. */
+function tempoName(tempo: number | null): string {
+	return tempo === null ? `the default t${DEFAULT_TEMPO}` : `t${tempo}`;
+}
+
 /** The tick count and the note length it comes to — true whatever the tempo is. */
 function tickParts(ticks: number): string[] {
 	const parts = [`${ticks} tick${ticks === 1 ? "" : "s"}`];
@@ -80,6 +94,16 @@ export function ticksLabel(ticks: number, tempo: number | null): string {
 	}
 
 	return parts.join(" · ");
+}
+
+/**
+ * {@link ticksLabel} for a fade's "Over", which always states its seconds: a song
+ * with no `t` in it yet is not a song with no tempo — the driver is already
+ * running at {@link DEFAULT_TEMPO}, and that is what the fade would be heard at.
+ */
+export function fadeTicksLabel(ticks: number, tempo: number | null): string {
+	const seconds = ticks * tickSeconds(tempo ?? DEFAULT_TEMPO);
+	return [...tickParts(ticks), `${seconds.toFixed(2)} s at ${tempoName(tempo)}`].join(" · ");
 }
 
 /**
@@ -124,9 +148,11 @@ export function tempoFadeSeconds(ticks: number, from: number, to: number): numbe
 export function tempoFadeLabel(ticks: number, from: number | null, to: number | null): string {
 	const parts = tickParts(ticks);
 
-	const seconds = from === null || to === null ? null : tempoFadeSeconds(ticks, from, to);
+	// Only the tempo it leaves has a default to fall back on; the one it fades to
+	// is the command's own second byte, and a half-typed one has nothing to say.
+	const seconds = to === null ? null : tempoFadeSeconds(ticks, from ?? DEFAULT_TEMPO, to);
 	if (seconds !== null) {
-		parts.push(`${seconds.toFixed(2)} s, t${from} → t${to}`);
+		parts.push(`${seconds.toFixed(2)} s, ${tempoName(from)} → t${to}`);
 	}
 
 	return parts.join(" · ");
