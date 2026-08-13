@@ -9,7 +9,6 @@
     <amk-icon-wrap />
   </button>
 
-  <!-- Will grow into a toolbar; the tabs and the caret readout are all it holds for now. -->
   <div panelAside class="flex items-center gap-3">
     <amk-tabs [tabs]="TABS" [(active)]="tab" />
     @if (tab() === 'source') {
@@ -17,16 +16,26 @@
     }
   </div>
 
-  <!-- Hidden rather than destroyed on tab switch, so the CodeMirror view keeps
-       its undo history, scroll position and selection. -->
-  <div class="h-full" [class.hidden]="tab() !== 'source'">
-    <div #editorHost class="h-full"></div>
-  </div>
-  @if (tab() === 'samples') {
-    <div class="flex h-full min-h-0 flex-col">
-      <amk-sample-browser class="min-h-0 flex-1" />
+  <!-- A column rather than the panel body's own block flow: the palette is a
+       fixed row above a view that takes the rest, and `h-full` on both would
+       overflow by exactly the palette's height. -->
+  <div class="flex h-full min-h-0 flex-col">
+    <!-- Above the editor rather than beside it: what it writes lands at the
+         caret, and it reads the dialect there, so it belongs to the text below. -->
+    @if (tab() === 'source') {
+      <amk-command-palette />
+    }
+
+    <!-- Hidden rather than destroyed on tab switch, so the CodeMirror view keeps
+         its undo history, scroll position and selection. -->
+    <div class="min-h-0 flex-1" [class.hidden]="tab() !== 'source'">
+      <div #editorHost class="h-full"></div>
     </div>
-  }
+
+    @if (tab() === 'samples') {
+      <amk-sample-browser class="min-h-0 flex-1" />
+    }
+  </div>
 </amk-panel>
 
 <amk-channel-mixer />

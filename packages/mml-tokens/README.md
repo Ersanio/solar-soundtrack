@@ -9,14 +9,15 @@ an echo will run away. Nothing else. No CodeMirror, no Angular, no third-party d
 `TOKEN_TAGS` holds `@lezer/highlight` tag _names_ as plain strings so the adapter can live in the
 app.
 
-| Module            | What it is                                                         |
-| ----------------- | ------------------------------------------------------------------ |
-| `tokens.ts`       | The scanner: `step`, `tokenize`, `Command`, `InstrumentDefinition` |
-| `edits.ts`        | Splices that rewrite a command in the source it was scanned from   |
-| `dialect.ts`      | What was in force at a point in the song — tempo, velocity table   |
-| `echo-hazards.ts` | Diagnostics for an echo that compounds instead of decaying         |
-| `fir-override.ts` | Which `$F5`s a later `$F1` throws away                             |
-| `commands/`       | What each argument _means_, in a form a panel can render and edit  |
+| Module                     | What it is                                                                      |
+| -------------------------- | ------------------------------------------------------------------------------- |
+| `tokens.ts`                | The scanner: `step`, `tokenize`, `Command`, `InstrumentDefinition`              |
+| `edits.ts`                 | Splices that rewrite a command in the source it was scanned from                |
+| `dialect.ts`               | What was in force at a point in the song — dialect, tempo, v-table              |
+| `echo-hazards.ts`          | Diagnostics for an echo that compounds instead of decaying                      |
+| `fir-override.ts`          | Which `$F5`s a later `$F1` throws away                                          |
+| `commands/`                | What each argument _means_, in a form a panel can render and edit               |
+| `commands/availability.ts` | Which dialects will take a command, for a palette asking before the text exists |
 
 ## A resumable scanner, not a second parser
 
@@ -116,6 +117,13 @@ this — costs more than the warning is worth.
 `commands/` says what each argument means: a codec (how the byte becomes the number a control
 edits), a role (what the number _is_), and optionally a control, a range, a set of named choices and
 a sentence about the consequence the number does not state.
+
+`availability.ts` is the same tables' answer to a different question. The descriptors say what a
+command's bytes mean once they are written; this says whether the dialect the song declares will
+take that command at all — which is what a palette needs, because it has to grey a button out
+_before_ there is any text to diagnose. Every rule in it is a condition `parser.ts` already tests,
+restated as a question rather than a check, and `palettetest` compiles every form at every dialect
+to hold the two answers together.
 
 One rule keeps the tables honest: **a descriptor never states how many arguments a command takes.**
 `tokens.ts` already carries that twice on purpose — as `scanHex`'s `hexLeft` mutations and as

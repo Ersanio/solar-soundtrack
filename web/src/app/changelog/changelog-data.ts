@@ -9,8 +9,11 @@ export interface ChangelogEntry {
 export const CHANGELOG: readonly ChangelogEntry[] = [
   // ─── newest first; add new blocks here ──────────────────────────────────
   {
-    date: '12 August 2026',
-    items: ['Songs always compile as you type, the manual controls are gone'],
+    date: '13 August 2026',
+    items: [
+      'Songs always compile as you type, the manual controls are gone',
+      'Command palette above the editor, with a button for every MML command',
+    ],
   },
   {
     date: '11 August 2026',

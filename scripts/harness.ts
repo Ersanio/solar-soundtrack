@@ -1,5 +1,5 @@
 /**
- * What the eleven byte-level harnesses share. Nothing here knows what is being
+ * What the twelve byte-level harnesses share. Nothing here knows what is being
  * tested, so it stays out of the way of the assertions. See README.md.
  */
 

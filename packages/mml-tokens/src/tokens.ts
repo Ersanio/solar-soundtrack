@@ -257,7 +257,7 @@ export interface CommandTarget {
 }
 
 /** What the parser assumes before any marker (`parser.ts:targetAMKVersion`/`songTargetProgram`). */
-const DEFAULT_TARGET: CommandTarget = { program: 0, amkVersion: 4 };
+export const DEFAULT_TARGET: CommandTarget = { program: 0, amkVersion: 4 };
 
 /**
  * Everything the scanner must carry across a line boundary.
@@ -1260,6 +1260,12 @@ export interface TokenIndex {
 	 * untaken branch is counted here where `preprocess.ts` would drop it.
 	 */
 	instruments: InstrumentDefinition[];
+	/**
+	 * Where the dialect changed, in source order, so a caller can ask what was in
+	 * force at an offset no command sits at. Empty when the song never moves off
+	 * {@link DEFAULT_TARGET}. See `dialect.ts:targetAt`.
+	 */
+	targets: TargetTransition[];
 }
 
 /**
@@ -1274,7 +1280,7 @@ interface GatherToken extends Token {
 }
 
 /** A point in the document where the dialect changed. See {@link tokenize}. */
-interface TargetTransition {
+export interface TargetTransition {
 	at: number;
 	target: CommandTarget;
 }
@@ -1375,6 +1381,7 @@ export function tokenize(text: string): TokenIndex {
 		tokens,
 		commands: gather(stream_, text, transitions),
 		instruments: gatherInstruments(stream_, text),
+		targets: transitions,
 	};
 }
 

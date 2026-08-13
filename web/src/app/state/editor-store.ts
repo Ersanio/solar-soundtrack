@@ -48,6 +48,16 @@ export interface Status {
   text: string;
 }
 
+/** Text bound for the caret, and which slice of it to leave selected. */
+export interface Insertion {
+  text: string;
+  /**
+   * Offsets *within* `text`, not into the document, which the sender does not
+   * know — so not a `Span`, which carries a line number that would be a lie.
+   */
+  select: { start: number; end: number } | null;
+}
+
 @Service()
 export class EditorStore {
   private readonly drivers = inject(DriverStore);
@@ -100,6 +110,25 @@ export class EditorStore {
     if (edit) {
       this.replace.set({ ...edit, span: { ...edit.span } });
     }
+  }
+
+  /**
+   * Text the editor should drop in at the caret, set when the command palette
+   * inserts a command. The third of the same family as {@link reveal} and
+   * {@link replace}, and separate from `replace` for two reasons: it carries a
+   * selection, which a splice does not, and it has no span at all — where a
+   * splice knows the range it is overwriting, this one lands wherever the caret
+   * happens to be, which only the view knows.
+   */
+  readonly insertion = signal<Insertion | null>(null);
+
+  /**
+   * Asks for `text` at the caret, selecting the slice `select` names once it is
+   * there — the first argument, so that the inspector opens on the command and
+   * typing over it replaces the placeholder.
+   */
+  insert(text: string, select: { start: number; end: number } | null): void {
+    this.insertion.set({ text, select: select && { ...select } });
   }
 
   /**

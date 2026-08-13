@@ -18,7 +18,7 @@ packages/mml-compiler/  @amk/compiler  preprocess -> parser -> link
 packages/mml-tokens/    @amk/tokens    scanner, splices, command model
 packages/spc/           @amk/spc       BRR, echo FIR, ARAM, emulator, worklet
 web/                    the Angular editor
-scripts/                eleven byte-level harnesses
+scripts/                twelve byte-level harnesses
 ```
 
 ```
@@ -50,7 +50,7 @@ Node 24 is what CI uses. CI runs `npm run lint` then `npm run check`.
 | `npm run lint`      | ESLint over every workspace.                                        |
 | `npm run format`    | Prettier over the workspace.                                        |
 | `npm run typecheck` | The app. `:packages` and `:scripts` cover the rest.                 |
-| `npm run check`     | The merge gate: formatting, three typechecks, all eleven harnesses. |
+| `npm run check`     | The merge gate: formatting, three typechecks, all twelve harnesses. |
 
 `npm run check` does **not** compile Angular templates, and neither does `npm run typecheck` — `tsc`
 does not run the template compiler, so a bad binding (`viewBox=` instead of `[attr.viewBox]=`)
@@ -76,7 +76,7 @@ which is all either needs:
 ### Tests
 
 There are no `.spec.ts` files — `npm run test` is Angular scaffolding and runs nothing. The real
-suite is the eleven harnesses under `scripts/`; **`scripts/README.md` says what each one proves**,
+suite is the twelve harnesses under `scripts/`; **`scripts/README.md` says what each one proves**,
 and several of those assertions are load-bearing in ways that are not obvious from the name.
 
 `scripts/Compare-Spc.ps1` and `scripts/Compare-SongBin.ps1` diff output against a real AddmusicK

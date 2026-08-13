@@ -51,11 +51,17 @@ dragging away from.
 
 ## Reaching into the editor
 
-The editor owns the CodeMirror view, so nothing else may touch it. Two signals on `EditorStore` are
-how a sibling panel asks:
+The editor owns the CodeMirror view, so nothing else may touch it. Three signals on `EditorStore`
+are how a sibling panel asks:
 
 - `reveal` — select and scroll to a span, set when a diagnostic is clicked.
 - `replace` — apply a splice, set when a panel edits a command in place.
+- `insertion` — type a snippet in at the caret, set when a palette button is clicked.
+
+`insertion` is the one with no span of its own: where it lands is the view's own selection, which
+only the editor knows, so there is nothing for an `expect` to guard and the spacing has to be
+decided at dispatch time. It never deletes and never lands mid-command — a palette click means "add
+this", and the click before it left an argument selected for typing over.
 
 `replace` carries `expect`, the text the splice believes occupies the span. Panels read the
 _undebounced_ scan, so their spans agree with the document — but only up to the microtask that

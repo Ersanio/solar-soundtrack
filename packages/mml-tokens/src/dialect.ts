@@ -1,5 +1,6 @@
 /**
  * What was in force at a point in the song:
+ * - Which dialect the `#amk` / `#am4` / `#amm` markers put it in
  * - Tempo
  * - Which velocity table `q` reads against, from the hex as well as the directives
  *
@@ -8,7 +9,65 @@
  * see README.md.
  */
 
-import type { Command, TokenIndex } from "./tokens";
+import { type Command, type CommandTarget, DEFAULT_TARGET, type TokenIndex } from "./tokens";
+
+/**
+ * The dialect in force at `offset`, as the scanner saw it.
+ *
+ * Off `tokenize`'s own transition list, so the marker precedence rules stay in
+ * `scanHash` rather than being re-derived. Takes the positional reading README.md
+ * describes: a marker governs from its line down, where `preprocess.ts` lets the
+ * file's last one govern the whole song. A caret above the `#amk` line therefore
+ * reads {@link DEFAULT_TARGET}, which is what the parser assumes before any marker.
+ */
+export function targetAt(index: TokenIndex, offset: number): CommandTarget {
+	let found = DEFAULT_TARGET;
+
+	for (const transition of index.targets) {
+		if (transition.at > offset) {
+			break;
+		}
+
+		found = transition.target;
+	}
+
+	return found;
+}
+
+/** The three markers, as `scanHash` lower-cases them. */
+const TARGET_MARKERS = new Set(["#amk", "#am4", "#amm"]);
+
+/**
+ * Whether a target marker is written at or above `offset`.
+ *
+ * Not answerable from {@link targetAt}: a transition is recorded only where the
+ * dialect *changes*, and `#amk 4` changes nothing — it is already
+ * {@link DEFAULT_TARGET}. So a song that declares the default correctly and one
+ * that declares nothing at all produce the same empty list, and only the marker
+ * itself tells them apart. AddmusicK rejects the second outright (AMK0002,
+ * `parser.ts:applyTarget`), which is worth saying rather than assuming.
+ */
+export function hasDialectMarker(index: TokenIndex, text: string, offset: number): boolean {
+	return index.tokens.some(
+		(token) =>
+			token.kind === "directive" &&
+			token.start <= offset &&
+			TARGET_MARKERS.has(text.slice(token.start, token.end).toLowerCase()),
+	);
+}
+
+/**
+ * Where the first `#0`-`#7` is, or `null` when the song has none yet.
+ *
+ * `parser.ts:parseOpenParen` (Music.cpp:1015) tells a remote code *definition*
+ * from a *call* by nothing but this: `channelDefined` latches on the first
+ * channel and never clears, so `(!1)[…]` above it defines and below it is read
+ * as a call. Nothing else in the language depends on the boundary, which is why
+ * this is a position rather than a flag on `ScanState`.
+ */
+export function channelsBeginAt(index: TokenIndex): number | null {
+	return index.tokens.find((token) => token.kind === "channel")?.start ?? null;
+}
 
 /**
  * The tempo in force where a command sits, as it was *written*, or `null` when

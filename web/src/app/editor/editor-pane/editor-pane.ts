@@ -14,16 +14,18 @@ import {
 
 import { defaultKeymap, history, historyKeymap, insertTab } from '@codemirror/commands';
 import { setDiagnostics } from '@codemirror/lint';
-import { Compartment, EditorState } from '@codemirror/state';
+import { Compartment, EditorSelection, EditorState } from '@codemirror/state';
 import { EditorView, keymap, lineNumbers } from '@codemirror/view';
 
 import type { Severity } from '@amk/core/types';
+import { commandAt } from '@amk/tokens';
 import { IconWrap } from '../../shared/icons/icon-wrap';
 import { Panel } from '../../shared/panel/panel';
 import { type TabDef, Tabs } from '../../shared/tabs/tabs';
-import { EditorStore } from '../../state/editor-store';
+import { EditorStore, type Insertion } from '../../state/editor-store';
 import { Playback } from '../../state/playback';
 import { ChannelMixer } from '../channel-mixer/channel-mixer';
+import { CommandPalette } from '../command-palette/command-palette';
 import { SampleBrowser } from '../sample-browser/sample-browser';
 import { commandHover } from '../codemirror/command-hover';
 import { mmlLanguage } from '../codemirror/mml-language';
@@ -65,7 +67,7 @@ const LINT_SEVERITY: Record<Severity, 'error' | 'warning' | 'info'> = {
  */
 @Component({
   selector: 'amk-editor-pane',
-  imports: [Panel, Tabs, ChannelMixer, SampleBrowser, IconWrap],
+  imports: [Panel, Tabs, ChannelMixer, SampleBrowser, IconWrap, CommandPalette],
   templateUrl: './editor-pane.html',
   host: { class: 'flex min-h-0 min-w-0 flex-col' },
 })
@@ -209,6 +211,33 @@ export class EditorPane {
       });
     });
 
+    // Sanctioned effect: the palette's insert, which is the same imperative-view
+    // job again — but at the caret rather than at a span, so unlike `replace`
+    // there is nothing to compare against and the view's own selection is the
+    // only authority. `store.caret` lags a debounce behind and is the head only.
+    effect(() => {
+      const insertion = this.store.insertion();
+      if (!insertion) {
+        return;
+      }
+
+      untracked(() => {
+        // Consumed on the spot, as `reveal` and `replace` are: an insertion
+        // describes one gesture, and a re-run would land it a second time.
+        this.store.insertion.set(null);
+
+        // Revealing into a hidden view cannot measure or focus, so the tab
+        // switch takes the same render barrier `reveal` takes.
+        if (this.tab() !== 'source') {
+          this.tab.set('source');
+          afterNextRender(() => this.insertAtCaret(insertion), { injector: this.injector });
+          return;
+        }
+
+        this.insertAtCaret(insertion);
+      });
+    });
+
     // Sanctioned effect: mirroring diagnostics into the CodeMirror view.
     //
     // Compiler spans can lag the document by the typing debounce, so every
@@ -249,6 +278,49 @@ export class EditorPane {
     this.view.dispatch({
       effects: this.wrapCompartment.reconfigure(wrap ? EditorView.lineWrapping : []),
     });
+  }
+
+  /**
+   * Drops `insertion` in after the caret, padded so it cannot fuse with the text
+   * beside it.
+   *
+   * **It never deletes.** A palette click means "add this", so unlike typing it
+   * does not replace the selection — and it must not, because the previous click
+   * left the argument it wrote selected for typing over. Two clicks in a row
+   * would otherwise have the second eat the first's argument.
+   *
+   * **It never lands mid-command.** A caret inside `$EF $FF $28 $28` — which is
+   * exactly where the previous click left it — advances to the end of that
+   * command first. Splitting a hex run is never what was meant and never valid:
+   * the bytes after the split become arguments of the command inserted into it.
+   * The same rule keeps a click from cutting a note in half.
+   *
+   * MML is whitespace-separated, so the padding is decided from the characters
+   * actually either side; inserting into open space adds nothing.
+   */
+  private insertAtCaret(insertion: Insertion): void {
+    const doc = this.view.state.doc;
+    const command = commandAt(this.store.tokens().commands, this.view.state.selection.main.to);
+    const at = Math.min(
+      Math.max(this.view.state.selection.main.to, command?.span.end ?? 0),
+      doc.length,
+    );
+
+    const before = at > 0 && !/\s/.test(doc.sliceString(at - 1, at)) ? ' ' : '';
+    const after = at < doc.length && !/\s/.test(doc.sliceString(at, at + 1)) ? ' ' : '';
+    const text = `${before}${insertion.text}${after}`;
+
+    // The selection is named in the insertion's own coordinates, so it moves
+    // with whatever padding was added in front of it.
+    const anchor = at + before.length + (insertion.select?.start ?? insertion.text.length);
+    const head = at + before.length + (insertion.select?.end ?? insertion.text.length);
+
+    this.view.dispatch({
+      changes: { from: at, insert: text },
+      selection: EditorSelection.range(anchor, head),
+      scrollIntoView: true,
+    });
+    this.view.focus();
   }
 
   /** Selects and centers `span`, clamped to the document as it stands now. */
