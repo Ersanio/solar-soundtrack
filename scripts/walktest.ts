@@ -50,7 +50,9 @@ import { readDriverState } from "@amk/spc/driver-state";
 import { emptySample } from "@amk/spc/brr";
 import { SPC_SAMPLE_RATE, instantiate } from "@amk/spc/wasm-host";
 import { type SongTimeline, type TempoChange, unreachableChannels, vcmdLength, walkSong } from "@amk/spc/song-walk";
-import { songClock } from "../web/src/app/state/song-clock";
+import { secondsAtTick, songClock } from "../web/src/app/state/song-clock";
+import { measureClock, tempoShortfall } from "../web/src/app/state/measure-clock";
+import { driverTickSeconds } from "@amk/tokens/commands/units";
 
 import { SPC_ASSETS, check, stubFetch, summarise } from "./harness";
 
@@ -680,6 +682,106 @@ console.log("\nthe driver plays what the walk says it will");
 		"the note the walk predicts is the note the driver is on",
 		looked > 0 && agreed / looked > 0.95,
 		`${agreed}/${looked} agreed`,
+	);
+}
+
+// ---------------------------------------------------------------------------
+console.log("\nthe driver does not always run the song as fast as it is written");
+// ---------------------------------------------------------------------------
+{
+	// The one thing in the app that cannot be computed: the driver's main loop
+	// handles at most one music tick per pass (`main.asm`, `MainLoop`), so a song
+	// asking for more ticks a second than it can manage gets fewer, and every
+	// seconds figure built on the tempo it *asked* for is wrong by the shortfall.
+	// `measure-clock.ts` plays the song to find out; this is what says it works.
+	const emu = instantiate(new WebAssembly.Module(readFileSync(join(SPC_ASSETS, "player", "spc.wasm"))));
+
+	const spcOf = (result: CompileResult) =>
+		buildSpc({
+			songData: result.data ?? new Uint8Array(0),
+			driver,
+			samples: (result.sampleList ?? []).map((name) => BY_NAME.get(name) ?? emptySample(name)),
+			echoBufferSize: result.stats?.echoBufferSize,
+			date: new Date(2026, 6, 28),
+		}).spc;
+
+	const run = (source: string) => {
+		const { result, timeline } = build(source);
+		const stats = result.stats;
+		const passTicks = (stats?.introTicks ?? 0) + (stats?.loopTicks ?? 0);
+		const measured = measureClock(emu, spcOf(result), passTicks);
+		return { measured, passTicks, timeline, predicted: songClock(timeline) };
+	};
+
+	// One channel at t54 is nothing like the driver's ceiling, so the measurement
+	// must land on the prediction. Without this the whole mechanism could be
+	// reporting garbage and only the pathological songs would show it.
+	const easy = run("#amk 4\n#0 t54 @0 o4 [c8d8e8f8]8\n");
+	check("an easy song reaches the tick count it was written for", !easy.measured.truncated);
+	check(
+		"and measures within a percent of the prediction",
+		Math.abs((tempoShortfall(easy.measured) ?? 0) - 1) < 0.01,
+		`${(tempoShortfall(easy.measured) ?? 0).toFixed(4)}x`,
+	);
+
+	// Eight channels at t254 ask for 498 ticks a second and get about half. This
+	// is the case the transport used to count at half speed on.
+	const hard = run(
+		"#amk 4\n" +
+			[0, 1, 2, 3, 4, 5, 6, 7].map((ch) => `#${ch} ${ch === 0 ? "t254 " : ""}@6 o4 [c16d16e16f16]16\n`).join(""),
+	);
+	const shortfall = tempoShortfall(hard.measured) ?? 0;
+	check("eight channels at t254 fall well short of the rate they ask for", shortfall > 1.5, `${shortfall.toFixed(3)}x`);
+	check(
+		"so the predicted clock is the one that is wrong, not the measurement",
+		hard.predicted !== null && hard.measured.seconds > hard.predicted.seconds * 1.5,
+		`measured ${hard.measured.seconds.toFixed(2)} s vs predicted ${hard.predicted?.seconds.toFixed(2)} s`,
+	);
+
+	// The measured clock has to be usable through the same two functions the
+	// predicted one is, or the transport cannot read one for the other.
+	const clock = hard.measured.clock;
+	check("a measurement yields a clock", clock !== null && clock.segments.length > 0);
+	if (clock) {
+		check(
+			"whose ends are the pass it measured",
+			secondsAtTick(clock, 0) === 0 && Math.abs(secondsAtTick(clock, clock.ticks) - clock.seconds) < 1e-9,
+		);
+		check(
+			"which never runs backwards",
+			Array.from({ length: 64 }, (_, n) => secondsAtTick(clock, (n * clock.ticks) / 63)).every(
+				(seconds, n, all) => n === 0 || seconds >= all[n - 1],
+			),
+		);
+		check(
+			"and joins up at every segment boundary",
+			clock.segments.every((s, n) => {
+				const next = clock.segments[n + 1];
+				return (
+					next === undefined || Math.abs(s.seconds + (next.tick - s.tick) * s.secondsPerTick - next.seconds) < 1e-9
+				);
+			}),
+		);
+	}
+
+	// The restatement guard, as `vcmdLength` has: `measure-clock.ts` prices a
+	// tick at the driver tempo itself rather than importing `@amk/tokens`, whose
+	// `driverTickSeconds` says the same thing. If these drift, every shortfall
+	// figure and the AMK0503 that rides on it drift with them.
+	let apart = 0;
+	for (let driverTempo = 1; driverTempo <= 255; driverTempo++) {
+		if (256 / (500 * driverTempo) !== driverTickSeconds(driverTempo)) {
+			apart++;
+		}
+	}
+
+	check("both packages price a driver tick the same way", apart === 0, `${apart} disagreements`);
+
+	// A song with no ticks to reach has nothing to measure, and must say so
+	// rather than return a clock of length zero that would read as a real answer.
+	check(
+		"nothing to measure yields no clock",
+		measureClock(emu, spcOf(build("#amk 4\n#0 c4\n").result), 0).clock === null,
 	);
 }
 

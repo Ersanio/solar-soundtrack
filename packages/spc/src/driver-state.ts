@@ -10,8 +10,8 @@ const enum Addr {
 	Tempo = 0x51,
 	/** `$5C`: voice bits whose `VxVOL` the driver must rewrite this tick. */
 	VolumeDirty = 0x5c,
-	/** `$5E`: the driver's own mute mask, one bit per voice. */
-	MuteMask = 0x5e,
+	// `$5E` is the driver's own mute mask, and nothing here writes it — see
+	// {@link applyChannelMutes} for why disabling a channel is the wrong tool.
 	/** `$70-$7F`: music note duration, one byte per voice. */
 	NoteDurations = 0x70,
 	/** `$0241+2n`: per-voice track volume, as `v` and `$E8` leave it. */
@@ -86,7 +86,7 @@ export const TICK_POLL_HZ = 1000;
  * somewhere until the channel is given it back.
  */
 export interface MuteBackup {
-	/** The mask last written, so `$5E` bits the song set itself survive. */
+	/** The mask last applied, so a voice let go of can be told from one still held. */
 	applied: number;
 	/** The track volume taken off each voice, waiting to be put back. */
 	saved: Uint8Array;
@@ -106,11 +106,24 @@ export function resetMuteBackup(backup: MuteBackup): void {
 }
 
 /**
- * Silences the voices in `mask`, by writing the driver's own registers.
+ * Silences the voices in `mask`, by taking their volume away.
  *
- * Muted through two registers:
- * $5E: Channel disable, but continues playing the current note or command
- * $0241+2n: Channel volume
+ * **By volume alone, and `$5E` is deliberately left alone.** The driver's own
+ * mute register disables a channel, which makes the driver's main loop cheaper —
+ * and the loop handles at most one music tick per pass, so on a song already at
+ * that ceiling the song *speeds up* when a channel is muted. Measured on a
+ * `t254` song: 233 ticks a second unmuted, 273 with seven voices muted, 301 with
+ * all eight. Muting is a monitoring aid, and one that plays the song 29% fast is
+ * telling the porter something untrue about their own music.
+ *
+ * Taking the track volume costs the driver nothing — it goes on parsing, keying
+ * on and writing `VxVOL`, just with 0 in it — so the rate does not move at all,
+ * and it is the register that actually silences: `$5E` only stops the *next*
+ * note, where this cuts the one already ringing. With every voice taken the
+ * output is exactly zero either way, so `$5E` bought nothing that this does not.
+ *
+ * Not touching `$5E` also means a song muting its own channels through
+ * `$F4 $06` can never have those bits disturbed by the mixer.
  */
 export function applyChannelMutes(aram: Uint8Array, mask: number, backup: MuteBackup): void {
 	const wanted = mask & ALL_VOICES;
@@ -121,10 +134,6 @@ export function applyChannelMutes(aram: Uint8Array, mask: number, backup: MuteBa
 	// Voices let go of since the last call owe their volume back; ones muted
 	// again before that happened can keep waiting.
 	backup.restoring = (backup.restoring | (backup.applied & ~wanted)) & ~wanted;
-
-	// Composed rather than assigned, so a song muting its own channels with
-	// `$F4 $06` keeps those bits.
-	aram[Addr.MuteMask] = (aram[Addr.MuteMask] & ~backup.applied) | wanted;
 	backup.applied = wanted;
 
 	let dirty = 0;

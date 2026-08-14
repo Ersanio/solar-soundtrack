@@ -11,7 +11,7 @@ main thread, and inside an `AudioWorkletGlobalScope`.
 | `adsr.ts`         | Envelope and tuning maths for an instrument's six bytes           |
 | `brr.ts`          | The SNES's ADPCM container and decoder                            |
 | `driver.ts`       | Loads `assets/driver/` — program, base images, `#default` samples |
-| `driver-state.ts` | Reads the running driver out of APU RAM; writes its mute register |
+| `driver-state.ts` | Reads the running driver out of APU RAM; takes a voice's volume   |
 | `export.ts`       | Assembles the 0x10200-byte `.spc`                                 |
 | `fir.ts`          | The echo filter: response, stability, headroom, design            |
 | `instruments.ts`  | Finds the driver's own instrument and percussion tables           |
@@ -46,8 +46,18 @@ gives it enough work drops ticks — measurably, around 0.8% on eight busy chann
 tempo accounts for that, and a playhead built on one drifts further every pass round the loop.
 
 `applyChannelMutes` is the same knowledge pointed the other way: APU RAM is a live window into the
-emulator's heap, so the driver's own mute register at `$5E` can be written as easily as its tempo is
-read. Mutes never touch song data, so preview and export build identical bytes.
+emulator's heap, so a voice's track volume can be taken away as easily as the tempo is read. Mutes
+never touch song data, so preview and export build identical bytes.
+
+It takes the **volume** and deliberately not `$5E`, the driver's own mute register, and the paragraph
+above is why. Disabling a channel makes each pass of the main loop cheaper, and a song already at the
+one-tick-per-pass ceiling turns that straight into more ticks a second — measured on a `t254` song,
+233 unmuted, 273 with seven voices muted and 301 with all eight. Muting is a monitoring aid, and one
+that plays the song 29% fast is telling the porter something untrue about their own music. Taking the
+volume costs the driver nothing, because the channel goes on being parsed and keyed on with 0 in its
+`VxVOL`, and it is the register that actually silences — `$5E` only stops the _next_ note, where this
+cuts the one already ringing. With every voice taken the output is exactly zero either way.
+`audiotest` pins both halves: that the rate does not move, and that the silence is still silence.
 
 The module is useful beyond the transport — where each voice is right now and at what tempo is
 exactly what the piano roll follows.

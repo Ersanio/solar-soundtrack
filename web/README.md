@@ -151,12 +151,53 @@ none reads **55/54 longer**, because `estimateSeconds` treats `0x36` as a writte
 `main.asm:177` puts it straight into `$51`. That is the same ruling as "assume t53 for songs that
 don't have a tempo command", and `walktest` pins the ratio so it cannot drift.
 
-The seek bar stays denominated in **seconds**, which is the one place in the app that is not ticks.
-It prints m:ss and a constant time-per-pixel is what a seek bar is for — on a song fading from t53 to
-t254 a tick-denominated thumb would move four times as fast at the end as at the start. Everything
-downstream of it is ticks: `ticksAt` converts once, and `player.seek` and the worklet take the tick
-itself, so the emulator lands on the tick it was given rather than on a prediction that runs early
-the further in it reaches.
+## The clock is measured, not only predicted
+
+Predicting is not enough, and the gap is not small. The driver's main loop handles at most one music
+tick per pass, so a song that asks for more ticks a second than it can manage simply gets fewer.
+Measured against the emulator: one channel at `t254` reaches 99.6% of the 498 ticks a second it asks
+for, four channels reach 81%, eight reach 50%, and a real eight-channel `t254` song reaches **46%**.
+Even eight channels at `t100` lose 8%. The `~0.8%` figure in `packages/spc/README.md` is an
+ordinary-tempo one.
+
+Every seconds figure is `ticks × the tempo the song asked for`, so on such a song the transport
+counted at 46% of wall speed — the timer visibly failing to tick once per second — and called a
+32-second pass 15 seconds long.
+
+Nothing can compute the shortfall. It is a function of how much work each tick costs, which varies
+with the live channels, the commands they carry and the passage being played: on the song that
+prompted this the opening measures 1.86x where the whole pass is 2.15x, so even sampling the start is
+wrong by 13%. So `measure-clock.ts` plays the song instead, silently, and records when each tick
+actually arrived. It produces a `SongClock` — the same shape `songClock` predicts — and everything
+downstream reads one through the other without knowing which it has.
+
+That costs about 90 ms for a half-minute pass and several hundred for a long one, which is a stutter
+on the main thread and a dropout on the audio thread. So `clock.worker.ts` runs it, and
+`EditorStore` asks **a second after typing stops** rather than on every compile — a typing burst
+would throw every answer away, and a second of quiet is far less than it takes to reach for the
+transport. The predicted clock stands in the meantime and stands for good if the measurement fails,
+which is why it is still worth having.
+
+`AMK0503` is the same finding pointed at the porter: past 10% the song is not playing at the tempo it
+was written at, and a SNES drops the same ticks, so it is a fact about the song rather than about
+this editor. `severe`, beside the echo hazards and `AMK0502` — it compiles cleanly and then
+misbehaves on playback.
+
+**Nothing that follows the music is denominated in seconds**, the seek bar included: its `min`, `max`
+and `value` are driver ticks, `Playback.position` and `scrubbing` are ticks, `player.seek` and the
+worklet take the tick itself, and the m:ss beside the bar is a label `secondsAt` derives from the
+tick under the thumb. `Playback` holds one playhead, `songTicks`, where it used to hold that and a
+shadow copy in seconds kept in step by hand at five call sites.
+
+That is why the conversion runs one way only. `secondsAtTick` has no inverse: seconds are produced
+for a label and never consumed, so no position ever has to survive a round trip through a clock that
+is a prediction until the song has been measured. An inverse existed while the bar was in seconds,
+and every call to it was a place a tick could come back a different tick.
+
+Two things stay in seconds because they genuinely are wall-clock, not because they were missed: the
+fade past the end of the song — the driver has stopped reading music data by then, so there are no
+ticks left to count — and the frame timing inside the piano roll, which is about the display's
+refresh rate and not the song's.
 
 ## The piano roll
 
@@ -185,6 +226,19 @@ formula compounds them; here the driver's own count steers the clock on every an
 sets the velocity between readings and never the position. Raising the worklet's post rate instead
 would cost sixty structured clones a second from the audio thread and still not match a 144 Hz
 display.
+
+**The velocity comes from the clock, not from the tempo byte**, and that distinction is the one the
+rule was pointing at all along. `ticksPerSecond($51 - 1)` is the rate the song _asked_ for; a song the
+driver cannot keep up with gets about half of it, and a playhead extrapolated at the asking rate
+therefore races between anchors and settles a steady distance ahead of the notes it is drawn over —
+59 ticks on the `t254` song, most of a quarter note, scrolling perfectly smoothly the whole time.
+`ticksPerSecondAt` reads the measured clock's own slope instead, which is what the driver really did.
+`charttest` pins both halves: that the tempo byte puts it more than a quarter note out and that the
+clock's rate holds it inside a 32nd. In the browser the roll now leads the transport's anchor by
+about 12 ticks at `t254`, which is that anchor's own staleness and nothing more.
+
+The `ticks/s` in the roll's readout says the same thing: it shows `231.9 of 498.0 ticks/s` when the
+two part company by more than a twentieth, and the plain figure when they agree.
 
 Only what the song uses gets a row: the pitched range is fitted and rounded out to whole octaves,
 and a drum or noise lane appears only when something plays it. Rows then stretch to fill the pane,

@@ -1,4 +1,13 @@
-import { Service, computed, effect, inject, linkedSignal, signal } from '@angular/core';
+import {
+  DestroyRef,
+  Service,
+  computed,
+  effect,
+  inject,
+  linkedSignal,
+  signal,
+  untracked,
+} from '@angular/core';
 
 import { compiler } from '@amk/compiler';
 import type { Edit } from '@amk/tokens/edits';
@@ -9,6 +18,8 @@ import { ARAM_SIZE, type AramBudget, computeBudget } from '@amk/spc/layout';
 import { type SongTimeline, unreachableChannels, walkSong } from '@amk/spc/song-walk';
 import { echoHazards } from '@amk/tokens/echo-hazards';
 import { type SongClock, songClock } from './song-clock';
+import { type Measurement, tempoShortfall } from './measure-clock';
+import type { MeasureReply, MeasureRequest } from './clock.worker';
 import { caretPosition, downloadBlob, errorMessage } from '../util/format';
 import { DriverStore } from './driver-store';
 import { SampleStore } from './sample-store';
@@ -42,6 +53,24 @@ f+16 d16 c16 f+16 d16 c16 g16 f16 d16 < b16 a+16 a16
 
 /** How long typing pauses before a compile fires. */
 const DEBOUNCE_MS = 150;
+
+/**
+ * How long the song has to hold still before its clock is measured.
+ *
+ * Longer than {@link DEBOUNCE_MS} because measuring is a whole pass of emulation
+ * — tens to hundreds of milliseconds of a worker core — and every keystroke
+ * would throw the answer away. A second of quiet is far less than it takes to
+ * reach for the transport, so the measured length is there before it is read.
+ */
+const MEASURE_IDLE_MS = 1000;
+
+/**
+ * Past this, the driver is not playing the song that was written and the porter
+ * should be told. 1.10 rather than something tighter because eight busy channels
+ * drop about 0.8% at an ordinary tempo and a few percent is ordinary; this is
+ * for the songs that are out by a third or a half.
+ */
+const TEMPO_SHORTFALL_LIMIT = 1.1;
 
 export type StatusKind = 'ok' | 'error' | 'busy';
 
@@ -141,6 +170,12 @@ export class EditorStore {
   private readonly committed = signal(this.source());
   private timer: ReturnType<typeof setTimeout> | undefined;
 
+  /** The measuring worker and the request in flight on it. */
+  private worker: Worker | null = null;
+  private measureTimer: ReturnType<typeof setTimeout> | undefined;
+  private measureToken = 0;
+  private measuring: Uint8Array | null = null;
+
   /** `null` until a driver supplies a load address — never a guessed one. */
   private readonly compilation = computed(() => {
     const driver = this.drivers.driver();
@@ -188,13 +223,42 @@ export class EditorStore {
   });
 
   /**
-   * Ticks to seconds, for the transport — `null` when the walk cannot say.
+   * Ticks to seconds, predicted — `null` when the walk cannot say.
    *
    * Built off {@link timeline} rather than off `stats`, because the compiler
    * abandons the whole of a song's length over a tempo fade or a `t` that runs
    * more than once, and the walk does not. See `song-clock.ts`.
    */
-  readonly clock = computed<SongClock | null>(() => songClock(this.timeline()));
+  private readonly predictedClock = computed<SongClock | null>(() => songClock(this.timeline()));
+
+  /** What the worker last measured, for the song {@link measuredFor} names. */
+  private readonly measured = signal<Measurement | null>(null);
+  private readonly measuredFor = signal<Uint8Array | null>(null);
+
+  /**
+   * Ticks to seconds, measured where possible and predicted where not.
+   *
+   * The prediction prices every tick at the tempo the song asked for, and the
+   * driver does not always manage it — at `t254` on eight channels it runs at
+   * under half the requested rate, which made the transport count at under half
+   * speed. `measure-clock.ts` says why no formula can fix that and the emulator
+   * has to be watched instead.
+   *
+   * The predicted clock is what stands until the measurement lands, about a
+   * second after typing stops, and what stands for good if it fails. The two
+   * have the same shape on purpose, so nothing downstream knows which it holds.
+   */
+  readonly clock = computed<SongClock | null>(() => {
+    const measured = this.measured();
+    const data = this.compilation()?.result.data;
+    // Only for the bytes it was measured from: a stale clock on a song that has
+    // been edited under it is worse than an honest prediction.
+    if (measured?.clock && data && this.measuredFor() === data) {
+      return measured.clock;
+    }
+
+    return this.predictedClock();
+  });
 
   /**
    * Errors first, then by position — the order you want to fix them in.
@@ -213,9 +277,59 @@ export class EditorStore {
       ...(this.result()?.diagnostics ?? []), // Compiler diagnostics
       ...echoHazards(this.tokens().commands), // Echo hazard diagnostics
       ...(timeline ? unreachableChannels(timeline, this.result()?.noteMap ?? []) : []), // Unreachable notes in channels
+      ...this.tempoDiagnostics(), // The driver cannot keep up with the tempo
     ];
     return all.sort((a, b) => order[a.severity] - order[b.severity] || a.span.start - b.span.start);
   });
+
+  /**
+   * `AMK0503` — the driver cannot run the song as fast as it is written.
+   *
+   * A fourth source, and the only one that had to be *played* to find out. The
+   * driver handles at most one music tick per pass of its main loop, so a song
+   * asking for more ticks a second than it can manage simply gets fewer: at
+   * `t254` on eight channels around 230 of the 498 it asked for. That is not an
+   * editor artefact — a SNES does the same, which is why AddmusicK's readme
+   * warns about high tempos — so the song a porter ships plays at a tempo they
+   * did not write.
+   *
+   * `severe` puts it with the echo hazards and `AMK0502` in the `AMK05xx` band:
+   * it compiles cleanly and then misbehaves on playback. Held back until the
+   * measurement is in, and silent for the few percent an ordinary busy song
+   * loses — see {@link TEMPO_SHORTFALL_LIMIT}.
+   */
+  private tempoDiagnostics(): Diagnostic[] {
+    const measured = this.measured();
+    const data = this.compilation()?.result.data;
+    if (!measured || !data || this.measuredFor() !== data) {
+      return [];
+    }
+
+    const shortfall = tempoShortfall(measured);
+    if (shortfall === null || shortfall < TEMPO_SHORTFALL_LIMIT) {
+      return [];
+    }
+
+    const percent = Math.round((1 - 1 / shortfall) * 100);
+    return [
+      {
+        severity: 'severe',
+        code: 'AMK0503',
+        message:
+          `The driver cannot keep up with this song's tempo: it plays about ${percent}% slower than written. ` +
+          `Lower the tempo, or give the busiest channels less to do.`,
+        span: this.tempoSpan(),
+      },
+    ];
+  }
+
+  /** The `t` or `$E2`/`$E3` that set the rate, or the top of the document. */
+  private tempoSpan(): Span {
+    const command = this.tokens().commands.find(
+      (c) => c.vcmd === 0xe2 || c.vcmd === 0xe3 || (c.vcmd === undefined && c.kind === 't'),
+    );
+    return command?.span ?? { start: 0, end: 0, line: 1 };
+  }
 
   /** The notes the song is too short to reach, for the editor to underline. */
   readonly unreachableSpans = computed<readonly Span[]>(() => {
@@ -375,6 +489,94 @@ export class EditorStore {
   constructor() {
     // Sanctioned effect: mirroring signal state into an imperative store.
     effect(() => localStorage.setItem(STORAGE_KEY, this.source()));
+
+    // Sanctioned effect: the compiled bytes drive an imperative sink, the
+    // measuring worker. Idle-triggered rather than per-compile, because a
+    // typing burst produces a compile every 150 ms and each measurement is a
+    // whole pass of emulation — there is no point measuring a song the next
+    // keystroke will replace.
+    effect(() => {
+      const data = this.compilation()?.result.data ?? null;
+      const stats = this.result()?.stats;
+      const passTicks = stats ? stats.introTicks + stats.loopTicks : 0;
+      untracked(() => this.scheduleMeasure(data, passTicks));
+    });
+
+    inject(DestroyRef).onDestroy(() => {
+      clearTimeout(this.measureTimer);
+      this.worker?.terminate();
+      this.worker = null;
+    });
+  }
+
+  /**
+   * Asks the worker for the song's real clock, once typing has settled.
+   *
+   * Nothing is measured for a song that will not play — no bytes, no pass to
+   * measure over — and the previous answer is dropped at once rather than left
+   * standing over new bytes, so {@link clock} falls back to the prediction for
+   * the moment in between.
+   */
+  private scheduleMeasure(data: Uint8Array | null, passTicks: number): void {
+    clearTimeout(this.measureTimer);
+    if (this.measuredFor() !== data) {
+      this.measured.set(null);
+      this.measuredFor.set(null);
+    }
+
+    if (!data || passTicks <= 0 || typeof Worker === 'undefined') {
+      return;
+    }
+
+    this.measureTimer = setTimeout(() => this.measure(data, passTicks), MEASURE_IDLE_MS);
+  }
+
+  private measure(data: Uint8Array, passTicks: number): void {
+    const spc = this.assembleSpc();
+    if (!spc) {
+      return;
+    }
+
+    try {
+      this.worker ??= this.startWorker();
+      this.measureToken++;
+      this.worker.postMessage({
+        token: this.measureToken,
+        spc,
+        passTicks,
+        // Resolved here, not in the worker: a relative fetch there would
+        // resolve against the worker's own bundled URL rather than the app's
+        // base href, which is `/<repo>/` on Pages.
+        wasmUrl: new URL('player/spc.wasm', document.baseURI).href,
+      } satisfies MeasureRequest);
+      this.measuring = data;
+    } catch {
+      // No worker, or it refused the message. The prediction stands; a song
+      // that cannot be measured is not a song that cannot be played.
+      this.worker = null;
+    }
+  }
+
+  private startWorker(): Worker {
+    const worker = new Worker(new URL('./clock.worker', import.meta.url), { type: 'module' });
+    worker.onmessage = (event: MessageEvent<MeasureReply>) => {
+      const reply = event.data;
+      // Superseded while it ran: a run cannot be cancelled, so late answers are
+      // dropped here rather than fought over.
+      if (reply.token !== this.measureToken || !reply.ok) {
+        return;
+      }
+
+      this.measured.set(reply);
+      this.measuredFor.set(this.measuring);
+    };
+
+    worker.onerror = () => {
+      this.worker?.terminate();
+      this.worker = null;
+    };
+
+    return worker;
   }
 
   // --- editing --------------------------------------------------------------
