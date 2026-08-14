@@ -1,0 +1,280 @@
+<amk-toolbar>
+  <div class="flex items-center gap-1">
+    <span class="text-ink-muted text-xs">Zoom</span>
+    <button
+      class="border-edge bg-inset text-ink hover:border-accent cursor-pointer rounded-md border px-2 leading-6"
+      (click)="setZoom(-1)"
+    >
+      −
+    </button>
+    <button
+      class="border-edge bg-inset text-ink hover:border-accent cursor-pointer rounded-md border px-2 leading-6"
+      (click)="setZoom(1)"
+    >
+      +
+    </button>
+  </div>
+
+  <div class="flex items-center gap-1">
+    <span class="text-ink-muted text-xs">Rows</span>
+    <button
+      class="border-edge bg-inset text-ink hover:border-accent cursor-pointer rounded-md border px-2 leading-6"
+      (click)="setRowHeight(-1)"
+    >
+      −
+    </button>
+    <button
+      class="border-edge bg-inset text-ink hover:border-accent cursor-pointer rounded-md border px-2 leading-6"
+      (click)="setRowHeight(1)"
+    >
+      +
+    </button>
+  </div>
+
+  <amk-checkbox
+    class="text-xs"
+    title="Keep the roll on the playing song, including after a scroll seeks it"
+    [checked]="follow()"
+    (checkedChange)="setFollow($event)"
+  >
+    Follow playback
+  </amk-checkbox>
+  <amk-checkbox class="text-xs" [checked]="allOctaves()" (checkedChange)="setAllOctaves($event)">
+    All octaves
+  </amk-checkbox>
+  <amk-checkbox class="text-xs" [checked]="grid()" (checkedChange)="setGrid($event)">
+    Grid
+  </amk-checkbox>
+
+  <!-- The switch on the toolbar and the panel below it, as the source view does
+       for the command palette: a closed strip would otherwise be one row of
+       chrome that still had to be drawn. -->
+  <button
+    type="button"
+    class="text-ink-muted hover:text-ink cursor-pointer text-xs font-semibold tracking-wide uppercase"
+    [title]="
+      percussionOpen() ? 'Hide the percussion set' : 'Choose which instruments are percussion'
+    "
+    (click)="setPercussionOpen(!percussionOpen())"
+  >
+    {{ percussionOpen() ? '▾' : '▸' }} Percussion
+  </button>
+
+  <span class="text-ink-muted ml-auto font-mono text-xs">{{ readout() }}</span>
+</amk-toolbar>
+
+@if (percussionOpen()) {
+  <div class="border-edge bg-raised flex shrink-0 flex-wrap items-center gap-2 border-b px-3 py-2">
+    <span class="text-ink-muted text-xs">On percussion lanes</span>
+    @for (chip of percussionChips(); track chip.instrument) {
+      <button
+        type="button"
+        [class]="chipClass(chip.on)"
+        [title]="chip.title"
+        (click)="togglePercussion(chip.instrument)"
+      >
+        {{ chip.label }}
+      </button>
+    } @empty {
+      <span class="text-ink-muted text-xs">This song plays no instruments.</span>
+    }
+    <button
+      amk-button
+      variant="ghost"
+      class="ml-auto"
+      [disabled]="!hasPercussionOverrides()"
+      (click)="resetPercussion()"
+    >
+      Reset
+    </button>
+  </div>
+}
+
+@if (problems().length > 0) {
+  <ul class="border-edge text-warn border-b px-3 py-2 text-xs leading-relaxed">
+    @for (problem of problems(); track problem) {
+      <li>{{ problem }}</li>
+    }
+  </ul>
+}
+
+<div
+  #viewport
+  class="relative min-h-0 flex-1 overflow-x-hidden overflow-y-auto"
+  (wheel)="onWheel($event)"
+  (pointermove)="onMove($event)"
+  (pointerleave)="leave()"
+>
+  @if (viewBox(); as box) {
+    <svg class="block w-full" [attr.height]="stackHeight()" [attr.viewBox]="box">
+      <defs>
+        <clipPath id="amk-roll-clip">
+          <rect
+            y="0"
+            [attr.x]="keyWidth"
+            [attr.width]="rollWidth()"
+            [attr.height]="stackHeight()"
+          />
+        </clipPath>
+      </defs>
+
+      <!-- Row backgrounds. Black keys sit darker, so the octaves read at a glance. -->
+      @for (lane of lanes(); track lane.row) {
+        <rect
+          x="0"
+          [attr.y]="lane.row * rowHeight()"
+          [attr.width]="width()"
+          [attr.height]="rowHeight()"
+          [class]="heldRows().has(lane.row) ? 'fill-accent' : laneClass(lane)"
+          [attr.fill-opacity]="heldRows().has(lane.row) ? 0.14 : 1"
+        />
+        @if (lane.octaveStart || lane.kind !== 'key') {
+          <line
+            x1="0"
+            class="stroke-edge"
+            stroke-width="1"
+            [attr.x2]="width()"
+            [attr.y1]="lane.row * rowHeight()"
+            [attr.y2]="lane.row * rowHeight()"
+          />
+        }
+      }
+
+      <g clip-path="url(#amk-roll-clip)">
+        <g [attr.transform]="scroll()">
+          @for (line of lines(); track line.tick) {
+            <line
+              y1="0"
+              class="stroke-edge"
+              stroke-width="1"
+              [attr.x1]="line.x"
+              [attr.x2]="line.x"
+              [attr.y2]="stackHeight()"
+              [attr.stroke-opacity]="line.strong ? 0.9 : 0.35"
+            />
+          }
+
+          @if (loopX(); as x) {
+            <line
+              y1="0"
+              class="stroke-good"
+              stroke-width="1.5"
+              stroke-dasharray="4 3"
+              [attr.x1]="x"
+              [attr.x2]="x"
+              [attr.y2]="stackHeight()"
+            />
+          }
+          @if (endX(); as x) {
+            <line
+              y1="0"
+              class="stroke-ink-muted"
+              stroke-width="1.5"
+              [attr.x1]="x"
+              [attr.x2]="x"
+              [attr.y2]="stackHeight()"
+            />
+          }
+
+          @for (mark of marks(); track mark.id) {
+            <g
+              class="mark cursor-pointer"
+              (pointerenter)="enter(mark)"
+              (click)="reveal(mark)"
+              (keydown.enter)="reveal(mark)"
+            >
+              <!-- The slot, then the part that actually sounds. The inner bar is
+                   `q`'s gate made geometric rather than written down. -->
+              <rect
+                rx="2"
+                [attr.x]="mark.x"
+                [attr.y]="mark.y"
+                [attr.width]="mark.w"
+                [attr.height]="mark.h"
+                [class]="mark.fill"
+                [attr.fill-opacity]="mark.opacity * 0.35"
+              />
+              <rect
+                rx="2"
+                [attr.x]="mark.x"
+                [attr.y]="mark.y"
+                [attr.width]="mark.gateW"
+                [attr.height]="mark.h"
+                [class]="mark.fill"
+                [attr.fill-opacity]="mark.opacity"
+              />
+            </g>
+          }
+        </g>
+
+        <line
+          y1="0"
+          class="stroke-accent"
+          stroke-width="1.5"
+          [attr.x1]="playheadX()"
+          [attr.x2]="playheadX()"
+          [attr.y2]="stackHeight()"
+        />
+      </g>
+
+      <!-- The key column, drawn last so notes never spill over it. -->
+      <rect
+        x="0"
+        y="0"
+        class="fill-surface"
+        [attr.width]="keyWidth"
+        [attr.height]="stackHeight()"
+      />
+      @for (lane of lanes(); track lane.row) {
+        @let held = heldRows().has(lane.row);
+        <rect
+          x="0"
+          rx="1"
+          [attr.y]="lane.row * rowHeight() + 0.5"
+          [attr.width]="keyWidth - 5"
+          [attr.height]="rowHeight() - 1"
+          [class]="keyClass(lane, held)"
+        />
+        @if (showLabels()) {
+          <text
+            x="4"
+            dominant-baseline="central"
+            [class]="`${keyTextClass(lane, held)} font-mono`"
+            [attr.y]="lane.row * rowHeight() + rowHeight() / 2"
+            [attr.font-size]="labelSize()"
+          >
+            {{ lane.label }}
+          </text>
+        }
+      }
+      <line
+        y1="0"
+        class="stroke-edge"
+        stroke-width="1"
+        [attr.x1]="keyWidth"
+        [attr.x2]="keyWidth"
+        [attr.y2]="stackHeight()"
+      />
+    </svg>
+  }
+</div>
+
+@if (tooltip(); as tip) {
+  <div
+    class="border-edge bg-raised text-ink pointer-events-none absolute z-10 max-w-64 rounded-md border px-2 py-1.5 text-xs leading-relaxed shadow-lg"
+    [style.left.px]="tip.left"
+    [style.right.px]="tip.right"
+    [style.top.px]="tip.top"
+    [style.bottom.px]="tip.bottom"
+  >
+    <div class="font-semibold">{{ tip.heading }}</div>
+    <div class="text-ink-muted font-mono">{{ tip.length }}</div>
+    @for (row of tip.rows; track row) {
+      <div class="text-ink-muted">{{ row }}</div>
+    }
+    @if (tip.source; as source) {
+      <div class="border-edge text-accent-soft mt-1 border-t pt-1 font-mono">{{ source }}</div>
+      <div class="text-ink-muted">click to show it in the source</div>
+    }
+  </div>
+}

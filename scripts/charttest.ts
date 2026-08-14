@@ -11,8 +11,23 @@
  *   npm run charttest
  */
 
+import { KEY_COUNT, type WalkNote } from "@amk/spc/song-walk";
+import {
+	DEFAULT_PERCUSSION,
+	keyOf,
+	parsePercussion,
+	rollShape,
+} from "../web/src/app/editor/views/piano-roll/percussion";
 import { PLOT, plot } from "../web/src/app/shared/chart/plot";
 import { stackSegments } from "../web/src/app/shared/chart/stack";
+import {
+	advanceTick,
+	gridLines,
+	keyIsBlack,
+	keyName,
+	laneStack,
+	tickWindow,
+} from "../web/src/app/editor/views/piano-roll/roll-layout";
 import { clamp } from "../web/src/app/util/math";
 
 import { check, summarise } from "./harness";
@@ -111,6 +126,287 @@ console.log("\nclamp holds a value inside its bounds");
 	// editor-pane spans rely on: `clamp(end, start + 1, length)` with an empty
 	// document has `min` above `max`.
 	check("an inverted range answers with max", clamp(5, 10, 0) === 0, String(clamp(5, 10, 0)));
+}
+
+console.log("\npiano roll lanes");
+{
+	// The whole point of fitting: a song that lives in one octave should not be
+	// drawn against seventy rows, most of them empty.
+	const fitted = laneStack({ lowestKey: 28, highestKey: 33 });
+	check("a fitted range covers whole octaves", fitted.lanes.length === 12, `${fitted.lanes.length} rows`);
+	check("and it contains the notes played", fitted.rowOfKey[28] >= 0 && fitted.rowOfKey[33] >= 0);
+	check("while a key outside it has no row", fitted.rowOfKey[0] === -1 && fitted.rowOfKey[69] === -1);
+	check(
+		"the top row is the highest pitch",
+		fitted.lanes[0].index === 35 && fitted.lanes[fitted.lanes.length - 1].index === 24,
+		`${fitted.lanes[0].label} down to ${fitted.lanes[fitted.lanes.length - 1].label}`,
+	);
+
+	const all = laneStack({ lowestKey: 28, highestKey: 33, all: true });
+	check("all octaves is the whole keyboard", all.lanes.length === KEY_COUNT, `${all.lanes.length} rows`);
+	// "All octaves" widens the pitch range and nothing else — asking for the
+	// whole keyboard must not conjure nine drum lanes the song never plays.
+	check(
+		"and it still adds no unused drum",
+		all.lanes.every((l) => l.kind === "key"),
+	);
+	check("o1 c is key 0 and o6 a is key 69", keyName(0) === "o1 c" && keyName(69) === "o6 a");
+	check("the black keys are the five", [1, 3, 6, 8, 10].every(keyIsBlack) && ![0, 2, 4, 5, 7, 9, 11].some(keyIsBlack));
+
+	// Drums and noise appear only when the song plays them — nine empty drum
+	// rows on a song with no percussion is nine rows of nothing. A drum is
+	// named by its instrument number, so `@10` sits in the same list as the
+	// driver's own `@21`-`@29` and needs no separate concept.
+	const withDrums = laneStack({
+		lowestKey: 28,
+		highestKey: 33,
+		usedDrums: [10, 21, 29],
+		usesNoise: true,
+		drumNotes: new Map([
+			[21, 0xa8],
+			[29, 0xa1],
+		]),
+	});
+	check("only the drums played get a lane", withDrums.lanes.filter((l) => l.kind === "drum").length === 3);
+	check("the ones that are not played have no row", withDrums.rowOfDrum.get(24) === undefined);
+	check("a noise lane appears when noise is used", withDrums.noiseRow === 0, `row ${withDrums.noiseRow}`);
+	check("and no noise lane when it is not", fitted.noiseRow === -1);
+	check(
+		"drums and noise sit above the keyboard",
+		withDrums.lanes.slice(0, 4).every((l) => l.kind !== "key") && withDrums.lanes[4].kind === "key",
+	);
+	check(
+		"drums count down to the keyboard, @10 last",
+		withDrums.lanes
+			.slice(1, 4)
+			.map((l) => l.index)
+			.join(",") === "29,21,10",
+		withDrums.lanes
+			.slice(1, 4)
+			.map((l) => l.label)
+			.join(" | "),
+	);
+	// A table drum states the note it plays; `@10` has no percussion-table entry
+	// to state one from, so it is named and nothing more.
+	check("a table drum's lane names its own note", withDrums.lanes[1].label === "@29 o3 a", withDrums.lanes[1].label);
+	check("a melodic-slot drum is named alone", withDrums.lanes[3].label === "@10", withDrums.lanes[3].label);
+
+	// A song the compiler produced no notes for still has to lay out.
+	const empty = laneStack();
+	check("a song with no notes still draws a keyboard", empty.lanes.length === KEY_COUNT);
+}
+
+console.log("\npiano roll window and grid");
+{
+	// The window is snapped outward to a whole note so the mark list rebuilds a
+	// couple of times per screen rather than on every frame of a scroll.
+	const w = tickWindow(1000, 800, 2, 0.2);
+	check("the window is snapped to whole notes", w.from % 192 === 0 && w.to % 192 === 0, `${w.from}..${w.to}`);
+	check("it contains what is on screen", w.from <= 1000 - 80 && w.to >= 1000 + 320, `${w.from}..${w.to}`);
+	check("it carries a screen of margin either side", w.to - w.from >= (800 / 2) * 2, `${w.to - w.from} ticks`);
+	check("it never runs before the start", tickWindow(0, 800, 2, 0.2).from === 0);
+
+	// The property that keeps the DOM still while the transform moves: sweeping a
+	// playhead across the song must produce only a handful of distinct windows,
+	// not one per position. Counted rather than compared pairwise, because two
+	// neighbouring positions legitimately differ when one crosses a boundary —
+	// what matters is how often that happens, not that it never does.
+	const seen = new Set<string>();
+	let sampled = 0;
+	for (let tick = 0; tick <= 2000; tick += 5) {
+		sampled++;
+		seen.add(JSON.stringify(tickWindow(tick, 800, 2, 0.2)));
+	}
+
+	// Two per whole note, not one: the near and far edges snap independently, so
+	// each contributes its own crossings. That is still a rebuild roughly once a
+	// second at the default tempo, against sixty frames in the same second.
+	check(
+		"a sweep rebuilds the window twice per whole note at most",
+		seen.size <= (2 * 2000) / 192 + 2,
+		`${seen.size} windows over ${sampled} positions`,
+	);
+	check("which is far below one per frame", seen.size * 10 < sampled, `${seen.size} against ${sampled}`);
+	check("a zero width does not divide by zero", Number.isFinite(tickWindow(100, 0, 2, 0.2).to));
+	check("a zero zoom does not divide by zero", Number.isFinite(tickWindow(100, 800, 0, 0.2).to));
+
+	const lines = gridLines(0, 384, 48);
+	check("the grid steps every quarter note", lines.length === 9, `${lines.length} lines`);
+	check("and marks every whole note heavily", lines.filter((l) => l.strong).length === 3);
+	check(
+		"the strong lines are the multiples of 192",
+		lines.filter((l) => l.strong).every((l) => l.tick % 192 === 0),
+	);
+	check("a zero step yields nothing rather than hanging", gridLines(0, 384, 0).length === 0);
+}
+
+console.log("\nthe playhead's own clock");
+{
+	const RATE = 95.7; // t48, the tempo the stutter was found on
+	const FRAME = 1 / 60;
+	const PASS = 12312;
+
+	// The bug this exists to prevent. Every anchor arrives with about the same
+	// small lag, so a clock that re-derived its position from the newest one
+	// reproduced that lag ten times a second and jerked to close it: measured at
+	// 2.4x speed on one frame in ten, exactly 100 ms apart. Run the real thing
+	// against a steadily-lagging anchor and no frame may be far off the median.
+	{
+		const LAG = 8; // ticks, roughly what a postMessage costs at this tempo
+		let shown = 0;
+		let truth = 0;
+		const steps: number[] = [];
+		for (let frame = 0; frame < 240; frame++) {
+			truth += RATE * FRAME;
+			const next = advanceTick({ shown, target: truth - LAG, rate: RATE, elapsed: FRAME, pass: PASS });
+			steps.push(next - shown);
+			shown = next;
+		}
+
+		// Discard the first half-second, which is the clock acquiring the lag.
+		const settled = steps.slice(30);
+		const median = [...settled].sort((a, b) => a - b)[Math.floor(settled.length / 2)];
+		const worst = settled.reduce((a, b) => (Math.abs(b - median) > Math.abs(a - median) ? b : a));
+		check(
+			"a steady lag is absorbed, not re-corrected every anchor",
+			Math.abs(worst - median) < median * 0.1,
+			`worst frame ${worst.toFixed(3)} against a median of ${median.toFixed(3)} ticks`,
+		);
+		check(
+			"and it still runs at the driver's rate",
+			Math.abs(median / FRAME - RATE) < 1,
+			`${(median / FRAME).toFixed(1)} ticks per second against ${RATE}`,
+		);
+	}
+
+	// A wrap is not drift. Easing across one would crawl the whole song.
+	check(
+		"a loop wrap snaps rather than easing",
+		advanceTick({ shown: PASS - 5, target: 24, rate: RATE, elapsed: FRAME, pass: PASS }) === 24,
+	);
+	check(
+		"and so does a seek",
+		advanceTick({ shown: 100, target: 9000, rate: RATE, elapsed: FRAME, pass: PASS }) === 9000,
+	);
+	// The clock stops with the loop, so the first frame back is not elapsed time.
+	check(
+		"a long gap between frames snaps rather than lurching",
+		advanceTick({ shown: 100, target: 130, rate: RATE, elapsed: 4, pass: PASS }) === 130,
+	);
+
+	// The anchor is folded into one pass, so anything past its end is the
+	// display running off the end of the song.
+	check(
+		"the playhead never runs past the end of the pass",
+		advanceTick({ shown: PASS, target: PASS, rate: RATE, elapsed: FRAME, pass: PASS }) === PASS,
+	);
+	check("nor before the start", advanceTick({ shown: 0, target: 0, rate: 0, elapsed: FRAME, pass: PASS }) === 0);
+	// A stopped song has no tempo to run at; standing still beats guessing.
+	check(
+		"no tempo means no motion of its own",
+		advanceTick({ shown: 50, target: 50, rate: 0, elapsed: FRAME, pass: PASS }) === 50,
+	);
+}
+
+console.log("\npercussion is a preference, not a rule");
+{
+	/** The driver's own notes for `@21` and `@29`, decoded from `main.bin`. */
+	const DRUM_NOTES = new Map([
+		[21, 0xa8], // o4 e
+		[29, 0xa1], // o3 a
+	]);
+
+	const context = (percussion: number[], noisy: number[] = []) => ({
+		percussion: new Set(percussion),
+		noisy: new Set(noisy),
+		drumNotes: DRUM_NOTES,
+	});
+
+	/** A note as the walk would report it; only the fields placement reads. */
+	const note = (instrument: number | null, byte: number, noise: number | null = null): WalkNote => ({
+		channel: 0,
+		tick: 0,
+		ticks: 24,
+		gateTicks: 24,
+		note: byte,
+		key: byte >= 0x80 && byte < 0xc6 ? byte - 0x80 : null,
+		percussion: byte >= 0xd0 ? byte - 0xd0 : null,
+		address: 0,
+		state: {
+			instrument,
+			volume: null,
+			pan: null,
+			quantization: null,
+			gate: 0xff,
+			velocity: 0xff,
+			vibrato: false,
+			tremolo: false,
+			noise,
+			transpose: 0,
+			tempo: 0,
+			globalVolume: null,
+		},
+	});
+
+	check(
+		"the default is @10 and the driver's nine",
+		DEFAULT_PERCUSSION.join(",") === "10,21,22,23,24,25,26,27,28,29",
+		DEFAULT_PERCUSSION.join(","),
+	);
+
+	// A hi-hat must not stretch the keyboard. `@10` sits at o4 f+ once its
+	// default transposition applies, and letting that widen the range adds
+	// octaves of empty rows to every song with a drum in it.
+	const drummed = rollShape([note(29, 0xd8), note(29, 0x97), note(0, 0xa4)], context([...DEFAULT_PERCUSSION]));
+	check("a drum lane never widens the pitched range", drummed.usedDrums.join(",") === "29" && drummed.lowestKey === 36);
+	check("and the melodic note is the only thing in it", drummed.lowestKey === drummed.highestKey);
+
+	// The case the whole feature exists for: a song that repointed its samples,
+	// where `@10` is no longer a drum and its notes belong on the keyboard.
+	const melodicTen = rollShape([note(10, 0x9e)], context([12, 21, 29]));
+	check("removing a drum gives its notes back to the keyboard", melodicTen.usedDrums.length === 0);
+	check("and they claim their own pitch", melodicTen.lowestKey === 30, String(melodicTen.lowestKey));
+
+	// A bare `$D0`-`$D8` carries no pitch, so a removed drum's notes would have
+	// no lane *and* no key — they would silently disappear. The driver's own
+	// table is what they fall back to.
+	const bare = note(29, 0xd8);
+	check("a bare drum falls back to the note the driver's table gives it", keyOf(bare, context([])) === 33);
+	check("and @21's is its own", keyOf(note(21, 0xd0), context([])) === 40, String(keyOf(note(21, 0xd0), context([]))));
+	const removed = rollShape([bare], context([]));
+	check(
+		"so removing it keeps the note rather than losing it",
+		removed.lowestKey === 33 && removed.usedDrums.length === 0,
+	);
+
+	// The fallback is for the bare byte only. A pitched note after a drum was
+	// written at a pitch and must keep it.
+	check("a pitched note after a drum keeps the pitch it was written at", keyOf(note(29, 0x97), context([])) === 23);
+
+	// Nothing about the rule may be special-cased to `@21`-`@29`.
+	check(
+		"any instrument the porter names leaves the keyboard",
+		rollShape([note(4, 0xa4)], context([4])).usedDrums.join(",") === "4",
+	);
+
+	// Two classifications over one note, invisible until a row comes out empty.
+	const both = rollShape([note(30, 0xa4)], context([30], [30]));
+	check("percussion takes precedence over noise", both.usedDrums.join(",") === "30" && !both.usesNoise);
+	check("and noise still wins when it is not named", rollShape([note(30, 0xa4)], context([], [30])).usesNoise);
+
+	check(
+		"an empty set leaves everything on the keyboard",
+		rollShape([note(29, 0xd8), note(10, 0x9e)], context([])).usedDrums.length === 0,
+	);
+
+	// Storage is a string someone can hand-edit.
+	check("a stored set that is not a list is ignored", parsePercussion("yes") === null && parsePercussion(42) === null);
+	check("junk inside a list is dropped", parsePercussion([10, "x", 12, 1.5, -1, 999])?.join(",") === "10,12");
+	check("and it comes back sorted and deduped", parsePercussion([29, 10, 29])?.join(",") === "10,29");
+	// The `sampleList: null is not []` rule, in miniature: `null` means nothing
+	// was stored and the default stands, `[]` means the porter turned everything
+	// off. Reading `[]` as "no opinion" would make that undo itself on reload.
+	check("an empty stored set is kept, not treated as absent", parsePercussion([])?.length === 0);
 }
 
 summarise();

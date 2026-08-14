@@ -408,7 +408,9 @@ class SpcProcessor extends AudioWorkletProcessor {
 			this.frames += frames;
 
 			const now = this.frames / sampleRate;
-			if (this.postedAt < 0 || now - this.postedAt >= POSITION_INTERVAL) {
+			const due =
+				this.postedAt < 0 ? this.ticks > 0 || now >= POSITION_INTERVAL : now - this.postedAt >= POSITION_INTERVAL;
+			if (due) {
 				this.postedAt = now;
 				this.send({
 					type: "position",

@@ -3,16 +3,18 @@ import { Component, effect, signal } from '@angular/core';
 import { Panel } from '../../shared/panel/panel';
 import { type TabDef, Tabs } from '../../shared/tabs/tabs';
 import { ChannelMixer } from '../channel-mixer/channel-mixer';
+import { PianoRoll } from '../views/piano-roll/piano-roll';
 import { SampleBrowser } from '../views/sample-browser/sample-browser';
 import { SourceView } from '../views/source-view/source-view';
 
-type ViewId = 'source' | 'samples';
+type ViewId = 'source' | 'samples' | 'roll';
 
 const VIEW_KEY = 'solar-soundtrack.view';
 
 const VIEWS: readonly TabDef<ViewId>[] = [
   { id: 'source', label: 'Source' },
   { id: 'samples', label: 'Samples' },
+  { id: 'roll', label: 'Piano Roll' },
 ];
 
 /** The stored view, or the one the pane opens on when there is none. */
@@ -37,7 +39,7 @@ function readView(): ViewId {
  */
 @Component({
   selector: 'amk-editor-pane',
-  imports: [Panel, Tabs, ChannelMixer, SourceView, SampleBrowser],
+  imports: [Panel, Tabs, ChannelMixer, SourceView, SampleBrowser, PianoRoll],
   templateUrl: './editor-pane.html',
   host: { class: 'flex min-h-0 min-w-0 flex-col' },
 })

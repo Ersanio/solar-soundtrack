@@ -6,6 +6,7 @@ import { commandAt, tokenize } from '@amk/tokens';
 import type { CompileResult, Diagnostic, Span } from '@amk/core/types';
 import { buildSpc, spcFilename } from '@amk/spc/export';
 import { ARAM_SIZE, type AramBudget, computeBudget } from '@amk/spc/layout';
+import { type SongTimeline, unreachableChannels, walkSong } from '@amk/spc/song-walk';
 import { echoHazards } from '@amk/tokens/echo-hazards';
 import { caretPosition, downloadBlob, errorMessage } from '../util/format';
 import { DriverStore } from './driver-store';
@@ -178,6 +179,13 @@ export class EditorStore {
    */
   readonly compiledText = computed(() => this.compilation()?.text ?? null);
 
+  /** The song as a timeline of notes on ticks, for the piano roll. */
+  readonly timeline = computed<SongTimeline | null>(() => {
+    const compiled = this.compilation();
+    const data = compiled?.result.data;
+    return data ? walkSong(data, compiled.aramAddress) : null;
+  });
+
   /**
    * Errors first, then by position — the order you want to fix them in.
    *
@@ -190,23 +198,34 @@ export class EditorStore {
    */
   readonly diagnostics = computed<Diagnostic[]>(() => {
     const order = { error: 0, severe: 1, warning: 2, info: 3 } as const;
-    const all = [...(this.result()?.diagnostics ?? []), ...echoHazards(this.tokens().commands)];
+    const timeline = this.timeline();
+    const all = [
+      ...(this.result()?.diagnostics ?? []), // Compiler diagnostics
+      ...echoHazards(this.tokens().commands), // Echo hazard diagnostics
+      ...(timeline ? unreachableChannels(timeline, this.result()?.noteMap ?? []) : []), // Unreachable notes in channels
+    ];
     return all.sort((a, b) => order[a.severity] - order[b.severity] || a.span.start - b.span.start);
+  });
+
+  /** The notes the song is too short to reach, for the editor to underline. */
+  readonly unreachableSpans = computed<readonly Span[]>(() => {
+    const timeline = this.timeline();
+    const map = this.result()?.noteMap;
+    if (!timeline || !map || timeline.unreachable.length === 0) {
+      return [];
+    }
+
+    const byAddress = new Map(map.map((entry) => [entry.address, entry]));
+    return timeline.unreachable
+      .map((address) => byAddress.get(address)?.span)
+      .filter((span) => span !== undefined);
   });
 
   readonly errorCount = computed(
     () => this.diagnostics().filter((d) => d.severity === 'error').length,
   );
 
-  /**
-   * The sample set every export and budget is measured against.
-   *
-   * One place, so the budget in the output pane and the SPC the player loads
-   * can never disagree. The compiler decides *which* names and in what order —
-   * that ordering is the SRCN assignment — and the library supplies the bytes,
-   * so replacing a bundled file changes what its instrument plays. A `null`
-   * list means the compiler had no opinion, and the driver's own set stands.
-   */
+  /** The sample set every export and budget is measured against. */
   private readonly samples = computed(() => {
     const named = this.result()?.sampleList;
     if (named) {

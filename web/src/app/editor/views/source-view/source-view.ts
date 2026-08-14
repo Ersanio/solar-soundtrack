@@ -31,6 +31,7 @@ import { commandHover } from '../../codemirror/command-hover';
 import { mmlLanguage } from '../../codemirror/mml-language';
 import { mmlTheme } from '../../codemirror/mml-theme';
 import { playheadField, setPlayhead } from '../../codemirror/playhead';
+import { setUnreachable, unreachableField } from '../../codemirror/unreachable';
 
 const PALETTE_KEY = 'solar-soundtrack.palette';
 
@@ -138,6 +139,7 @@ export class SourceView {
           mmlTheme,
           commandHover(() => this.store.tokens().commands),
           playheadField,
+          unreachableField,
           EditorState.tabSize.of(8),
           EditorView.contentAttributes.of({
             spellcheck: 'false',
@@ -280,6 +282,12 @@ export class SourceView {
     effect(() => {
       const spans = this.playback.playheadSpans();
       untracked(() => this.view.dispatch({ effects: setPlayhead.of(spans) }));
+    });
+
+    // Sanctioned effect: the same, for the notes AMK0502 says never play.
+    effect(() => {
+      const spans = this.store.unreachableSpans();
+      untracked(() => this.view.dispatch({ effects: setUnreachable.of(spans) }));
     });
   }
 

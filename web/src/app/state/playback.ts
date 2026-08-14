@@ -32,6 +32,11 @@ export class Playback {
   readonly state = signal<'idle' | 'playing' | 'paused'>('idle');
   readonly elapsed = signal(0);
   /**
+   * The playhead in driver ticks, folded into one pass, and the moment it
+   * arrived — refreshed with {@link elapsed}, about ten times a second.
+   */
+  readonly songTicks = signal<{ ticks: number; at: number }>({ ticks: 0, at: 0 });
+  /**
    * What the driver is doing right now — where each voice is reading its music
    * data, and the tempo in force — refreshed about ten times a second.
    *
@@ -93,7 +98,12 @@ export class Playback {
     return played ? played.introSeconds + played.mainSeconds : 0;
   });
   readonly durationLabel = computed(() => formatTime(this.duration()));
-  readonly canSeek = computed(() => !this.isIdle() && this.duration() > 0);
+  /**
+   * A length to seek within is the whole requirement — a stopped song can be
+   * seeked too, and the position that leaves is where the next press of play
+   * picks the song up. Anything the transport can show, it can be moved to.
+   */
+  readonly canSeek = computed(() => this.duration() > 0);
 
   /**
    * How long the tail past the end runs before playback stops.
@@ -221,11 +231,16 @@ export class Playback {
     // nothing is rebuilt and playback does not break stride.
     effect(() => this.player.setMute(this.silenced()));
 
-    this.player.onPosition = (songTicks) => this.elapsed.set(this.secondsAt(songTicks));
+    this.player.onPosition = (songTicks) => {
+      this.elapsed.set(this.secondsAt(songTicks));
+      this.songTicks.set({ ticks: songTicks, at: performance.now() });
+    };
+
     this.player.onDriverState = (state) => this.driver.set(state);
     this.player.onEnded = () => {
       this.state.set('idle');
       this.elapsed.set(0);
+      this.songTicks.set({ ticks: 0, at: performance.now() });
       this.scrubbing.set(null);
       this.driver.set(null);
       this.loaded.set(null);
@@ -362,6 +377,34 @@ export class Playback {
     );
   }
 
+  /**
+   * The inverse of {@link secondsAt}, for the views that scroll in ticks.
+   *
+   * The same two-piece split, and it has to be: a single flat scale would land a
+   * seek in the wrong bar on any song that changes `t` at the loop. Guarded on
+   * the seconds rather than the ticks — the two sides agree about which pieces
+   * exist, and this is the side that divides.
+   */
+  private ticksAt(seconds: number): number {
+    const stats = this.editor.result()?.stats;
+    const played = stats?.playback;
+    if (!stats || !played) {
+      return 0;
+    }
+
+    if (played.introSeconds > 0 && seconds < played.introSeconds) {
+      return (seconds / played.introSeconds) * stats.introTicks;
+    }
+
+    if (played.mainSeconds <= 0) {
+      return stats.introTicks;
+    }
+
+    return (
+      stats.introTicks + ((seconds - played.introSeconds) / played.mainSeconds) * stats.loopTicks
+    );
+  }
+
   private reload(result: CompileResult | null): void {
     if (this.state() !== 'playing' || !result?.ok) {
       return;
@@ -415,7 +458,10 @@ export class Playback {
       return;
     }
 
-    this.player.play(spc, 0, this.timing());
+    // Wherever the transport was left, which is the start unless it was seeked
+    // while stopped. Clamped because the compile just above may have shortened
+    // the song out from under a position set against the previous one.
+    this.player.play(spc, clamp(this.elapsed(), 0, this.duration()), this.timing());
     this.loaded.set(this.captureLoaded());
     this.state.set('playing');
   }
@@ -424,6 +470,7 @@ export class Playback {
     this.player.stop();
     this.state.set('idle');
     this.elapsed.set(0);
+    this.songTicks.set({ ticks: 0, at: performance.now() });
     this.scrubbing.set(null);
     this.driver.set(null);
     this.loaded.set(null);
@@ -437,11 +484,16 @@ export class Playback {
    * {@link commitScrub} does the work once the drag ends.
    */
   scrubTo(seconds: number): void {
-    if (this.isIdle()) {
+    if (!this.canSeek()) {
       return;
     }
 
     this.scrubbing.set(clamp(seconds, 0, this.duration()));
+  }
+
+  /** {@link scrubTo}, in driver ticks — what the piano roll speaks. */
+  scrubToTick(songTicks: number): void {
+    this.scrubTo(this.secondsAt(songTicks));
   }
 
   /**
@@ -463,16 +515,41 @@ export class Playback {
   /**
    * Jumps to a point in the song. The emulator replays silently to get there,
    * so this is not instant on a long song.
+   *
+   * Stopped is a position like any other: there is no emulator to move, so the
+   * transport simply stands at the new point and {@link toggle} starts the song
+   * from it. Without that, the only thing a stopped song could be seeked to is
+   * the beginning it was already at.
    */
   seek(seconds: number): void {
     this.scrubbing.set(null);
-    if (this.isIdle()) {
+    if (!this.canSeek()) {
       return;
     }
 
     const target = clamp(seconds, 0, this.duration());
     this.elapsed.set(target);
-    this.player.seek(target);
+    // The tick anchor moves with `elapsed`, and for the same reason: the worklet
+    // replays the song from the top to get here and posts nothing until it
+    // arrives — nothing at all while paused, where it renders no audio — so a
+    // view anchored on the old reading goes on drawing the playhead where the
+    // song no longer is. `player.seek` bumps its epoch, so the readings still in
+    // flight are dropped rather than overwriting this.
+    this.songTicks.set({ ticks: this.ticksAt(target), at: performance.now() });
+    if (!this.isIdle()) {
+      this.player.seek(target);
+    }
+  }
+
+  /**
+   * {@link seek}, in driver ticks.
+   *
+   * Ends the scrub either way, `seek` clearing it ahead of its own gate: a
+   * recompile can take the song's length away mid-gesture, and a scrub left
+   * standing would freeze the readout on a position the song has played past.
+   */
+  seekTick(songTicks: number): void {
+    this.seek(this.secondsAt(songTicks));
   }
 
   /** Ignored while a channel is soloed, where the mute buttons are disabled. */

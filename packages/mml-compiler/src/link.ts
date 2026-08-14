@@ -79,6 +79,8 @@ export function link(parsed: ParseOutput, aramAddress: number): LinkResult {
 		.map((event) => ({
 			channel: event.channel,
 			address: aramAddress + header.length + channelStart[event.channel] + event.offset,
+			note: event.note,
+			ticks: event.ticks,
 			span: event.span,
 		}))
 		.sort((a, b) => a.address - b.address);

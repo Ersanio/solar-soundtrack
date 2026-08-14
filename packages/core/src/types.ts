@@ -93,6 +93,14 @@ export interface NoteAddress {
 	address: number;
 	/** 0-7 for the music channels; 8 for the loop/subroutine block. */
 	channel: number;
+	/**
+	 * The note byte as emitted: `$80`-`$C5` pitched, `$C6` a tie, `$C7` a rest,
+	 * `$D0`-`$D8` a drum. Post-transpose and post-percussion-remap, so it is what
+	 * the driver will read rather than what the letter said.
+	 */
+	note: number;
+	/** Ticks the note occupies, source-level `^` ties already folded in. */
+	ticks: number;
 	span: Span;
 }
 

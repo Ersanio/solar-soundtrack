@@ -18,7 +18,7 @@ packages/mml-compiler/  @amk/compiler  preprocess -> parser -> link
 packages/mml-tokens/    @amk/tokens    scanner, splices, command model
 packages/spc/           @amk/spc       BRR, echo FIR, ARAM, emulator, worklet
 web/                    the Angular editor
-scripts/                twelve byte-level harnesses
+scripts/                thirteen byte-level harnesses
 ```
 
 ```
@@ -42,15 +42,15 @@ AddmusicK release if they are missing.
 
 Node 24 is what CI uses. CI runs `npm run lint` then `npm run check`.
 
-| Command             | What it does                                                        |
-| ------------------- | ------------------------------------------------------------------- |
-| `npm start`         | Dev server on `http://localhost:4200/`.                             |
-| `npm run build`     | Production build into `web/dist/`.                                  |
-| `npm run watch`     | Dev-configuration build with `--watch`, no server.                  |
-| `npm run lint`      | ESLint over every workspace.                                        |
-| `npm run format`    | Prettier over the workspace.                                        |
-| `npm run typecheck` | The app. `:packages` and `:scripts` cover the rest.                 |
-| `npm run check`     | The merge gate: formatting, three typechecks, all twelve harnesses. |
+| Command             | What it does                                                          |
+| ------------------- | --------------------------------------------------------------------- |
+| `npm start`         | Dev server on `http://localhost:4200/`.                               |
+| `npm run build`     | Production build into `web/dist/`.                                    |
+| `npm run watch`     | Dev-configuration build with `--watch`, no server.                    |
+| `npm run lint`      | ESLint over every workspace.                                          |
+| `npm run format`    | Prettier over the workspace.                                          |
+| `npm run typecheck` | The app. `:packages` and `:scripts` cover the rest.                   |
+| `npm run check`     | The merge gate: formatting, three typechecks, all thirteen harnesses. |
 
 `npm run check` does **not** compile Angular templates, and neither does `npm run typecheck` — `tsc`
 does not run the template compiler, so a bad binding (`viewBox=` instead of `[attr.viewBox]=`)
@@ -76,7 +76,7 @@ which is all either needs:
 ### Tests
 
 There are no `.spec.ts` files — `npm run test` is Angular scaffolding and runs nothing. The real
-suite is the twelve harnesses under `scripts/`; **`scripts/README.md` says what each one proves**,
+suite is the thirteen harnesses under `scripts/`; **`scripts/README.md` says what each one proves**,
 and several of those assertions are load-bearing in ways that are not obvious from the name.
 
 `scripts/Compare-Spc.ps1` and `scripts/Compare-SongBin.ps1` diff output against a real AddmusicK
@@ -154,9 +154,13 @@ Selector prefix is `amk` — `amk-root`, `amk-editor-pane` for components, camel
 directives. ESLint enforces both.
 
 Styling is Tailwind v4, with the entire theme as CSS variables in `web/src/styles.css` (v4 has no
-`tailwind.config.js`). Dark-only on purpose. The `--color-seg-*` ARAM bar palette is a validated
-categorical set — do not reorder or re-hue it without re-validating, since adjacent-pair CVD
-separation and contrast against `--color-surface` are the properties being preserved.
+`tailwind.config.js`). Dark-only on purpose. Two **validated categorical sets** live there —
+`--color-seg-*` for the ARAM bar and `--color-ch-*` for the eight music channels — and neither may be
+reordered or re-hued without re-validating, since adjacent-pair CVD separation and contrast against
+`--color-surface` are the properties being preserved. The order is the mechanism, not decoration: it
+is what the adjacent-pair check runs against. `--color-ch-*` does not clear the all-pairs gate and no
+set of eight can, so nothing may leave channel identity to colour alone; `styles.css` says what
+carries it instead.
 
 Framework-generic Angular 22 conventions (signal APIs, `@Service()`, host bindings, control flow)
 live in `web/.claude/CLAUDE.md`, which the Angular CLI generated via `--ai-config=claude` and can

@@ -15,7 +15,7 @@ them.
 | ----------------------- | ------------------------------------------------------------------------------------ |
 | `src/app/state/`        | Four `@Service()` singletons, in dependency order                                    |
 | `src/app/editor/`       | The left pane and its chrome: top bar, transport, mixer, palette, CodeMirror adapter |
-| `src/app/editor/views/` | What the pane's tabs switch between: the source, the sample library                  |
+| `src/app/editor/views/` | What the pane's tabs switch between: source, sample library, piano roll              |
 | `src/app/output/`       | Diagnostics, stats, the ARAM bar, the command inspector                              |
 | `src/app/shared/`       | Form controls, panels, icons, chart helpers                                          |
 | `src/app/util/`         | Formatting, IndexedDB, `clamp`                                                       |
@@ -128,6 +128,64 @@ widths and offsets are in viewBox units rather than pixels.
 pixels by `stack.ts`, because the surface gap between its fills and the floor under a small region
 are pixel sizes, not fractions of the bar that would vanish as it narrows. It is the only component
 that needs either file, and `stack.ts` is the only chart code with a harness — `npm run charttest`.
+
+## The piano roll
+
+`editor/views/piano-roll/` draws whatever `@amk/spc/song-walk` says, and nothing else — the
+compiler's `noteMap` records an address, a channel and a span, and no pitch, duration or tick, so
+the roll is a view of a walk over the emitted bytes rather than of the compile. Rows are the
+**emitted note byte**: `@2 o5 g` draws on o5 d, because `@2` carries a default transposition of five
+semitones, and the roll shows what the driver plays rather than what the letter said.
+
+Two clocks drive it and keeping them apart is the whole trick. The mark list is a `computed` over
+the transport's 10 Hz anchor, snapped outward to a whole note, so the DOM rebuilds about twice per
+screen; the scroll is a `computed` over `shared/chart/frame-clock.ts` and is one `transform` that
+nothing beneath reads. That is why the roll can run at 240 Hz without the note list knowing.
+
+The playhead **carries its position across frames** rather than deriving it from the newest anchor,
+and `advanceTick` in `roll-layout.ts` is where that lives. It matters: every anchor arrives with
+about the same small lag — mostly the time the message spent getting here — so a clock that
+re-derived its position each frame reproduced that lag ten times a second and jerked to close it.
+Measured on a `t48` song, one frame in ten ran at 2.4× speed or stalled outright, spaced exactly
+100 ms apart, and the roll visibly stuttered. Running at the driver's rate and easing the gap shut
+turns a periodic jolt into a constant offset nobody can see. `charttest` pins it.
+
+Interpolating over tempo is what the root `CLAUDE.md` warns against, so read the comment before
+"fixing" it. The rule forbids a playhead _built on_ the formula, because the driver drops ticks and a
+formula compounds them; here the driver's own count steers the clock on every anchor, so the formula
+sets the velocity between readings and never the position. Raising the worklet's post rate instead
+would cost sixty structured clones a second from the audio thread and still not match a 144 Hz
+display.
+
+Only what the song uses gets a row: the pitched range is fitted and rounded out to whole octaves,
+and a drum or noise lane appears only when something plays it. Rows then stretch to fill the pane,
+because two octaves stranded at the top of an empty box is the worse picture.
+
+**A row is chosen by the instrument, not by the note byte.** Everything played while a drum is
+loaded is that drum being hit, so `@29 c d e` is three marks on one lane rather than one drum and
+two notes scattered up the keyboard — the pitched ones only look melodic because `parser.ts:2676`
+stops remapping after the first. The pitch they were written at is still true and still in the
+tooltip; it just does not decide where the mark goes.
+
+**Which instruments are percussion is the porter's to say**, from the toolbar's `▸ Percussion`
+strip. `percussion.ts` holds the default — `@21`-`@29` plus `@10` — and the whole of the reasoning,
+including why nothing is derived: the obvious rule is to look at the sample an instrument resolves
+to and ask whether the driver's drums play it, and that says no the moment a porter swaps one drum
+sample for another. Nothing in the data answers "is this a drum", so the question goes to the person
+who knows. Anything on the list can be taken off, `@21`-`@29` included; a bare `$D0`-`$D8` then
+falls back to the pitch the driver's own percussion table gives that drum, so it keeps a row rather
+than vanishing.
+
+`placeOf` is the one statement of the precedence — percussion, then noise, then the keyboard. The
+lanes and the fitted range are both built from it because they used to be two implementations of it
+and had to agree. `song-walk.ts` has no opinion on any of this by design.
+
+A channel longer than the song is **not** the roll's business, even though the walk is what notices
+it — that goes to the diagnostics list as `AMK0502` and to the editor as a wavy underline on the
+notes that never sound (`codemirror/unreachable.ts`, the sibling of `playhead.ts`). The roll's own
+warning strip is only for a walk that could not make sense of the bytes. `EditorStore.diagnostics`
+is where the three sources meet, and it is the reason `timeline` is read on every compile rather
+than only while the roll is open.
 
 `fir-graph`'s frequency axis is **linear**, DC to Nyquist, which is not what an audio plot usually
 does. Eight taps at 32 kHz have no authority below a couple of kHz, so a log axis would spend most
