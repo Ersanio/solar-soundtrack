@@ -6,7 +6,7 @@ import type { DriverState } from '@amk/spc/driver-state';
 import { SPC_SAMPLE_RATE } from '@amk/spc/wasm-host';
 import { errorMessage, formatTime } from '../util/format';
 import { EditorStore } from './editor-store';
-import { secondsAtTick, tickAtSeconds } from './song-clock';
+import { secondsAtTick } from './song-clock';
 import { clamp } from '../util/math';
 
 /** N-SPC songs have eight music channels. */
@@ -31,10 +31,21 @@ export class Playback {
   private readonly player = new SpcPlayer();
 
   readonly state = signal<'idle' | 'playing' | 'paused'>('idle');
-  readonly elapsed = signal(0);
   /**
    * The playhead in driver ticks, folded into one pass, and the moment it
-   * arrived — refreshed with {@link elapsed}, about ten times a second.
+   * arrived — refreshed about ten times a second.
+   *
+   * The only playhead there is. It was once shadowed by an `elapsed` in seconds,
+   * kept in step by hand at five call sites, and seconds are the wrong thing to
+   * hold: they can only be *derived* from a tick, through a clock that is a
+   * prediction until the song has been measured. Holding ticks and converting
+   * for the label means the transport never stores a number the song could
+   * disagree with.
+   *
+   * `at` is here because ten updates a second is not enough to scroll anything
+   * smoothly: a view drawing at frame rate interpolates between two of these and
+   * re-anchors on each new one, which needs to know how long ago the anchor was.
+   * One object rather than two signals, so the pair cannot be read half-updated.
    */
   readonly songTicks = signal<{ ticks: number; at: number }>({ ticks: 0, at: 0 });
   /**
@@ -60,7 +71,7 @@ export class Playback {
    */
   private readonly soloedChannel = signal<number | null>(null);
 
-  /** Where the seek bar is being dragged to, while the drag is still going on. */
+  /** Where the seek bar is being dragged to, in ticks, while the drag goes on. */
   private readonly scrubbing = signal<number | null>(null);
 
   /**
@@ -74,60 +85,58 @@ export class Playback {
   readonly isIdle = computed(() => this.state() === 'idle');
 
   /**
-   * The playhead as the transport should show it: the drag target while the user
-   * is scrubbing, and the song's own position the rest of the time.
+   * The playhead in ticks as the transport should show it: the drag target while
+   * the user is scrubbing, and the song's own position the rest of the time.
    *
-   * The distinction is what keeps a drag smooth. `elapsed` is pushed from the
+   * The distinction is what keeps a drag smooth. The playhead is pushed from the
    * audio thread ten times a second, and a seek bar bound straight to it has its
    * value rewritten from under the pointer on every update — the thumb snaps
    * between the cursor and the song until the button comes back up.
    */
-  readonly position = computed(() => this.scrubbing() ?? this.elapsed());
-  readonly timeLabel = computed(() => formatTime(this.position()));
+  readonly position = computed(() => this.scrubbing() ?? this.songTicks().ticks);
+  readonly timeLabel = computed(() => formatTime(this.secondsAt(this.position())));
 
   /**
-   * One pass through the song — intro plus a single trip round the loop — which
-   * is what the seek bar spans and where the emulator fades out.
+   * One pass through the song in ticks — intro plus a single trip round the loop
+   * — which is what the seek bar spans and where the emulator fades out.
    *
-   * The walk's clock first, and `stats.playback` only when there is no walk to
-   * read. Neither AddmusicK figure will do: `tagSeconds` is the ID666 field and
-   * counts the loop twice, and the estimate both are built from is a few percent
-   * fast — but more to the point, the compiler abandons all three of them over a
-   * tempo fade or a `t` that runs more than once (`parser.ts:1692`, `:1705`),
-   * which used to leave those songs with a transport reading `0:00` and, since
-   * seeking is gated on a length, no way to move.
+   * From `stats` rather than from a clock, and this is the figure the transport
+   * is built on: ticks are known for every song that compiles, where seconds are
+   * not. A tempo fade costs the compiler its seconds and none of its ticks
+   * (`parser.ts:1705`), so a length in seconds is a thing the transport can be
+   * left without — as it once was, which is how these songs came to have a seek
+   * bar that was greyed out.
+   */
+  readonly durationTicks = computed(() => {
+    const stats = this.editor.result()?.stats;
+    return stats ? stats.introTicks + stats.loopTicks : 0;
+  });
+
+  /**
+   * The same pass in seconds, for the readout beside the bar and for sizing the
+   * fade — the two things that are genuinely wall-clock.
+   *
+   * The clock first, and `stats.playback` only when there is no walk to read.
+   * Neither AddmusicK figure will do: `tagSeconds` is the ID666 field and counts
+   * the loop twice, and the estimate both are built from is a few percent fast
+   * before the driver's dropped ticks are even considered.
    *
    * A song with a declared `#length` is timed by the clock too, not by what was
    * declared: `#length` is an ID666 field, and `buildSpc` still writes it into
    * the tag from `stats.tagSeconds` untouched.
    */
-  readonly duration = computed(() => {
-    const clock = this.editor.clock();
-    if (clock) {
-      return clock.seconds;
-    }
+  private readonly durationSeconds = computed(() => this.secondsAt(this.durationTicks()));
+  readonly durationLabel = computed(() => formatTime(this.durationSeconds()));
 
-    const played = this.editor.result()?.stats?.playback;
-    return played ? played.introSeconds + played.mainSeconds : 0;
-  });
-  readonly durationLabel = computed(() => formatTime(this.duration()));
-  /**
-   * The same pass in driver ticks, which is what a seek is actually made in.
-   *
-   * From `stats` rather than from the clock: the two agree, and these are known
-   * for every song that compiles — a tempo fade costs the compiler its seconds
-   * and none of its ticks.
-   */
-  private readonly durationTicks = computed(() => {
-    const stats = this.editor.result()?.stats;
-    return stats ? stats.introTicks + stats.loopTicks : 0;
-  });
   /**
    * A length to seek within is the whole requirement — a stopped song can be
    * seeked too, and the position that leaves is where the next press of play
    * picks the song up. Anything the transport can show, it can be moved to.
+   *
+   * Gated on ticks and not on seconds, deliberately: a song whose seconds cannot
+   * be worked out is still a song with a position in it.
    */
-  readonly canSeek = computed(() => this.duration() > 0);
+  readonly canSeek = computed(() => this.durationTicks() > 0);
 
   /**
    * How long the tail past the end runs before playback stops.
@@ -137,9 +146,13 @@ export class Playback {
    * round again underneath a fade, long after the transport has reached the end.
    * Sizing it to the song keeps the tail musical, and the bounds stop a jingle
    * or a ten-minute piece from getting a silly one.
+   *
+   * One of the two places seconds are the right unit rather than a leak: the
+   * driver has stopped reading music data by then, so there are no more ticks to
+   * count and the fade has to run on the wall clock.
    */
   private readonly fadeSeconds = computed(() => {
-    const total = this.duration();
+    const total = this.durationSeconds();
     return total > 0 ? clamp(total / 8, 1, 3) : 0;
   });
 
@@ -255,15 +268,12 @@ export class Playback {
     // nothing is rebuilt and playback does not break stride.
     effect(() => this.player.setMute(this.silenced()));
 
-    this.player.onPosition = (songTicks) => {
-      this.elapsed.set(this.secondsAt(songTicks));
+    this.player.onPosition = (songTicks) =>
       this.songTicks.set({ ticks: songTicks, at: performance.now() });
-    };
 
     this.player.onDriverState = (state) => this.driver.set(state);
     this.player.onEnded = () => {
       this.state.set('idle');
-      this.elapsed.set(0);
       this.songTicks.set({ ticks: 0, at: performance.now() });
       this.scrubbing.set(null);
       this.driver.set(null);
@@ -368,7 +378,7 @@ export class Playback {
     return {
       introTicks: stats?.introTicks ?? 0,
       loopTicks: stats?.loopTicks ?? 0,
-      fadeSeconds: this.duration() > 0 ? this.fadeSeconds() : undefined,
+      fadeSeconds: this.durationSeconds() > 0 ? this.fadeSeconds() : undefined,
       songLoops: stats?.loops ?? true,
     };
   }
@@ -406,36 +416,6 @@ export class Playback {
 
     return (
       played.introSeconds + ((songTicks - stats.introTicks) / stats.loopTicks) * played.mainSeconds
-    );
-  }
-
-  /**
-   * The inverse of {@link secondsAt}, for the one place a position arrives in
-   * seconds: the transport's own seek bar, which is denominated in them because
-   * that is what it prints.
-   */
-  private ticksAt(seconds: number): number {
-    const clock = this.editor.clock();
-    if (clock) {
-      return tickAtSeconds(clock, seconds);
-    }
-
-    const stats = this.editor.result()?.stats;
-    const played = stats?.playback;
-    if (!stats || !played) {
-      return 0;
-    }
-
-    if (played.introSeconds > 0 && seconds < played.introSeconds) {
-      return (seconds / played.introSeconds) * stats.introTicks;
-    }
-
-    if (played.mainSeconds <= 0) {
-      return stats.introTicks;
-    }
-
-    return (
-      stats.introTicks + ((seconds - played.introSeconds) / played.mainSeconds) * stats.loopTicks
     );
   }
 
@@ -505,7 +485,6 @@ export class Playback {
   stop(): void {
     this.player.stop();
     this.state.set('idle');
-    this.elapsed.set(0);
     this.songTicks.set({ ticks: 0, at: performance.now() });
     this.scrubbing.set(null);
     this.driver.set(null);
@@ -513,23 +492,18 @@ export class Playback {
   }
 
   /**
-   * Follows the seek bar without moving the song.
+   * Follows the seek bar without moving the song, in driver ticks.
    *
    * Seeking on every drag event would queue a re-emulation per pixel, since the
    * emulator has no snapshot to jump to; this only moves what is displayed, and
    * {@link commitScrub} does the work once the drag ends.
    */
-  scrubTo(seconds: number): void {
+  scrubTo(songTicks: number): void {
     if (!this.canSeek()) {
       return;
     }
 
-    this.scrubbing.set(clamp(seconds, 0, this.duration()));
-  }
-
-  /** {@link scrubTo}, in driver ticks — what the piano roll speaks. */
-  scrubToTick(songTicks: number): void {
-    this.scrubTo(this.secondsAt(songTicks));
+    this.scrubbing.set(clamp(songTicks, 0, this.durationTicks()));
   }
 
   /**
@@ -549,50 +523,31 @@ export class Playback {
   }
 
   /**
-   * Jumps to a point in the song. The emulator replays silently to get there,
-   * so this is not instant on a long song.
+   * Jumps to a tick in the song. The emulator replays silently to get there, so
+   * this is not instant on a long song.
+   *
+   * Ticks are what moves the song, from the transport and the roll alike: the
+   * emulator counts its own and stops on the one it was given, where a request
+   * in seconds could only be converted through a clock and would land wherever
+   * the clock was wrong.
    *
    * Stopped is a position like any other: there is no emulator to move, so the
    * transport simply stands at the new point and {@link toggle} starts the song
    * from it. Without that, the only thing a stopped song could be seeked to is
    * the beginning it was already at.
-   */
-  seek(seconds: number): void {
-    this.scrubbing.set(null);
-    if (!this.canSeek()) {
-      return;
-    }
-
-    this.goToTick(this.ticksAt(clamp(seconds, 0, this.duration())));
-  }
-
-  /**
-   * {@link seek}, in driver ticks — what the piano roll speaks, and what the
-   * emulator is told either way.
    *
-   * Ends the scrub either way, ahead of the gate: a recompile can take the
-   * song's length away mid-gesture, and a scrub left standing would freeze the
-   * readout on a position the song has played past.
+   * Ends the scrub ahead of its own gate: a recompile can take the song's length
+   * away mid-gesture, and a scrub left standing would freeze the readout on a
+   * position the song has played past.
    */
-  seekTick(songTicks: number): void {
+  seek(songTicks: number): void {
     this.scrubbing.set(null);
     if (!this.canSeek()) {
       return;
     }
 
-    this.goToTick(songTicks);
-  }
-
-  /**
-   * Where every seek ends up: the transport's, in seconds, and the roll's, in
-   * ticks. Ticks are what actually moves the song — the emulator counts its own
-   * and lands on the one it was given, where a request in seconds can only be
-   * converted through a predicted tempo and runs early the further in it reaches.
-   */
-  private goToTick(songTicks: number): void {
     const target = clamp(songTicks, 0, this.durationTicks());
-    this.elapsed.set(this.secondsAt(target));
-    // The tick anchor moves with `elapsed`, and for the same reason: the worklet
+    // The anchor moves before the emulator does, because the worklet
     // replays the song from the top to get here and posts nothing until it
     // arrives — nothing at all while paused, where it renders no audio — so a
     // view anchored on the old reading goes on drawing the playhead where the

@@ -227,11 +227,14 @@ console.log("\nfast-forward lands somewhere different");
 	check("still audible after skipping", peak(fromThree) > 0.005, `peak ${peak(fromThree).toFixed(4)}`);
 }
 
-console.log("\nthe mute register is composed, not assigned");
+console.log("\nmuting takes the volume and nothing else");
 {
-	// A pure check of the bookkeeping, with no emulator involved: a song can mute
-	// its own channels through `$FA $05`, and taking a mixer mute away must not
-	// take those with it.
+	// A pure check of the bookkeeping, with no emulator involved. `$5E`, the
+	// driver's own mute register, is deliberately never written: disabling a
+	// channel makes the driver's main loop cheaper, and since the loop handles at
+	// most one music tick per pass, a song already at that ceiling *speeds up*
+	// when a channel is muted. A song muting its own channels through `$F4 $06`
+	// therefore also finds its bits untouched, which used to need care.
 	const aram = new Uint8Array(0x10000);
 	const backup = createMuteBackup();
 
@@ -239,13 +242,13 @@ console.log("\nthe mute register is composed, not assigned");
 	aram[0x0241 + 2 * 1] = 200;
 
 	applyChannelMutes(aram, 0b0000_0010, backup);
-	check("a mixer mute joins the song's own", aram[0x5e] === 0b0000_1010, `$5E = ${aram[0x5e].toString(2)}`);
+	check("the mixer leaves $5E to the song", aram[0x5e] === 0b0000_1000, `$5E = ${aram[0x5e].toString(2)}`);
 	check("the muted channel's volume is taken", aram[0x0241 + 2 * 1] === 0);
 	check("and its bit is flagged for rewriting", (aram[0x5c] & 0b10) !== 0);
 
 	aram[0x5c] = 0;
 	applyChannelMutes(aram, 0, backup);
-	check("lifting it leaves the song's own mute", aram[0x5e] === 0b0000_1000, `$5E = ${aram[0x5e].toString(2)}`);
+	check("lifting it still leaves $5E alone", aram[0x5e] === 0b0000_1000, `$5E = ${aram[0x5e].toString(2)}`);
 	check("and hands the volume back", aram[0x0241 + 2 * 1] === 200);
 
 	// A volume written while muted is the one that comes back.
@@ -381,12 +384,14 @@ console.log("\na muted channel goes on carrying the song");
 		`${mutedGap} muted vs ${openGap} open`,
 	);
 	// If `t192` had gone with the channel the driver would fall back to its own
-	// tempo and the count would be out by a factor, not by a fraction of a
-	// percent. The slack is for the drop-ticks a busy driver loses, which a
-	// muted channel loses slightly fewer of.
+	// tempo and the count would be out by a factor. It is not out at all: muting
+	// takes a volume and leaves the driver's workload alone, so the song runs at
+	// exactly the rate it does unmuted. This was 1% before `$5E` stopped being
+	// written, and the slack that allowed for it is what the next section is
+	// about.
 	check(
 		"and it still sets the tempo it declares",
-		Math.abs(muted.ticks - open.ticks) < open.ticks * 0.01,
+		muted.ticks === open.ticks,
 		`${muted.ticks} ticks muted vs ${open.ticks} open, over ${seconds}s`,
 	);
 	// The channel really was silent for all of that.
@@ -395,6 +400,66 @@ console.log("\na muted channel goes on carrying the song");
 		peak(renderMuted(spc, 4000, 32000, () => 0b11)) < 0.01,
 		`peak ${peak(renderMuted(spc, 4000, 32000, () => 0b11)).toFixed(4)}`,
 	);
+}
+
+console.log("\nmuting does not change how fast the song plays");
+{
+	// The reason `applyChannelMutes` leaves `$5E` alone. The driver's main loop
+	// handles at most one music tick per pass, so a song already at that ceiling
+	// gets *more* ticks a second the less work each one costs — and disabling a
+	// channel is exactly that. Writing `$5E` made this song play 29% fast with
+	// every voice muted, which is a monitoring aid lying about the music.
+	//
+	// Eight busy channels at t254, which asks for 498 ticks a second and gets
+	// around 230. An easy song shows none of this, so it has to be a hard one.
+	const source =
+		"#amk 4\n" +
+		[0, 1, 2, 3, 4, 5, 6, 7].map((ch) => `#${ch} ${ch === 0 ? "t254 " : ""}@6 o4 [c16d16e16f16]40\n`).join("");
+	const spc = compileToSpc(source);
+
+	/** Ticks the driver manages over `seconds`, with `mask` held throughout. */
+	function rate(mask: number, seconds: number): number {
+		emu.loadSpc(spc);
+		const backup = createMuteBackup();
+		let voice = -1;
+		let duration = 0;
+		let ticks = 0;
+
+		for (let done = 0; done < SPC_SAMPLE_RATE * seconds; done += BLOCK) {
+			emu.renderView(BLOCK);
+			const aram = emu.aram();
+			applyChannelMutes(aram, mask, backup);
+
+			if (voice < 0) {
+				voice = tickVoice(aram);
+				duration = readNoteDuration(aram, voice);
+				continue;
+			}
+
+			const now = readNoteDuration(aram, voice);
+			ticks += sawTick(duration, now);
+			duration = now;
+		}
+
+		return ticks / seconds;
+	}
+
+	const seconds = 6;
+	const open = rate(0b0000_0000, seconds);
+	check("the song is one the driver cannot keep up with", open < 400, `${open.toFixed(1)} ticks/s of 498`);
+
+	for (const [label, mask] of [
+		["one channel", 0b1000_0000],
+		["half of them", 0b0000_1111],
+		["all eight", 0b1111_1111],
+	] as const) {
+		const muted = rate(mask, seconds);
+		check(
+			`muting ${label} leaves the rate alone`,
+			Math.abs(muted / open - 1) < 0.01,
+			`${muted.toFixed(1)} vs ${open.toFixed(1)} ticks/s`,
+		);
+	}
 }
 
 console.log("\nmuting cuts a note that is already ringing");

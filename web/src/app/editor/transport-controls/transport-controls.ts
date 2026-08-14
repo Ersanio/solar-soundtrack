@@ -19,7 +19,13 @@ export class TransportControls {
     this.playback.volume.set(Number((event.target as HTMLInputElement).value));
   }
 
-  /** Dragging: move the readout with the pointer, but leave the song alone. */
+  /**
+   * Dragging: move the readout with the pointer, but leave the song alone.
+   *
+   * The bar is denominated in driver ticks, like everything else that follows
+   * the music — the m:ss beside it is the label {@link Playback.timeLabel}
+   * derives, not the value being dragged.
+   */
   protected onScrub(event: Event): void {
     this.playback.scrubTo(Number((event.target as HTMLInputElement).value));
   }

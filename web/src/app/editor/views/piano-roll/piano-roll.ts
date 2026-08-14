@@ -35,6 +35,7 @@ import { clamp } from '../../../util/math';
 import { DriverStore } from '../../../state/driver-store';
 import { EditorStore } from '../../../state/editor-store';
 import { Playback } from '../../../state/playback';
+import { ticksPerSecondAt } from '../../../state/song-clock';
 import { type Lane, advanceTick, gridLines, laneStack, tickWindow } from './roll-layout';
 
 /** Width of the key column. Wide enough for a drum's longest label, `@29 o4 c+`. */
@@ -373,8 +374,22 @@ export class PianoRoll {
     const anchor = this.playback.songTicks();
     const driver = this.playback.driver();
     const pass = this.timeline()?.ticks ?? 0;
-    // `DriverState.tempo` is `$51`, which the driver holds one higher than `t`.
-    const rate = driver && driver.tempo > 0 ? ticksPerSecond(driver.tempo - 1) : 0;
+    // How fast ticks are really going by, which is not what the tempo says. The
+    // driver runs at most one tick per pass of its main loop, so a song that
+    // asks for more than it can manage gets fewer — at `t254` on eight channels
+    // about 231 of the 498 a second it wrote. Extrapolating at the tempo byte
+    // instead put the playhead a steady 59 ticks, most of a quarter note, ahead
+    // of the notes being sounded. `charttest` pins the difference.
+    //
+    // The tempo byte is still the fallback, for a song with no clock at all: it
+    // is what the clock would predict anyway, minus the driver's shortfall.
+    const clock = this.editor.clock();
+    const rate = clock
+      ? ticksPerSecondAt(clock, anchor.ticks)
+      : driver && driver.tempo > 0
+        ? // `DriverState.tempo` is `$51`, one higher than `t`.
+          ticksPerSecond(driver.tempo - 1)
+        : 0;
 
     const elapsed = this.lastFrameAt === 0 ? 0 : (frame - this.lastFrameAt) / 1000;
     this.lastFrameAt = frame;
@@ -784,7 +799,7 @@ export class PianoRoll {
     const from = this.currentTick();
     this.scrolling.set(true);
     this.panTick.set(Math.max(0, from + along / this.zoom()));
-    this.playback.scrubToTick(this.parkedTick());
+    this.playback.scrubTo(this.parkedTick());
 
     clearTimeout(this.seekTimer);
     this.seekTimer = setTimeout(() => this.commitScroll(), SEEK_QUIET_MS);
@@ -802,7 +817,7 @@ export class PianoRoll {
 
     this.shownTick.set(to);
     this.scrolling.set(false);
-    this.playback.seekTick(to);
+    this.playback.seek(to);
   }
 
   protected onMove(event: PointerEvent): void {
@@ -897,11 +912,21 @@ export class PianoRoll {
 
     const driver = this.playback.driver();
     const tempo = driver && driver.tempo > 0 ? driver.tempo - 1 : 0;
-    const parts = [
-      `tick ${Math.round(this.playTick()).toLocaleString()} of ${song.ticks.toLocaleString()}`,
-    ];
+    const tick = this.playTick();
+    const parts = [`tick ${Math.round(tick).toLocaleString()} of ${song.ticks.toLocaleString()}`];
     if (tempo > 0) {
-      parts.push(`t${tempo} · ${ticksPerSecond(tempo).toFixed(1)} ticks/s`);
+      // The rate the song is *getting*, which on a busy one is not the rate the
+      // tempo byte asks for — the driver runs at most one tick per pass of its
+      // main loop. Both are shown when they part company by enough to matter,
+      // since "t254 · 231 ticks/s" on its own reads like a bug in the readout.
+      const clock = this.editor.clock();
+      const asked = ticksPerSecond(tempo);
+      const got = clock ? ticksPerSecondAt(clock, tick) : asked;
+      const rate =
+        got > 0 && got < asked * 0.95
+          ? `${got.toFixed(1)} of ${asked.toFixed(1)} ticks/s`
+          : `${asked.toFixed(1)} ticks/s`;
+      parts.push(`t${tempo} · ${rate}`);
     }
 
     parts.push(`${song.notes.length.toLocaleString()} notes`);

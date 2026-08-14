@@ -114,11 +114,26 @@ formula over tempo can be exact; a playhead built on one drifts further every pa
 `stats.tagSeconds` / `introSeconds` / `mainSeconds` are AddmusicK's own arithmetic, kept for the
 ID666 header and for labels, and are a few percent out by design.
 
-Seeking is in ticks all the way down to the emulator, which stops on its own tick count rather than
-on a sample count — a request in seconds can only be converted through a predicted tempo, and lands
-progressively early the further in it reaches. The transport's seek bar is the one thing still
-denominated in seconds, because it prints m:ss and a constant time-per-pixel is what a seek bar is
-for; `web/src/app/state/song-clock.ts` is where the conversion happens and says why it exists at all.
+This is a rule about **denomination, not just about arithmetic**. Nothing that follows the music
+stores or accepts seconds: the seek bar's `max` and `value` are ticks, `Playback` holds one playhead
+in ticks, and `player.seek` and the worklet take the tick itself — the worklet stops on its own tick
+count rather than on a sample count, so a seek lands where it was asked to. Seconds appear at exactly
+two edges: as the m:ss **label** `web/src/app/state/song-clock.ts` derives from a tick, and for the
+fade past the end of the song, where the driver has stopped reading music data and there are no ticks
+left to count. The conversion has no inverse on purpose — seconds are produced and never consumed, so
+no position round-trips through a clock. Adding a `tickAtSeconds` back means a seconds-denominated
+control got in, and that is the thing to fix instead.
+
+The compiler's own seconds — `stats.tagSeconds` / `introSeconds` / `mainSeconds`, the ID666 header
+and the "Length" tile — are outside this: they are AddmusicK's arithmetic, reported as it reports it.
+
+**And the tick rate itself is measured, not assumed.** The driver runs at most one tick per pass of
+its main loop, so a song asking for more than it can manage gets fewer — 46% of the requested rate on
+a real eight-channel `t254` song, where the ~0.8% above is an ordinary-tempo figure. No formula
+predicts it, because it depends on the work each tick costs. `web/src/app/state/measure-clock.ts`
+plays the song on a worker and records when each tick really arrived; `AMK0503` reports it. Anything
+that turns ticks into seconds must go through `EditorStore.clock`, which serves the measurement where
+there is one and the prediction where there is not.
 
 **`sampleList: null` is not `[]`.** `null` means the compiler had no opinion and the driver's default
 set stands; `[]` means the song genuinely asks for no samples. The list's _order is the SRCN

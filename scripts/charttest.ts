@@ -19,7 +19,7 @@ import {
 	tempoFadeSteps,
 	tickSeconds,
 } from "@amk/tokens/commands/units";
-import { secondsAtTick, songClock, tickAtSeconds } from "../web/src/app/state/song-clock";
+import { secondsAtTick, songClock, ticksPerSecondAt } from "../web/src/app/state/song-clock";
 import {
 	DEFAULT_PERCUSSION,
 	keyOf,
@@ -475,11 +475,15 @@ console.log("\nthe transport's clock, over songs the compiler will not time");
 		`${faded.segments.length} segments`,
 	);
 
-	// A seek that did not round-trip would nudge the playhead every time the roll
-	// committed a scroll.
+	// The table has to join up: a segment's own seconds plus its rate across its
+	// span must land on the next one's, or the readout jumps at every boundary
+	// while still looking monotone and plausible either side of it.
 	check(
-		"the two directions are exact inverses across a fade",
-		[0, 1, 63, 128, 254, 255].every((tick) => near(tickAtSeconds(faded, secondsAtTick(faded, tick)), tick)),
+		"segments join up, so the readout does not jump at a boundary",
+		faded.segments.every((s, n) => {
+			const next = faded.segments[n + 1];
+			return next === undefined || near(s.seconds + (next.tick - s.tick) * s.secondsPerTick, next.seconds);
+		}),
 	);
 	check(
 		"and seconds never run backwards",
@@ -524,6 +528,69 @@ console.log("\nthe transport's clock, over songs the compiler will not time");
 	check("no walk, no clock", songClock(null) === null);
 	check("nor for a song of no ticks", songClock(song(0)) === null);
 	check("nor for a walk that ran out of budget", songClock(song(192, [], true)) === null);
+
+	// The rate the roll extrapolates at, which has to be the clock's own slope.
+	const rate = songClock(song(384, [at(96, 192)]))!;
+	check("the clock reports its own rate", near(ticksPerSecondAt(rate, 0), 1 / driverTickSeconds(54)));
+	check("which follows a tempo change", near(ticksPerSecondAt(rate, 300), 1 / driverTickSeconds(97)));
+}
+
+console.log("\nthe roll's playhead follows the music, not the tempo it was written at");
+{
+	// The driver runs at most one tick per pass of its main loop, so a song that
+	// asks for more than it can manage gets fewer — measured, about 231 of the
+	// 498 ticks a second a t254 song on eight channels writes. A playhead
+	// extrapolated at the tempo *byte* therefore races between anchors and sits a
+	// steady distance ahead of the notes being sounded. There is no visual tell:
+	// it scrolls perfectly smoothly, in the wrong place.
+	const PASS = 7488;
+	const MAX_EXTRAPOLATION = 0.15; // PianoRoll.MAX_EXTRAPOLATION
+	const FPS = 60;
+
+	/** The roll's clock over `seconds`, with `rate` as its belief about speed. */
+	const drift = (trueRate: number, rate: number, seconds = 6) => {
+		let shown = 0;
+		let anchorTicks = 0;
+		let anchorAt = 0;
+		let last = 0;
+		let worst = 0;
+
+		for (let f = 1; f <= seconds * FPS; f++) {
+			const now = (f * 1000) / FPS;
+			// The transport posts the driver's own count about ten times a second.
+			if (now - anchorAt >= 100) {
+				anchorAt = now;
+				anchorTicks = (now / 1000) * trueRate;
+			}
+
+			const elapsed = last === 0 ? 0 : (now - last) / 1000;
+			last = now;
+
+			const since = Math.max(0, (now - anchorAt) / 1000);
+			const reach = anchorTicks + Math.min(since, MAX_EXTRAPOLATION) * rate;
+			shown = advanceTick({ shown, target: clamp(reach, 0, PASS), rate, elapsed, pass: PASS });
+
+			// Second half only, so the start-up transient is not the answer.
+			if (f > seconds * FPS * 0.5) {
+				worst = Math.max(worst, Math.abs(shown - (now / 1000) * trueRate));
+			}
+		}
+
+		return worst;
+	};
+
+	// A song the driver keeps up with never had a problem, and must not gain one.
+	check(
+		"an ordinary song tracks within a couple of ticks",
+		drift(105.5, 105.5) < 3,
+		`${drift(105.5, 105.5).toFixed(1)}`,
+	);
+
+	// 231.2 measured against 498.0 nominal, on the song that prompted this.
+	const nominal = drift(231.2, 498.0);
+	const measured = drift(231.2, 231.2);
+	check("the tempo byte puts it more than a quarter note out", nominal > 48, `${nominal.toFixed(1)} ticks`);
+	check("the clock's own rate keeps it within a 32nd", measured < 6, `${measured.toFixed(1)} ticks`);
 }
 
 summarise();

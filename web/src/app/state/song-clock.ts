@@ -179,31 +179,46 @@ export function songClock(timeline: SongTimeline | null): SongClock | null {
   return { segments, ticks: tick, seconds, stalled };
 }
 
-/** The second a tick falls on. Clamped at both ends; monotone in between. */
+/**
+ * The second a tick falls on. Clamped at both ends; monotone in between.
+ *
+ * One direction only, and that is the point: ticks are what the transport, the
+ * roll and the emulator all hold, so seconds are produced for a label and never
+ * consumed. An inverse existed while the seek bar was denominated in seconds,
+ * and every use of it was a place a position had to survive a round trip through
+ * a clock that is a prediction until the song has been measured.
+ */
 export function secondsAtTick(clock: SongClock, tick: number): number {
   const at = clamp(tick, 0, clock.ticks);
-  const segment = segmentAt(clock, at, (s) => s.tick);
+  const segment = segmentAt(clock, at);
   return Math.min(clock.seconds, segment.seconds + (at - segment.tick) * segment.secondsPerTick);
 }
 
-/** {@link secondsAtTick} the other way up, in fractional ticks. */
-export function tickAtSeconds(clock: SongClock, seconds: number): number {
-  const at = clamp(seconds, 0, clock.seconds);
-  const segment = segmentAt(clock, at, (s) => s.seconds);
-  return Math.min(clock.ticks, segment.tick + (at - segment.seconds) / segment.secondsPerTick);
+/**
+ * How fast ticks are going by at a tick, in ticks per second.
+ *
+ * For the one thing that has to draw the song against a wall clock rather than
+ * follow it: a view running at frame rate, interpolating between two of the
+ * transport's ten-a-second anchors. It needs a velocity, and `ticksPerSecond`
+ * off the tempo byte is the wrong one — that is the rate the song *asked* for,
+ * and on a song the driver cannot keep up with it is nearly double what it gets,
+ * which puts the playhead a quarter note ahead of what is sounding.
+ *
+ * The clock's own slope is the right one, because a measured clock's slope is
+ * what the driver actually did.
+ */
+export function ticksPerSecondAt(clock: SongClock, tick: number): number {
+  const perTick = segmentAt(clock, clamp(tick, 0, clock.ticks)).secondsPerTick;
+  return perTick > 0 ? 1 / perTick : 0;
 }
 
-/** The last segment starting at or before `at`, by whichever axis `key` reads. */
-function segmentAt(
-  clock: SongClock,
-  at: number,
-  key: (segment: ClockSegment) => number,
-): ClockSegment {
+/** The last segment starting at or before `at`. */
+function segmentAt(clock: SongClock, at: number): ClockSegment {
   let low = 0;
   let high = clock.segments.length - 1;
   while (low < high) {
     const mid = (low + high + 1) >> 1;
-    if (key(clock.segments[mid]) <= at) {
+    if (clock.segments[mid].tick <= at) {
       low = mid;
     } else {
       high = mid - 1;
