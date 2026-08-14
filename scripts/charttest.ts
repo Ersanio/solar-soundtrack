@@ -1,7 +1,10 @@
 /**
- * Chart geometry: the stacked bar, the plot space and `clamp`.
+ * Everything the app draws that is arithmetic rather than markup: the stacked
+ * bar, the plot space, `clamp`, the piano roll's lanes, mark window, grid and
+ * playhead clock, its percussion set, and the transport's tick-to-seconds clock.
  *
- * The ARAM bar spans all 64 KiB, so real regions are routinely a fraction of a
+ * The ARAM bar is the oldest of them and the reason this file exists. It spans
+ * all 64 KiB, so real regions are routinely a fraction of a
  * percent of it and land on sub-pixel widths. That arithmetic has already gone
  * wrong once — subtracting the inter-segment gap from each segment silently
  * zeroed anything narrower than the gap, so a small song vanished from the bar
@@ -131,7 +134,7 @@ console.log("\nclamp holds a value inside its bounds");
 	check("above ceilings", clamp(11, 0, 10) === 10);
 	check("the bounds themselves are inside", clamp(0, 0, 10) === 0 && clamp(10, 0, 10) === 10);
 	// A degenerate range still answers with a number in it, which is what the
-	// editor-pane spans rely on: `clamp(end, start + 1, length)` with an empty
+	// source view's spans rely on: `clamp(end, start + 1, length)` with an empty
 	// document has `min` above `max`.
 	check("an inverted range answers with max", clamp(5, 10, 0) === 0, String(clamp(5, 10, 0)));
 }

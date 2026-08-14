@@ -32,5 +32,8 @@ they cannot drift apart.
 intact. `tagSeconds`, `introSeconds` and `mainSeconds` are AddmusicK's own arithmetic — what it
 prints, and what the ID666 tag is built from — and are 2–6% out, which is fine for a label and
 useless for a playhead, because the error compounds on every pass round the loop. `playback` is the
-same split measured against the driver's real tick rate, and is what anything following the audio
-must use.
+same split priced at the driver's real tick rate rather than AddmusicK's rounded one, and is the
+editor's **fallback**: it is still a prediction over the tempo the song asked for, so it is out by
+whatever the driver drops, and it is `null` for a song AddmusicK will not time at all. Anything
+following the audio goes through `EditorStore.clock` first, which measures the song rather than
+predicting it, and reaches this only when there is no walk of the compiled bytes to read.

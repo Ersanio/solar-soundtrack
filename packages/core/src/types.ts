@@ -64,7 +64,13 @@ export interface CompileStats {
 	mainSeconds: number | null;
 	/**
 	 * Songlength synced against the driver's real tick rate rather than AddmusicK's
-	 * rounded one; what anything following the audio must use. See README.md.
+	 * rounded one, and the transport's **fallback**. See README.md.
+	 *
+	 * It is still an estimate over the tempo the song asked for, so it is wrong by
+	 * whatever the driver drops, and `null` for a song AddmusicK will not time at
+	 * all. Anything following the audio goes through the editor's own clock first
+	 * — see `EditorStore.clock` — and reaches this only when there is no walk of
+	 * the compiled bytes to read.
 	 */
 	playback: SongLength | null;
 	/** ID666 tags parsed out of `#spc { }`. */
@@ -97,9 +103,15 @@ export interface NoteAddress {
 	 * The note byte as emitted: `$80`-`$C5` pitched, `$C6` a tie, `$C7` a rest,
 	 * `$D0`-`$D8` a drum. Post-transpose and post-percussion-remap, so it is what
 	 * the driver will read rather than what the letter said.
+	 *
+	 * Here so that `walktest` can check `@amk/spc`'s walk of the emitted bytes
+	 * against what the compiler thought it was emitting — two independent
+	 * derivations of the same note. Nothing in the app reads it: the roll draws
+	 * from the walk, which also knows the tick each note falls on and the state
+	 * it sounds under, and this map does not.
 	 */
 	note: number;
-	/** Ticks the note occupies, source-level `^` ties already folded in. */
+	/** Ticks the note occupies, source-level `^` ties already folded in. Same use as {@link note}. */
 	ticks: number;
 	span: Span;
 }

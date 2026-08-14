@@ -500,7 +500,7 @@ export class PianoRoll {
    * By instrument, not by note byte: every note played while a drum is loaded is
    * that drum being hit, so `@29 c d e` is three hits on one lane rather than
    * one drum and two notes scattered across the keyboard. The pitched ones only
-   * look melodic because `parser.ts:2676` stops remapping after the first.
+   * look melodic because `parser.ts:2681` stops remapping after the first.
    */
   private rowOf(
     note: WalkNote,

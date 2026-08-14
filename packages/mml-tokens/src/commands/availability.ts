@@ -99,7 +99,7 @@ export function formAvailability(form: PaletteForm, target: CommandTarget): Avai
 						"Here the comma is not looked for at all, so only the first number would take effect.",
 					) ?? OK
 				);
-			// `parseDefaultLength` (`parser.ts:1452`).
+			// `parseDefaultLength` (`parser.ts:1453`).
 			case "exactLength":
 				return needsVersion(target, 4, "An exact tick length (l=NN)") ?? OK;
 			// `parseOpenParen` (`parser.ts:2097`) — AMK0117, "Unrecognized character '!'".

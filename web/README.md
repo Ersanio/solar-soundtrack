@@ -127,7 +127,8 @@ widths and offsets are in viewBox units rather than pixels.
 `aram-bar` is the one that does not. It is measured with `element-size.ts` and laid out in real
 pixels by `stack.ts`, because the surface gap between its fills and the floor under a small region
 are pixel sizes, not fractions of the bar that would vanish as it narrows. It is the only component
-that needs either file, and `stack.ts` is the only chart code with a harness — `npm run charttest`.
+that needs either file. `npm run charttest` pins both `stack.ts` and `plot.ts`, along with the roll's
+layout maths and the transport's clock — anything here that is arithmetic rather than markup.
 
 ## The transport's clock
 
@@ -142,11 +143,12 @@ It exists because **the compiler will not time some perfectly ordinary songs**, 
 `estimateSeconds` is segment-wise over source text, so a `t` that runs more than once has no place in
 it and a tempo fade has no segment at all; AddmusicK gives up on the song's whole length either way
 (`Music.cpp:809`), and this port reproduces that faithfully. What used to follow was that
-`stats.playback` was `null`, `Playback.duration` was 0, and `canSeek` — the single gate on seeking
-and on scrubbing the roll — was false. Those songs could be played and nothing else.
+`stats.playback` was `null`, the transport's length in seconds was 0, and `canSeek` — the single gate
+on seeking and on scrubbing the roll — was gated on that length rather than on ticks, so it was false. Those songs could be played and nothing else.
 
-So `duration`, `secondsAt` and `ticksAt` read the clock and fall back to `stats.playback` only when
-there is no walk to read. The two agree exactly on any song that sets its own `t`; a song that sets
+So `durationSeconds` and `secondsAt` read the clock and fall back to `stats.playback` only when there
+is no walk to read. `durationTicks` needs neither: ticks are known for every song that compiles, and
+that is why it, and not a length in seconds, is what the transport is built on. The two agree exactly on any song that sets its own `t`; a song that sets
 none reads **55/54 longer**, because `estimateSeconds` treats `0x36` as a written byte where
 `main.asm:177` puts it straight into `$51`. That is the same ruling as "assume t53 for songs that
 don't have a tempo command", and `walktest` pins the ratio so it cannot drift.
@@ -202,8 +204,9 @@ refresh rate and not the song's.
 ## The piano roll
 
 `editor/views/piano-roll/` draws whatever `@amk/spc/song-walk` says, and nothing else — the
-compiler's `noteMap` records an address, a channel and a span, and no pitch, duration or tick, so
-the roll is a view of a walk over the emitted bytes rather than of the compile. Rows are the
+compiler's `noteMap` records the emitted byte and a note's own length but leaves it in source order,
+with no tick to draw it on and no instrument, volume or tempo to draw it under, so the roll is a view
+of a walk over the emitted bytes rather than of the compile. Rows are the
 **emitted note byte**: `@2 o5 g` draws on o5 d, because `@2` carries a default transposition of five
 semitones, and the roll shows what the driver plays rather than what the letter said.
 
@@ -246,7 +249,7 @@ because two octaves stranded at the top of an empty box is the worse picture.
 
 **A row is chosen by the instrument, not by the note byte.** Everything played while a drum is
 loaded is that drum being hit, so `@29 c d e` is three marks on one lane rather than one drum and
-two notes scattered up the keyboard — the pitched ones only look melodic because `parser.ts:2676`
+two notes scattered up the keyboard — the pitched ones only look melodic because `parser.ts:2681`
 stops remapping after the first. The pitch they were written at is still true and still in the
 tooltip; it just does not decide where the mark goes.
 

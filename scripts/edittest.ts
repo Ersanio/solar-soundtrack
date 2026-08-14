@@ -44,7 +44,7 @@ function hexCommand(source: string, vcmd: number): Command {
 	return found;
 }
 
-/** Applies an edit the way `editor-pane.ts` does, so a test reads as before/after text. */
+/** Applies an edit the way `views/source-view/source-view.ts` does, so a test reads as before/after text. */
 function applied(source: string, edit: { span: { start: number; end: number }; text: string } | null): string {
 	return edit === null ? source : source.slice(0, edit.span.start) + edit.text + source.slice(edit.span.end);
 }

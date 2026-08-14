@@ -71,9 +71,22 @@ export type ToWorklet =
 export type FromWorklet =
 	| {
 			type: "position";
-			/** Emulated time since the song was loaded, which a loop runs past. */
+			/**
+			 * Emulated time since the song was loaded, which a loop runs past.
+			 *
+			 * The page stopped reading this when the transport went over to ticks;
+			 * `worklettest` is what reads it now, to check that the wall clock keeps
+			 * step with the frames rendered. Kept because it is the only honest
+			 * measure of that, and the audio thread is the only place it exists.
+			 */
 			seconds: number;
-			/** Music ticks counted off the driver since the song was loaded. */
+			/**
+			 * Music ticks counted off the driver since the song was loaded.
+			 *
+			 * Unfolded, so it runs past one pass; `songTicks` below is the same
+			 * count folded, and that is the one the page reads. `worklettest` uses
+			 * this one to check the folding.
+			 */
 			ticks: number;
 			/** The same playhead folded into one pass, for a transport to show. */
 			songTicks: number;
