@@ -18,36 +18,31 @@
   --color-ink-muted: #838b9b;
 
   --color-accent: #6ea8fe;
-  /*
-   * The argument bytes of a hex command, against --color-accent for the command byte itself, so
-   * that $E7 $02 reads as one run rather than a blue byte beside body text. Accent's hue with the
-   * saturation down about 40%: it is the drop in saturation that makes it recede.
-   */
   --color-accent-soft: #a7c4e8;
   --color-danger: #ff7b72;
-  /*
-   * Between danger and warn, and its own hue rather than a shade of either: it marks the
-   * diagnostics that compile cleanly and then misbehave on playback, which is a different kind of
-   * problem from both "this will not build" and "you may not have meant this". 7.1:1 against
-   * --color-surface. The three warm hues are close together, so the diagnostics list spells the
-   * severity out as well — colour is not carrying this on its own.
-   */
   --color-severe: #f0883e;
   --color-warn: #e3b341;
   --color-good: #7ee787;
 
   /*
    * ARAM budget bar. A categorical set — the segments are identities (driver,
-   * song, samples, echo), not magnitudes — validated for CVD separation and
-   * contrast against --color-surface above. Do not reorder or re-hue without
-   * re-running the palette validator: adjacent-pair separation is the property
-   * being preserved.
+   * song, samples, echo).
    */
   --color-seg-driver: #3987e5;
   --color-seg-song: #199e70;
   --color-seg-samples: #c98500;
   --color-seg-echo: #d55181;
   --color-seg-free: #333844;
+
+  /* The eight music channels, in the piano roll and on the mixer's index chips. */
+  --color-ch-0: #3987e5;
+  --color-ch-1: #d95926;
+  --color-ch-2: #199e70;
+  --color-ch-3: #c98500;
+  --color-ch-4: #d55181;
+  --color-ch-5: #008300;
+  --color-ch-6: #9085e9;
+  --color-ch-7: #e66767;
 
   --font-mono: ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace;
 }

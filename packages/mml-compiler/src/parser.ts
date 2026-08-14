@@ -51,6 +51,10 @@ export interface AddmusicKOptions {
 export interface NoteEvent {
 	channel: number;
 	offset: number;
+	/** The emitted note byte, after transposition and the percussion remap. */
+	note: number;
+	/** Ticks the note occupies, `^` ties folded in and the tempo ratio applied. */
+	ticks: number;
 	span: Span;
 }
 
@@ -2710,6 +2714,8 @@ export class AddmusicKParser {
 		this.noteEvents.push({
 			channel: this.channel,
 			offset: this.data[this.channel].length,
+			note,
+			ticks,
 			span: this.spanAt(start, end),
 		});
 

@@ -69,6 +69,11 @@ const structure = EditorView.theme(
       backgroundColor: 'color-mix(in srgb, var(--color-accent) 24%, transparent)',
       borderRadius: '2px',
     },
+    '.cm-amk-unreachable': {
+      textDecoration: 'underline wavy var(--color-severe)',
+      textDecorationSkipInk: 'none',
+      textUnderlineOffset: '3px',
+    },
   },
   { dark: true },
 );

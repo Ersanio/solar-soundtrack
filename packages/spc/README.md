@@ -18,6 +18,7 @@ main thread, and inside an `AudioWorkletGlobalScope`.
 | `layout.ts`       | Where things sit in ARAM, and what is left                        |
 | `player.ts`       | AudioContext, worklet node, transport                             |
 | `protocol.ts`     | The one message contract between page and audio thread            |
+| `song-walk.ts`    | Reads a compiled song the way the driver does: what sounds when   |
 | `wasm-host.ts`    | Blargg's snes_spc, called directly                                |
 | `worklet.ts`      | The renderer on the audio thread                                  |
 
@@ -48,8 +49,51 @@ tempo accounts for that, and a playhead built on one drifts further every pass r
 emulator's heap, so the driver's own mute register at `$5E` can be written as easily as its tempo is
 read. Mutes never touch song data, so preview and export build identical bytes.
 
-The module is meant to be useful beyond the transport — a piano roll or a tracker view needs exactly
-this, where each voice is right now and at what tempo.
+The module is useful beyond the transport — where each voice is right now and at what tempo is
+exactly what the piano roll follows.
+
+## Reading a song without playing it
+
+`song-walk.ts` is the other half of that. `driver-state.ts` says where a voice _is_; this says what
+the whole song _will do_, by walking the emitted bytes the way `main.asm`'s fetch loop walks them and
+producing every note on its own tick. Nothing else in the tree knows that — the compiler's `noteMap`
+carries an address, a channel and a span, deliberately, and no pitch or duration.
+
+It walks bytes rather than source because the bytes are the only place the answer is unambiguous.
+`@29 o2a1b2c3` is one drum and two pitched notes on `#0` but three drums on `#6`
+(`parser.ts:2672-2678`), and `@21`-`@29` emit no `$DA` at all, so the instrument a note plays on is
+knowable only by following what the driver does with a `$D0` byte. A pass over the text would have to
+re-derive both rules; this gets them for free.
+
+The walk names the instrument each note sounds on and stops there. Whether any of them counts as
+**percussion** is not a question about the driver: that `@21`-`@29` are drums is, but that a porter
+counts `@10` among them is a judgement about Super Mario World's sample set — and one a song can
+invalidate outright, since `@10`'s SRCN is fixed at `$0B` while which file `$0B` names belongs
+entirely to `#samples`. Nor can it be derived: the obvious rule, checking whether the driver's own
+drums play the same sample, says no the moment a porter swaps one drum sample for another. So the
+answer is a preference, and it lives in the editor with the view that needs it —
+`web/src/app/editor/views/piano-roll/percussion.ts`, where the reasoning is written down beside it.
+
+What this module contributes is `usedInstruments`, which is the same kind of statement as the rest
+of `SongTimeline`: which instruments the song loads, not what sort of thing they are.
+
+The traps are all in the grammar and each carries its citation in the source: a `$00` after a
+duration byte is a quantization byte and not the end of the channel, `$C7`-`$CF` are _all_ rests,
+`$FA $FE` runs on for every trailing byte with the high bit set, `$FB`'s operands are `$80`-range
+bytes that are not notes, and `$E6` and `$E9` use disjoint driver state so a subloop nests inside a
+call without either disturbing the other. `walktest` is what holds all of it, with the running
+emulator as its oracle.
+
+`vcmdLength` restates what `@amk/tokens`' `expectedArgs` already says, because this package may not
+reach that one. That is the arrangement `BANK_SLOT_COUNT` and `MELODIC_SRCN` live under too, and it
+is safe only because a harness asserts the two agree.
+
+`unreachableChannels` is the one diagnostic the walk produces — `AMK0502`, in the same `AMK05xx`
+range as `@amk/tokens`' echo hazards, for the same reason: it is about what the song _does_, not
+about whether it builds. A phrase ends when any voice runs out of data, so a channel longer than the
+shortest is truncated in silence. `unreachable` lists only notes with **no** surviving occurrence —
+cutting `[c e g e]8` in half loses four iterations of four notes that still sound in the other four,
+and calling those dead would be a lie the editor then underlines.
 
 ## The ARAM budget is exact by construction
 

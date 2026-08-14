@@ -353,6 +353,15 @@ console.log("\nthe playhead is counted off the driver, not predicted");
 	// song is t40 and the register reads 41, because the driver stores the `t`
 	// value plus one — which is exactly why reading it beats computing it.
 	check("the driver state comes with it", last.driver.tempo === 41, `tempo ${last.driver.tempo}`);
+
+	// And the first report already does. The driver boots with `#$36` in `$51` and
+	// takes ~40ms to reach the song's `t`, so posting on the very first block would
+	// report t53 for a song that is t40 from beginning to end.
+	check(
+		"from the first report, not just once it settles",
+		seen[0].driver.tempo === 41,
+		`tempo ${seen[0].driver.tempo} at ${(seen[0].seconds * 1000).toFixed(1)}ms`,
+	);
 	check(
 		"including where voice 0 is reading from",
 		last.driver.trackPointers[0] > 0,

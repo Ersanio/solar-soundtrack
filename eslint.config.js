@@ -15,6 +15,7 @@ const SPC_BEYOND_THE_MATHS = [
   '@amk/spc/layout',
   '@amk/spc/player',
   '@amk/spc/protocol',
+  '@amk/spc/song-walk',
   '@amk/spc/wasm-host',
   '@amk/spc/worklet',
 ];
