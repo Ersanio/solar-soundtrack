@@ -4,11 +4,11 @@
  * The compiler emits bytes and `noteMap` remembers which source text each note
  * came from, but this data is incomplete: neither records a pitch, a duration
  * or a tick.
- * 
+ *
  * This walks the emitted stream exactly as `main.asm`'s fetch loop does and
  * produces the missing timeline — every note, on its own tick, with the state
  * in force.
- * 
+ *
  * This is used to emulate the song inside the piano roll.
  *
  * Walking the bytes rather than the source is what makes it faithful. Two
@@ -28,7 +28,7 @@
  *     instrument number, so after `@10 (@1, $02)` a note still reports `@10`.
  *     Following it means tracking a per-voice SRCN override, which nothing yet
  *     needs; the lane rule is defined on `@n` and stays self-consistent.
- * 
+ *
  * Feed the compiled song binary into {@link walkSong} to get its timeline.
  */
 
@@ -98,7 +98,15 @@ export interface NoteState {
 	noise: number | null;
 	/** `$E4` song-wide transposition, in semitones. */
 	transpose: number;
-	/** The `t` value in force — not `$51`, which is one higher. */
+	/**
+	 * The `t` value the song has last been *told* to reach — not `$51`, which is
+	 * one higher.
+	 *
+	 * Through a `$E3` fade this is the target, which the driver has not got to
+	 * yet: the fade steps once per tick and only a per-tick walk knows where it
+	 * is partway. {@link SongTimeline.tempoChanges} is the authority on what a
+	 * given tick really runs at; this is what the song asked for.
+	 */
 	tempo: number;
 	/** `$E0`/`$E1` master volume. */
 	globalVolume: number | null;
@@ -129,6 +137,16 @@ export interface WalkNote {
 	state: NoteState;
 }
 
+/** A song-wide tempo command, on the tick the driver runs it. */
+export interface TempoChange {
+	/** Ticks from the start of the pass. */
+	tick: number;
+	/** The `t` byte: `$E2`'s only operand, `$E3`'s *second*. */
+	tempo: number;
+	/** `$E3`'s duration byte. 0 for `$E2`, which takes effect at once. */
+	fadeTicks: number;
+}
+
 export interface SongTimeline {
 	/** Sorted by tick, then by channel. */
 	notes: readonly WalkNote[];
@@ -136,6 +154,21 @@ export interface SongTimeline {
 	ticks: number;
 	/** Where the loop comes back to, or `null` for a song that does not loop. */
 	loopTick: number | null;
+	/**
+	 * Every `$E2`/`$E3` the pass runs, ascending by tick and in driver order.
+	 *
+	 * The compiler cannot produce this list, which is why it is here.
+	 * `estimateSeconds` is segment-wise over source text, so a `t` that executes
+	 * more than once has no place in it (`parser.ts:1692`) and a fade has no
+	 * segment at all (`parser.ts:1705`, porting `Music.cpp:809`) — either one
+	 * makes it abandon the whole song's length. Walking bytes has neither
+	 * problem: a `t` in a loop body appears once per iteration, at the tick that
+	 * iteration reaches, because that is what the driver does with it.
+	 *
+	 * Cut at the end of the pass the same way {@link notes} is — a `t` past the
+	 * shortest channel never runs, which is what `AMK0217` warns about.
+	 */
+	tempoChanges: readonly TempoChange[];
 	/** Ticks walked per channel, to cross-check against `stats.channelTicks`. */
 	channelTicks: readonly number[];
 	/** Channels the song writes to. */
@@ -249,6 +282,7 @@ const word = (song: Uint8Array, at: number): number => song[at] | (song[at + 1] 
 export function walkSong(song: Uint8Array, aramAddress: number): SongTimeline {
 	const problems: string[] = [];
 	const notes: WalkNote[] = [];
+	const tempoChanges: TempoChange[] = [];
 
 	/** Blob index of an ARAM address, or -1 when it does not land in the blob. */
 	const indexOf = (address: number): number => {
@@ -562,6 +596,19 @@ export function walkSong(song: Uint8Array, aramAddress: number): SongTimeline {
 				break;
 			case 0xe2:
 			case 0xe3:
+				// `track.ticks` is the driver's own position for this command: a
+				// channel is only ever advanced while it is the furthest behind
+				// (the loop below), and `step` moves the clock at most once, in
+				// `emitNote` — so the eight channels' commands are recorded in the
+				// order the driver would run them, already ascending by tick.
+				tempoChanges.push({
+					tick: track.ticks,
+					tempo: vcmd === 0xe2 ? arg(0) : arg(1),
+					fadeTicks: vcmd === 0xe2 ? 0 : arg(0),
+				});
+				// The target, not what a fade is passing through — see
+				// {@link NoteState.tempo}. Pricing a fade tick by tick is the
+				// clock's job, and it reads `tempoChanges` to do it.
 				shared.tempo = vcmd === 0xe2 ? arg(0) : arg(1);
 				break;
 			case 0xe4:
@@ -731,6 +778,9 @@ export function walkSong(song: Uint8Array, aramAddress: number): SongTimeline {
 		notes: played,
 		ticks,
 		loopTick: resolvedLoopTick,
+		// The same cut `played` takes: a command past the shortest channel is
+		// never reached, on this pass or any later one.
+		tempoChanges: tempoChanges.filter((change) => ticks === 0 || change.tick < ticks),
 		channelTicks,
 		used,
 		unreachable,
@@ -745,6 +795,7 @@ export function walkSong(song: Uint8Array, aramAddress: number): SongTimeline {
 			notes: [],
 			ticks: 0,
 			loopTick: null,
+			tempoChanges: [],
 			channelTicks: new Array<number>(CHANNELS).fill(0),
 			used: new Array<boolean>(CHANNELS).fill(false),
 			unreachable: [],

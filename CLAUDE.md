@@ -114,6 +114,12 @@ formula over tempo can be exact; a playhead built on one drifts further every pa
 `stats.tagSeconds` / `introSeconds` / `mainSeconds` are AddmusicK's own arithmetic, kept for the
 ID666 header and for labels, and are a few percent out by design.
 
+Seeking is in ticks all the way down to the emulator, which stops on its own tick count rather than
+on a sample count — a request in seconds can only be converted through a predicted tempo, and lands
+progressively early the further in it reaches. The transport's seek bar is the one thing still
+denominated in seconds, because it prints m:ss and a constant time-per-pixel is what a seek bar is
+for; `web/src/app/state/song-clock.ts` is where the conversion happens and says why it exists at all.
+
 **`sampleList: null` is not `[]`.** `null` means the compiler had no opinion and the driver's default
 set stands; `[]` means the song genuinely asks for no samples. The list's _order is the SRCN
 assignment_, so building an SPC against a different set produces a valid-looking file that plays the

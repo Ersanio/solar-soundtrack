@@ -18,7 +18,14 @@ import { type ScanState, type Token, commandAt, copyState, startState, step, tok
 
 import { velocityTableAt } from "@amk/tokens/dialect";
 import { resolveCommand } from "@amk/tokens/commands/describe";
-import { DEFAULT_TEMPO, tempoFadeSeconds, tickSeconds } from "@amk/tokens/commands/units";
+import {
+	DEFAULT_TEMPO,
+	driverTempo,
+	driverTickSeconds,
+	tempoFadeSeconds,
+	tempoFadeSteps,
+	tickSeconds,
+} from "@amk/tokens/commands/units";
 
 import { check, summarise } from "./harness";
 
@@ -257,6 +264,77 @@ console.log("\na tempo fade is priced across the tempo it changes, not the one i
 	check("a fade to a stop has no duration to give", tempoFadeSeconds(96, 144, 255) === null);
 	check("nor does one out of a stopped song", tempoFadeSeconds(96, 255, 144) === null);
 	check("nor does a fade over no ticks at all", tempoFadeSeconds(0, 144, 254) === null);
+}
+
+console.log("\nthe label and the transport's clock read one model of a fade");
+{
+	// `tempoFadeSeconds` is a sum over `tempoFadeSteps`, and the editor's clock
+	// walks the same list a tick at a time to say where in a fade a given tick
+	// falls. Two models would be two answers to "how long is this song", both
+	// plausible, differing only in the middle of a fade where nobody looks.
+	const steps = tempoFadeSteps(255, 144, 254) ?? [];
+
+	check("a fade has one tempo per tick", steps.length === 255, String(steps.length));
+
+	// The snap is on the tick *after* the last, so the run never reaches the
+	// target. A list that ended on it would be one tick short over its length,
+	// and every total would come out a shade low in a way no eye would catch.
+	check("and the last of them is not the target it snaps to", steps[254] !== driverTempo(254), String(steps[254]));
+	check("it starts one above the tempo it leaves", steps[0] === driverTempo(144), String(steps[0]));
+
+	// The clock coalesces equal-tempo ticks into segments, which is only sound
+	// because the run never doubles back.
+	check(
+		"the run is monotone",
+		steps.every((tempo, n) => n === 0 || tempo >= steps[n - 1]),
+	);
+
+	// Exact equality, not `near`: the same additions in the same order.
+	for (const [ticks, from, to] of [
+		[255, 144, 254],
+		[255, 254, 144],
+		[255, DEFAULT_TEMPO, 254],
+		[1, 144, 254],
+		[96, 144, 144],
+	] as const) {
+		const summed = (tempoFadeSteps(ticks, from, to) ?? []).reduce((total, t) => total + driverTickSeconds(t), 0);
+		check(`t${ticks},${to} out of t${from} sums to its label`, tempoFadeSeconds(ticks, from, to) === summed);
+	}
+
+	// The clock has to give up in exactly the places the label does, or a song
+	// gets a length the inspector says it cannot have.
+	for (const [ticks, from, to] of [
+		[96, 144, 255],
+		[96, 255, 144],
+		[0, 144, 254],
+	] as const) {
+		check(
+			`t${ticks},${to} out of t${from} is null on both`,
+			tempoFadeSteps(ticks, from, to) === null && tempoFadeSeconds(ticks, from, to) === null,
+		);
+	}
+}
+
+console.log("\n$51 holds one more than the byte, and wraps");
+{
+	// Commands.asm:320/:330 enter with the carry set, and it is an 8-bit adc.
+	// The plausible-but-wrong reading is 256 — "as fast as it goes" — where the
+	// register really holds 0 and the song stops dead.
+	check("t255 wraps the register to a stop", driverTempo(255) === 0);
+	check("t254 is the fastest that still runs", driverTempo(254) === 255);
+
+	// `tickSeconds` reads a byte for a label and adds the one without wrapping,
+	// so `t255` gets a length rather than a division by zero. That is the only
+	// place the two spellings part company, and this is what fixes it there.
+	let apart = 0;
+	for (let tempo = 0; tempo <= 255; tempo++) {
+		if (driverTickSeconds(driverTempo(tempo)) !== tickSeconds(tempo)) {
+			apart++;
+		}
+	}
+
+	check("the byte and the register agree everywhere but 255", apart === 1, `${apart} disagreements`);
+	check("where the label still gives a length", Number.isFinite(tickSeconds(255)));
 }
 
 console.log("\na fade in a song with no tempo yet is read at the driver's default");

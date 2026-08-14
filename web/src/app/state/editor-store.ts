@@ -8,6 +8,7 @@ import { buildSpc, spcFilename } from '@amk/spc/export';
 import { ARAM_SIZE, type AramBudget, computeBudget } from '@amk/spc/layout';
 import { type SongTimeline, unreachableChannels, walkSong } from '@amk/spc/song-walk';
 import { echoHazards } from '@amk/tokens/echo-hazards';
+import { type SongClock, songClock } from './song-clock';
 import { caretPosition, downloadBlob, errorMessage } from '../util/format';
 import { DriverStore } from './driver-store';
 import { SampleStore } from './sample-store';
@@ -185,6 +186,15 @@ export class EditorStore {
     const data = compiled?.result.data;
     return data ? walkSong(data, compiled.aramAddress) : null;
   });
+
+  /**
+   * Ticks to seconds, for the transport — `null` when the walk cannot say.
+   *
+   * Built off {@link timeline} rather than off `stats`, because the compiler
+   * abandons the whole of a song's length over a tempo fade or a `t` that runs
+   * more than once, and the walk does not. See `song-clock.ts`.
+   */
+  readonly clock = computed<SongClock | null>(() => songClock(this.timeline()));
 
   /**
    * Errors first, then by position — the order you want to fix them in.

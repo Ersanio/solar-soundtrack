@@ -13,7 +13,7 @@ them.
 
 | Path                    | What it is                                                                           |
 | ----------------------- | ------------------------------------------------------------------------------------ |
-| `src/app/state/`        | Four `@Service()` singletons, in dependency order                                    |
+| `src/app/state/`        | Four `@Service()` singletons in dependency order, and the transport's clock          |
 | `src/app/editor/`       | The left pane and its chrome: top bar, transport, mixer, palette, CodeMirror adapter |
 | `src/app/editor/views/` | What the pane's tabs switch between: source, sample library, piano roll              |
 | `src/app/output/`       | Diagnostics, stats, the ARAM bar, the command inspector                              |
@@ -128,6 +128,35 @@ widths and offsets are in viewBox units rather than pixels.
 pixels by `stack.ts`, because the surface gap between its fills and the floor under a small region
 are pixel sizes, not fractions of the bar that would vanish as it narrows. It is the only component
 that needs either file, and `stack.ts` is the only chart code with a harness — `npm run charttest`.
+
+## The transport's clock
+
+`state/song-clock.ts` turns ticks into seconds, and it lives in the app because nothing else can
+reach both halves of the answer. `@amk/spc`'s walk records every tempo command on the tick the driver
+runs it; `@amk/tokens`' `tempoFadeSteps` is the driver's own per-tick model of a `$E3`. Neither
+package may import the other (`eslint.config.js`'s `SPC_BEYOND_THE_MATHS`), so the join is here. It
+is a placement the dependency graph forces, not a preference, and nothing about the module is
+otherwise app-specific — `charttest` and `walktest` both drive it directly.
+
+It exists because **the compiler will not time some perfectly ordinary songs**, and is right not to.
+`estimateSeconds` is segment-wise over source text, so a `t` that runs more than once has no place in
+it and a tempo fade has no segment at all; AddmusicK gives up on the song's whole length either way
+(`Music.cpp:809`), and this port reproduces that faithfully. What used to follow was that
+`stats.playback` was `null`, `Playback.duration` was 0, and `canSeek` — the single gate on seeking
+and on scrubbing the roll — was false. Those songs could be played and nothing else.
+
+So `duration`, `secondsAt` and `ticksAt` read the clock and fall back to `stats.playback` only when
+there is no walk to read. The two agree exactly on any song that sets its own `t`; a song that sets
+none reads **55/54 longer**, because `estimateSeconds` treats `0x36` as a written byte where
+`main.asm:177` puts it straight into `$51`. That is the same ruling as "assume t53 for songs that
+don't have a tempo command", and `walktest` pins the ratio so it cannot drift.
+
+The seek bar stays denominated in **seconds**, which is the one place in the app that is not ticks.
+It prints m:ss and a constant time-per-pixel is what a seek bar is for — on a song fading from t53 to
+t254 a tick-denominated thumb would move four times as fast at the end as at the start. Everything
+downstream of it is ticks: `ticksAt` converts once, and `player.seek` and the worklet take the tick
+itself, so the emulator lands on the tick it was given rather than on a prediction that runs early
+the further in it reaches.
 
 ## The piano roll
 

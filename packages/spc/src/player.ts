@@ -74,7 +74,6 @@ export class SpcPlayer {
 	private gain: GainNode | null = null;
 
 	private state: PlayerState = "idle";
-	private position = 0;
 	private songTicks = 0;
 	private volume = 1;
 	private looping = false;
@@ -189,22 +188,21 @@ export class SpcPlayer {
 	}
 
 	/**
-	 * Loads an SPC and plays it, optionally fast-forwarded to `atSeconds`.
+	 * Loads an SPC and plays it, optionally fast-forwarded to `atTicks`.
 	 *
 	 * `timing` says what the header cannot. The ID666 length counts the main loop
 	 * twice and the fade beside it is sized for a listening app, so a host that
 	 * knows the song's real shape states it here in ticks and gets a playhead that
 	 * follows the driver. Left out, the song plays on with the file's own fade.
 	 */
-	play(spc: Uint8Array, atSeconds = 0, timing: SongTiming = {}): void {
+	play(spc: Uint8Array, atTicks = 0, timing: SongTiming = {}): void {
 		this.require();
-		this.position = Math.max(0, atSeconds);
-		this.songTicks = 0;
+		this.songTicks = Math.max(0, atTicks);
 		this.epoch++;
 		this.post({
 			type: "load",
 			spc,
-			atSeconds: this.position,
+			atTicks: this.songTicks,
 			epoch: this.epoch,
 			introTicks: timing.introTicks ?? 0,
 			loopTicks: timing.loopTicks ?? 0,
@@ -222,7 +220,6 @@ export class SpcPlayer {
 
 		this.post({ type: "stop" });
 		this.state = "idle";
-		this.position = 0;
 		this.songTicks = 0;
 	}
 
@@ -245,18 +242,22 @@ export class SpcPlayer {
 	}
 
 	/**
-	 * Jumps to `seconds`. The emulator has no snapshot to jump to, so this
-	 * replays the song silently up to that point — seeking a long way into a
-	 * long song takes a moment.
+	 * Jumps to a tick. The emulator has no snapshot to jump to, so this replays
+	 * the song silently up to that point — seeking a long way into a long song
+	 * takes a moment.
+	 *
+	 * Ticks, because that is the unit the answer is exact in: the seconds a tick
+	 * falls on can only be predicted, and the prediction runs early the further
+	 * in it reaches.
 	 */
-	seek(seconds: number): void {
+	seek(ticks: number): void {
 		if (!this.node || this.state === "idle") {
 			return;
 		}
 
-		this.position = Math.max(0, seconds);
+		this.songTicks = Math.max(0, ticks);
 		this.epoch++;
-		this.post({ type: "seek", seconds: this.position, epoch: this.epoch });
+		this.post({ type: "seek", ticks: this.songTicks, epoch: this.epoch });
 	}
 
 	setLoop(loop: boolean): void {
@@ -316,7 +317,6 @@ export class SpcPlayer {
 					return;
 				}
 
-				this.position = message.seconds;
 				this.songTicks = message.songTicks;
 				this.onPosition?.(message.songTicks);
 				this.onDriverState?.(message.driver);

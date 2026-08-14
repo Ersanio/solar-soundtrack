@@ -25,8 +25,8 @@ export type ToWorklet =
 			type: "load";
 			/** A complete `.spc` file image, as `buildSpc` produces. */
 			spc: Uint8Array;
-			/** Start position; the emulator fast-forwards to it. */
-			atSeconds: number;
+			/** Start position in music ticks; the emulator fast-forwards to it. */
+			atTicks: number;
 			/** See {@link FromWorklet}'s `epoch`. */
 			epoch: number;
 			/**
@@ -49,7 +49,12 @@ export type ToWorklet =
 			 */
 			songLoops: boolean;
 	  }
-	| { type: "seek"; seconds: number; epoch: number }
+	/**
+	 * Move the playhead, in music ticks — the same currency as `atTicks`, and for
+	 * the same reason: the host asks for a place in the song, and only the
+	 * emulator knows how many seconds of audio it takes to get there.
+	 */
+	| { type: "seek"; ticks: number; epoch: number }
 	| { type: "paused"; paused: boolean }
 	| { type: "loop"; loop: boolean }
 	/**

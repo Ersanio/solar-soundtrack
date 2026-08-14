@@ -77,6 +77,20 @@ answer is a preference, and it lives in the editor with the view that needs it �
 What this module contributes is `usedInstruments`, which is the same kind of statement as the rest
 of `SongTimeline`: which instruments the song loads, not what sort of thing they are.
 
+`tempoChanges` is there for the same reason and answers to nobody else. The compiler's own length
+estimate is segment-wise over source text, so a `t` that executes more than once has no place in it
+(`parser.ts:1692`) and a `$E3` has no segment at all (`parser.ts:1705`) — AddmusicK abandons the
+song's whole length in either case, and this port reproduces that. Walking bytes has neither problem:
+a `t` in a loop body is recorded once per iteration, at the tick that iteration reaches, because that
+is what the driver does with it. Turning the list into seconds is not this package's job — a `$E3`
+ramps once per tick and the model of that lives in `@amk/tokens`, which nothing here may import — so
+the editor joins the two in `web/src/app/state/song-clock.ts`.
+
+`NoteState.tempo` is deliberately not that answer. It is the tempo the song has last been _told_ to
+reach, which through a fade is the target the driver has not got to yet; the roll's tooltip wants
+what was asked for, and anything wanting what is actually playing reads `tempoChanges` or the live
+`$51`.
+
 The traps are all in the grammar and each carries its citation in the source: a `$00` after a
 duration byte is a quantization byte and not the end of the channel, `$C7`-`$CF` are _all_ rests,
 `$FA $FE` runs on for every trailing byte with the high bit set, `$FB`'s operands are `$80`-range
