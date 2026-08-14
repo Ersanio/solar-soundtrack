@@ -34,7 +34,14 @@
   --color-seg-echo: #d55181;
   --color-seg-free: #333844;
 
-  /* The eight music channels, in the piano roll and on the mixer's index chips. */
+  /*
+   * The eight music channels, used by the piano roll's marks and nowhere else.
+   *
+   * Eight is past what any categorical set can keep separable for every pair of
+   * viewers, so **nothing identifies a channel by colour alone**: a mark's
+   * tooltip names its channel, and the mixer numbers its chips rather than
+   * tinting them.
+   */
   --color-ch-0: #3987e5;
   --color-ch-1: #d95926;
   --color-ch-2: #199e70;

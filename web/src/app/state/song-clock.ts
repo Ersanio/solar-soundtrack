@@ -52,6 +52,10 @@ export interface SongClock {
    * A tempo of 0 was reached and the song stops advancing short of the pass.
    * `t255` does it outright — the driver's carry-set `adc` wraps `$FF` to 0 —
    * and so does a fade that ends there.
+   *
+   * Read by `charttest` and by nothing in the app, which needs no separate
+   * branch for it: `ticks` already stops where the song does, so clamping
+   * against it does the right thing without anyone asking why.
    */
   readonly stalled: boolean;
 }

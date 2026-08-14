@@ -104,9 +104,9 @@ function compileToSpc(source: string): Uint8Array {
 const BLOCK = SPC_SAMPLE_RATE / TICK_POLL_HZ;
 
 /**
- * Renders with channels muted the way the app mutes them: by writing the
- * driver's mute register after every emulated block, exactly as `worklet.ts`
- * does. Nothing about the SPC image changes.
+ * Renders with channels muted the way the app mutes them: by taking the muted
+ * voices' track volume after every emulated block, exactly as `worklet.ts` does.
+ * Nothing about the SPC image changes, and `$5E` is left to the song.
  *
  * `warmup` frames are rendered and thrown away first, so the song is past its
  * boot handshake by the time the level is measured; keep it and `frames` whole

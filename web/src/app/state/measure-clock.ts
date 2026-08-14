@@ -62,9 +62,13 @@ export interface Measurement {
   seconds: number;
   /** What the same ticks would have taken at the tempo the song asked for. */
   nominalSeconds: number;
-  /** Ticks reached; short of the pass when the song stalled or ran out. */
-  ticks: number;
-  /** The pass was not reached — the figures describe as far as it got. */
+  /**
+   * The pass was not reached — the figures describe as far as it got.
+   *
+   * Read by `walktest` and by nothing in the app, which reads `clock` and lets
+   * a short measurement stand: the clock it yields covers the ticks that were
+   * reached, and beyond them the transport clamps.
+   */
   truncated: boolean;
 }
 
@@ -79,7 +83,6 @@ export function measureClock(core: SpcCore, spc: Uint8Array, passTicks: number):
     clock: null,
     seconds: 0,
     nominalSeconds: 0,
-    ticks: 0,
     truncated: true,
   };
   if (passTicks <= 0) {
@@ -144,7 +147,6 @@ export function measureClock(core: SpcCore, spc: Uint8Array, passTicks: number):
     clock: toClock(points, ticks, seconds),
     seconds,
     nominalSeconds,
-    ticks,
     truncated: ticks < passTicks,
   };
 }

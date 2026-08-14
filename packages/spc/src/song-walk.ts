@@ -2,8 +2,11 @@
  * Reads a compiled song the way the driver reads it, and says what sounds when.
  *
  * The compiler emits bytes and `noteMap` remembers which source text each note
- * came from, but this data is incomplete: neither records a pitch, a duration
- * or a tick.
+ * came from, along with the byte it emitted and the ticks it occupies — but not
+ * *when* it sounds, and nothing about the state it sounds under. A song is not a
+ * list of notes in source order: a `[ ]` plays its body many times, and the
+ * instrument, volume and tempo in force at each of those come from commands on
+ * a channel the note may not be on.
  *
  * This walks the emitted stream exactly as `main.asm`'s fetch loop does and
  * produces the missing timeline — every note, on its own tick, with the state
@@ -13,8 +16,8 @@
  *
  * Walking the bytes rather than the source is what makes it faithful. Two
  * behaviours make the point: `@29 o2a1b2c3` compiles to `$D8 $97 $98` on `#0`
- * but `$D8 $D8 $D8` on `#6` (`parser.ts:2672-2678`), and `@21`-`@29` emit no
- * `$DA` at all (`parser.ts:1812-1843`), so the instrument is only knowable by
+ * but `$D8 $D8 $D8` on `#6` (`parser.ts:2676-2682`), and `@21`-`@29` emit no
+ * `$DA` at all (`parser.ts:1816-1847`), so the instrument is only knowable by
  * following what the driver does with a `$D0` byte. A pass over the text would
  * have to re-derive both.
  *
@@ -78,7 +81,17 @@ const NOTE_BUDGET = 200_000;
 /** Bytes one channel may read in a phrase. Generous; only a loop can reach it. */
 const STEP_BUDGET = 2_000_000;
 
-/** The song-wide and per-channel settings a note sounds under. */
+/**
+ * The song-wide and per-channel settings a note sounds under.
+ *
+ * Deliberately the whole of it, not the subset anything reads today. A view
+ * takes what it shows — the roll's tooltip uses `instrument`, `volume`,
+ * `quantization`, `noise` and `tempo`, and leaves the rest — but the walk is the
+ * only place any of it can be known, since the command that set it may be
+ * thousands of ticks back on another channel. Working it out here once is what
+ * makes a second reader of it free; deleting the unread ones would make the next
+ * tooltip row a change to the walker.
+ */
 export interface NoteState {
 	/** `$DA`'s operand, or the drum a `$D0`-`$D8` byte selected. `null` if unset. */
 	instrument: number | null;
@@ -663,7 +676,7 @@ export function walkSong(song: Uint8Array, aramAddress: number): SongTimeline {
 				const count = arg(2);
 				if (target < 0) {
 					// `*` before any `[ ]` emits `$E9 FF FF n` on purpose
-					// (`parser.ts:2478-2487`, porting `Music.cpp:1321`), because
+					// (`parser.ts:2485-2494`, porting `Music.cpp:1321`), because
 					// AddmusicK builds it. A call to nowhere ends the channel here
 					// rather than throwing, so the other seven still draw.
 					problems.push(`Channel ${channel} calls a loop that was never defined.`);

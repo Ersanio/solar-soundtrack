@@ -113,29 +113,29 @@ interface Supersession {
 }
 
 const SUPERSEDED: Supersession[] = [
-	{ vcmd: 0xda, by: "text:@", letter: "c4 @0", hex: "c4 $DA $00", cite: "parser.ts:1842" },
-	{ vcmd: 0xdb, by: "text:y", letter: "c4 y10", hex: "c4 $DB $0A", cite: "parser.ts:1610" },
-	{ vcmd: 0xde, by: "text:p", letter: "c4 p12,8", hex: "c4 $DE $00 $0C $08", cite: "parser.ts:1941" },
-	{ vcmd: 0xe0, by: "text:w", letter: "c4 w200", hex: "c4 $E0 $C8", cite: "parser.ts:1485" },
-	{ vcmd: 0xe1, by: "text:w,", letter: "c4 w18,200", hex: "c4 $E1 $12 $C8", cite: "parser.ts:1488" },
-	{ vcmd: 0xe2, by: "text:t", letter: "c4 t144", hex: "c4 $E2 $90", cite: "parser.ts:1694" },
+	{ vcmd: 0xda, by: "text:@", letter: "c4 @0", hex: "c4 $DA $00", cite: "parser.ts:1846" },
+	{ vcmd: 0xdb, by: "text:y", letter: "c4 y10", hex: "c4 $DB $0A", cite: "parser.ts:1614" },
+	{ vcmd: 0xde, by: "text:p", letter: "c4 p12,8", hex: "c4 $DE $00 $0C $08", cite: "parser.ts:1945" },
+	{ vcmd: 0xe0, by: "text:w", letter: "c4 w200", hex: "c4 $E0 $C8", cite: "parser.ts:1489" },
+	{ vcmd: 0xe1, by: "text:w,", letter: "c4 w18,200", hex: "c4 $E1 $12 $C8", cite: "parser.ts:1492" },
+	{ vcmd: 0xe2, by: "text:t", letter: "c4 t144", hex: "c4 $E2 $90", cite: "parser.ts:1698" },
 	{ vcmd: 0xe3, by: "text:t,", letter: "c4 t18,144", hex: "c4 $E3 $12 $90", cite: "parseTempo's fade fork" },
-	{ vcmd: 0xe7, by: "text:v", letter: "c4 v200", hex: "c4 $E7 $C8", cite: "parser.ts:1502" },
-	{ vcmd: 0xe8, by: "text:v,", letter: "c4 v18,200", hex: "c4 $E8 $12 $C8", cite: "parser.ts:1505" },
+	{ vcmd: 0xe7, by: "text:v", letter: "c4 v200", hex: "c4 $E7 $C8", cite: "parser.ts:1506" },
+	{ vcmd: 0xe8, by: "text:v,", letter: "c4 v18,200", hex: "c4 $E8 $12 $C8", cite: "parser.ts:1509" },
 	// `n` reads its argument as hex (`HEX_ARG_LETTERS`), so `n10` is sixteen.
-	{ vcmd: 0xf8, by: "text:n", letter: "c4 n10", hex: "c4 $F8 $10", cite: "parser.ts:1896" },
-	{ vcmd: 0xe6, by: "text:[[", letter: "c4 [[ c4 ]]2", hex: null, cite: "parser.ts:2377" },
-	{ vcmd: 0xe9, by: "text:[", letter: "c4 [ c4 ]4", hex: null, cite: "parser.ts:2508" },
+	{ vcmd: 0xf8, by: "text:n", letter: "c4 n10", hex: "c4 $F8 $10", cite: "parser.ts:1900" },
+	{ vcmd: 0xe6, by: "text:[[", letter: "c4 [[ c4 ]]2", hex: null, cite: "parser.ts:2381" },
+	{ vcmd: 0xe9, by: "text:[", letter: "c4 [ c4 ]4", hex: null, cite: "parser.ts:2512" },
 	{
 		vcmd: 0xfc,
 		by: "text:(!n,",
 		// The definition alone emits only its body; `$FC` is written where the
-		// remote code is *called* (`parser.ts:2330`), which is why the palette
+		// remote code is *called* (`parser.ts:2334`), which is why the palette
 		// carries both spellings and why the probe needs both here.
 		above: "(!1)[$F4 $09]",
 		letter: "c4 (!1,1,24)",
 		hex: null,
-		cite: "parser.ts:2330",
+		cite: "parser.ts:2334",
 	},
 ];
 

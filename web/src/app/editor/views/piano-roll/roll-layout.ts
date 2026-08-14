@@ -16,7 +16,14 @@ export interface Lane {
   /** Distance from the top of the stack, in rows. */
   row: number;
   kind: 'key' | 'drum' | 'noise';
-  /** 0-69 for a key, the `@n` for a drum, -1 for noise. */
+  /**
+   * 0-69 for a key, the `@n` for a drum, -1 for noise.
+   *
+   * Read by `charttest` and by nothing in the roll, which goes the other way
+   * round — `rowOfKey` and `rowOfDrum` take it a number and hand back a row.
+   * It stays because the checks that a fitted range covers the notes played,
+   * and that the drums count down to the keyboard, are about this number.
+   */
   index: number;
   /** `o4 c+` for a key, `@23 o3 a` for a drum. */
   label: string;

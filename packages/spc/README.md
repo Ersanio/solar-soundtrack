@@ -35,10 +35,11 @@ out of it. The Angular builder refuses an asset path outside its own workspace r
 
 ## Observe the driver, do not predict it
 
-Everything else in this app predicts playback: the compiler works out how long a song should take,
-and the transport follows that prediction. `driver-state.ts` observes it instead. The driver keeps
-its whole working state in the zero page and `AddmusicKreadme/readme_files/aram_map.html` documents
-every byte, so tempo, per-voice position and the tick accumulator can simply be read.
+The compiler predicts playback: it works out how long a song should take, and every figure in seconds
+the editor shows is built on that. `driver-state.ts` observes it instead, and the playhead is
+observed — not one second of it is predicted. The driver keeps its whole working state in the zero
+page and `AddmusicKreadme/readme_files/aram_map.html` documents every byte, so tempo, per-voice
+position and the tick accumulator can simply be read.
 
 That matters because prediction is not exact and cannot be made exact. The driver's main loop
 (`AddmusicKsrc/main.asm`, `MainLoop`) processes at most one music tick per iteration, so a song that
@@ -66,12 +67,15 @@ exactly what the piano roll follows.
 
 `song-walk.ts` is the other half of that. `driver-state.ts` says where a voice _is_; this says what
 the whole song _will do_, by walking the emitted bytes the way `main.asm`'s fetch loop walks them and
-producing every note on its own tick. Nothing else in the tree knows that — the compiler's `noteMap`
-carries an address, a channel and a span, deliberately, and no pitch or duration.
+producing every note on its own tick. Nothing else in the tree knows that. The compiler's `noteMap`
+carries the emitted byte and the ticks a note occupies, but in source order and with no tick to put
+them on, and nothing at all about the state a note sounds under — the instrument, volume and tempo in
+force come from commands that may be on another channel entirely, and a `[ ]` sounds its body many
+times over from one entry in the map.
 
 It walks bytes rather than source because the bytes are the only place the answer is unambiguous.
 `@29 o2a1b2c3` is one drum and two pitched notes on `#0` but three drums on `#6`
-(`parser.ts:2672-2678`), and `@21`-`@29` emit no `$DA` at all, so the instrument a note plays on is
+(`parser.ts:2676-2682`), and `@21`-`@29` emit no `$DA` at all, so the instrument a note plays on is
 knowable only by following what the driver does with a `$D0` byte. A pass over the text would have to
 re-derive both rules; this gets them for free.
 
