@@ -174,7 +174,6 @@ export class EditorStore {
   private worker: Worker | null = null;
   private measureTimer: ReturnType<typeof setTimeout> | undefined;
   private measureToken = 0;
-  private measuring: Uint8Array | null = null;
 
   /** `null` until a driver supplies a load address — never a guessed one. */
   private readonly compilation = computed(() => {
@@ -231,9 +230,23 @@ export class EditorStore {
    */
   private readonly predictedClock = computed<SongClock | null>(() => songClock(this.timeline()));
 
-  /** What the worker last measured, for the song {@link measuredFor} names. */
+  /**
+   * The last thing the emulator observed about this song.
+   *
+   * **Replaced, never cleared.** It was cleared on every recompile once, on the
+   * reasoning that a measurement belongs to the bytes it was taken from — but
+   * compiling happens 150 ms after a keystroke and measuring a second after
+   * that, so the whole of it was thrown away and not yet replaced for as long as
+   * anyone kept typing. `AMK0503` blinked out and back on every pause, and the
+   * transport's length flicked between the measurement and the prediction.
+   *
+   * What it measures is how far the driver falls behind the tempo the song
+   * asked for, and that is a property of the song's *texture* — how many
+   * channels are live and what each tick costs them. A keystroke does not change
+   * it. So the honest thing to hold between measurements is the last answer,
+   * not no answer.
+   */
   private readonly measured = signal<Measurement | null>(null);
-  private readonly measuredFor = signal<Uint8Array | null>(null);
 
   /**
    * Ticks to seconds, measured where possible and predicted where not.
@@ -244,21 +257,17 @@ export class EditorStore {
    * speed. `measure-clock.ts` says why no formula can fix that and the emulator
    * has to be watched instead.
    *
-   * The predicted clock is what stands until the measurement lands, about a
-   * second after typing stops, and what stands for good if it fails. The two
-   * have the same shape on purpose, so nothing downstream knows which it holds.
+   * The prediction stands only until the first measurement lands, and after that
+   * the previous measurement stands rather than the prediction: an edit moves
+   * the tick count a little, where the prediction is wrong by up to a factor of
+   * two on exactly the songs this exists for. Both ends clamp, so a measurement
+   * that covers slightly fewer ticks than the song now has costs the readout the
+   * difference and nothing more. The two have the same shape on purpose, so
+   * nothing downstream knows which it holds.
    */
-  readonly clock = computed<SongClock | null>(() => {
-    const measured = this.measured();
-    const data = this.compilation()?.result.data;
-    // Only for the bytes it was measured from: a stale clock on a song that has
-    // been edited under it is worse than an honest prediction.
-    if (measured?.clock && data && this.measuredFor() === data) {
-      return measured.clock;
-    }
-
-    return this.predictedClock();
-  });
+  readonly clock = computed<SongClock | null>(
+    () => this.measured()?.clock ?? this.predictedClock(),
+  );
 
   /**
    * Errors first, then by position — the order you want to fix them in.
@@ -295,13 +304,17 @@ export class EditorStore {
    *
    * `severe` puts it with the echo hazards and `AMK0502` in the `AMK05xx` band:
    * it compiles cleanly and then misbehaves on playback. Held back until the
-   * measurement is in, and silent for the few percent an ordinary busy song
-   * loses — see {@link TEMPO_SHORTFALL_LIMIT}.
+   * first measurement is in, and silent for the few percent an ordinary busy
+   * song loses — see {@link TEMPO_SHORTFALL_LIMIT}.
+   *
+   * It stands on the last measurement rather than only on one taken from the
+   * current bytes, which is what stops it blinking out on every keystroke; see
+   * {@link measured}. The span is resolved from the undebounced scan, so it
+   * still points at the tempo command in the document as it is now.
    */
   private tempoDiagnostics(): Diagnostic[] {
     const measured = this.measured();
-    const data = this.compilation()?.result.data;
-    if (!measured || !data || this.measuredFor() !== data) {
+    if (!measured) {
       return [];
     }
 
@@ -512,26 +525,21 @@ export class EditorStore {
   /**
    * Asks the worker for the song's real clock, once typing has settled.
    *
-   * Nothing is measured for a song that will not play — no bytes, no pass to
-   * measure over — and the previous answer is dropped at once rather than left
-   * standing over new bytes, so {@link clock} falls back to the prediction for
-   * the moment in between.
+   * Re-armed on every compile and never cancelled into nothing: a song that
+   * will not play has no pass to measure, so no request goes out, but whatever
+   * was measured last stays standing until something better arrives. See
+   * {@link measured} for why that is the honest answer rather than a stale one.
    */
   private scheduleMeasure(data: Uint8Array | null, passTicks: number): void {
     clearTimeout(this.measureTimer);
-    if (this.measuredFor() !== data) {
-      this.measured.set(null);
-      this.measuredFor.set(null);
-    }
-
     if (!data || passTicks <= 0 || typeof Worker === 'undefined') {
       return;
     }
 
-    this.measureTimer = setTimeout(() => this.measure(data, passTicks), MEASURE_IDLE_MS);
+    this.measureTimer = setTimeout(() => this.measure(passTicks), MEASURE_IDLE_MS);
   }
 
-  private measure(data: Uint8Array, passTicks: number): void {
+  private measure(passTicks: number): void {
     const spc = this.assembleSpc();
     if (!spc) {
       return;
@@ -549,7 +557,6 @@ export class EditorStore {
         // base href, which is `/<repo>/` on Pages.
         wasmUrl: new URL('player/spc.wasm', document.baseURI).href,
       } satisfies MeasureRequest);
-      this.measuring = data;
     } catch {
       // No worker, or it refused the message. The prediction stands; a song
       // that cannot be measured is not a song that cannot be played.
@@ -568,7 +575,6 @@ export class EditorStore {
       }
 
       this.measured.set(reply);
-      this.measuredFor.set(this.measuring);
     };
 
     worker.onerror = () => {
