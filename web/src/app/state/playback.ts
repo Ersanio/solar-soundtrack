@@ -6,6 +6,7 @@ import type { DriverState } from '@amk/spc/driver-state';
 import { SPC_SAMPLE_RATE } from '@amk/spc/wasm-host';
 import { errorMessage, formatTime } from '../util/format';
 import { EditorStore } from './editor-store';
+import { secondsAtTick, tickAtSeconds } from './song-clock';
 import { clamp } from '../util/math';
 
 /** N-SPC songs have eight music channels. */
@@ -88,16 +89,39 @@ export class Playback {
    * One pass through the song — intro plus a single trip round the loop — which
    * is what the seek bar spans and where the emulator fades out.
    *
-   * `stats.playback` rather than the AddmusicK figures beside it, on both counts:
-   * `tagSeconds` is the ID666 field and counts the loop twice, and the estimate
-   * it is built from is a few percent fast, which a looping playhead turns into
-   * a drift that grows with every pass.
+   * The walk's clock first, and `stats.playback` only when there is no walk to
+   * read. Neither AddmusicK figure will do: `tagSeconds` is the ID666 field and
+   * counts the loop twice, and the estimate both are built from is a few percent
+   * fast — but more to the point, the compiler abandons all three of them over a
+   * tempo fade or a `t` that runs more than once (`parser.ts:1692`, `:1705`),
+   * which used to leave those songs with a transport reading `0:00` and, since
+   * seeking is gated on a length, no way to move.
+   *
+   * A song with a declared `#length` is timed by the clock too, not by what was
+   * declared: `#length` is an ID666 field, and `buildSpc` still writes it into
+   * the tag from `stats.tagSeconds` untouched.
    */
   readonly duration = computed(() => {
+    const clock = this.editor.clock();
+    if (clock) {
+      return clock.seconds;
+    }
+
     const played = this.editor.result()?.stats?.playback;
     return played ? played.introSeconds + played.mainSeconds : 0;
   });
   readonly durationLabel = computed(() => formatTime(this.duration()));
+  /**
+   * The same pass in driver ticks, which is what a seek is actually made in.
+   *
+   * From `stats` rather than from the clock: the two agree, and these are known
+   * for every song that compiles — a tempo fade costs the compiler its seconds
+   * and none of its ticks.
+   */
+  private readonly durationTicks = computed(() => {
+    const stats = this.editor.result()?.stats;
+    return stats ? stats.introTicks + stats.loopTicks : 0;
+  });
   /**
    * A length to seek within is the whole requirement — a stopped song can be
    * seeked too, and the position that leaves is where the next press of play
@@ -353,11 +377,19 @@ export class Playback {
    * Turns a tick position into the second it falls on, for the transport to show.
    *
    * The playhead itself is counted off the driver and is exact; this only puts a
-   * clock face on it. Interpolating within the intro and the loop separately
-   * matters because the two can run at different tempos, so one flat scale would
-   * put the readout out by however much they differ.
+   * clock face on it. The clock's segment table follows every tempo the song
+   * sets, a fade included, so the readout is right in the middle of a section
+   * and not only at its edges — where the two-piece intro/loop interpolation
+   * this replaced was exact at the boundaries and drifting in between.
+   *
+   * The fallback keeps that old split, for a song the walk could not read.
    */
   private secondsAt(songTicks: number): number {
+    const clock = this.editor.clock();
+    if (clock) {
+      return secondsAtTick(clock, songTicks);
+    }
+
     const stats = this.editor.result()?.stats;
     const played = stats?.playback;
     if (!stats || !played) {
@@ -378,14 +410,16 @@ export class Playback {
   }
 
   /**
-   * The inverse of {@link secondsAt}, for the views that scroll in ticks.
-   *
-   * The same two-piece split, and it has to be: a single flat scale would land a
-   * seek in the wrong bar on any song that changes `t` at the loop. Guarded on
-   * the seconds rather than the ticks — the two sides agree about which pieces
-   * exist, and this is the side that divides.
+   * The inverse of {@link secondsAt}, for the one place a position arrives in
+   * seconds: the transport's own seek bar, which is denominated in them because
+   * that is what it prints.
    */
   private ticksAt(seconds: number): number {
+    const clock = this.editor.clock();
+    if (clock) {
+      return tickAtSeconds(clock, seconds);
+    }
+
     const stats = this.editor.result()?.stats;
     const played = stats?.playback;
     if (!stats || !played) {
@@ -412,9 +446,11 @@ export class Playback {
 
     const spc = this.editor.assembleSpc();
     // Resume inside the song rather than at the raw clock, so reloading after a
-    // long looping session does not re-emulate every pass to get back.
+    // long looping session does not re-emulate every pass to get back. The
+    // playhead is already folded into one pass and already in ticks, so nothing
+    // is converted and nothing is lost.
     if (spc) {
-      this.player.play(spc, this.secondsAt(this.player.getSongTicks()), this.timing());
+      this.player.play(spc, this.player.getSongTicks(), this.timing());
       this.loaded.set(this.captureLoaded());
     }
   }
@@ -461,7 +497,7 @@ export class Playback {
     // Wherever the transport was left, which is the start unless it was seeked
     // while stopped. Clamped because the compile just above may have shortened
     // the song out from under a position set against the previous one.
-    this.player.play(spc, clamp(this.elapsed(), 0, this.duration()), this.timing());
+    this.player.play(spc, clamp(this.songTicks().ticks, 0, this.durationTicks()), this.timing());
     this.loaded.set(this.captureLoaded());
     this.state.set('playing');
   }
@@ -527,29 +563,45 @@ export class Playback {
       return;
     }
 
-    const target = clamp(seconds, 0, this.duration());
-    this.elapsed.set(target);
+    this.goToTick(this.ticksAt(clamp(seconds, 0, this.duration())));
+  }
+
+  /**
+   * {@link seek}, in driver ticks — what the piano roll speaks, and what the
+   * emulator is told either way.
+   *
+   * Ends the scrub either way, ahead of the gate: a recompile can take the
+   * song's length away mid-gesture, and a scrub left standing would freeze the
+   * readout on a position the song has played past.
+   */
+  seekTick(songTicks: number): void {
+    this.scrubbing.set(null);
+    if (!this.canSeek()) {
+      return;
+    }
+
+    this.goToTick(songTicks);
+  }
+
+  /**
+   * Where every seek ends up: the transport's, in seconds, and the roll's, in
+   * ticks. Ticks are what actually moves the song — the emulator counts its own
+   * and lands on the one it was given, where a request in seconds can only be
+   * converted through a predicted tempo and runs early the further in it reaches.
+   */
+  private goToTick(songTicks: number): void {
+    const target = clamp(songTicks, 0, this.durationTicks());
+    this.elapsed.set(this.secondsAt(target));
     // The tick anchor moves with `elapsed`, and for the same reason: the worklet
     // replays the song from the top to get here and posts nothing until it
     // arrives — nothing at all while paused, where it renders no audio — so a
     // view anchored on the old reading goes on drawing the playhead where the
     // song no longer is. `player.seek` bumps its epoch, so the readings still in
     // flight are dropped rather than overwriting this.
-    this.songTicks.set({ ticks: this.ticksAt(target), at: performance.now() });
+    this.songTicks.set({ ticks: target, at: performance.now() });
     if (!this.isIdle()) {
       this.player.seek(target);
     }
-  }
-
-  /**
-   * {@link seek}, in driver ticks.
-   *
-   * Ends the scrub either way, `seek` clearing it ahead of its own gate: a
-   * recompile can take the song's length away mid-gesture, and a scrub left
-   * standing would freeze the readout on a position the song has played past.
-   */
-  seekTick(songTicks: number): void {
-    this.seek(this.secondsAt(songTicks));
   }
 
   /** Ignored while a channel is soloed, where the mute buttons are disabled. */

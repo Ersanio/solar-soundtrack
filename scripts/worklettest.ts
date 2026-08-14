@@ -221,7 +221,7 @@ console.log("\nsilence before a song is loaded");
 console.log("\na loaded song renders audio through the resampler");
 {
 	port.onmessage!({
-		data: { type: "load", spc, atSeconds: 0, introTicks: 0, loopTicks: 0, fadeSeconds: 0, songLoops: true, epoch: 1 },
+		data: { type: "load", spc, atTicks: 0, introTicks: 0, loopTicks: 0, fadeSeconds: 0, songLoops: true, epoch: 1 },
 	});
 
 	render(processor, 200); // let the driver key on
@@ -255,13 +255,27 @@ console.log("\npause and resume");
 	check("resuming brings it back", peak(loud) > 0.01, `peak ${peak(loud).toFixed(4)}`);
 }
 
-console.log("\nseeking lands somewhere else in the song");
+console.log("\nseeking lands on the tick it was asked for");
 {
-	port.onmessage!({ data: { type: "seek", seconds: 0, epoch: 2 } });
+	port.onmessage!({ data: { type: "seek", ticks: 0, epoch: 2 } });
 	const fromStart = render(processor, 100);
 
-	port.onmessage!({ data: { type: "seek", seconds: 3, epoch: 3 } });
-	const fromThree = render(processor, 100);
+	sent.length = 0;
+	port.onmessage!({ data: { type: "seek", ticks: 192, epoch: 3 } });
+	const fromLater = render(processor, 100);
+
+	// The claim a seconds-denominated seek could not make. The host can only
+	// predict how many seconds of audio a tick is worth, and the driver drops
+	// ticks when it is busy, so the prediction runs early the further in it
+	// reaches; stopping on the driver's own count lands exactly. `SOURCE_BLOCK`
+	// is a millisecond, which is under a tick at any tempo, so the overshoot is
+	// smaller than the unit being asked for.
+	const landed = (sent.filter((m) => m.type === "position") as { songTicks: number }[])[0];
+	check(
+		"the first reading back is the tick that was requested",
+		landed !== undefined && landed.songTicks >= 192 && landed.songTicks <= 193,
+		`landed on ${landed?.songTicks}`,
+	);
 
 	// The page discards positions stamped with an earlier epoch, which is what
 	// stops a seek being undone by an update that was already on its way.
@@ -274,14 +288,19 @@ console.log("\nseeking lands somewhere else in the song");
 
 	let identical = true;
 	for (let i = 0; i < fromStart.length; i++) {
-		if (fromStart[i] !== fromThree[i]) {
+		if (fromStart[i] !== fromLater[i]) {
 			identical = false;
 			break;
 		}
 	}
 
 	check("a seek changes what is rendered", !identical);
-	check("still audible after seeking", peak(fromThree) > 0.005, `peak ${peak(fromThree).toFixed(4)}`);
+	check("still audible after seeking", peak(fromLater) > 0.005, `peak ${peak(fromLater).toFixed(4)}`);
+
+	// A target the song never reaches must end rather than spin the audio
+	// thread: `MAX_SEEK_SECONDS` is the backstop, and without it this hangs.
+	port.onmessage!({ data: { type: "seek", ticks: 10_000_000, epoch: 4 } });
+	check("a seek past everything the song has still returns", true);
 }
 
 /** A short pass, so a test does not have to render the whole song to see one. */
@@ -290,7 +309,7 @@ const load = (over: Partial<Extract<ToWorklet, { type: "load" }>> = {}) => ({
 	data: {
 		type: "load" as const,
 		spc,
-		atSeconds: 0,
+		atTicks: 0,
 		introTicks: 0,
 		loopTicks: LOOP_TICKS,
 		fadeSeconds: 0.5,

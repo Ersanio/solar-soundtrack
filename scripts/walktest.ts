@@ -49,7 +49,8 @@ import { buildSpc } from "@amk/spc/export";
 import { readDriverState } from "@amk/spc/driver-state";
 import { emptySample } from "@amk/spc/brr";
 import { SPC_SAMPLE_RATE, instantiate } from "@amk/spc/wasm-host";
-import { type SongTimeline, unreachableChannels, vcmdLength, walkSong } from "@amk/spc/song-walk";
+import { type SongTimeline, type TempoChange, unreachableChannels, vcmdLength, walkSong } from "@amk/spc/song-walk";
+import { songClock } from "../web/src/app/state/song-clock";
 
 import { SPC_ASSETS, check, stubFetch, summarise } from "./harness";
 
@@ -195,6 +196,112 @@ for (const song of CORPUS) {
 		!timeline.truncated && timeline.problems.length === 0,
 		timeline.problems.join(" | "),
 	);
+}
+
+// ---------------------------------------------------------------------------
+console.log("\nthe song's tempo map");
+// ---------------------------------------------------------------------------
+{
+	const map = (source: string) => build(source).timeline.tempoChanges;
+	const shown = (changes: readonly TempoChange[]) =>
+		changes.map((c) => `${c.tick}:t${c.tempo}${c.fadeTicks ? `/${c.fadeTicks}` : ""}`).join(" ");
+
+	const plain = map("#amk 4\n#0 o4 t54 c4\n");
+	check("a t at the top is one change on tick 0", shown(plain) === "0:t54", shown(plain));
+
+	// `$E3` writes its duration first and its target second (`parser.ts:1706-1708`).
+	// A map that swapped them still reads as a perfectly reasonable fade.
+	const fade = map("#amk 4\n#0 o4 t20,96 c1\n");
+	check(
+		"a fade keeps its duration and its target apart",
+		shown(fade) === "0:t96/20",
+		`${shown(fade)} — tempo ${fade[0]?.tempo}, over ${fade[0]?.fadeTicks}`,
+	);
+
+	const later = map("#amk 4\n#0 o4 c1 t96 c1\n");
+	check("a command runs where the channel has got to", shown(later) === "192:t96", shown(later));
+
+	// The claim that makes the map worth having: it records *executions*, not
+	// bytes. The compiler cannot say this at all — `parser.ts:1692` gives up on
+	// the song's whole length for a `t` in the loop block — and a walk that
+	// recorded bytes would say one change and produce a timeline that looks fine.
+	const looped = map("#amk 4\n#0 o4 [t96 c1]3\n");
+	check("a t inside a loop is recorded once per iteration", shown(looped) === "0:t96 192:t96 384:t96", shown(looped));
+
+	const subloop = map("#amk 4\n#0 o4 [[t96 c1]]2\n");
+	check("and once per turn of a superloop", shown(subloop) === "0:t96 192:t96", shown(subloop));
+
+	// The driver's own order, which is what makes a table built forward from the
+	// list correct. Nothing sorts it; the walk emits it that way.
+	const two = map("#amk 4\n#0 o4 c1 t96 c1\n#1 o4 t60 c1 c1\n");
+	check("two channels interleave by tick, unsorted", shown(two) === "0:t60 192:t96", shown(two));
+
+	// The same cut `notes` takes, and what AMK0217 warns about.
+	const past = map("#amk 4\n#0 o4 c4\n#1 o4 c4 c4 t96 c4\n");
+	check("a t past the shortest channel never runs", shown(past) === "", shown(past));
+
+	// The premise of the whole clock, in one place: if this ever stops being true
+	// the app can go back to `stats.playback` and none of it is needed.
+	const { result, timeline } = build("#amk 4\n#0 o4 t20,96 c1\n");
+	check(
+		"a fade leaves the compiler with no length, and the walk with every tick",
+		result.stats?.playback === null && timeline.ticks === 192 && timeline.tempoChanges.length === 1,
+		`playback ${JSON.stringify(result.stats?.playback)}, ${timeline.ticks} ticks`,
+	);
+	check(
+		"and the note it carries reports the tempo the fade is aiming at",
+		timeline.notes[0]?.state.tempo === 96,
+		String(timeline.notes[0]?.state.tempo),
+	);
+}
+
+// ---------------------------------------------------------------------------
+console.log("\nthe clock and the compiler agree about the songs the compiler can time");
+// ---------------------------------------------------------------------------
+{
+	// The clock is the only thing that can time a faded song, so nothing can
+	// check it against the compiler there. What *can* be checked is that
+	// replacing `stats.playback` with it does not quietly retime every other
+	// song in the editor — and where it does, that the size of the difference is
+	// named rather than discovered later.
+	//
+	// This needs the compiler for `stats`, the walk for the ticks and the app for
+	// the arithmetic that makes them comparable, which is why it is here: no
+	// package can reach all three, and `charttest` has no compiler.
+	for (const song of CORPUS) {
+		const { result, timeline } = build(song.source);
+		const played = result.stats?.playback;
+		const clock = songClock(timeline);
+		if (!played || !clock) {
+			check(`${song.name}: has both a length and a clock`, false);
+			continue;
+		}
+
+		const stated = played.introSeconds + played.mainSeconds;
+		const setsTempo = timeline.tempoChanges.some((change) => change.tick === 0 && change.fadeTicks === 0);
+		if (setsTempo) {
+			check(
+				`${song.name}: the clock reads exactly what the compiler does`,
+				Math.abs(clock.seconds - stated) < 1e-9,
+				`clock ${clock.seconds.toFixed(6)}, stats ${stated.toFixed(6)}`,
+			);
+			continue;
+		}
+
+		// A song with no `t` differs by exactly 55/54, and the ratio is the
+		// assertion. `estimateSeconds` unshifts `[0, 0x36]` (`parser.ts:3477`) and
+		// reads `0x36` as an MML byte, adding one to get driver 55; `main.asm:177`
+		// puts `#$36` into `$51` itself, which is driver 54, and that is what
+		// `DEFAULT_TEMPO` says. The clock reads ~1.85% longer and is right —
+		// commit a512e25 already ruled on this. Pinning the ratio means the next
+		// person to touch either side sees the divergence rather than finding a
+		// retimed editor.
+		check(
+			`${song.name}: with no t of its own it is the driver's t53, not AddmusicK's t54`,
+			Math.abs(clock.seconds / stated - 55 / 54) < 1e-9,
+			`clock ${clock.seconds.toFixed(6)}, stats ${stated.toFixed(6)}`,
+		);
+	}
 }
 
 // ---------------------------------------------------------------------------

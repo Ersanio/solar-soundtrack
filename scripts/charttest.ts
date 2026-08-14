@@ -11,7 +11,15 @@
  *   npm run charttest
  */
 
-import { KEY_COUNT, type WalkNote } from "@amk/spc/song-walk";
+import { KEY_COUNT, type SongTimeline, type TempoChange, type WalkNote } from "@amk/spc/song-walk";
+import {
+	DEFAULT_TEMPO,
+	driverTickSeconds,
+	tempoFadeSeconds,
+	tempoFadeSteps,
+	tickSeconds,
+} from "@amk/tokens/commands/units";
+import { secondsAtTick, songClock, tickAtSeconds } from "../web/src/app/state/song-clock";
 import {
 	DEFAULT_PERCUSSION,
 	keyOf,
@@ -407,6 +415,115 @@ console.log("\npercussion is a preference, not a rule");
 	// was stored and the default stands, `[]` means the porter turned everything
 	// off. Reading `[]` as "no opinion" would make that undo itself on reload.
 	check("an empty stored set is kept, not treated as absent", parsePercussion([])?.length === 0);
+}
+
+console.log("\nthe transport's clock, over songs the compiler will not time");
+{
+	/** Only the four fields `songClock` reads; the rest is padding. */
+	const song = (ticks: number, tempoChanges: TempoChange[] = [], truncated = false): SongTimeline => ({
+		notes: [],
+		ticks,
+		loopTick: null,
+		tempoChanges,
+		channelTicks: [ticks, 0, 0, 0, 0, 0, 0, 0],
+		used: [true, false, false, false, false, false, false, false],
+		usedInstruments: [],
+		unreachable: [],
+		customInstruments: [],
+		truncated,
+		problems: [],
+	});
+
+	const at = (tempo: number, tick = 0): TempoChange => ({ tick, tempo, fadeTicks: 0 });
+	const fade = (tick: number, tempo: number, fadeTicks: number): TempoChange => ({ tick, tempo, fadeTicks });
+	const near = (got: number, want: number) => Math.abs(got - want) < 1e-9;
+
+	// A song with no `t` is not a song with no tempo — main.asm:177 has already
+	// put #$36 into $51. Reading it as a written byte would give 55 and retime
+	// every untempoed song by 1.85%.
+	const bare = songClock(song(192))!;
+	check(
+		"no tempo command still clocks, at the driver's t53",
+		near(bare.seconds, 192 * driverTickSeconds(54)),
+		`${bare.seconds.toFixed(4)} s`,
+	);
+	check("and leaves no empty segment in front of a t at tick 0", songClock(song(192, [at(96)]))!.segments.length === 1);
+
+	// Two exact terms, not one average: the halves do not agree by a constant.
+	const stepped = songClock(song(384, [at(96, 192)]))!;
+	check(
+		"a $E2 takes effect on its own tick",
+		near(stepped.seconds, 192 * driverTickSeconds(54) + 192 * driverTickSeconds(97)),
+		`${stepped.seconds.toFixed(4)} s`,
+	);
+
+	// The whole point of the change: the clock and the inspector's label are one
+	// model, so they cannot give a song two lengths.
+	const faded = songClock(song(255, [fade(0, 254, 255)]))!;
+	check(
+		"a fade is priced tick by tick, exactly as its label is",
+		faded.seconds === tempoFadeSeconds(255, DEFAULT_TEMPO, 254),
+		`${faded.seconds.toFixed(4)} s`,
+	);
+	check("which is not what those ticks take at the tempo it leaves", faded.seconds < 255 * tickSeconds(DEFAULT_TEMPO));
+
+	// A row per tick would work and make the binary search pointless.
+	check(
+		"equal-tempo ticks fold into segments",
+		faded.segments.length < 255 &&
+			faded.segments.every((s, n) => n === 0 || s.secondsPerTick !== faded.segments[n - 1].secondsPerTick),
+		`${faded.segments.length} segments`,
+	);
+
+	// A seek that did not round-trip would nudge the playhead every time the roll
+	// committed a scroll.
+	check(
+		"the two directions are exact inverses across a fade",
+		[0, 1, 63, 128, 254, 255].every((tick) => near(tickAtSeconds(faded, secondsAtTick(faded, tick)), tick)),
+	);
+	check(
+		"and seconds never run backwards",
+		Array.from({ length: 256 }, (_, tick) => secondsAtTick(faded, tick)).every(
+			(seconds, n, all) => n === 0 || seconds > all[n - 1],
+		),
+	);
+
+	// The delta belongs to the written duration. Re-deriving it from the ticks
+	// that survive is a different fade, and reads entirely reasonable.
+	const cut = songClock(song(96, [fade(0, 254, 255)]))!;
+	const first96 = (tempoFadeSteps(255, DEFAULT_TEMPO, 254) ?? [])
+		.slice(0, 96)
+		.reduce((total, tempo) => total + driverTickSeconds(tempo), 0);
+	check("a fade cut short keeps the delta its written duration gave it", near(cut.seconds, first96));
+	check("which is not the same as a shorter fade", !near(cut.seconds, tempoFadeSeconds(96, DEFAULT_TEMPO, 254)!));
+
+	// The driver has one tempo, not a stack: a second command ends the ramp.
+	const interrupted = songClock(song(192, [fade(0, 254, 255), at(53, 96)]))!;
+	const ramped = (tempoFadeSteps(255, DEFAULT_TEMPO, 254) ?? [])
+		.slice(0, 96)
+		.reduce((total, tempo) => total + driverTickSeconds(tempo), 0);
+	check(
+		"a tempo command inside a fade ends it there",
+		near(interrupted.seconds, ramped + 96 * driverTickSeconds(54)),
+		`${interrupted.seconds.toFixed(4)} s`,
+	);
+
+	// Commands.asm:330's carry-set adc wraps $FF to 0. Not a division by zero,
+	// not an infinite song: the pass genuinely never finishes.
+	const stopped = songClock(song(384, [at(255, 192)]))!;
+	check("t255 stops the song rather than running it fastest", stopped.stalled && stopped.ticks === 192);
+	check(
+		"and the clock pins there instead of diverging",
+		Number.isFinite(stopped.seconds) && secondsAtTick(stopped, 999) === stopped.seconds,
+	);
+	check("a fade into a stop stops too", songClock(song(384, [fade(0, 255, 96)]))!.stalled);
+
+	// `null` and not a zero-length clock: the callers read it as "no opinion, use
+	// what the compiler said", and a song of no length would disable seeking all
+	// over again — which is the bug this whole change is about.
+	check("no walk, no clock", songClock(null) === null);
+	check("nor for a song of no ticks", songClock(song(0)) === null);
+	check("nor for a walk that ran out of budget", songClock(song(192, [], true)) === null);
 }
 
 summarise();

@@ -50,6 +50,24 @@ const SOURCE_BLOCK = SPC_SAMPLE_RATE / TICK_POLL_HZ;
 /** How often to tell the page where playback has got to. */
 const POSITION_INTERVAL = 0.1;
 
+/**
+ * How long a seek will emulate without the tick count moving before it gives up.
+ *
+ * A target the song never reaches — one past the end of a song that does not
+ * loop, or any target at all in a song with no note data to tick on — would
+ * otherwise render until a wall-clock ceiling, which on the audio thread is a
+ * freeze rather than a slow seek. Two seconds is four times the 0.512 s a tick
+ * takes at the slowest tempo the driver can hold, so no real song can look
+ * stalled while it is merely slow.
+ */
+const SEEK_STALL_BLOCKS = 2 * TICK_POLL_HZ;
+
+/**
+ * And an outright ceiling, for a song that ticks forever without reaching the
+ * target. `999` seconds is what the SPC format allows.
+ */
+const MAX_SEEK_SECONDS = 999;
+
 const FULL_SCALE = 32768;
 
 class SpcProcessor extends AudioWorkletProcessor {
@@ -139,12 +157,12 @@ class SpcProcessor extends AudioWorkletProcessor {
 					this.introTicks = message.introTicks;
 					this.loopTicks = message.loopTicks;
 					this.epoch = message.epoch;
-					this.seek(message.atSeconds);
+					this.seek(message.atTicks);
 					this.playing = true;
 					break;
 				case "seek":
 					this.epoch = message.epoch;
-					this.seek(message.seconds);
+					this.seek(message.ticks);
 					break;
 				case "paused":
 					this.paused = message.paused;
@@ -175,7 +193,7 @@ class SpcProcessor extends AudioWorkletProcessor {
 	}
 
 	/**
-	 * Restarts the song and fast-forwards to `seconds`.
+	 * Restarts the song and fast-forwards to `songTicks`.
 	 *
 	 * The fast-forward is emulated a millisecond at a time rather than through
 	 * `_skipSPC`, because the tick count has to be carried across it: skipping
@@ -183,14 +201,21 @@ class SpcProcessor extends AudioWorkletProcessor {
 	 * had gone by, and every reading after that would inherit the error. The
 	 * format gives no snapshot to jump to either way, so seeking far into a long
 	 * song blocks the audio thread for a moment.
+	 *
+	 * Stopping on the tick count rather than on a sample count is what makes a
+	 * seek land where it was asked to. A host can only guess how many seconds of
+	 * audio a tick is worth — the driver drops ticks when it is busy, so the
+	 * guess runs progressively early the further in you seek — whereas the ticks
+	 * counted here are the driver's own. `SOURCE_BLOCK` is a millisecond, which
+	 * is under a tick at any tempo, so the overshoot is smaller than the unit.
 	 */
-	private seek(seconds: number): void {
+	private seek(songTicks: number): void {
 		const { core, spc } = this;
 		if (!core || !spc) {
 			return;
 		}
 
-		const target = Math.max(0, seconds);
+		const target = Math.max(0, songTicks);
 		core.loadSpc(spc);
 
 		this.ticks = 0;
@@ -201,13 +226,21 @@ class SpcProcessor extends AudioWorkletProcessor {
 		// left would be restored into a song that has moved on.
 		resetMuteBackup(this.MuteBackup);
 
-		const wanted = Math.round(target * SPC_SAMPLE_RATE);
-		for (let done = 0; done < wanted; done += SOURCE_BLOCK) {
-			core.renderView(Math.min(SOURCE_BLOCK, wanted - done));
+		let rendered = 0;
+		let stalledFor = 0;
+		const cap = MAX_SEEK_SECONDS * SPC_SAMPLE_RATE;
+		while (this.ticks < target && rendered < cap && stalledFor < SEEK_STALL_BLOCKS) {
+			const before = this.ticks;
+			core.renderView(SOURCE_BLOCK);
+			rendered += SOURCE_BLOCK;
 			this.afterBlock();
+			stalledFor = this.ticks > before ? 0 : stalledFor + 1;
 		}
 
-		this.frames = Math.round(target * sampleRate);
+		// What was actually rendered, not what was asked for. This is the wall
+		// clock the end-of-song fade runs on, and the two parted company as soon
+		// as the request stopped being denominated in seconds.
+		this.frames = Math.round((rendered / SPC_SAMPLE_RATE) * sampleRate);
 		this.endsAtTicks = this.durationTicks();
 		this.fadeFrom = -1;
 		this.postedAt = -1;

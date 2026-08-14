@@ -4,12 +4,33 @@
  */
 
 /**
+ * What `$51` holds for a tempo byte.
+ *
+ * One more than the byte, because both handlers are entered with the carry set
+ * and add it in (`Commands.asm:320`, `:330`) — and it is an 8-bit `adc`, so
+ * `t255` wraps to 0 and *stops* the song rather than running it at its fastest.
+ */
+export function driverTempo(tempo: number): number {
+	return (tempo + 1) & 0xff;
+}
+
+/** Seconds per tick at a *driver* tempo — `$51` itself, not the byte that set it. */
+export function driverTickSeconds(driver: number): number {
+	return 256 / (500 * driver);
+}
+
+/**
  * Seconds per driver tick at a tempo byte.
  * `parser.ts:TEMPO_TICK_SECONDS` — a tick is `256 / (500 × (tempo + 1))` seconds.
  * The + 1 is intentional as in the ASM source, the carry flag is set.
+ *
+ * Deliberately `tempo + 1` and not {@link driverTempo}: this reads a byte for a
+ * label, and `t255` should say how long its ticks would be rather than divide by
+ * the zero the register really holds. The two part company at 255 alone, and
+ * `tokentest` pins where.
  */
 export function tickSeconds(tempo: number): number {
-	return 256 / (500 * (tempo + 1));
+	return driverTickSeconds(tempo + 1);
 }
 
 /** Beats per minute for a tempo byte: 48 ticks to a quarter note. */
@@ -107,23 +128,21 @@ export function fadeTicksLabel(ticks: number, tempo: number | null): string {
 }
 
 /**
- * Seconds a tempo fade really takes, or `null` when it ends the song.
+ * The tempo the driver plays each tick of a `$E3` fade at, driver-side, or
+ * `null` when the fade ends the song.
  *
- * {@link ticksLabel}'s arithmetic cannot answer this one: the tick length it
- * multiplies by is the thing the command is changing. `main.asm:2461` steps the
- * tempo once per tick by `Commands.asm:335`'s 8.8 delta and snaps to the target
- * on the last, so the elapsed time is the sum of each step's own tick length —
- * `t255,254` from t144 takes 0.67 s where 255 ticks at t144 would be 0.90 s, and
- * a fade the other way is out by more than double.
+ * `main.asm:2461` steps the tempo once per tick by `Commands.asm:335`'s 8.8
+ * delta and snaps to the target on the tick *after* the last, so this has
+ * exactly `ticks` entries and the last of them is not the target.
  *
  * Walked rather than integrated because the walk is the driver's: 255 terms at
- * most, and it lands on the same truncation the fixed-point delta does.
+ * most, and it lands on the same truncation the fixed-point delta does. The one
+ * model of a fade in the tree — {@link tempoFadeSeconds} sums it for a label and
+ * the editor's transport clock reads it tick by tick, so the two cannot drift.
  */
-export function tempoFadeSeconds(ticks: number, from: number, to: number): number | null {
-	// Both handlers are entered with the carry set, so the driver holds one more
-	// than either byte says (`Commands.asm:320`, `:330`).
-	const start = (from + 1) & 0xff;
-	const target = (to + 1) & 0xff;
+export function tempoFadeSteps(ticks: number, from: number, to: number): number[] | null {
+	const start = driverTempo(from);
+	const target = driverTempo(to);
 	if (start === 0 || target === 0 || ticks === 0) {
 		// A tempo of 0 stops the song advancing, so there is no duration to give.
 		return null;
@@ -133,12 +152,26 @@ export function tempoFadeSeconds(ticks: number, from: number, to: number): numbe
 	// fraction, so what the driver plays at is the whole part of the running sum.
 	const delta = Math.trunc(((target - start) * 256) / ticks) / 256;
 
-	let seconds = 0;
+	const steps: number[] = [];
 	for (let step = 0; step < ticks; step++) {
-		seconds += 256 / (500 * Math.floor(start + step * delta));
+		steps.push(Math.floor(start + step * delta));
 	}
 
-	return seconds;
+	return steps;
+}
+
+/**
+ * Seconds a tempo fade really takes, or `null` when it ends the song.
+ *
+ * {@link ticksLabel}'s arithmetic cannot answer this one: the tick length it
+ * multiplies by is the thing the command is changing. The elapsed time is the
+ * sum of each of {@link tempoFadeSteps}' own tick lengths — `t255,254` from t144
+ * takes 0.67 s where 255 ticks at t144 would be 0.90 s, and a fade the other way
+ * is out by more than double.
+ */
+export function tempoFadeSeconds(ticks: number, from: number, to: number): number | null {
+	const steps = tempoFadeSteps(ticks, from, to);
+	return steps === null ? null : steps.reduce((total, tempo) => total + driverTickSeconds(tempo), 0);
 }
 
 /**
