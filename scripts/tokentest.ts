@@ -171,9 +171,9 @@ console.log("\na comma form of t, v or w is its hex fade, and reads as one");
 {
 	// parser.ts:parseFadeableValue and parseTempo compile `w30,200` to exactly
 	// `$E1 $1E $C8`, so the panel and the hover have to say the same thing about
-	// both. This pins the naming and the parameter rows together, because the two
-	// used to disagree: `w30,200` was "global volume" over a duration row that
-	// called 0 ticks "0.00 s", where `$E1 $00` called it "instant".
+	// both. This pins the naming and the parameter rows together, so the two
+	// cannot disagree: `w30,200` is "global volume" and its duration row must call
+	// 0 ticks what `$E1 $00` calls it.
 	const CONTEXT = { tempo: 120, samples: [] };
 	const shapeOf = (body: string, needle: string) => {
 		const source = `#amk 4\n#0 ${body}\n`;
@@ -224,9 +224,9 @@ console.log("\na tempo fade is priced across the tempo it changes, not the one i
 {
 	// $E3 steps the tempo once per tick (main.asm:2461) and a tick's length is
 	// what the tempo *is*, so the elapsed time is the sum of every step's own
-	// tick. The row used to multiply the count by the starting tick — the one
-	// thing the command exists to change — and read t255,254 from t144 as 0.90 s
-	// against the driver's 0.67, or 2.42 against 1.02 from the driver's default.
+	// tick. Multiplying the count by the starting tick — the one thing the command
+	// exists to change — would read t255,254 from t144 as 0.90 s against the
+	// driver's 0.67, or 2.42 against 1.02 from the driver's default.
 	const naive = (ticks: number, tempo: number) => ticks * tickSeconds(tempo);
 
 	// The continuum the walk approximates, derived independently of it: ticks
@@ -249,7 +249,7 @@ console.log("\na tempo fade is priced across the tempo it changes, not the one i
 	// The driver's own default, t53, which is where the gap is widest.
 	const slow = tempoFadeSeconds(255, 53, 254) ?? 0;
 	check("out of the driver's default it is 1.02 s", near(slow, integral(255, 53, 254), 0.02), `${slow.toFixed(4)} s`);
-	check("not the 2.42 s the old reading gave", naive(255, 53) / slow > 2.3, `${naive(255, 53)} s`);
+	check("not the 2.42 s a starting-tempo reading gives", naive(255, 53) / slow > 2.3, `${naive(255, 53)} s`);
 
 	// A fade to the tempo already in force has nothing to account for, and one
 	// tick is over before the snap, so both come back to the plain reading.
@@ -384,7 +384,6 @@ console.log("\na fade over 0 ticks is dropped, not applied");
 	// :2785 and :2817 for $E8 and $DC, :3302 for $EA. The destination byte is read
 	// only where the counter *reaches* zero (main.asm:2464 for $E3), so `t0,200`
 	// stores a tempo the driver never looks at and the song carries on unchanged.
-	// The row used to call it instant, which is what a duration of 1 does.
 	const durationRow = (body: string, needle: string) => {
 		const source = `#amk 4\n#0 ${body}\n`;
 		const command = commandAt(tokenize(source).commands, source.indexOf(needle));
@@ -1012,7 +1011,7 @@ console.log("\n#instruments is scanned as a block, not as commands");
 	check("the first is a named file", index.instruments[0]?.sample.form === "file");
 	check("with its name unquoted", (index.instruments[0]?.sample as { name: string }).name === "kick.brr");
 	check("the second copies an instrument", index.instruments[1]?.sample.form === "copy");
-	// readInstrumentSample — @5's sample is $07, which is the whole point of the fix.
+	// readInstrumentSample — @5's sample is $07.
 	check("resolving @5 to SRCN $07", (index.instruments[1]?.sample as { srcn: number }).srcn === 0x07);
 	check("the third is noise", index.instruments[2]?.sample.form === "noise");
 	// readInstrumentSample — the high bit is what marks it noise.
@@ -1147,8 +1146,6 @@ console.log("\nknown divergences from AddmusicK, pinned on purpose");
 
 console.log("\na directive's bare-word argument is not music");
 {
-	// `#option smwvtable` used to colour as s, m, a global volume, a volume,
-	// two notes and a default length — the report that added directiveWord.
 	const source = "#amk 4\n#option smwvtable\n#0 w255 c4\n";
 	const { tokens } = tokenize(source);
 	const word = tokenAt(tokens, source.indexOf("smwvtable"));
@@ -1318,7 +1315,7 @@ console.log("\na command takes its arguments and stops");
 	// `scanHex` emits `hexArg` for any byte below $DA even with `hexLeft` at 0
 	// (tokens.ts), because a sample load's tuning byte has to read as one.
 	// So a byte standing after a full command looks exactly like an argument, and
-	// `gather` used to claim it. The parser does not: `parseHexCommand` reads
+	// `gather` must not claim it. The parser does not: `parseHexCommand` reads
 	// it as a standalone literal and reports AMK0151 under #amk. Two things go
 	// wrong if the scanner disagrees — the inspector draws a row for an argument
 	// that is not one, and `spliceArg` writes over a byte the command does not own.
@@ -1339,9 +1336,8 @@ console.log("\na command takes its arguments and stops");
 	check("an HFD upload still gathers its payload", upload?.args.length === 8, `got ${upload?.args.length}`);
 
 	// parseHexCommand / scanHex — $FA $FE's toggle byte takes a
-	// further byte when its high bit is set. `expectedArgs` did not fork here
-	// while `scanHex` did, which is exactly the disagreement this pair of
-	// statements exists to prevent.
+	// further byte when its high bit is set. `expectedArgs` and `scanHex` must
+	// fork here together.
 	const bits = tokenize("#amk 2\n#0 $FA $FE $81 $02 c4\n").commands.find((c) => c.vcmd === 0xfa);
 	check("$FA $FE takes a third byte when the high bit is set", bits?.args.length === 3, `got ${bits?.args.length}`);
 	check("and is complete with it", bits?.complete === true);

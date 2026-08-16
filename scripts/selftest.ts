@@ -406,22 +406,22 @@ console.log("\ndiagnostic spans point into the source the author wrote");
 	// the scanner runs. So the check is against the exact index instead.
 	//
 	// `%` is not valid MML; AMK0100 reports the character it choked on. Here it
-	// sits at 16, and the marker preprocessing removes is 7 characters — so
-	// before this mapping existed the span said 9, pointing at the `4` of `o4`.
+	// sits at 16, and the marker preprocessing removes is 7 characters — so an
+	// unmapped offset would say 9, pointing at the `4` of `o4`.
 	const source = "#amk 4\n#0 o4 c4 % d4\n";
 	const marked = spanOf(source, "AMK0100");
 	check("the #amk marker is accounted for", marked?.text === "%", JSON.stringify(marked));
 	check("the offset is exact", marked?.start === source.indexOf("%"), `${marked?.start} vs ${source.indexOf("%")}`);
 	check("and the line is right", marked?.line === 2, String(marked?.line));
 
-	// The more the preprocessor removes, the further the old spans drifted.
+	// The more the preprocessor removes, the further an unmapped offset drifts.
 	const heavy = "#amk 4\n#define A 1\n#define B 2\n; a comment line\n#0 o4 c4 % d4\n";
 	const drifted = spanOf(heavy, "AMK0100");
 	check("a heavily preprocessed song still lands", drifted?.text === "%", JSON.stringify(drifted));
 	check("exactly", drifted?.start === heavy.indexOf("%"), `${drifted?.start} vs ${heavy.indexOf("%")}`);
 
 	// Comments are stripped wholesale, so anything after one on the same line
-	// used to drift by the comment's length.
+	// would drift by the comment's length without the mapping.
 	const commented = spanOf("#amk 4\n#0 o4 ; a comment\nc4 % d4\n", "AMK0100");
 	check("stripped comments are accounted for", commented?.text === "%", JSON.stringify(commented));
 	check("on the line after the comment", commented?.line === 3, String(commented?.line));
@@ -469,11 +469,11 @@ console.log("\nARAM overflow is caught");
 	check("overflow rejected", !result.ok && result.diagnostics.some((d) => d.code === "AMK0300"));
 }
 
-console.log("\nparity fixes against AddmusicKsrc");
+console.log("\nparity against AddmusicKsrc");
 {
 	// Music.cpp:535 — `?1` and `?2` set `noMusic[][]`, which the reference never
-	// reads. Only `?` and `?0` stop the song looping. Before the digit was
-	// consumed, `?1` both killed the loop and left a stray `1` behind.
+	// reads. Only `?` and `?0` stop the song looping. The digit is consumed, so
+	// `?1` neither kills the loop nor leaves a stray `1`.
 	const bare = compile("#amk 4\n#0 ? o4 c4\n");
 	const zero = compile("#amk 4\n#0 ?0 o4 c4\n");
 	const one = compile("#amk 4\n#0 ?1 o4 c4\n");
@@ -1098,7 +1098,7 @@ console.log("\noptimizeSampleUsage");
 	const two = run("#amk 4\n#0 o4 @0 c4\n#1 o4 @1 c4\n");
 	check("two instruments keep two samples", kept(two) === 2, `${kept(two)} kept`);
 
-	// Importance no longer follows from having written a name out; it comes from
+	// Importance does not follow from having written a name out; it comes from
 	// the host, and the "importance comes from the host" section covers it.
 
 	// Nothing is important by default here, so an unplayed group member goes.
@@ -1204,9 +1204,8 @@ console.log("\nimportance comes from the host, not from the syntax");
 	check("an important bank slot is kept", names(slot)[7] === "zelda.bnk:07", names(slot)[7]);
 	check("an unimportant slot is emptied", names(slot)[8] === "EMPTY.brr", names(slot)[8]);
 
-	// Regression: the implicit `#default` fallback never goes through `pushSample`,
-	// so it briefly had no importance at all and reclaimed every important sample
-	// in any song that omitted `#samples` — which is most songs.
+	// The implicit `#default` fallback never goes through `pushSample`, so its
+	// importance is honoured separately — most songs omit `#samples`.
 	const implicitImportant = run("#amk 4\n#0 o4 @0 c4\n", [STOCK[9], STOCK[12]]);
 	check(
 		"the implicit #default fallback honours importance",

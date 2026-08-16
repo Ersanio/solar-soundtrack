@@ -78,9 +78,8 @@ interface HexEntry extends Described {
    * A name for the button, where `VCMD_NAMES`' is not one.
    *
    * It calls both `$EF` and `$F1` "echo parameters", which is true - they are
-   * two halves of one setting - and was serviceable while the byte was on the
-   * button to tell them apart. With the byte gone it leaves two identical
-   * buttons, so these two say which half they are instead.
+   * two halves of one setting - and on a button that does not show the byte
+   * leaves two identical labels, so these two say which half they are instead.
    */
   label?: string;
   /**

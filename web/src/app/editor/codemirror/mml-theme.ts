@@ -5,11 +5,10 @@ import { tags } from '@lezer/highlight';
 
 /**
  * The editor's look, entirely in terms of the theme variables in `styles.css`
- * so it cannot drift from the rest of the app. Structurally it reproduces the
- * `<textarea>` it replaced: 13px mono at `leading-relaxed`, `p-3` padding,
- * `bg-surface`/`text-ink`, no wrapping, and no focus outline of its own — the
- * caret carries focus, exactly as `focus:outline-none` did. The global
- * `:focus-visible` rule is untouched.
+ * so it cannot drift from the rest of the app: 13px mono at `leading-relaxed`,
+ * `p-3` padding, `bg-surface`/`text-ink`, no wrapping, and no focus outline of
+ * its own — the caret carries focus. The global `:focus-visible` rule is
+ * untouched.
  */
 const structure = EditorView.theme(
   {
@@ -86,8 +85,8 @@ const structure = EditorView.theme(
  * A hex command's argument bytes are the one tag that carries a colour of its
  * own rather than one already spent elsewhere. They are not `--color-accent`:
  * repeating the command byte's colour would flatten `$E7 $02` into one
- * undifferentiated blue run, and leaving them on `tags.number` — which is where
- * they were — made them indistinguishable from notes and body text.
+ * undifferentiated blue run, and on `tags.number` they would be
+ * indistinguishable from notes and body text.
  */
 const highlight = HighlightStyle.define([
   { tag: tags.comment, color: 'var(--color-ink-muted)', fontStyle: 'italic' },

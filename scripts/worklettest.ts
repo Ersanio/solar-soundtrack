@@ -3,8 +3,8 @@
  *
  * The audio thread is not a worker thread: an AudioWorkletGlobalScope exposes
  * only ECMAScript, `console`, and the AudioWorklet interfaces. No `fetch`, no
- * `setTimeout`, and — the one that actually bit — no `TextDecoder`, because
- * those are `[Exposed=(Window,Worker)]` and a worklet scope is neither.
+ * `setTimeout`, and no `TextDecoder`, because those are `[Exposed=(Window,Worker)]`
+ * and a worklet scope is neither.
  *
  * Node has all of them globally, so `audiotest` cannot catch a worklet reaching
  * for one; the failure only appears in a browser, as a dead play button. This

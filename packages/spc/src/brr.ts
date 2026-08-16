@@ -66,8 +66,7 @@ export function validateBrr(bytes: Uint8Array): string | null {
  * preprocessor gets to it first. A bare `#` starts a directive
  * (`preprocess.ts`), and `;` starts a comment that `stripComments` removes
  * without checking whether it is inside quotes — so either character would be
- * silently mangled in a `#samples` block. Neither was reachable while the
- * sample list was fixed at build time.
+ * silently mangled in a `#samples` block.
  */
 export function validateName(name: string): string | null {
 	if (name.trim().length === 0) {

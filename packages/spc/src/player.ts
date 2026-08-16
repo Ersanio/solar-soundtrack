@@ -46,7 +46,7 @@ export interface SongTiming {
  */
 const ID666_FADE = 0xac; // 5 digits, milliseconds
 
-/** The player allows a little headroom above unity, as the old backend did. */
+/** The player allows a little headroom above unity. */
 const MAX_VOLUME = 5;
 
 function readDigits(spc: Uint8Array, offset: number, length: number): number {

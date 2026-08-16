@@ -63,7 +63,6 @@ const ROW_HEIGHTS = [6, 9, 13] as const;
 /**
  * Tailwind v4 scans source text, so a class name has to be a complete literal —
  * `fill-ch-${n}` generates no CSS at all and every note renders unpainted.
- * `aram-bar.ts` learned this the same way.
  */
 const CHANNEL_FILL: readonly string[] = [
   'fill-ch-0',
@@ -117,12 +116,12 @@ interface StoredSettings {
 /**
  * The stored settings, field by field.
  *
- * Field by field and not a spread, which is what this used to be: a spread takes
- * whatever is in storage on trust, so a hand-edited `zoom: "big"` multiplies
- * every mark's x into `NaN` and blanks the roll, and `percussion: "yes"` would
- * be handed to `new Set` as a string of characters. The enumerated numbers are
- * checked against their own tables rather than by type, which is what makes
- * them safe rather than merely numeric.
+ * Field by field and not a spread: a spread takes whatever is in storage on
+ * trust, so a hand-edited `zoom: "big"` multiplies every mark's x into `NaN` and
+ * blanks the roll, and `percussion: "yes"` would be handed to `new Set` as a
+ * string of characters. The enumerated numbers are checked against their own
+ * tables rather than by type, which is what makes them safe rather than merely
+ * numeric.
  */
 function readSettings(): Settings {
   const settings: Settings = {
@@ -378,8 +377,8 @@ export class PianoRoll {
     // driver runs at most one tick per pass of its main loop, so a song that
     // asks for more than it can manage gets fewer — at `t254` on eight channels
     // about 231 of the 498 a second it wrote. Extrapolating at the tempo byte
-    // instead put the playhead a steady 59 ticks, most of a quarter note, ahead
-    // of the notes being sounded. `charttest` pins the difference.
+    // would put the playhead most of a quarter note ahead of what is sounding;
+    // `charttest` pins the difference.
     //
     // The tempo byte is still the fallback, for a song with no clock at all: it
     // is what the clock would predict anyway, minus the driver's shortfall.
@@ -493,9 +492,8 @@ export class PianoRoll {
   /**
    * Which row a note belongs on.
    *
-   * The placement itself is `placeOf`, which the fitted range is built from too
-   * — they were two implementations of the same precedence and had to agree, so
-   * now they are one. This only turns its answer into a row.
+   * The placement itself is `placeOf`, which the fitted range is built from too,
+   * so the two cannot disagree. This only turns its answer into a row.
    *
    * By instrument, not by note byte: every note played while a drum is loaded is
    * that drum being hit, so `@29 c d e` is three hits on one lane rather than
@@ -730,9 +728,8 @@ export class PianoRoll {
    *
    * What "stop following" has to start from, and the reason parking is done at
    * the two places that stop rather than in an effect watching the flag: an
-   * effect runs after the handler, so a wheel event that turned following off
-   * and panned in one go had its pan overwritten by the parking that followed
-   * it — the first notch of every scroll was swallowed.
+   * effect runs after the handler, so it would overwrite the pan of a wheel
+   * event that turned following off and panned in one go.
    */
   private currentTick(): number {
     return this.following() ? this.shownTick() : this.parkedTick();

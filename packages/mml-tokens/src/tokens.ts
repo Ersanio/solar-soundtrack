@@ -616,9 +616,9 @@ function stepInner(
 
 	// Music.cpp:433 — under `#am4`, an unfinished `$E6` met by anything that is
 	// not a hex byte is not unfinished at all: it is a one-byte Tremolo Off, and
-	// AddmusicK rewrites the emitted byte to `$FD` and clears `hexLeft`. Leaving
-	// the count standing made the next real command scan as `$E6`'s argument and
-	// disappear from the gathered list.
+	// AddmusicK rewrites the emitted byte to `$FD` and clears `hexLeft`. Left
+	// standing, the count makes the next real command scan as `$E6`'s argument
+	// and vanish from the gathered list.
 	if (state.hexLeft !== 0 && state.currentHex === 0xe6 && state.songTargetProgram === 1 && c !== "$") {
 		state.hexLeft = 0;
 		state.currentHex = 0;
@@ -1756,9 +1756,9 @@ function gather(tokens: GatherToken[], text: string, transitions: TargetTransiti
 				// below `$DA` even with `hexLeft` at 0 (see the comment there), so a
 				// `$00` standing after a full command is one — but it is not an
 				// argument: `parser.ts:parseHexCommand` reads such a byte as a standalone
-				// literal and reports it, as AMK0151 under `#amk`. Claiming it here
-				// made a one-argument command look like a two-argument one, gave the
-				// inspector a row to name, and pointed `spliceArg` at a byte the
+				// literal and reports it, as AMK0151 under `#amk`. Claimed here, it
+				// makes a one-argument command look like a two-argument one, gives the
+				// inspector a row to name, and points `spliceArg` at a byte the
 				// command does not own.
 				//
 				// Asked once per token because the answer changes as they arrive:
@@ -2020,9 +2020,9 @@ export function expectedArgs(vcmd: number, args: { value: number }[], target: Co
 	// Music.cpp:1807-1813 — `$FA $FE`'s hot patch takes one further byte for
 	// *every* trailing byte whose high bit is set, not only the first: `hexLeft++`
 	// runs again each time the chain reaches its end still set, which is what
-	// `scanHex` mirrors. Returning a flat 3 here made the two statements this
-	// module deliberately keeps disagree past the second link, so a longer chain
-	// lost its last byte and went `complete` early.
+	// `scanHex` mirrors. A flat 3 here would make the two statements this module
+	// deliberately keeps disagree past the second link: a longer chain loses its
+	// last byte and goes `complete` early.
 	if (vcmd === 0xfa && args.length > 0 && args[0].value === 0xfe) {
 		let expected = base;
 		while (args.length >= expected && args[expected - 1].value >= 0x80) {

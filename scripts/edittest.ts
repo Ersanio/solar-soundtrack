@@ -51,12 +51,12 @@ function applied(source: string, edit: { span: { start: number; end: number }; t
 
 console.log("an argument is written in the radix its own command reads");
 {
-	// The bug this exists to stop: `q` and `n` are read with `getHex`, not
-	// `getInt` (`HEX_ARG_LETTERS`), so writing their argument as decimal is wrong
+	// Pins that `q` and `n` are read with `getHex`, not `getInt`
+	// (`HEX_ARG_LETTERS`), so writing their argument as decimal is wrong
 	// *silently* — a decimal string carries no hex letters to trip an error, it
 	// just means a different number. The assertion is a round trip through
 	// `tokenize`, because that is the only thing that can catch it: any
-	// assertion about the *text* would have agreed with the broken version.
+	// assertion about the *text* cannot tell the two apart.
 	const roundTrip = (letter: string, value: number): number => {
 		const source = `#0 ${letter}00\n`;
 		const command = tokenize(source).commands.find((c) => c.kind === letter);

@@ -119,11 +119,10 @@ export class BendCommand {
   /**
    * Whether the bend fits in the note it rides on, and what is lost if not.
    *
-   * The seconds beside the two sliders are honest arithmetic and were still
-   * misleading, because they are unconditional: the next key-on overwrites the
-   * slide state outright (`main.asm:465-466`), so a `$DD` that outlasts its note
-   * is simply cut off mid-slide and never reaches the target. That is the gap
-   * between what the panel said and what the song did.
+   * The seconds beside the two sliders are unconditional, and the song is not:
+   * the next key-on overwrites the slide state outright (`main.asm:465-466`), so
+   * a `$DD` that outlasts its note is simply cut off mid-slide and never reaches
+   * the target. This is what says so.
    */
   protected readonly reachability = computed(() => {
     if (!this.isPitchBend()) {

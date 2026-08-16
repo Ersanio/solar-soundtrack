@@ -103,6 +103,16 @@ comparison; there are no deliberate divergences left in the compiled output.
 rules would make it harder to diff against the C++ that is the only check on its faithfulness. It
 gets one ESLint rule, an import boundary. Prettier still runs.
 
+**Comments describe the code as it is, not as it was.** No "it used to", "this replaced", "which is
+where it was", "the bug this exists to fix", "before this existed". A comment that says "it was once
+X, and X was wrong because Y" has one useful sentence — the present-tense reason for the shape it has
+now — and the rest is history: state the reason and stop, or state Y as a plain counterfactual ("a
+spread would take whatever is in storage on trust"). Harness comments say what is pinned, not what
+once broke. This applies to the READMEs too. The git log holds what changed; a shape that was moved
+away from and is worth not proposing again goes in "Decisions already made" below, in the same
+change, and nowhere in the source. (`AUDIT.md`, the changelog and `.git-blame-ignore-revs` are
+records by genre and are outside this.)
+
 **Package boundaries are a lint rule.** npm links every workspace into `node_modules/@amk`, so
 TypeScript resolves a sibling package however the tsconfigs are written; `no-restricted-imports` in
 `eslint.config.js` is what actually holds the graph. Adding an edge means changing that rule
@@ -162,6 +172,43 @@ Write for **music porters, not developers**, and keep it to a short phrase namin
 "Sample browser & importer", not a sentence about how it works. How something is implemented never
 belongs here, however interesting. Refactors, internal work and small fixes get no entry at all. It
 is hand-written and must never be generated from commit subjects, which are not written for users.
+
+## Decisions already made
+
+Shapes this code has had and moved away from. Here rather than in comments so they are on record
+without sitting in the source — the code says what it is; this says what it is not going back to.
+One entry each: what it was, what it is, why.
+
+- **Anything seconds-denominated in the transport** — a shadow `elapsed` beside the tick playhead, a
+  `tickAtSeconds`, `canSeek` gated on a length in seconds (a song with a tempo fade or a repeated `t`
+  has none, and got a greyed-out bar) — is covered by "Ticks, not seconds" above.
+- **The m:ss readout from a two-piece intro/loop interpolation** over `stats.playback` — exact at the
+  section boundaries, drifting between them. The label reads the segment-table clock
+  (`song-clock.ts`, or the measurement); the interpolation is the fallback for a song the walk cannot
+  read.
+- **Clearing the clock measurement on recompile** — it takes a second to come back, so `AMK0503` and
+  the transport length flickered on every pause in typing. The last measurement stands until the next
+  lands (`EditorStore`, "replaced, never cleared").
+- **Extrapolating the roll's playhead at the tempo byte's rate** — the driver runs slower than asked,
+  so it sat most of a quarter note ahead. The clock's own slope (`ticksPerSecondAt`) is the rate;
+  `charttest` pins the difference.
+- **Re-deriving the roll's playhead from the newest anchor each frame** — every anchor arrives with
+  the same small lag, so one frame in ten lurched. It carries its position across frames and eases
+  the gap shut (`roll-layout.ts`).
+- **Parking the roll in an `effect` on the follow flag** — an effect runs after the handler and
+  overwrote a pan made in the same wheel gesture. Parking happens at the two call sites that stop
+  following.
+- **Template method calls per row** — the sample browser decoded 64 BRR samples on every
+  change-detection pass, ten times a second while playing. Panels build one `computed` view model;
+  the `no-call-expression` note in `eslint.config.js` says why lint cannot catch it.
+- **Muting by writing the driver's `$5E`** — a disabled channel does less work per tick, so a busy
+  song sped up. The mixer takes track volume and leaves `$5E` alone (`applyChannelMutes`).
+- **Auto-scaling the bend graph to the further end of the bend** — one semitone and two octaves drew
+  the same shape. The reach is a fixed octave, stepped by whole octaves.
+- **A tone slider in the FIR designer** over `designTone` — a worse route to the presets it
+  generates; `Warm`/`Dark`/`Bright` are its output.
+- **A 1024-frame render block in the worklet** — a tick counter that only looks every 1024 frames
+  drifts. 32 frames costs ~4% and keeps the count exact.
 
 ## Angular specifics
 

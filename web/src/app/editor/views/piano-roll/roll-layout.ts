@@ -235,12 +235,9 @@ export interface ClockStep {
  * the newest anchor, and that is the whole point. Anchors land ten times a
  * second and each arrives already slightly stale — mostly the time the message
  * spent getting here — so the gap between the display and the anchor stays
- * roughly *constant*. Re-deriving the position every frame therefore reproduced
- * that same gap ten times a second, and closing it in one frame made the
- * playhead lurch: measured on a `t48` song, one frame in ten ran at 2.4x speed
- * or stalled outright, spaced exactly 100 ms apart. Running at the driver's own
- * rate and easing the gap shut turns a periodic jolt into a constant offset
- * nobody can see.
+ * roughly *constant*. Re-deriving the position every frame would reproduce that
+ * gap ten times a second as a lurch; running at the driver's own rate and easing
+ * the gap shut turns a periodic jolt into a constant offset nobody can see.
  *
  * This is why interpolating over tempo does not break "ticks, not seconds": the
  * driver's own count steers it on every anchor, so the formula sets the velocity

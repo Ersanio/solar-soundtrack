@@ -39,11 +39,10 @@ declare function registerProcessor(
  * duration counter gets read.
  *
  * 1 ms, so `$70` is sampled at {@link TICK_POLL_HZ} — twice the driver's main
- * loop rate, which is what makes the tick count exact. This used to be 1024
- * frames to amortise the call overhead; measured against the vendored core,
- * dropping to 32 costs about 4% more emulator time and still runs 355x faster
- * than realtime on an eight-channel song, which is a cheap price for a playhead
- * that cannot drift.
+ * loop rate, which is what makes the tick count exact. Measured against the
+ * vendored core, 32 frames rather than 1024 costs about 4% more emulator time
+ * and still runs 355x faster than realtime on an eight-channel song — a cheap
+ * price for a playhead that cannot drift.
  */
 const SOURCE_BLOCK = SPC_SAMPLE_RATE / TICK_POLL_HZ;
 
@@ -238,8 +237,8 @@ class SpcProcessor extends AudioWorkletProcessor {
 		}
 
 		// What was actually rendered, not what was asked for. This is the wall
-		// clock the end-of-song fade runs on, and the two parted company as soon
-		// as the request stopped being denominated in seconds.
+		// clock the end-of-song fade runs on, and the request is in ticks, so the
+		// two are not the same number.
 		this.frames = Math.round((rendered / SPC_SAMPLE_RATE) * sampleRate);
 		this.endsAtTicks = this.durationTicks();
 		this.fadeFrom = -1;

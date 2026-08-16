@@ -71,9 +71,8 @@ BY_NAME.set(EMPTY_SAMPLE_NAME, emptySample(EMPTY_SAMPLE_NAME));
  * Resolves names to samples the way the app does, preserving positions.
  *
  * Dropping an unresolvable name would shift every later SRCN down and rewire the
- * directory — which is exactly the bug this helper was written with, and it made
- * a `$DA`-selected instrument play silence while an `@`-selected one survived by
- * happening to sit at index 0.
+ * directory: a `$DA`-selected instrument plays silence while an `@`-selected one
+ * survives by sitting at index 0.
  */
 function resolveSamples(names: readonly string[]): BrrSample[] {
 	return names.map((name) => BY_NAME.get(name) ?? emptySample(name));
@@ -234,7 +233,7 @@ console.log("\nmuting takes the volume and nothing else");
 	// channel makes the driver's main loop cheaper, and since the loop handles at
 	// most one music tick per pass, a song already at that ceiling *speeds up*
 	// when a channel is muted. A song muting its own channels through `$F4 $06`
-	// therefore also finds its bits untouched, which used to need care.
+	// therefore also finds its bits untouched.
 	const aram = new Uint8Array(0x10000);
 	const backup = createMuteBackup();
 
@@ -386,9 +385,7 @@ console.log("\na muted channel goes on carrying the song");
 	// If `t192` had gone with the channel the driver would fall back to its own
 	// tempo and the count would be out by a factor. It is not out at all: muting
 	// takes a volume and leaves the driver's workload alone, so the song runs at
-	// exactly the rate it does unmuted. This was 1% before `$5E` stopped being
-	// written, and the slack that allowed for it is what the next section is
-	// about.
+	// exactly the rate it does unmuted.
 	check(
 		"and it still sets the tempo it declares",
 		muted.ticks === open.ticks,
@@ -629,8 +626,7 @@ console.log("\noptimizeSampleUsage does not silence the song");
 		aramAddress: driver.manifest.localPos,
 		options: OPTIONS,
 	});
-	// Pins the hazard that made the check above fail while it was being written: a
-	// resolver that drops unresolvable names instead of holding their slots shifts
+	// Pins that a resolver holds a slot for an unresolvable name: dropping it shifts
 	// every later SRCN down, so the song plays the wrong samples. The two lists
 	// must be the same length and the kept sample must stay at its own index.
 	const holding = resolveSamples(hexSelected.sampleList ?? []);

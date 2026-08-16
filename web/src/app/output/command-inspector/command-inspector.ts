@@ -43,11 +43,10 @@ const VIEWS: Readonly<Record<number, string>> = {
 /**
  * Letter commands with a view of their own.
  *
- * Only `@`, `p` and `q` are left. The rest used to have a read-only readout each
- * — tempo in BPM, pan as a position, noise in hertz — and every one of those
- * readings now lives in `@amk/tokens/commands/letter-params.ts`, where the
- * parameter table both states it *and* lets it be edited. Two implementations of
- * the same sentence would only drift.
+ * Only `@`, `p` and `q`. Every other letter's reading — tempo in BPM, pan as a
+ * position, noise in hertz — lives in `@amk/tokens/commands/letter-params.ts`,
+ * where the parameter table both states it *and* lets it be edited; a second
+ * implementation of the same sentence would only drift.
  */
 const LETTER_VIEWS: Readonly<Record<string, string>> = {
   '@': 'instrument',

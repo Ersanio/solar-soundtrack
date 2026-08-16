@@ -15,8 +15,7 @@ faithful. The same argument covers the comments: roughly 100 of them cite a `Mus
 they are the port's audit trail rather than explanations of TypeScript.
 
 Prettier still runs. Formatting does not change what the code says, and the tabs/double-quotes/120
-profile is carried over from the pre-Angular prototype precisely so the port can be diffed against
-the C++.
+profile exists so the port can be diffed against the C++.
 
 **Read the cited lines before changing behaviour, and cite the lines you port.** Behaviour that
 looks strange is almost always strange in the original too — reproduce it and say so in a comment.

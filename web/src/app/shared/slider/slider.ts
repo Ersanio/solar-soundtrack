@@ -81,9 +81,8 @@ export class Slider {
    * **Compute it from the previewed value, not the committed one.** It is shown
    * throughout a gesture, so a label derived from the document would sit there
    * describing the value you started from — which is exactly the number you are
-   * dragging away from. It used to be hidden mid-drag for that reason; every
-   * caller now feeds it a `dragPreview`, so hiding it would only throw away the
-   * live reading.
+   * dragging away from. Every caller feeds it a `dragPreview`, so it stays up
+   * rather than hiding a live reading.
    */
   readonly valueLabel = input<string | null>(null);
 

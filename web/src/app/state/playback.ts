@@ -35,12 +35,10 @@ export class Playback {
    * The playhead in driver ticks, folded into one pass, and the moment it
    * arrived — refreshed about ten times a second.
    *
-   * The only playhead there is. It was once shadowed by an `elapsed` in seconds,
-   * kept in step by hand at five call sites, and seconds are the wrong thing to
-   * hold: they can only be *derived* from a tick, through a clock that is a
-   * prediction until the song has been measured. Holding ticks and converting
-   * for the label means the transport never stores a number the song could
-   * disagree with.
+   * The only playhead there is, and it is in ticks: seconds can only be
+   * *derived* from a tick, through a clock that is a prediction until the song
+   * has been measured, so holding ticks and converting for the label means the
+   * transport never stores a number the song could disagree with.
    *
    * `at` is here because ten updates a second is not enough to scroll anything
    * smoothly: a view drawing at frame rate interpolates between two of these and
@@ -102,10 +100,8 @@ export class Playback {
    *
    * From `stats` rather than from a clock, and this is the figure the transport
    * is built on: ticks are known for every song that compiles, where seconds are
-   * not. A tempo fade costs the compiler its seconds and none of its ticks
-   * (`parser.ts:1705`), so a length in seconds is a thing the transport can be
-   * left without — as it once was, which is how these songs came to have a seek
-   * bar that was greyed out.
+   * not — a tempo fade costs the compiler its seconds and none of its ticks
+   * (`parser.ts:1705`).
    */
   readonly durationTicks = computed(() => {
     const stats = this.editor.result()?.stats;
@@ -389,10 +385,9 @@ export class Playback {
    * The playhead itself is counted off the driver and is exact; this only puts a
    * clock face on it. The clock's segment table follows every tempo the song
    * sets, a fade included, so the readout is right in the middle of a section
-   * and not only at its edges — where the two-piece intro/loop interpolation
-   * this replaced was exact at the boundaries and drifting in between.
-   *
-   * The fallback keeps that old split, for a song the walk could not read.
+   * and not only at its edges. The fallback is a two-piece intro/loop
+   * interpolation, exact only at the boundaries, for a song the walk could not
+   * read.
    */
   private secondsAt(songTicks: number): number {
     const clock = this.editor.clock();

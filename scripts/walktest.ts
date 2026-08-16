@@ -262,10 +262,9 @@ console.log("\nthe clock and the compiler agree about the songs the compiler can
 // ---------------------------------------------------------------------------
 {
 	// The clock is the only thing that can time a faded song, so nothing can
-	// check it against the compiler there. What *can* be checked is that
-	// replacing `stats.playback` with it does not quietly retime every other
-	// song in the editor — and where it does, that the size of the difference is
-	// named rather than discovered later.
+	// check it against the compiler there. What *can* be checked is that it
+	// retimes no ordinary song relative to `stats.playback` — and where it does,
+	// that the size of the difference is named rather than discovered later.
 	//
 	// This needs the compiler for `stats`, the walk for the ticks and the app for
 	// the arithmetic that makes them comparable, which is why it is here: no
@@ -441,7 +440,7 @@ console.log("\npercussion follows the channel it is written on");
 	// The walk must have no opinion about which of them is a drum. `@10` is one
 	// the roll calls percussion by default and `@11` is not, and nothing here
 	// may be able to tell them apart — the moment this list starts sorting them,
-	// a view preference has moved back into a package that states driver facts.
+	// a view preference has moved into a package that states driver facts.
 	const alike = build("#amk 4\n#0 @10 o4 c\n#1 @11 o4 c\n").timeline;
 	check(
 		"a drum and a melodic slot are listed alike",
@@ -549,8 +548,8 @@ console.log("\na channel longer than the song is reported, not drawn");
 		dead.map(text).join(" "),
 	);
 
-	// The roll must not also complain about it; that was moved out of `problems`
-	// so the same fact is not reported in two places with two different wordings.
+	// The roll must not also complain about it; it is not in `problems`, so the
+	// same fact is not reported in two places with two different wordings.
 	check("the walk keeps quiet about it", uneven.timeline.problems.length === 0, uneven.timeline.problems.join(" | "));
 
 	// Channels of equal length, and a song with only one, have nothing to say.
@@ -724,8 +723,7 @@ console.log("\nthe driver does not always run the song as fast as it is written"
 		`${(tempoShortfall(easy.measured) ?? 0).toFixed(4)}x`,
 	);
 
-	// Eight channels at t254 ask for 498 ticks a second and get about half. This
-	// is the case the transport used to count at half speed on.
+	// Eight channels at t254 ask for 498 ticks a second and get about half.
 	const hard = run(
 		"#amk 4\n" +
 			[0, 1, 2, 3, 4, 5, 6, 7].map((ch) => `#${ch} ${ch === 0 ? "t254 " : ""}@6 o4 [c16d16e16f16]16\n`).join(""),
