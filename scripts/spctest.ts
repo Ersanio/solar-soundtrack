@@ -34,8 +34,8 @@ const SONG = `#amk 4
 
 console.log("\nURL encoding");
 {
-	// Regression: encodeURIComponent escapes `@` to %40, which decodeURI does not
-	// undo, so the file never resolves and the SPA fallback returns index.html.
+	// encodeURIComponent escapes `@` to %40, which decodeURI does not undo, so the
+	// file never resolves and the SPA fallback returns index.html.
 	check(
 		"@ is left unescaped in path segments",
 		encodePathSegment("00 SMW @0.brr") === "00%20SMW%20@0.brr",
@@ -66,8 +66,8 @@ const driver = await loadDriver();
 
 console.log("\nmanifest.json still describes the shipped main.bin");
 {
-	// Nothing derives these from the image any more, so this is the only place a
-	// stale manifest is caught. Every address it states is checked against the
+	// Nothing derives these from the image, so this is the only place a stale
+	// manifest is caught. Every address it states is checked against the
 	// bytes it claims to describe: a regenerated main.bin that nobody re-measured
 	// fails here, rather than producing an .spc that assembles cleanly and plays
 	// the wrong memory.
@@ -369,8 +369,7 @@ console.log("\n#samples reaches the sample directory");
 console.log("\nthe budget says how many samples are really loaded");
 {
 	// "20 samples" for every possible song reads as "the default set is loaded"
-	// no matter what optimisation actually did, which is how a real bug in the
-	// importance fallback went unnoticed. The row has to distinguish the two.
+	// no matter what optimisation actually did. The row has to distinguish the two.
 	const byName = new Map(driver.samples.map((sample) => [sample.sampleName, sample]));
 	byName.set(EMPTY_SAMPLE_NAME, emptySample(EMPTY_SAMPLE_NAME));
 

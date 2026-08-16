@@ -23,11 +23,10 @@ const SAMPLE_FORMS: readonly EnumOption[] = [
 /**
  * One `#instruments` entry, editable.
  *
- * An entry is a sample and five bytes — ADSR1, ADSR2, GAIN, tuning, subtuning —
- * and until now the panel could only read them out. The five are the same three
- * envelope bytes `$ED` writes plus an 8.8 pitch multiplier, so the envelope goes
- * through the same tuner and the multiplier gets a slider that says what it does
- * in semitones.
+ * An entry is a sample and five bytes — ADSR1, ADSR2, GAIN, tuning, subtuning.
+ * The five are the same three envelope bytes `$ED` writes plus an 8.8 pitch
+ * multiplier, so the envelope goes through the same tuner and the multiplier
+ * gets a slider that says what it does in semitones.
  *
  * Every control splices its own token, so changing what a drum is sampled from
  * does not reset an envelope somebody tuned, and vice versa.

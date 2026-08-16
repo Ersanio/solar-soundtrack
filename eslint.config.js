@@ -71,8 +71,8 @@ module.exports = defineConfig([
       },
     },
     rules: {
-      // `any` was 'warn', but warnings never failed the build, so it was a
-      // valve that would have leaked silently. There are none in the tree.
+      // `error`, not `warn`: a warning never fails the build. There are none
+      // in the tree.
       '@typescript-eslint/no-explicit-any': 'error',
       '@typescript-eslint/no-empty-function': ['error', { allow: ['arrowFunctions'] }],
 
@@ -244,8 +244,7 @@ module.exports = defineConfig([
       // `button-has-type` cannot see through a component. Every `<button
       // amk-button>` already gets `type="button"` from Button's host binding
       // (shared/button/button.ts), so all twenty-four buttons the rule reports
-      // are false positives — the one that really was missing a type, a raw
-      // `<button>` in the changelog trigger, has since been fixed.
+      // are false positives.
 
       // Styling is Tailwind utility classes throughout; an inline style is a
       // theme variable that escaped styles.css. `[style.x.px]` bindings, which
@@ -253,8 +252,8 @@ module.exports = defineConfig([
       '@angular-eslint/template/no-inline-styles': ['error', { allowBindToStyle: true }],
 
       // `no-call-expression` would be the rule that catches work done per row
-      // per change-detection pass — the sample browser's decode-the-whole-
-      // library bug was exactly its target. It cannot be used here: it matches
+      // per change-detection pass — a method that decodes the whole sample
+      // library on every pass, say. It cannot be used here: it matches
       // every `Call` node in a template, and in a signals codebase every read
       // is one. It reports 405 problems, and the first is `splitCss()` in
       // app.html. Its `allowList`/`allowPrefix` options match on the callee's

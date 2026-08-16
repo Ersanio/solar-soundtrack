@@ -706,7 +706,7 @@ export class AddmusicKParser {
 	 * `?1` and `?2` set AMK's `noMusic[channel][]`, which is written at
 	 * Music.cpp:543-544 and read nowhere in the reference, so they are consumed
 	 * and discarded. Consuming the digit matters either way: without it `?1`
-	 * both stopped the song looping and left the `1` to be reported as a stray
+	 * both stops the song looping and leaves the `1` reported as a stray
 	 * character.
 	 */
 	private parseQMark(): void {
@@ -3085,7 +3085,7 @@ export class AddmusicKParser {
 
 			// Music.cpp:1964 — `hexLeft == 1` is the sample number. `hexLeft == 0`
 			// is the pitch multiplier that follows it, so recording usage there
-			// marked the wrong sample entirely.
+			// would mark the wrong sample.
 			if (this.hexLeft === 1 && this.currentHex === 0xf3) {
 				this.noteSampleUse(i);
 			}
@@ -3527,10 +3527,9 @@ export class AddmusicKParser {
 	/**
 	 * Records that the song plays a given sample directory slot.
 	 *
-	 * Previously this pushed a synthetic `#default[N]` string onto a name list,
-	 * in first-use order — which meant `stats.sampleNames` was neither filenames
-	 * nor in SRCN order, despite promising both. The set of slots and the ordered
-	 * list of names are two different things, so they are two fields now.
+	 * The set of slots and the ordered list of names are two different things,
+	 * so they are two fields: `stats.sampleNames` is filenames in SRCN order and
+	 * nothing else.
 	 */
 	private noteSampleUse(srcn: number): void {
 		if (srcn >= 0 && srcn < this.usedSamples.length) {
@@ -3611,10 +3610,9 @@ export class AddmusicKParser {
 	 * The buffer is not the text the author wrote: preprocessing removed the
 	 * `#amk` marker, every `#define`/`#if` line, the untaken side of a false
 	 * branch and all comments, and replacement expansion has rewritten parts of
-	 * what is left. Reporting raw buffer offsets meant every diagnostic in a
-	 * song beginning `#amk 4` pointed six characters early, and further adrift
-	 * the more the preprocessor had removed. {@link origins} is what makes them
-	 * land.
+	 * what is left. A raw buffer offset is wrong by however much was removed —
+	 * six characters in a song beginning `#amk 4`; {@link origins} is what makes
+	 * a diagnostic land.
 	 *
 	 * The line is counted in the source too, so it agrees with the offset rather
 	 * than with the buffer.

@@ -74,10 +74,9 @@ export type FromWorklet =
 			/**
 			 * Emulated time since the song was loaded, which a loop runs past.
 			 *
-			 * The page stopped reading this when the transport went over to ticks;
-			 * `worklettest` is what reads it now, to check that the wall clock keeps
-			 * step with the frames rendered. Kept because it is the only honest
-			 * measure of that, and the audio thread is the only place it exists.
+			 * Read by `worklettest` and by nothing in the app, to check that the wall
+			 * clock keeps step with the frames rendered — the only honest measure of
+			 * that, and the audio thread is the only place it exists.
 			 */
 			seconds: number;
 			/**

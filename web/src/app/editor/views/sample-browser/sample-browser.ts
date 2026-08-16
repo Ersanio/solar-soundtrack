@@ -60,12 +60,11 @@ export class SampleBrowser {
   /**
    * One view model per row, with everything the template draws already resolved.
    *
-   * The template used to call ten methods per row instead, and `slots()` among
-   * them reached `SampleStore.bankSlots`. With a bank expanded that decoded up
-   * to 64 BRR samples and rebuilt 64 SVG paths on *every* change-detection
-   * pass — and the transport pushes a new position ten times a second while a
-   * song plays, so it never stopped. As a `computed` the work happens when the
-   * library, the compile result or the open set actually changes.
+   * A `computed` rather than methods the template calls per row: a method runs
+   * on *every* change-detection pass, ten times a second while a song plays,
+   * and `SampleStore.bankSlots` alone decodes up to 64 BRR samples for an
+   * expanded bank. Here the work happens when the library, the compile result or
+   * the open set actually changes.
    *
    * A row's waveform is built only if it will be drawn, which is why `waveform`
    * is empty for anything unreadable or absent from the song.

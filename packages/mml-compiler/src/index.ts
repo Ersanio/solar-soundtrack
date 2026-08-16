@@ -156,7 +156,7 @@ export class AddmusicKCompiler {
  * `CompileRequest.options` is `Record<string, unknown>` and documented as
  * "unknown keys must be ignored", so this validates rather than casts: a host
  * that passes nothing, or passes the wrong shape, gets `undefined` and the
- * compiler behaves as it did before options existed.
+ * compiler behaves as if no options were given.
  */
 function readOptions(options: CompileRequest["options"]): AddmusicKOptions | undefined {
 	if (!options) {

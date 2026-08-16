@@ -7,15 +7,13 @@
  * approaches the loop rate it simply drops ticks — measurably 0.8% on eight busy
  * channels at an ordinary tempo, and **more than half** at `t254`, where 498
  * ticks a second are asked for and around 230 arrive. A transport built on the
- * prediction then counts at less than half speed, which is the bug this exists
- * to fix.
+ * prediction would count at less than half speed.
  *
  * No formula can answer it. The shortfall is a function of how much work each
  * tick costs, which varies with the number of live channels, the commands they
- * carry, and the passage being played — on the song that prompted this the
- * opening measures at 1.86x where the whole pass is 2.15x, so even sampling the
- * beginning is not enough. The only honest answer is to play the song and watch,
- * which is what this does.
+ * carry, and the passage being played — one song's opening measures run at 1.86x
+ * where its whole pass is 2.15x, so sampling the beginning is not enough. The
+ * only honest answer is to play the song and watch, which is what this does.
  *
  * The result is a {@link SongClock}, the same shape `songClock` predicts, so
  * everything downstream reads one through the other without knowing which it

@@ -44,12 +44,10 @@ export class BendGraph {
    * Semitones from the written note to the top of the plot.
    *
    * Fixed at an octave, and stepped up by whole octaves only when a bend
-   * genuinely goes further. It used to scale to whichever end was further out,
-   * which kept every bend filling the plot and made the picture say nothing:
-   * one semitone and two octaves drew the identical shape, sliding the control
-   * never moved the line, and crossing zero flipped it end for end. Now the
-   * written note stays on the centre line and the ramp moves against it, which
-   * is the only way the height means anything.
+   * genuinely goes further, so the written note stays on the centre line and the
+   * ramp moves against it — the only way the height means anything. Scaling to
+   * whichever end is further out would draw one semitone and two octaves as the
+   * identical shape.
    */
   private readonly reach = computed(() => {
     const furthest = Math.max(Math.abs(this.from()), Math.abs(this.to()));

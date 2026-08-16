@@ -35,8 +35,8 @@
         <span class="text-ink font-mono text-[11px] tabular-nums">{{ notes().length }}</span>
       </div>
 
-      <!-- Aligned to the top, not the bottom: the row is now a label, a track
-           and a line of prose, and buttons hung off its bottom edge read as
+      <!-- Aligned to the top, not the bottom: the row is a label, a track and
+           a line of prose, and buttons hung off its bottom edge read as
            belonging to the interval text rather than to the note. -->
       @for (note of notes(); track note.index) {
         <div class="flex items-start gap-1.5">

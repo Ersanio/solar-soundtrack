@@ -40,10 +40,8 @@ const MERGE_HZ = 500;
  * from FIRcon, and the raw coefficients for anyone who wants them. They all read
  * and write one signal, so no two of them can disagree about what the filter is.
  *
- * There was a fourth — a tone slider over `designTone` — and it went
- * because it was a worse way to reach the presets it generates. `Warm`, `Dark`
- * and `Bright` are still that function's output, so the tilt it designs is
- * reachable in one click rather than by finding a slider position.
+ * `Warm`, `Dark` and `Bright` are `designTone`'s output, so the tilt it designs
+ * is one click away and needs no slider of its own.
  *
  * The taps come from the `$F5` under the caret and go back to the same place.
  * Committing them recompiles, and because the player already reloads a
@@ -80,9 +78,8 @@ export class FirDesigner {
   /**
    * The eight as the fields are showing them, per keystroke.
    *
-   * A coefficient field commits on blur, which left the curve describing the
-   * filter you were replacing for the whole time you were replacing it. These
-   * feed the plot and every reading beside it, so the response, the corner, the
+   * A coefficient field commits on blur, and the plot must not wait for that:
+   * these feed it and every reading beside it, so the response, the corner, the
    * tilt and the headroom warning all answer for what is typed.
    *
    * They deliberately do **not** feed the `[value]` binding on the inputs

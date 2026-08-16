@@ -8,8 +8,8 @@ import { join } from "node:path";
 
 /**
  * `packages/spc/assets` — the driver bundle and the emulator — whatever directory
- * the harness was bundled into. Import this rather than restating it: three
- * harnesses used to keep their own copy, and the path has now moved once.
+ * the harness was bundled into. Import this rather than restating it, so the path
+ * is stated once.
  */
 export const SPC_ASSETS = join(import.meta.dirname, "..", "packages", "spc", "assets");
 
@@ -28,9 +28,8 @@ export function check(name: string, condition: boolean, detail = ""): void {
 /**
  * Print the tally and exit. Call it last.
  *
- * The wording is fixed here because it used to differ: six harnesses said "all
- * checks passed" and four said "All FIR tests passed." and friends, which made
- * one suite look like two.
+ * The wording is fixed here so every harness prints the same tally and the suite
+ * reads as one.
  */
 export function summarise(): never {
 	console.log(`\n${failures === 0 ? "all checks passed" : `${failures} check(s) failed`}\n`);

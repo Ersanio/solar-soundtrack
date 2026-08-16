@@ -68,7 +68,7 @@ export type Place = 'drum' | 'noise' | 'key' | 'none';
 
 /**
  * The precedence, stated once so the lanes and the fitted range cannot disagree
- * about the same note — they used to be two implementations of this.
+ * about the same note.
  *
  * The porter's set comes first: if they have called a noise instrument
  * percussion, that is what they meant.

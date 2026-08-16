@@ -40,8 +40,8 @@ export function paramContext(
  * Why one argument cannot be edited, or `null` when it can.
  *
  * A fragment, meant to follow the argument's own name: "Depth comes from the
- * …". Four panels stated this for themselves and three of them said it
- * differently, which read as three different rules rather than one.
+ * …". Worded once here so the panels that show it cannot state one rule three
+ * ways.
  */
 export function argLockedBecause(command: Command, index: number): string | null {
   const macro = index >= 0 ? command.args[index]?.replacement : undefined;

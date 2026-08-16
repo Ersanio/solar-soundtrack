@@ -3,13 +3,11 @@
  * bar, the plot space, `clamp`, the piano roll's lanes, mark window, grid and
  * playhead clock, its percussion set, and the transport's tick-to-seconds clock.
  *
- * The ARAM bar is the oldest of them and the reason this file exists. It spans
- * all 64 KiB, so real regions are routinely a fraction of a
- * percent of it and land on sub-pixel widths. That arithmetic has already gone
- * wrong once — subtracting the inter-segment gap from each segment silently
- * zeroed anything narrower than the gap, so a small song vanished from the bar
- * entirely — and it is awkward to eyeball in a browser. So it lives in a pure
- * function and is checked here.
+ * The ARAM bar spans all 64 KiB, so real regions are routinely a fraction of a
+ * percent of it and land on sub-pixel widths — subtracting the inter-segment gap
+ * from each segment would zero anything narrower than the gap — and that is
+ * awkward to eyeball in a browser. So it lives in a pure function and is checked
+ * here.
  *
  *   npm run charttest
  */
@@ -253,15 +251,14 @@ console.log("\npiano roll window and grid");
 
 console.log("\nthe playhead's own clock");
 {
-	const RATE = 95.7; // t48, the tempo the stutter was found on
+	const RATE = 95.7; // t48
 	const FRAME = 1 / 60;
 	const PASS = 12312;
 
-	// The bug this exists to prevent. Every anchor arrives with about the same
-	// small lag, so a clock that re-derived its position from the newest one
-	// reproduced that lag ten times a second and jerked to close it: measured at
-	// 2.4x speed on one frame in ten, exactly 100 ms apart. Run the real thing
-	// against a steadily-lagging anchor and no frame may be far off the median.
+	// Every anchor arrives with about the same small lag, so a clock that
+	// re-derived its position from the newest one would reproduce that lag ten
+	// times a second and jerk to close it. Run the real thing against a
+	// steadily-lagging anchor and no frame may be far off the median.
 	{
 		const LAG = 8; // ticks, roughly what a postMessage costs at this tempo
 		let shown = 0;
@@ -526,8 +523,7 @@ console.log("\nthe transport's clock, over songs the compiler will not time");
 	check("a fade into a stop stops too", songClock(song(384, [fade(0, 255, 96)]))!.stalled);
 
 	// `null` and not a zero-length clock: the callers read it as "no opinion, use
-	// what the compiler said", and a song of no length would disable seeking all
-	// over again — which is the bug this whole change is about.
+	// what the compiler said", and a song of no length would disable seeking.
 	check("no walk, no clock", songClock(null) === null);
 	check("nor for a song of no ticks", songClock(song(0)) === null);
 	check("nor for a walk that ran out of budget", songClock(song(192, [], true)) === null);
@@ -582,14 +578,13 @@ console.log("\nthe roll's playhead follows the music, not the tempo it was writt
 		return worst;
 	};
 
-	// A song the driver keeps up with never had a problem, and must not gain one.
 	check(
 		"an ordinary song tracks within a couple of ticks",
 		drift(105.5, 105.5) < 3,
 		`${drift(105.5, 105.5).toFixed(1)}`,
 	);
 
-	// 231.2 measured against 498.0 nominal, on the song that prompted this.
+	// 231.2 measured against 498.0 nominal.
 	const nominal = drift(231.2, 498.0);
 	const measured = drift(231.2, 231.2);
 	check("the tempo byte puts it more than a quarter note out", nominal > 48, `${nominal.toFixed(1)} ticks`);

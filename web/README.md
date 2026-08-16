@@ -142,9 +142,7 @@ otherwise app-specific — `charttest` and `walktest` both drive it directly.
 It exists because **the compiler will not time some perfectly ordinary songs**, and is right not to.
 `estimateSeconds` is segment-wise over source text, so a `t` that runs more than once has no place in
 it and a tempo fade has no segment at all; AddmusicK gives up on the song's whole length either way
-(`Music.cpp:809`), and this port reproduces that faithfully. What used to follow was that
-`stats.playback` was `null`, the transport's length in seconds was 0, and `canSeek` — the single gate
-on seeking and on scrubbing the roll — was gated on that length rather than on ticks, so it was false. Those songs could be played and nothing else.
+(`Music.cpp:809`), and this port reproduces that faithfully, so `stats.playback` is `null` for them.
 
 So `durationSeconds` and `secondsAt` read the clock and fall back to `stats.playback` only when there
 is no walk to read. `durationTicks` needs neither: ticks are known for every song that compiles, and
@@ -162,14 +160,13 @@ for, four channels reach 81%, eight reach 50%, and a real eight-channel `t254` s
 Even eight channels at `t100` lose 8%. The `~0.8%` figure in `packages/spc/README.md` is an
 ordinary-tempo one.
 
-Every seconds figure is `ticks × the tempo the song asked for`, so on such a song the transport
-counted at 46% of wall speed — the timer visibly failing to tick once per second — and called a
-32-second pass 15 seconds long.
+Every predicted seconds figure is `ticks × the tempo the song asked for`, so on such a song it is
+out by the whole shortfall — a 32-second pass called 15 seconds long.
 
 Nothing can compute the shortfall. It is a function of how much work each tick costs, which varies
-with the live channels, the commands they carry and the passage being played: on the song that
-prompted this the opening measures 1.86x where the whole pass is 2.15x, so even sampling the start is
-wrong by 13%. So `measure-clock.ts` plays the song instead, silently, and records when each tick
+with the live channels, the commands they carry and the passage being played: one song's opening
+measures run at 1.86x where its whole pass is 2.15x, so even sampling the start is wrong by 13%. So
+`measure-clock.ts` plays the song instead, silently, and records when each tick
 actually arrived. It produces a `SongClock` — the same shape `songClock` predicts — and everything
 downstream reads one through the other without knowing which it has.
 
@@ -188,13 +185,11 @@ misbehaves on playback.
 **Nothing that follows the music is denominated in seconds**, the seek bar included: its `min`, `max`
 and `value` are driver ticks, `Playback.position` and `scrubbing` are ticks, `player.seek` and the
 worklet take the tick itself, and the m:ss beside the bar is a label `secondsAt` derives from the
-tick under the thumb. `Playback` holds one playhead, `songTicks`, where it used to hold that and a
-shadow copy in seconds kept in step by hand at five call sites.
+tick under the thumb. `Playback` holds one playhead, `songTicks`.
 
 That is why the conversion runs one way only. `secondsAtTick` has no inverse: seconds are produced
 for a label and never consumed, so no position ever has to survive a round trip through a clock that
-is a prediction until the song has been measured. An inverse existed while the bar was in seconds,
-and every call to it was a place a tick could come back a different tick.
+is a prediction until the song has been measured.
 
 Two things stay in seconds because they genuinely are wall-clock, not because they were missed: the
 fade past the end of the song — the driver has stopped reading music data by then, so there are no
@@ -218,10 +213,9 @@ nothing beneath reads. That is why the roll can run at 240 Hz without the note l
 The playhead **carries its position across frames** rather than deriving it from the newest anchor,
 and `advanceTick` in `roll-layout.ts` is where that lives. It matters: every anchor arrives with
 about the same small lag — mostly the time the message spent getting here — so a clock that
-re-derived its position each frame reproduced that lag ten times a second and jerked to close it.
-Measured on a `t48` song, one frame in ten ran at 2.4× speed or stalled outright, spaced exactly
-100 ms apart, and the roll visibly stuttered. Running at the driver's rate and easing the gap shut
-turns a periodic jolt into a constant offset nobody can see. `charttest` pins it.
+re-derived its position each frame would reproduce that lag ten times a second and jerk to close
+it. Running at the driver's rate and easing the gap shut turns a periodic jolt into a constant
+offset nobody can see. `charttest` pins it.
 
 Interpolating over tempo is what the root `CLAUDE.md` warns against, so read the comment before
 "fixing" it. The rule forbids a playhead _built on_ the formula, because the driver drops ticks and a
@@ -237,8 +231,8 @@ therefore races between anchors and settles a steady distance ahead of the notes
 59 ticks on the `t254` song, most of a quarter note, scrolling perfectly smoothly the whole time.
 `ticksPerSecondAt` reads the measured clock's own slope instead, which is what the driver really did.
 `charttest` pins both halves: that the tempo byte puts it more than a quarter note out and that the
-clock's rate holds it inside a 32nd. In the browser the roll now leads the transport's anchor by
-about 12 ticks at `t254`, which is that anchor's own staleness and nothing more.
+clock's rate holds it inside a 32nd. In the browser the roll leads the transport's anchor by about
+12 ticks at `t254`, which is that anchor's own staleness and nothing more.
 
 The `ticks/s` in the roll's readout says the same thing: it shows `231.9 of 498.0 ticks/s` when the
 two part company by more than a twentieth, and the plain figure when they agree.
@@ -263,8 +257,8 @@ falls back to the pitch the driver's own percussion table gives that drum, so it
 than vanishing.
 
 `placeOf` is the one statement of the precedence — percussion, then noise, then the keyboard. The
-lanes and the fitted range are both built from it because they used to be two implementations of it
-and had to agree. `song-walk.ts` has no opinion on any of this by design.
+lanes and the fitted range are both built from it, so they cannot disagree. `song-walk.ts` has no
+opinion on any of this by design.
 
 A channel longer than the song is **not** the roll's business, even though the walk is what notices
 it — that goes to the diagnostics list as `AMK0502` and to the editor as a wavy underline on the

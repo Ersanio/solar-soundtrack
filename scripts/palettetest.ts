@@ -187,10 +187,9 @@ console.log("\ncatalogue");
 	const unused = GLYPH_NAMES.filter((glyph) => !entries.some((entry) => entry.icon === glyph));
 	check("every glyph is used by an entry", unused.length === 0, unused.join(", "));
 
-	// Two buttons that say the same thing. Tolerable while the byte was on the
-	// face — `VCMD_NAMES` calls both `$EF` and `$F1` "echo parameters" and the
-	// chip told them apart — and not tolerable now the face is an icon and the
-	// name is all a search result has.
+	// Two buttons that say the same thing. The face is an icon and the name is all
+	// a search result has, so no two entries may share a label — `VCMD_NAMES`
+	// calls both `$EF` and `$F1` "echo parameters".
 	const seen = new Map<string, string>();
 	const collisions: string[] = [];
 	for (const entry of entries) {

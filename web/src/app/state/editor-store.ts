@@ -233,12 +233,10 @@ export class EditorStore {
   /**
    * The last thing the emulator observed about this song.
    *
-   * **Replaced, never cleared.** It was cleared on every recompile once, on the
-   * reasoning that a measurement belongs to the bytes it was taken from — but
-   * compiling happens 150 ms after a keystroke and measuring a second after
-   * that, so the whole of it was thrown away and not yet replaced for as long as
-   * anyone kept typing. `AMK0503` blinked out and back on every pause, and the
-   * transport's length flicked between the measurement and the prediction.
+   * **Replaced, never cleared.** Compiling happens 150 ms after a keystroke and
+   * measuring a second after that, so clearing this on recompile would leave the
+   * song unmeasured for as long as anyone kept typing, with `AMK0503` and the
+   * transport's length flicking on every pause.
    *
    * What it measures is how far the driver falls behind the tempo the song
    * asked for, and that is a property of the song's *texture* — how many
@@ -253,9 +251,8 @@ export class EditorStore {
    *
    * The prediction prices every tick at the tempo the song asked for, and the
    * driver does not always manage it — at `t254` on eight channels it runs at
-   * under half the requested rate, which made the transport count at under half
-   * speed. `measure-clock.ts` says why no formula can fix that and the emulator
-   * has to be watched instead.
+   * under half the requested rate. `measure-clock.ts` says why no formula can
+   * fix that and the emulator has to be watched instead.
    *
    * The prediction stands only until the first measurement lands, and after that
    * the previous measurement stands rather than the prediction: an edit moves

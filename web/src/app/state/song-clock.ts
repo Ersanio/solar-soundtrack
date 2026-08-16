@@ -1,20 +1,18 @@
 /**
- * Ticks to seconds and back, for a song the compiler could not put a clock on.
+ * Ticks to seconds, for a song the compiler could not put a clock on.
  *
  * `estimateSeconds` (`parser.ts:3459`) is segment-wise over source text, so two
  * ordinary things defeat it: a `t` that runs more than once has no place in the
  * list (`parser.ts:1692`), and a tempo fade has no segment at all
  * (`parser.ts:1705`, porting `Music.cpp:809`). Either one makes it abandon the
- * song's length outright, which used to leave the transport reading `0:00` and,
- * because seeking was gated on that length, disabled.
+ * song's length outright.
  *
- * Both halves of the answer already existed and could not meet. `@amk/spc`'s
- * walk records every tempo command on the tick the driver runs it, and
- * `@amk/tokens`' `tempoFadeSteps` is the driver's own per-tick model of a fade —
- * but `@amk/spc` may not reach `@amk/tokens` and `@amk/tokens` may not reach
- * `@amk/spc/song-walk` (`eslint.config.js`'s `SPC_BEYOND_THE_MATHS`). The app is
- * the only place the two can be put together, so the join lives here rather than
- * in either package. Nothing about it is app-specific otherwise.
+ * `@amk/spc`'s walk records every tempo command on the tick the driver runs it,
+ * and `@amk/tokens`' `tempoFadeSteps` is the driver's own per-tick model of a
+ * fade — but `@amk/spc` may not reach `@amk/tokens` and `@amk/tokens` may not
+ * reach `@amk/spc/song-walk` (`eslint.config.js`'s `SPC_BEYOND_THE_MATHS`). The
+ * app is the only place the two can be put together, so the join lives here
+ * rather than in either package. Nothing about it is app-specific otherwise.
  *
  * This maps **one pass**, as the walk does. A song that sets `t` only inside its
  * loop re-enters on pass two at the tempo standing at the end of pass one, which
@@ -74,8 +72,8 @@ const MAX_SEGMENTS = 100_000;
  * `null` rather than a zero-length clock, and the callers lean on the
  * difference: it means "no opinion, use whatever the compiler said", where a
  * clock reading 0 everywhere would be a song of no length and would disable
- * seeking all over again. A truncated walk qualifies because its tick count is a
- * floor and not the answer.
+ * seeking. A truncated walk qualifies because its tick count is a floor and not
+ * the answer.
  */
 export function songClock(timeline: SongTimeline | null): SongClock | null {
   if (!timeline || timeline.ticks <= 0 || timeline.truncated) {
@@ -188,9 +186,7 @@ export function songClock(timeline: SongTimeline | null): SongClock | null {
  *
  * One direction only, and that is the point: ticks are what the transport, the
  * roll and the emulator all hold, so seconds are produced for a label and never
- * consumed. An inverse existed while the seek bar was denominated in seconds,
- * and every use of it was a place a position had to survive a round trip through
- * a clock that is a prediction until the song has been measured.
+ * consumed.
  */
 export function secondsAtTick(clock: SongClock, tick: number): number {
   const at = clamp(tick, 0, clock.ticks);

@@ -83,9 +83,9 @@ export class SourceView {
   readonly activate = output<void>();
 
   /**
-   * Off by default, matching the editor's prior behaviour. A `Compartment`
-   * rather than a plain extension: word wrap has to flip without tearing down
-   * the view, which would lose undo history, scroll position and selection.
+   * Off by default. A `Compartment` rather than a plain extension: word wrap
+   * has to flip without tearing down the view, which would lose undo history,
+   * scroll position and selection.
    */
   protected readonly wordWrap = signal(false);
   private readonly wrapCompartment = new Compartment();
@@ -127,7 +127,7 @@ export class SourceView {
               },
             },
             // Tab inserts; Shift-Tab stays unbound so keyboard focus can
-            // escape backwards, exactly as the textarea behaved.
+            // escape backwards.
             { key: 'Tab', run: insertTab },
             ...defaultKeymap,
             ...historyKeymap,
@@ -174,8 +174,7 @@ export class SourceView {
     //
     // The work happens after the next render rather than here: revealing a span
     // while another tab is open first has to make the editor visible, and
-    // focusing or measuring a `display: none` view is a no-op. afterNextRender
-    // is the render barrier the old viewChild dependency used to provide.
+    // focusing or measuring a `display: none` view is a no-op.
     effect(() => {
       const span = this.store.reveal();
       if (!span) {
@@ -194,9 +193,9 @@ export class SourceView {
 
     // Sanctioned effect: the same imperative-view job as `reveal` above, for a
     // panel that changes text rather than selecting it. The dispatch maps the
-    // selection through the change, which is the caret preservation the old
-    // textarea code did by hand; the update listener then propagates the new
-    // document and caret back into the store.
+    // selection through the change, which is what preserves the caret; the
+    // update listener then propagates the new document and caret back into the
+    // store.
     effect(() => {
       const edit = this.store.replace();
       if (!edit) {

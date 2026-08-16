@@ -23,8 +23,7 @@ const VOICE_LABELS = ['0', '1', '2', '3', '4', '5', '6', '7'];
  * The default arm of the inspector, and the reason "an inspector for every
  * command" is a table rather than sixty components: a descriptor says what an
  * argument *means*, this renders the control that fits it, and a command nobody
- * has described yet still gets one editable row per argument instead of the
- * hex/decimal/binary dump that used to stand here.
+ * has described yet still gets one editable row per argument.
  *
  * Every edit goes through `spliceArg`, so it rewrites one token and leaves the
  * author's spacing — and any argument that came out of a macro alone.
@@ -104,8 +103,7 @@ export class ParamTable {
    * Writes one argument back.
    *
    * The value arrives in the control's units, so a signed descriptor converts on
-   * the way out; `argumentText` picks the radix, which is a per-command fact and
-   * not the two-way one this used to assume.
+   * the way out; `argumentText` picks the radix, which is a per-command fact.
    */
   protected commit(row: ParamRow, value: number): void {
     const command = this.command();
