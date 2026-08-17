@@ -134,8 +134,8 @@
             class="stroke-edge"
             stroke-width="1"
             [attr.x2]="width()"
-            [attr.y1]="lane.row * rowHeight()"
-            [attr.y2]="lane.row * rowHeight()"
+            [attr.y1]="(lane.row + 1) * rowHeight()"
+            [attr.y2]="(lane.row + 1) * rowHeight()"
           />
         }
       }
