@@ -467,6 +467,13 @@ console.log("\npercussion is a preference, not a rule");
 	// was stored and the default stands, `[]` means the porter turned everything
 	// off. Reading `[]` as "no opinion" would make that undo itself on reload.
 	check("an empty stored set is kept, not treated as absent", parsePercussion([])?.length === 0);
+	// The porter's answer for a custom instrument is worth as much as the one for
+	// `@21`, and costs more to give again: nothing here treats it differently.
+	check(
+		"a custom instrument is stored like any other",
+		parsePercussion([10, 29, 30, 200])?.join(",") === "10,29,30,200",
+		parsePercussion([10, 29, 30, 200])?.join(","),
+	);
 }
 
 console.log("\nthe transport's clock, over songs the compiler will not time");
