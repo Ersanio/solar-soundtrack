@@ -198,12 +198,21 @@ refresh rate and not the song's.
 
 ## The piano roll
 
-`editor/views/piano-roll/` draws whatever `@amk/spc/song-walk` says, and nothing else — the
-compiler's `noteMap` records the emitted byte and a note's own length but leaves it in source order,
-with no tick to draw it on and no instrument, volume or tempo to draw it under, so the roll is a view
-of a walk over the emitted bytes rather than of the compile. Rows are the
-**emitted note byte**: `@2 o5 g` draws on o5 d, because `@2` carries a default transposition of five
-semitones, and the roll shows what the driver plays rather than what the letter said.
+`editor/views/piano-roll/` draws whatever `@amk/spc/song-walk` says — the compiler's `noteMap`
+records the emitted byte and a note's own length but leaves it in source order, with no tick to draw
+it on and no instrument, volume or tempo to draw it under, so the roll is a view of a walk over the
+emitted bytes rather than of the compile. The one thing it takes from the map is the **row**: a
+pitched note draws at the pitch it was **written** at (`NoteAddress.written`), so `@2 o5 g` sits on
+o5 g even though the byte is o5 d. The five semitones `@2` takes off exist to cancel its sample's
+tuning, and the readme calls `h` "Tune" for the same reason — so a row on the byte would be neither
+what was written nor what sounds, and it is only the letter that an edit could ever go back to. What
+a note plays as is the tooltip's business: `plays as o5 d — transposed -5`, and `$E4` and `$FA $02`
+beside it when the driver adds them, since none of that is knowable from the source alone. A note the
+map does not know — a `$8x` typed as raw hex — keeps the byte, and a bare `$D0`-`$D8` keeps the
+driver's own pitch for its drum, since the letter it was written under had no say in it.
+
+Written pitch is not held to the driver's o1 c–o6 a — `o0` is legal MML and `h12 o0 c` is a note the
+driver plays — so `roll-layout.ts` grows the keyboard to take such a note in, above or below.
 
 Two clocks drive it and keeping them apart is the whole trick. The mark list is a `computed` over
 the transport's 10 Hz anchor, snapped outward to a whole note, so the DOM rebuilds about twice per

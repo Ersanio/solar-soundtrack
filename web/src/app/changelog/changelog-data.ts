@@ -9,6 +9,12 @@ export interface ChangelogEntry {
 export const CHANGELOG: readonly ChangelogEntry[] = [
   // ─── newest first; add new blocks here ──────────────────────────────────
   {
+    date: '17 August 2026',
+    items: [
+      'Piano roll draws notes as written, and its tooltip says what a transposed note plays as',
+    ],
+  },
+  {
     date: '15 August 2026',
     items: [
       'Piano roll that scrolls along with the song',

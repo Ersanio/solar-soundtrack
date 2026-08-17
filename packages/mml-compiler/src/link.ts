@@ -80,6 +80,7 @@ export function link(parsed: ParseOutput, aramAddress: number): LinkResult {
 			channel: event.channel,
 			address: aramAddress + header.length + channelStart[event.channel] + event.offset,
 			note: event.note,
+			written: event.written,
 			ticks: event.ticks,
 			span: event.span,
 		}))

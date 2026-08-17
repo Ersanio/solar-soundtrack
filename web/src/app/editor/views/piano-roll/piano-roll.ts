@@ -36,7 +36,7 @@ import { DriverStore } from '../../../state/driver-store';
 import { EditorStore } from '../../../state/editor-store';
 import { Playback } from '../../../state/playback';
 import { ticksPerSecondAt } from '../../../state/song-clock';
-import { type Lane, advanceTick, gridLines, laneStack, tickWindow } from './roll-layout';
+import { type Lane, advanceTick, gridLines, keyName, laneStack, tickWindow } from './roll-layout';
 
 /** Width of the key column. Wide enough for a drum's longest label, `@29 o4 c+`. */
 const KEY_WIDTH = 76;
@@ -238,11 +238,22 @@ export class PianoRoll {
 
   protected readonly percussion = computed(() => new Set(this.settings().percussion));
 
+  /** Where each note was written, by the address the walk names it by. */
+  private readonly written = computed(() => {
+    const written = new Map<number, number>();
+    for (const [address, entry] of this.editor.notesByAddress()) {
+      written.set(address, entry.written);
+    }
+
+    return written;
+  });
+
   /** One object per change of any input, rather than one per note. */
   private readonly placeContext = computed<PlaceContext>(() => ({
     percussion: this.percussion(),
     noisy: this.noiseInstruments(),
     drumNotes: this.drumNotes(),
+    written: this.written(),
   }));
 
   /** The rows the preference asks for, and the pitched range it leaves over. */
@@ -515,7 +526,7 @@ export class PianoRoll {
       case 'key': {
         const key = keyOf(note, context);
 
-        return key === null ? -1 : (stack.rowOfKey[key] ?? -1);
+        return key === null ? -1 : (stack.rowOfKey.get(key) ?? -1);
       }
 
       case 'none':
@@ -618,9 +629,29 @@ export class PianoRoll {
       // A drum written at a pitch of its own is the interesting case, and the
       // one its lane cannot show: `@29 c` and `@29 g` are one drum at two rates.
       const pitched = place === 'drum' && note.percussion === null;
+      const at = pitched ? keyOf(note, context) : null;
       rows.push(
-        `@${instrument}${pitched ? ` at ${noteName(note.note)}` : ''}${place === 'drum' ? ' — a drum' : ''}${sample}`,
+        `@${instrument}${at === null ? '' : ` at ${keyName(at)}`}${place === 'drum' ? ' — a drum' : ''}${sample}`,
       );
+    }
+
+    // What the driver is handed, when that is not the pitch that was written.
+    // `h` and the instrument's transposition are in the byte already; `$E4` and
+    // `$FA $02` are added on the way to the DSP (`main.asm:439-442`). Said here
+    // rather than drawn, so the row stays the note the source has.
+    if (note.key !== null) {
+      const written = context.written.get(note.address);
+      const transposition: [number, string][] = [
+        [written === undefined ? 0 : note.note - written, 'transposed'],
+        [note.state.transpose, '$E4'],
+        [note.state.tune, '$FA $02'],
+      ];
+      const applied = transposition.filter(([by]) => by !== 0);
+      if (applied.length > 0) {
+        const plays = keyName(note.key + note.state.transpose + note.state.tune);
+        const by = applied.map(([n, what]) => `${what} ${n > 0 ? '+' : ''}${n}`).join(', ');
+        rows.push(`plays as ${plays} — ${by}`);
+      }
     }
 
     if (note.state.noise !== null) {
@@ -647,7 +678,7 @@ export class PianoRoll {
     // each other: a bare `$D0` whose drum the porter has removed is drawn on a
     // key, and a heading reading `@29` would be pointing at the wrong row.
     const key = keyOf(note, context);
-    const heading = place === 'key' && key !== null ? noteName(0x80 | key) : `@${instrument}`;
+    const heading = place === 'key' && key !== null ? keyName(key) : `@${instrument}`;
 
     const at = this.pointer();
     const leftward = at.x > at.width / 2;
@@ -672,9 +703,7 @@ export class PianoRoll {
       return null;
     }
 
-    const span = this.editor
-      .result()
-      ?.noteMap?.find((entry) => entry.address === note.address)?.span;
+    const span = this.editor.notesByAddress().get(note.address)?.span;
     return span ? text.slice(span.start, span.end) : null;
   }
 
@@ -851,9 +880,7 @@ export class PianoRoll {
       return;
     }
 
-    const span = this.editor
-      .result()
-      ?.noteMap?.find((entry) => entry.address === mark.note.address)?.span;
+    const span = this.editor.notesByAddress().get(mark.note.address)?.span;
     if (span) {
       this.editor.reveal.set({ ...span });
     }

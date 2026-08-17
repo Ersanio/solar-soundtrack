@@ -143,8 +143,8 @@ console.log("\npiano roll lanes");
 	// drawn against seventy rows, most of them empty.
 	const fitted = laneStack({ lowestKey: 28, highestKey: 33 });
 	check("a fitted range covers whole octaves", fitted.lanes.length === 12, `${fitted.lanes.length} rows`);
-	check("and it contains the notes played", fitted.rowOfKey[28] >= 0 && fitted.rowOfKey[33] >= 0);
-	check("while a key outside it has no row", fitted.rowOfKey[0] === -1 && fitted.rowOfKey[69] === -1);
+	check("and it contains the notes played", fitted.rowOfKey.has(28) && fitted.rowOfKey.has(33));
+	check("while a key outside it has no row", !fitted.rowOfKey.has(0) && !fitted.rowOfKey.has(69));
 	check(
 		"the top row is the highest pitch",
 		fitted.lanes[0].index === 35 && fitted.lanes[fitted.lanes.length - 1].index === 24,
@@ -161,6 +161,34 @@ console.log("\npiano roll lanes");
 	);
 	check("o1 c is key 0 and o6 a is key 69", keyName(0) === "o1 c" && keyName(69) === "o6 a");
 	check("the black keys are the five", [1, 3, 6, 8, 10].every(keyIsBlack) && ![0, 2, 4, 5, 7, 9, 11].some(keyIsBlack));
+
+	// Rows are written pitches, and `o0` is legal MML: `h12 o0 c` is a note the
+	// driver plays and the roll must have a row for, below the driver's own
+	// keyboard. The names and the black keys have to wrap the right way there.
+	check("o0 c is key -12", keyName(-12) === "o0 c" && keyName(-1) === "o0 b", `${keyName(-12)}, ${keyName(-1)}`);
+	check("and o7 b+ is o8 c", keyName(84) === "o8 c" && keyName(72) === "o7 c", `${keyName(84)}, ${keyName(72)}`);
+	check(
+		"a black key below o1 is still black",
+		keyIsBlack(-11) && keyIsBlack(-2) && !keyIsBlack(-12) && !keyIsBlack(-1),
+	);
+	const below = laneStack({ lowestKey: -12, highestKey: 3 });
+	check("a range below o1 is drawn in whole octaves", below.lanes.length === 24, `${below.lanes.length} rows`);
+	check(
+		"from o1 b down to o0 c",
+		below.lanes[0].index === 11 && below.lanes[23].index === -12 && below.rowOfKey.get(-12) === 23,
+		`${below.lanes[0].label} down to ${below.lanes[23].label}`,
+	);
+	check("o0 c starts its octave", below.lanes[23].octaveStart && !below.lanes[22].octaveStart);
+	const allBelow = laneStack({ lowestKey: -5, highestKey: 3, all: true });
+	check("all octaves grows to take in a written note below o1", allBelow.lanes.length === KEY_COUNT + 12);
+	// The driver's top octave stops at o6 a, since `$C6` is the tie — unless
+	// something is written above it, when the octave is filled out.
+	const top = laneStack({ lowestKey: 60, highestKey: 69 });
+	check("a range up to o6 a stops at o6 a", top.lanes[0].index === 69, top.lanes[0].label);
+	const above = laneStack({ lowestKey: 60, highestKey: 70 });
+	check("a written o6 a+ fills out o6", above.lanes[0].index === 71, above.lanes[0].label);
+	const beyond = laneStack({ lowestKey: 60, highestKey: 72, all: true });
+	check("all octaves grows to take in a written note above o6", beyond.lanes.length === KEY_COUNT + 2 + 12);
 
 	// Drums and noise appear only when the song plays them — nine empty drum
 	// rows on a song with no percussion is nine rows of nothing. A drum is
@@ -324,14 +352,15 @@ console.log("\npercussion is a preference, not a rule");
 		[29, 0xa1], // o3 a
 	]);
 
-	const context = (percussion: number[], noisy: number[] = []) => ({
+	const context = (percussion: number[], noisy: number[] = [], written: [number, number][] = []) => ({
 		percussion: new Set(percussion),
 		noisy: new Set(noisy),
 		drumNotes: DRUM_NOTES,
+		written: new Map(written),
 	});
 
 	/** A note as the walk would report it; only the fields placement reads. */
-	const note = (instrument: number | null, byte: number, noise: number | null = null): WalkNote => ({
+	const note = (instrument: number | null, byte: number, noise: number | null = null, address = 0): WalkNote => ({
 		channel: 0,
 		tick: 0,
 		ticks: 24,
@@ -339,7 +368,7 @@ console.log("\npercussion is a preference, not a rule");
 		note: byte,
 		key: byte >= 0x80 && byte < 0xc6 ? byte - 0x80 : null,
 		percussion: byte >= 0xd0 ? byte - 0xd0 : null,
-		address: 0,
+		address,
 		state: {
 			instrument,
 			volume: null,
@@ -351,6 +380,7 @@ console.log("\npercussion is a preference, not a rule");
 			tremolo: false,
 			noise,
 			transpose: 0,
+			tune: 0,
 			tempo: 0,
 			globalVolume: null,
 		},
@@ -390,6 +420,28 @@ console.log("\npercussion is a preference, not a rule");
 	// The fallback is for the bare byte only. A pitched note after a drum was
 	// written at a pitch and must keep it.
 	check("a pitched note after a drum keeps the pitch it was written at", keyOf(note(29, 0x97), context([])) === 23);
+
+	// The row is the pitch that was *written*, which only the note map knows:
+	// `@2 o5 g` emits `$B2` because `@2` takes five semitones off, and the roll
+	// draws it on o5 g all the same — the byte is neither what was written nor
+	// what sounds, and only the letter is something an edit could go back to.
+	const transposed = note(2, 0xb2, null, 0x1234);
+	check("a pitched note draws at its written pitch", keyOf(transposed, context([], [], [[0x1234, 0xb7]])) === 55);
+	check("and at the byte when the map does not know it", keyOf(transposed, context([])) === 50);
+	check(
+		"the fitted range is over written pitches too",
+		rollShape([transposed], context([], [], [[0x1234, 0xb7]])).highestKey === 55,
+	);
+	// `h12 o0 c` is `$80` on the wire and o0 c in the source; the row is below o1.
+	check(
+		"a written pitch below o1 is a negative key",
+		keyOf(note(0, 0x80, null, 7), context([], [], [[7, 0x74]])) === -12,
+	);
+	// A bare drum's letter had no say in its byte, so the map has no say in its row.
+	check(
+		"a bare drum ignores the pitch it was written under",
+		keyOf(note(29, 0xd8, null, 9), context([], [], [[9, 0xa4]])) === 33,
+	);
 
 	// Nothing about the rule may be special-cased to `@21`-`@29`.
 	check(

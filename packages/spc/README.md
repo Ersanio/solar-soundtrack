@@ -68,10 +68,11 @@ exactly what the piano roll follows.
 `song-walk.ts` is the other half of that. `driver-state.ts` says where a voice _is_; this says what
 the whole song _will do_, by walking the emitted bytes the way `main.asm`'s fetch loop walks them and
 producing every note on its own tick. Nothing else in the tree knows that. The compiler's `noteMap`
-carries the emitted byte and the ticks a note occupies, but in source order and with no tick to put
-them on, and nothing at all about the state a note sounds under — the instrument, volume and tempo in
-force come from commands that may be on another channel entirely, and a `[ ]` sounds its body many
-times over from one entry in the map.
+carries the emitted byte, the pitch the letter was written at and the ticks a note occupies, but in
+source order and with no tick to put them on, and nothing at all about the state a note sounds under —
+the instrument, volume and tempo in force come from commands that may be on another channel entirely,
+and a `[ ]` sounds its body many times over from one entry in the map. The two meet in the piano roll,
+which draws the walk's notes on the map's written pitch.
 
 It walks bytes rather than source because the bytes are the only place the answer is unambiguous.
 `@29 o2a1b2c3` is one drum and two pitched notes on `#0` but three drums on `#6`

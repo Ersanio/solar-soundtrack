@@ -203,6 +203,11 @@ One entry each: what it was, what it is, why.
   the `no-call-expression` note in `eslint.config.js` says why lint cannot catch it.
 - **Muting by writing the driver's `$5E`** — a disabled channel does less work per tick, so a busy
   song sped up. The mixer takes track volume and leaves `$5E` alone (`applyChannelMutes`).
+- **Roll rows on the emitted note byte** — `@2 o5 g` drew on o5 d, which is neither what was written
+  nor what sounds (the five semitones cancel the sample's tuning), `h` used as the readme's "Tune"
+  moved every note off the letters in the source, and no edit could map a byte back to text. Rows
+  are the written pitch (`NoteAddress.written`); what a note plays as is a tooltip line. No "as
+  played" toggle either: an honest one is not computable, since a sample's root is not in the data.
 - **Auto-scaling the bend graph to the further end of the bend** — one semitone and two octaves drew
   the same shape. The reach is a fixed octave, stepped by whole octaves.
 - **A tone slider in the FIR designer** over `designTone` — a worse route to the presets it
