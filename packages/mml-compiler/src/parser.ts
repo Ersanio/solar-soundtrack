@@ -53,6 +53,12 @@ export interface NoteEvent {
 	offset: number;
 	/** The emitted note byte, after transposition and the percussion remap. */
 	note: number;
+	/**
+	 * The byte the letter and octave alone name — `getPitch` — before `h`, the
+	 * instrument's transposition and the percussion remap. Equal to `note` for a
+	 * rest or a tie. Not something AddmusicK records; the piano roll draws on it.
+	 */
+	written: number;
 	/** Ticks the note occupies, `^` ties folded in and the tempo ratio applied. */
 	ticks: number;
 	span: Span;
@@ -2641,12 +2647,13 @@ export class AddmusicKParser {
 		}
 
 		let note: number;
+		let written: number;
 		if (letter === "r") {
-			note = NOTE_REST;
+			note = written = NOTE_REST;
 		} else if (letter === "^") {
-			note = NOTE_TIE;
+			note = written = NOTE_TIE;
 		} else {
-			note = this.getPitch(letter);
+			note = written = this.getPitch(letter);
 
 			if (this.usingHTranspose) {
 				note += this.hTranspose;
@@ -2715,6 +2722,7 @@ export class AddmusicKParser {
 			channel: this.channel,
 			offset: this.data[this.channel].length,
 			note,
+			written,
 			ticks,
 			span: this.spanAt(start, end),
 		});

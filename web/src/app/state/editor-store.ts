@@ -12,7 +12,7 @@ import {
 import { compiler } from '@amk/compiler';
 import type { Edit } from '@amk/tokens/edits';
 import { commandAt, tokenize } from '@amk/tokens';
-import type { CompileResult, Diagnostic, Span } from '@amk/core/types';
+import type { CompileResult, Diagnostic, NoteAddress, Span } from '@amk/core/types';
 import { buildSpc, spcFilename } from '@amk/spc/export';
 import { ARAM_SIZE, type AramBudget, computeBudget } from '@amk/spc/layout';
 import { type SongTimeline, unreachableChannels, walkSong } from '@amk/spc/song-walk';
@@ -341,15 +341,23 @@ export class EditorStore {
     return command?.span ?? { start: 0, end: 0, line: 1 };
   }
 
+  /**
+   * The note map by ARAM address, which is how the walk names a note. Built
+   * once here because three readers key into it — the roll for a note's written
+   * pitch and its source, and {@link unreachableSpans}.
+   */
+  readonly notesByAddress = computed<ReadonlyMap<number, NoteAddress>>(
+    () => new Map((this.result()?.noteMap ?? []).map((entry) => [entry.address, entry])),
+  );
+
   /** The notes the song is too short to reach, for the editor to underline. */
   readonly unreachableSpans = computed<readonly Span[]>(() => {
     const timeline = this.timeline();
-    const map = this.result()?.noteMap;
-    if (!timeline || !map || timeline.unreachable.length === 0) {
+    if (!timeline || timeline.unreachable.length === 0) {
       return [];
     }
 
-    const byAddress = new Map(map.map((entry) => [entry.address, entry]));
+    const byAddress = this.notesByAddress();
     return timeline.unreachable
       .map((address) => byAddress.get(address)?.span)
       .filter((span) => span !== undefined);

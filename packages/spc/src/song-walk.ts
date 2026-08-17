@@ -22,8 +22,10 @@
  * have to re-derive both.
  *
  * Deliberately **not** modelled, because none of it moves a note in time:
- *   - runtime transposition (`$E4`, `$EE`, `$FA $02`). A row is the *emitted*
- *     note byte; transposition is reported as state instead of a moved bar.
+ *   - runtime transposition (`$E4`, `$EE`, `$FA $02`). {@link WalkNote.key} is
+ *     the emitted byte's; `$E4` and `$FA $02` are reported as state. Which row
+ *     a note draws on is the roll's decision, made from the written pitch in
+ *     `noteMap`, and the transposition is a tooltip line rather than a moved bar.
  *   - `ShouldSkipKeyOff`'s (main.asm:2949) readahead, which is articulation.
  *   - the second trip round the loop, whose channel state carries over from the
  *     end of the first. Every {@link WalkNote.state} is the first pass's.
@@ -86,11 +88,11 @@ const STEP_BUDGET = 2_000_000;
  *
  * Deliberately the whole of it, not the subset anything reads today. A view
  * takes what it shows — the roll's tooltip uses `instrument`, `volume`,
- * `quantization`, `noise` and `tempo`, and leaves the rest — but the walk is the
- * only place any of it can be known, since the command that set it may be
- * thousands of ticks back on another channel. Working it out here once is what
- * makes a second reader of it free; deleting the unread ones would make the next
- * tooltip row a change to the walker.
+ * `quantization`, `noise`, `transpose`, `tune` and `tempo`, and leaves the
+ * rest — but the walk is the only place any of it can be known, since the
+ * command that set it may be thousands of ticks back on another channel.
+ * Working it out here once is what makes a second reader of it free; deleting
+ * the unread ones would make the next tooltip row a change to the walker.
  */
 export interface NoteState {
 	/** `$DA`'s operand, or the drum a `$D0`-`$D8` byte selected. `null` if unset. */
@@ -111,6 +113,11 @@ export interface NoteState {
 	noise: number | null;
 	/** `$E4` song-wide transposition, in semitones. */
 	transpose: number;
+	/**
+	 * `$FA $02`, the channel's own semitone tune — `!HTuneValues+x`, which the
+	 * driver adds to every note number beside `$43` (`main.asm:439-442`).
+	 */
+	tune: number;
 	/**
 	 * The `t` value the song has last been *told* to reach — not `$51`, which is
 	 * one higher.
@@ -282,6 +289,7 @@ interface ChannelState {
 	vibrato: boolean;
 	tremolo: boolean;
 	noise: number | null;
+	tune: number;
 }
 
 const word = (song: Uint8Array, at: number): number => song[at] | (song[at + 1] << 8);
@@ -394,6 +402,7 @@ export function walkSong(song: Uint8Array, aramAddress: number): SongTimeline {
 				vibrato: false,
 				tremolo: false,
 				noise: null,
+				tune: 0,
 			},
 			snapshot: null,
 		});
@@ -419,11 +428,23 @@ export function walkSong(song: Uint8Array, aramAddress: number): SongTimeline {
 			tremolo: track.state.tremolo,
 			noise: track.state.noise,
 			transpose: shared.transpose,
+			tune: track.state.tune,
 			tempo: shared.tempo,
 			globalVolume: shared.globalVolume,
 		};
 
 		return track.snapshot;
+	};
+
+	/**
+	 * A song-wide command is read by every channel's next note, so every frozen
+	 * snapshot is stale, not only the running channel's — the others would go on
+	 * reporting the tempo or transposition in force when they were taken.
+	 */
+	const invalidateAll = (): void => {
+		for (const track of tracks) {
+			track.snapshot = null;
+		}
 	};
 
 	/**
@@ -606,6 +627,7 @@ export function walkSong(song: Uint8Array, aramAddress: number): SongTimeline {
 			case 0xe0:
 			case 0xe1:
 				shared.globalVolume = vcmd === 0xe0 ? arg(0) : arg(1);
+				invalidateAll();
 				break;
 			case 0xe2:
 			case 0xe3:
@@ -623,9 +645,11 @@ export function walkSong(song: Uint8Array, aramAddress: number): SongTimeline {
 				// {@link NoteState.tempo}. Pricing a fade tick by tick is the
 				// clock's job, and it reads `tempoChanges` to do it.
 				shared.tempo = vcmd === 0xe2 ? arg(0) : arg(1);
+				invalidateAll();
 				break;
 			case 0xe4:
 				shared.transpose = (arg(0) << 24) >> 24;
+				invalidateAll();
 				break;
 			case 0xe5:
 				state.tremolo = true;
@@ -644,7 +668,14 @@ export function walkSong(song: Uint8Array, aramAddress: number): SongTimeline {
 					shared.secondVelocityTable = arg(1) !== 0;
 				}
 
-				dirty = false;
+				// `$FA $02` is the channel's semitone tune, and the one `$FA` that
+				// changes what a note reports.
+				if (arg(0) === 0x02) {
+					state.tune = (arg(1) << 24) >> 24;
+				} else {
+					dirty = false;
+				}
+
 				break;
 
 			case 0xe6: {

@@ -61,6 +61,12 @@ export interface PlaceContext {
   noisy: ReadonlySet<number>;
   /** The driver's own note byte for each of `@21`-`@29`. */
   drumNotes: ReadonlyMap<number, number>;
+  /**
+   * The pitch each note was written at, by the ARAM address of its note map
+   * entry — `NoteAddress.written`. Only the compiler knows it: the byte the walk
+   * reads has `h` and the instrument's transposition already folded in.
+   */
+  written: ReadonlyMap<number, number>;
 }
 
 /** Which band of rows a note belongs to. */
@@ -89,14 +95,25 @@ export function placeOf(note: WalkNote, context: PlaceContext): Place {
 /**
  * The key a note draws on, for anything `placeOf` puts on the keyboard.
  *
+ * A pitched note draws at the pitch it was **written** at, and that is a
+ * musician's answer rather than a byte's: `@2 o5 g` is a g to whoever wrote it,
+ * and the five semitones the compiler takes off exist to cancel the sample's
+ * tuning, so a row on the byte would be neither what was written nor what
+ * sounds. It is also the only row an edit could map back to the text from.
+ * What the note plays as is the tooltip's to say. A note the map does not know
+ * — a `$8x` typed as raw hex — keeps the byte, since there is nothing else.
+ *
  * `null` only when the driver has not loaded and so has no table to ask, which
  * cannot happen while a song is compiled — compilation is blocked until it has.
  */
 export function keyOf(note: WalkNote, context: PlaceContext): number | null {
   if (note.key !== null) {
-    return note.key;
+    const written = context.written.get(note.address);
+    return written === undefined ? note.key : written - 0x80;
   }
 
+  // A bare `$D0`-`$D8` is the driver's drum at the driver's pitch: the letter
+  // it was written under had no say in the byte, so it has none in the row.
   // `& 0x7f` rather than `- 0x80`, matching `keyName` and `units.ts`'s `noteName`.
   const sounds =
     note.state.instrument === null ? undefined : context.drumNotes.get(note.state.instrument);

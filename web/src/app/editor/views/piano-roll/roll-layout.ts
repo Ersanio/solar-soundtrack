@@ -17,7 +17,8 @@ export interface Lane {
   row: number;
   kind: 'key' | 'drum' | 'noise';
   /**
-   * 0-69 for a key, the `@n` for a drum, -1 for noise.
+   * The key number for a key — o1 c is 0, and a written pitch below it is
+   * negative — the `@n` for a drum, -1 for noise.
    *
    * Read by `charttest` and by nothing in the roll, which goes the other way
    * round — `rowOfKey` and `rowOfDrum` take it a number and hand back a row.
@@ -35,8 +36,8 @@ export interface Lane {
 
 export interface LaneStack {
   lanes: readonly Lane[];
-  /** Row of every pitched key, indexed by key number. -1 when out of range. */
-  rowOfKey: readonly number[];
+  /** Row of every pitched key drawn, keyed by key number. */
+  rowOfKey: ReadonlyMap<number, number>;
   /**
    * Row of each drum, keyed by its instrument number.
    *
@@ -52,13 +53,22 @@ export interface LaneStack {
 const NAMES = ['c', 'c+', 'd', 'd+', 'e', 'f', 'f+', 'g', 'g+', 'a', 'a+', 'b'];
 const BLACK = [false, true, false, true, false, false, true, false, true, false, true, false];
 
-/** `$80` is o1 c, so key 0 is o1 c and key 69 is o6 a. */
+/**
+ * `$80` is o1 c, so key 0 is o1 c and key 69 is o6 a. A key below 0 is a
+ * written pitch in o0 — `o0` is legal MML and `h12` brings it back into the
+ * driver's range — so the octave floors and the semitone wraps.
+ */
 export function keyName(key: number): string {
-  return `o${Math.floor(key / OCTAVE) + 1} ${NAMES[key % OCTAVE]}`;
+  return `o${Math.floor(key / OCTAVE) + 1} ${NAMES[semitone(key)]}`;
 }
 
 export function keyIsBlack(key: number): boolean {
-  return BLACK[key % OCTAVE];
+  return BLACK[semitone(key)];
+}
+
+/** 0-11 for any key, negative ones included. */
+function semitone(key: number): number {
+  return ((key % OCTAVE) + OCTAVE) % OCTAVE;
 }
 
 /**
@@ -73,6 +83,10 @@ export function keyIsBlack(key: number): boolean {
  * would put a black key at the top edge with no white key under it. `all` draws
  * the full o1-o6 regardless, for when the fitted range is the thing you want to
  * check — it widens the pitch range only, and never conjures an unused drum.
+ *
+ * Keys are written pitches, and a written pitch is not held to the driver's
+ * o1 c-o6 a: `h12 o0 c` is a legal note whose row is o0 c. Either range simply
+ * grows to take it in.
  */
 export interface LaneRequest {
   /** The pitched range the song actually plays, or `null` when it plays none. */
@@ -103,7 +117,7 @@ export function laneStack(request: LaneRequest = {}): LaneStack {
   } = request;
 
   const lanes: Lane[] = [];
-  const rowOfKey = new Array<number>(KEY_COUNT).fill(-1);
+  const rowOfKey = new Map<number, number>();
   const rowOfDrum = new Map<number, number>();
   let noiseRow = -1;
 
@@ -137,22 +151,30 @@ export function laneStack(request: LaneRequest = {}): LaneStack {
     });
   }
 
+  // The driver's o1-o6 when asked for all of it or given nothing to fit to;
+  // otherwise the octaves the song writes in — and those either way, since a
+  // note off the driver's keyboard still needs a row.
   let low = 0;
   let high = KEY_COUNT - 1;
-  if (!all && lowestKey !== null && highestKey !== null) {
-    low = Math.floor(lowestKey / OCTAVE) * OCTAVE;
-    high = Math.min(KEY_COUNT - 1, Math.floor(highestKey / OCTAVE) * OCTAVE + OCTAVE - 1);
+  if (lowestKey !== null && highestKey !== null) {
+    const fittedLow = Math.floor(lowestKey / OCTAVE) * OCTAVE;
+    // Whole octaves, except that the driver's top one stops at o6 a — `$C6`
+    // and `$C7` are the tie and the rest — unless something is written above.
+    const octaveTop = Math.floor(highestKey / OCTAVE) * OCTAVE + OCTAVE - 1;
+    const fittedHigh = highestKey < KEY_COUNT ? Math.min(KEY_COUNT - 1, octaveTop) : octaveTop;
+    low = all ? Math.min(low, fittedLow) : fittedLow;
+    high = all ? Math.max(high, fittedHigh) : fittedHigh;
   }
 
   for (let key = high; key >= low; key--) {
-    rowOfKey[key] = lanes.length;
+    rowOfKey.set(key, lanes.length);
     lanes.push({
       row: lanes.length,
       kind: 'key',
       index: key,
       label: keyName(key),
       black: keyIsBlack(key),
-      octaveStart: key % OCTAVE === 0,
+      octaveStart: semitone(key) === 0,
     });
   }
 

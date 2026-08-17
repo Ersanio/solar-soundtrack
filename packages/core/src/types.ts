@@ -111,6 +111,14 @@ export interface NoteAddress {
 	 * it sounds under, and this map does not.
 	 */
 	note: number;
+	/**
+	 * The byte the letter and octave alone name, before `h`, the instrument's
+	 * transposition and the percussion remap — `o4 c` is `$A4` whatever it plays
+	 * as. Equal to {@link note} for a rest or a tie. Only the source knows this,
+	 * which is why the walk cannot supply it: the piano roll draws a pitched note
+	 * on this row and reports `note - written` as the transposition.
+	 */
+	written: number;
 	/** Ticks the note occupies, source-level `^` ties already folded in. Same use as {@link note}. */
 	ticks: number;
 	span: Span;
