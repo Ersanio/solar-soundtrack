@@ -407,10 +407,11 @@ export interface BarContent {
  * What fits inside one bar: its name on the left, its glyphs on the right.
  *
  * Measured rather than assumed, because a bar is a 32nd note at one zoom and a
- * whole note at another, and rows stretch to fill the pane. The name goes first
- * and the glyphs are dropped from the end — a bar that says `C6` and nothing
- * else is still telling you something, where glyphs with no note beside them
- * are a row of icons floating over the music.
+ * whole note at another, and rows stretch to fill the pane. Both scale with the
+ * bar's height and fill it, so a tall row is easier to read and not merely
+ * emptier. The name goes first and the glyphs are dropped from the end — a bar
+ * that says `C6` and nothing else is still telling you something, where glyphs
+ * with no note beside them are a row of icons floating over the music.
  *
  * Anything that does not fit is not drawn and not marked either: the inspector
  * lists all of them for the note under the caret, and a hover names them.
@@ -426,7 +427,7 @@ export function fitBarContent(
     return empty;
   }
 
-  const size = clamp(height - 4, 7, 11);
+  const size = Math.max(7, height - 4);
   const nameWidth = name.length * size * ADVANCE;
   // The name is the floor, not the first of several things competing for room:
   // a bar with no room for it has none for a glyph either, and letting the
@@ -441,7 +442,7 @@ export function fitBarContent(
 
   // Right-aligned and filled leftwards, so the last command to take effect sits
   // furthest from the name rather than the list shuffling as it grows.
-  const box = Math.min(height - 2, 12);
+  const box = height - 2;
   const room = Math.floor((width - left - CONTENT_PAD + CONTENT_PAD) / (box + CONTENT_PAD));
   const count = clamp(Math.min(room, glyphs), 0, MAX_GLYPHS);
   const laid: BarGlyph[] = [];

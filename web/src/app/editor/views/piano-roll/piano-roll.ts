@@ -88,7 +88,7 @@ const SCRUB_HEIGHT = 36;
 const SCRUB_PAD = 3;
 
 const ZOOMS = [0.5, 1, 2, 4, 8] as const;
-const ROW_HEIGHTS = [6, 9, 13] as const;
+const ROW_HEIGHTS = [6, 9, 13, 18, 26, 36] as const;
 
 /**
  * Tailwind v4 scans source text, so a class name has to be a complete literal —
@@ -1083,10 +1083,18 @@ export class PianoRoll {
     this.settings.update((s) => ({ ...s, zoom: ZOOMS[next] }));
   }
 
+  /**
+   * Up steps from the height on screen, so a press always shows; down steps the
+   * floor itself, so a press never raises it.
+   */
   protected setRowHeight(direction: number): void {
-    const at = ROW_HEIGHTS.indexOf(this.rowHeight() as (typeof ROW_HEIGHTS)[number]);
-    const next = clamp((at < 0 ? 1 : at) + direction, 0, ROW_HEIGHTS.length - 1);
-    this.settings.update((s) => ({ ...s, rowHeight: ROW_HEIGHTS[next] }));
+    const next =
+      direction > 0
+        ? ROW_HEIGHTS.find((h) => h > this.rowHeight())
+        : ROW_HEIGHTS.filter((h) => h < this.settings().rowHeight).at(-1);
+    if (next !== undefined) {
+      this.settings.update((s) => ({ ...s, rowHeight: next }));
+    }
   }
 
   protected setFollow(follow: boolean): void {
