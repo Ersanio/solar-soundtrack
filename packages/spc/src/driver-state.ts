@@ -47,10 +47,20 @@ export function readDriverState(aram: Uint8Array): DriverState {
 	};
 }
 
-/** The voice to count ticks off: the lowest one the song actually plays. */
+/**
+ * The voice to count ticks off: the lowest one the driver is playing.
+ *
+ * Decided the way the driver decides it — `L_0C31` and `L_0C4D`
+ * (`main.asm:2315, 2331`) test the pointer's high byte alone, `mov a, $31+x` /
+ * `beq`. The whole word would not do: at song start the driver points `$30`
+ * into the zero page for its hot-patch reset (`main.asm:2104-2105`), a word
+ * with a low byte and no high byte, and a poll landing there would count off
+ * voice 0 for the rest of a song that never plays it — every tick lost, and the
+ * playhead never moving, in a song whose lowest channel is `#1`.
+ */
 export function tickVoice(aram: Uint8Array): number {
 	for (let voice = 0; voice < VOICES; voice++) {
-		if (word(aram, Addr.TrackPointers + voice * 2) !== 0) {
+		if (aram[Addr.TrackPointers + voice * 2 + 1] !== 0) {
 			return voice;
 		}
 	}

@@ -32,7 +32,7 @@
  */
 
 import { FIRST_PERCUSSION_INSTRUMENT } from "@amk/core/hardcoded-tables";
-import type { Command } from "../tokens";
+import type { Command, TokenIndex } from "../tokens";
 
 /** How far a command reaches, and therefore whether a note is the thing it acts on. */
 export type CommandScope =
@@ -146,24 +146,47 @@ function parseTimeSlot(command: Command): ParseTimeSlot | null {
  * a caret and what a roll mark reaches through its source span. A note with none
  * of them is absent rather than present and empty.
  *
- * Channel-scoped, because that is how `parser.ts` keeps `q` and the transpose:
- * a command written under `#0` says nothing about a note under `#1`, even one
- * written between them.
+ * `q` and `@21`-`@29` are channel-scoped, because that is how `parser.ts` keeps
+ * them — `q[channel]` and `instrument[channel]`, neither of which a `#N`
+ * touches: a command written under `#0` says nothing about a note under `#1`,
+ * even one written between them. One written above the first marker is on the
+ * starting channel (`Command.channel`), and that is where `parseQuantization`
+ * puts it even from a `(!1)[ ]` body — it writes `q[prevChannel]`
+ * (Music.cpp:684-687), so `(!1)[q40 …]` above `#0` is the `q` of `#0`'s first
+ * note.
+ *
+ * `h` is one variable in `parser.ts` (`hTranspose`), and `parseHash`
+ * (Music.cpp:569) resets it at every `#N` — the one it is already on included.
+ * So it is one slot here, cleared at every marker: an `h` above the first
+ * channel reaches nothing, and a channel declared in two blocks does not carry
+ * the first block's `h` into the second. `gather` raises no command for a `#N`
+ * and `Command.channel` cannot see a channel re-entering itself, so the markers
+ * are read off `index.tokens`; `text` is what says whether one is a real
+ * `#0`-`#7`, since a malformed one is reported and resets nothing (AMK0030,
+ * AMK0031).
  */
-export function parseTimeInForce(commands: readonly Command[]): ReadonlyMap<Command, readonly Command[]> {
+export function parseTimeInForce(index: TokenIndex, text: string): ReadonlyMap<Command, readonly Command[]> {
 	const inForce = new Map<Command, readonly Command[]>();
 	const byChannel = new Map<number, Map<ParseTimeSlot, Command>>();
+	let transpose: Command | null = null;
 	let frozen: readonly Command[] | null = null;
 	let frozenChannel = -1;
 
-	for (const command of commands) {
-		// Before the first `#0` nothing is on a channel, so nothing it writes can
-		// reach a note — which is what keeps a `(!1)[ … ]` body out of the answer.
-		const channel = command.channel;
-		if (channel === undefined) {
-			continue;
+	const markers = index.tokens.filter((token) => token.kind === "channel");
+	let marker = 0;
+
+	for (const command of index.commands) {
+		while (marker < markers.length && markers[marker].start < command.span.start) {
+			const declared = Number.parseInt(text.slice(markers[marker].start + 1, markers[marker].end), 10);
+			if (declared >= 0 && declared <= 7 && transpose !== null) {
+				transpose = null;
+				frozen = null;
+			}
+
+			marker++;
 		}
 
+		const channel = command.channel;
 		let slots = byChannel.get(channel);
 		if (slots === undefined) {
 			slots = new Map();
@@ -175,10 +198,10 @@ export function parseTimeInForce(commands: readonly Command[]): ReadonlyMap<Comm
 			// `WalkNote.origins` is: a run of notes under one state is one array.
 			if (frozen === null || frozenChannel !== channel) {
 				frozen = PARSE_TIME_SLOTS.flatMap((slot) => {
-					const held = slots.get(slot);
+					const held = slot === "transpose" ? transpose : (slots.get(slot) ?? null);
 					// The instrument slot reports only the spelling that emitted
 					// nothing; anything else is the walk's to name.
-					return held !== undefined && (slot !== "instrument" || isPercussionInstrument(held)) ? [held] : [];
+					return held !== null && (slot !== "instrument" || isPercussionInstrument(held)) ? [held] : [];
 				});
 				frozenChannel = channel;
 			}
@@ -191,7 +214,12 @@ export function parseTimeInForce(commands: readonly Command[]): ReadonlyMap<Comm
 		}
 
 		const slot = parseTimeSlot(command);
-		if (slot !== null && slots.get(slot) !== command) {
+		if (slot === "transpose") {
+			if (transpose !== command) {
+				transpose = command;
+				frozen = null;
+			}
+		} else if (slot !== null && slots.get(slot) !== command) {
 			slots.set(slot, command);
 			frozen = null;
 		}

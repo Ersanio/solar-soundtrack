@@ -1175,14 +1175,18 @@ export interface Command {
 	 */
 	replacement?: string;
 	/**
-	 * The `#0`-`#7` channel this was written under, or `undefined` before any.
+	 * The channel the compiler is writing when it reads this: the `#0`-`#7` it
+	 * was written under, or, above the first marker, the starting channel — the
+	 * lowest-numbered `#N` anywhere in the song, 0 when there is none
+	 * (`parser.ts:detectStartingChannel`, Music.cpp:385-400). A `$F1` or a `q`
+	 * written above `#0` is on channel 0's track, ahead of everything `#0` writes.
 	 *
 	 * Source order within one channel is execution order, which is what lets a
 	 * reader say "this command runs after that one". Across channels it is not:
 	 * the driver interleaves them by time, so nothing here should compare two
 	 * commands from different channels and call one later.
 	 */
-	channel?: number;
+	channel: number;
 	/**
 	 * Written as `@@n`, the "direct" form (`parser.ts:parseInstrument`).
 	 *
@@ -1673,6 +1677,31 @@ function gatherNoteLength(
 	return { segments, args, last, from, nextIndex: index };
 }
 
+/**
+ * The channel the compiler writes to above the first `#N`.
+ *
+ * `parser.ts:detectStartingChannel` (Music.cpp:385-400) probes the whole text
+ * for `#0`, then `#1`, up to `#7`, and starts on the first it finds — so it is
+ * the lowest channel declared anywhere, not the first declared, and 0 when
+ * there is none. The probe is a substring search, so `#08` counts as `#0`; the
+ * first digit is what is read here for the same reason.
+ */
+function startingChannel(tokens: GatherToken[], textOf: (token: GatherToken) => string): number {
+	let lowest = 8;
+	for (const token of tokens) {
+		if (token.kind !== "channel") {
+			continue;
+		}
+
+		const digit = textOf(token).charCodeAt(1) - 0x30;
+		if (digit >= 0 && digit < lowest) {
+			lowest = digit;
+		}
+	}
+
+	return lowest === 8 ? 0 : lowest;
+}
+
 /** Groups the flat token list into commands with their arguments. */
 function gather(tokens: GatherToken[], text: string, transitions: TargetTransition[]): Command[] {
 	const commands: Command[] = [];
@@ -1680,7 +1709,9 @@ function gather(tokens: GatherToken[], text: string, transitions: TargetTransiti
 	// A token from an expansion stands for text that is not in the document, so
 	// its own `text` wins over the span it was stamped with.
 	const textOf = (token: GatherToken): string => token.text ?? text.slice(token.start, token.end);
-	let channel: number | undefined;
+	// A whole-document fact, asked here rather than in `step` for the reason
+	// `TokenIndex.instruments` gives: it depends on markers below the line.
+	let channel = startingChannel(tokens, textOf);
 	let target = DEFAULT_TARGET;
 	let transition = 0;
 	// parser.ts:defaultNoteLength — what a note or rest falls back to when it carries no
@@ -1734,10 +1765,11 @@ function gather(tokens: GatherToken[], text: string, transitions: TargetTransiti
 		}
 
 		if (token.kind === "channel") {
-			// `#0`-`#7`. A malformed one leaves the previous channel standing,
-			// which is also what the parser does — it reports and carries on.
+			// `#0`-`#7`. A malformed or out-of-range one leaves the previous channel
+			// standing, which is also what the parser does — it reports and carries
+			// on (AMK0030, AMK0031).
 			const parsed = Number.parseInt(textOf(token).slice(1), 10);
-			if (!Number.isNaN(parsed)) {
+			if (parsed >= 0 && parsed <= 7) {
 				channel = parsed;
 			}
 

@@ -233,6 +233,12 @@ One entry each: what it was, what it is, why.
   generates; `Warm`/`Dark`/`Bright` are its output.
 - **A 1024-frame render block in the worklet** — a tick counter that only looks every 1024 frames
   drifts. 32 frames costs ~4% and keeps the count exact.
+- **`Command.channel` left `undefined` above the first `#N`** — every same-channel scan read it as
+  "no channel", so a `q` or a `$F1` written above `#0` reached nothing and the roll's glyphs, the
+  echo hazards and the FIR designer all missed it. It is the starting channel — the lowest `#N`
+  declared anywhere, 0 without one — because that is where `detectStartingChannel` starts writing
+  (Music.cpp:385-400); `parseTimeInForce` reads the markers themselves for the one thing a channel
+  number cannot see, `h` being reset by a `#N` that re-enters its own channel.
 
 ## Angular specifics
 

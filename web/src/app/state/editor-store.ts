@@ -434,10 +434,11 @@ export class EditorStore {
       return NOTHING_IN_FORCE;
     }
 
-    const commands = this.tokens().commands;
+    const index = this.tokens();
+    const commands = index.commands;
     const byAddress = this.commandsByAddress();
     const notes = this.notesByAddress();
-    const parseTime = parseTimeInForce(commands);
+    const parseTime = parseTimeInForce(index, this.source());
     const cache = new Map<readonly (number | null)[], Map<Command | null, readonly Command[]>>();
 
     const walked = (origins: readonly (number | null)[]): Command[] => {

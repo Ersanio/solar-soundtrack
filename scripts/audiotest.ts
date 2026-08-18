@@ -962,6 +962,53 @@ console.log("\nthe driver's own ticks are counted exactly");
 	);
 }
 
+console.log("\nthe voice the ticks are counted off is one the driver plays");
+{
+	// The playhead's whole count runs on one voice's duration counter, latched
+	// on the first poll that finds a voice — from the moment the SPC loads, as
+	// `worklet.ts` and `measure-clock.ts` do it. At song start the driver holds
+	// `$30` pointing into the zero page for its hot-patch reset
+	// (`main.asm:2104-2105`), a word with a low byte and no high byte, and it
+	// stays that way for some milliseconds. A latch reading the whole word takes
+	// voice 0 there, and in a song whose lowest channel is `#1` that voice never
+	// ticks: the music plays and nothing that follows it moves. The driver's own
+	// test is the high byte alone (`main.asm:2315`), and so is `tickVoice`'s.
+	const zeroPage = new Uint8Array(0x100);
+	zeroPage[0x30] = 0x32;
+	check("a pointer into the zero page is not a playing voice", tickVoice(zeroPage) === -1);
+	zeroPage[0x32] = 0xac;
+	zeroPage[0x33] = 0x29;
+	check("and voice 1 is found behind it", tickVoice(zeroPage) === 1);
+
+	function latched(source: string, seconds: number): { voice: number; ticks: number } {
+		emu.loadSpc(compileToSpc(source));
+		let voice = -1;
+		let duration = 0;
+		let ticks = 0;
+		for (let done = 0; done < SPC_SAMPLE_RATE * seconds; done += BLOCK) {
+			emu.renderView(BLOCK);
+			const aram = emu.aram();
+			if (voice < 0) {
+				voice = tickVoice(aram);
+				duration = readNoteDuration(aram, voice);
+				continue;
+			}
+
+			const now = readNoteDuration(aram, voice);
+			ticks += sawTick(duration, now);
+			duration = now;
+		}
+
+		return { voice, ticks };
+	}
+
+	const zero = latched("#amk 4\n#0 t54 v200 @0 o4 q7F c8d8e8f8\n", 2);
+	const one = latched("#amk 4\n#1 t54 v200 @0 o4 q7F c8d8e8f8\n", 2);
+	check("a song whose lowest channel is #1 is counted off voice 1", one.voice === 1, `voice ${one.voice}`);
+	check("and its ticks advance", one.ticks > 100, `${one.ticks} ticks`);
+	check("to the same count as the same music on #0", one.ticks === zero.ticks, `${one.ticks} against ${zero.ticks}`);
+}
+
 console.log("\nthe note map lands on what the driver is playing");
 {
 	// A loop, so the loop block is exercised: while a voice is inside `[ ]` its
