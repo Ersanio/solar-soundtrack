@@ -63,6 +63,9 @@
         @case ('bend') {
           <amk-bend-command [command]="current" />
         }
+        @case ('note') {
+          <amk-note-command [command]="current" />
+        }
         @default {
           <amk-param-table [command]="current" />
         }

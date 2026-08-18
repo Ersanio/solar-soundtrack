@@ -25,10 +25,12 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { compiler } from "@amk/compiler";
-import { type CommandTarget, commandAt, expectedArgs, tokenize } from "@amk/tokens";
+import { type CommandTarget, commandAt, expectedArgs, tokenize, VCMD_NAMES } from "@amk/tokens";
 import { channelsBeginAt, targetAt } from "@amk/tokens/dialect";
 import { ENTRIES, type ResolvedEntry, resolveEntry } from "../web/src/app/editor/command-palette/catalog";
 import { GLYPH_NAMES } from "../web/src/app/editor/command-palette/command-icon";
+import { glyphOf } from "../web/src/app/editor/command-palette/glyph-of";
+import { commandScope } from "@amk/tokens/commands/in-force";
 
 import { check, summarise } from "./harness";
 
@@ -75,6 +77,25 @@ function probe(marker: string, entry: ResolvedEntry, beforeChannels: boolean): {
 }
 
 /** Every entry as the palette itself would resolve it, at one dialect and place. */
+/** Anything in here drawn without `svg:` in front of it would ship blank. */
+const SVG_TAGS = new Set([
+	"path",
+	"circle",
+	"ellipse",
+	"rect",
+	"line",
+	"polyline",
+	"polygon",
+	"g",
+	"text",
+	"tspan",
+	"defs",
+	"use",
+	"marker",
+]);
+
+const hex = (vcmd: number): string => `$${vcmd.toString(16).toUpperCase()}`;
+
 function resolveAll(target: CommandTarget, beforeChannels: boolean): ResolvedEntry[] {
 	return ENTRIES.map((entry) => resolveEntry(entry, target, { beforeChannels }));
 }
@@ -101,8 +122,6 @@ const capitalised = (label: string) => label.charAt(0).toUpperCase() + label.sli
  */
 interface Supersession {
 	vcmd: number;
-	/** The entry key that writes it. */
-	by: string;
 	/** Channel body that produces the command, note first. */
 	letter: string;
 	/** The same thing in raw hex, or `null` when the compiler adds more than bytes. */
@@ -113,22 +132,21 @@ interface Supersession {
 }
 
 const SUPERSEDED: Supersession[] = [
-	{ vcmd: 0xda, by: "text:@", letter: "c4 @0", hex: "c4 $DA $00", cite: "parser.ts:1846" },
-	{ vcmd: 0xdb, by: "text:y", letter: "c4 y10", hex: "c4 $DB $0A", cite: "parser.ts:1614" },
-	{ vcmd: 0xde, by: "text:p", letter: "c4 p12,8", hex: "c4 $DE $00 $0C $08", cite: "parser.ts:1945" },
-	{ vcmd: 0xe0, by: "text:w", letter: "c4 w200", hex: "c4 $E0 $C8", cite: "parser.ts:1489" },
-	{ vcmd: 0xe1, by: "text:w,", letter: "c4 w18,200", hex: "c4 $E1 $12 $C8", cite: "parser.ts:1492" },
-	{ vcmd: 0xe2, by: "text:t", letter: "c4 t144", hex: "c4 $E2 $90", cite: "parser.ts:1698" },
-	{ vcmd: 0xe3, by: "text:t,", letter: "c4 t18,144", hex: "c4 $E3 $12 $90", cite: "parseTempo's fade fork" },
-	{ vcmd: 0xe7, by: "text:v", letter: "c4 v200", hex: "c4 $E7 $C8", cite: "parser.ts:1506" },
-	{ vcmd: 0xe8, by: "text:v,", letter: "c4 v18,200", hex: "c4 $E8 $12 $C8", cite: "parser.ts:1509" },
+	{ vcmd: 0xda, letter: "c4 @0", hex: "c4 $DA $00", cite: "parser.ts:1846" },
+	{ vcmd: 0xdb, letter: "c4 y10", hex: "c4 $DB $0A", cite: "parser.ts:1614" },
+	{ vcmd: 0xde, letter: "c4 p12,8", hex: "c4 $DE $00 $0C $08", cite: "parser.ts:1945" },
+	{ vcmd: 0xe0, letter: "c4 w200", hex: "c4 $E0 $C8", cite: "parser.ts:1489" },
+	{ vcmd: 0xe1, letter: "c4 w18,200", hex: "c4 $E1 $12 $C8", cite: "parser.ts:1492" },
+	{ vcmd: 0xe2, letter: "c4 t144", hex: "c4 $E2 $90", cite: "parser.ts:1698" },
+	{ vcmd: 0xe3, letter: "c4 t18,144", hex: "c4 $E3 $12 $90", cite: "parseTempo's fade fork" },
+	{ vcmd: 0xe7, letter: "c4 v200", hex: "c4 $E7 $C8", cite: "parser.ts:1506" },
+	{ vcmd: 0xe8, letter: "c4 v18,200", hex: "c4 $E8 $12 $C8", cite: "parser.ts:1509" },
 	// `n` reads its argument as hex (`HEX_ARG_LETTERS`), so `n10` is sixteen.
-	{ vcmd: 0xf8, by: "text:n", letter: "c4 n10", hex: "c4 $F8 $10", cite: "parser.ts:1900" },
-	{ vcmd: 0xe6, by: "text:[[", letter: "c4 [[ c4 ]]2", hex: null, cite: "parser.ts:2381" },
-	{ vcmd: 0xe9, by: "text:[", letter: "c4 [ c4 ]4", hex: null, cite: "parser.ts:2512" },
+	{ vcmd: 0xf8, letter: "c4 n10", hex: "c4 $F8 $10", cite: "parser.ts:1900" },
+	{ vcmd: 0xe6, letter: "c4 [[ c4 ]]2", hex: null, cite: "parser.ts:2381" },
+	{ vcmd: 0xe9, letter: "c4 [ c4 ]4", hex: null, cite: "parser.ts:2512" },
 	{
 		vcmd: 0xfc,
-		by: "text:(!n,",
 		// The definition alone emits only its body; `$FC` is written where the
 		// remote code is *called* (`parser.ts:2334`), which is why the palette
 		// carries both spellings and why the probe needs both here.
@@ -160,11 +178,15 @@ console.log("\ncatalogue");
 
 	check("every VCMD $DA-$FE has an entry or a letter form that writes it", missing.length === 0, missing.join(" "));
 
-	const claimed = SUPERSEDED.filter((row) => offered.has(row.vcmd)).map((row) => row.by);
+	const claimed = SUPERSEDED.filter((row) => offered.has(row.vcmd)).map((row) => hex(row.vcmd));
 	check("nothing is both offered and superseded", claimed.length === 0, claimed.join(", "));
 
-	const orphaned = SUPERSEDED.filter((row) => !keys.has(row.by)).map((row) => row.by);
-	check("every superseding entry exists", orphaned.length === 0, orphaned.join(", "));
+	// Which spelling supersedes a byte is `LetterEntry.writes`, and the app reads
+	// it too — the roll meets a `$E7` in a compiled song and has to draw `v`'s
+	// speaker. Resolved rather than restated here, so there is one statement of it.
+	const writers = new Map(entries.filter((entry) => entry.writes !== undefined).map((entry) => [entry.writes, entry]));
+	const orphaned = SUPERSEDED.filter((row) => !writers.has(row.vcmd)).map((row) => hex(row.vcmd));
+	check("every superseded byte has an entry claiming to write it", orphaned.length === 0, orphaned.join(", "));
 
 	check("entry keys are unique", keys.size === entries.length);
 }
@@ -182,6 +204,15 @@ console.log("\ncatalogue");
 	);
 	const undrawn = GLYPH_NAMES.filter((glyph) => !template.includes(`@case ('${glyph}')`));
 	check("every glyph the union names has a @case", undrawn.length === 0, undrawn.join(", "));
+
+	// The template has no <svg> of its own — the host is one — so Angular has no
+	// parent to take a namespace from and every element needs the `svg:` prefix.
+	// Without it the element is built in the HTML namespace: it type-checks, it
+	// builds, and it draws nothing at all, in the palette and on a roll bar alike.
+	const bare = [...template.matchAll(/<([a-z]+)(?![a-z])/g)]
+		.map((found) => found[1])
+		.filter((tag) => SVG_TAGS.has(tag));
+	check("and every element carries the svg: prefix", bare.length === 0, [...new Set(bare)].join(", "));
 
 	const entries = resolveAll(DIALECTS[2].target, false);
 	const unused = GLYPH_NAMES.filter((glyph) => !entries.some((entry) => entry.icon === glyph));
@@ -222,8 +253,8 @@ console.log("\ncatalogue");
 console.log("\nsuperseded");
 
 for (const row of SUPERSEDED) {
-	const byte = `$${row.vcmd.toString(16).toUpperCase()}`;
-	const label = `${byte} superseded by ${row.by}`;
+	const byte = hex(row.vcmd);
+	const label = `${byte} superseded`;
 	const data = (body: string) =>
 		compiler.compile({ source: `#amk 4\n${row.above ? `${row.above}\n` : ""}#0 ${body}\n`, aramAddress: ARAM }).data;
 
@@ -366,6 +397,51 @@ console.log("\nplacement");
 	const first = channelsBeginAt(tokenize(song));
 	check("channelsBeginAt finds the first #N", first === song.indexOf("#0"), `found ${first}`);
 	check("and nothing when the song has no channel", channelsBeginAt(tokenize("#amk 4\n")) === null);
+}
+
+// ---------------------------------------------------------------------------
+console.log("\na command read back out of a song finds its glyph");
+// ---------------------------------------------------------------------------
+//
+// The catalogue answers "what can I add"; the piano roll asks it backwards, for
+// a command already written. A byte with no answer is a bar with a gap on it,
+// which looks exactly like a bar with nothing acting on it.
+{
+	const drawn = (body: string) => {
+		const source = `#amk 4\n#0 ${body}\n`;
+		const command = tokenize(source).commands.find((entry) => entry.span.start >= source.indexOf(body));
+		return command === undefined ? null : { command, entry: glyphOf(command) };
+	};
+
+	const undrawable: string[] = [];
+	for (const vcmd of Object.keys(VCMD_NAMES).map(Number)) {
+		const found = drawn(hex(vcmd));
+		if (found === null || commandScope(found.command) !== "note-state") {
+			continue;
+		}
+
+		if (found.entry === null) {
+			undrawable.push(hex(vcmd));
+		}
+	}
+
+	check("every VCMD that acts on a note has a glyph", undrawable.length === 0, undrawable.join(" "));
+
+	const letters = ["@", "v", "y", "q", "h", "n", "p"];
+	const missing = letters.filter((letter) => drawn(`${letter}1`)?.entry == null);
+	check("and so does every letter that acts on one", missing.length === 0, missing.join(" "));
+
+	// One opcode, two envelopes, told apart by the first argument's top bit —
+	// the same test the inspector makes to choose between the two views.
+	check("$ED below $80 is the four-stage envelope", drawn("$ED $3F $4D")?.entry?.icon === "adsr");
+	check("and at or above it drives the level directly", drawn("$ED $8E $7F")?.entry?.icon === "gain");
+
+	// A second argument turns three letters into their fades, which is the same
+	// count `gather` splits their names on.
+	check("t144 is the tempo glyph", drawn("t144")?.entry?.icon === "metronome");
+	check("and t18,144 the fade", drawn("t18,144")?.entry?.icon === "metronomeFade");
+	check("v200 is the volume glyph", drawn("v200")?.entry?.icon === "speaker");
+	check("and v18,200 the fade", drawn("v18,200")?.entry?.icon === "hairpin");
 }
 
 summarise();

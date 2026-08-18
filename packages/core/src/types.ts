@@ -124,6 +124,30 @@ export interface NoteAddress {
 	span: Span;
 }
 
+/**
+ * A command that emitted bytes, and the source text it was written as.
+ *
+ * The sibling of {@link NoteAddress}, and not something AddmusicK records
+ * either. It exists because the driver decides which command is in force at run
+ * time: a `[ ]` body, a `[[ ]]` subloop and a `(1)n` call all replay one run of
+ * bytes under whatever state reached them, so only a walk of the emitted stream
+ * can say which command a note sounds under — and a walk can name a command by
+ * nothing but its address. This turns that address back into text.
+ *
+ * Commands the compiler resolves at parse time are deliberately absent, since
+ * they emit nothing to address: `q` folds into each note's duration byte, `h`
+ * and `@21`-`@29` into the note byte itself, and `o`/`l` into neither. Source
+ * order answers those exactly, because that is the order the compiler read them
+ * in.
+ */
+export interface CommandAddress {
+	/** Absolute ARAM address of the first byte the command emitted. */
+	address: number;
+	/** 0-7 for the music channels; 8 for the loop/subroutine block. */
+	channel: number;
+	span: Span;
+}
+
 export interface CompileResult {
 	ok: boolean;
 	/** Relocated song data, ready to paste at `aramAddress`. Null if `!ok`. */
@@ -134,6 +158,12 @@ export interface CompileResult {
 	 * Null if `!ok`.
 	 */
 	noteMap: readonly NoteAddress[] | null;
+	/**
+	 * Every command that emitted bytes, by the ARAM address of its first byte,
+	 * sorted by address. The piano roll names the commands a note sounds under
+	 * with it. Null if `!ok`.
+	 */
+	commandMap: readonly CommandAddress[] | null;
 	/** The sample set this song needs, by filename, ordered by sample index. */
 	sampleList: readonly string[] | null;
 	diagnostics: Diagnostic[];

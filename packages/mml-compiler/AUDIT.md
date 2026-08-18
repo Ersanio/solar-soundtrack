@@ -104,6 +104,17 @@ shows in its stats panel. Kept because the alternative is showing `0:00` for a s
 stated its length, which is worse for no fidelity gain. Flagged here rather than left implicit, so
 it is a decision rather than an oversight.
 
+## Outputs AddmusicK does not have
+
+`noteMap` and `commandMap` record where each note and each byte-emitting command came from in the
+source. AddmusicK records neither and has no use for either; they exist so the editor can join a
+compiled byte back to the text it was written as — the piano roll draws on the first and names the
+commands acting on a note with the second.
+
+Neither changes a byte. `commandMap` is gathered by bracketing `scan`'s one dispatch loop and asking
+whether the channel's vector grew, which touches no handler and decides nothing; `selftest` and the
+byte tables are what hold that, and the emitted blob is identical across every dialect.
+
 ## Checked and not confirmed
 
 `handleSuperLoopExit` and `addNoteLength` index `channelLengths` with `this.channel`, which can be

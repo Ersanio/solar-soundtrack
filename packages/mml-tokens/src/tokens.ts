@@ -2052,6 +2052,41 @@ export function expectedArgs(vcmd: number, args: { value: number }[], target: Co
  * which is what "the command it just finished" means, and which keeps the
  * result from depending on where the binary search happened to land.
  */
+/**
+ * The command that begins exactly at `offset`, or `null`.
+ *
+ * The lookup a *span* wants, where {@link commandAt} is the one a *caret* wants.
+ * That one's end is inclusive and answers a tie with the first of the run, so in
+ * `v200c4` the note begins at offset 4 and `commandAt(4)` returns the `v200` it
+ * comes straight after. Anything joining a compiled address back to the command
+ * it was written as has a start and needs the command that starts there.
+ *
+ * A replacement collapses every command it expands to onto one span, so the
+ * first of them is returned, exactly as {@link commandAt} does.
+ */
+export function commandStartingAt(commands: readonly Command[], offset: number): Command | null {
+	let low = 0;
+	let high = commands.length - 1;
+	while (low <= high) {
+		const mid = (low + high) >> 1;
+		const { start } = commands[mid].span;
+		if (offset < start) {
+			high = mid - 1;
+		} else if (offset > start) {
+			low = mid + 1;
+		} else {
+			let index = mid;
+			while (index > 0 && commands[index - 1].span.start === offset) {
+				index--;
+			}
+
+			return commands[index];
+		}
+	}
+
+	return null;
+}
+
 export function commandAt(commands: Command[], offset: number): Command | null {
 	let low = 0;
 	let high = commands.length - 1;

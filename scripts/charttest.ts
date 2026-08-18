@@ -33,8 +33,13 @@ import {
 	advanceTick,
 	gridLines,
 	keyIsBlack,
+	fitBarContent,
 	keyName,
+	noteLabel,
 	laneStack,
+	pageStart,
+	scrubOffset,
+	scrubTick,
 	tickWindow,
 } from "../web/src/app/editor/views/piano-roll/roll-layout";
 import { clamp } from "../web/src/app/util/math";
@@ -277,6 +282,241 @@ console.log("\npiano roll window and grid");
 	check("a zero step yields nothing rather than hanging", gridLines(0, 384, 0).length === 0);
 }
 
+console.log("\nthe roll's pages");
+{
+	// The paged view holds the music still and sweeps the playhead across it,
+	// turning over once the playhead reaches PAGE_TURN_AT and moving PAGE_STEP of
+	// a pane — so it lands at the difference, a tenth in, with the bar it has just
+	// played still on screen. None of it is visible in a screenshot: a page that
+	// turns a fraction early or late looks exactly like one that does not.
+	const TURN_AT = 0.9; // PianoRoll.PAGE_TURN_AT
+	const STEP = 0.8; // PianoRoll.PAGE_STEP
+	const LEAD = 0.2; // PianoRoll.PLAYHEAD_AT, the continuous roll's fixed lead
+	const SCREEN = 800; // ticks across the pane
+	const STRIDE = SCREEN * STEP;
+	const LEAD_IN = SCREEN * (TURN_AT - STEP);
+	const page = (tick: number) => pageStart(tick, SCREEN, TURN_AT, STEP);
+	const offset = (tick: number) => tick - page(tick);
+
+	// The song opens on the lead-in every later page opens on, which means page
+	// zero starts before tick 0 and the first bar is drawn with space in front of
+	// it. Opening flush against the key column instead makes that margin appear
+	// out of nowhere at the first turn, and makes a scroll back to the beginning
+	// show the space and then lose it again on the way back to the song.
+	check("a song opens on the lead-in, not against the key column", page(0) === -LEAD_IN, `${page(0)}`);
+	check(
+		"which is the margin every later page opens on too",
+		Math.abs(offset(0) - LEAD_IN) < EPSILON && Math.abs(offset(STRIDE) - LEAD_IN) < EPSILON,
+		`${offset(0)} then ${offset(STRIDE)}`,
+	);
+	check(
+		"and it holds there until the playhead reaches the turn",
+		page(STRIDE - 1) === page(0) && Math.abs(page(STRIDE) - (page(0) + STRIDE)) < EPSILON,
+		`${page(STRIDE - 1)} then ${page(STRIDE)}`,
+	);
+	check(
+		"the turn comes when the playhead is TURN_AT across the pane",
+		Math.abs(offset(STRIDE - EPSILON) - SCREEN * TURN_AT) < 1e-3,
+		`${offset(STRIDE - EPSILON)} ticks in, of ${SCREEN}`,
+	);
+
+	// Why the step is shorter than the turn: a page moving the whole pane would
+	// drop the playhead hard against the key column with nothing behind it, and
+	// the phrase that had just played would be gone at the moment you looked for it.
+	check(
+		"a turn leaves the music just played still on screen",
+		Math.abs(offset(STRIDE) - SCREEN * (TURN_AT - STEP)) < EPSILON,
+		`${offset(STRIDE)} ticks in, of ${SCREEN}`,
+	);
+
+	// The playhead is drawn at its offset into the page, so an offset outside the
+	// pane is a line over the key column or off the right edge — where the clip
+	// hides it rather than showing anything wrong.
+	let outside = "";
+	let backwards = "";
+	let previous = page(0);
+	for (let tick = 0; tick <= SCREEN * 12; tick += 7) {
+		const into = offset(tick);
+		if (into < LEAD_IN - EPSILON || into >= SCREEN * TURN_AT + EPSILON) {
+			outside += ` ${tick}`;
+		}
+
+		if (page(tick) < previous - EPSILON) {
+			backwards += ` ${tick}`;
+		}
+
+		previous = page(tick);
+	}
+
+	check("the playhead is never outside the lead-in and the turn", outside === "", outside);
+	check("and a page never turns backwards as the song runs forwards", backwards === "", backwards);
+
+	// One turn per stride, not one per frame. The transform itself is cheap, but a
+	// page flickering between two values at the boundary takes the marks with it,
+	// and that is the whole pane rebuilt.
+	const starts = new Set<number>();
+	let sampled = 0;
+	for (let tick = 0; tick <= SCREEN * 12; tick += 7) {
+		sampled++;
+		starts.add(page(tick));
+	}
+
+	check(
+		"a sweep turns one page per stride at most",
+		starts.size <= (SCREEN * 12) / STRIDE + 1,
+		`${starts.size} pages over ${(SCREEN * 12) / STRIDE} strides`,
+	);
+	check("which is far below one per frame", starts.size * 20 < sampled, `${starts.size} against ${sampled}`);
+	check(
+		"and every page starts a whole stride past the lead-in",
+		[...starts].every((tick) => Math.abs((tick + LEAD_IN) % STRIDE) < EPSILON),
+	);
+
+	check("an unmeasured pane pages nowhere rather than dividing by zero", pageStart(500, 0, TURN_AT, STEP) === 0);
+	check("and neither does a zero step", pageStart(500, SCREEN, TURN_AT, 0) === 0);
+
+	// The anchor, which is what a scroll moves. Measured from the song's own start
+	// always, a seek drops the playhead wherever its place in that fixed grid
+	// happens to fall — so the notes jump the moment the wheel goes quiet, by up
+	// to a whole stride, and the roll looks like it is fighting the scroll.
+	{
+		const anchored = (tick: number, origin: number) => pageStart(tick, SCREEN, TURN_AT, STEP, origin);
+		check(
+			"the anchor is the tick that sits on the lead-in",
+			anchored(1234, 1234) === 1234 - LEAD_IN,
+			`${anchored(1234, 1234)}`,
+		);
+		check("and an anchor of zero is the song's own start", anchored(500, 0) === page(500));
+
+		// The property the fix exists for: a scroll leaves the view at some tick and
+		// some lead, and re-anchoring on it must reproduce that exact camera. Over
+		// every lead a page can show the playhead at, which is the lead-in up to but
+		// not including the turn — a page ends *at* the turn, so that is the one
+		// value no page has the playhead sitting at.
+		let moved = "";
+		for (const tick of [0, 137, 900, 5000, 12345]) {
+			for (const lead of [0.1, 0.2, 0.35, 0.5, 0.75, 0.85, 0.899]) {
+				const viewLeft = tick - SCREEN * lead;
+				const origin = viewLeft + LEAD_IN;
+				if (Math.abs(anchored(tick, origin) - viewLeft) > EPSILON) {
+					moved += ` ${tick}@${lead}`;
+				}
+			}
+		}
+
+		check("re-anchoring on a parked view leaves the notes exactly where they are", moved === "", moved);
+
+		// And that the excluded value is excluded because the page has turned there,
+		// not because the arithmetic gives up: anchoring at the turn lands the
+		// playhead on the next page's lead-in, which is what turning a page is.
+		const atTurn = anchored(5000, 5000 - SCREEN * TURN_AT + LEAD_IN);
+		check(
+			"anchoring exactly at the turn turns the page, as it should",
+			Math.abs(5000 - atTurn - LEAD_IN) < EPSILON,
+			`playhead ${5000 - atTurn} into the page, lead-in ${LEAD_IN}`,
+		);
+
+		// Which is reachable only in theory: a page shows the playhead below the
+		// turn by construction, so the lead a scroll parks with is never that value.
+		let atOrPast = "";
+		for (let tick = 0; tick <= SCREEN * 12; tick += 3) {
+			if (offset(tick) >= SCREEN * TURN_AT) {
+				atOrPast += ` ${tick}`;
+			}
+		}
+
+		check("and a real page never has the playhead at the turn to begin with", atOrPast === "", atOrPast);
+
+		// And the grid still behaves once anchored: same lead-in, same turn, and a
+		// page behind the anchor rather than the playhead stranded off the pane —
+		// which is what a loop wrap back past the anchor would otherwise do.
+		const ORIGIN = 5000;
+		let bad = "";
+		for (let tick = 0; tick <= 12000; tick += 11) {
+			const into = tick - anchored(tick, ORIGIN);
+			if (into < LEAD_IN - EPSILON || into >= SCREEN * TURN_AT + EPSILON) {
+				bad += ` ${tick}`;
+			}
+		}
+
+		check("an anchored grid still holds the playhead on the pane, before the anchor too", bad === "", bad);
+	}
+
+	// The one with no visual tell at all. The marks are built for a window around
+	// the *playhead*, snapped and carrying a screen of margin either side, while
+	// the transform points at the *page*. A page reaching outside that window
+	// would scroll perfectly smoothly over blank music, so the two are pinned
+	// together rather than left to be rediscovered.
+	let uncovered = "";
+	for (const zoom of [0.5, 1, 2, 4, 8]) {
+		const width = SCREEN * zoom;
+		for (let tick = 0; tick <= 20000; tick += 13) {
+			// Clamped at 0, because the opening page reaches before the first tick
+			// and there is no music there to be missing.
+			const from = Math.max(0, pageStart(tick, SCREEN, TURN_AT, STEP));
+			const window = tickWindow(tick, width, zoom, LEAD);
+			if (from < window.from || from + SCREEN > window.to) {
+				uncovered += ` ${zoom}@${tick}`;
+				break;
+			}
+		}
+	}
+
+	check("every page is inside the window the marks are built for", uncovered === "", uncovered);
+}
+
+console.log("\nthe scrub bar's time axis");
+{
+	// The bar holds the whole song and nothing else, so a drag on it is a mapping
+	// and its inverse. The inverse has to be exact: a scrub commits to the tick
+	// under the pointer, and one that landed merely near it would drop the song a
+	// note away from where it was dropped, every time, with nothing on screen to
+	// say so.
+	const WIDTH = 724; // a pane, less the key column
+	const TICKS = 12312;
+
+	check("tick 0 is the left edge", scrubOffset(0, TICKS, WIDTH) === 0);
+	check("and the last tick is the right edge", scrubOffset(TICKS, TICKS, WIDTH) === WIDTH);
+	check("with the middle in the middle", Math.abs(scrubOffset(TICKS / 2, TICKS, WIDTH) - WIDTH / 2) < EPSILON);
+
+	let apart = "";
+	for (let tick = 0; tick <= TICKS; tick += 7) {
+		const back = scrubTick(scrubOffset(tick, TICKS, WIDTH), TICKS, WIDTH);
+		if (Math.abs(back - tick) > 1e-9) {
+			apart += ` ${tick}->${back}`;
+		}
+	}
+
+	check("a tick survives the round trip to the bar and back", apart === "", apart);
+
+	// The whole song and nothing else: the same tick lands on a different pixel of
+	// a wider pane, and on the same *fraction* of either. A bar that drew a fixed
+	// number of pixels per tick would run off the end of a long song.
+	check(
+		"the song fills the bar at any width",
+		[200, 724, 1600, 3000].every((w) => scrubOffset(TICKS, TICKS, w) === w && scrubOffset(0, TICKS, w) === 0),
+	);
+	check(
+		"and a short song fills it exactly as a long one does",
+		[1, 96, 12312, 999999].every((t) => Math.abs(scrubOffset(t / 2, t, WIDTH) - WIDTH / 2) < EPSILON),
+	);
+
+	// A drag that leaves the bar is still asking for an end of the song, not for a
+	// tick outside it — which the transport would clamp anyway, silently.
+	check("a drag off the left end asks for the first tick", scrubTick(-500, TICKS, WIDTH) === 0);
+	check("and off the right end for the last", scrubTick(WIDTH + 500, TICKS, WIDTH) === TICKS);
+	check("a tick past the end draws at the right edge", scrubOffset(TICKS * 2, TICKS, WIDTH) === WIDTH);
+	check("and one before the start at the left", scrubOffset(-100, TICKS, WIDTH) === 0);
+
+	// A NaN here is an x of NaN on every bar of the minimap: a strip that renders
+	// blank, with nothing in the console to say why.
+	check(
+		"a song of no ticks answers 0 rather than NaN",
+		scrubOffset(50, 0, WIDTH) === 0 && scrubTick(50, 0, WIDTH) === 0,
+	);
+	check("and so does an unmeasured pane", scrubOffset(50, TICKS, 0) === 0 && scrubTick(50, TICKS, 0) === 0);
+}
+
 console.log("\nthe playhead's own clock");
 {
 	const RATE = 95.7; // t48
@@ -361,6 +601,7 @@ console.log("\npercussion is a preference, not a rule");
 
 	/** A note as the walk would report it; only the fields placement reads. */
 	const note = (instrument: number | null, byte: number, noise: number | null = null, address = 0): WalkNote => ({
+		origins: [],
 		channel: 0,
 		tick: 0,
 		ticks: 24,
@@ -648,6 +889,94 @@ console.log("\nthe roll's playhead follows the music, not the tempo it was writt
 	const measured = drift(231.2, 231.2);
 	check("the tempo byte puts it more than a quarter note out", nominal > 48, `${nominal.toFixed(1)} ticks`);
 	check("the clock's own rate keeps it within a 32nd", measured < 6, `${measured.toFixed(1)} ticks`);
+}
+
+// ---------------------------------------------------------------------------
+console.log("\nwhat fits inside one bar");
+// ---------------------------------------------------------------------------
+//
+// A bar names its own note and carries a glyph per command acting on it. Both
+// are drawn inside a rectangle whose width is a note length times a zoom and
+// whose height is a stretched row, so "does it fit" is arithmetic and the
+// failure — text running out over the next bar, or over the key column — is the
+// kind that only shows up on somebody else's song.
+{
+	// Two spellings of one pitch. `keyName` is four characters too wide for a bar
+	// and `noteLabel` is what goes in one, so the only thing that matters is that
+	// they can never name different keys.
+	let apart = "";
+	for (let key = -24; key < 96; key++) {
+		const long = keyName(key);
+		const at = long.indexOf(" ");
+		const rewritten = long.slice(at + 1).toUpperCase() + long.slice(1, at);
+		if (noteLabel(key) !== rewritten) {
+			apart += ` ${long} vs ${noteLabel(key)}`;
+		}
+	}
+
+	check("a bar's name and the key column's name the same key", apart === "", apart);
+	check("including below o1, where the octave floors", noteLabel(-12) === "C0" && noteLabel(-1) === "B0");
+	check("and the accidental is MML's own +", noteLabel(1) === "C+1");
+
+	// A row too short to hold text holds nothing: half a letter is worse than a
+	// bar that simply says nothing and leaves it to the hover.
+	check("nothing is drawn in a row too short for it", fitBarContent(400, 8, "C4", 3).name === null);
+	check("and no glyphs either", fitBarContent(400, 8, "C4", 3).glyphs.length === 0);
+	check("nor in a bar of no width", fitBarContent(0, 30, "C4", 3).name === null);
+
+	// The name goes first and the glyphs are dropped from the end. A bar saying
+	// `C6` is still saying something; glyphs with no note beside them are a row of
+	// icons floating over the music.
+	const wide = fitBarContent(300, 20, "C4", 4);
+	check("a wide bar takes its name and every glyph", wide.name !== null && wide.glyphs.length === 4);
+
+	// Monotone, and it has to be: a bar that grows an icon as it shrinks is what
+	// happens when the glyphs are allowed the room the name gave up.
+	let last = 99;
+	let grew = "";
+	let nameLost = -1;
+	for (let width = 300; width >= 0; width -= 1) {
+		const fit = fitBarContent(width, 20, "C4", 4);
+		if (fit.glyphs.length > last) {
+			grew += ` ${fit.glyphs.length} at ${width}`;
+		}
+
+		last = fit.glyphs.length;
+		if (fit.name === null && nameLost < 0) {
+			nameLost = width;
+		}
+	}
+
+	check("glyphs only ever drop as a bar narrows", grew === "", grew);
+	check("down to none", last === 0);
+	check(
+		"and the name is the last thing to go",
+		nameLost >= 0 && fitBarContent(nameLost + 1, 20, "C4", 4).glyphs.length === 0,
+		`name lost at ${nameLost}`,
+	);
+
+	// Nothing may cross the bar it is drawn in: the roll clips at the key column
+	// and not per mark, so an overhang lands on the neighbouring note.
+	let overflow = "";
+	for (const width of [12, 20, 40, 80, 160, 320]) {
+		for (const glyphs of [0, 1, 3, 5, 8]) {
+			const fit = fitBarContent(width, 24, "C+4", glyphs);
+			for (const box of fit.glyphs) {
+				if (box.x < 0 || box.x + box.size > width) {
+					overflow += ` ${width}/${glyphs}`;
+				}
+			}
+
+			// The name is measured at the monospace advance, which is what makes
+			// this an estimate worth trusting: the roll's text is `font-mono`.
+			const nameEnd = fit.name === null ? 0 : fit.name.x + "C+4".length * fit.name.size * 0.6;
+			if (fit.glyphs.length > 0 && fit.glyphs[0].x < nameEnd) {
+				overflow += ` overlap ${width}/${glyphs}`;
+			}
+		}
+	}
+
+	check("nothing is laid outside its bar or over its name", overflow === "", overflow);
 }
 
 summarise();

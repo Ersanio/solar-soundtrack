@@ -10,8 +10,14 @@
  */
 
 import { hex, hex4 } from "@amk/core/hex";
-import type { Diagnostic, NoteAddress } from "@amk/core/types";
-import type { NoteEvent, ParseOutput } from "./parser";
+import type { CommandAddress, Diagnostic, NoteAddress } from "@amk/core/types";
+import type { ParseOutput } from "./parser";
+
+/** What {@link prependBlobPrefix} shifts: both event maps are relocated alike. */
+interface PlacedEvent {
+	channel: number;
+	offset: number;
+}
 
 export interface LinkResult {
 	data: Uint8Array;
@@ -20,6 +26,8 @@ export interface LinkResult {
 	loopDataSize: number;
 	/** The parser's note events with their offsets relocated to ARAM addresses, sorted by address. */
 	noteMap: NoteAddress[];
+	/** The same, for every command that emitted bytes. */
+	commandMap: CommandAddress[];
 	diagnostics: Diagnostic[];
 }
 
@@ -36,8 +44,9 @@ export function link(parsed: ParseOutput, aramAddress: number): LinkResult {
 	const loopLocations = parsed.loopLocations.map((locations) => [...locations]);
 	const phrasePointers = parsed.phrasePointers.map((pair) => [...pair]);
 	const noteEvents = parsed.noteEvents.map((event) => ({ ...event }));
+	const commandEvents = parsed.commandEvents.map((event) => ({ ...event }));
 
-	prependBlobPrefix(parsed, data, loopLocations, phrasePointers, noteEvents);
+	prependBlobPrefix(parsed, data, loopLocations, phrasePointers, [...noteEvents, ...commandEvents]);
 
 	// Lay the channels out end to end and record where each one starts.
 	let offset = 0;
@@ -75,15 +84,22 @@ export function link(parsed: ParseOutput, aramAddress: number): LinkResult {
 		}
 	}
 
+	const addressOf = (event: PlacedEvent): number =>
+		aramAddress + header.length + channelStart[event.channel] + event.offset;
+
 	const noteMap: NoteAddress[] = noteEvents
 		.map((event) => ({
 			channel: event.channel,
-			address: aramAddress + header.length + channelStart[event.channel] + event.offset,
+			address: addressOf(event),
 			note: event.note,
 			written: event.written,
 			ticks: event.ticks,
 			span: event.span,
 		}))
+		.sort((a, b) => a.address - b.address);
+
+	const commandMap: CommandAddress[] = commandEvents
+		.map((event) => ({ channel: event.channel, address: addressOf(event), span: event.span }))
 		.sort((a, b) => a.address - b.address);
 
 	const end = aramAddress + blob.length;
@@ -102,6 +118,7 @@ export function link(parsed: ParseOutput, aramAddress: number): LinkResult {
 		channelSizes: data.slice(0, 8).map((channel) => channel.length),
 		loopDataSize: data[8].length,
 		noteMap,
+		commandMap,
 		diagnostics,
 	};
 }
@@ -116,7 +133,7 @@ function prependBlobPrefix(
 	data: number[][],
 	loopLocations: number[][],
 	phrasePointers: number[][],
-	noteEvents: NoteEvent[],
+	events: PlacedEvent[],
 ): void {
 	const channel = parsed.resizedChannel;
 	if (channel === -1) {
@@ -175,7 +192,7 @@ function prependBlobPrefix(
 	phrasePointers[channel][0] += shift;
 	phrasePointers[channel][1] += shift;
 
-	for (const event of noteEvents) {
+	for (const event of events) {
 		if (event.channel === channel) {
 			event.offset += shift;
 		}

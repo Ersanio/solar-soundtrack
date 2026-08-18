@@ -84,6 +84,179 @@ const NOTE_BUDGET = 200_000;
 const STEP_BUDGET = 2_000_000;
 
 /**
+ * The channel or song state a VCMD writes. Two commands sharing a slot
+ * supersede each other, so a slot holds at most one command at a time.
+ *
+ * A driver fact and not a presentation one: it says what `main.asm` keeps where,
+ * which is the same question {@link NoteState} answers with values. A reader that
+ * wants only some of these filters them itself, the way the percussion set is the
+ * roll's business and not this module's.
+ *
+ * Only VCMDs are here, because only a VCMD has an address for {@link WalkNote.origins}
+ * to name it by. `q` folds into each note's duration byte, `h` and `@21`-`@29`
+ * into the note byte, and `o`/`l` into neither — those have no slot and no origin,
+ * and the source is where they are answered.
+ */
+export type StateSlot =
+	/** `$DA`. `@21`-`@29` reach {@link NoteState.instrument} without one. */
+	| "instrument"
+	/** `$F3`. */
+	| "sample"
+	/** `$ED`, ADSR or GAIN. */
+	| "envelope"
+	/** `$E7`/`$E8`. */
+	| "volume"
+	/** `$DB`/`$DC`. */
+	| "pan"
+	/** `$EE`, the pitch modifier. */
+	| "tune"
+	/** `$FA $02`, `!HTuneValues` — a different register from `$EE`. */
+	| "htune"
+	/** `$F8`, cleared by `$DA` as the driver clears it. */
+	| "noise"
+	/** `$DE`/`$EA`, cleared by `$DF`. */
+	| "vibrato"
+	/** `$E5`, cleared by `$FD`. */
+	| "tremolo"
+	/** `$EB`/`$EC`, cleared by `$FE`. */
+	| "pitchEnvelope"
+	/** `$DD`. */
+	| "bend"
+	/** `$FB`. */
+	| "arpeggio"
+	/** `$F4`'s nine switches, as one slot: they draw the same and read the same. */
+	| "toggles"
+	/** `$FA`'s other sub-commands, likewise. */
+	| "settings"
+	/** `$FC`. */
+	| "remote"
+	/** `$E2`/`$E3`. Song-wide. */
+	| "tempo"
+	/** `$E0`/`$E1`. Song-wide. */
+	| "globalVolume"
+	/** `$E4`. Song-wide. */
+	| "transpose"
+	/** `$EF`/`$F1`/`$F2`, cleared by `$F0`. One DSP, so song-wide. */
+	| "echo"
+	/** `$F5`. Song-wide, for the same reason. */
+	| "fir";
+
+/** Every slot, in the order {@link WalkNote.origins} is indexed by. */
+export const SLOTS: readonly StateSlot[] = [
+	"instrument",
+	"sample",
+	"envelope",
+	"volume",
+	"pan",
+	"tune",
+	"htune",
+	"noise",
+	"vibrato",
+	"tremolo",
+	"pitchEnvelope",
+	"bend",
+	"arpeggio",
+	"toggles",
+	"settings",
+	"remote",
+	"tempo",
+	"globalVolume",
+	"transpose",
+	"echo",
+	"fir",
+];
+
+/**
+ * How many of {@link SLOTS} a channel owns. The song-wide ones are the tail, so
+ * one number splits them and a channel's array need only be this long.
+ *
+ * Taken from where `"tempo"` sits rather than written as a count, so adding a
+ * slot to either half moves the boundary with it. `walktest` checks the tail is
+ * what this claims, since a per-channel slot filed as song-wide would have one
+ * channel's command reported by all eight.
+ */
+const CHANNEL_SLOTS = SLOTS.indexOf("tempo");
+
+const slotAt = (slot: StateSlot): number => SLOTS.indexOf(slot);
+
+const INSTRUMENT_SLOT = slotAt("instrument");
+
+/**
+ * The slot a command writes, and the one it clears instead.
+ *
+ * A function rather than a table because `$FA` is eight commands under one byte
+ * and only `$02` writes a slot of its own, and because the four `off` commands
+ * take a slot away rather than occupying one: after `$DF` there is no vibrato,
+ * so reporting the `$DF` as the vibrato in force would be a plain lie.
+ */
+function slotsOf(vcmd: number, sub: number): { writes: StateSlot | null; clears: StateSlot | null } {
+	switch (vcmd) {
+		case 0xda:
+			// `SetInstrument` writes `$C1+x` and clears the noise bit with it
+			// (`main.asm:2554` ModifyNoise), which is why this takes noise away.
+			return { writes: "instrument", clears: "noise" };
+		case 0xdb:
+		case 0xdc:
+			return { writes: "pan", clears: null };
+		case 0xdd:
+			return { writes: "bend", clears: null };
+		case 0xde:
+		case 0xea:
+			return { writes: "vibrato", clears: null };
+		case 0xdf:
+			return { writes: null, clears: "vibrato" };
+		case 0xe0:
+		case 0xe1:
+			return { writes: "globalVolume", clears: null };
+		case 0xe2:
+		case 0xe3:
+			return { writes: "tempo", clears: null };
+		case 0xe4:
+			return { writes: "transpose", clears: null };
+		case 0xe5:
+			return { writes: "tremolo", clears: null };
+		case 0xe7:
+		case 0xe8:
+			return { writes: "volume", clears: null };
+		case 0xeb:
+		case 0xec:
+			return { writes: "pitchEnvelope", clears: null };
+		case 0xed:
+			return { writes: "envelope", clears: null };
+		case 0xee:
+			return { writes: "tune", clears: null };
+		case 0xef:
+		case 0xf1:
+		case 0xf2:
+			return { writes: "echo", clears: null };
+		case 0xf0:
+			return { writes: null, clears: "echo" };
+		case 0xf3:
+			return { writes: "sample", clears: null };
+		case 0xf4:
+			return { writes: "toggles", clears: null };
+		case 0xf5:
+			return { writes: "fir", clears: null };
+		case 0xf8:
+			return { writes: "noise", clears: null };
+		case 0xfa:
+			return { writes: sub === 0x02 ? "htune" : "settings", clears: null };
+		case 0xfb:
+			return { writes: "arpeggio", clears: null };
+		case 0xfc:
+			return { writes: "remote", clears: null };
+		case 0xfd:
+			return { writes: null, clears: "tremolo" };
+		case 0xfe:
+			return { writes: null, clears: "pitchEnvelope" };
+		default:
+			// `$E6`/`$E9` are structure, and `$F6`/`$F7`/`$F9` write a register or a
+			// byte once rather than setting anything a later note reads.
+			return { writes: null, clears: null };
+	}
+}
+
+/**
  * The song-wide and per-channel settings a note sounds under.
  *
  * Deliberately the whole of it, not the subset anything reads today. A view
@@ -155,6 +328,20 @@ export interface WalkNote {
 	 */
 	address: number;
 	state: NoteState;
+	/**
+	 * ARAM address of the command in force in each of {@link SLOTS}, or `null`
+	 * where nothing has written that slot yet.
+	 *
+	 * Addresses rather than values, because the point is to name the command: a
+	 * `[ ]` body, a `[[ ]]` subloop and a `(1)n` call all replay one run of bytes
+	 * under whatever state reached them, so which `$ED` a note sounds under is a
+	 * fact about execution and not about the text. `CompileResult.commandMap`
+	 * turns an address back into the source it was written as.
+	 *
+	 * Shared between consecutive notes for as long as nothing changes, exactly as
+	 * {@link state} is.
+	 */
+	origins: readonly (number | null)[];
 }
 
 /** A song-wide tempo command, on the tick the driver runs it. */
@@ -274,8 +461,12 @@ interface Track {
 	loopCount: number;
 	loopStart: number;
 	state: ChannelState;
+	/** Where each of this channel's slots was last written. See {@link WalkNote.origins}. */
+	origins: (number | null)[];
 	/** The last frozen snapshot, reused until something changes. */
 	snapshot: NoteState | null;
+	/** The last frozen origins, reused on the same terms. */
+	frozenOrigins: readonly (number | null)[] | null;
 }
 
 /** The mutable half of {@link NoteState}, kept per channel. */
@@ -390,8 +581,13 @@ export function walkSong(song: Uint8Array, aramAddress: number): SongTimeline {
 			callRestart: -1,
 			loopCount: 0,
 			loopStart: -1,
+			origins: new Array<number | null>(CHANNEL_SLOTS).fill(null),
+			frozenOrigins: null,
 			state: {
-				instrument: null,
+				// `main.asm:2321` calls `SetInstrument` with 0 for every channel whose
+				// `$C1+x` is still zero, which `main.asm:2193` has just made true of
+				// all of them — so a channel that never writes an `@` plays `@0`.
+				instrument: 0,
 				volume: null,
 				pan: null,
 				quantization: null,
@@ -411,7 +607,14 @@ export function walkSong(song: Uint8Array, aramAddress: number): SongTimeline {
 	// Song-wide state. Any channel may write it and every channel reads it.
 	// `tempo` is 0 until the song sets one; the caller supplies its own default,
 	// since what AddmusicK assumes for an untempoed song is a compiler question.
-	const shared = { transpose: 0, tempo: 0, globalVolume: null as number | null, secondVelocityTable: true };
+	const shared = {
+		transpose: 0,
+		tempo: 0,
+		globalVolume: null as number | null,
+		secondVelocityTable: true,
+		/** Song-wide slots, which every channel's next note reports. */
+		origins: new Array<number | null>(SLOTS.length).fill(null),
+	};
 	let loopTick = loopPhrase >= 0 ? Number.POSITIVE_INFINITY : Number.NaN;
 	let truncated = false;
 
@@ -437,13 +640,68 @@ export function walkSong(song: Uint8Array, aramAddress: number): SongTimeline {
 	};
 
 	/**
+	 * The commands in force, frozen alongside the state.
+	 *
+	 * The two halves are merged here rather than kept in one array because a
+	 * song-wide command is written once and read by all eight channels; keeping
+	 * one copy is what makes `invalidateAll` enough to publish it.
+	 */
+	const origins = (track: Track): readonly (number | null)[] => {
+		track.frozenOrigins ??= SLOTS.map((_, at) => (at < CHANNEL_SLOTS ? track.origins[at] : shared.origins[at]));
+		return track.frozenOrigins;
+	};
+
+	/**
 	 * A song-wide command is read by every channel's next note, so every frozen
 	 * snapshot is stale, not only the running channel's — the others would go on
 	 * reporting the tempo or transposition in force when they were taken.
 	 */
+	/**
+	 * Where each slot was last written, which is the whole of {@link WalkNote.origins}.
+	 *
+	 * One call in front of the dispatch rather than a line in each of its thirty
+	 * arms: a command that set state and forgot to say so would leave a note
+	 * reporting the one before it, which reads as entirely reasonable.
+	 */
+	const recordOrigin = (track: Track, vcmd: number, sub: number, address: number): void => {
+		const { writes, clears } = slotsOf(vcmd, sub);
+		if (writes === null && clears === null) {
+			return;
+		}
+
+		for (const [slot, to] of [
+			[writes, address],
+			[clears, null],
+		] as const) {
+			if (slot === null) {
+				continue;
+			}
+
+			const at = slotAt(slot);
+			if (at < CHANNEL_SLOTS) {
+				if (track.origins[at] === to) {
+					continue;
+				}
+
+				track.origins[at] = to;
+				track.frozenOrigins = null;
+			} else {
+				if (shared.origins[at] === to) {
+					continue;
+				}
+
+				// Song-wide, so every channel's next note reports it, not only this
+				// one's — the same reason {@link invalidateAll} exists.
+				shared.origins[at] = to;
+				invalidateAll();
+			}
+		}
+	};
+
 	const invalidateAll = (): void => {
 		for (const track of tracks) {
 			track.snapshot = null;
+			track.frozenOrigins = null;
 		}
 	};
 
@@ -578,6 +836,12 @@ export function walkSong(song: Uint8Array, aramAddress: number): SongTimeline {
 			if (track.state.instrument !== drum) {
 				track.state.instrument = drum;
 				track.snapshot = null;
+				// The instrument slot goes empty rather than stale. What loaded this
+				// drum is a note byte, not a command, so the last `$DA` is no longer
+				// in force and naming it would be a plain lie; the `@21`-`@29` that
+				// did it emitted nothing, so the source is where it is answered.
+				track.origins[INSTRUMENT_SLOT] = null;
+				track.frozenOrigins = null;
 			}
 		}
 
@@ -592,6 +856,7 @@ export function walkSong(song: Uint8Array, aramAddress: number): SongTimeline {
 			percussion,
 			address,
 			state: snapshot(track),
+			origins: origins(track),
 		});
 
 		track.ticks += ticks;
@@ -608,6 +873,10 @@ export function walkSong(song: Uint8Array, aramAddress: number): SongTimeline {
 		const arg = (n: number): number => song[argAt + n] ?? 0;
 		const state = track.state;
 		let dirty = true;
+
+		// Taken before the switch: `$E6` and `$E9` move the pointer, and the
+		// address wanted is the one the driver read this command from.
+		recordOrigin(track, vcmd, arg(0), aramAddress + track.at);
 
 		switch (vcmd) {
 			case 0xda: // instrument

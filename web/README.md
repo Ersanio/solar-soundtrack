@@ -74,9 +74,16 @@ dragging away from.
 `editor/views/source-view/` owns the CodeMirror view, so nothing else may touch it — not even the
 pane it sits in. Three signals on `EditorStore` are how a sibling panel asks:
 
-- `reveal` — select and scroll to a span, set when a diagnostic is clicked.
+- `reveal` — select a span, set when a diagnostic or a piano roll bar is clicked.
 - `replace` — apply a splice, set when a panel edits a command in place.
 - `insertion` — type a snippet in at the caret, set when a palette button is clicked.
+
+`reveal` carries a `show` flag, and it is the difference between a summons and a question. A
+diagnostic wants the source brought forward, scrolled to and focused. A single click on a roll bar
+wants the note inspected, and the inspector is in the pane _beside_ the roll — so switching tabs
+would take away the thing being asked about. The quiet form dispatches the selection and nothing
+else, which is safe on a hidden view because it measures nothing. Both go through the document
+rather than writing `caret`, so what the inspector is looking at has one statement.
 
 `insertion` is the one with no span of its own: where it lands is the view's own selection, which
 only the editor knows, so there is nothing for an `expect` to guard and the spacing has to be
@@ -211,13 +218,72 @@ beside it when the driver adds them, since none of that is knowable from the sou
 map does not know — a `$8x` typed as raw hex — keeps the byte, and a bare `$D0`-`$D8` keeps the
 driver's own pitch for its drum, since the letter it was written under had no say in it.
 
+**A bar says what it is and what is acting on it.** Its own pitch on the left — `C6`, `C+6`, the
+compact spelling of the key column's `o6 c` — and on the right a glyph per command in force, drawn
+from the same catalogue the command palette's buttons are. A single click asks the inspector about
+that note; a double click goes to it in the source, which is what a click alone used to do. Clicking
+a glyph targets its command instead. What fits is measured (`fitBarContent`): the name has priority
+and the glyphs drop from the end, because a bar that says `C6` and nothing else is still saying
+something. Anything dropped is in the hover and in the inspector, so nothing is only on a bar.
+
+**Which commands act on a note is answered exactly, and it takes two halves to be exact.** Anything
+that emits a VCMD is named by the walk, at the ARAM address the driver read it from, and
+`CompileResult.commandMap` turns that address back into source. That is the only way to be right
+where one run of bytes plays more than once: `v255 (1)[ c ]2 v200 (1)5` sounds one written `c` under
+two volumes, and no reading of the text around that `c` could say which, because the command that
+decides it is not in the body at all. The rest — `q`, `h` and `@21`-`@29` — emit nothing to address,
+and for them source order _is_ the answer rather than an approximation, since `parser.ts` resolved
+them in one textual pass and baked them into the notes' own bytes;
+`@amk/tokens/commands/in-force` does that half. `walktest` pins both, on the loop-call song above.
+
+The song's own settings and the shape of the music get no glyph — `t`, `w`, `$E4` and the echo unit
+reach every note alike, and `o`, `<`, `>` and `l` are what the bar's row and width already are.
+`commandScope` is the one statement of that.
+
 Written pitch is not held to the driver's o1 c–o6 a — `o0` is legal MML and `h12 o0 c` is a note the
 driver plays — so `roll-layout.ts` grows the keyboard to take such a note in, above or below.
+
+**The scrub bar** across the top is the whole song at once, and the only way to seek from the roll.
+Its width is one song — tick 0 on the left edge, the last tick on the right, at every zoom — so it is
+the song rather than a view of it, and `scrubOffset`/`scrubTick` are that mapping and its exact
+inverse: a drag commits to the tick under the pointer. It sits outside the roll's own scroller,
+because a scrubber that scrolled out of view would be gone exactly when a tall song most needs it.
+
+Its bars ask `rowOf` — the same function the roll's marks ask — so the percussion toggles land on
+both pictures at once, and an instrument taken off the drum lanes moves to the keyboard in the
+minimap and the roll together. Answering that question twice is how the two would drift. The bars are
+deduped by pixel and row, keeping the wider of a pair: every bar is one colour, so two notes sharing a
+pixel of a row are the same picture, and a dense song still fits in the DOM. The list is built from
+the song, the lane stack and the pane's width and never from the playhead, so it rebuilds on a
+recompile and not on a frame; the playhead line and the box showing what the roll is displaying are
+their own `computed`s over the frame clock.
 
 Two clocks drive it and keeping them apart is the whole trick. The mark list is a `computed` over
 the transport's 10 Hz anchor, snapped outward to a whole note, so the DOM rebuilds about twice per
 screen; the scroll is a `computed` over `shared/chart/frame-clock.ts` and is one `transform` that
 nothing beneath reads. That is why the roll can run at 240 Hz without the note list knowing.
+
+**Which of the two moves is a view option**, "Scroll the notes" on the roll's own toolbar. Ticked,
+it pins the playhead a fifth across the pane and slides the music under it; unticked — the default —
+the roll pages: the music holds still and the playhead crosses it,
+turning the roll over by 80% of a pane once the line reaches 90% of it — so it lands a tenth in with
+the bar it has just played still on screen. **Every page opens on that tenth, the first one
+included**: page zero starts before tick 0, so a song is drawn with the margin it keeps for the rest
+of its length rather than against the key column. Opening on tick 0 instead would put the margin
+only on later pages, so it appeared at the first turn and a scroll back to the beginning showed a
+space that vanished again on the way back to the song. Both are the same arithmetic: `lead` is how far across
+the roll the playhead sits, and the camera and the line are both derived from it, so a pinned
+playhead is simply the value that number holds still at. `pageStart` is a closed form and not a counter, so given its
+anchor the page is a function of the tick and a loop wrap or a resize lands on the right page with
+nothing to reset. **The anchor is what a scroll moves**: measured from the song's own start always, a
+seek would drop the playhead wherever its place in that fixed grid happened to fall, and the notes
+would jump back the moment the drag ended — by exactly as far as the scrub had just moved them.
+A scrub re-anchors the grid on the view it leaves behind, so the roll carries on from what is on
+screen and turns a page a full pane later. A stop puts the anchor back on tick 0, since a stop is
+back to the beginning. The mark window is unchanged and does not need to be told: it already carries a
+screen of margin either side of a playhead at a fifth, and every page a sweep can produce falls
+inside that — `charttest` pins the coupling, because a roll drawing the wrong span scrolls perfectly
+smoothly over blank music.
 
 The playhead **carries its position across frames** rather than deriving it from the newest anchor,
 and `advanceTick` in `roll-layout.ts` is where that lives. It matters: every anchor arrives with

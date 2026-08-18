@@ -80,6 +80,13 @@ export type CommandGlyph = (typeof GLYPH_NAMES)[number];
  * convention is kept exactly, so a glyph could be lifted out into that folder
  * unchanged if one of these ever becomes app furniture.
  *
+ * **An attribute on a real `<svg>`, not an element of its own**, because the
+ * piano roll draws these inside its own inline SVG and a component element there
+ * is an unknown SVG element — no layout box, nothing rendered, and no error to
+ * say so. An attribute selector is matched after the namespace is split off, so
+ * one drawing serves a palette button and a bar alike. Width and height are the
+ * call site's for the same reason: a bar sizes its glyphs to its row.
+ *
  * Three motifs run through the set, and they are what make it legible at 14px
  * rather than forty unrelated pictures: a **slash** across a glyph means the
  * command turns that effect *off*, a **rising arrow** means it happens *over
@@ -87,12 +94,13 @@ export type CommandGlyph = (typeof GLYPH_NAMES)[number];
  * rather than this channel.
  *
  * ```html
- * <amk-command-icon name="metronome" />
+ * <svg amk-glyph name="metronome" width="14" height="14"></svg>
  * ```
  */
 @Component({
-  selector: 'amk-command-icon',
+  selector: 'svg[amk-glyph]',
   templateUrl: './command-icon.html',
+  host: { viewBox: '0 0 16 16', fill: 'none' },
 })
 export class CommandIcon {
   readonly name = input.required<CommandGlyph>();

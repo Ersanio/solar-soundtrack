@@ -116,7 +116,15 @@ export class AddmusicKCompiler {
 			return this.failure(diagnostics, stats, sampleList);
 		}
 
-		return { ok: true, data: linked.data, noteMap: linked.noteMap, sampleList, diagnostics, stats };
+		return {
+			ok: true,
+			data: linked.data,
+			noteMap: linked.noteMap,
+			commandMap: linked.commandMap,
+			sampleList,
+			diagnostics,
+			stats,
+		};
 	}
 
 	private initStats(): CompileStats {
@@ -146,7 +154,7 @@ export class AddmusicKCompiler {
 		stats: CompileStats | null = null,
 		sampleList: readonly string[] | null = null,
 	): CompileResult {
-		return { ok: false, data: null, noteMap: null, sampleList, diagnostics, stats };
+		return { ok: false, data: null, noteMap: null, commandMap: null, sampleList, diagnostics, stats };
 	}
 }
 

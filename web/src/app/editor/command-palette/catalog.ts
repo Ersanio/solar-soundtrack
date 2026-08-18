@@ -97,11 +97,23 @@ interface LetterEntry extends Described {
   /** The letter, which is also its key into `LETTER_NAMES` and `LETTER_PARAMS`. */
   id: string;
   snippet: string;
+  /**
+   * The VCMD this spelling compiles to, where it compiles to one.
+   *
+   * Thirteen bytes have no button because a letter or bracket writes them, and
+   * this is that claim - `palettetest` compiles both spellings and compares the
+   * output byte for byte rather than taking it on trust. It is also how a
+   * command read back out of a song finds its glyph: the roll meets `$E7` and
+   * has to draw `v`'s speaker.
+   */
+  writes?: number;
 }
 
 interface SyntaxEntry extends Described {
   kind: 'syntax';
   id: string;
+  /** As {@link LetterEntry.writes}. */
+  writes?: number;
   /** Said in full, since no name table has a word for a spelling. */
   label: string;
   snippet: string;
@@ -124,7 +136,11 @@ const hex = (
   rest: Omit<HexEntry, 'kind' | 'vcmd' | 'args'>,
 ): HexEntry => ({ kind: 'hex', vcmd, args, ...rest });
 
-const letter = (id: string, snippet: string, rest: Described): LetterEntry => ({
+const letter = (
+  id: string,
+  snippet: string,
+  rest: Described & { writes?: number },
+): LetterEntry => ({
   kind: 'letter',
   id,
   snippet,
@@ -177,6 +193,7 @@ export const ENTRIES: readonly Entry[] = [
   }),
   letter('t', 't144', {
     category: 'notes',
+    writes: 0xe2,
     icon: 'metronome',
     blurb: 'How fast the song plays.',
   }),
@@ -184,6 +201,7 @@ export const ENTRIES: readonly Entry[] = [
     kind: 'syntax',
     category: 'notes',
     id: 't,',
+    writes: 0xe3,
     icon: 'metronomeFade',
     label: 'tempo fade',
     blurb: 'Slides the tempo to a new speed over time - an accelerando or a ritardando.',
@@ -194,6 +212,7 @@ export const ENTRIES: readonly Entry[] = [
   // ─── Volume and pan ─────────────────────────────────────────────────────
   letter('v', 'v200', {
     category: 'volume',
+    writes: 0xe7,
     icon: 'speaker',
     blurb: 'How loud this channel plays.',
   }),
@@ -201,6 +220,7 @@ export const ENTRIES: readonly Entry[] = [
     kind: 'syntax',
     category: 'volume',
     id: 'v,',
+    writes: 0xe8,
     icon: 'hairpin',
     label: 'volume fade',
     blurb: "Slides this channel's volume over time - a crescendo or a diminuendo.",
@@ -209,6 +229,7 @@ export const ENTRIES: readonly Entry[] = [
   },
   letter('w', 'w200', {
     category: 'volume',
+    writes: 0xe0,
     icon: 'speakerMaster',
     blurb: 'How loud the whole song plays, every channel at once.',
   }),
@@ -216,6 +237,7 @@ export const ENTRIES: readonly Entry[] = [
     kind: 'syntax',
     category: 'volume',
     id: 'w,',
+    writes: 0xe1,
     icon: 'hairpinMaster',
     label: 'global volume fade',
     blurb: 'Slides the whole song louder or quieter over time - a fade-in or a fade-out.',
@@ -224,6 +246,7 @@ export const ENTRIES: readonly Entry[] = [
   },
   letter('y', 'y10', {
     category: 'volume',
+    writes: 0xdb,
     icon: 'pan',
     blurb: 'Where this channel sits between the left and right speakers.',
   }),
@@ -251,6 +274,7 @@ export const ENTRIES: readonly Entry[] = [
   }),
   letter('p', 'p12,8', {
     category: 'pitch',
+    writes: 0xde,
     icon: 'wave',
     blurb: 'A steady wobble in pitch.',
   }),
@@ -303,11 +327,13 @@ export const ENTRIES: readonly Entry[] = [
   // ─── Instrument ─────────────────────────────────────────────────────────
   letter('@', '@0', {
     category: 'instrument',
+    writes: 0xda,
     icon: 'keys',
     blurb: 'Which instrument this channel plays.',
   }),
   letter('n', 'n10', {
     category: 'instrument',
+    writes: 0xf8,
     icon: 'noise',
     blurb: 'Swaps the instrument for white noise.',
   }),
@@ -365,6 +391,7 @@ export const ENTRIES: readonly Entry[] = [
   // and the point of the defaults is that the song keeps compiling as you type.
   letter('[', '[ ]4', {
     category: 'loops',
+    writes: 0xe9,
     icon: 'repeatStart',
     blurb: 'Opens a section that plays a set number of times.',
   }),
@@ -377,6 +404,7 @@ export const ENTRIES: readonly Entry[] = [
     kind: 'syntax',
     category: 'loops',
     id: '[[',
+    writes: 0xe6,
     icon: 'repeatNested',
     label: 'subloop',
     blurb: 'A repeat inside a repeat, for a figure that recurs within a longer phrase.',
@@ -403,6 +431,7 @@ export const ENTRIES: readonly Entry[] = [
     kind: 'syntax',
     category: 'loops',
     id: '(!n,',
+    writes: 0xfc,
     icon: 'trigger',
     label: 'remote code call',
     blurb: 'Arms a remote snippet from here on, and says what should set it off.',
@@ -458,6 +487,8 @@ export interface ResolvedEntry {
   key: string;
   /** The byte it writes, for a hex entry. `palettetest` counts coverage off this. */
   vcmd?: number;
+  /** {@link LetterEntry.writes} - the byte a spelled form compiles to. */
+  writes?: number;
   icon: CommandGlyph;
   label: string;
   blurb: string;
@@ -531,6 +562,7 @@ export function resolveEntry(
 
     return {
       key: `text:${entry.id}`,
+      writes: entry.writes,
       icon: entry.icon,
       label,
       blurb: entry.blurb,

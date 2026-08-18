@@ -48,6 +48,9 @@ export interface AddmusicKOptions {
 	optimizeSampleUsage?: boolean;
 }
 
+/** What `scan` dispatches to `parseNote`; {@link NoteEvent} already holds them. */
+const NOTE_LETTERS = new Set(["c", "d", "e", "f", "g", "a", "b", "r", "^"]);
+
 export interface NoteEvent {
 	channel: number;
 	offset: number;
@@ -64,12 +67,26 @@ export interface NoteEvent {
 	span: Span;
 }
 
+/**
+ * A command that emitted bytes, for the command map. See `CommandAddress`.
+ *
+ * Only commands that emit are here, because only those have an address for the
+ * walk to name them by. `q`, `h` and `@21`-`@29` write nothing of their own —
+ * they fold into the notes that follow — and `o` and `l` write nothing at all.
+ */
+export interface CommandEvent {
+	channel: number;
+	offset: number;
+	span: Span;
+}
+
 /** Raw output of the scan, before pointers are resolved. See `link.ts`. */
 export interface ParseOutput {
 	data: number[][];
 	loopLocations: number[][];
 	phrasePointers: number[][];
 	noteEvents: NoteEvent[];
+	commandEvents: CommandEvent[];
 	instrumentData: number[];
 	hasIntro: boolean;
 	doesntLoop: boolean;
@@ -153,6 +170,9 @@ export class AddmusicKParser {
 	private readonly loopLocations: number[][] = Array.from({ length: 9 }, () => []);
 	private readonly phrasePointers: number[][] = Array.from({ length: 8 }, () => [0, 0]);
 	private readonly noteEvents: NoteEvent[] = [];
+	private readonly commandEvents: CommandEvent[] = [];
+	/** The hex run being gathered, since `$ED $3F $4D` is three dispatches. */
+	private hexRun: { start: number; offset: number } | null = null;
 	private readonly passedNote = new Array<boolean>(8).fill(false);
 	private readonly passedIntro = new Array<boolean>(8).fill(false);
 
@@ -364,6 +384,11 @@ export class AddmusicKParser {
 				}
 			}
 
+			const commandAt = this.pos;
+			const commandChannel = this.channel;
+			const commandOffset = this.data[this.channel].length;
+			const midRun = this.hexLeft !== 0;
+
 			// prettier-ignore
 			switch (lower) {
 				case "?": this.parseQMark(); break;
@@ -406,7 +431,61 @@ export class AddmusicKParser {
 						this.pos++;
 					}
 			}
+
+			this.recordCommand(lower, commandAt, commandChannel, commandOffset, midRun);
 		}
+	}
+
+	/**
+	 * The command map: what the dispatch above just wrote, and where it was
+	 * written. Nothing AddmusicK records — see `CommandAddress`.
+	 *
+	 * Here rather than in each handler because there are fifty of them and one
+	 * that forgot would leave a note sounding under a command nothing could
+	 * name. The dispatch is the one place every command passes through, so the
+	 * question "did that write bytes to this channel" is asked once.
+	 *
+	 * Three things it has to know that the byte count alone does not say:
+	 *
+	 *   - A hex run is many dispatches. `$ED $3F $4D` reaches `case "$"` three
+	 *     times, one byte each, so the run opens on the byte that found
+	 *     `hexLeft` at zero and is recorded when it returns there — under the
+	 *     first byte's offset, which is the address the driver reads it at.
+	 *   - Notes are already in {@link NoteEvent}, and a note in both maps would
+	 *     be a command in force on itself.
+	 *   - `#N`, `[` and `]` move {@link channel} out from under the offset that
+	 *     was taken before them, which is what the comparison catches. Their own
+	 *     bytes are structure rather than state, so losing them costs nothing.
+	 */
+	private recordCommand(lower: string, start: number, channel: number, offset: number, midRun: boolean): void {
+		if (this.hexLeft !== 0) {
+			// Still gathering. The first byte of the run is the one to remember;
+			// whitespace between arguments must not disturb it.
+			if (lower === "$" && !midRun && this.data[channel].length > offset) {
+				this.hexRun = { start, offset };
+			}
+
+			return;
+		}
+
+		const run = this.hexRun;
+		this.hexRun = null;
+
+		if (this.channel !== channel || this.data[channel].length === offset || NOTE_LETTERS.has(lower)) {
+			return;
+		}
+
+		// A single-byte command like `$F0` never opened a run, so it is its own.
+		const from = lower === "$" && run !== null ? run : { start, offset };
+
+		// The trailing whitespace the handler's own `skipSpaces` walked past is
+		// not part of the command, as `parseNote` trims it for the same reason.
+		let end = this.pos;
+		while (end > from.start && isSpace(this.text[end - 1])) {
+			end--;
+		}
+
+		this.commandEvents.push({ channel, offset: from.offset, span: this.spanAt(from.start, end) });
 	}
 
 	private terminateChannels(): void {
@@ -3723,6 +3802,7 @@ export class AddmusicKParser {
 			loopLocations: this.loopLocations,
 			phrasePointers: this.phrasePointers,
 			noteEvents: this.noteEvents,
+			commandEvents: this.commandEvents,
 			instrumentData: this.instrumentData,
 			hasIntro: this.hasIntro,
 			doesntLoop: this.doesntLoop,
