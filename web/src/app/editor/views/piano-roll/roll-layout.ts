@@ -62,6 +62,18 @@ export function keyName(key: number): string {
   return `o${Math.floor(key / OCTAVE) + 1} ${NAMES[semitone(key)]}`;
 }
 
+/**
+ * The same key, short enough to sit inside a bar: `C6`, `C+6`.
+ *
+ * {@link keyName}'s `o6 c` is right down the key column and in a tooltip, and
+ * four characters too wide for a bar at any sensible zoom. Both are built from
+ * the same {@link semitone} and the same floor, so they can only ever name the
+ * same key — `charttest` holds them to it.
+ */
+export function noteLabel(key: number): string {
+  return `${NAMES[semitone(key)].toUpperCase()}${Math.floor(key / OCTAVE) + 1}`;
+}
+
 export function keyIsBlack(key: number): boolean {
   return BLACK[semitone(key)];
 }
@@ -207,6 +219,85 @@ export function tickWindow(
 }
 
 /**
+ * The tick at the left edge of a paged roll.
+ *
+ * A page turns when the playhead reaches `turnAt` across the pane, and moves by
+ * `step` of a pane, so the playhead lands at `turnAt - step` with the music it
+ * has just played still behind it.
+ *
+ * **Every page opens on that same lead-in**, so `origin` is the tick that sits
+ * on it: the grid runs both ways from there in whole `stride`s. A song that has
+ * not been scrolled anchors on 0, and page zero therefore starts `turnAt - step`
+ * of a pane *before* tick 0 rather than on it — the song is drawn with the margin
+ * it will keep for the rest of its length. Start it flush against the key column
+ * instead and the first bar has nowhere to sit, while the margin every later page
+ * has appears out of nowhere at the first turn.
+ *
+ * **The anchor is what a scroll moves.** Measured from the song's own start
+ * always, a seek would drop the playhead wherever its place in that fixed grid
+ * happened to fall, so the notes would jump the moment the wheel went quiet.
+ * Anchoring on the view the scroll left behind means the roll carries on from
+ * what is on screen, and turns a page a full pane later.
+ *
+ * A closed form rather than a counter: given the anchor, the page is a function
+ * of the tick, so a loop wrap or a resize lands on the right page with nothing
+ * to reset and no way for the view to disagree with the playhead. It needs
+ * `step` below `turnAt` to stay one — a longer step would drop the playhead past
+ * the very turn it just made, and would leave no lead-in to open on.
+ */
+export function pageStart(
+  tick: number,
+  screenTicks: number,
+  turnAt: number,
+  step: number,
+  origin = 0,
+): number {
+  const stride = screenTicks * step;
+  if (!(stride > 0)) {
+    return 0; // An unmeasured pane, or no zoom to divide by.
+  }
+
+  // With the lead-in taken out, a turn is simply every `stride` of music from
+  // the anchor, so the count of turns is what the distance to it divides into.
+  // Negative behind the anchor, which is a loop wrap and needs a page just the
+  // same — clamping there would strand the playhead off the left of the pane.
+  const leadIn = screenTicks * (turnAt - step);
+  return origin - leadIn + Math.floor((tick - origin) / stride) * stride;
+}
+
+/**
+ * Where a tick sits across the scrub bar, in px from the roll's left edge.
+ *
+ * The bar holds the **whole song and nothing else**: tick 0 on its left edge and
+ * the last tick on its right, at every zoom and every pane width. The roll's own
+ * horizontal scale has no bearing on it, which is the point — the roll shows a
+ * pane of music and this shows the song it is a pane of.
+ */
+export function scrubOffset(tick: number, ticks: number, width: number): number {
+  if (!(ticks > 0) || !(width > 0)) {
+    return 0; // Nothing compiled, or an unmeasured pane. Not a NaN across every bar.
+  }
+
+  return clamp(tick / ticks, 0, 1) * width;
+}
+
+/**
+ * The tick under a point on the scrub bar, the exact inverse of
+ * {@link scrubOffset}.
+ *
+ * Exact because a drag rides on it: the tick a scrub commits to has to be the
+ * one under the pointer, not one near it. Off either end is the song's own end,
+ * since a drag that runs past the bar is still asking for the last tick.
+ */
+export function scrubTick(offset: number, ticks: number, width: number): number {
+  if (!(ticks > 0) || !(width > 0)) {
+    return 0;
+  }
+
+  return clamp(offset / width, 0, 1) * ticks;
+}
+
+/**
  * Where the grid lines fall inside a window.
  *
  * Every 48 ticks — a quarter note — with a heavier line every 192. Called a
@@ -281,4 +372,86 @@ export function advanceTick(step: ClockStep): number {
   }
 
   return hold(shown + rate * elapsed + (target - shown) * Math.min(1, CATCH_UP * elapsed));
+}
+
+/** A bar has room for its name below this, and for nothing at all under it. */
+const MIN_CONTENT_HEIGHT = 11;
+/** Monospace advance as a fraction of the font size, for `font-mono` at any size. */
+const ADVANCE = 0.6;
+/** Between the bar's edge and its text, and between two glyphs. */
+const CONTENT_PAD = 3;
+/** More than this on one bar is a wall of icons rather than a reading of it. */
+const MAX_GLYPHS = 5;
+
+/** Where a bar's name goes, in the same user units as the mark. */
+export interface BarName {
+  x: number;
+  y: number;
+  size: number;
+}
+
+/** Where one glyph goes. Square, so one number does for width and height. */
+export interface BarGlyph {
+  x: number;
+  y: number;
+  size: number;
+}
+
+export interface BarContent {
+  name: BarName | null;
+  /** As many as fit, in the order they were given. The rest are simply not drawn. */
+  glyphs: readonly BarGlyph[];
+}
+
+/**
+ * What fits inside one bar: its name on the left, its glyphs on the right.
+ *
+ * Measured rather than assumed, because a bar is a 32nd note at one zoom and a
+ * whole note at another, and rows stretch to fill the pane. The name goes first
+ * and the glyphs are dropped from the end — a bar that says `C6` and nothing
+ * else is still telling you something, where glyphs with no note beside them
+ * are a row of icons floating over the music.
+ *
+ * Anything that does not fit is not drawn and not marked either: the inspector
+ * lists all of them for the note under the caret, and a hover names them.
+ */
+export function fitBarContent(
+  width: number,
+  height: number,
+  name: string,
+  glyphs: number,
+): BarContent {
+  const empty: BarContent = { name: null, glyphs: [] };
+  if (height < MIN_CONTENT_HEIGHT || width <= 0) {
+    return empty;
+  }
+
+  const size = clamp(height - 4, 7, 11);
+  const nameWidth = name.length * size * ADVANCE;
+  // The name is the floor, not the first of several things competing for room:
+  // a bar with no room for it has none for a glyph either, and letting the
+  // glyphs take the space the name gave up means a bar that grows an icon as it
+  // shrinks. Nothing at all is the honest picture, and the hover still answers.
+  if (nameWidth + CONTENT_PAD * 2 > width) {
+    return empty;
+  }
+
+  const placed: BarName = { x: CONTENT_PAD, y: height / 2, size };
+  const left = CONTENT_PAD + nameWidth + CONTENT_PAD;
+
+  // Right-aligned and filled leftwards, so the last command to take effect sits
+  // furthest from the name rather than the list shuffling as it grows.
+  const box = Math.min(height - 2, 12);
+  const room = Math.floor((width - left - CONTENT_PAD + CONTENT_PAD) / (box + CONTENT_PAD));
+  const count = clamp(Math.min(room, glyphs), 0, MAX_GLYPHS);
+  const laid: BarGlyph[] = [];
+  for (let n = 0; n < count; n++) {
+    laid.push({
+      x: width - CONTENT_PAD - (n + 1) * box - n * CONTENT_PAD,
+      y: (height - box) / 2,
+      size: box,
+    });
+  }
+
+  return { name: placed, glyphs: laid.reverse() };
 }

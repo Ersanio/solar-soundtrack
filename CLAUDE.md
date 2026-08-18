@@ -196,8 +196,12 @@ One entry each: what it was, what it is, why.
   the same small lag, so one frame in ten lurched. It carries its position across frames and eases
   the gap shut (`roll-layout.ts`).
 - **Parking the roll in an `effect` on the follow flag** — an effect runs after the handler and
-  overwrote a pan made in the same wheel gesture. Parking happens at the two call sites that stop
-  following.
+  overwrote a position set in the same gesture that came off the song. Parking happens at the two
+  call sites that stop following, the follow toggle and the scrub bar's pointer-down.
+- **Seeking the roll by `Shift`+wheel, committed on a 200 ms quiet timer** — nothing on screen said
+  the roll could be seeked at all, and the commit fired on a guess about when the gesture had ended
+  rather than on anything the porter did. The scrub bar above the roll is the affordance, and a
+  pointer-up is a real end.
 - **Template method calls per row** — the sample browser decoded 64 BRR samples on every
   change-detection pass, ten times a second while playing. Panels build one `computed` view model;
   the `no-call-expression` note in `eslint.config.js` says why lint cannot catch it.
@@ -208,6 +212,21 @@ One entry each: what it was, what it is, why.
   moved every note off the letters in the source, and no edit could map a byte back to text. Rows
   are the written pitch (`NoteAddress.written`); what a note plays as is a tooltip line. No "as
   played" toggle either: an honest one is not computable, since a sample's root is not in the data.
+- **A single click on a roll bar revealing the source** — it threw the author onto the Source tab
+  on every glance at a note. A click asks the inspector about that note and a double click goes to
+  it; `reveal` carries a `show` flag for the difference.
+- **A component element inside the roll's `<svg>`** for the command glyphs — `<amk-command-icon>`
+  written there is an unknown SVG element, so it has no layout box and neither it nor its children
+  render, silently. The glyph is an attribute component on a real `<svg>` (`svg[amk-glyph]`), and its
+  template's elements carry the `svg:` prefix because Angular takes an element's namespace from its
+  parent in the same template and that template has no `<svg>` of its own. `palettetest` greps for
+  both.
+- **Answering "which commands act on this note" from the source alone** — it is right until a `[ ]`
+  body or a `(1)n` call plays one run of bytes twice, and then it is confidently wrong with no tell.
+  The walk names them by address and `commandMap` maps that back to text; the source answers only
+  `q`, `h` and `@21`-`@29`, which emit nothing to address and which the compiler resolved in source
+  order anyway. No fallback to a guess when there is no walk, either: an approximate list that looks
+  like the exact one is worse than an empty one.
 - **Auto-scaling the bend graph to the further end of the bend** — one semitone and two octaves drew
   the same shape. The reach is a fixed octave, stepped by whole octaves.
 - **A tone slider in the FIR designer** over `designTone` — a worse route to the presets it

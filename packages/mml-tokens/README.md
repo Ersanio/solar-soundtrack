@@ -112,6 +112,22 @@ onto its use site, so a `$F5` and a `$F1` written inside the _same_ macro share 
 neither check sees the other. The alternative — a secondary order carried on every command just for
 this — costs more than the warning is worth.
 
+`commands/in-force.ts` is the third module under that rule, and the one place where it happens to be
+the whole truth rather than a compromise. It answers which commands act on a note for the piano
+roll's glyphs, and it covers only the ones that emit no bytes at all: `q` folds into each note's
+duration byte, `h` and `@21`-`@29` into the note byte itself. `parser.ts` does that folding in one
+textual pass with its own per-channel state, so the `q` written before a note on that channel is the
+`q` that went into the bytes of **every** pass of it — a loop cannot change the answer, because the
+answer was decided before the loop existed. Everything that does emit a byte is the walk's to name,
+at the address the driver reads it from, and `CompileResult.commandMap` turns that back into source.
+The two sets are disjoint by construction and `tokentest` asserts it, since a command answered twice
+would draw two glyphs for one setting.
+
+`commandScope` is the same module's other half, and the first classification of commands in this
+package — `param.ts`'s `Role` is about one argument's units and the palette's `Category` is about
+which strip a button sits on, so neither could say that `t` reaches every channel while `v` reaches
+one.
+
 ## The descriptor tables
 
 `commands/` says what each argument means: a codec (how the byte becomes the number a control

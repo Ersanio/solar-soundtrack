@@ -1,638 +1,653 @@
 <!--
-  One <svg> and one @switch, drawn to `shared/icons/`'s convention: a 16x16 box,
-  14px on screen, `currentColor` throughout, 1.3 strokes with round caps.
+  One @switch, drawn to `shared/icons/`'s convention: a 16x16 box, `currentColor`
+  throughout, 1.3 strokes with round caps. The box and `fill="none"` are the
+  host's, since the host is the <svg>.
 
   Filled shapes appear only where notation is filled — noteheads, staccato and
-  repeat dots — and carry `fill="currentColor"` themselves, since the <svg> is
-  `fill="none"` for the strokes.
+  repeat dots — and carry `fill="currentColor"` themselves, against that
+  `fill="none"`.
+
+  **The `svg:` prefixes are what put these in the SVG namespace.** Angular takes
+  an element's namespace from its parent *in the same template*, and only `svg`,
+  `foreignObject` and `math` carry one implicitly — so a template with no <svg>
+  of its own draws nothing at all without them. The failure type-checks, builds
+  and ships blank, so `palettetest` greps for it.
 
   The "off" slash runs whichever diagonal is *not* parallel to the glyph it
   crosses. A slash lying along a stroke it is meant to negate reads as part of
   the drawing, which is the one thing this mark cannot afford.
 -->
-<svg viewBox="0 0 16 16" width="14" height="14" fill="none">
-  @switch (name()) {
-    <!-- ─── Notes and timing ─────────────────────────────────────────── -->
-    @case ('note') {
-      <ellipse cx="6" cy="11" rx="2.6" ry="2" fill="currentColor" />
-      <path d="M8.5 11V3.4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" />
-    }
-    @case ('noteTicks') {
-      <ellipse cx="4.8" cy="11" rx="2.4" ry="1.9" fill="currentColor" />
-      <path d="M7.1 11V3.8" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" />
-      <path
-        d="M10.6 5.2v2M13 5.2v2M10.6 9.4v2M13 9.4v2"
-        stroke="currentColor"
-        stroke-width="1.3"
-        stroke-linecap="round"
-      />
-    }
-    @case ('octave') {
-      <circle cx="8" cy="5.4" r="2.4" stroke="currentColor" stroke-width="1.3" />
-      <circle cx="8" cy="11" r="3" stroke="currentColor" stroke-width="1.3" />
-    }
-    @case ('octaveDown') {
-      <circle cx="4.8" cy="5.4" r="2.1" stroke="currentColor" stroke-width="1.3" />
-      <circle cx="4.8" cy="10.6" r="2.6" stroke="currentColor" stroke-width="1.3" />
-      <path
-        d="M11.8 3.4v9.2m-2.4-2.6 2.4 2.6 2.4-2.6"
-        stroke="currentColor"
-        stroke-width="1.3"
-        stroke-linecap="round"
-        stroke-linejoin="round"
-      />
-    }
-    @case ('octaveUp') {
-      <circle cx="4.8" cy="5.4" r="2.1" stroke="currentColor" stroke-width="1.3" />
-      <circle cx="4.8" cy="10.6" r="2.6" stroke="currentColor" stroke-width="1.3" />
-      <path
-        d="M11.8 12.6V3.4M9.4 6l2.4-2.6L14.2 6"
-        stroke="currentColor"
-        stroke-width="1.3"
-        stroke-linecap="round"
-        stroke-linejoin="round"
-      />
-    }
-    @case ('staccato') {
-      <ellipse cx="6.4" cy="9.4" rx="2.6" ry="2" fill="currentColor" />
-      <path d="M8.9 9.4V2.6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" />
-      <circle cx="6.4" cy="13.4" r="1.1" fill="currentColor" />
-    }
-    @case ('metronome') {
-      <path
-        d="M8 2.4 3.6 13.2h8.8L8 2.4Z"
-        stroke="currentColor"
-        stroke-width="1.3"
-        stroke-linecap="round"
-        stroke-linejoin="round"
-      />
-      <path d="M5.9 8.4h4.2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" />
-    }
-    @case ('metronomeFade') {
-      <path
-        d="M6.2 2.4 2.6 11.4h7.2L6.2 2.4Z"
-        stroke="currentColor"
-        stroke-width="1.3"
-        stroke-linecap="round"
-        stroke-linejoin="round"
-      />
-      <path
-        d="M10.4 14.2 14.4 10.2m-2.6 0h2.6v2.6"
-        stroke="currentColor"
-        stroke-width="1.3"
-        stroke-linecap="round"
-        stroke-linejoin="round"
-      />
-    }
+@switch (name()) {
+  <!-- ─── Notes and timing ─────────────────────────────────────────── -->
+  @case ('note') {
+    <svg:ellipse cx="6" cy="11" rx="2.6" ry="2" fill="currentColor" />
+    <svg:path d="M8.5 11V3.4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" />
+  }
+  @case ('noteTicks') {
+    <svg:ellipse cx="4.8" cy="11" rx="2.4" ry="1.9" fill="currentColor" />
+    <svg:path d="M7.1 11V3.8" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" />
+    <svg:path
+      d="M10.6 5.2v2M13 5.2v2M10.6 9.4v2M13 9.4v2"
+      stroke="currentColor"
+      stroke-width="1.3"
+      stroke-linecap="round"
+    />
+  }
+  @case ('octave') {
+    <svg:circle cx="8" cy="5.4" r="2.4" stroke="currentColor" stroke-width="1.3" />
+    <svg:circle cx="8" cy="11" r="3" stroke="currentColor" stroke-width="1.3" />
+  }
+  @case ('octaveDown') {
+    <svg:circle cx="4.8" cy="5.4" r="2.1" stroke="currentColor" stroke-width="1.3" />
+    <svg:circle cx="4.8" cy="10.6" r="2.6" stroke="currentColor" stroke-width="1.3" />
+    <svg:path
+      d="M11.8 3.4v9.2m-2.4-2.6 2.4 2.6 2.4-2.6"
+      stroke="currentColor"
+      stroke-width="1.3"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    />
+  }
+  @case ('octaveUp') {
+    <svg:circle cx="4.8" cy="5.4" r="2.1" stroke="currentColor" stroke-width="1.3" />
+    <svg:circle cx="4.8" cy="10.6" r="2.6" stroke="currentColor" stroke-width="1.3" />
+    <svg:path
+      d="M11.8 12.6V3.4M9.4 6l2.4-2.6L14.2 6"
+      stroke="currentColor"
+      stroke-width="1.3"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    />
+  }
+  @case ('staccato') {
+    <svg:ellipse cx="6.4" cy="9.4" rx="2.6" ry="2" fill="currentColor" />
+    <svg:path d="M8.9 9.4V2.6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" />
+    <svg:circle cx="6.4" cy="13.4" r="1.1" fill="currentColor" />
+  }
+  @case ('metronome') {
+    <svg:path
+      d="M8 2.4 3.6 13.2h8.8L8 2.4Z"
+      stroke="currentColor"
+      stroke-width="1.3"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    />
+    <svg:path d="M5.9 8.4h4.2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" />
+  }
+  @case ('metronomeFade') {
+    <svg:path
+      d="M6.2 2.4 2.6 11.4h7.2L6.2 2.4Z"
+      stroke="currentColor"
+      stroke-width="1.3"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    />
+    <svg:path
+      d="M10.4 14.2 14.4 10.2m-2.6 0h2.6v2.6"
+      stroke="currentColor"
+      stroke-width="1.3"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    />
+  }
 
-    <!-- ─── Volume and pan ───────────────────────────────────────────── -->
-    @case ('speaker') {
-      <path
-        d="M2.6 6.2h2.2L8.2 3.4v9.2L4.8 9.8H2.6Z"
-        stroke="currentColor"
-        stroke-width="1.3"
-        stroke-linecap="round"
-        stroke-linejoin="round"
-      />
-      <path
-        d="M11 5.8a4.2 4.2 0 0 1 0 4.4"
-        stroke="currentColor"
-        stroke-width="1.3"
-        stroke-linecap="round"
-      />
-    }
-    @case ('hairpin') {
-      <path
-        d="M13.6 3.8 2.4 8l11.2 4.2"
-        stroke="currentColor"
-        stroke-width="1.3"
-        stroke-linecap="round"
-        stroke-linejoin="round"
-      />
-    }
-    @case ('speakerMaster') {
-      <path
-        d="M2.6 5.4h2.2L8.2 2.8v8.4L4.8 8.8H2.6Z"
-        stroke="currentColor"
-        stroke-width="1.3"
-        stroke-linecap="round"
-        stroke-linejoin="round"
-      />
-      <path
-        d="M10.8 4.8a4.2 4.2 0 0 1 0 4.4"
-        stroke="currentColor"
-        stroke-width="1.3"
-        stroke-linecap="round"
-      />
-      <path d="M2.6 14h10.8" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
-    }
-    @case ('hairpinMaster') {
-      <path
-        d="M13.4 3 2.6 6.8l10.8 3.8"
-        stroke="currentColor"
-        stroke-width="1.3"
-        stroke-linecap="round"
-        stroke-linejoin="round"
-      />
-      <path d="M2.6 14h10.8" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
-    }
-    @case ('pan') {
-      <path
-        d="M2.6 12.2a6.2 6.2 0 0 1 10.8 0"
-        stroke="currentColor"
-        stroke-width="1.3"
-        stroke-linecap="round"
-      />
-      <path d="M8 12.2 11.2 6.6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" />
-      <circle cx="8" cy="12.2" r="1" fill="currentColor" />
-    }
-    @case ('panFade') {
-      <path
-        d="M1.8 10.8a5.4 5.4 0 0 1 9.4 0"
-        stroke="currentColor"
-        stroke-width="1.3"
-        stroke-linecap="round"
-      />
-      <path d="M6.5 10.8 9.3 5.9" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" />
-      <path
-        d="M11.4 14.4 14.6 11.2m-2.2 0h2.2v2.2"
-        stroke="currentColor"
-        stroke-width="1.3"
-        stroke-linecap="round"
-        stroke-linejoin="round"
-      />
-    }
-    @case ('tremolo') {
-      <path d="M12 2.8v10.4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" />
-      <path
-        d="m3.4 5 6-2.2M3.4 8.4l6-2.2M3.4 11.8l6-2.2"
-        stroke="currentColor"
-        stroke-width="1.6"
-        stroke-linecap="round"
-      />
-    }
-    @case ('tremoloOff') {
-      <path d="M12 2.8v10.4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" />
-      <path
-        d="m3.4 5 6-2.2M3.4 8.4l6-2.2M3.4 11.8l6-2.2"
-        stroke="currentColor"
-        stroke-width="1.6"
-        stroke-linecap="round"
-      />
-      <!-- Down the diagonal the beams do not run: they rise to the right, and a
+  <!-- ─── Volume and pan ───────────────────────────────────────────── -->
+  @case ('speaker') {
+    <svg:path
+      d="M2.6 6.2h2.2L8.2 3.4v9.2L4.8 9.8H2.6Z"
+      stroke="currentColor"
+      stroke-width="1.3"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    />
+    <svg:path
+      d="M11 5.8a4.2 4.2 0 0 1 0 4.4"
+      stroke="currentColor"
+      stroke-width="1.3"
+      stroke-linecap="round"
+    />
+  }
+  @case ('hairpin') {
+    <svg:path
+      d="M13.6 3.8 2.4 8l11.2 4.2"
+      stroke="currentColor"
+      stroke-width="1.3"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    />
+  }
+  @case ('speakerMaster') {
+    <svg:path
+      d="M2.6 5.4h2.2L8.2 2.8v8.4L4.8 8.8H2.6Z"
+      stroke="currentColor"
+      stroke-width="1.3"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    />
+    <svg:path
+      d="M10.8 4.8a4.2 4.2 0 0 1 0 4.4"
+      stroke="currentColor"
+      stroke-width="1.3"
+      stroke-linecap="round"
+    />
+    <svg:path d="M2.6 14h10.8" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+  }
+  @case ('hairpinMaster') {
+    <svg:path
+      d="M13.4 3 2.6 6.8l10.8 3.8"
+      stroke="currentColor"
+      stroke-width="1.3"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    />
+    <svg:path d="M2.6 14h10.8" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+  }
+  @case ('pan') {
+    <svg:path
+      d="M2.6 12.2a6.2 6.2 0 0 1 10.8 0"
+      stroke="currentColor"
+      stroke-width="1.3"
+      stroke-linecap="round"
+    />
+    <svg:path
+      d="M8 12.2 11.2 6.6"
+      stroke="currentColor"
+      stroke-width="1.3"
+      stroke-linecap="round"
+    />
+    <svg:circle cx="8" cy="12.2" r="1" fill="currentColor" />
+  }
+  @case ('panFade') {
+    <svg:path
+      d="M1.8 10.8a5.4 5.4 0 0 1 9.4 0"
+      stroke="currentColor"
+      stroke-width="1.3"
+      stroke-linecap="round"
+    />
+    <svg:path
+      d="M6.5 10.8 9.3 5.9"
+      stroke="currentColor"
+      stroke-width="1.3"
+      stroke-linecap="round"
+    />
+    <svg:path
+      d="M11.4 14.4 14.6 11.2m-2.2 0h2.2v2.2"
+      stroke="currentColor"
+      stroke-width="1.3"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    />
+  }
+  @case ('tremolo') {
+    <svg:path d="M12 2.8v10.4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" />
+    <svg:path
+      d="m3.4 5 6-2.2M3.4 8.4l6-2.2M3.4 11.8l6-2.2"
+      stroke="currentColor"
+      stroke-width="1.6"
+      stroke-linecap="round"
+    />
+  }
+  @case ('tremoloOff') {
+    <svg:path d="M12 2.8v10.4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" />
+    <svg:path
+      d="m3.4 5 6-2.2M3.4 8.4l6-2.2M3.4 11.8l6-2.2"
+      stroke="currentColor"
+      stroke-width="1.6"
+      stroke-linecap="round"
+    />
+    <!-- Down the diagonal the beams do not run: they rise to the right, and a
            slash lying along them reads as a fourth beam rather than a negation. -->
-      <path
-        d="M2.6 2.6 13.4 13.4"
-        stroke="currentColor"
-        stroke-width="1.3"
-        stroke-linecap="round"
-      />
-    }
+    <svg:path
+      d="M2.6 2.6 13.4 13.4"
+      stroke="currentColor"
+      stroke-width="1.3"
+      stroke-linecap="round"
+    />
+  }
 
-    <!-- ─── Pitch ────────────────────────────────────────────────────── -->
-    @case ('sharp') {
-      <path
-        d="M6.2 3v10M9.8 3v10M3.8 6.8l8.4-1.4M3.8 10.6l8.4-1.4"
-        stroke="currentColor"
-        stroke-width="1.3"
-        stroke-linecap="round"
-      />
-    }
-    @case ('sharpMaster') {
-      <path
-        d="M6.2 2.4v8.4M9.8 2.4v8.4M3.8 5.8l8.4-1.4M3.8 9l8.4-1.4"
-        stroke="currentColor"
-        stroke-width="1.3"
-        stroke-linecap="round"
-      />
-      <path d="M2.6 14h10.8" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
-    }
-    @case ('wave') {
-      <path
-        d="M1.8 8q1.55-3.6 3.1 0t3.1 0 3.1 0 3.1 0"
-        stroke="currentColor"
-        stroke-width="1.3"
-        stroke-linecap="round"
-      />
-    }
-    @case ('waveOff') {
-      <path
-        d="M1.8 8q1.55-3.6 3.1 0t3.1 0 3.1 0 3.1 0"
-        stroke="currentColor"
-        stroke-width="1.3"
-        stroke-linecap="round"
-      />
-      <path
-        d="M2.6 13.4 13.4 2.6"
-        stroke="currentColor"
-        stroke-width="1.3"
-        stroke-linecap="round"
-      />
-    }
-    @case ('waveFade') {
-      <path
-        d="M1.6 8q1.1-1.3 2.2 0t2.2 0"
-        stroke="currentColor"
-        stroke-width="1.3"
-        stroke-linecap="round"
-      />
-      <path
-        d="M6 8q1.3-3.6 2.6 0t2.6 0"
-        stroke="currentColor"
-        stroke-width="1.3"
-        stroke-linecap="round"
-      />
-      <path
-        d="M11.2 8q1.4-5.4 2.8 0"
-        stroke="currentColor"
-        stroke-width="1.3"
-        stroke-linecap="round"
-      />
-    }
-    @case ('slide') {
-      <ellipse cx="3.9" cy="11.6" rx="2.4" ry="1.9" fill="currentColor" />
-      <ellipse cx="12.1" cy="4.8" rx="2.4" ry="1.9" fill="currentColor" />
-      <path
-        d="M5.9 10.3 10.2 5.9"
-        stroke="currentColor"
-        stroke-width="1.3"
-        stroke-linecap="round"
-      />
-    }
-    <!-- The scoop and the fall, as jazz notation draws them: a curve bending
+  <!-- ─── Pitch ────────────────────────────────────────────────────── -->
+  @case ('sharp') {
+    <svg:path
+      d="M6.2 3v10M9.8 3v10M3.8 6.8l8.4-1.4M3.8 10.6l8.4-1.4"
+      stroke="currentColor"
+      stroke-width="1.3"
+      stroke-linecap="round"
+    />
+  }
+  @case ('sharpMaster') {
+    <svg:path
+      d="M6.2 2.4v8.4M9.8 2.4v8.4M3.8 5.8l8.4-1.4M3.8 9l8.4-1.4"
+      stroke="currentColor"
+      stroke-width="1.3"
+      stroke-linecap="round"
+    />
+    <svg:path d="M2.6 14h10.8" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+  }
+  @case ('wave') {
+    <svg:path
+      d="M1.8 8q1.55-3.6 3.1 0t3.1 0 3.1 0 3.1 0"
+      stroke="currentColor"
+      stroke-width="1.3"
+      stroke-linecap="round"
+    />
+  }
+  @case ('waveOff') {
+    <svg:path
+      d="M1.8 8q1.55-3.6 3.1 0t3.1 0 3.1 0 3.1 0"
+      stroke="currentColor"
+      stroke-width="1.3"
+      stroke-linecap="round"
+    />
+    <svg:path
+      d="M2.6 13.4 13.4 2.6"
+      stroke="currentColor"
+      stroke-width="1.3"
+      stroke-linecap="round"
+    />
+  }
+  @case ('waveFade') {
+    <svg:path
+      d="M1.6 8q1.1-1.3 2.2 0t2.2 0"
+      stroke="currentColor"
+      stroke-width="1.3"
+      stroke-linecap="round"
+    />
+    <svg:path
+      d="M6 8q1.3-3.6 2.6 0t2.6 0"
+      stroke="currentColor"
+      stroke-width="1.3"
+      stroke-linecap="round"
+    />
+    <svg:path
+      d="M11.2 8q1.4-5.4 2.8 0"
+      stroke="currentColor"
+      stroke-width="1.3"
+      stroke-linecap="round"
+    />
+  }
+  @case ('slide') {
+    <svg:ellipse cx="3.9" cy="11.6" rx="2.4" ry="1.9" fill="currentColor" />
+    <svg:ellipse cx="12.1" cy="4.8" rx="2.4" ry="1.9" fill="currentColor" />
+    <svg:path
+      d="M5.9 10.3 10.2 5.9"
+      stroke="currentColor"
+      stroke-width="1.3"
+      stroke-linecap="round"
+    />
+  }
+  <!-- The scoop and the fall, as jazz notation draws them: a curve bending
          into the notehead at the start, and away from it at the end. A bare
          rising or falling line would say only "a line" at this size. -->
-    @case ('envelopeUp') {
-      <path
-        d="M2.6 13.2q0-4.4 6-6"
-        stroke="currentColor"
-        stroke-width="1.3"
-        stroke-linecap="round"
-      />
-      <ellipse cx="11" cy="6.2" rx="2.6" ry="2" fill="currentColor" />
-    }
-    @case ('envelopeDown') {
-      <ellipse cx="5" cy="6.2" rx="2.6" ry="2" fill="currentColor" />
-      <path
-        d="M7.4 7.4q6 1.6 6 6"
-        stroke="currentColor"
-        stroke-width="1.3"
-        stroke-linecap="round"
-      />
-    }
-    <!--
+  @case ('envelopeUp') {
+    <svg:path
+      d="M2.6 13.2q0-4.4 6-6"
+      stroke="currentColor"
+      stroke-width="1.3"
+      stroke-linecap="round"
+    />
+    <svg:ellipse cx="11" cy="6.2" rx="2.6" ry="2" fill="currentColor" />
+  }
+  @case ('envelopeDown') {
+    <svg:ellipse cx="5" cy="6.2" rx="2.6" ry="2" fill="currentColor" />
+    <svg:path
+      d="M7.4 7.4q6 1.6 6 6"
+      stroke="currentColor"
+      stroke-width="1.3"
+      stroke-linecap="round"
+    />
+  }
+  <!--
       A held pitch rather than a slashed scoop. The scoop and the fall are both
       diagonals, and a diagonal slash across either draws an ✕ and nothing else;
       the flat line says what turning the envelope off actually leaves you with.
     -->
-    @case ('envelopeOff') {
-      <ellipse cx="4.6" cy="8" rx="2.6" ry="2" fill="currentColor" />
-      <path d="M7.4 8h6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" />
-      <path
-        d="M2.6 13.4 13.4 2.6"
-        stroke="currentColor"
-        stroke-width="1.3"
-        stroke-linecap="round"
-      />
-    }
-    @case ('tuningFork') {
-      <path
-        d="M5.4 2.4v5.2a2.6 2.6 0 0 0 5.2 0V2.4"
-        stroke="currentColor"
-        stroke-width="1.3"
-        stroke-linecap="round"
-      />
-      <path d="M8 10.2v3.4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" />
-    }
-    @case ('arpeggio') {
-      <path
-        d="M4 13.6c1.9-1.35-1.9-2.25 0-3.6s-1.9-2.25 0-3.6-1.9-2.25 0-3.6"
-        stroke="currentColor"
-        stroke-width="1.3"
-        stroke-linecap="round"
-      />
-      <ellipse cx="9.4" cy="11.6" rx="2.2" ry="1.7" fill="currentColor" />
-      <ellipse cx="12.6" cy="5.4" rx="2.2" ry="1.7" fill="currentColor" />
-    }
+  @case ('envelopeOff') {
+    <svg:ellipse cx="4.6" cy="8" rx="2.6" ry="2" fill="currentColor" />
+    <svg:path d="M7.4 8h6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" />
+    <svg:path
+      d="M2.6 13.4 13.4 2.6"
+      stroke="currentColor"
+      stroke-width="1.3"
+      stroke-linecap="round"
+    />
+  }
+  @case ('tuningFork') {
+    <svg:path
+      d="M5.4 2.4v5.2a2.6 2.6 0 0 0 5.2 0V2.4"
+      stroke="currentColor"
+      stroke-width="1.3"
+      stroke-linecap="round"
+    />
+    <svg:path d="M8 10.2v3.4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" />
+  }
+  @case ('arpeggio') {
+    <svg:path
+      d="M4 13.6c1.9-1.35-1.9-2.25 0-3.6s-1.9-2.25 0-3.6-1.9-2.25 0-3.6"
+      stroke="currentColor"
+      stroke-width="1.3"
+      stroke-linecap="round"
+    />
+    <svg:ellipse cx="9.4" cy="11.6" rx="2.2" ry="1.7" fill="currentColor" />
+    <svg:ellipse cx="12.6" cy="5.4" rx="2.2" ry="1.7" fill="currentColor" />
+  }
 
-    <!-- ─── Instrument ───────────────────────────────────────────────── -->
-    @case ('keys') {
-      <rect
-        x="2.4"
-        y="3.6"
-        width="11.2"
-        height="8.8"
-        rx="1.2"
-        stroke="currentColor"
-        stroke-width="1.3"
-      />
-      <path
-        d="M6.1 3.6v8.8M9.9 3.6v8.8"
-        stroke="currentColor"
-        stroke-width="1.3"
-        stroke-linecap="round"
-      />
-      <path
-        d="M6.1 3.6v3.8M9.9 3.6v3.8"
-        stroke="currentColor"
-        stroke-width="2.4"
-        stroke-linecap="round"
-      />
-    }
-    @case ('noise') {
-      <path
-        d="M1.8 8 3.4 4.2l1.4 7.4 1.6-9 1.5 6.2 1.6-4.4 1.5 5.6 1.6-3.4 1.6 2"
-        stroke="currentColor"
-        stroke-width="1.3"
-        stroke-linecap="round"
-        stroke-linejoin="round"
-      />
-    }
-    @case ('adsr') {
-      <path
-        d="M2 13.2 5.2 3.2 7.8 8.6h3.2l2.8 4.6"
-        stroke="currentColor"
-        stroke-width="1.3"
-        stroke-linecap="round"
-        stroke-linejoin="round"
-      />
-    }
-    <!-- ADSR peaks and decays; GAIN ramps to a level and holds there. Drawing
+  <!-- ─── Instrument ───────────────────────────────────────────────── -->
+  @case ('keys') {
+    <svg:rect
+      x="2.4"
+      y="3.6"
+      width="11.2"
+      height="8.8"
+      rx="1.2"
+      stroke="currentColor"
+      stroke-width="1.3"
+    />
+    <svg:path
+      d="M6.1 3.6v8.8M9.9 3.6v8.8"
+      stroke="currentColor"
+      stroke-width="1.3"
+      stroke-linecap="round"
+    />
+    <svg:path
+      d="M6.1 3.6v3.8M9.9 3.6v3.8"
+      stroke="currentColor"
+      stroke-width="2.4"
+      stroke-linecap="round"
+    />
+  }
+  @case ('noise') {
+    <svg:path
+      d="M1.8 8 3.4 4.2l1.4 7.4 1.6-9 1.5 6.2 1.6-4.4 1.5 5.6 1.6-3.4 1.6 2"
+      stroke="currentColor"
+      stroke-width="1.3"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    />
+  }
+  @case ('adsr') {
+    <svg:path
+      d="M2 13.2 5.2 3.2 7.8 8.6h3.2l2.8 4.6"
+      stroke="currentColor"
+      stroke-width="1.3"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    />
+  }
+  <!-- ADSR peaks and decays; GAIN ramps to a level and holds there. Drawing
          them as two profiles is the whole difference between the two forms. -->
-    @case ('gain') {
-      <path
-        d="M2.2 12.6 6.8 4.8h7"
-        stroke="currentColor"
-        stroke-width="1.3"
-        stroke-linecap="round"
-        stroke-linejoin="round"
-      />
-    }
-    @case ('sample') {
-      <path d="M1.8 8h12.4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" />
-      <path
-        d="M4.2 5.6v4.8M6.6 3v10M9 5.9v4.2M11.4 4.2v7.6M13.6 6.6v2.8"
-        stroke="currentColor"
-        stroke-width="1.3"
-        stroke-linecap="round"
-      />
-    }
+  @case ('gain') {
+    <svg:path
+      d="M2.2 12.6 6.8 4.8h7"
+      stroke="currentColor"
+      stroke-width="1.3"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    />
+  }
+  @case ('sample') {
+    <svg:path d="M1.8 8h12.4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" />
+    <svg:path
+      d="M4.2 5.6v4.8M6.6 3v10M9 5.9v4.2M11.4 4.2v7.6M13.6 6.6v2.8"
+      stroke="currentColor"
+      stroke-width="1.3"
+      stroke-linecap="round"
+    />
+  }
 
-    <!-- ─── Echo ─────────────────────────────────────────────────────── -->
-    @case ('echo') {
-      <path
-        d="M2.6 3.4v9.2M6.4 5.4v5.2M9.8 6.8v2.4M12.8 7.5v1"
-        stroke="currentColor"
-        stroke-width="1.3"
-        stroke-linecap="round"
-      />
-    }
-    @case ('echoOff') {
-      <path
-        d="M2.6 3.4v9.2M6.4 5.4v5.2M9.8 6.8v2.4M12.8 7.5v1"
-        stroke="currentColor"
-        stroke-width="1.3"
-        stroke-linecap="round"
-      />
-      <path
-        d="M2.6 13.4 13.4 2.6"
-        stroke="currentColor"
-        stroke-width="1.3"
-        stroke-linecap="round"
-      />
-    }
-    @case ('echoDelay') {
-      <path
-        d="M2.6 2.4v8.2M7.4 4.4v6.2M11.4 5.8v4.8"
-        stroke="currentColor"
-        stroke-width="1.3"
-        stroke-linecap="round"
-      />
-      <path
-        d="M2.6 13.6h4.8m-3.6-1.2-1.2 1.2 1.2 1.2m2.4-2.4 1.2 1.2-1.2 1.2"
-        stroke="currentColor"
-        stroke-width="1.3"
-        stroke-linecap="round"
-        stroke-linejoin="round"
-      />
-    }
-    @case ('echoFade') {
-      <path
-        d="M2 3v8.4M5.4 4.8v4.8M8.4 6.2v2"
-        stroke="currentColor"
-        stroke-width="1.3"
-        stroke-linecap="round"
-      />
-      <path
-        d="M10.6 14.2 14.4 10.4m-2.5 0h2.5v2.5"
-        stroke="currentColor"
-        stroke-width="1.3"
-        stroke-linecap="round"
-        stroke-linejoin="round"
-      />
-    }
-    @case ('filter') {
-      <path
-        d="M1.8 5.2h5.4c2.4 0 2.2 7.6 6.8 7.6"
-        stroke="currentColor"
-        stroke-width="1.3"
-        stroke-linecap="round"
-      />
-    }
+  <!-- ─── Echo ─────────────────────────────────────────────────────── -->
+  @case ('echo') {
+    <svg:path
+      d="M2.6 3.4v9.2M6.4 5.4v5.2M9.8 6.8v2.4M12.8 7.5v1"
+      stroke="currentColor"
+      stroke-width="1.3"
+      stroke-linecap="round"
+    />
+  }
+  @case ('echoOff') {
+    <svg:path
+      d="M2.6 3.4v9.2M6.4 5.4v5.2M9.8 6.8v2.4M12.8 7.5v1"
+      stroke="currentColor"
+      stroke-width="1.3"
+      stroke-linecap="round"
+    />
+    <svg:path
+      d="M2.6 13.4 13.4 2.6"
+      stroke="currentColor"
+      stroke-width="1.3"
+      stroke-linecap="round"
+    />
+  }
+  @case ('echoDelay') {
+    <svg:path
+      d="M2.6 2.4v8.2M7.4 4.4v6.2M11.4 5.8v4.8"
+      stroke="currentColor"
+      stroke-width="1.3"
+      stroke-linecap="round"
+    />
+    <svg:path
+      d="M2.6 13.6h4.8m-3.6-1.2-1.2 1.2 1.2 1.2m2.4-2.4 1.2 1.2-1.2 1.2"
+      stroke="currentColor"
+      stroke-width="1.3"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    />
+  }
+  @case ('echoFade') {
+    <svg:path
+      d="M2 3v8.4M5.4 4.8v4.8M8.4 6.2v2"
+      stroke="currentColor"
+      stroke-width="1.3"
+      stroke-linecap="round"
+    />
+    <svg:path
+      d="M10.6 14.2 14.4 10.4m-2.5 0h2.5v2.5"
+      stroke="currentColor"
+      stroke-width="1.3"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    />
+  }
+  @case ('filter') {
+    <svg:path
+      d="M1.8 5.2h5.4c2.4 0 2.2 7.6 6.8 7.6"
+      stroke="currentColor"
+      stroke-width="1.3"
+      stroke-linecap="round"
+    />
+  }
 
-    <!-- ─── Loops ────────────────────────────────────────────────────── -->
-    @case ('repeatStart') {
-      <path d="M3 2.8v10.4" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" />
-      <path d="M6 2.8v10.4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" />
-      <circle cx="9.4" cy="6.2" r="1.1" fill="currentColor" />
-      <circle cx="9.4" cy="9.8" r="1.1" fill="currentColor" />
-    }
-    @case ('repeatEnd') {
-      <path d="M13 2.8v10.4" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" />
-      <path d="M10 2.8v10.4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" />
-      <circle cx="6.6" cy="6.2" r="1.1" fill="currentColor" />
-      <circle cx="6.6" cy="9.8" r="1.1" fill="currentColor" />
-    }
-    @case ('repeatNested') {
-      <path
-        d="M2.2 2.8v10.4M6.6 2.8v10.4"
-        stroke="currentColor"
-        stroke-width="2.2"
-        stroke-linecap="round"
-      />
-      <path
-        d="M4.6 2.8v10.4M9 2.8v10.4"
-        stroke="currentColor"
-        stroke-width="1.3"
-        stroke-linecap="round"
-      />
-      <circle cx="12.2" cy="6.2" r="1.1" fill="currentColor" />
-      <circle cx="12.2" cy="9.8" r="1.1" fill="currentColor" />
-    }
-    @case ('replay') {
-      <path
-        d="M13.2 8.6A5.4 5.4 0 1 1 11.2 4"
-        stroke="currentColor"
-        stroke-width="1.3"
-        stroke-linecap="round"
-      />
-      <path
-        d="M8.2 3.6h3.4V7"
-        stroke="currentColor"
-        stroke-width="1.3"
-        stroke-linecap="round"
-        stroke-linejoin="round"
-      />
-    }
-    <!-- The bolt is the snippet. Boxed it is stored, bare it fires, slashed it
+  <!-- ─── Loops ────────────────────────────────────────────────────── -->
+  @case ('repeatStart') {
+    <svg:path d="M3 2.8v10.4" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" />
+    <svg:path d="M6 2.8v10.4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" />
+    <svg:circle cx="9.4" cy="6.2" r="1.1" fill="currentColor" />
+    <svg:circle cx="9.4" cy="9.8" r="1.1" fill="currentColor" />
+  }
+  @case ('repeatEnd') {
+    <svg:path d="M13 2.8v10.4" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" />
+    <svg:path d="M10 2.8v10.4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" />
+    <svg:circle cx="6.6" cy="6.2" r="1.1" fill="currentColor" />
+    <svg:circle cx="6.6" cy="9.8" r="1.1" fill="currentColor" />
+  }
+  @case ('repeatNested') {
+    <svg:path
+      d="M2.2 2.8v10.4M6.6 2.8v10.4"
+      stroke="currentColor"
+      stroke-width="2.2"
+      stroke-linecap="round"
+    />
+    <svg:path
+      d="M4.6 2.8v10.4M9 2.8v10.4"
+      stroke="currentColor"
+      stroke-width="1.3"
+      stroke-linecap="round"
+    />
+    <svg:circle cx="12.2" cy="6.2" r="1.1" fill="currentColor" />
+    <svg:circle cx="12.2" cy="9.8" r="1.1" fill="currentColor" />
+  }
+  @case ('replay') {
+    <svg:path
+      d="M13.2 8.6A5.4 5.4 0 1 1 11.2 4"
+      stroke="currentColor"
+      stroke-width="1.3"
+      stroke-linecap="round"
+    />
+    <svg:path
+      d="M8.2 3.6h3.4V7"
+      stroke="currentColor"
+      stroke-width="1.3"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    />
+  }
+  <!-- The bolt is the snippet. Boxed it is stored, bare it fires, slashed it
          is cancelled — which is the whole of the remote-code story. -->
-    @case ('triggerDefine') {
-      <rect
-        x="2.2"
-        y="2.2"
-        width="11.6"
-        height="11.6"
-        rx="2"
-        stroke="currentColor"
-        stroke-width="1.3"
-      />
-      <path
-        d="M9.2 4.2 5.6 8.6h2.4l-.9 3.4 3.5-4.4H8.3l.9-3.4Z"
-        stroke="currentColor"
-        stroke-width="1.3"
-        stroke-linecap="round"
-        stroke-linejoin="round"
-      />
-    }
-    @case ('trigger') {
-      <path
-        d="M9.6 1.8 4.2 9h3.6l-1.4 5.2L13.4 7H9.6l1.4-5.2Z"
-        stroke="currentColor"
-        stroke-width="1.3"
-        stroke-linecap="round"
-        stroke-linejoin="round"
-      />
-    }
-    @case ('triggerOff') {
-      <path
-        d="M9.6 1.8 4.2 9h3.6l-1.4 5.2L13.4 7H9.6l1.4-5.2Z"
-        stroke="currentColor"
-        stroke-width="1.3"
-        stroke-linecap="round"
-        stroke-linejoin="round"
-      />
-      <path
-        d="M2.6 2.6 13.4 13.4"
-        stroke="currentColor"
-        stroke-width="1.3"
-        stroke-linecap="round"
-      />
-    }
+  @case ('triggerDefine') {
+    <svg:rect
+      x="2.2"
+      y="2.2"
+      width="11.6"
+      height="11.6"
+      rx="2"
+      stroke="currentColor"
+      stroke-width="1.3"
+    />
+    <svg:path
+      d="M9.2 4.2 5.6 8.6h2.4l-.9 3.4 3.5-4.4H8.3l.9-3.4Z"
+      stroke="currentColor"
+      stroke-width="1.3"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    />
+  }
+  @case ('trigger') {
+    <svg:path
+      d="M9.6 1.8 4.2 9h3.6l-1.4 5.2L13.4 7H9.6l1.4-5.2Z"
+      stroke="currentColor"
+      stroke-width="1.3"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    />
+  }
+  @case ('triggerOff') {
+    <svg:path
+      d="M9.6 1.8 4.2 9h3.6l-1.4 5.2L13.4 7H9.6l1.4-5.2Z"
+      stroke="currentColor"
+      stroke-width="1.3"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    />
+    <svg:path
+      d="M2.6 2.6 13.4 13.4"
+      stroke="currentColor"
+      stroke-width="1.3"
+      stroke-linecap="round"
+    />
+  }
 
-    <!-- ─── Misc ─────────────────────────────────────────────────────── -->
-    <!-- The slur has to clear the noteheads by enough that the three do not
+  <!-- ─── Misc ─────────────────────────────────────────────────────── -->
+  <!-- The slur has to clear the noteheads by enough that the three do not
          close into one outline, which at 14px reads as a pair of headphones. -->
-    <!-- `$F4` flips things and `$FA` sets them to a value. A switch and a pair
+  <!-- `$F4` flips things and `$FA` sets them to a value. A switch and a pair
          of sliders is that difference, drawn — and it keeps both apart from the
          three chips beside them, which poke the hardware directly. -->
-    @case ('toggle') {
-      <rect
-        x="1.6"
-        y="4.4"
-        width="12.8"
-        height="7.2"
-        rx="3.6"
-        stroke="currentColor"
-        stroke-width="1.3"
-      />
-      <circle cx="10.8" cy="8" r="2.1" fill="currentColor" />
-    }
-    @case ('sliders') {
-      <path
-        d="M1.8 5.4h12.4M1.8 10.6h12.4"
-        stroke="currentColor"
-        stroke-width="1.3"
-        stroke-linecap="round"
-      />
-      <circle cx="10.2" cy="5.4" r="2" stroke="currentColor" stroke-width="1.3" />
-      <circle cx="5.4" cy="10.6" r="2" stroke="currentColor" stroke-width="1.3" />
-    }
-    @case ('chip') {
-      <rect
-        x="4.4"
-        y="4.4"
-        width="7.2"
-        height="7.2"
-        rx="1.2"
-        stroke="currentColor"
-        stroke-width="1.3"
-      />
-      <path
-        d="M6.4 4.4V2.6M9.6 4.4V2.6M6.4 11.6v1.8M9.6 11.6v1.8M4.4 6.4H2.6M4.4 9.6H2.6M11.6 6.4h1.8M11.6 9.6h1.8"
-        stroke="currentColor"
-        stroke-width="1.3"
-        stroke-linecap="round"
-      />
-    }
-    @case ('chipWrite') {
-      <rect
-        x="4.4"
-        y="4.4"
-        width="7.2"
-        height="7.2"
-        rx="1.2"
-        stroke="currentColor"
-        stroke-width="1.3"
-      />
-      <path
-        d="M6.4 4.4V2.6M9.6 4.4V2.6M6.4 11.6v1.8M9.6 11.6v1.8M4.4 6.4H2.6M4.4 9.6H2.6M11.6 6.4h1.8M11.6 9.6h1.8"
-        stroke="currentColor"
-        stroke-width="1.3"
-        stroke-linecap="round"
-      />
-      <rect x="6.6" y="6.6" width="2.8" height="2.8" rx="0.5" fill="currentColor" />
-    }
-    @case ('chipSend') {
-      <rect
-        x="2.4"
-        y="4.4"
-        width="7"
-        height="7.2"
-        rx="1.2"
-        stroke="currentColor"
-        stroke-width="1.3"
-      />
-      <path
-        d="M4.4 4.4V2.6M7.4 4.4V2.6M4.4 11.6v1.8M7.4 11.6v1.8M2.4 6.4H1M2.4 9.6H1"
-        stroke="currentColor"
-        stroke-width="1.3"
-        stroke-linecap="round"
-      />
-      <path
-        d="M10.4 8h4.2m-1.6-1.6L14.6 8l-1.6 1.6"
-        stroke="currentColor"
-        stroke-width="1.3"
-        stroke-linecap="round"
-        stroke-linejoin="round"
-      />
-    }
+  @case ('toggle') {
+    <svg:rect
+      x="1.6"
+      y="4.4"
+      width="12.8"
+      height="7.2"
+      rx="3.6"
+      stroke="currentColor"
+      stroke-width="1.3"
+    />
+    <svg:circle cx="10.8" cy="8" r="2.1" fill="currentColor" />
+  }
+  @case ('sliders') {
+    <svg:path
+      d="M1.8 5.4h12.4M1.8 10.6h12.4"
+      stroke="currentColor"
+      stroke-width="1.3"
+      stroke-linecap="round"
+    />
+    <svg:circle cx="10.2" cy="5.4" r="2" stroke="currentColor" stroke-width="1.3" />
+    <svg:circle cx="5.4" cy="10.6" r="2" stroke="currentColor" stroke-width="1.3" />
+  }
+  @case ('chip') {
+    <svg:rect
+      x="4.4"
+      y="4.4"
+      width="7.2"
+      height="7.2"
+      rx="1.2"
+      stroke="currentColor"
+      stroke-width="1.3"
+    />
+    <svg:path
+      d="M6.4 4.4V2.6M9.6 4.4V2.6M6.4 11.6v1.8M9.6 11.6v1.8M4.4 6.4H2.6M4.4 9.6H2.6M11.6 6.4h1.8M11.6 9.6h1.8"
+      stroke="currentColor"
+      stroke-width="1.3"
+      stroke-linecap="round"
+    />
+  }
+  @case ('chipWrite') {
+    <svg:rect
+      x="4.4"
+      y="4.4"
+      width="7.2"
+      height="7.2"
+      rx="1.2"
+      stroke="currentColor"
+      stroke-width="1.3"
+    />
+    <svg:path
+      d="M6.4 4.4V2.6M9.6 4.4V2.6M6.4 11.6v1.8M9.6 11.6v1.8M4.4 6.4H2.6M4.4 9.6H2.6M11.6 6.4h1.8M11.6 9.6h1.8"
+      stroke="currentColor"
+      stroke-width="1.3"
+      stroke-linecap="round"
+    />
+    <svg:rect x="6.6" y="6.6" width="2.8" height="2.8" rx="0.5" fill="currentColor" />
+  }
+  @case ('chipSend') {
+    <svg:rect
+      x="2.4"
+      y="4.4"
+      width="7"
+      height="7.2"
+      rx="1.2"
+      stroke="currentColor"
+      stroke-width="1.3"
+    />
+    <svg:path
+      d="M4.4 4.4V2.6M7.4 4.4V2.6M4.4 11.6v1.8M7.4 11.6v1.8M2.4 6.4H1M2.4 9.6H1"
+      stroke="currentColor"
+      stroke-width="1.3"
+      stroke-linecap="round"
+    />
+    <svg:path
+      d="M10.4 8h4.2m-1.6-1.6L14.6 8l-1.6 1.6"
+      stroke="currentColor"
+      stroke-width="1.3"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    />
+  }
 
-    <!--
+  <!--
       A glyph nobody drew. `palettetest` asserts no entry reaches this, so it is
       a backstop for a VCMD added to `tokens.ts` before anyone drew its icon —
       visibly missing rather than an empty square.
     -->
-    @default {
-      <rect
-        x="2.6"
-        y="2.6"
-        width="10.8"
-        height="10.8"
-        rx="1.6"
-        stroke="currentColor"
-        stroke-width="1.3"
-        stroke-dasharray="2 2"
-      />
-    }
+  @default {
+    <svg:rect
+      x="2.6"
+      y="2.6"
+      width="10.8"
+      height="10.8"
+      rx="1.6"
+      stroke="currentColor"
+      stroke-width="1.3"
+      stroke-dasharray="2 2"
+    />
   }
-</svg>
+}

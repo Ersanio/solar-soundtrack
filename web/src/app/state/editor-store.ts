@@ -11,11 +11,17 @@ import {
 
 import { compiler } from '@amk/compiler';
 import type { Edit } from '@amk/tokens/edits';
-import { commandAt, tokenize } from '@amk/tokens';
-import type { CompileResult, Diagnostic, NoteAddress, Span } from '@amk/core/types';
+import { type Command, commandAt, commandStartingAt, tokenize } from '@amk/tokens';
+import { commandScope, parseTimeInForce } from '@amk/tokens/commands/in-force';
+import type { CommandAddress, CompileResult, Diagnostic, NoteAddress, Span } from '@amk/core/types';
 import { buildSpc, spcFilename } from '@amk/spc/export';
 import { ARAM_SIZE, type AramBudget, computeBudget } from '@amk/spc/layout';
-import { type SongTimeline, unreachableChannels, walkSong } from '@amk/spc/song-walk';
+import {
+  type SongTimeline,
+  type WalkNote,
+  unreachableChannels,
+  walkSong,
+} from '@amk/spc/song-walk';
 import { echoHazards } from '@amk/tokens/echo-hazards';
 import { type SongClock, songClock } from './song-clock';
 import { type Measurement, tempoShortfall } from './measure-clock';
@@ -79,6 +85,27 @@ export interface Status {
   text: string;
 }
 
+/**
+ * A span to select, and whether the source view should come forward for it.
+ *
+ * See {@link EditorStore.reveal}. A separate type rather than a bare `Span`
+ * because the flag is the whole difference between a summons and a question.
+ */
+export interface Reveal {
+  span: Span;
+  show: boolean;
+}
+
+/**
+ * What {@link EditorStore.commandsInForce} answers while there is no walk to read.
+ *
+ * The same function every time, and it has to be: a computed notifies on a new
+ * value, so returning a fresh closure per keystroke would rebuild the piano
+ * roll's whole mark list on every one of them — the thing its two clocks exist
+ * to avoid.
+ */
+const NOTHING_IN_FORCE = (): readonly Command[] => [];
+
 /** Text bound for the caret, and which slice of it to leave selected. */
 export interface Insertion {
   text: string;
@@ -105,11 +132,18 @@ export class EditorStore {
   readonly caret = signal(0);
 
   /**
-   * A range the editor should select and scroll to, set when a diagnostic is
-   * clicked. The editor owns the view, so this is how a sibling panel asks
+   * A range the editor should select, set when a diagnostic or a piano roll bar
+   * is clicked. The editor owns the view, so this is how a sibling panel asks
    * for a selection without reaching across the component tree.
+   *
+   * `show` is what separates the two callers. A diagnostic is a summons — bring
+   * the source forward, scroll to it, take focus. A single click on a bar is a
+   * question about that note, and the inspector answers it from the pane beside
+   * the roll, so switching tabs would take away the thing being asked about. The
+   * quiet form still goes through the document, because the caret is the one
+   * statement of what is being inspected and panels do not write it.
    */
-  readonly reveal = signal<Span | null>(null);
+  readonly reveal = signal<Reveal | null>(null);
 
   /**
    * A splice the editor should apply, set when a panel edits a command in
@@ -342,6 +376,26 @@ export class EditorStore {
   }
 
   /**
+   * Which occurrence of a note the piano roll was last asked about.
+   *
+   * A note written once inside a loop is played many times, and the commands in
+   * force can differ between them, so the caret — which names the *text* — is
+   * one answer short. Set when a bar is clicked and read only while it is still
+   * an occurrence of the note the caret is on, which is what makes moving the
+   * caret enough to retire it.
+   */
+  readonly inspecting = signal<{ address: number; tick: number } | null>(null);
+
+  /**
+   * The command map by ARAM address, which is how the walk names a command.
+   * The sibling of {@link notesByAddress}, and what turns `WalkNote.origins`
+   * back into the text a command was written as.
+   */
+  readonly commandsByAddress = computed<ReadonlyMap<number, CommandAddress>>(
+    () => new Map((this.result()?.commandMap ?? []).map((entry) => [entry.address, entry])),
+  );
+
+  /**
    * The note map by ARAM address, which is how the walk names a note. Built
    * once here because three readers key into it — the roll for a note's written
    * pitch and its source, and {@link unreachableSpans}.
@@ -349,6 +403,80 @@ export class EditorStore {
   readonly notesByAddress = computed<ReadonlyMap<number, NoteAddress>>(
     () => new Map((this.result()?.noteMap ?? []).map((entry) => [entry.address, entry])),
   );
+
+  /**
+   * The commands acting on a note, exactly — a lookup rather than a map.
+   *
+   * Two answers joined, each exact in its own half. `WalkNote.origins` names
+   * every command that emitted a VCMD, by the address the driver read it from,
+   * which is the only way to be right where one run of bytes plays more than
+   * once: `v255 (1)[ c ]2 v200 (1)5` sounds one written `c` under two volumes,
+   * and the answer is a fact about the pass rather than about the text.
+   * {@link parseTimeInForce} supplies the rest — `q`, `h` and `@21`-`@29` emit
+   * nothing to address, and source order is exactly what the compiler resolved
+   * them in.
+   *
+   * Filtered to commands that act on a note at all: the song's own settings
+   * reach every channel alike and where a note sits is what a roll already
+   * draws, so neither is something acting on *this* note.
+   *
+   * A lookup and not a map because the timeline can hold two hundred thousand
+   * notes and only the ones on screen are ever asked about. Answers are cached
+   * on the two things they are derived from, and both are shared across a run of
+   * notes under unchanged state, so a long song resolves a handful of lists.
+   *
+   * Empty for every note while the editor has moved past the text that compiled:
+   * a span into a document that has changed points at the wrong thing, which is
+   * the same test the roll's tooltip and its clicks take.
+   */
+  readonly commandsInForce = computed<(note: WalkNote) => readonly Command[]>(() => {
+    if (this.compiledText() !== this.source()) {
+      return NOTHING_IN_FORCE;
+    }
+
+    const commands = this.tokens().commands;
+    const byAddress = this.commandsByAddress();
+    const notes = this.notesByAddress();
+    const parseTime = parseTimeInForce(commands);
+    const cache = new Map<readonly (number | null)[], Map<Command | null, readonly Command[]>>();
+
+    const walked = (origins: readonly (number | null)[]): Command[] => {
+      const acting: Command[] = [];
+      for (const at of origins) {
+        const span = at === null ? undefined : byAddress.get(at)?.span;
+        const command = span === undefined ? null : commandStartingAt(commands, span.start);
+        if (command !== null && commandScope(command) === 'note-state') {
+          acting.push(command);
+        }
+      }
+
+      return acting;
+    };
+
+    return (note: WalkNote) => {
+      let byWritten = cache.get(note.origins);
+      if (byWritten === undefined) {
+        byWritten = new Map();
+        cache.set(note.origins, byWritten);
+      }
+
+      const span = notes.get(note.address)?.span;
+      const written = span === undefined ? null : commandStartingAt(commands, span.start);
+      const found = byWritten.get(written);
+      if (found !== undefined) {
+        return found;
+      }
+
+      // The parse-time ones first: they are what the note itself was written
+      // under, where the rest reached it from wherever the driver had been.
+      const acting = [
+        ...(written === null ? [] : (parseTime.get(written) ?? [])),
+        ...walked(note.origins),
+      ];
+      byWritten.set(written, acting);
+      return acting;
+    };
+  });
 
   /** The notes the song is too short to reach, for the editor to underline. */
   readonly unreachableSpans = computed<readonly Span[]>(() => {

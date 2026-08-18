@@ -9,6 +9,7 @@ import { EchoInspector } from './echo-inspector/echo-inspector';
 import { FirDesigner } from './fir-designer/fir-designer';
 import { InstrumentEntryEditor } from './instrument-entry/instrument-entry';
 import { InstrumentInspector } from './instrument-inspector/instrument-inspector';
+import { NoteCommand } from './note-command/note-command';
 import { PanCommand } from './pan-command/pan-command';
 import { ParamTable } from './param-table/param-table';
 import { QuantizationCommand } from './quantization-command/quantization-command';
@@ -75,6 +76,7 @@ const LETTER_VIEWS: Readonly<Record<string, string>> = {
     FirDesigner,
     InstrumentEntryEditor,
     InstrumentInspector,
+    NoteCommand,
     PanCommand,
     ParamTable,
     QuantizationCommand,
@@ -111,6 +113,13 @@ export class CommandInspector {
     const command = this.command();
     if (!command) {
       return null;
+    }
+
+    // Nine note letters, `r` and `^` are one command in eleven spellings, and
+    // `gather` gives that command — and only that one — its length segments. One
+    // test rather than eleven rows in the table below.
+    if (command.noteLength !== undefined) {
+      return 'note';
     }
 
     if (command.vcmd !== undefined) {

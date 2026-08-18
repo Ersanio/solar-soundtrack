@@ -101,6 +101,16 @@ is what the driver does with it. Turning the list into seconds is not this packa
 ramps once per tick and the model of that lives in `@amk/tokens`, which nothing here may import — so
 the editor joins the two in `web/src/app/state/song-clock.ts`.
 
+`WalkNote.origins` is the same idea pointed at the commands rather than their values: the ARAM
+address of whatever last wrote each of `SLOTS`, so a reader can name the `$ED` a note sounds under
+and not merely read its bytes. It has to come from here for the reason the rest of the state does —
+`v255 (1)[ c ]2 v200 (1)5` plays one written note under two volumes, and which one is a fact about
+the pass rather than about the text. `slotsOf` is where a command claims a slot or takes one away;
+the four `off` commands take one away rather than occupying it, since after `$DF` there is no
+vibrato to report. A `$D0`-`$D8` clears the instrument slot instead of filling it: the byte that
+loaded that drum is a note, and the `@21`-`@29` that did it emitted nothing to point at. Which of
+these a view chooses to draw is not this package's business, as the percussion set is not.
+
 `NoteState.tempo` is deliberately not that answer. It is the tempo the song has last been _told_ to
 reach, which through a fade is the target the driver has not got to yet; the roll's tooltip wants
 what was asked for, and anything wanting what is actually playing reads `tempoChanges` or the live

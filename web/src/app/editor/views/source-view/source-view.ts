@@ -172,12 +172,14 @@ export class SourceView {
 
     // Sanctioned effect: driving an imperative view API (selection) from state.
     //
-    // The work happens after the next render rather than here: revealing a span
-    // while another tab is open first has to make the editor visible, and
-    // focusing or measuring a `display: none` view is a no-op.
+    // A shown reveal does its work after the next render rather than here:
+    // making the editor visible comes first, and focusing or measuring a
+    // `display: none` view is a no-op. A quiet one needs neither, since it only
+    // moves the selection — which is how a panel beside another tab retargets
+    // the inspector without taking the tab away.
     effect(() => {
-      const span = this.store.reveal();
-      if (!span) {
+      const reveal = this.store.reveal();
+      if (!reveal) {
         return;
       }
 
@@ -186,8 +188,13 @@ export class SourceView {
         // set would let a later re-run select it again long after the author
         // has moved on.
         this.store.reveal.set(null);
+        if (!reveal.show) {
+          this.selectSpan(reveal.span);
+          return;
+        }
+
         this.activate.emit();
-        afterNextRender(() => this.revealSpan(span), { injector: this.injector });
+        afterNextRender(() => this.revealSpan(reveal.span), { injector: this.injector });
       });
     });
 
@@ -344,13 +351,28 @@ export class SourceView {
 
   /** Selects and centers `span`, clamped to the document as it stands now. */
   private revealSpan(span: { start: number; end: number }): void {
-    const length = this.view.state.doc.length;
-    const anchor = Math.min(span.start, length);
-    const head = clamp(span.end, span.start + 1, length);
     this.view.dispatch({
-      selection: { anchor, head },
-      effects: EditorView.scrollIntoView(anchor, { y: 'center' }),
+      selection: this.selectionFor(span),
+      effects: EditorView.scrollIntoView(span.start, { y: 'center' }),
     });
     this.view.focus();
+  }
+
+  /**
+   * Selects `span` and nothing more — no scroll, no focus, no tab switch.
+   *
+   * Safe on a hidden view precisely because it measures nothing, which is what
+   * lets it run inline rather than behind a render barrier. The update listener
+   * carries the new selection out to `caret`, so the inspector follows.
+   */
+  private selectSpan(span: { start: number; end: number }): void {
+    this.view.dispatch({ selection: this.selectionFor(span) });
+  }
+
+  /** The two of them clamp alike, so a quiet selection lands where a loud one would. */
+  private selectionFor(span: { start: number; end: number }): { anchor: number; head: number } {
+    const length = this.view.state.doc.length;
+    const anchor = Math.min(span.start, length);
+    return { anchor, head: clamp(span.end, span.start + 1, length) };
   }
 }

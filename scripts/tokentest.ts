@@ -14,7 +14,21 @@
 
 import { Tag, tags } from "@lezer/highlight";
 
-import { type ScanState, type Token, commandAt, copyState, startState, step, tokenize, TOKEN_TAGS } from "@amk/tokens";
+import {
+	type Command,
+	type ScanState,
+	type Token,
+	commandAt,
+	commandStartingAt,
+	copyState,
+	LETTER_NAMES,
+	startState,
+	step,
+	tokenize,
+	TOKEN_TAGS,
+	VCMD_NAMES,
+} from "@amk/tokens";
+import { type CommandScope, commandScope, parseTimeInForce } from "@amk/tokens/commands/in-force";
 
 import { velocityTableAt } from "@amk/tokens/dialect";
 import { resolveCommand } from "@amk/tokens/commands/describe";
@@ -1524,6 +1538,121 @@ console.log("\naudit: the scanner agrees with the driver about command lengths")
 			.map((t) => t.start)
 			.join(", "),
 	);
+}
+
+// ---------------------------------------------------------------------------
+console.log("\nwhat a command reaches, and what the source alone can answer");
+// ---------------------------------------------------------------------------
+//
+// The piano roll draws a glyph per command acting on a note. Two halves answer
+// that and they must not overlap: anything that emits a VCMD is named by the
+// walk, at the address the driver read it from, and the rest — `q`, `h` and
+// `@21`-`@29`, which emit nothing — is named here. A command answered twice
+// draws two glyphs for one setting; one answered neither way draws none.
+{
+	// Exhaustive, because a table that quietly loses an entry is a command the
+	// roll silently stops drawing.
+	const missing: string[] = [];
+	const scopes = new Set<CommandScope>();
+	for (const vcmd of Object.keys(VCMD_NAMES).map(Number)) {
+		const source = `#amk 4\n#0 $${vcmd.toString(16).toUpperCase()}\n`;
+		const command = tokenize(source).commands.find((entry) => entry.vcmd === vcmd);
+		if (command === undefined) {
+			missing.push(`${vcmd.toString(16)}`);
+			continue;
+		}
+
+		scopes.add(commandScope(command));
+	}
+
+	check("every VCMD is gathered and scoped", missing.length === 0, missing.join(" "));
+
+	const letters = Object.keys(LETTER_NAMES).filter((letter) => letter !== "<" && letter !== ">");
+	const unscoped: string[] = [];
+	for (const letter of letters) {
+		const source = `#amk 4\n#0 ${letter}1\n`;
+		const command = tokenize(source).commands.find((entry) => entry.kind.toLowerCase() === letter);
+		if (command === undefined) {
+			unscoped.push(letter);
+			continue;
+		}
+
+		scopes.add(commandScope(command));
+	}
+
+	check("every named letter but the octave shifts is gathered", unscoped.length === 0, unscoped.join(" "));
+
+	// `<` and `>` never become commands at all — `octaveShift` is absent from
+	// `LETTER_COMMAND_KINDS` — so `commandScope` is never asked about them and
+	// the roll has nothing to draw. Worth pinning, since they *are* in
+	// `LETTER_NAMES` and reading that table would suggest otherwise.
+	check(
+		"an octave shift is not a command",
+		tokenize(`#amk 4\n#0 c > d\n`).commands.every((command) => command.kind !== ">"),
+	);
+
+	const arms: CommandScope[] = ["note-state", "song", "position", "structure"];
+	const unused = arms.filter((arm) => !scopes.has(arm));
+	check("and every scope is reached by something", unused.length === 0, unused.join(", "));
+}
+
+// The exclusions, stated as the roll asks the question.
+{
+	const source = `#amk 4\n#0 t144 w200 o4 l8 $E4 $00 $EF $FF $28 $28 $F5 $7F $00 $00 $00 $00 $00 $00 $00 [ c8 ]2 *2\n`;
+	const drawn = tokenize(source)
+		.commands.filter((command) => commandScope(command) === "note-state")
+		.map((command) => source.slice(command.span.start, command.span.end));
+	check("nothing song-wide, positional or structural is note state", drawn.length === 0, drawn.join(" | "));
+}
+
+// The parse-time half. Exact rather than approximate: `parser.ts` resolves these
+// in one textual pass, so the `q` before a note in the source is the `q` that
+// went into the bytes of every pass of it.
+{
+	const source = `#amk 4\n#0 q7f h2 c8 d8 q6e e8\n#1 f8\n`;
+	const index = tokenize(source);
+	const inForce = parseTimeInForce(index.commands);
+	const noteAt = (text: string): Command => {
+		const command = commandStartingAt(index.commands, source.indexOf(text));
+		if (command === null) {
+			throw new Error(`no command at ${text}`);
+		}
+
+		return command;
+	};
+
+	const textOf = (note: Command) =>
+		(inForce.get(note) ?? []).map((command) => source.slice(command.span.start, command.span.end)).join(" ");
+
+	check("a q and an h carry forward to the notes after them", textOf(noteAt("c8")) === "q7f h2");
+	check("and to the one after that", textOf(noteAt("d8")) === "q7f h2");
+	check("a second q replaces the first", textOf(noteAt("e8")) === "q6e h2");
+	check("and none of it reaches another channel", textOf(noteAt("f8")) === "");
+}
+
+// Channel scope, and the definition that belongs to no channel.
+{
+	const source = `#amk 4\n(!1)[q40 $F4 $09]\n#0 c8\n`;
+	const index = tokenize(source);
+	const inForce = parseTimeInForce(index.commands);
+	const note = commandStartingAt(index.commands, source.indexOf("c8"));
+	check("a q above the first channel reaches no note", (inForce.get(note!) ?? []).length === 0);
+}
+
+// `@21`-`@29` emit no `$DA`, so they are this half's; every other `@` emits one
+// and is the walk's. Reporting both would draw two instrument glyphs on one note.
+{
+	const drum = tokenize(`#amk 4\n#0 @21 c8\n`);
+	const pitched = tokenize(`#amk 4\n#0 @1 c8\n`);
+	const direct = tokenize(`#amk 4\n#0 @@21 c8\n`);
+	const held = (index: ReturnType<typeof tokenize>) => {
+		const note = index.commands.find((command) => command.noteLength !== undefined);
+		return note === undefined ? -1 : (parseTimeInForce(index.commands).get(note) ?? []).length;
+	};
+
+	check("a percussion @ is answered here", held(drum) === 1);
+	check("a pitched @ is left to the walk", held(pitched) === 0);
+	check("and @@21 is direct, so it emits and is left to the walk too", held(direct) === 0);
 }
 
 summarise();

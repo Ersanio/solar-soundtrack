@@ -39,6 +39,14 @@
   >
     Follow playback
   </amk-checkbox>
+  <amk-checkbox
+    class="text-xs"
+    title="Slide the music under a fixed playhead, rather than turning a page when the playhead reaches the edge"
+    [checked]="scrollNotes()"
+    (checkedChange)="setScrollNotes($event)"
+  >
+    Scroll the notes
+  </amk-checkbox>
   <amk-checkbox class="text-xs" [checked]="allOctaves()" (checkedChange)="setAllOctaves($event)">
     All octaves
   </amk-checkbox>
@@ -98,15 +106,80 @@
   </ul>
 }
 
+<!-- The scrub bar: the whole song at once, and the drag that seeks it. Outside
+     the roll's own scroller on purpose — a scrubber that scrolled out of view
+     would be gone exactly when a tall song most needs it. -->
+@if (scrubBox(); as box) {
+  <div class="border-edge bg-raised shrink-0 border-b">
+    <svg
+      class="block w-full cursor-pointer select-none"
+      [attr.height]="scrubHeight"
+      [attr.viewBox]="box"
+      (pointerdown)="onScrubDown($event)"
+      (pointermove)="onScrubMove($event)"
+      (pointerup)="onScrubUp($event)"
+      (pointercancel)="onScrubUp($event)"
+    >
+      <defs>
+        <clipPath id="amk-scrub-clip">
+          <rect y="0" [attr.x]="keyWidth" [attr.width]="rollWidth()" [attr.height]="scrubHeight" />
+        </clipPath>
+      </defs>
+
+      <rect
+        y="0"
+        class="fill-inset"
+        [attr.x]="keyWidth"
+        [attr.width]="rollWidth()"
+        [attr.height]="scrubHeight"
+      />
+
+      <g clip-path="url(#amk-scrub-clip)">
+        @if (scrubWindow(); as window) {
+          <rect
+            y="0"
+            class="fill-accent stroke-accent"
+            fill-opacity="0.14"
+            stroke-opacity="0.5"
+            [attr.x]="window.x"
+            [attr.width]="window.w"
+            [attr.height]="scrubHeight"
+          />
+        }
+
+        @for (bar of minimap(); track bar.id) {
+          <rect
+            class="fill-ink-muted"
+            [attr.x]="bar.x"
+            [attr.y]="bar.y"
+            [attr.width]="bar.w"
+            [attr.height]="bar.h"
+          />
+        }
+
+        <line
+          y1="0"
+          class="stroke-accent"
+          stroke-width="1.5"
+          [attr.x1]="scrubX()"
+          [attr.x2]="scrubX()"
+          [attr.y2]="scrubHeight"
+        />
+      </g>
+    </svg>
+  </div>
+}
+
 <div
   #viewport
   class="relative min-h-0 flex-1 overflow-x-hidden overflow-y-auto"
-  (wheel)="onWheel($event)"
   (pointermove)="onMove($event)"
   (pointerleave)="leave()"
 >
   @if (viewBox(); as box) {
-    <svg class="block w-full" [attr.height]="stackHeight()" [attr.viewBox]="box">
+    <!-- `select-none`: a double click on a bar must not drag a text selection
+         out of the labels drawn inside it. -->
+    <svg class="block w-full select-none" [attr.height]="stackHeight()" [attr.viewBox]="box">
       <defs>
         <clipPath id="amk-roll-clip">
           <rect
@@ -177,10 +250,13 @@
           }
 
           @for (mark of marks(); track mark.id) {
+            <!-- A click asks the inspector about this note; a double click goes
+                 to it in the source. -->
             <g
               class="mark cursor-pointer"
               (pointerenter)="enter(mark)"
-              (click)="reveal(mark)"
+              (click)="select(mark)"
+              (dblclick)="reveal(mark)"
               (keydown.enter)="reveal(mark)"
             >
               <!-- The slot, then the part that actually sounds. The inner bar is
@@ -203,6 +279,57 @@
                 [class]="mark.fill"
                 [attr.fill-opacity]="mark.opacity"
               />
+              @if (mark.label; as label) {
+                <text
+                  pointer-events="none"
+                  dominant-baseline="central"
+                  class="fill-ink font-mono"
+                  [attr.x]="label.x"
+                  [attr.y]="label.y"
+                  [attr.font-size]="label.size"
+                  [attr.fill-opacity]="mark.opacity"
+                >
+                  {{ label.text }}
+                </text>
+              }
+              <!-- The plate is the hit target as well as the highlight. An SVG
+                   element only takes a pointer where it is painted, so without it
+                   a glyph is clickable on its strokes and not in the gaps between
+                   them — a 1.3px target that reads as a dead icon.
+
+                   It lifts the bar rather than recolouring the glyph, because it
+                   is drawn over eight channel colours and only the plate works on
+                   all of them: `--color-accent` is a blue of much the same
+                   lightness as `--color-ch-0`, so on that channel a recoloured
+                   glyph would be the one that vanished on hover. Every
+                   `--color-ch-*` is mid-tone against the surface, so a near-white
+                   wash lifts each of them. -->
+              @for (glyph of mark.glyphs; track glyph.id) {
+                <g
+                  class="group"
+                  (click)="inspect(glyph, $event)"
+                  (dblclick)="inspect(glyph, $event, true)"
+                >
+                  <rect
+                    rx="2"
+                    class="fill-ink/0 group-hover:fill-ink/25"
+                    [attr.x]="glyph.x"
+                    [attr.y]="glyph.y"
+                    [attr.width]="glyph.size"
+                    [attr.height]="glyph.size"
+                  />
+                  <svg
+                    amk-glyph
+                    class="text-ink pointer-events-none"
+                    [name]="glyph.icon"
+                    [attr.x]="glyph.x"
+                    [attr.y]="glyph.y"
+                    [attr.width]="glyph.size"
+                    [attr.height]="glyph.size"
+                    [attr.opacity]="mark.opacity"
+                  ></svg>
+                </g>
+              }
             </g>
           }
         </g>
@@ -274,7 +401,7 @@
     }
     @if (tip.source; as source) {
       <div class="border-edge text-accent-soft mt-1 border-t pt-1 font-mono">{{ source }}</div>
-      <div class="text-ink-muted">click to show it in the source</div>
+      <div class="text-ink-muted">double-click to show it in the source</div>
     }
   </div>
 }

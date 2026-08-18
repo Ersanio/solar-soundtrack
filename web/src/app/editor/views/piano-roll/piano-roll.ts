@@ -10,7 +10,10 @@ import {
   viewChild,
 } from '@angular/core';
 
+import type { Span } from '@amk/core/types';
 import type { WalkNote } from '@amk/spc/song-walk';
+import { type CommandGlyph, CommandIcon } from '../../command-palette/command-icon';
+import { glyphOf } from '../../command-palette/glyph-of';
 import { noteName, ticksPerSecond } from '@amk/tokens/commands/units';
 import { noiseHz } from '@amk/spc/adsr';
 import {
@@ -36,7 +39,19 @@ import { DriverStore } from '../../../state/driver-store';
 import { EditorStore } from '../../../state/editor-store';
 import { Playback } from '../../../state/playback';
 import { ticksPerSecondAt } from '../../../state/song-clock';
-import { type Lane, advanceTick, gridLines, keyName, laneStack, tickWindow } from './roll-layout';
+import {
+  type Lane,
+  advanceTick,
+  fitBarContent,
+  gridLines,
+  keyName,
+  laneStack,
+  noteLabel,
+  pageStart,
+  scrubOffset,
+  scrubTick,
+  tickWindow,
+} from './roll-layout';
 
 /** Width of the key column. Wide enough for a drum's longest label, `@29 o4 c+`. */
 const KEY_WIDTH = 76;
@@ -48,14 +63,29 @@ const ROW_GAP = 1;
 const NOTE_GAP = 2;
 /** How far the tooltip sits from the pointer, so the cursor never covers it. */
 const TOOLTIP_GAP = 14;
-/** How long the wheel must be quiet before a scroll becomes a seek. */
-const SEEK_QUIET_MS = 200;
 /**
  * Where the song's last tick sits once the scroll has run as far right as it
  * goes — a little past the playhead, so the end of the song can be read with
  * some room after it rather than pinned under the line.
  */
 const SCROLL_END_AT = 0.1;
+/** How far across the pane a paged playhead runs before the roll turns over. */
+const PAGE_TURN_AT = 0.9;
+/**
+ * How much of a pane a turn moves.
+ *
+ * Less than {@link PAGE_TURN_AT}, so the playhead lands a tenth in rather than
+ * hard against the key column: the bar that has just played stays on screen,
+ * which is what makes the new page read as a continuation of the old one.
+ */
+const PAGE_STEP = 0.8;
+/** The margin a turn leaves, and so the one every page opens on. */
+const PAGE_LEAD_IN = PAGE_TURN_AT - PAGE_STEP;
+
+/** Height of the scrub bar: room for a pitch contour, little enough to stay chrome. */
+const SCRUB_HEIGHT = 36;
+/** Inset, so the top and bottom rows are not swallowed by the border. */
+const SCRUB_PAD = 3;
 
 const ZOOMS = [0.5, 1, 2, 4, 8] as const;
 const ROW_HEIGHTS = [6, 9, 13] as const;
@@ -77,6 +107,28 @@ const CHANNEL_FILL: readonly string[] = [
 
 const STORAGE_KEY = 'solar-soundtrack.pianoroll';
 
+/** One glyph on a bar: a command acting on that note, and where to draw it. */
+export interface MarkGlyph {
+  id: string;
+  icon: CommandGlyph;
+  x: number;
+  y: number;
+  size: number;
+  /** The command's own span, which is what a click on it selects. */
+  span: Span;
+  /** For the tooltip, since a glyph has no room to say what it is. */
+  label: string;
+}
+
+/** One note on the scrub bar's minimap. Every bar is the same colour. */
+export interface ScrubBar {
+  id: string;
+  x: number;
+  w: number;
+  y: number;
+  h: number;
+}
+
 /** One note, with everything the template needs already resolved. */
 export interface Mark {
   id: string;
@@ -88,6 +140,10 @@ export interface Mark {
   fill: string;
   /** Dimmed rather than hidden, so a muted part still reads as part of the song. */
   opacity: number;
+  /** `C6` on a key, `@23` on a drum lane. `null` when the bar has no room. */
+  label: { text: string; x: number; y: number; size: number } | null;
+  /** As many as fit; the inspector is where the whole list is. */
+  glyphs: readonly MarkGlyph[];
   note: WalkNote;
 }
 
@@ -95,6 +151,8 @@ interface Settings {
   zoom: number;
   rowHeight: number;
   follow: boolean;
+  /** Slide the music under a fixed playhead, rather than turning a page under it. */
+  scrollNotes: boolean;
   allOctaves: boolean;
   grid: boolean;
   /** Instruments drawn on percussion lanes, ascending. */
@@ -107,6 +165,7 @@ interface StoredSettings {
   zoom?: unknown;
   rowHeight?: unknown;
   follow?: unknown;
+  scrollNotes?: unknown;
   allOctaves?: unknown;
   grid?: unknown;
   percussion?: unknown;
@@ -128,6 +187,7 @@ function readSettings(): Settings {
     zoom: 2,
     rowHeight: 9,
     follow: true,
+    scrollNotes: false,
     allOctaves: false,
     grid: true,
     percussion: [...DEFAULT_PERCUSSION],
@@ -156,6 +216,10 @@ function readSettings(): Settings {
 
   if (typeof stored.follow === 'boolean') {
     settings.follow = stored.follow;
+  }
+
+  if (typeof stored.scrollNotes === 'boolean') {
+    settings.scrollNotes = stored.scrollNotes;
   }
 
   if (typeof stored.allOctaves === 'boolean') {
@@ -190,7 +254,7 @@ function readSettings(): Settings {
  */
 @Component({
   selector: 'amk-piano-roll',
-  imports: [Button, Checkbox, Toolbar],
+  imports: [Button, Checkbox, CommandIcon, Toolbar],
   templateUrl: './piano-roll.html',
   host: { class: 'relative flex min-h-0 min-w-0 flex-col' },
 })
@@ -208,17 +272,51 @@ export class PianoRoll {
 
   protected readonly zoom = computed(() => this.settings().zoom);
   protected readonly follow = computed(() => this.settings().follow);
+  protected readonly scrollNotes = computed(() => this.settings().scrollNotes);
   protected readonly allOctaves = computed(() => this.settings().allOctaves);
   protected readonly grid = computed(() => this.settings().grid);
 
   /** Where the view is parked when it is not following the song. */
   private readonly panTick = signal(0);
 
-  /** A scroll in progress: the roll is off the song until the wheel goes quiet. */
+  /**
+   * How far across the pane the playhead sits while the view is parked.
+   *
+   * A paged playhead is anywhere between the lead-in and the turn, and coming
+   * off the song must not move the music under it: parking keeps the fraction
+   * the playhead had, so the picture stays where the eye left it. A roll that
+   * scrolls its notes has only one answer, which is {@link PLAYHEAD_AT}.
+   */
+  private readonly panLead = signal(PLAYHEAD_AT);
+
+  /**
+   * The tick the page grid is measured from, which a scroll moves.
+   *
+   * Zero is the song's own start, and a song nobody has scrolled keeps it: the
+   * first page opens on the lead-in and every turn falls a stride after the last.
+   * A scroll re-anchors it on the view it leaves behind, so returning to the song
+   * carries on from what is on screen rather than from where the seeked tick
+   * happens to sit in a grid measured from the beginning.
+   */
+  private readonly pageOrigin = signal(0);
+
+  /** A scrub in progress: the roll is off the song until the drag ends. */
   private readonly scrolling = signal(false);
-  private seekTimer: ReturnType<typeof setTimeout> | undefined;
+
+  /** A pointer is down on the scrub bar. */
+  private readonly dragging = signal(false);
 
   protected readonly timeline = computed(() => this.editor.timeline());
+
+  /**
+   * Whether the editor still shows the text that compiled.
+   *
+   * Everything joined back to the source takes this test — the tooltip's MML,
+   * the held keys, a click, and the bars' glyphs. A boolean rather than the
+   * comparison inline at each of them, so `marks` rebuilds when the answer
+   * changes rather than on every keystroke that does not change it.
+   */
+  private readonly inSync = computed(() => this.editor.compiledText() === this.editor.source());
 
   /**
    * The driver's own note for each of `@21`-`@29`. Two uses, one map: it labels
@@ -303,12 +401,16 @@ export class PianoRoll {
   });
 
   protected readonly keyWidth = KEY_WIDTH;
-  protected readonly playheadX = computed(() => KEY_WIDTH + this.rollWidth() * PLAYHEAD_AT);
+
+  /** Ticks across the roll at this zoom, which is what a page is measured in. */
+  private readonly screenTicks = computed(() =>
+    this.zoom() > 0 ? this.rollWidth() / this.zoom() : 0,
+  );
 
   /** As far right as a scroll goes: the last tick, at {@link SCROLL_END_AT}. */
   private readonly maxPanTick = computed(() => {
     const pass = this.timeline()?.ticks ?? 0;
-    return pass + (this.rollWidth() * (PLAYHEAD_AT - SCROLL_END_AT)) / this.zoom();
+    return pass + (this.rollWidth() * (this.panLead() - SCROLL_END_AT)) / this.zoom();
   });
 
   /**
@@ -354,6 +456,20 @@ export class PianoRoll {
   private readonly shownTick = signal(0);
   private lastFrameAt = 0;
 
+  /** How often the readout is rewritten. Prose is read, not watched. */
+  private static readonly READOUT_MS = 500;
+
+  /**
+   * The playhead as the readout states it, twice a second.
+   *
+   * The transform wants a tick every frame; a line of text does not. A count and
+   * a ticks-per-second restated sixty times a second are a blur the eye cannot
+   * read at all, so the readout takes the same clock slowly and the display
+   * keeps the frame-rate one to itself.
+   */
+  private readonly slowTick = signal(0);
+  private lastReadoutAt = 0;
+
   /**
    * Whether the roll is showing the song's position rather than a parked one.
    *
@@ -367,16 +483,21 @@ export class PianoRoll {
 
   /**
    * Three cases, and the middle one is the reason this is not a one-liner:
-   * following the song, following a transport that has stopped — which is back
-   * at the beginning, so the roll goes there too — and parked by hand, which
-   * stays where it was put whatever the transport does.
+   * following the song, following a transport that is not running, and parked by
+   * hand — which stays where it was put whatever the transport does.
+   *
+   * The middle one asks the transport rather than assuming the beginning. A stop
+   * does put it back to tick 0 and the roll follows it there, but a scrub made
+   * while the song is stopped seeks without starting it, and a roll that read a
+   * stopped transport as tick 0 would throw that scrub away the moment it was
+   * released — the bar would move, the song would not, and nothing would say why.
    */
   protected readonly playTick = computed(() => {
     if (this.following()) {
       return this.shownTick();
     }
 
-    return this.attached() ? 0 : this.parkedTick();
+    return this.attached() ? this.playback.songTicks().ticks : this.parkedTick();
   });
 
   /** One frame of the display clock: read the driver, then hand it the step. */
@@ -419,6 +540,11 @@ export class PianoRoll {
         pass,
       }),
     );
+
+    if (frame - this.lastReadoutAt >= PianoRoll.READOUT_MS) {
+      this.lastReadoutAt = frame;
+      this.slowTick.set(this.shownTick());
+    }
   }
 
   /**
@@ -428,17 +554,131 @@ export class PianoRoll {
    * marks are two halves of one picture, so a pause that moved one and not the
    * other would scroll to the paused position and find nothing drawn there.
    */
-  private readonly windowTick = computed(() => {
-    if (this.following()) {
-      return this.playback.songTicks().ticks;
+  private readonly windowTick = computed(() =>
+    this.attached() ? this.playback.songTicks().ticks : this.parkedTick(),
+  );
+
+  /**
+   * How far across the roll the playhead sits, as a fraction of its width.
+   *
+   * The whole difference between the two view modes. Scrolling the notes pins
+   * the playhead and slides the music under it, so the fraction is fixed at
+   * {@link PLAYHEAD_AT}; paging, the default, holds the music still and lets the
+   * playhead cross the pane, so the fraction is how far into the current page it
+   * has got. Parked, it is whatever it was when the view came off the song.
+   */
+  private readonly lead = computed(() => {
+    if (this.scrollNotes()) {
+      return PLAYHEAD_AT;
     }
 
-    return this.attached() ? 0 : this.parkedTick();
+    if (!this.attached()) {
+      return this.panLead();
+    }
+
+    const screen = this.screenTicks();
+    if (screen <= 0) {
+      return PLAYHEAD_AT;
+    }
+
+    const from = pageStart(this.playTick(), screen, PAGE_TURN_AT, PAGE_STEP, this.pageOrigin());
+    return clamp((this.playTick() - from) / screen, 0, 1);
   });
 
+  /** The tick at the roll's left edge, which is the camera. */
+  private readonly viewTick = computed(() => this.playTick() - this.screenTicks() * this.lead());
+
+  protected readonly playheadX = computed(() => KEY_WIDTH + this.rollWidth() * this.lead());
+
   protected readonly scroll = computed(() => {
-    const x = KEY_WIDTH + this.rollWidth() * PLAYHEAD_AT - this.playTick() * this.zoom();
+    const x = KEY_WIDTH - this.viewTick() * this.zoom();
     return `translate(${x.toFixed(2)} 0)`;
+  });
+
+  // --- the scrub bar -------------------------------------------------------
+
+  protected readonly scrubHeight = SCRUB_HEIGHT;
+
+  /** Null until measured, so nothing renders against a zero-width box. */
+  protected readonly scrubBox = computed(() => {
+    const width = this.width();
+    return width > 0 ? `0 0 ${width} ${SCRUB_HEIGHT}` : null;
+  });
+
+  /**
+   * The whole song, drawn small.
+   *
+   * Built from the song, the lane stack and the pane's width, and deliberately
+   * **not** from {@link playTick} — the bars are the song rather than a view of
+   * it, so this rebuilds on a recompile, a percussion change or a resize, and
+   * never on a frame. The moving parts of the bar are their own computeds below.
+   *
+   * Rows come from {@link rowOf}, the same function the roll's own marks ask, so
+   * an instrument taken off the percussion lanes leaves the drum rows in both
+   * pictures at once. Answering that question twice is how the two would drift.
+   */
+  protected readonly minimap = computed<ScrubBar[]>(() => {
+    const song = this.timeline();
+    const stack = this.stack();
+    const width = this.rollWidth();
+    const rows = stack.lanes.length;
+    if (!song || song.ticks <= 0 || width <= 0 || rows <= 0) {
+      return [];
+    }
+
+    const context = this.placeContext();
+    const inner = SCRUB_HEIGHT - SCRUB_PAD * 2;
+    const h = Math.max(1, inner / rows);
+
+    // Keyed by the pixel a bar lands on and the row it lands in. Every bar is
+    // one colour, so two notes sharing a pixel of a row are the same picture;
+    // keeping the wider of them holds a long note's reach against a short one
+    // starting alongside it. Never more bars than notes, and far fewer on a
+    // dense song, which is what keeps the whole song inside the DOM.
+    const cells = new Map<string, ScrubBar>();
+    for (const note of song.notes) {
+      const row = this.rowOf(note, stack, context);
+      if (row < 0) {
+        continue;
+      }
+
+      const x = KEY_WIDTH + scrubOffset(note.tick, song.ticks, width);
+      const w = Math.max(1, scrubOffset(note.ticks, song.ticks, width));
+      const key = `${Math.round(x)}:${row}`;
+      const held = cells.get(key);
+      if (held && held.w >= w) {
+        continue;
+      }
+
+      cells.set(key, { id: key, x, w, y: SCRUB_PAD + (row / rows) * inner, h });
+    }
+
+    return [...cells.values()];
+  });
+
+  /** Where the playhead sits along the bar. */
+  protected readonly scrubX = computed(() => {
+    const song = this.timeline();
+    return KEY_WIDTH + scrubOffset(this.playTick(), song?.ticks ?? 0, this.rollWidth());
+  });
+
+  /**
+   * The slice of the song the roll is showing, as a box on the bar.
+   *
+   * Runs off both ends by design — a paged roll opens before tick 0 and the last
+   * page reaches past the end — so the strip clips it rather than this clamping
+   * it into something narrower than the pane it stands for.
+   */
+  protected readonly scrubWindow = computed(() => {
+    const song = this.timeline();
+    const width = this.rollWidth();
+    if (!song || song.ticks <= 0 || width <= 0) {
+      return null;
+    }
+
+    const from = (this.viewTick() / song.ticks) * width;
+    const w = (this.screenTicks() / song.ticks) * width;
+    return { x: KEY_WIDTH + from, w: Math.max(1, w) };
   });
 
   // --- marks ---------------------------------------------------------------
@@ -472,6 +712,7 @@ export class PianoRoll {
 
     const audible = new Map(this.playback.channels().map((c) => [c.index, c.audible]));
     const context = this.placeContext();
+    const inForce = this.editor.commandsInForce();
     const marks: Mark[] = [];
 
     for (const note of song.notes) {
@@ -484,21 +725,68 @@ export class PianoRoll {
         continue;
       }
 
+      const w = Math.max(1, note.ticks * zoom - NOTE_GAP);
+      const h = Math.max(1, height - ROW_GAP * 2);
+      const x = note.tick * zoom;
+      const y = row * height + ROW_GAP;
+
+      const acting = inForce(note).map((command) => ({
+        command,
+        entry: glyphOf(command),
+      }));
+      const drawable = acting.filter((each) => each.entry !== null);
+      const name = this.headingOf(note, context);
+      const content = fitBarContent(w, h, name, drawable.length);
+
       marks.push({
         id: `${note.address}:${note.tick}:${note.channel}`,
-        x: note.tick * zoom,
-        w: Math.max(1, note.ticks * zoom - NOTE_GAP),
+        x,
+        w,
         gateW: Math.max(1, note.gateTicks * zoom - NOTE_GAP),
-        y: row * height + ROW_GAP,
-        h: Math.max(1, height - ROW_GAP * 2),
+        y,
+        h,
         fill: CHANNEL_FILL[note.channel],
         opacity: audible.get(note.channel) === false ? 0.12 : 1,
+        label:
+          content.name === null
+            ? null
+            : { text: name, x: x + content.name.x, y: y + content.name.y, size: content.name.size },
+        // `fitBarContent` returns however many fit, taken from the front of the
+        // list, so the glyphs that survive a narrow bar are the same ones every
+        // time rather than shuffling as the roll is zoomed.
+        glyphs: content.glyphs.map((box, at) => ({
+          id: `${note.address}:${note.tick}:${drawable[at].command.span.start}`,
+          icon: drawable[at].entry!.icon,
+          x: x + box.x,
+          y: y + box.y,
+          size: box.size,
+          span: drawable[at].command.span,
+          label: drawable[at].entry!.label,
+        })),
         note,
       });
     }
 
     return marks;
   });
+
+  /**
+   * What a note is called, which is the bar's name and the tooltip's heading.
+   *
+   * One helper for both, so a bar cannot say one thing and its own hover
+   * another. Derived from where the mark actually sits: a bare `$D0` whose drum
+   * the porter has taken off the lanes is drawn on a key, and calling it `@29`
+   * would name a row it is not on.
+   */
+  private headingOf(note: WalkNote, context: PlaceContext, short = true): string {
+    const place = placeOf(note, context);
+    const key = keyOf(note, context);
+    if (place === 'key' && key !== null) {
+      return short ? noteLabel(key) : keyName(key);
+    }
+
+    return `@${note.state.instrument ?? 0}`;
+  }
 
   /**
    * Which row a note belongs on.
@@ -674,11 +962,17 @@ export class PianoRoll {
       rows.push(`t${tempo} — ${ticksPerSecond(tempo).toFixed(1)} ticks per second`);
     }
 
-    // Derived from where the mark actually sits, so the two cannot contradict
-    // each other: a bare `$D0` whose drum the porter has removed is drawn on a
-    // key, and a heading reading `@29` would be pointing at the wrong row.
-    const key = keyOf(note, context);
-    const heading = place === 'key' && key !== null ? keyName(key) : `@${instrument}`;
+    const heading = this.headingOf(note, context, false);
+
+    // A bar shows as many glyphs as it has room for, so the hover is where the
+    // rest of them are named. The inspector lists them with their arguments.
+    const acting = this.editor
+      .commandsInForce()(note)
+      .map((command) => glyphOf(command)?.label)
+      .filter((label) => label !== undefined);
+    if (acting.length > 0) {
+      rows.push(`under ${acting.join(', ').toLowerCase()}`);
+    }
 
     const at = this.pointer();
     const leftward = at.x > at.width / 2;
@@ -736,17 +1030,26 @@ export class PianoRoll {
     effect(() => {
       const idle = this.playback.isIdle();
       untracked(() => {
-        if (!idle && this.seekTimer === undefined) {
+        if (!idle && !this.dragging()) {
           this.scrolling.set(false);
+          return;
+        }
+
+        // A stop is back to the beginning, so the pages are measured from it
+        // again — a grid still anchored on some earlier scroll would draw the
+        // song's first tick at whatever offset that anchor gave it.
+        if (idle && !this.dragging()) {
+          this.pageOrigin.set(0);
         }
       });
     });
 
-    // A scroll can be one click away from a component that no longer exists —
-    // the roll is rebuilt on every tab switch. Honour the gesture rather than
-    // stranding the transport on a scrub nothing will commit.
+    // A drag can be one pointer-down away from a component that no longer
+    // exists — the roll is rebuilt on every tab switch, and a captured pointer
+    // never reports its release. Honour the gesture rather than stranding the
+    // transport on a scrub nothing will commit.
     this.destroyRef.onDestroy(() => {
-      if (this.seekTimer !== undefined) {
+      if (this.dragging()) {
         this.commitScroll();
       }
     });
@@ -757,11 +1060,21 @@ export class PianoRoll {
    *
    * What "stop following" has to start from, and the reason parking is done at
    * the two places that stop rather than in an effect watching the flag: an
-   * effect runs after the handler, so it would overwrite the pan of a wheel
-   * event that turned following off and panned in one go.
+   * effect runs after the handler, so it would overwrite the position a scrub
+   * set in the same gesture that took the roll off the song.
    */
   private currentTick(): number {
     return this.following() ? this.shownTick() : this.parkedTick();
+  }
+
+  /**
+   * The lead a view coming off the song keeps, so the picture does not move.
+   *
+   * Held off both edges: a parked view needs room after the last tick for the
+   * end-of-song marker, which is the distance {@link maxPanTick} measures.
+   */
+  private parkedLead(): number {
+    return clamp(this.lead(), Math.max(SCROLL_END_AT, PAGE_LEAD_IN), PAGE_TURN_AT);
   }
 
   protected setZoom(direction: number): void {
@@ -778,10 +1091,16 @@ export class PianoRoll {
 
   protected setFollow(follow: boolean): void {
     if (!follow) {
-      this.panTick.set(this.currentTick());
+      const tick = this.currentTick();
+      this.panLead.set(this.parkedLead());
+      this.panTick.set(tick);
     }
 
     this.settings.update((s) => ({ ...s, follow }));
+  }
+
+  protected setScrollNotes(scrollNotes: boolean): void {
+    this.settings.update((s) => ({ ...s, scrollNotes }));
   }
 
   protected setAllOctaves(allOctaves: boolean): void {
@@ -812,31 +1131,80 @@ export class PianoRoll {
     this.settings.update((s) => ({ ...s, percussion: [...DEFAULT_PERCUSSION] }));
   }
 
-  /** Scrolling the roll seeks the song.  */
-  protected onWheel(event: WheelEvent): void {
-    const along = event.deltaX !== 0 ? event.deltaX : event.shiftKey ? event.deltaY : 0;
-    if (along === 0) {
+  /**
+   * The tick under a pointer on the scrub bar.
+   *
+   * Measured from the element the handler is on, so it stays right wherever the
+   * pane is and however it is scrolled — and past either end it is the song's
+   * own end, since a drag that leaves the bar is still asking for the last tick.
+   */
+  private scrubTickAt(event: PointerEvent): number {
+    const box = (event.currentTarget as Element).getBoundingClientRect();
+    return scrubTick(
+      event.clientX - box.left - KEY_WIDTH,
+      this.timeline()?.ticks ?? 0,
+      Math.max(0, box.width - KEY_WIDTH),
+    );
+  }
+
+  /**
+   * Take the roll off the song and start scrubbing.
+   *
+   * The lead is read **once**, here, and held for the whole drag: it is where
+   * the playhead sat when the gesture began, and re-reading it per move would
+   * slide the music sideways under a pointer that had not moved.
+   */
+  protected onScrubDown(event: PointerEvent): void {
+    const song = this.timeline();
+    if (!song || song.ticks <= 0) {
       return;
     }
 
     event.preventDefault();
-    // Read where the roll is before it comes off the song, so the scroll starts
-    // from what is on screen rather than from wherever it was last parked.
-    const from = this.currentTick();
+    (event.currentTarget as Element).setPointerCapture(event.pointerId);
+    const lead = this.parkedLead();
+    this.dragging.set(true);
     this.scrolling.set(true);
-    this.panTick.set(Math.max(0, from + along / this.zoom()));
-    this.playback.scrubTo(this.parkedTick());
-
-    clearTimeout(this.seekTimer);
-    this.seekTimer = setTimeout(() => this.commitScroll(), SEEK_QUIET_MS);
+    this.panLead.set(lead);
+    this.scrubTo(event);
   }
 
-  /** The end of a scroll: the song jumps to where the roll was left. */
-  private commitScroll(): void {
-    clearTimeout(this.seekTimer);
-    this.seekTimer = undefined;
+  protected onScrubMove(event: PointerEvent): void {
+    if (this.dragging()) {
+      this.scrubTo(event);
+    }
+  }
 
+  protected onScrubUp(event: PointerEvent): void {
+    if (!this.dragging()) {
+      return;
+    }
+
+    const target = event.currentTarget as Element;
+    if (target.hasPointerCapture(event.pointerId)) {
+      target.releasePointerCapture(event.pointerId);
+    }
+
+    this.dragging.set(false);
+    this.commitScroll();
+  }
+
+  /** One step of a drag: move the view, and preview the position. */
+  private scrubTo(event: PointerEvent): void {
+    this.panTick.set(this.scrubTickAt(event));
+    this.playback.scrubTo(this.parkedTick());
+  }
+
+  /** The end of a scrub: the song jumps to where the roll was left. */
+  private commitScroll(): void {
     const to = this.parkedTick();
+    // Re-anchor the pages on the view the scroll is leaving, so the notes stay
+    // exactly where the wheel put them. Before the seek can be refused, because
+    // a scroll made while the transport was stopped is released by the effect
+    // below rather than here, and it re-attaches to this same grid.
+    this.pageOrigin.set(
+      to - this.screenTicks() * this.panLead() + this.screenTicks() * PAGE_LEAD_IN,
+    );
     if (!this.playback.canSeek()) {
       return;
     }
@@ -876,13 +1244,36 @@ export class PianoRoll {
    * and the same test guards the highlights.
    */
   protected reveal(mark: Mark): void {
-    if (this.editor.compiledText() !== this.editor.source()) {
+    this.select(mark, true);
+  }
+
+  /**
+   * A single click asks about the note; a double click goes to it.
+   *
+   * The quiet form leaves the roll on screen, which is the whole point of
+   * splitting them: the inspector sits in the pane beside this one and answers
+   * from the caret, so moving the caret is enough and switching tabs would take
+   * away the thing being asked about. {@link EditorStore.inspecting} carries the
+   * one thing the caret cannot — which pass of a loop this bar is.
+   */
+  protected select(mark: Mark, show = false): void {
+    if (!this.inSync()) {
       return;
     }
 
     const span = this.editor.notesByAddress().get(mark.note.address)?.span;
     if (span) {
-      this.editor.reveal.set({ ...span });
+      this.editor.inspecting.set({ address: mark.note.address, tick: mark.note.tick });
+      this.editor.reveal.set({ span: { ...span }, show });
+    }
+  }
+
+  /** A glyph is its own target: the command it stands for, not the note under it. */
+  protected inspect(glyph: MarkGlyph, event: Event, show = false): void {
+    // Without this the bar underneath answers as well, and the note would win.
+    event.stopPropagation();
+    if (this.inSync()) {
+      this.editor.reveal.set({ span: { ...glyph.span }, show });
     }
   }
 
@@ -928,6 +1319,18 @@ export class PianoRoll {
   protected readonly showLabels = computed(() => this.rowHeight() >= 11);
   protected readonly labelSize = computed(() => clamp(this.rowHeight() - 4, 7, 11));
 
+  /**
+   * The tick the readout reports.
+   *
+   * Slow only while the song is carrying the playhead along. A parked or stopped
+   * roll is not moving, so there is nothing to blur and the reading is exact —
+   * and a scroll's own readout must answer the wheel rather than half a second
+   * after it.
+   */
+  private readonly readoutTick = computed(() =>
+    this.following() ? this.slowTick() : this.playTick(),
+  );
+
   protected readonly readout = computed(() => {
     const song = this.timeline();
     if (!song) {
@@ -936,7 +1339,7 @@ export class PianoRoll {
 
     const driver = this.playback.driver();
     const tempo = driver && driver.tempo > 0 ? driver.tempo - 1 : 0;
-    const tick = this.playTick();
+    const tick = this.readoutTick();
     const parts = [`tick ${Math.round(tick).toLocaleString()} of ${song.ticks.toLocaleString()}`];
     if (tempo > 0) {
       // The rate the song is *getting*, which on a busy one is not the rate the

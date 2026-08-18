@@ -19,6 +19,6 @@ export class DiagnosticsList {
 
   protected reveal(diagnostic: Diagnostic): void {
     // A fresh object each time, so clicking the same diagnostic twice re-selects.
-    this.store.reveal.set({ ...diagnostic.span });
+    this.store.reveal.set({ span: { ...diagnostic.span }, show: true });
   }
 }

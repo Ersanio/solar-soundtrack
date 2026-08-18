@@ -43,13 +43,22 @@ import { join } from "node:path";
 import { compiler } from "@amk/compiler";
 import { type CompileResult, noteAddressAt } from "@amk/core/types";
 import { FIRST_VCMD, LAST_VCMD } from "@amk/core/hardcoded-tables";
-import { expectedArgs } from "@amk/tokens";
+import { commandStartingAt, expectedArgs, tokenize } from "@amk/tokens";
+import { commandScope } from "@amk/tokens/commands/in-force";
 import { loadDriver } from "@amk/spc/driver";
 import { buildSpc } from "@amk/spc/export";
 import { readDriverState } from "@amk/spc/driver-state";
 import { emptySample } from "@amk/spc/brr";
 import { SPC_SAMPLE_RATE, instantiate } from "@amk/spc/wasm-host";
-import { type SongTimeline, type TempoChange, unreachableChannels, vcmdLength, walkSong } from "@amk/spc/song-walk";
+import {
+	SLOTS,
+	type SongTimeline,
+	type StateSlot,
+	type TempoChange,
+	unreachableChannels,
+	vcmdLength,
+	walkSong,
+} from "@amk/spc/song-walk";
 import { secondsAtTick, songClock } from "../web/src/app/state/song-clock";
 import { measureClock, tempoShortfall } from "../web/src/app/state/measure-clock";
 import { driverTickSeconds } from "@amk/tokens/commands/units";
@@ -840,6 +849,157 @@ console.log("\nthe driver does not always run the song as fast as it is written"
 		"nothing to measure yields no clock",
 		measureClock(emu, spcOf(build("#amk 4\n#0 c4\n").result), 0).clock === null,
 	);
+}
+
+// ---------------------------------------------------------------------------
+console.log("\nthe command in force at a note is named exactly");
+// ---------------------------------------------------------------------------
+//
+// The roll draws one glyph per command acting on a note, and clicking a glyph
+// goes to that command in the source. Two joins carry that, and neither has any
+// visual tell when it is wrong: the compiler's command map has to address the
+// byte the walk reads, and the span it carries has to be the text a person
+// wrote. A map off by one addresses an argument, and still draws.
+{
+	const source = "#amk 4\n#0 v255 (1)[ c8 d8 e8 ]2 v200 (1)5 @1 $ED $3F $4D $DF\n";
+	const { result } = build(source);
+	const map = result.commandMap ?? [];
+	const commands = tokenize(source).commands;
+
+	check("a song with commands has a command map", map.length > 0);
+
+	let misaddressed = "";
+	let unwritten = "";
+	for (const entry of map) {
+		const byte = result.data![entry.address - ARAM];
+		if (source.slice(entry.span.start, entry.span.end).trim() === "") {
+			unwritten += ` ${entry.address}`;
+		}
+
+		// `(1)n` and `[ ]` are the two spellings `gather` does not raise to
+		// commands. Both are structure, and neither can carry a glyph.
+		const command = commandStartingAt(commands, entry.span.start);
+		if (command?.vcmd !== undefined && command.vcmd !== byte) {
+			misaddressed += ` ${byte.toString(16)} vs ${command.vcmd.toString(16)}`;
+		}
+	}
+
+	check("every hex entry addresses the byte its span was written as", misaddressed === "", misaddressed);
+	check("and every entry's span is text somebody wrote", unwritten === "", unwritten);
+
+	// A note in both maps would be a command in force on itself.
+	const noteAddresses = new Set((result.noteMap ?? []).map((entry) => entry.address));
+	check(
+		"no note is in the command map",
+		map.every((entry) => !noteAddresses.has(entry.address)),
+	);
+
+	// Nothing the roll draws is something it would then filter out.
+	const undrawable = map
+		.map((entry) => commandStartingAt(commands, entry.span.start))
+		.filter((command) => command !== null && commandScope(command) === "position");
+	check("no command that emits bytes is one the roll calls positioning", undrawable.length === 0);
+}
+
+// The case the whole design is for, and the one no reading of the text can
+// reach: the command that decides it is not inside the body at all.
+{
+	const source = "#amk 4\n#0 v255 (1)[ c8 d8 e8 ]2 v200 (1)5\n";
+	const { result, timeline } = build(source);
+	const spans = new Map((result.commandMap ?? []).map((entry) => [entry.address, entry.span]));
+	const volume = SLOTS.indexOf("volume");
+	const textOf = (note: SongTimeline["notes"][number]) => {
+		const at = note.origins[volume];
+		const span = at === null ? undefined : spans.get(at);
+		return span === undefined ? null : source.slice(span.start, span.end);
+	};
+
+	check("three written notes played seven times are 21 notes", timeline.notes.length === 21);
+	check(
+		"the first call's six sound under v255",
+		timeline.notes.slice(0, 6).every((note) => textOf(note) === "v255"),
+	);
+	check(
+		"and the second call's fifteen under v200",
+		timeline.notes.slice(6).every((note) => textOf(note) === "v200"),
+	);
+
+	// One array per state change, not one per note: the roll builds a view model
+	// off these, and a fresh array per note is a fresh view model per note.
+	const distinct = new Set(timeline.notes.map((note) => note.origins));
+	check("and share one origins array per state change", distinct.size === 2, `${distinct.size} arrays`);
+}
+
+// A command at the *end* of a body is in force for the body's own notes on the
+// second pass and not the first. One at the head is in force on every pass, and
+// would pass under any answer at all.
+{
+	const source = "#amk 4\n#0 v100 [ c8 d8 v200 ]2\n";
+	const { result, timeline } = build(source);
+	const spans = new Map((result.commandMap ?? []).map((entry) => [entry.address, entry.span]));
+	const volume = SLOTS.indexOf("volume");
+	const textOf = (note: SongTimeline["notes"][number]) => {
+		const at = note.origins[volume];
+		const span = at === null ? undefined : spans.get(at);
+		return span === undefined ? null : source.slice(span.start, span.end);
+	};
+
+	check("a loop body's first pass is under what preceded the loop", textOf(timeline.notes[0]) === "v100");
+	check("and its second under what its own last pass set", textOf(timeline.notes[2]) === "v200");
+}
+
+// Taking a slot away, and the one thing that fills a slot with no command.
+{
+	const { timeline } = build("#amk 4\n#0 @1 $DE $00 $0C $08 c8 $DF d8 @21 e8\n");
+	const vibrato = SLOTS.indexOf("vibrato");
+	const instrument = SLOTS.indexOf("instrument");
+	check("a $DE is in force on the note after it", timeline.notes[0].origins[vibrato] !== null);
+	check("and $DF takes it away rather than replacing it", timeline.notes[1].origins[vibrato] === null);
+
+	// `@21`-`@29` emit no `$DA`, so the drum a note byte loaded has no command in
+	// the stream at all; keeping the last `$DA` would name one no longer in force.
+	check("a drum loaded by its note byte leaves no stale instrument", timeline.notes[2].origins[instrument] === null);
+}
+
+// `main.asm:2321` calls `SetInstrument` with 0 for every channel whose `$C1+x`
+// is still zero, which `main.asm:2193` has just made true of all of them.
+{
+	const { timeline } = build("#amk 4\n#0 c8 d8\n");
+	check(
+		"a channel with no @ plays @0",
+		timeline.notes.every((note) => note.state.instrument === 0),
+	);
+}
+
+// Every slot is reachable. One that nothing can write is one the roll will
+// never draw, and it would look exactly like a command with no glyph.
+{
+	// The remote form rather than a bare `$FC`: the compiler writes that byte's
+	// address itself, so `(!1,1,24)` is the only spelling that produces a real one.
+	const source =
+		"#amk 4\n" +
+		"(!1)[$F4 $09]\n" +
+		"#0 @1 $F3 $00 $04 $ED $3F $4D v200 y10 $EE $01 $FA $02 $01 n10 p12,8 $E5 $00 $12 $08\n" +
+		"$EB $00 $18 $02 $DD $00 $18 $A4 $FB $02 $06 $A4 $A7 $F4 $01 $FA $00 $00 t144 w200 $E4 $00\n" +
+		"$EF $FF $28 $28 $F5 $7F $00 $00 $00 $00 $00 $00 $00 (!1,1,24) c8\n";
+	const { timeline } = build(source);
+	const note = timeline.notes[timeline.notes.length - 1];
+	const unreached: StateSlot[] = [];
+	SLOTS.forEach((slot, at) => {
+		if (note.origins[at] === null) {
+			unreached.push(slot);
+		}
+	});
+
+	check("one song writes every slot the walk tracks", unreached.length === 0, unreached.join(", "));
+
+	// The song-wide slots are the tail of `SLOTS`, which is what `CHANNEL_SLOTS`
+	// splits on. Filing a per-channel slot in that tail would have one channel's
+	// command reported by all eight, and filing a song-wide one outside it would
+	// have a `t` on #0 unheard by #1.
+	const songWide: StateSlot[] = ["tempo", "globalVolume", "transpose", "echo", "fir"];
+	const tail = SLOTS.slice(SLOTS.length - songWide.length);
+	check("and the song-wide ones are its tail", tail.join(",") === songWide.join(","), tail.join(","));
 }
 
 summarise();
