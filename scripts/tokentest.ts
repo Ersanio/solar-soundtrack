@@ -15,7 +15,6 @@
 import { Tag, tags } from "@lezer/highlight";
 
 import {
-	type Command,
 	type ScanState,
 	type Token,
 	commandAt,
@@ -682,8 +681,24 @@ console.log("\ncommands carry the channel they were written under");
 	check("the $F5 is in channel 0", fir?.channel === 0, String(fir?.channel));
 	check("the $F1 is in channel 3", echo?.channel === 3, String(echo?.channel));
 
+	// Above the first marker a command is on the channel the compiler starts
+	// on, which `parser.ts:detectStartingChannel` (Music.cpp:385-400) takes as
+	// the lowest `#N` found anywhere in the text — the first it *finds*, probing
+	// `#0` up through `#7`, not the first the song declares — and 0 without one.
 	const before = tokenize("$F5 $7F $00 $00 $00 $00 $00 $00 $00\n").commands[0];
-	check("a command before any channel has none", before?.channel === undefined);
+	check("a command before any channel is on channel 0 when the song has none", before?.channel === 0);
+	const lowest = tokenize("$ED $7F $E0\n#3 c8\n#0 c8\n").commands[0];
+	check("and on the lowest channel the song declares, not the first", lowest?.channel === 0, String(lowest?.channel));
+	const three = tokenize("$ED $7F $E0\n#3 c8\n#5 c8\n").commands[0];
+	check("which is #3 in a song without #0", three?.channel === 3, String(three?.channel));
+	// The probe is a substring search, so `#08` reads as `#0` there — and then
+	// fails as a directive (AMK0031) and leaves the channel where it was.
+	const substring = tokenize("$ED $7F $E0\n#08 c8\n#3 c8\n").commands;
+	check('#08 makes the starting channel 0, as text.find("#0") does', substring[0]?.channel === 0);
+	check(
+		"and does not switch to channel 8, which the compiler rejects",
+		substring.find((c) => c.noteLength !== undefined)?.channel === 0,
+	);
 
 	// A channel directive mid-line still applies to what follows it.
 	const mixed = tokenize("#0 t100 #1 t200\n").commands.filter((c) => c.kind === "t");
@@ -1605,54 +1620,89 @@ console.log("\nwhat a command reaches, and what the source alone can answer");
 	check("nothing song-wide, positional or structural is note state", drawn.length === 0, drawn.join(" | "));
 }
 
+/**
+ * What the parse-time half says is in force at the note written as `text`, as
+ * the source spells the commands, space-joined.
+ */
+function inForceAt(source: string): (text: string) => string {
+	const index = tokenize(source);
+	const inForce = parseTimeInForce(index, source);
+	return (text) => {
+		const note = commandStartingAt(index.commands, source.indexOf(text));
+		if (note === null) {
+			throw new Error(`no command at ${text}`);
+		}
+
+		return (inForce.get(note) ?? []).map((command) => source.slice(command.span.start, command.span.end)).join(" ");
+	};
+}
+
 // The parse-time half. Exact rather than approximate: `parser.ts` resolves these
 // in one textual pass, so the `q` before a note in the source is the `q` that
 // went into the bytes of every pass of it.
 {
-	const source = `#amk 4\n#0 q7f h2 c8 d8 q6e e8\n#1 f8\n`;
-	const index = tokenize(source);
-	const inForce = parseTimeInForce(index.commands);
-	const noteAt = (text: string): Command => {
-		const command = commandStartingAt(index.commands, source.indexOf(text));
-		if (command === null) {
-			throw new Error(`no command at ${text}`);
-		}
-
-		return command;
-	};
-
-	const textOf = (note: Command) =>
-		(inForce.get(note) ?? []).map((command) => source.slice(command.span.start, command.span.end)).join(" ");
-
-	check("a q and an h carry forward to the notes after them", textOf(noteAt("c8")) === "q7f h2");
-	check("and to the one after that", textOf(noteAt("d8")) === "q7f h2");
-	check("a second q replaces the first", textOf(noteAt("e8")) === "q6e h2");
-	check("and none of it reaches another channel", textOf(noteAt("f8")) === "");
+	const under = inForceAt(`#amk 4\n#0 q7f h2 c8 d8 q6e e8\n#1 f8\n`);
+	check("a q and an h carry forward to the notes after them", under("c8") === "q7f h2");
+	check("and to the one after that", under("d8") === "q7f h2");
+	check("a second q replaces the first", under("e8") === "q6e h2");
+	check("and none of it reaches another channel", under("f8") === "");
 }
 
-// Channel scope, and the definition that belongs to no channel.
+// Above the first marker a command is on the starting channel, and the parser's
+// `q[channel]` and `instrument[channel]` survive the marker — so a `q` or a
+// drum `@` written there is what the channel's first note goes out under.
+// `parseQuantization` writes `q[prevChannel]` from inside a `[ ]` body too
+// (Music.cpp:684-687), which is why the remote definition's `q` counts:
+// `selftest` pins the bytes, `18 40 A4`.
 {
-	const source = `#amk 4\n(!1)[q40 $F4 $09]\n#0 c8\n`;
-	const index = tokenize(source);
-	const inForce = parseTimeInForce(index.commands);
-	const note = commandStartingAt(index.commands, source.indexOf("c8"));
-	check("a q above the first channel reaches no note", (inForce.get(note!) ?? []).length === 0);
+	check("a q above the first channel is the q of its first note", inForceAt(`#amk 4\nq40\n#0 c8\n`)("c8") === "q40");
+	check(
+		"and so is one inside a remote definition above it",
+		inForceAt(`#amk 4\n(!1)[q40 $F4 $09]\n#0 c8\n`)("c8") === "q40",
+	);
+	check(
+		"a percussion @ above the first channel reaches its first note",
+		inForceAt(`#amk 4\n@21\n#0 c8\n`)("c8") === "@21",
+	);
+	check(
+		"and it is the lowest channel declared that they reach, not the first",
+		inForceAt(`#amk 4\nq40\n#3 d8\n#0 c8\n`)("c8") === "q40" && inForceAt(`#amk 4\nq40\n#3 d8\n#0 c8\n`)("d8") === "",
+	);
+}
+
+// `h` is one variable in the parser and every `#N` resets it (`parseHash`,
+// Music.cpp:569) — including a marker re-entering the channel it is on, which
+// is what a channel written in two blocks does.
+{
+	check("an h above the first channel reaches nothing", inForceAt(`#amk 4\nh5\n#0 c8\n`)("c8") === "");
+
+	const split = inForceAt(`#amk 4\n#0 h5 c8\n#1 d8\n#0 e8\n`);
+	check("an h holds until the channel's block ends", split("c8") === "h5");
+	check("and a second block of the same channel does not inherit it", split("e8") === "");
+
+	const twice = inForceAt(`#amk 4\n#0 h5 c8\n#0 d8\n`);
+	check("even when the two blocks are back to back", twice("d8") === "");
+
+	// A `q` is per channel and survives the marker, so the same song keeps it.
+	const kept = inForceAt(`#amk 4\n#0 q40 c8\n#1 d8\n#0 e8\n`);
+	check("where a q does carry into the channel's second block", kept("e8") === "q40");
+
+	// A malformed marker is reported and resets nothing (AMK0031).
+	check("a marker the compiler rejects resets nothing", inForceAt(`#amk 4\n#0 h5 c8\n#9 d8\n`)("d8") === "h5");
 }
 
 // `@21`-`@29` emit no `$DA`, so they are this half's; every other `@` emits one
 // and is the walk's. Reporting both would draw two instrument glyphs on one note.
 {
-	const drum = tokenize(`#amk 4\n#0 @21 c8\n`);
-	const pitched = tokenize(`#amk 4\n#0 @1 c8\n`);
-	const direct = tokenize(`#amk 4\n#0 @@21 c8\n`);
-	const held = (index: ReturnType<typeof tokenize>) => {
+	const held = (source: string) => {
+		const index = tokenize(source);
 		const note = index.commands.find((command) => command.noteLength !== undefined);
-		return note === undefined ? -1 : (parseTimeInForce(index.commands).get(note) ?? []).length;
+		return note === undefined ? -1 : (parseTimeInForce(index, source).get(note) ?? []).length;
 	};
 
-	check("a percussion @ is answered here", held(drum) === 1);
-	check("a pitched @ is left to the walk", held(pitched) === 0);
-	check("and @@21 is direct, so it emits and is left to the walk too", held(direct) === 0);
+	check("a percussion @ is answered here", held(`#amk 4\n#0 @21 c8\n`) === 1);
+	check("a pitched @ is left to the walk", held(`#amk 4\n#0 @1 c8\n`) === 0);
+	check("and @@21 is direct, so it emits and is left to the walk too", held(`#amk 4\n#0 @@21 c8\n`) === 0);
 }
 
 summarise();

@@ -98,6 +98,15 @@ at the channel boundary. Within one channel source order is execution order; acr
 driver interleaves by time, so "later in the file" would not mean "runs afterwards" and the warning
 would be guesswork.
 
+Text above the first `#N` is on a channel too: `Command.channel` puts it on the **starting channel**,
+the lowest `#N` declared anywhere in the song (0 when there is none), because that is where the
+compiler starts writing — `parser.ts:detectStartingChannel`, Music.cpp:385-400 — so a `$F1` or a
+`q` written above `#0` heads channel 0's own track and pairs with what `#0` writes below it. Every
+module under this rule inherits that from `gather`, which is a whole-document pass and can see the
+markers below the line. One departure: the compiler's probe is a substring search over the
+preprocessed text, so a `#0` inside a `"…"` string or an untaken `#if` branch counts there and not
+here.
+
 The cost is real and accepted: the DSP has a single echo unit, so a `$F1` in `#0` and a `$F5` in `#1`
 do interact, and that pairing is missed. A diagnostic that contradicted the FIR designer sitting
 next to it would be worse than the gap.
@@ -118,10 +127,13 @@ roll's glyphs, and it covers only the ones that emit no bytes at all: `q` folds 
 duration byte, `h` and `@21`-`@29` into the note byte itself. `parser.ts` does that folding in one
 textual pass with its own per-channel state, so the `q` written before a note on that channel is the
 `q` that went into the bytes of **every** pass of it — a loop cannot change the answer, because the
-answer was decided before the loop existed. Everything that does emit a byte is the walk's to name,
-at the address the driver reads it from, and `CompileResult.commandMap` turns that back into source.
-The two sets are disjoint by construction and `tokentest` asserts it, since a command answered twice
-would draw two glyphs for one setting.
+answer was decided before the loop existed. `h` is the one that is not per channel: it is a single
+variable the parser resets at every `#N`, the one it is already on included, so `parseTimeInForce`
+reads the markers off the token index and clears it at each — an `h` above the first channel reaches
+nothing, and a channel written in two blocks does not carry the first block's `h` into the second.
+Everything that does emit a byte is the walk's to name, at the address the driver reads it from, and
+`CompileResult.commandMap` turns that back into source. The two sets are disjoint by construction and
+`tokentest` asserts it, since a command answered twice would draw two glyphs for one setting.
 
 `commandScope` is the same module's other half, and the first classification of commands in this
 package — `param.ts`'s `Role` is about one argument's units and the palette's `Category` is about

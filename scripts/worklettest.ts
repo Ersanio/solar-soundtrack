@@ -388,6 +388,37 @@ console.log("\nthe playhead is counted off the driver, not predicted");
 	);
 }
 
+console.log("\nand off whichever voice the song plays");
+{
+	// The same music on `#1` alone. The count runs on one voice's duration
+	// counter, and the voice is latched off the driver's track pointers as it
+	// starts the song — through the moments it holds `$30` pointing into the zero
+	// page for its hot-patch reset (`main.asm:2104-2105`). Latching there takes
+	// voice 0, and this song never ticks it: the audio plays on while every
+	// position stays at 0. `tickVoice` reads the pointer as the driver does.
+	const lone = compileToSpc("#amk 4\n#1 t40 o4 v220 q7F @0 l8 c d e f g4 e4 c4 r4\n");
+	const { processor: fresh, sent: freshSent } = restart({ spc: lone, loopTicks: 0 });
+	render(fresh, 900);
+
+	const seen = positions(freshSent);
+	const last = seen.at(-1);
+	check("ticks are still reported", last !== undefined && last.ticks > 0, `${last?.ticks} ticks`);
+	const rate = last === undefined ? 0 : last.ticks / last.seconds;
+	check("at the rate the driver runs at", rate > 60 && rate < 95, `${rate.toFixed(2)} ticks/s`);
+	check("with voice 0 idle", last?.driver.trackPointers[0] === 0, `0x${last?.driver.trackPointers[0].toString(16)}`);
+
+	// And a seek into it lands, rather than emulating until the stall guard gives up.
+	freshSent.length = 0;
+	port.onmessage!({ data: { type: "seek", ticks: 96, epoch: 9 } });
+	render(fresh, 20);
+	const landed = positions(freshSent)[0];
+	check(
+		"and a seek lands on the tick asked for",
+		landed !== undefined && landed.songTicks >= 96 && landed.songTicks <= 97,
+		`landed on ${landed?.songTicks}`,
+	);
+}
+
 console.log("\nlooping leaves the song running for the emulator to repeat");
 {
 	const { processor: fresh, sent: freshSent } = restart({}, true);

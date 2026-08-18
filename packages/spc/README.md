@@ -41,6 +41,12 @@ observed — not one second of it is predicted. The driver keeps its whole worki
 page and `AddmusicKreadme/readme_files/aram_map.html` documents every byte, so tempo, per-voice
 position and the tick accumulator can simply be read.
 
+The tick count itself runs on one voice's note-duration counter — the lowest voice the driver is
+playing, latched off the track pointers as the song starts. "Playing" is judged the way the driver
+judges it, by the pointer's high byte alone (`main.asm:2315`): at song start `$30` briefly points
+into the zero page for the hot-patch reset (`main.asm:2104-2105`), and a whole-word test would latch
+voice 0 there and count nothing for the rest of a song whose lowest channel is `#1`.
+
 That matters because prediction is not exact and cannot be made exact. The driver's main loop
 (`AddmusicKsrc/main.asm`, `MainLoop`) processes at most one music tick per iteration, so a song that
 gives it enough work drops ticks — measurably, around 0.8% on eight busy channels. No formula over

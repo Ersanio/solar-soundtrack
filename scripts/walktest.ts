@@ -158,6 +158,12 @@ const CORPUS: { name: string; source: string }[] = [
 	{ name: "arpeggio", source: "#amk 4\n#0 o4 $FB $03 $10 $80 $84 $87 c4 d4\n" },
 	{ name: "hot patch chain", source: "#amk 4\n#0 $FA $FE $80 $80 $05 o4 c4 d4\n" },
 	{ name: "remote call", source: "#amk 4\n(!1)[$E7 $30]\n#0 o4 (!1,-1) c4 d4\n" },
+	// Music.cpp:385-400 — text above the first marker is written to the lowest
+	// channel declared anywhere, so these head #0 and #1 respectively.
+	{ name: "commands above the first channel", source: "#amk 4\n$ED $7F $E0 t54 v200\n#0 o4 c8 d8\n#1 o4 e8 f8\n" },
+	{ name: "the starting channel is the lowest declared", source: "#amk 4\n$ED $7F $E0\n#1 o4 e8 f8\n" },
+	// One channel in two blocks is one track: six notes on #0, six on #5.
+	{ name: "a split channel", source: "#amk 4\n\n#0 v255 t54 @15\naaa\n\n#5 @17\ncccccc\n\n#0 @9\nbbb\n" },
 	{ name: "eight channels", source: eightChannels() },
 	{
 		name: "a real song",
@@ -946,6 +952,72 @@ console.log("\nthe command in force at a note is named exactly");
 
 	check("a loop body's first pass is under what preceded the loop", textOf(timeline.notes[0]) === "v100");
 	check("and its second under what its own last pass set", textOf(timeline.notes[2]) === "v200");
+}
+
+// A command above the first marker is on the starting channel's track — the
+// lowest channel declared anywhere (Music.cpp:385-400) — and the walk sees it
+// there, and nowhere else, because that is where the bytes are.
+{
+	const named = (source: string, slot: StateSlot) => {
+		const { result, timeline } = build(source);
+		const spans = new Map((result.commandMap ?? []).map((entry) => [entry.address, entry.span]));
+		const at = SLOTS.indexOf(slot);
+		return (channel: number) => {
+			const note = timeline.notes.find((n) => n.channel === channel);
+			const address = note?.origins[at] ?? null;
+			const span = address === null ? undefined : spans.get(address);
+			return span === undefined ? null : source.slice(span.start, span.end);
+		};
+	};
+
+	const heads = named("#amk 4\n$ED $7F $E0\n#0 o4 c8 d8\n#1 o4 e8 f8\n", "envelope");
+	check("an $ED above #0 is in force on #0's first note", heads(0) === "$ED $7F $E0");
+	check("and not on #1's", heads(1) === null);
+
+	const lowest = named("#amk 4\n$ED $7F $E0\n#1 o4 e8 f8\n", "envelope");
+	check("with no #0 declared it is on #1's, the lowest there is", lowest(1) === "$ED $7F $E0");
+
+	const later = named("#amk 4\n$ED $7F $E0\n#1 o4 e8 f8\n#0 o4 c8 d8\n", "envelope");
+	check("and a #0 declared further down takes it back", later(0) === "$ED $7F $E0" && later(1) === null);
+}
+
+// A channel written in two blocks is one track, and the walk reads it as one:
+// the second block's notes follow the first's in time and under its own `@`.
+{
+	const source = "#amk 4\n\n#0 v255 t54 @15\naaa\n\n#5 @17\ncccccc\n\n#0 @9\nbbb\n";
+	const { result, timeline } = build(source);
+	const spans = new Map((result.commandMap ?? []).map((entry) => [entry.address, entry.span]));
+	const instrument = SLOTS.indexOf("instrument");
+	const under = (note: SongTimeline["notes"][number]) => {
+		const at = note.origins[instrument];
+		const span = at === null ? undefined : spans.get(at);
+		return span === undefined ? null : source.slice(span.start, span.end);
+	};
+
+	const first = timeline.notes.filter((n) => n.channel === 0);
+	const fifth = timeline.notes.filter((n) => n.channel === 5);
+	check("#0 written in two blocks is six notes", first.length === 6, `${first.length} notes`);
+	check("as many as #5 written in one", fifth.length === 6, `${fifth.length} notes`);
+	check(
+		"and they follow each other in time",
+		first.every((note, n) => n === 0 || note.tick > first[n - 1].tick),
+	);
+	check(
+		"the first block's under @15 and the second's under @9",
+		first.slice(0, 3).every((n) => under(n) === "@15") && first.slice(3).every((n) => under(n) === "@9"),
+		first.map((n) => under(n)).join(","),
+	);
+	check(
+		"and #5's under @17",
+		fifth.every((n) => under(n) === "@17"),
+	);
+	check(
+		"only those two channels play",
+		timeline.used
+			.map((u, ch) => (u ? ch : -1))
+			.filter((ch) => ch >= 0)
+			.join(",") === "0,5",
+	);
 }
 
 // Taking a slot away, and the one thing that fills a slot with no command.

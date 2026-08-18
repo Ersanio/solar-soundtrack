@@ -33,6 +33,7 @@ import {
 } from "@amk/spc/fir";
 
 import { builtInTaps, echoHazards, feedbackBefore } from "@amk/tokens/echo-hazards";
+import { firOverriddenBefore, firOverriddenBy } from "@amk/tokens/fir-override";
 import { tokenize } from "@amk/tokens";
 
 import { check, summarise } from "./harness";
@@ -482,6 +483,37 @@ console.log("\nchannels are read separately");
 
 	const together = hazards(`#amk 2\n\n#0 $F1 $08 $7F $01 ${HOT}\nc4\n`);
 	check("the same two in one channel do pair up", together.length === 1);
+
+	// Above the first marker is the starting channel's own head
+	// (`Command.channel`, `parser.ts:detectStartingChannel`), so a `$F1` written
+	// there runs on `#0`'s track before anything `#0` writes — the same channel,
+	// in source order — and the two pair up as any two on one channel do.
+	const above = hazards(`#amk 2\n$F1 $08 $7F $01\n\n#0 ${HOT}\nc4\n`);
+	check("a $F1 above the first channel arms a $F5 under #0", above.length === 1);
+	check(
+		"but not one under #1, which is another track",
+		hazards(`#amk 2\n$F1 $08 $7F $01\n\n#0 c4\n#1 ${HOT}\nc4\n`).length === 0,
+	);
+	// And where the lowest channel declared is `#3`, that is the track it heads.
+	check(
+		"and it heads whichever channel is the lowest declared",
+		hazards(`#amk 2\n$F1 $08 $7F $01\n\n#3 ${HOT}\nc4\n`).length === 1,
+	);
+}
+
+console.log("\nthe two override views see across the first marker");
+{
+	// The same rule from the other end: what a `$F1` above `#0` throws away, and
+	// what a `$F5` written there is later thrown away by.
+	const source = `#amk 2\n${HOT}\n\n#0 $F1 $08 $20 $01\nc4\n`;
+	const commands = tokenize(source).commands;
+	const fir = commands.find((c) => c.vcmd === 0xf5);
+	const echo = commands.find((c) => c.vcmd === 0xf1);
+	check(
+		"a $F5 above #0 is overridden by the $F1 under it",
+		fir !== undefined && firOverriddenBy(fir, commands) === echo,
+	);
+	check("and that $F1 names the $F5 it discards", echo !== undefined && firOverriddenBefore(echo, commands) === fir);
 }
 
 console.log("\nhalf-written commands are left alone");
@@ -501,6 +533,12 @@ console.log("\nthe pieces the inspectors share");
 	const commands = tokenize(source).commands;
 	const fir = commands.find((c) => c.vcmd === 0xf5);
 	check("feedbackBefore finds the $F1 ahead of a $F5", fir !== undefined && feedbackBefore(fir, commands) === 0x60);
+	const headed = tokenize(`#amk 2\n$F1 $08 $60 $00\n\n#0 ${HOT}\nc4\n`).commands;
+	const under = headed.find((c) => c.vcmd === 0xf5);
+	check(
+		"and one written above the first channel, which heads the same track",
+		under !== undefined && feedbackBefore(under, headed) === 0x60,
+	);
 	check(
 		"and answers zero when there is none",
 		feedbackBefore(

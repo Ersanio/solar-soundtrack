@@ -76,7 +76,7 @@ export function echoHazards(commands: readonly Command[]): Diagnostic[] {
 			continue;
 		}
 
-		const key = command.channel ?? -1;
+		const key = command.channel;
 		const state = states.get(key) ?? { taps: null, feedback: 0 };
 		states.set(key, state);
 
