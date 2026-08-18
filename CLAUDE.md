@@ -192,6 +192,11 @@ One entry each: what it was, what it is, why.
 - **Extrapolating the roll's playhead at the tempo byte's rate** — the driver runs slower than asked,
   so it sat most of a quarter note ahead. The clock's own slope (`ticksPerSecondAt`) is the rate;
   `charttest` pins the difference.
+- **The tempo shortfall taken over the whole pass from `loadSpc`** — the driver's boot and the
+  echo buffer `$FA $04` zeroes in the song's first tick (`main.asm`, `ModifyEchoDelay`, some 26 ms
+  per delay unit) are one-off costs, and a 48-tick song under `$F1 $06` read them as "30% slower".
+  `tempoShortfall` compares from the first tick (`Measurement.leadSeconds`); `clock.seconds` keeps
+  the lead-in because it is heard.
 - **Re-deriving the roll's playhead from the newest anchor each frame** — every anchor arrives with
   the same small lag, so one frame in ten lurched. It carries its position across frames and eases
   the gap shut (`roll-layout.ts`).

@@ -811,6 +811,29 @@ console.log("\nthe driver does not always run the song as fast as it is written"
 		`measured ${hard.measured.seconds.toFixed(2)} s vs predicted ${hard.predicted?.seconds.toFixed(2)} s`,
 	);
 
+	// A one-off cost at the top of the song is not a rate. `$FA $04` zeroes the
+	// whole echo buffer in the song's first tick (`main.asm`, `ModifyEchoDelay`),
+	// some 26 ms a delay unit, and a short song read that as the driver falling
+	// behind — 48 ticks under `$F1 $06` came out "30% slower". The pass is
+	// longer by the clear, since that is heard; the rate is not.
+	const plain = run("#amk 4\n#0 t53 @10 o4 f+16f+16f+16f+16\n");
+	const echoed = run("#amk 4\n#0 t53 $F1 $0F $50 $00 @10 o4 f+16f+16f+16f+16\n");
+	check(
+		"a short song that opens by clearing a 30 KB echo buffer measures at tempo",
+		Math.abs((tempoShortfall(echoed.measured) ?? 0) - 1) < 0.02,
+		`${(tempoShortfall(echoed.measured) ?? 0).toFixed(4)}x`,
+	);
+	check(
+		"and its pass is longer by the clear, which is what is heard",
+		echoed.measured.seconds - plain.measured.seconds > 0.3,
+		`${echoed.measured.seconds.toFixed(3)} s vs ${plain.measured.seconds.toFixed(3)} s`,
+	);
+	check(
+		"the whole of which sits before the first tick",
+		echoed.measured.leadSeconds - plain.measured.leadSeconds > 0.3,
+		`lead ${echoed.measured.leadSeconds.toFixed(3)} s vs ${plain.measured.leadSeconds.toFixed(3)} s`,
+	);
+
 	// The measured clock has to be usable through the same two functions the
 	// predicted one is, or the transport cannot read one for the other.
 	const clock = hard.measured.clock;

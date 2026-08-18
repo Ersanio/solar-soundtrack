@@ -19,6 +19,11 @@
  * everything downstream reads one through the other without knowing which it
  * has. It costs about 90 ms for a half-minute pass, so it belongs on a worker —
  * `clock.worker.ts` is what calls it.
+ *
+ * The rate is compared from the first tick onward. What comes before it — the
+ * driver's boot, and the song's first tick, in which `$FA $04` zeroes the whole
+ * echo buffer at some 26 ms per delay unit (`main.asm`, `ModifyEchoDelay`) —
+ * is a one-off cost, not a rate, and on a short song it would read as one.
  */
 
 import { SPC_SAMPLE_RATE, type SpcCore } from '@amk/spc/wasm-host';
@@ -56,9 +61,17 @@ const MAX_SECONDS = 999;
 export interface Measurement {
   /** The observed clock, or `null` when nothing could be measured. */
   clock: SongClock | null;
-  /** Wall seconds one pass really takes. */
+  /** Wall seconds one pass really takes, lead-in included — it is heard. */
   seconds: number;
-  /** What the same ticks would have taken at the tempo the song asked for. */
+  /**
+   * Wall seconds up to the first tick seen: the driver's boot and the song's
+   * first tick, where `$FA $04` clears the echo buffer.
+   */
+  leadSeconds: number;
+  /**
+   * What the ticks after the first would have taken at the tempo the song asked
+   * for — the same stretch `seconds - leadSeconds` covers.
+   */
   nominalSeconds: number;
   /**
    * The pass was not reached — the figures describe as far as it got.
@@ -80,6 +93,7 @@ export function measureClock(core: SpcCore, spc: Uint8Array, passTicks: number):
   const empty: Measurement = {
     clock: null,
     seconds: 0,
+    leadSeconds: 0,
     nominalSeconds: 0,
     truncated: true,
   };
@@ -93,6 +107,7 @@ export function measureClock(core: SpcCore, spc: Uint8Array, passTicks: number):
   const points: { tick: number; seconds: number }[] = [{ tick: 0, seconds: 0 }];
 
   let ticks = 0;
+  let lead = -1;
   let nominalSeconds = 0;
   let voice = -1;
   let duration = 0;
@@ -121,10 +136,15 @@ export function measureClock(core: SpcCore, spc: Uint8Array, passTicks: number):
     }
 
     ticks += stepped;
-    // Priced at the tempo standing when the tick was seen, so a song that
-    // changes tempo — or fades one — is compared against what it asked for at
-    // each point rather than against an average it never plays at.
-    nominalSeconds += nominalTickSeconds(aram[TEMPO] || 1) * stepped;
+    if (lead < 0) {
+      // The first tick seen; the comparison starts here.
+      lead = rendered / SPC_SAMPLE_RATE;
+    } else {
+      // Priced at the tempo standing when the tick was seen, so a song that
+      // changes tempo — or fades one — is compared against what it asked for at
+      // each point rather than against an average it never plays at.
+      nominalSeconds += nominalTickSeconds(aram[TEMPO] || 1) * stepped;
+    }
 
     if (ticks - marked >= step) {
       marked = ticks;
@@ -144,6 +164,7 @@ export function measureClock(core: SpcCore, spc: Uint8Array, passTicks: number):
   return {
     clock: toClock(points, ticks, seconds),
     seconds,
+    leadSeconds: lead,
     nominalSeconds,
     truncated: ticks < passTicks,
   };
@@ -181,12 +202,12 @@ function toClock(
 
 /**
  * How much slower the driver runs the song than it was written to go, as a
- * ratio — 1 when it keeps up.
+ * ratio — 1 when it keeps up. Taken from the first tick onward, so a song that
+ * opens by clearing its echo buffer is not read as slow.
  *
  * `null` when there is nothing to compare, which is not the same as 1.
  */
 export function tempoShortfall(measured: Measurement): number | null {
-  return measured.nominalSeconds > 0 && measured.seconds > 0
-    ? measured.seconds / measured.nominalSeconds
-    : null;
+  const elapsed = measured.seconds - measured.leadSeconds;
+  return measured.nominalSeconds > 0 && elapsed > 0 ? elapsed / measured.nominalSeconds : null;
 }
