@@ -34,12 +34,26 @@
   Loop
 </amk-checkbox>
 
-<input
-  type="range"
-  min="0"
-  max="500"
-  class="accent-accent w-20 cursor-pointer"
-  title="Volume"
-  [value]="playback.volume()"
-  (input)="onVolume($event)"
-/>
+<span class="relative flex">
+  <input
+    type="range"
+    min="0"
+    class="accent-accent w-20 cursor-pointer"
+    title="Volume"
+    [max]="VOLUME_MAX"
+    [value]="playback.volume()"
+    (input)="onVolume($event)"
+    (pointerdown)="volumeReadout.set(true)"
+    (pointerup)="volumeReadout.set(false)"
+    (pointercancel)="volumeReadout.set(false)"
+    (blur)="volumeReadout.set(false)"
+  />
+  @if (volumeBubble(); as bubble) {
+    <span
+      class="border-edge bg-raised text-ink pointer-events-none absolute top-full z-10 mt-1 -translate-x-1/2 rounded border px-1.5 py-0.5 font-mono text-xs tabular-nums whitespace-nowrap shadow-lg"
+      [style.left]="bubble.left"
+    >
+      {{ bubble.text }}
+    </span>
+  }
+</span>

@@ -11,12 +11,9 @@ export const CHANGELOG: readonly ChangelogEntry[] = [
   {
     date: '18 August 2026',
     items: [
-      'Piano roll rows go up to three sizes larger, with note names and icons to match',
-      'Piano roll notes show their pitch and the commands acting on them',
-      'Click a note in the roll to inspect it, double-click to jump to the MML',
       'Piano roll that scrolls along with the song',
-      'Piano roll turns a page as the song plays, or scrolls the notes if you prefer',
-      'Drag the bar above the piano roll to scrub through the song',
+      'Volume slider shows its level while dragging',
+      'Click a note or command in the roll to inspect it, double-click to jump to the MML',
       'Song length and the playback timer match what you actually hear',
       'A warning when the driver cannot keep up with the tempo',
     ],
