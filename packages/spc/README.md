@@ -114,8 +114,13 @@ and not merely read its bytes. It has to come from here for the reason the rest 
 the pass rather than about the text. `slotsOf` is where a command claims a slot or takes one away;
 the four `off` commands take one away rather than occupying it, since after `$DF` there is no
 vibrato to report. A `$D0`-`$D8` clears the instrument slot instead of filling it: the byte that
-loaded that drum is a note, and the `@21`-`@29` that did it emitted nothing to point at. Which of
-these a view chooses to draw is not this package's business, as the percussion set is not.
+loaded that drum is a note, and the `@21`-`@29` that did it emitted nothing to point at. What it
+fills instead is `WalkNote.drumFrom`, the address of that note — its own for a drum note — kept
+until the next `$DA`, since the drum's sample stays under every note in between: through the `]` of
+the loop it was written in, a `*` or `(1)n` that replays it, and a call from another channel. The
+source knows which `@` was folded into _that_ note, so a reader that wants the command asks it
+there (`web/src/app/state/commands-in-force.ts`). Which of these a view chooses to draw is not this
+package's business, as the percussion set is not.
 
 `NoteState.tempo` is deliberately not that answer. It is the tempo the song has last been _told_ to
 reach, which through a fade is the target the driver has not got to yet; the roll's tooltip wants

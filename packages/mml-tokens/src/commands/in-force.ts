@@ -25,6 +25,9 @@
  * and however many times it is played, because the answer was decided once and
  * baked into the bytes. This is the same rule `echo-hazards.ts` and
  * `fir-override.ts` walk under, applied where it happens to be the whole truth.
+ * The one thing it does not say is which drum a note still *sounds* on after
+ * the note that loaded it — that travels with the drum byte, so the walk names
+ * the loading note (`WalkNote.drumFrom`) and this map is asked about that one.
  *
  * The two sets are disjoint by construction: a command is in the compiler's
  * command map or it is here. `tokentest` asserts it, because a command answered
@@ -113,18 +116,26 @@ const PARSE_TIME_SLOTS: readonly ParseTimeSlot[] = ["instrument", "quantization"
  * sees them; `@@21` is the direct form and does emit one, which is why the
  * spelling matters and not only the number.
  */
-function isPercussionInstrument(command: Command): boolean {
+export function isPercussionInstrument(command: Command): boolean {
 	const value = command.args[0]?.value ?? -1;
-	return command.direct !== true && value >= FIRST_PERCUSSION_INSTRUMENT && value <= LAST_PERCUSSION_INSTRUMENT;
+	return (
+		command.kind === "@" &&
+		command.direct !== true &&
+		value >= FIRST_PERCUSSION_INSTRUMENT &&
+		value <= LAST_PERCUSSION_INSTRUMENT
+	);
 }
 
-/** Which slot a command occupies here, or `null` if it is not one of ours. */
+/**
+ * Which slot a command occupies here, or `null` if it is not one of ours.
+ *
+ * `$DA` is not: it emits, so the walk names it, and it leaves the parser's
+ * `instrument[channel]` alone — only `@` writes that (Music.cpp:908), which is
+ * why `#6 @21 c $DA $00 d` still folds `d` into a drum byte.
+ */
 function parseTimeSlot(command: Command): ParseTimeSlot | null {
 	if (command.vcmd !== undefined) {
-		// `$DA` is the emitted spelling of `@`, and it takes the slot away from a
-		// percussion `@` written before it: whichever came last is in force, and
-		// only the walk can name that one.
-		return command.vcmd === 0xda ? "instrument" : null;
+		return null;
 	}
 
 	switch (command.kind.toLowerCase()) {
@@ -139,6 +150,16 @@ function parseTimeSlot(command: Command): ParseTimeSlot | null {
 	}
 }
 
+/** `[` and `]` are one character each, so `[[` and `]]` are two commands touching. */
+function touches(first: Command, second: Command | undefined, kind: string): boolean {
+	return second?.kind === kind && second.span.start === first.span.end;
+}
+
+/** A pitched letter, which is what the drum remap folds into; a rest is left alone. */
+function isPitchedNote(command: Command): boolean {
+	return command.noteLength !== undefined && command.kind.toLowerCase() !== "r";
+}
+
 /**
  * The commands with no bytes of their own that are in force at each note.
  *
@@ -146,36 +167,50 @@ function parseTimeSlot(command: Command): ParseTimeSlot | null {
  * a caret and what a roll mark reaches through its source span. A note with none
  * of them is absent rather than present and empty.
  *
- * `q` and `@21`-`@29` are channel-scoped, because that is how `parser.ts` keeps
- * them — `q[channel]` and `instrument[channel]`, neither of which a `#N`
- * touches: a command written under `#0` says nothing about a note under `#1`,
- * even one written between them. One written above the first marker is on the
- * starting channel (`Command.channel`), and that is where `parseQuantization`
- * puts it even from a `(!1)[ ]` body — it writes `q[prevChannel]`
- * (Music.cpp:684-687), so `(!1)[q40 …]` above `#0` is the `q` of `#0`'s first
- * note.
+ * Each slot is kept the way `parser.ts` keeps the state behind it, so the answer
+ * is what went into the bytes and not an approximation of it:
  *
- * `h` is one variable in `parser.ts` (`hTranspose`), and `parseHash`
- * (Music.cpp:569) resets it at every `#N` — the one it is already on included.
- * So it is one slot here, cleared at every marker: an `h` above the first
- * channel reaches nothing, and a channel declared in two blocks does not carry
- * the first block's `h` into the second. `gather` raises no command for a `#N`
- * and `Command.channel` cannot see a channel re-entering itself, so the markers
- * are read off `index.tokens`; `text` is what says whether one is a real
- * `#0`-`#7`, since a malformed one is reported and resets nothing (AMK0030,
- * AMK0031).
+ *   - **`q`** is `q[channel]`, per channel and untouched by a `#N`: a command
+ *     written under `#0` says nothing about a note under `#1`, even one written
+ *     between them. One written above the first marker is on the starting
+ *     channel (`Command.channel`), and that is where `parseQuantization` puts it
+ *     even from a `(!1)[ ]` body — it writes `q[prevChannel]` (Music.cpp:684-687),
+ *     so `(!1)[q40 …]` above `#0` is the `q` of `#0`'s first note.
+ *   - **`h`** is one variable, `hTranspose`, and `parseHash` (Music.cpp:569)
+ *     resets it at every `#N` — the one it is already on included. So it is one
+ *     slot here, cleared at every marker: an `h` above the first channel reaches
+ *     nothing, and a channel declared in two blocks does not carry the first
+ *     block's `h` into the second. `gather` raises no command for a `#N` and
+ *     `Command.channel` cannot see a channel re-entering itself, so the markers
+ *     are read off `index.tokens`; `text` is what says whether one is a real
+ *     `#0`-`#7`, since a malformed one is reported and resets nothing (AMK0030,
+ *     AMK0031).
+ *   - **`@21`-`@29`** is `instrument[channel]`'s drum-ness, which only `@` writes
+ *     (Music.cpp:908). A `[` copies it into the loop block and a `]` copies
+ *     nothing back (Music.cpp:1239, `parseLoopStart`), so an `@` inside a `[ ]`
+ *     is gone at the `]` and one before it is back — `#0 @21 [ @0 c ]2 d` folds
+ *     `d` into a drum. And the first pitched note it folds clears it, except on
+ *     `#6`/`#7` under `#amk` (Music.cpp:2178-2183): `@21 c d` is one drum byte
+ *     and one pitched byte. That is a statement about *folding*. Which drum a
+ *     later note still *sounds* on is the walk's — `WalkNote.drumFrom` names the
+ *     note whose drum byte loaded it, and this map, asked about that note, names
+ *     its `@`.
  */
 export function parseTimeInForce(index: TokenIndex, text: string): ReadonlyMap<Command, readonly Command[]> {
 	const inForce = new Map<Command, readonly Command[]>();
 	const byChannel = new Map<number, Map<ParseTimeSlot, Command>>();
 	let transpose: Command | null = null;
+	/** The channel's drum `@` while a `[ ]` body works on its copy; `undefined` is "none held". */
+	let outsideLoop: { held: Command | undefined } | null = null;
 	let frozen: readonly Command[] | null = null;
 	let frozenChannel = -1;
 
 	const markers = index.tokens.filter((token) => token.kind === "channel");
 	let marker = 0;
 
-	for (const command of index.commands) {
+	const commands = index.commands;
+	for (let i = 0; i < commands.length; i++) {
+		const command = commands[i];
 		while (marker < markers.length && markers[marker].start < command.span.start) {
 			const declared = Number.parseInt(text.slice(markers[marker].start + 1, markers[marker].end), 10);
 			if (declared >= 0 && declared <= 7 && transpose !== null) {
@@ -193,6 +228,36 @@ export function parseTimeInForce(index: TokenIndex, text: string): ReadonlyMap<C
 			byChannel.set(channel, slots);
 		}
 
+		// `[[ ]]` never leaves the channel (`handleSuperLoopEnter`), so its brackets
+		// are stepped over; a lone `[` inside a `[ ]` is AMK0123 and does nothing,
+		// as a `]` outside one is AMK0129.
+		if (command.kind === "[") {
+			if (touches(command, commands[i + 1], "[")) {
+				i++;
+			} else {
+				outsideLoop ??= { held: slots.get("instrument") };
+			}
+
+			continue;
+		}
+
+		if (command.kind === "]") {
+			if (touches(command, commands[i + 1], "]")) {
+				i++;
+			} else if (outsideLoop !== null) {
+				if (outsideLoop.held === undefined) {
+					slots.delete("instrument");
+				} else {
+					slots.set("instrument", outsideLoop.held);
+				}
+
+				outsideLoop = null;
+				frozen = null;
+			}
+
+			continue;
+		}
+
 		if (command.noteLength !== undefined) {
 			// Shared between consecutive notes for as long as nothing changes, as
 			// `WalkNote.origins` is: a run of notes under one state is one array.
@@ -208,6 +273,19 @@ export function parseTimeInForce(index: TokenIndex, text: string): ReadonlyMap<C
 
 			if (frozen.length > 0) {
 				inForce.set(command, frozen);
+			}
+
+			// The drum byte this note became clears the remap behind it, unless the
+			// channel is one of the two SFX channels of an AddmusicK song.
+			const drum = slots.get("instrument");
+			if (
+				drum !== undefined &&
+				isPercussionInstrument(drum) &&
+				isPitchedNote(command) &&
+				(command.target.program !== 0 || (channel !== 6 && channel !== 7))
+			) {
+				slots.delete("instrument");
+				frozen = null;
 			}
 
 			continue;

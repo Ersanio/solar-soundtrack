@@ -342,6 +342,21 @@ export interface WalkNote {
 	 * {@link state} is.
 	 */
 	origins: readonly (number | null)[];
+	/**
+	 * The note whose `$D0`-`$D8` byte loaded the drum this note sounds on, by
+	 * its {@link address} — its own for a drum note — or `null` when the
+	 * instrument in force came from a `$DA` (or is the boot default).
+	 *
+	 * The instrument slot of {@link origins} cannot say this: `@21`-`@29` emit
+	 * no command, the drum byte itself does the loading (`main.asm:381-388`),
+	 * and it goes on being the sample under every note until the next `$DA` —
+	 * through the `]` of the loop it was written in, a `*` or `(1)n` that replays
+	 * it, and a call from another channel alike. So the walk names the note that
+	 * did it, and the source, which knows which `@` was folded into *that* note,
+	 * names the command from there. `CompileResult.noteMap` turns the address
+	 * back into text.
+	 */
+	drumFrom: number | null;
 }
 
 /** A song-wide tempo command, on the tick the driver runs it. */
@@ -435,6 +450,8 @@ interface Track {
 	duration: number;
 	/** The note a `$C6` tie should extend, or -1 when a tie would be a rest. */
 	held: number;
+	/** See {@link WalkNote.drumFrom}; -1 while no drum byte is the sample in force. */
+	drumFrom: number;
 	/**
 	 * Where the current note's frame began, or -1 when it begins at the note
 	 * byte itself. `emitNote` (`parser.ts:2766`) writes `[duration][q][note]`
@@ -575,6 +592,7 @@ export function walkSong(song: Uint8Array, aramAddress: number): SongTimeline {
 			ticks: 0,
 			duration: 1,
 			held: -1,
+			drumFrom: -1,
 			frameAt: -1,
 			callCount: 0,
 			callReturn: -1,
@@ -839,10 +857,16 @@ export function walkSong(song: Uint8Array, aramAddress: number): SongTimeline {
 				// The instrument slot goes empty rather than stale. What loaded this
 				// drum is a note byte, not a command, so the last `$DA` is no longer
 				// in force and naming it would be a plain lie; the `@21`-`@29` that
-				// did it emitted nothing, so the source is where it is answered.
+				// did it emitted nothing, so the source answers it — at the note
+				// {@link WalkNote.drumFrom} names, which is what carries it through
+				// loops and calls the text cannot see.
 				track.origins[INSTRUMENT_SLOT] = null;
 				track.frozenOrigins = null;
 			}
+
+			// Every drum byte reloads, so the newest one is the one in force — the
+			// same drum twice over is still two loads.
+			track.drumFrom = address;
 		}
 
 		track.held = notes.length;
@@ -857,6 +881,7 @@ export function walkSong(song: Uint8Array, aramAddress: number): SongTimeline {
 			address,
 			state: snapshot(track),
 			origins: origins(track),
+			drumFrom: track.drumFrom >= 0 ? track.drumFrom : null,
 		});
 
 		track.ticks += ticks;
@@ -882,6 +907,8 @@ export function walkSong(song: Uint8Array, aramAddress: number): SongTimeline {
 			case 0xda: // instrument
 				state.instrument = arg(0);
 				state.noise = null;
+				// `SetInstrument` reloads the sample, so no drum byte is in force now.
+				track.drumFrom = -1;
 				break;
 			case 0xdb: // pan
 			case 0xdc: // pan fade — the second byte is the target

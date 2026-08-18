@@ -11,8 +11,7 @@ import {
 
 import { compiler } from '@amk/compiler';
 import type { Edit } from '@amk/tokens/edits';
-import { type Command, commandAt, commandStartingAt, tokenize } from '@amk/tokens';
-import { commandScope, parseTimeInForce } from '@amk/tokens/commands/in-force';
+import { type Command, commandAt, tokenize } from '@amk/tokens';
 import type { CommandAddress, CompileResult, Diagnostic, NoteAddress, Span } from '@amk/core/types';
 import { buildSpc, spcFilename } from '@amk/spc/export';
 import { ARAM_SIZE, type AramBudget, computeBudget } from '@amk/spc/layout';
@@ -23,6 +22,7 @@ import {
   walkSong,
 } from '@amk/spc/song-walk';
 import { echoHazards } from '@amk/tokens/echo-hazards';
+import { commandsInForceOf } from './commands-in-force';
 import { type SongClock, songClock } from './song-clock';
 import { type Measurement, tempoShortfall } from './measure-clock';
 import type { MeasureReply, MeasureRequest } from './clock.worker';
@@ -405,25 +405,9 @@ export class EditorStore {
   );
 
   /**
-   * The commands acting on a note, exactly — a lookup rather than a map.
-   *
-   * Two answers joined, each exact in its own half. `WalkNote.origins` names
-   * every command that emitted a VCMD, by the address the driver read it from,
-   * which is the only way to be right where one run of bytes plays more than
-   * once: `v255 (1)[ c ]2 v200 (1)5` sounds one written `c` under two volumes,
-   * and the answer is a fact about the pass rather than about the text.
-   * {@link parseTimeInForce} supplies the rest — `q`, `h` and `@21`-`@29` emit
-   * nothing to address, and source order is exactly what the compiler resolved
-   * them in.
-   *
-   * Filtered to commands that act on a note at all: the song's own settings
-   * reach every channel alike and where a note sits is what a roll already
-   * draws, so neither is something acting on *this* note.
-   *
-   * A lookup and not a map because the timeline can hold two hundred thousand
-   * notes and only the ones on screen are ever asked about. Answers are cached
-   * on the two things they are derived from, and both are shared across a run of
-   * notes under unchanged state, so a long song resolves a handful of lists.
+   * The commands acting on a note, exactly — a lookup rather than a map. The
+   * join itself is `commands-in-force.ts`, so `walktest` can pin it end to end;
+   * this holds it to the current scan and compile.
    *
    * Empty for every note while the editor has moved past the text that compiled:
    * a span into a document that has changed points at the wrong thing, which is
@@ -434,49 +418,12 @@ export class EditorStore {
       return NOTHING_IN_FORCE;
     }
 
-    const index = this.tokens();
-    const commands = index.commands;
-    const byAddress = this.commandsByAddress();
-    const notes = this.notesByAddress();
-    const parseTime = parseTimeInForce(index, this.source());
-    const cache = new Map<readonly (number | null)[], Map<Command | null, readonly Command[]>>();
-
-    const walked = (origins: readonly (number | null)[]): Command[] => {
-      const acting: Command[] = [];
-      for (const at of origins) {
-        const span = at === null ? undefined : byAddress.get(at)?.span;
-        const command = span === undefined ? null : commandStartingAt(commands, span.start);
-        if (command !== null && commandScope(command) === 'note-state') {
-          acting.push(command);
-        }
-      }
-
-      return acting;
-    };
-
-    return (note: WalkNote) => {
-      let byWritten = cache.get(note.origins);
-      if (byWritten === undefined) {
-        byWritten = new Map();
-        cache.set(note.origins, byWritten);
-      }
-
-      const span = notes.get(note.address)?.span;
-      const written = span === undefined ? null : commandStartingAt(commands, span.start);
-      const found = byWritten.get(written);
-      if (found !== undefined) {
-        return found;
-      }
-
-      // The parse-time ones first: they are what the note itself was written
-      // under, where the rest reached it from wherever the driver had been.
-      const acting = [
-        ...(written === null ? [] : (parseTime.get(written) ?? [])),
-        ...walked(note.origins),
-      ];
-      byWritten.set(written, acting);
-      return acting;
-    };
+    return commandsInForceOf({
+      index: this.tokens(),
+      text: this.source(),
+      commands: this.commandsByAddress(),
+      notes: this.notesByAddress(),
+    });
   });
 
   /** The notes the song is too short to reach, for the editor to underline. */

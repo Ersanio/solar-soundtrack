@@ -602,6 +602,7 @@ console.log("\npercussion is a preference, not a rule");
 	/** A note as the walk would report it; only the fields placement reads. */
 	const note = (instrument: number | null, byte: number, noise: number | null = null, address = 0): WalkNote => ({
 		origins: [],
+		drumFrom: null,
 		channel: 0,
 		tick: 0,
 		ticks: 24,

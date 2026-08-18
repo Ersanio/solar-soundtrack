@@ -1705,4 +1705,45 @@ function inForceAt(source: string): (text: string) => string {
 	check("and @@21 is direct, so it emits and is left to the walk too", held(`#amk 4\n#0 @@21 c8\n`) === 0);
 }
 
+// The drum slot is `instrument[channel]` as the parser keeps it, and this half
+// answers what was *folded* into each note byte — `selftest` pins the bytes for
+// every song here. Which drum a later note still sounds on is the walk's
+// (`WalkNote.drumFrom`), and `walktest` pins the join.
+{
+	// Music.cpp:2178-2183 — the first pitched note the remap folds clears it,
+	// except on #6 and #7 under #amk, where every note stays a drum.
+	const once = inForceAt(`#amk 4\n#0 @21 c8 d8\n`);
+	check("on #0 the drum @ folds into one note", once("c8") === "@21" && once("d8") === "");
+	const sfx = inForceAt(`#amk 4\n#6 @21 c8 d8\n`);
+	check("and on #6 into every note", sfx("c8") === "@21" && sfx("d8") === "@21");
+	check("but under #am4 into one note on #6 as well", inForceAt(`#am4\n#6 @21 c8 d8\n`)("d8") === "");
+	check("a rest is not folded, so it clears nothing", inForceAt(`#amk 4\n#0 @21 r8 c8\n`)("c8") === "@21");
+
+	// Music.cpp:1239 — a `[` copies the drum state into the loop block, and a `]`
+	// copies nothing back: what the body writes dies with it, and what stood
+	// before it stands again.
+	const inside = inForceAt(`#amk 4\n#0 [ @21 c8 ]2 d8\n`);
+	check("a drum @ inside a [ ] reaches its body", inside("c8") === "@21");
+	check("and not the note after the ]", inside("d8") === "");
+	const restored = inForceAt(`#amk 4\n#0 @21 [ @0 c8 ]2 d8\n`);
+	check("a body's @0 takes the copy", restored("c8") === "");
+	check("and the ] gives the channel's own @21 back", restored("d8") === "@21");
+	const copied = inForceAt(`#amk 4\n#0 @21 [ c8 ]2 d8\n`);
+	check("the copy folds the body's first note", copied("c8") === "@21");
+	check("and its clearing is the copy's, so the note after the ] is a drum too", copied("d8") === "@21");
+
+	// `[[ ]]` never leaves the channel (`handleSuperLoopEnter`), so there is no copy.
+	check("a subloop's @0 is the channel's own", inForceAt(`#amk 4\n#0 @21 [[ @0 c8 ]]2 d8\n`)("d8") === "");
+	const nested = inForceAt(`#amk 4\n#0 [ c8 [[ @21 d8 ]]2 e8 ]2 f8\n`);
+	check(
+		"and inside a [ ] its brackets are stepped over",
+		nested("d8") === "@21" && nested("e8") === "" && nested("f8") === "",
+	);
+
+	// Music.cpp:908 — only `@` writes `instrument[channel]`; a raw `$DA` emits and
+	// leaves the remap standing.
+	check("a $DA does not take the drum slot", inForceAt(`#amk 4\n#6 @21 c8 $DA $00 d8\n`)("d8") === "@21");
+	check("though on #0 the first note has already cleared it", inForceAt(`#amk 4\n#0 @21 c8 $DA $00 d8\n`)("d8") === "");
+}
+
 summarise();
