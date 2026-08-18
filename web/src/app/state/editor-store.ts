@@ -336,7 +336,9 @@ export class EditorStore {
    * `severe` puts it with the echo hazards and `AMK0502` in the `AMK05xx` band:
    * it compiles cleanly and then misbehaves on playback. Held back until the
    * first measurement is in, and silent for the few percent an ordinary busy
-   * song loses — see {@link TEMPO_SHORTFALL_LIMIT}.
+   * song loses — see {@link TEMPO_SHORTFALL_LIMIT}. Compared from the first
+   * tick, so the pause `$FA $04` puts at the top of a song with echo is not
+   * read as a rate; `tempoShortfall` says so.
    *
    * It stands on the last measurement rather than only on one taken from the
    * current bytes, which is what stops it blinking out on every keystroke; see
