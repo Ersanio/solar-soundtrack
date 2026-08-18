@@ -251,9 +251,11 @@
 
           @for (mark of marks(); track mark.id) {
             <!-- A click asks the inspector about this note; a double click goes
-                 to it in the source. -->
+                 to it in the source. A muted note takes no pointer at all, so
+                 the live note over it is the one that answers. -->
             <g
               class="mark cursor-pointer"
+              [class.pointer-events-none]="mark.muted"
               (pointerenter)="enter(mark)"
               (click)="select(mark)"
               (dblclick)="reveal(mark)"

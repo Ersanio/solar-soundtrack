@@ -227,7 +227,9 @@ from the same catalogue the command palette's buttons are. A single click asks t
 that note; a double click goes to it in the source, which is what a click alone used to do. Clicking
 a glyph targets its command instead. What fits is measured (`fitBarContent`): the name has priority
 and the glyphs drop from the end, because a bar that says `C6` and nothing else is still saying
-something. Anything dropped is in the hover and in the inspector, so nothing is only on a bar.
+something. Anything dropped is in the hover and in the inspector, so nothing is only on a bar. A
+muted channel is drawn dimmed, behind the others, and takes no pointer at all, so where a live note
+overlaps it the live one is what a hover or a click reaches.
 
 **Which commands act on a note is answered exactly, and it takes two halves to be exact.** Anything
 that emits a VCMD is named by the walk, at the ARAM address the driver read it from, and

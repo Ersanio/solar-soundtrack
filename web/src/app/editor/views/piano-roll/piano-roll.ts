@@ -140,6 +140,8 @@ export interface Mark {
   fill: string;
   /** Dimmed rather than hidden, so a muted part still reads as part of the song. */
   opacity: number;
+  /** Drawn behind the audible marks and inert to the pointer, so a live note over it is the one hit. */
+  muted: boolean;
   /** `C6` on a key, `@23` on a drum lane. `null` when the bar has no room. */
   label: { text: string; x: number; y: number; size: number } | null;
   /** As many as fit; the inspector is where the whole list is. */
@@ -713,7 +715,10 @@ export class PianoRoll {
     const audible = new Map(this.playback.channels().map((c) => [c.index, c.audible]));
     const context = this.placeContext();
     const inForce = this.editor.commandsInForce();
-    const marks: Mark[] = [];
+    // Muted marks are drawn first, so a live note over one is the one on top.
+    // Each list keeps the walk's own tick-then-channel order.
+    const behind: Mark[] = [];
+    const front: Mark[] = [];
 
     for (const note of song.notes) {
       if (note.tick > to || note.tick + note.ticks < from) {
@@ -737,8 +742,9 @@ export class PianoRoll {
       const drawable = acting.filter((each) => each.entry !== null);
       const name = this.headingOf(note, context);
       const content = fitBarContent(w, h, name, drawable.length);
+      const muted = audible.get(note.channel) === false;
 
-      marks.push({
+      (muted ? behind : front).push({
         id: `${note.address}:${note.tick}:${note.channel}`,
         x,
         w,
@@ -746,7 +752,8 @@ export class PianoRoll {
         y,
         h,
         fill: CHANNEL_FILL[note.channel],
-        opacity: audible.get(note.channel) === false ? 0.12 : 1,
+        opacity: muted ? 0.12 : 1,
+        muted,
         label:
           content.name === null
             ? null
@@ -767,7 +774,7 @@ export class PianoRoll {
       });
     }
 
-    return marks;
+    return [...behind, ...front];
   });
 
   /**
