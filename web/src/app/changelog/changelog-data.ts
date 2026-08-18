@@ -9,6 +9,15 @@ export interface ChangelogEntry {
 export const CHANGELOG: readonly ChangelogEntry[] = [
   // ─── newest first; add new blocks here ──────────────────────────────────
   {
+    date: '19 August 2026',
+    items: [
+      'Piano roll grid follows a time signature you can set',
+      'Piano roll bars can be zoomed in even further',
+      'Muted channels cannot be interacted with in the piano roll',
+      'Fix echo buffer allocation messing with the song tempo estimation',
+    ],
+  },
+  {
     date: '18 August 2026',
     items: [
       'Piano roll that scrolls along with the song',

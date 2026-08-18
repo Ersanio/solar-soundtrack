@@ -11,6 +11,7 @@ import {
 } from '@angular/core';
 
 import type { Span } from '@amk/core/types';
+import { TICKS_PER_WHOLE } from '@amk/core/hardcoded-tables';
 import type { WalkNote } from '@amk/spc/song-walk';
 import { type CommandGlyph, CommandIcon } from '../../command-palette/command-icon';
 import { glyphOf } from '../../command-palette/glyph-of';
@@ -91,6 +92,17 @@ const ZOOMS = [0.5, 1, 2, 4, 8] as const;
 const ROW_HEIGHTS = [6, 9, 13, 18, 26, 36] as const;
 
 /**
+ * Note values a beat can be — a time signature's lower number.
+ *
+ * These seven and no others because the lower number *is* an MML note value, and
+ * because each divides a whole note exactly: a beat of `192 / 5` would put every
+ * line 38.4 ticks apart, on nothing a note could ever be written at.
+ */
+const BEAT_UNITS = [1, 2, 4, 8, 16, 32, 64] as const;
+/** Beats a bar may hold. Zero is the grid switched off. */
+const MAX_BEATS = 32;
+
+/**
  * Tailwind v4 scans source text, so a class name has to be a complete literal —
  * `fill-ch-${n}` generates no CSS at all and every note renders unpainted.
  */
@@ -156,7 +168,10 @@ interface Settings {
   /** Slide the music under a fixed playhead, rather than turning a page under it. */
   scrollNotes: boolean;
   allOctaves: boolean;
-  grid: boolean;
+  /** Beats in a bar of the grid — a time signature's upper number. Zero draws none. */
+  beatsPerBar: number;
+  /** The note value that gets the beat: its lower number, one of {@link BEAT_UNITS}. */
+  beatUnit: number;
   /** Instruments drawn on percussion lanes, ascending. */
   percussion: readonly number[];
   percussionOpen: boolean;
@@ -169,9 +184,15 @@ interface StoredSettings {
   follow?: unknown;
   scrollNotes?: unknown;
   allOctaves?: unknown;
-  grid?: unknown;
+  beatsPerBar?: unknown;
+  beatUnit?: unknown;
   percussion?: unknown;
   percussionOpen?: unknown;
+}
+
+/** A whole number of beats a bar could hold, zero — no grid — included. */
+function isBeatCount(value: unknown): value is number {
+  return typeof value === 'number' && Number.isInteger(value) && value >= 0 && value <= MAX_BEATS;
 }
 
 /**
@@ -191,7 +212,8 @@ function readSettings(): Settings {
     follow: true,
     scrollNotes: false,
     allOctaves: false,
-    grid: true,
+    beatsPerBar: 4,
+    beatUnit: 4,
     percussion: [...DEFAULT_PERCUSSION],
     percussionOpen: false,
   };
@@ -228,8 +250,12 @@ function readSettings(): Settings {
     settings.allOctaves = stored.allOctaves;
   }
 
-  if (typeof stored.grid === 'boolean') {
-    settings.grid = stored.grid;
+  if (isBeatCount(stored.beatsPerBar)) {
+    settings.beatsPerBar = stored.beatsPerBar;
+  }
+
+  if (BEAT_UNITS.includes(stored.beatUnit as (typeof BEAT_UNITS)[number])) {
+    settings.beatUnit = stored.beatUnit as number;
   }
 
   if (typeof stored.percussionOpen === 'boolean') {
@@ -276,7 +302,12 @@ export class PianoRoll {
   protected readonly follow = computed(() => this.settings().follow);
   protected readonly scrollNotes = computed(() => this.settings().scrollNotes);
   protected readonly allOctaves = computed(() => this.settings().allOctaves);
-  protected readonly grid = computed(() => this.settings().grid);
+  protected readonly beatsPerBar = computed(() => this.settings().beatsPerBar);
+  protected readonly beatUnit = computed(() => this.settings().beatUnit);
+
+  /** For the toolbar's two grid controls. */
+  protected readonly beatUnits = BEAT_UNITS;
+  protected readonly maxBeats = MAX_BEATS;
 
   /** Where the view is parked when it is not following the song. */
   private readonly panTick = signal(0);
@@ -830,12 +861,17 @@ export class PianoRoll {
   }
 
   protected readonly lines = computed(() => {
-    if (!this.grid()) {
-      return [];
+    const beats = this.beatsPerBar();
+    if (beats === 0) {
+      return []; // No grid asked for.
     }
 
     const { from, to } = this.window();
-    return gridLines(from, to, 48).map((line) => ({ ...line, x: line.tick * this.zoom() }));
+    const beatTicks = TICKS_PER_WHOLE / this.beatUnit();
+    return gridLines(from, to, beatTicks, beats).map((line) => ({
+      ...line,
+      x: line.tick * this.zoom(),
+    }));
   });
 
   protected readonly loopX = computed(() => {
@@ -1122,8 +1158,28 @@ export class PianoRoll {
     this.settings.update((s) => ({ ...s, allOctaves }));
   }
 
-  protected setGrid(grid: boolean): void {
-    this.settings.update((s) => ({ ...s, grid }));
+  /**
+   * The beats in a bar, off the toolbar's own field.
+   *
+   * On `change` — a blur or an Enter — rather than per keystroke, and text that
+   * is not a number puts the standing count back into the field. `0` is a real
+   * setting here, so a cleared field taken at face value would read as one and
+   * blank the grid on the way to typing `12`.
+   */
+  protected setBeatsPerBar(event: Event): void {
+    const field = event.target as HTMLInputElement;
+    const parsed = Number.parseInt(field.value, 10);
+    const beatsPerBar = Number.isNaN(parsed) ? this.beatsPerBar() : clamp(parsed, 0, MAX_BEATS);
+
+    field.value = String(beatsPerBar);
+    this.settings.update((s) => ({ ...s, beatsPerBar }));
+  }
+
+  protected setBeatUnit(event: Event): void {
+    const parsed = Number.parseInt((event.target as HTMLSelectElement).value, 10);
+    if (BEAT_UNITS.includes(parsed as (typeof BEAT_UNITS)[number])) {
+      this.settings.update((s) => ({ ...s, beatUnit: parsed }));
+    }
   }
 
   protected setPercussionOpen(percussionOpen: boolean): void {

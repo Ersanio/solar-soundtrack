@@ -250,6 +250,13 @@ One entry each: what it was, what it is, why.
   with the bar still drawn on the drum's lane. The walk names the note whose byte loaded the drum
   (`WalkNote.drumFrom`), `parseTimeInForce` says which `@` was folded into _that_ note, and
   `commands-in-force.ts` joins the two; the source alone answers only what was folded.
+- **A fixed quarter-note grid in the roll, with a heavier rule every whole note and no bars** — MML
+  carries no time signature, so the lines declined to claim they were bar lines and a song in 3/4 or
+  7/8 got a rule that fell across the beat everywhere but where it happened to agree. The porter
+  supplies the signature the format has not got: beats per bar over the note value that gets the
+  beat, `0` beats for no grid at all, and `gridLines` counts beats from tick 0 so a bar line is a
+  bar's first beat by construction. Not a `tick % barTicks` either — `tickWindow` snaps to a whole
+  note, a 7/8 bar is 168 ticks, and the two align only by coincidence.
 
 ## Angular specifics
 
