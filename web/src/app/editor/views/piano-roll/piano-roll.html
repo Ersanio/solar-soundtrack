@@ -50,9 +50,34 @@
   <amk-checkbox class="text-xs" [checked]="allOctaves()" (checkedChange)="setAllOctaves($event)">
     All octaves
   </amk-checkbox>
-  <amk-checkbox class="text-xs" [checked]="grid()" (checkedChange)="setGrid($event)">
-    Grid
-  </amk-checkbox>
+  <!-- Beats per bar over the note value that gets the beat, which is an MML note
+       length: 6/8 is six `l8`s. MML has no signature of its own, so this is the
+       porter's. -->
+  <div
+    class="flex items-center gap-1"
+    title="The grid's time signature: beats in a bar, over the note that gets the beat. Zero beats draws no grid."
+  >
+    <span class="text-ink-muted text-xs">Grid</span>
+    <input
+      type="number"
+      class="bg-inset border-edge text-ink w-12 rounded-md border px-1.5 font-mono text-xs leading-6 tabular-nums"
+      min="0"
+      step="1"
+      [max]="maxBeats"
+      [value]="beatsPerBar()"
+      (change)="setBeatsPerBar($event)"
+    />
+    <span class="text-ink-muted text-xs">/</span>
+    <select
+      class="bg-inset border-edge text-ink cursor-pointer rounded-md border px-1.5 font-mono text-xs leading-6 tabular-nums"
+      [value]="beatUnit()"
+      (change)="setBeatUnit($event)"
+    >
+      @for (unit of beatUnits; track unit) {
+        <option [value]="unit" [selected]="unit === beatUnit()">{{ unit }}</option>
+      }
+    </select>
+  </div>
 
   <!-- The switch on the toolbar and the panel below it, as the source view does
        for the command palette: a closed strip would otherwise be one row of

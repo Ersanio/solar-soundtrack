@@ -300,22 +300,30 @@ export function scrubTick(offset: number, ticks: number, width: number): number 
 /**
  * Where the grid lines fall inside a window.
  *
- * Every 48 ticks — a quarter note — with a heavier line every 192. Called a
- * grid and not bars on purpose: MML has no time signature, so anything claiming
- * to be a bar line would be an invention of this view's.
+ * A line every `beatTicks`, heavier on the first beat of a bar. MML carries no
+ * time signature, so the porter supplies one and the bars are the ones they
+ * named.
+ *
+ * Beats are counted **from tick 0** and the bar is the count's remainder, rather
+ * than a `tick % barTicks` on the tick itself. The window a caller asks about is
+ * snapped to a whole note ({@link tickWindow}) and a bar need not divide one —
+ * 7/8 is 168 ticks — so the two only ever line up by coincidence. Counting from
+ * the song's start makes a strong line the first beat of a bar by construction,
+ * whichever window it turns up in.
  */
 export function gridLines(
   from: number,
   to: number,
-  step: number,
+  beatTicks: number,
+  beatsPerBar: number,
 ): { tick: number; strong: boolean }[] {
   const lines: { tick: number; strong: boolean }[] = [];
-  if (step <= 0) {
-    return lines;
+  if (beatTicks <= 0 || beatsPerBar <= 0) {
+    return lines; // An unmeasured beat, or a grid the porter has switched off.
   }
 
-  for (let tick = Math.max(0, Math.floor(from / step) * step); tick <= to; tick += step) {
-    lines.push({ tick, strong: tick % 192 === 0 });
+  for (let beat = Math.max(0, Math.floor(from / beatTicks)); beat * beatTicks <= to; beat++) {
+    lines.push({ tick: beat * beatTicks, strong: beat % beatsPerBar === 0 });
   }
 
   return lines;

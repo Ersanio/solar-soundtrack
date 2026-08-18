@@ -252,6 +252,14 @@ reach every note alike, and `o`, `<`, `>` and `l` are what the bar's row and wid
 Written pitch is not held to the driver's o1 c–o6 a — `o0` is legal MML and `h12 o0 c` is a note the
 driver plays — so `roll-layout.ts` grows the keyboard to take such a note in, above or below.
 
+**The grid behind the notes is the porter's, since MML has not got one.** The toolbar's `x/y` is
+beats in a bar over the note value that gets the beat, and that lower number is an MML note length —
+6/8 is six `l8`s, and a 4/4 bar is one whole note, 192 ticks. `gridLines` counts beats from tick 0
+and takes the bar from the count rather than testing a tick against a bar's length: the mark window
+snaps outward to a whole note, a 7/8 bar is 168 ticks, and the two therefore line up only by
+coincidence, so a bar line has to be a bar's own first beat by construction. Zero beats in a bar is
+the grid switched off, which is why there is no separate switch for it.
+
 **The scrub bar** across the top is the whole song at once, and the only way to seek from the roll.
 Its width is one song — tick 0 on the left edge, the last tick on the right, at every zoom — so it is
 the song rather than a view of it, and `scrubOffset`/`scrubTick` are that mapping and its exact
