@@ -239,6 +239,12 @@ One entry each: what it was, what it is, why.
   declared anywhere, 0 without one — because that is where `detectStartingChannel` starts writing
   (Music.cpp:385-400); `parseTimeInForce` reads the markers themselves for the one thing a channel
   number cannot see, `h` being reset by a `#N` that re-enters its own channel.
+- **Naming a note's drum `@` from the note's own text** — the last `@21`-`@29` written before it on
+  its channel. Right until a `[ ]` works on a copy of the remap, the first drum note clears it, a `*`
+  or `(1)n` replays the drum byte, or another channel calls it — and wrong in both directions then,
+  with the bar still drawn on the drum's lane. The walk names the note whose byte loaded the drum
+  (`WalkNote.drumFrom`), `parseTimeInForce` says which `@` was folded into _that_ note, and
+  `commands-in-force.ts` joins the two; the source alone answers only what was folded.
 
 ## Angular specifics
 

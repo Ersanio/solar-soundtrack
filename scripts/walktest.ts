@@ -44,7 +44,7 @@ import { compiler } from "@amk/compiler";
 import { type CompileResult, noteAddressAt } from "@amk/core/types";
 import { FIRST_VCMD, LAST_VCMD } from "@amk/core/hardcoded-tables";
 import { commandStartingAt, expectedArgs, tokenize } from "@amk/tokens";
-import { commandScope } from "@amk/tokens/commands/in-force";
+import { commandScope, parseTimeInForce } from "@amk/tokens/commands/in-force";
 import { loadDriver } from "@amk/spc/driver";
 import { buildSpc } from "@amk/spc/export";
 import { readDriverState } from "@amk/spc/driver-state";
@@ -61,6 +61,7 @@ import {
 } from "@amk/spc/song-walk";
 import { secondsAtTick, songClock } from "../web/src/app/state/song-clock";
 import { measureClock, tempoShortfall } from "../web/src/app/state/measure-clock";
+import { commandsInForceOf } from "../web/src/app/state/commands-in-force";
 import { driverTickSeconds } from "@amk/tokens/commands/units";
 
 import { SPC_ASSETS, check, stubFetch, summarise } from "./harness";
@@ -1031,6 +1032,85 @@ console.log("\nthe command in force at a note is named exactly");
 	// `@21`-`@29` emit no `$DA`, so the drum a note byte loaded has no command in
 	// the stream at all; keeping the last `$DA` would name one no longer in force.
 	check("a drum loaded by its note byte leaves no stale instrument", timeline.notes[2].origins[instrument] === null);
+}
+
+// What names the drum instead: the note whose byte loaded it, which the walk
+// carries as `drumFrom`, and the source, asked about that note, names the `@`.
+// The two halves meet in `commands-in-force.ts`, and this is where the join is
+// pinned end to end — the roll and the note panel read it and nothing else can
+// exercise it.
+{
+	/** The commands acting on each note, as the roll's glyphs will show them, spelled as written. */
+	const acting = (source: string) => {
+		const { result, timeline } = build(source);
+		const index = tokenize(source);
+		const inForce = commandsInForceOf({
+			index,
+			text: source,
+			commands: new Map((result.commandMap ?? []).map((entry) => [entry.address, entry])),
+			notes: new Map((result.noteMap ?? []).map((entry) => [entry.address, entry])),
+		});
+		const folded = parseTimeInForce(index, source);
+		const spell = (command: { span: { start: number; end: number } }) =>
+			source.slice(command.span.start, command.span.end);
+		return {
+			timeline,
+			glyphs: (n: number) => inForce(timeline.notes[n]).map(spell).join(" "),
+			foldedInto: (text: string) => {
+				const command = commandStartingAt(index.commands, source.indexOf(text));
+				return command === null ? "?" : (folded.get(command) ?? []).map(spell).join(" ");
+			},
+		};
+	};
+
+	// The plain case: the compiler folds `@21` into `c` alone (`selftest` pins the
+	// bytes), and `d` still plays on drum 21's sample.
+	const plain = acting("#amk 4\n#0 @21 c8 d8\n");
+	check("a drum note names its own @", plain.glyphs(0) === "@21", plain.glyphs(0));
+	check(
+		"the pitched note after it names the same @ through the note that loaded it",
+		plain.glyphs(1) === "@21",
+		plain.glyphs(1),
+	);
+	check(
+		"which the source alone would not: nothing was folded into it",
+		plain.foldedInto("d8") === "",
+		plain.foldedInto("d8"),
+	);
+	check(
+		"and drumFrom is that note's address",
+		plain.timeline.notes[1].drumFrom === plain.timeline.notes[0].address &&
+			plain.timeline.notes[0].drumFrom === plain.timeline.notes[0].address,
+	);
+
+	// Through a `]`: the `@21` inside the body is gone at the `]` for the compiler,
+	// and the sample it loaded is still under `d`.
+	const looped = acting("#amk 4\n#0 [ @21 c8 ]2 d8\n");
+	check("a drum loaded inside a [ ] is named on the note after the ]", looped.glyphs(2) === "@21", looped.glyphs(2));
+
+	// A `$DA` reloads, and takes the drum with it: one glyph, the walk's.
+	const reloaded = acting("#amk 4\n#0 @21 c8 @0 d8\n");
+	check("a $DA after the drum is the only instrument named", reloaded.glyphs(1) === "@0", reloaded.glyphs(1));
+	check("and drumFrom is cleared by it", reloaded.timeline.notes[1].drumFrom === null);
+
+	// A `*` replays the drum byte, and a note after it is on the drum again — with
+	// the `$DA` between them no longer in force, so it is not named twice.
+	const replayed = acting("#amk 4\n#0 [ @21 c8 ]1 @0 d8 * e8\n");
+	check(
+		"a * that replays a drum byte puts a later note back on the drum",
+		replayed.glyphs(3) === "@21",
+		replayed.glyphs(3),
+	);
+
+	// And a call from another channel: the `@21` was written on #0, the note it
+	// reaches is on #1, and no reading of #1's text could find it.
+	const called = acting("#amk 4\n#0 (1)[ @21 c8 ]1 d8\n#1 (1)1 e8\n");
+	const e = called.timeline.notes.findIndex((note) => note.channel === 1 && note.percussion === null);
+	check(
+		"a drum loaded by a call from another channel is named on that channel's note",
+		e >= 0 && called.glyphs(e) === "@21",
+		called.glyphs(e),
+	);
 }
 
 // `main.asm:2321` calls `SetInstrument` with 0 for every channel whose `$C1+x`

@@ -131,9 +131,17 @@ answer was decided before the loop existed. `h` is the one that is not per chann
 variable the parser resets at every `#N`, the one it is already on included, so `parseTimeInForce`
 reads the markers off the token index and clears it at each — an `h` above the first channel reaches
 nothing, and a channel written in two blocks does not carry the first block's `h` into the second.
-Everything that does emit a byte is the walk's to name, at the address the driver reads it from, and
-`CompileResult.commandMap` turns that back into source. The two sets are disjoint by construction and
-`tokentest` asserts it, since a command answered twice would draw two glyphs for one setting.
+`@21`-`@29` is `instrument[channel]` as the parser keeps it, which only `@` writes: a `[` copies it
+into the loop block and a `]` copies nothing back, so `@21 [ @0 c ]2 d` folds `d` into a drum, and
+the first pitched note it folds clears it except on `#6`/`#7` under `#amk`, so `@21 c d` is one drum
+byte and one pitched one. That is the answer about _folding_. Which drum a later note still _sounds_
+on is a fact about execution — the drum byte loads the sample and it stays through the `]`, a `*`, a
+`(1)n` and a call from another channel — so the walk carries the note that loaded it
+(`WalkNote.drumFrom`) and the editor asks this map about _that_ note
+(`web/src/app/state/commands-in-force.ts`). Everything that does emit a byte is the walk's to name,
+at the address the driver reads it from, and `CompileResult.commandMap` turns that back into source.
+The two sets are disjoint by construction and `tokentest` asserts it, since a command answered twice
+would draw two glyphs for one setting.
 
 `commandScope` is the same module's other half, and the first classification of commands in this
 package — `param.ts`'s `Role` is about one argument's units and the palette's `Category` is about

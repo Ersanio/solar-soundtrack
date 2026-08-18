@@ -234,7 +234,11 @@ two volumes, and no reading of the text around that `c` could say which, because
 decides it is not in the body at all. The rest — `q`, `h` and `@21`-`@29` — emit nothing to address,
 and for them source order _is_ the answer rather than an approximation, since `parser.ts` resolved
 them in one textual pass and baked them into the notes' own bytes;
-`@amk/tokens/commands/in-force` does that half. `walktest` pins both, on the loop-call song above.
+`@amk/tokens/commands/in-force` does that half. The drum is both at once: `@21` is folded into one
+note byte, and that byte loads a sample every note after it plays on, through a `]`, a `*` and a call
+from another channel — so the walk names the note that loaded it (`WalkNote.drumFrom`) and the source
+is asked about that note. `state/commands-in-force.ts` is the join, kept out of the store so
+`walktest` can pin all three halves on the songs that need each.
 
 The song's own settings and the shape of the music get no glyph — `t`, `w`, `$E4` and the echo unit
 reach every note alike, and `o`, `<`, `>` and `l` are what the bar's row and width already are.
