@@ -331,8 +331,21 @@ export function gridLines(
 
 /** How fast the display closes a gap with the driver, in gaps per second. */
 const CATCH_UP = 6;
-/** A gap bigger than this much music is not drift; it is a wrap or a seek. */
+/** A target this much music *ahead* is not drift; it is a seek. */
 const SNAP_SECONDS = 1;
+/**
+ * A target this much music *behind* is not drift either; it is a loop wrap or a
+ * seek backwards.
+ *
+ * A bound of its own, and much the smaller of the two, because the display only
+ * ever trails: the ease settles `rate / CATCH_UP` — a sixth of a second of music
+ * — behind the anchor and never overshoots it, so anything ahead of that is the
+ * anchor having moved back. Sizing the backwards case off {@link SNAP_SECONDS}
+ * instead cannot see a wrap at all on a short loop, since the anchor is folded
+ * into one pass and the whole jump a wrap can make is one trip round it: `aaaa`
+ * at `t54` is 96 ticks against a second's 107.
+ */
+const SNAP_BACK_SECONDS = 0.25;
 /** A frame gap this long means the loop was stopped, not that time passed. */
 const MAX_FRAME = 0.25;
 
@@ -370,11 +383,16 @@ export function advanceTick(step: ClockStep): number {
 
   // A loop wrap, a seek, or the clock starting again after a pause. None of
   // those is drift, and easing across one would crawl the length of the song.
+  // The two directions get their own bounds because they are not the same
+  // question: forwards is a seek and can be told from drift by its size alone,
+  // where backwards is measured against a lead the display is never supposed to
+  // have — see {@link SNAP_BACK_SECONDS}.
   if (
     elapsed <= 0 ||
     elapsed > MAX_FRAME ||
     rate <= 0 ||
-    Math.abs(target - shown) > rate * SNAP_SECONDS
+    target - shown > rate * SNAP_SECONDS ||
+    shown - target > rate * SNAP_BACK_SECONDS
   ) {
     return hold(target);
   }

@@ -309,6 +309,14 @@ re-derived its position each frame would reproduce that lag ten times a second a
 it. Running at the driver's rate and easing the gap shut turns a periodic jolt into a constant
 offset nobody can see. `charttest` pins it.
 
+**A wrap is spotted by the anchor moving backwards, not by the size of the jump.** The two directions
+have separate bounds, and much the smaller one is backwards: the ease settles a sixth of a second of
+music _behind_ the anchor and never overshoots it, so a target ahead of that is the loop coming round
+or a seek. Judging both by the same second of music cannot see a wrap on a short loop at all — the
+anchor is folded into one pass, so the whole jump a wrap can make is one trip round it, and
+`#0 t54 aaaa` is 96 ticks against a second's 107. Eased instead of snapped, the line settles into a
+cycle over the back half of the roll and reaches the beginning on no pass at all.
+
 Interpolating over tempo is what the root `CLAUDE.md` warns against, so read the comment before
 "fixing" it. The rule forbids a playhead _built on_ the formula, because the driver drops ticks and a
 formula compounds them; here the driver's own count steers the clock on every anchor, so the formula
