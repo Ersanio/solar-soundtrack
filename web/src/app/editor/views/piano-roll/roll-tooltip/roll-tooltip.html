@@ -1,0 +1,11 @@
+@if (tip(); as tip) {
+  <div class="font-semibold">{{ tip.heading }}</div>
+  <div class="text-ink-muted font-mono">{{ tip.length }}</div>
+  @for (row of tip.rows; track row) {
+    <div class="text-ink-muted">{{ row }}</div>
+  }
+  @if (tip.source; as source) {
+    <div class="border-edge text-accent-soft mt-1 border-t pt-1 font-mono">{{ source }}</div>
+    <div class="text-ink-muted">double-click to show it in the source</div>
+  }
+}

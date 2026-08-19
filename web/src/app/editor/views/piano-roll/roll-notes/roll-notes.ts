@@ -1,0 +1,81 @@
+import { Component, computed, inject, input, output } from '@angular/core';
+
+import { CommandIcon } from '../../../command-palette/command-icon';
+import { EditorStore } from '../../../../state/editor-store';
+import type { Mark, MarkGlyph } from '../roll-marks';
+
+/**
+ * The notes themselves: a bar per note, its name, and a glyph per command in
+ * force on it.
+ *
+ * Sits inside the scrolled group and takes no frame-rate input, which is what
+ * keeps the bars out of the frame path — the transform above moves, and this is
+ * left alone until the mark window turns over.
+ *
+ * It writes to `EditorStore` itself, as the command inspector's children do: a
+ * click is a question about the note under it, and the note is what this holds.
+ *
+ * An attribute on a real `<g>`, and its template's elements carry the `svg:`
+ * prefix — see `roll-lanes.ts`. The one exception is the glyph's own `<svg>`,
+ * which needs no prefix because `svg` is one of the three element names that
+ * carry a namespace implicitly.
+ */
+@Component({
+  selector: 'g[amk-roll-notes]',
+  imports: [CommandIcon],
+  templateUrl: './roll-notes.html',
+})
+export class RollNotes {
+  private readonly editor = inject(EditorStore);
+
+  readonly marks = input.required<readonly Mark[]>();
+
+  /** The hover, which the roll turns into a tooltip beside the pointer. */
+  readonly entered = output<Mark>();
+
+  /**
+   * Whether the editor still shows the text that compiled.
+   *
+   * Everything joined back to the source takes this test. A boolean rather than
+   * the comparison inline at each of them, so it is one answer rather than three.
+   */
+  private readonly inSync = computed(() => this.editor.compiledText() === this.editor.source());
+
+  /**
+   * A single click asks about the note; a double click goes to it.
+   *
+   * The quiet form leaves the roll on screen, which is the whole point of
+   * splitting them: the inspector sits in the pane beside this one and answers
+   * from the caret, so moving the caret is enough and switching tabs would take
+   * away the thing being asked about. {@link EditorStore.inspecting} carries the
+   * one thing the caret cannot — which pass of a loop this bar is.
+   *
+   * Suppressed whenever the editor has moved on from the text that compiled: a
+   * span into a document that has changed underneath points at the wrong thing,
+   * and the same test guards the highlights.
+   */
+  protected select(mark: Mark, show = false): void {
+    if (!this.inSync()) {
+      return;
+    }
+
+    const span = this.editor.notesByAddress().get(mark.note.address)?.span;
+    if (span) {
+      this.editor.inspecting.set({ address: mark.note.address, tick: mark.note.tick });
+      this.editor.reveal.set({ span: { ...span }, show });
+    }
+  }
+
+  protected reveal(mark: Mark): void {
+    this.select(mark, true);
+  }
+
+  /** A glyph is its own target: the command it stands for, not the note under it. */
+  protected inspect(glyph: MarkGlyph, event: Event, show = false): void {
+    // Without this the bar underneath answers as well, and the note would win.
+    event.stopPropagation();
+    if (this.inSync()) {
+      this.editor.reveal.set({ span: { ...glyph.span }, show });
+    }
+  }
+}

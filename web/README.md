@@ -280,6 +280,22 @@ the transport's 10 Hz anchor, snapped outward to a whole note, so the DOM rebuil
 screen; the scroll is a `computed` over `shared/chart/frame-clock.ts` and is one `transform` that
 nothing beneath reads. That is why the roll can run at 240 Hz without the note list knowing.
 
+**The folder is a parent and eight children**, as `output/command-inspector/` is. `piano-roll.ts`
+holds the song's shape, the camera and the clock and hands each child what it draws:
+`roll-toolbar/`, `percussion-panel/`, `roll-scrub/` and `roll-tooltip/` in the ordinary namespace,
+`roll-lanes/`, `roll-grid/`, `roll-notes/` and `roll-keys/` inside the roll's own `<svg>`. Beside
+them sit six Angular-free files — `roll-layout.ts` and `percussion.ts`, and `roll-metrics.ts`,
+`roll-settings.ts`, `roll-marks.ts` and `roll-clock.ts` — so the arithmetic stays where a harness can
+import it. `charttest` reaches the first two by path.
+
+**The four inside the `<svg>` are attribute components on a real `<g>`**, and their templates prefix
+every element `svg:`. Both halves are required and neither fails loudly: a component _element_ in an
+`<svg>` is an unknown SVG element with no layout box, and a child template has no namespace of its
+own because Angular takes one from the parent in the same template. The glyph is the exception that
+proves it — `<svg amk-glyph>` needs no prefix, `svg` being one of the three names that carry a
+namespace implicitly. The `transform` binding stays in the parent, above children that take no
+frame-rate input, so the frame clock reaches it and stops there.
+
 **Which of the two moves is a view option**, "Scroll the notes" on the roll's own toolbar. Ticked,
 it pins the playhead a fifth across the pane and slides the music under it; unticked — the default —
 the roll pages: the music holds still and the playhead crosses it,

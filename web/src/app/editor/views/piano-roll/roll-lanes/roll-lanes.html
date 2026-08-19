@@ -1,0 +1,26 @@
+<!--
+  The `svg:` prefixes are what put these in the SVG namespace: Angular takes an
+  element's namespace from its parent in the same template, and this template has
+  no <svg> of its own — the host <g> is in the roll's.
+-->
+@for (row of rows(); track row.row) {
+  @let lit = held().has(row.row);
+  <svg:rect
+    x="0"
+    [attr.y]="row.y"
+    [attr.width]="width()"
+    [attr.height]="row.height"
+    [class]="lit ? 'fill-accent' : row.fill"
+    [attr.fill-opacity]="lit ? 0.14 : 1"
+  />
+  @if (row.rule !== null) {
+    <svg:line
+      x1="0"
+      class="stroke-edge"
+      stroke-width="1"
+      [attr.x2]="width()"
+      [attr.y1]="row.rule"
+      [attr.y2]="row.rule"
+    />
+  }
+}

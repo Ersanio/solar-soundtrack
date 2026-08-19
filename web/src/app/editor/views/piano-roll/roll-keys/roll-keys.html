@@ -1,0 +1,31 @@
+<svg:rect x="0" y="0" class="fill-surface" [attr.width]="keyWidth" [attr.height]="height()" />
+@for (key of rows(); track key.row) {
+  @let lit = held().has(key.row);
+  <svg:rect
+    x="0"
+    rx="1"
+    [attr.y]="key.y"
+    [attr.width]="keyWidth - 5"
+    [attr.height]="key.height"
+    [class]="lit ? 'fill-accent' : key.fill"
+  />
+  @if (showLabels()) {
+    <svg:text
+      x="4"
+      dominant-baseline="central"
+      [class]="lit ? 'fill-surface font-mono' : key.textFill"
+      [attr.y]="key.textY"
+      [attr.font-size]="labelSize()"
+    >
+      {{ key.label }}
+    </svg:text>
+  }
+}
+<svg:line
+  y1="0"
+  class="stroke-edge"
+  stroke-width="1"
+  [attr.x1]="keyWidth"
+  [attr.x2]="keyWidth"
+  [attr.y2]="height()"
+/>

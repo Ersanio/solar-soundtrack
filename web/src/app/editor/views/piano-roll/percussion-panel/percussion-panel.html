@@ -1,0 +1,22 @@
+<span class="text-ink-muted text-xs">On percussion lanes</span>
+@for (chip of rows(); track chip.instrument) {
+  <button
+    type="button"
+    [class]="chip.class"
+    [title]="chip.title"
+    (click)="toggled.emit(chip.instrument)"
+  >
+    {{ chip.label }}
+  </button>
+} @empty {
+  <span class="text-ink-muted text-xs">This song plays no instruments.</span>
+}
+<button
+  amk-button
+  variant="ghost"
+  class="ml-auto"
+  [disabled]="!hasOverrides()"
+  (click)="resetAll.emit()"
+>
+  Reset
+</button>

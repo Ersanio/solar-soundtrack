@@ -1,0 +1,101 @@
+<amk-toolbar>
+  <div class="flex items-center gap-1">
+    <span class="text-ink-muted text-xs">Zoom</span>
+    <button
+      class="border-edge bg-inset text-ink hover:border-accent cursor-pointer rounded-md border px-2 leading-6"
+      (click)="zoomBy.emit(-1)"
+    >
+      −
+    </button>
+    <button
+      class="border-edge bg-inset text-ink hover:border-accent cursor-pointer rounded-md border px-2 leading-6"
+      (click)="zoomBy.emit(1)"
+    >
+      +
+    </button>
+  </div>
+
+  <div class="flex items-center gap-1">
+    <span class="text-ink-muted text-xs">Rows</span>
+    <button
+      class="border-edge bg-inset text-ink hover:border-accent cursor-pointer rounded-md border px-2 leading-6"
+      (click)="rowHeightBy.emit(-1)"
+    >
+      −
+    </button>
+    <button
+      class="border-edge bg-inset text-ink hover:border-accent cursor-pointer rounded-md border px-2 leading-6"
+      (click)="rowHeightBy.emit(1)"
+    >
+      +
+    </button>
+  </div>
+
+  <amk-checkbox
+    class="text-xs"
+    title="Keep the roll on the playing song, including after a scroll seeks it"
+    [checked]="follow()"
+    (checkedChange)="followChange.emit($event)"
+  >
+    Follow playback
+  </amk-checkbox>
+  <amk-checkbox
+    class="text-xs"
+    title="Slide the music under a fixed playhead, rather than turning a page when the playhead reaches the edge"
+    [checked]="scrollNotes()"
+    (checkedChange)="scrollNotesChange.emit($event)"
+  >
+    Scroll the notes
+  </amk-checkbox>
+  <amk-checkbox
+    class="text-xs"
+    [checked]="allOctaves()"
+    (checkedChange)="allOctavesChange.emit($event)"
+  >
+    All octaves
+  </amk-checkbox>
+  <!-- Beats per bar over the note value that gets the beat, which is an MML note
+       length: 6/8 is six `l8`s. MML has no signature of its own, so this is the
+       porter's. -->
+  <div
+    class="flex items-center gap-1"
+    title="The grid's time signature: beats in a bar, over the note that gets the beat. Zero beats draws no grid."
+  >
+    <span class="text-ink-muted text-xs">Grid</span>
+    <input
+      type="number"
+      class="bg-inset border-edge text-ink w-12 rounded-md border px-1.5 font-mono text-xs leading-6 tabular-nums"
+      min="0"
+      step="1"
+      [max]="maxBeats"
+      [value]="beatsPerBar()"
+      (change)="setBeatsPerBar($event)"
+    />
+    <span class="text-ink-muted text-xs">/</span>
+    <select
+      class="bg-inset border-edge text-ink cursor-pointer rounded-md border px-1.5 font-mono text-xs leading-6 tabular-nums"
+      [value]="beatUnit()"
+      (change)="setBeatUnit($event)"
+    >
+      @for (unit of beatUnits; track unit) {
+        <option [value]="unit" [selected]="unit === beatUnit()">{{ unit }}</option>
+      }
+    </select>
+  </div>
+
+  <!-- The switch on the toolbar and the panel below it, as the source view does
+       for the command palette: a closed strip would otherwise be one row of
+       chrome that still had to be drawn. -->
+  <button
+    type="button"
+    class="text-ink-muted hover:text-ink cursor-pointer text-xs font-semibold tracking-wide uppercase"
+    [title]="
+      percussionOpen() ? 'Hide the percussion set' : 'Choose which instruments are percussion'
+    "
+    (click)="percussionOpenChange.emit(!percussionOpen())"
+  >
+    {{ percussionOpen() ? '▾' : '▸' }} Percussion
+  </button>
+
+  <span class="text-ink-muted ml-auto font-mono text-xs">{{ readout() }}</span>
+</amk-toolbar>
