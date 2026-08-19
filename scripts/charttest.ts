@@ -598,6 +598,59 @@ console.log("\nthe playhead's own clock");
 		"and so does a seek",
 		advanceTick({ shown: 100, target: 9000, rate: RATE, elapsed: FRAME, pass: PASS }) === 9000,
 	);
+
+	// The anchor is folded into one pass, so the jump a wrap makes is one trip
+	// round the loop and no more. Sized against a second of music alone, the test
+	// for one cannot fire at all on a loop shorter than that — `#0 t54 aaaa` is
+	// 96 ticks against a second's 107 — and the wrap is eased instead, which on a
+	// song that short never finishes before the next one arrives.
+	{
+		const SHORT_RATE = 107.42; // t54
+		const SHORT_PASS = 96; // `aaaa`, four notes at the default l8
+		check(
+			"a wrap on a song under a second of music still snaps",
+			advanceTick({ shown: 94, target: 1, rate: SHORT_RATE, elapsed: FRAME, pass: SHORT_PASS }) === 1,
+		);
+
+		// And over the whole sweep, because the symptom is the steady state rather
+		// than one frame: eased, the line settles into a cycle over the back half
+		// of the roll and reaches the beginning on no pass at all.
+		let shown = 0;
+		let truth = 0;
+		let lowest = SHORT_PASS;
+		for (let frame = 0; frame < 300; frame++) {
+			truth += SHORT_RATE * FRAME;
+			shown = advanceTick({ shown, target: truth % SHORT_PASS, rate: SHORT_RATE, elapsed: FRAME, pass: SHORT_PASS });
+			if (frame > 60) {
+				lowest = Math.min(lowest, shown);
+			}
+		}
+
+		check(
+			"so the line comes back to the beginning on every pass",
+			lowest < SHORT_RATE * FRAME * 2,
+			`${lowest.toFixed(1)} ticks into a pass of ${SHORT_PASS}`,
+		);
+	}
+
+	// The wrap lands on the loop point and not on tick 0, so what it has to clear
+	// is the loop and never the pass: a short loop behind a long intro is the
+	// same failure on a song of several seconds.
+	{
+		const INTRO = 3940;
+		const LOOP = 60;
+		check(
+			"a short loop behind a long intro snaps too",
+			advanceTick({
+				shown: INTRO + LOOP - 2,
+				target: INTRO,
+				rate: RATE,
+				elapsed: FRAME,
+				pass: INTRO + LOOP,
+			}) === INTRO,
+		);
+	}
+
 	// The clock stops with the loop, so the first frame back is not elapsed time.
 	check(
 		"a long gap between frames snaps rather than lurching",
