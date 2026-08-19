@@ -1,0 +1,40 @@
+@let slot = row().slot;
+<span class="text-ink-muted w-6 shrink-0 text-right font-mono text-xs tabular-nums">
+  {{ slot.index | hex2 }}
+</span>
+
+@if (row().used) {
+  <span
+    class="bg-good/20 text-good shrink-0 rounded px-1 py-px text-[10px] font-semibold tracking-wide uppercase"
+    title="This song plays this slot, so it is always loaded."
+    >used</span
+  >
+}
+
+<amk-audition-button [name]="slot.name" [disabled]="slot.empty" />
+
+<div class="min-w-0 flex-1">
+  @if (slot.empty) {
+    <p class="text-ink-muted font-mono text-xs">empty slot</p>
+  } @else {
+    <amk-sample-wave class="h-6" [d]="row().waveform" />
+    <p class="text-ink-muted mt-0.5 font-mono text-xs">{{ row().detail }}</p>
+  }
+</div>
+
+<span class="text-ink-muted shrink-0 font-mono text-xs tabular-nums">{{ row().size }}</span>
+
+@if (row().requested) {
+  <amk-checkbox
+    class="shrink-0 text-xs"
+    [checked]="slot.important"
+    (checkedChange)="onImportant(slot.name, $event)"
+    >keep</amk-checkbox
+  >
+} @else {
+  <span
+    class="text-ink-muted shrink-0 text-xs"
+    title="This song does not load this bank, so the slot uses no ARAM. Name the bank in #samples."
+    >not in song</span
+  >
+}

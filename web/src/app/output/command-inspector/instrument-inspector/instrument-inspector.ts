@@ -1,40 +1,19 @@
 import { Component, computed, inject, input } from '@angular/core';
 
 import {
-  attackSeconds,
-  decaySeconds,
-  decodeAdsr,
-  decodeGain,
-  gainModeName,
-  noiseHz,
-  releaseSeconds,
-  sustainLevel,
-  tuningMultiplier,
-  tuningSemitones,
-} from '@amk/spc/adsr';
-import {
   FIRST_CUSTOM_INSTRUMENT,
   FIRST_PERCUSSION_INSTRUMENT,
   type InstrumentEntry,
   MELODIC_SLOTS,
-  NOISE_FLAG,
 } from '@amk/spc/instruments';
 import type { Command } from '@amk/tokens';
-import { DEFAULT_TRANSPOSE } from '@amk/core/hardcoded-tables';
 import { DriverStore } from '../../../state/driver-store';
 import { EditorStore } from '../../../state/editor-store';
-import { duration, hex2 } from '../../../util/format';
+import { hex2 } from '../../../util/format';
 import { AdsrGraph } from '../adsr-graph/adsr-graph';
 import { InstrumentEntryEditor } from '../instrument-entry/instrument-entry';
 import { HexPipe } from '../../../util/hex.pipe';
-
-/** One "what this argument means" line. */
-interface DetailRow {
-  label: string;
-  value: string;
-  /** A sentence under the value, in prose rather than mono. Optional. */
-  note?: string;
-}
+import { type DetailRow, detailRows, sampleByte } from './instrument-rows';
 
 /** Which of the things `@n` — or a raw `$DA` — can mean. */
 type Band = 'melodic' | 'unsupported' | 'percussion' | 'custom' | 'undefined' | 'beyond';
@@ -217,11 +196,6 @@ export class InstrumentInspector {
   /** The sample byte, which is a SRCN unless its high bit says noise. */
   private readonly srcn = computed(() => (this.sampleKnown() ? (this.bytes()?.[0] ?? -1) : -1));
 
-  protected readonly isNoise = computed(() => {
-    const srcn = this.srcn();
-    return srcn >= 0 && (srcn & NOISE_FLAG) !== 0;
-  });
-
   protected readonly adsr1 = computed(() => this.bytes()?.[1] ?? 0);
   protected readonly adsr2 = computed(() => this.bytes()?.[2] ?? 0);
   protected readonly gain = computed(() => this.bytes()?.[3] ?? 0);
@@ -235,94 +209,12 @@ export class InstrumentInspector {
       return [];
     }
 
-    const rows: DetailRow[] = [];
-    if (this.isNoise()) {
-      const clock = this.srcn() & 0x1f;
-      rows.push({
-        label: 'Sample',
-        value: `noise, clock $${hex2(clock)}`,
-        note: `${Math.round(noiseHz(clock)).toLocaleString()} Hz`,
-      });
-    } else if (this.sampleKnown()) {
-      rows.push({ label: 'Sample', value: `$${hex2(this.srcn())}`, note: this.sampleName() });
-    } else {
-      // The name is already on the "Defined as" row; what is missing is the
-      // number, and it is missing because the compiler assigns it.
-      rows.push({
-        label: 'Sample',
-        value: 'decided by #samples',
-        note: 'its SRCN is fixed once the song compiles',
-      });
-    }
-
-    const envelope = decodeAdsr(bytes[1], bytes[2]);
-    if (envelope.adsrEnabled) {
-      const release = releaseSeconds(envelope.release, envelope.sustain);
-      rows.push({ label: 'Envelope', value: 'ADSR', note: `GAIN $${hex2(bytes[3])} is not used` });
-      rows.push({ label: 'Attack', value: duration(attackSeconds(envelope.attack)) });
-      rows.push({
-        label: 'Decay',
-        value: duration(decaySeconds(envelope.decay, envelope.sustain)),
-        note: `to ${Math.round(sustainLevel(envelope.sustain) * 100)}% of full`,
-      });
-      rows.push({
-        label: 'Release',
-        value: Number.isFinite(release) ? duration(release) : 'held indefinitely',
-        // AddmusicK calls this release; on the DSP it is the sustain-phase fall.
-        note: envelope.release === 0 ? 'a rate of 0 never decays' : undefined,
-      });
-    } else {
-      const gain = decodeGain(bytes[3]);
-      rows.push({
-        label: 'Envelope',
-        value: `GAIN $${hex2(bytes[3])}`,
-        note: 'ADSR is off, so bytes 1 and 2 are unused',
-      });
-      rows.push(
-        gain.mode === 'direct'
-          ? {
-              label: 'Level',
-              value: `${Math.round((gain.level ?? 0) * 100)}% of full`,
-              note: 'fixed',
-            }
-          : {
-              label: 'Mode',
-              value: gainModeName(gain.mode),
-              note:
-                gain.rate === 0
-                  ? 'a rate of 0 never advances, so the level holds'
-                  : `rate $${hex2(gain.rate ?? 0)}`,
-            },
-      );
-    }
-
-    const multiplier = tuningMultiplier(bytes[4], bytes[5]);
-    rows.push({
-      label: 'Tuning',
-      value: `×${multiplier.toFixed(3)}`,
-      note: `$${hex2(bytes[4])}.$${hex2(bytes[5])} — ${semitones(tuningSemitones(multiplier))}`,
+    return detailRows({
+      bytes,
+      srcn: this.srcn(),
+      sampleName: this.sampleName(),
+      emitted: this.emitted(),
     });
-
-    if (bytes.length > 6) {
-      rows.push({
-        label: 'Drum note',
-        value: `$${hex2(bytes[6])}`,
-        note: noteName(bytes[6]),
-      });
-    }
-
-    const n = this.emitted();
-    if (n !== null && n < DEFAULT_TRANSPOSE.length && DEFAULT_TRANSPOSE[n] !== 0) {
-      const t = DEFAULT_TRANSPOSE[n];
-      rows.push({
-        label: 'Transposes',
-        // `parser.ts`'s `parseNote` subtracts, so a positive entry moves notes *down*.
-        value: `${t > 0 ? '−' : '+'}${Math.abs(t)} semitones`,
-        note: 'applied to every note written under it',
-      });
-    }
-
-    return rows;
   });
 
   /**
@@ -379,39 +271,4 @@ export class InstrumentInspector {
   protected readonly validRanges = '@0–@18, @21–@29 and @30 upward';
 
   protected readonly drumIndex = computed(() => this.written() - FIRST_PERCUSSION_INSTRUMENT);
-}
-
-function sampleByte(sample: { form: string; srcn?: number; byte?: number }): number {
-  if (sample.form === 'copy') {
-    return sample.srcn ?? 0;
-  }
-
-  if (sample.form === 'noise') {
-    return sample.byte ?? 0;
-  }
-
-  // A named file's SRCN is decided by the resolved `#samples` list, which the
-  // scanner cannot know; the panel shows the name instead.
-  return -1;
-}
-
-function semitones(value: number): string {
-  if (!Number.isFinite(value)) {
-    return 'silent';
-  }
-
-  const rounded = value.toFixed(1);
-  return `${value > 0 ? '+' : ''}${rounded} semitones`;
-}
-
-const NOTE_NAMES = ['c', 'c+', 'd', 'd+', 'e', 'f', 'f+', 'g', 'g+', 'a', 'a+', 'b'];
-
-/**
- * A note byte as it would be written in MML.
- *
- * `pitch + (octave - 1) * 12 + 0x80` (`parser.ts:getPitch`), read backwards.
- */
-function noteName(byte: number): string {
-  const pitch = byte & 0x7f;
-  return `o${Math.floor(pitch / 12) + 1} ${NOTE_NAMES[pitch % 12]}`;
 }

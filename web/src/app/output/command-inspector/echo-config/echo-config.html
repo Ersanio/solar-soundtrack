@@ -1,0 +1,64 @@
+<amk-slider
+  label="Delay"
+  [value]="delay()"
+  [max]="15"
+  [note]="lockedBecause(0) ?? delayNote()"
+  [disabled]="!editable(0)"
+  (preview)="preview(0, $event)"
+  (commit)="setArg(0, $event)"
+/>
+<amk-slider
+  label="Feedback"
+  origin="centre"
+  [signed]="true"
+  [value]="signedOf(1)"
+  [min]="-128"
+  [max]="127"
+  [note]="lockedBecause(1) ?? signedNote(1)"
+  [disabled]="!editable(1)"
+  (preview)="preview(1, $event)"
+  (commit)="setArg(1, $event)"
+/>
+
+<!-- Above the filter buttons, since selecting the other one is half the fix. -->
+@if (runawayNote(); as problem) {
+  <p class="text-danger text-xs leading-relaxed">{{ problem }}</p>
+}
+
+<!-- Two presets, because the driver ships exactly two filter tables. -->
+<div class="flex flex-col gap-1">
+  <span class="text-ink-muted text-[11px]">Filter</span>
+  <div class="flex flex-wrap gap-1.5">
+    @for (choice of FILTERS; track choice.value) {
+      <button
+        amk-button
+        [variant]="filter() === choice.value ? 'primary' : 'default'"
+        [title]="choice.note"
+        [disabled]="!editable(2)"
+        (click)="setArg(2, choice.value)"
+      >
+        {{ choice.name }}
+      </button>
+    }
+  </div>
+  @if (lockedBecause(2); as reason) {
+    <span class="text-ink-muted text-[11px] leading-snug italic">{{ reason }}</span>
+  }
+  @if (filterNote(); as note) {
+    <span class="text-warn text-[11px] leading-snug">{{ note }}</span>
+  }
+</div>
+
+@if (taps(); as filterTaps) {
+  <div>
+    <div class="text-ink-muted mb-1 text-[11px] tracking-wide uppercase">Filter this selects</div>
+    <amk-fir-graph [taps]="filterTaps" [feedback]="feedback()" />
+  </div>
+
+  @if (overrides(); as earlier) {
+    <p class="text-warn text-xs leading-relaxed">
+      This replaces the coefficients set by the <code class="text-ink">$F5</code> on line
+      {{ earlier.line }}. AddmusicK does this silently.
+    </p>
+  }
+}

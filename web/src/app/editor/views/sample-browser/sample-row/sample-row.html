@@ -1,0 +1,92 @@
+@let file = row().file;
+<div class="flex items-center gap-3">
+  @if (file.kind === 'bank') {
+    <button
+      type="button"
+      class="text-ink-muted hover:text-ink w-6 shrink-0 cursor-pointer text-right font-mono text-xs"
+      (click)="toggled.emit(file.name)"
+    >
+      {{ row().expanded ? '▾' : '▸' }}
+    </button>
+  } @else {
+    <span class="text-ink-muted w-6 shrink-0 text-right font-mono text-xs tabular-nums">{{
+      index()
+    }}</span>
+  }
+
+  @if (file.kind === 'sample') {
+    <amk-audition-button [name]="file.name" [disabled]="file.error !== null" />
+  }
+
+  <div class="min-w-0 flex-1">
+    <div class="flex items-baseline gap-2">
+      <span class="text-ink truncate font-mono text-xs">{{ file.name }}</span>
+      @if (file.kind === 'bank') {
+        <span
+          class="bg-good/20 text-good shrink-0 rounded px-1 py-px text-[10px] font-semibold tracking-wide uppercase"
+          >bank</span
+        >
+      }
+      @if (file.source !== 'stock') {
+        <span
+          class="bg-accent/20 text-accent shrink-0 rounded px-1 py-px text-[10px] font-semibold tracking-wide uppercase"
+          >{{ file.source === 'override' ? 'replaced' : 'added' }}</span
+        >
+      }
+      @if (file.kind === 'sample' && row().used) {
+        <span
+          class="bg-good/20 text-good shrink-0 rounded px-1 py-px text-[10px] font-semibold tracking-wide uppercase"
+          title="This song plays this sample, so it is always loaded."
+          >used</span
+        >
+      }
+      <span class="text-ink-muted ml-auto shrink-0 font-mono text-xs tabular-nums">{{
+        row().size
+      }}</span>
+    </div>
+
+    @if (file.error) {
+      <p class="text-danger mt-0.5 text-xs leading-relaxed">{{ file.error }}</p>
+    } @else if (file.kind === 'bank') {
+      <p class="text-ink-muted mt-0.5 font-mono text-xs">{{ row().bank }}</p>
+    } @else if (!row().requested) {
+      <p class="text-ink-muted mt-0.5 font-mono text-xs">{{ row().detail }} · not in this song</p>
+    } @else {
+      <amk-sample-wave class="mt-1 h-8" [d]="row().waveform" />
+      <p class="text-ink-muted mt-0.5 font-mono text-xs">{{ row().detail }}</p>
+    }
+  </div>
+
+  @if (file.kind === 'sample' && file.error === null) {
+    @if (row().requested) {
+      <!-- Offered even when the sample is used, so the control does not appear
+           and vanish as the MML is edited. -->
+      <amk-checkbox
+        class="shrink-0 text-xs"
+        [checked]="file.important"
+        (checkedChange)="onImportant(file.name, $event)"
+        >keep</amk-checkbox
+      >
+    } @else {
+      <span
+        class="text-ink-muted shrink-0 text-xs"
+        title="This song does not reference this sample, so it uses no ARAM whether or not it is kept. Name it in #samples to load it."
+        >not in song</span
+      >
+    }
+  }
+
+  @if (file.source === 'override') {
+    <button amk-button variant="ghost" (click)="revert(file.name)">Revert</button>
+  } @else if (file.source === 'user') {
+    <button amk-button variant="ghost" (click)="remove(file.name)">Delete</button>
+  }
+</div>
+
+@if (row().open) {
+  <ul class="border-edge divide-edge mt-2 ml-6 divide-y border-l pl-3">
+    @for (slotRow of row().slots; track slotRow.slot.name) {
+      <li amk-slot-row [row]="slotRow"></li>
+    }
+  </ul>
+}
