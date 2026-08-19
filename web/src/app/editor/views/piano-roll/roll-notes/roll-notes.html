@@ -1,0 +1,87 @@
+@for (mark of marks(); track mark.id) {
+  <!-- A click asks the inspector about this note; a double click goes to it in
+       the source. A muted note takes no pointer at all, so the live note over it
+       is the one that answers. -->
+  <svg:g
+    class="mark cursor-pointer"
+    [class.pointer-events-none]="mark.muted"
+    (pointerenter)="entered.emit(mark)"
+    (click)="select(mark)"
+    (dblclick)="reveal(mark)"
+    (keydown.enter)="reveal(mark)"
+  >
+    <!-- The slot, then the part that actually sounds. The inner bar is `q`'s
+         gate made geometric rather than written down. -->
+    <svg:rect
+      rx="2"
+      [attr.x]="mark.x"
+      [attr.y]="mark.y"
+      [attr.width]="mark.w"
+      [attr.height]="mark.h"
+      [class]="mark.fill"
+      [attr.fill-opacity]="mark.opacity * 0.35"
+    />
+    <svg:rect
+      rx="2"
+      [attr.x]="mark.x"
+      [attr.y]="mark.y"
+      [attr.width]="mark.gateW"
+      [attr.height]="mark.h"
+      [class]="mark.fill"
+      [attr.fill-opacity]="mark.opacity"
+    />
+    @if (mark.label; as label) {
+      <svg:text
+        pointer-events="none"
+        dominant-baseline="central"
+        class="fill-ink font-mono"
+        [attr.x]="label.x"
+        [attr.y]="label.y"
+        [attr.font-size]="label.size"
+        [attr.fill-opacity]="mark.opacity"
+      >
+        {{ label.text }}
+      </svg:text>
+    }
+    <!-- The plate is the hit target as well as the highlight. An SVG element
+         only takes a pointer where it is painted, so without it a glyph is
+         clickable on its strokes and not in the gaps between them — a 1.3px
+         target that reads as a dead icon.
+
+         It lifts the bar rather than recolouring the glyph, because it is drawn
+         over eight channel colours and only the plate works on all of them:
+         `--color-accent` is a blue of much the same lightness as `--color-ch-0`,
+         so on that channel a recoloured glyph would be the one that vanished on
+         hover. Every `--color-ch-*` is mid-tone against the surface, so a
+         near-white wash lifts each of them. -->
+    @for (glyph of mark.glyphs; track glyph.id) {
+      <svg:g
+        class="group"
+        (click)="inspect(glyph, $event)"
+        (dblclick)="inspect(glyph, $event, true)"
+      >
+        <svg:rect
+          rx="2"
+          class="fill-ink/0 group-hover:fill-ink/25"
+          [attr.x]="glyph.x"
+          [attr.y]="glyph.y"
+          [attr.width]="glyph.size"
+          [attr.height]="glyph.size"
+        />
+        <!-- No `svg:` prefix on this one, and it must not have one: `svg` is one
+             of the three element names that carry a namespace implicitly, and the
+             glyph's selector is `svg[amk-glyph]`. -->
+        <svg
+          amk-glyph
+          class="text-ink pointer-events-none"
+          [name]="glyph.icon"
+          [attr.x]="glyph.x"
+          [attr.y]="glyph.y"
+          [attr.width]="glyph.size"
+          [attr.height]="glyph.size"
+          [attr.opacity]="mark.opacity"
+        ></svg>
+      </svg:g>
+    }
+  </svg:g>
+}

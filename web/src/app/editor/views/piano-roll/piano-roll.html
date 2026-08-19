@@ -1,126 +1,28 @@
-<amk-toolbar>
-  <div class="flex items-center gap-1">
-    <span class="text-ink-muted text-xs">Zoom</span>
-    <button
-      class="border-edge bg-inset text-ink hover:border-accent cursor-pointer rounded-md border px-2 leading-6"
-      (click)="setZoom(-1)"
-    >
-      −
-    </button>
-    <button
-      class="border-edge bg-inset text-ink hover:border-accent cursor-pointer rounded-md border px-2 leading-6"
-      (click)="setZoom(1)"
-    >
-      +
-    </button>
-  </div>
-
-  <div class="flex items-center gap-1">
-    <span class="text-ink-muted text-xs">Rows</span>
-    <button
-      class="border-edge bg-inset text-ink hover:border-accent cursor-pointer rounded-md border px-2 leading-6"
-      (click)="setRowHeight(-1)"
-    >
-      −
-    </button>
-    <button
-      class="border-edge bg-inset text-ink hover:border-accent cursor-pointer rounded-md border px-2 leading-6"
-      (click)="setRowHeight(1)"
-    >
-      +
-    </button>
-  </div>
-
-  <amk-checkbox
-    class="text-xs"
-    title="Keep the roll on the playing song, including after a scroll seeks it"
-    [checked]="follow()"
-    (checkedChange)="setFollow($event)"
-  >
-    Follow playback
-  </amk-checkbox>
-  <amk-checkbox
-    class="text-xs"
-    title="Slide the music under a fixed playhead, rather than turning a page when the playhead reaches the edge"
-    [checked]="scrollNotes()"
-    (checkedChange)="setScrollNotes($event)"
-  >
-    Scroll the notes
-  </amk-checkbox>
-  <amk-checkbox class="text-xs" [checked]="allOctaves()" (checkedChange)="setAllOctaves($event)">
-    All octaves
-  </amk-checkbox>
-  <!-- Beats per bar over the note value that gets the beat, which is an MML note
-       length: 6/8 is six `l8`s. MML has no signature of its own, so this is the
-       porter's. -->
-  <div
-    class="flex items-center gap-1"
-    title="The grid's time signature: beats in a bar, over the note that gets the beat. Zero beats draws no grid."
-  >
-    <span class="text-ink-muted text-xs">Grid</span>
-    <input
-      type="number"
-      class="bg-inset border-edge text-ink w-12 rounded-md border px-1.5 font-mono text-xs leading-6 tabular-nums"
-      min="0"
-      step="1"
-      [max]="maxBeats"
-      [value]="beatsPerBar()"
-      (change)="setBeatsPerBar($event)"
-    />
-    <span class="text-ink-muted text-xs">/</span>
-    <select
-      class="bg-inset border-edge text-ink cursor-pointer rounded-md border px-1.5 font-mono text-xs leading-6 tabular-nums"
-      [value]="beatUnit()"
-      (change)="setBeatUnit($event)"
-    >
-      @for (unit of beatUnits; track unit) {
-        <option [value]="unit" [selected]="unit === beatUnit()">{{ unit }}</option>
-      }
-    </select>
-  </div>
-
-  <!-- The switch on the toolbar and the panel below it, as the source view does
-       for the command palette: a closed strip would otherwise be one row of
-       chrome that still had to be drawn. -->
-  <button
-    type="button"
-    class="text-ink-muted hover:text-ink cursor-pointer text-xs font-semibold tracking-wide uppercase"
-    [title]="
-      percussionOpen() ? 'Hide the percussion set' : 'Choose which instruments are percussion'
-    "
-    (click)="setPercussionOpen(!percussionOpen())"
-  >
-    {{ percussionOpen() ? '▾' : '▸' }} Percussion
-  </button>
-
-  <span class="text-ink-muted ml-auto font-mono text-xs">{{ readout() }}</span>
-</amk-toolbar>
+<amk-roll-toolbar
+  [follow]="follow()"
+  [scrollNotes]="scrollNotes()"
+  [allOctaves]="allOctaves()"
+  [beatsPerBar]="beatsPerBar()"
+  [beatUnit]="beatUnit()"
+  [percussionOpen]="percussionOpen()"
+  [tick]="readoutTick()"
+  (zoomBy)="setZoom($event)"
+  (rowHeightBy)="setRowHeight($event)"
+  (followChange)="setFollow($event)"
+  (scrollNotesChange)="setScrollNotes($event)"
+  (allOctavesChange)="setAllOctaves($event)"
+  (beatsPerBarChange)="setBeatsPerBar($event)"
+  (beatUnitChange)="setBeatUnit($event)"
+  (percussionOpenChange)="setPercussionOpen($event)"
+/>
 
 @if (percussionOpen()) {
-  <div class="border-edge bg-raised flex shrink-0 flex-wrap items-center gap-2 border-b px-3 py-2">
-    <span class="text-ink-muted text-xs">On percussion lanes</span>
-    @for (chip of percussionChips(); track chip.instrument) {
-      <button
-        type="button"
-        [class]="chipClass(chip.on)"
-        [title]="chip.title"
-        (click)="togglePercussion(chip.instrument)"
-      >
-        {{ chip.label }}
-      </button>
-    } @empty {
-      <span class="text-ink-muted text-xs">This song plays no instruments.</span>
-    }
-    <button
-      amk-button
-      variant="ghost"
-      class="ml-auto"
-      [disabled]="!hasPercussionOverrides()"
-      (click)="resetPercussion()"
-    >
-      Reset
-    </button>
-  </div>
+  <amk-percussion-panel
+    [chips]="chips()"
+    [hasOverrides]="hasPercussionOverrides()"
+    (toggled)="togglePercussion($event)"
+    (resetAll)="resetPercussion()"
+  />
 }
 
 @if (problems().length > 0) {
@@ -135,64 +37,17 @@
      the roll's own scroller on purpose — a scrubber that scrolled out of view
      would be gone exactly when a tall song most needs it. -->
 @if (scrubBox(); as box) {
-  <div class="border-edge bg-raised shrink-0 border-b">
-    <svg
-      class="block w-full cursor-pointer select-none"
-      [attr.height]="scrubHeight"
-      [attr.viewBox]="box"
-      (pointerdown)="onScrubDown($event)"
-      (pointermove)="onScrubMove($event)"
-      (pointerup)="onScrubUp($event)"
-      (pointercancel)="onScrubUp($event)"
-    >
-      <defs>
-        <clipPath id="amk-scrub-clip">
-          <rect y="0" [attr.x]="keyWidth" [attr.width]="rollWidth()" [attr.height]="scrubHeight" />
-        </clipPath>
-      </defs>
-
-      <rect
-        y="0"
-        class="fill-inset"
-        [attr.x]="keyWidth"
-        [attr.width]="rollWidth()"
-        [attr.height]="scrubHeight"
-      />
-
-      <g clip-path="url(#amk-scrub-clip)">
-        @if (scrubWindow(); as window) {
-          <rect
-            y="0"
-            class="fill-accent stroke-accent"
-            fill-opacity="0.14"
-            stroke-opacity="0.5"
-            [attr.x]="window.x"
-            [attr.width]="window.w"
-            [attr.height]="scrubHeight"
-          />
-        }
-
-        @for (bar of minimap(); track bar.id) {
-          <rect
-            class="fill-ink-muted"
-            [attr.x]="bar.x"
-            [attr.y]="bar.y"
-            [attr.width]="bar.w"
-            [attr.height]="bar.h"
-          />
-        }
-
-        <line
-          y1="0"
-          class="stroke-accent"
-          stroke-width="1.5"
-          [attr.x1]="scrubX()"
-          [attr.x2]="scrubX()"
-          [attr.y2]="scrubHeight"
-        />
-      </g>
-    </svg>
-  </div>
+  <amk-roll-scrub
+    [box]="box"
+    [rollWidth]="rollWidth()"
+    [ticks]="songTicks()"
+    [bars]="minimap()"
+    [playheadX]="scrubX()"
+    [viewWindow]="scrubWindow()"
+    (scrubStart)="onScrubStart()"
+    (scrubTo)="onScrubTo($event)"
+    (scrubEnd)="onScrubEnd()"
+  />
 }
 
 <div
@@ -216,149 +71,27 @@
         </clipPath>
       </defs>
 
-      <!-- Row backgrounds. Black keys sit darker, so the octaves read at a glance. -->
-      @for (lane of lanes(); track lane.row) {
-        <rect
-          x="0"
-          [attr.y]="lane.row * rowHeight()"
-          [attr.width]="width()"
-          [attr.height]="rowHeight()"
-          [class]="heldRows().has(lane.row) ? 'fill-accent' : laneClass(lane)"
-          [attr.fill-opacity]="heldRows().has(lane.row) ? 0.14 : 1"
-        />
-        @if (lane.octaveStart || lane.kind !== 'key') {
-          <line
-            x1="0"
-            class="stroke-edge"
-            stroke-width="1"
-            [attr.x2]="width()"
-            [attr.y1]="(lane.row + 1) * rowHeight()"
-            [attr.y2]="(lane.row + 1) * rowHeight()"
-          />
-        }
-      }
+      <g
+        amk-roll-lanes
+        [lanes]="lanes()"
+        [rowHeight]="rowHeight()"
+        [width]="width()"
+        [held]="heldRows()"
+      />
 
       <g clip-path="url(#amk-roll-clip)">
+        <!-- The frame clock reaches exactly this far. Both children below take
+             the mark window's cadence instead, so neither is re-checked per
+             frame just because the music has moved a pixel. -->
         <g [attr.transform]="scroll()">
-          @for (line of lines(); track line.tick) {
-            <line
-              y1="0"
-              class="stroke-edge"
-              stroke-width="1"
-              [attr.x1]="line.x"
-              [attr.x2]="line.x"
-              [attr.y2]="stackHeight()"
-              [attr.stroke-opacity]="line.strong ? 0.9 : 0.35"
-            />
-          }
-
-          @if (loopX(); as x) {
-            <line
-              y1="0"
-              class="stroke-good"
-              stroke-width="1.5"
-              stroke-dasharray="4 3"
-              [attr.x1]="x"
-              [attr.x2]="x"
-              [attr.y2]="stackHeight()"
-            />
-          }
-          @if (endX(); as x) {
-            <line
-              y1="0"
-              class="stroke-ink-muted"
-              stroke-width="1.5"
-              [attr.x1]="x"
-              [attr.x2]="x"
-              [attr.y2]="stackHeight()"
-            />
-          }
-
-          @for (mark of marks(); track mark.id) {
-            <!-- A click asks the inspector about this note; a double click goes
-                 to it in the source. A muted note takes no pointer at all, so
-                 the live note over it is the one that answers. -->
-            <g
-              class="mark cursor-pointer"
-              [class.pointer-events-none]="mark.muted"
-              (pointerenter)="enter(mark)"
-              (click)="select(mark)"
-              (dblclick)="reveal(mark)"
-              (keydown.enter)="reveal(mark)"
-            >
-              <!-- The slot, then the part that actually sounds. The inner bar is
-                   `q`'s gate made geometric rather than written down. -->
-              <rect
-                rx="2"
-                [attr.x]="mark.x"
-                [attr.y]="mark.y"
-                [attr.width]="mark.w"
-                [attr.height]="mark.h"
-                [class]="mark.fill"
-                [attr.fill-opacity]="mark.opacity * 0.35"
-              />
-              <rect
-                rx="2"
-                [attr.x]="mark.x"
-                [attr.y]="mark.y"
-                [attr.width]="mark.gateW"
-                [attr.height]="mark.h"
-                [class]="mark.fill"
-                [attr.fill-opacity]="mark.opacity"
-              />
-              @if (mark.label; as label) {
-                <text
-                  pointer-events="none"
-                  dominant-baseline="central"
-                  class="fill-ink font-mono"
-                  [attr.x]="label.x"
-                  [attr.y]="label.y"
-                  [attr.font-size]="label.size"
-                  [attr.fill-opacity]="mark.opacity"
-                >
-                  {{ label.text }}
-                </text>
-              }
-              <!-- The plate is the hit target as well as the highlight. An SVG
-                   element only takes a pointer where it is painted, so without it
-                   a glyph is clickable on its strokes and not in the gaps between
-                   them — a 1.3px target that reads as a dead icon.
-
-                   It lifts the bar rather than recolouring the glyph, because it
-                   is drawn over eight channel colours and only the plate works on
-                   all of them: `--color-accent` is a blue of much the same
-                   lightness as `--color-ch-0`, so on that channel a recoloured
-                   glyph would be the one that vanished on hover. Every
-                   `--color-ch-*` is mid-tone against the surface, so a near-white
-                   wash lifts each of them. -->
-              @for (glyph of mark.glyphs; track glyph.id) {
-                <g
-                  class="group"
-                  (click)="inspect(glyph, $event)"
-                  (dblclick)="inspect(glyph, $event, true)"
-                >
-                  <rect
-                    rx="2"
-                    class="fill-ink/0 group-hover:fill-ink/25"
-                    [attr.x]="glyph.x"
-                    [attr.y]="glyph.y"
-                    [attr.width]="glyph.size"
-                    [attr.height]="glyph.size"
-                  />
-                  <svg
-                    amk-glyph
-                    class="text-ink pointer-events-none"
-                    [name]="glyph.icon"
-                    [attr.x]="glyph.x"
-                    [attr.y]="glyph.y"
-                    [attr.width]="glyph.size"
-                    [attr.height]="glyph.size"
-                    [attr.opacity]="mark.opacity"
-                  ></svg>
-                </g>
-              }
-            </g>
-          }
+          <g
+            amk-roll-grid
+            [lines]="lines()"
+            [height]="stackHeight()"
+            [loopX]="loopX()"
+            [endX]="endX()"
+          />
+          <g amk-roll-notes [marks]="marks()" (entered)="enter($event)" />
         </g>
 
         <line
@@ -371,64 +104,19 @@
         />
       </g>
 
-      <!-- The key column, drawn last so notes never spill over it. -->
-      <rect
-        x="0"
-        y="0"
-        class="fill-surface"
-        [attr.width]="keyWidth"
-        [attr.height]="stackHeight()"
-      />
-      @for (lane of lanes(); track lane.row) {
-        @let held = heldRows().has(lane.row);
-        <rect
-          x="0"
-          rx="1"
-          [attr.y]="lane.row * rowHeight() + 0.5"
-          [attr.width]="keyWidth - 5"
-          [attr.height]="rowHeight() - 1"
-          [class]="keyClass(lane, held)"
-        />
-        @if (showLabels()) {
-          <text
-            x="4"
-            dominant-baseline="central"
-            [class]="`${keyTextClass(lane, held)} font-mono`"
-            [attr.y]="lane.row * rowHeight() + rowHeight() / 2"
-            [attr.font-size]="labelSize()"
-          >
-            {{ lane.label }}
-          </text>
-        }
-      }
-      <line
-        y1="0"
-        class="stroke-edge"
-        stroke-width="1"
-        [attr.x1]="keyWidth"
-        [attr.x2]="keyWidth"
-        [attr.y2]="stackHeight()"
+      <g
+        amk-roll-keys
+        [lanes]="lanes()"
+        [rowHeight]="rowHeight()"
+        [height]="stackHeight()"
+        [held]="heldRows()"
+        [showLabels]="showLabels()"
+        [labelSize]="labelSize()"
       />
     </svg>
   }
 </div>
 
-@if (tooltip(); as tip) {
-  <div
-    class="border-edge bg-raised text-ink pointer-events-none absolute z-10 max-w-64 rounded-md border px-2 py-1.5 text-xs leading-relaxed shadow-lg"
-    [style.left.px]="tip.left"
-    [style.right.px]="tip.right"
-    [style.top.px]="tip.top"
-    [style.bottom.px]="tip.bottom"
-  >
-    <div class="font-semibold">{{ tip.heading }}</div>
-    <div class="text-ink-muted font-mono">{{ tip.length }}</div>
-    @for (row of tip.rows; track row) {
-      <div class="text-ink-muted">{{ row }}</div>
-    }
-    @if (tip.source; as source) {
-      <div class="border-edge text-accent-soft mt-1 border-t pt-1 font-mono">{{ source }}</div>
-      <div class="text-ink-muted">double-click to show it in the source</div>
-    }
-  </div>
+@if (tooltipFor(); as mark) {
+  <amk-roll-tooltip [mark]="mark" [anchor]="pointer()" [context]="placeContext()" />
 }

@@ -931,7 +931,7 @@ console.log("\nthe roll's playhead follows the music, not the tempo it was writt
 	// steady distance ahead of the notes being sounded. There is no visual tell:
 	// it scrolls perfectly smoothly, in the wrong place.
 	const PASS = 7488;
-	const MAX_EXTRAPOLATION = 0.15; // PianoRoll.MAX_EXTRAPOLATION
+	const MAX_EXTRAPOLATION = 0.15; // roll-clock.ts's MAX_EXTRAPOLATION
 	const FPS = 60;
 
 	/** The roll's clock over `seconds`, with `rate` as its belief about speed. */
