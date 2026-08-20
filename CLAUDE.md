@@ -188,7 +188,7 @@ One entry each: what it was, what it is, why.
   read.
 - **Clearing the clock measurement on recompile** — it takes a second to come back, so `AMK0503` and
   the transport length flickered on every pause in typing. The last measurement stands until the next
-  lands (`EditorStore`, "replaced, never cleared").
+  lands (`ClockMeasurer`, "replaced, never cleared").
 - **Extrapolating the roll's playhead at the tempo byte's rate** — the driver runs slower than asked,
   so it sat most of a quarter note ahead. The clock's own slope (`ticksPerSecondAt`) is the rate;
   `charttest` pins the difference.
@@ -263,8 +263,10 @@ One entry each: what it was, what it is, why.
 Angular 22, zoneless (scaffolded `--zoneless`, so zone.js is not a dependency and there is nothing
 to opt into), no router, no NgModules. Signals throughout: `signal`/`computed` for state, `effect`
 reserved for mirroring into imperative sinks (localStorage, the player, the DSP). State lives in
-four `@Service()` singletons in `web/src/app/state/`, in dependency order `DriverStore` →
-`SampleStore` → `EditorStore` → `Playback`. `web/README.md` has the rest.
+seven `@Service()` singletons in `web/src/app/state/`. The spine runs one way, `DriverStore` →
+`SampleStore` → `EditorStore` → `Playback`; `ClockMeasurer` feeds `EditorStore`, `Audition` hangs
+off it beside `Playback`, and `EditorRequests` depends on nothing at all. `web/README.md` has the
+rest.
 
 Selector prefix is `amk` — `amk-root`, `amk-editor-pane` for components, camelCase `amk*` for
 directives. ESLint enforces both.

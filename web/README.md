@@ -13,14 +13,18 @@ them.
 
 | Path                    | What it is                                                                           |
 | ----------------------- | ------------------------------------------------------------------------------------ |
-| `src/app/state/`        | Four `@Service()` singletons in dependency order, and the transport's clock          |
+| `src/app/state/`        | Seven `@Service()` singletons in dependency order, and the transport's clock         |
 | `src/app/editor/`       | The left pane and its chrome: top bar, transport, mixer, palette, CodeMirror adapter |
 | `src/app/editor/views/` | What the pane's tabs switch between: source, sample library, piano roll              |
 | `src/app/output/`       | Diagnostics, stats, the ARAM bar, the command inspector                              |
 | `src/app/shared/`       | Form controls, panels, icons, chart helpers                                          |
 | `src/app/util/`         | Formatting, IndexedDB, `clamp`                                                       |
 
-State flows one way: `DriverStore` → `SampleStore` → `EditorStore` → `Playback`.
+State flows one way: `DriverStore` → `SampleStore` → `EditorStore` → `Playback`. Three more sit off
+that spine: `ClockMeasurer`, which `EditorStore` owns and which drives the measurement described
+below; `Audition`, which hangs off `EditorStore` beside `Playback` and owns the second
+`AudioContext`; and `EditorRequests`, which injects nothing at all, because a mailbox between the
+panels and the source view has nothing to read.
 
 `DriverStore` loads `packages/spc/assets/driver/`. The song's ARAM load address is the slot the
 driver's own song pointer table reserves, stated in the bundle's `manifest.json` and checked against
@@ -53,10 +57,10 @@ does the same; the rest are `@case`d and rebuilt.
 
 ## Preview and commit
 
-Everything that edits MML writes back through `EditorStore.replace`, which recompiles. So a control
-that committed on every `input` event would push a recompile through the typing debounce once per
-frame of a drag, and the commit's own recompile would feed a new value back down and yank the thumb
-out from under the pointer.
+Everything that edits MML writes back through `EditorRequests.replace`, which recompiles. So a
+control that committed on every `input` event would push a recompile through the typing debounce
+once per frame of a drag, and the commit's own recompile would feed a new value back down and yank
+the thumb out from under the pointer.
 
 `amk-slider` is where that contract lives:
 
@@ -72,7 +76,7 @@ dragging away from.
 ## Reaching into the editor
 
 `editor/views/source-view/` owns the CodeMirror view, so nothing else may touch it — not even the
-pane it sits in. Three signals on `EditorStore` are how a sibling panel asks:
+pane it sits in. Three signals on `EditorRequests` are how a sibling panel asks:
 
 - `reveal` — select a span, set when a diagnostic or a piano roll bar is clicked.
 - `replace` — apply a splice, set when a panel edits a command in place.
@@ -96,7 +100,7 @@ carries the edit across, and a control that fires on `pointerup` is one gesture 
 that has moved. The editor compares before it dispatches, which turns that whole class of race from
 silent corruption into an edit that simply does not take.
 
-`EditorStore.apply` ignores the `null` the splice builders return when nothing would change. A
+`EditorRequests.apply` ignores the `null` the splice builders return when nothing would change. A
 slider fires per frame of a drag, and "that is the text already there" is what keeps a drag from
 pushing dozens of identical recompiles through the debounce.
 
@@ -116,8 +120,10 @@ oversight — see the note in the root `CLAUDE.md`. The global `:focus-visible` 
 
 ## Two AudioContexts
 
-`SpcPlayer` owns one for song playback. `Playback` owns a second for one-shot sample audition. They
-are separate on purpose: auditioning a sample must not interrupt or be interrupted by the song.
+`SpcPlayer` owns one for song playback. `Audition` owns a second for one-shot sample audition. They
+are separate on purpose: auditioning a sample must not interrupt or be interrupted by the song, and
+a service of its own is what keeps the second one from waiting on `player.init()` — hearing a
+65-byte square wave would otherwise mean downloading and compiling the SPC core first.
 
 ## Persistence is optional
 
@@ -179,7 +185,7 @@ downstream reads one through the other without knowing which it has.
 
 That costs about 90 ms for a half-minute pass and several hundred for a long one, which is a stutter
 on the main thread and a dropout on the audio thread. So `clock.worker.ts` runs it, and
-`EditorStore` asks **a second after typing stops** rather than on every compile — a typing burst
+`ClockMeasurer` asks **a second after typing stops** rather than on every compile — a typing burst
 would throw every answer away, and a second of quiet is far less than it takes to reach for the
 transport. The predicted clock stands in the meantime and stands for good if the measurement fails,
 which is why it is still worth having.
