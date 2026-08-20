@@ -2,7 +2,7 @@ import { Component, computed, inject, input } from '@angular/core';
 
 import { argumentText, spliceArg } from '@amk/tokens/edits';
 import type { Command } from '@amk/tokens';
-import { BitToggles } from '../../../shared/bit-toggles/bit-toggles';
+import { BitToggles, VOICE_LABELS } from '../../../shared/bit-toggles/bit-toggles';
 import { EnumSelect } from '../../../shared/enum-select/enum-select';
 import { NumberField } from '../../../shared/number-field/number-field';
 import { Slider } from '../../../shared/slider/slider';
@@ -15,8 +15,10 @@ import { type ParamRow, resolveCommand } from '@amk/tokens/commands/describe';
 import { fromSigned } from '@amk/tokens/commands/param';
 import { dragPreview } from '../commands/preview';
 
-/** LSB first, because every mask in the language is documented that way. */
-const VOICE_LABELS = ['0', '1', '2', '3', '4', '5', '6', '7'];
+/** `$00`, so a mask's readout says what is in the source as well as which bits are on. */
+function hexLabel(row: ParamRow): string {
+  return row.byte === null ? '—' : `$${hex2(row.byte)}`;
+}
 
 /**
  * Every command's arguments, named and editable.
@@ -78,28 +80,25 @@ export class ParamTable {
     return this.resolved().rows.map((row) => {
       const shown = this.drag.at(row.index, row.value);
       if (shown === row.value) {
-        return row;
+        return { ...row, hex: hexLabel(row) };
       }
 
       // `describe` and the raw form both want the byte; an `s8` control hands
       // out the signed reading of it.
       const byte = row.descriptor.codec === 's8' ? fromSigned(shown) : shown;
-      return {
+      const next = {
         ...row,
         raw: command.vcmd !== undefined ? `$${hex2(byte)}` : String(byte),
         note: row.descriptor.describe?.(byte, command, context) ?? null,
       };
+
+      return { ...next, hex: hexLabel(next) };
     });
   });
 
   /** Bound to every control that has a live channel; the rest commit outright. */
   protected preview(row: ParamRow, value: number): void {
     this.drag.set(row.index, value);
-  }
-
-  /** `$00`, so a mask's readout says what is in the source as well as which bits are on. */
-  protected hexLabel(row: ParamRow): string {
-    return row.byte === null ? '—' : `$${hex2(row.byte)}`;
   }
 
   /**

@@ -1,15 +1,8 @@
 <div class="flex flex-wrap items-center gap-2">
   <div class="flex flex-wrap items-center gap-1">
-    <button type="button" [class]="chipClass(filter() === 'all')" (click)="filter.set('all')">
-      All
-    </button>
-    @for (category of CATEGORIES; track category.id) {
-      <button
-        type="button"
-        [class]="chipClass(filter() === category.id)"
-        (click)="filter.set(category.id)"
-      >
-        {{ category.label }}
+    @for (chip of chips(); track chip.id) {
+      <button type="button" [class]="chip.class" (click)="filter.set(chip.id)">
+        {{ chip.label }}
       </button>
     }
   </div>
@@ -31,7 +24,7 @@
   @for (entry of entries(); track entry.key) {
     <button
       type="button"
-      [class]="entryClass(entry)"
+      [class]="entry.class"
       [disabled]="entry.availability.state === 'blocked'"
       (click)="insert(entry)"
       (mouseenter)="hovered.set(entry)"

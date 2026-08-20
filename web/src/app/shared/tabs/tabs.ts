@@ -36,13 +36,18 @@ export class Tabs<Id extends string = string> {
   private static readonly BASE =
     'cursor-pointer rounded-t-md px-3 py-1 text-xs font-semibold tracking-wide whitespace-nowrap uppercase transition-colors';
 
-  protected buttonClass(selected: boolean): string {
-    return `${Tabs.BASE} ${
-      selected
-        ? 'bg-surface text-ink border-edge border-x border-t'
-        : 'text-ink-muted hover:text-ink'
-    }`;
-  }
+  /** One view model rather than a class method called per tab per pass. */
+  protected readonly rows = computed(() => {
+    const active = this.active();
+    return this.tabs().map((tab) => ({
+      ...tab,
+      class: `${Tabs.BASE} ${
+        tab.id === active
+          ? 'bg-surface text-ink border-edge border-x border-t'
+          : 'text-ink-muted hover:text-ink'
+      }`,
+    }));
+  });
 
   protected onKeydown(event: KeyboardEvent, index: number): void {
     const last = this.count() - 1;

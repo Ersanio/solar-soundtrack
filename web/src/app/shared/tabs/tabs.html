@@ -1,8 +1,8 @@
-@for (tab of tabs(); track tab.id) {
+@for (tab of rows(); track tab.id) {
   <button
     #tabButton
     type="button"
-    [class]="buttonClass(tab.id === active())"
+    [class]="tab.class"
     (click)="active.set(tab.id)"
     (keydown)="onKeydown($event, $index)"
   >
