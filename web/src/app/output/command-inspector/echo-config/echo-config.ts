@@ -1,16 +1,14 @@
 import { Component, computed, inject, input } from '@angular/core';
 
-import { type FirTaps, echoStability, toSigned } from '@amk/spc/fir';
+import { type FirTaps, echoStability } from '@amk/spc/fir';
 import type { Command } from '@amk/tokens';
-import { argEditable, spliceArg } from '@amk/tokens/edits';
 import { builtInTaps } from '@amk/tokens/echo-hazards';
 import { firOverriddenBefore } from '@amk/tokens/fir-override';
 import { Button } from '../../../shared/button/button';
 import { Slider } from '../../../shared/slider/slider';
 import { EditorStore } from '../../../state/editor-store';
 import { hex2 } from '../../../util/format';
-import { argLockedBecause } from '../commands/context';
-import { dragPreview, shownArgs } from '../commands/preview';
+import { byteArgs } from '../commands/byte-args';
 import { FirGraph } from '../fir-graph/fir-graph';
 import { stopWhenRunaway } from '../runaway-guard';
 
@@ -43,31 +41,19 @@ export class EchoConfig {
 
   protected readonly FILTERS = FILTERS;
 
+  protected readonly bytes = byteArgs(this.command);
+
+  protected readonly filter = computed(() => this.bytes.at(2));
+
   /**
-   * What the document says. The sliders bind to these; only the graph and the
-   * readouts use {@link shown}. Binding the preview back into a slider makes it
-   * conclude the gesture changed nothing, and nothing is ever written.
+   * The delay is an ARAM allocation as much as a setting, and the number that
+   * decides whether the song still fits is the bar in the output pane, not the
+   * sentence under this slider. So the dragged value goes to the store too —
+   * which clears it itself once a compile has seen the real one.
    */
-  private readonly args = computed(() => this.command().args.map((a) => a.value));
-
-  private readonly drag = dragPreview(this.command);
-
-  /** The arguments as the controls are showing them. */
-  private readonly shown = computed(() => shownArgs(this.command(), this.drag));
-
-  protected readonly delay = computed(() => this.args()[0] ?? 0);
-  protected readonly filter = computed(() => this.args()[2] ?? 0);
-
-  protected preview(index: number, value: number): void {
-    this.drag.set(index, value < 0 ? value + 0x100 : value);
-
-    // The delay is an ARAM allocation as much as a setting, and the number that
-    // decides whether the song still fits is the bar in the output pane, not the
-    // sentence under this slider. So the dragged value goes to the store too —
-    // which clears it itself once a compile has seen the real one.
-    if (index === 0) {
-      this.store.echoDelayPreview.set(value & 0x0f);
-    }
+  protected previewDelay(value: number): void {
+    this.bytes.preview(0, value);
+    this.store.echoDelayPreview.set(value & 0x0f);
   }
 
   /**
@@ -76,7 +62,7 @@ export class EchoConfig {
    * toolchain does.
    */
   protected readonly delayNote = computed(() => {
-    const written = this.shown()[0] ?? 0;
+    const written = this.bytes.shownAt(0);
     const masked = written & 0x0f;
     if (written > 0x0f) {
       return `$${hex2(written)} is out of range; the driver masks it to $${hex2(masked)}`;
@@ -89,22 +75,11 @@ export class EchoConfig {
     this.filter() > 1 ? 'Only $00 and $01 exist; anything else reads past the table.' : null,
   );
 
-  /** A slider's position, from the document. */
-  protected signedOf(index: number): number {
-    return toSigned(this.args()[index] ?? 0);
-  }
-
-  /** Its readout, from whatever is being dragged. */
-  protected signedNote(index: number): string {
-    const byte = this.shown()[index] ?? 0;
-    return `$${hex2(byte)}${byte >= 0x80 ? ' — negative, so phase-inverted' : ''}`;
-  }
-
   /**
    * Feeds the FIR graph's repeat curves, so dragging the feedback shows the echo
    * building up or dying away as you move rather than after you let go.
    */
-  protected readonly feedback = computed(() => this.shown()[1] ?? 0);
+  protected readonly feedback = computed(() => this.bytes.shownAt(1));
 
   /**
    * The filter this command implies, so it shows the same picture the FIR
@@ -158,20 +133,4 @@ export class EchoConfig {
     const earlier = firOverriddenBefore(this.command(), this.store.tokens().commands);
     return earlier ? { line: earlier.span.line } : null;
   });
-
-  protected editable(index: number): boolean {
-    return argEditable(this.command(), index);
-  }
-
-  protected lockedBecause(index: number): string | null {
-    return argLockedBecause(this.command(), index);
-  }
-
-  /** Writes one argument back as `$XX`, leaving the rest of the run alone. */
-  protected setArg(index: number, value: number): void {
-    const byte = value < 0 ? value + 0x100 : value;
-    this.store.apply(
-      spliceArg(this.store.source(), this.command(), index, `$${hex2(byte & 0xff)}`),
-    );
-  }
 }

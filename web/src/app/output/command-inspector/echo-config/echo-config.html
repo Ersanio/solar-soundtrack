@@ -1,23 +1,23 @@
 <amk-slider
   label="Delay"
-  [value]="delay()"
+  [value]="bytes.at(0)"
   [max]="15"
-  [note]="lockedBecause(0) ?? delayNote()"
-  [disabled]="!editable(0)"
-  (preview)="preview(0, $event)"
-  (commit)="setArg(0, $event)"
+  [note]="bytes.lockedBecause(0) ?? delayNote()"
+  [disabled]="!bytes.editable(0)"
+  (preview)="previewDelay($event)"
+  (commit)="bytes.commit(0, $event)"
 />
 <amk-slider
   label="Feedback"
   origin="centre"
   [signed]="true"
-  [value]="signedOf(1)"
+  [value]="bytes.signedAt(1)"
   [min]="-128"
   [max]="127"
-  [note]="lockedBecause(1) ?? signedNote(1)"
-  [disabled]="!editable(1)"
-  (preview)="preview(1, $event)"
-  (commit)="setArg(1, $event)"
+  [note]="bytes.lockedBecause(1) ?? bytes.signedNote(1)"
+  [disabled]="!bytes.editable(1)"
+  (preview)="bytes.preview(1, $event)"
+  (commit)="bytes.commit(1, $event)"
 />
 
 <!-- Above the filter buttons, since selecting the other one is half the fix. -->
@@ -34,14 +34,14 @@
         amk-button
         [variant]="filter() === choice.value ? 'primary' : 'default'"
         [title]="choice.note"
-        [disabled]="!editable(2)"
-        (click)="setArg(2, choice.value)"
+        [disabled]="!bytes.editable(2)"
+        (click)="bytes.commit(2, choice.value)"
       >
         {{ choice.name }}
       </button>
     }
   </div>
-  @if (lockedBecause(2); as reason) {
+  @if (bytes.lockedBecause(2); as reason) {
     <span class="text-ink-muted text-[11px] leading-snug italic">{{ reason }}</span>
   }
   @if (filterNote(); as note) {
