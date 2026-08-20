@@ -14,6 +14,12 @@ const enum Addr {
 	// {@link applyChannelMutes} for why disabling a channel is the wrong tool.
 	/** `$70-$7F`: music note duration, one byte per voice. */
 	NoteDurations = 0x70,
+	/** `$C1+2n`: the instrument the voice is playing, 0 for one never given any. */
+	Instruments = 0xc1,
+	/** `$0201+2n`: the gate `q`'s high nybble chose, as a fraction of the duration. */
+	NoteGates = 0x0201,
+	/** `$0211+2n`: the velocity `q`'s low nybble chose, which scales `VxVOL`. */
+	NoteVelocities = 0x0211,
 	/** `$0241+2n`: per-voice track volume, as `v` and `$E8` leave it. */
 	TrackVolumes = 0x0241,
 }
@@ -60,7 +66,7 @@ export function readDriverState(aram: Uint8Array): DriverState {
  */
 export function tickVoice(aram: Uint8Array): number {
 	for (let voice = 0; voice < VOICES; voice++) {
-		if (aram[Addr.TrackPointers + voice * 2 + 1] !== 0) {
+		if (voicePlaying(aram, voice)) {
 			return voice;
 		}
 	}
@@ -88,6 +94,82 @@ export function sawTick(previous: number, current: number): number {
  * Twice the driver's ~500 Hz main loop, so no tick can hide between readings.
  */
 export const TICK_POLL_HZ = 1000;
+
+/**
+ * Whether the driver is playing a voice, judged the way it judges it: the track
+ * pointer's high byte alone (`main.asm:2315, 2331`, `mov a, $31+x` / `beq`). The
+ * same test {@link tickVoice} walks, and the same one {@link haltVoice} turns off.
+ */
+export function voicePlaying(aram: Uint8Array, voice: number): boolean {
+	return aram[Addr.TrackPointers + voice * 2 + 1] !== 0;
+}
+
+/**
+ * Takes a voice out of the driver's rotation, the way a channel that has run out
+ * of music data leaves it.
+ *
+ * The high byte alone, because that is the whole of the test above. A halted
+ * voice is skipped by the fetch loop (`main.asm:2331`) and by the per-voice
+ * volume and fade routine (`L_0D1C`, `main.asm:2504`), so it neither reads music
+ * data nor has its `VxVOL` rewritten — which means anything already ringing on it
+ * goes on ringing at whatever volume it had. Silence it first.
+ */
+export function haltVoice(aram: Uint8Array, voice: number): void {
+	aram[Addr.TrackPointers + voice * 2 + 1] = 0;
+}
+
+/**
+ * Points a voice at music data and makes it fetch on the driver's next pass.
+ *
+ * Setting the duration counter to 1 is the driver's own way of forcing a fetch:
+ * it is what `L_0C31` (`main.asm:2314-2318`) does to every voice as a song
+ * starts, and `L_0C4D` decrements to zero and reads the next byte
+ * (`main.asm:2337`).
+ */
+export function startVoiceAt(aram: Uint8Array, voice: number, address: number): void {
+	aram[Addr.TrackPointers + voice * 2] = address & 0xff;
+	aram[Addr.TrackPointers + voice * 2 + 1] = (address >> 8) & 0xff;
+	aram[Addr.NoteDurations + voice * 2] = 1;
+}
+
+/**
+ * Whether a voice has ever been given an instrument.
+ *
+ * Zero means none, which is the driver's own reading — at song start it tests
+ * `$c1+x` and calls `SetInstrument` with 0 for any voice that has not got one
+ * (`main.asm:2319-2321`).
+ */
+export function voiceHasInstrument(aram: Uint8Array, voice: number): boolean {
+	return aram[Addr.Instruments + voice * 2] !== 0;
+}
+
+/**
+ * Whether a voice has been given a `q` — the gate its notes are shortened to and
+ * the velocity its volume is scaled by.
+ *
+ * Both are read out of one byte after a duration (`main.asm:2382-2397`) and both
+ * are zero on a channel the song has not written to. A zero gate keys the note
+ * off after a single tick (`main.asm:2444-2449` floors the counter at 1) and a
+ * zero velocity scales `VxVOL` to nothing, so a note played on such a voice is
+ * inaudible. The compiler never leaves one that way: it emits `q` with the first
+ * note of every channel (`parser.ts:2863`).
+ */
+export function voiceHasQuantization(aram: Uint8Array, voice: number): boolean {
+	return aram[Addr.NoteGates + voice * 2] !== 0 && aram[Addr.NoteVelocities + voice * 2] !== 0;
+}
+
+/**
+ * Gives a voice its track volume back without asking for a `VxVOL` rewrite.
+ *
+ * The opposite half of {@link applyChannelMutes}, which sets the dirty bit
+ * precisely so a note already ringing is cut. Leaving the bit alone means the
+ * DSP keeps whatever it has until the voice's next note keys on and recomputes
+ * it — `NoteVCMD` sets the flag itself (`main.asm:459`). So the volume is in
+ * place for the note about to start and inaudible for the one about to end.
+ */
+export function restoreTrackVolume(aram: Uint8Array, voice: number, volume: number): void {
+	aram[Addr.TrackVolumes + voice * 2] = volume;
+}
 
 /**
  * What {@link applyChannelMutes} has to remember between calls.

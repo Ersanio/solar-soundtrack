@@ -21,6 +21,7 @@ import { EMPTY_SAMPLE_NAME, bankSlotName } from "@amk/core/hardcoded-tables";
 import { SAMPLE_BANK_BYTES, SAMPLE_BANK_SLOTS, type BrrSample, emptySample, parseSampleBank } from "@amk/spc/brr";
 import { loadDriver } from "@amk/spc/driver";
 import { buildSpc } from "@amk/spc/export";
+import { auditionNote, noteFrames } from "@amk/spc/note-audition";
 import { SPC_CHANNELS, SPC_SAMPLE_RATE, instantiate } from "@amk/spc/wasm-host";
 import {
 	TICK_POLL_HZ,
@@ -1077,6 +1078,122 @@ console.log("\nthe note map lands on what the driver is playing");
 		`${agreed}/${looked} agreed`,
 	);
 	check("the loop body was seen playing from the loop block", inLoopBlock > 0, `${inLoopBlock} polls`);
+}
+
+console.log("\none note, auditioned where the song is playing");
+{
+	const identical = (a: Int16Array | Uint8Array, b: Int16Array | Uint8Array): boolean => {
+		if (a.length !== b.length) {
+			return false;
+		}
+
+		for (let index = 0; index < a.length; index++) {
+			if (a[index] !== b[index]) {
+				return false;
+			}
+		}
+
+		return true;
+	};
+
+	const scratchAt = driver.manifest.localPos;
+	const NOTE = 0xa4; // o4 c, and what `@0` leaves alone
+
+	// The frames the driver is handed, against what `emitNote` writes for a note
+	// of the same length (`parser.ts:2853`, Music.cpp:2254).
+	const long = noteFrames(NOTE, 192);
+	check(
+		"192 ticks is a $60 note and a tie",
+		long[0] === 0x60 && long[1] === NOTE && long[2] === 0xc6,
+		[...long.subarray(0, 3)].map((b) => b.toString(16)).join(" "),
+	);
+
+	const short = noteFrames(NOTE, 48);
+	check("under 128 ticks is one frame", short[0] === 0x30 && short[1] === NOTE);
+	check("a rest follows, so the note keys off and releases", short[2] === 0x7f && short[3] === 0xc7);
+	check("the block is terminated", short[short.length - 1] === 0x00);
+
+	const source = `#amk 4
+#0 t40 o4 v220 q7F @0 l8 c d e f g a b > c
+#1 t40 o3 v180 q7D @1 l4 [c e g e]2
+`;
+	const spc = compileToSpc(source);
+	const pristine = spc.slice();
+
+	const play = (): Int16Array => {
+		emu.loadSpc(spc);
+		emu.render(4000);
+		return emu.render(16000);
+	};
+
+	const before = play();
+	const audition = auditionNote(emu, spc, { atTicks: 96, channel: 0, note: NOTE, ticks: 192, scratchAt });
+	const after = play();
+
+	check("the auditioned note is audible", peak(audition.pcm) > 0.01, `peak ${peak(audition.pcm).toFixed(4)}`);
+	check("both channels carry it", rms(audition.pcm) > 0.001, `rms ${rms(audition.pcm).toFixed(5)}`);
+	check("it reached the tick it was asked for", audition.reachedTicks === 96, `${audition.reachedTicks} ticks`);
+	check("it held the note for the ticks asked for", audition.heldTicks === 192, `${audition.heldTicks} ticks`);
+
+	// The pokes go into the emulator's ARAM, never into the caller's image, and
+	// `loadSpc` puts the pristine one back over them. Together those are why an
+	// audition cannot disturb anything: the app's second core is a different
+	// core, and even the same core is left exactly as it was found.
+	check("the SPC image is not written to", identical(pristine, spc));
+	check("the song plays identically after an audition", identical(before, after));
+
+	// A channel the song never touches has no instrument, and `PlaySong` gives
+	// every channel `$FF` before a note is read, so it is still audible.
+	const unused = auditionNote(emu, spc, { atTicks: 96, channel: 5, note: NOTE, ticks: 96, scratchAt });
+	check("a channel the song never uses still sounds", peak(unused.pcm) > 0.01, `peak ${peak(unused.pcm).toFixed(4)}`);
+
+	// The point of emulating rather than reconstructing: the note is played by
+	// whatever the driver is holding when it arrives.
+	const under = (instrument: string): Int16Array =>
+		auditionNote(emu, compileToSpc(`#amk 4\n#0 t40 o4 v220 q7F ${instrument} l8 c d e f\n`), {
+			atTicks: 48,
+			channel: 0,
+			note: NOTE,
+			ticks: 96,
+			scratchAt,
+		}).pcm;
+
+	check("the instrument in force decides the sound", !identical(under("@0"), under("@8")));
+
+	// And the `q` in force decides how long it rings: no quantization byte is
+	// written, so what the song left in `$0201+2n` is what shortens the note.
+	const sustained = (q: string): number => {
+		const { pcm } = auditionNote(emu, compileToSpc(`#amk 4\n#0 t40 o4 v220 ${q} @0 l8 c d e f\n`), {
+			atTicks: 48,
+			channel: 0,
+			note: NOTE,
+			ticks: 192,
+			scratchAt,
+		});
+
+		const floor = peak(pcm) * 32768 * 0.05;
+		let last = 0;
+		for (let index = 0; index < pcm.length; index++) {
+			if (Math.abs(pcm[index]) > floor) {
+				last = index;
+			}
+		}
+
+		return last / pcm.length;
+	};
+
+	const clipped = sustained("q1f");
+	const full = sustained("q7f");
+	check(
+		"the q in force decides how long it rings",
+		clipped < full - 0.05,
+		`q1f ${clipped.toFixed(2)} of the render, q7f ${full.toFixed(2)}`,
+	);
+
+	// The two guards `worklet.ts`'s seek states, restated in `note-audition.ts`:
+	// a target this song never reaches has to return rather than spin.
+	const far = auditionNote(emu, spc, { atTicks: 10_000_000, channel: 0, note: NOTE, ticks: 96, scratchAt });
+	check("a tick the song never reaches still returns", far.reachedTicks > 0, `${far.reachedTicks} ticks`);
 }
 
 summarise();

@@ -69,6 +69,47 @@ cuts the one already ringing. With every voice taken the output is exactly zero 
 The module is useful beyond the transport — where each voice is right now and at what tempo is
 exactly what the piano roll follows.
 
+## Auditioning one note
+
+`note-audition.ts` is the same knowledge pointed a third way: not reading the driver and not writing
+one register of it, but putting a note the song does not contain in front of it and recording what
+comes out. `auditionNote` emulates the song from the top to a tick, hands the driver a note there,
+and returns PCM.
+
+Emulating rather than reconstructing, because the list of things a note sounds under is longer than
+anything worth modelling: the instrument and its sample, envelope and tuning; a track volume that may
+be mid-fade; pan; `q`'s gate and velocity; vibrato and tremolo phase; a pitch envelope; the global
+volume; the tempo; and an echo buffer holding the last delay's worth of the song. `song-walk.ts`
+models some of that and says which parts it does not. The driver holds all of it, so the driver is
+asked.
+
+The recipe, once the fast-forward has arrived:
+
+1. `applyChannelMutes` over every voice, then a few blocks, so whatever is ringing stops without a
+   click and the backup is holding the target voice's own volume.
+2. `haltVoice` on the other seven. A halted voice reads no music data, so the note cannot be
+   disturbed by another channel and the song block is free to write into — the `$40` phrase table is
+   only consulted when a voice reads `$00` (`L_0C01`), and no voice will. Tempo and the global fades
+   run on regardless of voices.
+3. The note's frames at the caller's scratch address, the voice pointed there, its duration counter
+   forced to 1 — which is how the driver starts its own voices (`main.asm:2314-2318`).
+4. `restoreTrackVolume`, deliberately without the `$5C` dirty bit, so the DSP keeps 0 until the new
+   note keys on and recomputes it. `NoteVCMD` sets the flag itself (`main.asm:459`).
+
+`noteFrames` mirrors the compiler's `emitNote` (Music.cpp:2254), so the bytes are the ones a note of
+that length would really be written as. **It writes no `q` byte**, because the driver only reads one
+when the byte after the duration is below `$80` — leaving it out is what makes the gate and velocity
+the song left standing apply. The exception is a channel the song has never written to, which has
+neither a `q` nor an instrument and would otherwise play for one tick at no volume: there `@0` and
+`q7f` stand in, which are what the driver and the compiler respectively default to.
+
+Two things it does not do. The length is fixed when the request is made — the PCM is rendered before
+it is heard, so there is nothing to send a note-off to, which is the price of not putting a second
+emulator on a second audio thread. And the echo buffer still holds the song: silencing the voices
+stops new signal entering, but the last delay's worth decays under the note at the song's own
+feedback rate. That is what a note written there would really land on top of, and a song with no echo
+has none of it.
+
 ## Reading a song without playing it
 
 `song-walk.ts` is the other half of that. `driver-state.ts` says where a voice _is_; this says what
