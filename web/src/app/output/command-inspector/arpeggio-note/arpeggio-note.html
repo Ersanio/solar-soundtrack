@@ -1,0 +1,43 @@
+@let row = note();
+@if (row.isMarker) {
+  <!-- A marker occupies the slot rather than sitting between two, so it
+       replaces the row rather than decorating it. -->
+  <span class="flex-1 py-1 text-xs" [class.text-accent]="row.isLive">
+    <span class="font-mono">$80</span>
+    —
+    {{ row.isLive ? 'the sequence restarts here' : 'a loop point a later one overrides' }}
+  </span>
+} @else {
+  <amk-slider
+    class="flex-1"
+    origin="centre"
+    [label]="`Note ${row.index + 1}`"
+    [signed]="true"
+    [value]="row.value"
+    [min]="-127"
+    [max]="127"
+    [valueLabel]="row.hex"
+    [note]="row.meaning"
+    [disabled]="!editable()"
+    (preview)="previewed.emit({ index: row.index, value: $event })"
+    (commit)="committed.emit({ index: row.index, value: $event })"
+  />
+}
+<button
+  amk-button
+  variant="ghost"
+  [title]="row.isMarker ? 'Clear the loop point' : 'Restart the sequence here'"
+  [disabled]="!row.canMark && !row.isMarker"
+  (click)="looped.emit(row.index)"
+>
+  {{ row.isMarker ? 'Unloop' : 'Loop' }}
+</button>
+<button
+  amk-button
+  variant="ghost"
+  title="Remove this entry"
+  [disabled]="!resizable()"
+  (click)="removed.emit(row.index)"
+>
+  Remove
+</button>

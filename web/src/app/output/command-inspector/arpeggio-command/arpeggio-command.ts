@@ -3,6 +3,7 @@ import { Component, computed, inject, input } from '@angular/core';
 import { argsRewritable, commandRewritable, spliceArg, spliceCommand } from '@amk/tokens/edits';
 import type { Command } from '@amk/tokens';
 import { commandLockedBecause } from '../commands/context';
+import { ArpeggioNoteRow } from '../arpeggio-note/arpeggio-note';
 import { Button } from '../../../shared/button/button';
 import { type EnumOption, EnumSelect } from '../../../shared/enum-select/enum-select';
 import { Slider } from '../../../shared/slider/slider';
@@ -48,7 +49,7 @@ const LOOP_MARKER = 0x80;
  */
 @Component({
   selector: 'amk-arpeggio-command',
-  imports: [Button, EnumSelect, Slider],
+  imports: [ArpeggioNoteRow, Button, EnumSelect, Slider],
   templateUrl: './arpeggio-command.html',
   host: { class: 'flex flex-col gap-3' },
 })
@@ -120,21 +121,25 @@ export class ArpeggioCommand {
   /** One row per note actually written, capped so a huge sequence stays readable. */
   protected readonly notes = computed(() => {
     const shown = this.shown();
-    return this.args()
-      .slice(2, 2 + MAX_ROWS)
-      .map((value, index) => {
-        const showing = shown[index + 2] ?? value;
-        return {
-          index,
-          value: toSigned(value),
-          /** These two follow a drag; the rest do not — see {@link shown} for why. */
-          hex: `$${hex2(showing)}`,
-          meaning: intervalLabel(toSigned(showing)),
-          isMarker: value === LOOP_MARKER,
-          /** Only the last marker is live; an earlier one is dead weight. */
-          isLive: value === LOOP_MARKER && index === this.loopAt(),
-        };
-      });
+    const all = this.args().slice(2);
+    // A marker in the last slot sends the loop index past the end, and a list
+    // with only one other entry would leave nothing but markers once that one is
+    // cleared. Both are hangs, so neither slot offers the button.
+    const markable = this.canResize();
+    return all.slice(0, MAX_ROWS).map((value, index) => {
+      const showing = shown[index + 2] ?? value;
+      return {
+        index,
+        value: toSigned(value),
+        /** These two follow a drag; the rest do not — see {@link shown} for why. */
+        hex: `$${hex2(showing)}`,
+        meaning: intervalLabel(toSigned(showing)),
+        isMarker: value === LOOP_MARKER,
+        /** Only the last marker is live; an earlier one is dead weight. */
+        isLive: value === LOOP_MARKER && index === this.loopAt(),
+        canMark: markable && index < all.length - 1,
+      };
+    });
   });
 
   /**
@@ -237,18 +242,6 @@ export class ArpeggioCommand {
   protected addNote(): void {
     const notes = this.args().slice(2);
     this.rewrite([notes.length + 1, this.duration(), ...notes, 0x00]);
-  }
-
-  /**
-   * Whether marking this row would produce a sequence the driver cannot play.
-   *
-   * The last slot is refused because a marker there sends the loop index past
-   * the end; a list with only one other entry is refused because clearing that
-   * one later would leave nothing but markers. Both are hangs, not surprises.
-   */
-  protected canMark(index: number): boolean {
-    const notes = this.args().slice(2);
-    return this.canResize() && index < notes.length - 1;
   }
 
   /**
