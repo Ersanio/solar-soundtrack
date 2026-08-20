@@ -7,6 +7,7 @@ import { ticksPerSecond } from '@amk/tokens/commands/units';
 import { glyphOf } from '../../../command-palette/glyph-of';
 import { DriverStore } from '../../../../state/driver-store';
 import { EditorStore } from '../../../../state/editor-store';
+import { hex, hex2 } from '../../../../util/format';
 import { type PlaceContext, keyOf, placeOf } from '../percussion';
 import type { Mark } from '../roll-marks';
 import { headingOf } from '../roll-marks';
@@ -69,7 +70,7 @@ export class RollTooltip {
         instrument >= FIRST_PERCUSSION_INSTRUMENT && instrument < FIRST_CUSTOM_INSTRUMENT
           ? this.drivers.instruments()?.percussion[instrument - FIRST_PERCUSSION_INSTRUMENT]
           : undefined;
-      const sample = entry ? `, sample $${(entry.srcn ?? 0).toString(16).padStart(2, '0')}` : '';
+      const sample = entry ? `, sample $${hex2(entry.srcn ?? 0)}` : '';
 
       // A drum written at a pitch of its own is the interesting case, and the
       // one its lane cannot show: `@29 c` and `@29 g` are one drum at two rates.
@@ -101,7 +102,7 @@ export class RollTooltip {
 
     if (note.state.noise !== null) {
       rows.push(
-        `noise — clock $${note.state.noise.toString(16)}, ${Math.round(noiseHz(note.state.noise))} Hz`,
+        `noise — clock $${hex(note.state.noise)}, ${Math.round(noiseHz(note.state.noise))} Hz`,
       );
     }
 
@@ -110,9 +111,7 @@ export class RollTooltip {
     }
 
     if (note.state.quantization !== null) {
-      rows.push(
-        `q${note.state.quantization.toString(16).toUpperCase()} — sounds ${note.gateTicks} of ${note.ticks}`,
-      );
+      rows.push(`q${hex(note.state.quantization)} — sounds ${note.gateTicks} of ${note.ticks}`);
     }
 
     if (tempo > 0) {
