@@ -1,6 +1,6 @@
 import { Component, computed, input } from '@angular/core';
 
-export type ButtonVariant = 'default' | 'primary' | 'ghost';
+type ButtonVariant = 'default' | 'primary' | 'ghost';
 
 /**
  * Styling for a real `<button>`, applied by attribute.
