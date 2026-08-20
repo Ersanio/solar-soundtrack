@@ -3,7 +3,6 @@ import { DestroyRef, Service, computed, effect, inject, signal, untracked } from
 import { type CompileResult, type NoteAddress, type Span, noteAddressAt } from '@amk/core/types';
 import { SpcPlayer, type SongTiming } from '@amk/spc/player';
 import type { DriverState } from '@amk/spc/driver-state';
-import { SPC_SAMPLE_RATE } from '@amk/spc/wasm-host';
 import { errorMessage, formatTime } from '../util/format';
 import { EditorStore } from './editor-store';
 import { secondsAtTick } from './song-clock';
@@ -283,84 +282,7 @@ export class Playback {
 
     inject(DestroyRef).onDestroy(() => {
       void this.player.dispose();
-      this.stopAudition();
-      void this.auditionContext?.close();
-      this.auditionContext = null;
     });
-  }
-
-  // --- sample audition ------------------------------------------------------
-
-  /**
-   * A context of its own, separate from the player's.
-   *
-   * Auditioning a sample needs nothing the player provides — no worklet, no
-   * wasm, no emulator — and making it wait on `player.init()` would mean
-   * downloading and compiling the SPC core just to hear a 65-byte square wave.
-   */
-  private auditionContext: AudioContext | null = null;
-  private auditionSource: AudioBufferSourceNode | null = null;
-
-  /** The sample currently being auditioned, for the UI to show. */
-  readonly auditioning = signal<string | null>(null);
-
-  /**
-   * Plays decoded sample PCM at the DSP's native rate.
-   *
-   * This is the sample *as stored*: no instrument tuning, no pitch, no envelope.
-   * A sample that sounds an octave off here can still be correct in a song — the
-   * `$F3`/`@` tuning is what decides pitch at playback.
-   */
-  audition(name: string, pcm: Int16Array): void {
-    this.stopAudition();
-    if (pcm.length === 0) {
-      return;
-    }
-
-    try {
-      this.auditionContext ??= new AudioContext();
-      const context = this.auditionContext;
-
-      const buffer = context.createBuffer(1, pcm.length, SPC_SAMPLE_RATE);
-      const channel = buffer.getChannelData(0);
-      for (let index = 0; index < pcm.length; index++) {
-        channel[index] = pcm[index] / 0x8000;
-      }
-
-      const source = context.createBufferSource();
-      source.buffer = buffer;
-      source.connect(context.destination);
-      source.onended = () => {
-        if (this.auditionSource === source) {
-          this.auditionSource = null;
-          this.auditioning.set(null);
-        }
-      };
-
-      source.start();
-
-      this.auditionSource = source;
-      this.auditioning.set(name);
-      void context.resume();
-    } catch (error) {
-      this.editor.fail(errorMessage(error));
-    }
-  }
-
-  stopAudition(): void {
-    const source = this.auditionSource;
-    this.auditionSource = null;
-    this.auditioning.set(null);
-    if (!source) {
-      return;
-    }
-
-    source.onended = null;
-    try {
-      source.stop();
-    } catch {
-      // Already finished; nothing to stop.
-    }
   }
 
   /**
