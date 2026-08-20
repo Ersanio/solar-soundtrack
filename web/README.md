@@ -303,8 +303,9 @@ holds the song's shape, the camera and the clock and hands each child what it dr
 `roll-toolbar/`, `percussion-panel/`, `roll-scrub/`, `roll-channels/` and `roll-tooltip/` in the
 ordinary namespace, `roll-lanes/`, `roll-grid/`, `roll-notes/` and `roll-keys/` inside the roll's own
 `<svg>`. `roll-channels/` is the odd one: it draws nothing of the song, and takes the corner the
-scrub bar leaves empty above the key column to say which channel is being edited. Beside
-them sit six Angular-free files — `roll-layout.ts` and `percussion.ts`, and `roll-metrics.ts`,
+scrub bar leaves empty above the key column to say which channel is being edited. Its eight toggles
+are not the only way in — a click on a bar or on one of its glyphs names that bar's channel, since
+the roll is already pointing at the answer. Beside them sit six Angular-free files — `roll-layout.ts` and `percussion.ts`, and `roll-metrics.ts`,
 `roll-settings.ts`, `roll-marks.ts` and `roll-clock.ts` — so the arithmetic stays where a harness can
 import it. `charttest` reaches the first two by path.
 

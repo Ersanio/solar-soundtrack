@@ -660,6 +660,15 @@ export class PianoRoll {
     }));
   }
 
+  /**
+   * A click on the roll names a channel rather than toggling one: the bar it
+   * landed on is the answer, so a second note on the channel already being
+   * edited must not clear it.
+   */
+  protected selectEditChannel(editChannel: number): void {
+    this.settings.update((s) => ({ ...s, editChannel }));
+  }
+
   /** Kept sorted, so comparing against the default is a string compare. */
   protected togglePercussion(instrument: number): void {
     this.settings.update((s) => {

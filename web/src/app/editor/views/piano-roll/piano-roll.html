@@ -99,7 +99,12 @@
             [loopX]="loopX()"
             [endX]="endX()"
           />
-          <g amk-roll-notes [marks]="marks()" (entered)="enter($event)" />
+          <g
+            amk-roll-notes
+            [marks]="marks()"
+            (entered)="enter($event)"
+            (channelPicked)="selectEditChannel($event)"
+          />
         </g>
 
         <line

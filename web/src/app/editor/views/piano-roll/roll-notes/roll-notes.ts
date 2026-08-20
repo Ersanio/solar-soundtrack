@@ -15,6 +15,8 @@ import type { Mark, MarkGlyph } from '../roll-marks';
  *
  * It writes to `EditorStore` itself, as the command inspector's children do: a
  * click is a question about the note under it, and the note is what this holds.
+ * The channel a click lands on goes up as an output instead, because the roll's
+ * settings are the parent's.
  *
  * An attribute on a real `<g>`, and its template's elements carry the `svg:`
  * prefix — see `roll-lanes.ts`. The one exception is the glyph's own `<svg>`,
@@ -36,6 +38,9 @@ export class RollNotes {
   /** The hover, which the roll turns into a tooltip beside the pointer. */
   readonly entered = output<Mark>();
 
+  /** The channel of the bar a click landed on, which the roll edits from then on. */
+  readonly channelPicked = output<number>();
+
   /**
    * Whether the editor still shows the text that compiled.
    *
@@ -55,9 +60,12 @@ export class RollNotes {
    *
    * Suppressed whenever the editor has moved on from the text that compiled: a
    * span into a document that has changed underneath points at the wrong thing,
-   * and the same test guards the highlights.
+   * and the same test guards the highlights. The channel is not, since a
+   * channel number cannot go stale the way a span does.
    */
   protected select(mark: Mark, show = false): void {
+    this.channelPicked.emit(mark.note.channel);
+
     if (!this.inSync()) {
       return;
     }
@@ -73,10 +81,18 @@ export class RollNotes {
     this.select(mark, true);
   }
 
-  /** A glyph is its own target: the command it stands for, not the note under it. */
-  protected inspect(glyph: MarkGlyph, event: Event, show = false): void {
+  /**
+   * A glyph is its own target: the command it stands for, not the note under it.
+   *
+   * The channel is the one exception — a glyph is drawn on a bar, so it names
+   * the same channel the bar does, and it has to say so itself because the
+   * bar's own handler never runs for it.
+   */
+  protected inspect(mark: Mark, glyph: MarkGlyph, event: Event, show = false): void {
     // Without this the bar underneath answers as well, and the note would win.
     event.stopPropagation();
+    this.channelPicked.emit(mark.note.channel);
+
     if (this.inSync()) {
       this.requests.reveal.set({ span: { ...glyph.span }, show });
     }
