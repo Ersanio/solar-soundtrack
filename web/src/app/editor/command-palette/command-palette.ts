@@ -27,6 +27,36 @@ function readFilter(): Filter {
   return FILTERS.find((filter) => filter === stored) ?? 'notes';
 }
 
+function chipClass(selected: boolean): string {
+  return `cursor-pointer rounded px-2 py-0.5 text-xs transition-colors ${
+    selected ? 'bg-accent/20 text-accent font-semibold' : 'text-ink-muted hover:text-ink'
+  }`;
+}
+
+/**
+ * The editor's word-wrap toggle with a name beside the glyph.
+ *
+ * Same border, same radius, same transition, and the `ok` state's colours are
+ * that button's off state — an icon control in this app looks like this one.
+ * `inline-flex` and the horizontal padding are the only departures, and they
+ * are what the label costs.
+ *
+ * `caution` keeps the button live: AddmusicK compiles those, and a control that
+ * refused what the real tool accepts would be the compiler being permissive in
+ * the other direction.
+ */
+function entryClass(entry: ResolvedEntry): string {
+  const base =
+    'border-edge inline-flex cursor-pointer items-center gap-1.5 rounded-md border px-2 py-1 text-xs whitespace-nowrap transition-colors disabled:cursor-not-allowed disabled:opacity-40';
+  if (entry.availability.state === 'blocked') {
+    return `${base} text-ink-muted`;
+  }
+
+  return entry.availability.state === 'caution'
+    ? `${base} text-warn border-warn/40 hover:border-warn`
+    : `${base} text-ink-muted hover:text-ink hover:border-accent`;
+}
+
 /**
  * The command palette: every hex and letter command, one click from the caret.
  *
@@ -124,49 +154,40 @@ export class CommandPalette {
     };
   });
 
-  protected readonly entries = computed<ResolvedEntry[]>(() => {
+  /**
+   * The buttons, with their class resolved.
+   *
+   * A view model rather than `entryClass(entry)` in the template: that runs once
+   * per button on every change-detection pass, and the palette draws the whole
+   * catalogue when its filter is `all`.
+   */
+  protected readonly entries = computed(() => {
     const target = this.target();
     const place = this.place();
     const filter = this.filter();
 
-    return ENTRIES.filter((entry) => filter === 'all' || entry.category === filter).map((entry) =>
-      resolveEntry(entry, target, place),
-    );
+    return ENTRIES.filter((entry) => filter === 'all' || entry.category === filter).map((entry) => {
+      const resolved = resolveEntry(entry, target, place);
+      return { ...resolved, class: entryClass(resolved) };
+    });
+  });
+
+  /** The category chips, likewise — `All` is one of them rather than a special case. */
+  protected readonly chips = computed<{ id: Filter; label: string; class: string }[]>(() => {
+    const filter = this.filter();
+    return [
+      { id: 'all', label: 'All', class: chipClass(filter === 'all') },
+      ...CATEGORIES.map((category) => ({
+        id: category.id,
+        label: category.label,
+        class: chipClass(filter === category.id),
+      })),
+    ];
   });
 
   constructor() {
     // Sanctioned effect: mirroring a view preference into localStorage.
     effect(() => writeStored(FILTER_KEY, this.filter()));
-  }
-
-  protected chipClass(selected: boolean): string {
-    return `cursor-pointer rounded px-2 py-0.5 text-xs transition-colors ${
-      selected ? 'bg-accent/20 text-accent font-semibold' : 'text-ink-muted hover:text-ink'
-    }`;
-  }
-
-  /**
-   * The editor's word-wrap toggle with a name beside the glyph.
-   *
-   * Same border, same radius, same transition, and the `ok` state's colours are
-   * that button's off state — an icon control in this app looks like this one.
-   * `inline-flex` and the horizontal padding are the only departures, and they
-   * are what the label costs.
-   *
-   * `caution` keeps the button live: AddmusicK compiles those, and a control
-   * that refused what the real tool accepts would be the compiler being
-   * permissive in the other direction.
-   */
-  protected entryClass(entry: ResolvedEntry): string {
-    const base =
-      'border-edge inline-flex cursor-pointer items-center gap-1.5 rounded-md border px-2 py-1 text-xs whitespace-nowrap transition-colors disabled:cursor-not-allowed disabled:opacity-40';
-    if (entry.availability.state === 'blocked') {
-      return `${base} text-ink-muted`;
-    }
-
-    return entry.availability.state === 'caution'
-      ? `${base} text-warn border-warn/40 hover:border-warn`
-      : `${base} text-ink-muted hover:text-ink hover:border-accent`;
   }
 
   protected insert(entry: ResolvedEntry): void {

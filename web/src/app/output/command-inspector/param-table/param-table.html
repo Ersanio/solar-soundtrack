@@ -61,7 +61,7 @@
                 [value]="row.value"
                 [labels]="VOICE_LABELS"
                 [disabled]="!row.editable"
-                [valueLabel]="hexLabel(row)"
+                [valueLabel]="row.hex"
                 [note]="row.note"
                 (changed)="commit(row, $event)"
               />
