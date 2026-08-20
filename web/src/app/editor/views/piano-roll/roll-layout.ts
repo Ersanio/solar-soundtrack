@@ -6,6 +6,7 @@
  */
 
 import { KEY_COUNT } from '@amk/spc/song-walk';
+import { NOTE_NAMES } from '@amk/tokens/commands/units';
 import { clamp } from '../../../util/math';
 
 /** Semitones per octave, and where `$80` sits: o1 c. */
@@ -50,7 +51,6 @@ export interface LaneStack {
   noiseRow: number;
 }
 
-const NAMES = ['c', 'c+', 'd', 'd+', 'e', 'f', 'f+', 'g', 'g+', 'a', 'a+', 'b'];
 const BLACK = [false, true, false, true, false, false, true, false, true, false, true, false];
 
 /**
@@ -59,7 +59,7 @@ const BLACK = [false, true, false, true, false, false, true, false, true, false,
  * driver's range — so the octave floors and the semitone wraps.
  */
 export function keyName(key: number): string {
-  return `o${Math.floor(key / OCTAVE) + 1} ${NAMES[semitone(key)]}`;
+  return `o${Math.floor(key / OCTAVE) + 1} ${NOTE_NAMES[semitone(key)]}`;
 }
 
 /**
@@ -71,7 +71,7 @@ export function keyName(key: number): string {
  * same key — `charttest` holds them to it.
  */
 export function noteLabel(key: number): string {
-  return `${NAMES[semitone(key)].toUpperCase()}${Math.floor(key / OCTAVE) + 1}`;
+  return `${NOTE_NAMES[semitone(key)].toUpperCase()}${Math.floor(key / OCTAVE) + 1}`;
 }
 
 export function keyIsBlack(key: number): boolean {
