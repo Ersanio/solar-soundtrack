@@ -11,8 +11,8 @@ import { DEFAULT_PERCUSSION, parsePercussion } from './percussion';
 
 const STORAGE_KEY = 'solar-soundtrack.pianoroll';
 
-export const ZOOMS = [0.5, 1, 2, 4, 8] as const;
-export const ROW_HEIGHTS = [6, 9, 13, 18, 26, 36] as const;
+const ZOOMS = [0.5, 1, 2, 4, 8] as const;
+const ROW_HEIGHTS = [6, 9, 13, 18, 26, 36] as const;
 
 /**
  * Note values a beat can be — a time signature's lower number.

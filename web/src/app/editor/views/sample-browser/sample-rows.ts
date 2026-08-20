@@ -72,7 +72,7 @@ export function waveform(file: SampleFile | SampleSlot): string {
   return `${top}${bottom}Z`;
 }
 
-export function detailLabel(file: SampleFile | SampleSlot): string {
+function detailLabel(file: SampleFile | SampleSlot): string {
   if ('error' in file && file.error) {
     return file.error;
   }
