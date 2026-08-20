@@ -9,24 +9,24 @@
   @if (isEf()) {
     <amk-bit-toggles
       legend="Channels"
-      [value]="mask()"
+      [value]="bytes.at(0)"
       [labels]="VOICE_LABELS"
       [valueLabel]="maskLabel()"
-      [disabled]="!editable(0)"
-      [note]="lockedBecause(0)"
-      (changed)="setArg(0, $event)"
+      [disabled]="!bytes.editable(0)"
+      [note]="bytes.lockedBecause(0)"
+      (changed)="bytes.commit(0, $event)"
     />
   }
 
   @if (isFade()) {
     <amk-slider
       label="Over"
-      [value]="fadeTicks()"
+      [value]="bytes.at(0)"
       [max]="255"
-      [note]="lockedBecause(0) ?? fadeLabel()"
-      [disabled]="!editable(0)"
-      (preview)="preview(0, $event)"
-      (commit)="setArg(0, $event)"
+      [note]="bytes.lockedBecause(0) ?? fadeLabel()"
+      [disabled]="!bytes.editable(0)"
+      (preview)="bytes.preview(0, $event)"
+      (commit)="bytes.commit(0, $event)"
     />
   }
 
@@ -36,24 +36,24 @@
     origin="centre"
     [label]="isFade() ? 'To volume L' : 'Volume L'"
     [signed]="true"
-    [value]="signedOf(1)"
+    [value]="bytes.signedAt(1)"
     [min]="-128"
     [max]="127"
-    [note]="lockedBecause(1) ?? signedNote(1)"
-    [disabled]="!editable(1)"
-    (preview)="preview(1, $event)"
-    (commit)="setArg(1, $event)"
+    [note]="bytes.lockedBecause(1) ?? bytes.signedNote(1)"
+    [disabled]="!bytes.editable(1)"
+    (preview)="bytes.preview(1, $event)"
+    (commit)="bytes.commit(1, $event)"
   />
   <amk-slider
     origin="centre"
     [label]="isFade() ? 'To volume R' : 'Volume R'"
     [signed]="true"
-    [value]="signedOf(2)"
+    [value]="bytes.signedAt(2)"
     [min]="-128"
     [max]="127"
-    [note]="lockedBecause(2) ?? signedNote(2)"
-    [disabled]="!editable(2)"
-    (preview)="preview(2, $event)"
-    (commit)="setArg(2, $event)"
+    [note]="bytes.lockedBecause(2) ?? bytes.signedNote(2)"
+    [disabled]="!bytes.editable(2)"
+    (preview)="bytes.preview(2, $event)"
+    (commit)="bytes.commit(2, $event)"
   />
 }

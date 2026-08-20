@@ -1,6 +1,13 @@
 import { Component, computed, input, output } from '@angular/core';
 
 /**
+ * The eight DSP voices, LSB first — the labels every channel mask in the
+ * language wants. Here rather than in each panel, since the order is the whole
+ * point and two statements of it could disagree.
+ */
+export const VOICE_LABELS = ['0', '1', '2', '3', '4', '5', '6', '7'];
+
+/**
  * One checkbox per bit of a byte, LSB first.
  *
  * LSB first because every bitmask in the language is indexed that way and says
