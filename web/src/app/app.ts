@@ -5,6 +5,7 @@ import { TopBar } from './editor/top-bar/top-bar';
 import { OutputPane } from './output/output-pane/output-pane';
 import { UpdateBanner } from './update-banner/update-banner';
 import { clamp } from './util/math';
+import { readStored, writeStored } from './util/storage';
 
 const STORAGE_KEY = 'solar-soundtrack.split';
 
@@ -31,13 +32,9 @@ function clampSplit(value: number): number {
  * missing key and an empty one as well as text that does not parse.
  */
 function loadSplit(): number {
-  try {
-    const stored = Number(localStorage.getItem(STORAGE_KEY));
+  const stored = Number(readStored(STORAGE_KEY));
 
-    return Number.isFinite(stored) && stored > 0 ? clampSplit(stored) : DEFAULT_SPLIT;
-  } catch {
-    return DEFAULT_SPLIT; // Private browsing. The layout is not worth failing over.
-  }
+  return Number.isFinite(stored) && stored > 0 ? clampSplit(stored) : DEFAULT_SPLIT;
 }
 
 @Component({
@@ -67,13 +64,7 @@ export class App {
   constructor() {
     // Sanctioned effect: mirroring state into localStorage, as `editor-store.ts`
     // does for the draft and `sample-store.ts` for its settings.
-    effect(() => {
-      try {
-        localStorage.setItem(STORAGE_KEY, String(this.split()));
-      } catch {
-        // Private browsing, or a full quota. The seam still drags this session.
-      }
-    });
+    effect(() => writeStored(STORAGE_KEY, String(this.split())));
   }
 
   protected onGrab(event: PointerEvent): void {

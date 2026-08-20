@@ -6,6 +6,7 @@ import { ChannelMixer } from '../channel-mixer/channel-mixer';
 import { PianoRoll } from '../views/piano-roll/piano-roll';
 import { SampleBrowser } from '../views/sample-browser/sample-browser';
 import { SourceView } from '../views/source-view/source-view';
+import { readStored, writeStored } from '../../util/storage';
 
 type ViewId = 'source' | 'samples' | 'roll';
 
@@ -19,7 +20,7 @@ const VIEWS: readonly TabDef<ViewId>[] = [
 
 /** The stored view, or the one the pane opens on when there is none. */
 function readView(): ViewId {
-  const stored = localStorage.getItem(VIEW_KEY);
+  const stored = readStored(VIEW_KEY);
   return VIEWS.find((view) => view.id === stored)?.id ?? 'source';
 }
 
@@ -50,12 +51,6 @@ export class EditorPane {
   constructor() {
     // Sanctioned effect: mirroring state into localStorage, as `app.ts` does
     // for the split and the palette for its category.
-    effect(() => {
-      try {
-        localStorage.setItem(VIEW_KEY, this.view());
-      } catch {
-        /* Private browsing, or a full quota. The tabs still work this session. */
-      }
-    });
+    effect(() => writeStored(VIEW_KEY, this.view()));
   }
 }

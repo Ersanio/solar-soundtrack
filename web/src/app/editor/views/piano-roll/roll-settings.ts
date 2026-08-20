@@ -1,4 +1,5 @@
 import { clamp } from '../../../util/math';
+import { readStored, writeStored } from '../../../util/storage';
 import { DEFAULT_PERCUSSION, parsePercussion } from './percussion';
 
 /**
@@ -84,10 +85,10 @@ export function readSettings(): Settings {
 
   let stored: StoredSettings | null;
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = readStored(STORAGE_KEY);
     stored = raw ? (JSON.parse(raw) as StoredSettings) : null;
   } catch {
-    stored = null; // Unreadable or not ours; the defaults are fine.
+    stored = null; // Not ours, or not JSON; the defaults are fine.
   }
 
   if (!stored) {
@@ -134,13 +135,8 @@ export function readSettings(): Settings {
   return settings;
 }
 
-/** Private browsing, or a full quota. The controls still work this session. */
 export function writeSettings(settings: Settings): void {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
-  } catch {
-    /* Nothing to do about it, and nothing worth saying to the porter. */
-  }
+  writeStored(STORAGE_KEY, JSON.stringify(settings));
 }
 
 /** One step along {@link ZOOMS}, held at either end. */
