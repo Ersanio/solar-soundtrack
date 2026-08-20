@@ -168,6 +168,17 @@ export class PianoRoll {
 
   protected readonly percussion = computed(() => new Set(this.settings().percussion));
 
+  /**
+   * Which channels are heard, by index.
+   *
+   * One map for both readers. `heldRows` recomputes on every frame of playback,
+   * and building this inside it would rebuild eight entries sixty times a second
+   * to answer a question that only changes when the mixer is touched.
+   */
+  private readonly audible = computed(
+    () => new Map(this.playback.channels().map((c) => [c.index, c.audible])),
+  );
+
   /** Instrument numbers whose sample is noise, from the song's own entries. */
   private readonly noiseInstruments = computed(() => {
     const custom = this.timeline()?.customInstruments ?? [];
@@ -440,7 +451,7 @@ export class PianoRoll {
       to,
       zoom: this.zoom(),
       rowHeight: this.rowHeight(),
-      audible: new Map(this.playback.channels().map((c) => [c.index, c.audible])),
+      audible: this.audible(),
       inForce: this.editor.commandsInForce(),
     });
   });
@@ -495,7 +506,7 @@ export class PianoRoll {
       stack: this.stack(),
       context: this.placeContext(),
       tick: this.playTick(),
-      audible: new Map(this.playback.channels().map((c) => [c.index, c.audible])),
+      audible: this.audible(),
     });
   });
 
