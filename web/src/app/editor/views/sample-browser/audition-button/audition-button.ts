@@ -1,6 +1,6 @@
 import { Component, computed, inject, input } from '@angular/core';
 
-import { Playback } from '../../../../state/playback';
+import { Audition } from '../../../../state/audition';
 import { SampleStore } from '../../../../state/sample-store';
 
 /**
@@ -28,24 +28,24 @@ import { SampleStore } from '../../../../state/sample-store';
   host: { class: 'contents' },
 })
 export class AuditionButton {
-  private readonly playback = inject(Playback);
+  private readonly audition = inject(Audition);
   private readonly library = inject(SampleStore);
 
   readonly name = input.required<string>();
   readonly disabled = input(false);
 
-  protected readonly sounding = computed(() => this.playback.auditioning() === this.name());
+  protected readonly sounding = computed(() => this.audition.playing() === this.name());
 
   protected toggle(): void {
     const name = this.name();
-    if (this.playback.auditioning() === name) {
-      this.playback.stopAudition();
+    if (this.audition.playing() === name) {
+      this.audition.stop();
       return;
     }
 
     const pcm = this.library.pcm(name);
     if (pcm) {
-      this.playback.audition(name, pcm);
+      this.audition.play(name, pcm);
     }
   }
 }
