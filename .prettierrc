@@ -10,6 +10,12 @@
       }
     },
     {
+      "files": "COMMANDS.html",
+      "options": {
+        "parser": "html"
+      }
+    },
+    {
       "files": ["packages/**/*.ts", "scripts/**/*.ts"],
       "options": {
         "useTabs": true,
