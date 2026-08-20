@@ -11,6 +11,7 @@ import {
   resolveEntry,
 } from './catalog';
 import { CommandIcon } from './command-icon';
+import { readStored, writeStored } from '../../util/storage';
 
 type Filter = Category | 'all';
 
@@ -21,7 +22,7 @@ const FILTERS: readonly Filter[] = ['all', ...CATEGORIES.map((category) => categ
 
 /** The stored category, or the one the palette opens on when there is none. */
 function readFilter(): Filter {
-  const stored = localStorage.getItem(FILTER_KEY);
+  const stored = readStored(FILTER_KEY);
   return FILTERS.find((filter) => filter === stored) ?? 'notes';
 }
 
@@ -132,7 +133,7 @@ export class CommandPalette {
 
   constructor() {
     // Sanctioned effect: mirroring a view preference into localStorage.
-    effect(() => localStorage.setItem(FILTER_KEY, this.filter()));
+    effect(() => writeStored(FILTER_KEY, this.filter()));
   }
 
   protected chipClass(selected: boolean): string {

@@ -14,6 +14,7 @@ import {
   validateName,
 } from '@amk/spc/brr';
 import { clear, del, loadAll, put, storageFailure } from '../util/idb';
+import { readStored, writeStored } from '../util/storage';
 import { DriverStore } from './driver-store';
 
 /** Envelope resolution. Wide enough to read, small enough to keep in a signal. */
@@ -326,22 +327,19 @@ export class SampleStore {
         optimize: this.optimize(),
         important: Object.fromEntries(this.importantOverrides()),
       };
-      try {
-        localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
-      } catch {
-        // Private browsing, or a full quota. The library still works for this
-        // session, and `storageError` already says persistence is unavailable.
-      }
+      // A refusal is silent here: `storageError` already says persistence is
+      // unavailable, and the library still works for this session.
+      writeStored(SETTINGS_KEY, JSON.stringify(settings));
     });
   }
 
   private loadSettings(): void {
     let stored: StoredSettings | null;
     try {
-      const raw = localStorage.getItem(SETTINGS_KEY);
+      const raw = readStored(SETTINGS_KEY);
       stored = raw ? (JSON.parse(raw) as StoredSettings) : null;
     } catch {
-      stored = null; // Unreadable or not ours; the defaults are fine.
+      stored = null; // Not ours, or not JSON; the defaults are fine.
     }
 
     if (!stored) {

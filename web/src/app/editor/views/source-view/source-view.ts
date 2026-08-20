@@ -32,6 +32,7 @@ import { mmlLanguage } from '../../codemirror/mml-language';
 import { mmlTheme } from '../../codemirror/mml-theme';
 import { playheadField, setPlayhead } from '../../codemirror/playhead';
 import { setUnreachable, unreachableField } from '../../codemirror/unreachable';
+import { readStored, writeStored } from '../../../util/storage';
 
 const PALETTE_KEY = 'solar-soundtrack.palette';
 
@@ -105,7 +106,7 @@ export class SourceView {
    * toolbar rather than inside the palette — where it would be the one row of a
    * closed palette that still had to be drawn.
    */
-  protected readonly paletteOpen = signal(localStorage.getItem(PALETTE_KEY) !== 'closed');
+  protected readonly paletteOpen = signal(readStored(PALETTE_KEY) !== 'closed');
 
   private readonly host = viewChild.required<ElementRef<HTMLDivElement>>('editorHost');
   private readonly view: EditorView;
@@ -168,7 +169,7 @@ export class SourceView {
 
     // Sanctioned effect: mirroring a view preference into localStorage, as the
     // palette does for its category and `app.ts` for the split.
-    effect(() => localStorage.setItem(PALETTE_KEY, this.paletteOpen() ? 'open' : 'closed'));
+    effect(() => writeStored(PALETTE_KEY, this.paletteOpen() ? 'open' : 'closed'));
 
     // Sanctioned effect: driving an imperative view API (selection) from state.
     //

@@ -27,6 +27,7 @@ import { type SongClock, songClock } from './song-clock';
 import { type Measurement, tempoShortfall } from './measure-clock';
 import type { MeasureReply, MeasureRequest } from './clock.worker';
 import { caretPosition, downloadBlob, errorMessage } from '../util/format';
+import { readStored, writeStored } from '../util/storage';
 import { DriverStore } from './driver-store';
 import { SampleStore } from './sample-store';
 
@@ -128,7 +129,7 @@ export class EditorStore {
    * {@link replace} rather than by writing here — one-way sync, so there is no
    * mirror to feed back through.
    */
-  readonly source = signal(localStorage.getItem(STORAGE_KEY) ?? SAMPLE_SONG);
+  readonly source = signal(readStored(STORAGE_KEY) ?? SAMPLE_SONG);
   readonly caret = signal(0);
 
   /**
@@ -584,7 +585,7 @@ export class EditorStore {
 
   constructor() {
     // Sanctioned effect: mirroring signal state into an imperative store.
-    effect(() => localStorage.setItem(STORAGE_KEY, this.source()));
+    effect(() => writeStored(STORAGE_KEY, this.source()));
 
     // Sanctioned effect: the compiled bytes drive an imperative sink, the
     // measuring worker. Idle-triggered rather than per-compile, because a
