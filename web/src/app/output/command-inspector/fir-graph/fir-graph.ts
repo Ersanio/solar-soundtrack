@@ -167,16 +167,6 @@ export class FirGraph {
     this.picked.emit({ hz, gain: 10 ** (db / 20) });
   }
 
-  /** The curve in words: the response in decibels at four frequencies. */
-  protected readonly description = computed(() => {
-    const at = (hz: number) =>
-      (20 * Math.log10(Math.max(firMagnitude(this.taps(), hz), 1e-9))).toFixed(0);
-    return (
-      `Echo filter response: ${at(0)} decibels at DC, ${at(2000)} at 2 kilohertz, ` +
-      `${at(8000)} at 8 kilohertz, ${at(14000)} at 14 kilohertz.`
-    );
-  });
-
   private pathOf(magnitudes: number[]): string {
     return magnitudes
       .map((gain, i) => `${i === 0 ? 'M' : 'L'}${this.xOf(this.frequencies[i])} ${this.yOf(gain)}`)

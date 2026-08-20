@@ -110,9 +110,4 @@ export class VibratoGraph {
   });
 
   protected readonly spanLabel = `${SPAN_TICKS} ticks`;
-
-  protected readonly description = computed(
-    () =>
-      `Vibrato shape: ${this.delay()} ticks of delay, then the ${this.axis()} wobbles by ${this.depth()} of 255, ${this.cycleLabel()}.`,
-  );
 }
