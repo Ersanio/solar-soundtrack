@@ -5,13 +5,12 @@ import {
   attackSeconds,
   decaySeconds,
   decodeAdsr,
-  decodeGain,
   envelopeAdsr,
   envelopeGain,
-  releaseSeconds,
   sustainLevel,
 } from '@amk/spc/adsr';
 import { PLOT } from '../../../shared/chart/plot';
+import { duration } from '../../../util/format';
 import { clamp } from '../../../util/math';
 
 /**
@@ -101,10 +100,7 @@ export class AdsrGraph {
     return [...points, { t: this.duration(), level: last.level }];
   });
 
-  protected readonly durationLabel = computed(() => {
-    const total = this.duration();
-    return total >= 1 ? `${total.toFixed(2)} s` : `${(total * 1000).toFixed(0)} ms`;
-  });
+  protected readonly durationLabel = computed(() => duration(this.duration()));
 
   protected readonly path = computed(() =>
     this.drawn()
@@ -136,25 +132,6 @@ export class AdsrGraph {
     ].filter((mark) => mark.x > 1 && mark.x < PLOT.w - 1);
   });
 
-  /** The envelope in words. */
-  protected readonly description = computed(() => {
-    const envelope = this.envelope();
-    if (!envelope.adsrEnabled) {
-      const gain = decodeGain(this.gain());
-      return gain.mode === 'direct'
-        ? `Envelope: fixed GAIN at ${Math.round((gain.level ?? 0) * 100)} percent of full volume.`
-        : `Envelope: GAIN ${gain.mode} at rate ${gain.rate}.`;
-    }
-
-    const release = releaseSeconds(envelope.release, envelope.sustain);
-    return (
-      `Envelope: attack ${seconds(attackSeconds(envelope.attack))}, ` +
-      `decay ${seconds(decaySeconds(envelope.decay, envelope.sustain))} ` +
-      `to ${Math.round(sustainLevel(envelope.sustain) * 100)} percent, ` +
-      `then ${Number.isFinite(release) ? `fading over ${seconds(release)}` : 'held indefinitely'}.`
-    );
-  });
-
   private xOf(t: number): number {
     return (t / this.duration()) * PLOT.w;
   }
@@ -163,8 +140,4 @@ export class AdsrGraph {
   private yOf(level: number): number {
     return PLOT.h - 2 - clamp(level, 0, 1) * (PLOT.h - 4);
   }
-}
-
-function seconds(value: number): string {
-  return value >= 1 ? `${value.toFixed(2)} seconds` : `${(value * 1000).toFixed(0)} milliseconds`;
 }

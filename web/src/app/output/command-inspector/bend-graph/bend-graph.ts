@@ -103,9 +103,4 @@ export class BendGraph {
 
     return `${semitones > 0 ? '+' : ''}${semitones} semitone${Math.abs(semitones) === 1 ? '' : 's'}`;
   });
-
-  protected readonly description = computed(
-    () =>
-      `Pitch bend: ${this.delay()} ticks of delay, then ${this.reachLabel()} ${this.durationLabel()}.`,
-  );
 }
