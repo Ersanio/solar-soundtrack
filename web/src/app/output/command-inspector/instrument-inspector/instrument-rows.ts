@@ -12,6 +12,7 @@ import {
   tuningSemitones,
 } from '@amk/spc/adsr';
 import { NOISE_FLAG } from '@amk/spc/instruments';
+import { noteName } from '@amk/tokens/commands/units';
 import { duration, hex2 } from '../../../util/format';
 
 /**
@@ -162,16 +163,4 @@ function semitones(value: number): string {
 
   const rounded = value.toFixed(1);
   return `${value > 0 ? '+' : ''}${rounded} semitones`;
-}
-
-const NOTE_NAMES = ['c', 'c+', 'd', 'd+', 'e', 'f', 'f+', 'g', 'g+', 'a', 'a+', 'b'];
-
-/**
- * A note byte as it would be written in MML.
- *
- * `pitch + (octave - 1) * 12 + 0x80` (`parser.ts:getPitch`), read backwards.
- */
-function noteName(byte: number): string {
-  const pitch = byte & 0x7f;
-  return `o${Math.floor(pitch / 12) + 1} ${NOTE_NAMES[pitch % 12]}`;
 }
