@@ -1,28 +1,21 @@
 import { DestroyRef, Service, computed, effect, inject, signal, untracked } from '@angular/core';
 
-import { type CompileResult, type NoteAddress, type Span, noteAddressAt } from '@amk/core/types';
+import type { CompileResult, NoteAddress, Span } from '@amk/core/types';
 import { SpcPlayer, type SongTiming } from '@amk/spc/player';
 import type { DriverState } from '@amk/spc/driver-state';
 import { errorMessage, formatTime } from '../util/format';
 import { EditorStore } from './editor-store';
 import { secondsAtTick } from './song-clock';
+import {
+  type ChannelState,
+  channelStates,
+  estimatedSecondsAt,
+  silencedMask,
+  soundingSpans,
+} from './transport-view';
 import { clamp } from '../util/math';
 
-/** N-SPC songs have eight music channels. */
-const CHANNELS = 8;
-const ALL_CHANNELS = 0b11111111;
-/** In the note map, the loop/subroutine block counts as a ninth channel. */
-const LOOP_BLOCK = 8;
-
 const NO_SPANS: readonly Span[] = [];
-
-export interface ChannelState {
-  index: number;
-  muted: boolean;
-  soloed: boolean;
-  /** Audible right now, once solo is taken into account. */
-  audible: boolean;
-}
 
 @Service()
 export class Playback {
@@ -156,10 +149,7 @@ export class Playback {
    * engaging solo clears the mutes outright rather than holding them, so what
    * the buttons show is always what is being heard.
    */
-  private readonly silenced = computed(() => {
-    const soloed = this.soloedChannel();
-    return soloed === null ? this.mutedMask() : ~(1 << soloed) & ALL_CHANNELS;
-  });
+  private readonly silenced = computed(() => silencedMask(this.mutedMask(), this.soloedChannel()));
 
   /**
    * Only the channels the song actually writes to. A channel with no data has
@@ -168,24 +158,13 @@ export class Playback {
    * goes empty keeps its mute or solo and resumes it if the channel comes back,
    * and `clearChannels()` reaches it either way.
    */
-  readonly channels = computed<ChannelState[]>(() => {
-    const sizes = this.editor.result()?.stats?.channelSizes ?? [];
-    const muted = this.mutedMask();
-    const soloed = this.soloedChannel();
-    const silenced = this.silenced();
-
-    return Array.from({ length: CHANNELS }, (_, index) => index)
-      .filter((index) => (sizes[index] ?? 0) > 0)
-      .map((index) => {
-        const bit = 1 << index;
-        return {
-          index,
-          muted: (muted & bit) !== 0,
-          soloed: soloed === index,
-          audible: (silenced & bit) === 0,
-        };
-      });
-  });
+  readonly channels = computed<ChannelState[]>(() =>
+    channelStates(
+      this.editor.result()?.stats?.channelSizes ?? [],
+      this.mutedMask(),
+      this.soloedChannel(),
+    ),
+  );
 
   readonly isSoloing = computed(() => this.soloedChannel() !== null);
   readonly hasChannelOverrides = computed(() => this.mutedMask() !== 0 || this.isSoloing());
@@ -215,26 +194,7 @@ export class Playback {
         return NO_SPANS;
       }
 
-      const silenced = this.silenced();
-      const spans: Span[] = [];
-      for (let voice = 0; voice < CHANNELS; voice++) {
-        const pointer = driver.trackPointers[voice];
-        if (pointer === 0 || (silenced & (1 << voice)) !== 0) {
-          continue;
-        }
-
-        const entry = noteAddressAt(loaded.map, pointer);
-        if (entry && (entry.channel === voice || entry.channel === LOOP_BLOCK)) {
-          spans.push(entry.span);
-        }
-      }
-
-      return spans
-        .sort((a, b) => a.start - b.start || a.end - b.end)
-        .filter(
-          (span, n, all) =>
-            n === 0 || span.start !== all[n - 1].start || span.end !== all[n - 1].end,
-        );
+      return soundingSpans(loaded.map, driver.trackPointers, this.silenced());
     },
     {
       equal: (a, b) =>
@@ -267,22 +227,14 @@ export class Playback {
       this.songTicks.set({ ticks: songTicks, at: performance.now() });
 
     this.player.onDriverState = (state) => this.driver.set(state);
-    this.player.onEnded = () => {
-      this.state.set('idle');
-      this.songTicks.set({ ticks: 0, at: performance.now() });
-      this.scrubbing.set(null);
-      this.driver.set(null);
-      this.loaded.set(null);
-    };
+    this.player.onEnded = () => this.rest();
 
     this.player.onError = (error) => {
       this.state.set('idle');
       this.editor.fail(errorMessage(error));
     };
 
-    inject(DestroyRef).onDestroy(() => {
-      void this.player.dispose();
-    });
+    inject(DestroyRef).onDestroy(() => void this.player.dispose());
   }
 
   /**
@@ -323,16 +275,14 @@ export class Playback {
       return 0;
     }
 
-    if (stats.introTicks > 0 && songTicks < stats.introTicks) {
-      return (songTicks / stats.introTicks) * played.introSeconds;
-    }
-
-    if (stats.loopTicks <= 0) {
-      return played.introSeconds;
-    }
-
-    return (
-      played.introSeconds + ((songTicks - stats.introTicks) / stats.loopTicks) * played.mainSeconds
+    return estimatedSecondsAt(
+      {
+        introTicks: stats.introTicks,
+        loopTicks: stats.loopTicks,
+        introSeconds: played.introSeconds,
+        mainSeconds: played.mainSeconds,
+      },
+      songTicks,
     );
   }
 
@@ -401,6 +351,19 @@ export class Playback {
 
   stop(): void {
     this.player.stop();
+    this.rest();
+  }
+
+  /**
+   * Back to the beginning with nothing loaded — what a stop and a song running
+   * out both leave behind.
+   *
+   * One statement of it because the two have to agree: the roll and the source
+   * view read `driver` and `loaded` to decide what to light, and a reset that
+   * cleared one of them and not the other would leave a stopped song still
+   * showing its last sounding note.
+   */
+  private rest(): void {
     this.state.set('idle');
     this.songTicks.set({ ticks: 0, at: performance.now() });
     this.scrubbing.set(null);
