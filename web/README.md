@@ -298,10 +298,12 @@ the transport's 10 Hz anchor, snapped outward to a whole note, so the DOM rebuil
 screen; the scroll is a `computed` over `shared/chart/frame-clock.ts` and is one `transform` that
 nothing beneath reads. That is why the roll can run at 240 Hz without the note list knowing.
 
-**The folder is a parent and eight children**, as `output/command-inspector/` is. `piano-roll.ts`
+**The folder is a parent and nine children**, as `output/command-inspector/` is. `piano-roll.ts`
 holds the song's shape, the camera and the clock and hands each child what it draws:
-`roll-toolbar/`, `percussion-panel/`, `roll-scrub/` and `roll-tooltip/` in the ordinary namespace,
-`roll-lanes/`, `roll-grid/`, `roll-notes/` and `roll-keys/` inside the roll's own `<svg>`. Beside
+`roll-toolbar/`, `percussion-panel/`, `roll-scrub/`, `roll-channels/` and `roll-tooltip/` in the
+ordinary namespace, `roll-lanes/`, `roll-grid/`, `roll-notes/` and `roll-keys/` inside the roll's own
+`<svg>`. `roll-channels/` is the odd one: it draws nothing of the song, and takes the corner the
+scrub bar leaves empty above the key column to say which channel is being edited. Beside
 them sit six Angular-free files — `roll-layout.ts` and `percussion.ts`, and `roll-metrics.ts`,
 `roll-settings.ts`, `roll-marks.ts` and `roll-clock.ts` — so the arithmetic stays where a harness can
 import it. `charttest` reaches the first two by path.

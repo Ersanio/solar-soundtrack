@@ -1,3 +1,4 @@
+import { CHANNELS } from '../../../state/transport-view';
 import { clamp } from '../../../util/math';
 import { readStored, writeStored } from '../../../util/storage';
 import { DEFAULT_PERCUSSION, parsePercussion } from './percussion';
@@ -40,6 +41,8 @@ export interface Settings {
   /** Instruments drawn on percussion lanes, ascending. */
   percussion: readonly number[];
   percussionOpen: boolean;
+  /** The channel the roll is editing, or null for none. One at a time. */
+  editChannel: number | null;
 }
 
 /** Every field `unknown`, because none of it is ours until it is checked. */
@@ -53,11 +56,17 @@ interface StoredSettings {
   beatUnit?: unknown;
   percussion?: unknown;
   percussionOpen?: unknown;
+  editChannel?: unknown;
 }
 
 /** A whole number of beats a bar could hold, zero — no grid — included. */
 function isBeatCount(value: unknown): value is number {
   return typeof value === 'number' && Number.isInteger(value) && value >= 0 && value <= MAX_BEATS;
+}
+
+/** One of the eight music channels. Null — editing nothing — is the default, not a stored value. */
+function isChannel(value: unknown): value is number {
+  return typeof value === 'number' && Number.isInteger(value) && value >= 0 && value < CHANNELS;
 }
 
 /**
@@ -81,6 +90,7 @@ export function readSettings(): Settings {
     beatUnit: 4,
     percussion: [...DEFAULT_PERCUSSION],
     percussionOpen: false,
+    editChannel: null,
   };
 
   let stored: StoredSettings | null;
@@ -125,6 +135,10 @@ export function readSettings(): Settings {
 
   if (typeof stored.percussionOpen === 'boolean') {
     settings.percussionOpen = stored.percussionOpen;
+  }
+
+  if (isChannel(stored.editChannel)) {
+    settings.editChannel = stored.editChannel;
   }
 
   const percussion = parsePercussion(stored.percussion);

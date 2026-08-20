@@ -1,0 +1,10 @@
+@for (toggle of toggles(); track toggle.channel) {
+  <button
+    type="button"
+    [class]="toggle.class"
+    [title]="toggle.title"
+    (click)="picked.emit(toggle.channel)"
+  >
+    {{ toggle.channel }}
+  </button>
+}

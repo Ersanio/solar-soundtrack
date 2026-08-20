@@ -36,6 +36,8 @@ export class RollToolbar {
   readonly beatsPerBar = input.required<number>();
   readonly beatUnit = input.required<number>();
   readonly percussionOpen = input.required<boolean>();
+  /** The channel the corner's picker has selected, or null when none is. */
+  readonly editChannel = input.required<number | null>();
   /** The tick the readout reports, which the parent takes slowly while playing. */
   readonly tick = input.required<number>();
 
@@ -51,6 +53,18 @@ export class RollToolbar {
   /** For the two grid controls. */
   protected readonly beatUnits = BEAT_UNITS;
   protected readonly maxBeats = MAX_BEATS;
+
+  /**
+   * Which channel the picker has selected, named in the roll's own terms.
+   *
+   * Nothing acts on the selection yet, so this is how it is read at all. Its own
+   * label rather than a part of {@link readout}, since the two answer different
+   * questions and one of them is scaffolding.
+   */
+  protected readonly editLabel = computed(() => {
+    const channel = this.editChannel();
+    return channel === null ? 'editing: none' : `editing: #${channel}`;
+  });
 
   protected readonly readout = computed(() => {
     const song = this.editor.timeline();
