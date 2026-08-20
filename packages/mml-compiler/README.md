@@ -69,6 +69,37 @@ Diagnostics carry stable `AMK####` codes and are produced on failure paths too, 
 populated. Constructs this compiler does not implement are reported as errors, never silently
 mis-compiled.
 
+## The parse trace, and the normalizer built on it
+
+`compile({ …, options: { trace: true } })` returns `CompileResult.trace`: one event per dispatch of
+the scan loop — its source span, the character it dispatched on, the parser's state once it
+returned, and what it did to the loop structure — plus the final buffer and its `origins`, the span
+of every replacement the parser expanded, and the table every note was tuned by. It is gathered
+where the command map is, by bracketing `scan`'s one dispatch loop, and a loop event is read off the
+bytes a handler wrote rather than asked of the handler: `[` moves the channel to 8, `]` moves it back
+and leaves `$E9 lo hi n` on the caller, `*` and `(n)m` leave the same four bytes, and `]]n` leaves
+`$E6 n-1`. One guarded line in `doReplacement` records a match's extent, which is the only place it
+is known. Nothing is recorded unless asked for, and no byte changes either way.
+
+`normalize.ts` is what it exists for: seven text-to-text passes that leave a song with no
+`#define`, no replacement, no triplet, no loop or call, one block per channel in channel order,
+`o`/`l`/`q`/`@`/`t` written where a channel left them implied, `<`/`>` made absolute and the drum
+`@` before every drum note — the shape an editor can splice. A `[ ]` body is compiled once, under
+the state standing at its `[`, and replayed from bytes, so each copy of its text is preceded by
+whatever re-creates that state and the last copy followed by whatever restores the state that stood
+after the construct; `h` is switched off again by a `#N` re-entering the channel, which resets `h`
+and nothing else a note reads (`parseHash`). What cannot be re-created is refused with an `AMK06xx`
+diagnostic saying why: an instrument a copy would be tuned differently under — `h` _replaces_
+instrument tuning (`parseNote`), so no `h` is ever written and `@` only for a drum remap — a `*`
+with no loop before it, a legacy `&` whose duration byte comes from a bracket, and `tuning[n]=`. The
+passes never emit text from bytes; the note map's tick counts are the one thing read from the
+compile, for the lengths a triplet's notes become.
+
+The normalizer does not check its own work, because it cannot: the walk that would is in
+`@amk/spc`, which this package may not import. `web/src/app/state/normalize-song.ts` runs the
+passes, compiles and walks after each, and applies nothing unless every intermediate plays the same
+music as the original; `normalizetest` pins both halves.
+
 ## `sampleList: null` is not `[]`
 
 `null` means the compiler had no opinion and the host's driver default stands; `[]` means the song

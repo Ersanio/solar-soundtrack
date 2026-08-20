@@ -104,6 +104,30 @@ silent corruption into an edit that simply does not take.
 slider fires per frame of a drag, and "that is the text already there" is what keeps a drag from
 pushing dozens of identical recompiles through the debounce.
 
+## Normalizing a song
+
+The **Normalize** button on the Source and Piano Roll toolbars rewrites the whole document into the
+shape an editor can splice — `@amk/compiler`'s README has the passes. The rewrite itself is the
+compiler's; `state/normalize-song.ts` is the part only the app can do, and it is here for the reason
+`song-clock.ts` is: the passes rewrite text and the walk in `@amk/spc` reads bytes, and the package
+boundary keeps each from the other. It compiles and walks the result of every pass and compares it
+to the walk of the original — every note's tick, slot, byte, state and **written** pitch, the song's
+length, loop point and tempo commands — and the document is not touched unless they all agree. The
+outcome names the passes that changed the song, and a refusal names its reason.
+
+`editor/normalize-button/` is the button and the dialog behind it, one component on both toolbars.
+It runs the rewrite _before_ the dialog opens, so the dialog lists what changes in this song rather
+than what the passes do in general, and so a refusal — or a song already in shape — is said in the
+same place. It is a native `<dialog>` shown modally, which keeps the document still while the
+question is open, and its Confirm is held for three seconds.
+
+The write is one `EditorRequests.replace` over the whole document, so it is one CodeMirror
+transaction and one undo step, and its `expect` is the text the rewrite was built from, so a
+keystroke that lands in between makes it a no-op rather than an overwrite. `EditorStore.canNormalize`
+is the same guard from the other side: the button is off while the document has moved past the
+compile. The module is pure and takes no Angular, and `normalizetest` drives it the way the button
+does.
+
 ## The CodeMirror adapter
 
 `editor/codemirror/` is the only place that knows CodeMirror exists. `mml-language.ts` is 44 lines:

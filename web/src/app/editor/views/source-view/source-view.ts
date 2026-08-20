@@ -14,13 +14,24 @@ import {
   viewChild,
 } from '@angular/core';
 
-import { defaultKeymap, history, historyKeymap, insertTab } from '@codemirror/commands';
+import {
+  defaultKeymap,
+  history,
+  historyKeymap,
+  insertTab,
+  redo as redoCommand,
+  redoDepth,
+  undo as undoCommand,
+  undoDepth,
+} from '@codemirror/commands';
 import { setDiagnostics } from '@codemirror/lint';
 import { Compartment, EditorSelection, EditorState } from '@codemirror/state';
 import { EditorView, keymap, lineNumbers } from '@codemirror/view';
 
 import type { Severity } from '@amk/core/types';
 import { commandAt } from '@amk/tokens';
+import { IconRedo } from '../../../shared/icons/icon-redo';
+import { IconUndo } from '../../../shared/icons/icon-undo';
 import { IconWrap } from '../../../shared/icons/icon-wrap';
 import { Toolbar } from '../../../shared/toolbar/toolbar';
 import { EditorRequests, type Insertion } from '../../../state/editor-requests';
@@ -28,6 +39,7 @@ import { EditorStore } from '../../../state/editor-store';
 import { Playback } from '../../../state/playback';
 import { clamp } from '../../../util/math';
 import { CommandPalette } from '../../command-palette/command-palette';
+import { NormalizeButton } from '../../normalize-button/normalize-button';
 import { commandHover } from '../../codemirror/command-hover';
 import { mmlLanguage } from '../../codemirror/mml-language';
 import { mmlTheme } from '../../codemirror/mml-theme';
@@ -36,6 +48,11 @@ import { setUnreachable, unreachableField } from '../../codemirror/unreachable';
 import { readStored, writeStored } from '../../../util/storage';
 
 const PALETTE_KEY = 'solar-soundtrack.palette';
+
+/** The keys `historyKeymap` binds on this platform, for the history buttons' titles. */
+const HISTORY_KEYS = /Mac|iP/.test(navigator.platform)
+  ? { undo: '⌘Z', redo: '⇧⌘Z' }
+  : { undo: 'Ctrl+Z', redo: 'Ctrl+Y' };
 
 /**
  * CodeMirror's lint severities are a smaller set than ours: `severe` renders
@@ -69,7 +86,7 @@ const LINT_SEVERITY: Record<Severity, 'error' | 'warning' | 'info'> = {
  */
 @Component({
   selector: 'amk-source-view',
-  imports: [Toolbar, IconWrap, CommandPalette],
+  imports: [Toolbar, IconWrap, IconUndo, IconRedo, CommandPalette, NormalizeButton],
   templateUrl: './source-view.html',
   host: { class: 'flex min-h-0 min-w-0 flex-col' },
 })
@@ -109,6 +126,14 @@ export class SourceView {
    * closed palette that still had to be drawn.
    */
   protected readonly paletteOpen = signal(readStored(PALETTE_KEY) !== 'closed');
+
+  /**
+   * Whether the view's history has anything to undo or redo, read off every
+   * update so the two buttons follow the keyboard's own undo and redo too.
+   */
+  protected readonly canUndo = signal(false);
+  protected readonly canRedo = signal(false);
+  protected readonly historyKeys = HISTORY_KEYS;
 
   private readonly host = viewChild.required<ElementRef<HTMLDivElement>>('editorHost');
   private readonly view: EditorView;
@@ -157,6 +182,9 @@ export class SourceView {
             if (update.docChanged || update.selectionSet) {
               this.store.caret.set(update.state.selection.main.head);
             }
+
+            this.canUndo.set(undoDepth(update.state) > 0);
+            this.canRedo.set(redoDepth(update.state) > 0);
           }),
         ],
       }),
@@ -298,6 +326,17 @@ export class SourceView {
       const spans = this.store.unreachableSpans();
       untracked(() => this.view.dispatch({ effects: setUnreachable.of(spans) }));
     });
+  }
+
+  /** The keyboard's undo, for the mouse; focus goes back to the text it changed. */
+  protected undo(): void {
+    undoCommand(this.view);
+    this.view.focus();
+  }
+
+  protected redo(): void {
+    redoCommand(this.view);
+    this.view.focus();
   }
 
   /** Flips word wrap without rebuilding the view. */

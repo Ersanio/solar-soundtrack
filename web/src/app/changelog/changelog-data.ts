@@ -15,6 +15,8 @@ export const CHANGELOG: readonly ChangelogEntry[] = [
   {
     date: '20 August 2026',
     items: [
+      'Normalize a song for editing: loops unrolled, replacements inlined, channel defaults written out',
+      'Undo and redo buttons in the Source toolbar',
       'Piano roll channel picker',
       'Click a note or its command in the roll to edit that channel',
       'Command palette uses substitute hex commands on the older AddmusicK targets',

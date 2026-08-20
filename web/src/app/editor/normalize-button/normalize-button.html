@@ -1,0 +1,72 @@
+<!-- What it does is the title; what it will do to this song is the dialog. -->
+<button
+  type="button"
+  class="border-edge bg-inset text-ink hover:border-accent ml-auto cursor-pointer rounded-md border px-2 text-xs leading-6 disabled:cursor-not-allowed disabled:opacity-40"
+  title="Rewrite the song for editing: #define and replacements resolved, every loop unrolled, triplets written out, one block per channel, and o/l/q/@/t written where the song left them implied. What plays does not change; refused if it would."
+  [disabled]="!canNormalize()"
+  (click)="open()"
+>
+  Normalize
+</button>
+
+<!-- Empty until it is shown, and rendered in the top layer by the browser, so
+     it sits in a toolbar without being part of its row. -->
+<dialog
+  #dialog
+  class="bg-raised text-ink m-auto w-[34rem] max-w-[calc(100vw-2rem)] rounded-md border p-0 shadow-lg backdrop:bg-black/60"
+  [class]="edgeClass()"
+  (close)="onClosed()"
+>
+  @if (proposal(); as proposal) {
+    <div class="rounded-t-md border-b px-4 py-2" [class]="bandClass()">
+      <h2 class="text-xs font-semibold tracking-wide uppercase" [class]="headingClass()">
+        {{ heading() }}
+      </h2>
+    </div>
+
+    <div class="space-y-3 px-4 py-3 text-sm leading-relaxed">
+      @if (proposal.kind === 'rewrite') {
+        <p>
+          Editing in the piano roll needs the song written out in full — one piece of text per note
+          it plays, one block per channel, and the octave, length, quantization and instrument
+          stated where each note needs them — so that every edit is a local change to the text.
+          Normalizing rewrites <strong>the whole document</strong> into that form. What plays does
+          not change.
+        </p>
+        <p>What changes in this song:</p>
+        <ul class="list-disc space-y-1 pl-5">
+          @for (change of proposal.changes; track $index) {
+            <li>{{ change }}</li>
+          }
+        </ul>
+        <p class="text-ink-muted font-mono text-xs">{{ proposal.size }}</p>
+        <p class="text-danger">
+          The loops, replacements and directives it writes out are gone from the text afterwards.
+          Undo puts the whole song back, in one step.
+        </p>
+      } @else if (proposal.kind === 'refused') {
+        <p>Nothing was changed. The song cannot be rewritten as it stands:</p>
+        <ul class="list-disc space-y-1 pl-5 font-mono text-xs">
+          @for (reason of proposal.reasons; track $index) {
+            <li>{{ reason }}</li>
+          }
+        </ul>
+      } @else {
+        <p>The song is already in the form the piano roll edits. Nothing was changed.</p>
+      }
+    </div>
+
+    <!-- Opening focuses the way out, so Enter cancels; Confirm takes nothing
+         until the hold has run down. -->
+    <div class="border-edge flex justify-end gap-2 border-t px-4 py-3">
+      @if (proposal.kind === 'rewrite') {
+        <button amk-button autofocus (click)="close()">Cancel</button>
+        <button amk-button variant="danger" [disabled]="holdFor() > 0" (click)="confirm()">
+          {{ confirmLabel() }}
+        </button>
+      } @else {
+        <button amk-button autofocus (click)="close()">Close</button>
+      }
+    </div>
+  }
+</dialog>

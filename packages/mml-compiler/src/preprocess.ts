@@ -22,6 +22,19 @@ export const TARGET_AM4 = -1;
 export const TARGET_AMM = -2;
 export const TARGET_NONE = 0;
 
+/**
+ * A run of the source this pass did not pass on, and why.
+ *
+ * `directive` is a `#define`-family line, `marker` the target marker, and
+ * `untaken` the text inside a false branch. The newlines inside a false branch
+ * are not removed, so line numbers hold, and are not listed here.
+ */
+export interface RemovedRange {
+	start: number;
+	end: number;
+	reason: "directive" | "marker" | "untaken";
+}
+
 export interface PreprocessResult {
 	text: string;
 	/**
@@ -38,8 +51,16 @@ export interface PreprocessResult {
 	origins: number[];
 	/** `-1` = `#am4`, `-2` = `#amm`, `0` = none, otherwise the `#amk` version. */
 	version: number;
+	/**
+	 * What was taken out, by source offset, in order. The complement of
+	 * `origins` for everything but comments, which `stripComments` removes
+	 * after the fact, and the newlines of a false branch, which stay.
+	 */
+	removed: RemovedRange[];
 	diagnostics: Diagnostic[];
 }
+
+const PREPROCESSOR_DIRECTIVES = new Set(["define", "undef", "ifdef", "ifndef", "if", "endif"]);
 
 const isSpace = (c: string): boolean => c === " " || c === "\t" || c === "\n" || c === "\r" || c === "\v" || c === "\f";
 
@@ -50,11 +71,27 @@ export function preprocess(source: string): PreprocessResult {
 
 	let out = "";
 	const origins: number[] = [];
+	const removed: RemovedRange[] = [];
 	let pos = 0;
 	let line = 1;
 	let level = 0;
 	let okayToAdd = true;
 	let version = TARGET_NONE;
+
+	/** Records a run that was not passed on, joining it to the previous run when they touch. */
+	const drop = (start: number, end: number, reason: RemovedRange["reason"]): void => {
+		if (end <= start) {
+			return;
+		}
+
+		const last = removed[removed.length - 1];
+		if (last && last.end === start && last.reason === reason) {
+			last.end = end;
+			return;
+		}
+
+		removed.push({ start, end, reason });
+	};
 
 	/**
 	 * Appends to the output, recording where it came from.
@@ -152,6 +189,10 @@ export function preprocess(source: string): PreprocessResult {
 			}
 
 			pos++;
+			if (!okayToAdd) {
+				drop(quoteAt, Math.min(pos, source.length), "untaken");
+			}
+
 			continue;
 		}
 
@@ -159,6 +200,8 @@ export function preprocess(source: string): PreprocessResult {
 			// Newlines survive even inside a false branch so line numbers hold.
 			if (okayToAdd || source[pos] === "\n") {
 				emit(source[pos], pos);
+			} else {
+				drop(pos, pos + 1, "untaken");
 			}
 
 			pos++;
@@ -166,6 +209,7 @@ export function preprocess(source: string): PreprocessResult {
 		}
 
 		const hashAt = pos;
+		const wasOkayToAdd = okayToAdd;
 		pos++;
 
 		// `#amk=1` predates the spaced form and is special-cased.
@@ -175,6 +219,7 @@ export function preprocess(source: string): PreprocessResult {
 			}
 
 			pos += 5;
+			drop(hashAt, pos, wasOkayToAdd ? "marker" : "untaken");
 			continue;
 		}
 
@@ -361,6 +406,16 @@ export function preprocess(source: string): PreprocessResult {
 					emit(`#${directive}`, hashAt);
 				}
 		}
+
+		// Whatever the branch consumed, from the `#` to where it stopped, is gone
+		// from the output — bar the unknown directive just handed on.
+		if (!wasOkayToAdd) {
+			drop(hashAt, pos, "untaken");
+		} else if (PREPROCESSOR_DIRECTIVES.has(directive)) {
+			drop(hashAt, pos, "directive");
+		} else if (directive === "amk" || directive === "amm" || directive === "am4") {
+			drop(hashAt, pos, "marker");
+		}
 	}
 
 	if (level !== 0) {
@@ -375,10 +430,10 @@ export function preprocess(source: string): PreprocessResult {
 	// AddmusicM songs keep their semicolons; everything else has them stripped
 	// here, which is why the scanner treats a stray `;` as an error.
 	if (version !== TARGET_AMM) {
-		return { ...stripComments(out, origins), version, diagnostics };
+		return { ...stripComments(out, origins), version, removed, diagnostics };
 	}
 
-	return { text: out, origins, version, diagnostics };
+	return { text: out, origins, version, removed, diagnostics };
 }
 
 function stripComments(text: string, origins: number[]): { text: string; origins: number[] } {

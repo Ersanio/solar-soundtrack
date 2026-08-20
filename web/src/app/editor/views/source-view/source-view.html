@@ -8,6 +8,29 @@
     <amk-icon-wrap />
   </button>
 
+  <!-- The view's own history, which the keyboard reaches already; the same two
+       commands for the mouse. -->
+  <div class="flex items-center gap-1">
+    <button
+      type="button"
+      class="border-edge text-ink-muted hover:not-disabled:text-ink cursor-pointer rounded-md border px-1.5 py-1.5 transition-colors disabled:cursor-not-allowed disabled:opacity-40"
+      [title]="`Undo (${historyKeys.undo})`"
+      [disabled]="!canUndo()"
+      (click)="undo()"
+    >
+      <amk-icon-undo />
+    </button>
+    <button
+      type="button"
+      class="border-edge text-ink-muted hover:not-disabled:text-ink cursor-pointer rounded-md border px-1.5 py-1.5 transition-colors disabled:cursor-not-allowed disabled:opacity-40"
+      [title]="`Redo (${historyKeys.redo})`"
+      [disabled]="!canRedo()"
+      (click)="redo()"
+    >
+      <amk-icon-redo />
+    </button>
+  </div>
+
   <button
     type="button"
     class="text-ink-muted hover:text-ink cursor-pointer text-xs font-semibold tracking-wide uppercase"
@@ -17,7 +40,9 @@
     {{ paletteOpen() ? '▾' : '▸' }} Commands
   </button>
 
-  <span class="text-ink-muted ml-auto font-mono text-xs">{{ store.caretLabel() }}</span>
+  <amk-normalize-button />
+
+  <span class="text-ink-muted font-mono text-xs">{{ store.caretLabel() }}</span>
 </amk-toolbar>
 
 <!-- Above the editor rather than beside it: what it writes lands at the caret,
