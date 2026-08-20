@@ -1,6 +1,14 @@
 import { Component, computed, input, linkedSignal, output, signal } from '@angular/core';
 
-import { clamp } from '../../util/math';
+import {
+  mirror,
+  readout,
+  trackBounds,
+  trackFraction,
+  trackImage,
+  trackPosition,
+  valueAt,
+} from './slider-track';
 
 /**
  * A labelled range input that reports a drag and a commit separately.
@@ -109,122 +117,36 @@ export class Slider {
 
   protected readonly shown = computed(() => this.pending() ?? this.value());
 
-  protected readonly lowerBound = computed(() => (this.stops() ? 0 : this.min()));
-  protected readonly upperBound = computed(() => {
-    const stops = this.stops();
-    return stops ? Math.max(0, stops.length - 1) : this.max();
-  });
+  /** The track's own coordinate space: indices over the stops, or the plain range. */
+  private readonly bounds = computed(() => trackBounds(this.stops(), this.min(), this.max()));
 
-  /**
-   * Where the thumb sits: the value itself, or its index among the stops.
-   *
-   * A value that is not a stop takes the nearest index, so the thumb is never
-   * left somewhere the track cannot represent.
-   */
-  protected readonly position = computed(() => {
-    const stops = this.stops();
-    if (!stops) {
-      return this.shown();
-    }
+  protected readonly lowerBound = computed(() => this.bounds().low);
+  protected readonly upperBound = computed(() => this.bounds().high);
 
-    const value = this.shown();
-    let best = 0;
-    let error = Infinity;
-    for (let i = 0; i < stops.length; i++) {
-      const distance = Math.abs(stops[i] - value);
-      if (distance < error) {
-        error = distance;
-        best = i;
-      }
-    }
+  /** Where the thumb sits, before any mirroring. */
+  private readonly position = computed(() => trackPosition(this.shown(), this.stops()));
 
-    return best;
-  });
+  /** Where it physically sits — {@link position} reflected when `invert` is set. */
+  protected readonly trackPosition = computed(() =>
+    mirror(this.position(), this.bounds(), this.invert()),
+  );
 
-  /**
-   * {@link position} mirrored when {@link invert} is set — where the thumb
-   * physically sits.
-   *
-   * Mirroring the coordinate rather than setting `direction: rtl`, which is the
-   * other way to reverse a range input and is honoured inconsistently: Firefox
-   * and WebKit disagree about whether it also flips the keyboard arrows. Doing
-   * the arithmetic means every browser and every input method agrees, at the
-   * cost of one line here and one in {@link onInput}.
-   */
-  protected readonly trackPosition = computed(() => this.mirror(this.position()));
-
-  /** Its own inverse — the mirror of a mirror is the original. */
-  private mirror(coordinate: number): number {
-    return this.invert() ? this.lowerBound() + this.upperBound() - coordinate : coordinate;
-  }
-
-  /** The thumb's place along the track, 0–1, as drawn. */
-  private readonly fraction = computed(() => {
-    const span = this.upperBound() - this.lowerBound();
-    return span === 0 ? 0 : (this.trackPosition() - this.lowerBound()) / span;
-  });
-
-  /**
-   * The whole track, as one gradient on the input itself.
-   *
-   * Drawn here rather than through `::-webkit-slider-runnable-track` and
-   * `::-moz-range-track`, which cannot be given the same declaration in one rule
-   * — a browser drops a whole selector list it does not recognise, so styling
-   * both means writing everything twice and keeping the copies in step. A
-   * background on the element is one declaration every browser already agrees
-   * about, and the vendor tracks are only made transparent so it shows through.
-   *
-   * The stripe *is* the input's content box — 12px of it, held there by 2px of
-   * vertical padding — and the background is clipped to it. That is what rounds
-   * the ends: `border-radius` clips a background at the content edge with the
-   * radius reduced by the padding, so a pill on the 16px box arrives at the
-   * stripe as exactly half its height. Sizing the stripe with `background-size`
-   * instead paints the same pixels but leaves nothing to round them against.
-   *
-   * The centre tick is part of the same gradient rather than an element beside
-   * it, so it cannot drift out of alignment with the fill it marks.
-   */
-  protected readonly trackImage = computed(() => {
-    const track = 'var(--color-edge)';
-    const fill = 'var(--color-accent)';
-    const at = clamp(this.fraction() * 100, 0, 100);
-
-    if (this.origin() !== 'centre') {
-      return `linear-gradient(to right, ${fill} 0 ${at}%, ${track} ${at}% 100%)`;
-    }
-
-    const [from, to] = at < 50 ? [at, 50] : [50, at];
-
-    // The detent is listed first, which in CSS puts it *over* the fill — and it
-    // has to be, because the fill always reaches the centre by definition, so a
-    // mark underneath it could never be seen at any value.
-    return (
-      `linear-gradient(to right, transparent 0 calc(50% - 1px),` +
-      ` var(--color-ink-muted) calc(50% - 1px) calc(50% + 1px), transparent calc(50% + 1px) 100%),` +
-      ` linear-gradient(to right, ${track} 0 ${from}%, ${fill} ${from}% ${to}%,` +
-      ` ${track} ${to}% 100%)`
-    );
-  });
+  protected readonly trackImage = computed(() =>
+    trackImage(trackFraction(this.trackPosition(), this.bounds()), this.origin() === 'centre'),
+  );
 
   protected readonly endLabels = computed(() => {
     const ends = this.ends();
     return ends ? { low: ends[0], high: ends[1] } : null;
   });
 
-  protected readonly display = computed(() => {
-    const label = this.valueLabel();
-    if (label !== null) {
-      return label;
-    }
-
-    const value = this.shown();
-    return this.signed() && value > 0 ? `+${value}` : String(value);
-  });
+  protected readonly display = computed(() =>
+    readout(this.shown(), this.valueLabel(), this.signed()),
+  );
 
   protected onInput(event: Event): void {
-    const raw = this.mirror(Number((event.target as HTMLInputElement).value));
-    const stops = this.stops();
-    const value = stops ? (stops[raw] ?? this.value()) : raw;
+    const raw = Number((event.target as HTMLInputElement).value);
+    const value = valueAt(raw, this.stops(), this.bounds(), this.invert(), this.value());
     this.dragging.set(true);
     this.pending.set(value);
     this.preview.emit(value);
