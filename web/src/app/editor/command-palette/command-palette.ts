@@ -1,6 +1,7 @@
 import { Component, computed, effect, inject, signal } from '@angular/core';
 
 import { channelsBeginAt, hasDialectMarker, targetAt } from '@amk/tokens/dialect';
+import { EditorRequests } from '../../state/editor-requests';
 import { EditorStore } from '../../state/editor-store';
 import {
   CATEGORIES,
@@ -46,6 +47,8 @@ function readFilter(): Filter {
 })
 export class CommandPalette {
   private readonly store = inject(EditorStore);
+
+  private readonly requests = inject(EditorRequests);
 
   protected readonly CATEGORIES = CATEGORIES;
 
@@ -167,6 +170,6 @@ export class CommandPalette {
   }
 
   protected insert(entry: ResolvedEntry): void {
-    this.store.insert(entry.text, entry.select);
+    this.requests.insert(entry.text, entry.select);
   }
 }

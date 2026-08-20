@@ -6,6 +6,7 @@ import type { InstrumentDefinition } from '@amk/tokens';
 import { encodeTuning, noiseHz, tuningMultiplier, tuningSemitones } from '@amk/spc/adsr';
 import { type EnumOption, EnumSelect } from '../../../shared/enum-select/enum-select';
 import { Slider } from '../../../shared/slider/slider';
+import { EditorRequests } from '../../../state/editor-requests';
 import { EditorStore } from '../../../state/editor-store';
 import { SampleStore } from '../../../state/sample-store';
 import { hex2 } from '../../../util/format';
@@ -39,6 +40,8 @@ const SAMPLE_FORMS: readonly EnumOption[] = [
 })
 export class InstrumentEntryEditor {
   private readonly store = inject(EditorStore);
+
+  private readonly requests = inject(EditorRequests);
   private readonly library = inject(SampleStore);
 
   readonly entry = input.required<InstrumentDefinition>();
@@ -254,7 +257,7 @@ export class InstrumentEntryEditor {
     );
   }
 
-  private write(edit: Parameters<EditorStore['apply']>[0]): void {
-    this.store.apply(edit);
+  private write(edit: Parameters<EditorRequests['apply']>[0]): void {
+    this.requests.apply(edit);
   }
 }

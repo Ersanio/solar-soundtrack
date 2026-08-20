@@ -10,6 +10,7 @@ import {
 import type { Command } from '@amk/tokens';
 import { argLockedBecause } from '../commands/context';
 import { Slider } from '../../../shared/slider/slider';
+import { EditorRequests } from '../../../state/editor-requests';
 import { EditorStore } from '../../../state/editor-store';
 import { velocityTableAt } from '@amk/tokens/dialect';
 import { hex2 } from '../../../util/format';
@@ -43,6 +44,8 @@ import { dragPreview } from '../commands/preview';
 })
 export class QuantizationCommand {
   private readonly store = inject(EditorStore);
+
+  private readonly requests = inject(EditorRequests);
 
   readonly command = input.required<Command>();
 
@@ -147,6 +150,6 @@ export class QuantizationCommand {
 
   /** `q`'s argument is read with `getHex` (`parser.ts`'s `parseQuantization`), so it is written bare. */
   private write(value: number): void {
-    this.store.apply(spliceArg(this.store.source(), this.command(), 0, hex2(value)));
+    this.requests.apply(spliceArg(this.store.source(), this.command(), 0, hex2(value)));
   }
 }

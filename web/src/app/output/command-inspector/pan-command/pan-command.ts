@@ -13,7 +13,9 @@ import { panLabel } from '@amk/tokens/commands/units';
 import { argLockedBecause, commandLockedBecause } from '../commands/context';
 import { EnumSelect } from '../../../shared/enum-select/enum-select';
 import { Slider } from '../../../shared/slider/slider';
+import { EditorRequests } from '../../../state/editor-requests';
 import { EditorStore } from '../../../state/editor-store';
+import { hex2 } from '../../../util/format';
 import { dragPreview } from '../commands/preview';
 
 /** `y`'s second and third arguments, and the two bits they set. */
@@ -45,6 +47,8 @@ const SURROUND = [
 })
 export class PanCommand {
   private readonly store = inject(EditorStore);
+
+  private readonly requests = inject(EditorRequests);
 
   readonly command = input.required<Command>();
 
@@ -83,7 +87,7 @@ export class PanCommand {
     // with all five bits it kept, so anything past $14 reads off the end.
     this.shownPan() > 0x14
       ? `past the driver's 21-entry pan table, which ends at $14`
-      : `$${this.shownPan().toString(16).toUpperCase().padStart(2, '0')} of $14`,
+      : `$${hex2(this.shownPan())} of $14`,
   );
 
   /**
@@ -171,22 +175,22 @@ export class PanCommand {
       // panel's call to make.
       const kept = this.byte() & 0x20;
       const byte = (pan & 0x1f) | (left << 7) | (right << 6) | kept;
-      this.store.apply(spliceArg(source, command, 0, argumentText(command, byte)));
+      this.requests.apply(spliceArg(source, command, 0, argumentText(command, byte)));
       return;
     }
 
     if (command.args.length >= 3) {
-      this.store.apply(spliceArgs(source, command, [String(pan), String(left), String(right)]));
+      this.requests.apply(spliceArgs(source, command, [String(pan), String(left), String(right)]));
       return;
     }
 
     if (left === 0 && right === 0) {
-      this.store.apply(spliceArg(source, command, 0, String(pan)));
+      this.requests.apply(spliceArg(source, command, 0, String(pan)));
       return;
     }
 
     // Music.cpp:718 errors on a second argument without a third, so turning one
     // flag on has to write all three.
-    this.store.apply(spliceCommand(source, command, `${command.kind}${pan},${left},${right}`));
+    this.requests.apply(spliceCommand(source, command, `${command.kind}${pan},${left},${right}`));
   }
 }

@@ -3,6 +3,7 @@ import { Component, computed, inject, input } from '@angular/core';
 import { argsRewritable, commandRewritable, spliceArgs, spliceCommand } from '@amk/tokens/edits';
 import type { Command } from '@amk/tokens';
 import { commandLockedBecause } from '../commands/context';
+import { EditorRequests } from '../../../state/editor-requests';
 import { EditorStore } from '../../../state/editor-store';
 import { hex2 } from '../../../util/format';
 import { type EnvelopeValue, EnvelopeTuner } from '../envelope-tuner/envelope-tuner';
@@ -29,6 +30,8 @@ import { type EnvelopeValue, EnvelopeTuner } from '../envelope-tuner/envelope-tu
 })
 export class AdsrCommand {
   private readonly store = inject(EditorStore);
+
+  private readonly requests = inject(EditorRequests);
 
   readonly command = input.required<Command>();
 
@@ -69,7 +72,7 @@ export class AdsrCommand {
     // A half-written `$ED` has fewer argument spans than there are bytes to
     // write, so there is nowhere to splice the missing one.
     if (!command.complete) {
-      this.store.apply(spliceCommand(source, command, `$ED $${hex2(first)} $${hex2(second)}`));
+      this.requests.apply(spliceCommand(source, command, `$ED $${hex2(first)} $${hex2(second)}`));
       return;
     }
 
@@ -80,7 +83,7 @@ export class AdsrCommand {
     const [wasFirst, wasSecond] = this.args();
     const keepFirst = gain && this.isGain();
 
-    this.store.apply(
+    this.requests.apply(
       spliceArgs(source, command, [
         keepFirst || first === wasFirst ? null : `$${hex2(first)}`,
         second === wasSecond ? null : `$${hex2(second)}`,
