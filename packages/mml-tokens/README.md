@@ -50,8 +50,17 @@ split across a line break still resolves. The target-program forks (`#am4`'s `$E
 
 One deliberate difference there: `preprocess.ts` resolves the markers before the parser runs, so the
 file's last effective marker governs the _whole_ song, where a resumable scanner can only apply a
-marker from its line down. Well-formed songs put the marker before any music, where the two agree;
-the mid-file divergence is pinned in `tokentest`.
+marker from its line down. `Command.target` takes the positional reading, and has to — `scanHex`
+counts a command's argument bytes as it meets them, and `#am4`'s `$ED` and `#amk 1`'s `$FC` swallow
+different numbers of them, so a command already scanned must keep answering for the marker that was
+standing when it was scanned or `expectedArgs` would contradict the tokens. `tokentest` pins that.
+
+**Asking about the song rather than about a command is the other question, and `dialect.ts:songTarget`
+answers it whole-file**, because that is what the compiler does. A `#amk 2` written on the last line
+is what the song compiles as, and the command palette gates its buttons on that — text a porter is
+about to write has no scanned tokens to be positional about. It is the last entry in
+`TokenIndex.targets`, which is the scanner's own state at the end of the document, so the precedence
+rules stay in `scanHash`; `palettetest` pins the orderings with the markers written _below_ the music.
 
 Replacements — `"echo1=$EF"` and then a bare `echo1` — are followed, because writing commands that
 way is ordinary and an inspector that went blank on them would be blind to whole songs. `ScanState`
@@ -159,7 +168,19 @@ command's bytes mean once they are written; this says whether the dialect the so
 take that command at all — which is what a palette needs, because it has to grey a button out
 _before_ there is any text to diagnose. Every rule in it is a condition `parser.ts` already tests,
 restated as a question rather than a check, and `palettetest` compiles every form at every dialect
-to hold the two answers together.
+to hold the two answers together: `blocked` means the compile is not clean, `caution` means there is
+a warning to read, `ok` means silence.
+
+**The compiler is the whole of its oracle, and that bounds what it may say.** A byte that compiles
+without a word and then jumps the SPC to `$0000` — `$F7`, a `$DD` written anywhere but straight after
+a note — has no state here, and neither has `#am4`'s `$E4`, which the parser rewrites in silence.
+Those live beside the button as the catalogue's `caveat` rather than inside the model, because a rule
+no harness can check is a rule that drifts.
+
+Warnings only. Where a dialect refuses a spelling the palette writes the bytes it would have compiled
+to instead, and says nothing — a porter asked for a volume fade and gets one, and which of the two
+spellings their `#amk` line takes is the palette's business rather than theirs. `palettetest`
+compiles both forms and compares them byte for byte, and that proof is what lets the swap stay quiet.
 
 One rule keeps the tables honest: **a descriptor never states how many arguments a command takes.**
 `tokens.ts` already carries that twice on purpose — as `scanHex`'s `hexLeft` mutations and as

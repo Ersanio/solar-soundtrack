@@ -1,5 +1,6 @@
 import { TICKS_PER_WHOLE } from "@amk/core/hardcoded-tables";
 import { noiseHz } from "@amk/spc/adsr";
+import { isFade } from "../tokens";
 import { DURATION, type Resolver, TEMPO_FADE_DURATION, fixed, s8, ticks, u8 } from "./param";
 import { noteLengthName, percentOf255, tempoLabel } from "./units";
 
@@ -12,20 +13,28 @@ const MAX_TEMPO = 254;
  * `v`, `w` and `t`: one argument sets, two fade. `parser.ts:parseFadeableValue`,
  * `parseTempo`. The comma form compiles to `$E8` / `$E1` / `$E3`, so it is shown
  * as those are — same descriptors, same order, duration first.
+ *
+ * Below `#amk 3` the comma is not looked for, so the second number is not an
+ * argument at all: `isFade` is the test both this and `gather`'s naming make,
+ * and what is left is the plain form with a warning after it (AMK0100).
  */
 function fadeable(name: string, describe: (value: number) => string | null): Resolver {
 	return (command) => {
 		const target = u8(name, "level", { describe });
-		if (command.args.length < 2) {
-			return { params: [target] };
+		if (!isFade(command.kind, command.args.length, command.target)) {
+			return {
+				params: [target],
+				note: command.args.length >= 2 ? NOT_A_FADE : undefined,
+			};
 		}
 
-		return {
-			params: [DURATION, target],
-			note: "Two arguments make this a fade, which needs #amk 3 or above.",
-		};
+		return { params: [DURATION, target] };
 	};
 }
+
+/** Said where a comma was written and the dialect does not read one. */
+const NOT_A_FADE =
+	"The comma form needs #amk 4, so only the first number takes effect here; the rest is read as stray characters.";
 
 /** The vibrato rate. */
 const RATE = u8("Rate", "rate", {
@@ -106,12 +115,14 @@ export const LETTER_PARAMS: Readonly<Record<string, Resolver>> = {
 		});
 
 		const ceiling = "Stops at 254: the driver adds one, so t255 would be tempo 0 and the song would freeze.";
-		return command.args.length >= 2
-			? {
-					params: [TEMPO_FADE_DURATION, target],
-					note: `A tempo fade, which needs #amk 3 or above. ${ceiling}`,
-				}
-			: { params: [target], note: ceiling };
+		if (isFade(command.kind, command.args.length, command.target)) {
+			return { params: [TEMPO_FADE_DURATION, target], note: `A tempo fade. ${ceiling}` };
+		}
+
+		return {
+			params: [target],
+			note: command.args.length >= 2 ? `${NOT_A_FADE} ${ceiling}` : ceiling,
+		};
 	},
 	v: fadeable("Volume", percentOf255),
 	w: fadeable("Global volume", percentOf255),

@@ -1,6 +1,6 @@
 import { Component, computed, effect, inject, signal } from '@angular/core';
 
-import { channelsBeginAt, hasDialectMarker, targetAt } from '@amk/tokens/dialect';
+import { channelsBeginAt, hasDialectMarker, songTarget } from '@amk/tokens/dialect';
 import { EditorRequests } from '../../state/editor-requests';
 import { EditorStore } from '../../state/editor-store';
 import {
@@ -43,7 +43,8 @@ function chipClass(selected: boolean): string {
  *
  * `caution` keeps the button live: AddmusicK compiles those, and a control that
  * refused what the real tool accepts would be the compiler being permissive in
- * the other direction.
+ * the other direction. A `caveat` wears the same colour for the same reason —
+ * it is worth reading first and it is not a refusal.
  */
 function entryClass(entry: ResolvedEntry): string {
   const base =
@@ -52,7 +53,7 @@ function entryClass(entry: ResolvedEntry): string {
     return `${base} text-ink-muted`;
   }
 
-  return entry.availability.state === 'caution'
+  return entry.availability.state === 'caution' || entry.caveat !== undefined
     ? `${base} text-warn border-warn/40 hover:border-warn`
     : `${base} text-ink-muted hover:text-ink hover:border-accent`;
 }
@@ -61,8 +62,9 @@ function entryClass(entry: ResolvedEntry): string {
  * The command palette: every hex and letter command, one click from the caret.
  *
  * It sits above the editor rather than beside it because what it writes lands at
- * the caret, and it reads the dialect at the caret rather than the file's, so the
- * buttons answer for the place the text is actually going.
+ * the caret. Two things decide what it offers there: the song's dialect, which
+ * is the whole file's, and whether the caret is above the first channel, which
+ * only the two remote forms care about.
  *
  * Inserting is deliberately only half the job. The defaults are chosen to be
  * sane, not right, and the command inspector in the output pane picks the new
@@ -90,16 +92,21 @@ export class CommandPalette {
   protected readonly filter = signal<Filter>(readFilter());
 
   /**
-   * The dialect where the caret is, off the undebounced scan, so editing the
+   * The dialect the song compiles as, off the undebounced scan, so editing the
    * `#amk` line re-reads the palette on the keystroke rather than a compile
    * later.
    *
-   * The custom `equal` is what keeps that cheap: `targetAt` returns a fresh
+   * The whole file, not the text above the caret: `preprocess.ts` resolves the
+   * markers before the parser runs, so a `#amk 2` on the last line governs a
+   * command written on the first, and a palette that answered for the caret
+   * would offer `#amk 4`'s forms to a song that is not one.
+   *
+   * The custom `equal` is what keeps that cheap: `songTarget` returns a fresh
    * object per scan and the scan is rebuilt on every keystroke, so without it
    * every character retyped the whole button list for a dialect that had not
    * moved.
    */
-  protected readonly target = computed(() => targetAt(this.store.tokens(), this.store.caret()), {
+  protected readonly target = computed(() => songTarget(this.store.tokens()), {
     equal: (a, b) => a.program === b.program && a.amkVersion === b.amkVersion,
   });
 
@@ -125,7 +132,7 @@ export class CommandPalette {
    * of the two this is keeps the chip from looking like a fact.
    */
   protected readonly assumed = computed(
-    () => !hasDialectMarker(this.store.tokens(), this.store.source(), this.store.caret()),
+    () => !hasDialectMarker(this.store.tokens(), this.store.source()),
   );
 
   /**
@@ -145,12 +152,14 @@ export class CommandPalette {
       return null;
     }
 
+    // The reason a button is greyed out matters more than what it would have
+    // done, so it replaces the blurb rather than following it. A caveat is the
+    // other way round: the command still does what the blurb says.
+    const said = entry.availability.reason ?? entry.blurb;
     return {
       label: entry.label,
-      // The reason a button is greyed out matters more than what it would have
-      // done, so it replaces the blurb rather than following it.
-      text: entry.availability.reason ?? entry.blurb,
-      muted: entry.availability.state === 'ok',
+      text: entry.caveat ? `${said} ${entry.caveat}` : said,
+      muted: entry.availability.state === 'ok' && entry.caveat === undefined,
     };
   });
 

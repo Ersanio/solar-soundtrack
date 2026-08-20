@@ -69,36 +69,30 @@ const LEGAL_VERSIONS = [1, 2, 4];
 /**
  * `blocked` below `least`, advising the lowest legal marker that satisfies it.
  *
- * `instead` says what the dialect makes of the text when it does not error on
- * it, which matters more than the rule: `parseTempo` below `#amk 3` simply does
- * not look for the comma, so `t18,144` is read as `t18` with the rest warned
- * over character by character (AMK0100) and the song still builds. A form that
- * quietly means something else is exactly the one worth refusing to write.
+ * One sentence, because it is read where a greyed-out button is hovered and the
+ * only question there is what the song would have to be. Where the palette has
+ * a spelling it can write instead it does not come to this at all.
  */
-function needsVersion(target: CommandTarget, least: number, what: string, instead?: string): Availability | null {
+function needsVersion(target: CommandTarget, least: number, what: string): Availability | null {
 	if (target.program === 0 && target.amkVersion >= least) {
 		return null;
 	}
 
 	const advise = LEGAL_VERSIONS.find((version) => version >= least) ?? least;
-	const rule = `${what} needs #amk ${advise}; this song is ${dialectName(target)}.`;
-	return blocked(instead ? `${rule} ${instead}` : rule);
+	return blocked(`${what} needs #amk ${advise}; this song is ${dialectName(target)}.`);
 }
 
 export function formAvailability(form: PaletteForm, target: CommandTarget): Availability {
 	if (form.kind === "syntax") {
 		switch (form.id) {
 			// `parseFadeableValue` (`parser.ts:1520`) and `parseTempo` (`:1664`) both
-			// only look for the comma at `#amk 3` and above.
+			// only look for the comma at `#amk 3` and above; below it the comma is
+			// not looked for at all, so `t18,144` is `t18` and the rest is warned
+			// over character by character (AMK0100). A form that quietly means
+			// something else is one to refuse, which is why the state matters here
+			// even though the palette writes `$E3` rather than showing the reason.
 			case "fade":
-				return (
-					needsVersion(
-						target,
-						3,
-						"The comma fade form",
-						"Here the comma is not looked for at all, so only the first number would take effect.",
-					) ?? OK
-				);
+				return needsVersion(target, 3, "The comma fade form") ?? OK;
 			// `parseDefaultLength` (`parser.ts:1453`).
 			case "exactLength":
 				return needsVersion(target, 4, "An exact tick length (l=NN)") ?? OK;
@@ -112,8 +106,14 @@ export function formAvailability(form: PaletteForm, target: CommandTarget): Avai
 	}
 
 	if (form.kind === "letter") {
-		// Every letter in `LETTER_NAMES` parses in every dialect; only their comma
-		// and `=` forms are gated, and those are `syntax` forms of their own.
+		// `parser.ts:parseTranspose` — AMK0205, the one letter with a dialect rule
+		// of its own.
+		if (form.letter === "h" && target.program === 1) {
+			return caution('The "h" command is not native to Addmusic 4.05; AddmusicK warns (AMK0205).');
+		}
+
+		// Every other letter in `LETTER_NAMES` parses in every dialect; only their
+		// comma and `=` forms are gated, and those are `syntax` forms of their own.
 		return OK;
 	}
 

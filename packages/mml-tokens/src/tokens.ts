@@ -171,6 +171,25 @@ const LETTER_FADE_NAMES: Readonly<Record<string, string>> = {
 	w: "global volume fade",
 };
 
+/**
+ * Whether a second argument makes this letter a fade under the dialect it was
+ * written for.
+ *
+ * `parseFadeableValue` (`parser.ts:1520`) and `parseTempo` (`:1664`) look for
+ * the comma only at `#amk 3` and above; below it `t18,144` is `t18`, and the
+ * rest is reported character by character (AMK0100). Naming it a fade anywhere
+ * else would put the word on the roll, the hover and the inspector for a song
+ * where no fade happens.
+ */
+export function isFade(letter: string, argCount: number, target: CommandTarget): boolean {
+	return (
+		argCount >= 2 &&
+		target.program === 0 &&
+		target.amkVersion >= 3 &&
+		LETTER_FADE_NAMES[letter.toLowerCase()] !== undefined
+	);
+}
+
 /** Which `TokenKind` a command letter introduces. */
 export const LETTER_KINDS: Readonly<Record<string, TokenKind>> = {
 	t: "tempo",
@@ -1265,9 +1284,13 @@ export interface TokenIndex {
 	 */
 	instruments: InstrumentDefinition[];
 	/**
-	 * Where the dialect changed, in source order, so a caller can ask what was in
-	 * force at an offset no command sits at. Empty when the song never moves off
-	 * {@link DEFAULT_TARGET}. See `dialect.ts:targetAt`.
+	 * Where the dialect changed, in source order. Empty when the song never moves
+	 * off {@link DEFAULT_TARGET}.
+	 *
+	 * Read two ways, for two different questions. `gather` walks them in order to
+	 * stamp each command with the marker standing where it was written, which is
+	 * the reading `scanHex`'s byte counting requires. `dialect.ts:songTarget`
+	 * takes the last of them, which is the dialect the file compiles as.
 	 */
 	targets: TargetTransition[];
 }
@@ -1892,7 +1915,7 @@ function gather(tokens: GatherToken[], text: string, transitions: TargetTransiti
 		commands.push({
 			kind: letter,
 			name:
-				(args.length >= 2 ? LETTER_FADE_NAMES[letter.toLowerCase()] : undefined) ??
+				(isFade(letter, args.length, target) ? LETTER_FADE_NAMES[letter.toLowerCase()] : undefined) ??
 				LETTER_NAMES[letter.toLowerCase()] ??
 				nameForNote(token.kind),
 			span: { start: token.start, end: last.end, line: token.line },

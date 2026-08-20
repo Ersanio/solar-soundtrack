@@ -1,7 +1,7 @@
 /**
  * The command palette's catalogue.
  *
- * Two assertions carry the weight here, and neither is visible from the table
+ * Four assertions carry the weight here, and none is visible from the table
  * itself:
  *
  * 1. **The palette is not a third statement of arity.** An entry lists argument
@@ -14,9 +14,23 @@
  *    entry claims what AddmusicK will make of it under each dialect;
  *    `formAvailability` is a port of conditions `parser.ts` tests on text that
  *    exists, asked about text that does not. This compiles each snippet in a
- *    minimal song and checks the claim against what actually comes back. A
- *    `blocked` entry that compiles cleanly is a button greyed out for nothing;
- *    an `ok` entry that errors is the one promise the palette makes, broken.
+ *    minimal song and checks all three states against what actually comes back.
+ *    A `blocked` entry that compiles cleanly is a button greyed out for nothing;
+ *    an `ok` entry that errors is the one promise the palette makes, broken; and
+ *    a `caution` is a warning the author is told to read, so there has to be one.
+ *    What the compiler cannot answer — the driver's own lethal bytes, a dialect
+ *    that rewrites in silence — is a `caveat` and is checked only for compiling.
+ *
+ * 3. **Every command stays reachable in every dialect.** Coverage counted at
+ *    `#amk 4` alone misses the case that matters: a byte whose only spelling is
+ *    a form the dialect refuses is a byte no button can write there, and the
+ *    three fades are exactly that below `#amk 3`.
+ *
+ * 4. **A spelling swapped for its bytes is the same command, and says nothing
+ *    about it.** Where a dialect refuses the written form, the button writes
+ *    what it would have compiled to — so both are compiled where each is legal
+ *    and compared byte for byte, which is `SUPERSEDED`'s standard applied to the
+ *    other direction. Proving them equal is what lets the swap stay quiet.
  *
  *   npm run palettetest
  */
@@ -26,7 +40,8 @@ import { join } from "node:path";
 
 import { compiler } from "@amk/compiler";
 import { type CommandTarget, commandAt, expectedArgs, tokenize, VCMD_NAMES } from "@amk/tokens";
-import { channelsBeginAt, targetAt } from "@amk/tokens/dialect";
+import { formAvailability } from "@amk/tokens/commands/availability";
+import { channelsBeginAt, songTarget } from "@amk/tokens/dialect";
 import { ENTRIES, type ResolvedEntry, resolveEntry } from "../web/src/app/editor/command-palette/catalog";
 import { GLYPH_NAMES } from "../web/src/app/editor/command-palette/command-icon";
 import { glyphOf } from "../web/src/app/editor/command-palette/glyph-of";
@@ -178,6 +193,39 @@ console.log("\ncatalogue");
 
 	check("every VCMD $DA-$FE has an entry or a letter form that writes it", missing.length === 0, missing.join(" "));
 
+	// And in every dialect, not only the one above. A byte whose every spelling is
+	// a form the dialect refuses is a byte the palette cannot write there at all,
+	// which coverage counted at `#amk 4` cannot see — `$E1`, `$E3` and `$E8` are
+	// the three fades, and the forms that write them are gated at `#amk 3`.
+	//
+	// Only of the bytes the dialect itself will take: `#amm` refuses `$FA`
+	// outright (AMK0156), and a button for it would be the palette offering what
+	// AddmusicK does not.
+	//
+	// One allowance, and not a gap: at `#amk 1` a hand-written `$FC` is remote
+	// gain and takes two arguments (`parser.ts:parseHexCommand`), so the byte is
+	// reachable in the language but is not the command any entry names. A button
+	// for it would be a fourth remote entry existing in one dialect, and the
+	// catalogue offers a command rather than a byte.
+	const EXEMPT: Readonly<Record<string, number>> = { "#amk 1": 0xfc };
+	for (const { marker, target } of DIALECTS) {
+		const live = new Set(
+			resolveAll(target, false)
+				.filter((entry) => entry.availability.state !== "blocked")
+				.flatMap((entry) => [entry.vcmd, entry.writes])
+				.filter((vcmd) => vcmd !== undefined),
+		);
+		const unreachable: string[] = [];
+		for (let vcmd = 0xda; vcmd <= 0xfe; vcmd++) {
+			const takes = formAvailability({ kind: "hex", vcmd }, target).state !== "blocked";
+			if (takes && !live.has(vcmd) && EXEMPT[marker] !== vcmd) {
+				unreachable.push(hex(vcmd));
+			}
+		}
+
+		check(`${marker}: every VCMD $DA-$FE it takes is still reachable`, unreachable.length === 0, unreachable.join(" "));
+	}
+
 	const claimed = SUPERSEDED.filter((row) => offered.has(row.vcmd)).map((row) => hex(row.vcmd));
 	check("nothing is both offered and superseded", claimed.length === 0, claimed.join(", "));
 
@@ -283,6 +331,44 @@ for (const row of SUPERSEDED) {
 	);
 }
 
+// The substitutions, held to the same standard.
+//
+// A dialect that refuses a spelling gets the bytes it would have compiled to
+// instead — so the button keeps its name, and "does the same thing" in its
+// readout has to be true. Both spellings are compiled at `#amk 4`, where the
+// dialect takes each, and compared. The pair is read off the entries themselves:
+// an entry whose text moves between dialects is one that substitutes.
+console.log("\nsubstituted");
+
+for (const entry of ENTRIES) {
+	const spelled = resolveEntry(entry, DIALECTS[2].target, { beforeChannels: false });
+	const swapped = DIALECTS.map((dialect) => resolveEntry(entry, dialect.target, { beforeChannels: false })).find(
+		(resolved) => resolved.text !== spelled.text,
+	);
+
+	if (swapped === undefined) {
+		continue;
+	}
+
+	const data = (body: string) => compiler.compile({ source: `#amk 4\n#0 c4 ${body}\n`, aramAddress: ARAM }).data;
+	const fromSpelling = data(spelled.text);
+	const fromHex = data(swapped.text);
+	check(
+		`${spelled.key}: "${spelled.text}" compiles to exactly "${swapped.text}"`,
+		fromSpelling !== null &&
+			fromHex !== null &&
+			fromSpelling.length === fromHex.length &&
+			fromSpelling.every((value, index) => value === fromHex[index]),
+		`${fromSpelling?.length ?? "no"} bytes against ${fromHex?.length ?? "no"}`,
+	);
+
+	// And that it says nothing about having done so. The button is named for the
+	// command, both spellings are that command, and which one a dialect takes is
+	// not the porter's business — a `caveat` here would cost the button its
+	// ordinary colour for no warning worth reading.
+	check(`${spelled.key}: swaps silently`, swapped.caveat === undefined, swapped.caveat);
+}
+
 // A snippet is one run of MML on one line. A newline would break the line-oriented
 // scanner's account of it, a `"` would open a replacement definition, and a `;`
 // survives preprocessing under `#amm` (`preprocess.ts`) and would comment out the
@@ -301,15 +387,25 @@ for (const row of SUPERSEDED) {
 for (const { marker, target } of DIALECTS) {
 	console.log(`\n${marker}`);
 
-	// What the palette reads is what the scanner reads. If these disagreed, every
-	// gating decision below would be answering for the wrong dialect.
+	// What the palette reads is what the compiler reads. If these disagreed,
+	// every gating decision below would answer for the wrong dialect.
+	//
+	// Read off a marker at the *end* of the song as well as the top, because
+	// `preprocess.ts` resolves the whole file before the parser starts and a
+	// porter may write the marker anywhere. A palette that took the marker above
+	// the caret would offer `#amk 4`'s forms for every line of the second song.
 	{
-		const read = targetAt(tokenize(`${marker}\n#0 $E7 $B0 c4\n`), `${marker}\n#0 `.length);
-		check(
-			`${marker}: targetAt agrees with the marker`,
-			read.program === target.program && read.amkVersion === target.amkVersion,
-			`read program ${read.program}, #amk ${read.amkVersion}`,
-		);
+		const agrees = (label: string, song: string) => {
+			const read = songTarget(tokenize(song));
+			check(
+				`${marker}: ${label}`,
+				read.program === target.program && read.amkVersion === target.amkVersion,
+				`read program ${read.program}, #amk ${read.amkVersion}`,
+			);
+		};
+
+		agrees("songTarget agrees with the marker", `${marker}\n#0 $E7 $B0 c4\n`);
+		agrees("and with one written below all the music", `#0 $E7 $B0 c4\n${marker}\n`);
 	}
 
 	// Position is only a question for the two remote forms. Every other entry is
@@ -381,8 +477,24 @@ for (const { marker, target } of DIALECTS) {
 					result.diagnostics.length > 0,
 					"compiled clean",
 				);
+			} else if (entry.availability.state === "caution") {
+				// The state's whole claim, and both halves of it: it compiles, and
+				// there is something worth reading first. An `ok` that warns and a
+				// `caution` that does not are the same failure said two ways.
+				check(`${label}: cautioned, and AddmusicK still accepts it`, errors.length === 0, say(errors));
+				check(`${label}: cautioned, and there is a warning to read`, result.diagnostics.length > 0, "compiled clean");
 			} else {
-				check(`${label}: offered, and AddmusicK does accept it`, errors.length === 0, say(errors));
+				check(
+					`${label}: offered, and AddmusicK takes it silently`,
+					result.diagnostics.length === 0,
+					say(result.diagnostics),
+				);
+			}
+
+			// A caveat says what `availability` cannot — a driver hazard, a silent
+			// rewrite — so it claims nothing about the compile beyond this.
+			if (entry.caveat !== undefined) {
+				check(`${label}: carries a caveat, and still compiles`, errors.length === 0, say(errors));
 			}
 		}
 	}
@@ -399,6 +511,26 @@ console.log("\nplacement");
 	check("and nothing when the song has no channel", channelsBeginAt(tokenize("#amk 4\n")) === null);
 }
 
+// `songTarget` resolves the file the way `preprocess.ts` does, and the precedence
+// is the part worth pinning below the music rather than above it: `tokentest`
+// already covers these orderings for `Command.target`, where every marker
+// precedes the command it governs, and the whole point here is that it need not.
+{
+	const said = (song: string) => {
+		const read = songTarget(tokenize(song));
+		return read.program === 0 ? `#amk ${read.amkVersion}` : read.program === 1 ? "#am4" : "#amm";
+	};
+
+	// preprocess.ts's `amk` case is guarded by `version >= 0`, so a legacy marker
+	// anywhere stops every later #amk — even one written after it.
+	check("#amk below #am4 does not win", said("#am4\n#0 c4\n#amk 2\n") === "#am4", said("#am4\n#0 c4\n#amk 2\n"));
+	// Its `amm` and `am4` cases are unguarded, so a legacy marker always does.
+	check("#amm below #amk wins", said("#amk 2\n#0 c4\n#amm\n") === "#amm", said("#amk 2\n#0 c4\n#amm\n"));
+	// And between two #amk lines, the last one.
+	check("the last #amk wins", said("#amk 4\n#0 c4\n#amk 1\n") === "#amk 1", said("#amk 4\n#0 c4\n#amk 1\n"));
+	check("no marker is the #amk 4 default", said("#0 c4\n") === "#amk 4", said("#0 c4\n"));
+}
+
 // ---------------------------------------------------------------------------
 console.log("\na command read back out of a song finds its glyph");
 // ---------------------------------------------------------------------------
@@ -407,11 +539,13 @@ console.log("\na command read back out of a song finds its glyph");
 // a command already written. A byte with no answer is a bar with a gap on it,
 // which looks exactly like a bar with nothing acting on it.
 {
-	const drawn = (body: string) => {
-		const source = `#amk 4\n#0 ${body}\n`;
+	const drawnAt = (marker: string, body: string) => {
+		const source = `${marker}\n#0 ${body}\n`;
 		const command = tokenize(source).commands.find((entry) => entry.span.start >= source.indexOf(body));
 		return command === undefined ? null : { command, entry: glyphOf(command) };
 	};
+
+	const drawn = (body: string) => drawnAt("#amk 4", body);
 
 	const undrawable: string[] = [];
 	for (const vcmd of Object.keys(VCMD_NAMES).map(Number)) {
@@ -442,6 +576,41 @@ console.log("\na command read back out of a song finds its glyph");
 	check("and t18,144 the fade", drawn("t18,144")?.entry?.icon === "metronomeFade");
 	check("v200 is the volume glyph", drawn("v200")?.entry?.icon === "speaker");
 	check("and v18,200 the fade", drawn("v18,200")?.entry?.icon === "hairpin");
+
+	// …but only where the dialect reads the comma. Below `#amk 3` the second
+	// number is not an argument, so the command is a plain `t` and saying "fade"
+	// would put the word on a bar for a song that has none.
+	const flat = drawnAt("#amk 2", "t18,144");
+	check("under #amk 2, t18,144 is not a fade", flat?.entry?.icon === "metronome", flat?.entry?.icon);
+	check("and is named for what it is", flat?.command.name === "tempo", flat?.command.name);
+
+	// `#am4` reuses two bytes for other commands entirely, and the name has to
+	// follow the arguments *written* rather than the ones a button would insert
+	// — `resolveEntry` names an entry from its own defaults, which are chosen to
+	// stay clear of these very forks.
+	const named = (marker: string, body: string) => drawnAt(marker, body)?.entry?.label;
+	check("#am4's $ED $81 is a tune", named("#am4", "$ED $81 $10") === "Tune", named("#am4", "$ED $81 $10"));
+	check(
+		"its $ED $80 is a DSP write",
+		named("#am4", "$ED $80 $6C $20") === "DSP write",
+		named("#am4", "$ED $80 $6C $20"),
+	);
+	check(
+		"and its plain $ED is still an envelope",
+		named("#am4", "$ED $3F $4D") === "ADSR",
+		named("#am4", "$ED $3F $4D"),
+	);
+
+	const load = drawnAt("#am4", "$E5 $80 $04");
+	check("#am4's $E5 with a high first byte is a sample load", load?.entry?.label === "Sample load", load?.entry?.label);
+	check("and draws the sample glyph, not tremolo's", load?.entry?.icon === "sample", load?.entry?.icon);
+	check("while a low one is still tremolo", drawnAt("#am4", "$E5 $00 $12 $08")?.entry?.icon === "tremolo");
+
+	// The guard on all of that: `vcmdName` calls both `$EF` and `$F1` "echo
+	// parameters" whatever their arguments, so only the entries' own labels tell
+	// them apart and a rule that preferred the written name would lose them.
+	check("$EF keeps the label that tells it from $F1", named("#amk 4", "$EF $FF $28 $28") === "Echo channels & volume");
+	check("and $F1 keeps its own", named("#amk 4", "$F1 $02 $00 $00") === "Echo delay & feedback");
 }
 
 summarise();

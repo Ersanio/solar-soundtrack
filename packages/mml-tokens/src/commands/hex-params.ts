@@ -107,21 +107,33 @@ const VELOCITY_TABLES = [
 	{ value: 0x01, label: "$01 — N-SPC (#option nspcvtable)" },
 ] as const;
 
-/** The same two, where `#option` is not available (`parser.ts:parseOptionDirective`, AMK0045). */
+/** The same two, at `#amk 1`, where `#option` is not available (AMK0045). */
 const VELOCITY_TABLES_BARE = [
 	{ value: 0x00, label: "$00 — SMW" },
 	{ value: 0x01, label: "$01 — N-SPC" },
 ] as const;
 
-/** `$FC`'s event types, from the syntax reference's remote-code entry. */
+/**
+ * `$FC`'s event types, named for what `cmdFC` does with each rather than for the
+ * syntax reference's wording, which reserves the three the compiler itself emits.
+ *
+ * 4 installs the address, runs it and puts the old one back on the spot
+ * (`Commands.asm:1281-1304`); 5 is stored and handled exactly as 2
+ * (`main.asm:3220-3221`); 6 goes to the key-on slot and is consulted at key-off
+ * like a 3 (`Commands.asm:1253-1254`, `main.asm:349-352`). 7, 8 and −1 are real
+ * and documented only in the syntax reference (`Commands.asm:1249`, `:1323-1351`).
+ */
 const REMOTE_TYPES = [
-	{ value: 0, label: "0 — cancel any remote code" },
+	{ value: 0, label: "0 — cancel every remote code" },
 	{ value: 1, label: "1 — run after a set time" },
 	{ value: 2, label: "2 — run before a note ends" },
-	{ value: 3, label: "3 — run on key-off" },
-	{ value: 4, label: "4 — run on key-on" },
-	{ value: 5, label: "5 — run before a note, after key-on" },
-	{ value: 6, label: "6 — run on key-off, before the next note" },
+	{ value: 3, label: "3 — run on key-off, instead of the note cut" },
+	{ value: 4, label: "4 — run once, right now" },
+	{ value: 5, label: "5 — reserved; behaves as 2" },
+	{ value: 6, label: "6 — reserved; a key-on slot that fires at key-off" },
+	{ value: 7, label: "7 — cancel all but the key-on code" },
+	{ value: 8, label: "8 — cancel the key-on code" },
+	{ value: 0xff, label: "$FF — run on key-on, alongside the rest" },
 ] as const;
 
 // ---------------------------------------------------------------------------
@@ -247,7 +259,20 @@ const tremolo: Resolver = (command) => {
 /** `$FA` picks a different command per sub-byte. */
 const misc: Resolver = (command) => {
 	const sub = command.args[0]?.value;
-	const selector = choice("Sub-command", FA_SUBCOMMANDS, { structural: true });
+	const selector = choice("Sub-command", FA_SUBCOMMANDS, {
+		structural: true,
+		// Commands.asm:667-679 — a 16-bit index into a seven-entry table with no
+		// bounds check. $05's slot was emptied when remote code replaced it.
+		describe: (value) => {
+			if (value === 0x05) {
+				return "replaced by remote code type 3; the slot is empty and the SPC jumps to address zero";
+			}
+
+			return value > 0x06 && value !== 0x7f && value !== 0xfe
+				? "past the table: the SPC jumps into whatever follows it"
+				: null;
+		},
+	});
 
 	switch (sub) {
 		case 0x00:
@@ -284,9 +309,10 @@ const misc: Resolver = (command) => {
 					selector,
 					choice(
 						"Table",
-						// #option is an unknown command before #amk 2 (parser.ts:parseOptionDirective),
-						// so naming the directives there would point at a compile error.
-						command.target.program === 0 && command.target.amkVersion >= 2 ? VELOCITY_TABLES : VELOCITY_TABLES_BARE,
+						// AMK0045: parseOptionDirective refuses #option at #amk 1 and
+						// nowhere else, so #am4 and #amm songs — version 0 — may use it
+						// and are named the directives too.
+						command.target.amkVersion === 1 ? VELOCITY_TABLES_BARE : VELOCITY_TABLES,
 						{
 							// main.asm:2373 tests the byte against zero rather than against 1.
 							describe: (value) =>
@@ -342,7 +368,12 @@ const remote: Resolver = (command) => {
 		params: [
 			u8("Address, low", "address", { control: "readonly" }),
 			u8("Address, high", "address", { control: "readonly" }),
-			choice("Event type", REMOTE_TYPES),
+			choice("Event type", REMOTE_TYPES, {
+				// Commands.asm:1260-1269 stores any other value in the normal slot
+				// with that type, and nothing ever tests for it.
+				describe: (value) =>
+					value >= 0x09 && value <= 0xfe ? "no such event: the code is stored and never run" : null,
+			}),
 			ticks("Wait", { describe: (value) => (value === 0 ? "$00 is treated as $0100" : null) }),
 		],
 		note: "The address is written by the compiler from a (!n) label; editing it by hand points the driver at nothing.",
@@ -467,7 +498,20 @@ export const HEX_PARAMS: Readonly<Record<number, Resolver>> = {
 		],
 		note: "Changes the sample and coarse pitch only: the envelope and the fractional tuning are left as the previous instrument set them. $FA $FE’s third bit makes $F3 zero the fraction instead.",
 	}),
-	0xf4: fixed([choice("Sub-command", F4_SUBCOMMANDS, { structural: true })]),
+	0xf4: fixed([
+		choice("Sub-command", F4_SUBCOMMANDS, {
+			structural: true,
+			// Commands.asm:556-565 — ten entries, no bounds check, and $04's is
+			// `dw $0000`. Neither value is offered above; both are reachable by hand.
+			describe: (value) => {
+				if (value === 0x04) {
+					return "this driver has no such command: the SPC jumps to address zero";
+				}
+
+				return value >= 0x0a ? "past the table: the SPC jumps into whatever follows it" : null;
+			},
+		}),
+	]),
 	0xf5: fixed(
 		Array.from({ length: 8 }, (_, i) => s8(`Coefficient ${i + 1}`, "level")),
 		"C7 multiplies the newest sample and C0 the oldest.",

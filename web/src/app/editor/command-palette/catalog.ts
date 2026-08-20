@@ -20,7 +20,7 @@
  */
 
 import { hex2 } from '@amk/core/hex';
-import { type CommandTarget, LETTER_NAMES, vcmdName } from '@amk/tokens';
+import { type CommandTarget, expectedArgs, LETTER_NAMES, vcmdName } from '@amk/tokens';
 import {
   type Availability,
   type PaletteForm,
@@ -72,8 +72,19 @@ interface HexEntry extends Described {
   vcmd: number;
   /** The bytes after the command byte, in order. */
   args: readonly number[];
-  /** Bytes this entry writes that a second form of the same command needs instead. */
-  argsAt1?: readonly number[];
+  /**
+   * What to know before writing the byte that no diagnostic will tell you.
+   *
+   * `availability` answers to AddmusicK, and `palettetest` holds it to that: a
+   * `caution` has to produce a warning and an `ok` has to compile silently.
+   * Neither fits a byte that compiles clean and jumps the SPC into the direct
+   * page, nor one the dialect rewrites without a word, so those are said here.
+   *
+   * Only those. It costs the button its ordinary colour, which is worth a
+   * crashed SPC and not worth a note about which of two spellings a dialect
+   * takes - that is the palette's job to know and nobody else's to read.
+   */
+  caveat?: (target: CommandTarget) => string | undefined;
   /**
    * A name for the button, where `VCMD_NAMES`' is not one.
    *
@@ -119,6 +130,22 @@ interface SyntaxEntry extends Described {
   snippet: string;
   /** Which version rule governs it, or `null` when no dialect gates the form. */
   syntax: SyntaxForm | null;
+  /**
+   * The arguments to write as raw hex where the dialect refuses the spelling.
+   *
+   * Nothing here states arity: `expectedArgs` does, and its answer is also the
+   * test for whether the fallback applies at all, since a byte that takes a
+   * different number of arguments under a dialect is a different command there.
+   */
+  fallback?: readonly number[];
+  /**
+   * The command byte {@link fallback} writes, where {@link writes} is not it.
+   *
+   * `(!!n)` and `(!n,` are both `$FC`, and only one spelling may claim a byte -
+   * `byWrites` and `palettetest` both read that claim, and the call is what a
+   * `$FC` in a song usually is.
+   */
+  fallbackOf?: number;
   /**
    * Where in the song it is legal, when that is not everywhere. The two remote
    * forms are the only entries with an opinion, and it is `parseOpenParen`'s:
@@ -207,6 +234,7 @@ export const ENTRIES: readonly Entry[] = [
     blurb: 'Slides the tempo to a new speed over time - an accelerando or a ritardando.',
     snippet: 't18,144',
     syntax: 'fade',
+    fallback: [0x12, 0x90],
   },
 
   // ─── Volume and pan ─────────────────────────────────────────────────────
@@ -226,6 +254,7 @@ export const ENTRIES: readonly Entry[] = [
     blurb: "Slides this channel's volume over time - a crescendo or a diminuendo.",
     snippet: 'v18,200',
     syntax: 'fade',
+    fallback: [0x12, 0xc8],
   },
   letter('w', 'w200', {
     category: 'volume',
@@ -243,6 +272,7 @@ export const ENTRIES: readonly Entry[] = [
     blurb: 'Slides the whole song louder or quieter over time - a fade-in or a fade-out.',
     snippet: 'w18,200',
     syntax: 'fade',
+    fallback: [0x12, 0xc8],
   },
   letter('y', 'y10', {
     category: 'volume',
@@ -292,6 +322,11 @@ export const ENTRIES: readonly Entry[] = [
     category: 'pitch',
     icon: 'slide',
     blurb: 'Slides smoothly from the note playing now to another one.',
+    // main.asm:3256-3287 — the per-tick read-ahead peeks for $DD and swallows
+    // all four bytes, and its dispatch slot is $0000 for anything the command
+    // loop reaches first.
+    caveat: () =>
+      'Write it directly after a note of two ticks or more. Anywhere else the driver jumps to address zero and the SPC dies.',
   }),
   hex(0xec, [0x00, 0x18, 0x02], {
     category: 'pitch',
@@ -312,6 +347,13 @@ export const ENTRIES: readonly Entry[] = [
     category: 'pitch',
     icon: 'sharpMaster',
     blurb: 'Shifts every channel at once up or down by a number of semitones.',
+    // `parser.ts:parseHexCommand` (Music.cpp:1863) — Addmusic 4.05 stored one
+    // more than was written, and AddmusicK reproduces it in silence. Below
+    // `$F2`, so the non-native warning never covers it either.
+    caveat: (target) =>
+      target.program === 1
+        ? 'Under #am4 the compiler adds one, so the transpose lands a semitone above what is written.'
+        : undefined,
   }),
   hex(0xee, [0x00], {
     category: 'pitch',
@@ -448,6 +490,11 @@ export const ENTRIES: readonly Entry[] = [
     blurb: 'Cancels a remote snippet so it stops firing.',
     snippet: '(!!1)',
     syntax: 'remoteReset',
+    // Event type `$07`, the non-key-on slot, which is what `(!!1)` above emits —
+    // `$00` for 0 and `$08` for -1 are the other two (`parser.ts:parseRemoteCall`).
+    // The byte is the call's, so `writes` stays on `(!n,` and this names it.
+    fallbackOf: 0xfc,
+    fallback: [0x00, 0x00, 0x07, 0x00],
     context: 'channel',
   },
 
@@ -473,7 +520,12 @@ export const ENTRIES: readonly Entry[] = [
   hex(0xf7, [0x00, 0x00, 0x00], {
     category: 'misc',
     icon: 'chipWrite',
-    blurb: 'Writes a byte anywhere in the driver’s memory. AddmusicM’s command.',
+    blurb: 'AddmusicM’s command for writing a byte anywhere in the driver’s memory.',
+    // Commands.asm:633 — the body is commented out, so the label collapses onto
+    // cmdF9 and the dispatch slot is $0000 (main.bin @ $13A6). AddmusicK
+    // compiles it without a word.
+    caveat: () =>
+      'This driver never implemented it: the SPC jumps to address zero and dies. AddmusicK compiles it anyway.',
   }),
   hex(0xf9, [0x00, 0x00], {
     category: 'misc',
@@ -497,6 +549,12 @@ export interface ResolvedEntry {
   /** Which slice of `text` to leave selected - the first argument. */
   select: TextRange | null;
   availability: Availability;
+  /**
+   * A warning {@link availability} cannot carry, because it answers to the
+   * compiler and this does not - what the driver does with the byte, or a
+   * rewrite the dialect makes without a word. {@link HexEntry.caveat}.
+   */
+  caveat?: string;
   /** Where in the song this is legal, which is `'anywhere'` for all but two. */
   where: 'anywhere' | 'before-channels' | 'channel';
 }
@@ -542,6 +600,48 @@ function formFor(entry: LetterEntry | SyntaxEntry): PaletteForm | null {
 
 const AVAILABLE: Availability = { state: 'ok', reason: null };
 
+/** `$XX $YY …` — the one place a command's bytes become the text of a snippet. */
+function hexText(vcmd: number, args: readonly number[]): string {
+  return [vcmd, ...args].map((byte) => `$${hex2(byte)}`).join(' ');
+}
+
+/**
+ * The raw-hex spelling of a form the dialect will not take as written.
+ *
+ * Offered only where the byte is still *this* command there, which is
+ * `expectedArgs` agreeing with the count the fallback writes: `#amk 1`'s `$FC`
+ * is remote gain and takes two arguments, so `(!!n)` has nothing to fall back to
+ * and stays blocked. Asking `expectedArgs` rather than restating the dialect
+ * rules keeps the fork in the one place `tokentest` already pins it.
+ *
+ * The swap says nothing about itself. A porter asked for a volume fade and gets
+ * one; which of the two spellings their dialect takes is the palette's problem,
+ * and `palettetest` compiles both to prove they are the same command. What the
+ * button still reports is what AddmusicK will *say* about the bytes, which is
+ * the byte's own availability rather than the refused spelling's — `$FC` carries
+ * AMK0211 at `#amk 2` and the non-native warning under the legacy programs.
+ */
+function substitute(
+  entry: SyntaxEntry,
+  target: CommandTarget,
+): { vcmd: number; text: string; availability: Availability } | null {
+  const vcmd = entry.fallbackOf ?? entry.writes;
+  if (entry.fallback === undefined || vcmd === undefined) {
+    return null;
+  }
+
+  const args = entry.fallback.map((value) => ({ value }));
+  if (expectedArgs(vcmd, args, target) !== entry.fallback.length) {
+    return null;
+  }
+
+  return {
+    vcmd,
+    text: hexText(vcmd, entry.fallback),
+    availability: formAvailability({ kind: 'hex', vcmd }, target),
+  };
+}
+
 export function resolveEntry(
   entry: Entry,
   target: CommandTarget,
@@ -550,42 +650,43 @@ export function resolveEntry(
   if (entry.kind !== 'hex') {
     const form = formFor(entry);
     const dialect = form === null ? AVAILABLE : formAvailability(form, target);
+    // A spelling this dialect refuses becomes the bytes it would have compiled
+    // to, where those bytes still mean the same command here.
+    const swap =
+      entry.kind === 'syntax' && dialect.state === 'blocked' ? substitute(entry, target) : null;
+    const reached = swap?.availability ?? dialect;
     // The dialect rule is reported first when both bite: being on `#amk 1` is
     // the more basic reason, and moving the caret would not fix it.
     const availability =
-      dialect.state === 'ok' && entry.kind === 'syntax'
-        ? (placeAvailability(entry, place) ?? dialect)
-        : dialect;
+      reached.state !== 'blocked' && entry.kind === 'syntax'
+        ? (placeAvailability(entry, place) ?? reached)
+        : reached;
     const label = capitalise(
       entry.kind === 'syntax' ? entry.label : (LETTER_NAMES[entry.id] ?? entry.id),
     );
+    const text = swap?.text ?? entry.snippet;
 
     return {
       key: `text:${entry.id}`,
+      vcmd: swap?.vcmd,
       writes: entry.writes,
       icon: entry.icon,
       label,
       blurb: entry.blurb,
-      text: entry.snippet,
-      select: firstNumberSpan(entry.snippet),
+      text,
+      select: swap ? FIRST_HEX_ARG : firstNumberSpan(entry.snippet),
       availability,
       where: entry.kind === 'syntax' ? (entry.context ?? 'anywhere') : 'anywhere',
     };
   }
 
-  // `#amk 1`'s `$FC` is remote gain and takes two bytes, not four
-  // (`parser.ts:parseHexCommand`); `expectedArgs` says the same, and
-  // `palettetest` is what holds the two together.
-  const args =
-    entry.argsAt1 && target.program === 0 && target.amkVersion === 1 ? entry.argsAt1 : entry.args;
   const availability = formAvailability({ kind: 'hex', vcmd: entry.vcmd }, target);
   const named = vcmdName(
     entry.vcmd,
-    args.map((value) => ({ value })),
+    entry.args.map((value) => ({ value })),
     target,
   );
   const label = capitalise(entry.label ?? named);
-  const text = [entry.vcmd, ...args].map((byte) => `$${hex2(byte)}`).join(' ');
 
   return {
     // Two buttons can write one byte — `$ED`'s ADSR and GAIN do — so the byte
@@ -595,13 +696,16 @@ export function resolveEntry(
     icon: entry.icon,
     label,
     blurb: entry.blurb,
-    text,
-    // `$XX ` is four characters, then the argument's own `$`.
-    select: args.length > 0 ? { start: 5, end: 7 } : null,
+    text: hexText(entry.vcmd, entry.args),
+    select: entry.args.length > 0 ? FIRST_HEX_ARG : null,
     availability,
+    caveat: entry.caveat?.(target),
     where: 'anywhere',
   };
 }
+
+/** The two digits of a hex snippet's first argument: `$XX ` then its own `$`. */
+const FIRST_HEX_ARG: TextRange = { start: 5, end: 7 };
 
 /** The digits of the first argument - the run every letter form puts it in. */
 function firstNumberSpan(snippet: string): TextRange | null {

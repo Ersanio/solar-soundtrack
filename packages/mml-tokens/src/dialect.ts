@@ -4,55 +4,54 @@
  * - Tempo
  * - Which velocity table `q` reads against, from the hex as well as the directives
  *
- * A positional walk over the scanner's commands, not compiler output, so it
- * answers while the song is mid-edit. Same-channel only where that matters —
- * see README.md.
+ * A walk over the scanner's commands, not compiler output, so it answers while
+ * the song is mid-edit. Positional, and same-channel only, where that matters —
+ * see README.md. The dialect is the exception: the markers are resolved over the
+ * whole file, because that is what `preprocess.ts` does with them.
  */
 
 import { type Command, type CommandTarget, DEFAULT_TARGET, type TokenIndex } from "./tokens";
 
 /**
- * The dialect in force at `offset`, as the scanner saw it.
+ * The dialect the whole song compiles as — a marker anywhere in the file, not
+ * only above the caret.
  *
- * Off `tokenize`'s own transition list, so the marker precedence rules stay in
- * `scanHash` rather than being re-derived. Takes the positional reading README.md
- * describes: a marker governs from its line down, where `preprocess.ts` lets the
- * file's last one govern the whole song. A caret above the `#amk` line therefore
- * reads {@link DEFAULT_TARGET}, which is what the parser assumes before any marker.
+ * `preprocess.ts` runs over the entire text before the parser starts, so the
+ * file's last effective marker governs every line of it, a `#amk 2` on the last
+ * line included. That is not the reading {@link Command.target} takes, and the
+ * difference is not a lapse in either: `scanHex` decides how many argument bytes
+ * a hex command swallows as it meets them, and `#am4`'s `$ED` and `#amk 1`'s
+ * `$FC` swallow different numbers — so a command already scanned has to keep
+ * answering for the marker that was standing when it was scanned, which is what
+ * `tokentest` pins. This is for the other question, asked about text that does
+ * not exist yet: what will AddmusicK make of what I am about to write.
+ *
+ * The last transition is the whole answer. `tokenize` records one wherever the
+ * scanner's own two fields change, and those fields carry `scanHash`'s
+ * precedence rules — a later `#amk` losing to an earlier `#am4`, the last of two
+ * `#amk` lines winning — so the value they hold at the end of the document is
+ * the value `preprocess` arrives at.
  */
-export function targetAt(index: TokenIndex, offset: number): CommandTarget {
-	let found = DEFAULT_TARGET;
-
-	for (const transition of index.targets) {
-		if (transition.at > offset) {
-			break;
-		}
-
-		found = transition.target;
-	}
-
-	return found;
+export function songTarget(index: TokenIndex): CommandTarget {
+	return index.targets[index.targets.length - 1]?.target ?? DEFAULT_TARGET;
 }
 
 /** The three markers, as `scanHash` lower-cases them. */
 const TARGET_MARKERS = new Set(["#amk", "#am4", "#amm"]);
 
 /**
- * Whether a target marker is written at or above `offset`.
+ * Whether the song declares a target marker at all.
  *
- * Not answerable from {@link targetAt}: a transition is recorded only where the
- * dialect *changes*, and `#amk 4` changes nothing — it is already
+ * Not answerable from {@link songTarget}: a transition is recorded only where
+ * the dialect *changes*, and `#amk 4` changes nothing — it is already
  * {@link DEFAULT_TARGET}. So a song that declares the default correctly and one
  * that declares nothing at all produce the same empty list, and only the marker
  * itself tells them apart. AddmusicK rejects the second outright (AMK0002,
  * `parser.ts:applyTarget`), which is worth saying rather than assuming.
  */
-export function hasDialectMarker(index: TokenIndex, text: string, offset: number): boolean {
+export function hasDialectMarker(index: TokenIndex, text: string): boolean {
 	return index.tokens.some(
-		(token) =>
-			token.kind === "directive" &&
-			token.start <= offset &&
-			TARGET_MARKERS.has(text.slice(token.start, token.end).toLowerCase()),
+		(token) => token.kind === "directive" && TARGET_MARKERS.has(text.slice(token.start, token.end).toLowerCase()),
 	);
 }
 

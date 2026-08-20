@@ -11,8 +11,8 @@
     class="bg-accent/20 text-accent ml-auto shrink-0 rounded px-1.5 py-px font-mono text-[10px] font-semibold"
     [title]="
       assumed()
-        ? 'No #amk, #am4 or #amm marker above the caret, so the palette assumes what the parser assumes. AddmusicK itself rejects a song with no marker (AMK0002).'
-        : 'The dialect in force where the caret is. The palette follows it.'
+        ? 'No #amk, #am4 or #amm marker anywhere in the song, so the palette assumes what the parser assumes. AddmusicK itself rejects a song with no marker (AMK0002).'
+        : 'The dialect this song compiles as. A marker anywhere in the file sets it, and the palette follows it.'
     "
     >{{ dialect() }}{{ assumed() ? ' ?' : '' }}</span
   >

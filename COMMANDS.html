@@ -4738,17 +4738,20 @@ EchoFilter1:    $7F $00 $00 $00 $00 $00 $00 $00   ; flat</code></pre>
     <ul>
       <li>
         <code>packages/mml-tokens/src/commands/hex-params.ts</code>
-        <code>REMOTE_TYPES</code> (<code>:117-125</code>) labels type 4 “run on key-on”, 5 “run
-        before a note, after key-on” and 6 “run on key-off, before the next note”. The driver: 4
-        runs immediately, 5 behaves as type 2, 6 lives in the key-on slot and fires at key-off with
-        an instrument restore at key-on; types 7, 8 and <code>$FF</code> (−1) are absent from the
-        table. See the <code>$FC</code> card.
+        <code>REMOTE_TYPES</code> now names 4 “run once, right now”, 5 and 6 as the reserved pair
+        the compiler emits, and carries 7, 8 and <code>$FF</code> (−1); a type in
+        <code>$09</code>–<code>$FE</code> is described as stored and never run. Agrees with the
+        <code>$FC</code> card.
       </li>
       <li>
         <code>packages/mml-tokens/src/tokens.ts</code>
-        <code>VCMD_NAMES</code> (<code>:100-138</code>) names <code>$F7</code> “write byte” and
-        <code>web/src/app/editor/command-palette/catalog.ts</code> (<code>:473-477</code>) offers it
-        as a writable command; the driver's slot is <code>$0000</code>.
+        <code>VCMD_NAMES</code> still names <code>$F7</code> “write byte”, which is what it was
+        meant to be; the palette entry in
+        <code>web/src/app/editor/command-palette/catalog.ts</code> carries a
+        <code>caveat</code> saying the slot is <code>$0000</code> and the SPC dies. A
+        <code>$DD</code> away from a note and <code>#am4</code>'s silent <code>$E4</code> offset are
+        said the same way — <code>availability.ts</code> answers to the compiler's diagnostics, and
+        none of the three produces one.
       </li>
       <li>
         <code>packages/core/src/hardcoded-tables.ts</code>
@@ -4760,16 +4763,35 @@ EchoFilter1:    $7F $00 $00 $00 $00 $00 $00 $00   ; flat</code></pre>
         thinks, not the way the driver's read-ahead does.
       </li>
       <li>
-        <code>packages/mml-tokens/src/commands/availability.ts</code> (<code>:93-110</code>) gates
-        fades and <code>(!!N)</code> at <code>#amk 3</code>, remote code at <code>#amk 2</code> and
+        <code>packages/mml-tokens/src/commands/availability.ts</code> gates fades and
+        <code>(!!N)</code> at <code>#amk 3</code>, remote code at <code>#amk 2</code> and
         <code>l=N</code> at <code>#amk 4</code> — the same thresholds as the source, with 3
-        unreachable.
+        unreachable — and warns on <code>h</code> under <code>#am4</code> (AMK0205). Below the
+        threshold the palette writes the bytes the spelling would have compiled to, since
+        <code>$E1</code>, <code>$E3</code>, <code>$E8</code> and <code>$FC</code> are native where
+        the spellings are not; <code>l=N</code> and <code>(!N)</code> have no such form and say so.
+      </li>
+      <li>
+        <code>packages/mml-tokens/src/tokens.ts</code> <code>gather</code> and
+        <code>hex-params.ts</code>'s <code>$FA $06</code> row both read the version the way
+        <code>Music.cpp</code> does: a two-argument <code>t</code>/<code>v</code>/<code>w</code> is
+        a fade only at <code>#amk 3</code> and above (§2.5), and the <code>#option</code> spellings
+        are named for every target but <code>#amk 1</code>, which is the only one that refuses the
+        directive (§3.2).
       </li>
       <li>
         <code>packages/mml-compiler/src/parser.ts</code> (<code>:3203-3217</code>) documents two
         deliberate departures from <code>Music.cpp:1981</code>'s <code>*5</code> stride in the
         <code>#am4</code> <code>$DA</code> remap; the <code>$DA</code> card above records the source
         bug they depart from.
+      </li>
+      <li>
+        Open: under <code>#am4</code>, an <code>$E5</code> with a high first byte reaches no piano
+        roll bar. The parser emits <code>$F3</code> for it (<code>parseHexCommand</code>, the
+        <code>$E5</code> card), and the address that byte lands at is not mapped back to the
+        <code>$E5</code> written in the source, so <code>commandMap</code> has nothing for the walk
+        to name. The plain tremolo form and every other note-state command do reach it. The
+        inspector, which reads the source command rather than the walk, is unaffected.
       </li>
       <li>
         <code

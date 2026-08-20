@@ -9,6 +9,13 @@ export interface ChangelogEntry {
 export const CHANGELOG: readonly ChangelogEntry[] = [
   // ─── newest first; add new blocks here ──────────────────────────────────
   {
+    date: '20 August 2026',
+    items: [
+      'Command palette uses substitute hex commands on the older AddmusicK targets',
+      'Command palette warns about commands that crash the driver',
+    ],
+  },
+  {
     date: '19 August 2026',
     items: [
       'Piano roll grid follows a time signature you can set',
