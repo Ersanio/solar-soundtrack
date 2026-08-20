@@ -23,7 +23,8 @@ import type { Severity } from '@amk/core/types';
 import { commandAt } from '@amk/tokens';
 import { IconWrap } from '../../../shared/icons/icon-wrap';
 import { Toolbar } from '../../../shared/toolbar/toolbar';
-import { EditorStore, type Insertion } from '../../../state/editor-store';
+import { EditorRequests, type Insertion } from '../../../state/editor-requests';
+import { EditorStore } from '../../../state/editor-store';
 import { Playback } from '../../../state/playback';
 import { clamp } from '../../../util/math';
 import { CommandPalette } from '../../command-palette/command-palette';
@@ -74,6 +75,7 @@ const LINT_SEVERITY: Record<Severity, 'error' | 'warning' | 'info'> = {
 })
 export class SourceView {
   protected readonly store = inject(EditorStore);
+  private readonly requests = inject(EditorRequests);
   private readonly playback = inject(Playback);
   private readonly injector = inject(Injector);
 
@@ -179,7 +181,7 @@ export class SourceView {
     // moves the selection — which is how a panel beside another tab retargets
     // the inspector without taking the tab away.
     effect(() => {
-      const reveal = this.store.reveal();
+      const reveal = this.requests.reveal();
       if (!reveal) {
         return;
       }
@@ -188,7 +190,7 @@ export class SourceView {
         // Consumed on the spot: a reveal describes one moment, and leaving it
         // set would let a later re-run select it again long after the author
         // has moved on.
-        this.store.reveal.set(null);
+        this.requests.reveal.set(null);
         if (!reveal.show) {
           this.selectSpan(reveal.span);
           return;
@@ -205,7 +207,7 @@ export class SourceView {
     // update listener then propagates the new document and caret back into the
     // store.
     effect(() => {
-      const edit = this.store.replace();
+      const edit = this.requests.replace();
       if (!edit) {
         return;
       }
@@ -213,7 +215,7 @@ export class SourceView {
       untracked(() => {
         // Consumed on the spot: a splice describes one document, and a re-run
         // must never apply it a second time to text it no longer fits.
-        this.store.replace.set(null);
+        this.requests.replace.set(null);
 
         const length = this.view.state.doc.length;
         const from = Math.min(edit.span.start, length);
@@ -237,7 +239,7 @@ export class SourceView {
     // there is nothing to compare against and the view's own selection is the
     // only authority. `store.caret` lags a debounce behind and is the head only.
     effect(() => {
-      const insertion = this.store.insertion();
+      const insertion = this.requests.insertion();
       if (!insertion) {
         return;
       }
@@ -245,7 +247,7 @@ export class SourceView {
       untracked(() => {
         // Consumed on the spot, as `reveal` and `replace` are: an insertion
         // describes one gesture, and a re-run would land it a second time.
-        this.store.insertion.set(null);
+        this.requests.insertion.set(null);
 
         // Revealing into a hidden view cannot measure or focus, so becoming the
         // selected tab takes the same render barrier `reveal` takes.

@@ -5,6 +5,7 @@ import type { WalkNote } from '@amk/spc/song-walk';
 import type { Command } from '@amk/tokens';
 import { type CommandGlyph, CommandIcon } from '../../../editor/command-palette/command-icon';
 import { glyphOf } from '../../../editor/command-palette/glyph-of';
+import { EditorRequests } from '../../../state/editor-requests';
 import { EditorStore } from '../../../state/editor-store';
 import { ParamTable } from '../param-table/param-table';
 
@@ -47,6 +48,8 @@ interface Acting {
 export class NoteCommand {
   private readonly store = inject(EditorStore);
 
+  private readonly requests = inject(EditorRequests);
+
   readonly command = input.required<Command>();
 
   /** Every pass of this written note, in the order the song plays them. */
@@ -74,7 +77,7 @@ export class NoteCommand {
       return null;
     }
 
-    const asked = this.store.inspecting();
+    const asked = this.requests.inspecting();
     const found =
       asked === null
         ? undefined
@@ -127,6 +130,6 @@ export class NoteCommand {
 
   /** Jumping to a command is a jump: the source comes forward and selects it. */
   protected reveal(acting: Acting): void {
-    this.store.reveal.set({ span: { ...acting.span }, show: true });
+    this.requests.reveal.set({ span: { ...acting.span }, show: true });
   }
 }

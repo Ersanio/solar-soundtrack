@@ -6,6 +6,7 @@ import { BitToggles } from '../../../shared/bit-toggles/bit-toggles';
 import { EnumSelect } from '../../../shared/enum-select/enum-select';
 import { NumberField } from '../../../shared/number-field/number-field';
 import { Slider } from '../../../shared/slider/slider';
+import { EditorRequests } from '../../../state/editor-requests';
 import { EditorStore } from '../../../state/editor-store';
 import { SampleStore } from '../../../state/sample-store';
 import { hex2 } from '../../../util/format';
@@ -36,6 +37,8 @@ const VOICE_LABELS = ['0', '1', '2', '3', '4', '5', '6', '7'];
 })
 export class ParamTable {
   private readonly store = inject(EditorStore);
+
+  private readonly requests = inject(EditorRequests);
   private readonly library = inject(SampleStore);
 
   readonly command = input.required<Command>();
@@ -108,7 +111,7 @@ export class ParamTable {
   protected commit(row: ParamRow, value: number): void {
     const command = this.command();
     const byte = row.descriptor.codec === 's8' ? fromSigned(value) : value;
-    this.store.apply(
+    this.requests.apply(
       spliceArg(this.store.source(), command, row.index, argumentText(command, byte)),
     );
   }

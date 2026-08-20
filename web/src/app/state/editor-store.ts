@@ -1,16 +1,6 @@
-import {
-  DestroyRef,
-  Service,
-  computed,
-  effect,
-  inject,
-  linkedSignal,
-  signal,
-  untracked,
-} from '@angular/core';
+import { Service, computed, effect, inject, linkedSignal, signal, untracked } from '@angular/core';
 
 import { compiler } from '@amk/compiler';
-import type { Edit } from '@amk/tokens/edits';
 import { type Command, commandAt, tokenize } from '@amk/tokens';
 import type { CommandAddress, CompileResult, Diagnostic, NoteAddress, Span } from '@amk/core/types';
 import { buildSpc, spcFilename } from '@amk/spc/export';
@@ -24,8 +14,7 @@ import {
 import { echoHazards } from '@amk/tokens/echo-hazards';
 import { commandsInForceOf } from './commands-in-force';
 import { type SongClock, songClock } from './song-clock';
-import { type Measurement, tempoShortfall } from './measure-clock';
-import type { MeasureReply, MeasureRequest } from './clock.worker';
+import { ClockMeasurer, tempoDiagnostic } from './clock-measurer';
 import { caretPosition, downloadBlob, errorMessage } from '../util/format';
 import { readStored, writeStored } from '../util/storage';
 import { DriverStore } from './driver-store';
@@ -61,40 +50,11 @@ f+16 d16 c16 f+16 d16 c16 g16 f16 d16 < b16 a+16 a16
 /** How long typing pauses before a compile fires. */
 const DEBOUNCE_MS = 150;
 
-/**
- * How long the song has to hold still before its clock is measured.
- *
- * Longer than {@link DEBOUNCE_MS} because measuring is a whole pass of emulation
- * — tens to hundreds of milliseconds of a worker core — and every keystroke
- * would throw the answer away. A second of quiet is far less than it takes to
- * reach for the transport, so the measured length is there before it is read.
- */
-const MEASURE_IDLE_MS = 1000;
-
-/**
- * Past this, the driver is not playing the song that was written and the porter
- * should be told. 1.10 rather than something tighter because eight busy channels
- * drop about 0.8% at an ordinary tempo and a few percent is ordinary; this is
- * for the songs that are out by a third or a half.
- */
-const TEMPO_SHORTFALL_LIMIT = 1.1;
-
 export type StatusKind = 'ok' | 'error' | 'busy';
 
 export interface Status {
   kind: StatusKind;
   text: string;
-}
-
-/**
- * A span to select, and whether the source view should come forward for it.
- *
- * See {@link EditorStore.reveal}. A separate type rather than a bare `Span`
- * because the flag is the whole difference between a summons and a question.
- */
-export interface Reveal {
-  span: Span;
-  show: boolean;
 }
 
 /**
@@ -107,20 +67,11 @@ export interface Reveal {
  */
 const NOTHING_IN_FORCE = (): readonly Command[] => [];
 
-/** Text bound for the caret, and which slice of it to leave selected. */
-export interface Insertion {
-  text: string;
-  /**
-   * Offsets *within* `text`, not into the document, which the sender does not
-   * know — so not a `Span`, which carries a line number that would be a lie.
-   */
-  select: { start: number; end: number } | null;
-}
-
 @Service()
 export class EditorStore {
   private readonly drivers = inject(DriverStore);
   private readonly library = inject(SampleStore);
+  private readonly measurer = inject(ClockMeasurer);
 
   /**
    * The source as typed. The editor's CodeMirror document is the text
@@ -133,82 +84,12 @@ export class EditorStore {
   readonly caret = signal(0);
 
   /**
-   * A range the editor should select, set when a diagnostic or a piano roll bar
-   * is clicked. The editor owns the view, so this is how a sibling panel asks
-   * for a selection without reaching across the component tree.
-   *
-   * `show` is what separates the two callers. A diagnostic is a summons — bring
-   * the source forward, scroll to it, take focus. A single click on a bar is a
-   * question about that note, and the inspector answers it from the pane beside
-   * the roll, so switching tabs would take away the thing being asked about. The
-   * quiet form still goes through the document, because the caret is the one
-   * statement of what is being inspected and panels do not write it.
-   */
-  readonly reveal = signal<Reveal | null>(null);
-
-  /**
-   * A splice the editor should apply, set when a panel edits a command in
-   * place. The counterpart to {@link reveal}: that one asks for a selection,
-   * this one asks for a change, and both exist because the editor owns the
-   * view and nothing else may reach into it.
-   *
-   * A fresh object each time, so writing the same edit twice still takes.
-   *
-   * `expect` is what the splice believes occupies the span. Panels read the
-   * *undebounced* scan, so their spans agree with the document — but only up to
-   * the microtask that carries the edit across, and a control that fires on
-   * `pointerup` is one gesture away from a document that has moved. The editor
-   * compares before it dispatches, which turns that whole class of race from
-   * silent corruption into an edit that simply does not take.
-   */
-  readonly replace = signal<Edit | null>(null);
-
-  /**
-   * Applies a splice built by `@amk/tokens`'s `edits.ts`, ignoring the `null` those
-   * builders return when nothing would change.
-   *
-   * Here rather than in each panel so the no-op check and the defensive copy are
-   * stated once: a slider fires per frame of a drag, and the builders answering
-   * "that is the text already there" is what keeps a drag from pushing dozens of
-   * identical recompiles through the typing debounce.
-   */
-  apply(edit: Edit | null): void {
-    if (edit) {
-      this.replace.set({ ...edit, span: { ...edit.span } });
-    }
-  }
-
-  /**
-   * Text the editor should drop in at the caret, set when the command palette
-   * inserts a command. The third of the same family as {@link reveal} and
-   * {@link replace}, and separate from `replace` for two reasons: it carries a
-   * selection, which a splice does not, and it has no span at all — where a
-   * splice knows the range it is overwriting, this one lands wherever the caret
-   * happens to be, which only the view knows.
-   */
-  readonly insertion = signal<Insertion | null>(null);
-
-  /**
-   * Asks for `text` at the caret, selecting the slice `select` names once it is
-   * there — the first argument, so that the inspector opens on the command and
-   * typing over it replaces the placeholder.
-   */
-  insert(text: string, select: { start: number; end: number } | null): void {
-    this.insertion.set({ text, select: select && { ...select } });
-  }
-
-  /**
    * The text the compiler last ran on. It lags `source` by the typing debounce,
    * which is why the two are separate signals: the editor stays responsive at
    * keystroke speed while compilation runs at most every {@link DEBOUNCE_MS}.
    */
   private readonly committed = signal(this.source());
   private timer: ReturnType<typeof setTimeout> | undefined;
-
-  /** The measuring worker and the request in flight on it. */
-  private worker: Worker | null = null;
-  private measureTimer: ReturnType<typeof setTimeout> | undefined;
-  private measureToken = 0;
 
   /** `null` until a driver supplies a load address — never a guessed one. */
   private readonly compilation = computed(() => {
@@ -266,22 +147,6 @@ export class EditorStore {
   private readonly predictedClock = computed<SongClock | null>(() => songClock(this.timeline()));
 
   /**
-   * The last thing the emulator observed about this song.
-   *
-   * **Replaced, never cleared.** Compiling happens 150 ms after a keystroke and
-   * measuring a second after that, so clearing this on recompile would leave the
-   * song unmeasured for as long as anyone kept typing, with `AMK0503` and the
-   * transport's length flicking on every pause.
-   *
-   * What it measures is how far the driver falls behind the tempo the song
-   * asked for, and that is a property of the song's *texture* — how many
-   * channels are live and what each tick costs them. A keystroke does not change
-   * it. So the honest thing to hold between measurements is the last answer,
-   * not no answer.
-   */
-  private readonly measured = signal<Measurement | null>(null);
-
-  /**
    * Ticks to seconds, measured where possible and predicted where not.
    *
    * The prediction prices every tick at the tempo the song asked for, and the
@@ -298,7 +163,7 @@ export class EditorStore {
    * nothing downstream knows which it holds.
    */
   readonly clock = computed<SongClock | null>(
-    () => this.measured()?.clock ?? this.predictedClock(),
+    () => this.measurer.measured()?.clock ?? this.predictedClock(),
   );
 
   /**
@@ -318,57 +183,14 @@ export class EditorStore {
       ...(this.result()?.diagnostics ?? []), // Compiler diagnostics
       ...echoHazards(this.tokens().commands), // Echo hazard diagnostics
       ...(timeline ? unreachableChannels(timeline, this.result()?.noteMap ?? []) : []), // Unreachable notes in channels
-      ...this.tempoDiagnostics(), // The driver cannot keep up with the tempo
+      // The driver cannot keep up with the tempo. It stands on the last
+      // measurement rather than only on one taken from the current bytes, which
+      // is what stops it blinking out on every keystroke; the span comes from
+      // the undebounced scan, so it still points at the tempo command as written.
+      ...tempoDiagnostic(this.measurer.measured(), this.tempoSpan()),
     ];
     return all.sort((a, b) => order[a.severity] - order[b.severity] || a.span.start - b.span.start);
   });
-
-  /**
-   * `AMK0503` — the driver cannot run the song as fast as it is written.
-   *
-   * A fourth source, and the only one that had to be *played* to find out. The
-   * driver handles at most one music tick per pass of its main loop, so a song
-   * asking for more ticks a second than it can manage simply gets fewer: at
-   * `t254` on eight channels around 230 of the 498 it asked for. That is not an
-   * editor artefact — a SNES does the same, which is why AddmusicK's readme
-   * warns about high tempos — so the song a porter ships plays at a tempo they
-   * did not write.
-   *
-   * `severe` puts it with the echo hazards and `AMK0502` in the `AMK05xx` band:
-   * it compiles cleanly and then misbehaves on playback. Held back until the
-   * first measurement is in, and silent for the few percent an ordinary busy
-   * song loses — see {@link TEMPO_SHORTFALL_LIMIT}. Compared from the first
-   * tick, so the pause `$FA $04` puts at the top of a song with echo is not
-   * read as a rate; `tempoShortfall` says so.
-   *
-   * It stands on the last measurement rather than only on one taken from the
-   * current bytes, which is what stops it blinking out on every keystroke; see
-   * {@link measured}. The span is resolved from the undebounced scan, so it
-   * still points at the tempo command in the document as it is now.
-   */
-  private tempoDiagnostics(): Diagnostic[] {
-    const measured = this.measured();
-    if (!measured) {
-      return [];
-    }
-
-    const shortfall = tempoShortfall(measured);
-    if (shortfall === null || shortfall < TEMPO_SHORTFALL_LIMIT) {
-      return [];
-    }
-
-    const percent = Math.round((1 - 1 / shortfall) * 100);
-    return [
-      {
-        severity: 'severe',
-        code: 'AMK0503',
-        message:
-          `The driver cannot keep up with this song's tempo: it plays about ${percent}% slower than written. ` +
-          `Lower the tempo, or give the busiest channels less to do.`,
-        span: this.tempoSpan(),
-      },
-    ];
-  }
 
   /** The `t` or `$E2`/`$E3` that set the rate, or the top of the document. */
   private tempoSpan(): Span {
@@ -379,22 +201,11 @@ export class EditorStore {
   }
 
   /**
-   * Which occurrence of a note the piano roll was last asked about.
-   *
-   * A note written once inside a loop is played many times, and the commands in
-   * force can differ between them, so the caret — which names the *text* — is
-   * one answer short. Set when a bar is clicked and read only while it is still
-   * an occurrence of the note the caret is on, which is what makes moving the
-   * caret enough to retire it.
-   */
-  readonly inspecting = signal<{ address: number; tick: number } | null>(null);
-
-  /**
    * The command map by ARAM address, which is how the walk names a command.
    * The sibling of {@link notesByAddress}, and what turns `WalkNote.origins`
    * back into the text a command was written as.
    */
-  readonly commandsByAddress = computed<ReadonlyMap<number, CommandAddress>>(
+  private readonly commandsByAddress = computed<ReadonlyMap<number, CommandAddress>>(
     () => new Map((this.result()?.commandMap ?? []).map((entry) => [entry.address, entry])),
   );
 
@@ -442,7 +253,7 @@ export class EditorStore {
       .filter((span) => span !== undefined);
   });
 
-  readonly errorCount = computed(
+  private readonly errorCount = computed(
     () => this.diagnostics().filter((d) => d.severity === 'error').length,
   );
 
@@ -593,80 +404,13 @@ export class EditorStore {
     // whole pass of emulation — there is no point measuring a song the next
     // keystroke will replace.
     effect(() => {
-      const data = this.compilation()?.result.data ?? null;
+      const compiled = this.compilation()?.result.data != null;
       const stats = this.result()?.stats;
       const passTicks = stats ? stats.introTicks + stats.loopTicks : 0;
-      untracked(() => this.scheduleMeasure(data, passTicks));
+      // The measurer needs the assembled SPC, which needs the resolved sample
+      // set — so it is handed a way to build one rather than reaching for it.
+      untracked(() => this.measurer.schedule(compiled, passTicks, () => this.assembleSpc()));
     });
-
-    inject(DestroyRef).onDestroy(() => {
-      clearTimeout(this.measureTimer);
-      this.worker?.terminate();
-      this.worker = null;
-    });
-  }
-
-  /**
-   * Asks the worker for the song's real clock, once typing has settled.
-   *
-   * Re-armed on every compile and never cancelled into nothing: a song that
-   * will not play has no pass to measure, so no request goes out, but whatever
-   * was measured last stays standing until something better arrives. See
-   * {@link measured} for why that is the honest answer rather than a stale one.
-   */
-  private scheduleMeasure(data: Uint8Array | null, passTicks: number): void {
-    clearTimeout(this.measureTimer);
-    if (!data || passTicks <= 0 || typeof Worker === 'undefined') {
-      return;
-    }
-
-    this.measureTimer = setTimeout(() => this.measure(passTicks), MEASURE_IDLE_MS);
-  }
-
-  private measure(passTicks: number): void {
-    const spc = this.assembleSpc();
-    if (!spc) {
-      return;
-    }
-
-    try {
-      this.worker ??= this.startWorker();
-      this.measureToken++;
-      this.worker.postMessage({
-        token: this.measureToken,
-        spc,
-        passTicks,
-        // Resolved here, not in the worker: a relative fetch there would
-        // resolve against the worker's own bundled URL rather than the app's
-        // base href, which is `/<repo>/` on Pages.
-        wasmUrl: new URL('player/spc.wasm', document.baseURI).href,
-      } satisfies MeasureRequest);
-    } catch {
-      // No worker, or it refused the message. The prediction stands; a song
-      // that cannot be measured is not a song that cannot be played.
-      this.worker = null;
-    }
-  }
-
-  private startWorker(): Worker {
-    const worker = new Worker(new URL('./clock.worker', import.meta.url), { type: 'module' });
-    worker.onmessage = (event: MessageEvent<MeasureReply>) => {
-      const reply = event.data;
-      // Superseded while it ran: a run cannot be cancelled, so late answers are
-      // dropped here rather than fought over.
-      if (reply.token !== this.measureToken || !reply.ok) {
-        return;
-      }
-
-      this.measured.set(reply);
-    };
-
-    worker.onerror = () => {
-      this.worker?.terminate();
-      this.worker = null;
-    };
-
-    return worker;
   }
 
   // --- editing --------------------------------------------------------------

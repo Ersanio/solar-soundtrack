@@ -1,6 +1,7 @@
 import { Component, computed, inject, input, output } from '@angular/core';
 
 import { CommandIcon } from '../../../command-palette/command-icon';
+import { EditorRequests } from '../../../../state/editor-requests';
 import { EditorStore } from '../../../../state/editor-store';
 import type { Mark, MarkGlyph } from '../roll-marks';
 
@@ -27,6 +28,8 @@ import type { Mark, MarkGlyph } from '../roll-marks';
 })
 export class RollNotes {
   private readonly editor = inject(EditorStore);
+
+  private readonly requests = inject(EditorRequests);
 
   readonly marks = input.required<readonly Mark[]>();
 
@@ -61,8 +64,8 @@ export class RollNotes {
 
     const span = this.editor.notesByAddress().get(mark.note.address)?.span;
     if (span) {
-      this.editor.inspecting.set({ address: mark.note.address, tick: mark.note.tick });
-      this.editor.reveal.set({ span: { ...span }, show });
+      this.requests.inspecting.set({ address: mark.note.address, tick: mark.note.tick });
+      this.requests.reveal.set({ span: { ...span }, show });
     }
   }
 
@@ -75,7 +78,7 @@ export class RollNotes {
     // Without this the bar underneath answers as well, and the note would win.
     event.stopPropagation();
     if (this.inSync()) {
-      this.editor.reveal.set({ span: { ...glyph.span }, show });
+      this.requests.reveal.set({ span: { ...glyph.span }, show });
     }
   }
 }

@@ -3,6 +3,7 @@ import { type Signal, computed, inject } from '@angular/core';
 import { toSigned } from '@amk/spc/fir';
 import type { Command } from '@amk/tokens';
 import { argEditable, spliceArg } from '@amk/tokens/edits';
+import { EditorRequests } from '../../../state/editor-requests';
 import { EditorStore } from '../../../state/editor-store';
 import { hex2 } from '../../../util/format';
 import { argLockedBecause } from './context';
@@ -50,6 +51,7 @@ function asByte(value: number): number {
 
 export function byteArgs(command: Signal<Command>): ByteArgs {
   const store = inject(EditorStore);
+  const requests = inject(EditorRequests);
   const drag = dragPreview(command);
 
   const args = computed(() => command().args.map((a) => a.value));
@@ -62,7 +64,7 @@ export function byteArgs(command: Signal<Command>): ByteArgs {
     shown: () => shown(),
     preview: (index, value) => drag.set(index, asByte(value)),
     commit: (index, value) => {
-      store.apply(spliceArg(store.source(), command(), index, `$${hex2(asByte(value) & 0xff)}`));
+      requests.apply(spliceArg(store.source(), command(), index, `$${hex2(asByte(value) & 0xff)}`));
     },
     editable: (index) => argEditable(command(), index),
     lockedBecause: (index) => argLockedBecause(command(), index),

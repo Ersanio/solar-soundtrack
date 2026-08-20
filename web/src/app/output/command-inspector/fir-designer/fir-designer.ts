@@ -17,6 +17,7 @@ import {
 } from '@amk/spc/fir';
 import { Button } from '../../../shared/button/button';
 import { Slider } from '../../../shared/slider/slider';
+import { EditorRequests } from '../../../state/editor-requests';
 import { EditorStore } from '../../../state/editor-store';
 import { dragPreview } from '../commands/preview';
 import { builtInFilterName, firOverriddenBy } from '@amk/tokens/fir-override';
@@ -58,6 +59,8 @@ const MERGE_HZ = 500;
 })
 export class FirDesigner {
   private readonly store = inject(EditorStore);
+
+  private readonly requests = inject(EditorRequests);
 
   readonly command = input.required<Command>();
 
@@ -245,10 +248,10 @@ export class FirDesigner {
     // whole instead, which is the one case where losing the author's spacing is
     // unavoidable rather than careless.
     if (!command.complete) {
-      this.store.apply(spliceCommand(source, command, `$F5 ${bytes.join(' ')}`));
+      this.requests.apply(spliceCommand(source, command, `$F5 ${bytes.join(' ')}`));
       return;
     }
 
-    this.store.apply(spliceArgs(source, command, bytes));
+    this.requests.apply(spliceArgs(source, command, bytes));
   }
 }
