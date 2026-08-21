@@ -15,6 +15,8 @@ export const CHANGELOG: readonly ChangelogEntry[] = [
   {
     date: '20 August 2026',
     items: [
+      'Piano roll channel picker',
+      'Click a note or its command in the roll to edit that channel',
       'Command palette uses substitute hex commands on the older AddmusicK targets',
       'Command palette warns about commands that crash the driver',
     ],

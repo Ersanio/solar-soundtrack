@@ -23,6 +23,7 @@ import { EditorStore } from '../../../state/editor-store';
 import { Playback } from '../../../state/playback';
 import { PercussionPanel, percussionChips } from './percussion-panel/percussion-panel';
 import { DEFAULT_PERCUSSION, type PlaceContext, rollShape } from './percussion';
+import { RollChannels } from './roll-channels/roll-channels';
 import { rollClock } from './roll-clock';
 import { RollGrid } from './roll-grid/roll-grid';
 import { RollKeys } from './roll-keys/roll-keys';
@@ -84,6 +85,7 @@ const PAGE_LEAD_IN = PAGE_TURN_AT - PAGE_STEP;
   selector: 'amk-piano-roll',
   imports: [
     PercussionPanel,
+    RollChannels,
     RollGrid,
     RollKeys,
     RollLanes,
@@ -114,6 +116,7 @@ export class PianoRoll {
   protected readonly beatsPerBar = computed(() => this.settings().beatsPerBar);
   protected readonly beatUnit = computed(() => this.settings().beatUnit);
   protected readonly percussionOpen = computed(() => this.settings().percussionOpen);
+  protected readonly editChannel = computed(() => this.settings().editChannel);
 
   /** Where the view is parked when it is not following the song. */
   private readonly panTick = signal(0);
@@ -647,6 +650,23 @@ export class PianoRoll {
 
   protected setPercussionOpen(percussionOpen: boolean): void {
     this.settings.update((s) => ({ ...s, percussionOpen }));
+  }
+
+  /** Pressing the channel already being edited clears it, as the mixer's solo does. */
+  protected setEditChannel(channel: number): void {
+    this.settings.update((s) => ({
+      ...s,
+      editChannel: s.editChannel === channel ? null : channel,
+    }));
+  }
+
+  /**
+   * A click on the roll names a channel rather than toggling one: the bar it
+   * landed on is the answer, so a second note on the channel already being
+   * edited must not clear it.
+   */
+  protected selectEditChannel(editChannel: number): void {
+    this.settings.update((s) => ({ ...s, editChannel }));
   }
 
   /** Kept sorted, so comparing against the default is a string compare. */
