@@ -41,8 +41,11 @@ import {
 	pageStart,
 	scrubOffset,
 	scrubTick,
+	tickAtX,
 	tickWindow,
+	xAtTick,
 } from "../web/src/app/editor/views/piano-roll/roll-layout";
+import { KEY_WIDTH } from "../web/src/app/editor/views/piano-roll/roll-metrics";
 import {
 	mirror,
 	readout,
@@ -508,6 +511,76 @@ console.log("\nthe roll's pages");
 	}
 
 	check("every page is inside the window the marks are built for", uncovered === "", uncovered);
+}
+
+console.log("\nthe roll's playhead marks the song, not the camera");
+{
+	// `lead` is where the camera holds the playhead, and the transform is the same
+	// fraction run the other way — so while the roll is *on* the song, the line is
+	// at `lead` across the pane by construction. Parked it is not: the camera
+	// stands still and the music does not, so the line is drawn at the song's own
+	// tick in the camera's coordinates and is allowed to leave. None of it shows
+	// in a screenshot, since a line that has stopped and one that is off the pane
+	// look the same as a line that is simply somewhere else.
+	const WIDTH = 724; // a pane, less the key column
+	const TURN_AT = 0.9; // PianoRoll.PAGE_TURN_AT
+	const STEP = 0.8; // PianoRoll.PAGE_STEP
+	const LEAD = 0.2; // PianoRoll.PLAYHEAD_AT
+
+	// The two directions of the camera, and they have to agree: a gesture turns a
+	// pointer into a tick and the playhead turns a tick back into an x, so a pair
+	// that did not round-trip would draw a note somewhere other than under the
+	// pointer that drew it.
+	let drifted = "";
+	for (const zoom of [0.5, 1, 2, 4, 8]) {
+		for (const viewTick of [-96, 0, 1, 4919.5]) {
+			for (const tick of [0, 1, 96, 12345.5]) {
+				const back = tickAtX(xAtTick(tick, viewTick, zoom), viewTick, zoom);
+				if (Math.abs(back - tick) > EPSILON) {
+					drifted += ` ${zoom}@${viewTick}:${tick}`;
+				}
+			}
+		}
+	}
+
+	check("a tick drawn and read back is the tick it was", drifted === "", drifted);
+
+	// A following roll's camera is built around the playhead, in both view modes:
+	// paging leaves the view on the page start, scrolling the notes leaves it a
+	// fifth behind the tick. Either way the line cannot be off the pane, which is
+	// what makes drawing it from the song rather than from `lead` a no-op here.
+	let offPane = "";
+	for (const zoom of [0.5, 1, 2, 4, 8]) {
+		const screen = WIDTH / zoom;
+		for (let tick = 0; tick <= screen * 12; tick += 7) {
+			for (const view of [pageStart(tick, screen, TURN_AT, STEP), tick - screen * LEAD]) {
+				const x = xAtTick(tick, view, zoom);
+				if (x < KEY_WIDTH - EPSILON || x > KEY_WIDTH + WIDTH + EPSILON) {
+					offPane += ` ${zoom}@${tick}`;
+					break;
+				}
+			}
+		}
+	}
+
+	check("a following roll never draws the line off its own pane", offPane === "", offPane);
+
+	// Parked, the view is one fixed tick and the song goes on without it.
+	const parked = pageStart(4800, WIDTH, TURN_AT, STEP); // a view left mid-song
+	check(
+		"a parked roll moves the line at the song's own rate while the view stands still",
+		Math.abs(xAtTick(4800, parked, 2) - xAtTick(4700, parked, 2) - 200) < EPSILON,
+		`${xAtTick(4800, parked, 2)} against ${xAtTick(4700, parked, 2)}`,
+	);
+
+	// And lets it go, which is why `xAtTick` does not clamp: a line held at the
+	// edge would say the song was there. The clip in `piano-roll.html` is what
+	// keeps an x past either end off the key column and out of the pane.
+	check(
+		"and lets it leave the pane rather than holding it at the edge",
+		xAtTick(parked + WIDTH * 3, parked, 1) > KEY_WIDTH + WIDTH && xAtTick(parked - WIDTH, parked, 1) < KEY_WIDTH,
+		`${xAtTick(parked + WIDTH * 3, parked, 1)} and ${xAtTick(parked - WIDTH, parked, 1)}`,
+	);
 }
 
 console.log("\nthe scrub bar's time axis");
@@ -1021,6 +1094,7 @@ console.log("\nwhat fits inside one bar");
 	// bar that simply says nothing and leaves it to the hover.
 	check("nothing is drawn in a row too short for it", fitBarContent(400, 8, "C4", 3).name === null);
 	check("and no glyphs either", fitBarContent(400, 8, "C4", 3).glyphs.length === 0);
+	check("nor the mark that says there are more", fitBarContent(400, 8, "C4", 3).more === null);
 	check("nor in a bar of no width", fitBarContent(0, 30, "C4", 3).name === null);
 
 	// The name goes first and the glyphs are dropped from the end. A bar saying
@@ -1028,6 +1102,47 @@ console.log("\nwhat fits inside one bar");
 	// icons floating over the music.
 	const wide = fitBarContent(300, 20, "C4", 4);
 	check("a wide bar takes its name and every glyph", wide.name !== null && wide.glyphs.length === 4);
+	check("and says nothing about more, because there are none", wide.more === null);
+
+	// A truncated list and a complete one are the same picture without this, so
+	// the mark is the only thing that says the hover is worth asking. It costs a
+	// slot, and the slot comes off the glyphs rather than off the name.
+	{
+		// Every width from "one slot" upwards, so the claims below are about the
+		// rule rather than about three widths that happen to agree with it.
+		let unmarked = "";
+		let overrun = "";
+		let alone = -1;
+		for (let width = 0; width <= 400; width += 1) {
+			const fit = fitBarContent(width, 20, "C4", 4);
+			if (fit.more === null && fit.glyphs.length < 4 && fit.glyphs.length > 0) {
+				unmarked += ` ${width}`;
+			}
+
+			if (fit.more !== null && fit.glyphs.length >= 4) {
+				overrun += ` ${width}`;
+			}
+
+			if (fit.more !== null && fit.glyphs.length === 0 && alone < 0) {
+				alone = width;
+			}
+		}
+
+		check("a bar showing some of four always says there are more", unmarked === "", unmarked);
+		check("and one showing all four never does", overrun === "", overrun);
+		check("the narrowest bar with a slot spends it on the mark", alone >= 0, `never stood alone`);
+
+		// The second half of that, and the one the rule is chosen for: one slot
+		// and one glyph is the glyph, not a mark standing in for it.
+		const one = fitBarContent(alone, 20, "C4", 1);
+		check("but a bar with one slot and one glyph draws the glyph", one.glyphs.length === 1 && one.more === null);
+
+		// `MAX_GLYPHS` is a cut like any other: a bar wide enough for eight shows
+		// five at most, and the three it drops are three the porter cannot see.
+		const capped = fitBarContent(400, 20, "C4", 8);
+		check("a bar past the glyph cap says so too", capped.more !== null, `${capped.glyphs.length} glyphs, no mark`);
+		check("and spends one of the capped slots on saying it", capped.glyphs.length === 4);
+	}
 
 	// Monotone, and it has to be: a bar that grows an icon as it shrinks is what
 	// happens when the glyphs are allowed the room the name gave up.
@@ -1060,7 +1175,8 @@ console.log("\nwhat fits inside one bar");
 	for (const width of [12, 20, 40, 80, 160, 320]) {
 		for (const glyphs of [0, 1, 3, 5, 8]) {
 			const fit = fitBarContent(width, 24, "C+4", glyphs);
-			for (const box of fit.glyphs) {
+			const boxes = fit.more === null ? fit.glyphs : [...fit.glyphs, fit.more];
+			for (const box of boxes) {
 				if (box.x < 0 || box.x + box.size > width) {
 					overflow += ` ${width}/${glyphs}`;
 				}
@@ -1069,7 +1185,7 @@ console.log("\nwhat fits inside one bar");
 			// The name is measured at the monospace advance, which is what makes
 			// this an estimate worth trusting: the roll's text is `font-mono`.
 			const nameEnd = fit.name === null ? 0 : fit.name.x + "C+4".length * fit.name.size * 0.6;
-			if (fit.glyphs.length > 0 && fit.glyphs[0].x < nameEnd) {
+			if (boxes.length > 0 && boxes[0].x < nameEnd) {
 				overflow += ` overlap ${width}/${glyphs}`;
 			}
 		}

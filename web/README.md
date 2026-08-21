@@ -54,8 +54,10 @@ history, scroll position and selection that nothing could restore. So it is aliv
 showing, and its effects still run: a diagnostic clicked from the Samples tab has to bring the source
 back. It asks for that with an `activate` output rather than reaching for the tab itself, and it is
 told whether it is showing with an `active` input, because measuring or focusing a `display: none`
-view is a no-op and the render barrier has to be taken first. Any later view with state worth keeping
-does the same; the rest are `@case`d and rebuilt.
+view is a no-op and the render barrier has to be taken first. The rest are `@case`d and rebuilt, and a
+view with a position worth keeping hands it to a module that outlives it rather than joining the source
+view: the piano roll's camera and the row its scroller sits at live in `roll-camera.ts`, which is four
+numbers, where CodeMirror's undo history is not something anything could hand back.
 
 ## Preview and commit
 
@@ -83,6 +85,8 @@ pane it sits in. Three signals on `EditorRequests` are how a sibling panel asks:
 - `reveal` — select a span, set when a diagnostic or a piano roll bar is clicked.
 - `replace` — apply a splice, set when a panel edits a command in place.
 - `insertion` — type a snippet in at the caret, set when a palette button is clicked.
+- `history` — undo or redo, set by the two toolbars that carry the buttons, with `undoDepth` and
+  `redoDepth` travelling the other way so a button can tell whether there is anything to do.
 
 `reveal` carries a `show` flag, and it is the difference between a summons and a question. A
 diagnostic wants the source brought forward, scrolled to and focused. A single click on a roll bar
@@ -129,6 +133,17 @@ keystroke that lands in between makes it a no-op rather than an overwrite. `Edit
 is the same guard from the other side: the button is off while the document has moved past the
 compile. The module is pure and takes no Angular, and `normalizetest` drives it the way the button
 does.
+
+**One channel at a time.** `normalizeSong` takes an optional channel, and with one it rewrites that
+channel's music and leaves every other channel of the song exactly as it was. The roll needs it
+because it edits one channel at a time and refuses the ones it cannot splice — so what a porter wants
+when a channel is in the way is that channel put in order, and above all _not_ a refusal because some
+other channel has a loop that cannot be unrolled. Every pass that works construct by construct takes
+it as a filter (`NormalizeInput.onlyChannel`); the preprocessor and the replacements are global by
+nature and run whole either way; `orderChannels` refuses with `AMK0615` rather than joining one
+channel's blocks, because that moves text past the other channels and changes the `o` and `l` they
+inherit. The oracle does not change — the result is still walked and compared — so a scoped rewrite is
+held to exactly the standard a whole one is.
 
 ## The CodeMirror adapter
 
@@ -360,15 +375,21 @@ included**: page zero starts before tick 0, so a song is drawn with the margin i
 of its length rather than against the key column. Opening on tick 0 instead would put the margin
 only on later pages, so it appeared at the first turn and a scroll back to the beginning showed a
 space that vanished again on the way back to the song. Both are the same arithmetic: `lead` is how far across
-the roll the playhead sits, and the camera and the line are both derived from it, so a pinned
-playhead is simply the value that number holds still at. `pageStart` is a closed form and not a counter, so given its
+the roll the **camera** holds the playhead, so a pinned playhead is simply the value that number
+holds still at. The line itself is drawn at the song's own tick in the camera's coordinates
+(`xAtTick`), which comes to the same place while the roll is on the song and does not once it is
+parked: **"Follow playback" stops the view following the music, not the line**. Unticked, the notes
+stand still and the playhead goes on crossing them and off the pane, where the clip hides it —
+the honest picture, since a line held at the edge would say the song was there. `xAtTick` therefore
+does not clamp, and `charttest` pins both halves. `pageStart` is a closed form and not a counter, so given its
 anchor the page is a function of the tick and a loop wrap or a resize lands on the right page with
 nothing to reset. **The anchor is what a scroll moves**: measured from the song's own start always, a
 seek would drop the playhead wherever its place in that fixed grid happened to fall, and the notes
 would jump back the moment the drag ended — by exactly as far as the scrub had just moved them.
 A scrub re-anchors the grid on the view it leaves behind, so the roll carries on from what is on
 screen and turns a page a full pane later. A stop puts the anchor back on tick 0, since a stop is
-back to the beginning. The mark window is unchanged and does not need to be told: it already carries a
+back to the beginning — the transition and not the state, so that a roll built while the transport is
+already stopped leaves the anchor it was rebuilt from alone. The mark window is unchanged and does not need to be told: it already carries a
 screen of margin either side of a playhead at a fifth, and every page a sweep can produce falls
 inside that — `charttest` pins the coupling, because a roll drawing the wrong span scrolls perfectly
 smoothly over blank music.

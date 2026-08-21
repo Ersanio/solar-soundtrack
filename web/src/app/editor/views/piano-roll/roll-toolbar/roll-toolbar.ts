@@ -6,6 +6,7 @@ import { Toolbar } from '../../../../shared/toolbar/toolbar';
 import { EditorStore } from '../../../../state/editor-store';
 import { Playback } from '../../../../state/playback';
 import { ticksPerSecondAt } from '../../../../state/song-clock';
+import { HistoryButtons } from '../../../history-buttons/history-buttons';
 import { NormalizeButton } from '../../../normalize-button/normalize-button';
 import { BEAT_UNITS, MAX_BEATS, clampBeats, isBeatUnit } from '../roll-settings';
 
@@ -23,7 +24,7 @@ import { BEAT_UNITS, MAX_BEATS, clampBeats, isBeatUnit } from '../roll-settings'
  */
 @Component({
   selector: 'amk-roll-toolbar',
-  imports: [Checkbox, NormalizeButton, Toolbar],
+  imports: [Checkbox, HistoryButtons, NormalizeButton, Toolbar],
   templateUrl: './roll-toolbar.html',
   host: { class: 'contents' },
 })

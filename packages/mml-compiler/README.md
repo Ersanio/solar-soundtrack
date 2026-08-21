@@ -95,10 +95,20 @@ with no loop before it, a legacy `&` whose duration byte comes from a bracket, a
 passes never emit text from bytes; the note map's tick counts are the one thing read from the
 compile, for the lengths a triplet's notes become.
 
+`NormalizeInput.onlyChannel` narrows the whole thing to one channel, which is what the piano roll
+asks for: it edits one channel at a time, so a channel it cannot splice wants putting in order on its
+own — and must not be refused because a _different_ channel has a loop that cannot be unrolled. Every
+pass that works construct by construct filters on it; `resolvePreprocessor` and `inlineReplacements`
+are global by nature and run whole; `writeDefaults` writes no `t`, since a tempo reaches all eight
+channels however local the block it sits in; and `orderChannels` refuses with `AMK0615` rather than
+joining one channel's blocks, because that moves text past the others and changes the `o` and `l`
+they inherit.
+
 The normalizer does not check its own work, because it cannot: the walk that would is in
 `@amk/spc`, which this package may not import. `web/src/app/state/normalize-song.ts` runs the
 passes, compiles and walks after each, and applies nothing unless every intermediate plays the same
-music as the original; `normalizetest` pins both halves.
+music as the original — scoped or not, the standard is the same one; `normalizetest` pins both
+halves.
 
 ## `sampleList: null` is not `[]`
 

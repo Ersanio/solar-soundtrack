@@ -63,6 +63,7 @@
   class="relative min-h-0 flex-1 overflow-x-hidden overflow-y-auto"
   (pointermove)="onMove($event)"
   (pointerleave)="leave()"
+  (scroll)="onViewportScroll()"
 >
   @if (viewBox(); as box) {
     <!-- `select-none`: a double click on a bar must not drag a text selection

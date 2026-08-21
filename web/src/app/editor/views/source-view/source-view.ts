@@ -30,8 +30,6 @@ import { EditorView, keymap, lineNumbers } from '@codemirror/view';
 
 import type { Severity } from '@amk/core/types';
 import { commandAt } from '@amk/tokens';
-import { IconRedo } from '../../../shared/icons/icon-redo';
-import { IconUndo } from '../../../shared/icons/icon-undo';
 import { IconWrap } from '../../../shared/icons/icon-wrap';
 import { Toolbar } from '../../../shared/toolbar/toolbar';
 import { EditorRequests, type Insertion } from '../../../state/editor-requests';
@@ -39,6 +37,7 @@ import { EditorStore } from '../../../state/editor-store';
 import { Playback } from '../../../state/playback';
 import { clamp } from '../../../util/math';
 import { CommandPalette } from '../../command-palette/command-palette';
+import { HistoryButtons } from '../../history-buttons/history-buttons';
 import { NormalizeButton } from '../../normalize-button/normalize-button';
 import { commandHover } from '../../codemirror/command-hover';
 import { mmlLanguage } from '../../codemirror/mml-language';
@@ -48,11 +47,6 @@ import { setUnreachable, unreachableField } from '../../codemirror/unreachable';
 import { readStored, writeStored } from '../../../util/storage';
 
 const PALETTE_KEY = 'solar-soundtrack.palette';
-
-/** The keys `historyKeymap` binds on this platform, for the history buttons' titles. */
-const HISTORY_KEYS = /Mac|iP/.test(navigator.platform)
-  ? { undo: '⌘Z', redo: '⇧⌘Z' }
-  : { undo: 'Ctrl+Z', redo: 'Ctrl+Y' };
 
 /**
  * CodeMirror's lint severities are a smaller set than ours: `severe` renders
@@ -86,7 +80,7 @@ const LINT_SEVERITY: Record<Severity, 'error' | 'warning' | 'info'> = {
  */
 @Component({
   selector: 'amk-source-view',
-  imports: [Toolbar, IconWrap, IconUndo, IconRedo, CommandPalette, NormalizeButton],
+  imports: [Toolbar, IconWrap, CommandPalette, HistoryButtons, NormalizeButton],
   templateUrl: './source-view.html',
   host: { class: 'flex min-h-0 min-w-0 flex-col' },
 })
@@ -126,14 +120,6 @@ export class SourceView {
    * closed palette that still had to be drawn.
    */
   protected readonly paletteOpen = signal(readStored(PALETTE_KEY) !== 'closed');
-
-  /**
-   * Whether the view's history has anything to undo or redo, read off every
-   * update so the two buttons follow the keyboard's own undo and redo too.
-   */
-  protected readonly canUndo = signal(false);
-  protected readonly canRedo = signal(false);
-  protected readonly historyKeys = HISTORY_KEYS;
 
   private readonly host = viewChild.required<ElementRef<HTMLDivElement>>('editorHost');
   private readonly view: EditorView;
@@ -183,8 +169,11 @@ export class SourceView {
               this.store.caret.set(update.state.selection.main.head);
             }
 
-            this.canUndo.set(undoDepth(update.state) > 0);
-            this.canRedo.set(redoDepth(update.state) > 0);
+            // Published rather than kept, so both toolbars' history buttons
+            // follow the keyboard's own undo and redo without reaching for the
+            // view. Read off every update, which is when either can change.
+            this.requests.undoDepth.set(undoDepth(update.state));
+            this.requests.redoDepth.set(redoDepth(update.state));
           }),
         ],
       }),
@@ -262,6 +251,28 @@ export class SourceView {
       });
     });
 
+    // Sanctioned effect: the third imperative-view job, and the only one that
+    // runs a command rather than changing text. The history lives in the view,
+    // and both toolbars reach it through the mailbox.
+    effect(() => {
+      const command = this.requests.history();
+      if (!command) {
+        return;
+      }
+
+      untracked(() => {
+        this.requests.history.set(null);
+        // Focus follows the command only when the text already had it. Pressing
+        // Undo on the roll's toolbar undoes a roll gesture, and throwing the
+        // porter into the source would take away the thing they are editing.
+        const focused = this.view.hasFocus;
+        (command === 'undo' ? undoCommand : redoCommand)(this.view);
+        if (focused) {
+          this.view.focus();
+        }
+      });
+    });
+
     // Sanctioned effect: the palette's insert, which is the same imperative-view
     // job again — but at the caret rather than at a span, so unlike `replace`
     // there is nothing to compare against and the view's own selection is the
@@ -326,17 +337,6 @@ export class SourceView {
       const spans = this.store.unreachableSpans();
       untracked(() => this.view.dispatch({ effects: setUnreachable.of(spans) }));
     });
-  }
-
-  /** The keyboard's undo, for the mouse; focus goes back to the text it changed. */
-  protected undo(): void {
-    undoCommand(this.view);
-    this.view.focus();
-  }
-
-  protected redo(): void {
-    redoCommand(this.view);
-    this.view.focus();
   }
 
   /** Flips word wrap without rebuilding the view. */

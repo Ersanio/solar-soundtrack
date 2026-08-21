@@ -392,14 +392,21 @@ export class EditorStore {
    * `normalize-song.ts`. `null` without a driver, since there is no address to
    * compile at. Reads the live document rather than `committed`, which is what
    * {@link canNormalize} guards.
+   *
+   * With a channel, only that channel's music is rewritten and every other one
+   * is left exactly as it was — which is what the roll asks for when one channel
+   * is in the way, and which above all does not refuse because some *other*
+   * channel has a loop that cannot be unrolled. The check is the same either
+   * way: the result is walked and compared against the original before anything
+   * is applied.
    */
-  normalize(): NormalizeOutcome | null {
+  normalize(channel?: number): NormalizeOutcome | null {
     const driver = this.drivers.driver();
     if (!driver) {
       return null;
     }
 
-    return normalizeSong(this.source(), driver.manifest.localPos, this.compileOptions());
+    return normalizeSong(this.source(), driver.manifest.localPos, this.compileOptions(), channel);
   }
 
   constructor() {

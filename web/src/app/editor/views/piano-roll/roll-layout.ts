@@ -8,6 +8,7 @@
 import { KEY_COUNT } from '@amk/spc/song-walk';
 import { NOTE_NAMES } from '@amk/tokens/commands/units';
 import { clamp } from '../../../util/math';
+import { KEY_WIDTH } from './roll-metrics';
 
 /** Semitones per octave, and where `$80` sits: o1 c. */
 const OCTAVE = 12;
@@ -425,8 +426,10 @@ export interface BarGlyph {
 
 export interface BarContent {
   name: BarName | null;
-  /** As many as fit, in the order they were given. The rest are simply not drawn. */
+  /** As many as fit, in the order they were given. */
   glyphs: readonly BarGlyph[];
+  /** Where the "and more" mark goes, when some were left off. Null when they all fit. */
+  more: BarGlyph | null;
 }
 
 /**
@@ -439,8 +442,10 @@ export interface BarContent {
  * that says `C6` and nothing else is still telling you something, where glyphs
  * with no note beside them are a row of icons floating over the music.
  *
- * Anything that does not fit is not drawn and not marked either: the inspector
- * lists all of them for the note under the caret, and a hover names them.
+ * A bar that cannot show them all says so, in the rightmost slot: a truncated
+ * list and a complete one look the same otherwise, and the difference is what
+ * decides whether the hover is worth asking. The inspector lists all of them
+ * for the note under the caret, and a hover names them.
  */
 export function fitBarContent(
   width: number,
@@ -448,7 +453,7 @@ export function fitBarContent(
   name: string,
   glyphs: number,
 ): BarContent {
-  const empty: BarContent = { name: null, glyphs: [] };
+  const empty: BarContent = { name: null, glyphs: [], more: null };
   if (height < MIN_CONTENT_HEIGHT || width <= 0) {
     return empty;
   }
@@ -469,16 +474,49 @@ export function fitBarContent(
   // Right-aligned and filled leftwards, so the last command to take effect sits
   // furthest from the name rather than the list shuffling as it grows.
   const box = height - 2;
-  const room = Math.floor((width - left - CONTENT_PAD + CONTENT_PAD) / (box + CONTENT_PAD));
-  const count = clamp(Math.min(room, glyphs), 0, MAX_GLYPHS);
+  const slot = (n: number): BarGlyph => ({
+    x: width - CONTENT_PAD - (n + 1) * box - n * CONTENT_PAD,
+    y: (height - box) / 2,
+    size: box,
+  });
+
+  const room = clamp(Math.floor((width - left) / (box + CONTENT_PAD)), 0, MAX_GLYPHS);
+  // The mark takes a slot of its own, and takes it from the glyphs — a bar with
+  // room for one of four says "there are commands here" better than it says
+  // which one came first, so the last glyph gives way to it even when that
+  // leaves the mark standing alone. `MAX_GLYPHS` counts as no room: a list cut
+  // to keep the bar readable is still a list cut.
+  const short = glyphs > room;
+  const count = short ? Math.max(0, room - 1) : glyphs;
   const laid: BarGlyph[] = [];
   for (let n = 0; n < count; n++) {
-    laid.push({
-      x: width - CONTENT_PAD - (n + 1) * box - n * CONTENT_PAD,
-      y: (height - box) / 2,
-      size: box,
-    });
+    laid.push(slot(short ? n + 1 : n));
   }
 
-  return { name: placed, glyphs: laid.reverse() };
+  return { name: placed, glyphs: laid.reverse(), more: short && room > 0 ? slot(0) : null };
+}
+
+/**
+ * Where a tick sits across the roll, in px from its left edge.
+ *
+ * Deliberately unclamped. It is what draws the playhead, and a parked roll's
+ * playhead is wherever the song has got to rather than wherever the view is
+ * looking — so a song that has run past the pane gives an x off the end, and the
+ * clip in `piano-roll.html` is what hides it. Holding it inside the pane instead
+ * would draw a line at the edge saying the song was there.
+ */
+export function xAtTick(tick: number, viewTick: number, pxPerTick: number): number {
+  return KEY_WIDTH + (tick - viewTick) * pxPerTick;
+}
+
+/**
+ * The tick under a pointer, which is the camera run backwards.
+ *
+ * `offsetX` is measured from the roll's own left edge, key column included, so
+ * a caller hands over `event.clientX - box.left` and nothing else. The inverse
+ * of {@link xAtTick} and of the `translate` in `piano-roll.ts`, and the sibling
+ * of {@link scrubTick}, which is the same question asked of the scrub bar.
+ */
+export function tickAtX(offsetX: number, viewTick: number, pxPerTick: number): number {
+  return pxPerTick > 0 ? viewTick + (offsetX - KEY_WIDTH) / pxPerTick : viewTick;
 }

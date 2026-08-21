@@ -55,6 +55,8 @@ export interface Mark {
   label: { text: string; x: number; y: number; size: number } | null;
   /** As many as fit; the inspector is where the whole list is. */
   glyphs: readonly MarkGlyph[];
+  /** The "and more" mark, drawn when the bar had room for only some of them. */
+  more: { x: number; y: number; size: number } | null;
   note: WalkNote;
 }
 
@@ -191,6 +193,10 @@ export function buildMarks(request: MarkRequest): Mark[] {
         span: drawable[at].command.span,
         label: drawable[at].entry!.label,
       })),
+      more:
+        content.more === null
+          ? null
+          : { x: x + content.more.x, y: y + content.more.y, size: content.more.size },
       note,
     });
   }

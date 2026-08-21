@@ -115,6 +115,7 @@ export function normalizeSong(
   source: string,
   aramAddress: number,
   options: Readonly<Record<string, unknown>>,
+  onlyChannel?: number,
 ): NormalizeOutcome {
   const original = compileTraced(source, aramAddress, options);
   if (Array.isArray(original)) {
@@ -143,7 +144,12 @@ export function normalizeSong(
     };
   }
 
-  const input: NormalizeInput = { text: source, result: original.result, trace: original.trace };
+  const input: NormalizeInput = {
+    text: source,
+    result: original.result,
+    trace: original.trace,
+    onlyChannel,
+  };
   const blocked = precheck(input);
   if (blocked.length > 0) {
     return { ok: false, diagnostics: blocked };
@@ -194,7 +200,7 @@ export function normalizeSong(
       ];
     }
 
-    current = { text: out.text, result: next.result, trace: next.trace };
+    current = { text: out.text, result: next.result, trace: next.trace, onlyChannel };
     if (!changed.includes(pass)) {
       changed.push(pass);
     }
@@ -273,6 +279,13 @@ export function normalizeSong(
  * The one allowance is the `t` the defaults pass writes for a song that never
  * set one: the driver boots at that tempo, so the walk of the original reads 0
  * where the candidate reads the written value, and has one tempo command fewer.
+ *
+ * The notes **past** the end of the pass are deliberately not compared. They are
+ * `SongTimeline.unreachable`, and unrolling changes the list by construction: a
+ * note written once inside a `[ ]` is dropped once per time the loop would have
+ * replayed it, and the copies it becomes are separate addresses with separate
+ * pitches. `channelTicks` is what holds the tail to account, and it is compared
+ * above — so a rewrite cannot quietly make a channel longer or shorter.
  */
 export function timelinesAgree(
   a: Walked,

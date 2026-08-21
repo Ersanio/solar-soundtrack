@@ -270,12 +270,32 @@ One entry each: what it was, what it is, why.
   which has no strip, and a refusal is the answer to a click rather than a property of the song.
   The dialog that asks before the rewrite (`editor/normalize-button/`) is where a refusal shows,
   and a song already in shape gets the same dialog rather than a click that does nothing.
+- **`unreachable` in `timelinesAgree`** — sound-looking and wrong: unrolling changes the list by
+  construction, since a note inside a `[ ]` is dropped once per replay and the copies it becomes are
+  separate addresses. `channelTicks` is what holds a channel's tail to account. `normalizetest`
+  caught it.
+- **The roll's playhead line derived from `lead`** — the camera and the line were one number, so
+  unticking Follow parked the line with the view and nothing in the roll said where the music had
+  got to: the line, the scrub marker and the lit keys all froze together, and the frame clock was
+  switched off with them. `lead` is the camera's alone; the line is the song's tick in the camera's
+  coordinates (`xAtTick`), and the clip is what hides it once the song runs off the pane. Not a
+  clamp to the edge either — a line held there would say the song was there.
 - **The mixer's mutes and solo living on `Playback`** — the note previewer has to refuse a channel
   they silence, and it neither owns nor wants the transport: it shares no worklet, no audio thread
   and no song being played, and reaching through `Playback` to find the mask would make it depend on
   all three. `Mixer` holds the mask and the solo, injects `EditorStore` alone, and is read by
   `Playback`, `Audition` and the roll. The mask is the only thing the two audio paths share, and it
   is a number.
+- **The roll's page anchor reset on the transport being idle, rather than on its going idle** — an
+  effect runs once when it is created, so a roll rebuilt while the song was stopped zeroed the anchor
+  it had just been given and the view shifted by up to a page on every tab switch. It follows the
+  transition: what re-measures the pages is a stop. The camera outliving the component
+  (`roll-camera.ts`) is what turned a harmless re-run into a lost position.
+- **Keeping the roll alive behind `[class.hidden]`**, as the source view is — the symmetry is
+  inviting and it does not work: `display: none` destroys the layout box, so the native vertical
+  scroller comes back at row 0 regardless, and a hidden roll goes on drawing marks, a grid and a
+  transform for a tab nobody is looking at. CodeMirror is hidden because its undo history is not
+  something anything could hand back; a camera is four numbers that can be.
 
 ## Angular specifics
 

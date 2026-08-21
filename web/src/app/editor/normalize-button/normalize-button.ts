@@ -6,6 +6,7 @@ import {
   Injector,
   computed,
   inject,
+  input,
   signal,
   viewChild,
 } from '@angular/core';
@@ -101,6 +102,26 @@ export class NormalizeButton {
   private readonly injector = inject(Injector);
   private readonly dialog = viewChild.required<ElementRef<HTMLDialogElement>>('dialog');
 
+  /**
+   * The one channel to rewrite, or `null` for the whole song.
+   *
+   * The same button and the same dialog either way: a narrower target is still
+   * the same question, and a refusal still belongs in the dialog rather than in
+   * the roll's problems strip, because it is the answer to a click.
+   */
+  readonly channel = input<number | null>(null);
+
+  protected readonly label = computed(() => {
+    const channel = this.channel();
+    return channel === null ? 'Normalize' : `Normalize #${channel}`;
+  });
+
+  protected readonly title = computed(() =>
+    this.channel() === null
+      ? 'Rewrite the song for editing: #define and replacements resolved, every loop unrolled, triplets written out, one block per channel, and o/l/q/@/t written where the song left them implied. What plays does not change; refused if it would.'
+      : `Rewrite channel ${this.channel()} for editing, and leave every other channel exactly as it is. What plays does not change; refused if it would.`,
+  );
+
   /** Off while the document has moved past the compile the rewrite would be built on. */
   protected readonly canNormalize = computed(() => this.editor.canNormalize());
 
@@ -136,7 +157,7 @@ export class NormalizeButton {
 
   protected open(): void {
     const source = this.editor.source();
-    const outcome = this.editor.normalize();
+    const outcome = this.editor.normalize(this.channel() ?? undefined);
     if (!outcome) {
       return;
     }
