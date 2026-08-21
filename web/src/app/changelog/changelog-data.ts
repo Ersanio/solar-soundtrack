@@ -15,6 +15,7 @@ export const CHANGELOG: readonly ChangelogEntry[] = [
       'Mutes and solos apply when you preview a note',
       'A note bar says when it has more commands than it can show',
       'Normalize one channel instead of the whole song',
+      'The piano roll playhead keeps marking the song with Follow playback off',
       'Note length sliders drag right to make a note longer',
     ],
   },

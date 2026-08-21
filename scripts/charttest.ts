@@ -41,8 +41,11 @@ import {
 	pageStart,
 	scrubOffset,
 	scrubTick,
+	tickAtX,
 	tickWindow,
+	xAtTick,
 } from "../web/src/app/editor/views/piano-roll/roll-layout";
+import { KEY_WIDTH } from "../web/src/app/editor/views/piano-roll/roll-metrics";
 import {
 	mirror,
 	readout,
@@ -508,6 +511,76 @@ console.log("\nthe roll's pages");
 	}
 
 	check("every page is inside the window the marks are built for", uncovered === "", uncovered);
+}
+
+console.log("\nthe roll's playhead marks the song, not the camera");
+{
+	// `lead` is where the camera holds the playhead, and the transform is the same
+	// fraction run the other way — so while the roll is *on* the song, the line is
+	// at `lead` across the pane by construction. Parked it is not: the camera
+	// stands still and the music does not, so the line is drawn at the song's own
+	// tick in the camera's coordinates and is allowed to leave. None of it shows
+	// in a screenshot, since a line that has stopped and one that is off the pane
+	// look the same as a line that is simply somewhere else.
+	const WIDTH = 724; // a pane, less the key column
+	const TURN_AT = 0.9; // PianoRoll.PAGE_TURN_AT
+	const STEP = 0.8; // PianoRoll.PAGE_STEP
+	const LEAD = 0.2; // PianoRoll.PLAYHEAD_AT
+
+	// The two directions of the camera, and they have to agree: a gesture turns a
+	// pointer into a tick and the playhead turns a tick back into an x, so a pair
+	// that did not round-trip would draw a note somewhere other than under the
+	// pointer that drew it.
+	let drifted = "";
+	for (const zoom of [0.5, 1, 2, 4, 8]) {
+		for (const viewTick of [-96, 0, 1, 4919.5]) {
+			for (const tick of [0, 1, 96, 12345.5]) {
+				const back = tickAtX(xAtTick(tick, viewTick, zoom), viewTick, zoom);
+				if (Math.abs(back - tick) > EPSILON) {
+					drifted += ` ${zoom}@${viewTick}:${tick}`;
+				}
+			}
+		}
+	}
+
+	check("a tick drawn and read back is the tick it was", drifted === "", drifted);
+
+	// A following roll's camera is built around the playhead, in both view modes:
+	// paging leaves the view on the page start, scrolling the notes leaves it a
+	// fifth behind the tick. Either way the line cannot be off the pane, which is
+	// what makes drawing it from the song rather than from `lead` a no-op here.
+	let offPane = "";
+	for (const zoom of [0.5, 1, 2, 4, 8]) {
+		const screen = WIDTH / zoom;
+		for (let tick = 0; tick <= screen * 12; tick += 7) {
+			for (const view of [pageStart(tick, screen, TURN_AT, STEP), tick - screen * LEAD]) {
+				const x = xAtTick(tick, view, zoom);
+				if (x < KEY_WIDTH - EPSILON || x > KEY_WIDTH + WIDTH + EPSILON) {
+					offPane += ` ${zoom}@${tick}`;
+					break;
+				}
+			}
+		}
+	}
+
+	check("a following roll never draws the line off its own pane", offPane === "", offPane);
+
+	// Parked, the view is one fixed tick and the song goes on without it.
+	const parked = pageStart(4800, WIDTH, TURN_AT, STEP); // a view left mid-song
+	check(
+		"a parked roll moves the line at the song's own rate while the view stands still",
+		Math.abs(xAtTick(4800, parked, 2) - xAtTick(4700, parked, 2) - 200) < EPSILON,
+		`${xAtTick(4800, parked, 2)} against ${xAtTick(4700, parked, 2)}`,
+	);
+
+	// And lets it go, which is why `xAtTick` does not clamp: a line held at the
+	// edge would say the song was there. The clip in `piano-roll.html` is what
+	// keeps an x past either end off the key column and out of the pane.
+	check(
+		"and lets it leave the pane rather than holding it at the edge",
+		xAtTick(parked + WIDTH * 3, parked, 1) > KEY_WIDTH + WIDTH && xAtTick(parked - WIDTH, parked, 1) < KEY_WIDTH,
+		`${xAtTick(parked + WIDTH * 3, parked, 1)} and ${xAtTick(parked - WIDTH, parked, 1)}`,
+	);
 }
 
 console.log("\nthe scrub bar's time axis");

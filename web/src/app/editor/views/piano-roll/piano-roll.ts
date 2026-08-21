@@ -2,6 +2,8 @@ import {
   Component,
   DestroyRef,
   ElementRef,
+  Injector,
+  afterNextRender,
   computed,
   effect,
   inject,
@@ -24,12 +26,20 @@ import { Mixer } from '../../../state/mixer';
 import { Playback } from '../../../state/playback';
 import { PercussionPanel, percussionChips } from './percussion-panel/percussion-panel';
 import { DEFAULT_PERCUSSION, type PlaceContext, rollShape } from './percussion';
+import {
+  PAGE_LEAD_IN,
+  PAGE_STEP,
+  PAGE_TURN_AT,
+  PLAYHEAD_AT,
+  SCROLL_END_AT,
+  rollCamera,
+} from './roll-camera';
 import { RollChannels } from './roll-channels/roll-channels';
 import { rollClock } from './roll-clock';
 import { RollGrid } from './roll-grid/roll-grid';
 import { RollKeys } from './roll-keys/roll-keys';
 import { RollLanes } from './roll-lanes/roll-lanes';
-import { gridLines, laneStack, pageStart, scrubOffset, tickWindow } from './roll-layout';
+import { gridLines, laneStack, pageStart, scrubOffset, tickWindow, xAtTick } from './roll-layout';
 import { type Mark, buildMarks, buildMinimap, heldRowsAt } from './roll-marks';
 import { KEY_WIDTH, SCRUB_HEIGHT } from './roll-metrics';
 import { RollNotes } from './roll-notes/roll-notes';
@@ -43,27 +53,6 @@ import {
 } from './roll-settings';
 import { RollToolbar } from './roll-toolbar/roll-toolbar';
 import { RollTooltip } from './roll-tooltip/roll-tooltip';
-
-/** Where the playhead sits across the roll: a fifth in, so you see what is coming. */
-const PLAYHEAD_AT = 0.2;
-/**
- * Where the song's last tick sits once the scroll has run as far right as it
- * goes — a little past the playhead, so the end of the song can be read with
- * some room after it rather than pinned under the line.
- */
-const SCROLL_END_AT = 0.1;
-/** How far across the pane a paged playhead runs before the roll turns over. */
-const PAGE_TURN_AT = 0.9;
-/**
- * How much of a pane a turn moves.
- *
- * Less than {@link PAGE_TURN_AT}, so the playhead lands a tenth in rather than
- * hard against the key column: the bar that has just played stays on screen,
- * which is what makes the new page read as a continuation of the old one.
- */
-const PAGE_STEP = 0.8;
-/** The margin a turn leaves, and so the one every page opens on. */
-const PAGE_LEAD_IN = PAGE_TURN_AT - PAGE_STEP;
 
 /**
  * The song as music: a keyboard down the left, time running right, and all
@@ -106,6 +95,7 @@ export class PianoRoll {
 
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly injector = inject(Injector);
   private readonly viewport = viewChild.required<ElementRef<HTMLElement>>('viewport');
   private readonly size = elementSize(this.viewport);
 
@@ -120,29 +110,13 @@ export class PianoRoll {
   protected readonly percussionOpen = computed(() => this.settings().percussionOpen);
   protected readonly editChannel = computed(() => this.settings().editChannel);
 
-  /** Where the view is parked when it is not following the song. */
-  private readonly panTick = signal(0);
-
   /**
-   * How far across the pane the playhead sits while the view is parked.
-   *
-   * A paged playhead is anywhere between the lead-in and the turn, and coming
-   * off the song must not move the music under it: parking keeps the fraction
-   * the playhead had, so the picture stays where the eye left it. A roll that
-   * scrolls its notes has only one answer, which is {@link PLAYHEAD_AT}.
+   * The camera, which outlives the component — see `roll-camera.ts`. Aliased so
+   * that reading and moving it stays an ordinary signal read and an ordinary set.
    */
-  private readonly panLead = signal(PLAYHEAD_AT);
-
-  /**
-   * The tick the page grid is measured from, which a scroll moves.
-   *
-   * Zero is the song's own start, and a song nobody has scrolled keeps it: the
-   * first page opens on the lead-in and every turn falls a stride after the last.
-   * A scroll re-anchors it on the view it leaves behind, so returning to the song
-   * carries on from what is on screen rather than from where the seeked tick
-   * happens to sit in a grid measured from the beginning.
-   */
-  private readonly pageOrigin = signal(0);
+  private readonly panTick = rollCamera.panTick;
+  private readonly panLead = rollCamera.panLead;
+  private readonly pageOrigin = rollCamera.pageOrigin;
 
   /** A scrub in progress: the roll is off the song until the drag ends. */
   private readonly scrolling = signal(false);
@@ -298,8 +272,14 @@ export class PianoRoll {
   /** On the song: following it, and not taken off it by a scroll. */
   private readonly attached = computed(() => this.follow() && !this.scrolling());
 
-  /** Only run a frame callback while something is actually moving. */
-  private readonly running = computed(() => this.playback.isPlaying() && this.attached());
+  /**
+   * Only run a frame callback while something is actually moving.
+   *
+   * Which is any playing song, parked or not: a parked roll holds the music
+   * still and the playhead goes on crossing it, so the line still needs a frame
+   * clock — and costs less than a following one, whose transform moves too.
+   */
+  private readonly running = computed(() => this.playback.isPlaying());
 
   /** The tempo as `t` writes it — `DriverState.tempo` is `$51`, one higher. */
   private readonly tempo = computed(() => {
@@ -327,23 +307,42 @@ export class PianoRoll {
   private readonly following = computed(() => !this.playback.isIdle() && this.attached());
 
   /**
-   * Three cases, and the middle one is the reason this is not a one-liner:
-   * following the song, following a transport that is not running, and parked by
-   * hand — which stays where it was put whatever the transport does.
+   * Where the song is, which is what the playhead marks — parked or not.
    *
-   * The middle one asks the transport rather than assuming the beginning. A stop
-   * does put it back to tick 0 and the roll follows it there, but a scrub made
+   * Deliberately free of {@link attached}: coming off the song stops the *view*
+   * following it, and a line that stopped as well would leave nothing in the
+   * roll saying where the music had got to. Parked, this runs on past the pane
+   * and the clip takes it from there.
+   *
+   * A scrub is the exception, and reads the drag rather than the song, because
+   * `scrubTo` previews a seek without moving the transport (`playback.ts`) — so
+   * the tick the drag is asking for is the roll's own parked one.
+   *
+   * The last case asks the transport rather than assuming the beginning. A stop
+   * does put it back to tick 0 and the line follows it there, but a scrub made
    * while the song is stopped seeks without starting it, and a roll that read a
    * stopped transport as tick 0 would throw that scrub away the moment it was
    * released — the bar would move, the song would not, and nothing would say why.
    */
-  protected readonly playTick = computed(() => {
-    if (this.following()) {
-      return this.playhead.tick();
+  private readonly headTick = computed(() => {
+    if (this.scrolling()) {
+      return this.parkedTick();
     }
 
-    return this.attached() ? this.playback.songTicks().ticks : this.parkedTick();
+    return this.playback.isIdle() ? this.playback.songTicks().ticks : this.playhead.tick();
   });
+
+  /**
+   * Where the camera is: on the song while it is following it, and wherever it
+   * was parked otherwise.
+   *
+   * The other half of {@link headTick}, and the reason the two are separate.
+   * Everything about what is *drawn* — the transform, the mark window, the
+   * readout — is this one; the playhead alone is the other.
+   */
+  protected readonly playTick = computed(() =>
+    this.attached() ? this.headTick() : this.parkedTick(),
+  );
 
   /**
    * The 10 Hz anchor the mark window is snapped around, so it moves rarely.
@@ -357,13 +356,16 @@ export class PianoRoll {
   );
 
   /**
-   * How far across the roll the playhead sits, as a fraction of its width.
+   * Where the camera holds the playhead, as a fraction of the roll's width.
    *
    * The whole difference between the two view modes. Scrolling the notes pins
    * the playhead and slides the music under it, so the fraction is fixed at
    * {@link PLAYHEAD_AT}; paging, the default, holds the music still and lets the
    * playhead cross the pane, so the fraction is how far into the current page it
    * has got. Parked, it is whatever it was when the view came off the song.
+   *
+   * The camera's alone, and not where the line is drawn: parked, the camera
+   * stands still and the song goes on without it. {@link playheadX} is the line.
    */
   private readonly lead = computed(() => {
     if (this.scrollNotes()) {
@@ -384,9 +386,17 @@ export class PianoRoll {
   });
 
   /** The tick at the roll's left edge, which is the camera. */
-  private readonly viewTick = computed(() => this.playTick() - this.screenTicks() * this.lead());
+  protected readonly viewTick = computed(() => this.playTick() - this.screenTicks() * this.lead());
 
-  protected readonly playheadX = computed(() => KEY_WIDTH + this.rollWidth() * this.lead());
+  /**
+   * The song's own tick, in the camera's coordinates. One rule for all three
+   * views: a following roll puts it at {@link lead} across the pane by
+   * construction, since that is where the camera was built around it, and a
+   * parked one lets it cross the music and leave — the clip is what hides it.
+   */
+  protected readonly playheadX = computed(() =>
+    xAtTick(this.headTick(), this.viewTick(), this.zoom()),
+  );
 
   protected readonly scroll = computed(() => {
     const x = KEY_WIDTH - this.viewTick() * this.zoom();
@@ -416,9 +426,13 @@ export class PianoRoll {
     }),
   );
 
-  /** Where the playhead sits along the bar. */
+  /**
+   * Where the playhead sits along the bar — the song's tick, as the roll's own
+   * line is. The two are one playhead drawn twice, and the box beside this one
+   * is what says where the view is.
+   */
   protected readonly scrubX = computed(
-    () => KEY_WIDTH + scrubOffset(this.playTick(), this.songTicks(), this.rollWidth()),
+    () => KEY_WIDTH + scrubOffset(this.headTick(), this.songTicks(), this.rollWidth()),
   );
 
   /**
@@ -510,7 +524,7 @@ export class PianoRoll {
       notes: song.notes,
       stack: this.stack(),
       context: this.placeContext(),
-      tick: this.playTick(),
+      tick: this.headTick(),
       audible: this.audible(),
     });
   });
@@ -563,9 +577,21 @@ export class PianoRoll {
     // made while the transport was stopped could not seek, so the roll stayed
     // where it was put; pressing play gives it a song to follow again. Guarded
     // on the timer so it cannot fire in the middle of a gesture.
+    //
+    // It follows the transition and not the state: what re-measures the pages is
+    // a stop, and a roll built while the transport is already stopped has seen
+    // none — so the first run only records the state it came in on, leaving the
+    // camera it was rebuilt from alone.
+    let wasIdle = untracked(() => this.playback.isIdle());
     effect(() => {
       const idle = this.playback.isIdle();
       untracked(() => {
+        if (idle === wasIdle) {
+          return;
+        }
+
+        wasIdle = idle;
+
         if (!idle && !this.dragging()) {
           this.scrolling.set(false);
           return;
@@ -577,6 +603,22 @@ export class PianoRoll {
         if (idle && !this.dragging()) {
           this.pageOrigin.set(0);
         }
+      });
+    });
+
+    // Sanctioned effect: putting the vertical scroller back where the roll was
+    // left. There is nothing to scroll until the pane has been measured and the
+    // stack laid out, so it waits for a render that has both, and happens once.
+    let restored = false;
+    effect(() => {
+      if (restored || this.viewBox() === null || this.stackHeight() <= 0) {
+        return;
+      }
+
+      restored = true;
+      const top = rollCamera.topRow * untracked(() => this.rowHeight());
+      afterNextRender(() => (this.viewport().nativeElement.scrollTop = top), {
+        injector: this.injector,
       });
     });
 
@@ -751,5 +793,10 @@ export class PianoRoll {
 
   protected leave(): void {
     this.hovered.set(null);
+  }
+
+  /** The scroller's position, kept in rows so it survives a change of pane height. */
+  protected onViewportScroll(): void {
+    rollCamera.topRow = this.viewport().nativeElement.scrollTop / this.rowHeight();
   }
 }

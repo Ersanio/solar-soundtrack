@@ -8,6 +8,7 @@
 import { KEY_COUNT } from '@amk/spc/song-walk';
 import { NOTE_NAMES } from '@amk/tokens/commands/units';
 import { clamp } from '../../../util/math';
+import { KEY_WIDTH } from './roll-metrics';
 
 /** Semitones per octave, and where `$80` sits: o1 c. */
 const OCTAVE = 12;
@@ -493,4 +494,29 @@ export function fitBarContent(
   }
 
   return { name: placed, glyphs: laid.reverse(), more: short && room > 0 ? slot(0) : null };
+}
+
+/**
+ * Where a tick sits across the roll, in px from its left edge.
+ *
+ * Deliberately unclamped. It is what draws the playhead, and a parked roll's
+ * playhead is wherever the song has got to rather than wherever the view is
+ * looking — so a song that has run past the pane gives an x off the end, and the
+ * clip in `piano-roll.html` is what hides it. Holding it inside the pane instead
+ * would draw a line at the edge saying the song was there.
+ */
+export function xAtTick(tick: number, viewTick: number, pxPerTick: number): number {
+  return KEY_WIDTH + (tick - viewTick) * pxPerTick;
+}
+
+/**
+ * The tick under a pointer, which is the camera run backwards.
+ *
+ * `offsetX` is measured from the roll's own left edge, key column included, so
+ * a caller hands over `event.clientX - box.left` and nothing else. The inverse
+ * of {@link xAtTick} and of the `translate` in `piano-roll.ts`, and the sibling
+ * of {@link scrubTick}, which is the same question asked of the scrub bar.
+ */
+export function tickAtX(offsetX: number, viewTick: number, pxPerTick: number): number {
+  return pxPerTick > 0 ? viewTick + (offsetX - KEY_WIDTH) / pxPerTick : viewTick;
 }
