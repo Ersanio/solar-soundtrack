@@ -5,6 +5,7 @@ import {
   spellDuration,
   spellNote,
   spellOctave,
+  spellQ,
 } from '@amk/core/mml-text';
 import type { Span } from '@amk/core/types';
 import { type Edit, insertAt, spliceRange } from '@amk/tokens/edits';
@@ -79,6 +80,8 @@ export interface EditContext {
   strip: Strip;
   /** `CompileStats.targetAMKVersion` — what the target is able to spell. */
   targetAMKVersion: number;
+  /** `CompileStats.songTargetProgram` — 0 AddmusicK, 1 Addmusic 4.05, 2 AddmusicM. */
+  songTargetProgram: number;
 }
 
 export const REFUSE_RANGE = 'the driver cannot play a note that high or low';
@@ -472,6 +475,48 @@ export function committable(plan: Plan): boolean {
 
 // --- writing ----------------------------------------------------------------
 
+/** The document's own line ending, so a block written into it matches the rest. */
+function eol(source: string): string {
+  return source.includes('\r\n') ? '\r\n' : '\n';
+}
+
+/** The octave {@link channelOpening} writes, and so the one it leaves in force. */
+const OPENING_OCTAVE = 4;
+
+/** `q[channel]` before anything sets it (`parser.ts:200`). */
+const OPENING_Q = 0x7f;
+
+/**
+ * A channel the song has not declared, written out: its `#N` and the state a
+ * fresh channel runs under, so that nothing it plays depends on what the block
+ * above it happened to leave standing.
+ *
+ * `octave` and `defaultNoteLength` are one variable each and leak past a `#N`,
+ * which resets neither (`parser.ts:parseHash`), so `o4` and `l8` are what a
+ * channel runs at only while nothing has moved them (`parser.ts:193`, `:195`).
+ * `q` and `@` are per channel and start at `$7F` and 0 (`parser.ts:200`,
+ * `:199`). `v` and `y` are not parse-time state at all: the driver boots every
+ * voice at `$FF` volume and `$0A` pan, dead centre of `y`'s 0 to 20
+ * (`main.asm:2134-2138`). The octave and the length are literal because each has
+ * one spelling on every target — 24 ticks is `l8` wherever `192 / 24` is — and
+ * `q` goes through {@link spellQ}, whose two digits are upper case.
+ *
+ * No `@` on Addmusic 4.05 or AddmusicM, where an `@` switches instrument tuning
+ * on and resets `h` instead of saying what is already true; that is the gate
+ * `normalize.ts:writeDefaults` takes. No `t`, which reaches all eight channels
+ * and is not what drawing one note asked for, and no `h`, which replaces an
+ * instrument's tuning rather than adding to it, so `h0` is not "no transposition".
+ */
+function channelOpening(channel: number, songTargetProgram: number): string {
+  const parts = [`o${OPENING_OCTAVE}`, 'l8', spellQ(OPENING_Q)];
+  if (songTargetProgram === 0) {
+    parts.push('@0');
+  }
+
+  parts.push('v255', 'y10');
+  return `#${channel} ${parts.join(' ')}`;
+}
+
 /** How many characters of an item's head are the note itself rather than its length. */
 function headLength(source: string, item: StripItem): number {
   if (item.kind === 'rest') {
@@ -676,7 +721,7 @@ interface Region {
  * with no rest at all has one written in straight after the note before it.
  */
 function realiseRegion(context: EditContext, gap: Region): Edit[] | null {
-  const { source, strip, targetAMKVersion } = context;
+  const { source, targetAMKVersion } = context;
   const edits: Edit[] = [];
 
   // The tail is free: a channel may end wherever the music ends.
@@ -727,8 +772,8 @@ function realiseRegion(context: EditContext, gap: Region): Edit[] | null {
     return null;
   }
 
-  const edit = writeInto(strip, gap, `r${text}`);
-  return edit ? [...edits, edit] : edits;
+  const edit = writeInto(context, gap, `r${text}`);
+  return edit ? [...edits, edit] : null;
 }
 
 /**
@@ -739,14 +784,33 @@ function realiseRegion(context: EditContext, gap: Region): Edit[] | null {
  * the first item may be a note this same plan is deleting, and an insertion
  * inside a range being removed is two edits over one run of text, which
  * CodeMirror merges rather than refuses.
+ *
+ * A channel with neither note nor rest has no item to anchor to at all, and
+ * takes {@link Strip.home}: the end of its own block, or the end of the document
+ * with a whole `#N` written in front of it (see {@link channelOpening}). The run
+ * goes on a line of its own either way, so a `;` comment ending the block above
+ * cannot swallow it, and a new block is set off by a blank line unless it is
+ * opening an empty document.
  */
-function writeInto(strip: Strip, gap: Region, run: string): Edit | null {
+function writeInto(context: EditContext, gap: Region, run: string): Edit | null {
+  const { source, strip } = context;
   if (gap.after >= 0) {
     return insertAt(strip.items[gap.after].unitSpan.end, ` ${run}`, 1);
   }
 
   const next = strip.items[gap.before] ?? strip.items[0];
-  return next ? insertAt(next.unitSpan.start, `${run} `, 1) : null;
+  if (next) {
+    return insertAt(next.unitSpan.start, `${run} `, 1);
+  }
+
+  const line = eol(source);
+  if (strip.home.declared) {
+    return insertAt(strip.home.at, `${line}${run}`, 1);
+  }
+
+  const gapAbove = strip.home.at === 0 ? '' : `${line}${line}`;
+  const opening = channelOpening(strip.channel, context.songTargetProgram);
+  return insertAt(strip.home.at, `${gapAbove}${opening}${line}${run}`, 1);
 }
 
 function rested(rests: readonly StripItem[], from: number): number {
@@ -757,10 +821,14 @@ function rested(rests: readonly StripItem[], from: number): number {
  * A note being created, written into the gap it lands in.
  *
  * The gap has to be a single rest with nothing else in it, or empty text at the
- * end of the channel. Anything else — a command between two rests where the note
- * would go — is refused rather than guessed at, because splitting a run around a
- * command means deciding which side of the new note the command belongs on, and
- * only the porter knows.
+ * end of the channel, or a channel with nothing written on it at all. Anything
+ * else — a command between two rests where the note would go — is refused rather
+ * than guessed at, because splitting a run around a command means deciding which
+ * side of the new note the command belongs on, and only the porter knows.
+ *
+ * A builder answering `null` is refused too, rather than passed on as no edits:
+ * `planEdits` pushes what each region returns and goes on to the next, so a note
+ * that quietly wrote nothing would leave the rest of the gesture committed.
  */
 function spawnInto(context: EditContext, gap: Region): Edit[] | null {
   const { source, strip, targetAMKVersion } = context;
@@ -769,7 +837,10 @@ function spawnInto(context: EditContext, gap: Region): Edit[] | null {
   }
 
   const born = gap.born[0];
-  const text = noteText(born, null, null, targetAMKVersion, null);
+  // A channel being written from nothing has just had its own `o4` put in front
+  // of it, so a note in that octave has nothing to add (`channelOpening`).
+  const opening = strip.items.length === 0 && !strip.home.declared;
+  const text = noteText(born, null, null, targetAMKVersion, opening ? OPENING_OCTAVE : null);
   if (text === null) {
     return null;
   }
@@ -801,12 +872,12 @@ function spawnInto(context: EditContext, gap: Region): Edit[] | null {
   // command in the region exactly where it was.
   if (gap.rests.length === 1 && gap.between === 1) {
     const edit = spliceRange(source, gap.rests[0].unitSpan, run);
-    return edit ? [edit] : [];
+    return edit ? [edit] : null;
   }
 
   if (gap.rests.length === 0 && gap.between === 0) {
-    const edit = writeInto(strip, gap, run);
-    return edit ? [edit] : [];
+    const edit = writeInto(context, gap, run);
+    return edit ? [edit] : null;
   }
 
   return null;

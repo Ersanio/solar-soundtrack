@@ -607,6 +607,10 @@ export class PianoRoll {
     () => this.editor.result()?.stats?.targetAMKVersion ?? 4,
   );
 
+  private readonly songTargetProgram = computed(
+    () => this.editor.result()?.stats?.songTargetProgram ?? 0,
+  );
+
   protected readonly gestures = rollGestures(
     {
       strip: this.strip,
@@ -618,6 +622,7 @@ export class PianoRoll {
       editMode: this.editMode,
       lastLength: computed(() => this.settings().lastLength),
       targetAMKVersion: this.targetAMKVersion,
+      songTargetProgram: this.songTargetProgram,
       source: this.editor.source,
     },
     {

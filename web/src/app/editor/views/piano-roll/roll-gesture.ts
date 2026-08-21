@@ -78,6 +78,8 @@ export interface GestureSources {
   /** The length a drawn note takes. */
   lastLength: Signal<number>;
   targetAMKVersion: Signal<number>;
+  /** Which of the three programs the song compiles for, for writing a channel out. */
+  songTargetProgram: Signal<number>;
   source: Signal<string>;
 }
 
@@ -364,6 +366,7 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
         source: sources.source(),
         strip,
         targetAMKVersion: sources.targetAMKVersion(),
+        songTargetProgram: sources.songTargetProgram(),
       } satisfies EditContext,
       now,
     );
@@ -592,7 +595,12 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
       }
 
       const edits = planEdits(
-        { source: sources.source(), strip, targetAMKVersion: sources.targetAMKVersion() },
+        {
+          source: sources.source(),
+          strip,
+          targetAMKVersion: sources.targetAMKVersion(),
+          songTargetProgram: sources.songTargetProgram(),
+        },
         now,
       );
       if (edits && edits.length > 0) {
@@ -640,7 +648,12 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
 
     const now = planGesture(strip, { kind: 'delete', items: [index] }, sources.editMode());
     const edits = planEdits(
-      { source: sources.source(), strip, targetAMKVersion: sources.targetAMKVersion() },
+      {
+        source: sources.source(),
+        strip,
+        targetAMKVersion: sources.targetAMKVersion(),
+        songTargetProgram: sources.songTargetProgram(),
+      },
       now,
     );
     if (edits && edits.length > 0) {

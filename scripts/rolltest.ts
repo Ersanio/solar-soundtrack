@@ -103,12 +103,19 @@ function apply(source: string, edits: readonly Edit[]): string {
  * checked against is a second one rather than the same one twice.
  */
 function played(built: Built, channel: number): string[] {
-	const drums = new Map(
-		built.timeline.notes
-			.filter((note) => note.percussion !== null)
-			.map((note) => [note.address, 21 + (note.percussion ?? 0)]),
+	return notesOf(
+		built,
+		channel,
+		new Map(
+			built.timeline.notes
+				.filter((note) => note.percussion !== null)
+				.map((note) => [note.address, 21 + (note.percussion ?? 0)]),
+		),
 	);
+}
 
+/** The body of {@link played}, with the drum names handed in rather than read off the walk. */
+function notesOf(built: Built, channel: number, drums: ReadonlyMap<number, number>): string[] {
 	const out: string[] = [];
 	let tick = 0;
 	let held = -1;
@@ -147,21 +154,36 @@ function planned(plan: Plan): string[] {
 		});
 }
 
-/** Every other channel, so an edit that reached out of its own is caught. */
+/** No drum names, because the walk is not what this reads. */
+const NO_DRUMS: ReadonlyMap<number, number> = new Map();
+
+/**
+ * Every other channel, so an edit that reached out of its own is caught.
+ *
+ * Off the note map, for the reason {@link played} gives and one more: a case
+ * that *opens* a channel makes that channel the shortest, and `walkSong` ends
+ * the pass at the shortest — so every other channel's tail would drop out of the
+ * comparison and read as though the edit had deleted it. The map has each
+ * channel whole either way, which is the stronger check.
+ */
 function others(built: Built, channel: number): string {
-	return built.timeline.notes
-		.filter((note) => note.channel !== channel)
-		.map((note) => `${note.channel}:${note.tick}+${note.ticks}:${note.note}`)
-		.join(" ");
+	const out: string[] = [];
+	for (let other = 0; other < 8; other++) {
+		if (other !== channel) {
+			out.push(`${other}:${notesOf(built, other, NO_DRUMS).join(",")}`);
+		}
+	}
+
+	return out.join(" ");
 }
 
 interface Expectation {
 	/** The text after the edit, for the cases where the spelling is the point. */
 	text?: string;
-	/** A substring the result has to contain. */
-	contains?: string;
-	/** The result must not contain this. */
-	lacks?: string;
+	/** Substrings the result has to contain. */
+	contains?: string | readonly string[];
+	/** Substrings the result must not contain. */
+	lacks?: string | readonly string[];
 	/**
 	 * The mode the gesture is planned under, `"flexible"` unless a case says otherwise.
 	 *
@@ -194,6 +216,7 @@ function expectEdit(
 		source,
 		strip: bar,
 		targetAMKVersion: before.result.stats?.targetAMKVersion ?? 4,
+		songTargetProgram: before.result.stats?.songTargetProgram ?? 0,
 	};
 	const plan = planGesture(bar, gesture(bar), expectation.mode ?? "flexible");
 	const edits = planEdits(context, plan);
@@ -236,13 +259,22 @@ function expectEdit(
 		check(`${name}: writes what it should`, after === expectation.text, JSON.stringify(after));
 	}
 
-	if (expectation.contains !== undefined) {
-		check(`${name}: writes ${expectation.contains}`, after.includes(expectation.contains), JSON.stringify(after));
+	for (const wanted of listOf(expectation.contains)) {
+		check(`${name}: writes ${wanted}`, after.includes(wanted), JSON.stringify(after));
 	}
 
-	if (expectation.lacks !== undefined) {
-		check(`${name}: does not write ${expectation.lacks}`, !after.includes(expectation.lacks), JSON.stringify(after));
+	for (const unwanted of listOf(expectation.lacks)) {
+		check(`${name}: does not write ${unwanted}`, !after.includes(unwanted), JSON.stringify(after));
 	}
+}
+
+/** One substring or several, so a case can pin more than one thing about its result. */
+function listOf(expectation: string | readonly string[] | undefined): readonly string[] {
+	if (expectation === undefined) {
+		return [];
+	}
+
+	return typeof expectation === "string" ? [expectation] : expectation;
 }
 
 /** A gesture the roll must decline: no edit, and a reason. */
@@ -269,6 +301,7 @@ function expectRefused(
 		source,
 		strip: bar,
 		targetAMKVersion: before.result.stats?.targetAMKVersion ?? 4,
+		songTargetProgram: before.result.stats?.songTargetProgram ?? 0,
 	};
 	const plan = planGesture(bar, gesture(bar), mode);
 	check(`${name}: refused`, planEdits(context, plan) === null, "an edit was produced");
@@ -612,5 +645,82 @@ expectRefused("a note shortened past the command written inside it", "#amk 2\n#0
 	edge: "end",
 	deltaTicks: -60,
 }));
+
+console.log("\nopening a channel");
+
+// The whole text, because everything about the block is the point: the `#N`, the
+// six defaults, the blank line above it, the rest that carries the note out to
+// its tick — and that the note does not repeat the `o4` the block just wrote.
+expectEdit(
+	"a note drawn on a channel the song has not declared",
+	"#amk 2\n#0 o4 c4 d4 e4 f4\n",
+	5,
+	() => ({ kind: "spawn", startTick: 48, ticks: 48, written: NOTE_MIN + 36 + 4, drum: null }),
+	{ text: "#amk 2\n#0 o4 c4 d4 e4 f4\n\n#5 o4 l8 q7F @0 v255 y10\nr4 e4\n" },
+);
+
+// The channel is already open, so no second `#5` and no defaults over the top of
+// the `v200` the porter wrote.
+expectEdit(
+	"a note drawn on a channel that is declared but holds no music",
+	"#amk 2\n#0 o4 c4 d4 e4 f4\n#5 v200\n",
+	5,
+	() => ({ kind: "spawn", startTick: 0, ticks: 48, written: NOTE_MIN + 36, drum: null }),
+	{ text: "#amk 2\n#0 o4 c4 d4 e4 f4\n#5 v200\no4 c4\n" },
+);
+
+// A `;` runs to the end of its line, so a run written on the same line would be
+// read as part of the comment and the note would never compile.
+expectEdit(
+	"a note drawn on a channel whose block ends in a comment",
+	"#amk 2\n#0 o4 c4 d4 e4 f4\n#5 v200 ; the bass comes in later",
+	5,
+	() => ({ kind: "spawn", startTick: 0, ticks: 48, written: NOTE_MIN + 36, drum: null }),
+	{ contains: "later\no4 c4" },
+);
+
+// The opening's `@0` and the drum's own `@21` both, and the note on its lane.
+expectEdit(
+	"a drum drawn on a channel the song has not declared",
+	"#amk 2\n#0 o4 c4 d4 e4 f4\n",
+	6,
+	() => ({ kind: "spawn", startTick: 0, ticks: 24, written: NOTE_MIN + 24, drum: 21 }),
+	{ contains: "#6 o4 l8 q7F @0 v255 y10\n@21 c8" },
+);
+
+// `@` switches instrument tuning on under Addmusic 4.05 rather than saying what
+// is already true, so the opening leaves it out — `normalize.ts:writeDefaults`
+// takes the same gate.
+expectEdit(
+	"a channel opened on a target where an `@` is not a no-op",
+	"#am4\n#0 o4 c4 d4 e4 f4\n",
+	5,
+	() => ({ kind: "spawn", startTick: 0, ticks: 48, written: NOTE_MIN + 36, drum: null }),
+	{ contains: "#5 o4 l8 q7F v255 y10", lacks: "@0" },
+);
+
+// `detectStartingChannel` probes the text for `#0` first, so writing one would
+// take `c4 d4` off channel 1 and put it on the channel being drawn on. The songs
+// here are `#am4` because AddmusicK refuses notes outside a channel altogether
+// (AMK0140, `parser.ts:2880`), which is what makes this shape a legacy one.
+expectNoStrip(
+	"a channel below the lowest the song declares, with music above the first `#N`",
+	"#am4\no4 c4 d4\n#1 o4 e4 f4",
+	0,
+	"above the first",
+);
+
+// The same song from the other side: `#5` never wins the probe, so nothing moves.
+expectEdit(
+	"a channel above the lowest the song declares, with music above the first `#N`",
+	"#am4\no4 c4 d4\n#1 o4 e4 f4",
+	5,
+	() => ({ kind: "spawn", startTick: 0, ticks: 48, written: NOTE_MIN + 36, drum: null }),
+	{ contains: "#5 o4 l8 q7F v255 y10" },
+);
+
+// No marker at all means the starting channel is 0 by fallback, and a `#3`
+// written anywhere takes every note the song has over to channel 3.
+expectNoStrip("a channel opened in a song with no `#N` at all", "#am4\no4 c4 d4", 3, "above the first");
 
 summarise();

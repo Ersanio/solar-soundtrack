@@ -78,11 +78,28 @@ export interface StripItem {
   verified: boolean;
 }
 
+/**
+ * Where a channel with nothing written in it takes its first note.
+ *
+ * Every other anchor the roll splices against is a {@link StripItem}'s
+ * `unitSpan`, and a channel with neither note nor rest has none. So this is the
+ * offset a drawn note is written at, and whether a `#N` has to be written in
+ * front of it.
+ */
+export interface ChannelHome {
+  /** The end of the channel's own block, or of the document for a channel with no `#N`. */
+  at: number;
+  /** Whether a `#0`-`#7` for this channel is already written. */
+  declared: boolean;
+}
+
 export interface Strip {
   channel: number;
   items: readonly StripItem[];
   /** Where the channel's own music ends, in ticks. */
   ticks: number;
+  /** Where its first note goes while {@link items} is empty. */
+  home: ChannelHome;
 }
 
 /** Why a channel cannot be spliced, in the words the toolbar shows. */
@@ -125,6 +142,9 @@ const TIE_TEXT = new RegExp(String.raw`^\^${LENGTH}(?:\s*\^\s*${LENGTH})*$`);
 
 /** Only spaces and tabs, so a unit never grows across a line break. */
 const INLINE_GAP = /^[ \t]*$/;
+
+/** Line breaks included, for winding back to the end of a channel's text. */
+const WHITESPACE = /\s/;
 
 /** The commands a unit may swallow on the left of its head. */
 function leadsAUnit(command: Command): boolean {
@@ -267,6 +287,102 @@ function growUnits(
   }
 }
 
+/** A real `#0`-`#7`, and where it stands. */
+interface Marker {
+  channel: number;
+  start: number;
+}
+
+/**
+ * Every real `#0`-`#7` in the document, in source order.
+ *
+ * `gather` raises no command for a channel marker, so they are read off the
+ * tokens — the route `parseTimeInForce` takes for the same reason
+ * (`commands/in-force.ts`). A malformed or out-of-range one is not a marker: the
+ * parser reports it and leaves the previous channel standing (AMK0030, AMK0031).
+ */
+function channelMarkers(index: TokenIndex, source: string): Marker[] {
+  const markers: Marker[] = [];
+  for (const token of index.tokens) {
+    if (token.kind !== 'channel') {
+      continue;
+    }
+
+    const channel = Number.parseInt(source.slice(token.start + 1, token.end), 10);
+    if (channel >= 0 && channel <= 7) {
+      markers.push({ channel, start: token.start });
+    }
+  }
+
+  return markers;
+}
+
+/**
+ * Where this channel's first note goes while it has neither note nor rest.
+ *
+ * The end of its own block where it has one — its **last** block, since source
+ * order within a channel is execution order — and the end of the document where
+ * it has none. Wound back over the whitespace that follows either way, so the
+ * run lands against the text rather than after the blank line before whatever
+ * comes next.
+ */
+function channelHome(source: string, channel: number, markers: readonly Marker[]): ChannelHome {
+  let own = -1;
+  markers.forEach((marker, index) => {
+    if (marker.channel === channel) {
+      own = index;
+    }
+  });
+
+  let at = own < 0 ? source.length : (markers[own + 1]?.start ?? source.length);
+  while (at > 0 && WHITESPACE.test(source[at - 1])) {
+    at--;
+  }
+
+  return { at, declared: own >= 0 };
+}
+
+/**
+ * Whether writing a `#N` for this channel would take the music above the first
+ * marker away from the channel it plays on.
+ *
+ * `detectStartingChannel` probes the whole text for `#0`, then `#1`, up to `#7`,
+ * and starts writing to the first it finds (`parser.ts:379-390`,
+ * Music.cpp:383-406) — so everything above the first marker belongs to the
+ * lowest channel declared anywhere, and a `#N` written for a lower one moves all
+ * of it, along with the `$FA` prologue `link.ts:prependBlobPrefix` puts on that
+ * same channel.
+ *
+ * The music is counted off the **note map** rather than off `index.commands`,
+ * because an `#instruments` entry's bytes and a remote definition's body both
+ * gather as commands standing above the first marker, and `orderChannels` keeps
+ * both in the header — a refusal earned by those could not be cleared by the
+ * Normalize button offered beside it. Two consequences, both deliberate: a
+ * prelude of commands with no notes in it is not caught, and AddmusicK refuses
+ * notes outside a channel outright (AMK0140, `parser.ts:2880`), so a song that
+ * can earn this at all is an `#am4` or `#amm` one.
+ *
+ * The lowest channel is read off the markers where the parser reads a raw
+ * substring of the preprocessed text, so a `#3` written only inside an `#spc`
+ * string counts for the parser and not here. The two can disagree only by
+ * refusing a write that would have been safe.
+ */
+function movesTheStartingChannel(
+  source: string,
+  channel: number,
+  markers: readonly Marker[],
+  noteMap: readonly NoteAddress[],
+): boolean {
+  const lowest = markers.reduce((held, marker) => Math.min(held, marker.channel), 8);
+  const startingNow = lowest === 8 ? 0 : lowest;
+  if (Math.min(channel, lowest) === startingNow) {
+    return false;
+  }
+
+  const first = markers.length > 0 ? markers[0].start : source.length;
+  return noteMap.some((entry) => entry.span.start < first);
+}
+
 /**
  * The channel as a strip, or the reason it cannot be one.
  *
@@ -288,6 +404,12 @@ export function channelStrip(request: StripRequest): Strip | StripRefusal {
   const forbidden = forbiddenConstruct(index, channel, source);
   if (forbidden !== null) {
     return { refused: forbidden };
+  }
+
+  const markers = channelMarkers(index, source);
+  const home = channelHome(source, channel, markers);
+  if (!home.declared && movesTheStartingChannel(source, channel, markers, noteMap)) {
+    return { refused: 'writing this channel would move the music written above the first `#N`' };
   }
 
   const entries = noteMap
@@ -369,7 +491,7 @@ export function channelStrip(request: StripRequest): Strip | StripRefusal {
     return { refused: disagreement };
   }
 
-  return { channel, items, ticks: tick };
+  return { channel, items, ticks: tick, home };
 }
 
 /**

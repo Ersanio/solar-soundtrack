@@ -321,6 +321,12 @@ One entry each: what it was, what it is, why.
   it had just been given and the view shifted by up to a page on every tab switch. It follows the
   transition: what re-measures the pages is a stop. The camera outliving the component
   (`roll-camera.ts`) is what turned a harmless re-run into a lost position.
+- **Writing a channel the roll opens into its place in `#0`-`#7` order** — `octave` and
+  `defaultNoteLength` are one variable each and `parseHash` resets neither, so a block dropped
+  between two others changes what the second is parsed under, and only `ParseTrace` knows what to
+  restore. The roll's compile carries no trace, and asking for one costs an event per dispatch. A new
+  `#N` goes at the **end of the document**, where nothing follows it to be disturbed; `orderChannels`
+  is what puts the blocks in order afterwards, and it writes the `o` and `l` a moved block needs.
 - **Keeping the roll alive behind `[class.hidden]`**, as the source view is — the symmetry is
   inviting and it does not work: `display: none` destroys the layout box, so the native vertical
   scroller comes back at row 0 regardless, and a hidden roll goes on drawing marks, a grid and a

@@ -83,6 +83,15 @@ slider in the inspector, which writes one note's own length and never looks at i
 - **A drum's row is its instrument.** Dragging a drum up or down moves it between drum lanes by
   rewriting its `@21`–`@29`. Dragging one onto the keyboard, or a pitched note onto a drum lane, is
   refused: that is a change to what every note after it plays on, not a move.
+- **Drawing on an empty channel writes the channel.** Pick a channel the song has never used and draw
+  on it, and the roll writes a `#N` block for it at the end of the MML, with the settings a fresh
+  channel runs under — `o4 l8 q7F @0 v255 y10` — before the note. All of it is one undo step. The
+  block goes at the end because an octave and a default length carry across a `#N`, so a block
+  dropped in between two others would change what the second one is read under; **Normalize** is what
+  puts the blocks back in `#0` to `#7` order.
+- **A channel the roll opens has no intro.** If the rest of the song has a `/`, write one into the new
+  channel by hand — until you do, it restarts at its own top on every loop, and the roll's loop marker
+  sits at the beginning of the song.
 - **Every edit is one undo step**, including a whole selection moved at once, and it is the same
   history `Ctrl+Z` uses in the MML editor.
 

@@ -12,9 +12,7 @@ export const CHANGELOG: readonly ChangelogEntry[] = [
     date: '21 August 2026',
     items: [
       'Editable piano roll: draw, drag, stretch and delete notes, and the MML follows',
-      'Select a range of notes in the roll and move, quantize, glue or make them legato',
-      'Snap control, and a length readout while you stretch a note',
-      'Strict and flexible editing modes for overlapping notes in the piano roll',
+      'Draw on a channel the song has not used yet and the roll writes the channel in',
       'Undo and redo buttons in the piano roll toolbar',
       'Click a key on the roll to hear it',
       'Mutes and solos apply when you preview a note',
