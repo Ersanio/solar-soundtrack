@@ -8,6 +8,7 @@ any note, which picks that note's channel.
 
 | Gesture                          | What it does                                                             |
 | -------------------------------- | ------------------------------------------------------------------------ |
+| Hover over empty grid            | A ghost bar shows where the next note goes and how long it will be       |
 | Press on empty grid              | Draws a note there and keeps it under the pointer until you let go       |
 | Click on empty grid              | Draws the note and leaves it there                                       |
 | Drag the middle of a note        | Moves it — snapped along the grid, one row per semitone up and down      |

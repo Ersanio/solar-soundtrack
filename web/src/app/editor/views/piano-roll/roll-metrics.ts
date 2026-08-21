@@ -37,3 +37,15 @@ export const CHANNEL_FILL: readonly string[] = [
   'fill-ch-6',
   'fill-ch-7',
 ];
+
+/** The same eight, as outlines, and spelled out for the same reason. */
+export const CHANNEL_STROKE: readonly string[] = [
+  'stroke-ch-0',
+  'stroke-ch-1',
+  'stroke-ch-2',
+  'stroke-ch-3',
+  'stroke-ch-4',
+  'stroke-ch-5',
+  'stroke-ch-6',
+  'stroke-ch-7',
+];

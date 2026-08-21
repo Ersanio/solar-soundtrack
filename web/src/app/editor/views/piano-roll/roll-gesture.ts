@@ -4,9 +4,9 @@ import { NOTE_MIN } from '@amk/core/hardcoded-tables';
 import { octaveFor, spellDuration, spellNote } from '@amk/core/mml-text';
 import type { Edit } from '@amk/tokens/edits';
 import type { LaneStack } from './roll-layout';
-import { snapDuration, snapTick, stepDrawLength, tickAtX } from './roll-layout';
-import { type Preview, buildPreview, rowOfPlaced } from './roll-marks';
-import { KEY_WIDTH, NOTE_GAP } from './roll-metrics';
+import { rowAtY, snapDuration, snapTick, stepDrawLength, tickAtX } from './roll-layout';
+import { type Preview, type PreviewBar, buildPreview, rowOfPlaced } from './roll-marks';
+import { KEY_WIDTH, NOTE_GAP, ROW_GAP } from './roll-metrics';
 import {
   type EditContext,
   type EditMode,
@@ -127,6 +127,27 @@ interface Drag {
   length: number | null;
 }
 
+/**
+ * Where the pointer is when nothing is pressed, in pixels off the `<svg>`'s box.
+ *
+ * Pixels rather than ticks because the roll scrolls under a still pointer, and a
+ * stored tick would slide left with the music.
+ */
+interface Hover {
+  x: number;
+  y: number;
+  /** Over a note bar — this channel's or another's. */
+  onMark: boolean;
+  /** `Ctrl` is down, so a press would draw a box rather than a note. */
+  marquee: boolean;
+  fine: boolean;
+}
+
+/** The tick a press starts a drawn note on, so the ghost and the press agree. */
+function spawnTick(tick: number, snap: number, fine: boolean): number {
+  return Math.max(0, fine ? Math.round(tick) : snapTick(tick, snap));
+}
+
 /** Rows are semitones down the keyboard, so a row step is a semitone step. */
 function keysBetween(stack: LaneStack, from: number, to: number): number {
   const a = stack.lanes[from];
@@ -141,6 +162,8 @@ export interface RollGestures {
   preview: Signal<Preview | null>;
   /** The marquee box, in song coordinates. */
   marquee: Signal<{ x: number; y: number; w: number; h: number } | null>;
+  /** The note a press would draw, or `null` where a press would draw none. */
+  ghost: Signal<PreviewBar | null>;
   /** The length readout that follows a stretch, as the volume slider's does. */
   bubble: Signal<{ text: string; x: number; y: number } | null>;
   /** What the pointer should look like where it is. */
@@ -151,6 +174,8 @@ export interface RollGestures {
   onPointerDown(event: PointerEvent, box: DOMRect): void;
   onPointerMove(event: PointerEvent, box: DOMRect): void;
   onPointerUp(event: PointerEvent): void;
+  /** The pointer has left the roll, so there is nowhere for the ghost to be. */
+  onPointerLeave(): void;
   /**
    * Size the note being drawn, one rung of {@link stepDrawLength}'s ladder up
    * (`1`) or down (`-1`), or one tick at a time under `fine`.
@@ -209,6 +234,7 @@ function rowOfItem(item: StripItem, stack: LaneStack): number {
 export function rollGestures(sources: GestureSources, sinks: GestureSinks): RollGestures {
   const selection = signal<ReadonlySet<number>>(new Set<number>());
   const drag = signal<Drag | null>(null);
+  const hover = signal<Hover | null>(null);
 
   /** The gesture the pointer is describing, or `null` when it is not describing one. */
   const gestureNow = computed<Gesture | null>(() => {
@@ -236,7 +262,7 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
 
       return {
         kind: 'spawn',
-        startTick: Math.max(0, fine ? Math.round(held.tick) : snapTick(held.tick, snap)),
+        startTick: spawnTick(held.tick, snap, fine),
         ticks: held.length ?? sources.lastLength(),
         written: pitch.written,
         drum: pitch.drum,
@@ -324,6 +350,45 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
     return { x, y, w, h };
   });
 
+  /**
+   * The note a press would draw, drawn before it is pressed.
+   *
+   * Every reason it is `null` is a reason `onPointerDown` would not spawn a note
+   * either, so the ghost never offers a press that would be ignored. It asks
+   * `planGesture` nothing: a plan would put the red clash wash and the pushed
+   * bars on screen for a pointer that has committed to nothing.
+   */
+  const ghost = computed<PreviewBar | null>(() => {
+    const at = hover();
+    const strip = sources.strip();
+    if (!at || !strip || drag() || at.onMark || at.marquee) {
+      return null;
+    }
+
+    const stack = sources.stack();
+    const rowHeight = sources.rowHeight();
+    const row = rowAtY(at.y, rowHeight, stack.lanes.length);
+    if (at.x < KEY_WIDTH || row < 0 || !pitchOfRow(stack, row)) {
+      return null;
+    }
+
+    const zoom = sources.zoom();
+    const tick = tickAtX(at.x, sources.viewTick(), zoom);
+    if (itemAt(strip, stack, tick, row) >= 0) {
+      // This channel's own note: a press there moves or stretches it, which the
+      // cursor is already saying.
+      return null;
+    }
+
+    return {
+      id: 'ghost',
+      x: spawnTick(tick, sources.snap(), at.fine) * zoom,
+      y: row * rowHeight + ROW_GAP,
+      w: Math.max(1, sources.lastLength() * zoom - NOTE_GAP),
+      h: Math.max(1, rowHeight - ROW_GAP * 2),
+    };
+  });
+
   const bubble = computed(() => {
     const held = drag();
     const now = shownPlan();
@@ -403,11 +468,15 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
     selection: selection.asReadonly(),
     preview,
     marquee,
+    ghost,
     bubble,
     cursor: cursor.asReadonly(),
     busy,
 
     onPointerDown(event: PointerEvent, box: DOMRect): void {
+      // The preview layer draws what is in flight from here on.
+      hover.set(null);
+
       const strip = sources.strip();
       if (!strip || event.button > 2) {
         return;
@@ -534,10 +603,18 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
       const held = drag();
 
       if (!held) {
-        // Nothing is being dragged, so the cursor is the only thing to update.
+        // Nothing is being dragged, so the cursor and the ghost are all there is
+        // to update, and both come off this one event.
         cursor.set(
           hoverCursor(strip, sources.stack(), sources.zoom(), tick, row, event.clientX - box.left),
         );
+        hover.set({
+          x: event.clientX - box.left,
+          y: event.clientY - box.top,
+          onMark: Boolean((event.target as Element | null)?.closest('.mark')),
+          marquee: event.ctrlKey || event.metaKey,
+          fine: event.altKey,
+        });
         return;
       }
 
@@ -612,6 +689,10 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
       }
 
       finish();
+    },
+
+    onPointerLeave(): void {
+      hover.set(null);
     },
 
     stepLength(direction: number, fine: boolean): boolean {

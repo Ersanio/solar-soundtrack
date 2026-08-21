@@ -48,7 +48,7 @@ export interface Plan {
   notes: readonly PlacedNote[];
   /** The notes the gesture moved itself, drawn as the live bar. */
   touched: readonly PlacedNote[];
-  /** The notes a push moved out of the way, drawn as striped ghosts. */
+  /** The notes a push moved out of the way, drawn as striped bars. */
   pushed: readonly PlacedNote[];
   /** Drawn as a red wash on both notes. Empty for a plan that can be committed. */
   clashes: readonly Clash[];
@@ -225,8 +225,9 @@ function push(
  * their own `fixed` set at every call site, which is what keeps a selection from
  * shoving itself: one note of it would otherwise move the next.
  *
- * A note shoved twice is reported once, at where it finished, since the ghosts
- * are drawn from this and two rects for one note would sit at both positions.
+ * A note shoved twice is reported once, at where it finished, since the striped
+ * bars are drawn from this and two rects for one note would sit at both
+ * positions.
  */
 function pushFrom(
   notes: readonly PlacedNote[],

@@ -186,9 +186,8 @@ name, so `octaveOfNote` divides it out exactly.
 
 **`planGesture` decides and `planEdits` writes.** Everything the porter sees during a drag — the red
 wash, the striped pushed bars, the length bubble — is read off the one `Plan` that pointer-up
-commits, so
-what is drawn cannot disagree with what lands. A plan that is refused never reaches `planEdits` at
-all.
+commits, so what is drawn cannot disagree with what lands. A plan that is refused never reaches
+`planEdits` at all.
 
 Its **`EditMode`** is what an overlap does, and it is the porter's setting rather than the gesture's:
 `strict` refuses one and `flexible` shoves the notes in the way aside, for drawing, dragging,

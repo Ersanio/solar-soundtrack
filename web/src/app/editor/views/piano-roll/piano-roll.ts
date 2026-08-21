@@ -54,7 +54,7 @@ import {
   xAtTick,
 } from './roll-layout';
 import { type Mark, buildMarks, buildMinimap, heldRowsAt } from './roll-marks';
-import { CHANNEL_FILL, KEY_WIDTH, SCRUB_HEIGHT } from './roll-metrics';
+import { CHANNEL_FILL, CHANNEL_STROKE, KEY_WIDTH, SCRUB_HEIGHT } from './roll-metrics';
 import { type Strip, channelStrip, isStrip } from './roll-strip';
 import { RollNotes } from './roll-notes/roll-notes';
 import { RollScrub } from './roll-scrub/roll-scrub';
@@ -675,6 +675,12 @@ export class PianoRoll {
     return channel === null ? CHANNEL_FILL[0] : CHANNEL_FILL[channel];
   });
 
+  /** The same colour as an outline, which is what the ghost is drawn with. */
+  protected readonly editStroke = computed(() => {
+    const channel = this.editChannel();
+    return channel === null ? CHANNEL_STROKE[0] : CHANNEL_STROKE[channel];
+  });
+
   /** Red while the gesture in flight cannot be committed. */
   protected readonly blocked = computed(() => (this.gestures.preview()?.clash.length ?? 0) > 0);
 
@@ -972,6 +978,15 @@ export class PianoRoll {
 
   protected onEditUp(event: PointerEvent): void {
     this.gestures.onPointerUp(event);
+  }
+
+  /**
+   * On the `<svg>` rather than on the scroller, which has its own leave for the
+   * tooltip: a pointer inside the scroller but off the `<svg>` sends no move, so
+   * the ghost would hang where it was last seen.
+   */
+  protected onEditLeave(): void {
+    this.gestures.onPointerLeave();
   }
 
   /** The right button erases, so the browser's own menu would be in the way. */

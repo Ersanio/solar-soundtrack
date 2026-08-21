@@ -1,6 +1,6 @@
 import { Component, input } from '@angular/core';
 
-import type { Preview } from '../roll-marks';
+import type { Preview, PreviewBar } from '../roll-marks';
 
 /**
  * The gesture in flight, drawn over the song.
@@ -22,8 +22,12 @@ import type { Preview } from '../roll-marks';
 export class RollEditLayer {
   readonly preview = input.required<Preview | null>();
   readonly marquee = input.required<{ x: number; y: number; w: number; h: number } | null>();
+  /** The note the next press would draw. Never set while a gesture is in flight. */
+  readonly ghost = input.required<PreviewBar | null>();
   /** The channel's own fill, so a note being dragged stays the colour it is. */
   readonly fill = input.required<string>();
+  /** The same channel's stroke, which is what outlines the ghost. */
+  readonly stroke = input.required<string>();
   /** True while the gesture cannot be committed, which turns the live bars red. */
   readonly blocked = input.required<boolean>();
   /**

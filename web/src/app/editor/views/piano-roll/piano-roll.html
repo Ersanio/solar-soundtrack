@@ -88,6 +88,7 @@
       (pointermove)="onEditMove($event)"
       (pointerup)="onEditUp($event)"
       (pointercancel)="onEditUp($event)"
+      (pointerleave)="onEditLeave()"
       (contextmenu)="onContextMenu($event)"
     >
       <defs>
@@ -132,8 +133,10 @@
             amk-roll-edit
             [preview]="gestures.preview()"
             [marquee]="gestures.marquee()"
+            [ghost]="gestures.ghost()"
             [bubble]="gestures.bubble()"
             [fill]="editFill()"
+            [stroke]="editStroke()"
             [blocked]="blocked()"
           />
         </g>

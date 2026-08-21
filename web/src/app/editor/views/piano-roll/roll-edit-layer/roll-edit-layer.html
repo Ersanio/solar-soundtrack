@@ -1,8 +1,8 @@
 <svg:defs>
-  <!-- The ghost's stripes. `userSpaceOnUse` so they stay the same width at every
-       zoom rather than stretching with the bar they fill. -->
+  <!-- The pushed bars' stripes. `userSpaceOnUse` so they stay the same width at
+       every zoom rather than stretching with the bar they fill. -->
   <svg:pattern
-    id="amk-roll-ghost"
+    id="amk-roll-pushed"
     width="6"
     height="6"
     patternUnits="userSpaceOnUse"
@@ -12,13 +12,32 @@
   </svg:pattern>
 </svg:defs>
 
+@if (ghost(); as bar) {
+  <!-- Outlined as well as washed, because a real bar is already the channel's
+       colour at 0.35 and a fill alone is a note whose `q` is nothing. It takes
+       no pointer: it sits over the marks, whose hover and `.mark` test it would
+       otherwise answer in its own name. -->
+  <svg:rect
+    rx="2"
+    pointer-events="none"
+    fill-opacity="0.22"
+    stroke-width="1"
+    stroke-dasharray="3 3"
+    [class]="`${fill()} ${stroke()}`"
+    [attr.x]="bar.x"
+    [attr.y]="bar.y"
+    [attr.width]="bar.w"
+    [attr.height]="bar.h"
+  />
+}
+
 @if (preview(); as shown) {
   <!-- Where a note will be pushed to: an outline and stripes, no fill and no
        glyphs, so it reads as a place rather than as a note. -->
-  @for (bar of shown.ghost; track bar.id) {
+  @for (bar of shown.pushed; track bar.id) {
     <svg:rect
       rx="2"
-      fill="url(#amk-roll-ghost)"
+      fill="url(#amk-roll-pushed)"
       fill-opacity="0.35"
       class="stroke-ink-muted"
       stroke-width="1"

@@ -311,7 +311,7 @@ export interface Preview {
   /** The notes the gesture is moving, drawn solid in the channel's colour. */
   live: readonly PreviewBar[];
   /** The notes a push will shift, drawn as a striped outline with nothing in it. */
-  ghost: readonly PreviewBar[];
+  pushed: readonly PreviewBar[];
   /** Where two notes would sound at once, drawn red over both. */
   clash: readonly PreviewBar[];
 }
@@ -345,8 +345,8 @@ export interface PreviewRequest {
  * A gesture in flight, as boxes.
  *
  * Everything the porter sees while dragging comes off one {@link Plan}, so the
- * red wash and the ghosts can never disagree with what pointer-up will commit —
- * they are the same answer drawn twice rather than two answers.
+ * red wash and the striped bars can never disagree with what pointer-up will
+ * commit — they are the same answer drawn twice rather than two answers.
  */
 export function buildPreview(request: PreviewRequest): Preview {
   const { plan, stack, zoom, rowHeight } = request;
@@ -368,7 +368,7 @@ export function buildPreview(request: PreviewRequest): Preview {
 
   return {
     live: bars(plan.touched, 'live'),
-    ghost: bars(plan.pushed, 'ghost'),
+    pushed: bars(plan.pushed, 'pushed'),
     // A clash is a run of ticks rather than a note, so it is drawn down the
     // whole stack: the two notes it names are on different rows and a wash on
     // one of them would say the other was fine.
