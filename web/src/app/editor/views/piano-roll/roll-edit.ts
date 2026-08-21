@@ -586,21 +586,52 @@ function noteText(
   // run of notes moved together writes `o5` once rather than in front of each.
   const wantsOctave = running === null || running !== octave;
   const lead = wantsOctave ? spellOctave(octave) : '';
-  const exit = exitOctave === null || exitOctave === octave ? '' : spellOctave(exitOctave);
+  const exit = exitText(note, exitOctave);
   if (lead === null || exit === null) {
     return null;
   }
 
-  return `${lead ? `${lead} ` : ''}${head}${length}${exit ? ` ${exit}` : ''}`;
+  return `${lead ? `${lead} ` : ''}${head}${length}${exit}`;
+}
+
+/** The index of the next note on the channel at or after `from`, or -1 for none. */
+function noteFrom(strip: Strip, from: number): number {
+  for (let at = from; at < strip.items.length; at++) {
+    if (strip.items[at].kind === 'note') {
+      return at;
+    }
+  }
+
+  return -1;
+}
+
+/**
+ * Whether a note sets its own absolute octave, so an octave put back in front of
+ * it would be saying the same thing twice.
+ *
+ * Including a note this same plan is moving: transposing a run of four would
+ * otherwise write `o5 c o4 o5 d o4 o5 e o4 o5 f`, where every restore is undone
+ * by the octave immediately after it.
+ */
+function writesItsOwnOctave(
+  strip: Strip,
+  index: number,
+  survivors: ReadonlyMap<number, PlacedNote>,
+): boolean {
+  const note = strip.items[index];
+  const planned = survivors.get(index);
+  return (
+    note.hasLeadingOctave || (planned?.drum === null && octaveFor(planned.written) !== note.octave)
+  );
 }
 
 /**
  * The octave to put back after a note whose own has been rewritten.
  *
  * The octave in force after the unit as it was written — unless the next note on
- * the channel sets its own, in which case saying it twice is noise. The last
- * note of a channel always restores, because `octave` is global parser state and
- * leaks past a `#N` into whatever block comes after it.
+ * the channel sets its own. The last note of a channel always restores, because
+ * `octave` is global parser state and leaks past a `#N` into whatever block comes
+ * after it.
  */
 function exitOctaveFor(
   strip: Strip,
@@ -609,23 +640,24 @@ function exitOctaveFor(
 ): number | null {
   const item = strip.items[index];
   const exit = item.exitOctave ?? item.octave;
-  for (let at = index + 1; at < strip.items.length; at++) {
-    const next = strip.items[at];
-    if (next.kind !== 'note') {
-      continue;
-    }
+  const next = noteFrom(strip, index + 1);
+  return next >= 0 && writesItsOwnOctave(strip, next, survivors) ? null : exit;
+}
 
-    // Including a next note this same plan is moving: transposing a run of four
-    // would otherwise write `o5 c o4 o5 d o4 o5 e o4 o5 f`, where every restore
-    // is undone by the octave immediately after it.
-    const planned = survivors.get(at);
-    const writesItsOwn =
-      next.hasLeadingOctave ||
-      (planned?.drum === null && octaveFor(planned.written) !== next.octave);
-    return writesItsOwn ? null : exit;
+/**
+ * The octave put back after a note, as the text that follows it.
+ *
+ * `''` where nothing is needed — a drum writes no octave to put back, and an
+ * exit the note is already at is written by the note itself. `null` where `o`
+ * cannot reach the octave asked for, which `<` and `>` can (`spellOctave`).
+ */
+function exitText(note: PlacedNote, exitOctave: number | null): string | null {
+  if (exitOctave === null || note.drum !== null || exitOctave === octaveFor(note.written)) {
+    return '';
   }
 
-  return exit;
+  const spelled = spellOctave(exitOctave);
+  return spelled === null ? null : ` ${spelled}`;
 }
 
 /** The unit and the whitespace in front of it, so a deletion leaves no double space. */
@@ -698,12 +730,15 @@ function rewriteNote(
     return null;
   }
 
-  const octave = octaveFor(note.written);
-  const exitText = exit === null || exit === octave ? '' : ` ${spellOctave(exit) ?? ''}`;
+  const put = exitText(note, exit);
+  if (put === null) {
+    return null;
+  }
+
   const tailEdit = spliceRange(
     source,
     { start: tail.span.start, end: item.unitSpan.end, line: tail.span.line },
-    `^${length}${exitText}`,
+    `^${length}${put}`,
   );
   if (tailEdit) {
     edits.push(tailEdit);
@@ -739,7 +774,11 @@ interface Region {
  * shrink that exhausts one rest deletes it and carries on into the next; a gap
  * with no rest at all has one written in straight after the note before it.
  */
-function realiseRegion(context: EditContext, gap: Region): Edit[] | null {
+function realiseRegion(
+  context: EditContext,
+  gap: Region,
+  survivors: ReadonlyMap<number, PlacedNote>,
+): Edit[] | null {
   const { source, targetAMKVersion } = context;
   const edits: Edit[] = [];
 
@@ -749,7 +788,7 @@ function realiseRegion(context: EditContext, gap: Region): Edit[] | null {
   }
 
   if (gap.born.length > 0) {
-    return spawnInto(context, gap);
+    return spawnInto(context, gap, survivors);
   }
 
   let left = gap.ticks;
@@ -849,6 +888,9 @@ function rested(rests: readonly StripItem[], from: number): number {
  * `^` continuation, which is still one note — a tie emits `$C6` and the driver
  * carries the note through it.
  *
+ * `exitOctave` is the octave the run leaves standing, for a channel with no note
+ * left to be handed it (see {@link spawnInto}).
+ *
  * `null` where a length in the run has no spelling on this target.
  */
 function spawnRun(
@@ -858,6 +900,7 @@ function spawnRun(
   after: number,
   running: number | null,
   introAt: number | null,
+  exitOctave: number | null,
 ): string | null {
   const { targetAMKVersion } = context;
   const parts: string[] = [];
@@ -910,14 +953,17 @@ function spawnRun(
       const first = spellDuration(split - at, targetAMKVersion);
       const second = spellDuration(at + born.ticks - split, targetAMKVersion);
       const head = first === null ? null : noteText(born, first, null, targetAMKVersion, running);
-      if (head === null || second === null) {
+      // The `^` is where the note ends, so the octave goes after it rather than
+      // between the two halves.
+      const put = exitText(born, exitOctave);
+      if (head === null || second === null || put === null) {
         return false;
       }
 
-      parts.push(head, '/', `^${second}`);
+      parts.push(head, '/', `^${second}${put}`);
       marked = true;
     } else {
-      const whole = noteText(born, null, null, targetAMKVersion, running);
+      const whole = noteText(born, null, exitOctave, targetAMKVersion, running);
       if (whole === null) {
         return false;
       }
@@ -990,7 +1036,11 @@ function restFor(gap: Region, born: PlacedNote): StripItem | null {
  * `planEdits` pushes what each region returns and goes on to the next, so a note
  * that quietly wrote nothing would leave the rest of the gesture committed.
  */
-function spawnInto(context: EditContext, gap: Region): Edit[] | null {
+function spawnInto(
+  context: EditContext,
+  gap: Region,
+  survivors: ReadonlyMap<number, PlacedNote>,
+): Edit[] | null {
   const { source, strip } = context;
   if (gap.born.length !== 1) {
     return null;
@@ -1064,24 +1114,84 @@ function spawnInto(context: EditContext, gap: Region): Edit[] | null {
       ? context.introTicks
       : null;
 
-  const run = spawnRun(context, born, before, after, opening ? OPENING_OCTAVE : null, introAt);
+  /**
+   * The octave the run leaves standing, which is the note's own: a spawn writes
+   * an absolute `o` in front of itself wherever one is in doubt, and a drum
+   * writes none at all and so leaves whatever stood.
+   */
+  const leaves = born.drum === null ? octaveFor(born.written) : null;
+  const reader = noteFrom(strip, gap.after + 1);
+
+  /**
+   * The note that reads the octave the run leaves, and so has to be given the
+   * one it was written under.
+   *
+   * Its own head, rather than the end of the run: `<` and `>` are not commands
+   * to the scanner at all, so nothing here can say which side of the run one
+   * written in this gap sits on, and a note's head is past every one of them. It
+   * is also where the text settles — an `o` written there is that note's leading
+   * octave on the next pass (`roll-strip.ts:growUnits`), where one left between
+   * two rests is claimed by no unit and is what makes a later edit unreadable.
+   */
+  const owed =
+    leaves !== null && reader >= 0 && !writesItsOwnOctave(strip, reader, survivors)
+      ? strip.items[reader].octave
+      : null;
+
+  // Nothing left on the channel to hand it to, so the run carries it: `octave`
+  // is global parser state and leaks past a `#N` into the block below.
+  const previous = gap.after >= 0 ? strip.items[gap.after] : null;
+  const standing = previous ? (previous.exitOctave ?? previous.octave) : null;
+  const trailing = reader < 0 ? standing : null;
+
+  /**
+   * Whether the note after the gap can be left as it is.
+   *
+   * Only where the octave standing where this one is drawn is the one it is
+   * drawn at — and that is known only when the notes either side of the gap
+   * agree on it. A `<` or `>` between them is invisible to the scanner, and
+   * then which side of the run it sits on decides what the note after reads.
+   */
+  const untouched = standing !== null && standing === owed && standing === leaves;
+
+  const run = spawnRun(
+    context,
+    born,
+    before,
+    after,
+    opening ? OPENING_OCTAVE : null,
+    introAt,
+    trailing,
+  );
   if (run === null) {
     return null;
   }
 
-  if (over) {
-    const edit = spliceRange(source, over.unitSpan, run);
-    return edit ? [edit] : null;
+  let restore: Edit | null = null;
+  if (owed !== null && !untouched) {
+    const spelled = spellOctave(owed);
+    if (spelled === null) {
+      return null;
+    }
+
+    restore = insertAt(strip.items[reader].unitSpan.start, `${spelled} `, 1);
   }
 
   // Nothing at all between the notes either side, so the run is inserted rather
   // than written over anything.
-  if (gap.rests.length === 0 && gap.between === 0) {
-    const edit = writeInto(context, gap, run);
-    return edit ? [edit] : null;
+  const edit = over
+    ? spliceRange(source, over.unitSpan, run)
+    : gap.rests.length === 0 && gap.between === 0
+      ? writeInto(context, gap, run)
+      : null;
+  if (edit === null) {
+    return null;
   }
 
-  return null;
+  // The run first where the two land on the same offset — a run inserted at the
+  // head of the note it is being written in front of — so `coalesce` joins them
+  // in the order they are read.
+  return restore ? [edit, restore] : [edit];
 }
 
 export function planEdits(context: EditContext, plan: Plan): Edit[] | null {
@@ -1154,7 +1264,7 @@ export function planEdits(context: EditContext, plan: Plan): Edit[] | null {
   }
 
   for (const region of regionsOf(strip, survivors, born)) {
-    const written = realiseRegion(context, region);
+    const written = realiseRegion(context, region, survivors);
     if (written === null) {
       return null;
     }

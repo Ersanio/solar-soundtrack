@@ -357,6 +357,15 @@ One entry each: what it was, what it is, why.
   scroller comes back at row 0 regardless, and a hidden roll goes on drawing marks, a grid and a
   transform for a tab nobody is looking at. CodeMirror is hidden because its undo history is not
   something anything could hand back; a camera is four numbers that can be.
+- **Putting a drawn note's octave back at the end of its run**, in the mould of the rewrite path — a
+  rewrite restores the octave standing after the note it rewrote, which that note's own byte gives
+  it exactly; a run written into a gap has no such anchor, and `<` and `>` are not commands to the
+  scanner, so nothing can say which side of the run one written in the gap sits on. The octave goes
+  at the **head of the note that reads it** (`spawnInto`), where the byte is the answer and any
+  shift has already been applied — and where the text settles anyway, since an `o` left between two
+  rests is claimed by no unit on the next strip build and is what makes a later edit there
+  unreadable. Only a channel with no note left to hand it to has the run carry it, for the leak past
+  a `#N`.
 
 ## Angular specifics
 

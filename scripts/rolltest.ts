@@ -523,6 +523,68 @@ expectEdit("a note drawn at the end of a channel", "#amk 2\n#0 o4 c4 r4", 0, () 
 	drum: null,
 }));
 
+// A run leaves its own octave standing, so the note that reads it is handed the
+// one it was written under — at its own head, where the text settles anyway.
+// The whole channel below would move with the drawn note otherwise.
+expectEdit(
+	"a note drawn an octave above the one after it",
+	"#amk 2\n#0 o4 c4 r2 d4",
+	0,
+	() => ({ kind: "spawn", startTick: 72, ticks: 24, written: NOTE_MIN + 48, drum: null }),
+	{ text: "#amk 2\n#0 o4 c4 r8 o5 c8 r4 o4 d4" },
+);
+
+// The head is also past any `>`, which is not a command to the scanner at all —
+// nothing can say which side of the run one written in the gap sits on, so the
+// note after it is given its own octave rather than the run putting one back.
+expectEdit(
+	"a note drawn an octave above, before an octave shift",
+	"#amk 2\n#0 o4 c4 r2 > d4",
+	0,
+	() => ({ kind: "spawn", startTick: 72, ticks: 24, written: NOTE_MIN + 48, drum: null }),
+	{ text: "#amk 2\n#0 o4 c4 r8 o5 c8 r4 > o5 d4" },
+);
+
+expectEdit(
+	"a note drawn an octave above one that sets its own",
+	"#amk 2\n#0 o4 c4 r2 o5 d4",
+	0,
+	() => ({ kind: "spawn", startTick: 72, ticks: 24, written: NOTE_MIN + 48, drum: null }),
+	{ text: "#amk 2\n#0 o4 c4 r8 o5 c8 r4 o5 d4" },
+);
+
+// Nothing between the two notes to write over, so the run is inserted at the
+// head of the one it is drawn in front of and the octave lands on the same
+// offset, which `coalesce` joins in the order the two were read.
+expectEdit(
+	"a note drawn an octave above, straight in front of another",
+	"#amk 2\n#0 o4 c4 d4",
+	0,
+	() => ({ kind: "spawn", startTick: 48, ticks: 48, written: NOTE_MIN + 48, drum: null }),
+	{ text: "#amk 2\n#0 o4 c4 o5 c4 o4 d4" },
+);
+
+// `octave` is global parser state and leaks past a `#N`, so a run with no note
+// left to hand it to carries it itself — which `#1`, whose notes write no octave
+// of their own, is what catches.
+expectEdit(
+	"a note drawn an octave above at the end of a channel",
+	"#amk 2\n#0 o4 c4 r4\n#1 c4 c4 c4 c4",
+	0,
+	() => ({ kind: "spawn", startTick: 48, ticks: 48, written: NOTE_MIN + 48, drum: null }),
+	{ text: "#amk 2\n#0 o4 c4 o5 c4 o4\n#1 c4 c4 c4 c4" },
+);
+
+// A drum's lane is its instrument and it writes no octave at all, so there is
+// nothing standing for the note after it to be given back.
+expectEdit(
+	"a drum drawn in front of another",
+	"#amk 2\n#6 @21 c8 r8 @22 c8",
+	6,
+	() => ({ kind: "spawn", startTick: 24, ticks: 24, written: NOTE_MIN + 48, drum: 23 }),
+	{ lacks: "o" },
+);
+
 expectEdit("a drum moved to another lane", "#amk 2\n#6 @21 c8 @22 c8", 6, (bar) => ({
 	kind: "move",
 	items: [noteAt(bar, 0)],
