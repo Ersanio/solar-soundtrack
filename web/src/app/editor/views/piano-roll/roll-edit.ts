@@ -9,7 +9,7 @@ import {
 } from '@amk/core/mml-text';
 import type { Span } from '@amk/core/types';
 import { type Edit, insertAt, spliceRange } from '@amk/tokens/edits';
-import type { Strip, StripItem } from './roll-strip';
+import type { ChannelTail, Strip, StripItem } from './roll-strip';
 
 /**
  * What a gesture on the roll does to a channel, and what that is as text.
@@ -89,6 +89,10 @@ export interface EditContext {
    * the transport on. Not `SongTimeline.ticks`, which is the same number until a
    * channel emits bytes without occupying a tick — the walk counts that one as
    * used and answers 0, where `Music.cpp:3209` passes over it.
+   *
+   * A gesture reaching past it is what lengthens the song (see
+   * {@link padChannels}), so it is the line the edit is measured against rather
+   * than a limit on where a note may go.
    */
   playableTicks: number;
   /**
@@ -100,6 +104,14 @@ export interface EditContext {
    * where the rest of the song does.
    */
   introTicks: number | null;
+  /**
+   * Every channel as somewhere rests can be appended, indexed by channel.
+   *
+   * `channelTails`, off `stats.channelTicks` — so {@link playableTicks} is the
+   * smallest non-zero `ticks` in here, and the two are two readings of one
+   * array rather than two arrays. What {@link padChannels} writes to.
+   */
+  channels: readonly ChannelTail[];
 }
 
 export const REFUSE_RANGE = 'the driver cannot play a note that high or low';
@@ -871,6 +883,49 @@ function writeInto(context: EditContext, gap: Region, run: string): Edit | null 
   return insertAt(strip.home.at, `${gapAbove}${opening}${line}${run}`, 1);
 }
 
+/**
+ * A rest on the end of every other channel that would stop the song before `to`.
+ *
+ * The driver reloads all eight track pointers the moment one voice reads its
+ * `$00` (`main.asm:L_0C01`, `Music.cpp:3209`), so the song is as long as its
+ * shortest channel and a note past that point is written, compiled and never
+ * heard. Making it heard means making every other channel reach it.
+ *
+ * A rest is appended rather than a channel rewritten, and that is what makes
+ * this possible on a real song: it takes no note map, no agreement with the
+ * walk and no {@link Strip}, so a channel full of `[ ]` loops — which
+ * `channelStrip` refuses outright — is padded like any other. The run goes on a
+ * line of its own for the reason {@link writeInto} does it: a `;` comment ending
+ * the block would otherwise swallow it.
+ *
+ * A channel at 0 ticks is left alone. It is holding nothing back, and giving it
+ * ticks it never had is not what drawing a note asked for. So is the channel
+ * being edited, which the gesture's own splices already carry out to the note.
+ */
+function padChannels(context: EditContext, to: number): Edit[] | null {
+  const { source, strip, targetAMKVersion } = context;
+  const line = eol(source);
+  const edits: Edit[] = [];
+
+  for (const [channel, tail] of context.channels.entries()) {
+    if (channel === strip.channel || tail.ticks <= 0 || tail.ticks >= to) {
+      continue;
+    }
+
+    const text = spellDuration(to - tail.ticks, targetAMKVersion);
+    if (text === null) {
+      return null;
+    }
+
+    const edit = insertAt(tail.at, `${line}r${text}`, 1);
+    if (edit) {
+      edits.push(edit);
+    }
+  }
+
+  return edits;
+}
+
 function rested(rests: readonly StripItem[], from: number): number {
   return rests.slice(from).reduce((sum, rest) => sum + rest.ticks, 0);
 }
@@ -1063,8 +1118,8 @@ function spawnInto(
    * reads its `$00` (`main.asm:L_0C01`, `Music.cpp:3209`).
    *
    * A note drawn past the end extends the channel rather than being refused, in
-   * either case: the channel is then the long one, which is the ordinary shape
-   * `AMK0502` already reports.
+   * either case, and {@link padChannels} brings the rest of the song out to meet
+   * it — so the channel does not become the long one and the note is heard.
    */
   const channelEnd = empty ? context.playableTicks : strip.ticks;
 
@@ -1261,6 +1316,33 @@ export function planEdits(context: EditContext, plan: Plan): Edit[] | null {
     const own: number | null = note.drum === null ? octaveFor(note.written) : running;
     running = exit ?? own;
     previous = item;
+  }
+
+  /**
+   * How far past the song this gesture reaches, over the notes it is answerable
+   * for: the ones it placed itself, and the ones its push cascade shoved out of
+   * the way. Not every note in the plan — a channel already running past the cut
+   * is an ordinary shape, and reading its tail as "reach" would have a deletion
+   * lengthen the song.
+   */
+  const reach = [...plan.touched, ...plan.pushed].reduce(
+    (furthest, note) => Math.max(furthest, note.startTick + note.ticks),
+    0,
+  );
+
+  // Before the regions, and that is load-bearing rather than tidiness: a channel
+  // being opened writes its `#N` at `strip.home.at`, which for an undeclared one
+  // is the wound-back end of the document — the same offset as the tail of
+  // whichever channel is written last. Both are empty ranges, `coalesce` joins
+  // them into one, and the joined text is in this array's order. The other way
+  // round, the rest lands inside the block just opened.
+  if (reach > context.playableTicks) {
+    const padded = padChannels(context, reach);
+    if (padded === null) {
+      return null;
+    }
+
+    edits.push(...padded);
   }
 
   for (const region of regionsOf(strip, survivors, born)) {

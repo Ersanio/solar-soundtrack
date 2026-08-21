@@ -17,7 +17,7 @@ import {
   planEdits,
   planGesture,
 } from './roll-edit';
-import { type Strip, type StripItem } from './roll-strip';
+import { type ChannelTail, type Strip, type StripItem } from './roll-strip';
 
 /**
  * The roll's pointer: what a press means, what a drag is doing, and what
@@ -85,6 +85,8 @@ export interface GestureSources {
   playableTicks: Signal<number>;
   /** The tick the song loops back to, so a channel being opened gets its own `/` there. */
   introTicks: Signal<number | null>;
+  /** Every channel as somewhere rests can be appended, for a gesture that lengthens the song. */
+  channels: Signal<readonly ChannelTail[]>;
   source: Signal<string>;
 }
 
@@ -456,6 +458,17 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
     soundRow(row, draggedTick(held, item, sources.snap()), ticks ?? sources.lastLength());
   };
 
+  /** Everything `planEdits` reads besides the plan itself, as of right now. */
+  const contextFor = (strip: Strip): EditContext => ({
+    source: sources.source(),
+    strip,
+    targetAMKVersion: sources.targetAMKVersion(),
+    songTargetProgram: sources.songTargetProgram(),
+    playableTicks: sources.playableTicks(),
+    introTicks: sources.introTicks(),
+    channels: sources.channels(),
+  });
+
   const finish = (): void => {
     const strip = sources.strip();
     const now = plan();
@@ -469,17 +482,7 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
       return;
     }
 
-    const edits = planEdits(
-      {
-        source: sources.source(),
-        strip,
-        targetAMKVersion: sources.targetAMKVersion(),
-        songTargetProgram: sources.songTargetProgram(),
-        playableTicks: sources.playableTicks(),
-        introTicks: sources.introTicks(),
-      } satisfies EditContext,
-      now,
-    );
+    const edits = planEdits(contextFor(strip), now);
 
     if (edits && edits.length > 0) {
       if (now.touched.length > 0) {
@@ -756,17 +759,7 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
         return;
       }
 
-      const edits = planEdits(
-        {
-          source: sources.source(),
-          strip,
-          targetAMKVersion: sources.targetAMKVersion(),
-          songTargetProgram: sources.songTargetProgram(),
-          playableTicks: sources.playableTicks(),
-          introTicks: sources.introTicks(),
-        },
-        now,
-      );
+      const edits = planEdits(contextFor(strip), now);
       if (edits && edits.length > 0) {
         sinks.commit(edits);
         selection.set(new Set<number>());
@@ -811,17 +804,7 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
     }
 
     const now = planGesture(strip, { kind: 'delete', items: [index] }, sources.editMode());
-    const edits = planEdits(
-      {
-        source: sources.source(),
-        strip,
-        targetAMKVersion: sources.targetAMKVersion(),
-        songTargetProgram: sources.songTargetProgram(),
-        playableTicks: sources.playableTicks(),
-        introTicks: sources.introTicks(),
-      },
-      now,
-    );
+    const edits = planEdits(contextFor(strip), now);
     if (edits && edits.length > 0) {
       sinks.commit(edits);
     }

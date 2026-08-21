@@ -35,7 +35,13 @@ import {
 	planEdits,
 	planGesture,
 } from "../web/src/app/editor/views/piano-roll/roll-edit";
-import { type Strip, channelStrip, isStrip } from "../web/src/app/editor/views/piano-roll/roll-strip";
+import {
+	type ChannelTail,
+	type Strip,
+	channelStrip,
+	channelTails,
+	isStrip,
+} from "../web/src/app/editor/views/piano-roll/roll-strip";
 
 import { check, stubFetch, summarise } from "./harness";
 
@@ -195,6 +201,11 @@ function introOf(built: Built): number | null {
 	return stats?.hasIntro === true ? stats.introTicks : null;
 }
 
+/** Every channel as somewhere rests can be appended, the way the roll builds it. */
+function tailsOf(source: string, built: Built): readonly ChannelTail[] {
+	return channelTails(source, tokenize(source), built.result.stats?.channelTicks ?? []);
+}
+
 interface Expectation {
 	/** The text after the edit, for the cases where the spelling is the point. */
 	text?: string;
@@ -211,6 +222,15 @@ interface Expectation {
 	 * out at all, makes itself the shortest and takes the rest of the song with it.
 	 */
 	playsAsLong?: boolean;
+	/**
+	 * The song must play for exactly this many ticks after the edit.
+	 *
+	 * What a gesture reaching past the end of the song is pinned by: the note is
+	 * only heard if every channel that would cut the song short has been padded
+	 * out to meet it, and the text alone cannot say whether they were — a rest
+	 * one note too short reads exactly like a rest of the right length.
+	 */
+	playsFor?: number;
 	/**
 	 * The song must loop back to the same tick as it did.
 	 *
@@ -254,6 +274,7 @@ function expectEdit(
 		songTargetProgram: before.result.stats?.songTargetProgram ?? 0,
 		playableTicks: playable(before),
 		introTicks: introOf(before),
+		channels: tailsOf(source, before),
 	};
 	const plan = planGesture(bar, gesture(bar), expectation.mode ?? "flexible");
 	const edits = planEdits(context, plan);
@@ -296,6 +317,14 @@ function expectEdit(
 		check(
 			`${name}: plays for as long as it did`,
 			playable(before) === playable(rebuilt),
+			`${playable(before)} -> ${playable(rebuilt)} ticks`,
+		);
+	}
+
+	if (expectation.playsFor !== undefined) {
+		check(
+			`${name}: plays for ${expectation.playsFor} ticks`,
+			playable(rebuilt) === expectation.playsFor,
 			`${playable(before)} -> ${playable(rebuilt)} ticks`,
 		);
 	}
@@ -357,6 +386,7 @@ function expectRefused(
 		songTargetProgram: before.result.stats?.songTargetProgram ?? 0,
 		playableTicks: playable(before),
 		introTicks: introOf(before),
+		channels: tailsOf(source, before),
 	};
 	const plan = planGesture(bar, gesture(bar), mode);
 	check(`${name}: refused`, planEdits(context, plan) === null, "an edit was produced");
@@ -763,6 +793,96 @@ expectRefused("a note shortened past the command written inside it", "#amk 2\n#0
 	deltaTicks: -60,
 }));
 
+console.log("\npast the end of the song");
+
+// The driver reloads all eight track pointers the moment one voice reads its
+// `$00` (`main.asm:L_0C01`, `Music.cpp:3209`), so a note past the shortest
+// channel is written, compiled and never heard. Every channel that would cut the
+// song short is padded out to meet it instead, and `playsFor` is the only
+// reading that catches a rest of the wrong length — the text looks equally
+// plausible either way, and `others` cannot see a rest at all.
+
+expectEdit(
+	"a note drawn past the end of the song",
+	"#amk 2\n#0 o4 c4 d4\n#1 o4 e4 f4\n",
+	0,
+	() => ({ kind: "spawn", startTick: 96, ticks: 48, written: NOTE_MIN + 36 + 7, drum: null }),
+	{ text: "#amk 2\n#0 o4 c4 d4 o4 g4\n#1 o4 e4 f4\nr4\n", playsFor: 144 },
+);
+
+// Adding a rest to the end of a channel needs no note map and no agreement with
+// the walk, so a channel `channelStrip` will not build a strip for is padded
+// like any other — and most real songs have one.
+expectEdit(
+	"the channel holding the song back is one the roll cannot edit",
+	"#amk 2\n#0 o4 c4 d4\n#1 o4 [e4]2\n",
+	0,
+	() => ({ kind: "spawn", startTick: 96, ticks: 48, written: NOTE_MIN + 36 + 7, drum: null }),
+	{ text: "#amk 2\n#0 o4 c4 d4 o4 g4\n#1 o4 [e4]2\nr4\n", playsFor: 144 },
+);
+
+// The push cascade counts too: `f4` is shoved out past the end by the note drawn
+// in front of it, and a note the gesture moved there is one the gesture is
+// answerable for. Without this it would go quiet where it had been sounding.
+expectEdit(
+	"a note pushed past the end of the song",
+	"#amk 2\n#0 o4 c4 d4 e4 f4\n#1 o4 c1\n",
+	0,
+	() => ({ kind: "spawn", startTick: 0, ticks: 48, written: NOTE_MIN + 36 + 7, drum: null }),
+	{ contains: "#1 o4 c1\nr4", playsFor: 240 },
+);
+
+// The rests go on the end, so the `/` every channel re-enters at does not move.
+expectEdit(
+	"padding a channel does not move the loop point",
+	"#amk 2\n#0 o4 c4 d4 / e4 f4\n#1 o4 c1\n",
+	0,
+	() => ({ kind: "spawn", startTick: 192, ticks: 48, written: NOTE_MIN + 36 + 7, drum: null }),
+	{ contains: "#1 o4 c1\nr4", playsFor: 240, loopsWhereItDid: true },
+);
+
+// A channel with no ticks is holding nothing back — `index.ts:43` passes over it
+// — so giving it ticks it never had is not what drawing a note asked for.
+expectEdit(
+	"a channel with no ticks of its own is not padded",
+	"#amk 2\n#0 o4 c4 d4\n#1 v200\n",
+	0,
+	() => ({ kind: "spawn", startTick: 96, ticks: 48, written: NOTE_MIN + 36 + 7, drum: null }),
+	{ text: "#amk 2\n#0 o4 c4 d4 o4 g4\n#1 v200\n", playsFor: 144 },
+);
+
+// And one already past where the note reaches needs nothing either. It stays the
+// long channel, which is the ordinary shape `AMK0502` reports.
+expectEdit(
+	"a channel already past the new end is not padded",
+	"#amk 2\n#0 o4 c4 d4\n#1 o4 c1 c1\n",
+	0,
+	() => ({ kind: "spawn", startTick: 96, ticks: 48, written: NOTE_MIN + 36 + 7, drum: null }),
+	{ text: "#amk 2\n#0 o4 c4 d4 o4 g4\n#1 o4 c1 c1\n", playsFor: 144 },
+);
+
+// The channel drawn on already runs past the song, so its own length does not
+// move: the note is written into the rest it lands in and the padding answers to
+// where the *note* reaches, not to where that channel ends.
+expectEdit(
+	"a note drawn past the end of the song into a channel that already runs past it",
+	"#amk 2\n#0 o4 c2 r1\n#1 o4 c2\n",
+	0,
+	() => ({ kind: "spawn", startTick: 144, ticks: 48, written: NOTE_MIN + 36 + 2, drum: null }),
+	{ text: "#amk 2\n#0 o4 c2 r4 o4 d4 r2\n#1 o4 c2\nr2\n", playsFor: 192 },
+);
+
+// Nothing was moved, so nothing reaches past the end and the song keeps its
+// length — a channel already running long stays long rather than dragging every
+// other one out to its tail.
+expectEdit(
+	"a note deleted from a channel that runs past the song does not lengthen it",
+	"#amk 2\n#0 o4 c2 d2 e2 f2\n#1 o4 c2\n",
+	0,
+	(bar) => ({ kind: "delete", items: [noteAt(bar, 2)] }),
+	{ playsAsLong: true },
+);
+
 console.log("\nopening a channel");
 
 // The whole text, because everything about the block is the point: the `#N`, the
@@ -811,14 +931,22 @@ expectEdit(
 	{ contains: "#6 o4 l8 q7F @0 v255 y10\n@21 c8 r2..", playsAsLong: true },
 );
 
-// A note drawn past the end pads by nothing rather than refusing: the channel is
-// then the long one, and the song still stops where its shortest one does.
+// A note drawn past the end pads by nothing on its own channel and takes every
+// other one out to meet it, so the song lengthens from 192 to 216 rather than
+// leaving the note out past its own end unheard.
+//
+// The two insertions land on the same offset here — `#0`'s text ends where an
+// undeclared `#5`'s block would be written — so this is also what pins their
+// order: the rest belongs to `#0`, and the other way round it is `#5`'s.
 expectEdit(
 	"a note drawn past the end of the song on a channel the song has not declared",
 	"#amk 2\n#0 o4 c4 d4 e4 f4\n",
 	5,
 	() => ({ kind: "spawn", startTick: 168, ticks: 48, written: NOTE_MIN + 36, drum: null }),
-	{ text: "#amk 2\n#0 o4 c4 d4 e4 f4\n\n#5 o4 l8 q7F @0 v255 y10\nr2.. c4\n", playsAsLong: true },
+	{
+		text: "#amk 2\n#0 o4 c4 d4 e4 f4\nr8\n\n#5 o4 l8 q7F @0 v255 y10\nr2.. c4\n",
+		playsFor: 216,
+	},
 );
 
 // `@` switches instrument tuning on under Addmusic 4.05 rather than saying what

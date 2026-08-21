@@ -93,6 +93,24 @@ export interface ChannelHome {
   declared: boolean;
 }
 
+/**
+ * A channel as somewhere rests can be appended: how long it plays, and where its
+ * text ends.
+ *
+ * Everything the roll does to a channel's *notes* goes through a {@link Strip},
+ * which most channels cannot be — a `[ ]` or a `"name=value"` refuses one. Adding
+ * a rest after the last thing written is a much weaker operation than rewriting a
+ * span: it needs no note map, no agreement with the walk, and it cannot reach
+ * inside a loop body. So this is what a channel is to a caller that only wants to
+ * make it longer, and every channel has one.
+ */
+export interface ChannelTail {
+  /** `stats.channelTicks[channel]`. 0 for a channel the song does not play, which cuts nothing short. */
+  ticks: number;
+  /** The end of its own block, as {@link channelHome} — a run written here lands on this channel. */
+  at: number;
+}
+
 export interface Strip {
   channel: number;
   items: readonly StripItem[];
@@ -340,6 +358,29 @@ function channelHome(source: string, channel: number, markers: readonly Marker[]
   }
 
   return { at, declared: own >= 0 };
+}
+
+/**
+ * Every channel as a {@link ChannelTail}, indexed by channel.
+ *
+ * `channelTicks` is `CompileStats.channelTicks` — the compiler's own count, and
+ * the array `stats.introTicks + stats.loopTicks` is the minimum of
+ * (`index.ts:41-45`), so a caller comparing one against the other is comparing
+ * two readings of the same thing rather than two different ones.
+ *
+ * No view is taken of whether a channel could be spliced. That is
+ * {@link channelStrip}'s business, and appending is not splicing.
+ */
+export function channelTails(
+  source: string,
+  index: TokenIndex,
+  channelTicks: readonly number[],
+): readonly ChannelTail[] {
+  const markers = channelMarkers(index, source);
+  return channelTicks.map((ticks, channel) => ({
+    ticks,
+    at: channelHome(source, channel, markers).at,
+  }));
 }
 
 /**

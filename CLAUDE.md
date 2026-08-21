@@ -366,6 +366,17 @@ One entry each: what it was, what it is, why.
   rests is claimed by no unit on the next strip build and is what makes a later edit there
   unreadable. Only a channel with no note left to hand it to has the run carry it, for the leak past
   a `#N`.
+- **Letting a note drawn past the end of the song extend only its own channel** — the driver reloads
+  all eight track pointers the moment one voice reads its `$00` (`main.asm:L_0C01`,
+  `Music.cpp:3209`), so the note was written, compiled, reported by `AMK0502` and never heard, and
+  the roll had no way to make a song longer. A gesture reaching past `stats.introTicks +
+stats.loopTicks` pads **every other channel that would cut the song short** out to meet it
+  (`padChannels`), in the same commit and so the same undo step. It counts the notes the gesture
+  moved — placed and pushed both — rather than every note in the plan, or a deletion in a channel
+  already running long would lengthen the song. A rest on the end needs no note map, no walk
+  agreement and no `Strip`, so a channel `channelStrip` refuses outright is padded like any other;
+  a channel at 0 ticks is left alone, since it holds nothing back. `rolltest`'s `playsFor` is what
+  pins it — a rest one note short reads exactly like a rest of the right length.
 
 ## Angular specifics
 

@@ -55,7 +55,7 @@ import {
 } from './roll-layout';
 import { type Mark, buildMarks, buildMinimap, heldRowsAt } from './roll-marks';
 import { CHANNEL_FILL, CHANNEL_STROKE, KEY_WIDTH, SCRUB_HEIGHT } from './roll-metrics';
-import { type Strip, channelStrip, isStrip } from './roll-strip';
+import { type Strip, channelStrip, channelTails, isStrip } from './roll-strip';
 import { RollNotes } from './roll-notes/roll-notes';
 import { RollScrub } from './roll-scrub/roll-scrub';
 import {
@@ -627,6 +627,22 @@ export class PianoRoll {
     return stats?.hasIntro === true ? stats.introTicks : null;
   });
 
+  /**
+   * Every channel as somewhere rests can be appended, so a gesture reaching past
+   * the end of the song can bring the other channels out with it.
+   *
+   * Off the same result and the same source {@link stripOutcome} reads, so the
+   * tick counts and the offsets come from one compile — and off `channelTicks`,
+   * which {@link playableTicks} is the smallest non-zero member of.
+   */
+  private readonly channelTails = computed(() =>
+    channelTails(
+      this.editor.source(),
+      this.editor.tokens(),
+      this.editor.result()?.stats?.channelTicks ?? [],
+    ),
+  );
+
   protected readonly gestures = rollGestures(
     {
       strip: this.strip,
@@ -641,6 +657,7 @@ export class PianoRoll {
       songTargetProgram: this.songTargetProgram,
       playableTicks: this.playableTicks,
       introTicks: this.introTicks,
+      channels: this.channelTails,
       source: this.editor.source,
     },
     {
