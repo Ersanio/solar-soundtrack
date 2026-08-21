@@ -93,6 +93,18 @@ function centredFor(descriptor: ParamDescriptor): boolean {
 }
 
 /**
+ * Whether the track should run the opposite way to the number on it.
+ *
+ * Two values in the language count backwards from what they do. Pan's table runs
+ * from hard right to hard left (`main.asm:3486`), and a length is the `n` of
+ * `1/n`, so `l1` is a whole note and `l192` is a single tick. Either one on a
+ * plain track moves the thumb one way and the thing it means the other.
+ */
+function invertedFor(descriptor: ParamDescriptor): boolean {
+	return descriptor.role === "pan" || descriptor.role === "denominator";
+}
+
+/**
  * The command's parameters, bound to what it actually says.
  *
  * The descriptor table names as many arguments as it can; how many there *are*
@@ -133,9 +145,7 @@ export function resolveCommand(command: Command, context: ParamContext): Resolve
 			max,
 			stops: descriptor.stops ?? null,
 			centred: centredFor(descriptor),
-			// Pan is the only value in the language that counts backwards from what
-			// it does; `main.asm:3486`'s table runs from hard right to hard left.
-			invert: descriptor.role === "pan",
+			invert: invertedFor(descriptor),
 			ends: descriptor.role === "pan" ? ["L", "R"] : null,
 			choices: descriptor.choices ?? [],
 			raw: byte === null ? "—" : command.vcmd !== undefined ? `$${hex2(byte)}` : String(byte),

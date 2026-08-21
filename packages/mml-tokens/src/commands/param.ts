@@ -11,7 +11,19 @@ export type Codec = "u8" | "s8" | "nibbles" | "bits";
 
 /** What the number is, which is what the readout and the unit are drawn from. */
 export type Role =
-	"level" | "ticks" | "semitones" | "rate" | "index" | "pan" | "channelMask" | "srcn" | "note" | "address" | "opaque";
+	| "level"
+	| "ticks"
+	| "semitones"
+	| "rate"
+	| "index"
+	/** A note length, written as the `n` of `1/n`: the bigger the number the shorter the note. */
+	| "denominator"
+	| "pan"
+	| "channelMask"
+	| "srcn"
+	| "note"
+	| "address"
+	| "opaque";
 
 /** Which control to draw. Defaults fall out of the codec and range when unset. */
 export type Control = "slider" | "number" | "select" | "toggles" | "readonly";
