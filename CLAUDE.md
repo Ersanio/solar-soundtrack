@@ -18,7 +18,7 @@ packages/mml-compiler/  @amk/compiler  preprocess -> parser -> link
 packages/mml-tokens/    @amk/tokens    scanner, splices, command model
 packages/spc/           @amk/spc       BRR, echo FIR, ARAM, emulator, worklet
 web/                    the Angular editor
-scripts/                thirteen byte-level harnesses
+scripts/                fourteen byte-level harnesses
 ```
 
 ```
@@ -50,7 +50,7 @@ Node 24 is what CI uses. CI runs `npm run lint` then `npm run check`.
 | `npm run lint`      | ESLint over every workspace.                                          |
 | `npm run format`    | Prettier over the workspace.                                          |
 | `npm run typecheck` | The app. `:packages` and `:scripts` cover the rest.                   |
-| `npm run check`     | The merge gate: formatting, three typechecks, all thirteen harnesses. |
+| `npm run check`     | The merge gate: formatting, three typechecks, all fourteen harnesses. |
 
 `npm run check` does **not** compile Angular templates, and neither does `npm run typecheck` — `tsc`
 does not run the template compiler, so a bad binding (`viewBox=` instead of `[attr.viewBox]=`)
@@ -76,7 +76,7 @@ which is all either needs:
 ### Tests
 
 There are no `.spec.ts` files — `npm run test` is Angular scaffolding and runs nothing. The real
-suite is the thirteen harnesses under `scripts/`; **`scripts/README.md` says what each one proves**,
+suite is the fourteen harnesses under `scripts/`; **`scripts/README.md` says what each one proves**,
 and several of those assertions are load-bearing in ways that are not obvious from the name.
 
 `scripts/Compare-Spc.ps1` and `scripts/Compare-SongBin.ps1` diff output against a real AddmusicK
@@ -257,6 +257,19 @@ One entry each: what it was, what it is, why.
   beat, `0` beats for no grid at all, and `gridLines` counts beats from tick 0 so a bar line is a
   bar's first beat by construction. Not a `tick % barTicks` either — `tickWindow` snaps to a whole
   note, a 7/8 bar is 168 ticks, and the two align only by coincidence.
+- **Unrolling loops from the text alone, or decompiling the walk into MML** — a `[ ]` body is
+  compiled once, under the parse-time state at its `[`, and replayed from bytes, so copying its
+  text n times replays `<`, `>` and the drum remap's clearing n times, and a `(1)n` called from
+  another channel parses the body under that channel's `o`, `l` and `h`; and bytes cannot say what
+  was written. The parser records the state each body was compiled under (`ParseTrace`, gathered
+  where `commandMap` is), the rewrite is text to text (`normalize.ts`), and the walk of every
+  pass's result is compared to the walk of the original before anything reaches the document
+  (`state/normalize-song.ts`). No `h` is ever written either: it replaces the instrument's tuning
+  rather than adding to it, so `h0` is not "no transposition".
+- **Normalize refusals in the roll's problems strip** — the button is on the Source toolbar too,
+  which has no strip, and a refusal is the answer to a click rather than a property of the song.
+  The dialog that asks before the rewrite (`editor/normalize-button/`) is where a refusal shows,
+  and a song already in shape gets the same dialog rather than a click that does nothing.
 
 ## Angular specifics
 

@@ -115,6 +115,12 @@ Neither changes a byte. `commandMap` is gathered by bracketing `scan`'s one disp
 whether the channel's vector grew, which touches no handler and decides nothing; `selftest` and the
 byte tables are what hold that, and the emitted blob is identical across every dialect.
 
+`CompileResult.trace` and `PreprocessResult.removed` are the same kind of thing, for the normalizer
+(`normalize.ts`): the parser's state after every dispatch, and the ranges the preprocessor took out.
+Both are gathered the way `commandMap` is — a bracket around the dispatch loop, a list appended to
+where a directive is consumed — and neither changes a byte; the trace is not even built unless the
+request asks for it.
+
 ## Checked and not confirmed
 
 `handleSuperLoopExit` and `addNoteLength` index `channelLengths` with `this.channel`, which can be

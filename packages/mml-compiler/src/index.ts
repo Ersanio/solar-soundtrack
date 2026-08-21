@@ -31,7 +31,10 @@ export class AddmusicKCompiler {
 			]);
 		}
 
-		const parsed = new AddmusicKParser(source, options).parse();
+		// Read apart from `readOptions`, which answers `undefined` for a bag with
+		// no sample library in it; a trace is asked for on its own.
+		const trace = request.options?.["trace"] === true;
+		const parsed = new AddmusicKParser(source, options, trace).parse();
 
 		const stats = this.initStats();
 		stats.channelTicks = parsed.channelLengths.map((ticks) => Math.floor(ticks));
@@ -124,6 +127,7 @@ export class AddmusicKCompiler {
 			sampleList,
 			diagnostics,
 			stats,
+			...(parsed.trace ? { trace: parsed.trace } : {}),
 		};
 	}
 

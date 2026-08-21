@@ -20,7 +20,16 @@
  */
 
 import { hex2 } from "@amk/core/hex";
-import type { Diagnostic, SongLength, Span, SongTags } from "@amk/core/types";
+import type {
+	Diagnostic,
+	LoopEvent,
+	ParseEvent,
+	ParseState,
+	ParseTrace,
+	SongLength,
+	Span,
+	SongTags,
+} from "@amk/core/types";
 import { TARGET_AM4, TARGET_AMM, TARGET_NONE, preprocess } from "./preprocess";
 import {
 	DEFAULT_TRANSPOSE,
@@ -115,6 +124,8 @@ export interface ParseOutput {
 	songTargetProgram: number;
 	diagnostics: Diagnostic[];
 	errorCount: number;
+	/** Only when the parser was asked to trace. See `ParseTrace`. */
+	trace: ParseTrace | null;
 }
 
 /**
@@ -258,12 +269,23 @@ export class AddmusicKParser {
 	private scanned = "";
 	/** 1 when a BOM was removed, since that shifts every offset after it. */
 	private bomOffset = 0;
+	/** Offsets in {@link scanned} at which each line after the first begins; built on first use. */
+	private lineStarts: number[] | null = null;
+
+	// --- trace ---------------------------------------------------------------
+	/** One event per dispatch, or null when no trace was asked for. See `ParseTrace`. */
+	private readonly traceEvents: ParseEvent[] | null;
+	/** The source span of every replacement match, kept beside the events. */
+	private readonly expansions: Span[] | null;
 
 	constructor(
 		private readonly source: string,
 		private readonly options?: AddmusicKOptions,
+		trace = false,
 	) {
 		this.text = "";
+		this.traceEvents = trace ? [] : null;
+		this.expansions = trace ? [] : null;
 	}
 
 	// =========================================================================
@@ -388,6 +410,12 @@ export class AddmusicKParser {
 			const commandChannel = this.channel;
 			const commandOffset = this.data[this.channel].length;
 			const midRun = this.hexLeft !== 0;
+			// The trace's view of the same moment. `lengthsBefore` is what lets a
+			// loop event be read off the bytes a handler wrote, and is only taken
+			// when a trace was asked for.
+			const lengthsBefore = this.traceEvents === null ? null : this.data.map((channel) => channel.length);
+			const wasRemote = this.inRemoteDefinition;
+			const wasE6 = this.inE6Loop;
 
 			// prettier-ignore
 			switch (lower) {
@@ -433,6 +461,126 @@ export class AddmusicKParser {
 			}
 
 			this.recordCommand(lower, commandAt, commandChannel, commandOffset, midRun);
+			if (lengthsBefore !== null && !isSpace(c)) {
+				this.recordTrace(lower, commandAt, commandChannel, lengthsBefore, wasRemote, wasE6);
+			}
+		}
+	}
+
+	/**
+	 * The parse trace: the state each dispatch left behind, and what it did to
+	 * the loop structure. Nothing AddmusicK records — see `ParseTrace`.
+	 *
+	 * Here beside {@link recordCommand} for the same reason it is: the dispatch
+	 * is the one place every command passes through. What a bracket did is read
+	 * off the bytes rather than asked of the handler — `[` moves the channel to
+	 * 8, `]` moves it back and leaves `$E9 lo hi n` on the caller, `*` and `(n)m`
+	 * leave the same four bytes, `[[` and `]]n` toggle `inE6Loop` and `]]n`
+	 * leaves `$E6 n-1` — and every handler writes only on its success path, so
+	 * a dispatch that errored records no loop event.
+	 */
+	private recordTrace(
+		lower: string,
+		start: number,
+		channel: number,
+		lengthsBefore: number[],
+		wasRemote: boolean,
+		wasE6: boolean,
+	): void {
+		if (this.traceEvents === null) {
+			return;
+		}
+
+		let end = this.pos;
+		while (end > start && isSpace(this.text[end - 1])) {
+			end--;
+		}
+
+		const event: ParseEvent = { span: this.spanAt(start, end), char: lower, channel, state: this.snapshotState() };
+		const loop = this.loopEventOf(lower, start, channel, lengthsBefore, wasRemote, wasE6);
+		if (loop) {
+			event.loop = loop;
+		}
+
+		this.traceEvents.push(event);
+	}
+
+	private snapshotState(): ParseState {
+		return {
+			channel: this.channel,
+			prevChannel: this.prevChannel,
+			octave: this.octave,
+			defaultNoteLength: this.defaultNoteLength,
+			prevNoteLength: this.prevNoteLength,
+			triplet: this.triplet,
+			hTranspose: this.hTranspose,
+			usingHTranspose: this.usingHTranspose,
+			instrument: [...this.instrument],
+			q: [...this.q],
+			ignoreTuning: [...this.ignoreTuning],
+			inRemoteDefinition: this.inRemoteDefinition,
+			inE6Loop: this.inE6Loop,
+			prevLoop: this.prevLoop,
+			loopLabel: this.loopLabel,
+			channelDefined: this.channelDefined,
+			inPitchSlide: this.inPitchSlide,
+			nextNoteIsForDD: this.nextNoteIsForDD,
+		};
+	}
+
+	private loopEventOf(
+		lower: string,
+		start: number,
+		channel: number,
+		lengthsBefore: number[],
+		wasRemote: boolean,
+		wasE6: boolean,
+	): LoopEvent | undefined {
+		const grew = (slot: number): number => this.data[slot].length - lengthsBefore[slot];
+		const tail = (slot: number, back: number): number => this.data[slot][this.data[slot].length - back];
+
+		switch (lower) {
+			case "[":
+				if (channel < 8 && this.channel === 8) {
+					return { kind: "open", at: this.prevLoop, label: this.loopLabel, remote: this.inRemoteDefinition };
+				}
+
+				if (!wasE6 && this.inE6Loop) {
+					return { kind: "subOpen" };
+				}
+
+				return undefined;
+
+			case "]":
+				if (channel === 8 && this.channel < 8) {
+					const called = grew(this.channel) === 4 && tail(this.channel, 4) === 0xe9;
+					return { kind: "close", at: this.prevLoop, count: called ? tail(this.channel, 1) : 1, remote: wasRemote };
+				}
+
+				if (wasE6 && !this.inE6Loop && grew(channel) === 2 && tail(channel, 2) === 0xe6) {
+					return { kind: "subClose", count: tail(channel, 1) + 1 };
+				}
+
+				return undefined;
+
+			case "*":
+			case "(":
+				if (channel < 8 && grew(channel) === 4 && tail(channel, 4) === 0xe9) {
+					// `(n)m` reads its label as `parseLabelLoop` does, one higher than
+					// written, so it matches the `open` event's label.
+					const written = lower === "(" ? /^\((\d+)\)/.exec(this.text.slice(start, start + 8)) : null;
+					return {
+						kind: "call",
+						at: tail(channel, 3) | (tail(channel, 2) << 8),
+						count: tail(channel, 1),
+						label: written ? Number.parseInt(written[1], 10) + 1 : null,
+					};
+				}
+
+				return undefined;
+
+			default:
+				return undefined;
 		}
 	}
 
@@ -741,6 +889,12 @@ export class AddmusicKParser {
 			for (const [find, replacement] of this.sortedReplacements) {
 				if (this.text.startsWith(find, this.pos)) {
 					const useSite = this.originAt(this.pos);
+					// The only place the match's extent is known; the trace needs it to
+					// find the use site in the source.
+					if (this.expansions !== null) {
+						this.expansions.push(this.spanAt(this.pos, this.pos + find.length));
+					}
+
 					this.text = this.text.slice(0, this.pos) + replacement + this.text.slice(this.pos + find.length);
 					// `concat` rather than `splice(...)` with a spread: a long
 					// replacement would push its whole length onto the argument
@@ -3715,14 +3869,38 @@ export class AddmusicKParser {
 			to = Math.min(from + 1, this.scanned.length);
 		}
 
-		let line = 1;
-		for (let n = 0; n < from && n < this.scanned.length; n++) {
-			if (this.scanned[n] === "\n") {
-				line++;
+		return { start: from + this.bomOffset, end: Math.max(to, from) + this.bomOffset, line: this.lineOf(from) };
+	}
+
+	/**
+	 * The 1-based line a {@link scanned} offset falls on: one more than the
+	 * number of line starts at or before it. The table is built on the first
+	 * call; `scanned` never changes after `stripBOM`.
+	 */
+	private lineOf(offset: number): number {
+		if (this.lineStarts === null) {
+			const starts: number[] = [];
+			for (let n = 0; n < this.scanned.length; n++) {
+				if (this.scanned[n] === "\n") {
+					starts.push(n + 1);
+				}
+			}
+
+			this.lineStarts = starts;
+		}
+
+		let low = 0;
+		let high = this.lineStarts.length;
+		while (low < high) {
+			const mid = (low + high) >> 1;
+			if (this.lineStarts[mid] <= offset) {
+				low = mid + 1;
+			} else {
+				high = mid;
 			}
 		}
 
-		return { start: from + this.bomOffset, end: Math.max(to, from) + this.bomOffset, line };
+		return low + 1;
 	}
 
 	/** {@link origins} with the ends clamped, for positions past the buffer. */
@@ -3826,6 +4004,20 @@ export class AddmusicKParser {
 			songTargetProgram: this.songTargetProgram,
 			diagnostics: this.diagnostics,
 			errorCount: this.errorCount,
+			trace:
+				this.traceEvents === null
+					? null
+					: {
+							events: this.traceEvents,
+							buffer: this.text,
+							origins: this.origins,
+							expansions: this.expansions ?? [],
+							startingChannel: this.resizedChannel,
+							targetAMKVersion: this.targetAMKVersion,
+							songTargetProgram: this.songTargetProgram,
+							tempoRatio: this.tempoRatio,
+							transposeMap: [...this.transposeMap],
+						},
 		};
 	}
 }

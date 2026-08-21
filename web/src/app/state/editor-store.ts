@@ -18,34 +18,11 @@ import { ClockMeasurer, tempoDiagnostic } from './clock-measurer';
 import { caretPosition, downloadBlob, errorMessage } from '../util/format';
 import { readStored, writeStored } from '../util/storage';
 import { DriverStore } from './driver-store';
+import { type NormalizeOutcome, normalizeSong } from './normalize-song';
+import { SAMPLE_SONG } from './sample-song';
 import { SampleStore } from './sample-store';
 
 const STORAGE_KEY = 'solar-soundtrack.draft';
-
-const SAMPLE_SONG = `#amk 4
-
-#spc
-{
-    #title  "Level Theme"
-    #author "Akito Nakatsuka"
-    #game   "Ice Climber (NES)"
-    #comment "Demo for Solar Soundtrack"
-}
-
-#0 w255 t54
-o2
-
-g32. r12 e32. r48 f16 r16 g32. r8^48 > c32 r64 < b32 r64 > c32 r64 < b32 r64 > c32 < r64
-g32. r12 e32. r48 f16 r16 g32. r8^48 > c32 r64 < b32 r64 > c32 r64 < b32 r64 > c32 < r64
-a32. r12 f32. r48 g16 r16 a32. r8^48 > d32 r64 c+32 r64 d32 r64 c+32 r64 d32 < r64
-a32. r12 f32. r48 g16 r16 a32. r8^48 > d32 r64 c+32 r64 d32 r64 c+32 r64 d32 < r64
-
-b32. r12 g32. r48 a16 r16 b32. r8^48 > f32 r64 e32 r64 f32 r64 e32 r64 f32 < r64
-b32. r12 g32. r48 a16 r16 b32. r8^48 > f32 r64 e32 r64 f32 r64 e32 r64 f32 r64
-
-e16 c16 < g16 > e16 c16 < g16 > f16 d16 < a16 > f16 d16 < a16 >
-f+16 d16 c16 f+16 d16 c16 g16 f16 d16 < b16 a+16 a16
-`;
 
 /** How long typing pauses before a compile fires. */
 const DEBOUNCE_MS = 150;
@@ -102,15 +79,7 @@ export class EditorStore {
     const result = compiler.compile({
       source: this.committed(),
       aramAddress: driver.manifest.localPos,
-      // What the sample library holds, and what the user asked to be done with
-      // it. A compiler that does not understand these keys ignores them, per the
-      // `CompileRequest.options` contract.
-      options: {
-        sampleNames: this.library.names(),
-        sampleGroups: this.library.groups(),
-        importantSamples: this.library.importantSamples(),
-        optimizeSampleUsage: this.library.optimize(),
-      },
+      options: this.compileOptions(),
     });
     return {
       result,
@@ -119,6 +88,22 @@ export class EditorStore {
       text: this.committed(),
     };
   });
+
+  /**
+   * What the sample library holds, and what the user asked to be done with it.
+   * A compiler that does not understand these keys ignores them, per the
+   * `CompileRequest.options` contract. Read inside {@link compilation}, so the
+   * compile tracks the library; read again by {@link normalize}, which compiles
+   * the same song several times over and has to do it under the same options.
+   */
+  private compileOptions(): Record<string, unknown> {
+    return {
+      sampleNames: this.library.names(),
+      sampleGroups: this.library.groups(),
+      importantSamples: this.library.importantSamples(),
+      optimizeSampleUsage: this.library.optimize(),
+    };
+  }
 
   readonly result = computed<CompileResult | null>(() => this.compilation()?.result ?? null);
   readonly aramAddress = computed(() => this.compilation()?.aramAddress ?? null);
@@ -393,6 +378,29 @@ export class EditorStore {
   /** Compilation is gated on a driver, so every producing action is too. */
   readonly canCompile = computed(() => this.drivers.ready());
   readonly canDownload = computed(() => this.result()?.ok === true && this.result()?.data !== null);
+  /**
+   * Normalizing rewrites the whole document off the compile of it, so the two
+   * have to be the same text: while a keystroke is still inside the debounce
+   * the spans the rewrite is built on point into a document that has moved.
+   */
+  readonly canNormalize = computed(
+    () => this.result()?.ok === true && this.compiledText() === this.source(),
+  );
+
+  /**
+   * The song rewritten for editing, or the reasons it cannot be — see
+   * `normalize-song.ts`. `null` without a driver, since there is no address to
+   * compile at. Reads the live document rather than `committed`, which is what
+   * {@link canNormalize} guards.
+   */
+  normalize(): NormalizeOutcome | null {
+    const driver = this.drivers.driver();
+    if (!driver) {
+      return null;
+    }
+
+    return normalizeSong(this.source(), driver.manifest.localPos, this.compileOptions());
+  }
 
   constructor() {
     // Sanctioned effect: mirroring signal state into an imperative store.
