@@ -16,7 +16,7 @@ any note, which picks that note's channel.
 | Hold `Alt` while dragging        | Tick precision: no snapping, for either a position or a length           |
 | Click a note                     | Selects just that note, sounds it, and puts the caret on it in the MML   |
 | Double-click a note              | Goes to it in the MML                                                    |
-| `Shift` + click a note           | Adds it to, or takes it out of, the selection                            |
+| `Ctrl` + click a note            | Adds it to, or takes it out of, the selection                            |
 | `Ctrl` + drag on empty grid      | Draws a box and selects every note of this channel inside it             |
 | `Ctrl` + drag a note             | Copies it instead of moving it                                           |
 | Right-click a note               | Deletes it                                                               |

@@ -118,6 +118,8 @@ interface Drag {
   moved: boolean;
   /** `Ctrl` was down when it started: copy for a note, marquee for empty grid. */
   copy: boolean;
+  /** `Ctrl` on a bar: a press that stays a click toggles it in the selection. */
+  additive: boolean;
   /** The row last auditioned, so a drag sounds once per row rather than per pixel. */
   sounded: number;
   /** The pixel the press landed on, for the slop test. */
@@ -570,6 +572,7 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
           item: index,
           moved: false,
           copy: false,
+          additive: false,
           sounded: -1,
           fine: event.altKey,
           length: null,
@@ -604,6 +607,7 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
           item: -1,
           moved: false,
           copy: false,
+          additive: false,
           sounded: row,
           fine: event.altKey,
           length: null,
@@ -621,16 +625,19 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
 
       const item = strip.items[index];
       sinks.pick(strip.channel);
-      if (event.shiftKey) {
-        this.toggle(index);
-        return;
-      }
+
+      // `Ctrl` on a bar is both "add this one to the selection" and "copy it
+      // rather than move it", and which of the two it turns out to be is not
+      // known until the pointer either moves or does not. So the press starts
+      // an ordinary copy-drag and leaves the set exactly as it found it; the
+      // pointer-up toggles the bar if the drag never happened.
+      const additive = event.ctrlKey || event.metaKey;
 
       // A plain press selects the bar it landed on, so one click outlines one
       // note. A press on a note already in the selection leaves the set alone,
       // so a group still drags as a group; the pointer-up collapses it to the
       // one note if the press turns out to be a click.
-      if (!selection().has(index)) {
+      if (!additive && !selection().has(index)) {
         selection.set(new Set([index]));
       }
 
@@ -650,7 +657,8 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
         edge: edge ?? 'end',
         item: index,
         moved: false,
-        copy: event.ctrlKey || event.metaKey,
+        copy: additive,
+        additive,
         sounded: row,
         fine: event.altKey,
         length: null,
@@ -742,7 +750,12 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
       // nothing. Drawing is the exception — a click on empty grid is how a note
       // is drawn at all.
       if (!held.moved && held.kind !== 'spawn') {
-        selection.set(new Set([held.item]));
+        if (held.additive) {
+          this.toggle(held.item);
+        } else {
+          selection.set(new Set([held.item]));
+        }
+
         drag.set(null);
         return;
       }
