@@ -307,12 +307,14 @@ One entry each: what it was, what it is, why.
   switched off with them. `lead` is the camera's alone; the line is the song's tick in the camera's
   coordinates (`xAtTick`), and the clip is what hides it once the song runs off the pane. Not a
   clamp to the edge either — a line held there would say the song was there.
-- **The mixer's mutes and solo living on `Playback`** — the note previewer has to refuse a channel
-  they silence, and it neither owns nor wants the transport: it shares no worklet, no audio thread
-  and no song being played, and reaching through `Playback` to find the mask would make it depend on
-  all three. `Mixer` holds the mask and the solo, injects `EditorStore` alone, and is read by
-  `Playback`, `Audition` and the roll. The mask is the only thing the two audio paths share, and it
-  is a number.
+- **The mixer's mutes, solo and output level living on `Playback`** — the note previewer has to
+  refuse a channel they silence and sound what it does play at the level the slider is set to, and
+  it neither owns nor wants the transport: it shares no worklet, no audio thread and no song being
+  played, and reaching through `Playback` for either would make it depend on all three. `Mixer`
+  holds the mask, the solo and `volume`, injects `EditorStore` alone, and is read by `Playback`,
+  `Audition` and the roll. What the two audio paths share is two numbers, and nothing else — the
+  transport hands the level to the player's gain, the previewer to a `GainNode` of its own on its
+  own `AudioContext`.
 - **An HTML bubble for the roll's length readout**, in the volume slider's mould — the roll's
   coordinates are already the song's, so an HTML one has to undo the scroll transform and the
   scroller's own offset to land where an SVG one lands by standing still.

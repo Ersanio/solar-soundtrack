@@ -23,8 +23,10 @@ them.
 State flows one way: `DriverStore` → `SampleStore` → `EditorStore` → `Playback`. Four more sit off
 that spine: `ClockMeasurer`, which `EditorStore` owns and which drives the measurement described
 below; `Audition`, which hangs off `EditorStore` beside `Playback` and owns the second
-`AudioContext`; `Mixer`, which holds the per-channel mutes and the solo and is read by `Playback`,
-by `Audition` and by the roll — three readers and no owner is why it is not a member of any of them;
+`AudioContext`; `Mixer`, which holds the per-channel mutes, the solo and the output level and is
+read by `Playback`, by `Audition` and by the roll — three readers and no owner is why it is not a
+member of any of them, and the level is there for the same reason the mask is: both audio paths
+apply it, the transport to the player's gain and the previewer to a `GainNode` of its own;
 and `EditorRequests`, which injects nothing at all, because a mailbox between the panels and the
 source view has nothing to read.
 

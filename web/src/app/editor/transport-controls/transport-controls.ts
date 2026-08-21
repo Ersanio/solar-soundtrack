@@ -3,6 +3,7 @@ import { Component, computed, inject, signal } from '@angular/core';
 import { Button } from '../../shared/button/button';
 import { Checkbox } from '../../shared/checkbox/checkbox';
 import { EditorStore } from '../../state/editor-store';
+import { Mixer } from '../../state/mixer';
 import { Playback } from '../../state/playback';
 
 /** The volume slider's ceiling, in percent. */
@@ -19,6 +20,7 @@ const THUMB_WIDTH = 16;
 })
 export class TransportControls {
   protected readonly playback = inject(Playback);
+  protected readonly mixer = inject(Mixer);
   protected readonly store = inject(EditorStore);
   protected readonly VOLUME_MAX = VOLUME_MAX;
 
@@ -31,7 +33,7 @@ export class TransportControls {
       return null;
     }
 
-    const volume = this.playback.volume();
+    const volume = this.mixer.volume();
     const fraction = volume / VOLUME_MAX;
 
     // The thumb's centre: half a thumb in from the left, then its travel is the track less one thumb.
@@ -42,7 +44,7 @@ export class TransportControls {
   });
 
   protected onVolume(event: Event): void {
-    this.playback.volume.set(Number((event.target as HTMLInputElement).value));
+    this.mixer.volume.set(Number((event.target as HTMLInputElement).value));
     this.volumeReadout.set(true);
   }
 

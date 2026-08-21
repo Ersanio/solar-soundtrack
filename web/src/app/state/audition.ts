@@ -67,6 +67,8 @@ export class Audition {
 
   private context: AudioContext | null = null;
   private source: AudioBufferSourceNode | null = null;
+  /** The slider's level, between every source and the destination. */
+  private gain: GainNode | null = null;
   private worker: Worker | null = null;
 
   /**
@@ -236,9 +238,21 @@ export class Audition {
         }
       }
 
+      // The transport's slider, on this path too: the same note under the
+      // pointer and under the playhead is the same note, and one of them
+      // ignoring the slider is one of them at a level nobody asked for. Read at
+      // the source rather than mirrored by an effect — a preview lasts about a
+      // second, and the level it starts at is the level it was asked for.
+      if (!this.gain) {
+        this.gain = context.createGain();
+        this.gain.connect(context.destination);
+      }
+
+      this.gain.gain.value = this.mixer.volume() / 100;
+
       const source = context.createBufferSource();
       source.buffer = buffer;
-      source.connect(context.destination);
+      source.connect(this.gain);
       source.onended = () => {
         if (this.source === source) {
           this.source = null;
