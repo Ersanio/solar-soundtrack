@@ -13,8 +13,8 @@
  * asked with and the page ignores the ones it no longer wants.
  */
 
-import { instantiate } from '@amk/spc/wasm-host';
 import { type Measurement, measureClock } from './measure-clock';
+import { coreFor } from './spc-core';
 
 export interface MeasureRequest {
   token: number;
@@ -29,30 +29,9 @@ export interface MeasureRequest {
 export type MeasureReply =
   ({ token: number; ok: true } & Measurement) | { token: number; ok: false; message: string };
 
-/** One emulator for the worker's lifetime; instantiating is the expensive part. */
-let core: ReturnType<typeof instantiate> | null = null;
-let compiled: Promise<WebAssembly.Module> | null = null;
-
-async function ready(wasmUrl: string): Promise<ReturnType<typeof instantiate>> {
-  if (core) {
-    return core;
-  }
-
-  compiled ??= fetch(wasmUrl).then(async (response) => {
-    if (!response.ok) {
-      throw new Error(`Could not load ${wasmUrl} (HTTP ${response.status}).`);
-    }
-
-    return WebAssembly.compile(await response.arrayBuffer());
-  });
-
-  core = instantiate(await compiled);
-  return core;
-}
-
 addEventListener('message', (event: MessageEvent<MeasureRequest>) => {
   const { token, spc, passTicks, wasmUrl } = event.data;
-  void ready(wasmUrl)
+  void coreFor(wasmUrl)
     .then((emulator) => {
       const measured = measureClock(emulator, spc, passTicks);
       postMessage({ token, ok: true, ...measured } satisfies MeasureReply);

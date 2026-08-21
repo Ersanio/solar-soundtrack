@@ -120,10 +120,22 @@ oversight — see the note in the root `CLAUDE.md`. The global `:focus-visible` 
 
 ## Two AudioContexts
 
-`SpcPlayer` owns one for song playback. `Audition` owns a second for one-shot sample audition. They
-are separate on purpose: auditioning a sample must not interrupt or be interrupted by the song, and
-a service of its own is what keeps the second one from waiting on `player.init()` — hearing a
-65-byte square wave would otherwise mean downloading and compiling the SPC core first.
+`SpcPlayer` owns one for song playback. `Audition` owns a second for one-shot audition — a sample, or
+one note of the song. They are separate on purpose: auditioning must not interrupt or be interrupted
+by the song, and a note is meant to be sounded _while_ the song plays.
+
+A sample needs no emulator, and a service of its own is what keeps that path from waiting on
+`player.init()` — hearing a 65-byte square wave would otherwise mean downloading and compiling the
+SPC core first. A note does need one, and gets a second, on a worker: `note.worker.ts` runs the song
+silently up to the tick, hands the driver the note there and renders it, so what reaches this side is
+finished PCM and the context only has a buffer to play. The emulator playing the song is inside an
+`AudioWorkletProcessor` and is never addressed, which is the whole of why a note can be auditioned
+over a song without disturbing it.
+
+That worker is separate from `clock.worker.ts` rather than another message on it. The clock
+measurement fires a second after typing stops, which is exactly when someone is about to click, and
+an audition queued behind a whole pass of emulation would arrive hundreds of milliseconds late. They
+share `spc-core.ts`, which is the one-emulator-per-worker bootstrap both need.
 
 ## Persistence is optional
 

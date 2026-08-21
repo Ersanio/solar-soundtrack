@@ -13,6 +13,7 @@ const SPC_BEYOND_THE_MATHS = [
   '@amk/spc/export',
   '@amk/spc/instruments',
   '@amk/spc/layout',
+  '@amk/spc/note-audition',
   '@amk/spc/player',
   '@amk/spc/protocol',
   '@amk/spc/song-walk',
