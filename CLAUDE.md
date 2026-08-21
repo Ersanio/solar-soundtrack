@@ -368,6 +368,15 @@ One entry each: what it was, what it is, why.
   rests is claimed by no unit on the next strip build and is what makes a later edit there
   unreadable. Only a channel with no note left to hand it to has the run carry it, for the leak past
   a `#N`.
+- **Answering a deleted note's octave with `running = null`**, and leaving the note after it to
+  notice — a note whose pitch and length are unchanged returns from `rewriteNote` before an octave
+  is spelled at all, and the seed above it re-reads `item.octave` off the text the deletion had just
+  taken away, so `o2 a8 d8` losing `a8` moved `d8` an octave up. The note that _reads_ the octave
+  asks for it, once per run of deletions (`dropped`) however many notes went, and it goes in at that
+  note's head rather than through a rewrite of its unit: `noteText` re-spells what it writes, so an
+  untouched `d-8` would come back `c+8` and a `b+4` as `o5 c4`. With no note left to hand it to it
+  stays where the last unit was, for the leak past a `#N`; `rolltest` pins both, and the whole
+  channel deleted.
 - **Letting a note drawn past the end of the song extend only its own channel** — the driver reloads
   all eight track pointers the moment one voice reads its `$00` (`main.asm:L_0C01`,
   `Music.cpp:3209`), so the note was written, compiled, reported by `AMK0502` and never heard, and

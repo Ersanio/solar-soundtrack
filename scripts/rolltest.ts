@@ -535,7 +535,79 @@ expectEdit("a note shortened, which lengthens the rest after it", "#amk 2\n#0 o4
 	deltaTicks: -24,
 }));
 
-expectEdit("a note deleted", "#amk 2\n#0 o4 c4 d4 e4", 0, (bar) => ({ kind: "delete", items: [noteAt(bar, 1)] }));
+// A unit swallows the `o` written beside its head and the one written after its
+// tail (`roll-strip.ts:growUnits`), so removing one removes what put the octave
+// in force for every note after it. The octave goes back at the head of the note
+// that reads it, and only where the one standing is not already the one wanted —
+// which is what this first case pins, since `o4` still stands over `e4`.
+expectEdit("a note deleted", "#amk 2\n#0 o4 c4 d4 e4", 0, (bar) => ({ kind: "delete", items: [noteAt(bar, 1)] }), {
+	text: "#amk 2\n#0 o4 c4 r4 e4",
+});
+
+expectEdit(
+	"a note deleted from under the octave the note after it reads",
+	"#amk 2\n#1 l8\n@8\ny10\nq4f\n\n r4. o2 a8 d8 o3 d8\n",
+	1,
+	(bar) => ({ kind: "delete", items: [noteAt(bar, 0)] }),
+	{ contains: "o2 d8" },
+);
+
+// The `o3` here is `c4`'s own trailing octave restore — the `r4` between it and
+// `d4` keeps `d4`'s left scan off it — and it is inside `c4`'s unit and goes
+// with it.
+expectEdit(
+	"a note deleted with the octave written after it",
+	"#amk 2\n#0 o5 c4 o3 r4 d4",
+	0,
+	(bar) => ({ kind: "delete", items: [noteAt(bar, 0)] }),
+	{ contains: "o3 d4" },
+);
+
+// Once, however many notes went: it is the note that reads the octave that asks
+// for it, rather than each note that dropped one.
+expectEdit(
+	"two notes deleted in front of one that reads their octave",
+	"#amk 2\n#0 o4 c4 o5 d4 o6 e4 f4",
+	0,
+	(bar) => ({ kind: "delete", items: [noteAt(bar, 1), noteAt(bar, 2)] }),
+	{ contains: "o6 f4", lacks: "o6 o6" },
+);
+
+expectEdit(
+	"two notes deleted with one left standing between them",
+	"#amk 2\n#0 o4 c4 o5 d4 e4 o6 f4 g4",
+	0,
+	(bar) => ({ kind: "delete", items: [noteAt(bar, 1), noteAt(bar, 3)] }),
+	{ contains: ["o5 e4", "o6 g4"] },
+);
+
+expectEdit(
+	"a note deleted where the note after it writes its own octave",
+	"#amk 2\n#0 o4 c4 o5 d4 o3 e4",
+	0,
+	(bar) => ({ kind: "delete", items: [noteAt(bar, 1)] }),
+	{ lacks: "o5" },
+);
+
+// `octave` is global parser state and leaks past a `#N`, so a channel with no
+// note left to hand its octave to keeps it where the last unit was — otherwise
+// the `f4`s below move down two octaves, which is what "leaves the other
+// channels alone" catches.
+expectEdit(
+	"notes deleted off the end of a channel the block below reads the octave of",
+	"#amk 2\n#0 o4 c4 o5 d4 o6 e4\n#1 f4 f4 f4\n",
+	0,
+	(bar) => ({ kind: "delete", items: [noteAt(bar, 1), noteAt(bar, 2)] }),
+	{ contains: "o4 c4 o6", lacks: "o5" },
+);
+
+expectEdit(
+	"every note in a channel deleted",
+	"#amk 2\n#0 o4 c4 o5 d4 o6 e4\n#1 f4 f4 f4\n",
+	0,
+	(bar) => ({ kind: "delete", items: [noteAt(bar, 0), noteAt(bar, 1), noteAt(bar, 2)] }),
+	{ contains: "#0 o6", lacks: ["o4", "o5"] },
+);
 
 expectEdit("a note drawn into a rest", "#amk 2\n#0 o4 c4 r2 d4", 0, () => ({
 	kind: "spawn",

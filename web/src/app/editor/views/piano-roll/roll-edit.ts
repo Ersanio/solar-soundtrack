@@ -1273,6 +1273,18 @@ export function planEdits(context: EditContext, plan: Plan): Edit[] | null {
   // previous note's own exit detects, since the compiler gave both of them.
   let running: number | null = null;
   let previous: StripItem | null = null;
+  /** Whether a unit has been removed since the last surviving note. */
+  let dropped = false;
+  /**
+   * The octaves put back in front of the notes that read them, held apart so
+   * they are written after the regions.
+   *
+   * A rest realised into the gap a deleted first note left goes in at the next
+   * surviving note's head as well (`writeInto`), and `coalesce` joins two empty
+   * ranges at one offset in the order this array holds them. The rest has to be
+   * read first: an `o` behind it is claimed by no unit on the next strip build.
+   */
+  const restores: Edit[] = [];
 
   for (let index = 0; index < strip.items.length; index++) {
     const item = strip.items[index];
@@ -1290,20 +1302,47 @@ export function planEdits(context: EditContext, plan: Plan): Edit[] | null {
     // the one the note was written under — which the compiler gave us. Without
     // this seed the first note edited in a channel always gains an `o` saying
     // what was already true. A unit carrying its own leading `o` stays unknown,
-    // since that `o` is about to be rewritten along with the note.
-    if (running === null && !item.hasLeadingOctave) {
+    // since that `o` is about to be rewritten along with the note. So does a
+    // note standing after a unit that has gone: what the compiler gave us is
+    // what the text said before the `o` inside that unit was deleted.
+    if (running === null && !item.hasLeadingOctave && !dropped) {
       running = item.octave;
     }
 
     const note = survivors.get(index);
     if (!note) {
+      // The unit takes the `o` written beside it with it (`roll-strip.ts`,
+      // `growUnits`), and what stood in force for the notes after it goes too.
+      // `running` is left alone: what stands after a removed unit is what stood
+      // before it, which is what it already holds.
       edits.push(...removeItem(source, item));
-      // A note that is going still leaves its octave behind: it is written text
-      // either side of the run being deleted that decides what follows.
+      dropped = true;
       previous = item;
-      running = null;
       continue;
     }
+
+    // A unit removed since the last surviving note took the octave this one was
+    // written under with it, so it is given one of its own — at its head, where
+    // the text settles: an `o` written there is this note's leading octave on
+    // the next pass, where one left between two rests is claimed by no unit and
+    // is what makes a later edit there unreadable. Once, however many notes
+    // went, because it is the note that reads the octave that asks for it rather
+    // than each note that dropped one.
+    if (dropped && !writesItsOwnOctave(strip, index, survivors) && item.octave !== running) {
+      const spelled = item.octave === null ? null : spellOctave(item.octave);
+      if (spelled === null) {
+        return null;
+      }
+
+      const restore = insertAt(item.unitSpan.start, `${spelled} `, item.unitSpan.line);
+      if (restore) {
+        restores.push(restore);
+      }
+
+      running = item.octave;
+    }
+
+    dropped = false;
 
     const written = rewriteNote(context, index, note, survivors, running);
     if (written === null) {
@@ -1316,6 +1355,27 @@ export function planEdits(context: EditContext, plan: Plan): Edit[] | null {
     const own: number | null = note.drum === null ? octaveFor(note.written) : running;
     running = exit ?? own;
     previous = item;
+  }
+
+  // Nothing left on the channel to hand it to, so the octave the last unit put
+  // in force stays where that unit was: `octave` is global parser state and
+  // leaks past a `#N` into the block below. `coalesce` joins it to the unit's
+  // own removal, and the note before it claims it as a trailing `o` on the next
+  // pass. Only the last note deleted off the tail leaves `dropped` set, so a run
+  // of them writes one.
+  if (dropped && previous !== null) {
+    const standing = previous.exitOctave ?? previous.octave;
+    if (standing !== null && standing !== running) {
+      const spelled = spellOctave(standing);
+      if (spelled === null) {
+        return null;
+      }
+
+      const restore = insertAt(previous.unitSpan.end, ` ${spelled}`, previous.unitSpan.line);
+      if (restore) {
+        restores.push(restore);
+      }
+    }
   }
 
   /**
@@ -1353,6 +1413,11 @@ export function planEdits(context: EditContext, plan: Plan): Edit[] | null {
 
     edits.push(...written);
   }
+
+  // After the regions, and load-bearing for the reason they are put off at all:
+  // a rest realised at a reader's head has to be read before the octave written
+  // there.
+  edits.push(...restores);
 
   // Shortest first at a shared offset, so an insertion sits ahead of the
   // replacement it abuts and `coalesce` can join the two into one.
