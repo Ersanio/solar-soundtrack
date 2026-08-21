@@ -13,7 +13,7 @@ any note, which picks that note's channel.
 | Drag the middle of a note        | Moves it — snapped along the grid, one row per semitone up and down      |
 | Drag a note's left or right edge | Stretches that end; the other end stays put                              |
 | Hold `Alt` while dragging        | Tick precision: no snapping, for either a position or a length           |
-| Click a note                     | Selects it, sounds it, and puts the caret on it in the MML               |
+| Click a note                     | Selects just that note, sounds it, and puts the caret on it in the MML   |
 | Double-click a note              | Goes to it in the MML                                                    |
 | `Shift` + click a note           | Adds it to, or takes it out of, the selection                            |
 | `Ctrl` + drag on empty grid      | Draws a box and selects every note of this channel inside it             |

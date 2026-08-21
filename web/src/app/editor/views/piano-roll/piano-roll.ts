@@ -851,6 +851,7 @@ export class PianoRoll {
 
   /** Pressing the channel already being edited clears it, as the mixer's solo does. */
   protected setEditChannel(channel: number): void {
+    this.gestures.clearSelection();
     this.settings.update((s) => ({
       ...s,
       editChannel: s.editChannel === channel ? null : channel,
@@ -861,8 +862,18 @@ export class PianoRoll {
    * A click on the roll names a channel rather than toggling one: the bar it
    * landed on is the answer, so a second note on the channel already being
    * edited must not clear it.
+   *
+   * The selection goes with the channel, and only when the channel really
+   * changes: it is a set of indices into one channel's strip, so carrying it
+   * across would outline whatever notes happen to sit at those indices in the
+   * next one. A press names its own channel before it selects, so clearing on
+   * an unchanged channel would take away the note just clicked.
    */
   protected selectEditChannel(editChannel: number): void {
+    if (this.editChannel() !== editChannel) {
+      this.gestures.clearSelection();
+    }
+
     this.settings.update((s) => ({ ...s, editChannel }));
   }
 

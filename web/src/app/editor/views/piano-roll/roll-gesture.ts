@@ -477,6 +477,14 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
         return;
       }
 
+      // A plain press selects the bar it landed on, so one click outlines one
+      // note. A press on a note already in the selection leaves the set alone,
+      // so a group still drags as a group; the pointer-up collapses it to the
+      // one note if the press turns out to be a click.
+      if (!selection().has(index)) {
+        selection.set(new Set([index]));
+      }
+
       const zoom = sources.zoom();
       const { left, right, zone } = edgesOf(item, tick, zoom);
       const edge = left <= zone ? 'start' : right <= zone ? 'end' : null;
@@ -571,11 +579,13 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
       }
 
       // A press that never became a drag is a **click**, and a click on a note
-      // belongs to the bar: it names the channel, asks the inspector about that
-      // note, and a second one goes to it in the source. Committing a move of
-      // nowhere would only be an undo step that changes nothing. Drawing is the
-      // exception — a click on empty grid is how a note is drawn at all.
+      // belongs to the bar: it selects that note alone, names the channel, asks
+      // the inspector about it, and a second one goes to it in the source.
+      // Committing a move of nowhere would only be an undo step that changes
+      // nothing. Drawing is the exception — a click on empty grid is how a note
+      // is drawn at all.
       if (!held.moved && held.kind !== 'spawn') {
+        selection.set(new Set([held.item]));
         drag.set(null);
         return;
       }
