@@ -321,6 +321,12 @@ One entry each: what it was, what it is, why.
   it had just been given and the view shifted by up to a page on every tab switch. It follows the
   transition: what re-measures the pages is a stop. The camera outliving the component
   (`roll-camera.ts`) is what turned a harmless re-run into a lost position.
+- **Filling a channel the roll opens out to the _longest_ channel**, or leaving it at the length of
+  its first note — the second cuts the song off at that note, since the driver reloads every track
+  pointer the moment one voice reads its `$00` (`main.asm:L_0C01`, `Music.cpp:3209`), and the first
+  writes rests past a point the song never reaches. It is filled out to the **shortest playable**
+  channel, `stats.introTicks + stats.loopTicks`, which leaves that minimum exactly where it was: the
+  song plays for as long after a channel is opened as before it, which `rolltest` pins per case.
 - **Writing a channel the roll opens into its place in `#0`-`#7` order** — `octave` and
   `defaultNoteLength` are one variable each and `parseHash` resets neither, so a block dropped
   between two others changes what the second is parsed under, and only `ParseTrace` knows what to

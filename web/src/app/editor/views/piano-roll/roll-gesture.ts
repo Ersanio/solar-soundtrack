@@ -80,6 +80,8 @@ export interface GestureSources {
   targetAMKVersion: Signal<number>;
   /** Which of the three programs the song compiles for, for writing a channel out. */
   songTargetProgram: Signal<number>;
+  /** How long the song plays, which is how far a channel being opened is filled out. */
+  playableTicks: Signal<number>;
   source: Signal<string>;
 }
 
@@ -367,6 +369,7 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
         strip,
         targetAMKVersion: sources.targetAMKVersion(),
         songTargetProgram: sources.songTargetProgram(),
+        playableTicks: sources.playableTicks(),
       } satisfies EditContext,
       now,
     );
@@ -610,6 +613,7 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
           strip,
           targetAMKVersion: sources.targetAMKVersion(),
           songTargetProgram: sources.songTargetProgram(),
+          playableTicks: sources.playableTicks(),
         },
         now,
       );
@@ -663,6 +667,7 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
         strip,
         targetAMKVersion: sources.targetAMKVersion(),
         songTargetProgram: sources.songTargetProgram(),
+        playableTicks: sources.playableTicks(),
       },
       now,
     );

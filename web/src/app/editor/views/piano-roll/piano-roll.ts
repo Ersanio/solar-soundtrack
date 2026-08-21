@@ -611,6 +611,16 @@ export class PianoRoll {
     () => this.editor.result()?.stats?.songTargetProgram ?? 0,
   );
 
+  /**
+   * How long the song plays, which is how far a channel being opened is filled
+   * out with rests. The transport's own figure rather than {@link songTicks},
+   * which is the walk's — see `EditContext.playableTicks`.
+   */
+  private readonly playableTicks = computed(() => {
+    const stats = this.editor.result()?.stats;
+    return stats ? stats.introTicks + stats.loopTicks : 0;
+  });
+
   protected readonly gestures = rollGestures(
     {
       strip: this.strip,
@@ -623,6 +633,7 @@ export class PianoRoll {
       lastLength: computed(() => this.settings().lastLength),
       targetAMKVersion: this.targetAMKVersion,
       songTargetProgram: this.songTargetProgram,
+      playableTicks: this.playableTicks,
       source: this.editor.source,
     },
     {

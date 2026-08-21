@@ -89,6 +89,12 @@ slider in the inspector, which writes one note's own length and never looks at i
   block goes at the end because an octave and a default length carry across a `#N`, so a block
   dropped in between two others would change what the second one is read under; **Normalize** is what
   puts the blocks back in `#0` to `#7` order.
+- **And fills it out with rests to the length of the song.** A song is only as long as its shortest
+  channel — the driver stops every channel the moment one of them runs out — so a new channel holding
+  one note would cut the rest of the song off at that note and hide it from the roll. The rest after
+  the note is what stops that: the new channel comes to exactly the length the song already played
+  for. Draw _past_ the end of the song and no rest is added; that channel is simply the long one, and
+  the warning about music past the end of the song says so.
 - **A channel the roll opens has no intro.** If the rest of the song has a `/`, write one into the new
   channel by hand — until you do, it restarts at its own top on every loop, and the roll's loop marker
   sits at the beginning of the song.

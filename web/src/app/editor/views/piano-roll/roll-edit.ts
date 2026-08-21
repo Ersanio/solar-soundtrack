@@ -82,6 +82,15 @@ export interface EditContext {
   targetAMKVersion: number;
   /** `CompileStats.songTargetProgram` — 0 AddmusicK, 1 Addmusic 4.05, 2 AddmusicM. */
   songTargetProgram: number;
+  /**
+   * How long the song plays, in ticks: its shortest channel that has any.
+   *
+   * `stats.introTicks + stats.loopTicks`, which is the figure `Playback` builds
+   * the transport on. Not `SongTimeline.ticks`, which is the same number until a
+   * channel emits bytes without occupying a tick — the walk counts that one as
+   * used and answers 0, where `Music.cpp:3209` passes over it.
+   */
+  playableTicks: number;
 }
 
 export const REFUSE_RANGE = 'the driver cannot play a note that high or low';
@@ -837,16 +846,28 @@ function spawnInto(context: EditContext, gap: Region): Edit[] | null {
   }
 
   const born = gap.born[0];
+  const empty = strip.items.length === 0;
   // A channel being written from nothing has just had its own `o4` put in front
   // of it, so a note in that octave has nothing to add (`channelOpening`).
-  const opening = strip.items.length === 0 && !strip.home.declared;
+  const opening = empty && !strip.home.declared;
   const text = noteText(born, null, null, targetAMKVersion, opening ? OPENING_OCTAVE : null);
   if (text === null) {
     return null;
   }
 
   const before = born.startTick - gap.startTick;
-  const after = gap.ticks < 0 ? 0 : gap.startTick + gap.ticks - (born.startTick + born.ticks);
+  const end = born.startTick + born.ticks;
+  // A channel with nothing on it runs out to the song's own length, so that its
+  // first note does not become the shortest channel and cut every other one
+  // short: the driver reloads all eight track pointers the moment one voice
+  // reads its `$00` (`main.asm:L_0C01`, `Music.cpp:3209`). A note drawn past
+  // that length pads by nothing rather than refusing — the channel is then the
+  // long one, which is the ordinary shape `AMK0502` already reports.
+  const after = empty
+    ? Math.max(0, context.playableTicks - end)
+    : gap.ticks < 0
+      ? 0
+      : gap.startTick + gap.ticks - end;
   if (before < 0 || after < 0) {
     return null;
   }

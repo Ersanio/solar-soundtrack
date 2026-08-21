@@ -177,6 +177,18 @@ function others(built: Built, channel: number): string {
 	return out.join(" ");
 }
 
+/**
+ * How long the song plays: its shortest channel that has any.
+ *
+ * `Music.cpp:3209`, kept by the port as `introTicks + loopTicks` (`index.ts:41-45`)
+ * and read by `Playback.durationTicks`. It is what a channel being opened is
+ * filled out to, and what {@link Expectation.playsAsLong} pins.
+ */
+function playable(built: Built): number {
+	const stats = built.result.stats;
+	return stats ? stats.introTicks + stats.loopTicks : 0;
+}
+
 interface Expectation {
 	/** The text after the edit, for the cases where the spelling is the point. */
 	text?: string;
@@ -184,6 +196,15 @@ interface Expectation {
 	contains?: string | readonly string[];
 	/** Substrings the result must not contain. */
 	lacks?: string | readonly string[];
+	/**
+	 * The song must play for exactly as long after the edit as before it.
+	 *
+	 * Opt-in rather than always: drawing at the end of an ordinary channel
+	 * lengthens the song by design, and several cases here do. What it pins is a
+	 * channel being *opened* — one filled out to the wrong length, or not filled
+	 * out at all, makes itself the shortest and takes the rest of the song with it.
+	 */
+	playsAsLong?: boolean;
 	/**
 	 * The mode the gesture is planned under, `"flexible"` unless a case says otherwise.
 	 *
@@ -217,6 +238,7 @@ function expectEdit(
 		strip: bar,
 		targetAMKVersion: before.result.stats?.targetAMKVersion ?? 4,
 		songTargetProgram: before.result.stats?.songTargetProgram ?? 0,
+		playableTicks: playable(before),
 	};
 	const plan = planGesture(bar, gesture(bar), expectation.mode ?? "flexible");
 	const edits = planEdits(context, plan);
@@ -254,6 +276,14 @@ function expectEdit(
 		others(before, channel) === others(rebuilt, channel),
 		`${others(before, channel)} -> ${others(rebuilt, channel)}`,
 	);
+
+	if (expectation.playsAsLong === true) {
+		check(
+			`${name}: plays for as long as it did`,
+			playable(before) === playable(rebuilt),
+			`${playable(before)} -> ${playable(rebuilt)} ticks`,
+		);
+	}
 
 	if (expectation.text !== undefined) {
 		check(`${name}: writes what it should`, after === expectation.text, JSON.stringify(after));
@@ -302,6 +332,7 @@ function expectRefused(
 		strip: bar,
 		targetAMKVersion: before.result.stats?.targetAMKVersion ?? 4,
 		songTargetProgram: before.result.stats?.songTargetProgram ?? 0,
+		playableTicks: playable(before),
 	};
 	const plan = planGesture(bar, gesture(bar), mode);
 	check(`${name}: refused`, planEdits(context, plan) === null, "an edit was produced");
@@ -650,23 +681,24 @@ console.log("\nopening a channel");
 
 // The whole text, because everything about the block is the point: the `#N`, the
 // six defaults, the blank line above it, the rest that carries the note out to
-// its tick — and that the note does not repeat the `o4` the block just wrote.
+// its tick, the rest that runs the channel out to the song's own 192 — and that
+// the note does not repeat the `o4` the block just wrote.
 expectEdit(
 	"a note drawn on a channel the song has not declared",
 	"#amk 2\n#0 o4 c4 d4 e4 f4\n",
 	5,
 	() => ({ kind: "spawn", startTick: 48, ticks: 48, written: NOTE_MIN + 36 + 4, drum: null }),
-	{ text: "#amk 2\n#0 o4 c4 d4 e4 f4\n\n#5 o4 l8 q7F @0 v255 y10\nr4 e4\n" },
+	{ text: "#amk 2\n#0 o4 c4 d4 e4 f4\n\n#5 o4 l8 q7F @0 v255 y10\nr4 e4 r2\n", playsAsLong: true },
 );
 
 // The channel is already open, so no second `#5` and no defaults over the top of
-// the `v200` the porter wrote.
+// the `v200` the porter wrote — but it is still empty, so it is still filled out.
 expectEdit(
 	"a note drawn on a channel that is declared but holds no music",
 	"#amk 2\n#0 o4 c4 d4 e4 f4\n#5 v200\n",
 	5,
 	() => ({ kind: "spawn", startTick: 0, ticks: 48, written: NOTE_MIN + 36, drum: null }),
-	{ text: "#amk 2\n#0 o4 c4 d4 e4 f4\n#5 v200\no4 c4\n" },
+	{ text: "#amk 2\n#0 o4 c4 d4 e4 f4\n#5 v200\no4 c4 r2.\n", playsAsLong: true },
 );
 
 // A `;` runs to the end of its line, so a run written on the same line would be
@@ -676,7 +708,7 @@ expectEdit(
 	"#amk 2\n#0 o4 c4 d4 e4 f4\n#5 v200 ; the bass comes in later",
 	5,
 	() => ({ kind: "spawn", startTick: 0, ticks: 48, written: NOTE_MIN + 36, drum: null }),
-	{ contains: "later\no4 c4" },
+	{ contains: "later\no4 c4 r2.", playsAsLong: true },
 );
 
 // The opening's `@0` and the drum's own `@21` both, and the note on its lane.
@@ -685,7 +717,17 @@ expectEdit(
 	"#amk 2\n#0 o4 c4 d4 e4 f4\n",
 	6,
 	() => ({ kind: "spawn", startTick: 0, ticks: 24, written: NOTE_MIN + 24, drum: 21 }),
-	{ contains: "#6 o4 l8 q7F @0 v255 y10\n@21 c8" },
+	{ contains: "#6 o4 l8 q7F @0 v255 y10\n@21 c8 r2..", playsAsLong: true },
+);
+
+// A note drawn past the end pads by nothing rather than refusing: the channel is
+// then the long one, and the song still stops where its shortest one does.
+expectEdit(
+	"a note drawn past the end of the song on a channel the song has not declared",
+	"#amk 2\n#0 o4 c4 d4 e4 f4\n",
+	5,
+	() => ({ kind: "spawn", startTick: 168, ticks: 48, written: NOTE_MIN + 36, drum: null }),
+	{ text: "#amk 2\n#0 o4 c4 d4 e4 f4\n\n#5 o4 l8 q7F @0 v255 y10\nr2.. c4\n", playsAsLong: true },
 );
 
 // `@` switches instrument tuning on under Addmusic 4.05 rather than saying what
@@ -696,7 +738,7 @@ expectEdit(
 	"#am4\n#0 o4 c4 d4 e4 f4\n",
 	5,
 	() => ({ kind: "spawn", startTick: 0, ticks: 48, written: NOTE_MIN + 36, drum: null }),
-	{ contains: "#5 o4 l8 q7F v255 y10", lacks: "@0" },
+	{ contains: "#5 o4 l8 q7F v255 y10\nc4 r2.", lacks: "@0", playsAsLong: true },
 );
 
 // `detectStartingChannel` probes the text for `#0` first, so writing one would
@@ -716,7 +758,7 @@ expectEdit(
 	"#am4\no4 c4 d4\n#1 o4 e4 f4",
 	5,
 	() => ({ kind: "spawn", startTick: 0, ticks: 48, written: NOTE_MIN + 36, drum: null }),
-	{ contains: "#5 o4 l8 q7F v255 y10" },
+	{ contains: "#5 o4 l8 q7F v255 y10", playsAsLong: true },
 );
 
 // No marker at all means the starting channel is 0 by fallback, and a `#3`
