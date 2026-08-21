@@ -1,16 +1,17 @@
 import { type Signal, computed, signal } from '@angular/core';
 
 import { NOTE_MIN } from '@amk/core/hardcoded-tables';
-import { spellDuration } from '@amk/core/mml-text';
+import { octaveFor, spellDuration, spellNote } from '@amk/core/mml-text';
 import type { Edit } from '@amk/tokens/edits';
 import type { LaneStack } from './roll-layout';
-import { snapDuration, snapTick, tickAtX } from './roll-layout';
+import { snapDuration, snapTick, stepDrawLength, tickAtX } from './roll-layout';
 import { type Preview, buildPreview, rowOfPlaced } from './roll-marks';
 import { KEY_WIDTH, NOTE_GAP } from './roll-metrics';
 import {
   type EditContext,
   type EditMode,
   type Gesture,
+  type PlacedNote,
   type Plan,
   committable,
   planEdits,
@@ -92,8 +93,8 @@ export interface GestureSinks {
   commit: (edits: readonly Edit[]) => void;
   /** Remember the length the porter last drew or resized to. */
   rememberLength: (ticks: number) => void;
-  /** Sound a note as written, at the tick it is being put on. */
-  audition: (written: number, drum: number | null, tick: number) => void;
+  /** Sound a note as written, at the tick and for the length it is being put on. */
+  audition: (written: number, drum: number | null, tick: number, ticks: number) => void;
   /** Name the channel a bar belongs to, as a click on a note already does. */
   pick: (channel: number) => void;
 }
@@ -122,6 +123,8 @@ interface Drag {
   atY: number;
   /** `Alt` is down: tick precision, for this gesture only. */
   fine: boolean;
+  /** The length a drawn note takes, once the wheel has said; `null` follows the setting. */
+  length: number | null;
 }
 
 /** Rows are semitones down the keyboard, so a row step is a semitone step. */
@@ -148,6 +151,14 @@ export interface RollGestures {
   onPointerDown(event: PointerEvent, box: DOMRect): void;
   onPointerMove(event: PointerEvent, box: DOMRect): void;
   onPointerUp(event: PointerEvent): void;
+  /**
+   * Size the note being drawn, one rung of {@link stepDrawLength}'s ladder up
+   * (`1`) or down (`-1`), or one tick at a time under `fine`.
+   *
+   * Answers whether there was a note being drawn at all, so the wheel that asked
+   * knows whether to keep its own meaning.
+   */
+  stepLength(direction: number, fine: boolean): boolean;
   /** Runs a gesture the keyboard asked for — delete, nudge, quantize and the rest. */
   run(gesture: Gesture): void;
   selectAll(): void;
@@ -226,7 +237,7 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
       return {
         kind: 'spawn',
         startTick: Math.max(0, fine ? Math.round(held.tick) : snapTick(held.tick, snap)),
-        ticks: sources.lastLength(),
+        ticks: held.length ?? sources.lastLength(),
         written: pitch.written,
         drum: pitch.drum,
       };
@@ -325,7 +336,7 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
     const label =
       held.kind === 'move'
         ? `tick ${note.startTick}`
-        : `${lengthLabel(note.ticks, version)} · ${note.ticks} ticks`;
+        : `${lengthLabel(note, version, now.touched.length === 1)} · ${note.ticks} ticks`;
     return {
       text: label,
       x: (note.startTick + note.ticks / 2) * sources.zoom(),
@@ -348,7 +359,8 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
   const soundRow = (row: number, tick: number): void => {
     const pitch = pitchOfRow(sources.stack(), row);
     if (pitch) {
-      sinks.audition(pitch.written, pitch.drum, Math.max(0, Math.round(tick)));
+      const ticks = drag()?.length ?? sources.lastLength();
+      sinks.audition(pitch.written, pitch.drum, Math.max(0, Math.round(tick)), ticks);
     }
   };
 
@@ -433,6 +445,7 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
           copy: false,
           sounded: -1,
           fine: event.altKey,
+          length: null,
           atX: event.clientX,
           atY: event.clientY,
         });
@@ -470,6 +483,7 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
           copy: false,
           sounded: row,
           fine: event.altKey,
+          length: null,
           atX: event.clientX,
           atY: event.clientY,
         });
@@ -508,6 +522,7 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
         copy: event.ctrlKey || event.metaKey,
         sounded: row,
         fine: event.altKey,
+        length: null,
         atX: event.clientX,
         atY: event.clientY,
       });
@@ -597,6 +612,25 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
       }
 
       finish();
+    },
+
+    stepLength(direction: number, fine: boolean): boolean {
+      const held = drag();
+      if (held?.kind !== 'spawn') {
+        return false;
+      }
+
+      // `fine` is the wheel's own `Alt` rather than `held.fine`, which is only
+      // refreshed by a pointer move — and it is not written back, so sizing a
+      // note by ticks leaves the start it was pressed on where the porter put it.
+      const now = held.length ?? sources.lastLength();
+      const next = fine ? Math.max(1, now + direction) : stepDrawLength(now, direction);
+
+      // No audition. A note is sounded on the press and on each change of row,
+      // and one of those is a whole silent run of the song; one per notch of the
+      // wheel would be a queue of them arriving long after the wheel stopped.
+      drag.set({ ...held, length: next });
+      return true;
     },
 
     run(gesture: Gesture): void {
@@ -736,13 +770,31 @@ function hoverCursor(
 }
 
 /**
- * A length as the bubble says it: `l8` where the note has a name, `=37` where
- * it has only a count.
+ * A length as the bubble says it — `d16` for one note, `16` for a group.
  *
- * The same `spellDuration` the edit itself is written with, so the readout
- * during a stretch is the text that will be committed at the end of it.
+ * The note's own text, spelled the way `roll-edit.ts` spells it at commit, so
+ * the readout during a gesture is what will be written at the end of it: a `c`
+ * for a drum, whose letter has no say in the byte, and `=37` where the duration
+ * has no name of its own. Not an `l`, which the roll never writes and which
+ * cannot take a `=` below `#amk 4` anyway.
+ *
+ * The letter belongs to `touched[0]`, so a stretch of several notes drops it and
+ * says the length alone: they all take that length, and only one of them is a
+ * `d`. The octave is left off — `noteText` writes one only where the octave in
+ * force differs, which is not settled until the splice, and the row the bubble
+ * sits on says the pitch already.
  */
-function lengthLabel(ticks: number, version: number): string {
-  const spelled = spellDuration(ticks, version);
-  return spelled === null ? `${ticks} ticks` : `l${spelled}`;
+function lengthLabel(note: PlacedNote, version: number, alone: boolean): string {
+  const spelled = spellDuration(note.ticks, version);
+  if (spelled === null) {
+    return `${note.ticks} ticks`;
+  }
+
+  if (!alone) {
+    return spelled;
+  }
+
+  const octave = note.drum === null ? octaveFor(note.written) : null;
+  const head = note.drum !== null ? 'c' : octave === null ? null : spellNote(note.written, octave);
+  return `${head ?? ''}${spelled}`;
 }

@@ -185,7 +185,8 @@ octave a note was written under is not inferred: `written` is the byte the lette
 name, so `octaveOfNote` divides it out exactly.
 
 **`planGesture` decides and `planEdits` writes.** Everything the porter sees during a drag — the red
-wash, the striped ghosts, the length bubble — is read off the one `Plan` that pointer-up commits, so
+wash, the striped pushed bars, the length bubble — is read off the one `Plan` that pointer-up
+commits, so
 what is drawn cannot disagree with what lands. A plan that is refused never reaches `planEdits` at
 all.
 
@@ -205,7 +206,9 @@ default on `pointerdown`, because both stop the browser raising `click` and `dbl
 and those are still how a note names its channel, reaches the inspector, and is jumped to in the
 source. It captures on the first move past the slop threshold, shows no preview until then, and
 treats a press that never moved as a click that commits nothing. Drawing is the exception, since a
-click on empty grid is the whole gesture.
+click on empty grid is the whole gesture. That is also the one gesture the wheel reaches: a press
+holding a new note has no second axis left to say a length with, so `onWheel` offers the wheel to
+`stepLength` before it reads its own modifiers, and takes it back when there is nothing being drawn.
 
 ## The CodeMirror adapter
 

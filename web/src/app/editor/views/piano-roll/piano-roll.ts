@@ -650,7 +650,7 @@ export class PianoRoll {
       rememberLength: (lastLength) => {
         this.settings.update((s) => (s.lastLength === lastLength ? s : { ...s, lastLength }));
       },
-      audition: (note, drum, tick) => {
+      audition: (note, drum, tick, ticks) => {
         const channel = this.editChannel();
         // One render in flight: a note is heard by running the song silently up
         // to its tick, so a drag down the keyboard would otherwise queue one of
@@ -660,7 +660,7 @@ export class PianoRoll {
             channel,
             tick,
             note: drum === null ? note : 0xd0 + (drum - FIRST_PERCUSSION_INSTRUMENT),
-            ticks: this.settings().lastLength,
+            ticks,
             quiet: true,
           });
         }
@@ -982,12 +982,22 @@ export class PianoRoll {
   }
 
   /**
-   * Ctrl zooms about the pointer, Shift scrolls sideways. Neither seeks — the
-   * scrub bar is the only thing that does, and a wheel that moved the song
-   * would be a seek nothing on screen had asked for.
+   * A note being drawn takes the wheel first; otherwise Ctrl zooms about the
+   * pointer and Shift scrolls sideways. None of them seeks — the scrub bar is
+   * the only thing that does, and a wheel that moved the song would be a seek
+   * nothing on screen had asked for.
    */
   protected onWheel(event: WheelEvent): void {
     const delta = event.deltaY !== 0 ? event.deltaY : event.deltaX;
+
+    // A wheel while a note is being drawn sizes it, which is the one thing the
+    // pointer cannot say with the button already down. Ahead of the zoom and the
+    // pan, so a press holding a note takes the whole wheel rather than half of it.
+    if (this.gestures.stepLength(delta < 0 ? 1 : -1, event.altKey)) {
+      event.preventDefault();
+      return;
+    }
+
     if (event.ctrlKey || event.metaKey) {
       event.preventDefault();
       const box = this.svgBox(event);

@@ -13,6 +13,7 @@ export const CHANGELOG: readonly ChangelogEntry[] = [
     items: [
       'Editable piano roll: draw, drag, stretch and delete notes, and the MML follows',
       'Draw on a channel the song has not used yet and the roll writes it in, at the length of the song and looping with it',
+      'Scroll while drawing a note to set its length, l1 down to l192',
       'Undo and redo buttons in the piano roll toolbar',
       'Click a key on the roll to hear it',
       'Mutes and solos apply when you preview a note',

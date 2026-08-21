@@ -31,6 +31,7 @@ import {
 import { PLOT, plot } from "../web/src/app/shared/chart/plot";
 import { stackSegments } from "../web/src/app/shared/chart/stack";
 import {
+	DRAW_LENGTHS,
 	advanceTick,
 	gridLines,
 	keyIsBlack,
@@ -41,6 +42,7 @@ import {
 	pageStart,
 	scrubOffset,
 	scrubTick,
+	stepDrawLength,
 	tickAtX,
 	tickWindow,
 	xAtTick,
@@ -328,6 +330,46 @@ console.log("\npiano roll window and grid");
 
 	check("a zero beat yields nothing rather than hanging", gridLines(0, 384, 0, 4).length === 0);
 	check("and no beats in a bar is the grid switched off", gridLines(0, 384, 48, 0).length === 0);
+}
+
+console.log("\nthe ladder the wheel walks while a note is being drawn");
+{
+	// Fourteen rungs, one per denominator that divides a whole note exactly, so
+	// every one of them is an `l` the roll can write without dots or `=N`. The
+	// dotted rungs a stretch snaps to are deliberately not here: twice the rungs
+	// is twice the turns of the wheel it takes to cross the ladder.
+	check("the ladder is the fourteen divisors of a whole note", DRAW_LENGTHS.length === 14, `${DRAW_LENGTHS.length}`);
+	check(
+		"and every rung divides one exactly",
+		DRAW_LENGTHS.every((ticks) => 192 % ticks === 0),
+		DRAW_LENGTHS.join(),
+	);
+	check(
+		"it runs l192 to l1",
+		DRAW_LENGTHS[0] === 1 && DRAW_LENGTHS[DRAW_LENGTHS.length - 1] === 192,
+		`${DRAW_LENGTHS[0]}..${DRAW_LENGTHS[DRAW_LENGTHS.length - 1]}`,
+	);
+	check(
+		"no dotted rung is on it",
+		!DRAW_LENGTHS.includes(72) && !DRAW_LENGTHS.includes(36) && !DRAW_LENGTHS.includes(144),
+	);
+
+	check("a quarter note steps up to l3", stepDrawLength(48, 1) === 64, `${stepDrawLength(48, 1)}`);
+	check("and down to l6", stepDrawLength(48, -1) === 32, `${stepDrawLength(48, -1)}`);
+
+	// A length off the ladder — a tick-precise stretch is remembered as the one
+	// a note is drawn at — is brought onto it by the first turn either way,
+	// rather than being left where a wheel appears to do nothing.
+	check("an off-ladder length comes up onto it", stepDrawLength(37, 1) === 48, `${stepDrawLength(37, 1)}`);
+	check("and down onto it", stepDrawLength(37, -1) === 32, `${stepDrawLength(37, -1)}`);
+	check("one past a whole note comes back to l1", stepDrawLength(384, 1) === 192, `${stepDrawLength(384, 1)}`);
+
+	check("a whole note is the top", stepDrawLength(192, 1) === 192, `${stepDrawLength(192, 1)}`);
+	check("and one tick is the bottom", stepDrawLength(1, -1) === 1, `${stepDrawLength(1, -1)}`);
+	check(
+		"every rung steps to its neighbour",
+		DRAW_LENGTHS.every((ticks, at) => stepDrawLength(ticks, 1) === DRAW_LENGTHS[Math.min(at + 1, 13)]),
+	);
 }
 
 console.log("\nthe roll's pages");

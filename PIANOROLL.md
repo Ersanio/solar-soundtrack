@@ -20,6 +20,8 @@ any note, which picks that note's channel.
 | `Ctrl` + drag a note             | Copies it instead of moving it                                           |
 | Right-click a note               | Deletes it                                                               |
 | Right-drag across notes          | Deletes each one the pointer crosses                                     |
+| Wheel while drawing a note       | Sizes it — `l1`, `l2`, `l3`, `l4`, `l6`, `l8` … down to `l192`           |
+| `Alt` + wheel while drawing      | Sizes it a tick at a time instead                                        |
 | `Ctrl` + wheel                   | Zooms in and out about the pointer                                       |
 | `Shift` + wheel                  | Scrolls the roll sideways                                                |
 | Click a key on the left          | Sounds that pitch on the channel being edited, so you can find it by ear |
@@ -56,6 +58,17 @@ against.
 **Stretching does not use Snap.** A length lands on the note values themselves — a whole, a half, a
 quarter, an eighth, and their dotted forms — because a note in MML is a duration rather than a region
 on a timeline. The bubble that follows the edge says which one you are on and how many ticks it is.
+
+**The bubble reads the note as it will be written** — `c8.`, or `c=37` where the length has no name
+of its own — so what it says during the drag is what lands in the MML at the end of it. Stretch
+several notes at once and it drops the letter and says the length alone: they all take that length,
+and only one of them is a `c`.
+
+**A new note starts at the length of the last one you drew or stretched**, so a run of sixteenths
+costs one sizing rather than one per note. To size the one you are placing, keep the button down and
+turn the wheel: it steps through `1`, `2`, `3`, `4`, `6`, `8` and on down to `192`, and where you let
+go is where the next note starts. There are no dotted stops on the wheel — those are a stretch away,
+and putting them on the wheel would double the turns it takes to cross.
 
 **Edits** is what happens when a gesture would put two notes on top of each other. A channel plays
 one note at a time, so that is something the roll has to answer one way or the other, and this is
