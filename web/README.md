@@ -83,6 +83,8 @@ pane it sits in. Three signals on `EditorRequests` are how a sibling panel asks:
 - `reveal` — select a span, set when a diagnostic or a piano roll bar is clicked.
 - `replace` — apply a splice, set when a panel edits a command in place.
 - `insertion` — type a snippet in at the caret, set when a palette button is clicked.
+- `history` — undo or redo, set by the two toolbars that carry the buttons, with `undoDepth` and
+  `redoDepth` travelling the other way so a button can tell whether there is anything to do.
 
 `reveal` carries a `show` flag, and it is the difference between a summons and a question. A
 diagnostic wants the source brought forward, scrolled to and focused. A single click on a roll bar

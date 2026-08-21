@@ -28,13 +28,14 @@ export interface Insertion {
  * What a panel asks the editor to do, and nothing else.
  *
  * `editor/views/source-view/` owns the CodeMirror view, so nothing else may
- * touch it — not even the pane it sits in. These four signals are how a sibling
- * asks: select this, splice that, type this in, and remember which occurrence of
- * a note is being inspected.
+ * touch it — not even the pane it sits in. These signals are how a sibling
+ * asks: select this, splice that, type this in, undo, and remember which
+ * occurrence of a note is being inspected.
  *
- * Its own service rather than four more members on `EditorStore` because it
- * shares nothing with the compile pipeline — it reads no result, no scan and no
- * source. It is a mailbox, and every one of its correspondents is a panel.
+ * Its own service rather than more members on `EditorStore` because it shares
+ * nothing with the compile pipeline — it reads no result, no scan and no source,
+ * and it must not, or the spine would run both ways. It is a mailbox, and every
+ * one of its correspondents is a panel.
  */
 @Service()
 export class EditorRequests {
@@ -82,6 +83,20 @@ export class EditorRequests {
       this.replace.set({ ...edit, span: { ...edit.span } });
     }
   }
+
+  /**
+   * How deep the editor's undo and redo stacks are, written by the view.
+   *
+   * The one thing in here that travels the other way, and it has to: CodeMirror
+   * owns the history, the roll's toolbar carries the same two buttons the source
+   * toolbar does, and a button that cannot tell whether there is anything to
+   * undo is a button that is never disabled.
+   */
+  readonly undoDepth = signal(0);
+  readonly redoDepth = signal(0);
+
+  /** An undo or a redo for the editor to run, set by either toolbar's buttons. */
+  readonly history = signal<'undo' | 'redo' | null>(null);
 
   /**
    * Text the editor should drop in at the caret, set when the command palette

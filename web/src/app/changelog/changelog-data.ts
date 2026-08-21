@@ -11,6 +11,7 @@ export const CHANGELOG: readonly ChangelogEntry[] = [
   {
     date: '21 August 2026',
     items: [
+      'Undo and redo buttons in the piano roll toolbar',
       'Mutes and solos apply when you preview a note',
       'A note bar says when it has more commands than it can show',
       'Normalize one channel instead of the whole song',
