@@ -13,6 +13,7 @@ export const CHANGELOG: readonly ChangelogEntry[] = [
     items: [
       'Mutes and solos apply when you preview a note',
       'A note bar says when it has more commands than it can show',
+      'Normalize one channel instead of the whole song',
       'Note length sliders drag right to make a note longer',
     ],
   },

@@ -338,4 +338,70 @@ expectNormalized(
 	(t) => count(t, /c8/g) === 2 && t.includes("; a comment"),
 );
 
+// ---------------------------------------------------------------------------
+// One channel at a time
+// ---------------------------------------------------------------------------
+
+/**
+ * The point of the scoped form is that another channel's trouble is not this
+ * channel's: the roll edits one channel and refuses the ones it cannot splice,
+ * so what it needs is that channel put in order and nothing else touched.
+ */
+console.log("\nnormalizing one channel");
+{
+	const source = "#amk 2\n#0 o4 [c4 d4]2 e4\n#1 o4 [g4 a4]2 b4\n";
+	const before = build(source);
+	const scoped = normalizeSong(source, ARAM, OPTIONS, 0);
+	check("one channel: normalizes", scoped.ok, scoped.ok ? "" : describe(scoped.diagnostics));
+	if (scoped.ok && typeof before !== "string") {
+		const after = build(scoped.text);
+		check("one channel: the result compiles", typeof after !== "string", typeof after === "string" ? after : "");
+		check(
+			"one channel: #0's loop is gone",
+			count(scoped.text.split("#1")[0], /\[/g) === 0,
+			JSON.stringify(scoped.text),
+		);
+		check(
+			"one channel: #1's loop is left exactly as it was",
+			scoped.text.includes("#1 o4 [g4 a4]2 b4"),
+			JSON.stringify(scoped.text),
+		);
+		if (typeof after !== "string") {
+			const difference = timelinesAgree(
+				{ timeline: before.timeline, noteMap: before.result.noteMap ?? [] },
+				{ timeline: after.timeline, noteMap: after.result.noteMap ?? [] },
+				{ writtenTempo: null },
+			);
+			check("one channel: plays the same music", difference === null, difference?.message ?? "");
+		}
+	}
+}
+
+{
+	// A loop that cannot be unrolled on #1 must not stop #0 being put in order —
+	// this is the whole reason the scoped form exists rather than being the
+	// whole-song one with a filter bolted on afterwards.
+	const source = "#amk 2\n#0 o4 [c4 d4]2 e4\n#1 @0 [ @2 g4 ]2 a4\n";
+	const whole = normalize(source);
+	const scoped = normalizeSong(source, ARAM, OPTIONS, 0);
+	check("a channel the whole song cannot manage: the whole song is refused", !whole.ok, "it normalized");
+	check(
+		"a channel the whole song cannot manage: #0 alone still normalizes",
+		scoped.ok,
+		scoped.ok ? "" : describe(scoped.diagnostics),
+	);
+}
+
+{
+	// Joining a channel's blocks moves text past other channels', so the scoped
+	// form says so rather than doing it.
+	const source = "#amk 2\n#0 c4\n#1 d4\n#0 e4\n";
+	const scoped = normalizeSong(source, ARAM, OPTIONS, 0);
+	check(
+		"a channel written in two blocks: refused with AMK0615",
+		!scoped.ok && scoped.diagnostics.some((d) => d.code === "AMK0615"),
+		describe(scoped.diagnostics),
+	);
+}
+
 summarise();

@@ -270,6 +270,10 @@ One entry each: what it was, what it is, why.
   which has no strip, and a refusal is the answer to a click rather than a property of the song.
   The dialog that asks before the rewrite (`editor/normalize-button/`) is where a refusal shows,
   and a song already in shape gets the same dialog rather than a click that does nothing.
+- **`unreachable` in `timelinesAgree`** — sound-looking and wrong: unrolling changes the list by
+  construction, since a note inside a `[ ]` is dropped once per replay and the copies it becomes are
+  separate addresses. `channelTicks` is what holds a channel's tail to account. `normalizetest`
+  caught it.
 - **The mixer's mutes and solo living on `Playback`** — the note previewer has to refuse a channel
   they silence, and it neither owns nor wants the transport: it shares no worklet, no audio thread
   and no song being played, and reaching through `Playback` to find the mask would make it depend on

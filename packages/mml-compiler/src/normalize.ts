@@ -39,6 +39,24 @@ export interface NormalizeInput {
 	text: string;
 	result: CompileResult;
 	trace: ParseTrace;
+	/**
+	 * Rewrite only this channel's music, and leave every other channel of the
+	 * song exactly as it was.
+	 *
+	 * The piano roll edits one channel at a time and refuses the ones it cannot
+	 * splice, so what a porter wants when a channel is in the way is that
+	 * channel put in order — not the whole song rewritten, and above all not a
+	 * refusal because some *other* channel has a loop that cannot be unrolled.
+	 * Every pass that works construct by construct takes this as a filter; the
+	 * two that are global by nature (the preprocessor and the replacements) run
+	 * whole either way, and `orderChannels` refuses rather than moving another
+	 * channel's blocks about.
+	 *
+	 * The oracle does not change: the caller still walks the result and compares
+	 * it against the original, so a scoped rewrite is held to the same standard
+	 * as a whole one.
+	 */
+	onlyChannel?: number;
 }
 
 export interface PassResult {
@@ -218,11 +236,15 @@ function stateBefore(trace: ParseTrace, index: number): ParseState {
  * note.
  */
 export function precheck(input: NormalizeInput): Diagnostic[] {
-	const { text, trace } = input;
+	const { text, trace, onlyChannel } = input;
 	const out: Diagnostic[] = [];
 	trace.events.forEach((event, index) => {
+		// `tuning[n]=` is a fact about the whole song's tuning table, so it refuses
+		// whatever is being rewritten; everything else here is about one run of
+		// music and refuses only the channel it is on.
+		const mine = onlyChannel === undefined || event.channel === onlyChannel;
 		const before = stateBefore(trace, index);
-		if (isNote(event) && before.inPitchSlide && before.prevNoteLength === -1) {
+		if (mine && isNote(event) && before.inPitchSlide && before.prevNoteLength === -1) {
 			out.push(
 				diagnostic(
 					"AMK0607",
@@ -234,7 +256,7 @@ export function precheck(input: NormalizeInput): Diagnostic[] {
 
 		const boundary = event.loop !== undefined || isMarker(text, event);
 		const pending = (state: ParseState): boolean => state.inPitchSlide || state.nextNoteIsForDD;
-		if (boundary && (pending(before) || pending(event.state))) {
+		if (mine && boundary && (pending(before) || pending(event.state))) {
 			out.push(
 				diagnostic("AMK0607", "A pitch slide or $DD note is still pending at a loop or channel boundary.", event.span),
 			);
@@ -246,7 +268,7 @@ export function precheck(input: NormalizeInput): Diagnostic[] {
 			);
 		}
 
-		if (event.loop?.kind === "call" && event.loop.at === 0xffff) {
+		if (mine && event.loop?.kind === "call" && event.loop.at === 0xffff) {
 			out.push(
 				diagnostic("AMK0602", "This * repeats a loop that was never written, which cannot be unrolled.", event.span),
 			);
@@ -364,6 +386,10 @@ export function flattenTriplets(input: NormalizeInput): PassResult {
 
 	let open = -1;
 	events.forEach((event, index) => {
+		if (input.onlyChannel !== undefined && event.channel !== input.onlyChannel) {
+			return;
+		}
+
 		if (event.char === "{") {
 			open = index;
 			return;
@@ -661,6 +687,7 @@ export function unrollLoops(input: NormalizeInput): PassResult {
 		outer !== inner && outer.start <= inner.start && inner.end <= outer.end;
 	const topLevel = constructs.filter(
 		(construct) =>
+			(input.onlyChannel === undefined || construct.channel === input.onlyChannel) &&
 			!stateBefore(trace, construct.first).inRemoteDefinition &&
 			!constructs.some((other) => contains(other, construct)),
 	);
@@ -814,7 +841,7 @@ interface Piece {
  * under, since both leak from whatever came before.
  */
 export function orderChannels(input: NormalizeInput): PassResult {
-	const { text, trace } = input;
+	const { text, trace, onlyChannel } = input;
 	const events = trace.events;
 	const lineEnd = eol(text);
 	const markers = events.map((_, index) => index).filter((index) => isMarker(text, events[index]));
@@ -823,6 +850,29 @@ export function orderChannels(input: NormalizeInput): PassResult {
 	}
 
 	const diagnostics: Diagnostic[] = [];
+
+	// Merging one channel's blocks moves text past other channels' blocks and
+	// changes the `o` and `l` they inherit, so there is no scoped version of
+	// this pass: a channel already written in one place needs nothing, and one
+	// written in several is a whole-song rewrite whether or not it was asked for.
+	if (onlyChannel !== undefined) {
+		const own = markers.filter((index) => markerChannel(text, events[index]) === onlyChannel);
+		if (own.length > 1) {
+			return {
+				text,
+				diagnostics: [
+					diagnostic(
+						"AMK0615",
+						`Channel ${onlyChannel} is written in more than one block, and joining them would move the other channels' music. Normalize the whole song instead.`,
+						events[own[1]].span,
+					),
+				],
+				changed: false,
+			};
+		}
+
+		return unchanged(text);
+	}
 	for (const index of markers) {
 		const state = stateBefore(trace, index);
 		if (state.inPitchSlide || state.nextNoteIsForDD || state.triplet) {
@@ -1081,6 +1131,10 @@ export function writeDefaults(input: NormalizeInput, options: DefaultsOptions): 
 	const edits: TextEdit[] = [];
 
 	events.forEach((event) => {
+		if (input.onlyChannel !== undefined && event.channel !== input.onlyChannel) {
+			return;
+		}
+
 		if ((event.char === "<" || event.char === ">") && !event.state.inRemoteDefinition) {
 			const octave = spellOctave(event.state.octave);
 			if (octave !== null) {
@@ -1100,6 +1154,10 @@ export function writeDefaults(input: NormalizeInput, options: DefaultsOptions): 
 
 	const lowest = Math.min(...firstOf.keys());
 	for (const [channel, index] of firstOf) {
+		if (input.onlyChannel !== undefined && channel !== input.onlyChannel) {
+			continue;
+		}
+
 		const next = markers.find((marker) => marker > index) ?? events.length;
 		const entering = events[index].state;
 		let hasNote = false;
@@ -1115,7 +1173,10 @@ export function writeDefaults(input: NormalizeInput, options: DefaultsOptions): 
 		}
 
 		const parts: string[] = [];
-		if (channel === lowest && !options.tempoAtStart) {
+		// Not when only one channel is being rewritten: `t` is the song's tempo
+		// however local the block it sits in, and a porter putting one channel in
+		// order has not asked for a command that reaches all eight.
+		if (channel === lowest && !options.tempoAtStart && input.onlyChannel === undefined) {
 			const ratio = trace.targetAMKVersion >= 4 ? trace.tempoRatio : 1;
 			const tempo = options.bootTempo * ratio;
 			if (Number.isInteger(tempo) && tempo >= 0 && tempo <= 255) {
@@ -1201,6 +1262,10 @@ export function drumPerNote(input: NormalizeInput): PassResult {
 	const edits: TextEdit[] = [];
 
 	events.forEach((event, index) => {
+		if (input.onlyChannel !== undefined && event.channel !== input.onlyChannel) {
+			return;
+		}
+
 		if (!isPitched(event) || event.state.inRemoteDefinition) {
 			return;
 		}

@@ -2,11 +2,11 @@
 <button
   type="button"
   class="border-edge bg-inset text-ink hover:border-accent ml-auto cursor-pointer rounded-md border px-2 text-xs leading-6 disabled:cursor-not-allowed disabled:opacity-40"
-  title="Rewrite the song for editing: #define and replacements resolved, every loop unrolled, triplets written out, one block per channel, and o/l/q/@/t written where the song left them implied. What plays does not change; refused if it would."
+  [title]="title()"
   [disabled]="!canNormalize()"
   (click)="open()"
 >
-  Normalize
+  {{ label() }}
 </button>
 
 <!-- Empty until it is shown, and rendered in the top layer by the browser, so
