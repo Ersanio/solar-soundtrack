@@ -9,6 +9,10 @@ export interface ChangelogEntry {
 export const CHANGELOG: readonly ChangelogEntry[] = [
   // ─── newest first; add new blocks here ──────────────────────────────────
   {
+    date: '21 August 2026',
+    items: ['Note length sliders drag right to make a note longer'],
+  },
+  {
     date: '20 August 2026',
     items: [
       'Command palette uses substitute hex commands on the older AddmusicK targets',

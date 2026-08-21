@@ -57,13 +57,13 @@ const vibrato: Resolver = (command) =>
 				note: "With two arguments the first is the rate. Add a third and the first becomes a delay instead.",
 			};
 
-/** The length denominators worth stopping on: every one that divides 192 evenly + 128 */
-const NOTE_DENOMINATORS = [1, 2, 3, 4, 6, 8, 12, 16, 24, 32, 48, 64, 96, 128, 192] as const;
+/** The length denominators worth stopping on: every one that divides 192 evenly. */
+const NOTE_DENOMINATORS = [1, 2, 3, 4, 6, 8, 12, 16, 24, 32, 48, 64, 96, 192] as const;
 
 /** `l` — the length later notes fall back to (`parser.ts:parseDefaultLength`). Default: l8 */
 const defaultLength: Resolver = (command) => ({
 	params: [
-		u8("Length", "index", {
+		u8("Length", "denominator", {
 			min: 1,
 			max: TICKS_PER_WHOLE,
 			stops: NOTE_DENOMINATORS,
@@ -89,7 +89,7 @@ const defaultLength: Resolver = (command) => ({
 /** A note or rest, whose arguments are the lengths of its tied segments. */
 const noteLength: Resolver = (command) => ({
 	params: command.args.map((_argument, index) =>
-		u8(index === 0 ? "Length" : `Tied to`, "index", {
+		u8(index === 0 ? "Length" : `Tied to`, "denominator", {
 			min: 1,
 			max: TICKS_PER_WHOLE,
 			stops: NOTE_DENOMINATORS,
