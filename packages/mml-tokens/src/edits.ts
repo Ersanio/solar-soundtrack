@@ -174,3 +174,41 @@ export function spliceInstrumentSample(source: string, entry: InstrumentDefiniti
 	texts[0] = text;
 	return splice(source, instrumentParts(entry), texts);
 }
+
+/**
+ * A splice over a plain source range.
+ *
+ * The builders above all start from a scanned {@link Command}, because that is
+ * what an inspector has. The piano roll does not: it starts from a note's span
+ * in `CompileResult.noteMap`, and the run it rewrites reaches past the command
+ * into the octave written beside it. So this takes the range directly and
+ * derives `expect` from it, which is the one thing no caller should be spelling
+ * out for itself.
+ *
+ * `null` when the text is already what is there, matching the other builders and
+ * `EditorRequests.apply`'s contract.
+ */
+export function spliceRange(source: string, span: Span, text: string): Edit | null {
+	const expect = source.slice(span.start, span.end);
+	if (text === expect) {
+		return null;
+	}
+
+	return { span: { ...span }, text, expect };
+}
+
+/**
+ * An insertion at an offset, as an empty range.
+ *
+ * Its own function rather than a `spliceRange` with `start === end` so that the
+ * empty `expect` is deliberate where a reader meets it: there is nothing at an
+ * offset for a race guard to check, and the guard is doing its job by comparing
+ * two empty strings.
+ */
+export function insertAt(offset: number, text: string, line = 1): Edit | null {
+	if (text === "") {
+		return null;
+	}
+
+	return { span: { start: offset, end: offset, line }, text, expect: "" };
+}

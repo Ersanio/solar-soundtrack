@@ -12,7 +12,7 @@ import {
   viewChild,
 } from '@angular/core';
 
-import { TICKS_PER_WHOLE } from '@amk/core/hardcoded-tables';
+import { NOTE_MIN, TICKS_PER_WHOLE } from '@amk/core/hardcoded-tables';
 import {
   FIRST_CUSTOM_INSTRUMENT,
   FIRST_PERCUSSION_INSTRUMENT,
@@ -20,7 +20,9 @@ import {
 } from '@amk/spc/instruments';
 import { elementSize } from '../../../shared/chart/element-size';
 import { clamp } from '../../../util/math';
+import { Audition } from '../../../state/audition';
 import { DriverStore } from '../../../state/driver-store';
+import { EditorRequests } from '../../../state/editor-requests';
 import { EditorStore } from '../../../state/editor-store';
 import { Mixer } from '../../../state/mixer';
 import { Playback } from '../../../state/playback';
@@ -39,14 +41,28 @@ import { rollClock } from './roll-clock';
 import { RollGrid } from './roll-grid/roll-grid';
 import { RollKeys } from './roll-keys/roll-keys';
 import { RollLanes } from './roll-lanes/roll-lanes';
-import { gridLines, laneStack, pageStart, scrubOffset, tickWindow, xAtTick } from './roll-layout';
+import type { EditMode, Gesture } from './roll-edit';
+import { RollEditLayer } from './roll-edit-layer/roll-edit-layer';
+import { rollGestures } from './roll-gesture';
+import {
+  gridLines,
+  laneStack,
+  pageStart,
+  scrubOffset,
+  tickAtX,
+  tickWindow,
+  xAtTick,
+} from './roll-layout';
 import { type Mark, buildMarks, buildMinimap, heldRowsAt } from './roll-marks';
-import { KEY_WIDTH, SCRUB_HEIGHT } from './roll-metrics';
+import { CHANNEL_FILL, KEY_WIDTH, SCRUB_HEIGHT } from './roll-metrics';
+import { type Strip, channelStrip, isStrip } from './roll-strip';
 import { RollNotes } from './roll-notes/roll-notes';
 import { RollScrub } from './roll-scrub/roll-scrub';
 import {
   type Settings,
+  type SnapName,
   readSettings,
+  snapTicks,
   stepRowHeight,
   stepZoom,
   writeSettings,
@@ -76,6 +92,7 @@ import { RollTooltip } from './roll-tooltip/roll-tooltip';
   imports: [
     PercussionPanel,
     RollChannels,
+    RollEditLayer,
     RollGrid,
     RollKeys,
     RollLanes,
@@ -85,13 +102,21 @@ import { RollTooltip } from './roll-tooltip/roll-tooltip';
     RollTooltip,
   ],
   templateUrl: './piano-roll.html',
-  host: { class: 'relative flex min-h-0 min-w-0 flex-col' },
+  host: {
+    class: 'relative flex min-h-0 min-w-0 flex-col',
+    // On the window rather than through a focusable element: this project ships
+    // no `tabindex` and no `role`, and a shortcut that only works while a
+    // channel is being edited needs neither. See `web/README.md`.
+    '(window:keydown)': 'onKey($event)',
+  },
 })
 export class PianoRoll {
   private readonly editor = inject(EditorStore);
   private readonly drivers = inject(DriverStore);
   private readonly playback = inject(Playback);
   private readonly mixer = inject(Mixer);
+  private readonly audition = inject(Audition);
+  private readonly requests = inject(EditorRequests);
 
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly destroyRef = inject(DestroyRef);
@@ -109,6 +134,11 @@ export class PianoRoll {
   protected readonly beatUnit = computed(() => this.settings().beatUnit);
   protected readonly percussionOpen = computed(() => this.settings().percussionOpen);
   protected readonly editChannel = computed(() => this.settings().editChannel);
+  protected readonly snap = computed(() => this.settings().snap);
+  protected readonly editMode = computed(() => this.settings().editMode);
+  protected readonly snapTicks = computed(() =>
+    snapTicks(this.settings().snap, this.beatsPerBar(), this.beatUnit()),
+  );
 
   /**
    * The camera, which outlives the component — see `roll-camera.ts`. Aliased so
@@ -529,6 +559,116 @@ export class PianoRoll {
     });
   });
 
+  // --- editing -------------------------------------------------------------
+
+  /**
+   * The channel being edited, as a sequence the roll can splice — or the reason
+   * it cannot be one.
+   *
+   * Everything span-based takes the same staleness test: a span into a document
+   * that has moved points at the wrong thing. Here it is the difference between
+   * an edit and a corruption, so it is the first check rather than the last.
+   */
+  private readonly stripOutcome = computed(() => {
+    const channel = this.editChannel();
+    const result = this.editor.result();
+    const timeline = this.timeline();
+    if (
+      channel === null ||
+      !result?.ok ||
+      !timeline ||
+      this.editor.compiledText() !== this.editor.source()
+    ) {
+      return null;
+    }
+
+    return channelStrip({
+      source: this.editor.source(),
+      channel,
+      noteMap: result.noteMap ?? [],
+      timeline,
+      index: this.editor.tokens(),
+      tempoRatio: result.stats?.tempoRatio ?? 1,
+    });
+  });
+
+  protected readonly strip = computed<Strip | null>(() => {
+    const outcome = this.stripOutcome();
+    return outcome && isStrip(outcome) ? outcome : null;
+  });
+
+  /** Why the picked channel cannot be edited, for the toolbar to say. */
+  protected readonly editRefusal = computed(() => {
+    const outcome = this.stripOutcome();
+    return outcome && !isStrip(outcome) ? outcome.refused : null;
+  });
+
+  private readonly targetAMKVersion = computed(
+    () => this.editor.result()?.stats?.targetAMKVersion ?? 4,
+  );
+
+  protected readonly gestures = rollGestures(
+    {
+      strip: this.strip,
+      stack: this.stack,
+      zoom: this.zoom,
+      rowHeight: this.rowHeight,
+      viewTick: this.viewTick,
+      snap: this.snapTicks,
+      editMode: this.editMode,
+      lastLength: computed(() => this.settings().lastLength),
+      targetAMKVersion: this.targetAMKVersion,
+      source: this.editor.source,
+    },
+    {
+      commit: (edits) => {
+        this.requests.applyAll(edits);
+      },
+      rememberLength: (lastLength) => {
+        this.settings.update((s) => (s.lastLength === lastLength ? s : { ...s, lastLength }));
+      },
+      audition: (note, drum, tick) => {
+        const channel = this.editChannel();
+        // One render in flight: a note is heard by running the song silently up
+        // to its tick, so a drag down the keyboard would otherwise queue one of
+        // those per row and play them all long after the pointer stopped.
+        if (channel !== null && !this.audition.notePending()) {
+          this.audition.playNote({
+            channel,
+            tick,
+            note: drum === null ? note : 0xd0 + (drum - FIRST_PERCUSSION_INSTRUMENT),
+            ticks: this.settings().lastLength,
+            quiet: true,
+          });
+        }
+      },
+      pick: (channel) => this.selectEditChannel(channel),
+    },
+  );
+
+  /** The channel's own colour, so a note being dragged stays the colour it is. */
+  protected readonly editFill = computed(() => {
+    const channel = this.editChannel();
+    return channel === null ? CHANNEL_FILL[0] : CHANNEL_FILL[channel];
+  });
+
+  /** Red while the gesture in flight cannot be committed. */
+  protected readonly blocked = computed(() => (this.gestures.preview()?.clash.length ?? 0) > 0);
+
+  /** The selected notes as spans, which is what the bars are outlined by. */
+  protected readonly selectedSpans = computed(() => {
+    const strip = this.strip();
+    const chosen = this.gestures.selection();
+    const spans = new Set<number>();
+    if (strip) {
+      for (const index of chosen) {
+        spans.add(strip.items[index]?.address ?? -1);
+      }
+    }
+
+    return spans;
+  });
+
   // --- tooltip -------------------------------------------------------------
 
   protected readonly hovered = signal<Mark | null>(null);
@@ -692,6 +832,14 @@ export class PianoRoll {
     this.settings.update((s) => ({ ...s, beatUnit }));
   }
 
+  protected setSnap(snap: SnapName): void {
+    this.settings.update((s) => ({ ...s, snap }));
+  }
+
+  protected setEditMode(editMode: EditMode): void {
+    this.settings.update((s) => ({ ...s, editMode }));
+  }
+
   protected setPercussionOpen(percussionOpen: boolean): void {
     this.settings.update((s) => ({ ...s, percussionOpen }));
   }
@@ -771,6 +919,165 @@ export class PianoRoll {
     this.playhead.jumpTo(to);
     this.scrolling.set(false);
     this.playback.seek(to);
+  }
+
+  // --- the pointer, and the keys ------------------------------------------
+
+  /** The box gestures measure against: the `<svg>`, which scrolls with the notes. */
+  private svgBox(event: PointerEvent | WheelEvent): DOMRect {
+    return (event.currentTarget as Element).getBoundingClientRect();
+  }
+
+  protected onEditDown(event: PointerEvent): void {
+    this.gestures.onPointerDown(event, this.svgBox(event));
+  }
+
+  protected onEditMove(event: PointerEvent): void {
+    this.gestures.onPointerMove(event, this.svgBox(event));
+  }
+
+  protected onEditUp(event: PointerEvent): void {
+    this.gestures.onPointerUp(event);
+  }
+
+  /** The right button erases, so the browser's own menu would be in the way. */
+  protected onContextMenu(event: Event): void {
+    if (this.strip()) {
+      event.preventDefault();
+    }
+  }
+
+  /**
+   * Ctrl zooms about the pointer, Shift scrolls sideways. Neither seeks — the
+   * scrub bar is the only thing that does, and a wheel that moved the song
+   * would be a seek nothing on screen had asked for.
+   */
+  protected onWheel(event: WheelEvent): void {
+    const delta = event.deltaY !== 0 ? event.deltaY : event.deltaX;
+    if (event.ctrlKey || event.metaKey) {
+      event.preventDefault();
+      const box = this.svgBox(event);
+      const under = tickAtX(event.clientX - box.left, this.viewTick(), this.zoom());
+      const before = this.viewTick();
+      this.setZoom(delta < 0 ? 1 : -1);
+      // Hold the tick that was under the pointer, so a zoom happens where the
+      // eye is rather than dragging the music sideways under it. Only when the
+      // roll is parked: a following roll is anchored on the playhead instead.
+      if (!this.follow()) {
+        const kept = under - (event.clientX - box.left - KEY_WIDTH) / this.zoom();
+        this.panTick.update((tick) => tick + (kept - before));
+      }
+
+      return;
+    }
+
+    if (event.shiftKey) {
+      event.preventDefault();
+      // Panning takes the roll off the song, which is what the Follow switch
+      // already means; ticking it again is how the porter comes back.
+      this.setFollow(false);
+      this.panTick.update((tick) => tick + delta / this.zoom());
+    }
+  }
+
+  /**
+   * The roll's shortcuts, while a channel is being edited.
+   *
+   * Ignored while the text has focus, so `Ctrl+A` in the source still selects
+   * the source. Everything here goes through the same {@link Gesture} the
+   * pointer uses, so a nudge and a drag commit the same way.
+   */
+  protected onKey(event: KeyboardEvent): void {
+    const strip = this.strip();
+    const target = event.target as HTMLElement | null;
+    if (
+      !strip ||
+      target?.closest('input, textarea, select, .cm-editor') !== null ||
+      event.isComposing
+    ) {
+      return;
+    }
+
+    const chosen = [...this.gestures.selection()];
+    const run = (gesture: Gesture): void => {
+      event.preventDefault();
+      this.gestures.run(gesture);
+    };
+
+    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'a') {
+      event.preventDefault();
+      this.gestures.selectAll();
+      return;
+    }
+
+    if (event.key === 'Escape') {
+      this.gestures.clearSelection();
+      return;
+    }
+
+    if (chosen.length === 0) {
+      return;
+    }
+
+    switch (event.key) {
+      case 'Delete':
+      case 'Backspace':
+        run({ kind: 'delete', items: chosen });
+        return;
+      case 'ArrowLeft':
+      case 'ArrowRight': {
+        const step = Math.max(1, this.snapTicks()) * (event.key === 'ArrowRight' ? 1 : -1);
+        run({ kind: 'move', items: chosen, deltaTicks: step, deltaKeys: 0, copy: false });
+        return;
+      }
+
+      case 'ArrowUp':
+      case 'ArrowDown': {
+        const semitones = (event.shiftKey ? 12 : 1) * (event.key === 'ArrowUp' ? 1 : -1);
+        run({ kind: 'move', items: chosen, deltaTicks: 0, deltaKeys: semitones, copy: false });
+        return;
+      }
+
+      default:
+        break;
+    }
+
+    const key = event.key.toLowerCase();
+    if (event.altKey && key === 'q') {
+      run({ kind: 'quantize', items: chosen, snap: Math.max(1, this.snapTicks()) });
+    } else if (event.altKey && key === 'l') {
+      run({ kind: 'legato', items: chosen });
+    } else if ((event.ctrlKey || event.metaKey) && key === 'j') {
+      run({ kind: 'glue', items: chosen });
+    } else if ((event.ctrlKey || event.metaKey) && key === 'b') {
+      const bar = Math.max(1, this.snapTicks() * Math.max(1, this.beatsPerBar()));
+      run({ kind: 'move', items: chosen, deltaTicks: bar, deltaKeys: 0, copy: true });
+    }
+  }
+
+  /** A key on the left column, sounded on the channel being edited. */
+  protected onKeyPress(row: number): void {
+    const channel = this.editChannel();
+    const lane = this.lanes()[row];
+    if (channel === null || !lane || this.audition.notePending()) {
+      return;
+    }
+
+    const note =
+      lane.kind === 'key'
+        ? NOTE_MIN + lane.index
+        : lane.kind === 'drum'
+          ? 0xd0 + (lane.index - FIRST_PERCUSSION_INSTRUMENT)
+          : null;
+    if (note !== null) {
+      // Not `quiet`: one press is one deliberate question, so a press that
+      // sounds nothing is worth an answer. The drag sink is the per-row caller.
+      this.audition.playNote({
+        channel,
+        tick: Math.max(0, Math.round(this.playTick())),
+        note,
+      });
+    }
   }
 
   protected onMove(event: PointerEvent): void {

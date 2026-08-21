@@ -8,7 +8,15 @@ import { Playback } from '../../../../state/playback';
 import { ticksPerSecondAt } from '../../../../state/song-clock';
 import { HistoryButtons } from '../../../history-buttons/history-buttons';
 import { NormalizeButton } from '../../../normalize-button/normalize-button';
-import { BEAT_UNITS, MAX_BEATS, clampBeats, isBeatUnit } from '../roll-settings';
+import { EDIT_MODES, type EditMode } from '../roll-edit';
+import {
+  BEAT_UNITS,
+  MAX_BEATS,
+  SNAPS,
+  type SnapName,
+  clampBeats,
+  isBeatUnit,
+} from '../roll-settings';
 
 /**
  * The roll's own controls, which every view brings for itself.
@@ -38,6 +46,12 @@ export class RollToolbar {
   readonly beatsPerBar = input.required<number>();
   readonly beatUnit = input.required<number>();
   readonly percussionOpen = input.required<boolean>();
+  readonly snap = input.required<SnapName>();
+  readonly editMode = input.required<EditMode>();
+  /** Why the picked channel cannot be edited, or null when it can. */
+  readonly editRefusal = input.required<string | null>();
+  /** How many notes are selected, for the readout. */
+  readonly selected = input.required<number>();
   /** The channel the corner's picker has selected, or null when none is. */
   readonly editChannel = input.required<number | null>();
   /** The tick the readout reports, which the parent takes slowly while playing. */
@@ -51,10 +65,30 @@ export class RollToolbar {
   readonly beatsPerBarChange = output<number>();
   readonly beatUnitChange = output<number>();
   readonly percussionOpenChange = output<boolean>();
+  readonly snapChange = output<SnapName>();
+  readonly editModeChange = output<EditMode>();
 
   /** For the two grid controls. */
   protected readonly beatUnits = BEAT_UNITS;
   protected readonly maxBeats = MAX_BEATS;
+
+  /** For the Snap control. The names are the porter's, not the tick counts. */
+  protected readonly snaps = SNAPS;
+  protected readonly snapLabels: Record<SnapName, string> = {
+    bar: 'Bar',
+    beat: 'Beat',
+    half: '½ beat',
+    quarter: '¼ beat',
+    eighth: '⅛ beat',
+    off: 'Off',
+  };
+
+  /** For the Edits control. Both modes are named, so neither has to be inferred. */
+  protected readonly editModes = EDIT_MODES;
+  protected readonly editModeLabels: Record<EditMode, string> = {
+    flexible: 'Flexible',
+    strict: 'Strict',
+  };
 
   /**
    * Which channel the picker has selected, named in the roll's own terms.
@@ -65,7 +99,13 @@ export class RollToolbar {
    */
   protected readonly editLabel = computed(() => {
     const channel = this.editChannel();
-    return channel === null ? 'editing: none' : `editing: #${channel}`;
+    if (channel === null) {
+      return 'editing: none';
+    }
+
+    const selected = this.selected();
+    const chosen = selected > 0 ? ` · ${selected} selected` : '';
+    return `editing: #${channel}${chosen}`;
   });
 
   protected readonly readout = computed(() => {
@@ -113,6 +153,20 @@ export class RollToolbar {
 
     field.value = String(beatsPerBar);
     this.beatsPerBarChange.emit(beatsPerBar);
+  }
+
+  protected setSnap(event: Event): void {
+    const value = (event.target as HTMLSelectElement).value as SnapName;
+    if (SNAPS.includes(value)) {
+      this.snapChange.emit(value);
+    }
+  }
+
+  protected setEditMode(event: Event): void {
+    const value = (event.target as HTMLSelectElement).value as EditMode;
+    if (EDIT_MODES.includes(value)) {
+      this.editModeChange.emit(value);
+    }
   }
 
   protected setBeatUnit(event: Event): void {

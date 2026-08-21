@@ -5,6 +5,7 @@
  * both are obvious in a number.
  */
 
+import { TICKS_PER_WHOLE } from '@amk/core/hardcoded-tables';
 import { KEY_COUNT } from '@amk/spc/song-walk';
 import { NOTE_NAMES } from '@amk/tokens/commands/units';
 import { clamp } from '../../../util/math';
@@ -519,4 +520,66 @@ export function xAtTick(tick: number, viewTick: number, pxPerTick: number): numb
  */
 export function tickAtX(offsetX: number, viewTick: number, pxPerTick: number): number {
   return pxPerTick > 0 ? viewTick + (offsetX - KEY_WIDTH) / pxPerTick : viewTick;
+}
+
+/** Which row a pointer is over, or -1 past either end of the stack. */
+export function rowAtY(offsetY: number, rowHeight: number, rows: number): number {
+  if (rowHeight <= 0) {
+    return -1;
+  }
+
+  const row = Math.floor(offsetY / rowHeight);
+  return row >= 0 && row < rows ? row : -1;
+}
+
+/**
+ * Every duration a note can be written as one length token, in ticks.
+ *
+ * `1`, `2`, `4`… and their dotted forms — exactly the set `spellLength` can
+ * spell without falling back to `=N` — which is what a stretch snaps to. A
+ * start snaps to the grid and a length snaps to this, because a note in MML is
+ * a duration rather than a region and the porter thinks in note values.
+ */
+export const NOTE_LENGTHS: readonly number[] = (() => {
+  const ticks = new Set<number>();
+  for (let divisor = 1; divisor <= TICKS_PER_WHOLE; divisor++) {
+    if (TICKS_PER_WHOLE % divisor !== 0) {
+      continue;
+    }
+
+    const base = TICKS_PER_WHOLE / divisor;
+    const half = Math.floor(base / 2);
+    ticks.add(base);
+    ticks.add(base + half);
+    ticks.add(base + half + Math.floor(half / 2));
+  }
+
+  // A dotted whole note is past what one token holds, and `spellLength` says so
+  // by answering `null` — so the rungs stop where the spelling does.
+  return [...ticks].filter((each) => each <= TICKS_PER_WHOLE).sort((a, b) => a - b);
+})();
+
+/** The nearest length a note can be written as, at or above one tick. */
+export function snapDuration(ticks: number): number {
+  if (ticks <= NOTE_LENGTHS[0]) {
+    return NOTE_LENGTHS[0];
+  }
+
+  // Past a whole note the ladder repeats: a tie is whole notes and a remainder,
+  // so the same rungs are what a longer note lands on.
+  const whole = Math.max(0, Math.floor((ticks - 1) / TICKS_PER_WHOLE)) * TICKS_PER_WHOLE;
+  const left = ticks - whole;
+  let nearest = NOTE_LENGTHS[0];
+  for (const rung of NOTE_LENGTHS) {
+    if (Math.abs(rung - left) < Math.abs(nearest - left)) {
+      nearest = rung;
+    }
+  }
+
+  return whole + nearest;
+}
+
+/** A tick snapped to the grid the porter chose. `0` snaps to nothing. */
+export function snapTick(tick: number, snap: number): number {
+  return snap > 0 ? Math.round(tick / snap) * snap : Math.round(tick);
 }

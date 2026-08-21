@@ -25,6 +25,20 @@ export interface Insertion {
 }
 
 /**
+ * A batch of splices, and whether the editor should compile as soon as it lands.
+ *
+ * `immediate` separates the two kinds of caller. An inspector slider fires once
+ * per frame of a drag and must go through the typing debounce like a keystroke,
+ * or a drag is dozens of compiles. A piano roll gesture is committed once, on
+ * pointer-up, and the roll's spans are stale until the compile lands — so it
+ * asks for the compile now and gets its next frame right.
+ */
+export interface EditBatch {
+  edits: readonly Edit[];
+  immediate: boolean;
+}
+
+/**
  * What a panel asks the editor to do, and nothing else.
  *
  * `editor/views/source-view/` owns the CodeMirror view, so nothing else may
@@ -67,7 +81,7 @@ export class EditorRequests {
    * compares before it dispatches, which turns that whole class of race from
    * silent corruption into an edit that simply does not take.
    */
-  readonly replace = signal<Edit | null>(null);
+  readonly replace = signal<EditBatch | null>(null);
 
   /**
    * Applies a splice built by `@amk/tokens`'s `edits.ts`, ignoring the `null`
@@ -80,7 +94,25 @@ export class EditorRequests {
    */
   apply(edit: Edit | null): void {
     if (edit) {
-      this.replace.set({ ...edit, span: { ...edit.span } });
+      this.replace.set({ edits: [copyEdit(edit)], immediate: false });
+    }
+  }
+
+  /**
+   * Applies a whole gesture's worth of splices as one change.
+   *
+   * One transaction and so **one undo step**, which is what a range-select over
+   * forty notes has to be. The editor checks every `expect` before it dispatches
+   * anything, so the batch either lands whole or not at all — a half-applied
+   * gesture would leave the song in a shape nobody asked for.
+   *
+   * The ranges must be non-overlapping and in the document's own coordinates:
+   * CodeMirror merges overlapping ones rather than refusing them, so nothing
+   * downstream can catch it. `roll-edit.ts` asserts it where the edits are made.
+   */
+  applyAll(edits: readonly Edit[] | null): void {
+    if (edits && edits.length > 0) {
+      this.replace.set({ edits: edits.map(copyEdit), immediate: true });
     }
   }
 
@@ -127,4 +159,9 @@ export class EditorRequests {
    * caret enough to retire it.
    */
   readonly inspecting = signal<{ address: number; tick: number } | null>(null);
+}
+
+/** A splice the sender cannot go on mutating after it has posted it. */
+function copyEdit(edit: Edit): Edit {
+  return { ...edit, span: { ...edit.span } };
 }

@@ -83,7 +83,8 @@ dragging away from.
 pane it sits in. Three signals on `EditorRequests` are how a sibling panel asks:
 
 - `reveal` — select a span, set when a diagnostic or a piano roll bar is clicked.
-- `replace` — apply a splice, set when a panel edits a command in place.
+- `replace` — apply a batch of splices, set when a panel edits a command in place or the roll
+  commits a gesture.
 - `insertion` — type a snippet in at the caret, set when a palette button is clicked.
 - `history` — undo or redo, set by the two toolbars that carry the buttons, with `undoDepth` and
   `redoDepth` travelling the other way so a button can tell whether there is anything to do.
@@ -109,6 +110,20 @@ silent corruption into an edit that simply does not take.
 `EditorRequests.apply` ignores the `null` the splice builders return when nothing would change. A
 slider fires per frame of a drag, and "that is the text already there" is what keeps a drag from
 pushing dozens of identical recompiles through the debounce.
+
+`applyAll` is the same mailbox for a whole gesture: every `expect` is checked against the document
+before anything is dispatched, and then all the changes go in **one** transaction, which is what
+makes a range-select over forty notes one undo step. Its ranges must not overlap —
+`ChangeSet.of` merges overlapping ones rather than refusing them, so nothing downstream could catch
+it, and `roll-edit.ts` asserts it where the edits are made. It also carries `immediate`, which asks
+the editor to compile without waiting out the typing debounce: a gesture is committed once and the
+roll's spans are stale until the compile lands, where a slider fires per frame and must not. The
+call is the **view's**, not the mailbox's, because `EditorRequests` depends on nothing and reaching
+`EditorStore` from it would turn the spine round.
+
+The whole write-back path rests on one fact: the source view is hidden, never destroyed, when another
+tab is showing, so its effects are live while the roll is in front. If that `[class.hidden]` in
+`editor-pane.html` ever became an `@if`, every roll edit would vanish silently.
 
 ## Normalizing a song
 
@@ -144,6 +159,53 @@ nature and run whole either way; `orderChannels` refuses with `AMK0615` rather t
 channel's blocks, because that moves text past the other channels and changes the `o` and `l` they
 inherit. The oracle does not change — the result is still walked and compared — so a scoped rewrite is
 held to exactly the standard a whole one is.
+
+## Editing from the piano roll
+
+`editor/views/piano-roll/roll-strip.ts` and `roll-edit.ts` are the two halves of a roll gesture, and
+both are Angular-free so `rolltest` can drive them against a real compile.
+
+The **strip** is one channel as a sequence the roll can splice. It is built from the compiler's
+`noteMap` rather than from the walk, because `noteMap` carries **rests** — the walk drops them — and a
+gap the roll can address is exactly a rest it can rewrite. A `^` is its own entry whenever anything
+but whitespace separates it from its note, so `c4 v200 ^8` is two entries and one note; `foldStrip`
+joins them, and a length change rewrites the **last** segment so the ramp keeps its place.
+
+Its **gate** is five checks, and the third is the one no oracle could make: a `{ }` triplet scales
+every length by two thirds and a tempo ratio divides every one of them, and in both cases the strip
+and the walk agree perfectly while the text the roll would write is wrong. Reading each item's span
+back and insisting it is a note catches the other invisible one — `spanAt` collapses a
+replacement-sourced span to a single character, so a note written through `"x=c4"` has a span reading
+`x` and an `expect` guard cannot see it, because the roll would slice the same text.
+
+A note's **unit** is its own span grown over the `o` and the drum `@` written beside it. Growing it is
+what makes a second drag rewrite the octave the first one wrote instead of adding another, and
+leading wins over trailing where both could claim the same `o` — otherwise two units overlap. The
+octave a note was written under is not inferred: `written` is the byte the letter and octave alone
+name, so `octaveOfNote` divides it out exactly.
+
+**`planGesture` decides and `planEdits` writes.** Everything the porter sees during a drag — the red
+wash, the striped ghosts, the length bubble — is read off the one `Plan` that pointer-up commits, so
+what is drawn cannot disagree with what lands. A plan that is refused never reaches `planEdits` at
+all.
+
+Its **`EditMode`** is what an overlap does, and it is the porter's setting rather than the gesture's:
+`strict` refuses one and `flexible` shoves the notes in the way aside, for drawing, dragging,
+stretching and quantizing alike. A cascade never moves a note the gesture is placing itself — the
+`fixed` set — so a selection cannot shove itself, and an overlap it could not clear is reported as a
+clash rather than as a third outcome. The inspector's own length slider is not on this path at all:
+it writes one argument through `spliceArg` and knows nothing about neighbours.
+
+The commit is `EditorRequests.applyAll`: one transaction, one undo step for a whole selection, and
+the editor checks every `expect` before it dispatches anything, so a stale batch is a no-op rather
+than half a gesture.
+
+**A press is not yet a gesture.** `roll-gesture.ts` neither captures the pointer nor prevents the
+default on `pointerdown`, because both stop the browser raising `click` and `dblclick` on the bar —
+and those are still how a note names its channel, reaches the inspector, and is jumped to in the
+source. It captures on the first move past the slop threshold, shows no preview until then, and
+treats a press that never moved as a click that commits nothing. Drawing is the exception, since a
+click on empty grid is the whole gesture.
 
 ## The CodeMirror adapter
 

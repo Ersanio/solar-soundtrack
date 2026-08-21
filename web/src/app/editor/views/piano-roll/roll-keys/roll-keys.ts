@@ -1,4 +1,4 @@
-import { Component, computed, input } from '@angular/core';
+import { Component, computed, input, output } from '@angular/core';
 
 import type { Lane } from '../roll-layout';
 import { KEY_WIDTH } from '../roll-metrics';
@@ -43,6 +43,11 @@ export class RollKeys {
   readonly held = input.required<ReadonlySet<number>>();
   readonly showLabels = input.required<boolean>();
   readonly labelSize = input.required<number>();
+  /** Whether a press sounds anything, which needs a channel to sound it on. */
+  readonly playable = input.required<boolean>();
+
+  /** The row that was pressed, so the porter can find a pitch before drawing it. */
+  readonly pressed = output<number>();
 
   protected readonly keyWidth = KEY_WIDTH;
 

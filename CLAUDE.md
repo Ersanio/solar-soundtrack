@@ -18,7 +18,7 @@ packages/mml-compiler/  @amk/compiler  preprocess -> parser -> link
 packages/mml-tokens/    @amk/tokens    scanner, splices, command model
 packages/spc/           @amk/spc       BRR, echo FIR, ARAM, emulator, worklet
 web/                    the Angular editor
-scripts/                fourteen byte-level harnesses
+scripts/                fifteen byte-level harnesses
 ```
 
 ```
@@ -42,15 +42,15 @@ AddmusicK release if they are missing.
 
 Node 24 is what CI uses. CI runs `npm run lint` then `npm run check`.
 
-| Command             | What it does                                                          |
-| ------------------- | --------------------------------------------------------------------- |
-| `npm start`         | Dev server on `http://localhost:4200/`.                               |
-| `npm run build`     | Production build into `web/dist/`.                                    |
-| `npm run watch`     | Dev-configuration build with `--watch`, no server.                    |
-| `npm run lint`      | ESLint over every workspace.                                          |
-| `npm run format`    | Prettier over the workspace.                                          |
-| `npm run typecheck` | The app. `:packages` and `:scripts` cover the rest.                   |
-| `npm run check`     | The merge gate: formatting, three typechecks, all fourteen harnesses. |
+| Command             | What it does                                                         |
+| ------------------- | -------------------------------------------------------------------- |
+| `npm start`         | Dev server on `http://localhost:4200/`.                              |
+| `npm run build`     | Production build into `web/dist/`.                                   |
+| `npm run watch`     | Dev-configuration build with `--watch`, no server.                   |
+| `npm run lint`      | ESLint over every workspace.                                         |
+| `npm run format`    | Prettier over the workspace.                                         |
+| `npm run typecheck` | The app. `:packages` and `:scripts` cover the rest.                  |
+| `npm run check`     | The merge gate: formatting, three typechecks, all fifteen harnesses. |
 
 `npm run check` does **not** compile Angular templates, and neither does `npm run typecheck` — `tsc`
 does not run the template compiler, so a bad binding (`viewBox=` instead of `[attr.viewBox]=`)
@@ -76,7 +76,7 @@ which is all either needs:
 ### Tests
 
 There are no `.spec.ts` files — `npm run test` is Angular scaffolding and runs nothing. The real
-suite is the fourteen harnesses under `scripts/`; **`scripts/README.md` says what each one proves**,
+suite is the fifteen harnesses under `scripts/`; **`scripts/README.md` says what each one proves**,
 and several of those assertions are load-bearing in ways that are not obvious from the name.
 
 `scripts/Compare-Spc.ps1` and `scripts/Compare-SongBin.ps1` diff output against a real AddmusicK
@@ -270,10 +270,37 @@ One entry each: what it was, what it is, why.
   which has no strip, and a refusal is the answer to a click rather than a property of the song.
   The dialog that asks before the rewrite (`editor/normalize-button/`) is where a refusal shows,
   and a song already in shape gets the same dialog rather than a click that does nothing.
+- **A strict one-to-one gate between the walk's notes and the roll's strip** — `walkSong` ends the
+  pass at the shortest channel in use and sets everything after it aside as `unreachable`, so a
+  channel longer than the shortest is the commonest shape a song has and an equality check refused
+  editing on nearly all of them, pointing at Normalize, which does not fix it. The agreement is a
+  **prefix** (`agreesWithWalk`), and the items past the cut are editable and carry `verified: false`.
+- **Deciding a push's direction per neighbour**, by which half of each one the overlap lands on —
+  A shoves B right, B shoves C right, C shoves B left, and it never terminates. The half-rule picks
+  the direction at the _first_ neighbour, which is the one the porter can see, and the cascade keeps
+  it: every later shove then moves a note strictly away over a finite ordered set.
 - **`unreachable` in `timelinesAgree`** — sound-looking and wrong: unrolling changes the list by
   construction, since a note inside a `[ ]` is dropped once per replay and the copies it becomes are
   separate addresses. `channelTicks` is what holds a channel's tail to account. `normalizetest`
   caught it.
+- **A trailing octave run winning over a leading one** — in `c4 o5 d4` the `o5` is adjacent to both
+  notes, and two edit units claiming it produce overlapping splices that CodeMirror merges rather
+  than refuses. Leading wins (`growUnits`), which is also what makes the restore stable: a repitch
+  writes `o3 c4 o4 d4`, and on the next pass that `o4` is `d4`'s own leading octave.
+- **Re-serializing the whole run of text between two notes** to realise a gap — it moves every `v`,
+  `y` and `$ED` written in that run. Each item carries a `prefixSpan` instead, the rest nearest the
+  note _before_ the gap absorbs the change, and a gap whose run holds a fade command is refused.
+- **Refusing `<` and `>` in an edited channel** — they are not commands to the scanner at all, and
+  they are harmless: a note's octave comes from its own `written` byte rather than from a running
+  sum, so `o4 c4 > d4` repitches either note without disturbing the other. `rolltest` pins it.
+- **Capturing the pointer, and preventing the default, on the roll's `pointerdown`** — both stop
+  the browser raising `click` and `dblclick` on the bar underneath, which took away everything a
+  single click on a note used to do: naming its channel, asking the inspector about it, and going to
+  it in the source on a second click. Capture is taken on the first move past the slop threshold
+  instead, which is late enough to leave a click alone and early enough to follow a drag off the
+  roll; a press that never moves is a click and commits nothing, drawing on empty grid excepted.
+  A bar of another channel is not empty grid either — `itemAt` only knows the edited channel, so the
+  press checks `event.target.closest('.mark')` before it decides it is drawing.
 - **The roll's playhead line derived from `lead`** — the camera and the line were one number, so
   unticking Follow parked the line with the view and nothing in the roll said where the music had
   got to: the line, the scrub marker and the lit keys all froze together, and the frame clock was
@@ -286,6 +313,9 @@ One entry each: what it was, what it is, why.
   all three. `Mixer` holds the mask and the solo, injects `EditorStore` alone, and is read by
   `Playback`, `Audition` and the roll. The mask is the only thing the two audio paths share, and it
   is a number.
+- **An HTML bubble for the roll's length readout**, in the volume slider's mould — the roll's
+  coordinates are already the song's, so an HTML one has to undo the scroll transform and the
+  scroller's own offset to land where an SVG one lands by standing still.
 - **The roll's page anchor reset on the transport being idle, rather than on its going idle** — an
   effect runs once when it is created, so a roll rebuilt while the song was stopped zeroed the anchor
   it had just been given and the view shifted by up to a page on every tab switch. It follows the
