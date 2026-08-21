@@ -377,6 +377,22 @@ stats.loopTicks` pads **every other channel that would cut the song short** out 
   agreement and no `Strip`, so a channel `channelStrip` refuses outright is padded like any other;
   a channel at 0 ticks is left alone, since it holds nothing back. `rolltest`'s `playsFor` is what
   pins it — a rest one note short reads exactly like a rest of the right length.
+- **`cursor-pointer` on the roll's note bars**, to say a bar is clickable — an element's own
+  `cursor` beats the one it inherits, so the class silenced the roll's own cursor over every painted
+  part of a bar. The `ew-resize` showed in exactly one place: the `NOTE_GAP` sliver past a bar's
+  drawn right edge, where nothing is painted and `itemAt` still reports the note, since it hits the
+  whole slot. A bar's left end has no such gap and so had no handle at all. The `<svg>`'s
+  `[style.cursor]` is the roll's only cursor, and it says which gesture a press starts;
+  `hoverCursor` answers `pointer` for the bar that really is only clickable, which is another
+  channel's. The glyph plates inside a bar take no cursor either — they are right-aligned, so one
+  would sit on the right stretch zone and put the same bug back over the last twelve pixels.
+- **Setting that cursor from the pointer move that reported the position** — the roll scrolls under
+  a still pointer for the whole of a followed playback, so bars arrived under a cursor that had been
+  told `crosshair` and nothing said otherwise until the pointer moved. It is a `computed` over
+  `Hover`, which is stored in pixels for this reason, and `drag` is read first so a gesture in
+  flight keeps its own cursor. Nothing clears the hover on `pointerdown` either: `drag` is what
+  stands it aside in both readers, and a press that turns out to be a click has to have somewhere
+  to go back to.
 
 ## Angular specifics
 

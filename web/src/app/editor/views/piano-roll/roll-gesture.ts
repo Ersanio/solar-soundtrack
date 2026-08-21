@@ -426,7 +426,35 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
     };
   });
 
-  const cursor = signal('default');
+  /**
+   * What the pointer should look like, which is what says a gesture is there.
+   *
+   * Off {@link Hover} rather than set from the move that reported it: the roll
+   * scrolls under a still pointer while the song plays, so a bar arrives under a
+   * cursor that was told `crosshair` and nothing would say otherwise until the
+   * pointer moved. A drag comes first, and keeps its cursor wherever it wanders.
+   */
+  const cursor = computed<string>(() => {
+    const held = drag();
+    if (held) {
+      return held.kind === 'stretch'
+        ? 'ew-resize'
+        : held.kind === 'move'
+          ? 'grabbing'
+          : 'crosshair';
+    }
+
+    const at = hover();
+    if (!at) {
+      return 'default';
+    }
+
+    const stack = sources.stack();
+    const zoom = sources.zoom();
+    const row = rowAtY(at.y, sources.rowHeight(), stack.lanes.length);
+    const tick = tickAtX(at.x, sources.viewTick(), zoom);
+    return hoverCursor(sources.strip(), stack, zoom, tick, row, at.x, at.onMark);
+  });
 
   /** True once a gesture is really under way, so the hover tooltip stands aside. */
   const busy = computed(() => shownPlan() !== null);
@@ -500,13 +528,13 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
     marquee,
     ghost,
     bubble,
-    cursor: cursor.asReadonly(),
+    cursor,
     busy,
 
     onPointerDown(event: PointerEvent, box: DOMRect): void {
-      // The preview layer draws what is in flight from here on.
-      hover.set(null);
-
+      // The hover is left where it is: `drag` is what stands it aside, in both
+      // the ghost and the cursor, and a press that turns out to be a click has
+      // somewhere to go back to.
       const strip = sources.strip();
       if (!strip || event.button > 2) {
         return;
@@ -637,11 +665,8 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
       const held = drag();
 
       if (!held) {
-        // Nothing is being dragged, so the cursor and the ghost are all there is
-        // to update, and both come off this one event.
-        cursor.set(
-          hoverCursor(strip, sources.stack(), sources.zoom(), tick, row, event.clientX - box.left),
-        );
+        // Nothing is being dragged, so where the pointer is is all there is to
+        // record; the cursor and the ghost are both read off it.
         hover.set({
           x: event.clientX - box.left,
           y: event.clientY - box.top,
@@ -842,7 +867,13 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
   }
 }
 
-/** What the pointer should look like where it is, which is what says a stretch exists. */
+/**
+ * What the pointer should look like where it is, which is `onPointerDown`'s own
+ * decision tree read back: a press does what the cursor says it will.
+ *
+ * `edgesOf` is the same call the press makes, so the `ew-resize` and the stretch
+ * cover the same pixels by construction rather than by two constants agreeing.
+ */
 function hoverCursor(
   strip: Strip | null,
   stack: LaneStack,
@@ -850,6 +881,7 @@ function hoverCursor(
   tick: number,
   row: number,
   offsetX: number,
+  onMark: boolean,
 ): string {
   if (!strip || offsetX < KEY_WIDTH || row < 0) {
     return 'default';
@@ -857,7 +889,14 @@ function hoverCursor(
 
   const index = itemAt(strip, stack, tick, row);
   if (index < 0) {
-    return 'crosshair';
+    // A bar of another channel is not empty grid: a press there names its
+    // channel and asks the inspector about its note, and draws nothing. Neither
+    // does one on the noise lane, which is no pitch a note can be written on.
+    if (onMark) {
+      return 'pointer';
+    }
+
+    return pitchOfRow(stack, row) === null ? 'default' : 'crosshair';
   }
 
   const { left, right, zone } = edgesOf(strip.items[index], tick, zoom);

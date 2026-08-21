@@ -1,9 +1,13 @@
 @for (mark of marks(); track mark.id) {
   <!-- A click asks the inspector about this note; a double click goes to it in
        the source. A muted note takes no pointer at all, so the live note over it
-       is the one that answers. -->
+       is the one that answers.
+
+       No cursor of its own, here or on the glyph plates below: an element's own
+       `cursor` beats the one it inherits, and the roll's `<svg>` carries the one
+       that says which gesture a press starts. -->
   <svg:g
-    class="mark cursor-pointer"
+    class="mark"
     [class.pointer-events-none]="mark.muted"
     (pointerenter)="entered.emit(mark)"
     (click)="select(mark)"
