@@ -148,6 +148,23 @@ function spawnTick(tick: number, snap: number, fine: boolean): number {
   return Math.max(0, fine ? Math.round(tick) : snapTick(tick, snap));
 }
 
+/**
+ * The tick a drag would put its note on, which is not the tick under the pointer.
+ *
+ * The two differ by up to half a snap step, and the difference is audible rather
+ * than cosmetic: a preview is the song emulated up to the tick it is given, so
+ * the tick decides the instrument, volume, `q` and transposition the note is
+ * heard under. `item` is the bar being carried, and `undefined` for a spawn.
+ */
+function draggedTick(held: Drag, item: StripItem | undefined, snap: number): number {
+  if (held.kind === 'spawn' || !item) {
+    return spawnTick(held.tick, snap, held.fine);
+  }
+
+  const wanted = item.startTick + (held.tick - held.fromTick);
+  return held.fine ? Math.round(wanted) : snapTick(wanted, snap);
+}
+
 /** Rows are semitones down the keyboard, so a row step is a semitone step. */
 function keysBetween(stack: LaneStack, from: number, to: number): number {
   const a = stack.lanes[from];
@@ -248,8 +265,8 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
     const snap = sources.snap();
 
     // `Alt` drops both snaps for the length of one gesture without touching the
-    // setting: a position lands on the tick under the pointer, and a length on
-    // the tick count itself rather than the nearest note value.
+    // setting: a position lands on the tick under the pointer (`draggedTick`),
+    // and a length on the tick count itself rather than the nearest note value.
     const fine = held.fine;
 
     if (held.kind === 'spawn') {
@@ -262,7 +279,7 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
 
       return {
         kind: 'spawn',
-        startTick: spawnTick(held.tick, snap, fine),
+        startTick: draggedTick(held, undefined, snap),
         ticks: held.length ?? sources.lastLength(),
         written: pitch.written,
         drum: pitch.drum,
@@ -292,12 +309,10 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
       };
     }
 
-    const wanted = item.startTick + (held.tick - held.fromTick);
-    const startTick = fine ? Math.round(wanted) : snapTick(wanted, snap);
     return {
       kind: 'move',
       items,
-      deltaTicks: startTick - item.startTick,
+      deltaTicks: draggedTick(held, item, snap) - item.startTick,
       deltaKeys: keysBetween(stack, held.fromRow, held.row),
       copy: held.copy,
     };
@@ -421,12 +436,24 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
     return { tick, row };
   };
 
-  const soundRow = (row: number, tick: number): void => {
+  const soundRow = (row: number, tick: number, ticks: number): void => {
     const pitch = pitchOfRow(sources.stack(), row);
     if (pitch) {
-      const ticks = drag()?.length ?? sources.lastLength();
       sinks.audition(pitch.written, pitch.drum, Math.max(0, Math.round(tick)), ticks);
     }
+  };
+
+  /**
+   * Sound the note a drag is carrying, where it is going and at the length it is.
+   *
+   * Handed the drag rather than reading the signal, because both callers are
+   * building the next one and neither has set it yet. A spawn's length is the one
+   * the wheel chose; a move keeps the bar's own, which `Drag.length` never holds.
+   */
+  const soundDrag = (held: Drag, row: number): void => {
+    const item = sources.strip()?.items[held.item];
+    const ticks = held.kind === 'spawn' ? held.length : item?.ticks;
+    soundRow(row, draggedTick(held, item, sources.snap()), ticks ?? sources.lastLength());
   };
 
   const finish = (): void => {
@@ -536,11 +563,7 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
 
         // Ctrl on empty grid is the marquee; a plain press draws a note.
         const kind = event.ctrlKey || event.metaKey ? 'marquee' : 'spawn';
-        if (kind === 'spawn') {
-          soundRow(row, tick);
-        }
-
-        drag.set({
+        const started: Drag = {
           kind,
           fromTick: tick,
           fromRow: row,
@@ -555,7 +578,13 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
           length: null,
           atX: event.clientX,
           atY: event.clientY,
-        });
+        };
+
+        if (kind === 'spawn') {
+          soundDrag(started, row);
+        }
+
+        drag.set(started);
         return;
       }
 
@@ -577,7 +606,9 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
       const zoom = sources.zoom();
       const { left, right, zone } = edgesOf(item, tick, zoom);
       const edge = left <= zone ? 'start' : right <= zone ? 'end' : null;
-      soundRow(row, item.startTick);
+      // The bar's own tick and length: nothing has moved yet, and snapping here
+      // would sound an off-grid note somewhere it has not been asked to go.
+      soundRow(row, item.startTick, item.ticks);
 
       drag.set({
         kind: edge ? 'stretch' : 'move',
@@ -648,7 +679,7 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
       // often than that: one render is a whole silent run of the song.
       if (row !== held.sounded && held.kind !== 'marquee' && held.kind !== 'stretch') {
         next.sounded = row;
-        soundRow(row, tick);
+        soundDrag(next, row);
       }
 
       drag.set(next);
