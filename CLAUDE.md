@@ -321,6 +321,13 @@ One entry each: what it was, what it is, why.
   it had just been given and the view shifted by up to a page on every tab switch. It follows the
   transition: what re-measures the pages is a stop. The camera outliving the component
   (`roll-camera.ts`) is what turned a harmless re-run into a lost position.
+- **Putting the intro `/` a channel the roll opens needs on the nearest note boundary**, or leaving it
+  out where the tick falls inside the note — every channel resumes from its own marker on each pass
+  (`parser.ts:parseIntro` writes `phrasePointers[channel][1]`), so a marker a note out of place moves
+  the whole song's loop point, and none at all restarts the channel at its top. The tick decides, and
+  the piece it lands inside is split: a rest becomes two rests, the note becomes a head and a `^`
+  continuation, which is still one note because a tie emits `$C6`. `rolltest` pins `loopTick` across
+  the edit, which is the only reading that catches a marker on the wrong tick.
 - **Filling a channel the roll opens out to the _longest_ channel**, or leaving it at the length of
   its first note — the second cuts the song off at that note, since the driver reloads every track
   pointer the moment one voice reads its `$00` (`main.asm:L_0C01`, `Music.cpp:3209`), and the first

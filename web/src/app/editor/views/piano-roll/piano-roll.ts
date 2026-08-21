@@ -621,6 +621,12 @@ export class PianoRoll {
     return stats ? stats.introTicks + stats.loopTicks : 0;
   });
 
+  /** Where the song loops back to, so a channel being opened re-enters with it. */
+  private readonly introTicks = computed(() => {
+    const stats = this.editor.result()?.stats;
+    return stats?.hasIntro === true ? stats.introTicks : null;
+  });
+
   protected readonly gestures = rollGestures(
     {
       strip: this.strip,
@@ -634,6 +640,7 @@ export class PianoRoll {
       targetAMKVersion: this.targetAMKVersion,
       songTargetProgram: this.songTargetProgram,
       playableTicks: this.playableTicks,
+      introTicks: this.introTicks,
       source: this.editor.source,
     },
     {

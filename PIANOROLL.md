@@ -95,9 +95,11 @@ slider in the inspector, which writes one note's own length and never looks at i
   the note is what stops that: the new channel comes to exactly the length the song already played
   for. Draw _past_ the end of the song and no rest is added; that channel is simply the long one, and
   the warning about music past the end of the song says so.
-- **A channel the roll opens has no intro.** If the rest of the song has a `/`, write one into the new
-  channel by hand — until you do, it restarts at its own top on every loop, and the roll's loop marker
-  sits at the beginning of the song.
+- **And gives it the song's intro marker.** If the rest of the song has a `/`, the new channel gets one
+  too, on the same tick — every channel resumes from its own marker on each pass round the loop, so one
+  in the wrong place would leave the channel playing against the song. If the tick lands part-way
+  through a rest it is written as two rests, and if it lands part-way through the note the note is
+  written as `c8 / ^8`, which still sounds as one note.
 - **Every edit is one undo step**, including a whole selection moved at once, and it is the same
   history `Ctrl+Z` uses in the MML editor.
 

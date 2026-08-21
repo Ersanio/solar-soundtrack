@@ -189,6 +189,12 @@ function playable(built: Built): number {
 	return stats ? stats.introTicks + stats.loopTicks : 0;
 }
 
+/** Where the song loops back to, or null where it has no `/` at all. */
+function introOf(built: Built): number | null {
+	const stats = built.result.stats;
+	return stats?.hasIntro === true ? stats.introTicks : null;
+}
+
 interface Expectation {
 	/** The text after the edit, for the cases where the spelling is the point. */
 	text?: string;
@@ -205,6 +211,14 @@ interface Expectation {
 	 * out at all, makes itself the shortest and takes the rest of the song with it.
 	 */
 	playsAsLong?: boolean;
+	/**
+	 * The song must loop back to the same tick as it did.
+	 *
+	 * The walk's own `loopTick`, which is the lowest tick any channel reaches its
+	 * re-entry point at — so a `/` written one note out of place pulls it down and
+	 * this catches it, where comparing the text could not.
+	 */
+	loopsWhereItDid?: boolean;
 	/**
 	 * The mode the gesture is planned under, `"flexible"` unless a case says otherwise.
 	 *
@@ -239,6 +253,7 @@ function expectEdit(
 		targetAMKVersion: before.result.stats?.targetAMKVersion ?? 4,
 		songTargetProgram: before.result.stats?.songTargetProgram ?? 0,
 		playableTicks: playable(before),
+		introTicks: introOf(before),
 	};
 	const plan = planGesture(bar, gesture(bar), expectation.mode ?? "flexible");
 	const edits = planEdits(context, plan);
@@ -282,6 +297,14 @@ function expectEdit(
 			`${name}: plays for as long as it did`,
 			playable(before) === playable(rebuilt),
 			`${playable(before)} -> ${playable(rebuilt)} ticks`,
+		);
+	}
+
+	if (expectation.loopsWhereItDid === true) {
+		check(
+			`${name}: loops back where it did`,
+			before.timeline.loopTick === rebuilt.timeline.loopTick,
+			`${before.timeline.loopTick} -> ${rebuilt.timeline.loopTick}`,
 		);
 	}
 
@@ -333,6 +356,7 @@ function expectRefused(
 		targetAMKVersion: before.result.stats?.targetAMKVersion ?? 4,
 		songTargetProgram: before.result.stats?.songTargetProgram ?? 0,
 		playableTicks: playable(before),
+		introTicks: introOf(before),
 	};
 	const plan = planGesture(bar, gesture(bar), mode);
 	check(`${name}: refused`, planEdits(context, plan) === null, "an edit was produced");
@@ -688,7 +712,12 @@ expectEdit(
 	"#amk 2\n#0 o4 c4 d4 e4 f4\n",
 	5,
 	() => ({ kind: "spawn", startTick: 48, ticks: 48, written: NOTE_MIN + 36 + 4, drum: null }),
-	{ text: "#amk 2\n#0 o4 c4 d4 e4 f4\n\n#5 o4 l8 q7F @0 v255 y10\nr4 e4 r2\n", playsAsLong: true },
+	{
+		text: "#amk 2\n#0 o4 c4 d4 e4 f4\n\n#5 o4 l8 q7F @0 v255 y10\nr4 e4 r2\n",
+		playsAsLong: true,
+		// A song with no `/` gives the channel none either.
+		lacks: "/",
+	},
 );
 
 // The channel is already open, so no second `#5` and no defaults over the top of
@@ -739,6 +768,54 @@ expectEdit(
 	5,
 	() => ({ kind: "spawn", startTick: 0, ticks: 48, written: NOTE_MIN + 36, drum: null }),
 	{ contains: "#5 o4 l8 q7F v255 y10\nc4 r2.", lacks: "@0", playsAsLong: true },
+);
+
+// Every channel resumes from its own `/` on each pass round the loop, so a
+// channel opened without one restarts at its top instead — and one whose marker
+// is on the wrong tick is worse, because it drags the whole song's loop point
+// down with it. `loopsWhereItDid` is what pins that; the text alone could not.
+// The song here runs `c4 d4 / e4 f4`: 192 ticks, and the intro ends at 96.
+
+// The tick falls inside the rest that fills the channel out, so it is two rests.
+expectEdit(
+	"a channel opened in a song with an intro, with the marker landing in a rest",
+	"#amk 2\n#0 o4 c4 d4 / e4 f4\n",
+	5,
+	() => ({ kind: "spawn", startTick: 0, ticks: 48, written: NOTE_MIN + 36, drum: null }),
+	{
+		text: "#amk 2\n#0 o4 c4 d4 / e4 f4\n\n#5 o4 l8 q7F @0 v255 y10\nc4 r4 / r2\n",
+		playsAsLong: true,
+		loopsWhereItDid: true,
+	},
+);
+
+// And on a boundary, where nothing has to be split at all.
+expectEdit(
+	"a channel opened in a song with an intro, with the marker landing on a note's end",
+	"#amk 2\n#0 o4 c4 d4 / e4 f4\n",
+	5,
+	() => ({ kind: "spawn", startTick: 48, ticks: 48, written: NOTE_MIN + 36 + 4, drum: null }),
+	{
+		text: "#amk 2\n#0 o4 c4 d4 / e4 f4\n\n#5 o4 l8 q7F @0 v255 y10\nr4 e4 / r2\n",
+		playsAsLong: true,
+		loopsWhereItDid: true,
+	},
+);
+
+// Inside the note, which is written as a head and a `^` continuation: still one
+// note, because a tie emits `$C6` and the driver carries the note through it.
+// `plays what the plan said` is what proves that — the plan asks for one note of
+// 48 ticks at tick 72, and the note map has to read back as one.
+expectEdit(
+	"a channel opened in a song with an intro, with the marker landing inside the note",
+	"#amk 2\n#0 o4 c4 d4 / e4 f4\n",
+	5,
+	() => ({ kind: "spawn", startTick: 72, ticks: 48, written: NOTE_MIN + 36 + 4, drum: null }),
+	{
+		text: "#amk 2\n#0 o4 c4 d4 / e4 f4\n\n#5 o4 l8 q7F @0 v255 y10\nr4. e8 / ^8 r4.\n",
+		playsAsLong: true,
+		loopsWhereItDid: true,
+	},
 );
 
 // `detectStartingChannel` probes the text for `#0` first, so writing one would

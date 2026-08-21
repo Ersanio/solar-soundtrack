@@ -91,6 +91,15 @@ export interface EditContext {
    * used and answers 0, where `Music.cpp:3209` passes over it.
    */
   playableTicks: number;
+  /**
+   * The tick the song loops back to, or `null` where it has no `/` at all.
+   *
+   * `stats.introTicks`, which is the **first** `/` in the file — the boundary
+   * every other reading of the song's length is split at (`parser.ts:parseIntro`).
+   * A channel being opened takes its own `/` from this, so that it re-enters
+   * where the rest of the song does.
+   */
+  introTicks: number | null;
 }
 
 export const REFUSE_RANGE = 'the driver cannot play a note that high or low';
@@ -827,6 +836,118 @@ function rested(rests: readonly StripItem[], from: number): number {
 }
 
 /**
+ * The note and the rests either side of it, as one run of text, with the song's
+ * intro marker written into it where one is asked for.
+ *
+ * A `/` puts the channel's loop re-entry at the byte it stands on
+ * (`parser.ts:parseIntro`) and every channel resumes from its own on each pass
+ * round the loop, so a marker on the wrong tick leaves the channel playing
+ * against the rest of the song. `introAt` is therefore a tick rather than a
+ * place in the run, and where it does not fall on a boundary the piece it lands
+ * inside is written as two: a rest as two rests, and the note as a head and a
+ * `^` continuation, which is still one note — a tie emits `$C6` and the driver
+ * carries the note through it.
+ *
+ * `null` where a length in the run has no spelling on this target.
+ */
+function spawnRun(
+  context: EditContext,
+  born: PlacedNote,
+  before: number,
+  after: number,
+  running: number | null,
+  introAt: number | null,
+): string | null {
+  const { targetAMKVersion } = context;
+  const parts: string[] = [];
+  let at = 0;
+  let marked = introAt === null;
+
+  /** The marker where the tick falls between two pieces rather than inside one. */
+  const mark = (): void => {
+    if (!marked && introAt === at) {
+      parts.push('/');
+      marked = true;
+    }
+  };
+
+  /** The tick, where it falls strictly inside the piece of `ticks` starting here. */
+  const splitAt = (ticks: number): number | null =>
+    !marked && introAt !== null && introAt > at && introAt < at + ticks ? introAt : null;
+
+  const rest = (ticks: number): boolean => {
+    if (ticks === 0) {
+      return true;
+    }
+
+    const split = splitAt(ticks);
+    if (split !== null) {
+      const first = spellDuration(split - at, targetAMKVersion);
+      const second = spellDuration(at + ticks - split, targetAMKVersion);
+      if (first === null || second === null) {
+        return false;
+      }
+
+      parts.push(`r${first}`, '/', `r${second}`);
+      marked = true;
+    } else {
+      const whole = spellDuration(ticks, targetAMKVersion);
+      if (whole === null) {
+        return false;
+      }
+
+      parts.push(`r${whole}`);
+    }
+
+    at += ticks;
+    return true;
+  };
+
+  const note = (): boolean => {
+    const split = splitAt(born.ticks);
+    if (split !== null) {
+      const first = spellDuration(split - at, targetAMKVersion);
+      const second = spellDuration(at + born.ticks - split, targetAMKVersion);
+      const head = first === null ? null : noteText(born, first, null, targetAMKVersion, running);
+      if (head === null || second === null) {
+        return false;
+      }
+
+      parts.push(head, '/', `^${second}`);
+      marked = true;
+    } else {
+      const whole = noteText(born, null, null, targetAMKVersion, running);
+      if (whole === null) {
+        return false;
+      }
+
+      parts.push(whole);
+    }
+
+    at += born.ticks;
+    return true;
+  };
+
+  mark();
+  if (!rest(before)) {
+    return null;
+  }
+
+  mark();
+  if (!note()) {
+    return null;
+  }
+
+  mark();
+  if (!rest(after)) {
+    return null;
+  }
+
+  mark();
+  return parts.join(' ');
+}
+
+/**
  * A note being created, written into the gap it lands in.
  *
  * The gap has to be a single rest with nothing else in it, or empty text at the
@@ -840,7 +961,7 @@ function rested(rests: readonly StripItem[], from: number): number {
  * that quietly wrote nothing would leave the rest of the gesture committed.
  */
 function spawnInto(context: EditContext, gap: Region): Edit[] | null {
-  const { source, strip, targetAMKVersion } = context;
+  const { source, strip } = context;
   if (gap.born.length !== 1) {
     return null;
   }
@@ -850,10 +971,6 @@ function spawnInto(context: EditContext, gap: Region): Edit[] | null {
   // A channel being written from nothing has just had its own `o4` put in front
   // of it, so a note in that octave has nothing to add (`channelOpening`).
   const opening = empty && !strip.home.declared;
-  const text = noteText(born, null, null, targetAMKVersion, opening ? OPENING_OCTAVE : null);
-  if (text === null) {
-    return null;
-  }
 
   const before = born.startTick - gap.startTick;
   const end = born.startTick + born.ticks;
@@ -872,22 +989,20 @@ function spawnInto(context: EditContext, gap: Region): Edit[] | null {
     return null;
   }
 
-  const rest = (ticks: number): string | null => {
-    if (ticks === 0) {
-      return '';
-    }
+  // The tick the song loops back to, where this channel is being opened and the
+  // run is long enough to reach it. `gap.startTick` is 0 for an empty channel —
+  // it has one region and it begins at the top — so the run's own ticks and the
+  // channel's are the same count.
+  const total = before + born.ticks + after;
+  const introAt =
+    empty && context.introTicks !== null && context.introTicks >= 0 && context.introTicks <= total
+      ? context.introTicks
+      : null;
 
-    const spelled = spellDuration(ticks, targetAMKVersion);
-    return spelled === null ? null : `r${spelled}`;
-  };
-
-  const head = rest(before);
-  const tail = rest(after);
-  if (head === null || tail === null) {
+  const run = spawnRun(context, born, before, after, opening ? OPENING_OCTAVE : null, introAt);
+  if (run === null) {
     return null;
   }
-
-  const run = [head, text, tail].filter((part) => part !== '').join(' ');
 
   // One rest to write over: the common case, and the only one that keeps every
   // command in the region exactly where it was.

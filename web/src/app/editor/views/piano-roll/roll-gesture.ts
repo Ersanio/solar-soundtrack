@@ -82,6 +82,8 @@ export interface GestureSources {
   songTargetProgram: Signal<number>;
   /** How long the song plays, which is how far a channel being opened is filled out. */
   playableTicks: Signal<number>;
+  /** The tick the song loops back to, so a channel being opened gets its own `/` there. */
+  introTicks: Signal<number | null>;
   source: Signal<string>;
 }
 
@@ -370,6 +372,7 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
         targetAMKVersion: sources.targetAMKVersion(),
         songTargetProgram: sources.songTargetProgram(),
         playableTicks: sources.playableTicks(),
+        introTicks: sources.introTicks(),
       } satisfies EditContext,
       now,
     );
@@ -614,6 +617,7 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
           targetAMKVersion: sources.targetAMKVersion(),
           songTargetProgram: sources.songTargetProgram(),
           playableTicks: sources.playableTicks(),
+          introTicks: sources.introTicks(),
         },
         now,
       );
@@ -668,6 +672,7 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
         targetAMKVersion: sources.targetAMKVersion(),
         songTargetProgram: sources.songTargetProgram(),
         playableTicks: sources.playableTicks(),
+        introTicks: sources.introTicks(),
       },
       now,
     );
