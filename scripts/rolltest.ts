@@ -818,6 +818,58 @@ expectEdit(
 	},
 );
 
+// A second note goes into the rests the first one was filled out with, and must
+// not eat them: the tail region carries `ticks: -1` for "may be any length", and
+// reading that as nothing to fill took the channel back to where the new note
+// stopped — and the whole song with it. The sources here are what the three
+// cases above write.
+expectEdit(
+	"a second note drawn into the rests a channel was opened with",
+	"#amk 2\n#0 o4 c4 d4 e4 f4\n\n#5 o4 l8 q7F @0 v255 y10\nr4 e4 r2\n",
+	5,
+	() => ({ kind: "spawn", startTick: 120, ticks: 48, written: NOTE_MIN + 36 + 7, drum: null }),
+	{
+		text: "#amk 2\n#0 o4 c4 d4 e4 f4\n\n#5 o4 l8 q7F @0 v255 y10\nr4 e4 r8 o4 g4 r8\n",
+		playsAsLong: true,
+	},
+);
+
+// With an intro the `/` stands between two rests, so the region holds more than
+// one and only the rest the note falls inside is rewritten — everything between
+// them, the marker included, stays on its own tick.
+expectEdit(
+	"a second note drawn after the `/` a channel was opened with",
+	"#amk 2\n#0 o4 c4 d4 / e4 f4\n\n#5 o4 l8 q7F @0 v255 y10\nc4 r4 / r2\n",
+	5,
+	() => ({ kind: "spawn", startTick: 120, ticks: 48, written: NOTE_MIN + 36 + 7, drum: null }),
+	{
+		text: "#amk 2\n#0 o4 c4 d4 / e4 f4\n\n#5 o4 l8 q7F @0 v255 y10\nc4 r4 / r8 o4 g4 r8\n",
+		playsAsLong: true,
+		loopsWhereItDid: true,
+	},
+);
+
+expectEdit(
+	"a second note drawn before the `/` a channel was opened with",
+	"#amk 2\n#0 o4 c4 d4 / e4 f4\n\n#5 o4 l8 q7F @0 v255 y10\nc4 r4 / r2\n",
+	5,
+	() => ({ kind: "spawn", startTick: 48, ticks: 48, written: NOTE_MIN + 36 + 7, drum: null }),
+	{
+		text: "#amk 2\n#0 o4 c4 d4 / e4 f4\n\n#5 o4 l8 q7F @0 v255 y10\nc4 o4 g4 / r2\n",
+		playsAsLong: true,
+		loopsWhereItDid: true,
+	},
+);
+
+// A note that starts in one rest and ends in another would have to move the run
+// written between them, and only the porter knows which side it belongs on.
+expectRefused(
+	"a note drawn across the `/` a channel was opened with",
+	"#amk 2\n#0 o4 c4 d4 / e4 f4\n\n#5 o4 l8 q7F @0 v255 y10\nc4 r4 / r2\n",
+	5,
+	() => ({ kind: "spawn", startTick: 72, ticks: 48, written: NOTE_MIN + 36 + 7, drum: null }),
+);
+
 // `detectStartingChannel` probes the text for `#0` first, so writing one would
 // take `c4 d4` off channel 1 and put it on the channel being drawn on. The songs
 // here are `#am4` because AddmusicK refuses notes outside a channel altogether

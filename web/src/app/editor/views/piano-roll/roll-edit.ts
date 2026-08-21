@@ -949,13 +949,42 @@ function spawnRun(
 }
 
 /**
+ * The rest a note being drawn is written over, out of the ones its region holds.
+ *
+ * Usually a region is one rest and this is that rest. It is more than one where
+ * something the note map does not carry has been written between them — a `/`,
+ * or a command — and then the note belongs to whichever rest its own start falls
+ * in. Rewriting that one alone is what keeps everything between them where it
+ * was written, so there is nothing to guess at.
+ *
+ * A note starting at or past where the tail's music stopped takes the last rest
+ * there, and the run written over it reaches out to the note — which is how a
+ * note drawn past the end of a channel extends it.
+ *
+ * `null` where the region holds no rest at all, and where a note starts in one
+ * rest and ends in another: the run written between them would have to move,
+ * and only the porter knows which side of the note it belongs on.
+ */
+function restFor(gap: Region, born: PlacedNote): StripItem | null {
+  for (const rest of gap.rests) {
+    if (born.startTick >= rest.startTick && born.startTick < rest.startTick + rest.ticks) {
+      return born.startTick + born.ticks <= rest.startTick + rest.ticks ? rest : null;
+    }
+  }
+
+  const last = gap.rests[gap.rests.length - 1];
+  return gap.ticks < 0 && last !== undefined && born.startTick >= last.startTick + last.ticks
+    ? last
+    : null;
+}
+
+/**
  * A note being created, written into the gap it lands in.
  *
- * The gap has to be a single rest with nothing else in it, or empty text at the
- * end of the channel, or a channel with nothing written on it at all. Anything
- * else — a command between two rests where the note would go — is refused rather
- * than guessed at, because splitting a run around a command means deciding which
- * side of the new note the command belongs on, and only the porter knows.
+ * The gap has to hold nothing but rests — the note goes over the one it falls
+ * inside (see {@link restFor}) — or be empty text at the end of the channel, or
+ * a channel with nothing written on it at all. A note being deleted in the same
+ * region is refused rather than guessed at.
  *
  * A builder answering `null` is refused too, rather than passed on as no edits:
  * `planEdits` pushes what each region returns and goes on to the next, so a note
@@ -973,19 +1002,54 @@ function spawnInto(context: EditContext, gap: Region): Edit[] | null {
   // of it, so a note in that octave has nothing to add (`channelOpening`).
   const opening = empty && !strip.home.declared;
 
-  const before = born.startTick - gap.startTick;
   const end = born.startTick + born.ticks;
-  // A channel with nothing on it runs out to the song's own length, so that its
-  // first note does not become the shortest channel and cut every other one
-  // short: the driver reloads all eight track pointers the moment one voice
-  // reads its `$00` (`main.asm:L_0C01`, `Music.cpp:3209`). A note drawn past
-  // that length pads by nothing rather than refusing — the channel is then the
-  // long one, which is the ordinary shape `AMK0502` already reports.
-  const after = empty
-    ? Math.max(0, context.playableTicks - end)
-    : gap.ticks < 0
-      ? 0
-      : gap.startTick + gap.ticks - end;
+  /**
+   * Where the channel ends now, which a note drawn into its last rest must not
+   * move: the tail region carries `ticks: -1` for "may be any length", not "has
+   * none", and reading that as nothing to fill silently eats the rest the note
+   * landed in. A channel with nothing on it ends where the song does, so that
+   * its first note does not make it the shortest and cut every other channel
+   * short — the driver reloads all eight track pointers the moment one voice
+   * reads its `$00` (`main.asm:L_0C01`, `Music.cpp:3209`).
+   *
+   * A note drawn past the end extends the channel rather than being refused, in
+   * either case: the channel is then the long one, which is the ordinary shape
+   * `AMK0502` already reports.
+   */
+  const channelEnd = empty ? context.playableTicks : strip.ticks;
+
+  /**
+   * The rest being written over, and the ticks the run written there has to come
+   * to.
+   *
+   * One rest spans its whole region, so the run answers to the **region**: the
+   * note may reach past where that rest ended, because the notes after it are
+   * being pushed along to make room for it. Several rests means something
+   * carrying no ticks of its own was written between them — the `/` a channel is
+   * opened with, or a command — and then only the rest the note falls inside is
+   * rewritten, so the run answers to **that rest** and everything between them
+   * stays where it was written. A push cannot be served that way, so a region
+   * whose ticks no longer come to the rests it holds is refused instead.
+   */
+  const single = gap.rests.length === 1 && gap.between === 1;
+  const settled = gap.ticks < 0 || gap.ticks === rested(gap.rests, 0);
+  const over = single
+    ? gap.rests[0]
+    : gap.between === gap.rests.length && settled
+      ? restFor(gap, born)
+      : null;
+  if (over === null && gap.rests.length > 0) {
+    return null;
+  }
+
+  // Only the last of the tail's rests may grow, and that is what lets a note be
+  // drawn past the end of a channel at all.
+  const grows = gap.ticks < 0 && (over === null || over === gap.rests[gap.rests.length - 1]);
+
+  const before = born.startTick - (over ? over.startTick : gap.startTick);
+  const after = grows
+    ? Math.max(0, channelEnd - end)
+    : (single || over === null ? gap.startTick + gap.ticks : over.startTick + over.ticks) - end;
   if (before < 0 || after < 0) {
     return null;
   }
@@ -1005,13 +1069,13 @@ function spawnInto(context: EditContext, gap: Region): Edit[] | null {
     return null;
   }
 
-  // One rest to write over: the common case, and the only one that keeps every
-  // command in the region exactly where it was.
-  if (gap.rests.length === 1 && gap.between === 1) {
-    const edit = spliceRange(source, gap.rests[0].unitSpan, run);
+  if (over) {
+    const edit = spliceRange(source, over.unitSpan, run);
     return edit ? [edit] : null;
   }
 
+  // Nothing at all between the notes either side, so the run is inserted rather
+  // than written over anything.
   if (gap.rests.length === 0 && gap.between === 0) {
     const edit = writeInto(context, gap, run);
     return edit ? [edit] : null;
