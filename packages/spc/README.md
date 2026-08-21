@@ -65,6 +65,7 @@ volume costs the driver nothing, because the channel goes on being parsed and ke
 `VxVOL`, and it is the register that actually silences — `$5E` only stops the _next_ note, where this
 cuts the one already ringing. With every voice taken the output is exactly zero either way.
 `audiotest` pins both halves: that the rate does not move, and that the silence is still silence.
+`note-audition.ts` is the third caller, holding the same mask through its fast-forward.
 
 The module is useful beyond the transport — where each voice is right now and at what tempo is
 exactly what the piano roll follows.
@@ -82,6 +83,12 @@ be mid-fade; pan; `q`'s gate and velocity; vibrato and tremolo phase; a pitch en
 volume; the tempo; and an echo buffer holding the last delay's worth of the song. `song-walk.ts`
 models some of that and says which parts it does not. The driver holds all of it, so the driver is
 asked.
+
+The fast-forward runs under the mixer's mask, held the way `worklet.ts` holds it, so the note lands
+on the echo the transport is making rather than on the whole song's. The **target's own bit is
+ignored**: honouring it would take that voice's volume on the way through and step 4 below would hand
+it straight back, so the note would sound regardless and the only effect would be the target going
+missing from its own echo. A caller that wants silence needs no emulator at all.
 
 The recipe, once the fast-forward has arrived:
 
@@ -105,10 +112,16 @@ neither a `q` nor an instrument and would otherwise play for one tick at no volu
 
 Two things it does not do. The length is fixed when the request is made — the PCM is rendered before
 it is heard, so there is nothing to send a note-off to, which is the price of not putting a second
-emulator on a second audio thread. And the echo buffer still holds the song: silencing the voices
-stops new signal entering, but the last delay's worth decays under the note at the song's own
-feedback rate. That is what a note written there would really land on top of, and a song with no echo
-has none of it.
+emulator on a second audio thread. And the echo buffer still holds the song as the mixer leaves it:
+silencing the voices for the audition stops new signal entering, but the last delay's worth decays
+under the note at the song's own feedback rate. That is what a note written there would really land
+on top of, and a song with no echo has none of it.
+
+The echo is also the whole of what the mask reaches. Every voice but the target is halted before the
+note is handed over, so a silenced channel has no other way into the recording — on a song with no
+echo, masked and unmasked auditions differ by about a thousandth of the signal, which is the cost of
+the extra `VxVOL` write taking a volume asks for and is not audible. `audiotest` pins both ends of
+that: the difference with echo, and the absence of one without.
 
 ## Reading a song without playing it
 

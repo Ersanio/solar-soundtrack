@@ -4,6 +4,7 @@ import type { CompileResult } from '@amk/core/types';
 import { NOTE_MAX, NOTE_MIN } from '@amk/core/hardcoded-tables';
 import { SPC_CHANNELS, SPC_SAMPLE_RATE } from '@amk/spc/wasm-host';
 import { EditorStore } from './editor-store';
+import { Mixer } from './mixer';
 import type { NoteReply, NoteRequest } from './note.worker';
 import { transposeAt } from './note-transpose';
 import { errorMessage } from '../util/format';
@@ -25,16 +26,28 @@ export interface NotePlay {
   note: number;
   /** How long to hold it, in music ticks. Defaults to {@link AUDITION_TICKS}. */
   ticks?: number;
+  /**
+   * Say nothing about a note that did not sound — out of the driver's range, or
+   * on a channel the mixer has silenced. For a caller that asks on every row of
+   * a drag, where the alternative is the status line answering a question nobody
+   * asked twenty times over. One deliberate press is not such a caller.
+   */
+  quiet?: boolean;
 }
 
 /**
  * Playing one sample, or one note of the song, on its own AudioContext.
  *
- * Separate from `Playback` because it shares nothing with the transport — no
- * worklet, no audio thread, no song being played — and because the separation is
- * the point rather than an accident of layout: auditioning must not interrupt or
- * be interrupted by the song, and the two contexts are what makes that true. A
+ * Separate from `Playback` because it shares no machinery with the transport —
+ * no worklet, no audio thread, no song being played — and because the separation
+ * is the point rather than an accident of layout: auditioning must not interrupt
+ * or be interrupted by the song, and the two contexts are what makes that true. A
  * note can be sounded while the song plays, and is meant to be.
+ *
+ * What the two do share is `Mixer`, and only as a number. A note on a channel the
+ * mixer silences is refused here, before an emulator is asked for; one that
+ * sounds carries the mask with it, so the echo it lands on is the echo the
+ * transport is making. Neither is a route back to the worklet's emulator.
  *
  * Neither path reaches the emulator that is playing the song. A sample needs no
  * emulator at all — making that wait on `player.init()` would mean downloading
@@ -50,6 +63,7 @@ export interface NotePlay {
 @Service()
 export class Audition {
   private readonly editor = inject(EditorStore);
+  private readonly mixer = inject(Mixer);
 
   private context: AudioContext | null = null;
   private source: AudioBufferSourceNode | null = null;
@@ -70,6 +84,17 @@ export class Audition {
 
   /** The sample currently being auditioned, for the UI to show. */
   readonly playing = signal<string | null>(null);
+
+  /**
+   * Whether a note is being rendered right now.
+   *
+   * A note is heard by running the song silently up to its tick, which costs
+   * what the fast-forward costs — so a drag across twenty rows would queue
+   * twenty of them on the worker and hear them long after the pointer stopped.
+   * The roll waits for this to clear and then asks for the row it is on *now*,
+   * which keeps one render in flight and always the latest pitch.
+   */
+  readonly notePending = signal(false);
 
   constructor() {
     inject(DestroyRef).onDestroy(() => {
@@ -109,13 +134,39 @@ export class Audition {
       return;
     }
 
+    // Before the range check, and before an emulator is asked for: hearing
+    // nothing needs neither. The mask is the more actionable of the two answers
+    // anyway, so a note that is both silenced and out of range reports this one.
+    if (this.mixer.silenced() & (1 << request.channel)) {
+      if (!request.quiet) {
+        const soloed = this.mixer.soloed();
+        this.editor.say(
+          soloed === null
+            ? `channel ${request.channel} is muted`
+            : `only channel ${soloed} is soloed`,
+        );
+      }
+
+      return;
+    }
+
     const note = this.transposed(request);
     if (note === null) {
-      this.editor.fail('that note is out of range under the instrument in force there');
+      // A drag crossing the end of the range asks for this on every row, so a
+      // caller that expects to is allowed to ask quietly rather than filling
+      // the status line with a message about a note it never committed.
+      if (!request.quiet) {
+        this.editor.fail('that note is out of range under the instrument in force there');
+      }
+
       return;
     }
 
     this.stop();
+    // This note sounds, so a hint saying why the last one did not has stopped
+    // being true — un-muting a channel and hearing it again must not leave the
+    // status line still calling it muted.
+    this.editor.clearHint();
 
     try {
       this.worker ??= this.startWorker();
@@ -131,9 +182,15 @@ export class Audition {
         note,
         ticks: request.ticks ?? AUDITION_TICKS,
         scratchAt,
+        // Read here rather than taken from the caller, so nothing can route a
+        // preview around the mixer. The target's own bit is never set — a
+        // silenced channel was refused above.
+        silenced: this.mixer.silenced(),
       } satisfies NoteRequest);
+      this.notePending.set(true);
     } catch (error) {
       this.worker = null;
+      this.notePending.set(false);
       this.editor.fail(errorMessage(error));
     }
   }
@@ -238,6 +295,7 @@ export class Audition {
     const worker = new Worker(new URL('./note.worker', import.meta.url), { type: 'module' });
     worker.onmessage = (event: MessageEvent<NoteReply>) => {
       const reply = event.data;
+      this.notePending.set(false);
       // Superseded while it rendered: a run cannot be cancelled, so late answers
       // are dropped here rather than played over the newer one.
       if (reply.token !== this.token) {
@@ -255,6 +313,7 @@ export class Audition {
     worker.onerror = () => {
       this.worker?.terminate();
       this.worker = null;
+      this.notePending.set(false);
     };
 
     return worker;

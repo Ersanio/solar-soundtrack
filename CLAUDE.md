@@ -270,16 +270,22 @@ One entry each: what it was, what it is, why.
   which has no strip, and a refusal is the answer to a click rather than a property of the song.
   The dialog that asks before the rewrite (`editor/normalize-button/`) is where a refusal shows,
   and a song already in shape gets the same dialog rather than a click that does nothing.
+- **The mixer's mutes and solo living on `Playback`** — the note previewer has to refuse a channel
+  they silence, and it neither owns nor wants the transport: it shares no worklet, no audio thread
+  and no song being played, and reaching through `Playback` to find the mask would make it depend on
+  all three. `Mixer` holds the mask and the solo, injects `EditorStore` alone, and is read by
+  `Playback`, `Audition` and the roll. The mask is the only thing the two audio paths share, and it
+  is a number.
 
 ## Angular specifics
 
 Angular 22, zoneless (scaffolded `--zoneless`, so zone.js is not a dependency and there is nothing
 to opt into), no router, no NgModules. Signals throughout: `signal`/`computed` for state, `effect`
 reserved for mirroring into imperative sinks (localStorage, the player, the DSP). State lives in
-seven `@Service()` singletons in `web/src/app/state/`. The spine runs one way, `DriverStore` →
+eight `@Service()` singletons in `web/src/app/state/`. The spine runs one way, `DriverStore` →
 `SampleStore` → `EditorStore` → `Playback`; `ClockMeasurer` feeds `EditorStore`, `Audition` hangs
-off it beside `Playback`, and `EditorRequests` depends on nothing at all. `web/README.md` has the
-rest.
+off it beside `Playback`, `Mixer` hangs off it and is read by both of those and by the roll, and
+`EditorRequests` depends on nothing at all. `web/README.md` has the rest.
 
 Selector prefix is `amk` — `amk-root`, `amk-editor-pane` for components, camelCase `amk*` for
 directives. ESLint enforces both.

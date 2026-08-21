@@ -5,14 +5,9 @@ import { SpcPlayer, type SongTiming } from '@amk/spc/player';
 import type { DriverState } from '@amk/spc/driver-state';
 import { errorMessage, formatTime } from '../util/format';
 import { EditorStore } from './editor-store';
+import { Mixer } from './mixer';
 import { secondsAtTick } from './song-clock';
-import {
-  type ChannelState,
-  channelStates,
-  estimatedSecondsAt,
-  silencedMask,
-  soundingSpans,
-} from './transport-view';
+import { estimatedSecondsAt, soundingSpans } from './transport-view';
 import { clamp } from '../util/math';
 
 const NO_SPANS: readonly Span[] = [];
@@ -20,6 +15,7 @@ const NO_SPANS: readonly Span[] = [];
 @Service()
 export class Playback {
   private readonly editor = inject(EditorStore);
+  private readonly mixer = inject(Mixer);
   private readonly player = new SpcPlayer();
 
   readonly state = signal<'idle' | 'playing' | 'paused'>('idle');
@@ -51,15 +47,6 @@ export class Playback {
   /** Reload the running song in place whenever it recompiles. */
   readonly live = signal(true);
   readonly loop = signal(false);
-
-  /** Channels the user silenced, as a bitmask. */
-  private readonly mutedMask = signal(0);
-  /**
-   * The one channel the user isolated, or `null`. Solo is exclusive rather than
-   * a mask: isolating a part means hearing that part, and two channels soloed at
-   * once is just a mute of everything else wearing the wrong name.
-   */
-  private readonly soloedChannel = signal<number | null>(null);
 
   /** Where the seek bar is being dragged to, in ticks, while the drag goes on. */
   private readonly scrubbing = signal<number | null>(null);
@@ -145,31 +132,6 @@ export class Playback {
   });
 
   /**
-   * With a channel soloed only that channel is heard, and nothing else applies:
-   * engaging solo clears the mutes outright rather than holding them, so what
-   * the buttons show is always what is being heard.
-   */
-  private readonly silenced = computed(() => silencedMask(this.mutedMask(), this.soloedChannel()));
-
-  /**
-   * Only the channels the song actually writes to. A channel with no data has
-   * nothing to mute, so it gets no controls at all and they appear as the song
-   * grows into them. The state behind them is untouched by this: a channel that
-   * goes empty keeps its mute or solo and resumes it if the channel comes back,
-   * and `clearChannels()` reaches it either way.
-   */
-  readonly channels = computed<ChannelState[]>(() =>
-    channelStates(
-      this.editor.result()?.stats?.channelSizes ?? [],
-      this.mutedMask(),
-      this.soloedChannel(),
-    ),
-  );
-
-  readonly isSoloing = computed(() => this.soloedChannel() !== null);
-  readonly hasChannelOverrides = computed(() => this.mutedMask() !== 0 || this.isSoloing());
-
-  /**
    * The source spans being sounded right now, one per audible voice — the
    * playhead the editor decorates. Follows the driver's own read pointers
    * rather than any clock, so loops, tempo changes and dropped ticks cost it
@@ -194,7 +156,7 @@ export class Playback {
         return NO_SPANS;
       }
 
-      return soundingSpans(loaded.map, driver.trackPointers, this.silenced());
+      return soundingSpans(loaded.map, driver.trackPointers, this.mixer.silenced());
     },
     {
       equal: (a, b) =>
@@ -221,7 +183,7 @@ export class Playback {
     // Muting is a gate on the driver, not a property of the song data: the mask
     // goes straight to APU RAM and every channel goes on being played, so
     // nothing is rebuilt and playback does not break stride.
-    effect(() => this.player.setMute(this.silenced()));
+    effect(() => this.player.setMute(this.mixer.silenced()));
 
     this.player.onPosition = (songTicks) =>
       this.songTicks.set({ ticks: songTicks, at: performance.now() });
@@ -437,33 +399,5 @@ export class Playback {
     if (!this.isIdle()) {
       this.player.seek(target);
     }
-  }
-
-  /** Ignored while a channel is soloed, where the mute buttons are disabled. */
-  toggleMute(channel: number): void {
-    if (this.isSoloing()) {
-      return;
-    }
-
-    this.mutedMask.update((mask) => mask ^ (1 << channel));
-  }
-
-  /**
-   * Moves the solo to `channel`, or lifts it if that channel already has it.
-   * Taking a solo discards the mutes, so lifting it again leaves the whole song
-   * audible rather than restoring a mute the buttons stopped showing.
-   */
-  toggleSolo(channel: number): void {
-    const soloed = this.soloedChannel() === channel ? null : channel;
-    this.soloedChannel.set(soloed);
-    if (soloed !== null) {
-      this.mutedMask.set(0);
-    }
-  }
-
-  /** Drops every mute and any solo, so the whole song is heard again. */
-  clearChannels(): void {
-    this.mutedMask.set(0);
-    this.soloedChannel.set(null);
   }
 }

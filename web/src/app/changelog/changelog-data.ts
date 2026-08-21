@@ -10,7 +10,10 @@ export const CHANGELOG: readonly ChangelogEntry[] = [
   // ─── newest first; add new blocks here ──────────────────────────────────
   {
     date: '21 August 2026',
-    items: ['Note length sliders drag right to make a note longer'],
+    items: [
+      'Mutes and solos apply when you preview a note',
+      'Note length sliders drag right to make a note longer',
+    ],
   },
   {
     date: '20 August 2026',

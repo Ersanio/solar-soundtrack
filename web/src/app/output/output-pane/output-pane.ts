@@ -21,6 +21,7 @@ export class OutputPane {
 
   private readonly statusClass: Record<StatusKind, string> = {
     ok: 'text-good',
+    info: 'text-ink-muted',
     error: 'text-danger',
     busy: 'text-ink-muted',
   };

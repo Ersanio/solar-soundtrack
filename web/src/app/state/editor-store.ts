@@ -27,7 +27,7 @@ const STORAGE_KEY = 'solar-soundtrack.draft';
 /** How long typing pauses before a compile fires. */
 const DEBOUNCE_MS = 150;
 
-export type StatusKind = 'ok' | 'error' | 'busy';
+export type StatusKind = 'ok' | 'info' | 'error' | 'busy';
 
 export interface Status {
   kind: StatusKind;
@@ -340,7 +340,7 @@ export class EditorStore {
     );
   });
 
-  /** Set by actions that can fail outside compilation, such as export. */
+  /** Set by actions that report outside compilation, such as export — see {@link fail} and {@link say}. */
   private readonly override = signal<Status | null>(null);
 
   readonly status = computed<Status>(() => {
@@ -500,5 +500,26 @@ export class EditorStore {
 
   fail(text: string): void {
     this.override.set({ kind: 'error', text });
+  }
+
+  /**
+   * Says why an action did nothing, where nothing went wrong — a note not
+   * sounded because the mixer has its channel silenced, say. Not `fail`, which
+   * paints the line as an error, and not `ok`, which reads as a success.
+   */
+  say(text: string): void {
+    this.override.set({ kind: 'info', text });
+  }
+
+  /**
+   * Drops a {@link say} hint that has stopped being true — the action it
+   * explained having since succeeded. Only `info`, which is advice about the
+   * last action and is superseded by the next one; an error outlives the action
+   * that raised it and is cleared by editing, as it always was.
+   */
+  clearHint(): void {
+    if (this.override()?.kind === 'info') {
+      this.override.set(null);
+    }
   }
 }
