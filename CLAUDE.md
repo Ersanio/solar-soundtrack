@@ -340,6 +340,18 @@ One entry each: what it was, what it is, why.
   restore. The roll's compile carries no trace, and asking for one costs an event per dispatch. A new
   `#N` goes at the **end of the document**, where nothing follows it to be disturbed; `orderChannels`
   is what puts the blocks in order afterwards, and it writes the `o` and `l` a moved block needs.
+- **Latching the audition's fast-forward on the track pointer alone**, the way `worklet.ts` does —
+  `L_0C31` sets every voice a phrase names to a duration counter of 1 before any of them fetch
+  (`main.asm:2314-2318`), and `SetInstrument` runs between that and the `dec` at `L_0C4D`, so a poll
+  landing in that window reads 1 and `sawTick` counts the first fetch as a tick of music. The note is
+  then handed over inside the pass that starts the song, and the phrase walk still to come reads the
+  frames at `scratchAt` as its next phrase: every track pointer goes to zero and nothing sounds at
+  all. It latches on `$0200+2n`, the duration byte a voice has actually read (`voiceStarted`), and
+  the floor of one tick on `atTicks` is what starts the driver at all. `audiotest` sweeps three to
+  eight channels, because how much work `L_0C31` does before the tick voice's own write is what moves
+  the fetch against the poll — four channels was silent where one and two were not. The worklet keeps
+  the looser latch: a playhead a tick out is a playhead a tick out, where a note handed over a tick
+  early is not played.
 - **Keeping the roll alive behind `[class.hidden]`**, as the source view is — the symmetry is
   inviting and it does not work: `display: none` destroys the layout box, so the native vertical
   scroller comes back at row 0 regardless, and a hidden roll goes on drawing marks, a grid and a

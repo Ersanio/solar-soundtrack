@@ -16,6 +16,8 @@ const enum Addr {
 	NoteDurations = 0x70,
 	/** `$C1+2n`: the instrument the voice is playing, 0 for one never given any. */
 	Instruments = 0xc1,
+	/** `$0200+2n`: the duration byte a voice last read, ahead of its note. */
+	NoteDurationBytes = 0x0200,
 	/** `$0201+2n`: the gate `q`'s high nybble chose, as a fraction of the duration. */
 	NoteGates = 0x0201,
 	/** `$0211+2n`: the velocity `q`'s low nybble chose, which scales `VxVOL`. */
@@ -72,6 +74,22 @@ export function tickVoice(aram: Uint8Array): number {
 	}
 
 	return -1;
+}
+
+/**
+ * Whether a voice has read a duration byte, which is the driver's own mark that
+ * it is reading music rather than merely being pointed at some.
+ *
+ * The duration *counter* cannot answer this. `L_0C31` sets it to 1 for every
+ * voice a phrase names, before any of them fetch (`main.asm:2314-2318`), and
+ * `SetInstrument` runs between that and the `dec` at `L_0C4D`
+ * (`main.asm:2319-2321, 2337`) — so a poll landing in that window reads 1 and
+ * {@link sawTick} counts the fetch itself as a tick of music. `$0200+2n` is
+ * written from the byte before the note (`main.asm:2363`), nothing writes it
+ * back, and the program's setup zeroes the page (`main.asm:157-160`).
+ */
+export function voiceStarted(aram: Uint8Array, voice: number): boolean {
+	return voice >= 0 && aram[Addr.NoteDurationBytes + voice * 2] !== 0;
 }
 
 /** That voice's note duration counter, which is what a music tick moves. */

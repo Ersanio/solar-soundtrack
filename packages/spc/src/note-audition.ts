@@ -37,6 +37,7 @@ import {
 	tickVoice,
 	voiceHasInstrument,
 	voiceHasQuantization,
+	voiceStarted,
 } from "./driver-state";
 
 /** Emulated frames per poll, matching what `worklet.ts` counts ticks at. */
@@ -150,7 +151,11 @@ export interface NoteAuditionRequest {
 export interface AuditionedNote {
 	/** Interleaved stereo at {@link SPC_SAMPLE_RATE}, owning its own buffer. */
 	pcm: Int16Array;
-	/** Ticks the fast-forward reached; short of `atTicks` if the song ended first. */
+	/**
+	 * Ticks the fast-forward reached; short of `atTicks` if the song ended first,
+	 * and 1 for a request of 0, since the driver has to be started before a note
+	 * can be handed over.
+	 */
 	reachedTicks: number;
 	/** Ticks the note was held; short of `ticks` if the ceiling above was hit. */
 	heldTicks: number;
@@ -235,7 +240,18 @@ export function noteFrames(note: number, ticks: number, quantization: number | n
  */
 export function auditionNote(core: SpcCore, spc: Uint8Array, request: NoteAuditionRequest): AuditionedNote {
 	const { channel, note, scratchAt } = request;
-	const target = Math.max(0, Math.floor(request.atTicks));
+	// At least one tick, whatever is asked for. The dump's PC is the driver's main
+	// loop with the song index still in `$F6`, and it takes four passes of the main
+	// loop to become a song: `ReadInputRegister` copies `$F6` into `$02` only after
+	// `ProcessAPU2Input` has looked (main.asm:243-246, 288-299), `PlaySong` runs on
+	// the pass after that and writes every voice's `$FF` volume (main.asm:2137-2138),
+	// and the `$0c` countdown it sets takes two more before `L_0C22` installs the
+	// track pointers and `L_0C31`/`L_0C4D` give every voice an instrument and read
+	// its opening commands (main.asm:2093, 2282, 2302-2341). Nought ticks is the
+	// state before all of that: no pointer to aim at the note, no volume to give
+	// back, and the phrase walk still to come during the recording, where it reads
+	// the frames written at `scratchAt` as its next phrase.
+	const target = Math.max(1, Math.floor(request.atTicks));
 	const held = Math.max(1, Math.floor(request.ticks));
 
 	core.loadSpc(spc);
@@ -283,8 +299,12 @@ export function auditionNote(core: SpcCore, spc: Uint8Array, request: NoteAuditi
 
 /**
  * Emulates up to `target` ticks and throws the audio away, stopping on the
- * driver's own tick count rather than on a sample count — the same loop, and the
- * same reasoning, as `worklet.ts`'s seek. Returns how far it actually got.
+ * driver's own tick count rather than on a sample count, as `worklet.ts`'s seek
+ * does. Returns how far it actually got.
+ *
+ * It latches on a stricter reading of "the song has started" than the worklet
+ * does, and has to: a playhead a tick out is a playhead a tick out, where a note
+ * handed to a driver a tick early is not played at all. See the latch below.
  *
  * `silenced` is pressed back onto the driver after every block, exactly as
  * `worklet.ts`'s `afterBlock` does it and for the same reason: the driver rewrites
@@ -313,10 +333,20 @@ function fastForward(core: SpcCore, target: number, silenced: number, backup: Mu
 		applyChannelMutes(aram, silenced, backup);
 
 		if (voice < 0) {
-			// The song has not keyed on yet; latch the voice once it has, exactly as
-			// `worklet.ts` does, so both count off the same one.
-			voice = tickVoice(aram);
-			duration = readNoteDuration(aram, voice);
+			// The song has not keyed on yet; latch the voice once it has, and once it
+			// has read a duration byte. `worklet.ts` latches on the pointer alone,
+			// which is enough for a playhead that can be a tick out and not enough
+			// here: the tick counted off a voice latched mid-fetch is the fetch, so
+			// the note is handed over inside the pass that starts the song, where
+			// `L_0C01` has still to install the track pointers and reads the frames
+			// at `scratchAt` as a phrase (`main.asm:2288-2309`). See
+			// {@link voiceStarted}.
+			const playing = tickVoice(aram);
+			if (voiceStarted(aram, playing)) {
+				voice = playing;
+				duration = readNoteDuration(aram, voice);
+			}
+
 			stalledFor++;
 			continue;
 		}

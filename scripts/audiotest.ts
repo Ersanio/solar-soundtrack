@@ -1149,9 +1149,9 @@ console.log("\none note, auditioned where the song is playing");
 
 	// The point of emulating rather than reconstructing: the note is played by
 	// whatever the driver is holding when it arrives.
-	const under = (instrument: string): Int16Array =>
+	const under = (instrument: string, atTicks = 48): Int16Array =>
 		auditionNote(emu, compileToSpc(`#amk 4\n#0 t40 o4 v220 q7F ${instrument} l8 c d e f\n`), {
-			atTicks: 48,
+			atTicks,
 			channel: 0,
 			note: NOTE,
 			ticks: 96,
@@ -1159,6 +1159,65 @@ console.log("\none note, auditioned where the song is playing");
 		}).pcm;
 
 	check("the instrument in force decides the sound", !identical(under("@0"), under("@8")));
+
+	// Tick 0 is the commonest audition there is — the transport stopped at the top
+	// of the song, and a note drawn against the left edge of the roll. The dump is
+	// post-init but pre-`PlaySong`, so the fast-forward runs the driver's first
+	// pass before the note is handed over: until it does there is no track pointer
+	// to aim at the note, no `$FF` volume to hand back, and no `@` read.
+	const atZero = auditionNote(emu, spc, { atTicks: 0, channel: 0, note: NOTE, ticks: 96, scratchAt });
+	check("a note auditioned at tick 0 is audible", peak(atZero.pcm) > 0.01, `peak ${peak(atZero.pcm).toFixed(4)}`);
+	check(
+		"the song is started before the note is handed over",
+		atZero.reachedTicks === 1,
+		`${atZero.reachedTicks} ticks`,
+	);
+	check(
+		"and tick 0 hears the instrument the channel sets before its first note",
+		!identical(under("@0", 0), under("@8", 0)),
+	);
+	check("and it holds the note for the ticks asked for", atZero.heldTicks === 96, `${atZero.heldTicks} ticks`);
+
+	// `$F1 $02` reserves 4 KiB, and the `$FA $04` the linker puts at the top of the
+	// lowest channel (link.ts:170) clears it byte by byte inside the driver's first
+	// pass — tens of milliseconds, far longer than the four settle blocks. So the
+	// tick the fast-forward counts has to be a tick of music: stopping on the fetch
+	// that reads that command hands the note to a driver still in the clear, and
+	// `SetInstrument` has already put `@0`'s tuning on the voice (Commands.asm:107).
+	const echoed = (instrument: string): Int16Array =>
+		auditionNote(emu, compileToSpc(`#amk 4\n#0 t40 $F1 $02 $40 $00 o4 v220 q7F ${instrument} l8 c d e f\n`), {
+			atTicks: 0,
+			channel: 0,
+			note: NOTE,
+			ticks: 96,
+			scratchAt,
+		}).pcm;
+
+	check("an echo buffer to clear does not swallow the first tick", !identical(echoed("@0"), echoed("@8")));
+
+	// How much work `L_0C31` does before the tick voice's own `$70` write is how
+	// many channels the phrase names, so the channel count is what moves the
+	// driver's first fetch against the poll — and a voice latched inside that
+	// fetch counts it as a tick, hands the note over mid-pass, and the phrase walk
+	// that follows reads the frames at `scratchAt` as its next phrase. Four
+	// channels was silent, one and two were not, which is why this is a sweep and
+	// not a song.
+	for (let channels = 3; channels <= 8; channels++) {
+		const parts = Array.from({ length: channels }, (_, channel) => `#${channel} t40 o4 v220 q7F @8 l8 c d e f`);
+		const wide = auditionNote(emu, compileToSpc(`#amk 4\n${parts.join("\n")}\n`), {
+			atTicks: 0,
+			channel: 0,
+			note: NOTE,
+			ticks: 96,
+			scratchAt,
+		});
+
+		check(
+			`a note at tick 0 on a ${channels}-channel song sounds`,
+			peak(wide.pcm) > 0.01 && wide.heldTicks === 96,
+			`peak ${peak(wide.pcm).toFixed(4)}, held ${wide.heldTicks}`,
+		);
+	}
 
 	// And the `q` in force decides how long it rings: no quantization byte is
 	// written, so what the song left in `$0201+2n` is what shortens the note.
