@@ -1194,6 +1194,77 @@ console.log("\none note, auditioned where the song is playing");
 	// a target this song never reaches has to return rather than spin.
 	const far = auditionNote(emu, spc, { atTicks: 10_000_000, channel: 0, note: NOTE, ticks: 96, scratchAt });
 	check("a tick the song never reaches still returns", far.reachedTicks > 0, `${far.reachedTicks} ticks`);
+
+	// The mixer's mask, held through the fast-forward the way `worklet.ts` holds
+	// it. Every voice but the target is halted before the note is handed over, so
+	// the echo buffer is the only route a silenced channel has into the recording
+	// — which is exactly what the dry control below states.
+	//
+	// `$EF $03` puts channels 0 and 1 both in the echo, and both halves matter:
+	// channel 1's bit is what the "out of the echo" check rides on, and channel
+	// 0's is what would fail if `auditionNote` stopped ignoring the target's own
+	// bit. `$F1 $02 $40 $00` is a 4 KiB buffer at the feedback `firtest` calls
+	// stable rather than runaway.
+	const parts = `o4 v220 q7F @0 l8 c d e f g a b > c\n#1 t40 o3 v180 q7D @1 l4 [c e g e]2\n`;
+	const wet = compileToSpc(`#amk 4\n#0 t40 $EF $03 $50 $50 $F1 $02 $40 $00 ${parts}`);
+	const dry = compileToSpc(`#amk 4\n#0 t40 ${parts}`);
+	const wetPristine = wet.slice();
+
+	const heard = (image: Uint8Array, silenced: number) =>
+		auditionNote(emu, image, { atTicks: 96, channel: 0, note: NOTE, ticks: 96, scratchAt, silenced });
+
+	const open = heard(wet, 0);
+	const hushed = heard(wet, 0b10);
+
+	check("a silenced channel is out of the echo the note lands on", !identical(open.pcm, hushed.pcm));
+	check("and the note itself is still heard", peak(hushed.pcm) > 0.01, `peak ${peak(hushed.pcm).toFixed(4)}`);
+	// The control, and it is a level rather than an identity. Taking a voice's
+	// volume also ORs `$5C`, so the driver does one more `VxVOL` write than it
+	// otherwise would and the emulation shifts by a few cycles — which is a real
+	// difference in the samples and an inaudible one. Measured: a thousandth of
+	// the signal with no echo, against fifty times that with it.
+	const diffRms = (a: Int16Array, b: Int16Array): number => {
+		let sum = 0;
+		const length = Math.min(a.length, b.length);
+		for (let index = 0; index < length; index++) {
+			const delta = (a[index] - b[index]) / 32768;
+			sum += delta * delta;
+		}
+
+		return Math.sqrt(sum / length);
+	};
+
+	const dryDiff = diffRms(heard(dry, 0).pcm, heard(dry, 0b10).pcm);
+	const wetDiff = diffRms(open.pcm, hushed.pcm);
+	check(
+		"with no echo a mask changes nothing that can be heard",
+		dryDiff < rms(open.pcm) / 1000,
+		`diff rms ${dryDiff.toExponential(2)} against signal ${rms(open.pcm).toExponential(2)}`,
+	);
+	check(
+		"so the echo is the whole of what a mask reaches",
+		wetDiff > dryDiff * 20,
+		`${wetDiff.toExponential(2)} with echo, ${dryDiff.toExponential(2)} without`,
+	);
+
+	// `$5E` is still untouched, so the driver's work per pass is unchanged and the
+	// fast-forward arrives at the same tick. Exact, because this song has slack
+	// under the one-tick-per-pass ceiling; the `t254` case is pinned above.
+	check(
+		"and it moves neither the tick reached nor the tick count",
+		hushed.reachedTicks === open.reachedTicks && hushed.heldTicks === open.heldTicks,
+		`${hushed.reachedTicks}/${hushed.heldTicks} vs ${open.reachedTicks}/${open.heldTicks}`,
+	);
+
+	const unmasked = auditionNote(emu, wet, { atTicks: 96, channel: 0, note: NOTE, ticks: 96, scratchAt });
+	check("no mask at all is the same as an empty one", identical(unmasked.pcm, open.pcm));
+
+	// Honouring it would take the target's volume during the fast-forward and
+	// `restoreTrackVolume` would hand it straight back, so the note would sound
+	// anyway and the only effect would be the target missing from its own echo.
+	check("the target channel's own bit is ignored", identical(heard(wet, 0b01).pcm, open.pcm));
+	check("however it is spelled", identical(heard(wet, 0xff).pcm, heard(wet, 0xfe).pcm));
+	check("and a masked audition still leaves the image alone", identical(wetPristine, wet));
 }
 
 summarise();

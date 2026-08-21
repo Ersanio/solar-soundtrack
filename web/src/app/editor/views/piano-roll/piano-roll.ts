@@ -20,6 +20,7 @@ import { elementSize } from '../../../shared/chart/element-size';
 import { clamp } from '../../../util/math';
 import { DriverStore } from '../../../state/driver-store';
 import { EditorStore } from '../../../state/editor-store';
+import { Mixer } from '../../../state/mixer';
 import { Playback } from '../../../state/playback';
 import { PercussionPanel, percussionChips } from './percussion-panel/percussion-panel';
 import { DEFAULT_PERCUSSION, type PlaceContext, rollShape } from './percussion';
@@ -101,6 +102,7 @@ export class PianoRoll {
   private readonly editor = inject(EditorStore);
   private readonly drivers = inject(DriverStore);
   private readonly playback = inject(Playback);
+  private readonly mixer = inject(Mixer);
 
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly destroyRef = inject(DestroyRef);
@@ -179,7 +181,7 @@ export class PianoRoll {
    * to answer a question that only changes when the mixer is touched.
    */
   private readonly audible = computed(
-    () => new Map(this.playback.channels().map((c) => [c.index, c.audible])),
+    () => new Map(this.mixer.channels().map((c) => [c.index, c.audible])),
   );
 
   /** Instrument numbers whose sample is noise, from the song's own entries. */

@@ -28,6 +28,7 @@ import {
 	VOICES,
 	applyChannelMutes,
 	createMuteBackup,
+	type MuteBackup,
 	haltVoice,
 	readNoteDuration,
 	restoreTrackVolume,
@@ -129,6 +130,21 @@ export interface NoteAuditionRequest {
 	 * block. Free space no ARAM budget can take away.
 	 */
 	scratchAt: number;
+	/**
+	 * Voices the mixer is silencing, as a bitmask. `0` for no mixer at all.
+	 *
+	 * Held through the fast-forward the way `worklet.ts` holds it, so the note
+	 * arrives over the echo the transport is making rather than over the whole
+	 * song's. Every other voice is halted before the note is handed over, so the
+	 * echo buffer is the *only* route a silenced channel has into the recording —
+	 * on a song with no echo this changes nothing at all, byte for byte.
+	 *
+	 * The target's own bit is ignored. Honouring it would take that voice's volume
+	 * during the fast-forward and step 4 below would hand it straight back, so the
+	 * note would sound anyway and the only effect would be the target going
+	 * missing from its own echo. A caller that wants silence needs no emulator.
+	 */
+	silenced?: number;
 }
 
 export interface AuditionedNote {
@@ -201,6 +217,8 @@ export function noteFrames(note: number, ticks: number, quantization: number | n
  *
  * The recipe, all of it against `main.asm`:
  *
+ * 0. **Fast-forward under the mixer's mask**, so the echo the note is about to
+ *    land on is the echo the transport is making. See `silenced`.
  * 1. **Silence every voice** through {@link applyChannelMutes} and render a few
  *    blocks, so whatever was ringing stops without a click and `MuteBackup` is
  *    holding the target voice's own volume.
@@ -222,9 +240,12 @@ export function auditionNote(core: SpcCore, spc: Uint8Array, request: NoteAuditi
 
 	core.loadSpc(spc);
 
-	const reachedTicks = fastForward(core, target);
-
+	// One backup across both, so a voice the mixer silenced arrives at the settle
+	// loop with 0 already in its track volume: `applyChannelMutes` keeps the value
+	// it saved earlier rather than saving that zero over it.
 	const backup = createMuteBackup();
+	const reachedTicks = fastForward(core, target, (request.silenced ?? 0) & ~(1 << channel), backup);
+
 	for (let settle = 0; settle < SETTLE_BLOCKS; settle++) {
 		applyChannelMutes(core.aram(), 0xff, backup);
 		core.renderView(BLOCK);
@@ -264,8 +285,17 @@ export function auditionNote(core: SpcCore, spc: Uint8Array, request: NoteAuditi
  * Emulates up to `target` ticks and throws the audio away, stopping on the
  * driver's own tick count rather than on a sample count — the same loop, and the
  * same reasoning, as `worklet.ts`'s seek. Returns how far it actually got.
+ *
+ * `silenced` is pressed back onto the driver after every block, exactly as
+ * `worklet.ts`'s `afterBlock` does it and for the same reason: the driver rewrites
+ * `VxVOL` as it goes, so a mute that is not reapplied does not stick. It costs
+ * the tick count nothing — `$5E` is untouched, so the driver's work per pass of
+ * its main loop is unchanged and `ticks` comes out the same either way.
+ *
+ * The mask is constant for the whole run, which is what keeps `MuteBackup.restoring`
+ * at zero: bits enter it only when they leave the mask, and none do here.
  */
-function fastForward(core: SpcCore, target: number): number {
+function fastForward(core: SpcCore, target: number, silenced: number, backup: MuteBackup): number {
 	let ticks = 0;
 	let voice = -1;
 	let duration = 0;
@@ -278,6 +308,10 @@ function fastForward(core: SpcCore, target: number): number {
 		rendered += BLOCK;
 
 		const aram = core.aram();
+		// Before the latch below returns, so a song that has not keyed on yet is
+		// still being muted while we wait for it.
+		applyChannelMutes(aram, silenced, backup);
+
 		if (voice < 0) {
 			// The song has not keyed on yet; latch the voice once it has, exactly as
 			// `worklet.ts` does, so both count off the same one.

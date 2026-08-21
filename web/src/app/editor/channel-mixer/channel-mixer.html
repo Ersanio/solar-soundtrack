@@ -1,6 +1,6 @@
 <h3 class="text-ink-muted text-xs font-semibold tracking-wide uppercase">Channels</h3>
 
-@for (channel of playback.channels(); track channel.index) {
+@for (channel of mixer.channels(); track channel.index) {
   <div class="border-edge flex items-center overflow-hidden rounded-md border">
     <span
       class="border-edge border-r px-1.5 py-0.5 font-mono text-xs"
@@ -15,9 +15,9 @@
     <button
       type="button"
       [class]="`${toggleClass}disabled:cursor-not-allowed disabled:opacity-40${channel.muted ? ' bg-danger/20 text-danger font-semibold' : ' text-ink-muted hover:not-disabled:text-ink'}`"
-      [disabled]="playback.isSoloing()"
+      [disabled]="mixer.isSoloing()"
       [title]="`Mute channel ${channel.index}`"
-      (click)="playback.toggleMute(channel.index)"
+      (click)="mixer.toggleMute(channel.index)"
     >
       M
     </button>
@@ -31,7 +31,7 @@
           : ' text-ink-muted hover:not-disabled:text-ink')
       "
       [title]="`Solo channel ${channel.index}`"
-      (click)="playback.toggleSolo(channel.index)"
+      (click)="mixer.toggleSolo(channel.index)"
     >
       S
     </button>
@@ -41,8 +41,8 @@
 <button
   amk-button
   variant="ghost"
-  [disabled]="!playback.hasChannelOverrides()"
-  (click)="playback.clearChannels()"
+  [disabled]="!mixer.hasChannelOverrides()"
+  (click)="mixer.clearChannels()"
 >
   Reset
 </button>

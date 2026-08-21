@@ -1,7 +1,7 @@
 # The editor
 
 The Angular application. Everything it compiles, assembles and plays lives in `../packages`; what is
-here is the UI, the four state services, and the adapters that join CodeMirror and Web Audio to
+here is the UI, the eight state services, and the adapters that join CodeMirror and Web Audio to
 framework-free code.
 
 Run everything from the repository root, not from here. `npm start`, `npm run build` and
@@ -13,18 +13,20 @@ them.
 
 | Path                    | What it is                                                                           |
 | ----------------------- | ------------------------------------------------------------------------------------ |
-| `src/app/state/`        | Seven `@Service()` singletons in dependency order, and the transport's clock         |
+| `src/app/state/`        | Eight `@Service()` singletons in dependency order, and the transport's clock         |
 | `src/app/editor/`       | The left pane and its chrome: top bar, transport, mixer, palette, CodeMirror adapter |
 | `src/app/editor/views/` | What the pane's tabs switch between: source, sample library, piano roll              |
 | `src/app/output/`       | Diagnostics, stats, the ARAM bar, the command inspector                              |
 | `src/app/shared/`       | Form controls, panels, icons, chart helpers                                          |
 | `src/app/util/`         | Formatting, IndexedDB, `clamp`                                                       |
 
-State flows one way: `DriverStore` → `SampleStore` → `EditorStore` → `Playback`. Three more sit off
+State flows one way: `DriverStore` → `SampleStore` → `EditorStore` → `Playback`. Four more sit off
 that spine: `ClockMeasurer`, which `EditorStore` owns and which drives the measurement described
 below; `Audition`, which hangs off `EditorStore` beside `Playback` and owns the second
-`AudioContext`; and `EditorRequests`, which injects nothing at all, because a mailbox between the
-panels and the source view has nothing to read.
+`AudioContext`; `Mixer`, which holds the per-channel mutes and the solo and is read by `Playback`,
+by `Audition` and by the roll — three readers and no owner is why it is not a member of any of them;
+and `EditorRequests`, which injects nothing at all, because a mailbox between the panels and the
+source view has nothing to read.
 
 `DriverStore` loads `packages/spc/assets/driver/`. The song's ARAM load address is the slot the
 driver's own song pointer table reserves, stated in the bundle's `manifest.json` and checked against
@@ -155,6 +157,14 @@ silently up to the tick, hands the driver the note there and renders it, so what
 finished PCM and the context only has a buffer to play. The emulator playing the song is inside an
 `AudioWorkletProcessor` and is never addressed, which is the whole of why a note can be auditioned
 over a song without disturbing it.
+
+The mixer is the one thing the two paths share, and only as a number. A note on a channel the mixer
+silences is refused in `Audition` before an emulator is asked for — hearing nothing does not need a
+few hundred milliseconds of fast-forward to arrive at — and a deliberate key press says why, where a
+drag asks quietly because it asks once per row. A note that does sound carries the mask with it, so
+the echo it lands on is the echo the transport is making rather than the whole song's. Neither is a
+route back to the worklet's emulator. The mutes apply with the transport stopped too: they are a
+standing monitoring state, not a property of something playing.
 
 That worker is separate from `clock.worker.ts` rather than another message on it. The clock
 measurement fires a second after typing stops, which is exactly when someone is about to click, and
