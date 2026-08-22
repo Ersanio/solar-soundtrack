@@ -208,6 +208,11 @@ export class SourceView {
         // set would let a later re-run select it again long after the author
         // has moved on.
         this.requests.reveal.set(null);
+        // A reveal is somebody asking again, so whatever the inspector was
+        // dismissed at stops applying. Here rather than at each caller because
+        // a reveal onto the caret's own span moves nothing, and then nothing
+        // else would lift it.
+        this.requests.dismissed.set(null);
         if (!reveal.show) {
           this.selectSpan(reveal.span);
           return;

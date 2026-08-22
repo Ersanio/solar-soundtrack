@@ -474,6 +474,40 @@ stats.loopTicks` pads **every other channel that would cut the song short** out 
   it: `loopTick` is the lowest tick any channel re-enters at, and a second channel marked on the old
   tick holds the reading down. `writeInto` anchors at `gap.before - 1`, which is the same offset for
   a region that holds nothing.
+- **Letting the wheel size a note that is already being dragged** — `planGesture` takes one
+  `Gesture`, and a note carried _and_ resized is two, so the second one silently won and the drag
+  went nowhere. The wheel speaks only while the press has not passed `SLOP_PX` (`stepLength`), and
+  once it has spoken that press is a `stretch` of the note's far end and stays one however far the
+  pointer wanders. The pointer is already saying which of the two it means; this is only agreeing
+  with it.
+- **`shownPlan` gated on `moved || kind === 'spawn'` alone** — a press the wheel had resized had a
+  plan, committed it on pointer-up and drew nothing at all in between, so the length was chosen
+  blind. `held.length !== null` is the third way a press becomes something worth drawing, and it is
+  the same field the commit reads.
+- **The middle-button pan inside `roll-gesture.ts`** — that file refuses everything before it has a
+  `Strip`, so panning would have needed a channel picked, and the camera is not the editor's
+  anyway. `onEditDown`/`Move`/`Up` take `button === 1` before delegating; the gesture layer's guard
+  is narrowed to buttons 0 and 2 so the middle one cannot fall through to drawing. Preventing the
+  default on `pointerdown` is what stops the browser's autoscroll, since the compatibility
+  `mousedown` goes with it.
+- **Snapping a drag's destination rather than the distance it travelled** — snapping the sum of the
+  start and the movement is grid magnetism: a note written a little before the beat was pulled
+  square the first time it was touched, and one nudged less than half a step moved when the porter
+  had asked for nothing. `draggedTick` snaps `moved` and adds it, so the offset against the grid is preserved and
+  the delta is a whole number of steps — the same thing `←` and `→` pass to `run()`, which the drag
+  had silently disagreed with. `spawn` keeps the absolute snap, having no position of its own yet,
+  and `quantize` is left as the one gesture that squares a note up.
+- **Clearing the inspector by moving the caret off what it was answering about** — `commandAt` is
+  inclusive at **both** ends (`tokens.ts`), so in `c8 d8` the offset that ends `c8` is the offset
+  that begins `d8` and there is no position between them belonging to neither. There is nowhere
+  neutral to put the caret, and the roll faking one would be contradicted by the next click in the
+  text. `EditorRequests.dismissed` holds the caret the question was withdrawn at instead, so the
+  silence is one caret's worth and any move at all ends it — not a mode, which would have to be
+  turned off by something and would outlive the gesture that set it.
+- **One `Shift` flag for both of the gestures it changes** — `Shift` decides what a press on empty
+  grid _is_ (a note pinned at the press with its end on the pointer) and merely _constrains_ a drag
+  already under way (locked to its row), and those settle at different times. `anchored` is read at
+  the press and never again; `shift` is refreshed on every move, as `fine` is.
 
 ## Angular specifics
 

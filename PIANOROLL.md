@@ -14,20 +14,26 @@ no channel.
 | Hover over empty grid            | A ghost bar shows where the next note goes and how long it will be       |
 | Press on empty grid              | Draws a note there and keeps it under the pointer until you let go       |
 | Click on empty grid              | Draws the note and leaves it there                                       |
-| Drag the middle of a note        | Moves it — snapped along the grid, one row per semitone up and down      |
+| Drag the middle of a note        | Moves it a snap step at a time, one row per semitone up and down         |
 | Drag a note's left or right edge | Stretches that end; the other end stays put                              |
-| Hold `Alt` while dragging        | Tick precision: no snapping, for either a position or a length           |
+| Hold `Alt` during any gesture    | Tick precision: no snapping, for either a position or a length           |
 | Click a note                     | Selects just that note, sounds it, and puts the caret on it in the MML   |
 | Double-click a note              | Goes to it in the MML                                                    |
 | `Ctrl` + click a note            | Adds it to, or takes it out of, the selection                            |
 | `Ctrl` + drag on empty grid      | Draws a box and selects every note of this channel inside it             |
-| `Ctrl` + drag a note             | Copies it instead of moving it                                           |
+| `Ctrl` + drag a note             | Copies it instead of moving it — the whole selection, if there is one    |
+| `Shift` + drag on empty grid     | Draws a note where you pressed and pulls its right edge along            |
+| `Shift` + drag a note            | Moves it along the song only; it cannot leave the row it started on      |
 | Right-click a note               | Deletes it                                                               |
 | Right-drag across notes          | Deletes each one the pointer crosses                                     |
+| Middle-click                     | Nothing yet                                                              |
+| Middle-drag                      | Pans the roll, both ways at once                                         |
 | Wheel while drawing a note       | Sizes it — `l1`, `l2`, `l3`, `l4`, `l6`, `l8` … down to `l192`           |
-| `Alt` + wheel while drawing      | Sizes it a tick at a time instead                                        |
+| Wheel while holding a note still | Resizes that note the same way, from its right edge                      |
+| `Alt` + wheel while sizing       | Sizes it a tick at a time instead                                        |
 | `Ctrl` + wheel                   | Zooms in and out about the pointer                                       |
 | `Shift` + wheel                  | Scrolls the roll sideways                                                |
+| `Alt` + wheel                    | Makes the rows taller and shorter, about the pointer                     |
 | Drag the overview bar            | Scrolls the roll through the song — grab the lit box and it follows you  |
 | Drag the timeline below it       | Moves the playhead; hold past either end and the roll scrolls along      |
 | Click a key on the left          | Sounds that pitch on the channel being edited, so you can find it by ear |
@@ -38,7 +44,7 @@ no channel.
 | Key                         | What it does                                                    |
 | --------------------------- | --------------------------------------------------------------- |
 | `Delete` / `Backspace`      | Deletes the selected notes                                      |
-| `Escape`                    | Clears the selection, or the channel once nothing is selected   |
+| `Escape`                    | Drops the selection and the inspector with it, then the channel |
 | `←` `→`                     | Nudges the selection by one snap step                           |
 | `↑` `↓`                     | Moves the selection a semitone                                  |
 | `Shift` + `↑` `↓`           | Moves it an octave                                              |
@@ -67,12 +73,22 @@ have taken the roll somewhere the song is not. Tick it again to catch up with th
 
 **Grid** is the time signature the bar lines are drawn from: beats in a bar, over the note value that
 gets the beat. `6`/`8` is six `l8`s to a bar. MML has no time signature of its own, so this is yours.
-`0` beats draws no grid at all.
+`0` beats draws no grid at all. A fresh roll opens on `4`/`16` — a line every sixteenth with a
+heavier one every quarter note, which is the grid FL Studio opens on.
 
-**Snap** is what a note lands on when you draw or drag it — `Bar`, `Beat`, `½ beat`, `¼ beat`,
-`⅛ beat`, `⅟₁₆ beat`, or `Off`. `Bar` and `Beat` are read off the Grid, so the two stay in step
-without being welded together: at 4/4 a beat is a whole quarter note, which is far too coarse to
-draw sixteenths against.
+**Snap** is the step a note moves in — `Bar`, `Beat`, `½ beat`, `¼ beat`, `⅛ beat`, `⅟₁₆ beat`, or
+`Off`. `Bar` and `Beat` are read off the Grid, so the two stay in step without being welded
+together, and a fresh roll snaps to `Beat` — which at `4`/`16` is the sixteenth the lines are drawn
+at. Set the Grid to 4/4 and a beat is a whole quarter note instead, far too coarse to draw
+sixteenths against, and one of the fractions is what you want.
+
+**Dragging moves a note by whole steps; it does not pull it onto the grid.** A note written a
+little before the beat is meant to be there, and dragging it a bar later should leave it a little
+before that beat too — so what snaps is how far it travels, and it keeps whatever it had against the
+grid. `←` and `→` have always worked this way and a drag now agrees with them. Drawing a _new_ note
+is the exception, and has to be: a note that does not exist yet has no position of its own to keep,
+so it lands on the grid where the ghost said it would. **`Alt`+`Q` is the one thing that pulls a note
+onto the grid**, which is what quantizing is for.
 
 **Stretching does not use Snap.** A length lands on the note values themselves — a whole, a half, a
 quarter, an eighth, and their dotted forms — because a note in MML is a duration rather than a region
@@ -83,11 +99,16 @@ of its own — so what it says during the drag is what lands in the MML at the e
 several notes at once and it drops the letter and says the length alone: they all take that length,
 and only one of them is a `c`.
 
-**A new note starts at the length of the last one you drew or stretched**, so a run of sixteenths
-costs one sizing rather than one per note. To size the one you are placing, keep the button down and
-turn the wheel: it steps through `1`, `2`, `3`, `4`, `6`, `8` and on down to `192`, and where you let
-go is where the next note starts. There are no dotted stops on the wheel — those are a stretch away,
-and putting them on the wheel would double the turns it takes to cross.
+**A new note starts at the length of the last one you drew, stretched or clicked**, so a run of
+sixteenths costs one sizing rather than one per note, and picking up an existing note is enough to
+go on drawing at its length. The first note of a fresh roll is an `l8`. Deleting a note leaves the
+length alone — it is the note you were last interested in that sets it, not the one you threw away.
+
+To size the one you are placing, keep the button down and turn the wheel: it steps through `1`, `2`,
+`3`, `4`, `6`, `8` and on down to `192`, and where you let go is where the next note starts. The
+same wheel over a note you are **holding still** resizes that note from its right edge. There are no
+dotted stops on the wheel — those are a stretch away, and putting them on the wheel would double the
+turns it takes to cross.
 
 **Edits** is what happens when a gesture would put two notes on top of each other. A channel plays
 one note at a time, so that is something the roll has to answer one way or the other, and this is
