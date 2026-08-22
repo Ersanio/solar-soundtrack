@@ -72,7 +72,7 @@ export type Gesture =
  * The porter's setting rather than the gesture's, so a drag and a stretch answer
  * an overlap the same way.
  */
-export const EDIT_MODES = ['flexible', 'strict'] as const;
+export const EDIT_MODES = ['strict', 'flexible'] as const;
 export type EditMode = (typeof EDIT_MODES)[number];
 
 export interface EditContext {

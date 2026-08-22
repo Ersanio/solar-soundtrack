@@ -170,7 +170,7 @@ export function readSettings(): Settings {
     percussionOpen: false,
     editChannel: null,
     snap: 'beat',
-    editMode: 'flexible',
+    editMode: 'strict',
     lastLength: TICKS_PER_WHOLE / 4,
   };
 
