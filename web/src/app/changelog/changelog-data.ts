@@ -12,7 +12,7 @@ export const CHANGELOG: readonly ChangelogEntry[] = [
     date: '23 August 2026',
     items: [
       'The piano roll says why a gesture was refused instead of quietly doing nothing',
-      'Overwrite mode: a note drawn over a whole run of notes now lands',
+      'The piano roll does not error on songs with remote commands anymore',
     ],
   },
   {
