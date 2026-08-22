@@ -14,6 +14,7 @@ export const CHANGELOG: readonly ChangelogEntry[] = [
       'Editable piano roll: draw, drag, stretch and delete notes, and the MML updates accordingly',
       "Piano roll mouse controls follow FL Studio's, down to middle-drag to pan and Alt for tick precision",
       'Dragging a note moves it by a snap step instead of pulling it onto the grid',
+      'Dragging a note past another one no longer shifts the rest of the channel along',
       'Piano roll Overwrite mode: a note you place takes the ticks from whatever was under it',
       'A readme will soon follow with all the possible gestures and shortcuts',
       'A timeline over the piano roll, with bar numbers and a marker you drag to move the playhead',

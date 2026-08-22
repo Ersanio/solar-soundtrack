@@ -956,6 +956,17 @@ interface Region {
   between: number;
   /** Ticks it has to come to, or -1 for the tail, which may be any length. */
   ticks: number;
+  /**
+   * The stretch after the last note, which a channel may end wherever it likes.
+   *
+   * Carried rather than read off {@link Region.ticks} being negative: a gap
+   * between two notes can come out negative too, when a plan asks for them in an
+   * order the text does not have them in, and reading that as "the tail, so any
+   * length will do" is how such a plan used to be written out as a channel with
+   * every note after the crossing slid along. One is a fact about where the
+   * region is; the other was a guess from a number that had two meanings.
+   */
+  tail: boolean;
   /** Notes being created in it, in tick order. */
   born: PlacedNote[];
   /** Where it starts, in ticks. */
@@ -1116,8 +1127,17 @@ function realiseRegion(
 
   // The tail is free: a channel may end wherever the music ends. What it is not
   // free to leave is two rests where a deleted note stood between them.
-  if (gap.ticks < 0 && gap.born.length === 0) {
+  if (gap.tail && gap.born.length === 0) {
     return joinTail(context, gap);
+  }
+
+  // A gap between two notes that has to come to less than nothing is a plan
+  // asking for them in an order the text does not have them in, which
+  // `crossings` takes out before the regions are built. Refused rather than
+  // written: there is no run of rests that realises it, and the answer that
+  // looks plausible — leave the text alone — is a channel slid along.
+  if (!gap.tail && gap.ticks < 0) {
+    return null;
   }
 
   if (gap.born.length > 0) {
@@ -1415,7 +1435,7 @@ function restFor(gap: Region, born: PlacedNote): StripItem | null {
   }
 
   const last = gap.rests[gap.rests.length - 1];
-  return gap.ticks < 0 && last !== undefined && born.startTick >= last.startTick + last.ticks
+  return gap.tail && last !== undefined && born.startTick >= last.startTick + last.ticks
     ? last
     : null;
 }
@@ -1518,7 +1538,7 @@ function spawnInto(
    * whose ticks no longer come to the rests it holds is refused instead.
    */
   const single = gap.rests.length === 1 && gap.between === 1;
-  const settled = gap.ticks < 0 || gap.ticks === rested(gap.rests, 0);
+  const settled = gap.tail || gap.ticks === rested(gap.rests, 0);
   const inPlace = order.length === 1 && gap.between === gap.rests.length && settled;
 
   /** Whether the run answers to the whole region rather than to one rest inside it. */
@@ -1541,7 +1561,7 @@ function spawnInto(
 
   // Only the last of the tail's rests may grow, and that is what lets a note be
   // drawn past the end of a channel at all.
-  const grows = gap.ticks < 0 && (over === null || over === gap.rests[gap.rests.length - 1]);
+  const grows = gap.tail && (over === null || over === gap.rests[gap.rests.length - 1]);
 
   const runFrom = laidOut || over === null ? gap.startTick : over.startTick;
   const runTo = grows
@@ -1693,6 +1713,33 @@ export function planEdits(context: EditContext, plan: Plan): Edit[] | null {
     } else {
       born.push(note);
     }
+  }
+
+  // A note carried *past* another cannot be rewritten where it stands. The text
+  // is a sequence and a channel's positions are the running sum of its
+  // durations, so a note whose new tick puts it on the other side of one of its
+  // neighbours has to come out of the text and go back in over there. It is
+  // moved out of `survivors`, which is all it takes: the loop below removes the
+  // unit of anything it does not find there, and `regionsOf` hands a born note
+  // to the region its new tick lands in.
+  for (const index of crossings(survivors, plan.touched)) {
+    const note = survivors.get(index);
+    if (!note) {
+      continue;
+    }
+
+    // A command written inside the note stands between two of its segments and
+    // so inside the unit that is about to be taken out — `removeItem` splices
+    // the whole span, and the run written on the far side is the note alone.
+    // Moving one is not permission to throw a `v200` away, and which side of the
+    // note the porter meant it to follow is not something a drag can say. This
+    // is the same ground as `rewriteNote` refusing to move such a note's start.
+    if (strip.items[index].segments.length > 1) {
+      return null;
+    }
+
+    survivors.delete(index);
+    born.push({ ...note, from: -1 });
   }
 
   // The octave the edited text leaves in force, carried down the channel so a
@@ -1900,6 +1947,45 @@ function coalesce(sorted: readonly Edit[]): Edit[] {
 }
 
 /** The stretches of text between the surviving notes, with what belongs in each. */
+/**
+ * The notes whose place in the text is no longer their place in the music.
+ *
+ * {@link regionsOf} walks the channel in the order it is **written** and sizes
+ * each gap as the distance from the note before it, so it holds only while tick
+ * order and text order are the same thing. A gesture that carries a note past
+ * one of its neighbours breaks that, and the note has to be written again on the
+ * far side rather than rewritten where it stands.
+ *
+ * Only a note the gesture moved can break it. Everything else either stays
+ * exactly where it was or is carved, and a carve only ever trims a note's head
+ * or tail — it cannot carry one past its own end, let alone past a neighbour —
+ * so the notes the gesture left alone keep their order among themselves whatever
+ * else happens. Which is why taking the movers out is enough to put the rest
+ * back in agreement, rather than the first step of a search.
+ */
+function crossings(
+  survivors: ReadonlyMap<number, PlacedNote>,
+  touched: readonly PlacedNote[],
+): number[] {
+  const crossed: number[] = [];
+  for (const note of touched) {
+    const at = note.from;
+    if (at < 0 || !survivors.has(at)) {
+      continue; // Already being written afresh, or not a note of this channel's text.
+    }
+
+    for (const [index, other] of survivors) {
+      // Written after it but played before it, or the other way about.
+      if (index !== at && index > at !== other.startTick > note.startTick) {
+        crossed.push(at);
+        break;
+      }
+    }
+  }
+
+  return crossed;
+}
+
 function regionsOf(
   strip: Strip,
   survivors: ReadonlyMap<number, PlacedNote>,
@@ -1924,7 +2010,7 @@ function regionsOf(
     startTick = anchor.note.startTick + anchor.note.ticks;
   }
 
-  regions.push(makeRegion(strip, after, strip.items.length, startTick, -1));
+  regions.push(makeRegion(strip, after, strip.items.length, startTick, -1, true));
 
   for (const note of [...born].sort((a, b) => a.startTick - b.startTick)) {
     const home =
@@ -1946,6 +2032,7 @@ function makeRegion(
   before: number,
   startTick: number,
   ticks: number,
+  tail = false,
 ): Region {
   const rests: StripItem[] = [];
   let between = 0;
@@ -1956,5 +2043,5 @@ function makeRegion(
     }
   }
 
-  return { after, before, rests, ticks, born: [], startTick, between };
+  return { after, before, rests, ticks, tail, born: [], startTick, between };
 }

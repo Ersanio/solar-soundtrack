@@ -490,6 +490,15 @@ stats.loopTicks` pads **every other channel that would cut the song short** out 
   is narrowed to buttons 0 and 2 so the middle one cannot fall through to drawing. Preventing the
   default on `pointerdown` is what stops the browser's autoscroll, since the compatibility
   `mousedown` goes with it.
+- **A region's tick count doubling as the sign that it is the tail** — `regionsOf` sizes each gap as
+  the distance from the note before it _in the text_, so a plan that asks for two notes in an order
+  the text does not have them in produces a **negative** mid-channel gap, which `realiseRegion` read
+  as `-1`'s "the tail, so any length will do" and left alone. The channel was then written with
+  every note after the crossing slid along, silently and with nothing refused. `Region.tail` says
+  where a region is; the sign says nothing, and a negative gap anywhere else is refused. The
+  crossing itself is taken out before that by `crossings`, which moves the note into `born` so its
+  unit is removed and written again on the far side — a note that changes places has to change
+  places in the text, and rewriting it where it stands cannot express that.
 - **Snapping a drag's destination rather than the distance it travelled** — snapping the sum of the
   start and the movement is grid magnetism: a note written a little before the beat was pulled
   square the first time it was touched, and one nudged less than half a step moved when the porter
