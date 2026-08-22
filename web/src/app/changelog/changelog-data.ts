@@ -12,6 +12,7 @@ export const CHANGELOG: readonly ChangelogEntry[] = [
     date: '22 August 2026',
     items: [
       'Editable piano roll: draw, drag, stretch and delete notes, and the MML updates accordingly',
+      'Piano roll Overwrite mode: a note you place takes the ticks from whatever was under it',
       'A readme will soon follow with all the possible gestures and shortcuts',
       'A timeline over the piano roll, with bar numbers and a marker you drag to move the playhead',
       'The bar above it now scrolls the roll through the song instead of seeking',

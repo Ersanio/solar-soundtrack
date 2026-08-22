@@ -454,6 +454,26 @@ stats.loopTicks` pads **every other channel that would cut the song short** out 
   `Preview.refused` beside the clash count for the colour. `NOTHING` is left to the refusals that
   have nowhere to draw — a pitch off the driver's range has no lane, so `rowOfPlaced` answers -1
   whatever `touched` holds.
+- **Each gesture answering an overlap for itself** — drawing, dragging and quantizing held the same
+  block of code three times over and a stretch answered inside its own loop, so a mode added to the
+  table fell straight through to the push at all four sites with nothing to catch it: they were
+  `if`s, and `switch-exhaustiveness-check` cannot see an `if`. `resolved` is the one place the modes
+  are told apart, and a gesture brings only what it alone knows — which way a push should send what
+  is in the way, and which notes are its own. A stretch still pushes once per edge and carves once
+  after them all, because a carve inside that loop eats a note the same gesture is about to move:
+  it is not in `touched` yet, so nothing holds it back.
+- **Counting a carve's pieces in `reach`** — a carve only ever makes a note shorter, so every piece
+  it leaves sits at a tick the channel had already reached; reading the furthest of them as "how far
+  this gesture reaches" padded every other channel out to meet a note nothing had moved, which is
+  the same failure the `reach` comment already warned of for a deletion. `plan.erased` is what says
+  a carve is what filled `pushed`, and the two resolvers never both run since the mode picks one.
+- **Writing a spawned run in front of the region's items rather than after them** — with the intro
+  `/` written between the note before the region and the region's own contents, the run went in
+  front of the marker and the channel re-entered a whole region late. The song plays for the same
+  length either way, so `loopsWhereItDid` in a **one-channel** song is the only reading that catches
+  it: `loopTick` is the lowest tick any channel re-enters at, and a second channel marked on the old
+  tick holds the reading down. `writeInto` anchors at `gap.before - 1`, which is the same offset for
+  a region that holds nothing.
 
 ## Angular specifics
 
