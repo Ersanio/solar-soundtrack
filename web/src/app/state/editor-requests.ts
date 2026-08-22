@@ -159,6 +159,22 @@ export class EditorRequests {
    * caret enough to retire it.
    */
   readonly inspecting = signal<{ address: number; tick: number } | null>(null);
+
+  /**
+   * The caret the inspector's question was withdrawn at, or `null` for none.
+   *
+   * The roll's `Escape` lets a note go, and the panel that was answering about
+   * it has to let go too. It cannot be done by moving the caret: `commandAt` is
+   * inclusive at both ends, so `c8 d8` has no offset between the two that
+   * belongs to neither, and there is nowhere neutral to put it.
+   *
+   * An offset rather than a flag, so it retires itself the way
+   * {@link inspecting} does — the panel is blank only while the caret is still
+   * the one it was dismissed at, and any move at all, in the roll or in the
+   * text, brings it back. {@link reveal} clears it outright, for asking again
+   * about the very note it was dismissed on.
+   */
+  readonly dismissed = signal<number | null>(null);
 }
 
 /** A splice the sender cannot go on mutating after it has posted it. */

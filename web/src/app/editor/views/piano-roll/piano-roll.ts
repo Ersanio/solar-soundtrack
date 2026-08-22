@@ -1502,6 +1502,11 @@ export class PianoRoll {
     if (event.key === 'Escape') {
       if (this.gestures.selection().size > 0) {
         this.gestures.clearSelection();
+        // Letting the note go lets go of the question asked about it: the
+        // inspector is answering from the caret a click on that bar moved, and
+        // nothing else would retire it.
+        this.requests.inspecting.set(null);
+        this.requests.dismissed.set(this.editor.caret());
       } else {
         this.clearEditChannel();
       }

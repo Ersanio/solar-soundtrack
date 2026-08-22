@@ -490,6 +490,13 @@ stats.loopTicks` pads **every other channel that would cut the song short** out 
   is narrowed to buttons 0 and 2 so the middle one cannot fall through to drawing. Preventing the
   default on `pointerdown` is what stops the browser's autoscroll, since the compatibility
   `mousedown` goes with it.
+- **Clearing the inspector by moving the caret off what it was answering about** — `commandAt` is
+  inclusive at **both** ends (`tokens.ts`), so in `c8 d8` the offset that ends `c8` is the offset
+  that begins `d8` and there is no position between them belonging to neither. There is nowhere
+  neutral to put the caret, and the roll faking one would be contradicted by the next click in the
+  text. `EditorRequests.dismissed` holds the caret the question was withdrawn at instead, so the
+  silence is one caret's worth and any move at all ends it — not a mode, which would have to be
+  turned off by something and would outlive the gesture that set it.
 - **One `Shift` flag for both of the gestures it changes** — `Shift` decides what a press on empty
   grid _is_ (a note pinned at the press with its end on the pointer) and merely _constrains_ a drag
   already under way (locked to its row), and those settle at different times. `anchored` is read at

@@ -1,5 +1,6 @@
 import { Component, computed, inject } from '@angular/core';
 
+import { EditorRequests } from '../../state/editor-requests';
 import { EditorStore } from '../../state/editor-store';
 import { hex2 } from '../../util/format';
 import { AdsrCommand } from './adsr-command/adsr-command';
@@ -89,7 +90,18 @@ const LETTER_VIEWS: Readonly<Record<string, string>> = {
 export class CommandInspector {
   protected readonly store = inject(EditorStore);
 
-  protected readonly command = this.store.commandAtCaret;
+  private readonly requests = inject(EditorRequests);
+
+  /**
+   * Whether the roll has let go of what this was answering about — see
+   * {@link EditorRequests.dismissed}. It is one caret's worth of silence, not a
+   * mode: the next move of the caret is the next question.
+   */
+  private readonly dismissed = computed(() => this.requests.dismissed() === this.store.caret());
+
+  protected readonly command = computed(() =>
+    this.dismissed() ? null : this.store.commandAtCaret(),
+  );
 
   /**
    * The `#instruments` entry the caret is in, which wins over everything else.
@@ -102,7 +114,9 @@ export class CommandInspector {
    * without this the editor would be reachable only from the two sample forms
    * that happen to scan as commands.
    */
-  protected readonly entry = this.store.instrumentAtCaret;
+  protected readonly entry = computed(() =>
+    this.dismissed() ? null : this.store.instrumentAtCaret(),
+  );
 
   /** Which view to render; `null` falls through to the parameter table. */
   protected readonly view = computed(() => {

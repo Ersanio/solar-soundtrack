@@ -44,7 +44,7 @@ no channel.
 | Key                         | What it does                                                    |
 | --------------------------- | --------------------------------------------------------------- |
 | `Delete` / `Backspace`      | Deletes the selected notes                                      |
-| `Escape`                    | Clears the selection, or the channel once nothing is selected   |
+| `Escape`                    | Drops the selection and the inspector with it, then the channel |
 | `←` `→`                     | Nudges the selection by one snap step                           |
 | `↑` `↓`                     | Moves the selection a semitone                                  |
 | `Shift` + `↑` `↓`           | Moves it an octave                                              |
