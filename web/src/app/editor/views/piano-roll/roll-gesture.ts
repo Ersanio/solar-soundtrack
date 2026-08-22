@@ -580,6 +580,10 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
           atY: event.clientY,
         });
         if (index >= 0) {
+          // Names the channel first, as the left button does: with none picked,
+          // the strip is the channel under the pointer, and an erase is as much
+          // a gesture on that channel as a drag is.
+          sinks.pick(strip.channel);
           erase(index);
         }
 

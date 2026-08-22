@@ -1,8 +1,11 @@
 # Piano roll shortcuts
 
-A reference for the piano roll editor while there is no proper readme page for it. Everything here
-needs a **channel picked** first — the eight toggles in the corner above the keyboard, or a click on
-any note, which picks that note's channel.
+A reference for the piano roll editor while there is no proper readme page for it. The **channel**
+is picked by the eight toggles in the corner above the keyboard, by a click on any note, or by
+soloing a part in the mixer below. It does not have to be picked first: with none picked you can
+still grab, stretch, copy or delete a note in any channel, and doing so picks that note's channel.
+Drawing a new note, the marquee and the keyboard shortcuts do need one, since empty grid belongs to
+no channel.
 
 ## Mouse
 
@@ -26,6 +29,7 @@ any note, which picks that note's channel.
 | `Ctrl` + wheel                   | Zooms in and out about the pointer                                       |
 | `Shift` + wheel                  | Scrolls the roll sideways                                                |
 | Click a key on the left          | Sounds that pitch on the channel being edited, so you can find it by ear |
+| `Ctrl` + click a channel chip    | Solos that channel, which also picks it to edit                          |
 
 ## Keyboard
 
@@ -118,6 +122,11 @@ slider in the inspector, which writes one note's own length and never looks at i
   history `Ctrl+Z` uses in the MML editor.
 
 ## When a channel cannot be edited
+
+**A channel you cannot hear cannot be edited.** Mute it, or solo another part, and its notes go dim,
+stop answering the pointer, drop whatever was selected on them, and the toolbar says which of the two
+it is. Unmute it, or lift the solo, and it takes edits again — though the selection does not come
+back, having been dropped rather than hidden.
 
 Some MML has no one-to-one relationship between what is written and what is played, and the roll says
 so in the toolbar rather than guessing. A `[ ]` loop, a `*` or `(n)` call, a `{ }` triplet, a

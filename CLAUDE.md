@@ -397,6 +397,26 @@ stats.loopTicks` pads **every other channel that would cut the song short** out 
   `hoverCursor` answers `pointer` for the bar that really is only clickable, which is another
   channel's. The glyph plates inside a bar take no cursor either — they are right-aligned, so one
   would sit on the right stretch zone and put the same bug back over the last twelve pixels.
+- **Moving `editChannel` onto `Mixer`** so a press on `M` or `S` could set it at its own call site,
+  the way the roll's chips do — it is one field of the roll's persisted `Settings`, and a service
+  owning it either splits that `localStorage` write in two or takes the whole roll's settings with
+  it. The mixer is carried into the roll by a transition-following effect instead
+  (`followMixer`), in the mould of the `wasIdle` one beside it: a `let` holding the last mask, the
+  body `untracked`. Following the state and not the transition is what does not work — the roll is
+  rebuilt on every tab switch, so an effect reading `silenced()` alone would drag the edited channel
+  back to a solo taken long ago each time the tab came round.
+- **Refusing every gesture until a channel is picked** — the roll was already pointing at the answer
+  and would not take it, so the first act on a song was always to find eight small chips in a corner.
+  With none picked the strip is built for the channel of the bar under the pointer (`editing`, off
+  the `hovered` mark the tooltip already tracks), which gives the cursor, the hit test and the press
+  the same channel for free, and `onPointerDown`'s existing `pick` sink names it for real. Not a
+  hover-wide adoption either: empty grid belongs to no channel, so drawing, the marquee and the
+  shortcuts still ask for one, and `editRefusal` and `onKey` stay on `editChannel` so a channel
+  merely hovered is never announced as being edited.
+- **A muted channel editable but un-clickable** — its bars take no pointer, so muting the channel
+  being edited left drawing and the keyboard working on notes that could not be selected or heard.
+  The strip refuses a silenced channel outright, in `silencedReason`'s words, which is the same
+  sentence `Audition` refuses to preview one in.
 - **Setting that cursor from the pointer move that reported the position** — the roll scrolls under
   a still pointer for the whole of a followed playback, so bars arrived under a cursor that had been
   told `crosshair` and nothing said otherwise until the pointer moved. It is a `computed` over

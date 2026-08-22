@@ -26,6 +26,7 @@ import { EditorRequests } from '../../../state/editor-requests';
 import { EditorStore } from '../../../state/editor-store';
 import { Mixer } from '../../../state/mixer';
 import { Playback } from '../../../state/playback';
+import { silencedReason, soleAudible } from '../../../state/transport-view';
 import { PercussionPanel, percussionChips } from './percussion-panel/percussion-panel';
 import { DEFAULT_PERCUSSION, type PlaceContext, rollShape } from './percussion';
 import {
@@ -187,6 +188,10 @@ export class PianoRoll {
   private readonly audible = computed(
     () => new Map(this.mixer.channels().map((c) => [c.index, c.audible])),
   );
+
+  /** The mixer's own state, for the chips to say what is muted and what is soloed. */
+  protected readonly mixerChannels = this.mixer.channels;
+  protected readonly silenced = this.mixer.silenced;
 
   /** Instrument numbers whose sample is noise, from the song's own entries. */
   private readonly noiseInstruments = computed(() => {
@@ -562,6 +567,46 @@ export class PianoRoll {
   // --- editing -------------------------------------------------------------
 
   /**
+   * The bar under the pointer. Read by the tooltip and by {@link hoverChannel},
+   * which is why it sits above both rather than with the rest of the tooltip.
+   */
+  protected readonly hovered = signal<Mark | null>(null);
+
+  /**
+   * The channel of the bar under the pointer.
+   *
+   * A muted bar takes no pointer at all (`roll-notes.html`), so it never sets
+   * this and a channel nothing can be heard on is never offered.
+   */
+  private readonly hoverChannel = computed(() => this.hovered()?.note.channel ?? null);
+
+  /**
+   * The channel a gesture acts on: the one being edited, or — while none is —
+   * the one under the pointer, so a press on a bar can take the channel with it.
+   *
+   * The press then names it for real, through the `pick` sink `onPointerDown`
+   * already calls. Empty grid offers nothing, so drawing, the marquee and the
+   * shortcuts still need a channel chosen: only a bar can say which channel a
+   * gesture on it belongs to.
+   */
+  private readonly editing = computed(() => this.editChannel() ?? this.hoverChannel());
+
+  /**
+   * Why the channel about to be edited is not being heard, or `null` where it is.
+   *
+   * A channel nothing can be heard on takes no interaction, which is the rule its
+   * bars already keep by taking no pointer; editing is the rest of it, since a
+   * note drawn there is one the porter can neither hear nor click. The same
+   * sentence the note previewer refuses to sound it in.
+   */
+  private readonly silencedEdit = computed(() => {
+    const channel = this.editing();
+    return channel !== null && (this.mixer.silenced() & (1 << channel)) !== 0
+      ? silencedReason(channel, this.mixer.soloed())
+      : null;
+  });
+
+  /**
    * The channel being edited, as a sequence the roll can splice — or the reason
    * it cannot be one.
    *
@@ -570,7 +615,7 @@ export class PianoRoll {
    * an edit and a corruption, so it is the first check rather than the last.
    */
   private readonly stripOutcome = computed(() => {
-    const channel = this.editChannel();
+    const channel = this.editing();
     const result = this.editor.result();
     const timeline = this.timeline();
     if (
@@ -580,6 +625,11 @@ export class PianoRoll {
       this.editor.compiledText() !== this.editor.source()
     ) {
       return null;
+    }
+
+    const quiet = this.silencedEdit();
+    if (quiet !== null) {
+      return { refused: quiet };
     }
 
     return channelStrip({
@@ -597,11 +647,25 @@ export class PianoRoll {
     return outcome && isStrip(outcome) ? outcome : null;
   });
 
-  /** Why the picked channel cannot be edited, for the toolbar to say. */
+  /**
+   * Why the picked channel cannot be edited, for the toolbar to say.
+   *
+   * Only for a channel really picked: a hovered one is not being edited, and the
+   * toolbar would be explaining a refusal beside the words "editing: none".
+   */
   protected readonly editRefusal = computed(() => {
-    const outcome = this.stripOutcome();
+    const outcome = this.editChannel() === null ? null : this.stripOutcome();
     return outcome && !isStrip(outcome) ? outcome.refused : null;
   });
+
+  /**
+   * Whether rewriting the channel is the answer to the refusal on show.
+   *
+   * It is for every refusal `channelStrip` gives, which are all things the text
+   * says. It is not for a mute: nothing written in the channel is what is
+   * stopping it, and a Normalize offered there is a rewrite that changes nothing.
+   */
+  protected readonly normalizable = computed(() => this.silencedEdit() === null);
 
   private readonly targetAMKVersion = computed(
     () => this.editor.result()?.stats?.targetAMKVersion ?? 4,
@@ -688,13 +752,13 @@ export class PianoRoll {
 
   /** The channel's own colour, so a note being dragged stays the colour it is. */
   protected readonly editFill = computed(() => {
-    const channel = this.editChannel();
+    const channel = this.editing();
     return channel === null ? CHANNEL_FILL[0] : CHANNEL_FILL[channel];
   });
 
   /** The same colour as an outline, which is what the ghost is drawn with. */
   protected readonly editStroke = computed(() => {
-    const channel = this.editChannel();
+    const channel = this.editing();
     return channel === null ? CHANNEL_STROKE[0] : CHANNEL_STROKE[channel];
   });
 
@@ -717,7 +781,6 @@ export class PianoRoll {
 
   // --- tooltip -------------------------------------------------------------
 
-  protected readonly hovered = signal<Mark | null>(null);
   protected readonly pointer = signal({ x: 0, y: 0, width: 0, height: 0 });
 
   /** The hovered mark, while there is still a song for it to have come from. */
@@ -789,6 +852,46 @@ export class PianoRoll {
         if (idle && !this.dragging()) {
           this.pageOrigin.set(0);
         }
+      });
+    });
+
+    // Sanctioned effect: carrying a press on the mixer's own buttons back to the
+    // channel being edited. The mixer is a strip under the whole pane rather
+    // than a child of the roll, so it has no call site here to do it at, the way
+    // the picker's own chips do.
+    //
+    // It follows the transition and not the state, for the same reason as the
+    // one above: the roll is rebuilt on every tab switch, and adopting on the
+    // state alone would drag the edited channel back to a solo taken long ago
+    // each time the tab came round. The mask is the whole trigger — it changes
+    // only when M, S or Reset is pressed, so a recompile cannot fire this.
+    let wasSilenced = untracked(() => this.mixer.silenced());
+    effect(() => {
+      const silenced = this.mixer.silenced();
+      untracked(() => {
+        if (silenced === wasSilenced) {
+          return;
+        }
+
+        wasSilenced = silenced;
+        this.followMixer(silenced);
+      });
+    });
+
+    // Sanctioned effect: a selection is a set of indices into the channel's
+    // strip, so a rebuild from text the roll did not write leaves the outline on
+    // whatever notes now sit at those indices. The roll's own gestures clear it
+    // as they commit; this is for the ones typed in the source view.
+    let wasSource = untracked(() => this.editor.source());
+    effect(() => {
+      const source = this.editor.source();
+      untracked(() => {
+        if (source === wasSource) {
+          return;
+        }
+
+        wasSource = source;
+        this.gestures.clearSelection();
       });
     });
 
@@ -904,18 +1007,58 @@ export class PianoRoll {
    * landed on is the answer, so a second note on the channel already being
    * edited must not clear it.
    *
-   * The selection goes with the channel, and only when the channel really
-   * changes: it is a set of indices into one channel's strip, so carrying it
-   * across would outline whatever notes happen to sit at those indices in the
-   * next one. A press names its own channel before it selects, so clearing on
-   * an unchanged channel would take away the note just clicked.
+   * Naming the channel already being edited does nothing at all, which is what
+   * lets every gesture call it: a press names its own channel before it selects,
+   * and clearing there would take away the note just clicked. The selection goes
+   * with a channel that really changes, being a set of indices into one
+   * channel's strip — carried across, it would outline whatever notes happen to
+   * sit at those indices in the next one.
    */
   protected selectEditChannel(editChannel: number): void {
-    if (this.editChannel() !== editChannel) {
-      this.gestures.clearSelection();
+    if (this.editChannel() === editChannel) {
+      return;
     }
 
+    this.gestures.clearSelection();
     this.settings.update((s) => ({ ...s, editChannel }));
+  }
+
+  /**
+   * What a press on the mixer means for the roll.
+   *
+   * Isolating a part is choosing one to work on, and a solo and muting every
+   * other channel by hand are the same act — `soleAudible` is what makes them
+   * the same answer. Otherwise a channel that has just gone quiet keeps its
+   * place but loses its selection, because a muted channel takes no interaction.
+   *
+   * The two cannot deadlock against the refusal a silenced channel gets: the
+   * channel handed over here is by definition the one still being heard.
+   */
+  private followMixer(silenced: number): void {
+    const sole = soleAudible(this.mixer.channels());
+    if (sole !== null) {
+      this.selectEditChannel(sole);
+      return;
+    }
+
+    const channel = this.editChannel();
+    if (channel !== null && (silenced & (1 << channel)) !== 0) {
+      this.gestures.clearSelection();
+    }
+  }
+
+  /**
+   * `Ctrl` on a chip isolates that channel instead of editing it, so a part can
+   * be picked out and worked on without crossing the pane to the mixer.
+   *
+   * Refused for a channel the song does not write to, as the mixer refuses it by
+   * giving those no buttons at all: soloing one silences everything, which would
+   * leave the roll with nothing it is allowed to edit.
+   */
+  protected isolateChannel(channel: number): void {
+    if (this.mixer.channels().some((state) => state.index === channel)) {
+      this.mixer.toggleSolo(channel);
+    }
   }
 
   /** Kept sorted, so comparing against the default is a string compare. */
@@ -1062,12 +1205,17 @@ export class PianoRoll {
    * Ignored while the text has focus, so `Ctrl+A` in the source still selects
    * the source. Everything here goes through the same {@link Gesture} the
    * pointer uses, so a nudge and a drag commit the same way.
+   *
+   * A channel really picked, rather than {@link editing}: a key has no pointer
+   * to name a channel with, so `Ctrl+A` under one merely hovered would select
+   * notes in a channel the toolbar says is not being edited.
    */
   protected onKey(event: KeyboardEvent): void {
     const strip = this.strip();
     const target = event.target as HTMLElement | null;
     if (
       !strip ||
+      this.editChannel() === null ||
       target?.closest('input, textarea, select, .cm-editor') !== null ||
       event.isComposing
     ) {

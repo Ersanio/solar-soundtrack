@@ -9,6 +9,15 @@ export interface ChangelogEntry {
 export const CHANGELOG: readonly ChangelogEntry[] = [
   // ─── newest first; add new blocks here ──────────────────────────────────
   {
+    date: '22 August 2026',
+    items: [
+      'Soloing a channel, or muting all but one, picks it to edit in the piano roll',
+      'A muted channel cannot be edited, and loses its selection',
+      'Grab, drag or resize a note before picking its channel',
+      'Roll channel buttons show what is muted and soloed; Ctrl+click one to solo it',
+    ],
+  },
+  {
     date: '21 August 2026',
     items: [
       'Editable piano roll: draw, drag, stretch and delete notes, and the MML updates accordingly',

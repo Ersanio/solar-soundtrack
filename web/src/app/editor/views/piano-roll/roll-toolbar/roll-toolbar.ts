@@ -50,6 +50,8 @@ export class RollToolbar {
   readonly editMode = input.required<EditMode>();
   /** Why the picked channel cannot be edited, or null when it can. */
   readonly editRefusal = input.required<string | null>();
+  /** Whether a rewrite of that channel is the answer to the refusal. */
+  readonly normalizable = input.required<boolean>();
   /** How many notes are selected, for the readout. */
   readonly selected = input.required<number>();
   /** The channel the corner's picker has selected, or null when none is. */

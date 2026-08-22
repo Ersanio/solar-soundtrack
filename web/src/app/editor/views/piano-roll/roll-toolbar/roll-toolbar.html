@@ -145,12 +145,15 @@
   <amk-normalize-button />
 
   <span class="text-ink-muted font-mono text-xs">{{ editLabel() }}</span>
-  <!-- Why a channel cannot be edited is a property of the song, so it is said
-       here rather than in a dialog; the narrower Normalize beside it is the
-       answer, and its own refusals go in its own dialog. -->
+  <!-- Why a channel cannot be edited is said here rather than in a dialog; the
+       narrower Normalize beside it is the answer where the reason is something
+       the text says, and its own refusals go in its own dialog. A muted channel
+       is the reason that is not: nothing written in it is what is stopping it. -->
   @if (editRefusal(); as reason) {
     <span class="text-warn text-xs">cannot edit: {{ reason }}</span>
-    <amk-normalize-button [channel]="editChannel() ?? 0" />
+    @if (normalizable()) {
+      <amk-normalize-button [channel]="editChannel() ?? 0" />
+    }
   }
   <span class="text-ink-muted font-mono text-xs">{{ readout() }}</span>
 </amk-toolbar>

@@ -7,6 +7,7 @@ import { EditorStore } from './editor-store';
 import { Mixer } from './mixer';
 import type { NoteReply, NoteRequest } from './note.worker';
 import { transposeAt } from './note-transpose';
+import { silencedReason } from './transport-view';
 import { errorMessage } from '../util/format';
 
 /** How long an auditioned note is held when the caller does not say — a whole note. */
@@ -141,12 +142,7 @@ export class Audition {
     // anyway, so a note that is both silenced and out of range reports this one.
     if (this.mixer.silenced() & (1 << request.channel)) {
       if (!request.quiet) {
-        const soloed = this.mixer.soloed();
-        this.editor.say(
-          soloed === null
-            ? `channel ${request.channel} is muted`
-            : `only channel ${soloed} is soloed`,
-        );
+        this.editor.say(silencedReason(request.channel, this.mixer.soloed()));
       }
 
       return;

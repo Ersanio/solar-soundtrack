@@ -10,6 +10,7 @@
   [snap]="snap()"
   [editMode]="editMode()"
   [editRefusal]="editRefusal()"
+  [normalizable]="normalizable()"
   [selected]="gestures.selection().size"
   (zoomBy)="setZoom($event)"
   (snapChange)="setSnap($event)"
@@ -60,7 +61,13 @@
       (scrubEnd)="onScrubEnd()"
     />
 
-    <amk-roll-channels [selected]="editChannel()" (picked)="setEditChannel($event)" />
+    <amk-roll-channels
+      [selected]="editChannel()"
+      [channels]="mixerChannels()"
+      [silenced]="silenced()"
+      (picked)="setEditChannel($event)"
+      (isolated)="isolateChannel($event)"
+    />
   </div>
 }
 

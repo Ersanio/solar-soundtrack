@@ -362,7 +362,9 @@ a glyph targets its command instead. What fits is measured (`fitBarContent`): th
 and the glyphs drop from the end, because a bar that says `C6` and nothing else is still saying
 something. Anything dropped is in the hover and in the inspector, so nothing is only on a bar. A
 muted channel is drawn dimmed, behind the others, and takes no pointer at all, so where a live note
-overlaps it the live one is what a hover or a click reaches.
+overlaps it the live one is what a hover or a click reaches — and it cannot be edited either, the
+strip refusing it in the words the note previewer refuses to sound it in (`silencedReason`), so a
+channel that goes quiet drops its selection rather than keeping one nothing can act on.
 
 **Which commands act on a note is answered exactly, and it takes two halves to be exact.** Anything
 that emits a VCMD is named by the walk, at the ARAM address the driver read it from, and
@@ -420,7 +422,12 @@ ordinary namespace, `roll-lanes/`, `roll-grid/`, `roll-notes/` and `roll-keys/` 
 `<svg>`. `roll-channels/` is the odd one: it draws nothing of the song, and takes the corner the
 scrub bar leaves empty above the key column to say which channel is being edited. Its eight toggles
 are not the only way in — a click on a bar or on one of its glyphs names that bar's channel, since
-the roll is already pointing at the answer. Beside them sit six Angular-free files — `roll-layout.ts` and `percussion.ts`, and `roll-metrics.ts`,
+the roll is already pointing at the answer, and so does the first gesture of a drag, a stretch or an
+erase, through `editing`: with no channel picked, the strip is built for the channel under the
+pointer, so a bar can be grabbed before it has been chosen and the press names it on the way. Empty
+grid offers nothing to name, which is why drawing, the marquee and the shortcuts still need a
+channel. The chips carry the mixer's state too — struck through where the mask silences them, ringed
+where the solo is — and `Ctrl` on one isolates that channel rather than editing it. Beside them sit six Angular-free files — `roll-layout.ts` and `percussion.ts`, and `roll-metrics.ts`,
 `roll-settings.ts`, `roll-marks.ts` and `roll-clock.ts` — so the arithmetic stays where a harness can
 import it. `charttest` reaches the first two by path.
 

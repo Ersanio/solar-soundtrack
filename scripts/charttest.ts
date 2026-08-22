@@ -57,7 +57,14 @@ import {
 	trackPosition,
 	valueAt,
 } from "../web/src/app/shared/slider/slider-track";
-import { channelStates, estimatedSecondsAt, silencedMask, soundingSpans } from "../web/src/app/state/transport-view";
+import {
+	channelStates,
+	estimatedSecondsAt,
+	silencedMask,
+	silencedReason,
+	soleAudible,
+	soundingSpans,
+} from "../web/src/app/state/transport-view";
 import { clamp } from "../web/src/app/util/math";
 
 import { check, summarise } from "./harness";
@@ -1353,6 +1360,22 @@ console.log("\nthe transport's mixer and playhead, which a browser cannot be mad
 
 	// An empty channel keeps no row, whatever its mute state.
 	check("an empty channel gets no row even when muted", channelStates([0, 0], 0b11, null).length === 0);
+
+	// What the roll adopts as the channel to edit. Soloing and muting every other
+	// channel by hand are one answer, which is the point of asking it over the rows.
+	check("nothing muted leaves no sole channel", soleAudible(rows) === null);
+	check("a solo leaves the soloed channel", soleAudible(soloed) === 2);
+	check(
+		"muting every other row by hand leaves the same one",
+		soleAudible(channelStates(sizes, 0b1000_0001, null)) === 2,
+	);
+	check("one mute short of that leaves none", soleAudible(muted) === null);
+	check("muting every row leaves none", soleAudible(channelStates(sizes, 0b1000_0101, null)) === null);
+	check("a song with one channel leaves that one", soleAudible(channelStates([40], 0, null)) === 0);
+	check("and a song with no channels at all leaves none", soleAudible(channelStates([], 0, null)) === null);
+
+	check("a mute is reported as a mute", silencedReason(3, null) === "channel 3 is muted");
+	check("  and a solo names the channel that has it", silencedReason(3, 5) === "only channel 5 is soloed");
 }
 
 console.log("\nthe playhead drops what a mid-update read of ARAM invents");
