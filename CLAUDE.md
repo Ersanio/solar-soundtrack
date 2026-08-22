@@ -207,6 +207,12 @@ One entry each: what it was, what it is, why.
   the roll could be seeked at all, and the commit fired on a guess about when the gesture had ended
   rather than on anything the porter did. The overview bar above the roll is the affordance, and a
   pointer-up is a real end.
+- **`w-full` on the bar over the roll** — the pane is measured inside its vertical scrollbar
+  (`elementSize` reads the content box) and the bar is drawn outside it, so the `viewBox` stretched
+  over that gutter while the pointer maths, which is in client px against a raw `KEY_WIDTH`, did
+  not: the drawn window and the tick under the pointer disagreed by about a scrollbar's width on any
+  roll tall enough to scroll. It is `[style.width.px]="width()"`, which is the roll `<svg>`'s own
+  width, so one user unit is one CSS px in one shared space.
 - **Template method calls per row** — the sample browser decoded 64 BRR samples on every
   change-detection pass, ten times a second while playing. Panels build one `computed` view model;
   the `no-call-expression` note in `eslint.config.js` says why lint cannot catch it.

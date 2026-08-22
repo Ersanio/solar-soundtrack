@@ -15,6 +15,11 @@ import { overviewTick } from '../roll-layout';
  * The pointer capture and the hit test are here because they are geometry of the
  * element this draws; what a drag *means* — coming off the song, and the seek at
  * the end of it — is the parent's, so this emits the gesture and nothing more.
+ *
+ * The `<svg>` is sized in pixels rather than `w-full` so that one user unit is
+ * one CSS px: the pane is measured inside its vertical scrollbar and the bar is
+ * drawn outside it, and a `w-full` bar stretches its `viewBox` over that gutter
+ * while the hit test below, which works in client px, does not follow it.
  */
 @Component({
   selector: 'amk-roll-overview',
@@ -24,6 +29,8 @@ import { overviewTick } from '../roll-layout';
 export class RollOverview {
   /** The bar's `viewBox`. Null until the pane is measured, so the parent withholds it. */
   readonly box = input.required<string>();
+  /** The pane's width, which is the bar's, in CSS pixels. */
+  readonly width = input.required<number>();
   readonly rollWidth = input.required<number>();
   /** The song's whole length. Zero refuses the drag, since there is nowhere to seek to. */
   readonly ticks = input.required<number>();

@@ -1,7 +1,8 @@
 <svg
-  class="block w-full cursor-pointer select-none"
+  class="block cursor-pointer select-none"
   [attr.height]="barHeight"
   [attr.viewBox]="box()"
+  [style.width.px]="width()"
   (pointerdown)="onDown($event)"
   (pointermove)="onMove($event)"
   (pointerup)="onUp($event)"
