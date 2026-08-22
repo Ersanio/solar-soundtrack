@@ -609,6 +609,102 @@ expectEdit(
 	{ contains: "#0 o6", lacks: ["o4", "o5"] },
 );
 
+// A gap is realised over **runs** of rests rather than over one rest at a time,
+// so a note deleted from between two of them leaves the one rest they now are.
+// `note rest note rest` is the commonest shape a channel has, and every case
+// here is checked by compiling and walking the result rather than by the text
+// alone: `r4.` and `r4 r8` sound identical and only the text tells them apart.
+expectEdit(
+	"a note deleted from between two rests",
+	"#amk 2\n#0 o4 c8 r8 d8 r8 e8",
+	0,
+	(bar) => ({ kind: "delete", items: [noteAt(bar, 1)] }),
+	{ text: "#amk 2\n#0 o4 c8 r4. e8" },
+);
+
+// Touching already, and still one rest afterwards: the run is being rewritten
+// either way, and leaving `r4 r8` behind is the thing this is for.
+expectEdit(
+	"two rests already touching in a gap being rewritten",
+	"#amk 2\n#0 o4 c8 r8 r8 d8 e8",
+	0,
+	(bar) => ({ kind: "delete", items: [noteAt(bar, 1)] }),
+	{ text: "#amk 2\n#0 o4 c8 r4. e8" },
+);
+
+// A run stops at anything that carries a position. The `v200` is two rests'
+// distance from the note it was written for and stays there.
+expectEdit(
+	"a command written between the two rests",
+	"#amk 2\n#0 o4 c8 r8 v200 d8 r8 e8",
+	0,
+	(bar) => ({ kind: "delete", items: [noteAt(bar, 1)] }),
+	{ text: "#amk 2\n#0 o4 c8 r4 v200 r8 e8" },
+);
+
+// The intro marker most of all: every channel resumes from its own on each pass
+// (`parser.ts:parseIntro`), so a `/` swallowed into a merged rest moves the
+// whole song's loop point — which is what `loopsWhereItDid` catches and what
+// reading the text could not.
+expectEdit(
+	"the intro marker written between the two rests",
+	"#amk 2\n#0 o4 c8 r8 / d8 r8 e8\n#1 o4 c8 r8 / d8 r8 e8",
+	0,
+	(bar) => ({ kind: "delete", items: [noteAt(bar, 1)] }),
+	{ text: "#amk 2\n#0 o4 c8 r4 / r8 e8\n#1 o4 c8 r8 / d8 r8 e8", loopsWhereItDid: true },
+);
+
+// And a gap whose ticks do not change is not rewritten at all, so two rests the
+// porter wrote touching are only ever joined by a gesture that had to move them.
+expectEdit(
+	"two rests the porter wrote touching in a gap that does not move",
+	"#amk 2\n#0 o4 c4 r4 r4 d4 e4",
+	0,
+	(bar) => ({ kind: "move", items: [noteAt(bar, 2)], deltaTicks: 48, deltaKeys: 0, copy: false }),
+	{ text: "#amk 2\n#0 o4 c4 r4 r4 d4 r4 e4" },
+);
+
+// The tail is the one stretch nothing rewrites — a channel may end wherever its
+// music ends — so the run collapsed there is only the one this gesture joined.
+expectEdit(
+	"the last note deleted from between two trailing rests",
+	"#amk 2\n#0 o4 c8 r8 d8 r8\n#1 o4 c2",
+	0,
+	(bar) => ({ kind: "delete", items: [noteAt(bar, 1)] }),
+	{ text: "#amk 2\n#0 o4 c8 r4\n#1 o4 c2" },
+);
+
+expectEdit(
+	"trailing rests the porter wrote touching",
+	"#amk 2\n#0 o4 c8 d8 r8 r8\n#1 o4 c2",
+	0,
+	(bar) => ({ kind: "delete", items: [noteAt(bar, 0)] }),
+	{ contains: "r8 r8" },
+);
+
+// `octave` is global parser state and leaks past a `#N`, so the last note off a
+// channel leaves what it put in force where its unit was — which lands between
+// the two removals a merged tail makes, and `coalesce` reads it in that order.
+// `#1` writes no octave of its own, so "leaves the other channels alone" is what
+// catches it going astray.
+expectEdit(
+	"the octave a deleted last note left, across a merged tail",
+	"#amk 2\n#0 o4 c8 r8 o5 d8 r8\n#1 c8 c8 c8 c8",
+	0,
+	(bar) => ({ kind: "delete", items: [noteAt(bar, 1)] }),
+	{ text: "#amk 2\n#0 o4 c8 r4 o5\n#1 c8 c8 c8 c8" },
+);
+
+// `spellDuration` has `=ticks` for a length with no divisor and no dotted
+// spelling, so a run comes to one rest however long it is.
+expectEdit(
+	"a run of three rests becoming one",
+	"#amk 2\n#0 o4 c8 r8 d8 r8 e8 r8 f8",
+	0,
+	(bar) => ({ kind: "delete", items: [noteAt(bar, 1), noteAt(bar, 2)] }),
+	{ text: "#amk 2\n#0 o4 c8 r=120 f8" },
+);
+
 expectEdit("a note drawn into a rest", "#amk 2\n#0 o4 c4 r2 d4", 0, () => ({
 	kind: "spawn",
 	startTick: 72,

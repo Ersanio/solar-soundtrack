@@ -780,6 +780,135 @@ interface Region {
   startTick: number;
 }
 
+/** A stretch of rests that will be written as the one rest they are — see {@link restRuns}. */
+interface RestRun {
+  /** In order. The first is the one the whole run is written into. */
+  rests: StripItem[];
+  /** Whether a unit this plan removes is what joined two of them. */
+  joined: boolean;
+}
+
+/**
+ * A region's rests, grouped into the stretches that will end up touching.
+ *
+ * Two rests are one run when everything between them is whitespace or a unit
+ * this plan removes — and every non-rest item strictly inside a region is a
+ * note being deleted, by construction of {@link regionsOf}, so a deleted note
+ * between two rests joins them. Two rests written touching already are one run
+ * too, since the text says so.
+ *
+ * A `v200`, a `y`, a `$ED` or the intro `/` between them is not whitespace, and
+ * the run stops there: those carry a position, and a run is written over as one
+ * piece. Spans are {@link StripItem.unitSpan} rather than `prefixSpan` because a
+ * deleted note's unit swallows the `o` written beside it (`roll-strip.ts`,
+ * `growUnits`) and {@link removeItem} takes the whole unit with it.
+ */
+function restRuns(context: EditContext, gap: Region): RestRun[] {
+  const { source, strip } = context;
+  const runs: RestRun[] = [];
+  let open: RestRun | null = null;
+  /** Whether nothing but whitespace and removed units has been passed since the last rest. */
+  let clean = false;
+  /** And whether one of those removed units is what stands between them. */
+  let removed = false;
+
+  for (let index = gap.after + 1; index < gap.before; index++) {
+    const item = strip.items[index];
+    const touches =
+      index > gap.after + 1 &&
+      source.slice(strip.items[index - 1].unitSpan.end, item.unitSpan.start).trim() === '';
+
+    if (item.kind !== 'rest') {
+      clean = clean && touches;
+      removed = true;
+      continue;
+    }
+
+    if (open !== null && clean && touches) {
+      open.rests.push(item);
+      open.joined ||= removed;
+    } else {
+      open = { rests: [item], joined: false };
+      runs.push(open);
+    }
+
+    clean = true;
+    removed = false;
+  }
+
+  return runs;
+}
+
+/**
+ * Trailing rests a deletion left touching, written as the one rest they are.
+ *
+ * Nothing rewrites the tail's length — the channel ends where its music ends —
+ * so the only runs collapsed here are the ones this gesture is what joined. A
+ * run the porter wrote touching has had nothing done to it and is left as
+ * written, which is the same line {@link realiseRegion} takes when a gap's ticks
+ * do not change.
+ *
+ * The total is preserved, so the channel is exactly as long afterwards.
+ */
+function joinTail(context: EditContext, gap: Region): Edit[] | null {
+  const edits: Edit[] = [];
+  for (const run of restRuns(context, gap)) {
+    if (!run.joined) {
+      continue;
+    }
+
+    const written = collapse(context, run, rested(run.rests, 0));
+    if (written === null) {
+      return null;
+    }
+
+    edits.push(...written);
+  }
+
+  return edits;
+}
+
+/**
+ * A run written as one rest of `want` ticks, or removed outright where it is
+ * asked for none.
+ *
+ * The rests it leaves behind go one edit each rather than the whole run going as
+ * a single splice, and that is load-bearing: `planEdits` puts a deleted note's
+ * octave restore back at that note's own `unitSpan.end`, which a splice over the
+ * run would enclose — and CodeMirror merges overlapping ranges rather than
+ * refusing them, so `planEdits` refuses the gesture instead. Abutting edits are
+ * what {@link coalesce} joins, in the order they are read.
+ */
+function collapse(context: EditContext, run: RestRun, want: number): Edit[] | null {
+  const { source, targetAMKVersion } = context;
+  const edits: Edit[] = [];
+  for (const gone of run.rests.slice(1)) {
+    edits.push(...removeItem(source, gone));
+  }
+
+  if (want <= 0) {
+    edits.push(...removeItem(source, run.rests[0]));
+    return edits;
+  }
+
+  const text = spellDuration(want, targetAMKVersion);
+  if (text === null) {
+    return null;
+  }
+
+  const edit = spliceRange(source, run.rests[0].unitSpan, `r${text}`);
+  if (edit) {
+    edits.push(edit);
+  }
+
+  return edits;
+}
+
+/** What a stretch of runs holds now, from `from` on. */
+function heldBy(runs: readonly RestRun[], from: number): number {
+  return runs.slice(from).reduce((sum, run) => sum + rested(run.rests, 0), 0);
+}
+
 /**
  * The rests between the notes, made to come to the ticks the plan asks for.
  *
@@ -788,45 +917,49 @@ interface Region {
  * written for: a `v200` two beats ahead of a note stays two beats ahead of it. A
  * shrink that exhausts one rest deletes it and carries on into the next; a gap
  * with no rest at all has one written in straight after the note before it.
+ *
+ * What the change is taken from is a **run** of rests rather than one rest
+ * (`restRuns`): a note deleted from between two of them leaves them touching,
+ * and two touching rests are one rest. A run whose ticks are what they already
+ * were is left exactly as written, so rests the porter wrote touching are only
+ * ever joined by a gesture that had to move them anyway.
  */
 function realiseRegion(
   context: EditContext,
   gap: Region,
   survivors: ReadonlyMap<number, PlacedNote>,
 ): Edit[] | null {
-  const { source, targetAMKVersion } = context;
+  const { targetAMKVersion } = context;
   const edits: Edit[] = [];
 
-  // The tail is free: a channel may end wherever the music ends.
+  // The tail is free: a channel may end wherever the music ends. What it is not
+  // free to leave is two rests where a deleted note stood between them.
   if (gap.ticks < 0 && gap.born.length === 0) {
-    return edits;
+    return joinTail(context, gap);
   }
 
   if (gap.born.length > 0) {
     return spawnInto(context, gap, survivors);
   }
 
+  const runs = restRuns(context, gap);
   let left = gap.ticks;
-  for (let at = 0; at < gap.rests.length; at++) {
-    const rest = gap.rests[at];
-    const last = at === gap.rests.length - 1;
-    const want = last ? left : at === 0 ? Math.max(0, left - rested(gap.rests, 1)) : rest.ticks;
-    if (want <= 0) {
-      edits.push(...removeItem(source, rest));
-      left -= 0;
-      continue;
-    }
-
-    if (want !== rest.ticks) {
-      const text = spellDuration(want, targetAMKVersion);
-      if (text === null) {
+  for (let at = 0; at < runs.length; at++) {
+    const run = runs[at];
+    const held = rested(run.rests, 0);
+    const last = at === runs.length - 1;
+    const want = last ? left : at === 0 ? Math.max(0, left - heldBy(runs, 1)) : held;
+    if (want !== held) {
+      const written = collapse(context, run, want);
+      if (written === null) {
         return null;
       }
 
-      const edit = spliceRange(source, rest.unitSpan, `r${text}`);
-      if (edit) {
-        edits.push(edit);
-      }
+      edits.push(...written);
+    }
+
+    if (want <= 0) {
+      continue;
     }
 
     left -= want;
