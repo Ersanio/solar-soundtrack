@@ -202,10 +202,10 @@ One entry each: what it was, what it is, why.
   the gap shut (`roll-layout.ts`).
 - **Parking the roll in an `effect` on the follow flag** — an effect runs after the handler and
   overwrote a position set in the same gesture that came off the song. Parking happens at the two
-  call sites that stop following, the follow toggle and the scrub bar's pointer-down.
+  call sites that stop following, the follow toggle and the overview bar's pointer-down.
 - **Seeking the roll by `Shift`+wheel, committed on a 200 ms quiet timer** — nothing on screen said
   the roll could be seeked at all, and the commit fired on a guess about when the gesture had ended
-  rather than on anything the porter did. The scrub bar above the roll is the affordance, and a
+  rather than on anything the porter did. The overview bar above the roll is the affordance, and a
   pointer-up is a real end.
 - **Template method calls per row** — the sample browser decoded 64 BRR samples on every
   change-detection pass, ten times a second while playing. Panels build one `computed` view model;
@@ -303,7 +303,7 @@ One entry each: what it was, what it is, why.
   press checks `event.target.closest('.mark')` before it decides it is drawing.
 - **The roll's playhead line derived from `lead`** — the camera and the line were one number, so
   unticking Follow parked the line with the view and nothing in the roll said where the music had
-  got to: the line, the scrub marker and the lit keys all froze together, and the frame clock was
+  got to: the line, the overview marker and the lit keys all froze together, and the frame clock was
   switched off with them. `lead` is the camera's alone; the line is the song's tick in the camera's
   coordinates (`xAtTick`), and the clip is what hides it once the song runs off the pane. Not a
   clamp to the edge either — a line held there would say the song was there.

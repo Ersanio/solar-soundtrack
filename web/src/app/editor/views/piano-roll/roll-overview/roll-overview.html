@@ -1,6 +1,6 @@
 <svg
   class="block w-full cursor-pointer select-none"
-  [attr.height]="scrubHeight"
+  [attr.height]="barHeight"
   [attr.viewBox]="box()"
   (pointerdown)="onDown($event)"
   (pointermove)="onMove($event)"
@@ -8,8 +8,8 @@
   (pointercancel)="onUp($event)"
 >
   <defs>
-    <clipPath id="amk-scrub-clip">
-      <rect y="0" [attr.x]="keyWidth" [attr.width]="rollWidth()" [attr.height]="scrubHeight" />
+    <clipPath id="amk-overview-clip">
+      <rect y="0" [attr.x]="keyWidth" [attr.width]="rollWidth()" [attr.height]="barHeight" />
     </clipPath>
   </defs>
 
@@ -18,10 +18,10 @@
     class="fill-inset"
     [attr.x]="keyWidth"
     [attr.width]="rollWidth()"
-    [attr.height]="scrubHeight"
+    [attr.height]="barHeight"
   />
 
-  <g clip-path="url(#amk-scrub-clip)">
+  <g clip-path="url(#amk-overview-clip)">
     @if (viewWindow(); as shown) {
       <rect
         y="0"
@@ -30,7 +30,7 @@
         stroke-opacity="0.5"
         [attr.x]="shown.x"
         [attr.width]="shown.w"
-        [attr.height]="scrubHeight"
+        [attr.height]="barHeight"
       />
     }
 
@@ -50,7 +50,7 @@
       stroke-width="1.5"
       [attr.x1]="playheadX()"
       [attr.x2]="playheadX()"
-      [attr.y2]="scrubHeight"
+      [attr.y2]="barHeight"
     />
   </g>
 </svg>

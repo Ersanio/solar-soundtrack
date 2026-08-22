@@ -395,9 +395,9 @@ snaps outward to a whole note, a 7/8 bar is 168 ticks, and the two therefore lin
 coincidence, so a bar line has to be a bar's own first beat by construction. Zero beats in a bar is
 the grid switched off, which is why there is no separate switch for it.
 
-**The scrub bar** across the top is the whole song at once, and the only way to seek from the roll.
+**The overview bar** across the top is the whole song at once, and the only way to seek from the roll.
 Its width is one song — tick 0 on the left edge, the last tick on the right, at every zoom — so it is
-the song rather than a view of it, and `scrubOffset`/`scrubTick` are that mapping and its exact
+the song rather than a view of it, and `overviewOffset`/`overviewTick` are that mapping and its exact
 inverse: a drag commits to the tick under the pointer. It sits outside the roll's own scroller,
 because a scrubber that scrolled out of view would be gone exactly when a tall song most needs it.
 
@@ -417,10 +417,10 @@ nothing beneath reads. That is why the roll can run at 240 Hz without the note l
 
 **The folder is a parent and nine children**, as `output/command-inspector/` is. `piano-roll.ts`
 holds the song's shape, the camera and the clock and hands each child what it draws:
-`roll-toolbar/`, `percussion-panel/`, `roll-scrub/`, `roll-channels/` and `roll-tooltip/` in the
+`roll-toolbar/`, `percussion-panel/`, `roll-overview/`, `roll-channels/` and `roll-tooltip/` in the
 ordinary namespace, `roll-lanes/`, `roll-grid/`, `roll-notes/` and `roll-keys/` inside the roll's own
 `<svg>`. `roll-channels/` is the odd one: it draws nothing of the song, and takes the corner the
-scrub bar leaves empty above the key column to say which channel is being edited. Its eight toggles
+overview bar leaves empty above the key column to say which channel is being edited. Its eight toggles
 are not the only way in — a click on a bar or on one of its glyphs names that bar's channel, since
 the roll is already pointing at the answer, and so does the first gesture of a drag, a stretch or an
 erase, through `editing`: with no channel picked, the strip is built for the channel under the

@@ -1,7 +1,7 @@
 import { Component, computed, input, output } from '@angular/core';
 
 import { CHANNELS, type ChannelState } from '../../../../state/transport-view';
-import { KEY_WIDTH, SCRUB_HEIGHT } from '../roll-metrics';
+import { KEY_WIDTH, OVERVIEW_HEIGHT } from '../roll-metrics';
 
 /**
  * Shared by all eight, so the difference between them is only the on/off half.
@@ -42,7 +42,7 @@ function chipTitle(
 /**
  * Which channel the roll is editing, in the corner above the key column.
  *
- * The corner is the one part of the scrub bar's strip that draws nothing — the
+ * The corner is the one part of the overview bar's strip that draws nothing — the
  * bar's own contents start at {@link KEY_WIDTH} — and it is directly above the
  * keys, which is where a channel picker belongs. The plate fills it, so a press
  * beside the toggles is inert rather than reaching the bar behind it.
@@ -55,7 +55,7 @@ function chipTitle(
  *
  * It emits the channel that was pressed, on the output the modifier chose, and
  * nothing more. Whether that press selects, clears or isolates is the parent's,
- * as the scrub bar's drag is.
+ * as the overview bar's drag is.
  */
 @Component({
   selector: 'amk-roll-channels',
@@ -63,7 +63,7 @@ function chipTitle(
   host: {
     class: 'bg-raised absolute top-0 left-0 grid grid-cols-4 grid-rows-2 gap-px p-0.5',
     '[style.width.px]': 'keyWidth',
-    '[style.height.px]': 'scrubHeight',
+    '[style.height.px]': 'barHeight',
   },
 })
 export class RollChannels {
@@ -86,7 +86,7 @@ export class RollChannels {
   readonly isolated = output<number>();
 
   protected readonly keyWidth = KEY_WIDTH;
-  protected readonly scrubHeight = SCRUB_HEIGHT;
+  protected readonly barHeight = OVERVIEW_HEIGHT;
 
   /** One view model rather than a class method called per button. */
   protected readonly toggles = computed(() => {

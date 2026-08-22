@@ -40,8 +40,8 @@ import {
 	noteLabel,
 	laneStack,
 	pageStart,
-	scrubOffset,
-	scrubTick,
+	overviewOffset,
+	overviewTick,
 	stepDrawLength,
 	tickAtX,
 	tickWindow,
@@ -632,7 +632,7 @@ console.log("\nthe roll's playhead marks the song, not the camera");
 	);
 }
 
-console.log("\nthe scrub bar's time axis");
+console.log("\nthe overview bar's time axis");
 {
 	// The bar holds the whole song and nothing else, so a drag on it is a mapping
 	// and its inverse. The inverse has to be exact: a scrub commits to the tick
@@ -642,13 +642,13 @@ console.log("\nthe scrub bar's time axis");
 	const WIDTH = 724; // a pane, less the key column
 	const TICKS = 12312;
 
-	check("tick 0 is the left edge", scrubOffset(0, TICKS, WIDTH) === 0);
-	check("and the last tick is the right edge", scrubOffset(TICKS, TICKS, WIDTH) === WIDTH);
-	check("with the middle in the middle", Math.abs(scrubOffset(TICKS / 2, TICKS, WIDTH) - WIDTH / 2) < EPSILON);
+	check("tick 0 is the left edge", overviewOffset(0, TICKS, WIDTH) === 0);
+	check("and the last tick is the right edge", overviewOffset(TICKS, TICKS, WIDTH) === WIDTH);
+	check("with the middle in the middle", Math.abs(overviewOffset(TICKS / 2, TICKS, WIDTH) - WIDTH / 2) < EPSILON);
 
 	let apart = "";
 	for (let tick = 0; tick <= TICKS; tick += 7) {
-		const back = scrubTick(scrubOffset(tick, TICKS, WIDTH), TICKS, WIDTH);
+		const back = overviewTick(overviewOffset(tick, TICKS, WIDTH), TICKS, WIDTH);
 		if (Math.abs(back - tick) > 1e-9) {
 			apart += ` ${tick}->${back}`;
 		}
@@ -661,27 +661,27 @@ console.log("\nthe scrub bar's time axis");
 	// number of pixels per tick would run off the end of a long song.
 	check(
 		"the song fills the bar at any width",
-		[200, 724, 1600, 3000].every((w) => scrubOffset(TICKS, TICKS, w) === w && scrubOffset(0, TICKS, w) === 0),
+		[200, 724, 1600, 3000].every((w) => overviewOffset(TICKS, TICKS, w) === w && overviewOffset(0, TICKS, w) === 0),
 	);
 	check(
 		"and a short song fills it exactly as a long one does",
-		[1, 96, 12312, 999999].every((t) => Math.abs(scrubOffset(t / 2, t, WIDTH) - WIDTH / 2) < EPSILON),
+		[1, 96, 12312, 999999].every((t) => Math.abs(overviewOffset(t / 2, t, WIDTH) - WIDTH / 2) < EPSILON),
 	);
 
 	// A drag that leaves the bar is still asking for an end of the song, not for a
 	// tick outside it — which the transport would clamp anyway, silently.
-	check("a drag off the left end asks for the first tick", scrubTick(-500, TICKS, WIDTH) === 0);
-	check("and off the right end for the last", scrubTick(WIDTH + 500, TICKS, WIDTH) === TICKS);
-	check("a tick past the end draws at the right edge", scrubOffset(TICKS * 2, TICKS, WIDTH) === WIDTH);
-	check("and one before the start at the left", scrubOffset(-100, TICKS, WIDTH) === 0);
+	check("a drag off the left end asks for the first tick", overviewTick(-500, TICKS, WIDTH) === 0);
+	check("and off the right end for the last", overviewTick(WIDTH + 500, TICKS, WIDTH) === TICKS);
+	check("a tick past the end draws at the right edge", overviewOffset(TICKS * 2, TICKS, WIDTH) === WIDTH);
+	check("and one before the start at the left", overviewOffset(-100, TICKS, WIDTH) === 0);
 
 	// A NaN here is an x of NaN on every bar of the minimap: a strip that renders
 	// blank, with nothing in the console to say why.
 	check(
 		"a song of no ticks answers 0 rather than NaN",
-		scrubOffset(50, 0, WIDTH) === 0 && scrubTick(50, 0, WIDTH) === 0,
+		overviewOffset(50, 0, WIDTH) === 0 && overviewTick(50, 0, WIDTH) === 0,
 	);
-	check("and so does an unmeasured pane", scrubOffset(50, TICKS, 0) === 0 && scrubTick(50, TICKS, 0) === 0);
+	check("and so does an unmeasured pane", overviewOffset(50, TICKS, 0) === 0 && overviewTick(50, TICKS, 0) === 0);
 }
 
 console.log("\nthe playhead's own clock");

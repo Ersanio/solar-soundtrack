@@ -268,14 +268,14 @@ export function pageStart(
 }
 
 /**
- * Where a tick sits across the scrub bar, in px from the roll's left edge.
+ * Where a tick sits across the overview bar, in px from the roll's left edge.
  *
  * The bar holds the **whole song and nothing else**: tick 0 on its left edge and
  * the last tick on its right, at every zoom and every pane width. The roll's own
  * horizontal scale has no bearing on it, which is the point — the roll shows a
  * pane of music and this shows the song it is a pane of.
  */
-export function scrubOffset(tick: number, ticks: number, width: number): number {
+export function overviewOffset(tick: number, ticks: number, width: number): number {
   if (!(ticks > 0) || !(width > 0)) {
     return 0; // Nothing compiled, or an unmeasured pane. Not a NaN across every bar.
   }
@@ -284,14 +284,14 @@ export function scrubOffset(tick: number, ticks: number, width: number): number 
 }
 
 /**
- * The tick under a point on the scrub bar, the exact inverse of
- * {@link scrubOffset}.
+ * The tick under a point on the overview bar, the exact inverse of
+ * {@link overviewOffset}.
  *
  * Exact because a drag rides on it: the tick a scrub commits to has to be the
  * one under the pointer, not one near it. Off either end is the song's own end,
  * since a drag that runs past the bar is still asking for the last tick.
  */
-export function scrubTick(offset: number, ticks: number, width: number): number {
+export function overviewTick(offset: number, ticks: number, width: number): number {
   if (!(ticks > 0) || !(width > 0)) {
     return 0;
   }
@@ -516,7 +516,7 @@ export function xAtTick(tick: number, viewTick: number, pxPerTick: number): numb
  * `offsetX` is measured from the roll's own left edge, key column included, so
  * a caller hands over `event.clientX - box.left` and nothing else. The inverse
  * of {@link xAtTick} and of the `translate` in `piano-roll.ts`, and the sibling
- * of {@link scrubTick}, which is the same question asked of the scrub bar.
+ * of {@link overviewTick}, which is the same question asked of the overview bar.
  */
 export function tickAtX(offsetX: number, viewTick: number, pxPerTick: number): number {
   return pxPerTick > 0 ? viewTick + (offsetX - KEY_WIDTH) / pxPerTick : viewTick;

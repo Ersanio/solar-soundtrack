@@ -2,7 +2,7 @@
  * The roll's drawing constants, shared by the parent and its children.
  *
  * Here rather than in `piano-roll.ts` because the pieces that draw with them are
- * separate components now: the key column's width is the scrub bar's left edge
+ * separate components now: the key column's width is the overview bar's left edge
  * as well as the keyboard's, and a second copy of that number is how the two
  * would come apart. The camera's own fractions are not here — nothing but the
  * camera reads them.
@@ -17,11 +17,11 @@ export const ROW_GAP = 1;
 /** The surface gap between two bars that meet, per the mark spec. */
 export const NOTE_GAP = 2;
 
-/** Height of the scrub bar: room for a pitch contour, little enough to stay chrome. */
-export const SCRUB_HEIGHT = 36;
+/** Height of the overview bar: room for a pitch contour, little enough to stay chrome. */
+export const OVERVIEW_HEIGHT = 36;
 
 /** Inset, so the top and bottom rows are not swallowed by the border. */
-export const SCRUB_PAD = 3;
+export const OVERVIEW_PAD = 3;
 
 /**
  * Tailwind v4 scans source text, so a class name has to be a complete literal —

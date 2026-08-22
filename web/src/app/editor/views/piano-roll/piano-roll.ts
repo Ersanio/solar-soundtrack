@@ -48,17 +48,17 @@ import { rollGestures } from './roll-gesture';
 import {
   gridLines,
   laneStack,
+  overviewOffset,
   pageStart,
-  scrubOffset,
   tickAtX,
   tickWindow,
   xAtTick,
 } from './roll-layout';
 import { type Mark, buildMarks, buildMinimap, heldRowsAt } from './roll-marks';
-import { CHANNEL_FILL, CHANNEL_STROKE, KEY_WIDTH, SCRUB_HEIGHT } from './roll-metrics';
+import { CHANNEL_FILL, CHANNEL_STROKE, KEY_WIDTH, OVERVIEW_HEIGHT } from './roll-metrics';
 import { type Strip, channelStrip, channelTails, isStrip } from './roll-strip';
 import { RollNotes } from './roll-notes/roll-notes';
-import { RollScrub } from './roll-scrub/roll-scrub';
+import { RollOverview } from './roll-overview/roll-overview';
 import {
   type Settings,
   type SnapName,
@@ -76,7 +76,7 @@ import { RollTooltip } from './roll-tooltip/roll-tooltip';
  * eight channels in one roll.
  *
  * This holds the song's shape, the camera and the clock, and hands each of them
- * to a component that draws one thing: the toolbar, the scrub bar, the row
+ * to a component that draws one thing: the toolbar, the overview bar, the row
  * stripes, the grid, the notes, the keys and the hover. The four `roll-*.ts`
  * files beside it are the arithmetic, Angular-free, the way `roll-layout.ts` and
  * `percussion.ts` already were.
@@ -98,7 +98,7 @@ import { RollTooltip } from './roll-tooltip/roll-tooltip';
     RollKeys,
     RollLanes,
     RollNotes,
-    RollScrub,
+    RollOverview,
     RollToolbar,
     RollTooltip,
   ],
@@ -152,12 +152,12 @@ export class PianoRoll {
   /** A scrub in progress: the roll is off the song until the drag ends. */
   private readonly scrolling = signal(false);
 
-  /** A pointer is down on the scrub bar. */
+  /** A pointer is down on the overview bar. */
   private readonly dragging = signal(false);
 
   protected readonly timeline = computed(() => this.editor.timeline());
 
-  /** The song's whole length, which the camera and the scrub bar both measure against. */
+  /** The song's whole length, which the camera and the overview bar both measure against. */
   protected readonly songTicks = computed(() => this.timeline()?.ticks ?? 0);
 
   /**
@@ -438,12 +438,12 @@ export class PianoRoll {
     return `translate(${x.toFixed(2)} 0)`;
   });
 
-  // --- the scrub bar -------------------------------------------------------
+  // --- the overview bar -------------------------------------------------------
 
   /** Null until measured, so nothing renders against a zero-width box. */
-  protected readonly scrubBox = computed(() => {
+  protected readonly overviewBox = computed(() => {
     const width = this.width();
-    return width > 0 ? `0 0 ${width} ${SCRUB_HEIGHT}` : null;
+    return width > 0 ? `0 0 ${width} ${OVERVIEW_HEIGHT}` : null;
   });
 
   /**
@@ -466,8 +466,8 @@ export class PianoRoll {
    * line is. The two are one playhead drawn twice, and the box beside this one
    * is what says where the view is.
    */
-  protected readonly scrubX = computed(
-    () => KEY_WIDTH + scrubOffset(this.headTick(), this.songTicks(), this.rollWidth()),
+  protected readonly overviewX = computed(
+    () => KEY_WIDTH + overviewOffset(this.headTick(), this.songTicks(), this.rollWidth()),
   );
 
   /**
@@ -477,7 +477,7 @@ export class PianoRoll {
    * page reaches past the end — so the strip clips it rather than this clamping
    * it into something narrower than the pane it stands for.
    */
-  protected readonly scrubWindow = computed(() => {
+  protected readonly overviewWindow = computed(() => {
     const ticks = this.songTicks();
     const width = this.rollWidth();
     if (ticks <= 0 || width <= 0) {
@@ -1158,7 +1158,7 @@ export class PianoRoll {
 
   /**
    * A note being drawn takes the wheel first; otherwise Ctrl zooms about the
-   * pointer and Shift scrolls sideways. None of them seeks — the scrub bar is
+   * pointer and Shift scrolls sideways. None of them seeks — the overview bar is
    * the only thing that does, and a wheel that moved the song would be a seek
    * nothing on screen had asked for.
    */

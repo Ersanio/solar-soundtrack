@@ -41,21 +41,21 @@
   </ul>
 }
 
-<!-- The scrub bar: the whole song at once, and the drag that seeks it. Outside
-     the roll's own scroller on purpose — a scrubber that scrolled out of view
+<!-- The overview bar: the whole song at once, and the drag that seeks it. Outside
+     the roll's own scroller on purpose — a scroller that scrolled out of view
      would be gone exactly when a tall song most needs it.
 
      The channel picker sits over the corner the bar leaves empty, inside the
      same `@if` so the corner arrives with the bar it is a corner of. -->
-@if (scrubBox(); as box) {
+@if (overviewBox(); as box) {
   <div class="relative shrink-0">
-    <amk-roll-scrub
+    <amk-roll-overview
       [box]="box"
       [rollWidth]="rollWidth()"
       [ticks]="songTicks()"
       [bars]="minimap()"
-      [playheadX]="scrubX()"
-      [viewWindow]="scrubWindow()"
+      [playheadX]="overviewX()"
+      [viewWindow]="overviewWindow()"
       (scrubStart)="onScrubStart()"
       (scrubTo)="onScrubTo($event)"
       (scrubEnd)="onScrubEnd()"

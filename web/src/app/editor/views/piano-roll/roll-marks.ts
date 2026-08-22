@@ -9,17 +9,17 @@ import {
   KEY_WIDTH,
   NOTE_GAP,
   ROW_GAP,
-  SCRUB_HEIGHT,
-  SCRUB_PAD,
+  OVERVIEW_HEIGHT,
+  OVERVIEW_PAD,
 } from './roll-metrics';
-import { type LaneStack, fitBarContent, keyName, noteLabel, scrubOffset } from './roll-layout';
+import { type LaneStack, fitBarContent, keyName, noteLabel, overviewOffset } from './roll-layout';
 import type { PlacedNote, Plan } from './roll-edit';
 
 /**
  * The three pictures of the song, and the one function that places a note in all
  * of them.
  *
- * The roll's bars, the scrub bar's minimap and the lit keys all ask
+ * The roll's bars, the overview bar's minimap and the lit keys all ask
  * {@link rowOf} rather than each working a row out for itself, so an instrument
  * taken off the percussion lanes moves to the keyboard in every one of them at
  * once. Answering that question three times is how they would drift, which is
@@ -61,8 +61,8 @@ export interface Mark {
   note: WalkNote;
 }
 
-/** One note on the scrub bar's minimap. Every bar is the same colour. */
-export interface ScrubBar {
+/** One note on the overview bar's minimap. Every bar is the same colour. */
+export interface MinimapBar {
   id: string;
   x: number;
   w: number;
@@ -223,14 +223,14 @@ export interface MinimapRequest {
  * this rebuilds on a recompile, a percussion change or a resize, and never on a
  * frame. The moving parts of the bar are the component's own.
  */
-export function buildMinimap(request: MinimapRequest): ScrubBar[] {
+export function buildMinimap(request: MinimapRequest): MinimapBar[] {
   const { notes, stack, context, ticks, width } = request;
   const rows = stack.lanes.length;
   if (ticks <= 0 || width <= 0 || rows <= 0) {
     return [];
   }
 
-  const inner = SCRUB_HEIGHT - SCRUB_PAD * 2;
+  const inner = OVERVIEW_HEIGHT - OVERVIEW_PAD * 2;
   const h = Math.max(1, inner / rows);
 
   // Keyed by the pixel a bar lands on and the row it lands in. Every bar is
@@ -238,22 +238,22 @@ export function buildMinimap(request: MinimapRequest): ScrubBar[] {
   // keeping the wider of them holds a long note's reach against a short one
   // starting alongside it. Never more bars than notes, and far fewer on a
   // dense song, which is what keeps the whole song inside the DOM.
-  const cells = new Map<string, ScrubBar>();
+  const cells = new Map<string, MinimapBar>();
   for (const note of notes) {
     const row = rowOf(note, stack, context);
     if (row < 0) {
       continue;
     }
 
-    const x = KEY_WIDTH + scrubOffset(note.tick, ticks, width);
-    const w = Math.max(1, scrubOffset(note.ticks, ticks, width));
+    const x = KEY_WIDTH + overviewOffset(note.tick, ticks, width);
+    const w = Math.max(1, overviewOffset(note.ticks, ticks, width));
     const key = `${Math.round(x)}:${row}`;
     const held = cells.get(key);
     if (held && held.w >= w) {
       continue;
     }
 
-    cells.set(key, { id: key, x, w, y: SCRUB_PAD + (row / rows) * inner, h });
+    cells.set(key, { id: key, x, w, y: OVERVIEW_PAD + (row / rows) * inner, h });
   }
 
   return [...cells.values()];
