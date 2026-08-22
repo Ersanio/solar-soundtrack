@@ -528,6 +528,23 @@ stats.loopTicks` pads **every other channel that would cut the song short** out 
   would be right for the roll and wrong for the echo hazards and the FIR designer, who would lose a
   `$F1` written inside a body. The commands stay in `growUnits`'s list too, where a `]` that cannot
   lead a unit is a barrier.
+- **Two passes each answering a note's octave for itself** — `planEdits`'s item loop gives the next
+  surviving note an `o` at its head when the unit above it went and took the channel's own octave
+  with it; `spawnInto` gives the note bounding its region one at that same head, for the run it
+  wrote in front of it. Both build the same insert at the same offset, `coalesce` concatenates
+  rather than dedupes, and a note carried past another came out `o4 o4 d8`. The regions are built
+  before the item loop, so the loop can ask whether a run is about to answer for that note
+  (`spawnHandsItBack`) and stand down — the pass that can see what the run leaves is the one that
+  speaks. Not a dedupe of identical edits at one offset: two writers agreeing by accident is not the
+  same as one of them knowing it has nothing to say.
+- **Asking whether the note after a spawn can be left as it is by what stood _before_ the gap** —
+  `untouched` compared the previous note's exit octave against the reader's and against the run's,
+  so a region at the head of a channel, which has no note before it to compare with, always wrote an
+  `o` saying what the run had just said. What that note reads is what the **run** leaves: `noteText`
+  spells an absolute `o` wherever the octave in force is not the one the note needs, so after the run
+  the octave standing is the last born note's own. `untouched` is that against the reader's octave,
+  plus the `MOVES_OCTAVE` scan over the text between the run and the reader's head — the same scan
+  as `inForce`, on the other side of the run.
 
 ## Angular specifics
 
