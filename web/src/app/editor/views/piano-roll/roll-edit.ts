@@ -147,6 +147,28 @@ export const REFUSE_ROOM = 'there is no room to push the notes out of the way';
 export const REFUSE_SPELL = 'that length cannot be written on this AddmusicK target';
 export const REFUSE_CROWDED = 'there is something written where that note would go';
 export const REFUSE_RAMP = 'that note is too short to keep the command written inside it';
+export const REFUSE_CLASH = 'two notes would sound at once, which MML cannot say';
+
+/**
+ * Why a plan cannot be written out, in the words the roll shows.
+ *
+ * {@link planGesture} refuses in the plan itself, where the roll can draw the
+ * refusal as it happens; {@link planEdits} has no plan to put one in, and a
+ * gesture that fails there is undone with nothing on screen to say why. So it
+ * answers this instead — the shape `Strip | StripRefusal` already has, for the
+ * same reason.
+ */
+export interface EditRefusal {
+  refused: string;
+}
+
+export function isEdits(outcome: Edit[] | EditRefusal): outcome is Edit[] {
+  return (outcome as EditRefusal).refused === undefined;
+}
+
+function refuse(reason: string): EditRefusal {
+  return { refused: reason };
+}
 
 // --- planning ---------------------------------------------------------------
 
@@ -677,7 +699,7 @@ export function planGesture(strip: Strip, gesture: Gesture, mode: EditMode): Pla
 }
 
 /** A plan is committable when nothing is refused and nothing would sound at once. */
-export function committable(plan: Plan): boolean {
+function committable(plan: Plan): boolean {
   return plan.refused === null && plan.clashes.length === 0;
 }
 
@@ -818,19 +840,24 @@ function writesItsOwnOctave(
 }
 
 /**
- * Whether a run spawned in front of this note leaves it reading the octave it
- * was written under, so one put back at its head would be a second.
+ * The octave a run spawned in the region ending at `index` leaves standing.
  *
- * {@link spawnInto} answers for the note bounding its region either way: it
- * writes the octave at that note's head, or it has proved the run already
- * leaves it standing. What it cannot answer for is a run ending on a drum —
- * that writes no octave at all and leaves whatever stood — which is `leaves`
- * being null there, and is the one case this says no to.
+ * Two readers, and one answer serves both. A note bounding the region reads it:
+ * {@link spawnInto} answers for that note either way — it writes the octave at
+ * the note's head, or it has proved the run already leaves the right one — so a
+ * number here means `planEdits` has nothing to add at that head. The block below
+ * a `#N` reads it too, where the region is the tail and nothing on the channel
+ * survived, since `octave` is global parser state.
+ *
+ * `null` where no run was spawned there, and where the one that was ends on a
+ * drum: that writes no octave at all and leaves whatever stood, which is
+ * `leaves` being null in {@link spawnInto} and is the one case neither reader
+ * can be answered for.
  */
-function spawnHandsItBack(regions: readonly Region[], index: number): boolean {
+function spawnLeaves(regions: readonly Region[], index: number): number | null {
   const gap = regions.find((each) => each.before === index && each.born.length > 0);
   if (gap === undefined) {
-    return false;
+    return null;
   }
 
   // The last note in tick order is the one whose octave the run leaves, which
@@ -840,7 +867,7 @@ function spawnHandsItBack(regions: readonly Region[], index: number): boolean {
   const last = gap.born.reduce((furthest, note) =>
     note.startTick >= furthest.startTick ? note : furthest,
   );
-  return last.drum === null;
+  return last.drum === null ? octaveFor(last.written) : null;
 }
 
 /**
@@ -896,7 +923,7 @@ function rewriteNote(
   note: PlacedNote,
   survivors: ReadonlyMap<number, PlacedNote>,
   running: number | null,
-): Edit[] | null {
+): Edit[] | EditRefusal {
   const { source, strip, targetAMKVersion } = context;
   const item = strip.items[index];
   const samePitch =
@@ -913,7 +940,7 @@ function rewriteNote(
     const length = sameLength ? writtenLength(source, item) : null;
     const text = noteText(note, length, exit, targetAMKVersion, running);
     if (text === null) {
-      return null;
+      return refuse(REFUSE_SPELL);
     }
 
     const edit = spliceRange(source, item.unitSpan, text);
@@ -926,7 +953,7 @@ function rewriteNote(
   // ramp written inside them fires later than it was written to. Which ticks the
   // porter meant to keep is not something the gesture says, so it is refused.
   if (note.startTick !== item.startTick) {
-    return null;
+    return refuse(REFUSE_RAMP);
   }
 
   // More than one segment means a command sits inside the note — a mid-note
@@ -936,14 +963,14 @@ function rewriteNote(
   const earlier = item.segments.slice(0, -1).reduce((sum, segment) => sum + segment.ticks, 0);
   const remaining = note.ticks - earlier;
   if (remaining < 1) {
-    return null;
+    return refuse(REFUSE_RAMP);
   }
 
   const edits: Edit[] = [];
   const headSpan: Span = { ...item.unitSpan, end: item.segments[0].span.end };
   const headText = noteText(note, writtenLength(source, item), null, targetAMKVersion, running);
   if (headText === null) {
-    return null;
+    return refuse(REFUSE_SPELL);
   }
 
   const headEdit = spliceRange(source, headSpan, headText);
@@ -954,12 +981,12 @@ function rewriteNote(
   const tail = item.segments[item.segments.length - 1];
   const length = spellDuration(remaining, targetAMKVersion);
   if (length === null) {
-    return null;
+    return refuse(REFUSE_SPELL);
   }
 
   const put = exitText(note, exit);
   if (put === null) {
-    return null;
+    return refuse(REFUSE_SPELL);
   }
 
   const tailEdit = spliceRange(
@@ -1151,14 +1178,15 @@ function realiseRegion(
   context: EditContext,
   gap: Region,
   survivors: ReadonlyMap<number, PlacedNote>,
-): Edit[] | null {
+): Edit[] | EditRefusal {
   const { targetAMKVersion } = context;
   const edits: Edit[] = [];
 
   // The tail is free: a channel may end wherever the music ends. What it is not
   // free to leave is two rests where a deleted note stood between them.
   if (gap.tail && gap.born.length === 0) {
-    return joinTail(context, gap);
+    const joined = joinTail(context, gap);
+    return joined ?? refuse(REFUSE_SPELL);
   }
 
   // A gap between two notes that has to come to less than nothing is a plan
@@ -1167,7 +1195,7 @@ function realiseRegion(
   // written: there is no run of rests that realises it, and the answer that
   // looks plausible — leave the text alone — is a channel slid along.
   if (!gap.tail && gap.ticks < 0) {
-    return null;
+    return refuse(REFUSE_CROWDED);
   }
 
   if (gap.born.length > 0) {
@@ -1184,7 +1212,7 @@ function realiseRegion(
     if (want !== held) {
       const written = collapse(context, run, want);
       if (written === null) {
-        return null;
+        return refuse(REFUSE_SPELL);
       }
 
       edits.push(...written);
@@ -1202,16 +1230,16 @@ function realiseRegion(
   }
 
   if (left < 0) {
-    return null; // The rests could not give up enough; a command would have to move.
+    return refuse(REFUSE_CROWDED); // The rests could not give up enough; a command would have to move.
   }
 
   const text = spellDuration(left, targetAMKVersion);
   if (text === null) {
-    return null;
+    return refuse(REFUSE_SPELL);
   }
 
   const edit = writeInto(context, gap, `r${text}`);
-  return edit ? [...edits, edit] : null;
+  return edit ? [...edits, edit] : refuse(REFUSE_CROWDED);
 }
 
 /**
@@ -1241,9 +1269,21 @@ function writeInto(context: EditContext, gap: Region, run: string): Edit | null 
     return insertAt(strip.items[gap.before - 1].unitSpan.end, ` ${run}`, 1);
   }
 
-  const next = strip.items[gap.before] ?? strip.items[0];
+  const next = strip.items[gap.before];
   if (next) {
     return insertAt(next.unitSpan.start, `${run} `, 1);
+  }
+
+  // No note after it either, so the region is the whole channel and the run goes
+  // where its items were: after the last of them, as the branch above puts it
+  // after the note before the gap. Not at the head of the first — every item in
+  // here is a unit `planEdits` removes, `removeItem` takes the whitespace in
+  // front of the unit with it, and an insertion at a head therefore lands
+  // strictly inside a range being deleted, which `planEdits` refuses. The end of
+  // the last only abuts one.
+  const last = strip.items[gap.before - 1];
+  if (last) {
+    return insertAt(last.unitSpan.end, ` ${run}`, 1);
   }
 
   const line = eol(source);
@@ -1525,10 +1565,10 @@ function spawnInto(
   context: EditContext,
   gap: Region,
   survivors: ReadonlyMap<number, PlacedNote>,
-): Edit[] | null {
+): Edit[] | EditRefusal {
   const { source, strip } = context;
   if (gap.born.length === 0) {
-    return null;
+    return refuse(REFUSE_CROWDED);
   }
 
   const order = [...gap.born].sort((a, b) => a.startTick - b.startTick);
@@ -1579,14 +1619,23 @@ function spawnInto(
   } else if (inPlace) {
     over = restFor(gap, born);
     laidOut = false;
-  } else if (itemsRunTogether(context, gap)) {
+    // With no rest in it there is nothing for the run to be laid over, and so no
+    // boundary of anything that survives for it to move: the run is inserted at
+    // one offset and every item in the region is a note `planEdits` removes
+    // outright. A command written between two of them keeps its place in the
+    // text and changes tick for the reason deleting those notes changes it —
+    // what it stood against has gone. Which is the commonest region a carve
+    // leaves, since a note drawn over a run of notes swallows all of them.
+  } else if (gap.rests.length === 0 || itemsRunTogether(context, gap)) {
     over = gap.rests[0] ?? null;
   } else {
-    return null;
+    return refuse(REFUSE_CROWDED);
   }
 
+  // A note that starts in one rest and ends in another: the run written between
+  // them would have to move, and only the porter knows which side it belongs on.
   if (over === null && gap.rests.length > 0) {
-    return null;
+    return refuse(REFUSE_CROWDED);
   }
 
   // Only the last of the tail's rests may grow, and that is what lets a note be
@@ -1605,7 +1654,7 @@ function spawnInto(
   let at = runFrom;
   for (const each of order) {
     if (each.startTick < at) {
-      return null;
+      return refuse(REFUSE_CROWDED);
     }
 
     gaps.push(each.startTick - at);
@@ -1613,7 +1662,7 @@ function spawnInto(
   }
 
   if (runTo < at) {
-    return null;
+    return refuse(REFUSE_CROWDED);
   }
 
   gaps.push(runTo - at);
@@ -1710,14 +1759,14 @@ function spawnInto(
 
   const run = spawnRun(context, order, gaps, opening ? OPENING_OCTAVE : inForce, introAt, trailing);
   if (run === null) {
-    return null;
+    return refuse(REFUSE_SPELL);
   }
 
   let restore: Edit | null = null;
   if (owed !== null && !untouched) {
     const spelled = spellOctave(owed);
     if (spelled === null) {
-      return null;
+      return refuse(REFUSE_SPELL);
     }
 
     restore = insertAt(strip.items[reader].unitSpan.start, `${spelled} `, 1);
@@ -1727,7 +1776,7 @@ function spawnInto(
   // plan is removing — so the run is inserted rather than written over anything.
   const edit = over ? spliceRange(source, over.unitSpan, run) : writeInto(context, gap, run);
   if (edit === null) {
-    return null;
+    return refuse(REFUSE_CROWDED);
   }
 
   // A run laid out afresh is the whole region's ticks, so the rests it did not
@@ -1745,9 +1794,9 @@ function spawnInto(
   return restore ? [edit, ...gone, restore] : [edit, ...gone];
 }
 
-export function planEdits(context: EditContext, plan: Plan): Edit[] | null {
+export function planEdits(context: EditContext, plan: Plan): Edit[] | EditRefusal {
   if (!committable(plan)) {
-    return null;
+    return refuse(plan.refused ?? REFUSE_CLASH);
   }
 
   const { source, strip } = context;
@@ -1782,7 +1831,7 @@ export function planEdits(context: EditContext, plan: Plan): Edit[] | null {
     // note the porter meant it to follow is not something a drag can say. This
     // is the same ground as `rewriteNote` refusing to move such a note's start.
     if (strip.items[index].segments.length > 1) {
-      return null;
+      return refuse(REFUSE_RAMP);
     }
 
     survivors.delete(index);
@@ -1860,12 +1909,12 @@ export function planEdits(context: EditContext, plan: Plan): Edit[] | null {
     if (
       dropped &&
       !writesItsOwnOctave(strip, index, survivors) &&
-      !spawnHandsItBack(regions, index) &&
+      spawnLeaves(regions, index) === null &&
       item.octave !== running
     ) {
       const spelled = item.octave === null ? null : spellOctave(item.octave);
       if (spelled === null) {
-        return null;
+        return refuse(REFUSE_SPELL);
       }
 
       const restore = insertAt(item.unitSpan.start, `${spelled} `, item.unitSpan.line);
@@ -1879,8 +1928,8 @@ export function planEdits(context: EditContext, plan: Plan): Edit[] | null {
     dropped = false;
 
     const written = rewriteNote(context, index, note, survivors, running);
-    if (written === null) {
-      return null;
+    if (!isEdits(written)) {
+      return written;
     }
 
     edits.push(...written);
@@ -1899,10 +1948,13 @@ export function planEdits(context: EditContext, plan: Plan): Edit[] | null {
   // of them writes one.
   if (dropped && previous !== null) {
     const standing = previous.exitOctave ?? previous.octave;
-    if (standing !== null && standing !== running) {
+    // A run spawned into the tail spells its own last note's octave, so that is
+    // what the block below reads and there is nothing here to say.
+    const left = spawnLeaves(regions, strip.items.length) ?? running;
+    if (standing !== null && standing !== left) {
       const spelled = spellOctave(standing);
       if (spelled === null) {
-        return null;
+        return refuse(REFUSE_SPELL);
       }
 
       const restore = insertAt(previous.unitSpan.end, ` ${spelled}`, previous.unitSpan.line);
@@ -1941,7 +1993,7 @@ export function planEdits(context: EditContext, plan: Plan): Edit[] | null {
   if (reach > context.playableTicks) {
     const padded = padChannels(context, reach);
     if (padded === null) {
-      return null;
+      return refuse(REFUSE_SPELL);
     }
 
     edits.push(...padded);
@@ -1949,8 +2001,8 @@ export function planEdits(context: EditContext, plan: Plan): Edit[] | null {
 
   for (const region of regions) {
     const written = realiseRegion(context, region, survivors);
-    if (written === null) {
-      return null;
+    if (!isEdits(written)) {
+      return written;
     }
 
     edits.push(...written);
@@ -1970,7 +2022,7 @@ export function planEdits(context: EditContext, plan: Plan): Edit[] | null {
     // CodeMirror merges overlapping ranges instead of refusing them, so this is
     // the roll's own invariant to hold rather than something it can be told.
     if (sorted[at].span.start < sorted[at - 1].span.end) {
-      return null;
+      return refuse(REFUSE_CROWDED);
     }
   }
 

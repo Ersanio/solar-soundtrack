@@ -534,9 +534,28 @@ stats.loopTicks` pads **every other channel that would cut the song short** out 
   wrote in front of it. Both build the same insert at the same offset, `coalesce` concatenates
   rather than dedupes, and a note carried past another came out `o4 o4 d8`. The regions are built
   before the item loop, so the loop can ask whether a run is about to answer for that note
-  (`spawnHandsItBack`) and stand down — the pass that can see what the run leaves is the one that
+  (`spawnLeaves`) and stand down — the pass that can see what the run leaves is the one that
   speaks. Not a dedupe of identical edits at one offset: two writers agreeing by accident is not the
   same as one of them knowing it has nothing to say.
+- **`planEdits` answering a refusal with a bare `null`** — the gesture was undone and nothing on
+  screen said why, while `REFUSE_SPELL`, `REFUSE_CROWDED` and `REFUSE_RAMP` sat exported and unread.
+  It answers `Edit[] | EditRefusal`, which is the shape `channelStrip` already has, and the roll puts
+  the sentence beside the toolbar's own "cannot edit". Not folded into `Plan.refused` either:
+  `planGesture` refuses what it can see while the pointer is down, which is what the red bars are
+  already drawing, where a spelling refusal is only known at the commit that undoes the gesture — so
+  it is held against the document it was given for rather than leaving with the gesture that earned
+  it.
+- **Reading `itemsRunTogether` over a region with no rest in it** — nothing is laid over anything
+  there: the run is inserted at one offset and every item in the region is a note `planEdits` removes
+  outright, so the guard was protecting a boundary that had gone anyway. It refused the commonest
+  shape a carve leaves — a note drawn over a run of notes with a `v` or a `y` written between them —
+  and wrote nothing at all. The guard is asked only where a rest is being rewritten.
+- **Anchoring a spawned run at `strip.items[0]` where no note after the region survives** —
+  `writeInto`'s head branch aims at the next _surviving_ note, and a carve that swallowed the whole
+  channel leaves none: `items[0]` is then a note the same plan is deleting, `removeItem` takes the
+  whitespace in front of a unit with it, and the insertion therefore lands strictly inside a range
+  being removed, which `planEdits` refuses. The run goes after the region's last item, as it goes
+  after the note before the gap in the other branch, and that only abuts the removal.
 - **Asking whether the note after a spawn can be left as it is by what stood _before_ the gap** —
   `untouched` compared the previous note's exit octave against the reader's and against the run's,
   so a region at the head of a channel, which has no note before it to compare with, always wrote an

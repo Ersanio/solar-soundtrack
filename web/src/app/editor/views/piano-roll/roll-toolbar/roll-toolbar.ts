@@ -50,6 +50,8 @@ export class RollToolbar {
   readonly editMode = input.required<EditMode>();
   /** Why the picked channel cannot be edited, or null when it can. */
   readonly editRefusal = input.required<string | null>();
+  /** Why the last gesture was not written out, or null when it was. */
+  readonly gestureRefusal = input.required<string | null>();
   /** Whether a rewrite of that channel is the answer to the refusal. */
   readonly normalizable = input.required<boolean>();
   /** How many notes are selected, for the readout. */

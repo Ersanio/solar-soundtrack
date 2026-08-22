@@ -32,8 +32,12 @@ import {
 	type EditMode,
 	type Gesture,
 	type Plan,
+	REFUSE_CLASH,
+	REFUSE_CROWDED,
+	REFUSE_RAMP,
 	REFUSE_RANGE,
 	REFUSE_ROOM,
+	isEdits,
 	planEdits,
 	planGesture,
 } from "../web/src/app/editor/views/piano-roll/roll-edit";
@@ -279,11 +283,13 @@ function expectEdit(
 		channels: tailsOf(source, before),
 	};
 	const plan = planGesture(bar, gesture(bar), expectation.mode ?? "insert");
-	const edits = planEdits(context, plan);
-	if (edits === null) {
-		check(`${name}: the gesture can be written`, false, plan.refused ?? "planEdits refused");
+	const outcome = planEdits(context, plan);
+	if (!isEdits(outcome)) {
+		check(`${name}: the gesture can be written`, false, outcome.refused);
 		return;
 	}
+
+	const edits = outcome;
 
 	let after: string;
 	try {
@@ -393,17 +399,31 @@ function planFor(
 	return { plan: planGesture(bar, gesture(bar), mode), context };
 }
 
-/** A gesture the roll must decline: no edit, and a reason. */
+/**
+ * A gesture the roll must decline: no edit, and a reason.
+ *
+ * `because` is the sentence the toolbar shows. Pinning it is what proves the
+ * refusal reaches the porter: a reason threaded through the wrong branch says
+ * the wrong thing about a real refusal, which is worse than the silence it
+ * replaces, and no test of "was it refused" can tell the two apart.
+ */
 function expectRefused(
 	name: string,
 	source: string,
 	channel: number,
 	gesture: (strip: Strip) => Gesture,
 	mode: EditMode = "insert",
+	because?: string,
 ): void {
 	const made = planFor(name, source, channel, gesture, mode);
-	if (made) {
-		check(`${name}: refused`, planEdits(made.context, made.plan) === null, "an edit was produced");
+	if (!made) {
+		return;
+	}
+
+	const outcome = planEdits(made.context, made.plan);
+	check(`${name}: refused`, !isEdits(outcome), "an edit was produced");
+	if (because !== undefined && !isEdits(outcome)) {
+		check(`${name}: says why`, outcome.refused === because, outcome.refused);
 	}
 }
 
@@ -1276,6 +1296,53 @@ expectEdit(
 	{ mode: "overwrite", playsAsLong: true, contains: ["v200", "^8"] },
 );
 
+// A carve that swallows every note leaves one region over the whole channel,
+// with no surviving note for the run to be written in front of and every item in
+// it a unit being removed. The run goes after the last of them: at a head it
+// would land strictly inside a range `removeItem` is deleting, and two edits over
+// one run of text is what `planEdits` refuses. Nothing is put back after it
+// either, since the run spells the octave it leaves.
+expectEdit(
+	"a note drawn over every note of a channel",
+	"#amk 2\n#0 o4 c4 d4",
+	0,
+	() => ({ kind: "spawn", startTick: 0, ticks: 96, written: NOTE_MIN + 36 + 7, drum: null }),
+	{ mode: "overwrite", playsAsLong: true, text: "#amk 2\n#0 o4 g2" },
+);
+
+// And the command written between two notes it swallows keeps its place in the
+// text. The tick it lands on is the one deleting those notes gives it — there is
+// no other answer once what it stood against has gone.
+expectEdit(
+	"a note drawn over every note of a channel, past a command written between them",
+	"#amk 2\n#0 o4 c4 v200 d4",
+	0,
+	() => ({ kind: "spawn", startTick: 0, ticks: 96, written: NOTE_MIN + 36 + 7, drum: null }),
+	{ mode: "overwrite", playsAsLong: true, text: "#amk 2\n#0 v200 o4 g2" },
+);
+
+// Mid-channel, where the region is bounded either side, the command keeps its
+// tick as well: the run is written after the last item in the region, so the
+// boundary the command stands on is the one the surviving note still starts at.
+expectEdit(
+	"a note drawn over two notes with a command written between them",
+	"#amk 2\n#0 o4 c4 d4 v200 e4 f4",
+	0,
+	() => ({ kind: "spawn", startTick: 48, ticks: 96, written: NOTE_MIN + 36 + 7, drum: null }),
+	{ mode: "overwrite", playsAsLong: true, text: "#amk 2\n#0 o4 c4 v200 g2 f4" },
+);
+
+// The one thing that is put back when the whole channel goes: `octave` is global
+// parser state and leaks past a `#N`, so a run that leaves a different one than
+// the channel did says so at the end.
+expectEdit(
+	"a note drawn an octave up over every note of a channel",
+	"#amk 2\n#0 o4 c4 v200 d4",
+	0,
+	() => ({ kind: "spawn", startTick: 0, ticks: 96, written: NOTE_MIN + 48 + 7, drum: null }),
+	{ mode: "overwrite", playsAsLong: true, text: "#amk 2\n#0 v200 o5 g2 o4" },
+);
+
 console.log("\nrefusals");
 expectRefused(
 	"a note dragged onto its neighbour, strictly",
@@ -1289,6 +1356,7 @@ expectRefused(
 		copy: false,
 	}),
 	"strict",
+	REFUSE_CLASH,
 );
 
 // The gesture the mode inverts: this is what `insert` pushes through, in the
@@ -1331,6 +1399,7 @@ expectRefused(
 	0,
 	() => ({ kind: "spawn", startTick: 0, ticks: 24, written: NOTE_MIN + 36 + 4, drum: null }),
 	"overwrite",
+	REFUSE_RAMP,
 );
 
 expectRefused(
@@ -1357,20 +1426,34 @@ expectRefused("quantize pulling two notes onto one beat", "#amk 2\n#0 o4 c16 d16
 	snap: 48,
 }));
 
-expectRefused("a note dragged off the bottom of the driver's range", "#amk 2\n#0 o1 c4 d4", 0, (bar) => ({
-	kind: "move",
-	items: [noteAt(bar, 0)],
-	deltaTicks: 0,
-	deltaKeys: -12,
-	copy: false,
-}));
+expectRefused(
+	"a note dragged off the bottom of the driver's range",
+	"#amk 2\n#0 o1 c4 d4",
+	0,
+	(bar) => ({
+		kind: "move",
+		items: [noteAt(bar, 0)],
+		deltaTicks: 0,
+		deltaKeys: -12,
+		copy: false,
+	}),
+	"insert",
+	REFUSE_RANGE,
+);
 
-expectRefused("a stretch with nowhere to push", "#amk 2\n#0 o4 c4 d4", 0, (bar) => ({
-	kind: "stretch",
-	items: [noteAt(bar, 1)],
-	edge: "start",
-	deltaTicks: -48,
-}));
+expectRefused(
+	"a stretch with nowhere to push",
+	"#amk 2\n#0 o4 c4 d4",
+	0,
+	(bar) => ({
+		kind: "stretch",
+		items: [noteAt(bar, 1)],
+		edge: "start",
+		deltaTicks: -48,
+	}),
+	"insert",
+	REFUSE_ROOM,
+);
 
 expectRefused("a note shortened past the command written inside it", "#amk 2\n#0 o4 c4 v200 ^8 d4", 0, (bar) => ({
 	kind: "stretch",
@@ -1804,6 +1887,8 @@ expectRefused(
 	"#amk 2\n#0 o4 c4 d4 / e4 f4\n\n#5 o4 l8 q7F @0 v255 y10\nc4 r4 / r2\n",
 	5,
 	() => ({ kind: "spawn", startTick: 72, ticks: 48, written: NOTE_MIN + 36 + 7, drum: null }),
+	"insert",
+	REFUSE_CROWDED,
 );
 
 // `detectStartingChannel` probes the text for `#0` first, so writing one would

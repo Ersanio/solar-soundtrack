@@ -13,7 +13,8 @@ import {
   type Gesture,
   type PlacedNote,
   type Plan,
-  committable,
+  REFUSE_CLASH,
+  isEdits,
   planEdits,
   planGesture,
 } from './roll-edit';
@@ -215,6 +216,15 @@ export interface RollGestures {
   cursor: Signal<string>;
   /** True while a gesture is in flight, so the hover tooltip stands aside. */
   busy: Signal<boolean>;
+  /**
+   * Why the gesture will not be written out, or `null`.
+   *
+   * What the plan refuses is known while the pointer is still down, and is
+   * already on the roll as red bars and a red wash; this is that in words. What
+   * the **splice** refuses is not known until the commit, which is the moment the
+   * gesture is undone — so that reason is held rather than shown and dropped.
+   */
+  refusal: Signal<string | null>;
 
   onPointerDown(event: PointerEvent, box: DOMRect): void;
   onPointerMove(event: PointerEvent, box: DOMRect): void;
@@ -526,6 +536,32 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
   /** True once a gesture is really under way, so the hover tooltip stands aside. */
   const busy = computed(() => shownPlan() !== null);
 
+  /**
+   * The reason the last commit gave for turning a gesture away, against the
+   * document it was given for.
+   *
+   * Held rather than shown and dropped, because a `planEdits` refusal arrives at
+   * the pointer-up that would have committed it: the gesture snaps back and the
+   * roll goes quiet, so a message that left with it would never be read. The
+   * document is what dates it — every commit that does happen writes one, and a
+   * reason given for text that has since moved is answering about nothing.
+   */
+  const latched = signal<{ reason: string; source: string } | null>(null);
+
+  const refusal = computed<string | null>(() => {
+    const now = shownPlan();
+    if (now !== null) {
+      // A gesture in flight answers for itself. The clash is spelled out here
+      // rather than carried in the plan because `planGesture` reports it as ticks
+      // for the roll to wash red; `planEdits` gives the same sentence at the
+      // commit, and this is it while the pointer is still down.
+      return now.refused ?? (now.clashes.length > 0 ? REFUSE_CLASH : null);
+    }
+
+    const held = latched();
+    return held !== null && held.source === sources.source() ? held.reason : null;
+  });
+
   /** Where a pointer is, in the song's own terms. */
   const at = (event: PointerEvent, box: DOMRect): { tick: number; row: number } => {
     const tick = tickAtX(event.clientX - box.left, sources.viewTick(), sources.zoom());
@@ -567,6 +603,25 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
     channels: sources.channels(),
   });
 
+  /**
+   * A plan written out, or the reason it was not, kept where the three commits
+   * can share it.
+   *
+   * Answers the edits so that each caller can do what it alone does with them —
+   * `finish` remembers the length it drew and drops the selection, `erase` does
+   * neither.
+   */
+  const write = (strip: Strip, now: Plan): readonly Edit[] | null => {
+    const outcome = planEdits(contextFor(strip), now);
+    if (!isEdits(outcome)) {
+      latched.set({ reason: outcome.refused, source: sources.source() });
+      return null;
+    }
+
+    latched.set(null);
+    return outcome;
+  };
+
   const finish = (): void => {
     const strip = sources.strip();
     const now = plan();
@@ -576,12 +631,7 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
       return;
     }
 
-    if (!committable(now)) {
-      return;
-    }
-
-    const edits = planEdits(contextFor(strip), now);
-
+    const edits = write(strip, now);
     if (edits && edits.length > 0) {
       if (now.touched.length > 0) {
         sinks.rememberLength(now.touched[0].ticks);
@@ -601,6 +651,7 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
     bubble,
     cursor,
     busy,
+    refusal,
 
     onPointerDown(event: PointerEvent, box: DOMRect): void {
       // The hover is left where it is: `drag` is what stands it aside, in both
@@ -618,6 +669,10 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
       if (event.clientX - box.left < KEY_WIDTH || row < 0 || row >= sources.stack().lanes.length) {
         return;
       }
+
+      // A reason given for a gesture that is over belongs to that gesture, and
+      // the porter starting another has read it or has not.
+      latched.set(null);
 
       const index = itemAt(strip, sources.stack(), tick, row);
 
@@ -904,11 +959,7 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
       }
 
       const now = planGesture(strip, gesture, sources.editMode());
-      if (!committable(now)) {
-        return;
-      }
-
-      const edits = planEdits(contextFor(strip), now);
+      const edits = write(strip, now);
       if (edits && edits.length > 0) {
         sinks.commit(edits);
         selection.set(new Set<number>());
@@ -953,7 +1004,7 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
     }
 
     const now = planGesture(strip, { kind: 'delete', items: [index] }, sources.editMode());
-    const edits = planEdits(contextFor(strip), now);
+    const edits = write(strip, now);
     if (edits && edits.length > 0) {
       sinks.commit(edits);
     }

@@ -144,6 +144,10 @@ slider in the inspector, which writes one note's own length and never looks at i
 - **A gap is a rest.** The space between two notes is the rest between them, and moving a note
   rewrites that rest rather than moving anything else. Anything you wrote inside the gap keeps its
   distance from the note that follows it.
+- **A refusal says so.** Where a gesture cannot be written, the roll turns the bars red while you
+  are still holding it, and the toolbar says why in words — "there is something written where that
+  note would go", and so on. A reason arrived at only when you let go stays on the toolbar until the
+  next edit lands, since the gesture it belongs to is over by then.
 - **A drum's row is its instrument.** Dragging a drum up or down moves it between drum lanes by
   rewriting its `@21`–`@29`. Dragging one onto the keyboard, or a pitched note onto a drum lane, is
   refused: that is a change to what every note after it plays on, not a move.

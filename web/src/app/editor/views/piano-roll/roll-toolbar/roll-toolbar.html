@@ -155,5 +155,12 @@
       <amk-normalize-button [channel]="editChannel() ?? 0" />
     }
   }
+  <!-- And why the last gesture was not written out. A refusal the plan carries
+       is on show while the pointer is down, beside the red bars saying the same
+       thing; one the splice makes arrives at the pointer-up that undoes the
+       gesture, so it stands until the document moves under it. -->
+  @if (gestureRefusal(); as reason) {
+    <span class="text-warn text-xs">refused: {{ reason }}</span>
+  }
   <span class="text-ink-muted font-mono text-xs">{{ readout() }}</span>
 </amk-toolbar>
