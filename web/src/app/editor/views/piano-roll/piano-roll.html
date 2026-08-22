@@ -109,7 +109,7 @@
       class="block w-full select-none"
       [attr.height]="stackHeight()"
       [attr.viewBox]="box"
-      [style.cursor]="gestures.cursor()"
+      [style.cursor]="rollCursor()"
       (pointerdown)="onEditDown($event)"
       (pointermove)="onEditMove($event)"
       (pointerup)="onEditUp($event)"

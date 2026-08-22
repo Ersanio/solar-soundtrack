@@ -109,7 +109,7 @@ export interface Settings {
   /**
    * The length a drawn note takes, in ticks — the last one drawn or resized.
    *
-   * Seeded at a quarter note. A roll that always drew `l4` would need every
+   * Seeded at an eighth note. A roll that always drew `l8` would need every
    * note resized after it was drawn, which is a gesture per note for no reason.
    */
   lastLength: number;
@@ -167,15 +167,17 @@ export function readSettings(): Settings {
     scrollNotes: false,
     allOctaves: true,
     beatsPerBar: 4,
-    beatUnit: 4,
+    // A line per sixteenth with a heavier one every quarter note, which is the
+    // grid FL Studio opens on and the one a snap of `beat` then lands on.
+    beatUnit: 16,
     percussion: [...DEFAULT_PERCUSSION],
     percussionOpen: false,
     editChannel: null,
-    snap: 'eighth',
+    snap: 'beat',
     // The first mode in the table, which is what makes that table's order the
     // one place the default, the fallback and the `<select>`'s order are set.
     editMode: EDIT_MODES[0],
-    lastLength: TICKS_PER_WHOLE / 4,
+    lastLength: TICKS_PER_WHOLE / 8,
   };
 
   let stored: StoredSettings | null;

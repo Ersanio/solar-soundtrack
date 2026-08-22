@@ -1321,15 +1321,73 @@ export class PianoRoll {
     return (event.currentTarget as Element).getBoundingClientRect();
   }
 
+  /**
+   * Where a middle-button pan took hold of the roll, or `null` for no pan.
+   *
+   * Both axes are recorded at the press and the move works out an absolute
+   * offset from them, rather than adding a step per event: a drag that rounds
+   * its way along a hundred moves leaves the music somewhere other than under
+   * the pointer that carried it. A signal because the cursor reads it.
+   */
+  private readonly panning = signal<{
+    x: number;
+    y: number;
+    fromTick: number;
+    fromTop: number;
+  } | null>(null);
+
+  /** What the pointer looks like over the roll: a pan first, then the gesture's own. */
+  protected readonly rollCursor = computed(() =>
+    this.panning() ? 'grabbing' : this.gestures.cursor(),
+  );
+
   protected onEditDown(event: PointerEvent): void {
+    // The middle button pans and edits nothing, so it is taken before the
+    // gesture layer and works with no channel picked. Preventing the default
+    // here suppresses the compatibility `mousedown`, and with it the browser's
+    // own autoscroll.
+    if (event.button === 1) {
+      event.preventDefault();
+      (event.currentTarget as Element).setPointerCapture(event.pointerId);
+      this.setFollow(false);
+      this.panning.set({
+        x: event.clientX,
+        y: event.clientY,
+        fromTick: this.panTick(),
+        fromTop: this.viewport().nativeElement.scrollTop,
+      });
+      return;
+    }
+
     this.gestures.onPointerDown(event, this.svgBox(event));
   }
 
   protected onEditMove(event: PointerEvent): void {
+    const pan = this.panning();
+    if (pan) {
+      const zoom = this.zoom();
+      if (zoom > 0) {
+        this.panTick.set(pan.fromTick - (event.clientX - pan.x) / zoom);
+      }
+
+      this.viewport().nativeElement.scrollTop = pan.fromTop - (event.clientY - pan.y);
+      return;
+    }
+
     this.gestures.onPointerMove(event, this.svgBox(event));
   }
 
   protected onEditUp(event: PointerEvent): void {
+    if (this.panning()) {
+      const target = event.currentTarget as Element;
+      if (target.hasPointerCapture(event.pointerId)) {
+        target.releasePointerCapture(event.pointerId);
+      }
+
+      this.panning.set(null);
+      return;
+    }
+
     this.gestures.onPointerUp(event);
   }
 
@@ -1383,6 +1441,30 @@ export class PianoRoll {
       return;
     }
 
+    if (event.altKey) {
+      event.preventDefault();
+      const scroller = this.viewport().nativeElement;
+      const before = this.rowHeight();
+      // Which row the pointer is on, as a fraction, so the zoom happens where
+      // the eye is rather than sliding the keyboard under it.
+      const under =
+        (scroller.scrollTop + event.clientY - scroller.getBoundingClientRect().top) / before;
+      this.setRowHeight(delta < 0 ? 1 : -1);
+
+      // After a render: the `<svg>` is still its old height when the handler
+      // runs, so a `scrollTop` written now is clamped against a stack that has
+      // not grown yet.
+      afterNextRender(
+        () => {
+          const now = this.rowHeight();
+          const box = scroller.getBoundingClientRect();
+          scroller.scrollTop = under * now - (event.clientY - box.top);
+        },
+        { injector: this.injector },
+      );
+      return;
+    }
+
     if (event.shiftKey) {
       event.preventDefault();
       // Panning takes the roll off the song, which is what the Follow switch
@@ -1424,6 +1506,18 @@ export class PianoRoll {
         this.clearEditChannel();
       }
 
+      return;
+    }
+
+    // Undo and redo, on the same history the two toolbars' buttons drive and the
+    // MML editor's own keymap walks. Bound here because that keymap only fires
+    // while the editor has focus, and the roll never gives it any. Ahead of the
+    // strip and the selection, neither of which an undo needs.
+    const control = event.ctrlKey || event.metaKey;
+    const pressed = event.key.toLowerCase();
+    if (control && (pressed === 'z' || pressed === 'y')) {
+      event.preventDefault();
+      this.requests.history.set(pressed === 'y' || event.shiftKey ? 'redo' : 'undo');
       return;
     }
 
@@ -1479,7 +1573,10 @@ export class PianoRoll {
     } else if ((event.ctrlKey || event.metaKey) && key === 'j') {
       run({ kind: 'glue', items: chosen });
     } else if ((event.ctrlKey || event.metaKey) && key === 'b') {
-      const bar = Math.max(1, this.snapTicks() * Math.max(1, this.beatsPerBar()));
+      // The grid's own bar rather than the snap step's, or the copy lands a
+      // different distance away every time Snap is changed.
+      const beat = TICKS_PER_WHOLE / this.beatUnit();
+      const bar = Math.max(1, beat * Math.max(1, this.beatsPerBar()));
       run({ kind: 'move', items: chosen, deltaTicks: bar, deltaKeys: 0, copy: true });
     }
   }

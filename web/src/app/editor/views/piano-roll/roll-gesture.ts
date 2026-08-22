@@ -127,6 +127,20 @@ interface Drag {
   atY: number;
   /** `Alt` is down: tick precision, for this gesture only. */
   fine: boolean;
+  /**
+   * `Shift` is down, which locks a move to its own row.
+   *
+   * Refreshed on every move as {@link Drag.fine} is, because it only constrains
+   * a gesture that already exists — unlike {@link Drag.anchored}, which decides
+   * what the gesture *is* and so is settled at the press.
+   */
+  shift: boolean;
+  /**
+   * `Shift` was down on a press that landed on empty grid: the note is pinned to
+   * the tick pressed and its end follows the pointer, rather than the whole note
+   * being carried along under it.
+   */
+  anchored: boolean;
   /** The length a drawn note takes, once the wheel has said; `null` follows the setting. */
   length: number | null;
 }
@@ -278,15 +292,26 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
     if (held.kind === 'spawn') {
       // The new note follows the pointer, which is what "in the dragged state"
       // means: press, and it is already there; drag, and it goes where you drag.
-      const pitch = pitchOfRow(stack, held.row);
+      // Anchored, it does the opposite: the start stays where it was pressed and
+      // the pointer pulls the end, so the row is the pressed one too.
+      const pitch = pitchOfRow(stack, held.anchored ? held.fromRow : held.row);
       if (!pitch) {
         return null;
       }
 
+      const startTick = held.anchored
+        ? spawnTick(held.fromTick, snap, fine)
+        : draggedTick(held, undefined, snap);
+      // The wheel has no say while anchored — the pointer owns the length — and
+      // the length answers to the note values a stretch does rather than to the
+      // grid, since what is being chosen is a duration.
+      const drawn = held.length ?? sources.lastLength();
+      const reach = Math.max(1, Math.round(held.tick - startTick));
+
       return {
         kind: 'spawn',
-        startTick: draggedTick(held, undefined, snap),
-        ticks: held.length ?? sources.lastLength(),
+        startTick,
+        ticks: held.anchored ? (fine ? reach : snapDuration(reach)) : drawn,
         written: pitch.written,
         drum: pitch.drum,
       };
@@ -304,9 +329,12 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
       // duration and the porter is choosing one.
       const end = item.startTick + item.ticks;
       const wanted = held.edge === 'end' ? held.tick - item.startTick : end - held.tick;
-      const length = fine
-        ? Math.max(1, Math.round(wanted))
-        : snapDuration(Math.max(1, Math.round(wanted)));
+      // The wheel wins where it has spoken: a press that is being sized by the
+      // wheel is not being sized by the pointer as well, and `stepLength` only
+      // hands a length to a press that never moved.
+      const length =
+        held.length ??
+        (fine ? Math.max(1, Math.round(wanted)) : snapDuration(Math.max(1, Math.round(wanted))));
       return {
         kind: 'stretch',
         items,
@@ -319,7 +347,9 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
       kind: 'move',
       items,
       deltaTicks: draggedTick(held, item, snap) - item.startTick,
-      deltaKeys: keysBetween(stack, held.fromRow, held.row),
+      // `Shift` locks the drag to the row it started on, so a note can be moved
+      // along the song without its pitch coming along for the ride.
+      deltaKeys: held.shift ? 0 : keysBetween(stack, held.fromRow, held.row),
       copy: held.copy,
     };
   });
@@ -335,12 +365,13 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
    * actually become a drag.
    *
    * A press on a note that turns out to be a click would otherwise flash a bar
-   * over the note it is standing on. Drawing is the exception, and has to be:
-   * "in the dragged state" means the new note is there from the press.
+   * over the note it is standing on. Two exceptions: drawing, where "in the
+   * dragged state" means the new note is there from the press, and a press the
+   * wheel has resized, which has something to show and no movement to show it by.
    */
   const shownPlan = computed<Plan | null>(() => {
     const held = drag();
-    return held && (held.moved || held.kind === 'spawn') ? plan() : null;
+    return held && (held.moved || held.kind === 'spawn' || held.length !== null) ? plan() : null;
   });
 
   const preview = computed<Preview | null>(() => {
@@ -463,7 +494,9 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
   const cursor = computed<string>(() => {
     const held = drag();
     if (held) {
-      return held.kind === 'stretch'
+      // An anchored spawn is drawing a note by its right edge, so it says what a
+      // stretch says rather than what a draw does.
+      return held.kind === 'stretch' || held.anchored
         ? 'ew-resize'
         : held.kind === 'move'
           ? 'grabbing'
@@ -509,7 +542,10 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
   const soundDrag = (held: Drag, row: number): void => {
     const item = sources.strip()?.items[held.item];
     const ticks = held.kind === 'spawn' ? held.length : item?.ticks;
-    soundRow(row, draggedTick(held, item, sources.snap()), ticks ?? sources.lastLength());
+    // A gesture the row is locked out of sounds the row it is pinned to, not the
+    // one the pointer wandered onto — that is where the note is going.
+    const going = held.anchored || held.shift ? held.fromRow : row;
+    soundRow(going, draggedTick(held, item, sources.snap()), ticks ?? sources.lastLength());
   };
 
   /** Everything `planEdits` reads besides the plan itself, as of right now. */
@@ -562,8 +598,11 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
       // The hover is left where it is: `drag` is what stands it aside, in both
       // the ghost and the cursor, and a press that turns out to be a click has
       // somewhere to go back to.
+      // The left button edits and the right one erases; every other button
+      // belongs to somebody else. The middle one is the camera's pan, which the
+      // roll handles above this so that it works with no channel picked.
       const strip = sources.strip();
-      if (!strip || event.button > 2) {
+      if (!strip || (event.button !== 0 && event.button !== 2)) {
         return;
       }
 
@@ -600,6 +639,8 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
           additive: false,
           sounded: -1,
           fine: event.altKey,
+          shift: event.shiftKey,
+          anchored: false,
           length: null,
           atX: event.clientX,
           atY: event.clientY,
@@ -639,6 +680,8 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
           additive: false,
           sounded: row,
           fine: event.altKey,
+          shift: event.shiftKey,
+          anchored: kind === 'spawn' && event.shiftKey,
           length: null,
           atX: event.clientX,
           atY: event.clientY,
@@ -690,6 +733,8 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
         additive,
         sounded: row,
         fine: event.altKey,
+        shift: event.shiftKey,
+        anchored: false,
         length: null,
         atX: event.clientX,
         atY: event.clientY,
@@ -729,7 +774,7 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
         }
       }
 
-      const next: Drag = { ...held, tick, row, moved, fine: event.altKey };
+      const next: Drag = { ...held, tick, row, moved, fine: event.altKey, shift: event.shiftKey };
       if (held.kind === 'erase') {
         drag.set(next);
         const index = strip ? itemAt(strip, sources.stack(), tick, row) : -1;
@@ -776,13 +821,21 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
       // belongs to the bar: it selects that note alone, names the channel, asks
       // the inspector about it, and a second one goes to it in the source.
       // Committing a move of nowhere would only be an undo step that changes
-      // nothing. Drawing is the exception — a click on empty grid is how a note
-      // is drawn at all.
-      if (!held.moved && held.kind !== 'spawn') {
+      // nothing. Two exceptions — a click on empty grid is how a note is drawn
+      // at all, and a press the wheel has resized has something to commit even
+      // though the pointer never went anywhere.
+      if (!held.moved && held.kind !== 'spawn' && held.length === null) {
         if (held.additive) {
           this.toggle(held.item);
         } else {
           selection.set(new Set([held.item]));
+        }
+
+        // The note clicked is the note the next one is drawn the length of, as
+        // it is in FL: picking a note up is how its length is picked up too.
+        const item = sources.strip()?.items[held.item];
+        if (item) {
+          sinks.rememberLength(item.ticks);
         }
 
         drag.set(null);
@@ -798,20 +851,41 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
 
     stepLength(direction: number, fine: boolean): boolean {
       const held = drag();
-      if (held?.kind !== 'spawn') {
+      if (!held) {
+        return false;
+      }
+
+      // A note being drawn is sized from the length it was drawn at. A note the
+      // press landed on is sized from its own, and only while that press has not
+      // moved: `planGesture` takes one gesture, so a note carried *and* resized
+      // is two, and the pointer is already saying which one it means. Once the
+      // wheel has spoken the press is a stretch of the note's far end and stays
+      // one, however far the pointer wanders afterwards.
+      const item = sources.strip()?.items[held.item];
+      const sizable =
+        held.kind === 'spawn'
+          ? sources.lastLength()
+          : (held.kind === 'move' || held.kind === 'stretch') && !held.moved && item
+            ? item.ticks
+            : null;
+      if (sizable === null) {
         return false;
       }
 
       // `fine` is the wheel's own `Alt` rather than `held.fine`, which is only
       // refreshed by a pointer move — and it is not written back, so sizing a
       // note by ticks leaves the start it was pressed on where the porter put it.
-      const now = held.length ?? sources.lastLength();
+      const now = held.length ?? sizable;
       const next = fine ? Math.max(1, now + direction) : stepDrawLength(now, direction);
 
       // No audition. A note is sounded on the press and on each change of row,
       // and one of those is a whole silent run of the song; one per notch of the
       // wheel would be a queue of them arriving long after the wheel stopped.
-      drag.set({ ...held, length: next });
+      drag.set(
+        held.kind === 'spawn'
+          ? { ...held, length: next }
+          : { ...held, kind: 'stretch', edge: 'end', length: next },
+      );
       return true;
     },
 

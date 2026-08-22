@@ -474,6 +474,26 @@ stats.loopTicks` pads **every other channel that would cut the song short** out 
   it: `loopTick` is the lowest tick any channel re-enters at, and a second channel marked on the old
   tick holds the reading down. `writeInto` anchors at `gap.before - 1`, which is the same offset for
   a region that holds nothing.
+- **Letting the wheel size a note that is already being dragged** — `planGesture` takes one
+  `Gesture`, and a note carried _and_ resized is two, so the second one silently won and the drag
+  went nowhere. The wheel speaks only while the press has not passed `SLOP_PX` (`stepLength`), and
+  once it has spoken that press is a `stretch` of the note's far end and stays one however far the
+  pointer wanders. The pointer is already saying which of the two it means; this is only agreeing
+  with it.
+- **`shownPlan` gated on `moved || kind === 'spawn'` alone** — a press the wheel had resized had a
+  plan, committed it on pointer-up and drew nothing at all in between, so the length was chosen
+  blind. `held.length !== null` is the third way a press becomes something worth drawing, and it is
+  the same field the commit reads.
+- **The middle-button pan inside `roll-gesture.ts`** — that file refuses everything before it has a
+  `Strip`, so panning would have needed a channel picked, and the camera is not the editor's
+  anyway. `onEditDown`/`Move`/`Up` take `button === 1` before delegating; the gesture layer's guard
+  is narrowed to buttons 0 and 2 so the middle one cannot fall through to drawing. Preventing the
+  default on `pointerdown` is what stops the browser's autoscroll, since the compatibility
+  `mousedown` goes with it.
+- **One `Shift` flag for both of the gestures it changes** — `Shift` decides what a press on empty
+  grid _is_ (a note pinned at the press with its end on the pointer) and merely _constrains_ a drag
+  already under way (locked to its row), and those settle at different times. `anchored` is read at
+  the press and never again; `shift` is refreshed on every move, as `fine` is.
 
 ## Angular specifics
 

@@ -1316,6 +1316,55 @@ expectEdit("a note copied rather than moved", "#amk 2\n#0 o4 c4 r4 r4", 0, (bar)
 	copy: true,
 }));
 
+// `Ctrl`+drag and `Ctrl`+B both copy the whole **selection**, so a region takes
+// as many notes at once as the porter had chosen. One note per region would
+// refuse the commonest shape there is — a run of notes copied a bar right.
+expectEdit(
+	"a run of notes copied together",
+	"#amk 2\n#0 o4 c4 d4 r4 r4",
+	0,
+	(bar) => ({
+		kind: "move",
+		items: [noteAt(bar, 0), noteAt(bar, 1)],
+		deltaTicks: 96,
+		deltaKeys: 0,
+		copy: true,
+	}),
+	{ contains: ["c4", "d4"] },
+);
+
+// The run carries the octave from note to note, so the second copy spells its
+// own `o` and going back down spells one again.
+expectEdit(
+	"copies an octave apart each spell their own octave",
+	"#amk 2\n#0 o4 c4 o5 c4 r4 r4",
+	0,
+	(bar) => ({
+		kind: "move",
+		items: [noteAt(bar, 0), noteAt(bar, 1)],
+		deltaTicks: 96,
+		deltaKeys: 0,
+		copy: true,
+	}),
+	{ contains: ["o5 c4"] },
+);
+
+// A drum leaves the octave standing rather than replacing it, so the note after
+// a copied drum is spelled against whatever the run last put in force.
+expectEdit(
+	"a run holding a drum copied together",
+	"#amk 2\n#0 o4 @21 c4 @0 o4 d4 r4 r4",
+	0,
+	(bar) => ({
+		kind: "move",
+		items: [noteAt(bar, 0), noteAt(bar, 1)],
+		deltaTicks: 96,
+		deltaKeys: 0,
+		copy: true,
+	}),
+	{ contains: ["@21"] },
+);
+
 console.log("\npast the end of the song");
 
 // The driver reloads all eight track pointers the moment one voice reads its
