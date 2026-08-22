@@ -625,6 +625,26 @@ expectEdit("a note drawn at the end of a channel", "#amk 2\n#0 o4 c4 r4", 0, () 
 	drum: null,
 }));
 
+// A note drawn at the octave already standing spells none of its own. What is in
+// force is the previous note's own byte, carried over text that moves it nowhere.
+expectEdit(
+	"a note drawn at the octave already standing",
+	"#amk 2\n#0 o4 c4 r2 d4",
+	0,
+	() => ({ kind: "spawn", startTick: 72, ticks: 24, written: NOTE_MIN + 36 + 4, drum: null }),
+	{ text: "#amk 2\n#0 o4 c4 r8 e8 r4 d4" },
+);
+
+// And a `>` between the two does move it, so the note spells one after all —
+// which is the whole of what the scan over the gap is for.
+expectEdit(
+	"a note drawn past an octave shift written in the gap",
+	"#amk 2\n#0 o4 c4 > r2 d4",
+	0,
+	() => ({ kind: "spawn", startTick: 72, ticks: 24, written: NOTE_MIN + 48 + 4, drum: null }),
+	{ text: "#amk 2\n#0 o4 c4 > r8 o5 e8 r4 o5 d4" },
+);
+
 // A run leaves its own octave standing, so the note that reads it is handed the
 // one it was written under — at its own head, where the text settles anyway.
 // The whole channel below would move with the drawn note otherwise.
@@ -879,7 +899,7 @@ expectEdit(
 	"#amk 2\n#0 o4 c4 d4\n#1 o4 e4 f4\n",
 	0,
 	() => ({ kind: "spawn", startTick: 96, ticks: 48, written: NOTE_MIN + 36 + 7, drum: null }),
-	{ text: "#amk 2\n#0 o4 c4 d4 o4 g4\n#1 o4 e4 f4\nr4\n", playsFor: 144 },
+	{ text: "#amk 2\n#0 o4 c4 d4 g4\n#1 o4 e4 f4\nr4\n", playsFor: 144 },
 );
 
 // Adding a rest to the end of a channel needs no note map and no agreement with
@@ -890,7 +910,7 @@ expectEdit(
 	"#amk 2\n#0 o4 c4 d4\n#1 o4 [e4]2\n",
 	0,
 	() => ({ kind: "spawn", startTick: 96, ticks: 48, written: NOTE_MIN + 36 + 7, drum: null }),
-	{ text: "#amk 2\n#0 o4 c4 d4 o4 g4\n#1 o4 [e4]2\nr4\n", playsFor: 144 },
+	{ text: "#amk 2\n#0 o4 c4 d4 g4\n#1 o4 [e4]2\nr4\n", playsFor: 144 },
 );
 
 // The push cascade counts too: `f4` is shoved out past the end by the note drawn
@@ -920,7 +940,7 @@ expectEdit(
 	"#amk 2\n#0 o4 c4 d4\n#1 v200\n",
 	0,
 	() => ({ kind: "spawn", startTick: 96, ticks: 48, written: NOTE_MIN + 36 + 7, drum: null }),
-	{ text: "#amk 2\n#0 o4 c4 d4 o4 g4\n#1 v200\n", playsFor: 144 },
+	{ text: "#amk 2\n#0 o4 c4 d4 g4\n#1 v200\n", playsFor: 144 },
 );
 
 // And one already past where the note reaches needs nothing either. It stays the
@@ -930,7 +950,7 @@ expectEdit(
 	"#amk 2\n#0 o4 c4 d4\n#1 o4 c1 c1\n",
 	0,
 	() => ({ kind: "spawn", startTick: 96, ticks: 48, written: NOTE_MIN + 36 + 7, drum: null }),
-	{ text: "#amk 2\n#0 o4 c4 d4 o4 g4\n#1 o4 c1 c1\n", playsFor: 144 },
+	{ text: "#amk 2\n#0 o4 c4 d4 g4\n#1 o4 c1 c1\n", playsFor: 144 },
 );
 
 // The channel drawn on already runs past the song, so its own length does not
@@ -941,7 +961,7 @@ expectEdit(
 	"#amk 2\n#0 o4 c2 r1\n#1 o4 c2\n",
 	0,
 	() => ({ kind: "spawn", startTick: 144, ticks: 48, written: NOTE_MIN + 36 + 2, drum: null }),
-	{ text: "#amk 2\n#0 o4 c2 r4 o4 d4 r2\n#1 o4 c2\nr2\n", playsFor: 192 },
+	{ text: "#amk 2\n#0 o4 c2 r4 d4 r2\n#1 o4 c2\nr2\n", playsFor: 192 },
 );
 
 // Nothing was moved, so nothing reaches past the end and the song keeps its
@@ -1091,7 +1111,7 @@ expectEdit(
 	5,
 	() => ({ kind: "spawn", startTick: 120, ticks: 48, written: NOTE_MIN + 36 + 7, drum: null }),
 	{
-		text: "#amk 2\n#0 o4 c4 d4 e4 f4\n\n#5 o4 l8 q7F @0 v255 y10\nr4 e4 r8 o4 g4 r8\n",
+		text: "#amk 2\n#0 o4 c4 d4 e4 f4\n\n#5 o4 l8 q7F @0 v255 y10\nr4 e4 r8 g4 r8\n",
 		playsAsLong: true,
 	},
 );
@@ -1105,7 +1125,7 @@ expectEdit(
 	5,
 	() => ({ kind: "spawn", startTick: 120, ticks: 48, written: NOTE_MIN + 36 + 7, drum: null }),
 	{
-		text: "#amk 2\n#0 o4 c4 d4 / e4 f4\n\n#5 o4 l8 q7F @0 v255 y10\nc4 r4 / r8 o4 g4 r8\n",
+		text: "#amk 2\n#0 o4 c4 d4 / e4 f4\n\n#5 o4 l8 q7F @0 v255 y10\nc4 r4 / r8 g4 r8\n",
 		playsAsLong: true,
 		loopsWhereItDid: true,
 	},
@@ -1117,7 +1137,7 @@ expectEdit(
 	5,
 	() => ({ kind: "spawn", startTick: 48, ticks: 48, written: NOTE_MIN + 36 + 7, drum: null }),
 	{
-		text: "#amk 2\n#0 o4 c4 d4 / e4 f4\n\n#5 o4 l8 q7F @0 v255 y10\nc4 o4 g4 / r2\n",
+		text: "#amk 2\n#0 o4 c4 d4 / e4 f4\n\n#5 o4 l8 q7F @0 v255 y10\nc4 g4 / r2\n",
 		playsAsLong: true,
 		loopsWhereItDid: true,
 	},

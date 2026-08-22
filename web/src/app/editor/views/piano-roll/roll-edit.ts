@@ -514,6 +514,9 @@ function eol(source: string): string {
 /** The octave {@link channelOpening} writes, and so the one it leaves in force. */
 const OPENING_OCTAVE = 4;
 
+/** Everything that can move the octave, as text — see {@link spawnInto}. */
+const MOVES_OCTAVE = /[o<>]/;
+
 /** `q[channel]` before anything sets it (`parser.ts:200`). */
 const OPENING_Q = 0x7f;
 
@@ -1200,6 +1203,25 @@ function spawnInto(
   const trailing = reader < 0 ? standing : null;
 
   /**
+   * The octave in force where the run goes, or `null` for not known — a note
+   * drawn at the octave already standing writes no `o` in front of itself.
+   *
+   * The note before the gap gives it, out of its own byte, so a `<` or a `>`
+   * written above that note is already in it. What is left is the text between
+   * that note and where the run lands, which has to move the octave nowhere:
+   * only `o`, `<` and `>` can, and a channel the strip built holds no `[ ]`,
+   * `(n)` or `"x=y"` to hide one inside (`roll-strip.ts:forbiddenConstruct`), so
+   * reading the three characters off the text is exact. It over-matches one
+   * written in a comment, which costs the note an `o` it did not need and
+   * nothing else.
+   */
+  const runAt = over ? over.unitSpan.start : (previous?.unitSpan.end ?? 0);
+  const inForce =
+    previous !== null && !MOVES_OCTAVE.test(source.slice(previous.unitSpan.end, runAt))
+      ? standing
+      : null;
+
+  /**
    * Whether the note after the gap can be left as it is.
    *
    * Only where the octave standing where this one is drawn is the one it is
@@ -1214,7 +1236,7 @@ function spawnInto(
     born,
     before,
     after,
-    opening ? OPENING_OCTAVE : null,
+    opening ? OPENING_OCTAVE : inForce,
     introAt,
     trailing,
   );
