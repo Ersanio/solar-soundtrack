@@ -82,6 +82,8 @@ export class RollToolbar {
     half: '½ beat',
     quarter: '¼ beat',
     eighth: '⅛ beat',
+    // Built from `⅟` and subscript digits, the vulgar fractions running out at ⅛.
+    sixteenth: '⅟₁₆ beat',
     off: 'Off',
   };
 

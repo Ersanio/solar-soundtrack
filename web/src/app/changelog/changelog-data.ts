@@ -15,6 +15,7 @@ export const CHANGELOG: readonly ChangelogEntry[] = [
       'A muted channel cannot be edited, and loses its selection',
       'Grab, drag or resize a note before picking its channel',
       'Roll channel buttons show what is muted and soloed; Ctrl+click one to solo it',
+      'A ⅟₁₆-of-a-beat snap, below the ⅛',
     ],
   },
   {

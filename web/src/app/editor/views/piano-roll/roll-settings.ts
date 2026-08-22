@@ -46,7 +46,7 @@ const MAX_NOTE_TICKS = TICKS_PER_WHOLE * 16;
  * are fractions of the beat, and `0` is the snap switched off, which `Alt`
  * reaches for the length of one gesture without changing the setting.
  */
-export const SNAPS = ['bar', 'beat', 'half', 'quarter', 'eighth', 'off'] as const;
+export const SNAPS = ['bar', 'beat', 'half', 'quarter', 'eighth', 'sixteenth', 'off'] as const;
 export type SnapName = (typeof SNAPS)[number];
 
 /** The Snap setting in ticks, from the grid the porter chose. */
@@ -63,6 +63,8 @@ export function snapTicks(name: SnapName, beatsPerBar: number, beatUnit: number)
       return Math.max(1, Math.floor(beat / 4));
     case 'eighth':
       return Math.max(1, Math.floor(beat / 8));
+    case 'sixteenth':
+      return Math.max(1, Math.floor(beat / 16));
     case 'off':
       return 0;
   }
