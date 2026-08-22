@@ -1276,6 +1276,53 @@ expectEdit(
 	{ mode: "overwrite", playsAsLong: true, contains: ["v200", "^8"] },
 );
 
+// A carve that swallows every note leaves one region over the whole channel,
+// with no surviving note for the run to be written in front of and every item in
+// it a unit being removed. The run goes after the last of them: at a head it
+// would land strictly inside a range `removeItem` is deleting, and two edits over
+// one run of text is what `planEdits` refuses. Nothing is put back after it
+// either, since the run spells the octave it leaves.
+expectEdit(
+	"a note drawn over every note of a channel",
+	"#amk 2\n#0 o4 c4 d4",
+	0,
+	() => ({ kind: "spawn", startTick: 0, ticks: 96, written: NOTE_MIN + 36 + 7, drum: null }),
+	{ mode: "overwrite", playsAsLong: true, text: "#amk 2\n#0 o4 g2" },
+);
+
+// And the command written between two notes it swallows keeps its place in the
+// text. The tick it lands on is the one deleting those notes gives it — there is
+// no other answer once what it stood against has gone.
+expectEdit(
+	"a note drawn over every note of a channel, past a command written between them",
+	"#amk 2\n#0 o4 c4 v200 d4",
+	0,
+	() => ({ kind: "spawn", startTick: 0, ticks: 96, written: NOTE_MIN + 36 + 7, drum: null }),
+	{ mode: "overwrite", playsAsLong: true, text: "#amk 2\n#0 v200 o4 g2" },
+);
+
+// Mid-channel, where the region is bounded either side, the command keeps its
+// tick as well: the run is written after the last item in the region, so the
+// boundary the command stands on is the one the surviving note still starts at.
+expectEdit(
+	"a note drawn over two notes with a command written between them",
+	"#amk 2\n#0 o4 c4 d4 v200 e4 f4",
+	0,
+	() => ({ kind: "spawn", startTick: 48, ticks: 96, written: NOTE_MIN + 36 + 7, drum: null }),
+	{ mode: "overwrite", playsAsLong: true, text: "#amk 2\n#0 o4 c4 v200 g2 f4" },
+);
+
+// The one thing that is put back when the whole channel goes: `octave` is global
+// parser state and leaks past a `#N`, so a run that leaves a different one than
+// the channel did says so at the end.
+expectEdit(
+	"a note drawn an octave up over every note of a channel",
+	"#amk 2\n#0 o4 c4 v200 d4",
+	0,
+	() => ({ kind: "spawn", startTick: 0, ticks: 96, written: NOTE_MIN + 48 + 7, drum: null }),
+	{ mode: "overwrite", playsAsLong: true, text: "#amk 2\n#0 v200 o5 g2 o4" },
+);
+
 console.log("\nrefusals");
 expectRefused(
 	"a note dragged onto its neighbour, strictly",

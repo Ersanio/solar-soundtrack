@@ -818,19 +818,24 @@ function writesItsOwnOctave(
 }
 
 /**
- * Whether a run spawned in front of this note leaves it reading the octave it
- * was written under, so one put back at its head would be a second.
+ * The octave a run spawned in the region ending at `index` leaves standing.
  *
- * {@link spawnInto} answers for the note bounding its region either way: it
- * writes the octave at that note's head, or it has proved the run already
- * leaves it standing. What it cannot answer for is a run ending on a drum —
- * that writes no octave at all and leaves whatever stood — which is `leaves`
- * being null there, and is the one case this says no to.
+ * Two readers, and one answer serves both. A note bounding the region reads it:
+ * {@link spawnInto} answers for that note either way — it writes the octave at
+ * the note's head, or it has proved the run already leaves the right one — so a
+ * number here means `planEdits` has nothing to add at that head. The block below
+ * a `#N` reads it too, where the region is the tail and nothing on the channel
+ * survived, since `octave` is global parser state.
+ *
+ * `null` where no run was spawned there, and where the one that was ends on a
+ * drum: that writes no octave at all and leaves whatever stood, which is
+ * `leaves` being null in {@link spawnInto} and is the one case neither reader
+ * can be answered for.
  */
-function spawnHandsItBack(regions: readonly Region[], index: number): boolean {
+function spawnLeaves(regions: readonly Region[], index: number): number | null {
   const gap = regions.find((each) => each.before === index && each.born.length > 0);
   if (gap === undefined) {
-    return false;
+    return null;
   }
 
   // The last note in tick order is the one whose octave the run leaves, which
@@ -840,7 +845,7 @@ function spawnHandsItBack(regions: readonly Region[], index: number): boolean {
   const last = gap.born.reduce((furthest, note) =>
     note.startTick >= furthest.startTick ? note : furthest,
   );
-  return last.drum === null;
+  return last.drum === null ? octaveFor(last.written) : null;
 }
 
 /**
@@ -1241,9 +1246,21 @@ function writeInto(context: EditContext, gap: Region, run: string): Edit | null 
     return insertAt(strip.items[gap.before - 1].unitSpan.end, ` ${run}`, 1);
   }
 
-  const next = strip.items[gap.before] ?? strip.items[0];
+  const next = strip.items[gap.before];
   if (next) {
     return insertAt(next.unitSpan.start, `${run} `, 1);
+  }
+
+  // No note after it either, so the region is the whole channel and the run goes
+  // where its items were: after the last of them, as the branch above puts it
+  // after the note before the gap. Not at the head of the first — every item in
+  // here is a unit `planEdits` removes, `removeItem` takes the whitespace in
+  // front of the unit with it, and an insertion at a head therefore lands
+  // strictly inside a range being deleted, which `planEdits` refuses. The end of
+  // the last only abuts one.
+  const last = strip.items[gap.before - 1];
+  if (last) {
+    return insertAt(last.unitSpan.end, ` ${run}`, 1);
   }
 
   const line = eol(source);
@@ -1579,7 +1596,14 @@ function spawnInto(
   } else if (inPlace) {
     over = restFor(gap, born);
     laidOut = false;
-  } else if (itemsRunTogether(context, gap)) {
+    // With no rest in it there is nothing for the run to be laid over, and so no
+    // boundary of anything that survives for it to move: the run is inserted at
+    // one offset and every item in the region is a note `planEdits` removes
+    // outright. A command written between two of them keeps its place in the
+    // text and changes tick for the reason deleting those notes changes it —
+    // what it stood against has gone. Which is the commonest region a carve
+    // leaves, since a note drawn over a run of notes swallows all of them.
+  } else if (gap.rests.length === 0 || itemsRunTogether(context, gap)) {
     over = gap.rests[0] ?? null;
   } else {
     return null;
@@ -1860,7 +1884,7 @@ export function planEdits(context: EditContext, plan: Plan): Edit[] | null {
     if (
       dropped &&
       !writesItsOwnOctave(strip, index, survivors) &&
-      !spawnHandsItBack(regions, index) &&
+      spawnLeaves(regions, index) === null &&
       item.octave !== running
     ) {
       const spelled = item.octave === null ? null : spellOctave(item.octave);
@@ -1899,7 +1923,10 @@ export function planEdits(context: EditContext, plan: Plan): Edit[] | null {
   // of them writes one.
   if (dropped && previous !== null) {
     const standing = previous.exitOctave ?? previous.octave;
-    if (standing !== null && standing !== running) {
+    // A run spawned into the tail spells its own last note's octave, so that is
+    // what the block below reads and there is nothing here to say.
+    const left = spawnLeaves(regions, strip.items.length) ?? running;
+    if (standing !== null && standing !== left) {
       const spelled = spellOctave(standing);
       if (spelled === null) {
         return null;
