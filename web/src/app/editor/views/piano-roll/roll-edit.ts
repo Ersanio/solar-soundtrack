@@ -86,7 +86,8 @@ export type Gesture =
 
 /**
  * What the roll does when a gesture would make two notes sound at once:
- * `strict` refuses it, `insert` shifts the notes in the way aside.
+ * `overwrite` takes the ticks off the notes already there, `insert` shifts them
+ * aside, `strict` refuses the edit.
  *
  * The porter's setting rather than the gesture's, so a drag and a stretch answer
  * an overlap the same way.
@@ -95,7 +96,7 @@ export type Gesture =
  * lists the table itself, and `readSettings` takes its default and its fallback
  * for an unreadable stored value from the first entry.
  */
-export const EDIT_MODES = ['strict', 'insert', 'overwrite'] as const;
+export const EDIT_MODES = ['overwrite', 'insert', 'strict'] as const;
 export type EditMode = (typeof EDIT_MODES)[number];
 
 export interface EditContext {

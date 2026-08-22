@@ -74,7 +74,7 @@ export interface GestureSources {
   viewTick: Signal<number>;
   /** What a position snaps to, in ticks; `0` for none. */
   snap: Signal<number>;
-  /** What an overlap does: refuse the gesture, or shift the notes in the way. */
+  /** What an overlap does: take the ticks, shift the notes in the way, or refuse. */
   editMode: Signal<EditMode>;
   /** The length a drawn note takes. */
   lastLength: Signal<number>;

@@ -90,9 +90,9 @@ export class RollToolbar {
   /** For the Edits control. Both modes are named, so neither has to be inferred. */
   protected readonly editModes = EDIT_MODES;
   protected readonly editModeLabels: Record<EditMode, string> = {
-    strict: 'Strict',
-    insert: 'Insert',
     overwrite: 'Overwrite',
+    insert: 'Insert',
+    strict: 'Strict',
   };
 
   /**

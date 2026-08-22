@@ -99,11 +99,11 @@ export interface Settings {
   /**
    * What a gesture does when it would make two notes sound at once.
    *
-   * The roll's answer rather than the gesture's: a stretch and a drag both push
-   * in `insert` and both refuse in `strict`, so the outcome does not depend on
-   * which part of a bar the press landed on. It reaches the roll only —
-   * the inspector's own length slider writes one argument and knows nothing
-   * about its neighbours.
+   * The roll's answer rather than the gesture's: a stretch and a drag both carve
+   * in `overwrite`, both push in `insert` and both refuse in `strict`, so the
+   * outcome does not depend on which part of a bar the press landed on. It
+   * reaches the roll only — the inspector's own length slider writes one
+   * argument and knows nothing about its neighbours.
    */
   editMode: EditMode;
   /**
