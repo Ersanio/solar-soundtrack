@@ -537,6 +537,14 @@ stats.loopTicks` pads **every other channel that would cut the song short** out 
   (`spawnLeaves`) and stand down — the pass that can see what the run leaves is the one that
   speaks. Not a dedupe of identical edits at one offset: two writers agreeing by accident is not the
   same as one of them knowing it has nothing to say.
+- **`planEdits` answering a refusal with a bare `null`** — the gesture was undone and nothing on
+  screen said why, while `REFUSE_SPELL`, `REFUSE_CROWDED` and `REFUSE_RAMP` sat exported and unread.
+  It answers `Edit[] | EditRefusal`, which is the shape `channelStrip` already has, and the roll puts
+  the sentence beside the toolbar's own "cannot edit". Not folded into `Plan.refused` either:
+  `planGesture` refuses what it can see while the pointer is down, which is what the red bars are
+  already drawing, where a spelling refusal is only known at the commit that undoes the gesture — so
+  it is held against the document it was given for rather than leaving with the gesture that earned
+  it.
 - **Reading `itemsRunTogether` over a region with no rest in it** — nothing is laid over anything
   there: the run is inserted at one offset and every item in the region is a note `planEdits` removes
   outright, so the guard was protecting a boundary that had gone anyway. It refused the commonest
