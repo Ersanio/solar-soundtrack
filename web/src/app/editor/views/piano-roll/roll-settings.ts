@@ -165,13 +165,13 @@ export function readSettings(): Settings {
     rowHeight: 9,
     follow: true,
     scrollNotes: false,
-    allOctaves: false,
+    allOctaves: true,
     beatsPerBar: 4,
     beatUnit: 4,
     percussion: [...DEFAULT_PERCUSSION],
     percussionOpen: false,
     editChannel: null,
-    snap: 'beat',
+    snap: 'eighth',
     // The first mode in the table, which is what makes that table's order the
     // one place the default, the fallback and the `<select>`'s order are set.
     editMode: EDIT_MODES[0],
