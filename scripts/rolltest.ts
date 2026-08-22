@@ -797,13 +797,14 @@ expectEdit(
 );
 
 // And a `>` between the two does move it, so the note spells one after all —
-// which is the whole of what the scan over the gap is for.
+// which is the whole of what the scan over the gap is for. `d4` is left alone:
+// the `>` had already put it in the octave the run leaves.
 expectEdit(
 	"a note drawn past an octave shift written in the gap",
 	"#amk 2\n#0 o4 c4 > r2 d4",
 	0,
 	() => ({ kind: "spawn", startTick: 72, ticks: 24, written: NOTE_MIN + 48 + 4, drum: null }),
-	{ text: "#amk 2\n#0 o4 c4 > r8 o5 e8 r4 o5 d4" },
+	{ text: "#amk 2\n#0 o4 c4 > r8 o5 e8 r4 d4" },
 );
 
 // A run leaves its own octave standing, so the note that reads it is handed the
@@ -1033,14 +1034,11 @@ expectEdit(
 	"#amk 2\n#0 o4 c8 d8 e8",
 	0,
 	(bar) => ({ kind: "move", items: [noteAt(bar, 2)], deltaTicks: -48, deltaKeys: 0, copy: false }),
-	// The `o4 o4` is one octave more than the text needs and is pinned rather than
-	// endorsed: the run written into the head region hands `d8` its octave, and
-	// the main loop hands it one too, having watched the unit that carried the
-	// channel's own `o4` be removed. Neither can see the other — one runs over
-	// the items and one over the regions — so both write. It is stable at two
-	// however many times the channel is edited, and `growUnits` gives both to
-	// `d8`'s unit on the next pass, which is why nothing downstream trips on it.
-	{ mode: "overwrite", playsFor: 48, text: "#amk 2\n#0 o4 e8 o4 o4 d8" },
+	// One `o4` for the channel, and the run writes it. Both writers have a reason
+	// to put another at `d8`'s head — the run leaves an octave standing, and the
+	// main loop watched the unit carrying the channel's own `o4` be removed — and
+	// neither does: it is already the octave `d8` was written under.
+	{ mode: "overwrite", playsFor: 48, text: "#amk 2\n#0 o4 e8 d8" },
 );
 
 // A note still ending the channel holds its length, and then the crossing costs

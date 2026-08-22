@@ -818,6 +818,32 @@ function writesItsOwnOctave(
 }
 
 /**
+ * Whether a run spawned in front of this note leaves it reading the octave it
+ * was written under, so one put back at its head would be a second.
+ *
+ * {@link spawnInto} answers for the note bounding its region either way: it
+ * writes the octave at that note's head, or it has proved the run already
+ * leaves it standing. What it cannot answer for is a run ending on a drum —
+ * that writes no octave at all and leaves whatever stood — which is `leaves`
+ * being null there, and is the one case this says no to.
+ */
+function spawnHandsItBack(regions: readonly Region[], index: number): boolean {
+  const gap = regions.find((each) => each.before === index && each.born.length > 0);
+  if (gap === undefined) {
+    return false;
+  }
+
+  // The last note in tick order is the one whose octave the run leaves, which
+  // is what `spawnInto` takes for its own `born`. On the tick alone rather than
+  // through `byTick`, which breaks ties on `from`: two notes on one tick sound
+  // at once, and `committable` has already turned that plan away.
+  const last = gap.born.reduce((furthest, note) =>
+    note.startTick >= furthest.startTick ? note : furthest,
+  );
+  return last.drum === null;
+}
+
+/**
  * The octave to put back after a note whose own has been rewritten.
  *
  * The octave in force after the unit as it was written — unless the next note on
@@ -1655,15 +1681,32 @@ function spawnInto(
       ? standing
       : null;
 
+  /** The head the octave would be put back at, which is where the reader begins. */
+  const readAt = reader >= 0 ? strip.items[reader].unitSpan.start : 0;
+  /**
+   * Where the run's text ends, which is where the splice over `over` and
+   * {@link writeInto} put it: the rest it was written over, the last item in
+   * the region, or the reader's own head for a region at the top of the channel.
+   */
+  const runEnd = over
+    ? over.unitSpan.end
+    : gap.after >= 0
+      ? strip.items[gap.before - 1].unitSpan.end
+      : readAt;
+
   /**
    * Whether the note after the gap can be left as it is.
    *
-   * Only where the octave standing where this one is drawn is the one it is
-   * drawn at — and that is known only when the notes either side of the gap
-   * agree on it. A `<` or `>` between them is invisible to the scanner, and
-   * then which side of the run it sits on decides what the note after reads.
+   * The run leaves {@link leaves} standing, so that note reads what it was
+   * written under exactly when the two are the same octave and nothing between
+   * the run and its head moves the octave again. What can is the three
+   * characters the scan above reads, on the other side of the run, and for the
+   * same reason: `o`, `<` and `>` are all that move it, and a channel the strip
+   * built holds no `[ ]`, `(n)` or `"x=y"` to hide one inside. It over-matches
+   * one written in a comment and one inside a unit this plan is deleting, which
+   * costs the note an `o` it did not need and nothing else.
    */
-  const untouched = standing !== null && standing === owed && standing === leaves;
+  const untouched = owed === leaves && !MOVES_OCTAVE.test(source.slice(runEnd, readAt));
 
   const run = spawnRun(context, order, gaps, opening ? OPENING_OCTAVE : inForce, introAt, trailing);
   if (run === null) {
@@ -1746,6 +1789,11 @@ export function planEdits(context: EditContext, plan: Plan): Edit[] | null {
     born.push({ ...note, from: -1 });
   }
 
+  // Built here rather than at the pass below that realises them: an octave put
+  // back at a note's head has to agree with what the run in front of it leaves,
+  // and `survivors` and `born` are both settled once the crossings are out.
+  const regions = regionsOf(strip, survivors, born);
+
   // The octave the edited text leaves in force, carried down the channel so a
   // note only writes one where the one already standing is not the one it needs.
   // `null` is "not known": before the first note, and after anything between two
@@ -1807,8 +1855,14 @@ export function planEdits(context: EditContext, plan: Plan): Edit[] | null {
     // the next pass, where one left between two rests is claimed by no unit and
     // is what makes a later edit there unreadable. Once, however many notes
     // went, because it is the note that reads the octave that asks for it rather
-    // than each note that dropped one.
-    if (dropped && !writesItsOwnOctave(strip, index, survivors) && item.octave !== running) {
+    // than each note that dropped one — and not at all where a run spawned into
+    // the region in front of it has already answered for the same head.
+    if (
+      dropped &&
+      !writesItsOwnOctave(strip, index, survivors) &&
+      !spawnHandsItBack(regions, index) &&
+      item.octave !== running
+    ) {
       const spelled = item.octave === null ? null : spellOctave(item.octave);
       if (spelled === null) {
         return null;
@@ -1893,7 +1947,7 @@ export function planEdits(context: EditContext, plan: Plan): Edit[] | null {
     edits.push(...padded);
   }
 
-  for (const region of regionsOf(strip, survivors, born)) {
+  for (const region of regions) {
     const written = realiseRegion(context, region, survivors);
     if (written === null) {
       return null;
