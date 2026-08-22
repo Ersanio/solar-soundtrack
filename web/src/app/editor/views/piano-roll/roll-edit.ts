@@ -43,15 +43,34 @@ export interface Clash {
   to: number;
 }
 
+/**
+ * Ticks a note gives up to one the gesture is placing over it.
+ *
+ * A run of ticks like a {@link Clash}, but it belongs to a note rather than to
+ * the channel, so it carries the row to draw it on: a clash names two notes and
+ * is washed down the whole stack, where this names one and is hatched over that
+ * note's own bar.
+ */
+export interface Erased {
+  from: number;
+  to: number;
+  /** The byte the letter and octave alone name, for the row. */
+  written: number;
+  /** `21`-`29` when the note giving them up is a drum, whose lane is its instrument. */
+  drum: number | null;
+}
+
 export interface Plan {
   /** Every note the channel would hold, in tick order. */
   notes: readonly PlacedNote[];
   /** The notes the gesture moved itself, drawn as the live bar. */
   touched: readonly PlacedNote[];
-  /** The notes a push moved out of the way, drawn as striped bars. */
+  /** The notes a push moved out of the way, or a carve cut down, drawn as striped bars. */
   pushed: readonly PlacedNote[];
   /** Drawn as a red wash on both notes. Empty for a plan that can be committed. */
   clashes: readonly Clash[];
+  /** Ticks the notes already there give up, drawn hatched on their own rows. */
+  erased: readonly Erased[];
   /** Why nothing will be committed, or `null`. */
   refused: string | null;
 }
@@ -280,7 +299,13 @@ function pushFrom(
  * that cannot: a pitch off the driver's range has no lane, so `rowOfPlaced`
  * answers -1 and there is nowhere to draw it.
  */
-const NOTHING: Omit<Plan, 'refused'> = { notes: [], touched: [], pushed: [], clashes: [] };
+const NOTHING: Omit<Plan, 'refused'> = {
+  notes: [],
+  touched: [],
+  pushed: [],
+  clashes: [],
+  erased: [],
+};
 
 export function planGesture(strip: Strip, gesture: Gesture, mode: EditMode): Plan {
   switch (gesture.kind) {
@@ -298,7 +323,14 @@ export function planGesture(strip: Strip, gesture: Gesture, mode: EditMode): Pla
       };
       const notes = [...placedNotes(strip), born].sort(byTick);
       if (mode === 'strict') {
-        return { notes, touched: [born], pushed: [], clashes: clashesIn(notes), refused: null };
+        return {
+          notes,
+          touched: [born],
+          pushed: [],
+          clashes: clashesIn(notes),
+          erased: [],
+          refused: null,
+        };
       }
 
       // A drawn note is put where the pointer is, so whatever was already there
@@ -310,6 +342,7 @@ export function planGesture(strip: Strip, gesture: Gesture, mode: EditMode): Pla
           touched: [born],
           pushed: [],
           clashes: clashesIn(notes),
+          erased: [],
           refused: REFUSE_ROOM,
         };
       }
@@ -320,6 +353,7 @@ export function planGesture(strip: Strip, gesture: Gesture, mode: EditMode): Pla
         touched: [born],
         pushed: shoved.pushed,
         clashes: clashesIn(sorted),
+        erased: [],
         refused: null,
       };
     }
@@ -359,7 +393,14 @@ export function planGesture(strip: Strip, gesture: Gesture, mode: EditMode): Pla
 
       const sorted = notes.sort(byTick);
       if (mode === 'strict') {
-        return { notes: sorted, touched, pushed: [], clashes: clashesIn(sorted), refused: null };
+        return {
+          notes: sorted,
+          touched,
+          pushed: [],
+          clashes: clashesIn(sorted),
+          erased: [],
+          refused: null,
+        };
       }
 
       // The way the porter is dragging: a note shoved aside carries on in the
@@ -374,6 +415,7 @@ export function planGesture(strip: Strip, gesture: Gesture, mode: EditMode): Pla
           touched,
           pushed: [],
           clashes: clashesIn(sorted),
+          erased: [],
           refused: REFUSE_ROOM,
         };
       }
@@ -384,6 +426,7 @@ export function planGesture(strip: Strip, gesture: Gesture, mode: EditMode): Pla
         touched,
         pushed: shoved.pushed.filter((each) => !chosen.has(each.from)),
         clashes: clashesIn(settled),
+        erased: [],
         refused: null,
       };
     }
@@ -412,6 +455,7 @@ export function planGesture(strip: Strip, gesture: Gesture, mode: EditMode): Pla
             ...NOTHING,
             notes,
             clashes: [{ from: Math.max(0, start), to: end }],
+            erased: [],
             refused: null,
           };
         }
@@ -426,7 +470,14 @@ export function planGesture(strip: Strip, gesture: Gesture, mode: EditMode): Pla
 
         const shoved = push(notes, stretched, direction);
         if (!shoved) {
-          return { notes, touched, pushed: [], clashes: clashesIn(notes), refused: REFUSE_ROOM };
+          return {
+            notes,
+            touched,
+            pushed: [],
+            clashes: clashesIn(notes),
+            erased: [],
+            refused: REFUSE_ROOM,
+          };
         }
 
         notes = shoved.notes;
@@ -434,13 +485,20 @@ export function planGesture(strip: Strip, gesture: Gesture, mode: EditMode): Pla
       }
 
       const sorted = [...notes].sort(byTick);
-      return { notes: sorted, touched, pushed, clashes: clashesIn(sorted), refused: null };
+      return {
+        notes: sorted,
+        touched,
+        pushed,
+        clashes: clashesIn(sorted),
+        erased: [],
+        refused: null,
+      };
     }
 
     case 'delete': {
       const gone = new Set(gesture.items);
       const notes = placedNotes(strip).filter((note) => !gone.has(note.from));
-      return { notes, touched: [], pushed: [], clashes: [], refused: null };
+      return { notes, touched: [], pushed: [], clashes: [], erased: [], refused: null };
     }
 
     case 'quantize': {
@@ -455,7 +513,7 @@ export function planGesture(strip: Strip, gesture: Gesture, mode: EditMode): Pla
         .sort(byTick);
       const touched = notes.filter((note) => chosen.has(note.from));
       if (mode === 'strict') {
-        return { notes, touched, pushed: [], clashes: clashesIn(notes), refused: null };
+        return { notes, touched, pushed: [], clashes: clashesIn(notes), erased: [], refused: null };
       }
 
       // Rightwards whichever way a note was pulled. A tidy-up that shoved its
@@ -463,7 +521,14 @@ export function planGesture(strip: Strip, gesture: Gesture, mode: EditMode): Pla
       // the direction has to be one for the whole cascade either way.
       const shoved = pushFrom(notes, touched, 1, new Set(touched));
       if (!shoved) {
-        return { notes, touched, pushed: [], clashes: clashesIn(notes), refused: REFUSE_ROOM };
+        return {
+          notes,
+          touched,
+          pushed: [],
+          clashes: clashesIn(notes),
+          erased: [],
+          refused: REFUSE_ROOM,
+        };
       }
 
       const settled = shoved.notes.sort(byTick);
@@ -472,6 +537,7 @@ export function planGesture(strip: Strip, gesture: Gesture, mode: EditMode): Pla
         touched,
         pushed: shoved.pushed.filter((each) => !chosen.has(each.from)),
         clashes: clashesIn(settled),
+        erased: [],
         refused: null,
       };
     }
@@ -490,6 +556,7 @@ export function planGesture(strip: Strip, gesture: Gesture, mode: EditMode): Pla
         touched: notes.filter((note) => chosen.has(note.from)),
         pushed: [],
         clashes: clashesIn(notes),
+        erased: [],
         refused: null,
       };
     }
@@ -518,7 +585,7 @@ export function planGesture(strip: Strip, gesture: Gesture, mode: EditMode): Pla
         }
       }
 
-      return { notes, touched, pushed: [], clashes: [], refused: null };
+      return { notes, touched, pushed: [], clashes: [], erased: [], refused: null };
     }
   }
 }

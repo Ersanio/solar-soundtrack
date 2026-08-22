@@ -314,6 +314,8 @@ export interface Preview {
   pushed: readonly PreviewBar[];
   /** Where two notes would sound at once, drawn red over both. */
   clash: readonly PreviewBar[];
+  /** Ticks a note is giving up to the gesture, drawn hatched over that note's own bar. */
+  erased: readonly PreviewBar[];
   /** Why nothing will be committed, or `null`. The live bars are red while it is set. */
   refused: string | null;
 }
@@ -352,7 +354,14 @@ export interface PreviewRequest {
  */
 export function buildPreview(request: PreviewRequest): Preview {
   const { plan, stack, zoom, rowHeight } = request;
-  const box = (note: PlacedNote, at: number, kind: string): PreviewBar | null => {
+  // Structural rather than `PlacedNote`, so a run of erased ticks can be boxed
+  // by the same arithmetic: all it needs is where it starts, how long it is, and
+  // which row it belongs on.
+  const box = (
+    note: { startTick: number; ticks: number; written: number; drum: number | null },
+    at: number,
+    kind: string,
+  ): PreviewBar | null => {
     const row = rowOfPlaced(note, stack);
     return row < 0
       ? null
@@ -381,6 +390,23 @@ export function buildPreview(request: PreviewRequest): Preview {
       w: Math.max(1, (clash.to - clash.from) * zoom),
       h: request.rows * rowHeight,
     })),
+    // A run of ticks like a clash, but drawn on the row of the note giving them
+    // up rather than down the stack: it names that one note, and it is that
+    // note's own bar underneath it.
+    erased: plan.erased
+      .map((span, at) =>
+        box(
+          {
+            startTick: span.from,
+            ticks: span.to - span.from,
+            written: span.written,
+            drum: span.drum,
+          },
+          at,
+          'erased',
+        ),
+      )
+      .filter((bar): bar is PreviewBar => bar !== null),
     refused: plan.refused,
   };
 }
