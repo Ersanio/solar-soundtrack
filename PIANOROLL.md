@@ -70,9 +70,9 @@ gets the beat. `6`/`8` is six `l8`s to a bar. MML has no time signature of its o
 `0` beats draws no grid at all.
 
 **Snap** is what a note lands on when you draw or drag it — `Bar`, `Beat`, `½ beat`, `¼ beat`,
-`⅛ beat`, or `Off`. `Bar` and `Beat` are read off the Grid, so the two stay in step without being
-welded together: at 4/4 a beat is a whole quarter note, which is far too coarse to draw sixteenths
-against.
+`⅛ beat`, `⅟₁₆ beat`, or `Off`. `Bar` and `Beat` are read off the Grid, so the two stay in step
+without being welded together: at 4/4 a beat is a whole quarter note, which is far too coarse to
+draw sixteenths against.
 
 **Stretching does not use Snap.** A length lands on the note values themselves — a whole, a half, a
 quarter, an eighth, and their dotted forms — because a note in MML is a duration rather than a region
