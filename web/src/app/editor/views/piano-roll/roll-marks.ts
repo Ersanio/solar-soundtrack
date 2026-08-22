@@ -314,6 +314,8 @@ export interface Preview {
   pushed: readonly PreviewBar[];
   /** Where two notes would sound at once, drawn red over both. */
   clash: readonly PreviewBar[];
+  /** Why nothing will be committed, or `null`. The live bars are red while it is set. */
+  refused: string | null;
 }
 
 /**
@@ -379,5 +381,6 @@ export function buildPreview(request: PreviewRequest): Preview {
       w: Math.max(1, (clash.to - clash.from) * zoom),
       h: request.rows * rowHeight,
     })),
+    refused: plan.refused,
   };
 }

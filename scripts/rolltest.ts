@@ -32,6 +32,8 @@ import {
 	type EditMode,
 	type Gesture,
 	type Plan,
+	REFUSE_RANGE,
+	REFUSE_ROOM,
 	planEdits,
 	planGesture,
 } from "../web/src/app/editor/views/piano-roll/roll-edit";
@@ -359,24 +361,24 @@ function listOf(expectation: string | readonly string[] | undefined): readonly s
 	return typeof expectation === "string" ? [expectation] : expectation;
 }
 
-/** A gesture the roll must decline: no edit, and a reason. */
-function expectRefused(
+/** The plan a gesture makes, for the assertions that are about the plan itself. */
+function planFor(
 	name: string,
 	source: string,
 	channel: number,
 	gesture: (strip: Strip) => Gesture,
-	mode: EditMode = "flexible",
-): void {
+	mode: EditMode,
+): { plan: Plan; context: EditContext } | null {
 	const before = build(source);
 	if (typeof before === "string") {
 		check(`${name}: compiles to begin with`, false, before);
-		return;
+		return null;
 	}
 
 	const bar = strip(source, before, channel);
 	if (typeof bar === "string") {
 		check(`${name}: the channel can be edited`, false, bar);
-		return;
+		return null;
 	}
 
 	const context: EditContext = {
@@ -388,8 +390,57 @@ function expectRefused(
 		introTicks: introOf(before),
 		channels: tailsOf(source, before),
 	};
-	const plan = planGesture(bar, gesture(bar), mode);
-	check(`${name}: refused`, planEdits(context, plan) === null, "an edit was produced");
+	return { plan: planGesture(bar, gesture(bar), mode), context };
+}
+
+/** A gesture the roll must decline: no edit, and a reason. */
+function expectRefused(
+	name: string,
+	source: string,
+	channel: number,
+	gesture: (strip: Strip) => Gesture,
+	mode: EditMode = "flexible",
+): void {
+	const made = planFor(name, source, channel, gesture, mode);
+	if (made) {
+		check(`${name}: refused`, planEdits(made.context, made.plan) === null, "an edit was produced");
+	}
+}
+
+/**
+ * Which strip items a gesture is carrying, by their `from`.
+ *
+ * The roll draws these itself, in the preview, and leaves them out of the song's
+ * own bars — so this list is what decides whether a dragged note is drawn once
+ * or twice. `-1` is a note with no original to leave out: a copy, or one being
+ * drawn.
+ */
+function expectCarried(
+	name: string,
+	source: string,
+	channel: number,
+	gesture: (strip: Strip) => Gesture,
+	froms: readonly number[],
+	because: string | null = null,
+	mode: EditMode = "flexible",
+): void {
+	const made = planFor(name, source, channel, gesture, mode);
+	if (!made) {
+		return;
+	}
+
+	const carried = made.plan.touched.map((note) => note.from).sort((a, b) => a - b);
+	const want = [...froms].sort((a, b) => a - b);
+	check(
+		`${name}: carries ${JSON.stringify(want)}`,
+		carried.length === want.length && carried.every((from, at) => from === want[at]),
+		JSON.stringify(carried),
+	);
+	check(
+		`${name}: ${because === null ? "is not refused" : `refused — ${because}`}`,
+		made.plan.refused === because,
+		String(made.plan.refused),
+	);
 }
 
 /** A channel the strip declines to build at all. */
@@ -979,6 +1030,83 @@ expectRefused("a note shortened past the command written inside it", "#amk 2\n#0
 	items: [noteAt(bar, 0)],
 	edge: "end",
 	deltaTicks: -60,
+}));
+
+console.log("\nwhat a drag carries");
+
+// `Plan.touched` is what the roll draws in the preview and leaves out of the
+// song's own bars, so these pin whether a dragged note is drawn once or twice.
+
+expectCarried(
+	"a dragged note",
+	"#amk 2\n#0 o4 c4 r4 d4",
+	0,
+	(bar) => ({
+		kind: "move",
+		items: [noteAt(bar, 0)],
+		deltaTicks: 24,
+		deltaKeys: 0,
+		copy: false,
+	}),
+	[0],
+);
+
+// A copy has no original to leave out, so `Ctrl`+drag keeps both bars on screen.
+expectCarried(
+	"a copied note",
+	"#amk 2\n#0 o4 c4 r4 r4",
+	0,
+	(bar) => ({
+		kind: "move",
+		items: [noteAt(bar, 0)],
+		deltaTicks: 48,
+		deltaKeys: 0,
+		copy: true,
+	}),
+	[-1],
+);
+
+// A refusal that still knows where the note was going keeps it, so the bar stays
+// under the pointer, red, until it is let go.
+expectCarried(
+	"a push with nowhere to go",
+	"#amk 2\n#0 o4 c4 d4",
+	0,
+	(bar) => ({
+		kind: "move",
+		items: [noteAt(bar, 1)],
+		deltaTicks: -24,
+		deltaKeys: 0,
+		copy: false,
+	}),
+	[1],
+	REFUSE_ROOM,
+);
+
+// And one that does not: a pitch past the driver's range has no lane, so there
+// is nowhere to draw it and every bar goes back where it was.
+expectCarried(
+	"a note dragged out of range",
+	"#amk 2\n#0 o1 c4 d4",
+	0,
+	(bar) => ({
+		kind: "move",
+		items: [noteAt(bar, 0)],
+		deltaTicks: 0,
+		deltaKeys: -12,
+		copy: false,
+	}),
+	[],
+	REFUSE_RANGE,
+);
+
+// And the copy written out, walked like any other gesture.
+expectEdit("a note copied rather than moved", "#amk 2\n#0 o4 c4 r4 r4", 0, (bar) => ({
+	kind: "move",
+	items: [noteAt(bar, 0)],
+	deltaTicks: 48,
+	deltaKeys: 0,
+	copy: true,
 }));
 
 console.log("\npast the end of the song");

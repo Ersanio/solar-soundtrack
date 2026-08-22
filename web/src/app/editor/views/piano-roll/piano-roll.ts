@@ -809,22 +809,41 @@ export class PianoRoll {
     return channel === null ? CHANNEL_STROKE[0] : CHANNEL_STROKE[channel];
   });
 
-  /** Red while the gesture in flight cannot be committed. */
-  protected readonly blocked = computed(() => (this.gestures.preview()?.clash.length ?? 0) > 0);
+  /**
+   * Red while the gesture in flight cannot be committed.
+   *
+   * Both reasons, since either of them ends in a pointer-up that commits
+   * nothing: an overlap the mode will not write, and a plan refused outright.
+   */
+  protected readonly blocked = computed(() => {
+    const shown = this.gestures.preview();
+    return shown !== null && (shown.clash.length > 0 || shown.refused !== null);
+  });
 
-  /** The selected notes as spans, which is what the bars are outlined by. */
-  protected readonly selectedSpans = computed(() => {
+  /**
+   * Strip indices as the addresses the marks are keyed by.
+   *
+   * The one place the two namings meet: a strip item is known by its place in
+   * the text and a mark by the address the walk gave it. An address is an ARAM
+   * offset, so it names one note across the whole song.
+   */
+  private addressesOf(indices: Iterable<number>): ReadonlySet<number> {
     const strip = this.strip();
-    const chosen = this.gestures.selection();
     const spans = new Set<number>();
     if (strip) {
-      for (const index of chosen) {
+      for (const index of indices) {
         spans.add(strip.items[index]?.address ?? -1);
       }
     }
 
     return spans;
-  });
+  }
+
+  /** The selected notes as spans, which is what the bars are outlined by. */
+  protected readonly selectedSpans = computed(() => this.addressesOf(this.gestures.selection()));
+
+  /** The notes the preview has taken over, which the song's own bars leave out. */
+  protected readonly movingSpans = computed(() => this.addressesOf(this.gestures.moving()));
 
   // --- tooltip -------------------------------------------------------------
 

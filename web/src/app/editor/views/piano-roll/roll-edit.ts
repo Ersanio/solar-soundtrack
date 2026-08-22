@@ -268,6 +268,14 @@ function pushFrom(
   return { notes: [...held], pushed: [...pushed.values()] };
 }
 
+/**
+ * A plan with nothing on screen, for the refusals that have nothing to put there.
+ *
+ * A refusal that still knows where its notes were going keeps them in `touched`,
+ * so the bar stays under the pointer until it is let go. This is for the ones
+ * that cannot: a pitch off the driver's range has no lane, so `rowOfPlaced`
+ * answers -1 and there is nowhere to draw it.
+ */
 const NOTHING: Omit<Plan, 'refused'> = { notes: [], touched: [], pushed: [], clashes: [] };
 
 export function planGesture(strip: Strip, gesture: Gesture, mode: EditMode): Plan {
@@ -293,7 +301,13 @@ export function planGesture(strip: Strip, gesture: Gesture, mode: EditMode): Pla
       // moves later rather than earlier.
       const shoved = pushFrom(notes, [born], 1, new Set([born]));
       if (!shoved) {
-        return { ...NOTHING, notes, clashes: clashesIn(notes), refused: REFUSE_ROOM };
+        return {
+          notes,
+          touched: [born],
+          pushed: [],
+          clashes: clashesIn(notes),
+          refused: REFUSE_ROOM,
+        };
       }
 
       const sorted = shoved.notes.sort(byTick);
@@ -351,7 +365,13 @@ export function planGesture(strip: Strip, gesture: Gesture, mode: EditMode): Pla
       const direction = gesture.deltaTicks < 0 ? -1 : 1;
       const shoved = pushFrom(sorted, touched, direction, new Set(touched));
       if (!shoved) {
-        return { ...NOTHING, notes: sorted, clashes: clashesIn(sorted), refused: REFUSE_ROOM };
+        return {
+          notes: sorted,
+          touched,
+          pushed: [],
+          clashes: clashesIn(sorted),
+          refused: REFUSE_ROOM,
+        };
       }
 
       const settled = shoved.notes.sort(byTick);
@@ -402,7 +422,7 @@ export function planGesture(strip: Strip, gesture: Gesture, mode: EditMode): Pla
 
         const shoved = push(notes, stretched, direction);
         if (!shoved) {
-          return { ...NOTHING, notes, clashes: clashesIn(notes), refused: REFUSE_ROOM };
+          return { notes, touched, pushed: [], clashes: clashesIn(notes), refused: REFUSE_ROOM };
         }
 
         notes = shoved.notes;
@@ -439,7 +459,7 @@ export function planGesture(strip: Strip, gesture: Gesture, mode: EditMode): Pla
       // the direction has to be one for the whole cascade either way.
       const shoved = pushFrom(notes, touched, 1, new Set(touched));
       if (!shoved) {
-        return { ...NOTHING, notes, clashes: clashesIn(notes), refused: REFUSE_ROOM };
+        return { notes, touched, pushed: [], clashes: clashesIn(notes), refused: REFUSE_ROOM };
       }
 
       const settled = shoved.notes.sort(byTick);
