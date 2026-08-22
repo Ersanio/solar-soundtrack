@@ -173,14 +173,22 @@ function spawnTick(tick: number, snap: number, fine: boolean): number {
  * than cosmetic: a preview is the song emulated up to the tick it is given, so
  * the tick decides the instrument, volume, `q` and transposition the note is
  * heard under. `item` is the bar being carried, and `undefined` for a spawn.
+ *
+ * What snaps is the **distance moved**, not where it lands: a note keeps
+ * whatever it had against the grid and travels a whole number of steps, which is
+ * what `←` and `→` have always done. A note is only ever on the grid because
+ * something put it there, and a drag is not that thing — `Alt+Q` is. A spawn is
+ * the exception and has to be: a note that does not exist yet has no position of
+ * its own to be relative to, so it lands on the grid like the ghost that
+ * promised it would.
  */
 function draggedTick(held: Drag, item: StripItem | undefined, snap: number): number {
   if (held.kind === 'spawn' || !item) {
     return spawnTick(held.tick, snap, held.fine);
   }
 
-  const wanted = item.startTick + (held.tick - held.fromTick);
-  return held.fine ? Math.round(wanted) : snapTick(wanted, snap);
+  const moved = held.tick - held.fromTick;
+  return item.startTick + (held.fine ? Math.round(moved) : snapTick(moved, snap));
 }
 
 /** Rows are semitones down the keyboard, so a row step is a semitone step. */

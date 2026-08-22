@@ -490,6 +490,13 @@ stats.loopTicks` pads **every other channel that would cut the song short** out 
   is narrowed to buttons 0 and 2 so the middle one cannot fall through to drawing. Preventing the
   default on `pointerdown` is what stops the browser's autoscroll, since the compatibility
   `mousedown` goes with it.
+- **Snapping a drag's destination rather than the distance it travelled** — snapping the sum of the
+  start and the movement is grid magnetism: a note written a little before the beat was pulled
+  square the first time it was touched, and one nudged less than half a step moved when the porter
+  had asked for nothing. `draggedTick` snaps `moved` and adds it, so the offset against the grid is preserved and
+  the delta is a whole number of steps — the same thing `←` and `→` pass to `run()`, which the drag
+  had silently disagreed with. `spawn` keeps the absolute snap, having no position of its own yet,
+  and `quantize` is left as the one gesture that squares a note up.
 - **Clearing the inspector by moving the caret off what it was answering about** — `commandAt` is
   inclusive at **both** ends (`tokens.ts`), so in `c8 d8` the offset that ends `c8` is the offset
   that begins `d8` and there is no position between them belonging to neither. There is nowhere

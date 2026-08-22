@@ -14,7 +14,7 @@ no channel.
 | Hover over empty grid            | A ghost bar shows where the next note goes and how long it will be       |
 | Press on empty grid              | Draws a note there and keeps it under the pointer until you let go       |
 | Click on empty grid              | Draws the note and leaves it there                                       |
-| Drag the middle of a note        | Moves it — snapped along the grid, one row per semitone up and down      |
+| Drag the middle of a note        | Moves it a snap step at a time, one row per semitone up and down         |
 | Drag a note's left or right edge | Stretches that end; the other end stays put                              |
 | Hold `Alt` during any gesture    | Tick precision: no snapping, for either a position or a length           |
 | Click a note                     | Selects just that note, sounds it, and puts the caret on it in the MML   |
@@ -76,11 +76,19 @@ gets the beat. `6`/`8` is six `l8`s to a bar. MML has no time signature of its o
 `0` beats draws no grid at all. A fresh roll opens on `4`/`16` — a line every sixteenth with a
 heavier one every quarter note, which is the grid FL Studio opens on.
 
-**Snap** is what a note lands on when you draw or drag it — `Bar`, `Beat`, `½ beat`, `¼ beat`,
-`⅛ beat`, `⅟₁₆ beat`, or `Off`. `Bar` and `Beat` are read off the Grid, so the two stay in step
-without being welded together, and a fresh roll snaps to `Beat` — which at `4`/`16` is the sixteenth
-the lines are drawn at. Set the Grid to 4/4 and a beat is a whole quarter note instead, far too
-coarse to draw sixteenths against, and one of the fractions is what you want.
+**Snap** is the step a note moves in — `Bar`, `Beat`, `½ beat`, `¼ beat`, `⅛ beat`, `⅟₁₆ beat`, or
+`Off`. `Bar` and `Beat` are read off the Grid, so the two stay in step without being welded
+together, and a fresh roll snaps to `Beat` — which at `4`/`16` is the sixteenth the lines are drawn
+at. Set the Grid to 4/4 and a beat is a whole quarter note instead, far too coarse to draw
+sixteenths against, and one of the fractions is what you want.
+
+**Dragging moves a note by whole steps; it does not pull it onto the grid.** A note written a
+little before the beat is meant to be there, and dragging it a bar later should leave it a little
+before that beat too — so what snaps is how far it travels, and it keeps whatever it had against the
+grid. `←` and `→` have always worked this way and a drag now agrees with them. Drawing a _new_ note
+is the exception, and has to be: a note that does not exist yet has no position of its own to keep,
+so it lands on the grid where the ghost said it would. **`Alt`+`Q` is the one thing that pulls a note
+onto the grid**, which is what quantizing is for.
 
 **Stretching does not use Snap.** A length lands on the note values themselves — a whole, a half, a
 quarter, an eighth, and their dotted forms — because a note in MML is a duration rather than a region
