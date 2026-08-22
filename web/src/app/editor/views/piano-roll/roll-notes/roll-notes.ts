@@ -44,6 +44,22 @@ export class RollNotes {
    */
   readonly selected = input.required<ReadonlySet<number>>();
 
+  /**
+   * The notes the edit layer is drawing at the position a gesture is taking
+   * them to. By address, as {@link selected} is.
+   */
+  readonly moving = input.required<ReadonlySet<number>>();
+
+  /**
+   * The bars to draw: the song's, less the ones the preview is already drawing.
+   *
+   * A note being dragged is drawn once, where it is going. The ring around a
+   * selected note goes with it, being inside the same group.
+   */
+  protected readonly shown = computed(() =>
+    this.marks().filter((mark) => !this.moving().has(mark.note.address)),
+  );
+
   /** The hover, which the roll turns into a tooltip beside the pointer. */
   readonly entered = output<Mark>();
 

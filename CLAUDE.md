@@ -438,6 +438,22 @@ stats.loopTicks` pads **every other channel that would cut the song short** out 
   flight keeps its own cursor. Nothing clears the hover on `pointerdown` either: `drag` is what
   stands it aside in both readers, and a press that turns out to be a click has to have somewhere
   to go back to.
+- **The roll's own bars drawn without regard to the gesture in flight** — the marks come off the
+  compiled song and the preview off the `Plan`, two paths that never consulted each other, so a
+  dragged note was painted twice: a solid bar following the pointer and the original left behind
+  with its selection ring still on it. The bars leave out what the preview has taken over
+  (`moving`, by strip index, turned into addresses by `movingSpans`), and it is a set rather than a
+  flag because a selection drags as a group. Still not folded into `buildMarks`, which rebuilds
+  about twice a screen and would otherwise rebuild the whole song's DOM on every pointer move. A
+  copy needs no case of its own: `planGesture` gives a copied note `from: -1`, so `Ctrl`+drag hides
+  nothing.
+- **A refused plan returning `NOTHING`** — the bar under the pointer vanished mid-drag, in the one
+  state where the porter most needs to see where the note is, and `PIANOROLL.md` had long said the
+  opposite. A refusal that knows where its notes were going keeps them in `touched`, so the bar
+  stays, red, until it is let go and the drag snaps back by committing nothing; `blocked` reads
+  `Preview.refused` beside the clash count for the colour. `NOTHING` is left to the refusals that
+  have nowhere to draw — a pitch off the driver's range has no lane, so `rowOfPlaced` answers -1
+  whatever `touched` holds.
 
 ## Angular specifics
 

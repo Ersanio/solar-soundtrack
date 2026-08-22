@@ -181,6 +181,8 @@ export interface RollGestures {
   selection: Signal<ReadonlySet<number>>;
   /** What to draw over the song right now, or `null` when nothing is happening. */
   preview: Signal<Preview | null>;
+  /** The notes the preview is already drawing, by their index in the strip. */
+  moving: Signal<ReadonlySet<number>>;
   /** The marquee box, in song coordinates. */
   marquee: Signal<{ x: number; y: number; w: number; h: number } | null>;
   /** The note a press would draw, or `null` where a press would draw none. */
@@ -352,6 +354,28 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
           rows: sources.stack().lanes.length,
         })
       : null;
+  });
+
+  /**
+   * The notes the preview has taken over, so the roll's own bars leave them out
+   * and a note being dragged is drawn once rather than twice.
+   *
+   * By strip index, as {@link RollGestures.selection} is; the roll turns both
+   * into the addresses its marks are keyed by. Three cases fall out of
+   * `PlacedNote.from` rather than needing a rule each: a copy keeps its original,
+   * because `planGesture` gives a copied note `from: -1`; a drawn note has no
+   * original at all, for the same reason; and a refusal with nothing to draw
+   * carries no notes, so every bar goes back where it was.
+   */
+  const moving = computed<ReadonlySet<number>>(() => {
+    const carried = new Set<number>();
+    for (const note of shownPlan()?.touched ?? []) {
+      if (note.from >= 0) {
+        carried.add(note.from);
+      }
+    }
+
+    return carried;
   });
 
   const marquee = computed(() => {
@@ -527,6 +551,7 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
   return {
     selection: selection.asReadonly(),
     preview,
+    moving,
     marquee,
     ghost,
     bubble,
