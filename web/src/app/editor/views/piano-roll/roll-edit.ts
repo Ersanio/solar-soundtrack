@@ -95,7 +95,7 @@ export type Gesture =
  * lists the table itself, and `readSettings` takes its default and its fallback
  * for an unreadable stored value from the first entry.
  */
-export const EDIT_MODES = ['strict', 'insert'] as const;
+export const EDIT_MODES = ['strict', 'insert', 'overwrite'] as const;
 export type EditMode = (typeof EDIT_MODES)[number];
 
 export interface EditContext {
@@ -292,6 +292,87 @@ function pushFrom(
 }
 
 /**
+ * The ticks a placed note covers, taken out of the notes already there.
+ *
+ * The overwrite answer to an overlap, and the mirror of {@link push}: where a
+ * push moves what is in the way and needs somewhere to move it to, this takes
+ * the overlapping ticks off it and leaves everything else exactly where it was
+ * written. It cannot run out of room, so it has no refusal of its own.
+ *
+ * A note the gesture is placing itself is in `placed` and is never carved, which
+ * is {@link push}'s `fixed` set by another name: a selection cannot eat its own
+ * notes, and two placed notes overlapping each other is left for `clashesIn` to
+ * report rather than becoming a third outcome.
+ *
+ * A note comes out of it in none, one or more pieces. **The first piece keeps
+ * `from`**, so it starts where the note started and {@link rewriteNote} shortens
+ * that unit in place; the rest are born notes at the same pitch. That is what
+ * makes a note the gesture landed inside survive as a head *and* a tail rather
+ * than losing everything past the cut.
+ *
+ * Pitch has no say in it. A channel plays one note at a time, so a note in the
+ * way is in the way whatever row it is drawn on.
+ */
+function carve(
+  notes: readonly PlacedNote[],
+  placed: ReadonlySet<PlacedNote>,
+): { notes: PlacedNote[]; pushed: PlacedNote[]; erased: Erased[] } {
+  const cuts = [...placed]
+    .map((note) => ({ from: note.startTick, to: note.startTick + note.ticks }))
+    .sort((a, b) => a.from - b.from);
+
+  const kept: PlacedNote[] = [];
+  const pushed: PlacedNote[] = [];
+  const erased: Erased[] = [];
+
+  for (const note of notes) {
+    if (placed.has(note)) {
+      kept.push(note);
+      continue;
+    }
+
+    const end = note.startTick + note.ticks;
+    const pieces: PlacedNote[] = [];
+    let at = note.startTick;
+    for (const cut of cuts) {
+      if (cut.to <= at || cut.from >= end) {
+        continue;
+      }
+
+      if (cut.from > at) {
+        pieces.push({ ...note, from: -1, startTick: at, ticks: cut.from - at });
+      }
+
+      erased.push({
+        from: Math.max(at, cut.from),
+        to: Math.min(end, cut.to),
+        written: note.written,
+        drum: note.drum,
+      });
+      at = Math.max(at, cut.to);
+    }
+
+    if (at === note.startTick) {
+      kept.push(note); // Nothing reached it.
+      continue;
+    }
+
+    if (at < end) {
+      pieces.push({ ...note, from: -1, startTick: at, ticks: end - at });
+    }
+
+    if (pieces.length > 0) {
+      pieces[0] = { ...pieces[0], from: note.from };
+    }
+
+    kept.push(...pieces);
+    pushed.push(...pieces);
+  }
+
+  return { notes: kept, pushed, erased };
+}
+
+/**
  * A plan with nothing on screen, for the refusals that have nothing to put there.
  *
  * A refusal that still knows where its notes were going keeps them in `touched`,
@@ -306,6 +387,83 @@ const NOTHING: Omit<Plan, 'refused'> = {
   clashes: [],
   erased: [],
 };
+
+/**
+ * A gesture whose notes are where it wants them, answered under one mode.
+ *
+ * The one place the three modes are told apart, so drawing, dragging,
+ * quantizing and stretching cannot drift into answering an overlap differently
+ * — which is the promise the setting makes. A gesture brings what it alone
+ * knows: which way a push should send what is in the way, and which notes are
+ * its own selection, whose shoving is the gesture moving itself rather than a
+ * neighbour being moved aside.
+ *
+ * `direction` is read by `insert` alone. Neither of the others has one: strict
+ * moves nothing, and a carve takes the ticks wherever the placed note landed on
+ * them.
+ */
+function resolved(
+  notes: readonly PlacedNote[],
+  touched: readonly PlacedNote[],
+  mode: EditMode,
+  direction: 1 | -1,
+  chosen: ReadonlySet<number>,
+): Plan {
+  const placed = new Set(touched);
+  switch (mode) {
+    case 'strict': {
+      const sorted = [...notes].sort(byTick);
+      return {
+        notes: sorted,
+        touched,
+        pushed: [],
+        clashes: clashesIn(sorted),
+        erased: [],
+        refused: null,
+      };
+    }
+
+    case 'overwrite': {
+      const carved = carve(notes, placed);
+      const settled = carved.notes.sort(byTick);
+      return {
+        notes: settled,
+        touched,
+        pushed: carved.pushed,
+        clashes: clashesIn(settled),
+        erased: carved.erased,
+        refused: null,
+      };
+    }
+
+    case 'insert': {
+      const sorted = [...notes].sort(byTick);
+      const shoved = pushFrom(sorted, touched, direction, placed);
+      if (!shoved) {
+        return {
+          notes: sorted,
+          touched,
+          pushed: [],
+          clashes: clashesIn(sorted),
+          erased: [],
+          refused: REFUSE_ROOM,
+        };
+      }
+
+      const settled = shoved.notes.sort(byTick);
+      return {
+        notes: settled,
+        touched,
+        // A note of the selection shoved by another of it is the gesture moving
+        // itself, and is already drawn as a live bar.
+        pushed: shoved.pushed.filter((each) => !chosen.has(each.from)),
+        clashes: clashesIn(settled),
+        erased: [],
+        refused: null,
+      };
+    }
+  }
+}
 
 export function planGesture(strip: Strip, gesture: Gesture, mode: EditMode): Plan {
   switch (gesture.kind) {
@@ -322,40 +480,9 @@ export function planGesture(strip: Strip, gesture: Gesture, mode: EditMode): Pla
         drum: gesture.drum,
       };
       const notes = [...placedNotes(strip), born].sort(byTick);
-      if (mode === 'strict') {
-        return {
-          notes,
-          touched: [born],
-          pushed: [],
-          clashes: clashesIn(notes),
-          erased: [],
-          refused: null,
-        };
-      }
-
       // A drawn note is put where the pointer is, so whatever was already there
       // moves later rather than earlier.
-      const shoved = pushFrom(notes, [born], 1, new Set([born]));
-      if (!shoved) {
-        return {
-          notes,
-          touched: [born],
-          pushed: [],
-          clashes: clashesIn(notes),
-          erased: [],
-          refused: REFUSE_ROOM,
-        };
-      }
-
-      const sorted = shoved.notes.sort(byTick);
-      return {
-        notes: sorted,
-        touched: [born],
-        pushed: shoved.pushed,
-        clashes: clashesIn(sorted),
-        erased: [],
-        refused: null,
-      };
+      return resolved(notes, [born], mode, 1, new Set());
     }
 
     case 'move': {
@@ -391,44 +518,12 @@ export function planGesture(strip: Strip, gesture: Gesture, mode: EditMode): Pla
         }
       }
 
-      const sorted = notes.sort(byTick);
-      if (mode === 'strict') {
-        return {
-          notes: sorted,
-          touched,
-          pushed: [],
-          clashes: clashesIn(sorted),
-          erased: [],
-          refused: null,
-        };
-      }
-
       // The way the porter is dragging: a note shoved aside carries on in the
       // same direction, and a drag straight up or down has no other way to send
       // it. A copy dropped on its own original pushes that original, which is
-      // the same rule seen from the other side.
+      // the same rule seen from the other side — and under a carve, eats it.
       const direction = gesture.deltaTicks < 0 ? -1 : 1;
-      const shoved = pushFrom(sorted, touched, direction, new Set(touched));
-      if (!shoved) {
-        return {
-          notes: sorted,
-          touched,
-          pushed: [],
-          clashes: clashesIn(sorted),
-          erased: [],
-          refused: REFUSE_ROOM,
-        };
-      }
-
-      const settled = shoved.notes.sort(byTick);
-      return {
-        notes: settled,
-        touched,
-        pushed: shoved.pushed.filter((each) => !chosen.has(each.from)),
-        clashes: clashesIn(settled),
-        erased: [],
-        refused: null,
-      };
+      return resolved(notes.sort(byTick), touched, mode, direction, chosen);
     }
 
     case 'stretch': {
@@ -464,7 +559,11 @@ export function planGesture(strip: Strip, gesture: Gesture, mode: EditMode): Pla
         notes = notes.map((each) => (each === note ? stretched : each));
         touched.push(stretched);
 
-        if (mode === 'strict') {
+        // Only the push happens per edge. A carve waits until every edge in the
+        // selection has been pulled, or the first note stretched would eat one
+        // this same gesture is about to move — it is not in `touched` yet, so
+        // nothing would hold it back.
+        if (mode !== 'insert') {
           continue;
         }
 
@@ -484,15 +583,21 @@ export function planGesture(strip: Strip, gesture: Gesture, mode: EditMode): Pla
         pushed.push(...shoved.pushed.filter((each) => !chosen.has(each.from)));
       }
 
-      const sorted = [...notes].sort(byTick);
-      return {
-        notes: sorted,
-        touched,
-        pushed,
-        clashes: clashesIn(sorted),
-        erased: [],
-        refused: null,
-      };
+      // Insert has already pushed, once per edge, and carries the notes it
+      // moved; asking again would find nothing left to shove and lose them.
+      if (mode === 'insert') {
+        const sorted = [...notes].sort(byTick);
+        return {
+          notes: sorted,
+          touched,
+          pushed,
+          clashes: clashesIn(sorted),
+          erased: [],
+          refused: null,
+        };
+      }
+
+      return resolved(notes, touched, mode, direction, chosen);
     }
 
     case 'delete': {
@@ -512,34 +617,10 @@ export function planGesture(strip: Strip, gesture: Gesture, mode: EditMode): Pla
         )
         .sort(byTick);
       const touched = notes.filter((note) => chosen.has(note.from));
-      if (mode === 'strict') {
-        return { notes, touched, pushed: [], clashes: clashesIn(notes), erased: [], refused: null };
-      }
-
       // Rightwards whichever way a note was pulled. A tidy-up that shoved its
-      // neighbours toward tick 0 would run out of room in the first bar, and
-      // the direction has to be one for the whole cascade either way.
-      const shoved = pushFrom(notes, touched, 1, new Set(touched));
-      if (!shoved) {
-        return {
-          notes,
-          touched,
-          pushed: [],
-          clashes: clashesIn(notes),
-          erased: [],
-          refused: REFUSE_ROOM,
-        };
-      }
-
-      const settled = shoved.notes.sort(byTick);
-      return {
-        notes: settled,
-        touched,
-        pushed: shoved.pushed.filter((each) => !chosen.has(each.from)),
-        clashes: clashesIn(settled),
-        erased: [],
-        refused: null,
-      };
+      // neighbours toward tick 0 would run out of room in the first bar, and the
+      // direction has to be one for the whole cascade either way.
+      return resolved(notes, touched, mode, 1, chosen);
     }
 
     case 'legato': {
@@ -1630,8 +1711,16 @@ export function planEdits(context: EditContext, plan: Plan): Edit[] | null {
    * the way. Not every note in the plan — a channel already running past the cut
    * is an ordinary shape, and reading its tail as "reach" would have a deletion
    * lengthen the song.
+   *
+   * A carve fills `pushed` too, and its pieces are left out for that same
+   * reason: it only ever makes a note shorter, so every piece it leaves sits at
+   * a tick the channel had already reached, and a carve out in a channel's tail
+   * would otherwise pad every other channel out to meet a note nothing moved.
+   * `erased` is what says a carve is what filled it — the two resolvers never
+   * both run, since the mode picks one.
    */
-  const reach = [...plan.touched, ...plan.pushed].reduce(
+  const moved = plan.erased.length > 0 ? plan.touched : [...plan.touched, ...plan.pushed];
+  const reach = moved.reduce(
     (furthest, note) => Math.max(furthest, note.startTick + note.ticks),
     0,
   );

@@ -965,6 +965,73 @@ expectEdit("a note drawn over the one after it, pushing it right", "#amk 2\n#0 o
 	drum: null,
 }));
 
+// --- overwrite mode: the notes already there give up the ticks -------------
+//
+// Every case here pins `playsAsLong`, and that is the point of the mode rather
+// than a detail of it: a carve only ever takes ticks that were already the
+// channel's, so the song has to be exactly as long afterwards. A carve that
+// lengthened the song would mean `reach` had counted a note nothing moved.
+
+console.log("\noverwrite");
+expectEdit(
+	"a note dragged onto the one after it, which gives up its head",
+	"#amk 2\n#0 o4 c4 d4 e4",
+	0,
+	(bar) => ({ kind: "move", items: [noteAt(bar, 0)], deltaTicks: 24, deltaKeys: 0, copy: false }),
+	{ mode: "overwrite", playsAsLong: true, contains: "d8" },
+);
+
+expectEdit(
+	"a note dragged over one that gives up all of them",
+	"#amk 2\n#0 o4 c4 d4 e4 f4",
+	0,
+	(bar) => ({ kind: "move", items: [noteAt(bar, 0)], deltaTicks: 48, deltaKeys: 0, copy: false }),
+	{ mode: "overwrite", playsAsLong: true, lacks: "d" },
+);
+
+expectEdit(
+	"a note stretched into the one after it, which gives up its head",
+	"#amk 2\n#0 o4 c4 d4 e4",
+	0,
+	(bar) => ({ kind: "stretch", items: [noteAt(bar, 0)], edge: "end", deltaTicks: 24 }),
+	{ mode: "overwrite", playsAsLong: true, contains: ["c4.", "d8"] },
+);
+
+expectEdit(
+	"a note stretched over the one after it, which gives up all of them",
+	"#amk 2\n#0 o4 c4 d4 e4",
+	0,
+	(bar) => ({ kind: "stretch", items: [noteAt(bar, 0)], edge: "end", deltaTicks: 48 }),
+	{ mode: "overwrite", playsAsLong: true, contains: "c2", lacks: "d" },
+);
+
+// The carve has no direction of its own — a push has to pick one and keep it,
+// where this takes the ticks wherever the placed note landed on them.
+expectEdit(
+	"a left edge pulled back into the note before it, which gives up its tail",
+	"#amk 2\n#0 o4 c4 d4 e4",
+	0,
+	(bar) => ({ kind: "stretch", items: [noteAt(bar, 1)], edge: "start", deltaTicks: -24 }),
+	{ mode: "overwrite", playsAsLong: true, contains: ["c8", "d4."] },
+);
+
+// The `placed` set, which is `push`'s `fixed` set by another name: the two
+// notes being dragged overlap nothing of each other's, and only the note they
+// land on gives anything up.
+expectEdit(
+	"a selection dragged onto an outsider, which alone gives up ticks",
+	"#amk 2\n#0 o4 c8 d8 r4 e8",
+	0,
+	(bar) => ({
+		kind: "move",
+		items: [noteAt(bar, 0), noteAt(bar, 1)],
+		deltaTicks: 60,
+		deltaKeys: 0,
+		copy: false,
+	}),
+	{ mode: "overwrite", playsAsLong: true },
+);
+
 console.log("\nrefusals");
 expectRefused(
 	"a note dragged onto its neighbour, strictly",
@@ -993,6 +1060,30 @@ expectRefused(
 		deltaTicks: 24,
 	}),
 	"strict",
+);
+
+// The one place overwrite is the stricter of the two: both notes are the
+// gesture's own, so neither may eat the other and the overlap stands. Insert
+// compounds the pushes here instead.
+expectRefused(
+	"two touching notes stretched into each other, overwriting",
+	"#amk 2\n#0 o4 c8 d8 r2",
+	0,
+	(bar) => ({
+		kind: "stretch",
+		items: [noteAt(bar, 0), noteAt(bar, 1)],
+		edge: "end",
+		deltaTicks: 24,
+	}),
+	"overwrite",
+);
+
+expectRefused(
+	"quantize pulling two notes onto one beat, overwriting",
+	"#amk 2\n#0 o4 c16 d16 r2",
+	0,
+	(bar) => ({ kind: "quantize", items: [noteAt(bar, 0), noteAt(bar, 1)], snap: 48 }),
+	"overwrite",
 );
 
 expectRefused("a note dragged onto the one before it with nowhere to push", "#amk 2\n#0 o4 c4 d4", 0, (bar) => ({

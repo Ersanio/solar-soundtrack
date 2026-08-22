@@ -92,6 +92,7 @@ export class RollToolbar {
   protected readonly editModeLabels: Record<EditMode, string> = {
     strict: 'Strict',
     insert: 'Insert',
+    overwrite: 'Overwrite',
   };
 
   /**
