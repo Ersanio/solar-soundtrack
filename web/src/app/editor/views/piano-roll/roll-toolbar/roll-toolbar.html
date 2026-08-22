@@ -83,6 +83,46 @@
     </select>
   </div>
 
+  <!-- What a drawn or dragged note lands on. Its own control rather than the
+       grid's beat, because the grid is the lines you want to see and at 4/4
+       that is a whole quarter note. Alt gives ticks without changing it. -->
+  <div
+    class="flex items-center gap-1"
+    title="What a note snaps to when you draw or drag it. Hold Alt for single ticks."
+  >
+    <span class="text-ink-muted text-xs">Snap</span>
+    <select
+      class="bg-inset border-edge text-ink cursor-pointer rounded-md border px-1.5 text-xs leading-6"
+      [value]="snap()"
+      (change)="setSnap($event)"
+    >
+      @for (name of snaps; track name) {
+        <option [value]="name" [selected]="name === snap()">{{ snapLabels[name] }}</option>
+      }
+    </select>
+  </div>
+
+  <!-- One rule for every gesture that could make two notes sound at once, so a
+       drag and a stretch answer an overlap the same way. The inspector's own
+       length slider is not the roll and does not read this. -->
+  <div
+    class="flex items-center gap-1"
+    title="What happens when notes overlap: Strict refuses the edit, Flexible shifts the notes out of the way."
+  >
+    <span class="text-ink-muted text-xs">Edits</span>
+    <select
+      class="bg-inset border-edge text-ink cursor-pointer rounded-md border px-1.5 text-xs leading-6"
+      [value]="editMode()"
+      (change)="setEditMode($event)"
+    >
+      @for (name of editModes; track name) {
+        <option [value]="name" [selected]="name === editMode()">
+          {{ editModeLabels[name] }}
+        </option>
+      }
+    </select>
+  </div>
+
   <!-- The switch on the toolbar and the panel below it, as the source view does
        for the command palette: a closed strip would otherwise be one row of
        chrome that still had to be drawn. -->
@@ -105,5 +145,15 @@
   <amk-normalize-button />
 
   <span class="text-ink-muted font-mono text-xs">{{ editLabel() }}</span>
+  <!-- Why a channel cannot be edited is said here rather than in a dialog; the
+       narrower Normalize beside it is the answer where the reason is something
+       the text says, and its own refusals go in its own dialog. A muted channel
+       is the reason that is not: nothing written in it is what is stopping it. -->
+  @if (editRefusal(); as reason) {
+    <span class="text-warn text-xs">cannot edit: {{ reason }}</span>
+    @if (normalizable()) {
+      <amk-normalize-button [channel]="editChannel() ?? 0" />
+    }
+  }
   <span class="text-ink-muted font-mono text-xs">{{ readout() }}</span>
 </amk-toolbar>

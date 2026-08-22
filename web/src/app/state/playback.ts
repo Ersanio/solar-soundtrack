@@ -42,8 +42,6 @@ export class Playback {
    * it follows the song itself. `null` while nothing is playing.
    */
   readonly driver = signal<DriverState | null>(null);
-  /** Percent, as the range input reports it. */
-  readonly volume = signal(300);
   /** Reload the running song in place whenever it recompiles. */
   readonly live = signal(true);
   readonly loop = signal(false);
@@ -166,7 +164,7 @@ export class Playback {
   );
 
   constructor() {
-    effect(() => this.player.setVolume(this.volume() / 100));
+    effect(() => this.player.setVolume(this.mixer.volume() / 100));
     effect(() => this.player.setLoop(this.loop()));
 
     // Live reload: swap the running song for the newly compiled one and
@@ -294,7 +292,7 @@ export class Playback {
       return;
     }
 
-    this.player.setVolume(this.volume() / 100);
+    this.player.setVolume(this.mixer.volume() / 100);
 
     this.editor.compileNow();
     const spc = this.editor.assembleSpc();

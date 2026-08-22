@@ -18,7 +18,7 @@ packages/mml-compiler/  @amk/compiler  preprocess -> parser -> link
 packages/mml-tokens/    @amk/tokens    scanner, splices, command model
 packages/spc/           @amk/spc       BRR, echo FIR, ARAM, emulator, worklet
 web/                    the Angular editor
-scripts/                fourteen byte-level harnesses
+scripts/                fifteen byte-level harnesses
 ```
 
 ```
@@ -42,15 +42,15 @@ AddmusicK release if they are missing.
 
 Node 24 is what CI uses. CI runs `npm run lint` then `npm run check`.
 
-| Command             | What it does                                                          |
-| ------------------- | --------------------------------------------------------------------- |
-| `npm start`         | Dev server on `http://localhost:4200/`.                               |
-| `npm run build`     | Production build into `web/dist/`.                                    |
-| `npm run watch`     | Dev-configuration build with `--watch`, no server.                    |
-| `npm run lint`      | ESLint over every workspace.                                          |
-| `npm run format`    | Prettier over the workspace.                                          |
-| `npm run typecheck` | The app. `:packages` and `:scripts` cover the rest.                   |
-| `npm run check`     | The merge gate: formatting, three typechecks, all fourteen harnesses. |
+| Command             | What it does                                                         |
+| ------------------- | -------------------------------------------------------------------- |
+| `npm start`         | Dev server on `http://localhost:4200/`.                              |
+| `npm run build`     | Production build into `web/dist/`.                                   |
+| `npm run watch`     | Dev-configuration build with `--watch`, no server.                   |
+| `npm run lint`      | ESLint over every workspace.                                         |
+| `npm run format`    | Prettier over the workspace.                                         |
+| `npm run typecheck` | The app. `:packages` and `:scripts` cover the rest.                  |
+| `npm run check`     | The merge gate: formatting, three typechecks, all fifteen harnesses. |
 
 `npm run check` does **not** compile Angular templates, and neither does `npm run typecheck` — `tsc`
 does not run the template compiler, so a bad binding (`viewBox=` instead of `[attr.viewBox]=`)
@@ -76,7 +76,7 @@ which is all either needs:
 ### Tests
 
 There are no `.spec.ts` files — `npm run test` is Angular scaffolding and runs nothing. The real
-suite is the fourteen harnesses under `scripts/`; **`scripts/README.md` says what each one proves**,
+suite is the fifteen harnesses under `scripts/`; **`scripts/README.md` says what each one proves**,
 and several of those assertions are load-bearing in ways that are not obvious from the name.
 
 `scripts/Compare-Spc.ps1` and `scripts/Compare-SongBin.ps1` diff output against a real AddmusicK
@@ -201,12 +201,26 @@ One entry each: what it was, what it is, why.
   the same small lag, so one frame in ten lurched. It carries its position across frames and eases
   the gap shut (`roll-layout.ts`).
 - **Parking the roll in an `effect` on the follow flag** — an effect runs after the handler and
-  overwrote a position set in the same gesture that came off the song. Parking happens at the two
-  call sites that stop following, the follow toggle and the scrub bar's pointer-down.
+  overwrote a position set in the same gesture that came off the song. Parking happens where the
+  following stops, which is `setFollow` and the pull's first frame.
 - **Seeking the roll by `Shift`+wheel, committed on a 200 ms quiet timer** — nothing on screen said
   the roll could be seeked at all, and the commit fired on a guess about when the gesture had ended
-  rather than on anything the porter did. The scrub bar above the roll is the affordance, and a
+  rather than on anything the porter did. The scrub bar over the roll is the affordance, and a
   pointer-up is a real end.
+- **One bar over the roll doing both jobs** — a drag on the song-wide bar panned the camera and
+  seeked the song at the end of the same gesture, so neither could be done alone: no way to look
+  ahead without moving the music, and none to move the music without moving the view. Two bars, one
+  job each — the overview scrolls (`roll-overview/`), the scrub bar seeks (`roll-scrub/`) — and a
+  scrub reaches past the pane by pulling the view along rather than by being song-wide, since a
+  timeline drawn in the roll's own coordinates is what puts the marker's tip on the playhead line.
+  The preview stays out of the camera for the same reason it is a preview at all: `playTick` reads
+  `songHead` and not `headTick`, or the music would slide sideways under the pointer and the marker
+  would snap back to `lead` the moment it was grabbed.
+- **`w-full` on the bars over the roll** — the pane is measured inside its vertical scrollbar
+  (`elementSize` reads the content box) and the bars are drawn outside it, so the `viewBox`
+  stretched over that gutter while the pointer maths did not, and the drawn window disagreed with
+  the tick under the pointer by about a scrollbar's width. Both are `[style.width.px]="width()"`,
+  which is the roll `<svg>`'s own width, so one user unit is one CSS px in one shared space.
 - **Template method calls per row** — the sample browser decoded 64 BRR samples on every
   change-detection pass, ten times a second while playing. Panels build one `computed` view model;
   the `no-call-expression` note in `eslint.config.js` says why lint cannot catch it.
@@ -270,32 +284,160 @@ One entry each: what it was, what it is, why.
   which has no strip, and a refusal is the answer to a click rather than a property of the song.
   The dialog that asks before the rewrite (`editor/normalize-button/`) is where a refusal shows,
   and a song already in shape gets the same dialog rather than a click that does nothing.
+- **A strict one-to-one gate between the walk's notes and the roll's strip** — `walkSong` ends the
+  pass at the shortest channel in use and sets everything after it aside as `unreachable`, so a
+  channel longer than the shortest is the commonest shape a song has and an equality check refused
+  editing on nearly all of them, pointing at Normalize, which does not fix it. The agreement is a
+  **prefix** (`agreesWithWalk`), and the items past the cut are editable and carry `verified: false`.
+- **Deciding a push's direction per neighbour**, by which half of each one the overlap lands on —
+  A shoves B right, B shoves C right, C shoves B left, and it never terminates. The half-rule picks
+  the direction at the _first_ neighbour, which is the one the porter can see, and the cascade keeps
+  it: every later shove then moves a note strictly away over a finite ordered set.
 - **`unreachable` in `timelinesAgree`** — sound-looking and wrong: unrolling changes the list by
   construction, since a note inside a `[ ]` is dropped once per replay and the copies it becomes are
   separate addresses. `channelTicks` is what holds a channel's tail to account. `normalizetest`
   caught it.
+- **A trailing octave run winning over a leading one** — in `c4 o5 d4` the `o5` is adjacent to both
+  notes, and two edit units claiming it produce overlapping splices that CodeMirror merges rather
+  than refuses. Leading wins (`growUnits`), which is also what makes the restore stable: a repitch
+  writes `o3 c4 o4 d4`, and on the next pass that `o4` is `d4`'s own leading octave.
+- **Re-serializing the whole run of text between two notes** to realise a gap — it moves every `v`,
+  `y` and `$ED` written in that run. Each item carries a `prefixSpan` instead, the rest nearest the
+  note _before_ the gap absorbs the change, and a gap whose run holds a fade command is refused.
+- **Refusing `<` and `>` in an edited channel** — they are not commands to the scanner at all, and
+  they are harmless: a note's octave comes from its own `written` byte rather than from a running
+  sum, so `o4 c4 > d4` repitches either note without disturbing the other. `rolltest` pins it.
+- **Capturing the pointer, and preventing the default, on the roll's `pointerdown`** — both stop
+  the browser raising `click` and `dblclick` on the bar underneath, which took away everything a
+  single click on a note used to do: naming its channel, asking the inspector about it, and going to
+  it in the source on a second click. Capture is taken on the first move past the slop threshold
+  instead, which is late enough to leave a click alone and early enough to follow a drag off the
+  roll; a press that never moves is a click and commits nothing, drawing on empty grid excepted.
+  A bar of another channel is not empty grid either — `itemAt` only knows the edited channel, so the
+  press checks `event.target.closest('.mark')` before it decides it is drawing.
 - **The roll's playhead line derived from `lead`** — the camera and the line were one number, so
   unticking Follow parked the line with the view and nothing in the roll said where the music had
-  got to: the line, the scrub marker and the lit keys all froze together, and the frame clock was
+  got to: the line, the marker on the bars and the lit keys all froze together, and the frame clock was
   switched off with them. `lead` is the camera's alone; the line is the song's tick in the camera's
   coordinates (`xAtTick`), and the clip is what hides it once the song runs off the pane. Not a
   clamp to the edge either — a line held there would say the song was there.
-- **The mixer's mutes and solo living on `Playback`** — the note previewer has to refuse a channel
-  they silence, and it neither owns nor wants the transport: it shares no worklet, no audio thread
-  and no song being played, and reaching through `Playback` to find the mask would make it depend on
-  all three. `Mixer` holds the mask and the solo, injects `EditorStore` alone, and is read by
-  `Playback`, `Audition` and the roll. The mask is the only thing the two audio paths share, and it
-  is a number.
+- **The mixer's mutes, solo and output level living on `Playback`** — the note previewer has to
+  refuse a channel they silence and sound what it does play at the level the slider is set to, and
+  it neither owns nor wants the transport: it shares no worklet, no audio thread and no song being
+  played, and reaching through `Playback` for either would make it depend on all three. `Mixer`
+  holds the mask, the solo and `volume`, injects `EditorStore` alone, and is read by `Playback`,
+  `Audition` and the roll. What the two audio paths share is two numbers, and nothing else — the
+  transport hands the level to the player's gain, the previewer to a `GainNode` of its own on its
+  own `AudioContext`.
+- **An HTML bubble for the roll's length readout**, in the volume slider's mould — the roll's
+  coordinates are already the song's, so an HTML one has to undo the scroll transform and the
+  scroller's own offset to land where an SVG one lands by standing still.
 - **The roll's page anchor reset on the transport being idle, rather than on its going idle** — an
   effect runs once when it is created, so a roll rebuilt while the song was stopped zeroed the anchor
   it had just been given and the view shifted by up to a page on every tab switch. It follows the
   transition: what re-measures the pages is a stop. The camera outliving the component
   (`roll-camera.ts`) is what turned a harmless re-run into a lost position.
+- **Putting the intro `/` a channel the roll opens needs on the nearest note boundary**, or leaving it
+  out where the tick falls inside the note — every channel resumes from its own marker on each pass
+  (`parser.ts:parseIntro` writes `phrasePointers[channel][1]`), so a marker a note out of place moves
+  the whole song's loop point, and none at all restarts the channel at its top. The tick decides, and
+  the piece it lands inside is split: a rest becomes two rests, the note becomes a head and a `^`
+  continuation, which is still one note because a tie emits `$C6`. `rolltest` pins `loopTick` across
+  the edit, which is the only reading that catches a marker on the wrong tick.
+- **Filling a channel the roll opens out to the _longest_ channel**, or leaving it at the length of
+  its first note — the second cuts the song off at that note, since the driver reloads every track
+  pointer the moment one voice reads its `$00` (`main.asm:L_0C01`, `Music.cpp:3209`), and the first
+  writes rests past a point the song never reaches. It is filled out to the **shortest playable**
+  channel, `stats.introTicks + stats.loopTicks`, which leaves that minimum exactly where it was: the
+  song plays for as long after a channel is opened as before it, which `rolltest` pins per case.
+- **Writing a channel the roll opens into its place in `#0`-`#7` order** — `octave` and
+  `defaultNoteLength` are one variable each and `parseHash` resets neither, so a block dropped
+  between two others changes what the second is parsed under, and only `ParseTrace` knows what to
+  restore. The roll's compile carries no trace, and asking for one costs an event per dispatch. A new
+  `#N` goes at the **end of the document**, where nothing follows it to be disturbed; `orderChannels`
+  is what puts the blocks in order afterwards, and it writes the `o` and `l` a moved block needs.
+- **Latching the audition's fast-forward on the track pointer alone**, the way `worklet.ts` does —
+  `L_0C31` sets every voice a phrase names to a duration counter of 1 before any of them fetch
+  (`main.asm:2314-2318`), and `SetInstrument` runs between that and the `dec` at `L_0C4D`, so a poll
+  landing in that window reads 1 and `sawTick` counts the first fetch as a tick of music. The note is
+  then handed over inside the pass that starts the song, and the phrase walk still to come reads the
+  frames at `scratchAt` as its next phrase: every track pointer goes to zero and nothing sounds at
+  all. It latches on `$0200+2n`, the duration byte a voice has actually read (`voiceStarted`), and
+  the floor of one tick on `atTicks` is what starts the driver at all. `audiotest` sweeps three to
+  eight channels, because how much work `L_0C31` does before the tick voice's own write is what moves
+  the fetch against the poll — four channels was silent where one and two were not. The worklet keeps
+  the looser latch: a playhead a tick out is a playhead a tick out, where a note handed over a tick
+  early is not played.
 - **Keeping the roll alive behind `[class.hidden]`**, as the source view is — the symmetry is
   inviting and it does not work: `display: none` destroys the layout box, so the native vertical
   scroller comes back at row 0 regardless, and a hidden roll goes on drawing marks, a grid and a
   transform for a tab nobody is looking at. CodeMirror is hidden because its undo history is not
   something anything could hand back; a camera is four numbers that can be.
+- **Putting a drawn note's octave back at the end of its run**, in the mould of the rewrite path — a
+  rewrite restores the octave standing after the note it rewrote, which that note's own byte gives
+  it exactly; a run written into a gap has no such anchor, and `<` and `>` are not commands to the
+  scanner, so nothing can say which side of the run one written in the gap sits on. The octave goes
+  at the **head of the note that reads it** (`spawnInto`), where the byte is the answer and any
+  shift has already been applied — and where the text settles anyway, since an `o` left between two
+  rests is claimed by no unit on the next strip build and is what makes a later edit there
+  unreadable. Only a channel with no note left to hand it to has the run carry it, for the leak past
+  a `#N`.
+- **Answering a deleted note's octave with `running = null`**, and leaving the note after it to
+  notice — a note whose pitch and length are unchanged returns from `rewriteNote` before an octave
+  is spelled at all, and the seed above it re-reads `item.octave` off the text the deletion had just
+  taken away, so `o2 a8 d8` losing `a8` moved `d8` an octave up. The note that _reads_ the octave
+  asks for it, once per run of deletions (`dropped`) however many notes went, and it goes in at that
+  note's head rather than through a rewrite of its unit: `noteText` re-spells what it writes, so an
+  untouched `d-8` would come back `c+8` and a `b+4` as `o5 c4`. With no note left to hand it to it
+  stays where the last unit was, for the leak past a `#N`; `rolltest` pins both, and the whole
+  channel deleted.
+- **Letting a note drawn past the end of the song extend only its own channel** — the driver reloads
+  all eight track pointers the moment one voice reads its `$00` (`main.asm:L_0C01`,
+  `Music.cpp:3209`), so the note was written, compiled, reported by `AMK0502` and never heard, and
+  the roll had no way to make a song longer. A gesture reaching past `stats.introTicks +
+stats.loopTicks` pads **every other channel that would cut the song short** out to meet it
+  (`padChannels`), in the same commit and so the same undo step. It counts the notes the gesture
+  moved — placed and pushed both — rather than every note in the plan, or a deletion in a channel
+  already running long would lengthen the song. A rest on the end needs no note map, no walk
+  agreement and no `Strip`, so a channel `channelStrip` refuses outright is padded like any other;
+  a channel at 0 ticks is left alone, since it holds nothing back. `rolltest`'s `playsFor` is what
+  pins it — a rest one note short reads exactly like a rest of the right length.
+- **`cursor-pointer` on the roll's note bars**, to say a bar is clickable — an element's own
+  `cursor` beats the one it inherits, so the class silenced the roll's own cursor over every painted
+  part of a bar. The `ew-resize` showed in exactly one place: the `NOTE_GAP` sliver past a bar's
+  drawn right edge, where nothing is painted and `itemAt` still reports the note, since it hits the
+  whole slot. A bar's left end has no such gap and so had no handle at all. The `<svg>`'s
+  `[style.cursor]` is the roll's only cursor, and it says which gesture a press starts;
+  `hoverCursor` answers `pointer` for the bar that really is only clickable, which is another
+  channel's. The glyph plates inside a bar take no cursor either — they are right-aligned, so one
+  would sit on the right stretch zone and put the same bug back over the last twelve pixels.
+- **Moving `editChannel` onto `Mixer`** so a press on `M` or `S` could set it at its own call site,
+  the way the roll's chips do — it is one field of the roll's persisted `Settings`, and a service
+  owning it either splits that `localStorage` write in two or takes the whole roll's settings with
+  it. The mixer is carried into the roll by a transition-following effect instead
+  (`followMixer`), in the mould of the `wasIdle` one beside it: a `let` holding the last mask, the
+  body `untracked`. Following the state and not the transition is what does not work — the roll is
+  rebuilt on every tab switch, so an effect reading `silenced()` alone would drag the edited channel
+  back to a solo taken long ago each time the tab came round.
+- **Refusing every gesture until a channel is picked** — the roll was already pointing at the answer
+  and would not take it, so the first act on a song was always to find eight small chips in a corner.
+  With none picked the strip is built for the channel of the bar under the pointer (`editing`, off
+  the `hovered` mark the tooltip already tracks), which gives the cursor, the hit test and the press
+  the same channel for free, and `onPointerDown`'s existing `pick` sink names it for real. Not a
+  hover-wide adoption either: empty grid belongs to no channel, so drawing, the marquee and the
+  shortcuts still ask for one, and `editRefusal` and `onKey` stay on `editChannel` so a channel
+  merely hovered is never announced as being edited.
+- **A muted channel editable but un-clickable** — its bars take no pointer, so muting the channel
+  being edited left drawing and the keyboard working on notes that could not be selected or heard.
+  The strip refuses a silenced channel outright, in `silencedReason`'s words, which is the same
+  sentence `Audition` refuses to preview one in.
+- **Setting that cursor from the pointer move that reported the position** — the roll scrolls under
+  a still pointer for the whole of a followed playback, so bars arrived under a cursor that had been
+  told `crosshair` and nothing said otherwise until the pointer moved. It is a `computed` over
+  `Hover`, which is stored in pixels for this reason, and `drag` is read first so a gesture in
+  flight keeps its own cursor. Nothing clears the hover on `pointerdown` either: `drag` is what
+  stands it aside in both readers, and a press that turns out to be a click has to have somewhere
+  to go back to.
 
 ## Angular specifics
 

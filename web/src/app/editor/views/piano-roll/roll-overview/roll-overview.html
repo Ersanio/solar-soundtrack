@@ -1,0 +1,60 @@
+<svg
+  class="block select-none"
+  [attr.height]="barHeight"
+  [attr.viewBox]="box()"
+  [style.width.px]="width()"
+  [style.cursor]="dragging() ? 'grabbing' : 'grab'"
+  (pointerdown)="onDown($event)"
+  (pointermove)="onMove($event)"
+  (pointerup)="onUp($event)"
+  (pointercancel)="onUp($event)"
+>
+  <defs>
+    <clipPath id="amk-overview-clip">
+      <rect y="0" [attr.x]="keyWidth" [attr.width]="rollWidth()" [attr.height]="barHeight" />
+    </clipPath>
+  </defs>
+
+  <!-- One step lighter than the scrub bar's track under it, so the two read as
+       two bars rather than as one tall one. -->
+  <rect
+    y="0"
+    class="fill-surface"
+    [attr.x]="keyWidth"
+    [attr.width]="rollWidth()"
+    [attr.height]="barHeight"
+  />
+
+  <g clip-path="url(#amk-overview-clip)">
+    @if (viewWindow(); as shown) {
+      <rect
+        y="0"
+        class="fill-accent stroke-accent"
+        fill-opacity="0.14"
+        stroke-opacity="0.5"
+        [attr.x]="shown.x"
+        [attr.width]="shown.w"
+        [attr.height]="barHeight"
+      />
+    }
+
+    @for (bar of bars(); track bar.id) {
+      <rect
+        class="fill-ink-muted"
+        [attr.x]="bar.x"
+        [attr.y]="bar.y"
+        [attr.width]="bar.w"
+        [attr.height]="bar.h"
+      />
+    }
+
+    <line
+      y1="0"
+      class="stroke-accent"
+      stroke-width="1.5"
+      [attr.x1]="playheadX()"
+      [attr.x2]="playheadX()"
+      [attr.y2]="barHeight"
+    />
+  </g>
+</svg>

@@ -9,14 +9,26 @@ export interface ChangelogEntry {
 export const CHANGELOG: readonly ChangelogEntry[] = [
   // ─── newest first; add new blocks here ──────────────────────────────────
   {
+    date: '22 August 2026',
+    items: [
+      'Editable piano roll: draw, drag, stretch and delete notes, and the MML updates accordingly',
+      'A readme will soon follow with all the possible gestures and shortcuts',
+      'A timeline over the piano roll, with bar numbers and a marker you drag to move the playhead',
+      'The bar above it now scrolls the roll through the song instead of seeking',
+      'A muted channel cannot be interacted with',
+      'Piano roll channel buttons show what is muted and soloed; Ctrl+click one to solo it',
+      'Escape clears the selection, then steps out of the channel',
+    ],
+  },
+  {
     date: '21 August 2026',
     items: [
       'Undo and redo buttons in the piano roll toolbar',
+      'Click a key on the roll to hear it',
       'Mutes and solos apply when you preview a note',
       'A note bar says when it has more commands than it can show',
       'Normalize one channel instead of the whole song',
       'The piano roll playhead keeps marking the song with Follow playback off',
-      'Note length sliders drag right to make a note longer',
     ],
   },
   {

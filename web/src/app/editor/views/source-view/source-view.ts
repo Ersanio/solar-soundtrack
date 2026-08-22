@@ -32,7 +32,7 @@ import type { Severity } from '@amk/core/types';
 import { commandAt } from '@amk/tokens';
 import { IconWrap } from '../../../shared/icons/icon-wrap';
 import { Toolbar } from '../../../shared/toolbar/toolbar';
-import { EditorRequests, type Insertion } from '../../../state/editor-requests';
+import { type EditBatch, EditorRequests, type Insertion } from '../../../state/editor-requests';
 import { EditorStore } from '../../../state/editor-store';
 import { Playback } from '../../../state/playback';
 import { clamp } from '../../../util/math';
@@ -233,21 +233,7 @@ export class SourceView {
         // Consumed on the spot: a splice describes one document, and a re-run
         // must never apply it a second time to text it no longer fits.
         this.requests.replace.set(null);
-
-        const length = this.view.state.doc.length;
-        const from = Math.min(edit.span.start, length);
-        const to = Math.min(edit.span.end, length);
-
-        // The span was worked out against a scan of `source`, which is written
-        // from the update listener below and so *is* the document — but only up
-        // to the microtask that carried this edit across. Checking the text
-        // rather than trusting the offsets is what makes a stale splice a
-        // no-op instead of an overwrite of whatever moved into its place.
-        if (this.view.state.doc.sliceString(from, to) !== edit.expect) {
-          return;
-        }
-
-        this.view.dispatch({ changes: { from, to, insert: edit.text } });
+        this.dispatchBatch(edit);
       });
     });
 
@@ -337,6 +323,48 @@ export class SourceView {
       const spans = this.store.unreachableSpans();
       untracked(() => this.view.dispatch({ effects: setUnreachable.of(spans) }));
     });
+  }
+
+  /**
+   * A whole gesture's splices as one transaction, or none of them.
+   *
+   * Every `expect` is checked against the document **before** anything is
+   * dispatched, so a batch that has gone stale is a no-op rather than a partly
+   * applied gesture. The spans are checked for range too: `ChangeSet.of` throws
+   * a `RangeError` on one that runs past the end of the document rather than
+   * clamping it, and an exception here would be swallowed by the update
+   * listener that called us.
+   *
+   * `immediate` skips the typing debounce, so a roll gesture's spans are valid
+   * on the next frame instead of 150 ms later. It is the view that makes that
+   * call, not the mailbox: `EditorRequests` depends on nothing, and reaching
+   * `EditorStore` from it would turn the spine round.
+   */
+  private dispatchBatch(batch: EditBatch): void {
+    const doc = this.view.state.doc;
+    for (const edit of batch.edits) {
+      const { start, end } = edit.span;
+      if (
+        start < 0 ||
+        end > doc.length ||
+        start > end ||
+        doc.sliceString(start, end) !== edit.expect
+      ) {
+        return;
+      }
+    }
+
+    this.view.dispatch({
+      changes: batch.edits.map((edit) => ({
+        from: edit.span.start,
+        to: edit.span.end,
+        insert: edit.text,
+      })),
+    });
+
+    if (batch.immediate) {
+      this.store.compileNow();
+    }
   }
 
   /** Flips word wrap without rebuilding the view. */

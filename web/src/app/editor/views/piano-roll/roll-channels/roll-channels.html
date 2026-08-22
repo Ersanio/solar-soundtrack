@@ -3,7 +3,7 @@
     type="button"
     [class]="toggle.class"
     [title]="toggle.title"
-    (click)="picked.emit(toggle.channel)"
+    (click)="press(toggle.channel, $event)"
   >
     {{ toggle.channel }}
   </button>

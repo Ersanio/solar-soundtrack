@@ -7,6 +7,7 @@ import { EditorStore } from './editor-store';
 import { Mixer } from './mixer';
 import type { NoteReply, NoteRequest } from './note.worker';
 import { transposeAt } from './note-transpose';
+import { silencedReason } from './transport-view';
 import { errorMessage } from '../util/format';
 
 /** How long an auditioned note is held when the caller does not say — a whole note. */
@@ -67,6 +68,8 @@ export class Audition {
 
   private context: AudioContext | null = null;
   private source: AudioBufferSourceNode | null = null;
+  /** The slider's level, between every source and the destination. */
+  private gain: GainNode | null = null;
   private worker: Worker | null = null;
 
   /**
@@ -139,12 +142,7 @@ export class Audition {
     // anyway, so a note that is both silenced and out of range reports this one.
     if (this.mixer.silenced() & (1 << request.channel)) {
       if (!request.quiet) {
-        const soloed = this.mixer.soloed();
-        this.editor.say(
-          soloed === null
-            ? `channel ${request.channel} is muted`
-            : `only channel ${soloed} is soloed`,
-        );
+        this.editor.say(silencedReason(request.channel, this.mixer.soloed()));
       }
 
       return;
@@ -236,9 +234,21 @@ export class Audition {
         }
       }
 
+      // The transport's slider, on this path too: the same note under the
+      // pointer and under the playhead is the same note, and one of them
+      // ignoring the slider is one of them at a level nobody asked for. Read at
+      // the source rather than mirrored by an effect — a preview lasts about a
+      // second, and the level it starts at is the level it was asked for.
+      if (!this.gain) {
+        this.gain = context.createGain();
+        this.gain.connect(context.destination);
+      }
+
+      this.gain.gain.value = this.mixer.volume() / 100;
+
       const source = context.createBufferSource();
       source.buffer = buffer;
-      source.connect(context.destination);
+      source.connect(this.gain);
       source.onended = () => {
         if (this.source === source) {
           this.source = null;

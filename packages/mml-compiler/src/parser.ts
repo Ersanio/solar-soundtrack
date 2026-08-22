@@ -122,6 +122,8 @@ export interface ParseOutput {
 	hasYoshiDrums: boolean;
 	targetAMKVersion: number;
 	songTargetProgram: number;
+	/** `#halvetempo` and `#option dividetempo`'s divisor, 1 without either. */
+	tempoRatio: number;
 	diagnostics: Diagnostic[];
 	errorCount: number;
 	/** Only when the parser was asked to trace. See `ParseTrace`. */
@@ -4002,6 +4004,7 @@ export class AddmusicKParser {
 			hasYoshiDrums: this.hasYoshiDrums,
 			targetAMKVersion: this.targetAMKVersion,
 			songTargetProgram: this.songTargetProgram,
+			tempoRatio: this.tempoRatio,
 			diagnostics: this.diagnostics,
 			errorCount: this.errorCount,
 			trace:

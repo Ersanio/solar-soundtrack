@@ -31,7 +31,9 @@ import {
 import { PLOT, plot } from "../web/src/app/shared/chart/plot";
 import { stackSegments } from "../web/src/app/shared/chart/stack";
 import {
+	DRAW_LENGTHS,
 	advanceTick,
+	edgeUrgency,
 	gridLines,
 	keyIsBlack,
 	fitBarContent,
@@ -39,8 +41,9 @@ import {
 	noteLabel,
 	laneStack,
 	pageStart,
-	scrubOffset,
-	scrubTick,
+	overviewOffset,
+	overviewTick,
+	stepDrawLength,
 	tickAtX,
 	tickWindow,
 	xAtTick,
@@ -55,7 +58,14 @@ import {
 	trackPosition,
 	valueAt,
 } from "../web/src/app/shared/slider/slider-track";
-import { channelStates, estimatedSecondsAt, silencedMask, soundingSpans } from "../web/src/app/state/transport-view";
+import {
+	channelStates,
+	estimatedSecondsAt,
+	silencedMask,
+	silencedReason,
+	soleAudible,
+	soundingSpans,
+} from "../web/src/app/state/transport-view";
 import { clamp } from "../web/src/app/util/math";
 
 import { check, summarise } from "./harness";
@@ -330,6 +340,46 @@ console.log("\npiano roll window and grid");
 	check("and no beats in a bar is the grid switched off", gridLines(0, 384, 48, 0).length === 0);
 }
 
+console.log("\nthe ladder the wheel walks while a note is being drawn");
+{
+	// Fourteen rungs, one per denominator that divides a whole note exactly, so
+	// every one of them is an `l` the roll can write without dots or `=N`. The
+	// dotted rungs a stretch snaps to are deliberately not here: twice the rungs
+	// is twice the turns of the wheel it takes to cross the ladder.
+	check("the ladder is the fourteen divisors of a whole note", DRAW_LENGTHS.length === 14, `${DRAW_LENGTHS.length}`);
+	check(
+		"and every rung divides one exactly",
+		DRAW_LENGTHS.every((ticks) => 192 % ticks === 0),
+		DRAW_LENGTHS.join(),
+	);
+	check(
+		"it runs l192 to l1",
+		DRAW_LENGTHS[0] === 1 && DRAW_LENGTHS[DRAW_LENGTHS.length - 1] === 192,
+		`${DRAW_LENGTHS[0]}..${DRAW_LENGTHS[DRAW_LENGTHS.length - 1]}`,
+	);
+	check(
+		"no dotted rung is on it",
+		!DRAW_LENGTHS.includes(72) && !DRAW_LENGTHS.includes(36) && !DRAW_LENGTHS.includes(144),
+	);
+
+	check("a quarter note steps up to l3", stepDrawLength(48, 1) === 64, `${stepDrawLength(48, 1)}`);
+	check("and down to l6", stepDrawLength(48, -1) === 32, `${stepDrawLength(48, -1)}`);
+
+	// A length off the ladder — a tick-precise stretch is remembered as the one
+	// a note is drawn at — is brought onto it by the first turn either way,
+	// rather than being left where a wheel appears to do nothing.
+	check("an off-ladder length comes up onto it", stepDrawLength(37, 1) === 48, `${stepDrawLength(37, 1)}`);
+	check("and down onto it", stepDrawLength(37, -1) === 32, `${stepDrawLength(37, -1)}`);
+	check("one past a whole note comes back to l1", stepDrawLength(384, 1) === 192, `${stepDrawLength(384, 1)}`);
+
+	check("a whole note is the top", stepDrawLength(192, 1) === 192, `${stepDrawLength(192, 1)}`);
+	check("and one tick is the bottom", stepDrawLength(1, -1) === 1, `${stepDrawLength(1, -1)}`);
+	check(
+		"every rung steps to its neighbour",
+		DRAW_LENGTHS.every((ticks, at) => stepDrawLength(ticks, 1) === DRAW_LENGTHS[Math.min(at + 1, 13)]),
+	);
+}
+
 console.log("\nthe roll's pages");
 {
 	// The paged view holds the music still and sweeps the playhead across it,
@@ -583,23 +633,23 @@ console.log("\nthe roll's playhead marks the song, not the camera");
 	);
 }
 
-console.log("\nthe scrub bar's time axis");
+console.log("\nthe overview bar's time axis");
 {
 	// The bar holds the whole song and nothing else, so a drag on it is a mapping
-	// and its inverse. The inverse has to be exact: a scrub commits to the tick
-	// under the pointer, and one that landed merely near it would drop the song a
-	// note away from where it was dropped, every time, with nothing on screen to
-	// say so.
+	// and its inverse. The inverse has to be exact: the view goes where the box
+	// under the pointer is put, and one that landed merely near it would drop the
+	// roll a note away from where it was dropped, every time, with nothing on
+	// screen to say so.
 	const WIDTH = 724; // a pane, less the key column
 	const TICKS = 12312;
 
-	check("tick 0 is the left edge", scrubOffset(0, TICKS, WIDTH) === 0);
-	check("and the last tick is the right edge", scrubOffset(TICKS, TICKS, WIDTH) === WIDTH);
-	check("with the middle in the middle", Math.abs(scrubOffset(TICKS / 2, TICKS, WIDTH) - WIDTH / 2) < EPSILON);
+	check("tick 0 is the left edge", overviewOffset(0, TICKS, WIDTH) === 0);
+	check("and the last tick is the right edge", overviewOffset(TICKS, TICKS, WIDTH) === WIDTH);
+	check("with the middle in the middle", Math.abs(overviewOffset(TICKS / 2, TICKS, WIDTH) - WIDTH / 2) < EPSILON);
 
 	let apart = "";
 	for (let tick = 0; tick <= TICKS; tick += 7) {
-		const back = scrubTick(scrubOffset(tick, TICKS, WIDTH), TICKS, WIDTH);
+		const back = overviewTick(overviewOffset(tick, TICKS, WIDTH), TICKS, WIDTH);
 		if (Math.abs(back - tick) > 1e-9) {
 			apart += ` ${tick}->${back}`;
 		}
@@ -612,27 +662,63 @@ console.log("\nthe scrub bar's time axis");
 	// number of pixels per tick would run off the end of a long song.
 	check(
 		"the song fills the bar at any width",
-		[200, 724, 1600, 3000].every((w) => scrubOffset(TICKS, TICKS, w) === w && scrubOffset(0, TICKS, w) === 0),
+		[200, 724, 1600, 3000].every((w) => overviewOffset(TICKS, TICKS, w) === w && overviewOffset(0, TICKS, w) === 0),
 	);
 	check(
 		"and a short song fills it exactly as a long one does",
-		[1, 96, 12312, 999999].every((t) => Math.abs(scrubOffset(t / 2, t, WIDTH) - WIDTH / 2) < EPSILON),
+		[1, 96, 12312, 999999].every((t) => Math.abs(overviewOffset(t / 2, t, WIDTH) - WIDTH / 2) < EPSILON),
 	);
 
 	// A drag that leaves the bar is still asking for an end of the song, not for a
 	// tick outside it — which the transport would clamp anyway, silently.
-	check("a drag off the left end asks for the first tick", scrubTick(-500, TICKS, WIDTH) === 0);
-	check("and off the right end for the last", scrubTick(WIDTH + 500, TICKS, WIDTH) === TICKS);
-	check("a tick past the end draws at the right edge", scrubOffset(TICKS * 2, TICKS, WIDTH) === WIDTH);
-	check("and one before the start at the left", scrubOffset(-100, TICKS, WIDTH) === 0);
+	check("a drag off the left end asks for the first tick", overviewTick(-500, TICKS, WIDTH) === 0);
+	check("and off the right end for the last", overviewTick(WIDTH + 500, TICKS, WIDTH) === TICKS);
+	check("a tick past the end draws at the right edge", overviewOffset(TICKS * 2, TICKS, WIDTH) === WIDTH);
+	check("and one before the start at the left", overviewOffset(-100, TICKS, WIDTH) === 0);
 
 	// A NaN here is an x of NaN on every bar of the minimap: a strip that renders
 	// blank, with nothing in the console to say why.
 	check(
 		"a song of no ticks answers 0 rather than NaN",
-		scrubOffset(50, 0, WIDTH) === 0 && scrubTick(50, 0, WIDTH) === 0,
+		overviewOffset(50, 0, WIDTH) === 0 && overviewTick(50, 0, WIDTH) === 0,
 	);
-	check("and so does an unmeasured pane", scrubOffset(50, TICKS, 0) === 0 && scrubTick(50, TICKS, 0) === 0);
+	check("and so does an unmeasured pane", overviewOffset(50, TICKS, 0) === 0 && overviewTick(50, TICKS, 0) === 0);
+}
+
+console.log("\nthe pull at the end of the scrub bar");
+{
+	// A scrub can only ask for a tick that is on screen, so a drag held off the
+	// end has to take the view with it. The middle must be dead still: a pull that
+	// crept while the pointer sat over the music would scroll the roll under a
+	// gesture that had only meant to seek.
+	const WIDTH = 800; // the whole bar, key column included
+	const MIDDLE = KEY_WIDTH + (WIDTH - KEY_WIDTH) / 2;
+
+	check("the middle of the bar pulls not at all", edgeUrgency(MIDDLE, WIDTH) === 0);
+	check("the right edge pulls forward at full", edgeUrgency(WIDTH, WIDTH) === 1);
+	check("and past it no harder", edgeUrgency(WIDTH + 5000, WIDTH) === 1);
+	check("the left edge pulls back at full", edgeUrgency(KEY_WIDTH, WIDTH) === -1);
+	check("and past it no harder", edgeUrgency(-5000, WIDTH) === -1);
+
+	// The key column is off the left end of the music rather than the start of it:
+	// a drag that runs onto the keys is asking for what is before the pane.
+	check("a pointer over the key column pulls back", edgeUrgency(KEY_WIDTH / 2, WIDTH) === -1);
+
+	// A ramp and not a switch, so a drag that has only just reached the strip
+	// creeps and one held off the end runs.
+	let climbed = true;
+	for (let x = WIDTH - 28; x < WIDTH; x++) {
+		const here = edgeUrgency(x, WIDTH);
+		const next = edgeUrgency(x + 1, WIDTH);
+		climbed &&= here >= 0 && next > here && next <= 1;
+	}
+
+	check("the pull ramps up over the last 28px", climbed);
+
+	// Both strips have to fit with music between them, or a bar narrow enough
+	// would pull in one direction wherever it was pressed.
+	check("a bar too narrow to have a middle pulls nowhere", edgeUrgency(KEY_WIDTH + 10, KEY_WIDTH + 20) === 0);
+	check("and an unmeasured pane answers 0 rather than NaN", edgeUrgency(50, 0) === 0);
 }
 
 console.log("\nthe playhead's own clock");
@@ -1311,6 +1397,22 @@ console.log("\nthe transport's mixer and playhead, which a browser cannot be mad
 
 	// An empty channel keeps no row, whatever its mute state.
 	check("an empty channel gets no row even when muted", channelStates([0, 0], 0b11, null).length === 0);
+
+	// What the roll adopts as the channel to edit. Soloing and muting every other
+	// channel by hand are one answer, which is the point of asking it over the rows.
+	check("nothing muted leaves no sole channel", soleAudible(rows) === null);
+	check("a solo leaves the soloed channel", soleAudible(soloed) === 2);
+	check(
+		"muting every other row by hand leaves the same one",
+		soleAudible(channelStates(sizes, 0b1000_0001, null)) === 2,
+	);
+	check("one mute short of that leaves none", soleAudible(muted) === null);
+	check("muting every row leaves none", soleAudible(channelStates(sizes, 0b1000_0101, null)) === null);
+	check("a song with one channel leaves that one", soleAudible(channelStates([40], 0, null)) === 0);
+	check("and a song with no channels at all leaves none", soleAudible(channelStates([], 0, null)) === null);
+
+	check("a mute is reported as a mute", silencedReason(3, null) === "channel 3 is muted");
+	check("  and a solo names the channel that has it", silencedReason(3, 5) === "only channel 5 is soloed");
 }
 
 console.log("\nthe playhead drops what a mid-update read of ARAM invents");

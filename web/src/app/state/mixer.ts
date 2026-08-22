@@ -4,13 +4,14 @@ import { EditorStore } from './editor-store';
 import { type ChannelState, channelStates, silencedMask } from './transport-view';
 
 /**
- * Which channels are heard, and which the porter has taken out.
+ * Which channels are heard, how loudly, and which the porter has taken out.
  *
  * Off the spine rather than on `Playback`, because two things have to ask the
- * same question and neither owns the other: the transport pushes the mask at the
- * emulator playing the song, and the note previewer refuses to sound a channel
- * the mask silences. A previewer that reached the whole transport to find out
- * would depend on the song being played at all, which it deliberately does not.
+ * same questions and neither owns the other: the transport pushes the mask and
+ * the level at the emulator playing the song, and the note previewer refuses to
+ * sound a channel the mask silences and plays what it does sound at that same
+ * level. A previewer that reached the whole transport to find them would depend
+ * on the song being played at all, which it deliberately does not.
  *
  * Nothing here rebuilds the song. The mask is applied to a running driver in APU
  * RAM, so preview and export build identical bytes.
@@ -18,6 +19,16 @@ import { type ChannelState, channelStates, silencedMask } from './transport-view
 @Service()
 export class Mixer {
   private readonly editor = inject(EditorStore);
+
+  /**
+   * The level both audio paths are heard at, in percent as the range input
+   * reports it. `100` is unity; the slider runs to `500`.
+   *
+   * One number for both, or the same note sounds at one level under the
+   * playhead and another under the pointer, and only one of them moves with the
+   * slider.
+   */
+  readonly volume = signal(300);
 
   /** Channels the user silenced, as a bitmask. */
   private readonly mutedMask = signal(0);

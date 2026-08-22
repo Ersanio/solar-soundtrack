@@ -75,6 +75,27 @@ export interface CompileStats {
 	playback: SongLength | null;
 	/** ID666 tags parsed out of `#spc { }`. */
 	tags: SongTags;
+	/**
+	 * The `#amk` version in force, 0 under `#am4`/`#amm`, and the target program
+	 * in the parser's own vocabulary: 0 AddmusicK, 1 Addmusic 4.05, 2 AddmusicM.
+	 *
+	 * Here because anything that writes MML back has to know what the target can
+	 * spell — dots and `=N` on an `l` need `#amk 4` (`mml-text.ts:spellLength`).
+	 * The scan can answer this positionally; the compiler answers it finally.
+	 */
+	targetAMKVersion: number;
+	songTargetProgram: number;
+	/**
+	 * `#halvetempo` and `#option dividetempo`'s divisor, 1 without either.
+	 *
+	 * Load-bearing for writing text, not a statistic: every note's {@link
+	 * NoteAddress.ticks} and every walked tick is already **divided** by it
+	 * (`parser.ts:divideByTempoRatio`), so a length spelled from a tick count has
+	 * to be multiplied back up first or the song is silently halved. Only
+	 * {@link ParseTrace} carried it before, and a trace costs an event per
+	 * dispatch where this costs nothing.
+	 */
+	tempoRatio: number;
 }
 
 export interface SongTags {

@@ -1,7 +1,8 @@
 <svg
-  class="block w-full cursor-pointer select-none"
-  [attr.height]="scrubHeight"
+  class="block cursor-pointer select-none"
+  [attr.height]="barHeight"
   [attr.viewBox]="box()"
+  [style.width.px]="width()"
   (pointerdown)="onDown($event)"
   (pointermove)="onMove($event)"
   (pointerup)="onUp($event)"
@@ -9,7 +10,7 @@
 >
   <defs>
     <clipPath id="amk-scrub-clip">
-      <rect y="0" [attr.x]="keyWidth" [attr.width]="rollWidth()" [attr.height]="scrubHeight" />
+      <rect y="0" [attr.x]="keyWidth" [attr.width]="rollWidth()" [attr.height]="barHeight" />
     </clipPath>
   </defs>
 
@@ -18,39 +19,46 @@
     class="fill-inset"
     [attr.x]="keyWidth"
     [attr.width]="rollWidth()"
-    [attr.height]="scrubHeight"
+    [attr.height]="barHeight"
   />
 
   <g clip-path="url(#amk-scrub-clip)">
-    @if (viewWindow(); as shown) {
-      <rect
-        y="0"
-        class="fill-accent stroke-accent"
-        fill-opacity="0.14"
-        stroke-opacity="0.5"
-        [attr.x]="shown.x"
-        [attr.width]="shown.w"
-        [attr.height]="scrubHeight"
-      />
-    }
+    <!-- The roll's own transform, over the roll's own lines: a bar is numbered
+         here at the x its rule is drawn at below. -->
+    <g [attr.transform]="scroll()">
+      @for (mark of marks(); track mark.tick) {
+        <!-- Read against the bar's own inset rather than against the roll, so
+             these are the ink the numbers are and not the rule colour the grid
+             below is: a tick that matched the grid would be invisible at the
+             two thirds of a bar's height it has to say anything in. -->
+        <line
+          class="stroke-ink-muted"
+          stroke-width="1"
+          [attr.x1]="mark.x"
+          [attr.x2]="mark.x"
+          [attr.y1]="mark.strong ? barTop : beatTop"
+          [attr.y2]="barHeight"
+          [attr.stroke-opacity]="mark.strong ? 0.85 : 0.4"
+        />
 
-    @for (bar of bars(); track bar.id) {
-      <rect
-        class="fill-ink-muted"
-        [attr.x]="bar.x"
-        [attr.y]="bar.y"
-        [attr.width]="bar.w"
-        [attr.height]="bar.h"
-      />
-    }
+        @if (mark.bar !== null) {
+          <!-- Centred on the rule rather than beside it: the number names the
+               line, and a number set off to one side reads as the label of
+               whichever bar it happens to sit further into. -->
+          <text
+            class="fill-ink-muted font-mono"
+            font-size="8"
+            text-anchor="middle"
+            [attr.x]="mark.x"
+            [attr.y]="numberBase"
+          >
+            {{ mark.bar }}
+          </text>
+        }
+      }
+    </g>
 
-    <line
-      y1="0"
-      class="stroke-accent"
-      stroke-width="1.5"
-      [attr.x1]="playheadX()"
-      [attr.x2]="playheadX()"
-      [attr.y2]="scrubHeight"
-    />
+    <!-- Last, so it reads over a number it lands on. -->
+    <path class="fill-accent" [attr.d]="marker" [attr.transform]="markerAt()" />
   </g>
 </svg>

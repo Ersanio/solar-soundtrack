@@ -75,7 +75,9 @@ exactly what the piano roll follows.
 `note-audition.ts` is the same knowledge pointed a third way: not reading the driver and not writing
 one register of it, but putting a note the song does not contain in front of it and recording what
 comes out. `auditionNote` emulates the song from the top to a tick, hands the driver a note there,
-and returns PCM.
+and returns PCM. It always emulates at least one tick, however early the note is: the dump's PC is
+the driver's main loop with the song index still sitting in `$F6`, so until `PlaySong` has had a
+pass there are no track pointers, no volumes and no instruments to hand a note to.
 
 Emulating rather than reconstructing, because the list of things a note sounds under is longer than
 anything worth modelling: the instrument and its sample, envelope and tuning; a track volume that may

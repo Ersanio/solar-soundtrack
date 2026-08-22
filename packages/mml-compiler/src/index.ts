@@ -1,3 +1,4 @@
+import { PARSER_VERSION } from "@amk/core/hardcoded-tables";
 import { hex } from "@amk/core/hex";
 import type { CompileRequest, CompileResult, CompileStats, Diagnostic } from "@amk/core/types";
 import { link } from "./link";
@@ -52,6 +53,9 @@ export class AddmusicKCompiler {
 		stats.mainSeconds = parsed.mainSeconds;
 		stats.playback = parsed.playback;
 		stats.tags = parsed.tags;
+		stats.targetAMKVersion = parsed.targetAMKVersion;
+		stats.songTargetProgram = parsed.songTargetProgram;
+		stats.tempoRatio = parsed.tempoRatio;
 
 		const sampleList = parsed.sampleList;
 		if (parsed.errorCount > 0) {
@@ -150,6 +154,9 @@ export class AddmusicKCompiler {
 			mainSeconds: null,
 			playback: null,
 			tags: {},
+			targetAMKVersion: PARSER_VERSION,
+			songTargetProgram: 0,
+			tempoRatio: 1,
 		};
 	}
 

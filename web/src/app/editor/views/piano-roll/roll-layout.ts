@@ -5,6 +5,7 @@
  * both are obvious in a number.
  */
 
+import { TICKS_PER_WHOLE } from '@amk/core/hardcoded-tables';
 import { KEY_COUNT } from '@amk/spc/song-walk';
 import { NOTE_NAMES } from '@amk/tokens/commands/units';
 import { clamp } from '../../../util/math';
@@ -267,14 +268,14 @@ export function pageStart(
 }
 
 /**
- * Where a tick sits across the scrub bar, in px from the roll's left edge.
+ * Where a tick sits across the overview bar, in px from the roll's left edge.
  *
  * The bar holds the **whole song and nothing else**: tick 0 on its left edge and
  * the last tick on its right, at every zoom and every pane width. The roll's own
  * horizontal scale has no bearing on it, which is the point — the roll shows a
  * pane of music and this shows the song it is a pane of.
  */
-export function scrubOffset(tick: number, ticks: number, width: number): number {
+export function overviewOffset(tick: number, ticks: number, width: number): number {
   if (!(ticks > 0) || !(width > 0)) {
     return 0; // Nothing compiled, or an unmeasured pane. Not a NaN across every bar.
   }
@@ -283,19 +284,51 @@ export function scrubOffset(tick: number, ticks: number, width: number): number 
 }
 
 /**
- * The tick under a point on the scrub bar, the exact inverse of
- * {@link scrubOffset}.
+ * The tick under a point on the overview bar, the exact inverse of
+ * {@link overviewOffset}.
  *
- * Exact because a drag rides on it: the tick a scrub commits to has to be the
+ * Exact because a drag rides on it: the tick the view is moved to has to be the
  * one under the pointer, not one near it. Off either end is the song's own end,
  * since a drag that runs past the bar is still asking for the last tick.
  */
-export function scrubTick(offset: number, ticks: number, width: number): number {
+export function overviewTick(offset: number, ticks: number, width: number): number {
   if (!(ticks > 0) || !(width > 0)) {
     return 0;
   }
 
   return clamp(offset / width, 0, 1) * ticks;
+}
+
+/** How wide the strip at either end of a bar that pulls the view along is. */
+const EDGE_PULL_PX = 28;
+
+/**
+ * How hard a drag held near the end of a bar pulls the view, as a signed
+ * fraction: negative to the left, zero anywhere in the middle, and ±1 at the
+ * edge or past it.
+ *
+ * A drag can only ask for a tick that is on screen, so a seek across a long song
+ * has to be able to take the view with it. It is a ramp rather than a switch
+ * because the pull's whole range is 28px wide: a drag that has only just reached
+ * the strip means "a little further", and one held off the end means "keep
+ * going".
+ *
+ * `offsetX` is measured from the bar's left edge, so the song's own span starts
+ * at {@link KEY_WIDTH} — a pointer over the key column is off the left end of
+ * the music, not at the start of it.
+ */
+export function edgeUrgency(offsetX: number, width: number): number {
+  if (!(width - KEY_WIDTH > EDGE_PULL_PX * 2)) {
+    return 0; // Too narrow to have a middle. Nothing that lands would be a scroll.
+  }
+
+  const left = KEY_WIDTH + EDGE_PULL_PX;
+  if (offsetX < left) {
+    return -clamp((left - offsetX) / EDGE_PULL_PX, 0, 1);
+  }
+
+  const right = width - EDGE_PULL_PX;
+  return offsetX > right ? clamp((offsetX - right) / EDGE_PULL_PX, 0, 1) : 0;
 }
 
 /**
@@ -515,8 +548,104 @@ export function xAtTick(tick: number, viewTick: number, pxPerTick: number): numb
  * `offsetX` is measured from the roll's own left edge, key column included, so
  * a caller hands over `event.clientX - box.left` and nothing else. The inverse
  * of {@link xAtTick} and of the `translate` in `piano-roll.ts`, and the sibling
- * of {@link scrubTick}, which is the same question asked of the scrub bar.
+ * of {@link overviewTick}, which is the same question asked of the overview bar.
  */
 export function tickAtX(offsetX: number, viewTick: number, pxPerTick: number): number {
   return pxPerTick > 0 ? viewTick + (offsetX - KEY_WIDTH) / pxPerTick : viewTick;
+}
+
+/** Which row a pointer is over, or -1 past either end of the stack. */
+export function rowAtY(offsetY: number, rowHeight: number, rows: number): number {
+  if (rowHeight <= 0) {
+    return -1;
+  }
+
+  const row = Math.floor(offsetY / rowHeight);
+  return row >= 0 && row < rows ? row : -1;
+}
+
+/**
+ * Every duration a note can be written as one length token, in ticks.
+ *
+ * `1`, `2`, `4`… and their dotted forms — exactly the set `spellLength` can
+ * spell without falling back to `=N` — which is what a stretch snaps to. A
+ * start snaps to the grid and a length snaps to this, because a note in MML is
+ * a duration rather than a region and the porter thinks in note values.
+ */
+export const NOTE_LENGTHS: readonly number[] = (() => {
+  const ticks = new Set<number>();
+  for (let divisor = 1; divisor <= TICKS_PER_WHOLE; divisor++) {
+    if (TICKS_PER_WHOLE % divisor !== 0) {
+      continue;
+    }
+
+    const base = TICKS_PER_WHOLE / divisor;
+    const half = Math.floor(base / 2);
+    ticks.add(base);
+    ticks.add(base + half);
+    ticks.add(base + half + Math.floor(half / 2));
+  }
+
+  // A dotted whole note is past what one token holds, and `spellLength` says so
+  // by answering `null` — so the rungs stop where the spelling does.
+  return [...ticks].filter((each) => each <= TICKS_PER_WHOLE).sort((a, b) => a - b);
+})();
+
+/** The nearest length a note can be written as, at or above one tick. */
+export function snapDuration(ticks: number): number {
+  if (ticks <= NOTE_LENGTHS[0]) {
+    return NOTE_LENGTHS[0];
+  }
+
+  // Past a whole note the ladder repeats: a tie is whole notes and a remainder,
+  // so the same rungs are what a longer note lands on.
+  const whole = Math.max(0, Math.floor((ticks - 1) / TICKS_PER_WHOLE)) * TICKS_PER_WHOLE;
+  const left = ticks - whole;
+  let nearest = NOTE_LENGTHS[0];
+  for (const rung of NOTE_LENGTHS) {
+    if (Math.abs(rung - left) < Math.abs(nearest - left)) {
+      nearest = rung;
+    }
+  }
+
+  return whole + nearest;
+}
+
+/**
+ * The lengths the wheel steps a drawn note through, in ticks.
+ *
+ * The fourteen denominators that divide a whole note exactly — `l1`, `l2`, `l3`,
+ * `l4`, `l6` … `l192` — which is the set the inspector's `l` slider stops on.
+ * A stretch snaps to {@link NOTE_LENGTHS}, dotted rungs and all; a wheel does
+ * not, because twice the rungs is twice the turns it takes to cross the ladder.
+ */
+export const DRAW_LENGTHS: readonly number[] = NOTE_LENGTHS.filter(
+  (ticks) => TICKS_PER_WHOLE % ticks === 0,
+);
+
+/**
+ * The next rung up (`1`) or down (`-1`) from a length, in ticks.
+ *
+ * The first rung strictly past `ticks` in the direction asked, so a length that
+ * is not on the ladder at all — a tick-precise stretch, or one longer than a
+ * whole note — is brought onto it by the first turn rather than ignored.
+ */
+export function stepDrawLength(ticks: number, direction: number): number {
+  if (direction > 0) {
+    return DRAW_LENGTHS.find((rung) => rung > ticks) ?? DRAW_LENGTHS[DRAW_LENGTHS.length - 1];
+  }
+
+  let below = DRAW_LENGTHS[0];
+  for (const rung of DRAW_LENGTHS) {
+    if (rung < ticks) {
+      below = rung;
+    }
+  }
+
+  return below;
+}
+
+/** A tick snapped to the grid the porter chose. `0` snaps to nothing. */
+export function snapTick(tick: number, snap: number): number {
+  return snap > 0 ? Math.round(tick / snap) * snap : Math.round(tick);
 }

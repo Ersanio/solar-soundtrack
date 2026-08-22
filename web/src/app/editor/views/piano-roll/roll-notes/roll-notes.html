@@ -1,15 +1,34 @@
 @for (mark of marks(); track mark.id) {
   <!-- A click asks the inspector about this note; a double click goes to it in
        the source. A muted note takes no pointer at all, so the live note over it
-       is the one that answers. -->
+       is the one that answers.
+
+       No cursor of its own, here or on the glyph plates below: an element's own
+       `cursor` beats the one it inherits, and the roll's `<svg>` carries the one
+       that says which gesture a press starts. -->
   <svg:g
-    class="mark cursor-pointer"
+    class="mark"
     [class.pointer-events-none]="mark.muted"
     (pointerenter)="entered.emit(mark)"
     (click)="select(mark)"
     (dblclick)="reveal(mark)"
     (keydown.enter)="reveal(mark)"
   >
+    <!-- A selected note is outlined rather than recoloured: the eight channel
+         colours are the one thing a bar always says, and a selection that took
+         one of them away would be a selection that renamed the channel. -->
+    @if (selected().has(mark.note.address)) {
+      <svg:rect
+        rx="3"
+        fill="none"
+        class="stroke-ink"
+        stroke-width="1.5"
+        [attr.x]="mark.x - 1"
+        [attr.y]="mark.y - 1"
+        [attr.width]="mark.w + 2"
+        [attr.height]="mark.h + 2"
+      />
+    }
     <!-- The slot, then the part that actually sounds. The inner bar is `q`'s
          gate made geometric rather than written down. -->
     <svg:rect

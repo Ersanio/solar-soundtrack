@@ -23,8 +23,10 @@ them.
 State flows one way: `DriverStore` → `SampleStore` → `EditorStore` → `Playback`. Four more sit off
 that spine: `ClockMeasurer`, which `EditorStore` owns and which drives the measurement described
 below; `Audition`, which hangs off `EditorStore` beside `Playback` and owns the second
-`AudioContext`; `Mixer`, which holds the per-channel mutes and the solo and is read by `Playback`,
-by `Audition` and by the roll — three readers and no owner is why it is not a member of any of them;
+`AudioContext`; `Mixer`, which holds the per-channel mutes, the solo and the output level and is
+read by `Playback`, by `Audition` and by the roll — three readers and no owner is why it is not a
+member of any of them, and the level is there for the same reason the mask is: both audio paths
+apply it, the transport to the player's gain and the previewer to a `GainNode` of its own;
 and `EditorRequests`, which injects nothing at all, because a mailbox between the panels and the
 source view has nothing to read.
 
@@ -83,7 +85,8 @@ dragging away from.
 pane it sits in. Three signals on `EditorRequests` are how a sibling panel asks:
 
 - `reveal` — select a span, set when a diagnostic or a piano roll bar is clicked.
-- `replace` — apply a splice, set when a panel edits a command in place.
+- `replace` — apply a batch of splices, set when a panel edits a command in place or the roll
+  commits a gesture.
 - `insertion` — type a snippet in at the caret, set when a palette button is clicked.
 - `history` — undo or redo, set by the two toolbars that carry the buttons, with `undoDepth` and
   `redoDepth` travelling the other way so a button can tell whether there is anything to do.
@@ -109,6 +112,20 @@ silent corruption into an edit that simply does not take.
 `EditorRequests.apply` ignores the `null` the splice builders return when nothing would change. A
 slider fires per frame of a drag, and "that is the text already there" is what keeps a drag from
 pushing dozens of identical recompiles through the debounce.
+
+`applyAll` is the same mailbox for a whole gesture: every `expect` is checked against the document
+before anything is dispatched, and then all the changes go in **one** transaction, which is what
+makes a range-select over forty notes one undo step. Its ranges must not overlap —
+`ChangeSet.of` merges overlapping ones rather than refusing them, so nothing downstream could catch
+it, and `roll-edit.ts` asserts it where the edits are made. It also carries `immediate`, which asks
+the editor to compile without waiting out the typing debounce: a gesture is committed once and the
+roll's spans are stale until the compile lands, where a slider fires per frame and must not. The
+call is the **view's**, not the mailbox's, because `EditorRequests` depends on nothing and reaching
+`EditorStore` from it would turn the spine round.
+
+The whole write-back path rests on one fact: the source view is hidden, never destroyed, when another
+tab is showing, so its effects are live while the roll is in front. If that `[class.hidden]` in
+`editor-pane.html` ever became an `@if`, every roll edit would vanish silently.
 
 ## Normalizing a song
 
@@ -144,6 +161,55 @@ nature and run whole either way; `orderChannels` refuses with `AMK0615` rather t
 channel's blocks, because that moves text past the other channels and changes the `o` and `l` they
 inherit. The oracle does not change — the result is still walked and compared — so a scoped rewrite is
 held to exactly the standard a whole one is.
+
+## Editing from the piano roll
+
+`editor/views/piano-roll/roll-strip.ts` and `roll-edit.ts` are the two halves of a roll gesture, and
+both are Angular-free so `rolltest` can drive them against a real compile.
+
+The **strip** is one channel as a sequence the roll can splice. It is built from the compiler's
+`noteMap` rather than from the walk, because `noteMap` carries **rests** — the walk drops them — and a
+gap the roll can address is exactly a rest it can rewrite. A `^` is its own entry whenever anything
+but whitespace separates it from its note, so `c4 v200 ^8` is two entries and one note; `foldStrip`
+joins them, and a length change rewrites the **last** segment so the ramp keeps its place.
+
+Its **gate** is five checks, and the third is the one no oracle could make: a `{ }` triplet scales
+every length by two thirds and a tempo ratio divides every one of them, and in both cases the strip
+and the walk agree perfectly while the text the roll would write is wrong. Reading each item's span
+back and insisting it is a note catches the other invisible one — `spanAt` collapses a
+replacement-sourced span to a single character, so a note written through `"x=c4"` has a span reading
+`x` and an `expect` guard cannot see it, because the roll would slice the same text.
+
+A note's **unit** is its own span grown over the `o` and the drum `@` written beside it. Growing it is
+what makes a second drag rewrite the octave the first one wrote instead of adding another, and
+leading wins over trailing where both could claim the same `o` — otherwise two units overlap. The
+octave a note was written under is not inferred: `written` is the byte the letter and octave alone
+name, so `octaveOfNote` divides it out exactly.
+
+**`planGesture` decides and `planEdits` writes.** Everything the porter sees during a drag — the red
+wash, the striped pushed bars, the length bubble — is read off the one `Plan` that pointer-up
+commits, so what is drawn cannot disagree with what lands. A plan that is refused never reaches
+`planEdits` at all.
+
+Its **`EditMode`** is what an overlap does, and it is the porter's setting rather than the gesture's:
+`strict` refuses one and `flexible` shoves the notes in the way aside, for drawing, dragging,
+stretching and quantizing alike. A cascade never moves a note the gesture is placing itself — the
+`fixed` set — so a selection cannot shove itself, and an overlap it could not clear is reported as a
+clash rather than as a third outcome. The inspector's own length slider is not on this path at all:
+it writes one argument through `spliceArg` and knows nothing about neighbours.
+
+The commit is `EditorRequests.applyAll`: one transaction, one undo step for a whole selection, and
+the editor checks every `expect` before it dispatches anything, so a stale batch is a no-op rather
+than half a gesture.
+
+**A press is not yet a gesture.** `roll-gesture.ts` neither captures the pointer nor prevents the
+default on `pointerdown`, because both stop the browser raising `click` and `dblclick` on the bar —
+and those are still how a note names its channel, reaches the inspector, and is jumped to in the
+source. It captures on the first move past the slop threshold, shows no preview until then, and
+treats a press that never moved as a click that commits nothing. Drawing is the exception, since a
+click on empty grid is the whole gesture. That is also the one gesture the wheel reaches: a press
+holding a new note has no second axis left to say a length with, so `onWheel` offers the wheel to
+`stepLength` before it reads its own modifiers, and takes it back when there is nothing being drawn.
 
 ## The CodeMirror adapter
 
@@ -296,7 +362,9 @@ a glyph targets its command instead. What fits is measured (`fitBarContent`): th
 and the glyphs drop from the end, because a bar that says `C6` and nothing else is still saying
 something. Anything dropped is in the hover and in the inspector, so nothing is only on a bar. A
 muted channel is drawn dimmed, behind the others, and takes no pointer at all, so where a live note
-overlaps it the live one is what a hover or a click reaches.
+overlaps it the live one is what a hover or a click reaches — and it cannot be edited either, the
+strip refusing it in the words the note previewer refuses to sound it in (`silencedReason`), so a
+channel that goes quiet drops its selection rather than keeping one nothing can act on.
 
 **Which commands act on a note is answered exactly, and it takes two halves to be exact.** Anything
 that emits a VCMD is named by the walk, at the ARAM address the driver read it from, and
@@ -327,13 +395,39 @@ snaps outward to a whole note, a 7/8 bar is 168 ticks, and the two therefore lin
 coincidence, so a bar line has to be a bar's own first beat by construction. Zero beats in a bar is
 the grid switched off, which is why there is no separate switch for it.
 
-**The scrub bar** across the top is the whole song at once, and the only way to seek from the roll.
-Its width is one song — tick 0 on the left edge, the last tick on the right, at every zoom — so it is
-the song rather than a view of it, and `scrubOffset`/`scrubTick` are that mapping and its exact
-inverse: a drag commits to the tick under the pointer. It sits outside the roll's own scroller,
-because a scrubber that scrolled out of view would be gone exactly when a tall song most needs it.
+**Two bars sit over the roll, one job each.** The **overview** is the whole song at once and moves
+the _view_; the **scrub bar** under it is the roll's own timeline and moves the _song_. One bar
+doing both jobs could do neither alone: there was no way to move the view without moving the music,
+and none to move the music without moving the view.
 
-Its bars ask `rowOf` — the same function the roll's marks ask — so the percussion toggles land on
+The overview's width is one song — tick 0 on the left edge, the last tick on the right, at every
+zoom — so it is the song rather than a view of it, and `overviewOffset`/`overviewTick` are that
+mapping and its exact inverse. It behaves as a scrollbar over a minimap: the box on it is the pane
+the roll is showing, a press inside that box grabs it and it stays under the pointer, and a press
+outside it centres it there first. A drag goes through `setFollow(false)` rather than parking behind
+the switch, as a `Shift`+wheel pan does, so the toolbar says where the roll is. Both bars sit
+outside the roll's own scroller, because a bar that scrolled out of view would be gone exactly when
+a tall song most needs it.
+
+The scrub bar is drawn in the roll's **own** coordinates instead — the same `viewBox`, the same key
+column, the same `scroll()` transform and the same `lines()` — so a tick is at the same x on it as
+in the roll, and the marker is handed the playhead line's own x rather than a number that agrees
+with it. Its numbers are the bars of that same grid, counted from 1 at tick 0. A drag previews
+through `playback.scrubTo` and commits one `seek` at the end, as the transport's own slider does,
+and the preview is deliberately kept out of the camera (`playTick` reads `songHead`, not
+`headTick`): a camera that chased it would slide the music sideways under the pointer and put the
+marker back at `lead` the moment it was grabbed. A drag can only ask for a tick that is on screen,
+so one held within `EDGE_PULL_PX` of either end pulls the view along at `edgeUrgency`'s ramp — a
+frame callback, since a pointer held off the end is not moving and is exactly when the pull is
+wanted — and the offset is held inside the bar before the tick is read off it, so the marker stays
+against the edge in view while the music comes to it.
+
+**Both `<svg>`s are sized in pixels rather than `w-full`.** The pane is measured inside the vertical
+scrollbar (`elementSize` reads the content box) and the bars are drawn outside it, so a `w-full` bar
+stretches its `viewBox` over that gutter while the pointer maths does not — a scrub bar off by a
+scrollbar's width from the roll it is a timeline for.
+
+The overview's bars ask `rowOf` — the same function the roll's marks ask — so the percussion toggles land on
 both pictures at once, and an instrument taken off the drum lanes moves to the keyboard in the
 minimap and the roll together. Answering that question twice is how the two would drift. The bars are
 deduped by pixel and row, keeping the wider of a pair: every bar is one colour, so two notes sharing a
@@ -347,14 +441,20 @@ the transport's 10 Hz anchor, snapped outward to a whole note, so the DOM rebuil
 screen; the scroll is a `computed` over `shared/chart/frame-clock.ts` and is one `transform` that
 nothing beneath reads. That is why the roll can run at 240 Hz without the note list knowing.
 
-**The folder is a parent and nine children**, as `output/command-inspector/` is. `piano-roll.ts`
+**The folder is a parent and ten children**, as `output/command-inspector/` is. `piano-roll.ts`
 holds the song's shape, the camera and the clock and hands each child what it draws:
-`roll-toolbar/`, `percussion-panel/`, `roll-scrub/`, `roll-channels/` and `roll-tooltip/` in the
-ordinary namespace, `roll-lanes/`, `roll-grid/`, `roll-notes/` and `roll-keys/` inside the roll's own
-`<svg>`. `roll-channels/` is the odd one: it draws nothing of the song, and takes the corner the
-scrub bar leaves empty above the key column to say which channel is being edited. Its eight toggles
+`roll-toolbar/`, `percussion-panel/`, `roll-overview/`, `roll-scrub/`, `roll-channels/` and
+`roll-tooltip/` in the ordinary namespace, `roll-lanes/`, `roll-grid/`, `roll-notes/` and
+`roll-keys/` inside the roll's own `<svg>`. `roll-channels/` is the odd one: it draws nothing of the
+song, and takes the corner the overview bar leaves empty above the key column to say which channel
+is being edited. Its eight toggles
 are not the only way in — a click on a bar or on one of its glyphs names that bar's channel, since
-the roll is already pointing at the answer. Beside them sit six Angular-free files — `roll-layout.ts` and `percussion.ts`, and `roll-metrics.ts`,
+the roll is already pointing at the answer, and so does the first gesture of a drag, a stretch or an
+erase, through `editing`: with no channel picked, the strip is built for the channel under the
+pointer, so a bar can be grabbed before it has been chosen and the press names it on the way. Empty
+grid offers nothing to name, which is why drawing, the marquee and the shortcuts still need a
+channel. The chips carry the mixer's state too — struck through where the mask silences them, ringed
+where the solo is — and `Ctrl` on one isolates that channel rather than editing it. Beside them sit six Angular-free files — `roll-layout.ts` and `percussion.ts`, and `roll-metrics.ts`,
 `roll-settings.ts`, `roll-marks.ts` and `roll-clock.ts` — so the arithmetic stays where a harness can
 import it. `charttest` reaches the first two by path.
 
@@ -385,8 +485,8 @@ does not clamp, and `charttest` pins both halves. `pageStart` is a closed form a
 anchor the page is a function of the tick and a loop wrap or a resize lands on the right page with
 nothing to reset. **The anchor is what a scroll moves**: measured from the song's own start always, a
 seek would drop the playhead wherever its place in that fixed grid happened to fall, and the notes
-would jump back the moment the drag ended — by exactly as far as the scrub had just moved them.
-A scrub re-anchors the grid on the view it leaves behind, so the roll carries on from what is on
+would jump back the moment the drag ended — by exactly as far as the scroll had just moved them.
+A scroll re-anchors the grid on the view it leaves behind, so the roll carries on from what is on
 screen and turns a page a full pane later. A stop puts the anchor back on tick 0, since a stop is
 back to the beginning — the transition and not the state, so that a roll built while the transport is
 already stopped leaves the anchor it was rebuilt from alone. The mark window is unchanged and does not need to be told: it already carries a

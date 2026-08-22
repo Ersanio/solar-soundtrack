@@ -1,6 +1,8 @@
+import { TICKS_PER_WHOLE } from '@amk/core/hardcoded-tables';
 import { CHANNELS } from '../../../state/transport-view';
 import { clamp } from '../../../util/math';
 import { readStored, writeStored } from '../../../util/storage';
+import { EDIT_MODES, type EditMode } from './roll-edit';
 import { DEFAULT_PERCUSSION, parsePercussion } from './percussion';
 
 /**
@@ -27,6 +29,47 @@ export const BEAT_UNITS = [1, 2, 4, 8, 16, 32, 64] as const;
 /** Beats a bar may hold. Zero is the grid switched off. */
 export const MAX_BEATS = 32;
 
+/**
+ * How long a note the roll will draw or snap to, in ticks.
+ *
+ * Sixteen whole notes, which is far past anything musical and well short of the
+ * point where a stored value could be nonsense. A stretch is not held to it —
+ * a note may be as long as the porter likes — only the stored settings are.
+ */
+const MAX_NOTE_TICKS = TICKS_PER_WHOLE * 16;
+
+/**
+ * What the toolbar's Snap control offers, coarsest first.
+ *
+ * `bar` and `beat` are named rather than fixed because they come off the grid
+ * the porter set: at 6/8 a beat is an `l8` and a bar is six of them. The rest
+ * are fractions of the beat, and `0` is the snap switched off, which `Alt`
+ * reaches for the length of one gesture without changing the setting.
+ */
+export const SNAPS = ['bar', 'beat', 'half', 'quarter', 'eighth', 'sixteenth', 'off'] as const;
+export type SnapName = (typeof SNAPS)[number];
+
+/** The Snap setting in ticks, from the grid the porter chose. */
+export function snapTicks(name: SnapName, beatsPerBar: number, beatUnit: number): number {
+  const beat = TICKS_PER_WHOLE / beatUnit;
+  switch (name) {
+    case 'bar':
+      return beat * Math.max(1, beatsPerBar);
+    case 'beat':
+      return beat;
+    case 'half':
+      return Math.max(1, Math.floor(beat / 2));
+    case 'quarter':
+      return Math.max(1, Math.floor(beat / 4));
+    case 'eighth':
+      return Math.max(1, Math.floor(beat / 8));
+    case 'sixteenth':
+      return Math.max(1, Math.floor(beat / 16));
+    case 'off':
+      return 0;
+  }
+}
+
 export interface Settings {
   zoom: number;
   rowHeight: number;
@@ -43,6 +86,33 @@ export interface Settings {
   percussionOpen: boolean;
   /** The channel the roll is editing, or null for none. One at a time. */
   editChannel: number | null;
+  /**
+   * What a drawn or dragged note snaps to — see {@link SNAPS}.
+   *
+   * Its own setting rather than the grid's beat, because the two answer
+   * different questions: the grid is the bar lines the porter wants to *see*,
+   * and at 4/4 that is a whole quarter note — far too coarse to draw sixteenths
+   * against. {@link SNAPS} is what the toolbar offers, and the two named ones
+   * are read off the grid so they still follow it.
+   */
+  snap: SnapName;
+  /**
+   * What a gesture does when it would make two notes sound at once.
+   *
+   * The roll's answer rather than the gesture's: a stretch and a drag both push
+   * in `flexible` and both refuse in `strict`, so the outcome does not depend on
+   * which part of a bar the press landed on. It reaches the roll only —
+   * the inspector's own length slider writes one argument and knows nothing
+   * about its neighbours.
+   */
+  editMode: EditMode;
+  /**
+   * The length a drawn note takes, in ticks — the last one drawn or resized.
+   *
+   * Seeded at a quarter note. A roll that always drew `l4` would need every
+   * note resized after it was drawn, which is a gesture per note for no reason.
+   */
+  lastLength: number;
 }
 
 /** Every field `unknown`, because none of it is ours until it is checked. */
@@ -57,6 +127,16 @@ interface StoredSettings {
   percussion?: unknown;
   percussionOpen?: unknown;
   editChannel?: unknown;
+  snap?: unknown;
+  editMode?: unknown;
+  lastLength?: unknown;
+}
+
+/** A tick count a drawn note could have. */
+function isTicks(value: unknown): value is number {
+  return (
+    typeof value === 'number' && Number.isInteger(value) && value >= 1 && value <= MAX_NOTE_TICKS
+  );
 }
 
 /** A whole number of beats a bar could hold, zero — no grid — included. */
@@ -91,6 +171,9 @@ export function readSettings(): Settings {
     percussion: [...DEFAULT_PERCUSSION],
     percussionOpen: false,
     editChannel: null,
+    snap: 'beat',
+    editMode: 'strict',
+    lastLength: TICKS_PER_WHOLE / 4,
   };
 
   let stored: StoredSettings | null;
@@ -139,6 +222,18 @@ export function readSettings(): Settings {
 
   if (isChannel(stored.editChannel)) {
     settings.editChannel = stored.editChannel;
+  }
+
+  if (SNAPS.includes(stored.snap as SnapName)) {
+    settings.snap = stored.snap as SnapName;
+  }
+
+  if (EDIT_MODES.includes(stored.editMode as EditMode)) {
+    settings.editMode = stored.editMode as EditMode;
+  }
+
+  if (isTicks(stored.lastLength)) {
+    settings.lastLength = stored.lastLength;
   }
 
   const percussion = parsePercussion(stored.percussion);

@@ -61,6 +61,32 @@ export function channelStates(
 }
 
 /**
+ * The one channel left audible, or `null` where more or fewer than one is.
+ *
+ * A solo and muting every other channel by hand are the same act — {@link
+ * silencedMask} already makes them the same mask — so one question answers both.
+ *
+ * Over the rows rather than the mask, because those are the channels the song
+ * writes to and so the only ones with buttons: muting 1 and 2 of a three-channel
+ * song is muting everything but one.
+ */
+export function soleAudible(states: readonly ChannelState[]): number | null {
+  const audible = states.filter((state) => state.audible);
+  return audible.length === 1 ? audible[0].index : null;
+}
+
+/**
+ * Why a channel is not being heard, in the words both the note previewer and the
+ * roll's toolbar say it in.
+ *
+ * The mask alone cannot tell the two apart, and they read differently: seven bits
+ * set is a solo to a listener and seven separate mutes to the buttons.
+ */
+export function silencedReason(channel: number, soloed: number | null): string {
+  return soloed === null ? `channel ${channel} is muted` : `only channel ${soloed} is soloed`;
+}
+
+/**
  * The source spans being sounded right now, one per audible voice.
  *
  * Follows the driver's own read pointers rather than any clock, so loops, tempo

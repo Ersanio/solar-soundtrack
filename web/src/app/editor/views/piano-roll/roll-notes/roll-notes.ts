@@ -35,6 +35,15 @@ export class RollNotes {
 
   readonly marks = input.required<readonly Mark[]>();
 
+  /**
+   * The addresses of the notes the porter has selected.
+   *
+   * By address rather than by index, because a mark is named by the address the
+   * walk gave it and a strip item by its place in the text — the address is the
+   * one both of them have.
+   */
+  readonly selected = input.required<ReadonlySet<number>>();
+
   /** The hover, which the roll turns into a tooltip beside the pointer. */
   readonly entered = output<Mark>();
 

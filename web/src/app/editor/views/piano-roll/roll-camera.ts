@@ -33,6 +33,14 @@ export const PAGE_TURN_AT = 0.9;
 export const PAGE_STEP = 0.8;
 /** The margin a turn leaves, and so the one every page opens on. */
 export const PAGE_LEAD_IN = PAGE_TURN_AT - PAGE_STEP;
+/**
+ * How much of a pane a scrub held off the end of the bar crosses in a second.
+ *
+ * A fraction of a pane rather than a count of pixels or ticks, so the pull reads
+ * the same at every zoom and every pane width: what the eye is measuring is how
+ * fast the music on screen is being replaced.
+ */
+export const PULL_PANES_PER_SEC = 0.8;
 
 export const rollCamera = {
   /** Where the view is parked when it is not following the song. */

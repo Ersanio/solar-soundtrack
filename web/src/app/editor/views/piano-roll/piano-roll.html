@@ -7,7 +7,14 @@
   [percussionOpen]="percussionOpen()"
   [editChannel]="editChannel()"
   [tick]="readoutTick()"
+  [snap]="snap()"
+  [editMode]="editMode()"
+  [editRefusal]="editRefusal()"
+  [normalizable]="normalizable()"
+  [selected]="gestures.selection().size"
   (zoomBy)="setZoom($event)"
+  (snapChange)="setSnap($event)"
+  (editModeChange)="setEditMode($event)"
   (rowHeightBy)="setRowHeight($event)"
   (followChange)="setFollow($event)"
   (scrollNotesChange)="setScrollNotes($event)"
@@ -34,28 +41,53 @@
   </ul>
 }
 
-<!-- The scrub bar: the whole song at once, and the drag that seeks it. Outside
-     the roll's own scroller on purpose — a scrubber that scrolled out of view
-     would be gone exactly when a tall song most needs it.
+<!-- The overview bar: the whole song at once, and the drag that scrolls the roll
+     through it. Outside the roll's own scroller on purpose — a scroller that
+     scrolled out of view would be gone exactly when a tall song most needs it.
 
      The channel picker sits over the corner the bar leaves empty, inside the
      same `@if` so the corner arrives with the bar it is a corner of. -->
-@if (scrubBox(); as box) {
+@if (overviewBox(); as box) {
   <div class="relative shrink-0">
-    <amk-roll-scrub
+    <amk-roll-overview
       [box]="box"
+      [width]="width()"
       [rollWidth]="rollWidth()"
       [ticks]="songTicks()"
       [bars]="minimap()"
-      [playheadX]="scrubX()"
-      [viewWindow]="scrubWindow()"
-      (scrubStart)="onScrubStart()"
-      (scrubTo)="onScrubTo($event)"
-      (scrubEnd)="onScrubEnd()"
+      [playheadX]="overviewX()"
+      [viewWindow]="overviewWindow()"
+      (panStart)="onPanStart($event)"
+      (panTo)="onPanTo($event)"
+      (panEnd)="onPanEnd()"
     />
 
-    <amk-roll-channels [selected]="editChannel()" (picked)="setEditChannel($event)" />
+    <amk-roll-channels
+      [selected]="editChannel()"
+      [channels]="mixerChannels()"
+      [silenced]="silenced()"
+      (picked)="setEditChannel($event)"
+      (isolated)="isolateChannel($event)"
+    />
   </div>
+}
+
+<!-- The scrub bar: the roll's own timeline, and the drag that moves the song
+     along it. Directly over the roll, in the roll's coordinates, so the
+     marker's tip lands on the playhead line it is handed the x of. -->
+@if (scrubBox(); as box) {
+  <amk-roll-scrub
+    [box]="box"
+    [width]="width()"
+    [rollWidth]="rollWidth()"
+    [ticks]="songTicks()"
+    [marks]="lines()"
+    [scroll]="scroll()"
+    [playheadX]="playheadX()"
+    (scrubStart)="onScrubStart($event)"
+    (scrubTo)="onScrubTo($event)"
+    (scrubEnd)="onScrubEnd()"
+  />
 }
 
 <div
@@ -63,12 +95,28 @@
   class="relative min-h-0 flex-1 overflow-x-hidden overflow-y-auto"
   (pointermove)="onMove($event)"
   (pointerleave)="leave()"
+  (wheel)="onWheel($event)"
   (scroll)="onViewportScroll()"
 >
   @if (viewBox(); as box) {
     <!-- `select-none`: a double click on a bar must not drag a text selection
-         out of the labels drawn inside it. -->
-    <svg class="block w-full select-none" [attr.height]="stackHeight()" [attr.viewBox]="box">
+         out of the labels drawn inside it.
+
+         The pointer handlers are on the `<svg>` rather than on the scroller
+         around it, so a gesture measures against a box that scrolls with the
+         notes and needs no scroll offset undone. -->
+    <svg
+      class="block w-full select-none"
+      [attr.height]="stackHeight()"
+      [attr.viewBox]="box"
+      [style.cursor]="gestures.cursor()"
+      (pointerdown)="onEditDown($event)"
+      (pointermove)="onEditMove($event)"
+      (pointerup)="onEditUp($event)"
+      (pointercancel)="onEditUp($event)"
+      (pointerleave)="onEditLeave()"
+      (contextmenu)="onContextMenu($event)"
+    >
       <defs>
         <clipPath id="amk-roll-clip">
           <rect
@@ -103,8 +151,19 @@
           <g
             amk-roll-notes
             [marks]="marks()"
+            [selected]="selectedSpans()"
             (entered)="enter($event)"
             (channelPicked)="selectEditChannel($event)"
+          />
+          <g
+            amk-roll-edit
+            [preview]="gestures.preview()"
+            [marquee]="gestures.marquee()"
+            [ghost]="gestures.ghost()"
+            [bubble]="gestures.bubble()"
+            [fill]="editFill()"
+            [stroke]="editStroke()"
+            [blocked]="blocked()"
           />
         </g>
 
@@ -126,11 +185,13 @@
         [held]="heldRows()"
         [showLabels]="showLabels()"
         [labelSize]="labelSize()"
+        [playable]="editChannel() !== null"
+        (pressed)="onKeyPress($event)"
       />
     </svg>
   }
 </div>
 
-@if (tooltipFor(); as mark) {
+@if (!gestures.busy() && tooltipFor(); as mark) {
   <amk-roll-tooltip [mark]="mark" [anchor]="pointer()" [context]="placeContext()" />
 }
