@@ -1,8 +1,9 @@
 <svg
-  class="block cursor-pointer select-none"
+  class="block select-none"
   [attr.height]="barHeight"
   [attr.viewBox]="box()"
   [style.width.px]="width()"
+  [style.cursor]="dragging() ? 'grabbing' : 'grab'"
   (pointerdown)="onDown($event)"
   (pointermove)="onMove($event)"
   (pointerup)="onUp($event)"
@@ -14,9 +15,11 @@
     </clipPath>
   </defs>
 
+  <!-- One step lighter than the scrub bar's track under it, so the two read as
+       two bars rather than as one tall one. -->
   <rect
     y="0"
-    class="fill-inset"
+    class="fill-surface"
     [attr.x]="keyWidth"
     [attr.width]="rollWidth()"
     [attr.height]="barHeight"

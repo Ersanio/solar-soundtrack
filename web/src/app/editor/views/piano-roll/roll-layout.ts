@@ -287,7 +287,7 @@ export function overviewOffset(tick: number, ticks: number, width: number): numb
  * The tick under a point on the overview bar, the exact inverse of
  * {@link overviewOffset}.
  *
- * Exact because a drag rides on it: the tick a scrub commits to has to be the
+ * Exact because a drag rides on it: the tick the view is moved to has to be the
  * one under the pointer, not one near it. Off either end is the song's own end,
  * since a drag that runs past the bar is still asking for the last tick.
  */
@@ -297,6 +297,38 @@ export function overviewTick(offset: number, ticks: number, width: number): numb
   }
 
   return clamp(offset / width, 0, 1) * ticks;
+}
+
+/** How wide the strip at either end of a bar that pulls the view along is. */
+const EDGE_PULL_PX = 28;
+
+/**
+ * How hard a drag held near the end of a bar pulls the view, as a signed
+ * fraction: negative to the left, zero anywhere in the middle, and ±1 at the
+ * edge or past it.
+ *
+ * A drag can only ask for a tick that is on screen, so a seek across a long song
+ * has to be able to take the view with it. It is a ramp rather than a switch
+ * because the pull's whole range is 28px wide: a drag that has only just reached
+ * the strip means "a little further", and one held off the end means "keep
+ * going".
+ *
+ * `offsetX` is measured from the bar's left edge, so the song's own span starts
+ * at {@link KEY_WIDTH} — a pointer over the key column is off the left end of
+ * the music, not at the start of it.
+ */
+export function edgeUrgency(offsetX: number, width: number): number {
+  if (!(width - KEY_WIDTH > EDGE_PULL_PX * 2)) {
+    return 0; // Too narrow to have a middle. Nothing that lands would be a scroll.
+  }
+
+  const left = KEY_WIDTH + EDGE_PULL_PX;
+  if (offsetX < left) {
+    return -clamp((left - offsetX) / EDGE_PULL_PX, 0, 1);
+  }
+
+  const right = width - EDGE_PULL_PX;
+  return offsetX > right ? clamp((offsetX - right) / EDGE_PULL_PX, 0, 1) : 0;
 }
 
 /**

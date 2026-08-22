@@ -33,6 +33,7 @@ import { stackSegments } from "../web/src/app/shared/chart/stack";
 import {
 	DRAW_LENGTHS,
 	advanceTick,
+	edgeUrgency,
 	gridLines,
 	keyIsBlack,
 	fitBarContent,
@@ -635,10 +636,10 @@ console.log("\nthe roll's playhead marks the song, not the camera");
 console.log("\nthe overview bar's time axis");
 {
 	// The bar holds the whole song and nothing else, so a drag on it is a mapping
-	// and its inverse. The inverse has to be exact: a scrub commits to the tick
-	// under the pointer, and one that landed merely near it would drop the song a
-	// note away from where it was dropped, every time, with nothing on screen to
-	// say so.
+	// and its inverse. The inverse has to be exact: the view goes where the box
+	// under the pointer is put, and one that landed merely near it would drop the
+	// roll a note away from where it was dropped, every time, with nothing on
+	// screen to say so.
 	const WIDTH = 724; // a pane, less the key column
 	const TICKS = 12312;
 
@@ -682,6 +683,42 @@ console.log("\nthe overview bar's time axis");
 		overviewOffset(50, 0, WIDTH) === 0 && overviewTick(50, 0, WIDTH) === 0,
 	);
 	check("and so does an unmeasured pane", overviewOffset(50, TICKS, 0) === 0 && overviewTick(50, TICKS, 0) === 0);
+}
+
+console.log("\nthe pull at the end of the scrub bar");
+{
+	// A scrub can only ask for a tick that is on screen, so a drag held off the
+	// end has to take the view with it. The middle must be dead still: a pull that
+	// crept while the pointer sat over the music would scroll the roll under a
+	// gesture that had only meant to seek.
+	const WIDTH = 800; // the whole bar, key column included
+	const MIDDLE = KEY_WIDTH + (WIDTH - KEY_WIDTH) / 2;
+
+	check("the middle of the bar pulls not at all", edgeUrgency(MIDDLE, WIDTH) === 0);
+	check("the right edge pulls forward at full", edgeUrgency(WIDTH, WIDTH) === 1);
+	check("and past it no harder", edgeUrgency(WIDTH + 5000, WIDTH) === 1);
+	check("the left edge pulls back at full", edgeUrgency(KEY_WIDTH, WIDTH) === -1);
+	check("and past it no harder", edgeUrgency(-5000, WIDTH) === -1);
+
+	// The key column is off the left end of the music rather than the start of it:
+	// a drag that runs onto the keys is asking for what is before the pane.
+	check("a pointer over the key column pulls back", edgeUrgency(KEY_WIDTH / 2, WIDTH) === -1);
+
+	// A ramp and not a switch, so a drag that has only just reached the strip
+	// creeps and one held off the end runs.
+	let climbed = true;
+	for (let x = WIDTH - 28; x < WIDTH; x++) {
+		const here = edgeUrgency(x, WIDTH);
+		const next = edgeUrgency(x + 1, WIDTH);
+		climbed &&= here >= 0 && next > here && next <= 1;
+	}
+
+	check("the pull ramps up over the last 28px", climbed);
+
+	// Both strips have to fit with music between them, or a bar narrow enough
+	// would pull in one direction wherever it was pressed.
+	check("a bar too narrow to have a middle pulls nowhere", edgeUrgency(KEY_WIDTH + 10, KEY_WIDTH + 20) === 0);
+	check("and an unmeasured pane answers 0 rather than NaN", edgeUrgency(50, 0) === 0);
 }
 
 console.log("\nthe playhead's own clock");

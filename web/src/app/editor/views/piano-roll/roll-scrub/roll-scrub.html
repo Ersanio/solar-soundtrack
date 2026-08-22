@@ -1,0 +1,64 @@
+<svg
+  class="block cursor-pointer select-none"
+  [attr.height]="barHeight"
+  [attr.viewBox]="box()"
+  [style.width.px]="width()"
+  (pointerdown)="onDown($event)"
+  (pointermove)="onMove($event)"
+  (pointerup)="onUp($event)"
+  (pointercancel)="onUp($event)"
+>
+  <defs>
+    <clipPath id="amk-scrub-clip">
+      <rect y="0" [attr.x]="keyWidth" [attr.width]="rollWidth()" [attr.height]="barHeight" />
+    </clipPath>
+  </defs>
+
+  <rect
+    y="0"
+    class="fill-inset"
+    [attr.x]="keyWidth"
+    [attr.width]="rollWidth()"
+    [attr.height]="barHeight"
+  />
+
+  <g clip-path="url(#amk-scrub-clip)">
+    <!-- The roll's own transform, over the roll's own lines: a bar is numbered
+         here at the x its rule is drawn at below. -->
+    <g [attr.transform]="scroll()">
+      @for (mark of marks(); track mark.tick) {
+        <!-- Read against the bar's own inset rather than against the roll, so
+             these are the ink the numbers are and not the rule colour the grid
+             below is: a tick that matched the grid would be invisible at the
+             two thirds of a bar's height it has to say anything in. -->
+        <line
+          class="stroke-ink-muted"
+          stroke-width="1"
+          [attr.x1]="mark.x"
+          [attr.x2]="mark.x"
+          [attr.y1]="mark.strong ? barTop : beatTop"
+          [attr.y2]="barHeight"
+          [attr.stroke-opacity]="mark.strong ? 0.85 : 0.4"
+        />
+
+        @if (mark.bar !== null) {
+          <!-- Centred on the rule rather than beside it: the number names the
+               line, and a number set off to one side reads as the label of
+               whichever bar it happens to sit further into. -->
+          <text
+            class="fill-ink-muted font-mono"
+            font-size="8"
+            text-anchor="middle"
+            [attr.x]="mark.x"
+            [attr.y]="numberBase"
+          >
+            {{ mark.bar }}
+          </text>
+        }
+      }
+    </g>
+
+    <!-- Last, so it reads over a number it lands on. -->
+    <path class="fill-accent" [attr.d]="marker" [attr.transform]="markerAt()" />
+  </g>
+</svg>

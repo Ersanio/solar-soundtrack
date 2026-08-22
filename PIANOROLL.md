@@ -28,6 +28,8 @@ no channel.
 | `Alt` + wheel while drawing      | Sizes it a tick at a time instead                                        |
 | `Ctrl` + wheel                   | Zooms in and out about the pointer                                       |
 | `Shift` + wheel                  | Scrolls the roll sideways                                                |
+| Drag the overview bar            | Scrolls the roll through the song — grab the lit box and it follows you  |
+| Drag the timeline below it       | Moves the playhead; hold past either end and the roll scrolls along      |
 | Click a key on the left          | Sounds that pitch on the channel being edited, so you can find it by ear |
 | `Ctrl` + click a channel chip    | Solos that channel, which also picks it to edit                          |
 
@@ -48,6 +50,18 @@ no channel.
 | `Ctrl` + `Z` / `Ctrl` + `Y` | Undo and redo, the same history the MML editor uses             |
 
 Shortcuts are ignored while you are typing in the MML, so `Ctrl+A` there still selects the text.
+
+## The two bars over the roll
+
+The wide one is the **whole song at once**, with the part you are looking at marked on it, and it is
+how you get around: grab that lit box and it follows the pointer, or press anywhere else on the bar
+to go straight there.
+
+The thin one under it is the **timeline** — bar numbers, beat ticks, and a triangle whose tip is on
+the playhead. Drag the triangle to move the music, and keep dragging past either end of it to carry
+the roll along with you. Anything that moves the **view** unticks **Follow playback** — the wide
+bar always, the timeline only when a drag runs off the end of it and starts scrolling — since you
+have taken the roll somewhere the song is not. Tick it again to catch up with the music.
 
 ## Three settings that decide how a drag lands
 

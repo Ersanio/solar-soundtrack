@@ -2,10 +2,10 @@
  * The roll's drawing constants, shared by the parent and its children.
  *
  * Here rather than in `piano-roll.ts` because the pieces that draw with them are
- * separate components now: the key column's width is the overview bar's left edge
- * as well as the keyboard's, and a second copy of that number is how the two
- * would come apart. The camera's own fractions are not here — nothing but the
- * camera reads them.
+ * separate components now: the key column's width is where both bars over the
+ * roll start as well as the keyboard's, and a second copy of that number is how
+ * they would come apart. The camera's own fractions are not here — nothing but
+ * the camera reads them.
  */
 
 /** Width of the key column. Wide enough for a drum's longest label, `@29 o4 c+`. */
@@ -22,6 +22,15 @@ export const OVERVIEW_HEIGHT = 36;
 
 /** Inset, so the top and bottom rows are not swallowed by the border. */
 export const OVERVIEW_PAD = 3;
+
+/** Height of the scrub bar: a row of bar numbers over a row of beat ticks. */
+export const SCRUB_HEIGHT = 20;
+
+/** How tall the playhead's marker is. Its tip is on the bar's bottom edge. */
+export const MARKER_HEIGHT = 10;
+
+/** Half the marker's width, so its two top corners are `x` either side of the tip. */
+export const MARKER_REACH = 6;
 
 /**
  * Tailwind v4 scans source text, so a class name has to be a complete literal —

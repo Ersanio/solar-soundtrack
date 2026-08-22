@@ -395,13 +395,39 @@ snaps outward to a whole note, a 7/8 bar is 168 ticks, and the two therefore lin
 coincidence, so a bar line has to be a bar's own first beat by construction. Zero beats in a bar is
 the grid switched off, which is why there is no separate switch for it.
 
-**The overview bar** across the top is the whole song at once, and the only way to seek from the roll.
-Its width is one song — tick 0 on the left edge, the last tick on the right, at every zoom — so it is
-the song rather than a view of it, and `overviewOffset`/`overviewTick` are that mapping and its exact
-inverse: a drag commits to the tick under the pointer. It sits outside the roll's own scroller,
-because a scrubber that scrolled out of view would be gone exactly when a tall song most needs it.
+**Two bars sit over the roll, one job each.** The **overview** is the whole song at once and moves
+the _view_; the **scrub bar** under it is the roll's own timeline and moves the _song_. One bar
+doing both jobs could do neither alone: there was no way to move the view without moving the music,
+and none to move the music without moving the view.
 
-Its bars ask `rowOf` — the same function the roll's marks ask — so the percussion toggles land on
+The overview's width is one song — tick 0 on the left edge, the last tick on the right, at every
+zoom — so it is the song rather than a view of it, and `overviewOffset`/`overviewTick` are that
+mapping and its exact inverse. It behaves as a scrollbar over a minimap: the box on it is the pane
+the roll is showing, a press inside that box grabs it and it stays under the pointer, and a press
+outside it centres it there first. A drag goes through `setFollow(false)` rather than parking behind
+the switch, as a `Shift`+wheel pan does, so the toolbar says where the roll is. Both bars sit
+outside the roll's own scroller, because a bar that scrolled out of view would be gone exactly when
+a tall song most needs it.
+
+The scrub bar is drawn in the roll's **own** coordinates instead — the same `viewBox`, the same key
+column, the same `scroll()` transform and the same `lines()` — so a tick is at the same x on it as
+in the roll, and the marker is handed the playhead line's own x rather than a number that agrees
+with it. Its numbers are the bars of that same grid, counted from 1 at tick 0. A drag previews
+through `playback.scrubTo` and commits one `seek` at the end, as the transport's own slider does,
+and the preview is deliberately kept out of the camera (`playTick` reads `songHead`, not
+`headTick`): a camera that chased it would slide the music sideways under the pointer and put the
+marker back at `lead` the moment it was grabbed. A drag can only ask for a tick that is on screen,
+so one held within `EDGE_PULL_PX` of either end pulls the view along at `edgeUrgency`'s ramp — a
+frame callback, since a pointer held off the end is not moving and is exactly when the pull is
+wanted — and the offset is held inside the bar before the tick is read off it, so the marker stays
+against the edge in view while the music comes to it.
+
+**Both `<svg>`s are sized in pixels rather than `w-full`.** The pane is measured inside the vertical
+scrollbar (`elementSize` reads the content box) and the bars are drawn outside it, so a `w-full` bar
+stretches its `viewBox` over that gutter while the pointer maths does not — a scrub bar off by a
+scrollbar's width from the roll it is a timeline for.
+
+The overview's bars ask `rowOf` — the same function the roll's marks ask — so the percussion toggles land on
 both pictures at once, and an instrument taken off the drum lanes moves to the keyboard in the
 minimap and the roll together. Answering that question twice is how the two would drift. The bars are
 deduped by pixel and row, keeping the wider of a pair: every bar is one colour, so two notes sharing a
@@ -415,12 +441,13 @@ the transport's 10 Hz anchor, snapped outward to a whole note, so the DOM rebuil
 screen; the scroll is a `computed` over `shared/chart/frame-clock.ts` and is one `transform` that
 nothing beneath reads. That is why the roll can run at 240 Hz without the note list knowing.
 
-**The folder is a parent and nine children**, as `output/command-inspector/` is. `piano-roll.ts`
+**The folder is a parent and ten children**, as `output/command-inspector/` is. `piano-roll.ts`
 holds the song's shape, the camera and the clock and hands each child what it draws:
-`roll-toolbar/`, `percussion-panel/`, `roll-overview/`, `roll-channels/` and `roll-tooltip/` in the
-ordinary namespace, `roll-lanes/`, `roll-grid/`, `roll-notes/` and `roll-keys/` inside the roll's own
-`<svg>`. `roll-channels/` is the odd one: it draws nothing of the song, and takes the corner the
-overview bar leaves empty above the key column to say which channel is being edited. Its eight toggles
+`roll-toolbar/`, `percussion-panel/`, `roll-overview/`, `roll-scrub/`, `roll-channels/` and
+`roll-tooltip/` in the ordinary namespace, `roll-lanes/`, `roll-grid/`, `roll-notes/` and
+`roll-keys/` inside the roll's own `<svg>`. `roll-channels/` is the odd one: it draws nothing of the
+song, and takes the corner the overview bar leaves empty above the key column to say which channel
+is being edited. Its eight toggles
 are not the only way in — a click on a bar or on one of its glyphs names that bar's channel, since
 the roll is already pointing at the answer, and so does the first gesture of a drag, a stretch or an
 erase, through `editing`: with no channel picked, the strip is built for the channel under the
@@ -458,8 +485,8 @@ does not clamp, and `charttest` pins both halves. `pageStart` is a closed form a
 anchor the page is a function of the tick and a loop wrap or a resize lands on the right page with
 nothing to reset. **The anchor is what a scroll moves**: measured from the song's own start always, a
 seek would drop the playhead wherever its place in that fixed grid happened to fall, and the notes
-would jump back the moment the drag ended — by exactly as far as the scrub had just moved them.
-A scrub re-anchors the grid on the view it leaves behind, so the roll carries on from what is on
+would jump back the moment the drag ended — by exactly as far as the scroll had just moved them.
+A scroll re-anchors the grid on the view it leaves behind, so the roll carries on from what is on
 screen and turns a page a full pane later. A stop puts the anchor back on tick 0, since a stop is
 back to the beginning — the transition and not the state, so that a roll built while the transport is
 already stopped leaves the anchor it was rebuilt from alone. The mark window is unchanged and does not need to be told: it already carries a

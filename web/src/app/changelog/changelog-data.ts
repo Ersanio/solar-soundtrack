@@ -11,6 +11,9 @@ export const CHANGELOG: readonly ChangelogEntry[] = [
   {
     date: '22 August 2026',
     items: [
+      'A timeline over the piano roll, with bar numbers and a marker you drag to move the playhead',
+      'Drag a seek past either end of the timeline and the roll scrolls along with it',
+      'The bar above it now scrolls the roll through the song instead of seeking',
       'Soloing a channel, or muting all but one, picks it to edit in the piano roll',
       'A muted channel cannot be edited, and loses its selection',
       'Grab, drag or resize a note before picking its channel',

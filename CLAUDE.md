@@ -201,18 +201,26 @@ One entry each: what it was, what it is, why.
   the same small lag, so one frame in ten lurched. It carries its position across frames and eases
   the gap shut (`roll-layout.ts`).
 - **Parking the roll in an `effect` on the follow flag** — an effect runs after the handler and
-  overwrote a position set in the same gesture that came off the song. Parking happens at the two
-  call sites that stop following, the follow toggle and the overview bar's pointer-down.
+  overwrote a position set in the same gesture that came off the song. Parking happens where the
+  following stops, which is `setFollow` and the pull's first frame.
 - **Seeking the roll by `Shift`+wheel, committed on a 200 ms quiet timer** — nothing on screen said
   the roll could be seeked at all, and the commit fired on a guess about when the gesture had ended
-  rather than on anything the porter did. The overview bar above the roll is the affordance, and a
+  rather than on anything the porter did. The scrub bar over the roll is the affordance, and a
   pointer-up is a real end.
-- **`w-full` on the bar over the roll** — the pane is measured inside its vertical scrollbar
-  (`elementSize` reads the content box) and the bar is drawn outside it, so the `viewBox` stretched
-  over that gutter while the pointer maths, which is in client px against a raw `KEY_WIDTH`, did
-  not: the drawn window and the tick under the pointer disagreed by about a scrollbar's width on any
-  roll tall enough to scroll. It is `[style.width.px]="width()"`, which is the roll `<svg>`'s own
-  width, so one user unit is one CSS px in one shared space.
+- **One bar over the roll doing both jobs** — a drag on the song-wide bar panned the camera and
+  seeked the song at the end of the same gesture, so neither could be done alone: no way to look
+  ahead without moving the music, and none to move the music without moving the view. Two bars, one
+  job each — the overview scrolls (`roll-overview/`), the scrub bar seeks (`roll-scrub/`) — and a
+  scrub reaches past the pane by pulling the view along rather than by being song-wide, since a
+  timeline drawn in the roll's own coordinates is what puts the marker's tip on the playhead line.
+  The preview stays out of the camera for the same reason it is a preview at all: `playTick` reads
+  `songHead` and not `headTick`, or the music would slide sideways under the pointer and the marker
+  would snap back to `lead` the moment it was grabbed.
+- **`w-full` on the bars over the roll** — the pane is measured inside its vertical scrollbar
+  (`elementSize` reads the content box) and the bars are drawn outside it, so the `viewBox`
+  stretched over that gutter while the pointer maths did not, and the drawn window disagreed with
+  the tick under the pointer by about a scrollbar's width. Both are `[style.width.px]="width()"`,
+  which is the roll `<svg>`'s own width, so one user unit is one CSS px in one shared space.
 - **Template method calls per row** — the sample browser decoded 64 BRR samples on every
   change-detection pass, ten times a second while playing. Panels build one `computed` view model;
   the `no-call-expression` note in `eslint.config.js` says why lint cannot catch it.
@@ -309,7 +317,7 @@ One entry each: what it was, what it is, why.
   press checks `event.target.closest('.mark')` before it decides it is drawing.
 - **The roll's playhead line derived from `lead`** — the camera and the line were one number, so
   unticking Follow parked the line with the view and nothing in the roll said where the music had
-  got to: the line, the overview marker and the lit keys all froze together, and the frame clock was
+  got to: the line, the marker on the bars and the lit keys all froze together, and the frame clock was
   switched off with them. `lead` is the camera's alone; the line is the song's tick in the camera's
   coordinates (`xAtTick`), and the clip is what hides it once the song runs off the pane. Not a
   clamp to the edge either — a line held there would say the song was there.

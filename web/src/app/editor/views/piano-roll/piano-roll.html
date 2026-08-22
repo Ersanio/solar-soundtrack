@@ -41,9 +41,9 @@
   </ul>
 }
 
-<!-- The overview bar: the whole song at once, and the drag that seeks it. Outside
-     the roll's own scroller on purpose — a scroller that scrolled out of view
-     would be gone exactly when a tall song most needs it.
+<!-- The overview bar: the whole song at once, and the drag that scrolls the roll
+     through it. Outside the roll's own scroller on purpose — a scroller that
+     scrolled out of view would be gone exactly when a tall song most needs it.
 
      The channel picker sits over the corner the bar leaves empty, inside the
      same `@if` so the corner arrives with the bar it is a corner of. -->
@@ -57,9 +57,9 @@
       [bars]="minimap()"
       [playheadX]="overviewX()"
       [viewWindow]="overviewWindow()"
-      (scrubStart)="onScrubStart()"
-      (scrubTo)="onScrubTo($event)"
-      (scrubEnd)="onScrubEnd()"
+      (panStart)="onPanStart($event)"
+      (panTo)="onPanTo($event)"
+      (panEnd)="onPanEnd()"
     />
 
     <amk-roll-channels
@@ -70,6 +70,24 @@
       (isolated)="isolateChannel($event)"
     />
   </div>
+}
+
+<!-- The scrub bar: the roll's own timeline, and the drag that moves the song
+     along it. Directly over the roll, in the roll's coordinates, so the
+     marker's tip lands on the playhead line it is handed the x of. -->
+@if (scrubBox(); as box) {
+  <amk-roll-scrub
+    [box]="box"
+    [width]="width()"
+    [rollWidth]="rollWidth()"
+    [ticks]="songTicks()"
+    [marks]="lines()"
+    [scroll]="scroll()"
+    [playheadX]="playheadX()"
+    (scrubStart)="onScrubStart($event)"
+    (scrubTo)="onScrubTo($event)"
+    (scrubEnd)="onScrubEnd()"
+  />
 }
 
 <div
