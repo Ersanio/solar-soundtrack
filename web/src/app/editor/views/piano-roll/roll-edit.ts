@@ -1173,7 +1173,12 @@ function realiseRegion(
 function writeInto(context: EditContext, gap: Region, run: string): Edit | null {
   const { source, strip } = context;
   if (gap.after >= 0) {
-    return insertAt(strip.items[gap.after].unitSpan.end, ` ${run}`, 1);
+    // After the last thing written in the region, which for a region holding
+    // nothing is the note before it. A `/` or a command written between that
+    // note and the region's own items stands on the boundary the two meet at,
+    // and the run belongs after it: put in front, a marker would come out a
+    // whole region late, and every channel resumes from its own on each pass.
+    return insertAt(strip.items[gap.before - 1].unitSpan.end, ` ${run}`, 1);
   }
 
   const next = strip.items[gap.before] ?? strip.items[0];
@@ -1258,9 +1263,8 @@ function rested(rests: readonly StripItem[], from: number): number {
  */
 function spawnRun(
   context: EditContext,
-  born: PlacedNote,
-  before: number,
-  after: number,
+  born: readonly PlacedNote[],
+  gaps: readonly number[],
   running: number | null,
   introAt: number | null,
   exitOctave: number | null,
@@ -1269,6 +1273,14 @@ function spawnRun(
   const parts: string[] = [];
   let at = 0;
   let marked = introAt === null;
+  /**
+   * The octave the run has left standing so far.
+   *
+   * Carried from note to note for the reason {@link noteText} takes it at all:
+   * a run that writes two notes an octave apart spells the second's `o` and a
+   * run that writes two in one octave spells it once.
+   */
+  let inForce = running;
 
   /** The marker where the tick falls between two pieces rather than inside one. */
   const mark = (): void => {
@@ -1310,15 +1322,22 @@ function spawnRun(
     return true;
   };
 
-  const note = (): boolean => {
-    const split = splitAt(born.ticks);
+  /** The octave a note leaves standing: its own, or what it was handed if a drum. */
+  const leftBy = (each: PlacedNote, exit: number | null): number | null =>
+    each.drum === null ? (exit ?? octaveFor(each.written)) : inForce;
+
+  // Only the last note in the run puts an octave back, since only the last one
+  // is what the text after the run reads.
+  const note = (each: PlacedNote, last: boolean): boolean => {
+    const exit = last ? exitOctave : null;
+    const split = splitAt(each.ticks);
     if (split !== null) {
       const first = spellDuration(split - at, targetAMKVersion);
-      const second = spellDuration(at + born.ticks - split, targetAMKVersion);
-      const head = first === null ? null : noteText(born, first, null, targetAMKVersion, running);
+      const second = spellDuration(at + each.ticks - split, targetAMKVersion);
+      const head = first === null ? null : noteText(each, first, null, targetAMKVersion, inForce);
       // The `^` is where the note ends, so the octave goes after it rather than
       // between the two halves.
-      const put = exitText(born, exitOctave);
+      const put = exitText(each, exit);
       if (head === null || second === null || put === null) {
         return false;
       }
@@ -1326,7 +1345,7 @@ function spawnRun(
       parts.push(head, '/', `^${second}${put}`);
       marked = true;
     } else {
-      const whole = noteText(born, null, exitOctave, targetAMKVersion, running);
+      const whole = noteText(each, null, exit, targetAMKVersion, inForce);
       if (whole === null) {
         return false;
       }
@@ -1334,22 +1353,26 @@ function spawnRun(
       parts.push(whole);
     }
 
-    at += born.ticks;
+    at += each.ticks;
+    inForce = leftBy(each, exit);
     return true;
   };
 
   mark();
-  if (!rest(before)) {
-    return null;
+  for (let index = 0; index < born.length; index++) {
+    if (!rest(gaps[index])) {
+      return null;
+    }
+
+    mark();
+    if (!note(born[index], index === born.length - 1)) {
+      return null;
+    }
+
+    mark();
   }
 
-  mark();
-  if (!note()) {
-    return null;
-  }
-
-  mark();
-  if (!rest(after)) {
+  if (!rest(gaps[born.length])) {
     return null;
   }
 
@@ -1388,12 +1411,51 @@ function restFor(gap: Region, born: PlacedNote): StripItem | null {
 }
 
 /**
+ * Whether the region's items are written one after another with nothing but
+ * whitespace between them.
+ *
+ * A `v`, a `y`, a `$ED` or the intro `/` carries no ticks of its own but does
+ * carry a **position**: the tick of the item boundary it stands at. A run laid
+ * over the whole region moves every boundary strictly inside it, so one written
+ * between two items would come out on a different tick, and only the porter
+ * knows which of the two it belongs with. One written before the first item or
+ * after the last stands on a boundary the region does not move — where it meets
+ * the surviving note either side — and stays exactly where it is, which is why
+ * only the interior is read.
+ */
+function itemsRunTogether(context: EditContext, gap: Region): boolean {
+  const { source, strip } = context;
+  for (let index = gap.after + 2; index < gap.before; index++) {
+    const between = source.slice(
+      strip.items[index - 1].unitSpan.end,
+      strip.items[index].unitSpan.start,
+    );
+    if (between.trim() !== '') {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+/**
  * A note being created, written into the gap it lands in.
  *
- * The gap has to hold nothing but rests — the note goes over the one it falls
- * inside (see {@link restFor}) — or be empty text at the end of the channel, or
- * a channel with nothing written on it at all. A note being deleted in the same
- * region is refused rather than guessed at.
+ * Two roads, and which one is taken is what decides whether anything written in
+ * the region may move.
+ *
+ * **In place.** The note goes over the one rest it falls inside
+ * (see {@link restFor}), and everything else in the region stays exactly where
+ * it was written. This is the road for a region holding several rests with
+ * something positional between them, and it takes one note at a time.
+ *
+ * **Laid out afresh.** Where the region's items run together
+ * ({@link itemsRunTogether}) there is nothing inside it carrying a position, so
+ * the whole stretch is written as one run of rests and notes. That is what lets
+ * a region hold more than one note being created — a carve's split leaves a
+ * tail beside the note that split it — and notes this same plan is removing,
+ * whose units `planEdits` deletes on its own and whose spans only ever abut this
+ * run rather than overlap it.
  *
  * A builder answering `null` is refused too, rather than passed on as no edits:
  * `planEdits` pushes what each region returns and goes on to the next, so a note
@@ -1405,11 +1467,12 @@ function spawnInto(
   survivors: ReadonlyMap<number, PlacedNote>,
 ): Edit[] | null {
   const { source, strip } = context;
-  if (gap.born.length !== 1) {
+  if (gap.born.length === 0) {
     return null;
   }
 
-  const born = gap.born[0];
+  const order = [...gap.born].sort((a, b) => a.startTick - b.startTick);
+  const born = order[order.length - 1];
   const empty = strip.items.length === 0;
   // A channel being written from nothing has just had its own `o4` put in front
   // of it, so a note in that octave has nothing to add (`channelOpening`).
@@ -1446,11 +1509,22 @@ function spawnInto(
    */
   const single = gap.rests.length === 1 && gap.between === 1;
   const settled = gap.ticks < 0 || gap.ticks === rested(gap.rests, 0);
-  const over = single
-    ? gap.rests[0]
-    : gap.between === gap.rests.length && settled
-      ? restFor(gap, born)
-      : null;
+  const inPlace = order.length === 1 && gap.between === gap.rests.length && settled;
+
+  /** Whether the run answers to the whole region rather than to one rest inside it. */
+  let laidOut = true;
+  let over: StripItem | null;
+  if (single) {
+    over = gap.rests[0];
+  } else if (inPlace) {
+    over = restFor(gap, born);
+    laidOut = false;
+  } else if (itemsRunTogether(context, gap)) {
+    over = gap.rests[0] ?? null;
+  } else {
+    return null;
+  }
+
   if (over === null && gap.rests.length > 0) {
     return null;
   }
@@ -1459,19 +1533,36 @@ function spawnInto(
   // drawn past the end of a channel at all.
   const grows = gap.ticks < 0 && (over === null || over === gap.rests[gap.rests.length - 1]);
 
-  const before = born.startTick - (over ? over.startTick : gap.startTick);
-  const after = grows
-    ? Math.max(0, channelEnd - end)
-    : (single || over === null ? gap.startTick + gap.ticks : over.startTick + over.ticks) - end;
-  if (before < 0 || after < 0) {
+  const runFrom = laidOut || over === null ? gap.startTick : over.startTick;
+  const runTo = grows
+    ? Math.max(end, channelEnd)
+    : laidOut || over === null
+      ? gap.startTick + gap.ticks
+      : over.startTick + over.ticks;
+
+  /** One rest before each note, and one more after the last — `order.length + 1`. */
+  const gaps: number[] = [];
+  let at = runFrom;
+  for (const each of order) {
+    if (each.startTick < at) {
+      return null;
+    }
+
+    gaps.push(each.startTick - at);
+    at = each.startTick + each.ticks;
+  }
+
+  if (runTo < at) {
     return null;
   }
+
+  gaps.push(runTo - at);
 
   // The tick the song loops back to, where this channel is being opened and the
   // run is long enough to reach it. `gap.startTick` is 0 for an empty channel —
   // it has one region and it begins at the top — so the run's own ticks and the
   // channel's are the same count.
-  const total = before + born.ticks + after;
+  const total = runTo - runFrom;
   const introAt =
     empty && context.introTicks !== null && context.introTicks >= 0 && context.introTicks <= total
       ? context.introTicks
@@ -1483,7 +1574,11 @@ function spawnInto(
    * writes none at all and so leaves whatever stood.
    */
   const leaves = born.drum === null ? octaveFor(born.written) : null;
-  const reader = noteFrom(strip, gap.after + 1);
+  // The next *surviving* note, which is what bounds the region — `noteFrom`
+  // would find the first note item, and that may be one this plan is removing:
+  // an octave inserted at its head is an edit inside a range being deleted, and
+  // two edits over one run of text is what `planEdits` refuses.
+  const reader = gap.before < strip.items.length ? gap.before : -1;
 
   /**
    * The note that reads the octave the run leaves, and so has to be given the
@@ -1536,15 +1631,7 @@ function spawnInto(
    */
   const untouched = standing !== null && standing === owed && standing === leaves;
 
-  const run = spawnRun(
-    context,
-    born,
-    before,
-    after,
-    opening ? OPENING_OCTAVE : inForce,
-    introAt,
-    trailing,
-  );
+  const run = spawnRun(context, order, gaps, opening ? OPENING_OCTAVE : inForce, introAt, trailing);
   if (run === null) {
     return null;
   }
@@ -1559,21 +1646,26 @@ function spawnInto(
     restore = insertAt(strip.items[reader].unitSpan.start, `${spelled} `, 1);
   }
 
-  // Nothing at all between the notes either side, so the run is inserted rather
-  // than written over anything.
-  const edit = over
-    ? spliceRange(source, over.unitSpan, run)
-    : gap.rests.length === 0 && gap.between === 0
-      ? writeInto(context, gap, run)
-      : null;
+  // No rest to write over — the region holds nothing, or nothing but notes this
+  // plan is removing — so the run is inserted rather than written over anything.
+  const edit = over ? spliceRange(source, over.unitSpan, run) : writeInto(context, gap, run);
   if (edit === null) {
     return null;
   }
 
+  // A run laid out afresh is the whole region's ticks, so the rests it did not
+  // go over are gone: what they held is in the run now. Each goes as its own
+  // edit rather than the whole stretch going as one splice, since anything
+  // between them is a unit `planEdits` is removing and two edits over one run of
+  // text is what it refuses.
+  const gone = laidOut
+    ? gap.rests.filter((rest) => rest !== over).flatMap((rest) => removeItem(source, rest))
+    : [];
+
   // The run first where the two land on the same offset — a run inserted at the
   // head of the note it is being written in front of — so `coalesce` joins them
   // in the order they are read.
-  return restore ? [edit, restore] : [edit];
+  return restore ? [edit, ...gone, restore] : [edit, ...gone];
 }
 
 export function planEdits(context: EditContext, plan: Plan): Edit[] | null {
