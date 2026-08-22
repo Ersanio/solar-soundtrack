@@ -192,7 +192,7 @@ commits, so what is drawn cannot disagree with what lands. A plan that is refuse
 `planEdits` at all.
 
 Its **`EditMode`** is what an overlap does, and it is the porter's setting rather than the gesture's:
-`strict` refuses one and `flexible` shoves the notes in the way aside, for drawing, dragging,
+`strict` refuses one and `insert` shoves the notes in the way aside, for drawing, dragging,
 stretching and quantizing alike. A cascade never moves a note the gesture is placing itself — the
 `fixed` set — so a selection cannot shove itself, and an overlap it could not clear is reported as a
 clash rather than as a third outcome. The inspector's own length slider is not on this path at all:

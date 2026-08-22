@@ -93,7 +93,7 @@ and putting them on the wheel would double the turns it takes to cross.
 one note at a time, so that is something the roll has to answer one way or the other, and this is
 where you say which:
 
-- **Flexible** moves the notes in the way out of the way, shown as striped outlines while you drag.
+- **Insert** moves the notes in the way out of the way, shown as striped outlines while you drag.
   They go in the direction you are dragging, and the notes they run into go with them.
 - **Strict** never writes an overlap. The bar turns red, the ticks where the two would sound at once
   are washed red down the whole roll, and letting go changes nothing.
@@ -107,7 +107,7 @@ slider in the inspector, which writes one note's own length and never looks at i
 - **No chords.** A channel plays one note at a time, so two notes can never overlap. What a gesture
   does about that is the **Edits** setting above, and it is the same answer for every gesture.
 - **A push can run out of room.** The start of the channel is the end of the road for notes being
-  shoved left, and a selection cannot shove its own notes aside to make space for itself. Flexible
+  shoved left, and a selection cannot shove its own notes aside to make space for itself. Insert
   mode says so the way strict mode does — red, and nothing committed.
 - **A gap is a rest.** The space between two notes is the rest between them, and moving a note
   rewrites that rest rather than moving anything else. Anything you wrote inside the gap keeps its

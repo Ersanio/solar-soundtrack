@@ -242,7 +242,7 @@ interface Expectation {
 	 */
 	loopsWhereItDid?: boolean;
 	/**
-	 * The mode the gesture is planned under, `"flexible"` unless a case says otherwise.
+	 * The mode the gesture is planned under, `"insert"` unless a case says otherwise.
 	 *
 	 * Most cases here never make two notes sound at once, and those read the same
 	 * either way; the ones that do name the mode they are pinning.
@@ -278,7 +278,7 @@ function expectEdit(
 		introTicks: introOf(before),
 		channels: tailsOf(source, before),
 	};
-	const plan = planGesture(bar, gesture(bar), expectation.mode ?? "flexible");
+	const plan = planGesture(bar, gesture(bar), expectation.mode ?? "insert");
 	const edits = planEdits(context, plan);
 	if (edits === null) {
 		check(`${name}: the gesture can be written`, false, plan.refused ?? "planEdits refused");
@@ -399,7 +399,7 @@ function expectRefused(
 	source: string,
 	channel: number,
 	gesture: (strip: Strip) => Gesture,
-	mode: EditMode = "flexible",
+	mode: EditMode = "insert",
 ): void {
 	const made = planFor(name, source, channel, gesture, mode);
 	if (made) {
@@ -422,7 +422,7 @@ function expectCarried(
 	gesture: (strip: Strip) => Gesture,
 	froms: readonly number[],
 	because: string | null = null,
-	mode: EditMode = "flexible",
+	mode: EditMode = "insert",
 ): void {
 	const made = planFor(name, source, channel, gesture, mode);
 	if (!made) {
@@ -926,9 +926,9 @@ expectEdit("a whole selection moves as one edit list", "#amk 2\n#0 o4 r4 c8 d8 e
 	copy: false,
 }));
 
-// --- flexible mode: the notes in the way move aside ------------------------
+// --- insert mode: the notes in the way move aside --------------------------
 
-console.log("\nflexible");
+console.log("\ninsert");
 expectEdit("a note dragged onto the one after it, pushing it right", "#amk 2\n#0 o4 c4 d4 e4", 0, (bar) => ({
 	kind: "move",
 	items: [noteAt(bar, 0)],
@@ -980,7 +980,8 @@ expectRefused(
 	"strict",
 );
 
-// The gesture the mode inverts: this is what `flexible` pushes through at :385.
+// The gesture the mode inverts: this is what `insert` pushes through, in the
+// stretch case above.
 expectRefused(
 	"a note stretched into its neighbour, strictly",
 	"#amk 2\n#0 o4 c4 d4 e4",

@@ -100,7 +100,7 @@ export interface Settings {
    * What a gesture does when it would make two notes sound at once.
    *
    * The roll's answer rather than the gesture's: a stretch and a drag both push
-   * in `flexible` and both refuse in `strict`, so the outcome does not depend on
+   * in `insert` and both refuse in `strict`, so the outcome does not depend on
    * which part of a bar the press landed on. It reaches the roll only —
    * the inspector's own length slider writes one argument and knows nothing
    * about its neighbours.
@@ -172,7 +172,9 @@ export function readSettings(): Settings {
     percussionOpen: false,
     editChannel: null,
     snap: 'beat',
-    editMode: 'strict',
+    // The first mode in the table, which is what makes that table's order the
+    // one place the default, the fallback and the `<select>`'s order are set.
+    editMode: EDIT_MODES[0],
     lastLength: TICKS_PER_WHOLE / 4,
   };
 

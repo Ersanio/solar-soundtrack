@@ -67,12 +67,16 @@ export type Gesture =
 
 /**
  * What the roll does when a gesture would make two notes sound at once:
- * `strict` refuses it, `flexible` shifts the notes in the way aside.
+ * `strict` refuses it, `insert` shifts the notes in the way aside.
  *
  * The porter's setting rather than the gesture's, so a drag and a stretch answer
  * an overlap the same way.
+ *
+ * The order is the mechanism rather than presentation: the toolbar's `<select>`
+ * lists the table itself, and `readSettings` takes its default and its fallback
+ * for an unreadable stored value from the first entry.
  */
-export const EDIT_MODES = ['strict', 'flexible'] as const;
+export const EDIT_MODES = ['strict', 'insert'] as const;
 export type EditMode = (typeof EDIT_MODES)[number];
 
 export interface EditContext {

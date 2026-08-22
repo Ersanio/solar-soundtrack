@@ -91,7 +91,7 @@ export class RollToolbar {
   protected readonly editModes = EDIT_MODES;
   protected readonly editModeLabels: Record<EditMode, string> = {
     strict: 'Strict',
-    flexible: 'Flexible',
+    insert: 'Insert',
   };
 
   /**
