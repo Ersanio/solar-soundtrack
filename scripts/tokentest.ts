@@ -714,6 +714,54 @@ console.log("\ncommands carry the channel they were written under");
 	);
 }
 
+console.log("\na remote code definition is marked, and is not the starting channel's music");
+{
+	// Music.cpp:1015 tells a definition from a call by position alone, so one can
+	// only sit above the first `#N` and its brackets gather on the starting
+	// channel. The body compiles to the loop block and runs where a `$FC` fires
+	// it, which is what the mark says and `channel` cannot.
+	const source = "#amk 2\n(!1)[$F4 $02]\n#0 [c4]2\n";
+	const { commands } = tokenize(source);
+	const marked = commands.filter((c) => c.inRemoteDefinition);
+	check("the body and both its brackets are marked", marked.length === 3, String(marked.length));
+	check(
+		"and are still reported on the starting channel",
+		marked.every((c) => c.channel === 0),
+	);
+	check(
+		"the channel's own loop below the marker is not",
+		commands.filter((c) => c.span.start > source.indexOf("#0")).every((c) => c.inRemoteDefinition === undefined),
+	);
+
+	// `[` inside `[[` is allowed (parser.ts:parseLoopStart), so the body's own
+	// brackets are counted rather than the first `]` closing the definition.
+	const nested = tokenize("#amk 2\n(!1)[ [[ $F4 $02 ]]2 ]\n#0 c4\n").commands;
+	check(
+		"a subloop inside a body does not close it early",
+		nested.filter((c) => c.inRemoteDefinition).length === 7,
+		String(nested.filter((c) => c.inRemoteDefinition).length),
+	);
+	check("and the note below the marker is left clear", nested.at(-1)?.inRemoteDefinition === undefined);
+
+	// Below the marker the same syntax is a call, and `(` and `!` are not command
+	// kinds — so there is nothing there to mark either way.
+	const called = "#amk 2\n(!1)[$F4 $02]\n#0 c4 (!1, 1, 8) d4\n";
+	check(
+		"a remote call below the marker is not marked",
+		tokenize(called)
+			.commands.filter((c) => c.span.start > called.indexOf("#0"))
+			.every((c) => c.inRemoteDefinition === undefined),
+	);
+
+	// A `[ ]` above the first `#N` that no `(!n)` armed is the starting channel's
+	// own music, and is marked by nothing.
+	const plain = tokenize("#amk 2\n[$F4 $02]2\n#0 c4\n").commands;
+	check(
+		"a plain loop above the marker stays the channel's own",
+		plain.every((c) => c.inRemoteDefinition === undefined) && plain.some((c) => c.kind === "["),
+	);
+}
+
 console.log("\nlookup");
 {
 	const source = "#amk 4\n#0 $F5 $7F $00 $00 $00 $00 $00 $00 $00\n";

@@ -211,6 +211,14 @@ function forbiddenConstruct(index: TokenIndex, channel: number, source: string):
       continue;
     }
 
+    // A remote definition sits above the first `#N` and so gathers on this
+    // channel, but its body runs only where a `$FC` fires it and plays none of
+    // what is written here twice. Left in `growUnits`'s list all the same: a `]`
+    // it cannot lead a unit with is a barrier there.
+    if (command.inRemoteDefinition) {
+      continue;
+    }
+
     if (command.replacement !== undefined || command.headReplacement !== undefined) {
       return 'this channel is written through a "name=value" replacement';
     }

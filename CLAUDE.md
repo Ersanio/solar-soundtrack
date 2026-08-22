@@ -517,6 +517,17 @@ stats.loopTicks` pads **every other channel that would cut the song short** out 
   grid _is_ (a note pinned at the press with its end on the pointer) and merely _constrains_ a drag
   already under way (locked to its row), and those settle at different times. `anchored` is read at
   the press and never again; `shift` is refreshed on every move, as `fine` is.
+- **Counting a remote code definition's `[ ]` against the starting channel** — AddmusicK tells a
+  definition from a call by nothing but position (`Music.cpp:1015`), so `(!1)[ … ]` always sits above
+  the first `#N` and its brackets gather on the starting channel like everything up there. That
+  refused channel 0 outright on every song with one, and pointed at Normalize, which leaves remote
+  code alone by design and could never clear it. `gather` marks the body and both its brackets
+  `inRemoteDefinition` and the roll's gate skips them. Not by exempting everything above the first
+  `#N` — a `[ ]` written up there that no `(!n)` armed is the channel's own music and does play it
+  twice — and not by giving the body `channel: 8` the way the compiler's `commandMap` does, which
+  would be right for the roll and wrong for the echo hazards and the FIR designer, who would lose a
+  `$F1` written inside a body. The commands stay in `growUnits`'s list too, where a `]` that cannot
+  lead a unit is a barrier.
 
 ## Angular specifics
 
