@@ -1058,6 +1058,30 @@ expectEdit(
 	{ mode: "strict", playsAsLong: true },
 );
 
+// And insert, which pushes only what the drag lands on: a drag that clears its
+// neighbour lands on nothing, so there is nothing to push and it commits the
+// crossing like the other two. The hole was never in the modes — it was in the
+// writer all three of them share.
+expectEdit(
+	"a note dragged past another into free space, inserting",
+	"#amk 2\n#0 o4 c8 d8 r4 e8",
+	0,
+	(bar) => ({ kind: "move", items: [noteAt(bar, 0)], deltaTicks: 48, deltaKeys: 0, copy: false }),
+	{ mode: "insert", playsAsLong: true },
+);
+
+// Carried past another *and* past the end of the song, so the note that moved
+// still has to pad every other channel out to meet it. `reach` reads the plan's
+// own `touched`, which the lifting-out does not disturb — and `playsFor` is the
+// only reading that catches a rest of the wrong length.
+expectEdit(
+	"a note carried past another and past the end of the song",
+	"#amk 2\n#0 o4 c8 d8\n#1 o4 c8 d8\n",
+	0,
+	(bar) => ({ kind: "move", items: [noteAt(bar, 0)], deltaTicks: 72, deltaKeys: 0, copy: false }),
+	{ mode: "overwrite", playsFor: 96 },
+);
+
 // A crossing and a carve in the one gesture: `c8` passes over `d8` and lands on
 // the head of `e4`.
 expectEdit(
@@ -1372,6 +1396,28 @@ expectCarried(
 		copy: false,
 	}),
 	[0],
+);
+
+// A note carried past another is written again on the far side, and it is still
+// the note the porter has hold of. Which is why the lifting-out happens in
+// `planEdits` and not in `planGesture`: the plan is what the roll draws, so a
+// note demoted a step earlier would carry `from: -1` here, the song's own bar
+// for it would stay on screen under the drag, and every crossing would look like
+// a copy being made.
+expectCarried(
+	"a note carried past another is still carried",
+	"#amk 2\n#0 o4 c8 d8 e8",
+	0,
+	(bar) => ({
+		kind: "move",
+		items: [noteAt(bar, 0)],
+		deltaTicks: 48,
+		deltaKeys: 0,
+		copy: false,
+	}),
+	[0],
+	null,
+	"overwrite",
 );
 
 // A copy has no original to leave out, so `Ctrl`+drag keeps both bars on screen.

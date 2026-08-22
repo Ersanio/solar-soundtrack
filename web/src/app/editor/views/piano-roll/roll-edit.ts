@@ -18,8 +18,12 @@ import type { ChannelTail, Strip, StripItem } from './roll-strip';
  * {@link planGesture} is arithmetic over ticks: where every note ends up, which
  * ones a push moved, and where two would sound at once. It is what the roll
  * draws while the pointer is still down, and it decides everything.
- * {@link planEdits} turns an accepted plan into splices and decides nothing —
- * a plan that is refused never reaches it.
+ * {@link planEdits} turns an accepted plan into splices. It decides nothing
+ * about the **music** — which notes there are, on which tick, at which pitch,
+ * are all settled before it is called, and a plan that is refused never reaches
+ * it — and everything about the **spelling**, down to whether a note is
+ * rewritten where it stands or lifted out and written again on the far side of
+ * one it was carried past. It can also refuse a spelling it cannot produce.
  *
  * Neither knows about Angular, the DOM or pixels, so `rolltest` drives both
  * against a real compile and checks the result by walking it.
@@ -1722,7 +1726,7 @@ export function planEdits(context: EditContext, plan: Plan): Edit[] | null {
   // moved out of `survivors`, which is all it takes: the loop below removes the
   // unit of anything it does not find there, and `regionsOf` hands a born note
   // to the region its new tick lands in.
-  for (const index of crossings(survivors, plan.touched)) {
+  for (const index of crossings(strip, survivors)) {
     const note = survivors.get(index);
     if (!note) {
       continue;
@@ -1946,7 +1950,6 @@ function coalesce(sorted: readonly Edit[]): Edit[] {
   return joined;
 }
 
-/** The stretches of text between the surviving notes, with what belongs in each. */
 /**
  * The notes whose place in the text is no longer their place in the music.
  *
@@ -1956,22 +1959,24 @@ function coalesce(sorted: readonly Edit[]): Edit[] {
  * one of its neighbours breaks that, and the note has to be written again on the
  * far side rather than rewritten where it stands.
  *
- * Only a note the gesture moved can break it. Everything else either stays
- * exactly where it was or is carved, and a carve only ever trims a note's head
- * or tail — it cannot carry one past its own end, let alone past a neighbour —
- * so the notes the gesture left alone keep their order among themselves whatever
- * else happens. Which is why taking the movers out is enough to put the rest
- * back in agreement, rather than the first step of a search.
+ * Only a note that ended up somewhere other than where it is written can break
+ * it, which is the test rather than membership of {@link Plan.touched}: a push
+ * moves notes the gesture never named, and a carve trims a head, so "the gesture
+ * moved it" is not the same question. The ones still on their own tick are in
+ * text order by construction — a channel's ticks are the running sum of its
+ * durations — so taking the movers out is enough to put the rest back in
+ * agreement rather than the first step of a search.
+ *
+ * A note that moved cannot always cross, and this asks anyway: a push settles a
+ * note against the edge that displaced it, so getting past a neighbour would
+ * mean lying across it, and an overlap no push resolved is a clash `committable`
+ * has already turned the plan away for.
  */
-function crossings(
-  survivors: ReadonlyMap<number, PlacedNote>,
-  touched: readonly PlacedNote[],
-): number[] {
+function crossings(strip: Strip, survivors: ReadonlyMap<number, PlacedNote>): number[] {
   const crossed: number[] = [];
-  for (const note of touched) {
-    const at = note.from;
-    if (at < 0 || !survivors.has(at)) {
-      continue; // Already being written afresh, or not a note of this channel's text.
+  for (const [at, note] of survivors) {
+    if (note.startTick === strip.items[at].startTick) {
+      continue; // Where it is written, so nothing can have got past it.
     }
 
     for (const [index, other] of survivors) {
@@ -1986,6 +1991,7 @@ function crossings(
   return crossed;
 }
 
+/** The stretches of text between the surviving notes, with what belongs in each. */
 function regionsOf(
   strip: Strip,
   survivors: ReadonlyMap<number, PlacedNote>,
