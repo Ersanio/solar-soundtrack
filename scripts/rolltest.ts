@@ -989,6 +989,134 @@ expectEdit(
 	{ mode: "overwrite", playsAsLong: true, lacks: "d" },
 );
 
+// --- a note carried *past* another ------------------------------------------
+//
+// The text is a sequence and a channel's positions are the running sum of its
+// durations, so a note that crosses another has to be written somewhere else
+// entirely: its unit comes out and it goes back in on the far side. Nothing but
+// `plays what the plan said` catches a failure here — the text of a channel
+// whose notes have all slid along reads perfectly well, and only walking it
+// says they are on the wrong ticks.
+
+expectEdit(
+	"a note dragged right past the one after it",
+	"#amk 2\n#0 o4 c8 d8 e8",
+	0,
+	(bar) => ({ kind: "move", items: [noteAt(bar, 0)], deltaTicks: 48, deltaKeys: 0, copy: false }),
+	// The whole shape of the fix in one line: `c8`'s unit is gone from the front,
+	// a rest stands where it was, `d8` is handed back the `o4` that left with it,
+	// and `c8` is written again on the far side. `e8` gave up all its ticks to it.
+	{ mode: "overwrite", playsAsLong: true, text: "#amk 2\n#0 r8 o4 d8 c8" },
+);
+
+// The channel really is shorter afterwards, and that is not the carve: the last
+// note is the one that moved, and it took the end of the channel with it. Only
+// `c8`, which it landed on, gave up any ticks. `playsFor` rather than
+// `playsAsLong` for that reason — the mode's promise is about what a carve
+// costs, and a note leaving the end is a move.
+expectEdit(
+	"a note dragged left past the one before it",
+	"#amk 2\n#0 o4 c8 d8 e8",
+	0,
+	(bar) => ({ kind: "move", items: [noteAt(bar, 2)], deltaTicks: -48, deltaKeys: 0, copy: false }),
+	// The `o4 o4` is one octave more than the text needs and is pinned rather than
+	// endorsed: the run written into the head region hands `d8` its octave, and
+	// the main loop hands it one too, having watched the unit that carried the
+	// channel's own `o4` be removed. Neither can see the other — one runs over
+	// the items and one over the regions — so both write. It is stable at two
+	// however many times the channel is edited, and `growUnits` gives both to
+	// `d8`'s unit on the next pass, which is why nothing downstream trips on it.
+	{ mode: "overwrite", playsFor: 48, text: "#amk 2\n#0 o4 e8 o4 o4 d8" },
+);
+
+// A note still ending the channel holds its length, and then the crossing costs
+// it nothing: `e8` goes to the front over `c8`, and the gap it left is a rest.
+expectEdit(
+	"a note dragged left past the one before it, with a note still ending the channel",
+	"#amk 2\n#0 o4 c8 d8 e8 f8",
+	0,
+	(bar) => ({ kind: "move", items: [noteAt(bar, 2)], deltaTicks: -48, deltaKeys: 0, copy: false }),
+	{ mode: "overwrite", playsAsLong: true },
+);
+
+expectEdit(
+	"a note dragged past two of them at once",
+	"#amk 2\n#0 o4 c8 d8 e8 f8 r2",
+	0,
+	(bar) => ({ kind: "move", items: [noteAt(bar, 0)], deltaTicks: 72, deltaKeys: 0, copy: false }),
+	{ mode: "overwrite", playsAsLong: true },
+);
+
+// Overwrite is where it is easy to reach, but the hole is in the writer, which
+// every mode shares: a jump into free space clashes with nothing, so strict says
+// yes to it too.
+expectEdit(
+	"a note dragged past another into free space, in strict",
+	"#amk 2\n#0 o4 c8 d8 r4 e8",
+	0,
+	(bar) => ({ kind: "move", items: [noteAt(bar, 0)], deltaTicks: 48, deltaKeys: 0, copy: false }),
+	{ mode: "strict", playsAsLong: true },
+);
+
+// And insert, which pushes only what the drag lands on: a drag that clears its
+// neighbour lands on nothing, so there is nothing to push and it commits the
+// crossing like the other two. The hole was never in the modes — it was in the
+// writer all three of them share.
+expectEdit(
+	"a note dragged past another into free space, inserting",
+	"#amk 2\n#0 o4 c8 d8 r4 e8",
+	0,
+	(bar) => ({ kind: "move", items: [noteAt(bar, 0)], deltaTicks: 48, deltaKeys: 0, copy: false }),
+	{ mode: "insert", playsAsLong: true },
+);
+
+// Carried past another *and* past the end of the song, so the note that moved
+// still has to pad every other channel out to meet it. `reach` reads the plan's
+// own `touched`, which the lifting-out does not disturb — and `playsFor` is the
+// only reading that catches a rest of the wrong length.
+expectEdit(
+	"a note carried past another and past the end of the song",
+	"#amk 2\n#0 o4 c8 d8\n#1 o4 c8 d8\n",
+	0,
+	(bar) => ({ kind: "move", items: [noteAt(bar, 0)], deltaTicks: 72, deltaKeys: 0, copy: false }),
+	{ mode: "overwrite", playsFor: 96 },
+);
+
+// A crossing and a carve in the one gesture: `c8` passes over `d8` and lands on
+// the head of `e4`.
+expectEdit(
+	"a note dragged past one note and onto the next",
+	"#amk 2\n#0 o4 c8 d8 e4",
+	0,
+	(bar) => ({ kind: "move", items: [noteAt(bar, 0)], deltaTicks: 60, deltaKeys: 0, copy: false }),
+	{ mode: "overwrite", playsAsLong: true },
+);
+
+// The whole selection crosses, so every one of them has to be written again.
+expectEdit(
+	"two notes dragged past a third together",
+	"#amk 2\n#0 o4 c8 d8 e8 r2",
+	0,
+	(bar) => ({
+		kind: "move",
+		items: [noteAt(bar, 0), noteAt(bar, 1)],
+		deltaTicks: 72,
+		deltaKeys: 0,
+		copy: false,
+	}),
+	{ mode: "overwrite", playsAsLong: true },
+);
+
+// A crossing keeps the note's own drum, since the lane is the instrument rather
+// than the pitch and the `@21` travels with it.
+expectEdit(
+	"a drum dragged past the note after it",
+	"#amk 2\n#0 o4 @21 c8 @0 o4 d8 e8",
+	0,
+	(bar) => ({ kind: "move", items: [noteAt(bar, 0)], deltaTicks: 48, deltaKeys: 0, copy: false }),
+	{ mode: "overwrite", playsAsLong: true, contains: "@21" },
+);
+
 expectEdit(
 	"a note stretched into the one after it, which gives up its head",
 	"#amk 2\n#0 o4 c4 d4 e4",
@@ -1239,6 +1367,18 @@ expectRefused("a note shortened past the command written inside it", "#amk 2\n#0
 	deltaTicks: -60,
 }));
 
+// Carrying a note past another takes its whole unit out and writes it again on
+// the far side, and the command written inside this one sits in that unit. It
+// would go with it, and which side of the note it belongs on afterwards is not
+// something a drag says — so the crossing is refused rather than guessed at.
+expectRefused(
+	"a note with a command inside it dragged past another",
+	"#amk 2\n#0 o4 c8 v200 ^8 d8 e8",
+	0,
+	(bar) => ({ kind: "move", items: [noteAt(bar, 0)], deltaTicks: 72, deltaKeys: 0, copy: false }),
+	"overwrite",
+);
+
 console.log("\nwhat a drag carries");
 
 // `Plan.touched` is what the roll draws in the preview and leaves out of the
@@ -1256,6 +1396,28 @@ expectCarried(
 		copy: false,
 	}),
 	[0],
+);
+
+// A note carried past another is written again on the far side, and it is still
+// the note the porter has hold of. Which is why the lifting-out happens in
+// `planEdits` and not in `planGesture`: the plan is what the roll draws, so a
+// note demoted a step earlier would carry `from: -1` here, the song's own bar
+// for it would stay on screen under the drag, and every crossing would look like
+// a copy being made.
+expectCarried(
+	"a note carried past another is still carried",
+	"#amk 2\n#0 o4 c8 d8 e8",
+	0,
+	(bar) => ({
+		kind: "move",
+		items: [noteAt(bar, 0)],
+		deltaTicks: 48,
+		deltaKeys: 0,
+		copy: false,
+	}),
+	[0],
+	null,
+	"overwrite",
 );
 
 // A copy has no original to leave out, so `Ctrl`+drag keeps both bars on screen.
