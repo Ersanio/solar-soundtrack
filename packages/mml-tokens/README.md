@@ -116,6 +116,15 @@ markers below the line. One departure: the compiler's probe is a substring searc
 preprocessed text, so a `#0` inside a `"…"` string or an untaken `#if` branch counts there and not
 here.
 
+One thing up there is not that channel's music: a `(!n)[ … ]` remote definition. AddmusicK tells a
+definition from a call by position alone — `channelDefined` latches on the first `#N` and never
+clears, Music.cpp:1015 — so every definition is above the marker and its brackets gather on the
+starting channel with the rest. The body compiles to the loop block and runs only where a `$FC`
+fires it, and `Command.inRemoteDefinition` is what says so. `channel` is left as it is rather than
+made 8: a `$F1` written inside a body still belongs with the channel's other echo commands, and a
+reader that wants only what the channel itself plays asks for the flag. The piano roll's edit gate
+is the one that does (`roll-strip.ts:forbiddenConstruct`).
+
 The cost is real and accepted: the DSP has a single echo unit, so a `$F1` in `#0` and a `$F5` in `#1`
 do interact, and that pairing is missed. A diagnostic that contradicted the FIR designer sitting
 next to it would be worse than the gap.

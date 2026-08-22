@@ -1207,6 +1207,12 @@ export interface Command {
 	 */
 	channel: number;
 	/**
+	 * Inside a `(!n)[ … ]` body, brackets included. The body compiles to the loop
+	 * block and runs only where a `$FC` fires it, so it is not {@link channel}'s
+	 * own music however the starting-channel rule above reads it.
+	 */
+	inRemoteDefinition?: boolean;
+	/**
 	 * Written as `@@n`, the "direct" form (`parser.ts:parseInstrument`).
 	 *
 	 * Worth carrying because it changes what the command *means*, not just how it
@@ -1749,9 +1755,21 @@ function gather(tokens: GatherToken[], text: string, transitions: TargetTransiti
 	// every note below read two thirds of its length.
 	let pendingBlock = false;
 	let inBlock = false;
+	// Music.cpp:1015 — `channelDefined` latches on the first `#N` and never
+	// clears, so `(!n)[ … ]` above it defines a remote body and below it is read
+	// as a call. A depth rather than a flag: `[[ ]]` inside a body is legal.
+	let channelDefined = false;
+	let pendingRemote = false;
+	let remoteDepth = 0;
 
 	for (let i = 0; i < tokens.length; i++) {
 		const token = tokens[i];
+
+		// `(!` above the first marker opens a definition. Neither character is a
+		// command kind, so arming is what carries the head as far as its `[`.
+		if (token.kind === "label" && !channelDefined && textOf(token) === "(") {
+			pendingRemote = tokens[i + 1]?.kind === "unknown" && textOf(tokens[i + 1]) === "!";
+		}
 
 		// Transitions land on directive and number tokens, never on a token a
 		// command opens with, so the `<=` tie cannot mis-attribute one.
@@ -1794,9 +1812,25 @@ function gather(tokens: GatherToken[], text: string, transitions: TargetTransiti
 			const parsed = Number.parseInt(textOf(token).slice(1), 10);
 			if (parsed >= 0 && parsed <= 7) {
 				channel = parsed;
+				channelDefined = true;
 			}
 
+			// A definition cannot span a marker, so a half-written one is bounded
+			// here rather than marking the rest of the document.
+			pendingRemote = false;
+			remoteDepth = 0;
 			continue;
+		}
+
+		// Read between the two so the body's own brackets are marked as well.
+		if (token.kind === "loopStart" && (pendingRemote || remoteDepth > 0)) {
+			pendingRemote = false;
+			remoteDepth++;
+		}
+
+		const inRemote = remoteDepth > 0;
+		if (token.kind === "loopEnd" && remoteDepth > 0) {
+			remoteDepth--;
 		}
 
 		if (token.kind === "hex") {
@@ -1846,6 +1880,7 @@ function gather(tokens: GatherToken[], text: string, transitions: TargetTransiti
 				complete: expected !== null && args.length >= expected,
 				replacement: from,
 				channel,
+				inRemoteDefinition: inRemote || undefined,
 				target,
 			});
 			i = j - 1;
@@ -1873,6 +1908,7 @@ function gather(tokens: GatherToken[], text: string, transitions: TargetTransiti
 				complete: true,
 				replacement: token.replacement ?? from,
 				channel,
+				inRemoteDefinition: inRemote || undefined,
 				target,
 				noteLength: segments,
 			});
@@ -1925,6 +1961,7 @@ function gather(tokens: GatherToken[], text: string, transitions: TargetTransiti
 			complete: true,
 			replacement: from,
 			channel,
+			inRemoteDefinition: inRemote || undefined,
 			direct: raw.startsWith("@@") || undefined,
 			target,
 		});

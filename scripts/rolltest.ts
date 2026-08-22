@@ -517,6 +517,20 @@ expectEdit(
 	{ contains: ">" },
 );
 
+// A remote definition can only sit above the first `#N` (Music.cpp:1015), so its
+// `[ ]` gathers on the starting channel — but the body runs only where the `$FC`
+// fires it, and channel 0 must stay editable.
+expectEdit(
+	"a channel under a remote code definition",
+	"#amk 2\n(!1)[$F4 $02]\n#0 o4 c4 (!1, 1, 8) d4",
+	0,
+	(bar) => ({ kind: "move", items: [noteAt(bar, 1)], deltaTicks: 0, deltaKeys: 2, copy: false }),
+	{ contains: ["(!1)[$F4 $02]", "(!1, 1, 8)"] },
+);
+// A `[ ]` up there that no `(!n)` armed is the starting channel's own music, and
+// still plays what is written in it more than once.
+expectNoStrip("a loop above the first marker", "#amk 2\n[$F4 $02]2\n#0 o4 c4 d4", 0, "`[`");
+
 // A channel longer than the shortest is the commonest shape a song has, and the
 // walk cuts the pass at the shortest — so this must be editable, not refused.
 expectEdit("a channel past the end of the pass", "#amk 2\n#0 o4 c4 d4 e4 f4\n#1 o4 g4", 0, (bar) => ({

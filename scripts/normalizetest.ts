@@ -393,6 +393,32 @@ console.log("\nnormalizing one channel");
 }
 
 {
+	// A remote definition sits above the first `#N`, which is where the scoped
+	// form's own channel starts — and it is not something any pass can rewrite,
+	// so putting #0 in order has to leave it character for character.
+	const source = "#amk 2\n(!1)[$F4 $02]\n#0 o4 [c4 d4]2 (!1, 1, 8) e4\n#1 o4 g4\n";
+	const scoped = normalizeSong(source, ARAM, OPTIONS, 0);
+	check("#0 under a remote definition: normalizes", scoped.ok, scoped.ok ? "" : describe(scoped.diagnostics));
+	if (scoped.ok) {
+		check(
+			"#0 under a remote definition: the definition is untouched",
+			scoped.text.includes("(!1)[$F4 $02]\n"),
+			JSON.stringify(scoped.text),
+		);
+		check(
+			"#0 under a remote definition: the call is untouched",
+			scoped.text.includes("(!1, 1, 8)"),
+			JSON.stringify(scoped.text),
+		);
+		check(
+			"#0 under a remote definition: its own loop is still unrolled",
+			count(scoped.text.split("#1")[0], /\[/g) === 1,
+			JSON.stringify(scoped.text),
+		);
+	}
+}
+
+{
 	// Joining a channel's blocks moves text past other channels', so the scoped
 	// form says so rather than doing it.
 	const source = "#amk 2\n#0 c4\n#1 d4\n#0 e4\n";

@@ -179,6 +179,11 @@ so in the toolbar rather than guessing. A `[ ]` loop, a `*` or `(n)` call, a `{ 
 `"name=value"` replacement, a `$DD` pitch slide or a `#halvetempo` all mean one written note is not
 one played note.
 
+A remote code definition is not one of them. `(!1)[ … ]` has to be written above the first `#N`, which
+puts it on the same channel the music below that marker starts on, but its body plays only where a
+`(!1, …)` call fires it — so the first channel of a song with remote code is edited like any other,
+and the definition is left exactly where it was written.
+
 The **Normalize #N** button beside that message rewrites just that channel into a shape the roll can
 splice — loops written out, triplets given plain lengths — and leaves every other channel of the song
 exactly as it was. The plain **Normalize** button does the whole song. Neither changes what the song
