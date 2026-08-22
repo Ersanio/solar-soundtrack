@@ -1037,11 +1037,18 @@ export class PianoRoll {
 
   /** Pressing the channel already being edited clears it, as the mixer's solo does. */
   protected setEditChannel(channel: number): void {
+    if (this.editChannel() === channel) {
+      this.clearEditChannel();
+      return;
+    }
+
+    this.selectEditChannel(channel);
+  }
+
+  /** Editing nothing again: the selection goes with the channel it indexes into. */
+  private clearEditChannel(): void {
     this.gestures.clearSelection();
-    this.settings.update((s) => ({
-      ...s,
-      editChannel: s.editChannel === channel ? null : channel,
-    }));
+    this.settings.update((s) => ({ ...s, editChannel: null }));
   }
 
   /**
@@ -1369,23 +1376,40 @@ export class PianoRoll {
   /**
    * The roll's shortcuts, while a channel is being edited.
    *
-   * Ignored while the text has focus, so `Ctrl+A` in the source still selects
-   * the source. Everything here goes through the same {@link Gesture} the
-   * pointer uses, so a nudge and a drag commit the same way.
+   * Ignored while the text or a modal has focus, so `Ctrl+A` in the source still
+   * selects the source and the normalize dialog keeps its own Escape. Everything
+   * that edits goes through the same {@link Gesture} the pointer uses, so a
+   * nudge and a drag commit the same way.
    *
    * A channel really picked, rather than {@link editing}: a key has no pointer
    * to name a channel with, so `Ctrl+A` under one merely hovered would select
    * notes in a channel the toolbar says is not being edited.
    */
   protected onKey(event: KeyboardEvent): void {
-    const strip = this.strip();
     const target = event.target as HTMLElement | null;
     if (
-      !strip ||
       this.editChannel() === null ||
-      target?.closest('input, textarea, select, .cm-editor') !== null ||
+      target?.closest('input, textarea, select, dialog, .cm-editor') !== null ||
       event.isComposing
     ) {
+      return;
+    }
+
+    // Escape steps back out, one level per press: the selection, then the
+    // channel itself. Ahead of the strip, and needing none — a channel the roll
+    // has refused is exactly the one the porter wants to leave.
+    if (event.key === 'Escape') {
+      if (this.gestures.selection().size > 0) {
+        this.gestures.clearSelection();
+      } else {
+        this.clearEditChannel();
+      }
+
+      return;
+    }
+
+    const strip = this.strip();
+    if (!strip) {
       return;
     }
 
@@ -1398,11 +1422,6 @@ export class PianoRoll {
     if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'a') {
       event.preventDefault();
       this.gestures.selectAll();
-      return;
-    }
-
-    if (event.key === 'Escape') {
-      this.gestures.clearSelection();
       return;
     }
 

@@ -36,9 +36,9 @@ import { type ChannelTail, type Strip, type StripItem } from './roll-strip';
  * How near an edge a press has to be to mean "stretch" rather than "move".
  *
  * Held to a third of the bar either side, so a short note keeps a middle to grab:
- * two twelve-pixel zones on a sixteen-pixel bar would leave no way to move it.
+ * two six-pixel zones on an eight-pixel bar would leave no way to move it.
  */
-const EDGE_PX = 12;
+const EDGE_PX = 6;
 
 /** Pointer movement below this is a click, not a drag. */
 const SLOP_PX = 3;
