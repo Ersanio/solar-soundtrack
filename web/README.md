@@ -192,11 +192,24 @@ commits, so what is drawn cannot disagree with what lands. A plan that is refuse
 `planEdits` at all.
 
 Its **`EditMode`** is what an overlap does, and it is the porter's setting rather than the gesture's:
-`strict` refuses one and `flexible` shoves the notes in the way aside, for drawing, dragging,
-stretching and quantizing alike. A cascade never moves a note the gesture is placing itself — the
-`fixed` set — so a selection cannot shove itself, and an overlap it could not clear is reported as a
-clash rather than as a third outcome. The inspector's own length slider is not on this path at all:
-it writes one argument through `spliceArg` and knows nothing about neighbours.
+`overwrite` takes the overlapping ticks off the notes already there, `insert` shoves them aside and
+`strict` refuses, for drawing, dragging, stretching and quantizing alike. `resolved` is the one place
+the three are told apart, so the gestures cannot drift into answering an overlap differently, and
+each brings only what it alone knows — which way a push should send what is in the way, and which
+notes are its own. `EDIT_MODES`'s order is the `<select>`'s order, the default and the fallback for
+an unreadable stored value, all at once.
+
+`carve` is the mirror of `push`. A push moves what is in the way and can run out of room; a carve
+takes the overlap off it, leaves everything else where it was written, and so has no refusal of its
+own. A note comes out of one in none, one or more pieces, and the first keeps its `from`, so the
+unit is shortened in place and a note landed inside survives as a head _and_ a tail. Neither ever
+touches a note the gesture is placing itself — `push`'s `fixed` set and `carve`'s `placed` are the
+same idea — so a selection cannot shove or eat itself, and an overlap it could not clear is reported
+as a clash rather than as a third outcome. `Plan.erased` carries the ticks being given up, which is
+what the roll hatches in red and what keeps a carve out of `reach`: its pieces sit where the channel
+already reached, so padding the song out to one would lengthen it for nothing. The inspector's own
+length slider is not on this path at all: it writes one argument through `spliceArg` and knows
+nothing about neighbours.
 
 The commit is `EditorRequests.applyAll`: one transaction, one undo step for a whole selection, and
 the editor checks every `expect` before it dispatches anything, so a stale batch is a no-op rather

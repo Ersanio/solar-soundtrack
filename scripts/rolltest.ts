@@ -242,7 +242,7 @@ interface Expectation {
 	 */
 	loopsWhereItDid?: boolean;
 	/**
-	 * The mode the gesture is planned under, `"flexible"` unless a case says otherwise.
+	 * The mode the gesture is planned under, `"insert"` unless a case says otherwise.
 	 *
 	 * Most cases here never make two notes sound at once, and those read the same
 	 * either way; the ones that do name the mode they are pinning.
@@ -278,7 +278,7 @@ function expectEdit(
 		introTicks: introOf(before),
 		channels: tailsOf(source, before),
 	};
-	const plan = planGesture(bar, gesture(bar), expectation.mode ?? "flexible");
+	const plan = planGesture(bar, gesture(bar), expectation.mode ?? "insert");
 	const edits = planEdits(context, plan);
 	if (edits === null) {
 		check(`${name}: the gesture can be written`, false, plan.refused ?? "planEdits refused");
@@ -399,7 +399,7 @@ function expectRefused(
 	source: string,
 	channel: number,
 	gesture: (strip: Strip) => Gesture,
-	mode: EditMode = "flexible",
+	mode: EditMode = "insert",
 ): void {
 	const made = planFor(name, source, channel, gesture, mode);
 	if (made) {
@@ -422,7 +422,7 @@ function expectCarried(
 	gesture: (strip: Strip) => Gesture,
 	froms: readonly number[],
 	because: string | null = null,
-	mode: EditMode = "flexible",
+	mode: EditMode = "insert",
 ): void {
 	const made = planFor(name, source, channel, gesture, mode);
 	if (!made) {
@@ -926,9 +926,9 @@ expectEdit("a whole selection moves as one edit list", "#amk 2\n#0 o4 r4 c8 d8 e
 	copy: false,
 }));
 
-// --- flexible mode: the notes in the way move aside ------------------------
+// --- insert mode: the notes in the way move aside --------------------------
 
-console.log("\nflexible");
+console.log("\ninsert");
 expectEdit("a note dragged onto the one after it, pushing it right", "#amk 2\n#0 o4 c4 d4 e4", 0, (bar) => ({
 	kind: "move",
 	items: [noteAt(bar, 0)],
@@ -965,6 +965,177 @@ expectEdit("a note drawn over the one after it, pushing it right", "#amk 2\n#0 o
 	drum: null,
 }));
 
+// --- overwrite mode: the notes already there give up the ticks -------------
+//
+// Every case here pins `playsAsLong`, and that is the point of the mode rather
+// than a detail of it: a carve only ever takes ticks that were already the
+// channel's, so the song has to be exactly as long afterwards. A carve that
+// lengthened the song would mean `reach` had counted a note nothing moved.
+
+console.log("\noverwrite");
+expectEdit(
+	"a note dragged onto the one after it, which gives up its head",
+	"#amk 2\n#0 o4 c4 d4 e4",
+	0,
+	(bar) => ({ kind: "move", items: [noteAt(bar, 0)], deltaTicks: 24, deltaKeys: 0, copy: false }),
+	{ mode: "overwrite", playsAsLong: true, contains: "d8" },
+);
+
+expectEdit(
+	"a note dragged over one that gives up all of them",
+	"#amk 2\n#0 o4 c4 d4 e4 f4",
+	0,
+	(bar) => ({ kind: "move", items: [noteAt(bar, 0)], deltaTicks: 48, deltaKeys: 0, copy: false }),
+	{ mode: "overwrite", playsAsLong: true, lacks: "d" },
+);
+
+expectEdit(
+	"a note stretched into the one after it, which gives up its head",
+	"#amk 2\n#0 o4 c4 d4 e4",
+	0,
+	(bar) => ({ kind: "stretch", items: [noteAt(bar, 0)], edge: "end", deltaTicks: 24 }),
+	{ mode: "overwrite", playsAsLong: true, contains: ["c4.", "d8"] },
+);
+
+expectEdit(
+	"a note stretched over the one after it, which gives up all of them",
+	"#amk 2\n#0 o4 c4 d4 e4",
+	0,
+	(bar) => ({ kind: "stretch", items: [noteAt(bar, 0)], edge: "end", deltaTicks: 48 }),
+	{ mode: "overwrite", playsAsLong: true, contains: "c2", lacks: "d" },
+);
+
+// The carve has no direction of its own — a push has to pick one and keep it,
+// where this takes the ticks wherever the placed note landed on them.
+expectEdit(
+	"a left edge pulled back into the note before it, which gives up its tail",
+	"#amk 2\n#0 o4 c4 d4 e4",
+	0,
+	(bar) => ({ kind: "stretch", items: [noteAt(bar, 1)], edge: "start", deltaTicks: -24 }),
+	{ mode: "overwrite", playsAsLong: true, contains: ["c8", "d4."] },
+);
+
+// The `placed` set, which is `push`'s `fixed` set by another name: the two
+// notes being dragged overlap nothing of each other's, and only the note they
+// land on gives anything up.
+expectEdit(
+	"a selection dragged onto an outsider, which alone gives up ticks",
+	"#amk 2\n#0 o4 c8 d8 r4 e8",
+	0,
+	(bar) => ({
+		kind: "move",
+		items: [noteAt(bar, 0), noteAt(bar, 1)],
+		deltaTicks: 60,
+		deltaKeys: 0,
+		copy: false,
+	}),
+	{ mode: "overwrite", playsAsLong: true },
+);
+
+// The case the mode turns on: only the ticks under the note are lost, so what
+// the note landed inside comes back as a head and a tail. The tail is a note
+// being created — `plays what the plan said` is the proof, since the plan asks
+// for two notes at that pitch and the note map has to read back as two.
+expectEdit(
+	"a note drawn inside a longer one, which survives either side of it",
+	"#amk 2\n#0 o4 c1 d4",
+	0,
+	() => ({ kind: "spawn", startTick: 48, ticks: 48, written: NOTE_MIN + 36 + 4, drum: null }),
+	{ mode: "overwrite", playsAsLong: true, text: "#amk 2\n#0 o4 c4 e4 c2 d4" },
+);
+
+// And the tail spells its own octave, because the note that split it moved the
+// one in force. The note after the run reads what it always read, so nothing is
+// put back at its head.
+expectEdit(
+	"a split whose tail has to spell the octave back",
+	"#amk 2\n#0 o4 c1 d4",
+	0,
+	() => ({ kind: "spawn", startTick: 48, ticks: 48, written: NOTE_MIN + 48 + 7, drum: null }),
+	{
+		mode: "overwrite",
+		playsAsLong: true,
+		text: "#amk 2\n#0 o4 c4 o5 g4 o4 c2 d4",
+	},
+);
+
+expectEdit(
+	"a note drawn exactly over one, which gives up all its ticks",
+	"#amk 2\n#0 o4 c4 d4 e4",
+	0,
+	() => ({ kind: "spawn", startTick: 48, ticks: 48, written: NOTE_MIN + 36 + 7, drum: null }),
+	{ mode: "overwrite", playsAsLong: true, text: "#amk 2\n#0 o4 c4 g4 e4" },
+);
+
+// The octave put back goes at the head of the next *surviving* note. The note
+// this same gesture removed is the first note item in the region, and an `o`
+// written at its head is an edit inside a range being deleted — two edits over
+// one run of text, which is what `planEdits` refuses outright.
+expectEdit(
+	"a note drawn an octave up over one, with the octave put back after it",
+	"#amk 2\n#0 o4 c4 d4 e4",
+	0,
+	() => ({ kind: "spawn", startTick: 48, ticks: 48, written: NOTE_MIN + 48 + 7, drum: null }),
+	{ mode: "overwrite", playsAsLong: true, text: "#amk 2\n#0 o4 c4 o5 g4 o4 e4" },
+);
+
+// A copy dropped on its own original: the original is not one of the notes the
+// gesture is placing, so it is a victim like any other and gives up everything.
+expectEdit(
+	"a copy dropped on its own original, which it replaces",
+	"#amk 2\n#0 o4 c4 d4",
+	0,
+	(bar) => ({ kind: "move", items: [noteAt(bar, 0)], deltaTicks: 0, deltaKeys: 0, copy: true }),
+	{ mode: "overwrite", playsAsLong: true },
+);
+
+// The `reach` guard. Every piece a carve leaves sits at a tick the channel had
+// already reached, so none of them may pad the song: the tail here ends at 288
+// in a song that plays 192, and counting it would drag `#1` out to meet a note
+// nothing had moved. `playsAsLong` is the only reading that catches it — the
+// text of `#1` looks equally plausible either way.
+expectEdit(
+	"a split out past the end of the song, which does not lengthen it",
+	"#amk 2\n#0 o4 c2 c1\n#1 o4 c1",
+	0,
+	() => ({ kind: "spawn", startTick: 120, ticks: 72, written: NOTE_MIN + 36 + 4, drum: null }),
+	{ mode: "overwrite", playsAsLong: true, contains: "c8 e4. c2" },
+);
+
+// Where the run lands relative to the intro marker. The `/` stands on the
+// boundary the note before the region meets it at, and the run goes after it —
+// written in front, the marker would come out a whole region late and every
+// channel resumes from its own on each pass.
+//
+// The one channel is the point: `loopTick` is the *lowest* tick any channel
+// re-enters at, so a second channel marked at 96 would hold the reading down at
+// 96 and hide a marker that had slipped to 144. Alone, the edited channel is
+// what sets it, and the song plays for the same 192 either way — which is what
+// makes this the only reading that catches it.
+expectEdit(
+	"a note drawn over the one after the intro marker",
+	"#amk 2\n#0 o4 c4 d4 / e4 f4",
+	0,
+	() => ({ kind: "spawn", startTick: 96, ticks: 48, written: NOTE_MIN + 36 + 7, drum: null }),
+	{
+		mode: "overwrite",
+		playsAsLong: true,
+		loopsWhereItDid: true,
+		contains: "/ g4 f4",
+	},
+);
+
+// A carve through the *tail* of a note with a command written inside it is
+// fine: the note keeps its start, so the ramp keeps the tick it was written at
+// and only the last continuation is shortened.
+expectEdit(
+	"a note drawn over the tail of one with a command written inside it",
+	"#amk 2\n#0 o4 c4 v200 ^4 d4",
+	0,
+	() => ({ kind: "spawn", startTick: 72, ticks: 48, written: NOTE_MIN + 36 + 4, drum: null }),
+	{ mode: "overwrite", playsAsLong: true, contains: ["v200", "^8"] },
+);
+
 console.log("\nrefusals");
 expectRefused(
 	"a note dragged onto its neighbour, strictly",
@@ -980,7 +1151,8 @@ expectRefused(
 	"strict",
 );
 
-// The gesture the mode inverts: this is what `flexible` pushes through at :385.
+// The gesture the mode inverts: this is what `insert` pushes through, in the
+// stretch case above.
 expectRefused(
 	"a note stretched into its neighbour, strictly",
 	"#amk 2\n#0 o4 c4 d4 e4",
@@ -992,6 +1164,41 @@ expectRefused(
 		deltaTicks: 24,
 	}),
 	"strict",
+);
+
+// The one place overwrite is the stricter of the two: both notes are the
+// gesture's own, so neither may eat the other and the overlap stands. Insert
+// compounds the pushes here instead.
+expectRefused(
+	"two touching notes stretched into each other, overwriting",
+	"#amk 2\n#0 o4 c8 d8 r2",
+	0,
+	(bar) => ({
+		kind: "stretch",
+		items: [noteAt(bar, 0), noteAt(bar, 1)],
+		edge: "end",
+		deltaTicks: 24,
+	}),
+	"overwrite",
+);
+
+// The other end of the same note is refused, and the reason is the command
+// rather than the carve: the note would keep the ticks it kept but start later,
+// so the `v200` written inside it would fire later than it was written to.
+expectRefused(
+	"a note drawn over the head of one with a command written inside it",
+	"#amk 2\n#0 o4 c4 v200 ^4 d4",
+	0,
+	() => ({ kind: "spawn", startTick: 0, ticks: 24, written: NOTE_MIN + 36 + 4, drum: null }),
+	"overwrite",
+);
+
+expectRefused(
+	"quantize pulling two notes onto one beat, overwriting",
+	"#amk 2\n#0 o4 c16 d16 r2",
+	0,
+	(bar) => ({ kind: "quantize", items: [noteAt(bar, 0), noteAt(bar, 1)], snap: 48 }),
+	"overwrite",
 );
 
 expectRefused("a note dragged onto the one before it with nowhere to push", "#amk 2\n#0 o4 c4 d4", 0, (bar) => ({

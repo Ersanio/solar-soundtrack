@@ -10,6 +10,19 @@
   >
     <svg:line y1="0" y2="6" x1="0" x2="0" class="stroke-ink-muted" stroke-width="2" />
   </svg:pattern>
+
+  <!-- The erased ticks' hatch. It leans the other way from the pushed stripes,
+       so what a carved note keeps and what it gives up are told apart inside
+       one bar. `userSpaceOnUse` for the same reason. -->
+  <svg:pattern
+    id="amk-roll-erased"
+    width="5"
+    height="5"
+    patternUnits="userSpaceOnUse"
+    patternTransform="rotate(-45)"
+  >
+    <svg:line y1="0" y2="5" x1="0" x2="0" class="stroke-danger" stroke-width="1.5" />
+  </svg:pattern>
 </svg:defs>
 
 @if (ghost(); as bar) {
@@ -32,6 +45,26 @@
 }
 
 @if (preview(); as shown) {
+  <!-- The ticks the notes already there are giving up. On their own row rather
+       than down the stack, unlike a clash: this names one note, and the bar it
+       is hatching is that note's. Under the live bars, so the note being placed
+       is drawn over what it is taking. -->
+  @for (bar of shown.erased; track bar.id) {
+    <svg:rect
+      rx="2"
+      fill="url(#amk-roll-erased)"
+      fill-opacity="0.5"
+      class="stroke-danger"
+      stroke-width="1"
+      stroke-dasharray="2 2"
+      pointer-events="none"
+      [attr.x]="bar.x"
+      [attr.y]="bar.y"
+      [attr.width]="bar.w"
+      [attr.height]="bar.h"
+    />
+  }
+
   <!-- Where a note will be pushed to: an outline and stripes, no fill and no
        glyphs, so it reads as a place rather than as a note. -->
   @for (bar of shown.pushed; track bar.id) {

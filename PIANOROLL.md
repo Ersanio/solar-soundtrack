@@ -70,9 +70,9 @@ gets the beat. `6`/`8` is six `l8`s to a bar. MML has no time signature of its o
 `0` beats draws no grid at all.
 
 **Snap** is what a note lands on when you draw or drag it — `Bar`, `Beat`, `½ beat`, `¼ beat`,
-`⅛ beat`, or `Off`. `Bar` and `Beat` are read off the Grid, so the two stay in step without being
-welded together: at 4/4 a beat is a whole quarter note, which is far too coarse to draw sixteenths
-against.
+`⅛ beat`, `⅟₁₆ beat`, or `Off`. `Bar` and `Beat` are read off the Grid, so the two stay in step
+without being welded together: at 4/4 a beat is a whole quarter note, which is far too coarse to
+draw sixteenths against.
 
 **Stretching does not use Snap.** A length lands on the note values themselves — a whole, a half, a
 quarter, an eighth, and their dotted forms — because a note in MML is a duration rather than a region
@@ -93,7 +93,12 @@ and putting them on the wheel would double the turns it takes to cross.
 one note at a time, so that is something the roll has to answer one way or the other, and this is
 where you say which:
 
-- **Flexible** moves the notes in the way out of the way, shown as striped outlines while you drag.
+- **Overwrite** takes the ticks. The note you are placing wins, and whatever was under it keeps
+  whatever it did not cover: the ticks being taken are hatched in red on that note's own row while
+  you drag, and what survives is drawn as a striped outline. A note you land wholly inside comes
+  back as two — the part before you and the part after you, at the same pitch. This is what a fresh
+  roll starts on.
+- **Insert** moves the notes in the way out of the way, shown as striped outlines while you drag.
   They go in the direction you are dragging, and the notes they run into go with them.
 - **Strict** never writes an overlap. The bar turns red, the ticks where the two would sound at once
   are washed red down the whole roll, and letting go changes nothing.
@@ -107,8 +112,14 @@ slider in the inspector, which writes one note's own length and never looks at i
 - **No chords.** A channel plays one note at a time, so two notes can never overlap. What a gesture
   does about that is the **Edits** setting above, and it is the same answer for every gesture.
 - **A push can run out of room.** The start of the channel is the end of the road for notes being
-  shoved left, and a selection cannot shove its own notes aside to make space for itself. Flexible
-  mode says so the way strict mode does — red, and nothing committed.
+  shoved left, and a selection cannot shove its own notes aside to make space for itself. Insert
+  mode says so the way strict mode does — red, and nothing committed. Overwrite never runs out of
+  room, because it takes room rather than needing it — but a selection cannot eat its own notes
+  either, so stretching two notes that already touch into each other is refused there too.
+- **A command written inside a note pins that note's start.** A `v200` halfway through a note stands
+  a number of ticks into it, so taking ticks off that note's _front_ would carry the command along
+  with it and it would sound later than you wrote it. Overwriting the head of such a note is
+  refused; overwriting its tail is not, and the command stays exactly where it is.
 - **A gap is a rest.** The space between two notes is the rest between them, and moving a note
   rewrites that rest rather than moving anything else. Anything you wrote inside the gap keeps its
   distance from the note that follows it.

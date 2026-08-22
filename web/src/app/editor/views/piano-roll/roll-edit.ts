@@ -43,15 +43,34 @@ export interface Clash {
   to: number;
 }
 
+/**
+ * Ticks a note gives up to one the gesture is placing over it.
+ *
+ * A run of ticks like a {@link Clash}, but it belongs to a note rather than to
+ * the channel, so it carries the row to draw it on: a clash names two notes and
+ * is washed down the whole stack, where this names one and is hatched over that
+ * note's own bar.
+ */
+export interface Erased {
+  from: number;
+  to: number;
+  /** The byte the letter and octave alone name, for the row. */
+  written: number;
+  /** `21`-`29` when the note giving them up is a drum, whose lane is its instrument. */
+  drum: number | null;
+}
+
 export interface Plan {
   /** Every note the channel would hold, in tick order. */
   notes: readonly PlacedNote[];
   /** The notes the gesture moved itself, drawn as the live bar. */
   touched: readonly PlacedNote[];
-  /** The notes a push moved out of the way, drawn as striped bars. */
+  /** The notes a push moved out of the way, or a carve cut down, drawn as striped bars. */
   pushed: readonly PlacedNote[];
   /** Drawn as a red wash on both notes. Empty for a plan that can be committed. */
   clashes: readonly Clash[];
+  /** Ticks the notes already there give up, drawn hatched on their own rows. */
+  erased: readonly Erased[];
   /** Why nothing will be committed, or `null`. */
   refused: string | null;
 }
@@ -67,12 +86,17 @@ export type Gesture =
 
 /**
  * What the roll does when a gesture would make two notes sound at once:
- * `strict` refuses it, `flexible` shifts the notes in the way aside.
+ * `overwrite` takes the ticks off the notes already there, `insert` shifts them
+ * aside, `strict` refuses the edit.
  *
  * The porter's setting rather than the gesture's, so a drag and a stretch answer
  * an overlap the same way.
+ *
+ * The order is the mechanism rather than presentation: the toolbar's `<select>`
+ * lists the table itself, and `readSettings` takes its default and its fallback
+ * for an unreadable stored value from the first entry.
  */
-export const EDIT_MODES = ['strict', 'flexible'] as const;
+export const EDIT_MODES = ['overwrite', 'insert', 'strict'] as const;
 export type EditMode = (typeof EDIT_MODES)[number];
 
 export interface EditContext {
@@ -269,6 +293,87 @@ function pushFrom(
 }
 
 /**
+ * The ticks a placed note covers, taken out of the notes already there.
+ *
+ * The overwrite answer to an overlap, and the mirror of {@link push}: where a
+ * push moves what is in the way and needs somewhere to move it to, this takes
+ * the overlapping ticks off it and leaves everything else exactly where it was
+ * written. It cannot run out of room, so it has no refusal of its own.
+ *
+ * A note the gesture is placing itself is in `placed` and is never carved, which
+ * is {@link push}'s `fixed` set by another name: a selection cannot eat its own
+ * notes, and two placed notes overlapping each other is left for `clashesIn` to
+ * report rather than becoming a third outcome.
+ *
+ * A note comes out of it in none, one or more pieces. **The first piece keeps
+ * `from`**, so it starts where the note started and {@link rewriteNote} shortens
+ * that unit in place; the rest are born notes at the same pitch. That is what
+ * makes a note the gesture landed inside survive as a head *and* a tail rather
+ * than losing everything past the cut.
+ *
+ * Pitch has no say in it. A channel plays one note at a time, so a note in the
+ * way is in the way whatever row it is drawn on.
+ */
+function carve(
+  notes: readonly PlacedNote[],
+  placed: ReadonlySet<PlacedNote>,
+): { notes: PlacedNote[]; pushed: PlacedNote[]; erased: Erased[] } {
+  const cuts = [...placed]
+    .map((note) => ({ from: note.startTick, to: note.startTick + note.ticks }))
+    .sort((a, b) => a.from - b.from);
+
+  const kept: PlacedNote[] = [];
+  const pushed: PlacedNote[] = [];
+  const erased: Erased[] = [];
+
+  for (const note of notes) {
+    if (placed.has(note)) {
+      kept.push(note);
+      continue;
+    }
+
+    const end = note.startTick + note.ticks;
+    const pieces: PlacedNote[] = [];
+    let at = note.startTick;
+    for (const cut of cuts) {
+      if (cut.to <= at || cut.from >= end) {
+        continue;
+      }
+
+      if (cut.from > at) {
+        pieces.push({ ...note, from: -1, startTick: at, ticks: cut.from - at });
+      }
+
+      erased.push({
+        from: Math.max(at, cut.from),
+        to: Math.min(end, cut.to),
+        written: note.written,
+        drum: note.drum,
+      });
+      at = Math.max(at, cut.to);
+    }
+
+    if (at === note.startTick) {
+      kept.push(note); // Nothing reached it.
+      continue;
+    }
+
+    if (at < end) {
+      pieces.push({ ...note, from: -1, startTick: at, ticks: end - at });
+    }
+
+    if (pieces.length > 0) {
+      pieces[0] = { ...pieces[0], from: note.from };
+    }
+
+    kept.push(...pieces);
+    pushed.push(...pieces);
+  }
+
+  return { notes: kept, pushed, erased };
+}
+
+/**
  * A plan with nothing on screen, for the refusals that have nothing to put there.
  *
  * A refusal that still knows where its notes were going keeps them in `touched`,
@@ -276,7 +381,90 @@ function pushFrom(
  * that cannot: a pitch off the driver's range has no lane, so `rowOfPlaced`
  * answers -1 and there is nowhere to draw it.
  */
-const NOTHING: Omit<Plan, 'refused'> = { notes: [], touched: [], pushed: [], clashes: [] };
+const NOTHING: Omit<Plan, 'refused'> = {
+  notes: [],
+  touched: [],
+  pushed: [],
+  clashes: [],
+  erased: [],
+};
+
+/**
+ * A gesture whose notes are where it wants them, answered under one mode.
+ *
+ * The one place the three modes are told apart, so drawing, dragging,
+ * quantizing and stretching cannot drift into answering an overlap differently
+ * — which is the promise the setting makes. A gesture brings what it alone
+ * knows: which way a push should send what is in the way, and which notes are
+ * its own selection, whose shoving is the gesture moving itself rather than a
+ * neighbour being moved aside.
+ *
+ * `direction` is read by `insert` alone. Neither of the others has one: strict
+ * moves nothing, and a carve takes the ticks wherever the placed note landed on
+ * them.
+ */
+function resolved(
+  notes: readonly PlacedNote[],
+  touched: readonly PlacedNote[],
+  mode: EditMode,
+  direction: 1 | -1,
+  chosen: ReadonlySet<number>,
+): Plan {
+  const placed = new Set(touched);
+  switch (mode) {
+    case 'strict': {
+      const sorted = [...notes].sort(byTick);
+      return {
+        notes: sorted,
+        touched,
+        pushed: [],
+        clashes: clashesIn(sorted),
+        erased: [],
+        refused: null,
+      };
+    }
+
+    case 'overwrite': {
+      const carved = carve(notes, placed);
+      const settled = carved.notes.sort(byTick);
+      return {
+        notes: settled,
+        touched,
+        pushed: carved.pushed,
+        clashes: clashesIn(settled),
+        erased: carved.erased,
+        refused: null,
+      };
+    }
+
+    case 'insert': {
+      const sorted = [...notes].sort(byTick);
+      const shoved = pushFrom(sorted, touched, direction, placed);
+      if (!shoved) {
+        return {
+          notes: sorted,
+          touched,
+          pushed: [],
+          clashes: clashesIn(sorted),
+          erased: [],
+          refused: REFUSE_ROOM,
+        };
+      }
+
+      const settled = shoved.notes.sort(byTick);
+      return {
+        notes: settled,
+        touched,
+        // A note of the selection shoved by another of it is the gesture moving
+        // itself, and is already drawn as a live bar.
+        pushed: shoved.pushed.filter((each) => !chosen.has(each.from)),
+        clashes: clashesIn(settled),
+        erased: [],
+        refused: null,
+      };
+    }
+  }
+}
 
 export function planGesture(strip: Strip, gesture: Gesture, mode: EditMode): Plan {
   switch (gesture.kind) {
@@ -293,31 +481,9 @@ export function planGesture(strip: Strip, gesture: Gesture, mode: EditMode): Pla
         drum: gesture.drum,
       };
       const notes = [...placedNotes(strip), born].sort(byTick);
-      if (mode === 'strict') {
-        return { notes, touched: [born], pushed: [], clashes: clashesIn(notes), refused: null };
-      }
-
       // A drawn note is put where the pointer is, so whatever was already there
       // moves later rather than earlier.
-      const shoved = pushFrom(notes, [born], 1, new Set([born]));
-      if (!shoved) {
-        return {
-          notes,
-          touched: [born],
-          pushed: [],
-          clashes: clashesIn(notes),
-          refused: REFUSE_ROOM,
-        };
-      }
-
-      const sorted = shoved.notes.sort(byTick);
-      return {
-        notes: sorted,
-        touched: [born],
-        pushed: shoved.pushed,
-        clashes: clashesIn(sorted),
-        refused: null,
-      };
+      return resolved(notes, [born], mode, 1, new Set());
     }
 
     case 'move': {
@@ -353,35 +519,12 @@ export function planGesture(strip: Strip, gesture: Gesture, mode: EditMode): Pla
         }
       }
 
-      const sorted = notes.sort(byTick);
-      if (mode === 'strict') {
-        return { notes: sorted, touched, pushed: [], clashes: clashesIn(sorted), refused: null };
-      }
-
       // The way the porter is dragging: a note shoved aside carries on in the
       // same direction, and a drag straight up or down has no other way to send
       // it. A copy dropped on its own original pushes that original, which is
-      // the same rule seen from the other side.
+      // the same rule seen from the other side — and under a carve, eats it.
       const direction = gesture.deltaTicks < 0 ? -1 : 1;
-      const shoved = pushFrom(sorted, touched, direction, new Set(touched));
-      if (!shoved) {
-        return {
-          notes: sorted,
-          touched,
-          pushed: [],
-          clashes: clashesIn(sorted),
-          refused: REFUSE_ROOM,
-        };
-      }
-
-      const settled = shoved.notes.sort(byTick);
-      return {
-        notes: settled,
-        touched,
-        pushed: shoved.pushed.filter((each) => !chosen.has(each.from)),
-        clashes: clashesIn(settled),
-        refused: null,
-      };
+      return resolved(notes.sort(byTick), touched, mode, direction, chosen);
     }
 
     case 'stretch': {
@@ -408,6 +551,7 @@ export function planGesture(strip: Strip, gesture: Gesture, mode: EditMode): Pla
             ...NOTHING,
             notes,
             clashes: [{ from: Math.max(0, start), to: end }],
+            erased: [],
             refused: null,
           };
         }
@@ -416,27 +560,51 @@ export function planGesture(strip: Strip, gesture: Gesture, mode: EditMode): Pla
         notes = notes.map((each) => (each === note ? stretched : each));
         touched.push(stretched);
 
-        if (mode === 'strict') {
+        // Only the push happens per edge. A carve waits until every edge in the
+        // selection has been pulled, or the first note stretched would eat one
+        // this same gesture is about to move — it is not in `touched` yet, so
+        // nothing would hold it back.
+        if (mode !== 'insert') {
           continue;
         }
 
         const shoved = push(notes, stretched, direction);
         if (!shoved) {
-          return { notes, touched, pushed: [], clashes: clashesIn(notes), refused: REFUSE_ROOM };
+          return {
+            notes,
+            touched,
+            pushed: [],
+            clashes: clashesIn(notes),
+            erased: [],
+            refused: REFUSE_ROOM,
+          };
         }
 
         notes = shoved.notes;
         pushed.push(...shoved.pushed.filter((each) => !chosen.has(each.from)));
       }
 
-      const sorted = [...notes].sort(byTick);
-      return { notes: sorted, touched, pushed, clashes: clashesIn(sorted), refused: null };
+      // Insert has already pushed, once per edge, and carries the notes it
+      // moved; asking again would find nothing left to shove and lose them.
+      if (mode === 'insert') {
+        const sorted = [...notes].sort(byTick);
+        return {
+          notes: sorted,
+          touched,
+          pushed,
+          clashes: clashesIn(sorted),
+          erased: [],
+          refused: null,
+        };
+      }
+
+      return resolved(notes, touched, mode, direction, chosen);
     }
 
     case 'delete': {
       const gone = new Set(gesture.items);
       const notes = placedNotes(strip).filter((note) => !gone.has(note.from));
-      return { notes, touched: [], pushed: [], clashes: [], refused: null };
+      return { notes, touched: [], pushed: [], clashes: [], erased: [], refused: null };
     }
 
     case 'quantize': {
@@ -450,26 +618,10 @@ export function planGesture(strip: Strip, gesture: Gesture, mode: EditMode): Pla
         )
         .sort(byTick);
       const touched = notes.filter((note) => chosen.has(note.from));
-      if (mode === 'strict') {
-        return { notes, touched, pushed: [], clashes: clashesIn(notes), refused: null };
-      }
-
       // Rightwards whichever way a note was pulled. A tidy-up that shoved its
-      // neighbours toward tick 0 would run out of room in the first bar, and
-      // the direction has to be one for the whole cascade either way.
-      const shoved = pushFrom(notes, touched, 1, new Set(touched));
-      if (!shoved) {
-        return { notes, touched, pushed: [], clashes: clashesIn(notes), refused: REFUSE_ROOM };
-      }
-
-      const settled = shoved.notes.sort(byTick);
-      return {
-        notes: settled,
-        touched,
-        pushed: shoved.pushed.filter((each) => !chosen.has(each.from)),
-        clashes: clashesIn(settled),
-        refused: null,
-      };
+      // neighbours toward tick 0 would run out of room in the first bar, and the
+      // direction has to be one for the whole cascade either way.
+      return resolved(notes, touched, mode, 1, chosen);
     }
 
     case 'legato': {
@@ -486,6 +638,7 @@ export function planGesture(strip: Strip, gesture: Gesture, mode: EditMode): Pla
         touched: notes.filter((note) => chosen.has(note.from)),
         pushed: [],
         clashes: clashesIn(notes),
+        erased: [],
         refused: null,
       };
     }
@@ -514,7 +667,7 @@ export function planGesture(strip: Strip, gesture: Gesture, mode: EditMode): Pla
         }
       }
 
-      return { notes, touched, pushed: [], clashes: [], refused: null };
+      return { notes, touched, pushed: [], clashes: [], erased: [], refused: null };
     }
   }
 }
@@ -735,6 +888,15 @@ function rewriteNote(
 
     const edit = spliceRange(source, item.unitSpan, text);
     return edit ? [edit] : [];
+  }
+
+  // The command inside the note stands a number of ticks into it, and only the
+  // last continuation is rewritten, so a change that moves the note's **start**
+  // carries the command along with it: the note keeps the ticks it kept, and the
+  // ramp written inside them fires later than it was written to. Which ticks the
+  // porter meant to keep is not something the gesture says, so it is refused.
+  if (note.startTick !== item.startTick) {
+    return null;
   }
 
   // More than one segment means a command sits inside the note — a mid-note
@@ -1021,7 +1183,12 @@ function realiseRegion(
 function writeInto(context: EditContext, gap: Region, run: string): Edit | null {
   const { source, strip } = context;
   if (gap.after >= 0) {
-    return insertAt(strip.items[gap.after].unitSpan.end, ` ${run}`, 1);
+    // After the last thing written in the region, which for a region holding
+    // nothing is the note before it. A `/` or a command written between that
+    // note and the region's own items stands on the boundary the two meet at,
+    // and the run belongs after it: put in front, a marker would come out a
+    // whole region late, and every channel resumes from its own on each pass.
+    return insertAt(strip.items[gap.before - 1].unitSpan.end, ` ${run}`, 1);
   }
 
   const next = strip.items[gap.before] ?? strip.items[0];
@@ -1106,9 +1273,8 @@ function rested(rests: readonly StripItem[], from: number): number {
  */
 function spawnRun(
   context: EditContext,
-  born: PlacedNote,
-  before: number,
-  after: number,
+  born: readonly PlacedNote[],
+  gaps: readonly number[],
   running: number | null,
   introAt: number | null,
   exitOctave: number | null,
@@ -1117,6 +1283,14 @@ function spawnRun(
   const parts: string[] = [];
   let at = 0;
   let marked = introAt === null;
+  /**
+   * The octave the run has left standing so far.
+   *
+   * Carried from note to note for the reason {@link noteText} takes it at all:
+   * a run that writes two notes an octave apart spells the second's `o` and a
+   * run that writes two in one octave spells it once.
+   */
+  let inForce = running;
 
   /** The marker where the tick falls between two pieces rather than inside one. */
   const mark = (): void => {
@@ -1158,15 +1332,22 @@ function spawnRun(
     return true;
   };
 
-  const note = (): boolean => {
-    const split = splitAt(born.ticks);
+  /** The octave a note leaves standing: its own, or what it was handed if a drum. */
+  const leftBy = (each: PlacedNote, exit: number | null): number | null =>
+    each.drum === null ? (exit ?? octaveFor(each.written)) : inForce;
+
+  // Only the last note in the run puts an octave back, since only the last one
+  // is what the text after the run reads.
+  const note = (each: PlacedNote, last: boolean): boolean => {
+    const exit = last ? exitOctave : null;
+    const split = splitAt(each.ticks);
     if (split !== null) {
       const first = spellDuration(split - at, targetAMKVersion);
-      const second = spellDuration(at + born.ticks - split, targetAMKVersion);
-      const head = first === null ? null : noteText(born, first, null, targetAMKVersion, running);
+      const second = spellDuration(at + each.ticks - split, targetAMKVersion);
+      const head = first === null ? null : noteText(each, first, null, targetAMKVersion, inForce);
       // The `^` is where the note ends, so the octave goes after it rather than
       // between the two halves.
-      const put = exitText(born, exitOctave);
+      const put = exitText(each, exit);
       if (head === null || second === null || put === null) {
         return false;
       }
@@ -1174,7 +1355,7 @@ function spawnRun(
       parts.push(head, '/', `^${second}${put}`);
       marked = true;
     } else {
-      const whole = noteText(born, null, exitOctave, targetAMKVersion, running);
+      const whole = noteText(each, null, exit, targetAMKVersion, inForce);
       if (whole === null) {
         return false;
       }
@@ -1182,22 +1363,26 @@ function spawnRun(
       parts.push(whole);
     }
 
-    at += born.ticks;
+    at += each.ticks;
+    inForce = leftBy(each, exit);
     return true;
   };
 
   mark();
-  if (!rest(before)) {
-    return null;
+  for (let index = 0; index < born.length; index++) {
+    if (!rest(gaps[index])) {
+      return null;
+    }
+
+    mark();
+    if (!note(born[index], index === born.length - 1)) {
+      return null;
+    }
+
+    mark();
   }
 
-  mark();
-  if (!note()) {
-    return null;
-  }
-
-  mark();
-  if (!rest(after)) {
+  if (!rest(gaps[born.length])) {
     return null;
   }
 
@@ -1236,12 +1421,51 @@ function restFor(gap: Region, born: PlacedNote): StripItem | null {
 }
 
 /**
+ * Whether the region's items are written one after another with nothing but
+ * whitespace between them.
+ *
+ * A `v`, a `y`, a `$ED` or the intro `/` carries no ticks of its own but does
+ * carry a **position**: the tick of the item boundary it stands at. A run laid
+ * over the whole region moves every boundary strictly inside it, so one written
+ * between two items would come out on a different tick, and only the porter
+ * knows which of the two it belongs with. One written before the first item or
+ * after the last stands on a boundary the region does not move — where it meets
+ * the surviving note either side — and stays exactly where it is, which is why
+ * only the interior is read.
+ */
+function itemsRunTogether(context: EditContext, gap: Region): boolean {
+  const { source, strip } = context;
+  for (let index = gap.after + 2; index < gap.before; index++) {
+    const between = source.slice(
+      strip.items[index - 1].unitSpan.end,
+      strip.items[index].unitSpan.start,
+    );
+    if (between.trim() !== '') {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+/**
  * A note being created, written into the gap it lands in.
  *
- * The gap has to hold nothing but rests — the note goes over the one it falls
- * inside (see {@link restFor}) — or be empty text at the end of the channel, or
- * a channel with nothing written on it at all. A note being deleted in the same
- * region is refused rather than guessed at.
+ * Two roads, and which one is taken is what decides whether anything written in
+ * the region may move.
+ *
+ * **In place.** The note goes over the one rest it falls inside
+ * (see {@link restFor}), and everything else in the region stays exactly where
+ * it was written. This is the road for a region holding several rests with
+ * something positional between them, and it takes one note at a time.
+ *
+ * **Laid out afresh.** Where the region's items run together
+ * ({@link itemsRunTogether}) there is nothing inside it carrying a position, so
+ * the whole stretch is written as one run of rests and notes. That is what lets
+ * a region hold more than one note being created — a carve's split leaves a
+ * tail beside the note that split it — and notes this same plan is removing,
+ * whose units `planEdits` deletes on its own and whose spans only ever abut this
+ * run rather than overlap it.
  *
  * A builder answering `null` is refused too, rather than passed on as no edits:
  * `planEdits` pushes what each region returns and goes on to the next, so a note
@@ -1253,11 +1477,12 @@ function spawnInto(
   survivors: ReadonlyMap<number, PlacedNote>,
 ): Edit[] | null {
   const { source, strip } = context;
-  if (gap.born.length !== 1) {
+  if (gap.born.length === 0) {
     return null;
   }
 
-  const born = gap.born[0];
+  const order = [...gap.born].sort((a, b) => a.startTick - b.startTick);
+  const born = order[order.length - 1];
   const empty = strip.items.length === 0;
   // A channel being written from nothing has just had its own `o4` put in front
   // of it, so a note in that octave has nothing to add (`channelOpening`).
@@ -1294,11 +1519,22 @@ function spawnInto(
    */
   const single = gap.rests.length === 1 && gap.between === 1;
   const settled = gap.ticks < 0 || gap.ticks === rested(gap.rests, 0);
-  const over = single
-    ? gap.rests[0]
-    : gap.between === gap.rests.length && settled
-      ? restFor(gap, born)
-      : null;
+  const inPlace = order.length === 1 && gap.between === gap.rests.length && settled;
+
+  /** Whether the run answers to the whole region rather than to one rest inside it. */
+  let laidOut = true;
+  let over: StripItem | null;
+  if (single) {
+    over = gap.rests[0];
+  } else if (inPlace) {
+    over = restFor(gap, born);
+    laidOut = false;
+  } else if (itemsRunTogether(context, gap)) {
+    over = gap.rests[0] ?? null;
+  } else {
+    return null;
+  }
+
   if (over === null && gap.rests.length > 0) {
     return null;
   }
@@ -1307,19 +1543,36 @@ function spawnInto(
   // drawn past the end of a channel at all.
   const grows = gap.ticks < 0 && (over === null || over === gap.rests[gap.rests.length - 1]);
 
-  const before = born.startTick - (over ? over.startTick : gap.startTick);
-  const after = grows
-    ? Math.max(0, channelEnd - end)
-    : (single || over === null ? gap.startTick + gap.ticks : over.startTick + over.ticks) - end;
-  if (before < 0 || after < 0) {
+  const runFrom = laidOut || over === null ? gap.startTick : over.startTick;
+  const runTo = grows
+    ? Math.max(end, channelEnd)
+    : laidOut || over === null
+      ? gap.startTick + gap.ticks
+      : over.startTick + over.ticks;
+
+  /** One rest before each note, and one more after the last — `order.length + 1`. */
+  const gaps: number[] = [];
+  let at = runFrom;
+  for (const each of order) {
+    if (each.startTick < at) {
+      return null;
+    }
+
+    gaps.push(each.startTick - at);
+    at = each.startTick + each.ticks;
+  }
+
+  if (runTo < at) {
     return null;
   }
+
+  gaps.push(runTo - at);
 
   // The tick the song loops back to, where this channel is being opened and the
   // run is long enough to reach it. `gap.startTick` is 0 for an empty channel —
   // it has one region and it begins at the top — so the run's own ticks and the
   // channel's are the same count.
-  const total = before + born.ticks + after;
+  const total = runTo - runFrom;
   const introAt =
     empty && context.introTicks !== null && context.introTicks >= 0 && context.introTicks <= total
       ? context.introTicks
@@ -1331,7 +1584,11 @@ function spawnInto(
    * writes none at all and so leaves whatever stood.
    */
   const leaves = born.drum === null ? octaveFor(born.written) : null;
-  const reader = noteFrom(strip, gap.after + 1);
+  // The next *surviving* note, which is what bounds the region — `noteFrom`
+  // would find the first note item, and that may be one this plan is removing:
+  // an octave inserted at its head is an edit inside a range being deleted, and
+  // two edits over one run of text is what `planEdits` refuses.
+  const reader = gap.before < strip.items.length ? gap.before : -1;
 
   /**
    * The note that reads the octave the run leaves, and so has to be given the
@@ -1384,15 +1641,7 @@ function spawnInto(
    */
   const untouched = standing !== null && standing === owed && standing === leaves;
 
-  const run = spawnRun(
-    context,
-    born,
-    before,
-    after,
-    opening ? OPENING_OCTAVE : inForce,
-    introAt,
-    trailing,
-  );
+  const run = spawnRun(context, order, gaps, opening ? OPENING_OCTAVE : inForce, introAt, trailing);
   if (run === null) {
     return null;
   }
@@ -1407,21 +1656,26 @@ function spawnInto(
     restore = insertAt(strip.items[reader].unitSpan.start, `${spelled} `, 1);
   }
 
-  // Nothing at all between the notes either side, so the run is inserted rather
-  // than written over anything.
-  const edit = over
-    ? spliceRange(source, over.unitSpan, run)
-    : gap.rests.length === 0 && gap.between === 0
-      ? writeInto(context, gap, run)
-      : null;
+  // No rest to write over — the region holds nothing, or nothing but notes this
+  // plan is removing — so the run is inserted rather than written over anything.
+  const edit = over ? spliceRange(source, over.unitSpan, run) : writeInto(context, gap, run);
   if (edit === null) {
     return null;
   }
 
+  // A run laid out afresh is the whole region's ticks, so the rests it did not
+  // go over are gone: what they held is in the run now. Each goes as its own
+  // edit rather than the whole stretch going as one splice, since anything
+  // between them is a unit `planEdits` is removing and two edits over one run of
+  // text is what it refuses.
+  const gone = laidOut
+    ? gap.rests.filter((rest) => rest !== over).flatMap((rest) => removeItem(source, rest))
+    : [];
+
   // The run first where the two land on the same offset — a run inserted at the
   // head of the note it is being written in front of — so `coalesce` joins them
   // in the order they are read.
-  return restore ? [edit, restore] : [edit];
+  return restore ? [edit, ...gone, restore] : [edit, ...gone];
 }
 
 export function planEdits(context: EditContext, plan: Plan): Edit[] | null {
@@ -1559,8 +1813,16 @@ export function planEdits(context: EditContext, plan: Plan): Edit[] | null {
    * the way. Not every note in the plan — a channel already running past the cut
    * is an ordinary shape, and reading its tail as "reach" would have a deletion
    * lengthen the song.
+   *
+   * A carve fills `pushed` too, and its pieces are left out for that same
+   * reason: it only ever makes a note shorter, so every piece it leaves sits at
+   * a tick the channel had already reached, and a carve out in a channel's tail
+   * would otherwise pad every other channel out to meet a note nothing moved.
+   * `erased` is what says a carve is what filled it — the two resolvers never
+   * both run, since the mode picks one.
    */
-  const reach = [...plan.touched, ...plan.pushed].reduce(
+  const moved = plan.erased.length > 0 ? plan.touched : [...plan.touched, ...plan.pushed];
+  const reach = moved.reduce(
     (furthest, note) => Math.max(furthest, note.startTick + note.ticks),
     0,
   );
