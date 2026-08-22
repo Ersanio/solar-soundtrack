@@ -1125,6 +1125,17 @@ expectEdit(
 	},
 );
 
+// A carve through the *tail* of a note with a command written inside it is
+// fine: the note keeps its start, so the ramp keeps the tick it was written at
+// and only the last continuation is shortened.
+expectEdit(
+	"a note drawn over the tail of one with a command written inside it",
+	"#amk 2\n#0 o4 c4 v200 ^4 d4",
+	0,
+	() => ({ kind: "spawn", startTick: 72, ticks: 48, written: NOTE_MIN + 36 + 4, drum: null }),
+	{ mode: "overwrite", playsAsLong: true, contains: ["v200", "^8"] },
+);
+
 console.log("\nrefusals");
 expectRefused(
 	"a note dragged onto its neighbour, strictly",
@@ -1168,6 +1179,17 @@ expectRefused(
 		edge: "end",
 		deltaTicks: 24,
 	}),
+	"overwrite",
+);
+
+// The other end of the same note is refused, and the reason is the command
+// rather than the carve: the note would keep the ticks it kept but start later,
+// so the `v200` written inside it would fire later than it was written to.
+expectRefused(
+	"a note drawn over the head of one with a command written inside it",
+	"#amk 2\n#0 o4 c4 v200 ^4 d4",
+	0,
+	() => ({ kind: "spawn", startTick: 0, ticks: 24, written: NOTE_MIN + 36 + 4, drum: null }),
 	"overwrite",
 );
 

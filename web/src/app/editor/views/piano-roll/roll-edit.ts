@@ -889,6 +889,15 @@ function rewriteNote(
     return edit ? [edit] : [];
   }
 
+  // The command inside the note stands a number of ticks into it, and only the
+  // last continuation is rewritten, so a change that moves the note's **start**
+  // carries the command along with it: the note keeps the ticks it kept, and the
+  // ramp written inside them fires later than it was written to. Which ticks the
+  // porter meant to keep is not something the gesture says, so it is refused.
+  if (note.startTick !== item.startTick) {
+    return null;
+  }
+
   // More than one segment means a command sits inside the note — a mid-note
   // volume ramp is the usual one. Only the head and the last continuation are
   // rewritten, so the command keeps its place; a length below what the earlier
