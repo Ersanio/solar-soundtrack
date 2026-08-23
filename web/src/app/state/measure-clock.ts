@@ -27,7 +27,13 @@
  */
 
 import { SPC_SAMPLE_RATE, type SpcCore } from '@amk/spc/wasm-host';
-import { TICK_POLL_HZ, readNoteDuration, sawTick, tickVoice } from '@amk/spc/driver-state';
+import {
+  TICK_POLL_HZ,
+  createTickPhase,
+  sawTick,
+  seedTickPhase,
+  tickVoice,
+} from '@amk/spc/driver-state';
 import type { ClockSegment, SongClock } from './song-clock';
 
 /** Emulated frames per poll, matching what `worklet.ts` counts ticks at. */
@@ -110,7 +116,7 @@ export function measureClock(core: SpcCore, spc: Uint8Array, passTicks: number):
   let lead = -1;
   let nominalSeconds = 0;
   let voice = -1;
-  let duration = 0;
+  const tick = createTickPhase();
   let rendered = 0;
   let marked = 0;
   const cap = MAX_SECONDS * SPC_SAMPLE_RATE;
@@ -121,16 +127,14 @@ export function measureClock(core: SpcCore, spc: Uint8Array, passTicks: number):
 
     const aram = core.aram();
     if (voice < 0) {
-      // The song has not keyed on yet; latch the voice once it has, exactly as
-      // `worklet.ts` does, so both count off the same one.
+      // The song has not keyed on yet; latch the voice once it has and start the
+      // count there, exactly as `worklet.ts` does, so both start on the same tick.
       voice = tickVoice(aram);
-      duration = readNoteDuration(aram, voice);
+      seedTickPhase(tick, aram);
       continue;
     }
 
-    const now = readNoteDuration(aram, voice);
-    const stepped = sawTick(duration, now);
-    duration = now;
+    const stepped = sawTick(tick, aram);
     if (stepped === 0) {
       continue;
     }

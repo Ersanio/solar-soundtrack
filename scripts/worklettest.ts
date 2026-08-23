@@ -390,12 +390,11 @@ console.log("\nthe playhead is counted off the driver, not predicted");
 
 console.log("\nand off whichever voice the song plays");
 {
-	// The same music on `#1` alone. The count runs on one voice's duration
-	// counter, and the voice is latched off the driver's track pointers as it
-	// starts the song — through the moments it holds `$30` pointing into the zero
-	// page for its hot-patch reset (`main.asm:2104-2105`). Latching there takes
-	// voice 0, and this song never ticks it: the audio plays on while every
-	// position stays at 0. `tickVoice` reads the pointer as the driver does.
+	// The same music on `#1` alone. The count starts once a voice is latched off
+	// the driver's track pointers — through the moments it holds `$30` pointing
+	// into the zero page for its hot-patch reset (`main.asm:2104-2105`). Latching
+	// there takes voice 0 and starts the count before the song does. `tickVoice`
+	// reads the pointer as the driver does.
 	const lone = compileToSpc("#amk 4\n#1 t40 o4 v220 q7F @0 l8 c d e f g4 e4 c4 r4\n");
 	const { processor: fresh, sent: freshSent } = restart({ spc: lone, loopTicks: 0 });
 	render(fresh, 900);
@@ -436,6 +435,37 @@ console.log("\nlooping leaves the song running for the emulator to repeat");
 	check(
 		"exactly, however many passes have gone by",
 		positions(freshSent).every((m) => m.songTicks === m.ticks % LOOP_TICKS),
+	);
+}
+
+console.log("\nand a song of one-tick notes stays in phase with it");
+{
+	// The fold is `ticks % loopTicks` against the compiler's count, so a counter
+	// that runs slow does not wobble — it walks away, further every pass. A note
+	// one tick long is what makes it run slow if the count comes off `$70+2n`:
+	// the counter is decremented to zero and reloaded from the duration byte in
+	// the same pass (`main.asm:2337, 2440-2441`), so the 1 that arrives is the 1
+	// that was already there. Four of the twelve-tick groups below end in one,
+	// and the tempo accumulator does not care.
+	const TIED_TICKS = 48;
+	const tied = compileToSpc("#amk 4\n#0 t40 v220 q7F @10 o4 f+=11 h0 ^=1 f+=11 h0 ^=1 f+=11 h0 ^=1 f+=11 h0 ^=1\n");
+	const { processor: fresh, sent: freshSent } = restart({ spc: tied, loopTicks: TIED_TICKS }, true);
+	render(fresh, 1400); // some five passes at t40, where a pass is 48 ticks
+
+	const seen = positions(freshSent);
+	const first = seen.find((m) => m.ticks > 0);
+	const last = seen.at(-1);
+	check("it is several passes in", last !== undefined && last.ticks > TIED_TICKS * 4, `${last?.ticks} ticks`);
+
+	// Measured between two reports rather than from the load, so the driver's
+	// boot is not charged to the rate. t40 is a driver tempo of 41, and
+	// 500 x 41 / 256 is what one of its seconds holds.
+	const rate =
+		first === undefined || last === undefined ? 0 : (last.ticks - first.ticks) / (last.seconds - first.seconds);
+	check("at the rate its tempo asks for", Math.abs(rate / ((500 * 41) / 256) - 1) < 0.01, `${rate.toFixed(2)} ticks/s`);
+	check(
+		"so the playhead is still where the music is",
+		seen.every((m) => m.songTicks === m.ticks % TIED_TICKS),
 	);
 }
 

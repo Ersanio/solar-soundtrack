@@ -356,18 +356,32 @@ One entry each: what it was, what it is, why.
   restore. The roll's compile carries no trace, and asking for one costs an event per dispatch. A new
   `#N` goes at the **end of the document**, where nothing follows it to be disturbed; `orderChannels`
   is what puts the blocks in order afterwards, and it writes the `o` and `l` a moved block needs.
+- **Counting music ticks off a voice's note duration counter** — `$70+2n` is decremented once a tick
+  and reloaded from the duration byte the moment it reaches zero, both in the one pass
+  (`main.asm:2337, 2440-2441`), so a note one tick long is handed the 1 the counter already held and
+  the tick that fetched it moves nothing at all. A run of equal one-tick notes is worse: `emitNote`
+  drops the repeated duration byte, so `$0200+2n` stops moving too and nearly every tick goes
+  missing. The playhead is folded into one pass by `ticks % loopTicks` against the compiler's count,
+  so a counter that runs slow does not wobble — it walks away, further every pass, in the transport
+  and the roll together, since both read the one anchor. It is the driver's own gate instead: a pass
+  of the main loop ticks when `$49 + tempo × timer count` passes 255 (`main.asm:220-238`), by the
+  carry or by the product's high byte, which are one statement and of which the second is the branch
+  a song too busy to keep up leaves through. Read off `$44` and not `$49`, because the driver writes
+  `$44` at the top of the pass and `$49` most of a pass later, so a poll can land between the two and
+  only `$44` still names the count. `walktest` prices a song of one-tick ties at tempo — the counter
+  read it 8.5% slow, and a song of nothing but one-tick notes three times slow.
 - **Latching the audition's fast-forward on the track pointer alone**, the way `worklet.ts` does —
-  `L_0C31` sets every voice a phrase names to a duration counter of 1 before any of them fetch
-  (`main.asm:2314-2318`), and `SetInstrument` runs between that and the `dec` at `L_0C4D`, so a poll
-  landing in that window reads 1 and `sawTick` counts the first fetch as a tick of music. The note is
+  `L_0C22` installs every voice's pointer, and `L_0C31` gives them instruments, a whole pass before
+  any of them has read a duration byte (`main.asm:2302-2341`), so a poll landing there starts the
+  count on a song that is not reading music yet and `atTicks` comes round a pass early. The note is
   then handed over inside the pass that starts the song, and the phrase walk still to come reads the
   frames at `scratchAt` as its next phrase: every track pointer goes to zero and nothing sounds at
   all. It latches on `$0200+2n`, the duration byte a voice has actually read (`voiceStarted`), and
   the floor of one tick on `atTicks` is what starts the driver at all. `audiotest` sweeps three to
-  eight channels, because how much work `L_0C31` does before the tick voice's own write is what moves
-  the fetch against the poll — four channels was silent where one and two were not. The worklet keeps
-  the looser latch: a playhead a tick out is a playhead a tick out, where a note handed over a tick
-  early is not played.
+  eight channels, because how much work `L_0C31` does before the song's first fetch is what moves it
+  against the poll — four channels was silent where one and two were not. The worklet keeps the
+  looser latch: a playhead a tick out is a playhead a tick out, where a note handed over a tick early
+  is not played.
 - **Keeping the roll alive behind `[class.hidden]`**, as the source view is — the symmetry is
   inviting and it does not work: `display: none` destroys the layout box, so the native vertical
   scroller comes back at row 0 regardless, and a hidden roll goes on drawing marks, a grid and a

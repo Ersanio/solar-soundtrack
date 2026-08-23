@@ -41,11 +41,22 @@ observed — not one second of it is predicted. The driver keeps its whole worki
 page and `AddmusicKreadme/readme_files/aram_map.html` documents every byte, so tempo, per-voice
 position and the tick accumulator can simply be read.
 
-The tick count itself runs on one voice's note-duration counter — the lowest voice the driver is
-playing, latched off the track pointers as the song starts. "Playing" is judged the way the driver
-judges it, by the pointer's high byte alone (`main.asm:2315`): at song start `$30` briefly points
-into the zero page for the hot-patch reset (`main.asm:2104-2105`), and a whole-word test would latch
-voice 0 there and count nothing for the rest of a song whose lowest channel is `#1`.
+The tick count itself is the driver's own gate. A pass of the main loop multiplies the tempo by
+timer 0's count, adds it to the accumulator at `$49`, and plays a tick of music if that carried or if
+the product had a high byte at all (`main.asm:220-238`) — one statement, `$49 + tempo × count > $FF`,
+and the second half is the branch a song too busy to keep up leaves through. It is read off `$44`,
+the sound effect accumulator beside it, whose step names the count that made it: the driver writes
+`$44` at the top of the pass and `$49` most of a pass later, so a reading can land between them and
+only `$44` still says a pass has begun. Nothing about it depends on what the music is doing, which a
+count taken off a voice's note-duration counter cannot manage — `$70+2n` is reloaded from the
+duration byte the moment it reaches zero, in the same pass (`main.asm:2337, 2440-2441`), so a note
+one tick long is handed the 1 the counter already held and the tick that fetched it is invisible.
+
+Counting _starts_ on a voice, though: the lowest one the driver is playing, latched off the track
+pointers as the song starts. "Playing" is judged the way the driver judges it, by the pointer's high
+byte alone (`main.asm:2315`): at song start `$30` briefly points into the zero page for the hot-patch
+reset (`main.asm:2104-2105`), and a whole-word test would latch voice 0 there and start counting
+before the song it is meant to be following.
 
 That matters because prediction is not exact and cannot be made exact. The driver's main loop
 (`AddmusicKsrc/main.asm`, `MainLoop`) processes at most one music tick per iteration, so a song that

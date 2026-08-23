@@ -834,6 +834,33 @@ console.log("\nthe driver does not always run the song as fast as it is written"
 		`lead ${echoed.measured.leadSeconds.toFixed(3)} s vs ${plain.measured.leadSeconds.toFixed(3)} s`,
 	);
 
+	// A note one tick long moves the driver's duration counter by nothing at all:
+	// `$70+2n` is decremented to zero and reloaded from the duration byte in the
+	// same pass (`main.asm:2337, 2440-2441`), so a 1 arrives where a 1 already
+	// was. The count comes off the tempo accumulator instead, which is the
+	// driver's own gate and knows nothing about note lengths. `h0` between the
+	// note and the `^` is what keeps the tie from folding in (`parser.ts`,
+	// `accumulateTiedLength`), and a run of equal one-tick notes drops the
+	// duration byte altogether, so `$0200+2n` stops moving too.
+	const tied = run("#amk 4\n#0 t23 q7F @10 o4 f+=11 h0 ^=1 f+=11 h0 ^=1 f+=11 h0 ^=1 f+=11 h0 ^=1\n");
+	check(
+		"a song of one-tick ties measures at tempo",
+		Math.abs((tempoShortfall(tied.measured) ?? 0) - 1) < 0.02,
+		`${(tempoShortfall(tied.measured) ?? 0).toFixed(4)}x`,
+	);
+
+	const drummed = run(`#amk 4\n#0 t23 q7F @10 o4 ${"c=1".repeat(48)}\n`);
+	check(
+		"and so does one of nothing but one-tick notes",
+		Math.abs((tempoShortfall(drummed.measured) ?? 0) - 1) < 0.02,
+		`${(tempoShortfall(drummed.measured) ?? 0).toFixed(4)}x`,
+	);
+	check(
+		"both reaching the tick count the compiler wrote them for",
+		!tied.measured.truncated && !drummed.measured.truncated && tied.passTicks === 48 && drummed.passTicks === 48,
+		`${tied.passTicks} and ${drummed.passTicks} ticks`,
+	);
+
 	// The measured clock has to be usable through the same two functions the
 	// predicted one is, or the transport cannot read one for the other.
 	const clock = hard.measured.clock;
