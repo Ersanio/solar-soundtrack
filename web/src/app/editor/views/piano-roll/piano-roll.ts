@@ -204,7 +204,7 @@ export class PianoRoll {
   /**
    * Which channels are heard, by index.
    *
-   * One map for both readers. `heldRows` recomputes on every frame of playback,
+   * One map for all three readers. `heldRows` recomputes on every frame of playback,
    * and building this inside it would rebuild eight entries sixty times a second
    * to answer a question that only changes when the mixer is touched.
    */
@@ -476,8 +476,9 @@ export class PianoRoll {
 
   /**
    * The whole song, drawn small — and deliberately not from {@link playTick}, so
-   * it rebuilds on a recompile, a percussion change or a resize and never on a
-   * frame. Its rows come from the same `rowOf` the marks ask.
+   * it rebuilds on a recompile, a percussion change, a mute or a resize and never
+   * on a frame. Its rows come from the same `rowOf` the marks ask and its colours
+   * from the same `CHANNEL_FILL`.
    */
   protected readonly minimap = computed(() =>
     buildMinimap({
@@ -486,6 +487,7 @@ export class PianoRoll {
       context: this.placeContext(),
       ticks: this.songTicks(),
       width: this.rollWidth(),
+      audible: this.audible(),
     }),
   );
 

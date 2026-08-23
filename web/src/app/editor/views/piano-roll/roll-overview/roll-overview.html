@@ -38,13 +38,17 @@
       />
     }
 
+    <!-- The roll's own colours, so this reads as the roll seen from further off
+         rather than as a second picture of it: a channel is the same hue in
+         both, and one the mixer silences is dimmed in both. -->
     @for (bar of bars(); track bar.id) {
       <rect
-        class="fill-ink-muted"
         [attr.x]="bar.x"
         [attr.y]="bar.y"
         [attr.width]="bar.w"
         [attr.height]="bar.h"
+        [class]="bar.fill"
+        [attr.fill-opacity]="bar.opacity"
       />
     }
 
