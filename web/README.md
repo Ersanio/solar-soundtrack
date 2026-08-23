@@ -382,7 +382,10 @@ they leave free is lightness: `--color-accent` is a blue of much the same lightn
 one channel. On a plate the glyph reads against the plate, so one pair of colours does for all eight.
 What fits is measured (`fitBarContent`): the name has priority
 and the glyphs drop from the end, because a bar that says `C6` and nothing else is still saying
-something. Anything dropped is in the hover and in the inspector, so nothing is only on a bar. A
+something. Anything dropped is in the hover and in the inspector, so nothing is only on a bar. The
+mark that stands for the dropped ones takes the plate when any of them is one the note puts in force
+— it is what is left of that glyph, and a bar too narrow to draw it would otherwise say the note
+inherits everything it plays under. A
 muted channel is drawn dimmed, behind the others, and takes no pointer at all, so where a live note
 overlaps it the live one is what a hover or a click reaches — and it cannot be edited either, the
 strip refusing it in the words the note previewer refuses to sound it in (`silencedReason`), so a

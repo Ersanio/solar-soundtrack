@@ -120,19 +120,31 @@
          it reads as one of the row. Not a glyph out of the palette, though: it
          stands for a list rather than a command, so it has no span to reveal
          and no handler of its own — the plate is there to be lit, and the click
-         it does not stop reaches the bar, whose answer is the whole list. -->
+         it does not stop reaches the bar, whose answer is the whole list.
+
+         It inverts on the same terms a glyph does, for any one of the commands
+         it stands for: it is what is left of those glyphs, so a bar narrow
+         enough to lose the one that took effect here would otherwise read as a
+         note inheriting everything it plays under. -->
     @if (mark.more; as more) {
       <svg:g class="group">
         <svg:rect
           rx="2"
-          class="fill-ink/0 group-hover:fill-ink/25"
+          [class]="
+            more.defining
+              ? 'fill-ink/70 group-hover:fill-ink'
+              : 'fill-ink/0 group-hover:fill-ink/25'
+          "
           [attr.x]="more.x"
           [attr.y]="more.y"
           [attr.width]="more.size"
           [attr.height]="more.size"
+          [attr.fill-opacity]="mark.opacity"
         />
         <svg:g
-          class="fill-ink pointer-events-none"
+          class="pointer-events-none"
+          [class.fill-ink]="!more.defining"
+          [class.fill-surface]="more.defining"
           [attr.fill-opacity]="mark.opacity"
           [attr.transform]="`translate(${more.x} ${more.y})`"
         >

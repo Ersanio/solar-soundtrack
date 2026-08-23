@@ -78,8 +78,15 @@ export interface Mark {
    * two cannot answer differently.
    */
   defining: ReadonlySet<Command>;
-  /** The "and more" mark, drawn when the bar had room for only some of them. */
-  more: { x: number; y: number; size: number } | null;
+  /**
+   * The "and more" mark, drawn when the bar had room for only some of them.
+   *
+   * `defining` when one of the commands it stands for takes effect at this note,
+   * so it wears the same plate a defining glyph does: the mark is what is left
+   * of that glyph, and a bar too narrow to show it would otherwise say the note
+   * inherits everything it plays under.
+   */
+  more: { x: number; y: number; size: number; defining: boolean } | null;
   note: WalkNote;
 }
 
@@ -245,7 +252,16 @@ export function buildMarks(request: MarkRequest): Mark[] {
       more:
         content.more === null
           ? null
-          : { x: x + content.more.x, y: y + content.more.y, size: content.more.size },
+          : {
+              x: x + content.more.x,
+              y: y + content.more.y,
+              size: content.more.size,
+              // The ones it stands for are the tail, the boxes having been
+              // handed back in the list's own order; `charttest` pins that.
+              defining: drawable
+                .slice(content.glyphs.length)
+                .some((each) => defining.has(each.command)),
+            },
       note,
     });
   }
