@@ -61,7 +61,7 @@ import {
 } from "@amk/spc/song-walk";
 import { secondsAtTick, songClock } from "../web/src/app/state/song-clock";
 import { measureClock, tempoShortfall } from "../web/src/app/state/measure-clock";
-import { commandsInForceOf } from "../web/src/app/state/commands-in-force";
+import { commandsInForceOf, definedAt, notePreceding } from "../web/src/app/state/commands-in-force";
 import { driverTickSeconds } from "@amk/tokens/commands/units";
 
 import { SPC_ASSETS, check, stubFetch, summarise } from "./harness";
@@ -1106,6 +1106,16 @@ console.log("\nthe command in force at a note is named exactly");
 		return {
 			timeline,
 			glyphs: (n: number) => inForce(timeline.notes[n]).map(spell).join(" "),
+			/** Of those, the ones that note puts in force rather than inherits. */
+			defined: (n: number) => {
+				const note = timeline.notes[n];
+				const before = notePreceding(timeline.notes, note);
+				const fresh = definedAt(inForce(note), before === null ? [] : inForce(before));
+				return inForce(note)
+					.filter((command) => fresh.has(command))
+					.map(spell)
+					.join(" ");
+			},
 			foldedInto: (text: string) => {
 				const command = commandStartingAt(index.commands, source.indexOf(text));
 				return command === null ? "?" : (folded.get(command) ?? []).map(spell).join(" ");
@@ -1160,6 +1170,112 @@ console.log("\nthe command in force at a note is named exactly");
 		"a drum loaded by a call from another channel is named on that channel's note",
 		e >= 0 && called.glyphs(e) === "@21",
 		called.glyphs(e),
+	);
+
+	// Which of the commands acting on a note the note *puts* in force, which is
+	// the other half of the same question and the one the roll's plated glyphs
+	// draw. A run of notes under one `v200` all name it; only the first of them
+	// is where it landed, and nothing but the note before it on its channel can
+	// say which that is.
+	const run = acting("#amk 4\n#0 v200 c8 d8 e8\n");
+	check("a note names the command it puts in force", run.defined(0) === "v200", run.defined(0));
+	check(
+		"and the notes carrying it name none of it, while still playing under it",
+		run.defined(1) === "" && run.defined(2) === "" && run.glyphs(1) === "v200",
+		`${run.defined(1)} | ${run.glyphs(1)}`,
+	);
+
+	const changed = acting("#amk 4\n#0 v200 c8 v100 d8\n");
+	check("a second command is put in force by the note after it", changed.defined(1) === "v100", changed.defined(1));
+
+	// Per channel, and not per place in the list: the walk sorts by tick and then
+	// by channel, so the note before `#0`'s second `c8` in `notes` is `#1`'s first
+	// `d8`, whose commands have nothing to do with it.
+	const both = acting("#amk 4\n#0 v200 c8 c8\n#1 v100 d8 d8\n");
+	check(
+		"the note before is the one before on that channel",
+		both.defined(0) === "v200" && both.defined(1) === "v100" && both.defined(2) === "" && both.defined(3) === "",
+		[0, 1, 2, 3].map((n) => `${n}:${both.defined(n)}`).join(" "),
+	);
+
+	// `recordOrigin` calls `invalidateAll` on a song-wide write, so every channel
+	// gets a fresh `origins` array holding the same addresses. Comparing the
+	// arrays rather than the commands in them lights up every channel's next note.
+	const tempo = acting("#amk 4\n#0 v200 c8 t144 c8\n#1 v100 d8 d8\n");
+	check(
+		"a song-wide command puts nothing else back in force",
+		tempo.timeline.notes.filter((_, n) => tempo.defined(n) !== "").length === 2,
+		tempo.timeline.notes.map((_, n) => `${n}:${tempo.defined(n)}`).join(" "),
+	);
+
+	// `origins` names a command by the address the driver read it from, and
+	// `recordOrigin` skips a write to the address already in the slot, so a body
+	// re-running a command that changes nothing changes nothing here either.
+	const body = acting("#amk 4\n#0 [ v200 c8 ]2 d8\n");
+	check(
+		"a [ ] re-running an unchanged command is not a second definition",
+		body.defined(0) === "v200" && body.defined(1) === "" && body.defined(2) === "",
+		[0, 1, 2].map((n) => `${n}:${body.defined(n)}`).join(" "),
+	);
+
+	// Where it alternates, every note is a definition, the slot having been taken
+	// by the other command in between.
+	const alternating = acting("#amk 4\n#0 [ v200 c8 v100 d8 ]2\n");
+	check(
+		"but one that alternates is a definition every time round",
+		[0, 1, 2, 3].every((n) => alternating.defined(n) !== ""),
+		[0, 1, 2, 3].map((n) => `${n}:${alternating.defined(n)}`).join(" "),
+	);
+
+	// `$DA` clears the noise slot (`song-walk.ts`, `slotsOf`), so the second pass
+	// writes an address the slot no longer holds and the `$F8` is in force again.
+	const cleared = acting("#amk 4\n#0 [ $F8 $10 c8 $DA $01 d8 ]2\n");
+	check(
+		"a slot cleared in between is put back in force by the byte that re-enables it",
+		cleared.defined(2).includes("$F8"),
+		cleared.defined(2),
+	);
+
+	check(
+		"the note whose byte loaded a drum is where its @ took effect",
+		plain.defined(0) === "@21" && plain.defined(1) === "",
+		`${plain.defined(0)} | ${plain.defined(1)}`,
+	);
+	// The `*` replays the drum byte itself, so the definition is that replay and
+	// not the note after it: `$DA` took the drum away in between, and the byte
+	// putting it back is the note the `[ ]` body plays again.
+	check(
+		"and a * that reloads one is a definition on the replayed note, not the next",
+		replayed.defined(2) === "@21" && replayed.defined(3) === "",
+		`2:${replayed.defined(2)} 3:${replayed.defined(3)}`,
+	);
+
+	// One written `v200`, two channels, and it is put in force on both — which is
+	// why the glyph that says so cannot be a channel's own colour.
+	const shared = acting("#amk 4\n#0 (1)[ v200 c8 ]1 d8\n#1 v100 e8 (1)1 f8\n");
+	const mine = shared.timeline.notes.findIndex((note) => note.channel === 0);
+	const theirs = shared.timeline.notes.findIndex((note, n) => note.channel === 1 && shared.glyphs(n) === "v200");
+	check(
+		"one written command is put in force on every channel that calls it",
+		mine >= 0 && theirs >= 0 && shared.defined(mine) === "v200" && shared.defined(theirs) === "v200",
+		`${shared.defined(mine)} | ${theirs >= 0 ? shared.defined(theirs) : "?"}`,
+	);
+
+	// Nothing came before, so everything the note plays under started at it.
+	const opening = acting("#amk 4\n#0 q7f v200 c8\n");
+	check(
+		"a channel's first note puts everything in force, folded before walked",
+		opening.defined(0) === "q7f v200",
+		opening.defined(0),
+	);
+
+	// The pass the walk produces runs straight through the marker, and everything
+	// read off a `WalkNote` is a statement about that one pass.
+	const intro = acting("#amk 4\n#0 v200 c8 / d8\n");
+	check(
+		"an intro marker is not a boundary",
+		intro.timeline.loopTick !== null && intro.defined(1) === "",
+		`${intro.timeline.loopTick} | ${intro.defined(1)}`,
 	);
 }
 

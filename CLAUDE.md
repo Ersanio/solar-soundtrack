@@ -606,6 +606,20 @@ stats.loopTicks` pads **every other channel that would cut the song short** out 
   the roll's own `MUTED_OPACITY` rather than dropped, and in a second map so its bars come back
   first and a live one is never veiled by the wash of something that cannot be heard; `charttest`
   pins all of it, none of it visible in a screenshot.
+- **Tinting the glyph a note puts in force, and finding it by comparing `origins` arrays** — the
+  first is the reading issue #34's own words invite and there is no colour that survives it: the
+  eight channel fills are mid-tone and chromatic, so `--color-accent` goes on `--color-ch-0`,
+  `--color-warn` on `--color-ch-3` and `--color-good` on `--color-ch-2`, and each is the one that
+  vanishes on some channel. The axis the set leaves free is lightness, which is the property
+  `roll-notes.html` already leans on for the hover, so a defining glyph is a near-white plate with
+  the icon in `--color-surface` and reads against the plate rather than against the bar. The second
+  is the cheap spelling of `definedAt` and it is wrong after every `t`: `recordOrigin` calls
+  `invalidateAll`, so a song-wide write hands all eight channels a fresh array holding the same
+  addresses and every channel's next note claims to set everything it plays under. It is the
+  identity of the commands in the list, `index.commands` holding one stable object each. Nor from
+  source order — the glyph names whichever command the driver had in force, so in
+  `v255 (1)[ c ]2 v200 (1)5` the text has that `c` setting `v255` on the pass it sounds under
+  `v200`. `walktest` writes a song for each of the three.
 
 ## Angular specifics
 

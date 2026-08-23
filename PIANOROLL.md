@@ -69,6 +69,19 @@ the roll along with you. Anything that moves the **view** unticks **Follow playb
 bar always, the timeline only when a drag runs off the end of it and starts scrolling — since you
 have taken the roll somewhere the song is not. Tick it again to catch up with the music.
 
+## What a note's icons mean
+
+A bar carries its own pitch on the left and, on the right, one icon per command acting on that
+note — its volume, its envelope, its instrument, and so on. Hover the bar to have them named, click
+one to ask the inspector about that command, or double-click it to go to it in the MML.
+
+An icon on a **solid pale chip** is a command that note puts in force; a plain outlined icon is one
+it inherits from earlier in the channel. So a run of notes under one `v200` shows the chip on the
+note the `v200` actually landed on and the outline on the rest, and the hover says the same thing in
+words — "sets volume" against "under volume". A wide bar shows more icons than a narrow one, and a
+bar too small for its own name shows none at all; three dots in the last slot mean there are more
+than fit, and the hover and the inspector always have the whole list.
+
 ## Three settings that decide how a drag lands
 
 **Grid** is the time signature the bar lines are drawn from: beats in a bar, over the note value that

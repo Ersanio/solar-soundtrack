@@ -17,6 +17,7 @@ export const CHANGELOG: readonly ChangelogEntry[] = [
       'The piano roll says why a gesture was refused instead of quietly doing nothing',
       'The piano roll does not error on songs with remote commands anymore',
       'The overview bar above the piano roll colours its notes by channel, like the roll itself',
+      'The piano roll marks which note a command takes effect at, apart from the notes inheriting it',
     ],
   },
   {

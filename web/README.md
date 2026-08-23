@@ -373,7 +373,14 @@ driver's own pitch for its drum, since the letter it was written under had no sa
 compact spelling of the key column's `o6 c` — and on the right a glyph per command in force, drawn
 from the same catalogue the command palette's buttons are. A single click asks the inspector about
 that note; a double click goes to it in the source, which is what a click alone used to do. Clicking
-a glyph targets its command instead. What fits is measured (`fitBarContent`): the name has priority
+a glyph targets its command instead. A glyph the note itself **puts** in force is drawn inverted —
+a near-white plate with the icon in `--color-surface` — where one it carries in from an earlier note
+is a plain light icon, so a run of notes under one `v200` says which of them the `v200` landed on. It
+is a plate and not a tint because the eight channel fills are mid-tone and chromatic, and the axis
+they leave free is lightness: `--color-accent` is a blue of much the same lightness as
+`--color-ch-0`, `--color-warn` sits on `--color-ch-3`, and each would be the colour that vanished on
+one channel. On a plate the glyph reads against the plate, so one pair of colours does for all eight.
+What fits is measured (`fitBarContent`): the name has priority
 and the glyphs drop from the end, because a bar that says `C6` and nothing else is still saying
 something. Anything dropped is in the hover and in the inspector, so nothing is only on a bar. A
 muted channel is drawn dimmed, behind the others, and takes no pointer at all, so where a live note
@@ -394,6 +401,17 @@ note byte, and that byte loads a sample every note after it plays on, through a 
 from another channel — so the walk names the note that loaded it (`WalkNote.drumFrom`) and the source
 is asked about that note. `state/commands-in-force.ts` is the join, kept out of the store so
 `walktest` can pin all three halves on the songs that need each.
+
+**Which of them a note puts in force is that list against the note before it on its channel**
+(`definedAt`), by the identity of the commands and never of the arrays holding them: a song-wide
+write invalidates every channel's frozen `origins` (`recordOrigin`), so after a `t` all eight get a
+fresh array holding the same addresses, and comparing arrays would report every channel's next note
+as setting everything it plays under. In walk order rather than source order, for the reason above —
+the glyph names whichever command the driver had in force, so a reading taken from the text would
+have that `c` setting `v255` on the pass it sounds under `v200`. Every command that reaches a glyph
+is channel-local, `commandScope` having dropped the song-wide slots and `remote`, so the note before
+on the channel is the whole comparison. `buildMarks` gets that neighbour from the loop that draws the
+bars, and `notePreceding` answers the same question where there is no such loop.
 
 The song's own settings and the shape of the music get no glyph — `t`, `w`, `$E4` and the echo unit
 reach every note alike, and `o`, `<`, `>` and `l` are what the bar's row and width already are.
