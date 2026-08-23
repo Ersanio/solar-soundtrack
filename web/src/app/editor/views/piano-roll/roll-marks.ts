@@ -206,10 +206,6 @@ export function buildMarks(request: MarkRequest): Mark[] {
       command,
       entry: glyphOf(command),
     }));
-    const drawable = acting.filter((each) => each.entry !== null);
-    const name = headingOf(note, context);
-    const content = fitBarContent(w, h, name, drawable.length);
-    const muted = audible.get(note.channel) === false;
     // Only the notes on screen ask, so the neighbour's list is fetched at most
     // once per drawn bar and the lookup's cache answers all but the first of a
     // run. A note with nothing acting on it needs no comparison at all.
@@ -220,6 +216,23 @@ export function buildMarks(request: MarkRequest): Mark[] {
             acting.map((each) => each.command),
             previous === null ? [] : inForce(previous),
           );
+
+    // The ones the note puts in force lead, and the slot order the list arrives
+    // in holds within each half. A bar drops from the end, so what survives a
+    // narrow one is what starts at this note rather than whatever `SLOTS`
+    // happens to name first — a `q` no note has touched for a page outranked
+    // the `v` the bar was drawn to show.
+    const glyphed = acting.filter((each) => each.entry !== null);
+    const drawable =
+      defining.size === 0
+        ? glyphed
+        : [
+            ...glyphed.filter((each) => defining.has(each.command)),
+            ...glyphed.filter((each) => !defining.has(each.command)),
+          ];
+    const name = headingOf(note, context);
+    const content = fitBarContent(w, h, name, drawable.length);
+    const muted = audible.get(note.channel) === false;
 
     (muted ? behind : front).push({
       id: `${note.address}:${note.tick}:${note.channel}`,

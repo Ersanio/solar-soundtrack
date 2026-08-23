@@ -620,6 +620,14 @@ stats.loopTicks` pads **every other channel that would cut the song short** out 
   source order — the glyph names whichever command the driver had in force, so in
   `v255 (1)[ c ]2 v200 (1)5` the text has that `c` setting `v255` on the pass it sounds under
   `v200`. `walktest` writes a song for each of the three.
+- **Drawing a bar's glyphs in the walk's slot order alone** — `fitBarContent` drops from the end, so
+  the ones a narrow bar kept were whichever `SLOTS` names first, and a bar with room for one spent it
+  on a `q` no note had touched for a page while the `v` that note actually sets went behind the dots
+  with nothing but the mark's plate to say it had. The ones the note puts in force lead
+  (`buildMarks`), slot order holding within each half, so the cut takes the inherited ones first. The
+  cost is real and is the smaller one: a command moves along the row between the note that sets it
+  and the notes after it. Not a fix in `fitBarContent` either — it is handed a count, and a layout
+  that knew which glyph mattered would be a layout that knew what a glyph was.
 
 ## Angular specifics
 
