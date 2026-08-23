@@ -382,6 +382,16 @@ export interface WalkCommand {
 	address: number;
 	/** The `$DA`-`$FE` byte itself. */
 	vcmd: number;
+	/**
+	 * Whether it took a slot rather than gave one up.
+	 *
+	 * `$DF`, `$F0`, `$FD` and `$FE` clear one, so no note's `origins` can ever
+	 * hold them and nothing asking a note what is acting on it will name them.
+	 * A reader wanting the commands a note cannot report has no other way to
+	 * tell, and reading it off {@link WalkCommand.vcmd} would restate the table
+	 * `slotsOf` already is.
+	 */
+	fills: boolean;
 }
 
 /** A song-wide tempo command, on the tick the driver runs it. */
@@ -779,7 +789,7 @@ export function walkSong(song: Uint8Array, aramAddress: number): SongTimeline {
 		}
 
 		if (moved) {
-			commands.push({ tick: track.ticks, channel, address, vcmd });
+			commands.push({ tick: track.ticks, channel, address, vcmd, fills: writes !== null });
 		}
 	};
 

@@ -227,8 +227,8 @@ export class EditorStore {
   });
 
   /**
-   * Every command the song puts in force, and the tick it does it at — the roll's
-   * command lane. The join itself is `command-timeline.ts`, so `walktest` can pin
+   * The commands no note bar can carry, and the ticks they run at — the roll's
+   * command lane. The rule itself is `command-timeline.ts`, so `walktest` can pin
    * it; this holds it to the current scan and compile.
    *
    * Empty while the editor has moved past the text that compiled, for the reason
@@ -245,9 +245,7 @@ export class EditorStore {
     return commandTimeline({
       timeline,
       index: this.tokens(),
-      text: this.source(),
       commands: this.commandsByAddress(),
-      notes: this.notesByAddress(),
     });
   });
 

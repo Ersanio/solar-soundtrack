@@ -8,7 +8,7 @@ import { type GridLine, RollGrid } from '../roll-grid/roll-grid';
 import { KEY_WIDTH, LANE_HEIGHT, LANE_ROW } from '../roll-metrics';
 
 /**
- * The command lane: every command the song puts in force, on the song's own
+ * The command lane: the commands a note bar cannot carry, on the song's own
  * timeline and with the note data out of the way.
  *
  * Drawn in the roll's **own** coordinates, like the scrub bar above it — the
@@ -19,7 +19,7 @@ import { KEY_WIDTH, LANE_HEIGHT, LANE_ROW } from '../roll-metrics';
  *
  * Everything in it is a command *taking effect*, so nothing here wears the
  * inverted plate a bar's glyph does: a bar draws what a note defines beside what
- * it inherits and has to tell them apart, and this draws only the first kind.
+ * it inherits and has to tell them apart, and nothing in this is inherited.
  *
  * It writes to `EditorRequests` itself, as the roll's own bars do. It does not
  * pick the edit channel with it, which a bar's glyph does: this holds all eight,

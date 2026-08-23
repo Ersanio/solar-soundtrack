@@ -336,6 +336,18 @@ console.log("\nthe song's command list");
 	const idle = map("#amk 4\n#0 o4 @1 c8 $DF d8\n");
 	check("but one with nothing to clear is not", idle === "0:#0:@1", idle);
 
+	// Which of the two it was. Only a command that *fills* a slot can be in a
+	// note's `origins` and so on a bar, and the lane is the complement of the
+	// bars — this is the half of that test no scope can make.
+	{
+		const { timeline } = build("#amk 4\n#0 o4 @1 $DE $00 $0C $08 c8 $DF d8\n");
+		const fills = timeline.commands
+			.filter((command) => command.vcmd !== 0xfa) // the blob's own prefix
+			.map((command) => `$${command.vcmd.toString(16)}:${command.fills}`)
+			.join(" ");
+		check("a command says whether it took a slot or gave one up", fills === "$da:true $de:true $df:false", fills);
+	}
+
 	// `$DA` writes the instrument and clears the noise in the one execution
 	// (`slotsOf`), and it is one command, so it is one entry.
 	const two = map("#amk 4\n#0 o4 $F8 $10 c8 @1 d8\n");

@@ -93,18 +93,26 @@ Under the roll is a strip holding nothing but command icons, on the song's own t
 effect, and where, with the note data out of the way. **Commands** on the toolbar opens and closes
 it, and it stays as you left it.
 
-It is all eight channels at once, each icon in its channel's colour, and it shows only commands that
-**change** something — the `v200` at the head of a run and not the notes that go on playing under it,
-a `[ v100 c v200 d ]2` four times over because each turn moves the volume twice, and a `$DF` that
-switches vibrato off, which no note is playing under and so appears on no bar. The song's own
-settings are here too — `t`, `w`, `$E4`, the echo — which a bar never shows, since they belong to no
-one channel. A muted channel fades rather than disappears.
+It holds **what the bars cannot show**, so nothing appears twice. That is two things:
+
+- **The song's own settings** — `t`, `w`, `$E4` and the whole echo unit, `$EF` to `$F2` and the `$F5`
+  filter. These reach every channel at once, so they act on the song rather than on any note of it,
+  and no bar has ever drawn them.
+- **The commands that switch something off** — `$DF`, `$F0`, `$FD`, `$FE`. A bar names what a note is
+  playing _under_, and there is nothing to name once vibrato is off, so these appear on no bar at any
+  point in the song.
+
+Everything else stays on the bars: a `v`, a `q`, a `@`, an `$ED` and the rest of the channel state is
+already on the note that sets it, with a solid chip to say so.
+
+The icons are all eight channels at once, each in its channel's colour — which for a song-wide
+command is the channel that wrote it — and a muted channel fades rather than disappears.
 
 The lane scrolls sideways with the roll and carries the same grid and the same playhead, so an icon
-sits under the note it acts on and on the beat it lands on. Where several land on one tick they stack upwards; three icons deep is as much as fits,
-and a plain wheel over the lane lifts the stack when there is more. A tick crowded past what the lane
-will draw at all ends in three dots; hover them for how many are behind. Click an icon to ask the
-inspector about that command, or double-click it to go
+sits under the note it acts on and on the beat it lands on. Where several land on one tick they stack
+upwards; three icons deep is as much as fits, and a plain wheel over the lane lifts the stack when
+there is more. A tick crowded past what the lane will draw at all ends in three dots; hover them for
+how many are behind. Click an icon to ask the inspector about that command, or double-click it to go
 to it in the MML — the same as clicking one on a bar, except that it leaves the channel you are
 editing alone.
 

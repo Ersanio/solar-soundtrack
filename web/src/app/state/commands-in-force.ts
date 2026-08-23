@@ -18,62 +18,6 @@ export interface InForceSources {
 }
 
 /**
- * The scanned command a walked note was written as, or `null` off the map.
- *
- * Its own factory because both lookups below need it, and each of them is built
- * once per compile: the note map and the scan are what it closes over.
- */
-function writtenAt(sources: InForceSources): (address: number) => Command | null {
-  const { index, notes } = sources;
-  return (address) => {
-    const span = notes.get(address)?.span;
-    return span === undefined ? null : commandStartingAt(index.commands, span.start);
-  };
-}
-
-/**
- * The half of the answer that emits no bytes: `q`, `h` and `@21`-`@29`.
- *
- * Split out because it is the half a *tick* can be given honestly. These fold
- * into a note's own frame, so the note they are folded into is where they take
- * effect — where a command that emits bytes runs at the tick the driver reads
- * it, which is a fact only the walk's own record holds.
- *
- * Cached on the two things it is derived from, both of which a run of notes
- * under unchanged state shares.
- */
-export function foldedInForceOf(sources: InForceSources): (note: WalkNote) => readonly Command[] {
-  const parseTime = parseTimeInForce(sources.index, sources.text);
-  const written = writtenAt(sources);
-  const cache = new Map<Command | null, Map<number, readonly Command[]>>();
-
-  return (note: WalkNote) => {
-    const own = written(note.address);
-    let byDrum = cache.get(own);
-    if (byDrum === undefined) {
-      byDrum = new Map();
-      cache.set(own, byDrum);
-    }
-
-    const drumKey = note.drumFrom ?? -1;
-    const found = byDrum.get(drumKey);
-    if (found !== undefined) {
-      return found;
-    }
-
-    // The drum comes from the note that loaded it, which is this one for a drum
-    // note; anything else folded into *that* note is not folded into this one.
-    const folded = own === null ? [] : (parseTime.get(own) ?? []);
-    const loader = note.drumFrom === null ? null : written(note.drumFrom);
-    const drum =
-      loader === null ? [] : (parseTime.get(loader) ?? []).filter(isPercussionInstrument);
-    const acting = [...folded.filter((command) => !isPercussionInstrument(command)), ...drum];
-    byDrum.set(drumKey, acting);
-    return acting;
-  };
-}
-
-/**
  * The commands acting on a walked note, exactly — a lookup rather than a map.
  *
  * Three answers joined, each exact in its own half:
@@ -104,14 +48,19 @@ export function foldedInForceOf(sources: InForceSources): (note: WalkNote) => re
  * run of notes under unchanged state, so a long song resolves a handful of lists.
  */
 export function commandsInForceOf(sources: InForceSources): (note: WalkNote) => readonly Command[] {
-  const { index, commands: byAddress } = sources;
+  const { index, text, commands: byAddress, notes } = sources;
   const commands = index.commands;
-  const folded = foldedInForceOf(sources);
-  const written = writtenAt(sources);
+  const parseTime = parseTimeInForce(index, text);
   const cache = new Map<
     readonly (number | null)[],
     Map<Command | null, Map<number, readonly Command[]>>
   >();
+
+  /** The scanned command a walked note was written as, or `null` off the map. */
+  const written = (address: number): Command | null => {
+    const span = notes.get(address)?.span;
+    return span === undefined ? null : commandStartingAt(commands, span.start);
+  };
 
   const walked = (origins: readonly (number | null)[]): Command[] => {
     const acting: Command[] = [];
@@ -147,8 +96,17 @@ export function commandsInForceOf(sources: InForceSources): (note: WalkNote) => 
     }
 
     // The parse-time ones first: they are what the note itself was written
-    // under, where the rest reached it from wherever the driver had been.
-    const acting = [...folded(note), ...walked(note.origins)];
+    // under, where the rest reached it from wherever the driver had been. The
+    // drum comes from the note that loaded it, which is this one for a drum note.
+    const folded = own === null ? [] : (parseTime.get(own) ?? []);
+    const loader = note.drumFrom === null ? null : written(note.drumFrom);
+    const drum =
+      loader === null ? [] : (parseTime.get(loader) ?? []).filter(isPercussionInstrument);
+    const acting = [
+      ...folded.filter((command) => !isPercussionInstrument(command)),
+      ...drum,
+      ...walked(note.origins),
+    ];
     byDrum.set(drumKey, acting);
     return acting;
   };
