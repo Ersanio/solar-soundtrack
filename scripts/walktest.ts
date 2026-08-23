@@ -29,7 +29,7 @@
  *    reason `audiotest` gives: a pointer read from outside the emulator can be
  *    caught half-written.
  *
- * A fourth, for `AMK0502`: a loop that repeats too many times must kill no
+ * A fourth, for `SST0502`: a loop that repeats too many times must kill no
  * *written* note. The same four notes sound in the iterations that survive, and
  * a diagnostic that underlined them would be telling an author a note is dead
  * while they can hear it playing.
@@ -576,7 +576,7 @@ console.log("\na channel longer than the song is reported, not drawn");
 	const [warning] = unreachableChannels(uneven.timeline, uneven.result.noteMap ?? []);
 
 	check("an over-long channel is reported", warning !== undefined);
-	check("it is AMK0502 and severe", warning?.code === "AMK0502" && warning?.severity === "severe", warning?.code);
+	check("it is SST0502 and severe", warning?.code === "SST0502" && warning?.severity === "severe", warning?.code);
 	check("it names the channel that runs long", warning?.message.includes("#1") === true, warning?.message);
 	check(
 		"and the shortest channel it is measured against",
@@ -890,7 +890,7 @@ console.log("\nthe driver does not always run the song as fast as it is written"
 	// The restatement guard, as `vcmdLength` has: `measure-clock.ts` prices a
 	// tick at the driver tempo itself rather than importing `@amk/tokens`, whose
 	// `driverTickSeconds` says the same thing. If these drift, every shortfall
-	// figure and the AMK0503 that rides on it drift with them.
+	// figure and the SST0503 that rides on it drift with them.
 	let apart = 0;
 	for (let driverTempo = 1; driverTempo <= 255; driverTempo++) {
 		if (256 / (500 * driverTempo) !== driverTickSeconds(driverTempo)) {

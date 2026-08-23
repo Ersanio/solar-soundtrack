@@ -11,7 +11,7 @@ export const setUnreachable = StateEffect.define<readonly Span[]>();
  * written.
  *
  * The driver ends a phrase the moment any voice runs out of data, so a channel
- * longer than the shortest is silently truncated — `AMK0502` names the channels
+ * longer than the shortest is silently truncated — `SST0502` names the channels
  * and this shows which notes it costs. The sibling of `playhead.ts`, and
  * deliberately a different kind of mark: the playhead is a filled highlight
  * that moves, this is a static underline, so a note can carry both at once

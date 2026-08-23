@@ -122,7 +122,7 @@ export function normalizeSong(
     return {
       ok: false,
       diagnostics: [
-        refusal('AMK0600', 'The song has to compile without errors before it can be normalized.'),
+        refusal('SST0600', 'The song has to compile without errors before it can be normalized.'),
         ...original,
       ],
     };
@@ -137,7 +137,7 @@ export function normalizeSong(
       ok: false,
       diagnostics: [
         refusal(
-          'AMK0601',
+          'SST0601',
           `The song cannot be read through to the end: ${walked.timeline.problems.join(' ') || 'the walk ran out of room.'}`,
         ),
       ],
@@ -177,7 +177,7 @@ export function normalizeSong(
     if (Array.isArray(next)) {
       return [
         refusal(
-          'AMK0600',
+          'SST0600',
           `Rewriting the ${name} produced a song that does not compile, so nothing was changed.`,
         ),
         ...next,
@@ -193,7 +193,7 @@ export function normalizeSong(
       const at = walked.noteMap.find((entry) => entry.address === difference.address);
       return [
         refusal(
-          'AMK0603',
+          'SST0603',
           `Rewriting the ${name} would change the music (${difference.message}), so nothing was changed.`,
           at?.span,
         ),
@@ -229,7 +229,7 @@ export function normalizeSong(
     if (round === UNROLL_ROUNDS) {
       return {
         ok: false,
-        diagnostics: [refusal('AMK0614', 'The loops did not unroll within the rounds allowed.')],
+        diagnostics: [refusal('SST0614', 'The loops did not unroll within the rounds allowed.')],
       };
     }
 

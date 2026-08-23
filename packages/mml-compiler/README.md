@@ -52,7 +52,7 @@ unimplemented, report it — never guess, and never silently mis-compile.
 
 There is exactly one deliberate divergence in what this compiles, and it is `#path`: the directive is
 read and validated and then applied to nothing, because the host's sample library is one flat list of
-filenames and a directory prefix resolves to nothing in it. `AMK0504` says so on every occurrence.
+filenames and a directory prefix resolves to nothing in it. `SST0504` says so on every occurrence.
 `AUDIT.md` carries the reasoning and is the record; every other divergence found is a bug, and gets a
 test before it gets a fix.
 
@@ -68,9 +68,13 @@ site; and `spanAt` is the single choke point that converts. Anything that adds a
 for free. **Anything that bypasses `spanAt` will be wrong.** `selftest` asserts the offsets land on
 the offending character, not merely near it.
 
-Diagnostics carry stable `AMK####` codes and are produced on failure paths too, so partial UI stays
-populated. Constructs this compiler does not implement are reported as errors, never silently
-mis-compiled.
+Diagnostics carry stable codes and are produced on failure paths too, so partial UI stays populated.
+The prefix says whose finding it is, not which file raises it: `AMK####` is a condition AddmusicK
+itself reports, which is nearly everything `preprocess.ts`, `parser.ts` and `link.ts` produce;
+`SST####` is one `Music.cpp` does not produce at all — `SST0504` for the `#path` this port
+deliberately ignores, `normalize.ts`'s `SST06xx` refusals, and `SST0301` on `compile()`'s ARAM
+argument rather than on anything in the MML. Constructs this compiler does not implement are
+reported as errors, never silently mis-compiled.
 
 ## The parse trace, and the normalizer built on it
 
@@ -91,7 +95,7 @@ is known. Nothing is recorded unless asked for, and no byte changes either way.
 the state standing at its `[`, and replayed from bytes, so each copy of its text is preceded by
 whatever re-creates that state and the last copy followed by whatever restores the state that stood
 after the construct; `h` is switched off again by a `#N` re-entering the channel, which resets `h`
-and nothing else a note reads (`parseHash`). What cannot be re-created is refused with an `AMK06xx`
+and nothing else a note reads (`parseHash`). What cannot be re-created is refused with an `SST06xx`
 diagnostic saying why: an instrument a copy would be tuned differently under — `h` _replaces_
 instrument tuning (`parseNote`), so no `h` is ever written and `@` only for a drum remap — a `*`
 with no loop before it, a legacy `&` whose duration byte comes from a bracket, and `tuning[n]=`. The
@@ -103,7 +107,7 @@ asks for: it edits one channel at a time, so a channel it cannot splice wants pu
 own — and must not be refused because a _different_ channel has a loop that cannot be unrolled. Every
 pass that works construct by construct filters on it; `resolvePreprocessor` and `inlineReplacements`
 are global by nature and run whole; `writeDefaults` writes no `t`, since a tempo reaches all eight
-channels however local the block it sits in; and `orderChannels` refuses with `AMK0615` rather than
+channels however local the block it sits in; and `orderChannels` refuses with `SST0615` rather than
 joining one channel's blocks, because that moves text past the others and changes the `o` and `l`
 they inherit.
 

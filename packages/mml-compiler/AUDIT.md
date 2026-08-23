@@ -90,7 +90,7 @@ the song in the editor, with the diagnostic naming a folder the library could ne
 
 The syntax is still AddmusicK's: the quoted string is required, read and consumed, so AMK0052,
 AMK0064 and AMK0068 all still reach it and a song this compiles is a song AddmusicK compiles. Only
-the prefix is dropped. `AMK0504` reports it at `info`, once per occurrence, and `selftest` pins the
+the prefix is dropped. `SST0504` reports it at `info`, once per occurrence, and `selftest` pins the
 resolution, the code, the severity and the span.
 
 This one is not the fidelity argument losing. The reference behaviour has no meaning in a host with

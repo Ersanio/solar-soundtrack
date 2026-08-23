@@ -1148,15 +1148,15 @@ export function walkSong(song: Uint8Array, aramAddress: number): SongTimeline {
 }
 
 /**
- * `AMK0502` — a channel with more music in it than the song is long.
+ * `SST0502` — a channel with more music in it than the song is long.
  *
- * Sits beside `@amk/tokens`' echo hazards in the `AMK05xx` range, which is the
+ * Sits beside `@amk/tokens`' echo hazards in the `SST05xx` range, which is the
  * band for diagnostics `Music.cpp` does not produce at all — this one is about
  * what the song *does* rather than about whether it builds. `severe` on its own
  * account rather than the range's: it compiles cleanly and then misbehaves on
  * playback, the extra music dropped in silence.
  */
-const CODE_UNREACHABLE = "AMK0502";
+const CODE_UNREACHABLE = "SST0502";
 
 /** Spoken lists read better than comma-joined ones in a sentence. */
 function listOf(names: string[]): string {

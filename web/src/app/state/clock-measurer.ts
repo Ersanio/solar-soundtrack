@@ -24,7 +24,7 @@ const MEASURE_IDLE_MS = 1000;
 const TEMPO_SHORTFALL_LIMIT = 1.1;
 
 /**
- * `AMK0503` — the driver cannot run the song as fast as it is written.
+ * `SST0503` — the driver cannot run the song as fast as it is written.
  *
  * The only diagnostic that had to be *played* to find out. The driver handles at
  * most one music tick per pass of its main loop, so a song asking for more ticks
@@ -33,8 +33,8 @@ const TEMPO_SHORTFALL_LIMIT = 1.1;
  * does the same, which is why AddmusicK's readme warns about high tempos — so
  * the song a porter ships plays at a tempo they did not write.
  *
- * `AMK05xx` is the band for diagnostics `Music.cpp` does not produce at all, and
- * `severe` puts it with the echo hazards and `AMK0502` within it: it compiles
+ * `SST05xx` is the band for diagnostics `Music.cpp` does not produce at all, and
+ * `severe` puts it with the echo hazards and `SST0502` within it: it compiles
  * cleanly and then misbehaves on playback. Silent for the few percent
  * an ordinary busy song loses — see {@link TEMPO_SHORTFALL_LIMIT} — and compared
  * from the first tick, so the pause `$FA $04` puts at the top of a song with
@@ -57,7 +57,7 @@ export function tempoDiagnostic(measured: Measurement | null, span: Span): Diagn
   return [
     {
       severity: 'severe',
-      code: 'AMK0503',
+      code: 'SST0503',
       message:
         `The driver cannot keep up with this song's tempo: it plays about ${percent}% slower than written. ` +
         `Lower the tempo, or give the busiest channels less to do.`,
@@ -84,7 +84,7 @@ export class ClockMeasurer {
    *
    * **Replaced, never cleared.** A measurement takes about a second to come
    * back, so clearing it on every recompile would leave a song unmeasured for as
-   * long as anyone kept typing, with `AMK0503` and the transport's length
+   * long as anyone kept typing, with `SST0503` and the transport's length
    * flicking on every pause.
    *
    * What it measures is how far the driver falls behind the tempo the song asked

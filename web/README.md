@@ -157,7 +157,7 @@ because it edits one channel at a time and refuses the ones it cannot splice —
 when a channel is in the way is that channel put in order, and above all _not_ a refusal because some
 other channel has a loop that cannot be unrolled. Every pass that works construct by construct takes
 it as a filter (`NormalizeInput.onlyChannel`); the preprocessor and the replacements are global by
-nature and run whole either way; `orderChannels` refuses with `AMK0615` rather than joining one
+nature and run whole either way; `orderChannels` refuses with `SST0615` rather than joining one
 channel's blocks, because that moves text past the other channels and changes the `o` and `l` they
 inherit. The oracle does not change — the result is still walked and compared — so a scoped rewrite is
 held to exactly the standard a whole one is.
@@ -330,11 +330,11 @@ would throw every answer away, and a second of quiet is far less than it takes t
 transport. The predicted clock stands in the meantime and stands for good if the measurement fails,
 which is why it is still worth having.
 
-`AMK0503` is the same finding pointed at the porter: past 10% the song is not playing at the tempo it
+`SST0503` is the same finding pointed at the porter: past 10% the song is not playing at the tempo it
 was written at, and a SNES drops the same ticks, so it is a fact about the song rather than about
-this editor. `severe`, beside the echo hazards and `AMK0502` — it compiles cleanly and then
-misbehaves on playback. What the `AMK05xx` band shares is not that, but that `Music.cpp` produces
-none of them: `AMK0504`, for a `#path` this editor deliberately ignores, is `info` and is about the
+this editor. `severe`, beside the echo hazards and `SST0502` — it compiles cleanly and then
+misbehaves on playback. What the `SST05xx` band shares is not that, but that `Music.cpp` produces
+none of them: `SST0504`, for a `#path` this editor deliberately ignores, is `info` and is about the
 editor rather than the song. The comparison starts at the first tick: the driver's boot, and the echo
 buffer `$FA $04` zeroes in the song's first tick — some 26 ms per delay unit, a pause AddmusicK puts
 at the top of every song on purpose — are one-off costs, and a short song would read them as a rate.
@@ -574,7 +574,7 @@ lanes and the fitted range are both built from it, so they cannot disagree. `son
 opinion on any of this by design.
 
 A channel longer than the song is **not** the roll's business, even though the walk is what notices
-it — that goes to the diagnostics list as `AMK0502` and to the editor as a wavy underline on the
+it — that goes to the diagnostics list as `SST0502` and to the editor as a wavy underline on the
 notes that never sound (`codemirror/unreachable.ts`, the sibling of `playhead.ts`). The roll's own
 warning strip is only for a walk that could not make sense of the bytes. `EditorStore.diagnostics`
 is where the three sources meet, and it is the reason `timeline` is read on every compile rather

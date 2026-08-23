@@ -100,7 +100,7 @@ what the reference does. `packages/mml-compiler/AUDIT.md` is the record of the l
 comparison.
 
 **`#path` is the one deliberate divergence, and the bar it had to clear is high.** It is read,
-validated and applied to nothing (`parsePath`, `AMK0504`), because the reference behaviour has
+validated and applied to nothing (`parsePath`, `SST0504`), because the reference behaviour has
 nothing to mean here: `basepath` is a directory prefix resolved against a filesystem, and the host's
 library is one flat list of filenames matched verbatim, so a prefixed name resolves to nothing and
 every sample under a `#path` fails with AMK0058. That is not the same as finding the reference
@@ -149,7 +149,7 @@ and the "Length" tile — are outside this: they are AddmusicK's arithmetic, rep
 its main loop, so a song asking for more than it can manage gets fewer — 46% of the requested rate on
 a real eight-channel `t254` song, where the ~0.8% above is an ordinary-tempo figure. No formula
 predicts it, because it depends on the work each tick costs. `web/src/app/state/measure-clock.ts`
-plays the song on a worker and records when each tick really arrived; `AMK0503` reports it. Anything
+plays the song on a worker and records when each tick really arrived; `SST0503` reports it. Anything
 that turns ticks into seconds must go through `EditorStore.clock`, which serves the measurement where
 there is one and the prediction where there is not.
 
@@ -158,10 +158,16 @@ set stands; `[]` means the song genuinely asks for no samples. The list's _order
 assignment_, so building an SPC against a different set produces a valid-looking file that plays the
 wrong sounds. It is a correctness-critical output, not a statistic.
 
-**Diagnostics carry source spans and stable `AMK####` codes**, and are carried on failure paths too,
-so partial UI stays populated. Spans are mapped back to the source the author wrote — `spanAt` is
-the single choke point, and anything that bypasses it will be wrong. Constructs this compiler does
-not implement are reported as errors, never silently mis-compiled.
+**Diagnostics carry source spans and stable codes**, and are carried on failure paths too, so
+partial UI stays populated. **The prefix says whose finding it is, not which file raises it**:
+`AMK####` is a condition AddmusicK itself reports, ported from `AddmusicKsrc/` with the `Music.cpp`
+line cited; `SST####` is one `Music.cpp` does not produce at all, so a porter is never told
+AddmusicK objects to something it has no opinion about. The echo hazards, the unreachable-channel
+warning, the tempo shortfall and the `#path` notice are `SST05xx`, the normalize refusals are
+`SST06xx`, and `SST0301` guards `compile()`'s own ARAM argument. A new diagnostic takes the prefix
+of the tool that found it. Spans are mapped back to the source the author wrote — `spanAt` is the
+single choke point, and anything that bypasses it will be wrong. Constructs this compiler does not
+implement are reported as errors, never silently mis-compiled.
 
 **This project ships no ARIA attributes and no `role` or `tabindex`.** Accessibility is deferred,
 not attempted-and-abandoned, so half of it is worse than none: the tab strip used to point
@@ -194,7 +200,7 @@ One entry each: what it was, what it is, why.
   section boundaries, drifting between them. The label reads the segment-table clock
   (`song-clock.ts`, or the measurement); the interpolation is the fallback for a song the walk cannot
   read.
-- **Clearing the clock measurement on recompile** — it takes a second to come back, so `AMK0503` and
+- **Clearing the clock measurement on recompile** — it takes a second to come back, so `SST0503` and
   the transport length flickered on every pause in typing. The last measurement stands until the next
   lands (`ClockMeasurer`, "replaced, never cleared").
 - **Extrapolating the roll's playhead at the tempo byte's rate** — the driver runs slower than asked,
@@ -415,7 +421,7 @@ One entry each: what it was, what it is, why.
   channel deleted.
 - **Letting a note drawn past the end of the song extend only its own channel** — the driver reloads
   all eight track pointers the moment one voice reads its `$00` (`main.asm:L_0C01`,
-  `Music.cpp:3209`), so the note was written, compiled, reported by `AMK0502` and never heard, and
+  `Music.cpp:3209`), so the note was written, compiled, reported by `SST0502` and never heard, and
   the roll had no way to make a song longer. A gesture reaching past `stats.introTicks +
 stats.loopTicks` pads **every other channel that would cut the song short** out to meet it
   (`padChannels`), in the same commit and so the same undo step. It counts the notes the gesture
