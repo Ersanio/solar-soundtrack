@@ -97,7 +97,15 @@ AddmusicK is case-sensitive, so is this — `#Title`, `"kick.BRR"` and `#DEFINE`
 reason to widen what is accepted, and neither is helpfulness a reason to narrow it: an unknown
 `#directive` is read as music and `*` with no previous loop emits a call to nowhere, because that is
 what the reference does. `packages/mml-compiler/AUDIT.md` is the record of the last line-by-line
-comparison; there are no deliberate divergences left in the compiled output.
+comparison.
+
+**`#path` is the one deliberate divergence, and the bar it had to clear is high.** It is read,
+validated and applied to nothing (`parsePath`, `AMK0504`), because the reference behaviour has
+nothing to mean here: `basepath` is a directory prefix resolved against a filesystem, and the host's
+library is one flat list of filenames matched verbatim, so a prefixed name resolves to nothing and
+every sample under a `#path` fails with AMK0058. That is not the same as finding the reference
+unhelpful — the two constructs above are unhelpful and were kept. Nothing else earns this: a second
+divergence needs the reference behaviour to be undefined here, not merely inconvenient.
 
 **`packages/mml-compiler` is not linted, and its comments are not thinned.** It is a port, and style
 rules would make it harder to diff against the C++ that is the only check on its faithfulness. It

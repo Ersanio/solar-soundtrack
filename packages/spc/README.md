@@ -206,8 +206,9 @@ reach that one. That is the arrangement `BANK_SLOT_COUNT` and `MELODIC_SRCN` liv
 is safe only because a harness asserts the two agree.
 
 `unreachableChannels` is the one diagnostic the walk produces — `AMK0502`, in the same `AMK05xx`
-range as `@amk/tokens`' echo hazards, for the same reason: it is about what the song _does_, not
-about whether it builds. A phrase ends when any voice runs out of data, so a channel longer than the
+range as `@amk/tokens`' echo hazards, for the same reason: nothing in `Music.cpp` reports it, because
+it is about what the song _does_ rather than about whether it builds. A phrase ends when any voice
+runs out of data, so a channel longer than the
 shortest is truncated in silence. `unreachable` lists only notes with **no** surviving occurrence —
 cutting `[c e g e]8` in half loses four iterations of four notes that still sound in the other four,
 and calling those dead would be a lie the editor then underlines.

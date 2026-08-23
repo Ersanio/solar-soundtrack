@@ -134,6 +134,12 @@ the length table entry at `Music.cpp:63` — so every instance is copied through
 upstream has an opinion to report. That is why the echo diagnostics carry their own `AMK05xx` range
 rather than extending the parser's.
 
+That is the whole band, and the property it holds is that **`Music.cpp` produces none of them**:
+`AMK0500`/`AMK0501` here, `AMK0502` in `@amk/spc`, `AMK0503` in the app, and `AMK0504` for a `#path`
+this editor deliberately ignores. Four of the five are `severe` because what they report compiles
+cleanly and then misbehaves on playback, but the severity is a property of each rather than of the
+range — `AMK0504` is `info`, since nothing about that song misbehaves anywhere.
+
 There is one blind spot, left alone deliberately: a replacement collapses everything it expands to
 onto its use site, so a `$F5` and a `$F1` written inside the _same_ macro share a `span.start` and
 neither check sees the other. The alternative — a secondary order carried on every command just for

@@ -33,8 +33,9 @@ const TEMPO_SHORTFALL_LIMIT = 1.1;
  * does the same, which is why AddmusicK's readme warns about high tempos — so
  * the song a porter ships plays at a tempo they did not write.
  *
- * `severe` puts it with the echo hazards and `AMK0502` in the `AMK05xx` band: it
- * compiles cleanly and then misbehaves on playback. Silent for the few percent
+ * `AMK05xx` is the band for diagnostics `Music.cpp` does not produce at all, and
+ * `severe` puts it with the echo hazards and `AMK0502` within it: it compiles
+ * cleanly and then misbehaves on playback. Silent for the few percent
  * an ordinary busy song loses — see {@link TEMPO_SHORTFALL_LIMIT} — and compared
  * from the first tick, so the pause `$FA $04` puts at the top of a song with
  * echo is not read as a rate; `tempoShortfall` says so.

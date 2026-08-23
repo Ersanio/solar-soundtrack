@@ -81,8 +81,24 @@ so it counts inside a false `#if` too, and `#spc { #title }` overrides it. `Musi
 
 ## Deliberate divergences
 
-**None.** There were two, both stricter than the reference, and both are gone — the fidelity
-argument wins even where the reference is doing something plainly unhelpful:
+**One: `#path` is read and applied to nothing.** `parsePath` (`Music.cpp:2776-2789`) sets `basepath`
+to `"./dir/"`, and `Music.cpp:958`, `:2594` and `:2717` join it onto every quoted sample name after
+it before resolving the result against the filesystem. There is no filesystem here. The host's
+library is one flat list of filenames, matched verbatim, so a prefixed name resolves to nothing and
+every sample under a `#path` fails with AMK0058 — a directive that is correct in AddmusicK breaking
+the song in the editor, with the diagnostic naming a folder the library could never hold.
+
+The syntax is still AddmusicK's: the quoted string is required, read and consumed, so AMK0052,
+AMK0064 and AMK0068 all still reach it and a song this compiles is a song AddmusicK compiles. Only
+the prefix is dropped. `AMK0504` reports it at `info`, once per occurrence, and `selftest` pins the
+resolution, the code, the severity and the span.
+
+This one is not the fidelity argument losing. The reference behaviour has no meaning in a host with
+no directories, so there is nothing to be faithful _to_ — which is a different thing from finding it
+unhelpful, and is why the two below stayed.
+
+Those two were both stricter than the reference, and both are gone — the fidelity argument wins even
+where the reference is doing something plainly unhelpful:
 
 - **An unknown `#directive` is read as music.** `parseSpecialDirective` (`Music.cpp:2413-2506`) has
   no final else, so `pos` is left on the first letter and the scan loop dispatches it: `#c4` is a
@@ -93,7 +109,7 @@ argument wins even where the reference is doing something plainly unhelpful:
 FF <count>` goes out and relocation lands the pointer one byte below the loop block. `selftest`
   pins that address, so the shape of the breakage is now a fact rather than an accident.
 
-## One divergence left, and it is not in the compiled output
+## And one that is not in the compiled output
 
 `lengths()` reports a declared `#length` as `introSeconds` / `mainSeconds`. AddmusicK leaves both at
 zero there, so its own readout prints `0:00` for such a song.

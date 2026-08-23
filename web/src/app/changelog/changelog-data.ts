@@ -11,6 +11,7 @@ export const CHANGELOG: readonly ChangelogEntry[] = [
   {
     date: '23 August 2026',
     items: [
+      '#path is ignored, since samples here are one flat folder',
       'The playhead no longer drifts out of sync on songs with one-tick notes',
       'The piano roll says why a gesture was refused instead of quietly doing nothing',
       'The piano roll does not error on songs with remote commands anymore',

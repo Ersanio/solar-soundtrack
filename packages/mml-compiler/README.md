@@ -50,8 +50,11 @@ unimplemented, report it — never guess, and never silently mis-compile.
 
 `#amk 3` (Codec's beta) is rejected — AddmusicK itself does not implement it.
 
-There are no deliberate divergences in what this compiles or what it rejects. `AUDIT.md` is the
-record; a divergence found is a bug, and gets a test before it gets a fix.
+There is exactly one deliberate divergence in what this compiles, and it is `#path`: the directive is
+read and validated and then applied to nothing, because the host's sample library is one flat list of
+filenames and a directory prefix resolves to nothing in it. `AMK0504` says so on every occurrence.
+`AUDIT.md` carries the reasoning and is the record; every other divergence found is a bug, and gets a
+test before it gets a fix.
 
 ## Diagnostics are mapped back to the source the author wrote
 

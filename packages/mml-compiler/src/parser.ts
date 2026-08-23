@@ -249,7 +249,6 @@ export class AddmusicKParser {
 	private readonly sampleList: string[] = [];
 	private readonly sampleImportant: boolean[] = [];
 	private readonly usedSamples = new Array<boolean>(256).fill(false);
-	private basepath = "";
 	private inRemoteDefinition = false;
 	private minSize = 0;
 	private readonly tags: SongTags = {};
@@ -1047,7 +1046,7 @@ export class AddmusicKParser {
 			this.parseBlock(() => this.parseInstrumentDefinitions(start));
 		} else if (this.matchWord("path")) {
 			this.pos += 4;
-			this.parsePath();
+			this.parsePath(start);
 		} else if (this.matchWord("pad")) {
 			this.pos += 3;
 			this.parsePadDefinition();
@@ -1157,29 +1156,41 @@ export class AddmusicKParser {
 	}
 
 	/**
-	 * `#path "dir"` — Music.cpp:2776.
+	 * `#path "dir"` — Music.cpp:2776-2789, and the one deliberate divergence in
+	 * this port. `AUDIT.md` is where it is on record.
 	 *
-	 * A replacement, not a stack: a second `#path` discards the first. It applies
-	 * to quoted names in `#samples` and `#instruments` and to `(...)` sample
-	 * loads, but never to `#group` members, which AMK resolves unprefixed.
+	 * AMK sets `basepath` to `"./dir/"` and joins it onto every quoted sample name
+	 * after it, resolving the result against the filesystem. The host here has no
+	 * filesystem to resolve against: its library is one flat list of filenames, so
+	 * a prefixed name matches nothing and every sample under a `#path` fails with
+	 * AMK0058 — a directive that is right in AddmusicK breaking the song here.
+	 *
+	 * So the directive is read and applied to nothing. The syntax is still AMK's,
+	 * which is why the quoted string is still required and still consumed: an
+	 * unquoted argument is an error in both, and a string left behind would be
+	 * scanned as music. `getQuotedString` still reports AMK0064 and AMK0068.
+	 *
+	 * AMK0504 says so once per occurrence, each on its own span, since two
+	 * directives are two things for the editor to underline.
 	 */
-	private parsePath(): void {
+	private parsePath(start: number): void {
 		this.skipSpaces();
 		if (this.text[this.pos] !== '"') {
 			return this.error("AMK0052", "Unexpected symbol in #path; expected a quoted string.");
 		}
 
 		this.pos++;
-		const dir = this.getQuotedString();
-		if (dir === null) {
+		if (this.getQuotedString() === null) {
 			return;
 		}
 
-		const trimmed = dir
-			.replace(/^[.\\/]+/, "")
-			.replace(/[\\/]+$/, "")
-			.replace(/\\/g, "/");
-		this.basepath = trimmed.length === 0 ? "" : `${trimmed}/`;
+		this.info(
+			start,
+			this.pos,
+			"AMK0504",
+			"#path does nothing here, as Solar Soundtrack's sample library is one flat folder. " +
+				"AddmusicK itself still accepts this directive.",
+		);
 	}
 
 	/**
@@ -1293,7 +1304,7 @@ export class AddmusicKParser {
 					return;
 				}
 
-				if (!this.addSampleByName(this.basepath + quoted)) {
+				if (!this.addSampleByName(quoted)) {
 					return;
 				}
 
@@ -1448,12 +1459,11 @@ export class AddmusicKParser {
 
 		if (character === '"') {
 			this.pos++;
-			const quoted = this.getQuotedString();
-			if (quoted === null) {
+			const name = this.getQuotedString();
+			if (name === null) {
 				return null;
 			}
 
-			const name = this.basepath + quoted;
 			// Resolved against *this song's* list, not the whole library, because
 			// the byte stored is an SRCN. That lookup is also what makes
 			// `#instruments` before `#samples` fail on its own, with no ordering
@@ -2276,12 +2286,11 @@ export class AddmusicKParser {
 			// AMK scans raw to the closing quote here rather than going through
 			// `getQuotedString`, so it has no escape handling. Using the shared
 			// reader is harmless: a name containing a quote could never resolve.
-			const quoted = this.getQuotedString();
-			if (quoted === null) {
+			const name = this.getQuotedString();
+			if (name === null) {
 				return;
 			}
 
-			const name = this.basepath + quoted;
 			const found = this.sampleList.indexOf(name);
 			if (found === -1) {
 				return this.errorAt(
@@ -3929,6 +3938,11 @@ export class AddmusicKParser {
 
 	private warn(start: number, end: number, code: string, message: string): void {
 		this.diagnostics.push({ severity: "warning", code, message, span: this.spanAt(start, end) });
+	}
+
+	/** Nothing is wrong with the song; something about it is worth saying anyway. */
+	private info(start: number, end: number, code: string, message: string): void {
+		this.diagnostics.push({ severity: "info", code, message, span: this.spanAt(start, end) });
 	}
 
 	private warnOnce(key: string, code: string, message: string): void {

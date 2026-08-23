@@ -1551,7 +1551,14 @@ instrToSample[30] = { 00 01 02 03 04 07 08 09 05 0A 0B 01 10 0C 0D 12 0C 11 01  
           <tr>
             <td class="c"><code>#path "dir"</code></td>
             <td><code>basepath = "./dir/"</code></td>
-            <td class="n">Prefix for every sample filename after it. No trailing slash.</td>
+            <td class="n">
+              Prefix for every quoted sample filename after it — in <code>#samples</code>,
+              <code>#instruments</code> and a <code>(…)</code> sample load. Not for
+              <code>#group</code> members, which resolve unprefixed (<code>:2717</code> prefixes
+              only the quoted branch). No trailing slash.
+              <strong>Solar Soundtrack ignores it</strong>
+              — see B.3.
+            </td>
             <td class="ok">native</td>
             <td class="ok">native</td>
             <td class="ok">native</td>
@@ -4736,6 +4743,19 @@ EchoFilter1:    $7F $00 $00 $00 $00 $00 $00 $00   ; flat</code></pre>
     <h3>B.3 Solar Soundtrack versus source</h3>
     <p>Line numbers are as of this document's writing; they will drift.</p>
     <ul>
+      <li>
+        <code>packages/mml-compiler/src/parser.ts</code> <code>parsePath</code> — the one deliberate
+        divergence in the port. <code>#path</code> is read and validated and then applied to
+        nothing: no <code>basepath</code> exists, and the three join sites
+        (<code>Music.cpp:958</code>, <code>:2594</code>, <code>:2717</code>) resolve the quoted name
+        as written. The editor's sample library is one flat list of filenames matched verbatim, with
+        no directory to resolve a prefix against, so the faithful behaviour makes every sample under
+        a <code>#path</code> fail with <code>AMK0058</code> naming a folder that cannot exist. The
+        syntax is still the source's — the quoted string is required and consumed, so
+        <code>AMK0052</code>, <code>AMK0064</code> and <code>AMK0068</code> all still reach it — and
+        <code>AMK0504</code> reports the no-op at <code>info</code>, once per occurrence.
+        <code>packages/mml-compiler/AUDIT.md</code> carries the reasoning.
+      </li>
       <li>
         <code>packages/mml-tokens/src/commands/hex-params.ts</code>
         <code>REMOTE_TYPES</code> now names 4 “run once, right now”, 5 and 6 as the reserved pair

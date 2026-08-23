@@ -333,7 +333,9 @@ which is why it is still worth having.
 `AMK0503` is the same finding pointed at the porter: past 10% the song is not playing at the tempo it
 was written at, and a SNES drops the same ticks, so it is a fact about the song rather than about
 this editor. `severe`, beside the echo hazards and `AMK0502` — it compiles cleanly and then
-misbehaves on playback. The comparison starts at the first tick: the driver's boot, and the echo
+misbehaves on playback. What the `AMK05xx` band shares is not that, but that `Music.cpp` produces
+none of them: `AMK0504`, for a `#path` this editor deliberately ignores, is `info` and is about the
+editor rather than the song. The comparison starts at the first tick: the driver's boot, and the echo
 buffer `$FA $04` zeroes in the song's first tick — some 26 ms per delay unit, a pause AddmusicK puts
 at the top of every song on purpose — are one-off costs, and a short song would read them as a rate.
 The pass length keeps them, since they are heard.
