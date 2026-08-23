@@ -11,13 +11,14 @@ export const CHANGELOG: readonly ChangelogEntry[] = [
   {
     date: '23 August 2026',
     items: [
+      'The piano roll marks which note a command takes effect at, apart from the notes inheriting it',
+      'The note inspector lists what a note sets apart from what it plays under',
       '#path is ignored, since samples here are one flat folder',
       'Solar Soundtrack-specific errors are now prefeixed with SST instead of AMK',
       'The playhead no longer drifts out of sync on songs with one-tick notes',
       'The piano roll says why a gesture was refused instead of quietly doing nothing',
       'The piano roll does not error on songs with remote commands anymore',
       'The overview bar above the piano roll colours its notes by channel, like the roll itself',
-      'The piano roll marks which note a command takes effect at, apart from the notes inheriting it',
     ],
   },
   {

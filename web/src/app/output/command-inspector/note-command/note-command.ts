@@ -5,6 +5,7 @@ import type { WalkNote } from '@amk/spc/song-walk';
 import type { Command } from '@amk/tokens';
 import { type CommandGlyph, CommandIcon } from '../../../editor/command-palette/command-icon';
 import { glyphOf } from '../../../editor/command-palette/glyph-of';
+import { definedAt, notePreceding } from '../../../state/commands-in-force';
 import { EditorRequests } from '../../../state/editor-requests';
 import { EditorStore } from '../../../state/editor-store';
 import { ParamTable } from '../param-table/param-table';
@@ -16,6 +17,19 @@ interface Acting {
   label: string;
   blurb: string;
   span: Span;
+  /** This note puts it in force, where the rest of a run inherits it. */
+  defining: boolean;
+}
+
+/** One headed group of those: what the note sets, and what it plays under. */
+interface Group {
+  readonly key: string;
+  readonly title: string;
+  /** Shown in place of the chips, since which of the two is empty says something. */
+  readonly nothing: string;
+  /** The pass readout, carried by the first group so it sits at the top. */
+  readonly pass: string | null;
+  readonly chips: readonly Acting[];
 }
 
 /**
@@ -86,32 +100,39 @@ export class NoteCommand {
     return found ?? passes[0];
   });
 
-  protected readonly acting = computed<readonly Acting[]>(() => {
+  private readonly acting = computed<readonly Acting[]>(() => {
     const note = this.pass();
     if (note === null) {
       return [];
     }
 
-    return this.store
-      .commandsInForce()(note)
-      .flatMap((command) => {
-        const entry = glyphOf(command);
-        return entry === null
-          ? []
-          : [
-              {
-                key: `${command.span.start}:${command.span.end}`,
-                icon: entry.icon,
-                label: entry.label,
-                blurb: entry.blurb,
-                span: command.span,
-              },
-            ];
-      });
+    // Which of them this note puts in force, against the note before it on its
+    // channel. The roll's bars get that neighbour from the loop that draws them;
+    // reached from the caret there is no such loop, so the pass is looked up in
+    // the timeline it came out of.
+    const before = notePreceding(this.store.timeline()?.notes ?? [], note);
+    const inForce = this.store.commandsInForce();
+    const defining = definedAt(inForce(note), before === null ? [] : inForce(before));
+
+    return inForce(note).flatMap((command) => {
+      const entry = glyphOf(command);
+      return entry === null
+        ? []
+        : [
+            {
+              key: `${command.span.start}:${command.span.end}`,
+              icon: entry.icon,
+              label: entry.label,
+              blurb: entry.blurb,
+              span: command.span,
+              defining: defining.has(command),
+            },
+          ];
+    });
   });
 
   /** Said only when it matters: a note played once needs no explaining. */
-  protected readonly whichPass = computed(() => {
+  private readonly whichPass = computed(() => {
     const passes = this.passes();
     const note = this.pass();
     if (note === null || passes.length < 2) {
@@ -119,6 +140,48 @@ export class NoteCommand {
     }
 
     return `plays ${passes.length} times — showing pass ${passes.indexOf(note) + 1}, at tick ${note.tick}`;
+  });
+
+  /**
+   * The chips under two headings: the commands this note puts in force, and the
+   * ones already in force when it plays.
+   *
+   * Both headings stand even when one of them has nothing under it, because
+   * which of the two a command is under is the answer being given — a group
+   * that vanished would leave the remaining heading to be read twice over.
+   */
+  protected readonly groups = computed<readonly Group[]>(() => {
+    const acting = this.acting();
+    const pass = this.whichPass();
+    if (acting.length === 0) {
+      // Nothing to tell apart, and two empty headings say less than one sentence.
+      return [
+        {
+          key: 'acting',
+          title: 'Commands acting on this note',
+          nothing: 'Nothing but the note itself.',
+          pass,
+          chips: [],
+        },
+      ];
+    }
+
+    return [
+      {
+        key: 'defined',
+        title: 'Commands defined by this note',
+        nothing: 'Nothing starts here.',
+        pass,
+        chips: acting.filter((each) => each.defining),
+      },
+      {
+        key: 'acting',
+        title: 'Commands acting on this note',
+        nothing: 'Nothing carries in from an earlier note.',
+        pass: null,
+        chips: acting.filter((each) => !each.defining),
+      },
+    ];
   });
 
   /** Why the list is empty, when it is empty for a reason worth stating. */

@@ -80,7 +80,8 @@ it inherits from earlier in the channel. So a run of notes under one `v200` show
 note the `v200` actually landed on and the outline on the rest, and the hover says the same thing in
 words — "sets volume" against "under volume". A wide bar shows more icons than a narrow one, and a
 bar too small for its own name shows none at all; three dots in the last slot mean there are more
-than fit, and the hover and the inspector always have the whole list.
+than fit, and the hover and the inspector always have the whole list — the inspector under two
+headings, one for what the note sets and one for what it plays under.
 
 ## Three settings that decide how a drag lands
 

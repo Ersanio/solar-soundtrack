@@ -411,7 +411,8 @@ the glyph names whichever command the driver had in force, so a reading taken fr
 have that `c` setting `v255` on the pass it sounds under `v200`. Every command that reaches a glyph
 is channel-local, `commandScope` having dropped the song-wide slots and `remote`, so the note before
 on the channel is the whole comparison. `buildMarks` gets that neighbour from the loop that draws the
-bars, and `notePreceding` answers the same question where there is no such loop.
+bars; the inspector, reached from the caret with no such loop, looks it up with `notePreceding` and
+puts the two kinds under headings of their own, having room for words where a bar has not.
 
 The song's own settings and the shape of the music get no glyph — `t`, `w`, `$E4` and the echo unit
 reach every note alike, and `o`, `<`, `>` and `l` are what the bar's row and width already are.
