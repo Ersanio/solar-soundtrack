@@ -247,7 +247,7 @@ export function precheck(input: NormalizeInput): Diagnostic[] {
 		if (mine && isNote(event) && before.inPitchSlide && before.prevNoteLength === -1) {
 			out.push(
 				diagnostic(
-					"AMK0607",
+					"SST0607",
 					"A pitch slide takes its duration from a loop or channel boundary, which cannot be written out.",
 					event.span,
 				),
@@ -258,19 +258,19 @@ export function precheck(input: NormalizeInput): Diagnostic[] {
 		const pending = (state: ParseState): boolean => state.inPitchSlide || state.nextNoteIsForDD;
 		if (mine && boundary && (pending(before) || pending(event.state))) {
 			out.push(
-				diagnostic("AMK0607", "A pitch slide or $DD note is still pending at a loop or channel boundary.", event.span),
+				diagnostic("SST0607", "A pitch slide or $DD note is still pending at a loop or channel boundary.", event.span),
 			);
 		}
 
 		if (event.char === "t" && eventText(text, event).startsWith("tuning[")) {
 			out.push(
-				diagnostic("AMK0608", "Songs that retune an instrument with tuning[n]= cannot be normalized.", event.span),
+				diagnostic("SST0608", "Songs that retune an instrument with tuning[n]= cannot be normalized.", event.span),
 			);
 		}
 
 		if (mine && event.loop?.kind === "call" && event.loop.at === 0xffff) {
 			out.push(
-				diagnostic("AMK0602", "This * repeats a loop that was never written, which cannot be unrolled.", event.span),
+				diagnostic("SST0602", "This * repeats a loop that was never written, which cannot be unrolled.", event.span),
 			);
 		}
 	});
@@ -348,7 +348,7 @@ export function inlineReplacements(input: NormalizeInput): PassResult {
 	for (const definition of definitions) {
 		if (sites.some((site) => definition.span.start >= site.start && definition.span.start < site.end)) {
 			diagnostics.push(
-				diagnostic("AMK0613", "A replacement that defines another replacement cannot be written out.", definition.span),
+				diagnostic("SST0613", "A replacement that defines another replacement cannot be written out.", definition.span),
 			);
 		}
 	}
@@ -412,7 +412,7 @@ export function flattenTriplets(input: NormalizeInput): PassResult {
 			if (!spelling || !head) {
 				diagnostics.push(
 					diagnostic(
-						"AMK0610",
+						"SST0610",
 						`A note of ${entry.ticks * ratio} ticks has no length this target can write.`,
 						note.span,
 					),
@@ -655,11 +655,11 @@ export function unrollLoops(input: NormalizeInput): PassResult {
 					diagnostics.push(
 						loop.at === 0xffff
 							? diagnostic(
-									"AMK0602",
+									"SST0602",
 									"This * repeats a loop that was never written, which cannot be unrolled.",
 									event.span,
 								)
-							: diagnostic("AMK0603", "A loop call could not be matched to its body.", event.span),
+							: diagnostic("SST0603", "A loop call could not be matched to its body.", event.span),
 					);
 					break;
 				}
@@ -727,7 +727,7 @@ export function unrollLoops(input: NormalizeInput): PassResult {
 				const octave = spellOctave(to.octave);
 				if (octave === null) {
 					diagnostics.push(
-						diagnostic("AMK0610", `An octave of ${to.octave} cannot be written with o.`, events[construct.first].span),
+						diagnostic("SST0610", `An octave of ${to.octave} cannot be written with o.`, events[construct.first].span),
 					);
 					return null;
 				}
@@ -740,7 +740,7 @@ export function unrollLoops(input: NormalizeInput): PassResult {
 				if (length === null) {
 					diagnostics.push(
 						diagnostic(
-							"AMK0610",
+							"SST0610",
 							`A default length of ${to.length} ticks has no l this target can write.`,
 							events[construct.first].span,
 						),
@@ -759,9 +759,9 @@ export function unrollLoops(input: NormalizeInput): PassResult {
 				if (isDrum(to.instrument) && from.ignoreTuning === to.ignoreTuning) {
 					parts.push(`@${to.instrument}`);
 				} else if (instrumentHazard(trace, notesFrom, notesTo, slotOf, from.instrument, from.ignoreTuning, sfx)) {
-					const code = notesFrom === body.openIndex + 1 ? "AMK0604" : "AMK0605";
+					const code = notesFrom === body.openIndex + 1 ? "SST0604" : "SST0605";
 					const message =
-						code === "AMK0604"
+						code === "SST0604"
 							? "This loop is played under a differently tuned instrument than it was written under, so its copies would sound different."
 							: "An instrument set inside this loop would retune the notes after it once unrolled.";
 					diagnostics.push(diagnostic(code, message, events[construct.first].span));
@@ -862,7 +862,7 @@ export function orderChannels(input: NormalizeInput): PassResult {
 				text,
 				diagnostics: [
 					diagnostic(
-						"AMK0615",
+						"SST0615",
 						`Channel ${onlyChannel} is written in more than one block, and joining them would move the other channels' music. Normalize the whole song instead.`,
 						events[own[1]].span,
 					),
@@ -878,7 +878,7 @@ export function orderChannels(input: NormalizeInput): PassResult {
 		if (state.inPitchSlide || state.nextNoteIsForDD || state.triplet) {
 			diagnostics.push(
 				diagnostic(
-					"AMK0609",
+					"SST0609",
 					"A pitch slide, $DD note or triplet is still open at this channel marker.",
 					events[index].span,
 				),
@@ -923,7 +923,7 @@ export function orderChannels(input: NormalizeInput): PassResult {
 			if (sawMusic && "olqh<>".includes(event.char)) {
 				diagnostics.push(
 					diagnostic(
-						"AMK0612",
+						"SST0612",
 						"A remote code definition changes the octave, length, quantization or transposition after music above the first channel.",
 						event.span,
 					),
@@ -1047,7 +1047,7 @@ export function orderChannels(input: NormalizeInput): PassResult {
 			if (carried.octave !== piece.start.octave) {
 				const octave = spellOctave(piece.start.octave);
 				if (octave === null) {
-					diagnostics.push(diagnostic("AMK0610", `An octave of ${piece.start.octave} cannot be written with o.`));
+					diagnostics.push(diagnostic("SST0610", `An octave of ${piece.start.octave} cannot be written with o.`));
 				} else {
 					prefix.push(octave);
 				}
@@ -1058,7 +1058,7 @@ export function orderChannels(input: NormalizeInput): PassResult {
 				if (length === null) {
 					diagnostics.push(
 						diagnostic(
-							"AMK0610",
+							"SST0610",
 							`A default length of ${piece.start.defaultNoteLength} ticks has no l this target can write.`,
 						),
 					);
@@ -1184,7 +1184,7 @@ export function writeDefaults(input: NormalizeInput, options: DefaultsOptions): 
 			} else {
 				diagnostics.push(
 					diagnostic(
-						"AMK0611",
+						"SST0611",
 						"The driver's default tempo cannot be written under this song's tempo ratio, so none was.",
 						events[index].span,
 						"info",
@@ -1199,7 +1199,7 @@ export function writeDefaults(input: NormalizeInput, options: DefaultsOptions): 
 				parts.push(octave);
 			} else if (hasNote) {
 				diagnostics.push(
-					diagnostic("AMK0610", `An octave of ${entering.octave} cannot be written with o.`, events[index].span),
+					diagnostic("SST0610", `An octave of ${entering.octave} cannot be written with o.`, events[index].span),
 				);
 			}
 		}
@@ -1211,7 +1211,7 @@ export function writeDefaults(input: NormalizeInput, options: DefaultsOptions): 
 			} else if (hasNote) {
 				diagnostics.push(
 					diagnostic(
-						"AMK0610",
+						"SST0610",
 						`A default length of ${entering.defaultNoteLength} ticks has no l this target can write.`,
 						events[index].span,
 					),

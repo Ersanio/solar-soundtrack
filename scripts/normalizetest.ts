@@ -171,11 +171,11 @@ expectNormalized(
 	(t) => count(t, /c8 d8 e8/g) === 7,
 );
 
-expectRefused("a * before any loop", "#amk 4\n#0 *2 c4\n", "AMK0602");
-expectRefused("a call under a differently tuned instrument", "#amk 4\n#0 @0 (1)[c8]2\n#1 @2 (1)2\n", "AMK0604");
-expectRefused("an @ inside the body that would retune what follows", "#amk 4\n#0 @0 [ @2 c8 ]2 d8\n", "AMK0605");
-expectRefused("a pitch slide across a bracket", "#amk 4\n#0 c8 & [ d8 ]2\n", "AMK0607");
-expectRefused("a song that retunes an instrument", "#amk 4\ntuning[0]=2\n#0 [c8]2\n", "AMK0608");
+expectRefused("a * before any loop", "#amk 4\n#0 *2 c4\n", "SST0602");
+expectRefused("a call under a differently tuned instrument", "#amk 4\n#0 @0 (1)[c8]2\n#1 @2 (1)2\n", "SST0604");
+expectRefused("an @ inside the body that would retune what follows", "#amk 4\n#0 @0 [ @2 c8 ]2 d8\n", "SST0605");
+expectRefused("a pitch slide across a bracket", "#amk 4\n#0 c8 & [ d8 ]2\n", "SST0607");
+expectRefused("a song that retunes an instrument", "#amk 4\ntuning[0]=2\n#0 [c8]2\n", "SST0608");
 
 // ---------------------------------------------------------------------------
 console.log("\ntriplets");
@@ -267,7 +267,7 @@ expectNormalized("an o leaked from another channel is written as what it was", "
 	);
 	check(
 		"and it says so",
-		outcome.ok && outcome.diagnostics.some((d) => d.code === "AMK0611" && d.severity === "info"),
+		outcome.ok && outcome.diagnostics.some((d) => d.code === "SST0611" && d.severity === "info"),
 		outcome.ok ? describe(outcome.diagnostics) : "",
 	);
 }
@@ -424,8 +424,8 @@ console.log("\nnormalizing one channel");
 	const source = "#amk 2\n#0 c4\n#1 d4\n#0 e4\n";
 	const scoped = normalizeSong(source, ARAM, OPTIONS, 0);
 	check(
-		"a channel written in two blocks: refused with AMK0615",
-		!scoped.ok && scoped.diagnostics.some((d) => d.code === "AMK0615"),
+		"a channel written in two blocks: refused with SST0615",
+		!scoped.ok && scoped.diagnostics.some((d) => d.code === "SST0615"),
 		describe(scoped.diagnostics),
 	);
 }

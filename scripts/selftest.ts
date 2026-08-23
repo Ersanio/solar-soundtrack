@@ -916,7 +916,7 @@ console.log("\n#samples and #path");
 	check("a song with #path compiles", pathed.ok, pathed.diagnostics.map((d) => `${d.code} ${d.message}`).join("; "));
 	check("#path does not prefix a quoted name", names(pathed)[0] === "snare.brr", names(pathed).join(", "));
 
-	const notices = pathed.diagnostics.filter((d) => d.code === "AMK0504");
+	const notices = pathed.diagnostics.filter((d) => d.code === "SST0504");
 	check("one notice says so", notices.length === 1, `${notices.length}`);
 	check("and it is info rather than an error", notices[0]?.severity === "info", notices[0]?.severity);
 	check(
@@ -936,8 +936,8 @@ console.log("\n#samples and #path");
 	const twicePathed = resolved('#amk 4\n#path "wrong"\n#path "drums"\n#samples { "snare.brr" }\n#0 o4 c4\n');
 	check(
 		"two #path directives give two notices",
-		twicePathed.diagnostics.filter((d) => d.code === "AMK0504").length === 2,
-		`${twicePathed.diagnostics.filter((d) => d.code === "AMK0504").length}`,
+		twicePathed.diagnostics.filter((d) => d.code === "SST0504").length === 2,
+		`${twicePathed.diagnostics.filter((d) => d.code === "SST0504").length}`,
 	);
 	check("and neither prefixes anything", names(twicePathed)[0] === "snare.brr", names(twicePathed).join(", "));
 

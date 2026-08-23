@@ -1681,7 +1681,7 @@ expectEdit(
 );
 
 // And one already past where the note reaches needs nothing either. It stays the
-// long channel, which is the ordinary shape `AMK0502` reports.
+// long channel, which is the ordinary shape `SST0502` reports.
 expectEdit(
 	"a channel already past the new end is not padded",
 	"#amk 2\n#0 o4 c4 d4\n#1 o4 c1 c1\n",

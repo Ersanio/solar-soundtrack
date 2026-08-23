@@ -1170,7 +1170,7 @@ export class AddmusicKParser {
 	 * unquoted argument is an error in both, and a string left behind would be
 	 * scanned as music. `getQuotedString` still reports AMK0064 and AMK0068.
 	 *
-	 * AMK0504 says so once per occurrence, each on its own span, since two
+	 * SST0504 says so once per occurrence, each on its own span, since two
 	 * directives are two things for the editor to underline.
 	 */
 	private parsePath(start: number): void {
@@ -1187,7 +1187,7 @@ export class AddmusicKParser {
 		this.info(
 			start,
 			this.pos,
-			"AMK0504",
+			"SST0504",
 			"#path does nothing here, as Solar Soundtrack's sample library is one flat folder. " +
 				"AddmusicK itself still accepts this directive.",
 		);

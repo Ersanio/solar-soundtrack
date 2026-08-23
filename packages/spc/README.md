@@ -205,7 +205,7 @@ emulator as its oracle.
 reach that one. That is the arrangement `BANK_SLOT_COUNT` and `MELODIC_SRCN` live under too, and it
 is safe only because a harness asserts the two agree.
 
-`unreachableChannels` is the one diagnostic the walk produces — `AMK0502`, in the same `AMK05xx`
+`unreachableChannels` is the one diagnostic the walk produces — `SST0502`, in the same `SST05xx`
 range as `@amk/tokens`' echo hazards, for the same reason: nothing in `Music.cpp` reports it, because
 it is about what the song _does_ rather than about whether it builds. A phrase ends when any voice
 runs out of data, so a channel longer than the

@@ -15,8 +15,8 @@ interface Reading {
  *
  * The echo's FIR sits inside its own feedback loop, so repeat *k* comes back at
  * `(EFB/128 · |H(f)|)^k` — past 1 that grows without bound for as long as the
- * song plays, through whatever the listener happens to be wearing. `AMK0500`
- * and `AMK0501` report it in the output pane, but a diagnostic is written from
+ * song plays, through whatever the listener happens to be wearing. `SST0500`
+ * and `SST0501` report it in the output pane, but a diagnostic is written from
  * the *document*, and both controls that cause one are sliders: the noise
  * arrives while the pointer is still moving, several seconds before anything is
  * written for a diagnostic to describe. So the panels judge what they are

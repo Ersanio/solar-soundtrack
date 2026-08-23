@@ -323,7 +323,7 @@ export class SourceView {
       untracked(() => this.view.dispatch({ effects: setPlayhead.of(spans) }));
     });
 
-    // Sanctioned effect: the same, for the notes AMK0502 says never play.
+    // Sanctioned effect: the same, for the notes SST0502 says never play.
     effect(() => {
       const spans = this.store.unreachableSpans();
       untracked(() => this.view.dispatch({ effects: setUnreachable.of(spans) }));

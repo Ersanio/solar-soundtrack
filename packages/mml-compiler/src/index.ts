@@ -25,7 +25,7 @@ export class AddmusicKCompiler {
 			return this.failure([
 				{
 					severity: "error",
-					code: "AMK0301",
+					code: "SST0301",
 					message: `ARAM address 0x${hex(aramAddress)} is outside the 64 KiB address space.`,
 					span: { start: 0, end: 0, line: 1 },
 				},

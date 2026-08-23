@@ -411,7 +411,7 @@ console.log("\nrunaway echo diagnostics");
 	const custom = hazards(`#amk 2\n\n#0 $F1 $08 $7F $00 ${HOT}\nc4\n`);
 	check(
 		"a hot $F5 under high feedback is reported",
-		custom.some((d) => d.code === "AMK0500"),
+		custom.some((d) => d.code === "SST0500"),
 	);
 	check(
 		"and it is severe rather than an error",
@@ -422,7 +422,7 @@ console.log("\nrunaway echo diagnostics");
 	// nothing to put a caret on. Filter 0 peaks at 132/128, which $7F feedback
 	// pushes past unity on its own.
 	const builtIn = hazards("#amk 2\n\n#0 $F1 $08 $7F $00\nc4\n");
-	check("$F1's own filter 0 at full feedback is reported", builtIn.length === 1 && builtIn[0].code === "AMK0501");
+	check("$F1's own filter 0 at full feedback is reported", builtIn.length === 1 && builtIn[0].code === "SST0501");
 	check("filter 1 is flat and cannot run away", hazards("#amk 2\n\n#0 $F1 $08 $7F $01\nc4\n").length === 0);
 
 	check("no feedback means no runaway", hazards(`#amk 2\n\n#0 $F1 $08 $00 $00 ${HOT}\nc4\n`).length === 0);
@@ -434,7 +434,7 @@ console.log("\nrunaway echo diagnostics");
 console.log("\nthe diagnostic points at the command that causes it");
 {
 	const source = `#amk 2\n\n#0 $F1 $08 $7F $00 ${HOT}\nc4\n`;
-	const fir = hazards(source).find((d) => d.code === "AMK0500");
+	const fir = hazards(source).find((d) => d.code === "SST0500");
 	check(
 		"the span covers the whole $F5 run",
 		fir !== undefined && source.slice(fir.span.start, fir.span.end) === HOT,
@@ -455,7 +455,7 @@ console.log("\nmultiple filters are judged one at a time");
 	const both = hazards(`#amk 2\n\n#0 $F1 $08 $7F $00 ${HOT} $F1 $08 $20 $01 ${HOT}\nc4\n`);
 	check(
 		"only the one whose feedback makes it diverge is reported",
-		both.filter((d) => d.code === "AMK0500").length === 1,
+		both.filter((d) => d.code === "SST0500").length === 1,
 		`${both.length} diagnostics: ${both.map((d) => d.code).join(", ")}`,
 	);
 
@@ -464,11 +464,11 @@ console.log("\nmultiple filters are judged one at a time");
 	const overridden = hazards(`#amk 2\n\n#0 $F1 $08 $7F $00 ${HOT} $F1 $08 $00 $01\nc4\n`);
 	check(
 		"a $F5 a later $F1 discards is still reported",
-		overridden.some((d) => d.code === "AMK0500"),
+		overridden.some((d) => d.code === "SST0500"),
 	);
 
 	const twice = hazards(`#amk 2\n\n#0 $F1 $08 $7F $00 ${HOT} ${HOT}\nc4\n`);
-	check("two runaway filters give two diagnostics, not one", twice.filter((d) => d.code === "AMK0500").length === 2);
+	check("two runaway filters give two diagnostics, not one", twice.filter((d) => d.code === "SST0500").length === 2);
 }
 
 console.log("\nchannels are read separately");

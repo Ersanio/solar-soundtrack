@@ -94,7 +94,7 @@ export class EchoConfig {
    * `$F1` reloads one of the driver's two built-in tables, so the filter it
    * selects *is* the filter — an earlier `$F5` is overridden by the time this
    * runs. Judged with the same `echoStability` and the same operands
-   * `echo-hazards.ts` uses for `AMK0501`, so the panel and the output pane can
+   * `echo-hazards.ts` uses for `SST0501`, so the panel and the output pane can
    * never disagree about whether a setting is safe.
    */
   private readonly stability = computed(() => {
@@ -121,7 +121,7 @@ export class EchoConfig {
   constructor() {
     // The feedback is a slider and the player keeps running through a drag, so
     // the runaway arrives while the pointer is still moving — several seconds
-    // before a commit could produce the AMK0501 that describes it.
+    // before a commit could produce the SST0501 that describes it.
     stopWhenRunaway(this.command, this.runaway, 'echo');
   }
 

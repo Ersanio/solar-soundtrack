@@ -11,10 +11,10 @@ import { hex2 } from "@amk/core/hex";
  */
 
 /** Runaway echo through custom `$F5` coefficients. */
-const CODE_FIR = "AMK0500";
+const CODE_FIR = "SST0500";
 
 /** Runaway echo through one of `$F1`'s two built-in tables. */
-const CODE_BUILT_IN = "AMK0501";
+const CODE_BUILT_IN = "SST0501";
 
 /**
  * The coefficients `$F1`'s third argument loads, or `null` for anything else.
