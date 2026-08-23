@@ -3,6 +3,7 @@ import type { WalkNote } from '@amk/spc/song-walk';
 import type { Command } from '@amk/tokens';
 import { type CommandGlyph } from '../../command-palette/command-icon';
 import { glyphOf } from '../../command-palette/glyph-of';
+import { definedAt } from '../../../state/commands-in-force';
 import { type PlaceContext, keyOf, placeOf } from './percussion';
 import {
   CHANNEL_FILL,
@@ -34,6 +35,9 @@ import type { PlacedNote, Plan } from './roll-edit';
  */
 export const MUTED_OPACITY = 0.12;
 
+/** Shared by every bar with nothing acting on it, which on a plain song is most. */
+const NOTHING_DEFINED: ReadonlySet<Command> = new Set<Command>();
+
 /** One glyph on a bar: a command acting on that note, and where to draw it. */
 export interface MarkGlyph {
   id: string;
@@ -45,6 +49,8 @@ export interface MarkGlyph {
   span: Span;
   /** For the tooltip, since a glyph has no room to say what it is. */
   label: string;
+  /** This note puts the command in force, where the rest of a run inherits it. */
+  defining: boolean;
 }
 
 /** One note, with everything the template needs already resolved. */
@@ -64,8 +70,23 @@ export interface Mark {
   label: { text: string; x: number; y: number; size: number } | null;
   /** As many as fit; the inspector is where the whole list is. */
   glyphs: readonly MarkGlyph[];
-  /** The "and more" mark, drawn when the bar had room for only some of them. */
-  more: { x: number; y: number; size: number } | null;
+  /**
+   * Of every command acting on the note, the ones it puts in force.
+   *
+   * The whole set and not only the drawn glyphs': the hover names the commands
+   * the bar had no room for, and it reads this rather than asking again, so the
+   * two cannot answer differently.
+   */
+  defining: ReadonlySet<Command>;
+  /**
+   * The "and more" mark, drawn when the bar had room for only some of them.
+   *
+   * `defining` when one of the commands it stands for takes effect at this note,
+   * so it wears the same plate a defining glyph does: the mark is what is left
+   * of that glyph, and a bar too narrow to show it would otherwise say the note
+   * inherits everything it plays under.
+   */
+  more: { x: number; y: number; size: number; defining: boolean } | null;
   note: WalkNote;
 }
 
@@ -156,7 +177,17 @@ export function buildMarks(request: MarkRequest): Mark[] {
   const behind: Mark[] = [];
   const front: Mark[] = [];
 
+  // Which commands a note puts in force is the list against the one before it on
+  // its channel, and the walk's order is this loop's, so the neighbour is free
+  // here where anything asking per note would have to go looking. Taken above
+  // both guards: a note off the screen, or on no row at all, is still the note
+  // the next one follows.
+  const last: (WalkNote | null)[] = new Array<WalkNote | null>(CHANNEL_FILL.length).fill(null);
+
   for (const note of notes) {
+    const previous = last[note.channel];
+    last[note.channel] = note;
+
     if (note.tick > to || note.tick + note.ticks < from) {
       continue;
     }
@@ -175,7 +206,30 @@ export function buildMarks(request: MarkRequest): Mark[] {
       command,
       entry: glyphOf(command),
     }));
-    const drawable = acting.filter((each) => each.entry !== null);
+    // Only the notes on screen ask, so the neighbour's list is fetched at most
+    // once per drawn bar and the lookup's cache answers all but the first of a
+    // run. A note with nothing acting on it needs no comparison at all.
+    const defining =
+      acting.length === 0
+        ? NOTHING_DEFINED
+        : definedAt(
+            acting.map((each) => each.command),
+            previous === null ? [] : inForce(previous),
+          );
+
+    // The ones the note puts in force lead, and the slot order the list arrives
+    // in holds within each half. A bar drops from the end, so what survives a
+    // narrow one is what starts at this note rather than whatever `SLOTS`
+    // happens to name first — a `q` no note has touched for a page outranked
+    // the `v` the bar was drawn to show.
+    const glyphed = acting.filter((each) => each.entry !== null);
+    const drawable =
+      defining.size === 0
+        ? glyphed
+        : [
+            ...glyphed.filter((each) => defining.has(each.command)),
+            ...glyphed.filter((each) => !defining.has(each.command)),
+          ];
     const name = headingOf(note, context);
     const content = fitBarContent(w, h, name, drawable.length);
     const muted = audible.get(note.channel) === false;
@@ -205,11 +259,22 @@ export function buildMarks(request: MarkRequest): Mark[] {
         size: box.size,
         span: drawable[at].command.span,
         label: drawable[at].entry!.label,
+        defining: defining.has(drawable[at].command),
       })),
+      defining,
       more:
         content.more === null
           ? null
-          : { x: x + content.more.x, y: y + content.more.y, size: content.more.size },
+          : {
+              x: x + content.more.x,
+              y: y + content.more.y,
+              size: content.more.size,
+              // The ones it stands for are the tail, the boxes having been
+              // handed back in the list's own order; `charttest` pins that.
+              defining: drawable
+                .slice(content.glyphs.length)
+                .some((each) => defining.has(each.command)),
+            },
       note,
     });
   }

@@ -122,12 +122,25 @@ export class RollTooltip {
 
     // A bar shows as many glyphs as it has room for, so the hover is where the
     // rest of them are named. The inspector lists them with their arguments.
-    const acting = this.editor
-      .commandsInForce()(note)
-      .map((command) => glyphOf(command)?.label)
-      .filter((label) => label !== undefined);
-    if (acting.length > 0) {
-      rows.push(`under ${acting.join(', ').toLowerCase()}`);
+    //
+    // Split the way the bar's glyphs are, and off the same set, so a plated
+    // glyph and this line cannot say different things about one command.
+    const defining = this.mark().defining;
+    const sets: string[] = [];
+    const under: string[] = [];
+    for (const command of this.editor.commandsInForce()(note)) {
+      const label = glyphOf(command)?.label;
+      if (label !== undefined) {
+        (defining.has(command) ? sets : under).push(label);
+      }
+    }
+
+    if (sets.length > 0) {
+      rows.push(`sets ${sets.join(', ').toLowerCase()}`);
+    }
+
+    if (under.length > 0) {
+      rows.push(`under ${under.join(', ').toLowerCase()}`);
     }
 
     const at = this.anchor();

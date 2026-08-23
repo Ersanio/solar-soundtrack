@@ -1347,6 +1347,23 @@ console.log("\nwhat fits inside one bar");
 		const capped = fitBarContent(400, 20, "C4", 8);
 		check("a bar past the glyph cap says so too", capped.more !== null, `${capped.glyphs.length} glyphs, no mark`);
 		check("and spends one of the capped slots on saying it", capped.glyphs.length === 4);
+
+		// `buildMarks` reads the boxes back onto the front of the list it asked
+		// about and takes the tail as the ones the mark stands for — which is what
+		// decides both the icon each box gets and whether the mark wears a
+		// defining note's plate. Both are silently wrong if the order is not the
+		// list's own, left to right with the mark past the end of them.
+		const cut = fitBarContent(120, 20, "C4", 5);
+		let ordered = cut.glyphs.length > 1;
+		for (let n = 1; n < cut.glyphs.length; n++) {
+			ordered &&= cut.glyphs[n - 1].x < cut.glyphs[n].x;
+		}
+
+		check("a cut bar hands its boxes back in the order it was given", ordered, `${cut.glyphs.length} boxes`);
+		check(
+			"with the mark for the rest past the last of them",
+			cut.more !== null && cut.more.x > cut.glyphs[cut.glyphs.length - 1].x,
+		);
 	}
 
 	// Monotone, and it has to be: a bar that grows an icon as it shrinks is what

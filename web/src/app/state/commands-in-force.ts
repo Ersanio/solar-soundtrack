@@ -111,3 +111,61 @@ export function commandsInForceOf(sources: InForceSources): (note: WalkNote) => 
     return acting;
   };
 }
+
+/**
+ * Of the commands acting on a note, the ones it puts in force rather than
+ * inherits — where `before` is what was acting on the note before it on its
+ * channel, and nothing at all for the first note of a pass.
+ *
+ * By the identity of the commands and never of the arrays holding them.
+ * `recordOrigin` calls `invalidateAll` on every song-wide write
+ * (`song-walk.ts:713`), so a `t`, a `$E4` or an echo byte hands all eight
+ * channels a fresh `origins` array with the same addresses in it, and an array
+ * compared against the one before would report every channel's next note as
+ * setting everything it plays under. `index.commands` holds one object per
+ * written command, which is stable across the whole scan.
+ *
+ * A `[ ]` body re-running a command that changes nothing is not a definition:
+ * `origins` names a command by the address the driver read it from and
+ * `recordOrigin` skips a write to the address already in the slot, so
+ * `[ v200 c8 ]2` is answered on the first pass alone. `[ v200 c8 v100 d8 ]2`
+ * answers all four, each list differing from the one before it.
+ *
+ * A statement about the one pass the walk produces, as everything else read off
+ * a `WalkNote` is.
+ */
+export function definedAt(
+  acting: readonly Command[],
+  before: readonly Command[],
+): ReadonlySet<Command> {
+  if (before.length === 0) {
+    return new Set(acting);
+  }
+
+  const held = new Set(before);
+  return new Set(acting.filter((command) => !held.has(command)));
+}
+
+/**
+ * The note the driver played before this one on its channel, for a caller with
+ * a note and no place in the list to read a neighbour from.
+ *
+ * A channel plays one note at a time, so its ticks strictly increase, and the
+ * notes a pass never reaches are dropped from the tail — what is left of a
+ * channel is a contiguous prefix of its walk order, and the last of them below
+ * this tick is the one before it.
+ */
+export function notePreceding(notes: readonly WalkNote[], note: WalkNote): WalkNote | null {
+  let before: WalkNote | null = null;
+  for (const each of notes) {
+    if (each.tick >= note.tick) {
+      break; // sorted by tick
+    }
+
+    if (each.channel === note.channel) {
+      before = each;
+    }
+  }
+
+  return before;
+}

@@ -62,17 +62,24 @@
         {{ label.text }}
       </svg:text>
     }
-    <!-- The plate is the hit target as well as the highlight. An SVG element
-         only takes a pointer where it is painted, so without it a glyph is
-         clickable on its strokes and not in the gaps between them — a 1.3px
-         target that reads as a dead icon.
+    <!-- The plate is the hit target, the hover highlight, and what says the note
+         is where its command took effect. An SVG element only takes a pointer
+         where it is painted, so without it a glyph is clickable on its strokes
+         and not in the gaps between them — a 1.3px target that reads as a dead
+         icon.
 
-         It lifts the bar rather than recolouring the glyph, because it is drawn
-         over eight channel colours and only the plate works on all of them:
-         `--color-accent` is a blue of much the same lightness as `--color-ch-0`,
-         so on that channel a recoloured glyph would be the one that vanished on
-         hover. Every `--color-ch-*` is mid-tone against the surface, so a
-         near-white wash lifts each of them. -->
+         A defining glyph is inverted rather than tinted: the eight channel
+         colours are mid-tone and chromatic, so the axis they leave free is
+         lightness. `--color-accent` is a blue of much the same lightness as
+         `--color-ch-0`, `--color-warn` sits on `--color-ch-3` and `--color-good`
+         on `--color-ch-2`, and each would be the colour that vanished on one
+         channel. A near-white plate lifts every one of them, and the glyph on it
+         reads against the plate rather than against the bar, so one pair of
+         colours does for all eight.
+
+         The plate takes the mark's opacity for the same reason the glyph does: a
+         chip at full strength over a muted bar would be the brightest thing on a
+         channel that cannot be heard. -->
     @for (glyph of mark.glyphs; track glyph.id) {
       <svg:g
         class="group"
@@ -81,18 +88,25 @@
       >
         <svg:rect
           rx="2"
-          class="fill-ink/0 group-hover:fill-ink/25"
+          [class]="
+            glyph.defining
+              ? 'fill-ink/70 group-hover:fill-ink'
+              : 'fill-ink/0 group-hover:fill-ink/25'
+          "
           [attr.x]="glyph.x"
           [attr.y]="glyph.y"
           [attr.width]="glyph.size"
           [attr.height]="glyph.size"
+          [attr.fill-opacity]="mark.opacity"
         />
         <!-- No `svg:` prefix on this one, and it must not have one: `svg` is one
              of the three element names that carry a namespace implicitly, and the
              glyph's selector is `svg[amk-glyph]`. -->
         <svg
           amk-glyph
-          class="text-ink pointer-events-none"
+          class="pointer-events-none"
+          [class.text-ink]="!glyph.defining"
+          [class.text-surface]="glyph.defining"
           [name]="glyph.icon"
           [attr.x]="glyph.x"
           [attr.y]="glyph.y"
@@ -106,19 +120,31 @@
          it reads as one of the row. Not a glyph out of the palette, though: it
          stands for a list rather than a command, so it has no span to reveal
          and no handler of its own — the plate is there to be lit, and the click
-         it does not stop reaches the bar, whose answer is the whole list. -->
+         it does not stop reaches the bar, whose answer is the whole list.
+
+         It inverts on the same terms a glyph does, for any one of the commands
+         it stands for: it is what is left of those glyphs, so a bar narrow
+         enough to lose the one that took effect here would otherwise read as a
+         note inheriting everything it plays under. -->
     @if (mark.more; as more) {
       <svg:g class="group">
         <svg:rect
           rx="2"
-          class="fill-ink/0 group-hover:fill-ink/25"
+          [class]="
+            more.defining
+              ? 'fill-ink/70 group-hover:fill-ink'
+              : 'fill-ink/0 group-hover:fill-ink/25'
+          "
           [attr.x]="more.x"
           [attr.y]="more.y"
           [attr.width]="more.size"
           [attr.height]="more.size"
+          [attr.fill-opacity]="mark.opacity"
         />
         <svg:g
-          class="fill-ink pointer-events-none"
+          class="pointer-events-none"
+          [class.fill-ink]="!more.defining"
+          [class.fill-surface]="more.defining"
           [attr.fill-opacity]="mark.opacity"
           [attr.transform]="`translate(${more.x} ${more.y})`"
         >

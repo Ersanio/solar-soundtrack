@@ -504,8 +504,10 @@ export function fitBarContent(
   const placed: BarName = { x: CONTENT_PAD, y: height / 2, size };
   const left = CONTENT_PAD + nameWidth + CONTENT_PAD;
 
-  // Right-aligned and filled leftwards, so the last command to take effect sits
-  // furthest from the name rather than the list shuffling as it grows.
+  // Right-aligned and filled leftwards, so a bar that grows a glyph grows it on
+  // the side away from the name. The boxes come back in the order they were
+  // asked for, left to right, which is what lets the caller read the ones it did
+  // not get back as the tail of its own list.
   const box = height - 2;
   const slot = (n: number): BarGlyph => ({
     x: width - CONTENT_PAD - (n + 1) * box - n * CONTENT_PAD,
