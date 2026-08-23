@@ -28,11 +28,12 @@ import {
 	VOICES,
 	applyChannelMutes,
 	createMuteBackup,
+	createTickPhase,
 	type MuteBackup,
 	haltVoice,
-	readNoteDuration,
 	restoreTrackVolume,
 	sawTick,
+	seedTickPhase,
 	startVoiceAt,
 	tickVoice,
 	voiceHasInstrument,
@@ -235,8 +236,8 @@ export function noteFrames(note: number, ticks: number, quantization: number | n
  *    moved there, the duration counter forced to 1.
  * 4. **Give it its volume back** without the dirty bit, so the DSP keeps 0 until
  *    the new note keys on and recomputes it. See {@link restoreTrackVolume}.
- * 5. **Count the note's ticks off that voice**, the same `sawTick` machinery the
- *    worklet and the clock measurement use, then render the tail.
+ * 5. **Count the note's ticks off the driver's tempo**, the same `sawTick`
+ *    machinery the worklet and the clock measurement use, then render the tail.
  */
 export function auditionNote(core: SpcCore, spc: Uint8Array, request: NoteAuditionRequest): AuditionedNote {
 	const { channel, note, scratchAt } = request;
@@ -294,7 +295,7 @@ export function auditionNote(core: SpcCore, spc: Uint8Array, request: NoteAuditi
 	startVoiceAt(aram, channel, scratchAt);
 	restoreTrackVolume(aram, channel, backup.saved[channel]);
 
-	return { ...record(core, channel, held), reachedTicks };
+	return { ...record(core, held), reachedTicks };
 }
 
 /**
@@ -318,7 +319,7 @@ export function auditionNote(core: SpcCore, spc: Uint8Array, request: NoteAuditi
 function fastForward(core: SpcCore, target: number, silenced: number, backup: MuteBackup): number {
 	let ticks = 0;
 	let voice = -1;
-	let duration = 0;
+	const tick = createTickPhase();
 	let rendered = 0;
 	let stalledFor = 0;
 	const cap = MAX_SEEK_SECONDS * SPC_SAMPLE_RATE;
@@ -336,24 +337,22 @@ function fastForward(core: SpcCore, target: number, silenced: number, backup: Mu
 			// The song has not keyed on yet; latch the voice once it has, and once it
 			// has read a duration byte. `worklet.ts` latches on the pointer alone,
 			// which is enough for a playhead that can be a tick out and not enough
-			// here: the tick counted off a voice latched mid-fetch is the fetch, so
-			// the note is handed over inside the pass that starts the song, where
+			// here: counting from a voice merely pointed at music starts a pass early,
+			// so the note is handed over inside the pass that starts the song, where
 			// `L_0C01` has still to install the track pointers and reads the frames
 			// at `scratchAt` as a phrase (`main.asm:2288-2309`). See
 			// {@link voiceStarted}.
 			const playing = tickVoice(aram);
 			if (voiceStarted(aram, playing)) {
 				voice = playing;
-				duration = readNoteDuration(aram, voice);
 			}
 
+			seedTickPhase(tick, aram);
 			stalledFor++;
 			continue;
 		}
 
-		const now = readNoteDuration(aram, voice);
-		const stepped = sawTick(duration, now);
-		duration = now;
+		const stepped = sawTick(tick, aram);
 		ticks += stepped;
 		stalledFor = stepped > 0 ? 0 : stalledFor + 1;
 	}
@@ -362,18 +361,19 @@ function fastForward(core: SpcCore, target: number, silenced: number, backup: Mu
 }
 
 /**
- * Renders the note and its tail, counting ticks off the one voice still playing.
+ * Renders the note and its tail, counting ticks off the driver's own tempo.
  *
  * The note's length is ticks because it follows the music; the tail is seconds
  * because it does not. Both are bounded by {@link MAX_AUDITION_SECONDS}, so a
  * song at a crawl returns a short note rather than a long silence.
  */
-function record(core: SpcCore, channel: number, held: number): { pcm: Int16Array; heldTicks: number } {
+function record(core: SpcCore, held: number): { pcm: Int16Array; heldTicks: number } {
 	const cap = MAX_AUDITION_SECONDS * SPC_SAMPLE_RATE;
 	const pcm = new Int16Array(cap * SPC_CHANNELS);
 
 	let ticks = 0;
-	let duration = readNoteDuration(core.aram(), channel);
+	const tick = createTickPhase();
+	seedTickPhase(tick, core.aram());
 	let rendered = 0;
 	let tail = -1;
 
@@ -382,9 +382,7 @@ function record(core: SpcCore, channel: number, held: number): { pcm: Int16Array
 		rendered += BLOCK;
 
 		if (tail < 0) {
-			const now = readNoteDuration(core.aram(), channel);
-			ticks += sawTick(duration, now);
-			duration = now;
+			ticks += sawTick(tick, core.aram());
 			if (ticks >= held) {
 				tail = rendered;
 			}

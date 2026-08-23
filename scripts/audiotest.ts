@@ -27,9 +27,10 @@ import {
 	TICK_POLL_HZ,
 	applyChannelMutes,
 	createMuteBackup,
+	createTickPhase,
 	readDriverState,
-	readNoteDuration,
 	sawTick,
+	seedTickPhase,
 	tickVoice,
 } from "@amk/spc/driver-state";
 
@@ -321,14 +322,14 @@ console.log("\na muted channel goes on carrying the song");
 		emu.loadSpc(spc);
 		const backup = createMuteBackup();
 
-		// Let the song key on, so there is a voice to count off.
+		// Let the song key on, so the count runs at the song's own tempo.
 		for (let done = 0; done < SPC_SAMPLE_RATE / 20; done += BLOCK) {
 			emu.renderView(BLOCK);
 			applyChannelMutes(emu.aram(), mask, backup);
 		}
 
-		const voice = tickVoice(emu.aram());
-		let previous = readNoteDuration(emu.aram(), voice);
+		const tick = createTickPhase();
+		seedTickPhase(tick, emu.aram());
 		let pointer = readDriverState(emu.aram()).trackPointers[0];
 		let ticks = 0;
 		const passes: number[] = [];
@@ -340,9 +341,7 @@ console.log("\na muted channel goes on carrying the song");
 			const aram = emu.aram();
 			applyChannelMutes(aram, mask, backup);
 
-			const now = readNoteDuration(aram, voice);
-			ticks += sawTick(previous, now);
-			previous = now;
+			ticks += sawTick(tick, aram);
 
 			// A 16-bit pointer read from outside the emulator can be caught
 			// half-written; a real jump is still there on the next look.
@@ -420,7 +419,7 @@ console.log("\nmuting does not change how fast the song plays");
 		emu.loadSpc(spc);
 		const backup = createMuteBackup();
 		let voice = -1;
-		let duration = 0;
+		const tick = createTickPhase();
 		let ticks = 0;
 
 		for (let done = 0; done < SPC_SAMPLE_RATE * seconds; done += BLOCK) {
@@ -430,13 +429,11 @@ console.log("\nmuting does not change how fast the song plays");
 
 			if (voice < 0) {
 				voice = tickVoice(aram);
-				duration = readNoteDuration(aram, voice);
+				seedTickPhase(tick, aram);
 				continue;
 			}
 
-			const now = readNoteDuration(aram, voice);
-			ticks += sawTick(duration, now);
-			duration = now;
+			ticks += sawTick(tick, aram);
 		}
 
 		return ticks / seconds;
@@ -854,10 +851,10 @@ console.log("\nthe driver's own ticks are counted exactly");
 		core.loadSpc(spc);
 		const block = SPC_SAMPLE_RATE / TICK_POLL_HZ;
 
-		// Let the song key on, so there is a voice to count off.
+		// Let the song key on, so the count runs at the song's own tempo.
 		core.renderView(SPC_SAMPLE_RATE / 20);
-		const voice = tickVoice(core.aram());
-		let previous = readNoteDuration(core.aram(), voice);
+		const tick = createTickPhase();
+		seedTickPhase(tick, core.aram());
 		let pointer = readDriverState(core.aram()).trackPointers[0];
 		let ticks = 0;
 		const passes: number[] = [];
@@ -868,9 +865,7 @@ console.log("\nthe driver's own ticks are counted exactly");
 			core.renderView(block);
 			const aram = core.aram();
 
-			const now = readNoteDuration(aram, voice);
-			ticks += sawTick(previous, now);
-			previous = now;
+			ticks += sawTick(tick, aram);
 
 			// A 16-bit pointer read from outside the emulator can be caught
 			// half-written, which looks like a jump backwards and is not one. A real
@@ -963,17 +958,61 @@ console.log("\nthe driver's own ticks are counted exactly");
 	);
 }
 
-console.log("\nthe voice the ticks are counted off is one the driver plays");
+console.log("\nthe music tick is the driver's own accumulator overflow");
 {
-	// The playhead's whole count runs on one voice's duration counter, latched
-	// on the first poll that finds a voice — from the moment the SPC loads, as
-	// `worklet.ts` and `measure-clock.ts` do it. At song start the driver holds
-	// `$30` pointing into the zero page for its hot-patch reset
-	// (`main.asm:2104-2105`), a word with a low byte and no high byte, and it
-	// stays that way for some milliseconds. A latch reading the whole word takes
-	// voice 0 there, and in a song whose lowest channel is `#1` that voice never
-	// ticks: the music plays and nothing that follows it moves. The driver's own
-	// test is the high byte alone (`main.asm:2315`), and so is `tickVoice`'s.
+	// `main.asm:220-238`. A pass of the main loop multiplies the tempo by timer
+	// 0's count, adds it to `$49`, and plays a tick if that carried *or* if the
+	// product had a high byte at all. Fed a synthetic page here, because the two
+	// branches cannot be told apart by watching a real song: the second only
+	// fires once the driver has fallen a whole accumulator period behind.
+	const gate = (tempo: number, counts: readonly number[]): number => {
+		const aram = new Uint8Array(0x100);
+		aram[0x51] = tempo;
+		const tick = createTickPhase();
+		seedTickPhase(tick, aram);
+
+		let ticks = 0;
+		for (const count of counts) {
+			aram[0x44] = (aram[0x44] + count * 0x38) & 0xff;
+			ticks += sawTick(tick, aram);
+		}
+
+		return ticks;
+	};
+
+	const keepingUp = Array.from({ length: 500 }, () => 1);
+	check(
+		"a driver keeping up ticks once per accumulator period",
+		gate(54, keepingUp) === Math.floor((54 * 500) / 256),
+		`${gate(54, keepingUp)} of ${Math.floor((54 * 500) / 256)}`,
+	);
+	check(
+		"and the phase is carried, so no period is lost to rounding",
+		gate(
+			1,
+			Array.from({ length: 256 }, () => 1),
+		) === 1,
+	);
+
+	// 52 x 5 is 260: the low byte adds 4 and never carries, and the tick is the
+	// one `cmp y, #$00` runs. Watching `$49` alone would count nothing here.
+	check("a pass that fell behind ticks on the product's high byte", gate(52, [5]) === 1);
+	check("a pass that did not happen is not a tick", gate(54, [0, 0, 0]) === 0);
+	// `t255` wraps `$FF` to 0 in the driver's carry-set `adc`, and a tempo of 0
+	// stops the accumulator dead rather than running the song at its fastest.
+	check("a stopped song never ticks", gate(0, keepingUp) === 0);
+}
+
+console.log("\nthe voice the count is latched on is one the driver plays");
+{
+	// The playhead starts counting on the first poll that finds a voice — from
+	// the moment the SPC loads, as `worklet.ts` and `measure-clock.ts` do it. At
+	// song start the driver holds `$30` pointing into the zero page for its
+	// hot-patch reset (`main.asm:2104-2105`), a word with a low byte and no high
+	// byte, and it stays that way for some milliseconds. A latch reading the whole
+	// word takes voice 0 there, and so starts the count several ticks before the
+	// song it is meant to be following. The driver's own test is the high byte
+	// alone (`main.asm:2315`), and so is `tickVoice`'s.
 	const zeroPage = new Uint8Array(0x100);
 	zeroPage[0x30] = 0x32;
 	check("a pointer into the zero page is not a playing voice", tickVoice(zeroPage) === -1);
@@ -984,20 +1023,18 @@ console.log("\nthe voice the ticks are counted off is one the driver plays");
 	function latched(source: string, seconds: number): { voice: number; ticks: number } {
 		emu.loadSpc(compileToSpc(source));
 		let voice = -1;
-		let duration = 0;
+		const tick = createTickPhase();
 		let ticks = 0;
 		for (let done = 0; done < SPC_SAMPLE_RATE * seconds; done += BLOCK) {
 			emu.renderView(BLOCK);
 			const aram = emu.aram();
 			if (voice < 0) {
 				voice = tickVoice(aram);
-				duration = readNoteDuration(aram, voice);
+				seedTickPhase(tick, aram);
 				continue;
 			}
 
-			const now = readNoteDuration(aram, voice);
-			ticks += sawTick(duration, now);
-			duration = now;
+			ticks += sawTick(tick, aram);
 		}
 
 		return { voice, ticks };
@@ -1005,7 +1042,7 @@ console.log("\nthe voice the ticks are counted off is one the driver plays");
 
 	const zero = latched("#amk 4\n#0 t54 v200 @0 o4 q7F c8d8e8f8\n", 2);
 	const one = latched("#amk 4\n#1 t54 v200 @0 o4 q7F c8d8e8f8\n", 2);
-	check("a song whose lowest channel is #1 is counted off voice 1", one.voice === 1, `voice ${one.voice}`);
+	check("a song whose lowest channel is #1 is latched on voice 1", one.voice === 1, `voice ${one.voice}`);
 	check("and its ticks advance", one.ticks > 100, `${one.ticks} ticks`);
 	check("to the same count as the same music on #0", one.ticks === zero.ticks, `${one.ticks} against ${zero.ticks}`);
 }

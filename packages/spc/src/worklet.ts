@@ -15,10 +15,11 @@ import {
 	TICK_POLL_HZ,
 	applyChannelMutes,
 	createMuteBackup,
+	createTickPhase,
 	readDriverState,
-	readNoteDuration,
 	resetMuteBackup,
 	sawTick,
+	seedTickPhase,
 	tickVoice,
 } from "./driver-state";
 import { SPC_PROCESSOR, type FromWorklet, type SpcProcessorOptions, type ToWorklet } from "./protocol";
@@ -35,10 +36,10 @@ declare function registerProcessor(
 ): void;
 
 /**
- * Emulator frames per refill, which is also how often the driver's note
- * duration counter gets read.
+ * Emulator frames per refill, which is also how often the driver's tempo
+ * accumulator gets read.
  *
- * 1 ms, so `$70` is sampled at {@link TICK_POLL_HZ} — twice the driver's main
+ * 1 ms, so `$44` is sampled at {@link TICK_POLL_HZ} — twice the driver's main
  * loop rate, which is what makes the tick count exact. Measured against the
  * vendored core, 32 frames rather than 1024 costs about 4% more emulator time
  * and still runs 355x faster than realtime on an eight-channel song — a cheap
@@ -93,9 +94,9 @@ class SpcProcessor extends AudioWorkletProcessor {
 	 * than predicted. This is the clock the playhead runs on.
 	 */
 	private ticks = 0;
-	/** The voice ticks are counted off, and its counter as of the last poll. */
+	/** The voice whose keying on says the song is running, and the tick state. */
 	private voice = -1;
-	private duration = 0;
+	private readonly tick = createTickPhase();
 
 	/**
 	 * Where the song stops, in ticks. Normally one pass, but loop mode moves it:
@@ -219,7 +220,6 @@ class SpcProcessor extends AudioWorkletProcessor {
 
 		this.ticks = 0;
 		this.voice = -1;
-		this.duration = 0;
 		// The reload puts the pristine image back, so `$5E` and every track
 		// volume are the song's own again. A volume saved from the position just
 		// left would be restored into a song that has moved on.
@@ -256,9 +256,9 @@ class SpcProcessor extends AudioWorkletProcessor {
 	/**
 	 * Everything that happens in APU RAM between emulated blocks.
 	 *
-	 * Two things, sharing the one look at it: the driver's note duration counter
-	 * is folded into the running count, and the mixer's mute mask is pressed back
-	 * onto the driver. Running at the block rate is what keeps tick sampling
+	 * Two things, sharing the one look at it: the driver's tempo accumulator is
+	 * folded into the running tick count, and the mixer's mute mask is pressed
+	 * back onto the driver. Running at the block rate is what keeps tick sampling
 	 * above the driver's iteration rate, and it is also what makes the mute
 	 * stick — see {@link applyChannelMutes}.
 	 */
@@ -273,13 +273,11 @@ class SpcProcessor extends AudioWorkletProcessor {
 		// The song has not keyed on yet at load; latch the voice once it has.
 		if (this.voice < 0) {
 			this.voice = tickVoice(aram);
-			this.duration = readNoteDuration(aram, this.voice);
+			seedTickPhase(this.tick, aram);
 			return;
 		}
 
-		const now = readNoteDuration(aram, this.voice);
-		this.ticks += sawTick(this.duration, now);
-		this.duration = now;
+		this.ticks += sawTick(this.tick, aram);
 	}
 
 	/**
