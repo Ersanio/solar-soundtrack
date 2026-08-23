@@ -578,6 +578,20 @@ stats.loopTicks` pads **every other channel that would cut the song short** out 
   the octave standing is the last born note's own. `untouched` is that against the reader's octave,
   plus the `MOVES_OCTAVE` scan over the text between the run and the reader's head — the same scan
   as `inForce`, on the other side of the run.
+- **The overview bar's minimap in one grey, deduped by pixel and row alone** — it was the one picture
+  of the song that would not say whose note a bar was, and the key made that structural rather than
+  incidental: two notes colliding on it are by definition two channels', so the wider won and the
+  other channel's note left the picture with nothing to say it had gone, which two channels sharing a
+  drum lane does on every song that splits percussion. The bars carry `CHANNEL_FILL[note.channel]` as
+  the roll's marks do and the channel is in the key, so a cell is one channel's reach through one
+  pixel of one row and "keep the wider" compares a channel against itself. Dropping the channel back
+  out of the key is not the cheaper spelling it looks like: the count is bounded by the song's notes
+  either way — the pixel-and-row ceiling is `rollWidth × rows`, some hundred thousand cells, and
+  never bound anything — so the only thing that key saved was the notes it was losing. In the key
+  rather than beside it because `id` is what `track bar.id` tracks. A silenced channel is dimmed to
+  the roll's own `MUTED_OPACITY` rather than dropped, and in a second map so its bars come back
+  first and a live one is never veiled by the wash of something that cannot be heard; `charttest`
+  pins all of it, none of it visible in a screenshot.
 
 ## Angular specifics
 

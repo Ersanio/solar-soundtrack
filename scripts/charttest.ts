@@ -48,6 +48,7 @@ import {
 	tickWindow,
 	xAtTick,
 } from "../web/src/app/editor/views/piano-roll/roll-layout";
+import { MUTED_OPACITY, buildMinimap } from "../web/src/app/editor/views/piano-roll/roll-marks";
 import { KEY_WIDTH } from "../web/src/app/editor/views/piano-roll/roll-metrics";
 import {
 	mirror,
@@ -683,6 +684,124 @@ console.log("\nthe overview bar's time axis");
 		overviewOffset(50, 0, WIDTH) === 0 && overviewTick(50, 0, WIDTH) === 0,
 	);
 	check("and so does an unmeasured pane", overviewOffset(50, TICKS, 0) === 0 && overviewTick(50, TICKS, 0) === 0);
+}
+
+console.log("\nthe overview bar's minimap");
+{
+	// A bar's colour is which channel it is, so the dedupe that keeps a dense song
+	// inside the DOM has to keep the channels apart. Everything here is invisible
+	// in a screenshot: a note folded into another channel's bar leaves the picture
+	// altogether, and the only tell is a colour that is not there.
+	const WIDTH = 724;
+	const TICKS = 12312;
+	const stack = laneStack({ lowestKey: 24, highestKey: 35 });
+	const context = {
+		percussion: new Set<number>(),
+		noisy: new Set<number>(),
+		drumNotes: new Map<number, number>(),
+		written: new Map<number, number>(),
+	};
+
+	/** A pitched note as the walk would report it; only the fields the minimap reads. */
+	const note = (channel: number, key: number, tick: number, ticks: number): WalkNote => ({
+		origins: [],
+		drumFrom: null,
+		channel,
+		tick,
+		ticks,
+		gateTicks: ticks,
+		note: 0x80 + key,
+		key,
+		percussion: null,
+		address: 0,
+		state: {
+			instrument: 0,
+			volume: null,
+			pan: null,
+			quantization: null,
+			gate: 0xff,
+			velocity: 0xff,
+			vibrato: false,
+			tremolo: false,
+			noise: null,
+			transpose: 0,
+			tune: 0,
+			tempo: 0,
+			globalVolume: null,
+		},
+	});
+
+	const minimap = (notes: WalkNote[], audible: ReadonlyMap<number, boolean> = new Map()) =>
+		buildMinimap({ notes, stack, context, ticks: TICKS, width: WIDTH, audible });
+
+	// One pixel of this bar is some seventeen ticks, so ticks 0 and 1 land on it
+	// together — which is the collision the key has to tell apart.
+	const together = minimap([note(0, 28, 0, 24), note(1, 28, 1, 24)]);
+	check("two channels through one pixel of a row are two bars", together.length === 2, `${together.length}`);
+	check(
+		"each in its own channel's colour",
+		together
+			.map((bar) => bar.fill)
+			.sort()
+			.join(",") === "fill-ch-0,fill-ch-1",
+		together.map((bar) => bar.fill).join(","),
+	);
+
+	// One channel's two are one picture, and the wider holds a long note's reach
+	// against a short one starting alongside it.
+	const doubled = minimap([note(0, 28, 0, 24), note(0, 28, 1, 96)]);
+	check("one channel's two through that pixel are one bar", doubled.length === 1, `${doubled.length}`);
+	check(
+		"and it is the wider of them",
+		Math.abs(doubled[0].w - overviewOffset(96, TICKS, WIDTH)) < EPSILON,
+		`${doubled[0].w}`,
+	);
+
+	const reversed = minimap([note(0, 28, 0, 96), note(0, 28, 1, 24)]);
+	check(
+		"whichever order the two arrive in",
+		reversed.length === 1 && Math.abs(reversed[0].w - doubled[0].w) < EPSILON,
+		`${reversed.length} at ${reversed[0].w}`,
+	);
+
+	// A silenced channel is dimmed rather than dropped, at the roll's own value,
+	// and its bars come back first so a live one is never veiled by the wash of
+	// something that cannot be heard.
+	const mixed = minimap(
+		[note(0, 28, 0, 24), note(1, 30, 0, 24), note(2, 32, 0, 24)],
+		new Map([
+			[0, true],
+			[1, false],
+			[2, true],
+		]),
+	);
+	check("a silenced channel is dimmed rather than dropped", mixed.length === 3, `${mixed.length}`);
+	check(
+		"at the value the roll's own bars use",
+		mixed.filter((bar) => bar.fill === "fill-ch-1").every((bar) => bar.opacity === MUTED_OPACITY),
+	);
+	check("its bars come back before every audible one", mixed[0].fill === "fill-ch-1", mixed[0].fill);
+	check(
+		"and an audible one is not dimmed at all",
+		mixed.filter((bar) => bar.fill !== "fill-ch-1").every((bar) => bar.opacity === 1),
+	);
+	// The mixer only has controls for the channels a song writes to, so a channel
+	// missing from the map is one nothing has silenced.
+	check("a channel the mixer has no entry for is heard", minimap([note(3, 28, 0, 24)])[0].opacity === 1);
+
+	// `track bar.id` — two bars sharing an id is a duplicate-key error in dev and
+	// a bar that never updates in production, which is why the channel is in the
+	// key rather than beside it.
+	const dense: WalkNote[] = [];
+	for (let channel = 0; channel < 8; channel++) {
+		for (let tick = 0; tick < TICKS; tick += 13) {
+			dense.push(note(channel, 24 + (tick % 12), tick, 24));
+		}
+	}
+
+	const bars = minimap(dense);
+	check("every bar's id is its own", new Set(bars.map((bar) => bar.id)).size === bars.length, `${bars.length} bars`);
+	check("and there are never more bars than notes", bars.length <= dense.length, `${bars.length} of ${dense.length}`);
 }
 
 console.log("\nthe pull at the end of the scrub bar");

@@ -442,12 +442,18 @@ scrollbar's width from the roll it is a timeline for.
 
 The overview's bars ask `rowOf` — the same function the roll's marks ask — so the percussion toggles land on
 both pictures at once, and an instrument taken off the drum lanes moves to the keyboard in the
-minimap and the roll together. Answering that question twice is how the two would drift. The bars are
-deduped by pixel and row, keeping the wider of a pair: every bar is one colour, so two notes sharing a
-pixel of a row are the same picture, and a dense song still fits in the DOM. The list is built from
-the song, the lane stack and the pane's width and never from the playhead, so it rebuilds on a
-recompile and not on a frame; the playhead line and the box showing what the roll is displaying are
-their own `computed`s over the frame clock.
+minimap and the roll together. Answering that question twice is how the two would drift. They take
+their colours from the same `CHANNEL_FILL` for the same reason, and dim a channel the mixer silences
+by the same `MUTED_OPACITY`, so the minimap is the roll seen from further off rather than a second
+picture of it. The bars are deduped by pixel, row **and channel**, keeping the wider of a pair: one
+channel's two notes through a pixel of a row are the same picture, where two channels' are two, and a
+key without the channel in it takes the narrower of them out of the minimap altogether — two channels
+sharing a drum lane is the commonest way that happens. A dense song still fits in the DOM either way;
+the count is bounded by the song's notes and never was by the key. The muted bars come back first, so
+a live one is never veiled by the wash of something that cannot be heard. The list is built from the
+song, the lane stack, the pane's width and the mixer and never from the playhead, so it rebuilds on a
+recompile, a mute or a resize and not on a frame; the playhead line and the box showing what the roll
+is displaying are their own `computed`s over the frame clock.
 
 Two clocks drive it and keeping them apart is the whole trick. The mark list is a `computed` over
 the transport's 10 Hz anchor, snapped outward to a whole note, so the DOM rebuilds about twice per

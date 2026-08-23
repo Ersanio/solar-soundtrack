@@ -26,6 +26,14 @@ import type { PlacedNote, Plan } from './roll-edit';
  * why the builders share a file.
  */
 
+/**
+ * How far a silenced channel is dimmed, in both pictures.
+ *
+ * One number, so a mute reads the same on the roll as on the overview bar.
+ * Dimmed rather than hidden: a muted part is still part of the song.
+ */
+export const MUTED_OPACITY = 0.12;
+
 /** One glyph on a bar: a command acting on that note, and where to draw it. */
 export interface MarkGlyph {
   id: string;
@@ -61,13 +69,17 @@ export interface Mark {
   note: WalkNote;
 }
 
-/** One note on the overview bar's minimap. Every bar is the same colour. */
+/** One note on the overview bar's minimap, in its channel's colour. */
 export interface MinimapBar {
   id: string;
   x: number;
   w: number;
   y: number;
   h: number;
+  /** The same class the roll's own bar for this note carries. */
+  fill: string;
+  /** Dimmed rather than dropped, so a muted part still reads as part of the song. */
+  opacity: number;
 }
 
 /**
@@ -176,7 +188,7 @@ export function buildMarks(request: MarkRequest): Mark[] {
       y,
       h,
       fill: CHANNEL_FILL[note.channel],
-      opacity: muted ? 0.12 : 1,
+      opacity: muted ? MUTED_OPACITY : 1,
       muted,
       label:
         content.name === null
@@ -213,18 +225,21 @@ export interface MinimapRequest {
   ticks: number;
   /** The roll's width, less the key column. */
   width: number;
+  /** Channel index to whether it is heard; a missing entry counts as audible. */
+  audible: ReadonlyMap<number, boolean>;
 }
 
 /**
  * The whole song, drawn small.
  *
- * Built from the song, the lane stack and the pane's width, and deliberately
- * **not** from the playhead — the bars are the song rather than a view of it, so
- * this rebuilds on a recompile, a percussion change or a resize, and never on a
- * frame. The moving parts of the bar are the component's own.
+ * Built from the song, the lane stack, the pane's width and the mixer, and
+ * deliberately **not** from the playhead — the bars are the song rather than a
+ * view of it, so this rebuilds on a recompile, a percussion change, a mute or a
+ * resize, and never on a frame. The moving parts of the bar are the component's
+ * own.
  */
 export function buildMinimap(request: MinimapRequest): MinimapBar[] {
-  const { notes, stack, context, ticks, width } = request;
+  const { notes, stack, context, ticks, width, audible } = request;
   const rows = stack.lanes.length;
   if (ticks <= 0 || width <= 0 || rows <= 0) {
     return [];
@@ -233,12 +248,21 @@ export function buildMinimap(request: MinimapRequest): MinimapBar[] {
   const inner = OVERVIEW_HEIGHT - OVERVIEW_PAD * 2;
   const h = Math.max(1, inner / rows);
 
-  // Keyed by the pixel a bar lands on and the row it lands in. Every bar is
-  // one colour, so two notes sharing a pixel of a row are the same picture;
-  // keeping the wider of them holds a long note's reach against a short one
-  // starting alongside it. Never more bars than notes, and far fewer on a
-  // dense song, which is what keeps the whole song inside the DOM.
-  const cells = new Map<string, MinimapBar>();
+  // Keyed by the pixel a bar lands on, the row it lands in and the channel it
+  // belongs to. One channel's two notes through a pixel of a row are the same
+  // picture, and keeping the wider of them holds a long note's reach against a
+  // short one starting alongside it; two channels' are two pictures, since the
+  // colour is which channel it is, and a key without the channel in it takes the
+  // narrower of them out of the minimap altogether — two channels sharing a drum
+  // lane is the commonest way that happens. Never more bars than notes, and far
+  // fewer on a dense song, which is what keeps the whole song inside the DOM.
+  //
+  // Muted in one map and audible in the other, so a live bar is never veiled by
+  // the wash of a channel that cannot be heard. Two maps rather than one and a
+  // partition after it: a channel is silenced or it is not, so a key can only
+  // ever land in one of them, and the id stays unique across both.
+  const behind = new Map<string, MinimapBar>();
+  const front = new Map<string, MinimapBar>();
   for (const note of notes) {
     const row = rowOf(note, stack, context);
     if (row < 0) {
@@ -247,16 +271,26 @@ export function buildMinimap(request: MinimapRequest): MinimapBar[] {
 
     const x = KEY_WIDTH + overviewOffset(note.tick, ticks, width);
     const w = Math.max(1, overviewOffset(note.ticks, ticks, width));
-    const key = `${Math.round(x)}:${row}`;
+    const key = `${Math.round(x)}:${row}:${note.channel}`;
+    const muted = audible.get(note.channel) === false;
+    const cells = muted ? behind : front;
     const held = cells.get(key);
     if (held && held.w >= w) {
       continue;
     }
 
-    cells.set(key, { id: key, x, w, y: OVERVIEW_PAD + (row / rows) * inner, h });
+    cells.set(key, {
+      id: key,
+      x,
+      w,
+      y: OVERVIEW_PAD + (row / rows) * inner,
+      h,
+      fill: CHANNEL_FILL[note.channel],
+      opacity: muted ? MUTED_OPACITY : 1,
+    });
   }
 
-  return [...cells.values()];
+  return [...behind.values(), ...front.values()];
 }
 
 export interface HeldRequest {

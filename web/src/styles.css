@@ -35,12 +35,17 @@
   --color-seg-free: #333844;
 
   /*
-   * The eight music channels, used by the piano roll's marks and nowhere else.
+   * The eight music channels, used by the piano roll's marks and by the overview
+   * bar's minimap of them, and nowhere else. Both are drawn on --color-surface,
+   * which is the contrast this set was validated against.
    *
    * Eight is past what any categorical set can keep separable for every pair of
    * viewers, so **nothing identifies a channel by colour alone**: a mark's
    * tooltip names its channel, and the mixer numbers its chips rather than
-   * tinting them.
+   * tinting them. The minimap needs no tooltip of its own — every bar on it is a
+   * note in the roll below, in the same hue and under the roll's own naming, so
+   * its colours repeat what is already said in words rather than being the only
+   * place something is said.
    */
   --color-ch-0: #3987e5;
   --color-ch-1: #d95926;

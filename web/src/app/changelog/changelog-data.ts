@@ -14,6 +14,7 @@ export const CHANGELOG: readonly ChangelogEntry[] = [
       'The playhead no longer drifts out of sync on songs with one-tick notes',
       'The piano roll says why a gesture was refused instead of quietly doing nothing',
       'The piano roll does not error on songs with remote commands anymore',
+      'The overview bar above the piano roll colours its notes by channel, like the roll itself',
     ],
   },
   {
