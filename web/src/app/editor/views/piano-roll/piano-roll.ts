@@ -58,10 +58,13 @@ import {
   xAtTick,
 } from './roll-layout';
 import { type Mark, buildMarks, buildMinimap, heldRowsAt } from './roll-marks';
+import { laneWindow, packCommandLane } from './roll-command-lane';
+import { RollCommandLane } from './roll-command-lane/roll-command-lane';
 import {
   CHANNEL_FILL,
   CHANNEL_STROKE,
   KEY_WIDTH,
+  LANE_HEIGHT,
   OVERVIEW_HEIGHT,
   SCRUB_HEIGHT,
 } from './roll-metrics';
@@ -108,6 +111,7 @@ import { RollTooltip } from './roll-tooltip/roll-tooltip';
   imports: [
     PercussionPanel,
     RollChannels,
+    RollCommandLane,
     RollEditLayer,
     RollGrid,
     RollKeys,
@@ -150,6 +154,7 @@ export class PianoRoll {
   protected readonly beatsPerBar = computed(() => this.settings().beatsPerBar);
   protected readonly beatUnit = computed(() => this.settings().beatUnit);
   protected readonly percussionOpen = computed(() => this.settings().percussionOpen);
+  protected readonly commandLaneOpen = computed(() => this.settings().commandLaneOpen);
   protected readonly editChannel = computed(() => this.settings().editChannel);
   protected readonly snap = computed(() => this.settings().snap);
   protected readonly editMode = computed(() => this.settings().editMode);
@@ -526,6 +531,35 @@ export class PianoRoll {
   protected readonly scrubBox = computed(() => {
     const width = this.width();
     return width > 0 ? `0 0 ${width} ${SCRUB_HEIGHT}` : null;
+  });
+
+  // --- the command lane ----------------------------------------------------
+
+  /** Null until measured, so nothing renders against a zero-width box. */
+  protected readonly laneBox = computed(() => {
+    const width = this.width();
+    return width > 0 ? `0 0 ${width} ${LANE_HEIGHT}` : null;
+  });
+
+  /**
+   * The whole song's commands, packed into rows — deliberately not windowed.
+   *
+   * Rows are dealt over the whole song so they hold still as the roll scrolls,
+   * and this rebuilds on a recompile, a zoom or a mute and never on a frame. The
+   * window is taken off it below, which is a slice rather than a second pack.
+   */
+  private readonly commandLane = computed(() =>
+    packCommandLane({
+      events: this.editor.commandTimeline(),
+      text: this.editor.source(),
+      zoom: this.zoom(),
+      audible: this.audible(),
+    }),
+  );
+
+  protected readonly laneView = computed(() => {
+    const { from, to } = this.window();
+    return laneWindow(this.commandLane(), from, to, this.zoom());
   });
 
   // --- marks ---------------------------------------------------------------
@@ -1050,6 +1084,10 @@ export class PianoRoll {
 
   protected setEditMode(editMode: EditMode): void {
     this.settings.update((s) => ({ ...s, editMode }));
+  }
+
+  protected setCommandLaneOpen(commandLaneOpen: boolean): void {
+    this.settings.update((s) => ({ ...s, commandLaneOpen }));
   }
 
   protected setPercussionOpen(percussionOpen: boolean): void {

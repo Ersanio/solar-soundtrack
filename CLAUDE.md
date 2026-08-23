@@ -628,6 +628,27 @@ stats.loopTicks` pads **every other channel that would cut the song short** out 
   cost is real and is the smaller one: a command moves along the row between the note that sets it
   and the notes after it. Not a fix in `fitBarContent` either — it is handed a count, and a layout
   that knew which glyph mattered would be a layout that knew what a glyph was.
+- **Reading the command lane off `definedAt` alone** — it is anchored on a _note_ and a timeline needs
+  a _tick_: `emitNote` pushes a `WalkNote` for a note and not for a rest, so in `c4 v200 r4 d4` the
+  `v200` runs at tick 48 and the lane drew it at 96, a whole rest late. `origins` names what
+  _occupies_ a slot, too, so `$DF`, `$F0`, `$FD` and `$FE`, which clear one, could never be named at
+  all — and vibrato-off is exactly what a command timeline is for. The walk raises its own
+  `WalkCommand` in `recordOrigin`, which is already the one place that knows a slot has changed
+  hands, so the two agree wherever they overlap: a write of the address a slot already holds moves
+  nothing, and `[ v200 c8 ]2` is one entry from either end. `definedAt` keeps the half it is exactly
+  right for, `q`, `h` and `@21`-`@29`, which emit no byte to address and so have no tick but the note
+  they fold into.
+- **A native `overflow-y-auto` on the command lane** — nothing here styles a scrollbar, so a ~15px
+  Windows bar eats a third of a 42px lane, and its gutter narrows the content box, which puts the
+  lane's right edge a scrollbar out of step with the roll it is drawn to track — the trap `w-full` on
+  the bars over the roll already fell into. A plain wheel lifts the glyphs by a transform, and the
+  thumb saying the stack runs deeper is drawn inside the `<svg>`, where it costs no width.
+- **Packing the lane over the window on screen** — rows are first-fit, so a re-deal at every
+  `tickWindow` turnover moved glyphs up and down as the roll scrolled past them, and a glyph that
+  changes row while the roll moves is saying something about the scrolling rather than about the song.
+  `packCommandLane` runs over the whole song and `laneWindow` only slices it, keeping the whole song's
+  `depth` rather than the slice's: that is the scroll range, and one that shrank as a deep column went
+  past would take the porter's position with it.
 
 ## Angular specifics
 

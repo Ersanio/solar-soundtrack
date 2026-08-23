@@ -87,6 +87,27 @@ the ones they stand for starts at that note. The hover and the inspector always 
 list — the inspector under two headings, one for what the note sets and one for what it plays
 under.
 
+## The command lane
+
+Under the roll is a strip holding nothing but command icons, on the song's own timeline: what takes
+effect, and where, with the note data out of the way. **Commands** on the toolbar opens and closes
+it, and it stays as you left it.
+
+It is all eight channels at once, each icon in its channel's colour, and it shows only commands that
+**change** something — the `v200` at the head of a run and not the notes that go on playing under it,
+a `[ v100 c v200 d ]2` four times over because each turn moves the volume twice, and a `$DF` that
+switches vibrato off, which no note is playing under and so appears on no bar. The song's own
+settings are here too — `t`, `w`, `$E4`, the echo — which a bar never shows, since they belong to no
+one channel. A muted channel fades rather than disappears.
+
+The lane scrolls sideways with the roll and carries the same grid and the same playhead, so an icon
+sits under the note it acts on and on the beat it lands on. Where several land on one tick they stack upwards; three icons deep is as much as fits,
+and a plain wheel over the lane lifts the stack when there is more. A tick crowded past what the lane
+will draw at all ends in three dots; hover them for how many are behind. Click an icon to ask the
+inspector about that command, or double-click it to go
+to it in the MML — the same as clicking one on a bar, except that it leaves the channel you are
+editing alone.
+
 ## Three settings that decide how a drag lands
 
 **Grid** is the time signature the bar lines are drawn from: beats in a bar, over the note value that

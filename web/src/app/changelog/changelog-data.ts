@@ -11,6 +11,7 @@ export const CHANGELOG: readonly ChangelogEntry[] = [
   {
     date: '23 August 2026',
     items: [
+      'A command timeline under the piano roll, showing what takes effect where',
       'The piano roll & note inspector shows which note a command takes effect at, and which notes are inheriting one',
       '#path is ignored, since samples here are one flat folder',
       'Solar Soundtrack-specific errors are now prefeixed with SST instead of AMK',

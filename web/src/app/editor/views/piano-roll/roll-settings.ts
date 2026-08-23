@@ -84,6 +84,8 @@ export interface Settings {
   /** Instruments drawn on percussion lanes, ascending. */
   percussion: readonly number[];
   percussionOpen: boolean;
+  /** The command lane under the roll. Open by default — it is the point of the tab. */
+  commandLaneOpen: boolean;
   /** The channel the roll is editing, or null for none. One at a time. */
   editChannel: number | null;
   /**
@@ -126,6 +128,7 @@ interface StoredSettings {
   beatUnit?: unknown;
   percussion?: unknown;
   percussionOpen?: unknown;
+  commandLaneOpen?: unknown;
   editChannel?: unknown;
   snap?: unknown;
   editMode?: unknown;
@@ -172,6 +175,7 @@ export function readSettings(): Settings {
     beatUnit: 16,
     percussion: [...DEFAULT_PERCUSSION],
     percussionOpen: false,
+    commandLaneOpen: true,
     editChannel: null,
     snap: 'beat',
     // The first mode in the table, which is what makes that table's order the
@@ -222,6 +226,10 @@ export function readSettings(): Settings {
 
   if (typeof stored.percussionOpen === 'boolean') {
     settings.percussionOpen = stored.percussionOpen;
+  }
+
+  if (typeof stored.commandLaneOpen === 'boolean') {
+    settings.commandLaneOpen = stored.commandLaneOpen;
   }
 
   if (isChannel(stored.editChannel)) {

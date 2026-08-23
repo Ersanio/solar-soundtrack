@@ -14,6 +14,8 @@
  */
 
 import { KEY_COUNT, type SongTimeline, type TempoChange, type WalkNote } from "@amk/spc/song-walk";
+import { tokenize } from "@amk/tokens";
+import type { TimelineCommand } from "../web/src/app/state/command-timeline";
 import {
 	DEFAULT_TEMPO,
 	driverTickSeconds,
@@ -49,7 +51,13 @@ import {
 	xAtTick,
 } from "../web/src/app/editor/views/piano-roll/roll-layout";
 import { MUTED_OPACITY, buildMinimap } from "../web/src/app/editor/views/piano-roll/roll-marks";
-import { KEY_WIDTH } from "../web/src/app/editor/views/piano-roll/roll-metrics";
+import {
+	type CommandLane,
+	MAX_LANE_ROWS,
+	laneWindow,
+	packCommandLane,
+} from "../web/src/app/editor/views/piano-roll/roll-command-lane";
+import { KEY_WIDTH, LANE_GLYPH, LANE_ROW } from "../web/src/app/editor/views/piano-roll/roll-metrics";
 import {
 	mirror,
 	readout,
@@ -1102,6 +1110,7 @@ console.log("\nthe transport's clock, over songs the compiler will not time");
 		ticks,
 		loopTick: null,
 		tempoChanges,
+		commands: [],
 		channelTicks: [ticks, 0, 0, 0, 0, 0, 0, 0],
 		used: [true, false, false, false, false, false, false, false],
 		usedInstruments: [],
@@ -1414,6 +1423,132 @@ console.log("\nwhat fits inside one bar");
 	}
 
 	check("nothing is laid outside its bar or over its name", overflow === "", overflow);
+}
+
+// ---------------------------------------------------------------------------
+console.log("\nhow the command lane stacks what lands together");
+// ---------------------------------------------------------------------------
+//
+// The lane draws one glyph per command going in effect, at `tick * zoom`, and
+// never moves one sideways to make room — where a glyph is *is* the claim it
+// makes. So room is found by going deeper, and the rule has to hold at every
+// zoom: two commands a beat apart do not collide at 4 px per tick and do at 0.5.
+//
+// Rows are dealt over the whole song rather than over the window on screen. A
+// window-scoped pack would re-deal them at every turnover, and a glyph changing
+// row as the roll scrolled past it would be saying something about the scroll.
+{
+	const source = "#amk 4\n#0 v200 y10 q7f @1 $ED $3F $4D t144 n10 p12,8 $DE $00 $0C $08 $F8 $10 c8\n";
+	const written = tokenize(source).commands.filter((command) => command.kind !== "c");
+	/** Real commands off a real scan, so `glyphOf` is exercised as the lane exercises it. */
+	const at = (tick: number, channel: number, n: number): TimelineCommand => ({
+		tick,
+		channel,
+		command: written[n % written.length],
+	});
+	const pack = (events: TimelineCommand[], zoom: number, audible = new Map<number, boolean>()) =>
+		packCommandLane({ events, text: source, zoom, audible });
+	const rows = (lane: CommandLane) => lane.glyphs.map((glyph) => glyph.y / LANE_ROW).join(",");
+
+	const together = pack([at(96, 0, 0), at(96, 1, 1), at(96, 2, 2)], 2);
+	check("three commands on one tick take three rows", rows(together) === "0,1,2", rows(together));
+	check(
+		"and all three keep that tick's x",
+		together.glyphs.every((g) => g.x === 192),
+	);
+	check("which is how deep the lane says it is", together.depth === 3, String(together.depth));
+
+	// Far enough apart at this zoom that the first has cleared before the second
+	// begins, so the second goes back to the top rather than staying where the
+	// one before it happened to land.
+	const apart = pack([at(0, 0, 0), at(96, 0, 1)], 2);
+	check("two commands far apart share row 0", rows(apart) === "0,0", rows(apart));
+
+	// The same two events, zoomed out until their boxes overlap. Nothing about
+	// the song changed; the picture did, and the lane has to answer for the
+	// picture or one glyph is drawn over another.
+	const crowded = pack([at(0, 0, 0), at(4, 0, 1)], 0.5);
+	check("and stack once the zoom brings them together", rows(crowded) === "0,1", rows(crowded));
+
+	const opened = pack([at(0, 0, 0), at(4, 0, 1)], 8);
+	check("then flatten again when it is wound back in", rows(opened) === "0,0", rows(opened));
+
+	// The rule the two above are cases of, over every zoom the toolbar offers.
+	let overlapping = "";
+	for (const zoom of [0.5, 1, 2, 4, 8]) {
+		const lane = pack(
+			[0, 3, 6, 9, 24, 25, 48, 192].map((tick, n) => at(tick, 0, n)),
+			zoom,
+		);
+		const byRow = new Map<number, number[]>();
+		for (const glyph of lane.glyphs) {
+			const row = byRow.get(glyph.y) ?? [];
+			row.push(glyph.x);
+			byRow.set(glyph.y, row);
+		}
+
+		for (const xs of byRow.values()) {
+			for (let n = 1; n < xs.length; n++) {
+				if (xs[n] - xs[n - 1] < LANE_GLYPH) {
+					overlapping += ` ${zoom}`;
+				}
+			}
+		}
+	}
+
+	check("no glyph is ever drawn over another, at any zoom", overlapping === "", overlapping);
+
+	// A column deeper than the lane will draw is counted rather than dropped in
+	// silence: a stack cut to keep the DOM finite is still a stack cut.
+	const deep = pack(
+		Array.from({ length: MAX_LANE_ROWS + 3 }, (_, n) => at(48, n % 8, n)),
+		2,
+	);
+	check(
+		"a column past the cap keeps the cap's worth",
+		deep.glyphs.length === MAX_LANE_ROWS,
+		String(deep.glyphs.length),
+	);
+	check(
+		"and says how many it could not draw, in the deepest row",
+		deep.more.length === 1 && deep.more[0].count === 3 && deep.more[0].y === (MAX_LANE_ROWS - 1) * LANE_ROW,
+		deep.more.map((m) => `${m.count}@${m.y}`).join(" "),
+	);
+
+	// Dimmed rather than dropped, as the roll's bars and the overview's are, and
+	// still taking its row: a muted channel is still part of the song.
+	const muted = pack([at(96, 3, 0), at(96, 4, 1)], 2, new Map([[3, false]]));
+	check(
+		"a silenced channel's command is dimmed and keeps its place",
+		muted.glyphs[0].opacity === MUTED_OPACITY && muted.glyphs[1].opacity === 1 && muted.depth === 2,
+		muted.glyphs.map((g) => g.opacity).join(","),
+	);
+
+	// The colour is `color` and not `fill`: a palette glyph paints its own shapes
+	// with `currentColor`, so a `fill-ch-*` would reach none of them. And the
+	// hover names the channel, because the eight colours do not identify one on
+	// their own — `styles.css` says so and this is where it is kept true.
+	check("a glyph is tinted by color, per channel", muted.glyphs[1].tint === "text-ch-4", muted.glyphs[1].tint);
+	check(
+		"and its hover names the command, the text, the channel and the tick",
+		muted.glyphs[1].title.includes("#4") && muted.glyphs[1].title.includes("tick 96"),
+		muted.glyphs[1].title,
+	);
+
+	// The window is a slice of the pack, so a glyph keeps the row the whole song
+	// gave it, and `depth` stays the whole song's — it is how far the lane can be
+	// scrolled, and a range that shrank as the roll moved would take the porter's
+	// position with it.
+	const whole = pack([at(0, 0, 0), at(0, 1, 1), at(0, 2, 2), at(960, 0, 3)], 2);
+	const slice = laneWindow(whole, 900, 1000, 2);
+	check("a window holds only the glyphs inside it", slice.glyphs.length === 1, String(slice.glyphs.length));
+	check("keeps the row the whole song dealt it", slice.glyphs[0].y === 0, String(slice.glyphs[0].y));
+	check("and reports the whole song's depth", slice.depth === 3, String(slice.depth));
+
+	check(
+		"a lane with no commands has no depth",
+		packCommandLane({ events: [], text: source, zoom: 2, audible: new Map() }).depth === 0,
+	);
 }
 
 console.log("\nthe slider's track, whose two rules fail invisibly");

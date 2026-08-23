@@ -418,9 +418,37 @@ on the channel is the whole comparison. `buildMarks` gets that neighbour from th
 bars; the inspector, reached from the caret with no such loop, looks it up with `notePreceding` and
 puts the two kinds under headings of their own, having room for words where a bar has not.
 
-The song's own settings and the shape of the music get no glyph — `t`, `w`, `$E4` and the echo unit
-reach every note alike, and `o`, `<`, `>` and `l` are what the bar's row and width already are.
-`commandScope` is the one statement of that.
+The song's own settings and the shape of the music get no glyph **on a bar** — `t`, `w`, `$E4` and
+the echo unit reach every note alike, and `o`, `<`, `>` and `l` are what the bar's row and width
+already are. `commandScope` is the one statement of that, and the command lane reads the same
+statement differently: a song-wide command belongs on a timeline precisely because it belongs to no
+one note, so the lane keeps `'note-state'` and `'song'` and drops the other two.
+
+**That lane is the same question asked of a tick rather than of a note**, which is why it is not
+`definedAt` read a second time. `definedAt` is anchored on a note and `emitNote` pushes a `WalkNote`
+for a note and not for a rest, so in `c4 v200 r4 d4` the `v200` runs at tick 48 and a note-anchored
+reading draws it at 96, a whole rest late. `origins` names what _occupies_ a slot, too, so `$DF`,
+`$F0`, `$FD` and `$FE`, which clear one, could never be named at all — and vibrato-off is exactly
+what a command timeline is for. The walk keeps its own list instead (`SongTimeline.commands`), raised
+in `recordOrigin`, which is already the one place that knows a slot has changed hands: a write of the
+address a slot already holds moves nothing and raises nothing, so `[ v200 c8 ]2` is one entry and
+`[ v100 c8 v200 d8 ]2` is four — the same answer `definedAt` gives, arrived at from the byte end. A
+command that writes no slot at all is not there (`$F6`, `$F7`, `$F9`), nor is anything inside a `$FC`
+body, which the walk does not follow, and the lane draws only what the compiler mapped, so the byte
+blob's own `$FA` prefix reaches no glyph.
+
+**The lane's other half is the folded one, unchanged.** `q`, `h` and `@21`-`@29` emit nothing to
+address, so the note they fold into is the only honest tick they have; `foldedInForceOf` is that half
+of `commandsInForceOf` split out to be read twice, and the lane takes `definedAt` over it against the
+previous note on the channel exactly as a bar does. `state/command-timeline.ts` is the join;
+`roll-command-lane.ts` beside `roll-layout.ts` is geometry alone, first-fit rows over the whole song
+so that a glyph's row depends on the song and the zoom and not on where the roll has been scrolled
+to, with `x` always `tick * zoom` and never nudged sideways, because where a glyph is _is_ the claim
+the lane makes. Nothing in it takes a plate: everything drawn there is a command going in force, so
+the inversion a bar draws would have nothing to distinguish. It is a sibling of the roll's scroller
+rather than a child of it, so a song too tall for the pane does not carry the lane off the bottom of
+it, and it is lifted by a transform rather than scrolled natively — a scrollbar would eat a third of
+its height and narrow its content box, putting its right edge out of step with the roll it tracks.
 
 Written pitch is not held to the driver's o1 c–o6 a — `o0` is legal MML and `h12 o0 c` is a note the
 driver plays — so `roll-layout.ts` grows the keyboard to take such a note in, above or below.

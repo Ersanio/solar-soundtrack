@@ -1,0 +1,126 @@
+<svg
+  class="block select-none"
+  [attr.height]="laneHeight"
+  [attr.viewBox]="box()"
+  [style.width.px]="width()"
+  (wheel)="onWheel($event)"
+>
+  <defs>
+    <clipPath id="amk-lane-clip">
+      <rect y="0" [attr.x]="keyWidth" [attr.width]="rollWidth()" [attr.height]="laneHeight" />
+    </clipPath>
+  </defs>
+
+  <rect
+    y="0"
+    class="fill-inset"
+    [attr.x]="keyWidth"
+    [attr.width]="rollWidth()"
+    [attr.height]="laneHeight"
+  />
+
+  <!-- The lane's own name, in the column the keyboard has below. -->
+  <text
+    x="8"
+    class="fill-ink-muted text-[10px] font-semibold tracking-wide uppercase"
+    dominant-baseline="central"
+    [attr.y]="laneHeight / 2"
+  >
+    Commands
+  </text>
+
+  <g clip-path="url(#amk-lane-clip)">
+    <!-- Sideways with the roll, then up by whatever the wheel has lifted. Two
+         transforms because they are two cameras: the first is the song's and is
+         shared with everything else drawn over the roll, the second is this
+         lane's alone. -->
+    <g [attr.transform]="scroll()">
+      <!-- Outside the lift: the grid belongs to the song, so it stays put while
+           the stack over it is scrolled. -->
+      <g amk-roll-grid [lines]="lines()" [height]="laneHeight" [loopX]="loopX()" [endX]="endX()" />
+
+      <g [attr.transform]="stack()">
+        @for (glyph of lane().glyphs; track glyph.id) {
+          <!-- The plate is the hit target as well as the hover: an SVG element
+               takes a pointer only where it is painted, so without it a glyph is
+               clickable on its strokes and not in the gaps between them. -->
+          <g
+            class="group cursor-pointer"
+            (click)="inspect(glyph, $event)"
+            (dblclick)="inspect(glyph, $event, true)"
+          >
+            <title>{{ glyph.title }}</title>
+            <rect
+              rx="2"
+              class="fill-ink/0 group-hover:fill-ink/25"
+              [attr.x]="glyph.x"
+              [attr.y]="glyph.y"
+              [attr.width]="glyph.size"
+              [attr.height]="glyph.size"
+              [attr.fill-opacity]="glyph.opacity"
+            />
+            <!-- `svg` is one of the three element names that carry a namespace
+                 implicitly, so this one takes no prefix even inside an <svg>. -->
+            <svg
+              amk-glyph
+              class="pointer-events-none"
+              [class]="glyph.tint"
+              [name]="glyph.icon"
+              [attr.x]="glyph.x"
+              [attr.y]="glyph.y"
+              [attr.width]="glyph.size"
+              [attr.height]="glyph.size"
+              [attr.opacity]="glyph.opacity"
+            ></svg>
+          </g>
+        }
+
+        <!-- A column deeper than the lane will draw. It stands for a list rather
+             than a command, so it has no span to reveal and no handler; the
+             inspector is where the whole list is. -->
+        @for (more of lane().more; track more.id) {
+          <g class="fill-ink-muted">
+            <title>{{ more.count }} more here</title>
+            <circle
+              [attr.cx]="more.x + more.size * 0.26"
+              [attr.cy]="more.y + more.size / 2"
+              [attr.r]="more.size * 0.07"
+            />
+            <circle
+              [attr.cx]="more.x + more.size * 0.5"
+              [attr.cy]="more.y + more.size / 2"
+              [attr.r]="more.size * 0.07"
+            />
+            <circle
+              [attr.cx]="more.x + more.size * 0.74"
+              [attr.cy]="more.y + more.size / 2"
+              [attr.r]="more.size * 0.07"
+            />
+          </g>
+        }
+      </g>
+    </g>
+
+    <line
+      y1="0"
+      class="stroke-accent"
+      stroke-width="1.5"
+      [attr.x1]="playheadX()"
+      [attr.x2]="playheadX()"
+      [attr.y2]="laneHeight"
+    />
+  </g>
+
+  <!-- Inside the `<svg>`, so saying the stack runs deeper costs no width. -->
+  @if (thumb(); as thumb) {
+    <rect
+      rx="1.5"
+      width="3"
+      class="fill-ink-muted"
+      fill-opacity="0.5"
+      [attr.x]="width() - 5"
+      [attr.y]="thumb.y"
+      [attr.height]="thumb.height"
+    />
+  }
+</svg>

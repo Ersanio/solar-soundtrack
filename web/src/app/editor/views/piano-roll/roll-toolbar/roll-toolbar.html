@@ -137,6 +137,18 @@
     {{ percussionOpen() ? '▾' : '▸' }} Percussion
   </button>
 
+  <!-- The lane below the roll, on the same switch the panel above it takes. -->
+  <button
+    type="button"
+    class="text-ink-muted hover:text-ink cursor-pointer text-xs font-semibold tracking-wide uppercase"
+    [title]="
+      commandLaneOpen() ? 'Hide the command lane' : 'Show what takes effect where in the song'
+    "
+    (click)="commandLaneOpenChange.emit(!commandLaneOpen())"
+  >
+    {{ commandLaneOpen() ? '▾' : '▸' }} Commands
+  </button>
+
   <!-- The same pair the source toolbar carries: one history, so a roll gesture
        and a keystroke undo in the order they happened. -->
   <amk-history-buttons />

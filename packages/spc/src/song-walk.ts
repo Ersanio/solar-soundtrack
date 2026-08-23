@@ -80,6 +80,8 @@ export const KEY_COUNT = 70;
  */
 const TICK_BUDGET = 1_000_000;
 const NOTE_BUDGET = 200_000;
+/** The same, for a song of nothing but commands, which no note count bounds. */
+const COMMAND_BUDGET = 200_000;
 /** Bytes one channel may read in a phrase. Generous; only a loop can reach it. */
 const STEP_BUDGET = 2_000_000;
 
@@ -359,6 +361,29 @@ export interface WalkNote {
 	drumFrom: number | null;
 }
 
+/**
+ * One command the pass runs, on the tick it changes something.
+ *
+ * A *transition* and not an execution: it is raised where {@link SLOTS} changes
+ * hands, which is the test `recordOrigin` already makes. So a `[ v200 c8 ]2`
+ * raises one, its second pass writing the address already in the slot, and
+ * `[ v100 c8 v200 d8 ]2` raises four. That is the same answer `definedAt` gives
+ * from the note end, arrived at from the byte end.
+ */
+export interface WalkCommand {
+	/** Ticks from the start of the pass. */
+	tick: number;
+	/**
+	 * 0-7. Its own, because `CommandAddress.channel` is 8 for every byte that
+	 * lives in the loop block, and a reader colouring by voice needs the voice.
+	 */
+	channel: number;
+	/** ARAM address of the command byte — a key into `CompileResult.commandMap`. */
+	address: number;
+	/** The `$DA`-`$FE` byte itself. */
+	vcmd: number;
+}
+
 /** A song-wide tempo command, on the tick the driver runs it. */
 export interface TempoChange {
 	/** Ticks from the start of the pass. */
@@ -391,6 +416,35 @@ export interface SongTimeline {
 	 * shortest channel never runs, which is what `AMK0217` warns about.
 	 */
 	tempoChanges: readonly TempoChange[];
+	/**
+	 * Every command the pass runs that changes something, ascending by tick and
+	 * in driver order.
+	 *
+	 * Neither the compiler nor {@link WalkNote.origins} can produce this list.
+	 * `origins` names the command in force *at a note*, so it dates a command to
+	 * the next note that sounds rather than to the tick the driver read it — a
+	 * `v` written before a rest is a whole rest out — and it can never name the
+	 * four commands that take a slot away instead of filling one (`$DF`, `$F0`,
+	 * `$FD`, `$FE`), since after a `$DF` there is no vibrato and reporting the
+	 * `$DF` as the vibrato in force would be a plain lie. Nor can it see a
+	 * command with no note after it at all.
+	 *
+	 * A command that writes no slot is not here: `$F6`, `$F7` and `$F9` write a
+	 * register or a byte once and nothing later reads it back as state, and
+	 * `$E6`/`$E9` are the shape of the music rather than a setting. Neither is
+	 * anything inside a `$FC` body, which the walk does not follow.
+	 *
+	 * Not everything here was written by anybody: AddmusicK prepends
+	 * `$FA $04 <echo size>` and `$FA $06 $01` to the lowest channel itself
+	 * (Music.cpp:2989-3050), and the driver runs them like any other. They are in
+	 * no command map, so a reader joining back to source drops them there.
+	 *
+	 * It does not replace {@link tempoChanges}, which carries the tempo value and
+	 * the fade length a clock needs; a `$E2` is in both, answering two questions.
+	 *
+	 * Cut at the end of the pass the same way {@link notes} is.
+	 */
+	commands: readonly WalkCommand[];
 	/** Ticks walked per channel, to cross-check against `stats.channelTicks`. */
 	channelTicks: readonly number[];
 	/** Channels the song writes to. */
@@ -512,6 +566,7 @@ export function walkSong(song: Uint8Array, aramAddress: number): SongTimeline {
 	const problems: string[] = [];
 	const notes: WalkNote[] = [];
 	const tempoChanges: TempoChange[] = [];
+	const commands: WalkCommand[] = [];
 
 	/** Blob index of an ARAM address, or -1 when it does not land in the blob. */
 	const indexOf = (address: number): number => {
@@ -680,13 +735,19 @@ export function walkSong(song: Uint8Array, aramAddress: number): SongTimeline {
 	 * One call in front of the dispatch rather than a line in each of its thirty
 	 * arms: a command that set state and forgot to say so would leave a note
 	 * reporting the one before it, which reads as entirely reasonable.
+	 *
+	 * It is also where a slot changing hands is known, so it is where
+	 * {@link SongTimeline.commands} is raised — once per command however many
+	 * slots it moved, `$DA` writing the instrument and clearing the noise in the
+	 * one execution.
 	 */
-	const recordOrigin = (track: Track, vcmd: number, sub: number, address: number): void => {
+	const recordOrigin = (channel: number, track: Track, vcmd: number, sub: number, address: number): void => {
 		const { writes, clears } = slotsOf(vcmd, sub);
 		if (writes === null && clears === null) {
 			return;
 		}
 
+		let moved = false;
 		for (const [slot, to] of [
 			[writes, address],
 			[clears, null],
@@ -713,6 +774,12 @@ export function walkSong(song: Uint8Array, aramAddress: number): SongTimeline {
 				shared.origins[at] = to;
 				invalidateAll();
 			}
+
+			moved = true;
+		}
+
+		if (moved) {
+			commands.push({ tick: track.ticks, channel, address, vcmd });
 		}
 	};
 
@@ -901,7 +968,7 @@ export function walkSong(song: Uint8Array, aramAddress: number): SongTimeline {
 
 		// Taken before the switch: `$E6` and `$E9` move the pointer, and the
 		// address wanted is the one the driver read this command from.
-		recordOrigin(track, vcmd, arg(0), aramAddress + track.at);
+		recordOrigin(channel, track, vcmd, arg(0), aramAddress + track.at);
 
 		switch (vcmd) {
 			case 0xda: // instrument
@@ -1058,7 +1125,7 @@ export function walkSong(song: Uint8Array, aramAddress: number): SongTimeline {
 			break;
 		}
 
-		if (tracks[next].ticks > TICK_BUDGET || notes.length > NOTE_BUDGET) {
+		if (tracks[next].ticks > TICK_BUDGET || notes.length > NOTE_BUDGET || commands.length > COMMAND_BUDGET) {
 			truncated = true;
 			problems.push("The song is longer than the roll will draw.");
 			break;
@@ -1121,6 +1188,7 @@ export function walkSong(song: Uint8Array, aramAddress: number): SongTimeline {
 		// The same cut `played` takes: a command past the shortest channel is
 		// never reached, on this pass or any later one.
 		tempoChanges: tempoChanges.filter((change) => ticks === 0 || change.tick < ticks),
+		commands: commands.filter((command) => ticks === 0 || command.tick < ticks),
 		channelTicks,
 		used,
 		unreachable,
@@ -1136,6 +1204,7 @@ export function walkSong(song: Uint8Array, aramAddress: number): SongTimeline {
 			ticks: 0,
 			loopTick: null,
 			tempoChanges: [],
+			commands: [],
 			channelTicks: new Array<number>(CHANNELS).fill(0),
 			used: new Array<boolean>(CHANNELS).fill(false),
 			unreachable: [],
