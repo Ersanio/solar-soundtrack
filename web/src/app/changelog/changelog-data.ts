@@ -9,6 +9,10 @@ export interface ChangelogEntry {
 export const CHANGELOG: readonly ChangelogEntry[] = [
   // ─── newest first; add new blocks here ──────────────────────────────────
   {
+    date: '24 August 2026',
+    items: ['Overwriting a note completely also clears the commands written for it'],
+  },
+  {
     date: '23 August 2026',
     items: [
       'A command timeline under the piano roll, showing what takes effect where',

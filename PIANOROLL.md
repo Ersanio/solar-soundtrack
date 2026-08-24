@@ -164,8 +164,10 @@ where you say which:
 - **Overwrite** takes the ticks. The note you are placing wins, and whatever was under it keeps
   whatever it did not cover: the ticks being taken are hatched in red on that note's own row while
   you drag, and what survives is drawn as a striped outline. A note you land wholly inside comes
-  back as two — the part before you and the part after you, at the same pitch. This is what a fresh
-  roll starts on.
+  back as two — the part before you and the part after you, at the same pitch. A note or rest you
+  cover completely is erased along with the commands written just in front of it — its `v`, `y`, `q`
+  and the like go with it, and your note inherits nothing. Song settings such as `t`, an `o` or an
+  `l`, and the intro `/` always stay put. This is what a fresh roll starts on.
 - **Insert** moves the notes in the way out of the way, shown as striped outlines while you drag.
   They go in the direction you are dragging, and the notes they run into go with them.
 - **Strict** never writes an overlap. The bar turns red, the ticks where the two would sound at once
@@ -190,7 +192,8 @@ slider in the inspector, which writes one note's own length and never looks at i
   refused; overwriting its tail is not, and the command stays exactly where it is.
 - **A gap is a rest.** The space between two notes is the rest between them, and moving a note
   rewrites that rest rather than moving anything else. Anything you wrote inside the gap keeps its
-  distance from the note that follows it.
+  distance from the note that follows it — unless the gesture covers the whole rest, which erases
+  it like a note, the commands written for it included.
 - **A refusal says so.** Where a gesture cannot be written, the roll turns the bars red while you
   are still holding it, and the toolbar says why in words — "there is something written where that
   note would go", and so on. A reason arrived at only when you let go stays on the toolbar until the

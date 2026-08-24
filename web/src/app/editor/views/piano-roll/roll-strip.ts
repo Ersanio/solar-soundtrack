@@ -118,6 +118,8 @@ export interface Strip {
   ticks: number;
   /** Where its first note goes while {@link items} is empty. */
   home: ChannelHome;
+  /** The channel's own commands, for the prefix a wholly overwritten item takes with it. */
+  commands: readonly Command[];
 }
 
 /** Why a channel cannot be spliced, in the words the toolbar shows. */
@@ -540,7 +542,7 @@ export function channelStrip(request: StripRequest): Strip | StripRefusal {
     return { refused: disagreement };
   }
 
-  return { channel, items, ticks: tick, home };
+  return { channel, items, ticks: tick, home, commands };
 }
 
 /**

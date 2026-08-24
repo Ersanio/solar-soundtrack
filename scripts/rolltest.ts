@@ -1310,26 +1310,26 @@ expectEdit(
 	{ mode: "overwrite", playsAsLong: true, text: "#amk 2\n#0 o4 g2" },
 );
 
-// And the command written between two notes it swallows keeps its place in the
-// text. The tick it lands on is the one deleting those notes gives it — there is
-// no other answer once what it stood against has gone.
+// And the command written between two notes it swallows is deleted with the
+// note it defined: an erased note takes its `'note-state'` declarations with
+// it, and the replacement inherits nothing.
 expectEdit(
 	"a note drawn over every note of a channel, past a command written between them",
 	"#amk 2\n#0 o4 c4 v200 d4",
 	0,
 	() => ({ kind: "spawn", startTick: 0, ticks: 96, written: NOTE_MIN + 36 + 7, drum: null }),
-	{ mode: "overwrite", playsAsLong: true, text: "#amk 2\n#0 v200 o4 g2" },
+	{ mode: "overwrite", playsAsLong: true, text: "#amk 2\n#0 o4 g2" },
 );
 
-// Mid-channel, where the region is bounded either side, the command keeps its
-// tick as well: the run is written after the last item in the region, so the
-// boundary the command stands on is the one the surviving note still starts at.
+// Mid-channel, where the region is bounded either side, the same rule holds:
+// the `v200` is the second swallowed note's declaration and goes with it, and
+// the survivors play under whatever stood before it.
 expectEdit(
 	"a note drawn over two notes with a command written between them",
 	"#amk 2\n#0 o4 c4 d4 v200 e4 f4",
 	0,
 	() => ({ kind: "spawn", startTick: 48, ticks: 96, written: NOTE_MIN + 36 + 7, drum: null }),
-	{ mode: "overwrite", playsAsLong: true, text: "#amk 2\n#0 o4 c4 v200 g2 f4" },
+	{ mode: "overwrite", playsAsLong: true, text: "#amk 2\n#0 o4 c4 g2 f4" },
 );
 
 // The one thing that is put back when the whole channel goes: `octave` is global
@@ -1340,7 +1340,104 @@ expectEdit(
 	"#amk 2\n#0 o4 c4 v200 d4",
 	0,
 	() => ({ kind: "spawn", startTick: 0, ticks: 96, written: NOTE_MIN + 48 + 7, drum: null }),
-	{ mode: "overwrite", playsAsLong: true, text: "#amk 2\n#0 v200 o5 g2 o4" },
+	{ mode: "overwrite", playsAsLong: true, text: "#amk 2\n#0 o5 g2 o4" },
+);
+
+// --- erasure takes the defining commands ---------------------------------------------------------
+//
+// A note or rest wholly covered by the gesture is erased from existence, and the `'note-state'`
+// commands written to run just before it — its declarations — are deleted with it. Song-wide
+// commands, `o`/`l`, the intro `/` and the prefix of a channel's first item all stay, and an item
+// only partly covered keeps everything.
+
+// The reporting song: `y0` is the erased note's declaration and goes with it, so the notes after
+// the replacement are back under `y20`. The rest before it is not reached and keeps its bytes.
+expectEdit(
+	"a note drawn over the whole of one whose declaration stands at its head",
+	"#amk 2\n\n#3 q7F\nl32 @17\no5 v85y20r16y0a^=1",
+	3,
+	() => ({ kind: "spawn", startTick: 12, ticks: 24, written: NOTE_MIN + 48 + 10, drum: null }),
+	{
+		mode: "overwrite",
+		playsFor: 36,
+		text: "#amk 2\n\n#3 q7F\nl32 @17\no5 v85y20r16 o5 a+8",
+	},
+);
+
+// The mirror shape: the erased note's neighbour is a rest with a declaration of
+// its own, and the run stops short of both. The `v200` is the rest's, not the
+// erased note's, and the rest was never reached.
+expectEdit(
+	"a note drawn over the whole of one, leaving the rest after it its declaration",
+	"#amk 2\n#0 o4 c4 v200 r4 d4",
+	0,
+	() => ({ kind: "spawn", startTick: 0, ticks: 48, written: NOTE_MIN + 36 + 7, drum: null }),
+	{ mode: "overwrite", playsAsLong: true, text: "#amk 2\n#0 o4 g4 v200 r4 d4" },
+);
+
+// A rest wholly covered is erased like a note, declarations included — read off
+// tick geometry rather than the carve, since `plan.erased` never names a rest.
+expectEdit(
+	"a note drawn over the whole of a rest with a declaration at its head",
+	"#amk 2\n#0 o4 c4 v200 r4 d4",
+	0,
+	() => ({ kind: "spawn", startTick: 48, ticks: 48, written: NOTE_MIN + 36 + 7, drum: null }),
+	{ mode: "overwrite", playsAsLong: true, text: "#amk 2\n#0 o4 c4 g4 d4" },
+);
+
+// No inheriting between notes either: the erased note's `v200` does not slide
+// onto the replacement.
+expectEdit(
+	"a note drawn over the whole of one between two others",
+	"#amk 2\n#0 o4 c4 v200 d4 e4",
+	0,
+	() => ({ kind: "spawn", startTick: 48, ticks: 48, written: NOTE_MIN + 36 + 7, drum: null }),
+	{ mode: "overwrite", playsAsLong: true, lacks: "v200", contains: "c4 g4 e4" },
+);
+
+// A `t` acts on the song and not on the note in front of it, so erasing the
+// note deletes only the `y0` beside it.
+expectEdit(
+	"a note drawn over the whole of one with a tempo at its head",
+	"#amk 2\n#0 o4 c4 t60 y0 d4 e4",
+	0,
+	() => ({ kind: "spawn", startTick: 48, ticks: 48, written: NOTE_MIN + 36 + 7, drum: null }),
+	{ mode: "overwrite", playsAsLong: true, lacks: "y0", contains: "t60" },
+);
+
+// The channel's first item keeps its prefix even erased: what stands above the
+// first note or rest is the channel's setup rather than its declaration.
+expectEdit(
+	"a note drawn over the whole of a channel's first note, under its setup",
+	"#amk 2\n#0 v200 c4 d4",
+	0,
+	() => ({ kind: "spawn", startTick: 0, ticks: 48, written: NOTE_MIN + 36 + 7, drum: null }),
+	{ mode: "overwrite", playsAsLong: true, contains: "v200" },
+);
+
+// Two erased notes, two declarations, both gone in the one gesture.
+expectEdit(
+	"a note drawn over two notes that each carry a declaration",
+	"#amk 2\n#0 c4 v200 d4 y15 e4 f4",
+	0,
+	() => ({ kind: "spawn", startTick: 48, ticks: 96, written: NOTE_MIN + 36 + 7, drum: null }),
+	{ mode: "overwrite", playsAsLong: true, lacks: ["v200", "y15"], contains: "c4 g2 f4" },
+);
+
+// The gate is coverage, not the spawn gesture: a note dragged wholly onto
+// another erases it the same way, declaration and all.
+expectEdit(
+	"a note dragged wholly onto the next, which carries a declaration",
+	"#amk 2\n#0 o4 c4 v200 d4 e4",
+	0,
+	(bar) => ({
+		kind: "move",
+		items: [noteAt(bar, 0)],
+		deltaTicks: 48,
+		deltaKeys: 0,
+		copy: false,
+	}),
+	{ mode: "overwrite", playsAsLong: true, lacks: "v200" },
 );
 
 console.log("\nrefusals");
@@ -1888,6 +1985,18 @@ expectRefused(
 	5,
 	() => ({ kind: "spawn", startTick: 72, ticks: 48, written: NOTE_MIN + 36 + 7, drum: null }),
 	"insert",
+	REFUSE_CROWDED,
+);
+
+// Only an item wholly covered takes its declaration with it: this one reaches
+// half a rest, so the rest keeps its `v200` — and standing where the run would
+// have to be laid, the command refuses the gesture as it always has.
+expectRefused(
+	"a note drawn over one note and half the rest that follows it",
+	"#amk 2\n#0 o4 c4 v200 r4 d4",
+	0,
+	() => ({ kind: "spawn", startTick: 0, ticks: 72, written: NOTE_MIN + 36 + 7, drum: null }),
+	"overwrite",
 	REFUSE_CROWDED,
 );
 

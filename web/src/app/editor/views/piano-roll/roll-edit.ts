@@ -8,6 +8,8 @@ import {
   spellQ,
 } from '@amk/core/mml-text';
 import type { Span } from '@amk/core/types';
+import type { Command } from '@amk/tokens';
+import { commandScope } from '@amk/tokens/commands/in-force';
 import { type Edit, insertAt, spliceRange } from '@amk/tokens/edits';
 import type { ChannelTail, Strip, StripItem } from './roll-strip';
 
@@ -916,6 +918,77 @@ function removeItem(source: string, item: StripItem): Edit[] {
   return edit ? [edit] : [];
 }
 
+/**
+ * The commands an item wholly overwritten takes with it: the `'note-state'`
+ * ones in its prefix, which are its own declarations and nobody else's. A `t`
+ * or a `w` acts on the whole song, an `l`, an `o`, a `<` or a `>` is parse
+ * state every later note reads, and the intro `/` and a comment are not
+ * commands at all — all of those stay exactly where they are written.
+ *
+ * The scope test is also the overlap guard: a trailing `o` claimed by the
+ * previous unit (`roll-strip.ts:trailsAUnit`) lies inside both that unit's span
+ * and this prefix, and `'position'` is what keeps the deletion off it.
+ *
+ * Callers skip the channel's first item, whose prefix reaches back over the
+ * channel's own header: what stands above the first note or rest is the
+ * channel's setup rather than that item's declaration.
+ */
+function prefixCommandsOf(strip: Strip, item: StripItem): Command[] {
+  return strip.commands.filter(
+    (command) =>
+      command.span.start >= item.prefixSpan.start &&
+      command.span.end <= item.prefixSpan.end &&
+      !command.inRemoteDefinition &&
+      commandScope(command) === 'note-state',
+  );
+}
+
+/** A prefix command and the whitespace in front of it, as {@link removeItem} takes a unit. */
+function removeCommand(source: string, command: Command): Edit[] {
+  let start = command.span.start;
+  while (start > 0 && (source[start - 1] === ' ' || source[start - 1] === '\t')) {
+    start--;
+  }
+
+  const edit = spliceRange(source, { ...command.span, start }, '');
+  return edit ? [edit] : [];
+}
+
+/** Whether the carve's erased ranges cover every tick of the item. */
+function coveredByErased(erased: readonly Erased[], item: StripItem): boolean {
+  const ranges = erased
+    .filter((each) => each.to > item.startTick && each.from < item.startTick + item.ticks)
+    .sort((a, b) => a.from - b.from);
+
+  let at = item.startTick;
+  for (const range of ranges) {
+    if (range.from > at) {
+      return false;
+    }
+
+    at = Math.max(at, range.to);
+  }
+
+  return at >= item.startTick + item.ticks;
+}
+
+/** Whether the born notes cover every tick of the rest. `order` is in tick order. */
+function coveredByBorn(order: readonly PlacedNote[], rest: StripItem): boolean {
+  let at = rest.startTick;
+  for (const note of order) {
+    if (note.startTick > at) {
+      return false;
+    }
+
+    at = Math.max(at, note.startTick + note.ticks);
+    if (at >= rest.startTick + rest.ticks) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 /** What one surviving note needs written, which is usually nothing at all. */
 function rewriteNote(
   context: EditContext,
@@ -1178,6 +1251,7 @@ function realiseRegion(
   context: EditContext,
   gap: Region,
   survivors: ReadonlyMap<number, PlacedNote>,
+  deleted: readonly Span[],
 ): Edit[] | EditRefusal {
   const { targetAMKVersion } = context;
   const edits: Edit[] = [];
@@ -1199,7 +1273,7 @@ function realiseRegion(
   }
 
   if (gap.born.length > 0) {
-    return spawnInto(context, gap, survivors);
+    return spawnInto(context, gap, survivors, deleted);
   }
 
   const runs = restRuns(context, gap);
@@ -1511,27 +1585,89 @@ function restFor(gap: Region, born: PlacedNote): StripItem | null {
 }
 
 /**
- * Whether the region's items are written one after another with nothing but
+ * The interior items the run consumes: the smallest contiguous stretch holding
+ * every note this plan removes, every note being born, and every rest one of
+ * those touches. The items outside it — untouched rests, and whatever is
+ * written in their prefixes — are left byte-identical, which is what lets a
+ * note erase its neighbour without disturbing a `v200` declared for a rest the
+ * gesture never reached.
+ *
+ * Every interior note is in it by construction: a surviving note would bound
+ * the region instead, so each one here is being removed and its ticks have to
+ * be re-expressed by the run. Only a rest can stand aside, and only one no
+ * born note reaches into.
+ */
+function windowOf(strip: Strip, gap: Region, order: readonly PlacedNote[]): StripItem[] {
+  const interior = strip.items.slice(gap.after + 1, gap.before);
+  let from = Infinity;
+  let to = -Infinity;
+  for (const item of interior) {
+    if (item.kind !== 'rest') {
+      from = Math.min(from, item.startTick);
+      to = Math.max(to, item.startTick + item.ticks);
+    }
+  }
+
+  for (const note of order) {
+    from = Math.min(from, note.startTick);
+    to = Math.max(to, note.startTick + note.ticks);
+  }
+
+  // A rest partly under the stretch joins it whole, which can reach the next.
+  let grew = true;
+  while (grew) {
+    grew = false;
+    for (const item of interior) {
+      if (item.startTick < to && item.startTick + item.ticks > from) {
+        if (item.startTick < from) {
+          from = item.startTick;
+          grew = true;
+        }
+
+        if (item.startTick + item.ticks > to) {
+          to = item.startTick + item.ticks;
+          grew = true;
+        }
+      }
+    }
+  }
+
+  return interior.filter((item) => item.startTick < to && item.startTick + item.ticks > from);
+}
+
+/**
+ * Whether the window's items are written one after another with nothing but
  * whitespace between them.
  *
  * A `v`, a `y`, a `$ED` or the intro `/` carries no ticks of its own but does
  * carry a **position**: the tick of the item boundary it stands at. A run laid
- * over the whole region moves every boundary strictly inside it, so one written
- * between two items would come out on a different tick, and only the porter
- * knows which of the two it belongs with. One written before the first item or
- * after the last stands on a boundary the region does not move — where it meets
- * the surviving note either side — and stays exactly where it is, which is why
- * only the interior is read.
+ * over the window moves every boundary strictly inside it, so one written
+ * between two of its items would come out on a different tick, and only the
+ * porter knows which of the two it belongs with. One written before the
+ * window's first item or after its last stands on a boundary the run starts or
+ * ends at, and stays exactly where it is, which is why only the interior is
+ * read.
+ *
+ * A command this plan deletes along with the item it defined stands on no
+ * boundary at all, so the spans in `deleted` read as blank.
  */
-function itemsRunTogether(context: EditContext, gap: Region): boolean {
-  const { source, strip } = context;
-  for (let index = gap.after + 2; index < gap.before; index++) {
-    const between = source.slice(
-      strip.items[index - 1].unitSpan.end,
-      strip.items[index].unitSpan.start,
-    );
-    if (between.trim() !== '') {
-      return false;
+function itemsRunTogether(
+  context: EditContext,
+  window: readonly StripItem[],
+  deleted: readonly Span[],
+): boolean {
+  const { source } = context;
+  for (let index = 1; index < window.length; index++) {
+    const from = window[index - 1].unitSpan.end;
+    const to = window[index].unitSpan.start;
+    for (let at = from; at < to; at++) {
+      if (/\s/.test(source[at])) {
+        continue;
+      }
+
+      if (!deleted.some((span) => at >= span.start && at < span.end)) {
+        return false;
+      }
     }
   }
 
@@ -1549,13 +1685,22 @@ function itemsRunTogether(context: EditContext, gap: Region): boolean {
  * it was written. This is the road for a region holding several rests with
  * something positional between them, and it takes one note at a time.
  *
- * **Laid out afresh.** Where the region's items run together
- * ({@link itemsRunTogether}) there is nothing inside it carrying a position, so
- * the whole stretch is written as one run of rests and notes. That is what lets
- * a region hold more than one note being created — a carve's split leaves a
- * tail beside the note that split it — and notes this same plan is removing,
- * whose units `planEdits` deletes on its own and whose spans only ever abut this
- * run rather than overlap it.
+ * **Laid out afresh, over the window.** The stretch the gesture actually
+ * touches ({@link windowOf}) is written as one run of rests and notes, and the
+ * items outside it are not touched at all — a rest the notes never reached
+ * keeps its bytes and its declarations both. Within the window everything but
+ * the whitespace must be leaving ({@link itemsRunTogether}): an item's unit
+ * `planEdits` removes, or a declaration deleted with the item that owned it,
+ * whose spans only ever abut this run rather than overlap it. That is what
+ * lets a region hold more than one note being created — a carve's split leaves
+ * a tail beside the note that split it — while a `v200` on the far side of the
+ * region stands.
+ *
+ * On either road, a rest the born notes wholly cover is erased from existence
+ * the way a carved-out note is, and its defining commands go with it
+ * ({@link prefixCommandsOf}) — read off tick geometry rather than off the
+ * carve, since rests are not notes and `plan.erased` never names one, which
+ * also means a note drawn exactly over a whole rest erases it in every mode.
  *
  * A builder answering `null` is refused too, rather than passed on as no edits:
  * `planEdits` pushes what each region returns and goes on to the next, so a note
@@ -1565,6 +1710,7 @@ function spawnInto(
   context: EditContext,
   gap: Region,
   survivors: ReadonlyMap<number, PlacedNote>,
+  deleted: readonly Span[],
 ): Edit[] | EditRefusal {
   const { source, strip } = context;
   if (gap.born.length === 0) {
@@ -1573,6 +1719,12 @@ function spawnInto(
 
   const order = [...gap.born].sort((a, b) => a.startTick - b.startTick);
   const born = order[order.length - 1];
+
+  // The channel's first item keeps its prefix even buried: what stands above
+  // the first note or rest is the channel's setup rather than its declaration.
+  const buried = gap.rests.filter((rest) => rest !== strip.items[0] && coveredByBorn(order, rest));
+  const takenWith = buried.flatMap((rest) => prefixCommandsOf(strip, rest));
+  const allDeleted = [...deleted, ...takenWith.map((command) => command.span)];
   const empty = strip.items.length === 0;
   // A channel being written from nothing has just had its own `o4` put in front
   // of it, so a note in that octave has nothing to add (`channelOpening`).
@@ -1609,44 +1761,84 @@ function spawnInto(
    */
   const single = gap.rests.length === 1 && gap.between === 1;
   const settled = gap.tail || gap.ticks === rested(gap.rests, 0);
-  const inPlace = order.length === 1 && gap.between === gap.rests.length && settled;
+  const inPlace =
+    order.length === 1 && gap.rests.length > 0 && gap.between === gap.rests.length && settled;
 
-  /** Whether the run answers to the whole region rather than to one rest inside it. */
+  /** Whether the run is laid out afresh rather than fitted inside one rest. */
   let laidOut = true;
   let over: StripItem | null;
+  /**
+   * The interior items the run consumes ({@link windowOf}); the ones outside it
+   * keep their bytes, kept declarations included. The first two roads consume
+   * what they always did — the region's one rest, or the one the note falls
+   * inside — so for them it only feeds the bookkeeping below.
+   */
+  let window: readonly StripItem[];
   if (single) {
     over = gap.rests[0];
+    window = gap.rests;
   } else if (inPlace) {
     over = restFor(gap, born);
     laidOut = false;
-    // With no rest in it there is nothing for the run to be laid over, and so no
-    // boundary of anything that survives for it to move: the run is inserted at
-    // one offset and every item in the region is a note `planEdits` removes
-    // outright. A command written between two of them keeps its place in the
-    // text and changes tick for the reason deleting those notes changes it —
-    // what it stood against has gone. Which is the commonest region a carve
-    // leaves, since a note drawn over a run of notes swallows all of them.
-  } else if (gap.rests.length === 0 || itemsRunTogether(context, gap)) {
-    over = gap.rests[0] ?? null;
+    // A note that starts in one rest and ends in another: the run written
+    // between them would have to move, and only the porter knows which side of
+    // the note it belongs on.
+    if (over === null) {
+      return refuse(REFUSE_CROWDED);
+    }
+
+    window = [over];
   } else {
-    return refuse(REFUSE_CROWDED);
+    // Everything in the window but the whitespace must be leaving — a unit
+    // `planEdits` removes, or a declaration deleted with the item that owned
+    // it — or the run would move it off its tick. A `t`, an `l` or a `/`
+    // between two erased notes still changes tick, for the reason deleting the
+    // notes changes it: what it stood against has gone.
+    window = windowOf(strip, gap, order);
+    if (!itemsRunTogether(context, window, allDeleted)) {
+      return refuse(REFUSE_CROWDED);
+    }
+
+    over = window.find((item) => item.kind === 'rest') ?? null;
   }
 
-  // A note that starts in one rest and ends in another: the run written between
-  // them would have to move, and only the porter knows which side it belongs on.
-  if (over === null && gap.rests.length > 0) {
-    return refuse(REFUSE_CROWDED);
+  const wide = window.length === gap.between;
+  // A run that leaves items of the region standing cannot absorb a resize:
+  // their ticks are exactly what it must not rewrite. No gesture builds such a
+  // region — a pushed note bounds its own region, and a carve keeps the
+  // region's ticks — so this is a guard rather than a road.
+  if (laidOut && !wide && !gap.tail) {
+    let interiorTicks = 0;
+    for (let index = gap.after + 1; index < gap.before; index++) {
+      interiorTicks += strip.items[index].ticks;
+    }
+
+    if (gap.ticks !== interiorTicks) {
+      return refuse(REFUSE_CROWDED);
+    }
   }
 
-  // Only the last of the tail's rests may grow, and that is what lets a note be
-  // drawn past the end of a channel at all.
-  const grows = gap.tail && (over === null || over === gap.rests[gap.rests.length - 1]);
+  // Only a run reaching the tail's end may grow, and that is what lets a note
+  // be drawn past the end of a channel at all.
+  const grows =
+    gap.tail &&
+    (laidOut
+      ? gap.between === 0 || window[window.length - 1] === strip.items[gap.before - 1]
+      : over === gap.rests[gap.rests.length - 1]);
 
-  const runFrom = laidOut || over === null ? gap.startTick : over.startTick;
+  // A wide window answers to the region's own bounds, which for a note being
+  // fitted among pushed neighbours are not the old items' — a narrow one to its
+  // items, whose ticks the guard above holds still.
+  const windowLast = window[window.length - 1];
+  const narrow = windowLast !== undefined && !wide;
+  const runFrom =
+    laidOut || over === null ? (narrow ? window[0].startTick : gap.startTick) : over.startTick;
   const runTo = grows
     ? Math.max(end, channelEnd)
     : laidOut || over === null
-      ? gap.startTick + gap.ticks
+      ? narrow
+        ? windowLast.startTick + windowLast.ticks
+        : gap.startTick + gap.ticks
       : over.startTick + over.ticks;
 
   /** One rest before each note, and one more after the last — `order.length + 1`. */
@@ -1724,7 +1916,9 @@ function spawnInto(
    * written in a comment, which costs the note an `o` it did not need and
    * nothing else.
    */
-  const runAt = over ? over.unitSpan.start : (previous?.unitSpan.end ?? 0);
+  const runAt = over
+    ? over.unitSpan.start
+    : (windowLast?.unitSpan.end ?? previous?.unitSpan.end ?? 0);
   const inForce =
     previous !== null && !MOVES_OCTAVE.test(source.slice(previous.unitSpan.end, runAt))
       ? standing
@@ -1733,15 +1927,14 @@ function spawnInto(
   /** The head the octave would be put back at, which is where the reader begins. */
   const readAt = reader >= 0 ? strip.items[reader].unitSpan.start : 0;
   /**
-   * Where the run's text ends, which is where the splice over `over` and
-   * {@link writeInto} put it: the rest it was written over, the last item in
-   * the region, or the reader's own head for a region at the top of the channel.
+   * Where the run's text ends, which is where the splice over `over` and the
+   * insertions below put it: the rest it was written over, the window's last
+   * item, or the reader's own head for a region at the top of the channel.
    */
   const runEnd = over
     ? over.unitSpan.end
-    : gap.after >= 0
-      ? strip.items[gap.before - 1].unitSpan.end
-      : readAt;
+    : (windowLast?.unitSpan.end ??
+      (gap.after >= 0 ? strip.items[gap.before - 1].unitSpan.end : readAt));
 
   /**
    * Whether the note after the gap can be left as it is.
@@ -1772,26 +1965,37 @@ function spawnInto(
     restore = insertAt(strip.items[reader].unitSpan.start, `${spelled} `, 1);
   }
 
-  // No rest to write over — the region holds nothing, or nothing but notes this
-  // plan is removing — so the run is inserted rather than written over anything.
-  const edit = over ? spliceRange(source, over.unitSpan, run) : writeInto(context, gap, run);
+  // No rest to write over — the window holds nothing but notes this plan is
+  // removing — so the run is inserted after its last item, where the removals
+  // leave a hole of exactly the run's ticks and the insertion only abuts them.
+  // A window with no items at all is a run written beside the region's anchors,
+  // which is {@link writeInto}'s to place.
+  const edit = over
+    ? spliceRange(source, over.unitSpan, run)
+    : windowLast !== undefined
+      ? insertAt(windowLast.unitSpan.end, ` ${run}`, 1)
+      : writeInto(context, gap, run);
   if (edit === null) {
     return refuse(REFUSE_CROWDED);
   }
 
-  // A run laid out afresh is the whole region's ticks, so the rests it did not
-  // go over are gone: what they held is in the run now. Each goes as its own
-  // edit rather than the whole stretch going as one splice, since anything
-  // between them is a unit `planEdits` is removing and two edits over one run of
-  // text is what it refuses.
+  // A run laid out afresh is the whole window's ticks, so the rests in it that
+  // it did not go over are gone: what they held is in the run now. Each goes as
+  // its own edit rather than the whole stretch going as one splice, since
+  // anything between them is a unit `planEdits` is removing and two edits over
+  // one run of text is what it refuses.
   const gone = laidOut
-    ? gap.rests.filter((rest) => rest !== over).flatMap((rest) => removeItem(source, rest))
+    ? window
+        .filter((item) => item.kind === 'rest' && item !== over)
+        .flatMap((item) => removeItem(source, item))
     : [];
+
+  const cleared = takenWith.flatMap((command) => removeCommand(source, command));
 
   // The run first where the two land on the same offset — a run inserted at the
   // head of the note it is being written in front of — so `coalesce` joins them
   // in the order they are read.
-  return restore ? [edit, ...gone, restore] : [edit, ...gone];
+  return restore ? [edit, ...gone, ...cleared, restore] : [edit, ...gone, ...cleared];
 }
 
 export function planEdits(context: EditContext, plan: Plan): Edit[] | EditRefusal {
@@ -1818,6 +2022,7 @@ export function planEdits(context: EditContext, plan: Plan): Edit[] | EditRefusa
   // moved out of `survivors`, which is all it takes: the loop below removes the
   // unit of anything it does not find there, and `regionsOf` hands a born note
   // to the region its new tick lands in.
+  const lifted = new Set<number>();
   for (const index of crossings(strip, survivors)) {
     const note = survivors.get(index);
     if (!note) {
@@ -1835,6 +2040,7 @@ export function planEdits(context: EditContext, plan: Plan): Edit[] | EditRefusa
     }
 
     survivors.delete(index);
+    lifted.add(index);
     born.push({ ...note, from: -1 });
   }
 
@@ -1842,6 +2048,25 @@ export function planEdits(context: EditContext, plan: Plan): Edit[] | EditRefusa
   // back at a note's head has to agree with what the run in front of it leaves,
   // and `survivors` and `born` are both settled once the crossings are out.
   const regions = regionsOf(strip, survivors, born);
+
+  // A note wholly overwritten is erased from existence, and its defining
+  // commands go with it (`prefixCommandsOf`) — the replacement inherits
+  // nothing. Erasure rather than removal: a deleted or glued note keeps its
+  // commands, and only the carve fills `plan.erased`. A note the plan lifts
+  // across a neighbour is moving rather than dying, so it keeps them too.
+  const erasedPrefixes = new Map<number, Command[]>();
+  for (let index = 1; index < strip.items.length; index++) {
+    const item = strip.items[index];
+    if (item.kind !== 'note' || survivors.has(index) || lifted.has(index)) {
+      continue;
+    }
+
+    if (coveredByErased(plan.erased, item)) {
+      erasedPrefixes.set(index, prefixCommandsOf(strip, item));
+    }
+  }
+
+  const deleted: Span[] = [...erasedPrefixes.values()].flat().map((command) => command.span);
 
   // The octave the edited text leaves in force, carried down the channel so a
   // note only writes one where the one already standing is not the one it needs.
@@ -1893,6 +2118,10 @@ export function planEdits(context: EditContext, plan: Plan): Edit[] | EditRefusa
       // `running` is left alone: what stands after a removed unit is what stood
       // before it, which is what it already holds.
       edits.push(...removeItem(source, item));
+      for (const command of erasedPrefixes.get(index) ?? []) {
+        edits.push(...removeCommand(source, command));
+      }
+
       dropped = true;
       previous = item;
       continue;
@@ -2000,7 +2229,7 @@ export function planEdits(context: EditContext, plan: Plan): Edit[] | EditRefusa
   }
 
   for (const region of regions) {
-    const written = realiseRegion(context, region, survivors);
+    const written = realiseRegion(context, region, survivors, deleted);
     if (!isEdits(written)) {
       return written;
     }

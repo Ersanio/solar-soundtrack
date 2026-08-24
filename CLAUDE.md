@@ -658,6 +658,15 @@ stats.loopTicks` pads **every other channel that would cut the song short** out 
   `packCommandLane` runs over the whole song and `laneWindow` only slices it, keeping the whole song's
   `depth` rather than the slice's: that is the scroll range, and one that shrank as a deep column went
   past would take the porter's position with it.
+- **A wholly overwritten item's declarations left for the replacement to inherit** — the erased
+  note's `v200` stayed in the text, so it landed on whatever was drawn over it, and one standing
+  between two erased items refused the whole gesture as crowded. An item erased from existence takes
+  the `'note-state'` commands in its prefix with it (`prefixCommandsOf`), gated on **erasure rather
+  than removal** — the Delete key keeps them — and the channel's first item is exempt, its prefix
+  being the channel's setup. Not region-wide either: the laid-out run covers the **window**
+  (`windowOf`), the contiguous items the gesture actually touches, which is what lets a rest it
+  never reached keep its bytes and its own `v200` both — a run over the whole region would move
+  that kept command off its tick, which is the crowded refusal all over again.
 
 ## Angular specifics
 
