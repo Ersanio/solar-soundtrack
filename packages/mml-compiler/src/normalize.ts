@@ -7,13 +7,16 @@
  *   A. `resolvePreprocessor` — `#define`/`#if…` lines and untaken branches go.
  *   B. `inlineReplacements`  — every `"find=value"` use site becomes its value.
  *   D. `flattenTriplets`     — notes inside `{ }` get the length they compiled to.
- *   C. `unrollLoops`         — `[ ]n`, `(n)[ ]n`, `(n)m`, `*n` and `[[ ]]n`
- *                              become n copies of the body. Repeated until none
- *                              are left, because a copy can contain a subloop.
+ *   H. `writeNoteLengths`    — every note carries its own length, and no `l` is
+ *                              left for a later one to read.
+ *   C. `unrollLoops`         — `[ ]n`, `(n)[ ]n`, `(n)m`, `*n`, `[[ ]]n` and the
+ *                              same subloop written `$E6 $00`/`$E6 $nn` become
+ *                              n copies of the body. Repeated until none are
+ *                              left, because a copy can contain a subloop.
  *   E. `orderChannels`       — one block per channel, `#0` to `#7`, the music
  *                              above the first `#N` under the starting channel.
- *   F. `writeDefaults`       — `o`, `l`, `q`, `@` and `t` written out where a
- *                              channel left them implied; `<` and `>` absolute.
+ *   F. `writeDefaults`       — `o`, `q`, `@` and `t` written out where a channel
+ *                              left them implied; `<` and `>` absolute.
  *   G. `drumPerNote`         — the drum `@` immediately before every drum note.
  *
  * A `[ ]` body is compiled once, under the parse-time state standing at its
@@ -31,7 +34,7 @@
  */
 
 import { FIRST_CUSTOM_INSTRUMENT, FIRST_PERCUSSION_INSTRUMENT, TICKS_PER_WHOLE } from "@amk/core/hardcoded-tables";
-import { spellLength, spellOctave, spellQ } from "@amk/core/mml-text";
+import { spellDuration, spellLength, spellOctave, spellQ } from "@amk/core/mml-text";
 import type { CompileResult, Diagnostic, ParseEvent, ParseState, ParseTrace, Span } from "@amk/core/types";
 import { preprocess } from "./preprocess";
 
@@ -49,8 +52,9 @@ export interface NormalizeInput {
 	 * refusal because some *other* channel has a loop that cannot be unrolled.
 	 * Every pass that works construct by construct takes this as a filter; the
 	 * two that are global by nature (the preprocessor and the replacements) run
-	 * whole either way, and `orderChannels` refuses rather than moving another
-	 * channel's blocks about.
+	 * whole either way, `orderChannels` refuses rather than moving another
+	 * channel's blocks about, and `writeNoteLengths` stands down, the default
+	 * note length being one variable every channel reads.
 	 *
 	 * The oracle does not change: the caller still walks the result and compares
 	 * it against the original, so a scoped rewrite is held to the same standard
@@ -434,6 +438,197 @@ export function flattenTriplets(input: NormalizeInput): PassResult {
 }
 
 // ---------------------------------------------------------------------------
+// H. Lengths
+// ---------------------------------------------------------------------------
+
+/** A note, rest or tie head and the length written after it. One segment. */
+const SEGMENT = /([a-gA-G][+-]?|[rR]|\^)((?:=\d+|\d*)\.*)/g;
+
+/** Whether a segment's length text names no length, so the note reads the `l`. */
+const implied = (length: string): boolean => /^\.*$/.test(length);
+
+/**
+ * Deletions, widened to the whole line only where the line would be left holding
+ * nothing at all.
+ *
+ * Not {@link deletionEdits}, which widens over a trailing `;` comment too: a
+ * comment beside a `#define` is about the directive and goes with it, where one
+ * beside an `l` is about the music and outlives it.
+ */
+function emptiedLines(text: string, ranges: readonly { start: number; end: number }[]): TextEdit[] {
+	return mergeRanges(ranges).map((range) => {
+		const lineStart = text.lastIndexOf("\n", range.start - 1) + 1;
+		const newline = text.indexOf("\n", range.end);
+		const lineEnd = newline === -1 ? text.length : newline;
+		const remaining = text.slice(lineStart, range.start) + text.slice(range.end, lineEnd);
+		return /^\s*$/.test(remaining)
+			? { start: lineStart, end: lineEnd + (newline === -1 ? 0 : 1), text: "" }
+			: { ...range, text: "" };
+	});
+}
+
+/**
+ * What `dots` dots add to `ticks`: the running value halved at each step, with
+ * the floor taken every time (Music.cpp:2950, `parser.ts:getNoteLengthModifier`).
+ *
+ * The composition is the reason a length cannot be written in front of the dots
+ * already there. Under a 36-tick default `c.` is 36 + 18, and `spellLength` puts
+ * 36 as `8.`, so `c8..` would be 24 + 12 + 6 — a different note.
+ */
+function dotted(ticks: number, dots: number): number {
+	let frac = ticks;
+	let out = ticks;
+	for (let dot = 0; dot < dots; dot++) {
+		frac = Math.floor(frac / 2);
+		out += frac;
+	}
+
+	return out;
+}
+
+/**
+ * Whether an argument written as `text` reads the default note length, the way
+ * `getNoteLength` decides it (`parser.ts:748-778`): a `$` is a hex byte and an
+ * `=n` is exact, and anything else falls back to the default unless it is a
+ * plain 1-192.
+ */
+function readsTheDefault(text: string): boolean {
+	const argument = text.trim();
+	if (argument.startsWith("$") || /^=\d+/.test(argument)) {
+		return false;
+	}
+
+	const digits = /^\d+/.exec(argument);
+	if (!digits) {
+		return true;
+	}
+
+	const n = Number.parseInt(digits[0], 10);
+	return n < 1 || n > TICKS_PER_WHOLE;
+}
+
+/**
+ * Every note's own length written out, and every `l` gone.
+ *
+ * The default note length is one variable for the whole song — `#N`, `[`, `]`,
+ * `(n)`, `*`, `/` and `{ }` all leave it standing (`parser.ts:parseHash`) — so a
+ * note written without digits reads whatever was last set anywhere above it.
+ * That is the one piece of parse state a splice cannot work around, and writing
+ * it onto the note is what makes a length a property of the note.
+ *
+ * Segment by segment, not note by note: `accumulateTiedLength` folds a run
+ * across whitespace and nothing else (`parser.ts:2977-3016`), so `c4^` is one
+ * note of an explicit 48 and an implied 24, and `r4 r r` is one rest of three.
+ * Each segment's own dots are re-spelled with it, since dots compose rather than
+ * add — see {@link dotted}.
+ *
+ * `spellDuration` rather than `spellLength`, because `l=n` range-checks nothing
+ * (`parser.ts:parseDefaultLength`) and dots raise it further, so a segment can
+ * be longer than the whole note one token stops at; the ties it writes fold back
+ * into the same note. Nothing is written in a remote definition, which cannot
+ * hold a note at all (AMK0165, `parser.ts:2882`), so an `l` in one is left where
+ * it is and governs nothing once every note outside carries its own length.
+ *
+ * **Whole songs only.** Scoping the rewrite does not scope the reader: one `l` is
+ * read by every later channel's bare notes and by every `[ ]` body, whose events
+ * carry channel 8. Deleting one channel's `l` while another channel still reads
+ * it changes the music, and rewriting the notes that read it means rewriting
+ * text a scoped run has promised to leave alone. So a scoped run stands down and
+ * the channel keeps its `l`s, as `orderChannels` stands down rather than joining
+ * one channel's blocks — and the roll is unharmed either way, since a note's
+ * length is read off its own written text.
+ */
+export function writeNoteLengths(input: NormalizeInput): PassResult {
+	const { text, trace } = input;
+	const events = trace.events;
+	const diagnostics: Diagnostic[] = [];
+	const edits: TextEdit[] = [];
+	const gone: { start: number; end: number }[] = [];
+	// Music.cpp:2960 — Addmusic 4.05 stops reading after two dots.
+	const mostDots = trace.songTargetProgram === 1 ? 2 : Number.POSITIVE_INFINITY;
+
+	if (input.onlyChannel !== undefined) {
+		return unchanged(text);
+	}
+
+	for (const [index, event] of events.entries()) {
+		if (event.char === "l" && !event.state.inRemoteDefinition) {
+			// The whitespace in front goes too, so `o4 l8 q7F` closes up rather
+			// than being left holding a gap.
+			let start = event.span.start;
+			while (start > 0 && (text[start - 1] === " " || text[start - 1] === "\t")) {
+				start--;
+			}
+
+			gone.push({ start, end: event.span.end });
+			continue;
+		}
+
+		// A `(!n, type, n)` reads the default too, and is the only thing that is
+		// not a note that does (`parser.ts:2552`). There is nowhere to write the
+		// length onto a note here, and the walk need not notice a `$FC` argument
+		// moving, so it is refused rather than left to the oracle.
+		if (event.char === "(") {
+			const call = /^\(\s*!\s*\d+\s*,[^,)]*,([^)]*)\)/.exec(eventText(text, event));
+			if (call && readsTheDefault(call[1])) {
+				diagnostics.push(
+					diagnostic(
+						"SST0606",
+						"This remote code call takes its length from the l in force, which cannot be written onto a note.",
+						event.span,
+					),
+				);
+			}
+
+			continue;
+		}
+
+		if (!isNote(event)) {
+			continue;
+		}
+
+		// `$DD`'s last parameter is a note that names a pitch and nothing else:
+		// `parseNote` appends the byte and returns before it reads a length
+		// (`parser.ts:2971-2975`), so one written here is not read by anything
+		// and is left behind as a stray digit.
+		if (stateBefore(trace, index).nextNoteIsForDD) {
+			continue;
+		}
+
+		const written = eventText(text, event);
+		for (const match of written.matchAll(SEGMENT)) {
+			const [whole, head, length] = match;
+			if (!implied(length)) {
+				continue;
+			}
+
+			const dots = Math.min(length.length, mostDots);
+			const ticks = dotted(event.state.defaultNoteLength, dots);
+			const spelling = spellDuration(ticks, trace.targetAMKVersion);
+			if (spelling === null) {
+				diagnostics.push(
+					diagnostic("SST0610", `A note of ${ticks} ticks has no length this target can write.`, event.span),
+				);
+				continue;
+			}
+
+			const at = event.span.start + match.index + head.length;
+			edits.push({ start: at, end: at + (whole.length - head.length), text: spelling });
+		}
+	}
+
+	if (diagnostics.length > 0) {
+		return { text, diagnostics, changed: false };
+	}
+
+	if (edits.length === 0 && gone.length === 0) {
+		return unchanged(text);
+	}
+
+	return { text: applyEdits(text, [...edits, ...emptiedLines(text, gone)]), diagnostics, changed: true };
+}
+
+// ---------------------------------------------------------------------------
 // C. Loops
 // ---------------------------------------------------------------------------
 
@@ -569,7 +764,7 @@ export function unrollLoops(input: NormalizeInput): PassResult {
 	const diagnostics: Diagnostic[] = [];
 	const bodies = new Map<number, Body>();
 	const constructs: Construct[] = [];
-	const open: { index: number; at: number; remote: boolean; sub: boolean }[] = [];
+	const open: { index: number; at: number; remote: boolean; sub: boolean; from?: number }[] = [];
 
 	events.forEach((event, index) => {
 		const loop = event.loop;
@@ -583,7 +778,7 @@ export function unrollLoops(input: NormalizeInput): PassResult {
 				break;
 
 			case "subOpen":
-				open.push({ index, at: -1, remote: false, sub: true });
+				open.push({ index, at: -1, remote: false, sub: true, from: loop.from });
 				break;
 
 			case "close": {
@@ -630,16 +825,19 @@ export function unrollLoops(input: NormalizeInput): PassResult {
 					break;
 				}
 
+				// Written as hex, the event sits on the argument byte and the run
+				// began at `from`; written as `[[`/`]]n`, the event's own span is
+				// the whole construct. Either end may be either spelling.
 				constructs.push({
 					kind: "subloop",
-					start: events[opened.index].span.start,
+					start: opened.from ?? events[opened.index].span.start,
 					end: event.span.end,
 					first: opened.index,
 					last: index,
 					count: loop.count,
 					body: {
 						start: events[opened.index].span.end,
-						end: event.span.start,
+						end: loop.from ?? event.span.start,
 						openIndex: opened.index,
 						closeIndex: index,
 						remote: false,
@@ -937,6 +1135,16 @@ export function orderChannels(input: NormalizeInput): PassResult {
 			continue;
 		}
 
+		// The `(` of `(!n)[` is a label rather than music, and the `[` on the next
+		// iteration is what paints it — reaching back for it, since only the `[`
+		// carries the loop event. This runs first, so without it the definition's
+		// own label is read as music and the body's first `o`, `l`, `q` or `h` is
+		// refused on the strength of it.
+		const opens = events[index + 1]?.loop;
+		if (event.char === "(" && opens?.kind === "open" && opens.remote) {
+			continue;
+		}
+
 		if (event.char === "#" && HEADER_DIRECTIVE.test(eventText(text, event))) {
 			paint(event.span, HEADER);
 		} else {
@@ -1111,12 +1319,15 @@ export interface DefaultsOptions {
 }
 
 /**
- * Writes out what each channel's first block left implied: `o`, `l`, `q` and
- * `@` with the values its first note was parsed under, and `t` at the top of
- * the lowest channel for a song that never sets one. Each only where no such
+ * Writes out what each channel's first block left implied: `o`, `q` and `@`
+ * with the values its first note was parsed under, and `t` at the top of the
+ * lowest channel for a song that never sets one. Each only where no such
  * command already precedes the channel's first note, so a song that says
  * everything is left alone. Every `<` and `>` becomes the absolute `o` it
  * produced.
+ *
+ * No `l`: {@link writeNoteLengths} has already put every note's length on the
+ * note, so one written here would state what nothing reads.
  *
  * `@` is written on AddmusicK targets only: on Addmusic 4.05 an `@` switches
  * instrument tuning on (`parser.ts:parseInstrument`), and on AddmusicM a stock
@@ -1204,21 +1415,6 @@ export function writeDefaults(input: NormalizeInput, options: DefaultsOptions): 
 			}
 		}
 
-		if (!seen.has("l")) {
-			const length = spellLength(entering.defaultNoteLength, "l", trace.targetAMKVersion);
-			if (length !== null) {
-				parts.push(`l${length}`);
-			} else if (hasNote) {
-				diagnostics.push(
-					diagnostic(
-						"SST0610",
-						`A default length of ${entering.defaultNoteLength} ticks has no l this target can write.`,
-						events[index].span,
-					),
-				);
-			}
-		}
-
 		if (!seen.has("q")) {
 			parts.push(spellQ(entering.q[channel]));
 		}
@@ -1266,7 +1462,9 @@ export function drumPerNote(input: NormalizeInput): PassResult {
 			return;
 		}
 
-		if (!isPitched(event) || event.state.inRemoteDefinition) {
+		// No remote-definition test: a remote body cannot hold a note at all
+		// (AMK0165, `parser.ts:2882`), so a pitched event is never in one.
+		if (!isPitched(event)) {
 			return;
 		}
 

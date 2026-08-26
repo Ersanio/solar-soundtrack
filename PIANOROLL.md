@@ -242,7 +242,8 @@ to put it on. Delete it from the lane first if you meant it to go.
   refused: that is a change to what every note after it plays on, not a move.
 - **Drawing on an empty channel writes the channel.** Pick a channel the song has never used and draw
   on it, and the roll writes a `#N` block for it at the end of the MML, with the settings a fresh
-  channel runs under — `o4 l8 q7F @0 v255 y10` — before the note. All of it is one undo step. The
+  channel runs under — `o4 q7F @0 v255 y10` — before the note. No `l`: every length the roll writes
+  is the note's own, so nothing it puts there reads a default. All of it is one undo step. The
   block goes at the end because an octave and a default length carry across a `#N`, so a block
   dropped in between two others would change what the second one is read under; **Normalize** is what
   puts the blocks back in `#0` to `#7` order.
@@ -268,9 +269,9 @@ it is. Unmute it, or lift the solo, and it takes edits again — though the sele
 back, having been dropped rather than hidden.
 
 Some MML has no one-to-one relationship between what is written and what is played, and the roll says
-so in the toolbar rather than guessing. A `[ ]` loop, a `*` or `(n)` call, a `{ }` triplet, a
-`"name=value"` replacement, a `$DD` pitch slide or a `#halvetempo` all mean one written note is not
-one played note.
+so in the toolbar rather than guessing. A `[ ]` loop, a `[[ ]]` subloop or the same thing written as
+`$E6 $00` … `$E6 $nn`, a `*` or `(n)` call, a `{ }` triplet, a `"name=value"` replacement, a `$DD`
+pitch slide or a `#halvetempo` all mean one written note is not one played note.
 
 A remote code definition is not one of them. `(!1)[ … ]` has to be written above the first `#N`, which
 puts it on the same channel the music below that marker starts on, but its body plays only where a
@@ -278,6 +279,6 @@ puts it on the same channel the music below that marker starts on, but its body 
 and the definition is left exactly where it was written.
 
 The **Normalize #N** button beside that message rewrites just that channel into a shape the roll can
-splice — loops written out, triplets given plain lengths — and leaves every other channel of the song
-exactly as it was. The plain **Normalize** button does the whole song. Neither changes what the song
+splice — loops and subloops written out, triplets given plain lengths, and every note given its own
+length so that no `l` decides it — and leaves every other channel of the song exactly as it was. The plain **Normalize** button does the whole song. Neither changes what the song
 plays: the result is compiled and compared against the original first, and refused if anything moved.

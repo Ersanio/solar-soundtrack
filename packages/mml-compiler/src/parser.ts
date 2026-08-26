@@ -417,6 +417,10 @@ export class AddmusicKParser {
 			const lengthsBefore = this.traceEvents === null ? null : this.data.map((channel) => channel.length);
 			const wasRemote = this.inRemoteDefinition;
 			const wasE6 = this.inE6Loop;
+			// Where the hex run this dispatch belongs to began, taken before
+			// `recordCommand` consumes it. A subloop written as `$E6 $00` turns the
+			// flag over on the argument byte, and the run is what a rewrite replaces.
+			const runFrom = this.hexRun?.start;
 
 			// prettier-ignore
 			switch (lower) {
@@ -463,7 +467,7 @@ export class AddmusicKParser {
 
 			this.recordCommand(lower, commandAt, commandChannel, commandOffset, midRun);
 			if (lengthsBefore !== null && !isSpace(c)) {
-				this.recordTrace(lower, commandAt, commandChannel, lengthsBefore, wasRemote, wasE6);
+				this.recordTrace(lower, commandAt, commandChannel, lengthsBefore, wasRemote, wasE6, runFrom);
 			}
 		}
 	}
@@ -478,7 +482,9 @@ export class AddmusicKParser {
 	 * 8, `]` moves it back and leaves `$E9 lo hi n` on the caller, `*` and `(n)m`
 	 * leave the same four bytes, `[[` and `]]n` toggle `inE6Loop` and `]]n`
 	 * leaves `$E6 n-1` — and every handler writes only on its success path, so
-	 * a dispatch that errored records no loop event.
+	 * a dispatch that errored records no loop event. A subloop written as
+	 * `$E6 $00` toggles the same flag and leaves the same bytes, so it is read
+	 * the same way; `runFrom` is what says where its run began.
 	 */
 	private recordTrace(
 		lower: string,
@@ -487,6 +493,7 @@ export class AddmusicKParser {
 		lengthsBefore: number[],
 		wasRemote: boolean,
 		wasE6: boolean,
+		runFrom: number | undefined,
 	): void {
 		if (this.traceEvents === null) {
 			return;
@@ -498,7 +505,10 @@ export class AddmusicKParser {
 		}
 
 		const event: ParseEvent = { span: this.spanAt(start, end), char: lower, channel, state: this.snapshotState() };
-		const loop = this.loopEventOf(lower, start, channel, lengthsBefore, wasRemote, wasE6);
+		// Every offset a trace event carries is a source one, and `runFrom` is a
+		// {@link scanned} offset like the rest of the scan's bookkeeping.
+		const runAt = runFrom === undefined ? undefined : this.spanAt(runFrom, runFrom).start;
+		const loop = this.loopEventOf(lower, start, channel, lengthsBefore, wasRemote, wasE6, runAt);
 		if (loop) {
 			event.loop = loop;
 		}
@@ -536,6 +546,7 @@ export class AddmusicKParser {
 		lengthsBefore: number[],
 		wasRemote: boolean,
 		wasE6: boolean,
+		runFrom: number | undefined,
 	): LoopEvent | undefined {
 		const grew = (slot: number): number => this.data[slot].length - lengthsBefore[slot];
 		const tail = (slot: number, back: number): number => this.data[slot][this.data[slot].length - back];
@@ -576,6 +587,21 @@ export class AddmusicKParser {
 						count: tail(channel, 1),
 						label: written ? Number.parseInt(written[1], 10) + 1 : null,
 					};
+				}
+
+				return undefined;
+
+			// A subloop the porter wrote as hex. `parseHexCommand` turns the flag
+			// over on the argument byte and appends one byte per dispatch, so this
+			// is the same pair of tests as `[` and `]` above with `grew` at 1
+			// rather than 2, and `from` carries the `$E6` the run opened with.
+			case "$":
+				if (!wasE6 && this.inE6Loop) {
+					return { kind: "subOpen", from: runFrom };
+				}
+
+				if (wasE6 && !this.inE6Loop && grew(channel) === 1 && tail(channel, 2) === 0xe6) {
+					return { kind: "subClose", count: tail(channel, 1) + 1, from: runFrom };
 				}
 
 				return undefined;

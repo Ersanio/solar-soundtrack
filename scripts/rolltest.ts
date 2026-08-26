@@ -559,6 +559,11 @@ expectNoStrip("a triplet", "#amk 2\n#0 o4 {c8 d8 e8} f4", 0, "{ }");
 expectNoStrip("a replacement", '#amk 2\n"x=c4"\n#0 o4 x d4', 0, "replacement");
 expectNoStrip("a tempo ratio", "#amk 2\n#halvetempo\n#0 o4 c4 d4", 0, "divides its tempo");
 expectNoStrip("a pitch slide", "#amk 2\n#0 o4 c4 $DD $00 $18 e4", 0, "$DD");
+// A subloop written as hex. The walk catches this one too where it lies inside
+// the pass, but a subloop past the shortest channel has no played note to
+// disagree with, so the gate has to name it in its own right.
+expectNoStrip("a hex subloop", "#amk 2\n#0 o4 c4 $E6 $00 d4 $E6 $01 e4", 0, "$E6");
+expectNoStrip("a hex subloop past the end of the pass", "#amk 2\n#0 o4 c4 $E6 $00 d4 $E6 $01 e4\n#1 o4 g4", 0, "$E6");
 // `<` and `>` are safe and must **not** be refused: a note's octave comes from
 // its own written byte rather than from a running sum, so either note here
 // repitches without disturbing the other.
@@ -1959,7 +1964,7 @@ expectEdit(
 console.log("\nopening a channel");
 
 // The whole text, because everything about the block is the point: the `#N`, the
-// six defaults, the blank line above it, the rest that carries the note out to
+// five defaults, the blank line above it, the rest that carries the note out to
 // its tick, the rest that runs the channel out to the song's own 192 — and that
 // the note does not repeat the `o4` the block just wrote.
 expectEdit(
@@ -1968,7 +1973,7 @@ expectEdit(
 	5,
 	() => ({ kind: "spawn", startTick: 48, ticks: 48, written: NOTE_MIN + 36 + 4, drum: null }),
 	{
-		text: "#amk 2\n#0 o4 c4 d4 e4 f4\n\n#5 o4 l8 q7F @0 v255 y10\nr4 e4 r2\n",
+		text: "#amk 2\n#0 o4 c4 d4 e4 f4\n\n#5 o4 q7F @0 v255 y10\nr4 e4 r2\n",
 		playsAsLong: true,
 		// A song with no `/` gives the channel none either.
 		lacks: "/",
@@ -2001,7 +2006,7 @@ expectEdit(
 	"#amk 2\n#0 o4 c4 d4 e4 f4\n",
 	6,
 	() => ({ kind: "spawn", startTick: 0, ticks: 24, written: NOTE_MIN + 24, drum: 21 }),
-	{ contains: "#6 o4 l8 q7F @0 v255 y10\n@21 c8 r2..", playsAsLong: true },
+	{ contains: "#6 o4 q7F @0 v255 y10\n@21 c8 r2..", playsAsLong: true },
 );
 
 // A note drawn past the end pads by nothing on its own channel and takes every
@@ -2017,7 +2022,7 @@ expectEdit(
 	5,
 	() => ({ kind: "spawn", startTick: 168, ticks: 48, written: NOTE_MIN + 36, drum: null }),
 	{
-		text: "#amk 2\n#0 o4 c4 d4 e4 f4\nr8\n\n#5 o4 l8 q7F @0 v255 y10\nr2.. c4\n",
+		text: "#amk 2\n#0 o4 c4 d4 e4 f4\nr8\n\n#5 o4 q7F @0 v255 y10\nr2.. c4\n",
 		playsFor: 216,
 	},
 );
@@ -2030,7 +2035,7 @@ expectEdit(
 	"#am4\n#0 o4 c4 d4 e4 f4\n",
 	5,
 	() => ({ kind: "spawn", startTick: 0, ticks: 48, written: NOTE_MIN + 36, drum: null }),
-	{ contains: "#5 o4 l8 q7F v255 y10\nc4 r2.", lacks: "@0", playsAsLong: true },
+	{ contains: "#5 o4 q7F v255 y10\nc4 r2.", lacks: "@0", playsAsLong: true },
 );
 
 // Every channel resumes from its own `/` on each pass round the loop, so a
@@ -2046,7 +2051,7 @@ expectEdit(
 	5,
 	() => ({ kind: "spawn", startTick: 0, ticks: 48, written: NOTE_MIN + 36, drum: null }),
 	{
-		text: "#amk 2\n#0 o4 c4 d4 / e4 f4\n\n#5 o4 l8 q7F @0 v255 y10\nc4 r4 / r2\n",
+		text: "#amk 2\n#0 o4 c4 d4 / e4 f4\n\n#5 o4 q7F @0 v255 y10\nc4 r4 / r2\n",
 		playsAsLong: true,
 		loopsWhereItDid: true,
 	},
@@ -2059,7 +2064,7 @@ expectEdit(
 	5,
 	() => ({ kind: "spawn", startTick: 48, ticks: 48, written: NOTE_MIN + 36 + 4, drum: null }),
 	{
-		text: "#amk 2\n#0 o4 c4 d4 / e4 f4\n\n#5 o4 l8 q7F @0 v255 y10\nr4 e4 / r2\n",
+		text: "#amk 2\n#0 o4 c4 d4 / e4 f4\n\n#5 o4 q7F @0 v255 y10\nr4 e4 / r2\n",
 		playsAsLong: true,
 		loopsWhereItDid: true,
 	},
@@ -2075,7 +2080,7 @@ expectEdit(
 	5,
 	() => ({ kind: "spawn", startTick: 72, ticks: 48, written: NOTE_MIN + 36 + 4, drum: null }),
 	{
-		text: "#amk 2\n#0 o4 c4 d4 / e4 f4\n\n#5 o4 l8 q7F @0 v255 y10\nr4. e8 / ^8 r4.\n",
+		text: "#amk 2\n#0 o4 c4 d4 / e4 f4\n\n#5 o4 q7F @0 v255 y10\nr4. e8 / ^8 r4.\n",
 		playsAsLong: true,
 		loopsWhereItDid: true,
 	},
@@ -2088,11 +2093,11 @@ expectEdit(
 // cases above write.
 expectEdit(
 	"a second note drawn into the rests a channel was opened with",
-	"#amk 2\n#0 o4 c4 d4 e4 f4\n\n#5 o4 l8 q7F @0 v255 y10\nr4 e4 r2\n",
+	"#amk 2\n#0 o4 c4 d4 e4 f4\n\n#5 o4 q7F @0 v255 y10\nr4 e4 r2\n",
 	5,
 	() => ({ kind: "spawn", startTick: 120, ticks: 48, written: NOTE_MIN + 36 + 7, drum: null }),
 	{
-		text: "#amk 2\n#0 o4 c4 d4 e4 f4\n\n#5 o4 l8 q7F @0 v255 y10\nr4 e4 r8 g4 r8\n",
+		text: "#amk 2\n#0 o4 c4 d4 e4 f4\n\n#5 o4 q7F @0 v255 y10\nr4 e4 r8 g4 r8\n",
 		playsAsLong: true,
 	},
 );
@@ -2102,11 +2107,11 @@ expectEdit(
 // them, the marker included, stays on its own tick.
 expectEdit(
 	"a second note drawn after the `/` a channel was opened with",
-	"#amk 2\n#0 o4 c4 d4 / e4 f4\n\n#5 o4 l8 q7F @0 v255 y10\nc4 r4 / r2\n",
+	"#amk 2\n#0 o4 c4 d4 / e4 f4\n\n#5 o4 q7F @0 v255 y10\nc4 r4 / r2\n",
 	5,
 	() => ({ kind: "spawn", startTick: 120, ticks: 48, written: NOTE_MIN + 36 + 7, drum: null }),
 	{
-		text: "#amk 2\n#0 o4 c4 d4 / e4 f4\n\n#5 o4 l8 q7F @0 v255 y10\nc4 r4 / r8 g4 r8\n",
+		text: "#amk 2\n#0 o4 c4 d4 / e4 f4\n\n#5 o4 q7F @0 v255 y10\nc4 r4 / r8 g4 r8\n",
 		playsAsLong: true,
 		loopsWhereItDid: true,
 	},
@@ -2114,11 +2119,11 @@ expectEdit(
 
 expectEdit(
 	"a second note drawn before the `/` a channel was opened with",
-	"#amk 2\n#0 o4 c4 d4 / e4 f4\n\n#5 o4 l8 q7F @0 v255 y10\nc4 r4 / r2\n",
+	"#amk 2\n#0 o4 c4 d4 / e4 f4\n\n#5 o4 q7F @0 v255 y10\nc4 r4 / r2\n",
 	5,
 	() => ({ kind: "spawn", startTick: 48, ticks: 48, written: NOTE_MIN + 36 + 7, drum: null }),
 	{
-		text: "#amk 2\n#0 o4 c4 d4 / e4 f4\n\n#5 o4 l8 q7F @0 v255 y10\nc4 g4 / r2\n",
+		text: "#amk 2\n#0 o4 c4 d4 / e4 f4\n\n#5 o4 q7F @0 v255 y10\nc4 g4 / r2\n",
 		playsAsLong: true,
 		loopsWhereItDid: true,
 	},
@@ -2128,7 +2133,7 @@ expectEdit(
 // written between them, and only the porter knows which side it belongs on.
 expectRefused(
 	"a note drawn across the `/` a channel was opened with",
-	"#amk 2\n#0 o4 c4 d4 / e4 f4\n\n#5 o4 l8 q7F @0 v255 y10\nc4 r4 / r2\n",
+	"#amk 2\n#0 o4 c4 d4 / e4 f4\n\n#5 o4 q7F @0 v255 y10\nc4 r4 / r2\n",
 	5,
 	() => ({ kind: "spawn", startTick: 72, ticks: 48, written: NOTE_MIN + 36 + 7, drum: null }),
 	"insert",
@@ -2197,7 +2202,7 @@ expectEdit(
 	"#am4\no4 c4 d4\n#1 o4 e4 f4",
 	5,
 	() => ({ kind: "spawn", startTick: 0, ticks: 48, written: NOTE_MIN + 36, drum: null }),
-	{ contains: "#5 o4 l8 q7F v255 y10", playsAsLong: true },
+	{ contains: "#5 o4 q7F v255 y10", playsAsLong: true },
 );
 
 // No marker at all means the starting channel is 0 by fallback, and a `#3`

@@ -229,6 +229,19 @@ function forbiddenConstruct(index: TokenIndex, channel: number, source: string):
       return `this channel uses \`${command.kind}\`, so one written note plays more than once`;
     }
 
+    // A subloop the porter wrote as hex rather than as `[[ ]]`. Not caught by
+    // the kinds above, which are the scanner's own, and not left to
+    // `agreesWithWalk` either: one lying entirely past the walk's cut has no
+    // played note to disagree with, so the strip would be built on the written
+    // tick count where the driver plays each note n times. `unrollLoops` clears
+    // it, so Normalize is the answer the toolbar offers beside this — except for
+    // an unterminated `$E6 $00`, which opens a subloop nothing closes and so has
+    // no construct to unroll. That is the same standing an unterminated `[[` has
+    // here, `FORBIDDEN_KINDS` refusing it and Normalize leaving it alone.
+    if (command.vcmd === 0xe6) {
+      return 'this channel uses `$E6`, so one written note plays more than once';
+    }
+
     // A note used as `$DD`'s last parameter emits no note event at all
     // (`parser.ts:2934`), so the strip believes the notes either side of the
     // slide are adjacent — and a rest written between them breaks the lookahead,

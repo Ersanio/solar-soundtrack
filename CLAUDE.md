@@ -705,6 +705,46 @@ stats.loopTicks` pads **every other channel that would cut the song short** out 
   refused (`REFUSE_INSIDE`), because there is no tick left to put it on and no gesture can say which
   side of the deletion the porter meant it to follow. `REFUSE_RAMP` keeps the one site whose reason
   really is the length, a note cut shorter than the ticks in front of the command.
+- **Reading the loop structure off the dispatch character alone** — `loopEventOf` switched on `[`,
+  `]`, `*` and `(`, and a hex command dispatches as `"$"`, so `[[ ]]n` raised a `subOpen`/`subClose`
+  pair and the same subloop written `$E6 $00`/`$E6 $nn` raised nothing. Normalize could not see it,
+  and the roll refused the channel through `agreesWithWalk` and offered a Normalize that had nothing
+  to unroll. The tests are on the bytes and the `inE6Loop` flag, which both spellings share, so a
+  `case "$"` reads it the same way — `grew` at 1 rather than 2, since `parseHexCommand` appends one
+  byte per dispatch. `LoopEvent.from` carries where the run began, because the flag turns over on
+  the argument byte and the event's span is that byte alone; it is a **source** offset, mapped
+  through `spanAt` like every other one the trace carries, since `hexRun` is a `scanned` offset.
+  `$E9` and `$FC` get no such reading: their address is worked out by the compiler and relocated
+  (`link.ts`), so a hand-written one names a body nothing can resolve.
+- **Writing a note's missing length in front of the dots already there** — dots compose rather than
+  add, `getNoteLengthModifier` halving the running value at each one (Music.cpp:2950), so under a
+  36-tick default `c.` is 36 + 18 while `c8..` is 24 + 12 + 6. The segment's own ticks are computed
+  and the whole length text re-spelled from the total, dots included; in the ordinary case that is
+  the same text anyway, `c` under `l4` being `c4`. And `spellDuration` rather than `spellLength`,
+  since `l=n` range-checks nothing so a segment can outrun the whole note one token stops at.
+- **Classifying the prelude event by event, with a `(` read before its `[`** — only the `[` carries
+  the loop event that says a remote definition is opening, so `orderChannels` painted the `(!n)`
+  label of one as music and set `sawMusic`; the `[` reached back and repainted it a beat later, but
+  the flag stayed. Every remote body holding an `o`, `l`, `q`, `h`, `<` or `>` was then refused
+  `SST0612` — "after music above the first channel" — on the strength of its own label, with nothing
+  above the first `#N` at all. The label is skipped by looking one event ahead, the mirror of the
+  lookbehind that paints it. Not by clearing `sawMusic` when the `[` arrives either: that would also
+  clear it for real music written before the definition, which is what the diagnostic is about.
+- **`writeNoteLengths` filtering on `onlyChannel`, the way `flattenTriplets` does** — that filter is
+  sound for a `{ }`, which is a bracketed region on one channel, and unsound for an `l`, which is one
+  variable the whole song reads: `#1`'s bare notes read `#0`'s, and a `[ ]` body's events carry
+  channel 8 rather than the channel that wrote them. A scoped run deleted the `l` and left its
+  readers alone, and the oracle refused the song — which is the one thing the scoped form exists to
+  avoid, since it is what the roll's **Normalize #N** runs. There is no correct per-channel version:
+  rewriting every reader means rewriting text a scoped run has promised to leave. It stands down
+  instead, as `orderChannels` does, and the channel keeps its `l`s — which costs the roll nothing,
+  a note's length being read off its own written text.
+- **`writeNoteLengths` working note by note** — every segment's digits are independently optional
+  and `accumulateTiedLength` folds a run across whitespace and nothing else, so one event's span can
+  cover several: `c4^` is an explicit 48 and an implied 24, `r4 r r` is one rest of three. The
+  `$DD` target note is the exception in the other direction — `parseNote` appends its byte and
+  returns before it reads a length at all (`parser.ts:2971-2975`), so a length written there is a
+  stray digit nothing reads, and `normalizetest`'s fixed-point check is what caught it.
 
 ## Angular specifics
 

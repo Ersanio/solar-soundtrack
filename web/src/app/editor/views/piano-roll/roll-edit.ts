@@ -741,15 +741,18 @@ const OPENING_Q = 0x7f;
  * fresh channel runs under, so that nothing it plays depends on what the block
  * above it happened to leave standing.
  *
- * `octave` and `defaultNoteLength` are one variable each and leak past a `#N`,
- * which resets neither (`parser.ts:parseHash`), so `o4` and `l8` are what a
- * channel runs at only while nothing has moved them (`parser.ts:193`, `:195`).
- * `q` and `@` are per channel and start at `$7F` and 0 (`parser.ts:200`,
- * `:199`). `v` and `y` are not parse-time state at all: the driver boots every
- * voice at `$FF` volume and `$0A` pan, dead centre of `y`'s 0 to 20
- * (`main.asm:2134-2138`). The octave and the length are literal because each has
- * one spelling on every target — 24 ticks is `l8` wherever `192 / 24` is — and
- * `q` goes through {@link spellQ}, whose two digits are upper case.
+ * `octave` is one variable and leaks past a `#N`, which does not reset it
+ * (`parser.ts:parseHash`), so `o4` is what a channel runs at only while nothing
+ * has moved it (`parser.ts:193`). `q` and `@` are per channel and start at `$7F`
+ * and 0 (`parser.ts:200`, `:199`). `v` and `y` are not parse-time state at all:
+ * the driver boots every voice at `$FF` volume and `$0A` pan, dead centre of
+ * `y`'s 0 to 20 (`main.asm:2134-2138`). The octave is literal, having one
+ * spelling on every target, and `q` goes through {@link spellQ}, whose two
+ * digits are upper case.
+ *
+ * No `l`, which leaks the same way and would be the one thing here the roll then
+ * had to keep in step: every length it writes is the note's own
+ * ({@link spellDuration}), so nothing it puts in this channel reads a default.
  *
  * No `@` on Addmusic 4.05 or AddmusicM, where an `@` switches instrument tuning
  * on and resets `h` instead of saying what is already true; that is the gate
@@ -758,7 +761,7 @@ const OPENING_Q = 0x7f;
  * instrument's tuning rather than adding to it, so `h0` is not "no transposition".
  */
 function channelOpening(channel: number, songTargetProgram: number): string {
-  const parts = [`o${OPENING_OCTAVE}`, 'l8', spellQ(OPENING_Q)];
+  const parts = [`o${OPENING_OCTAVE}`, spellQ(OPENING_Q)];
   if (songTargetProgram === 0) {
     parts.push('@0');
   }

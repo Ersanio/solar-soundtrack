@@ -15,6 +15,9 @@ export const CHANGELOG: readonly ChangelogEntry[] = [
       'Deleting or drawing over a note only clears the commands written for it if nothing else still plays under them',
       'Drawing over notes keeps the commands written between them, on the ticks they run at',
       'Right-click a command in the timeline to delete it',
+      'Normalize unrolls subloops written as $E6, so the piano roll can edit that channel',
+      'Normalize gives every note its own length instead of leaving it to l',
+      'Normalize no longer refuses songs whose remote code sets an octave, length or quantization',
     ],
   },
   {
