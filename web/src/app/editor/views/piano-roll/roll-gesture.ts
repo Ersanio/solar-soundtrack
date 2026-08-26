@@ -2,6 +2,7 @@ import { type Signal, computed, signal } from '@angular/core';
 
 import { NOTE_MIN } from '@amk/core/hardcoded-tables';
 import { octaveFor, spellDuration, spellNote } from '@amk/core/mml-text';
+import type { Command } from '@amk/tokens';
 import type { Edit } from '@amk/tokens/edits';
 import type { LaneStack } from './roll-layout';
 import { rowAtY, snapDuration, snapTick, stepDrawLength, tickAtX } from './roll-layout';
@@ -88,6 +89,8 @@ export interface GestureSources {
   introTicks: Signal<number | null>;
   /** Every channel as somewhere rests can be appended, for a gesture that lengthens the song. */
   channels: Signal<readonly ChannelTail[]>;
+  /** What the walk had in force at a note, for deciding what a removed item takes with it. */
+  inForce: Signal<(address: number) => readonly Command[] | null>;
   source: Signal<string>;
 }
 
@@ -601,6 +604,7 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
     playableTicks: sources.playableTicks(),
     introTicks: sources.introTicks(),
     channels: sources.channels(),
+    inForce: sources.inForce(),
   });
 
   /**

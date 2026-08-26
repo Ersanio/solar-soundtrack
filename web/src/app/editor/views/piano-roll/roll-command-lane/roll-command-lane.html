@@ -44,10 +44,13 @@
           <!-- The plate is the hit target as well as the hover: an SVG element
                takes a pointer only where it is painted, so without it a glyph is
                clickable on its strokes and not in the gaps between them. -->
+          <!-- `contextmenu` on the glyph and not on the lane, so a right click
+               on the background still gives the porter their browser menu. -->
           <g
             class="group cursor-pointer"
             (click)="inspect(glyph, $event)"
             (dblclick)="inspect(glyph, $event, true)"
+            (contextmenu)="erase(glyph, $event)"
           >
             <title>{{ glyph.title }}</title>
             <rect

@@ -1,5 +1,6 @@
 import { Component, computed, inject, input, output, signal } from '@angular/core';
 
+import { spliceOut } from '@amk/tokens/edits';
 import { CommandIcon } from '../../../command-palette/command-icon';
 import { EditorRequests } from '../../../../state/editor-requests';
 import { EditorStore } from '../../../../state/editor-store';
@@ -117,5 +118,27 @@ export class RollCommandLane {
     if (this.inSync()) {
       this.requests.reveal.set({ span: { ...glyph.span }, show });
     }
+  }
+
+  /**
+   * A right click deletes the command, which is the roll's own erase idiom.
+   *
+   * The counterweight to a rule that keeps more than it removes: an edit gives a
+   * command back to a note that still needs it, and this is how the porter says
+   * no note does. `preventDefault` is load-bearing rather than tidy — this
+   * `<svg>` is a sibling of the roll's scroller, so nothing there sees the event
+   * and the browser menu would open over the lane.
+   *
+   * Through `applyAll`, so one right click is one undo step.
+   */
+  protected erase(glyph: LaneGlyph, event: Event): void {
+    event.preventDefault();
+    event.stopPropagation();
+    if (!glyph.removable || !this.inSync()) {
+      return;
+    }
+
+    const edit = spliceOut(this.editor.source(), glyph.span);
+    this.requests.applyAll(edit ? [edit] : null);
   }
 }

@@ -13,6 +13,7 @@ import {
 } from '@angular/core';
 
 import { NOTE_MIN, TICKS_PER_WHOLE } from '@amk/core/hardcoded-tables';
+import type { Command } from '@amk/tokens';
 import {
   FIRST_CUSTOM_INSTRUMENT,
   FIRST_PERCUSSION_INSTRUMENT,
@@ -790,6 +791,30 @@ export class PianoRoll {
     ),
   );
 
+  /** The walk's notes by address, which is how a strip item names the one it is. */
+  private readonly walkedNotes = computed(
+    () => new Map((this.timeline()?.notes ?? []).map((note) => [note.address, note])),
+  );
+
+  /**
+   * What the walk had in force at a note, by the address of its head, or `null`
+   * for a note the pass never reached.
+   *
+   * The answers are `Command` objects out of `EditorStore.tokens()`, which is
+   * the same index {@link stripOutcome} hands `channelStrip` — so the commands
+   * `planEdits` compares are one set of objects and identity means what it says.
+   * Two scans of one text hold the same commands as different objects, and every
+   * comparison between them is silently false.
+   */
+  private readonly inForceAt = computed<(address: number) => readonly Command[] | null>(() => {
+    const acting = this.editor.commandsInForce();
+    const walked = this.walkedNotes();
+    return (address) => {
+      const note = walked.get(address);
+      return note === undefined ? null : acting(note);
+    };
+  });
+
   protected readonly gestures = rollGestures(
     {
       strip: this.strip,
@@ -805,6 +830,7 @@ export class PianoRoll {
       playableTicks: this.playableTicks,
       introTicks: this.introTicks,
       channels: this.channelTails,
+      inForce: this.inForceAt,
       source: this.editor.source,
     },
     {

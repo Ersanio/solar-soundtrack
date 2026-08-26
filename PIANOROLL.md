@@ -120,7 +120,11 @@ upwards; three icons deep is as much as fits, and a plain wheel over the lane li
 there is more. A tick crowded past what the lane will draw at all ends in three dots; hover them for
 how many are behind. Click an icon to ask the inspector about that command, or double-click it to go
 to it in the MML — the same as clicking one on a bar, except that it leaves the channel you are
-editing alone.
+editing alone. **Right-click one to delete it**, in one undo step. That is the counterweight to a
+roll that keeps a command wherever something still plays under it: an edit hands the command back to
+the notes that need it, and this is how you say none of them do. A command written through a
+`"name=value"` cannot be deleted this way — its icon offers no right-click — because the text it
+would take out is the call site rather than the command.
 
 ## Three settings that decide how a drag lands
 
@@ -170,10 +174,8 @@ where you say which:
 - **Overwrite** takes the ticks. The note you are placing wins, and whatever was under it keeps
   whatever it did not cover: the ticks being taken are hatched in red on that note's own row while
   you drag, and what survives is drawn as a striped outline. A note you land wholly inside comes
-  back as two — the part before you and the part after you, at the same pitch. A note or rest you
-  cover completely is erased along with the commands written just in front of it — its `v`, `y`, `q`
-  and the like go with it, and your note inherits nothing. Song settings such as `t`, an `o` or an
-  `l`, and the intro `/` always stay put. This is what a fresh roll starts on.
+  back as two — the part before you and the part after you, at the same pitch. This is what a fresh
+  roll starts on.
 - **Insert** moves the notes in the way out of the way, shown as striped outlines while you drag.
   They go in the direction you are dragging, and the notes they run into go with them.
 - **Strict** never writes an overlap. The bar turns red, the ticks where the two would sound at once
@@ -182,6 +184,35 @@ where you say which:
 It is one rule for every gesture — drawing, dragging, nudging with the arrows, stretching an edge,
 and `Alt+Q` — so where you grabbed the bar does not change the answer. It does not reach the Length
 slider in the inspector, which writes one note's own length and never looks at its neighbours.
+
+## What happens to a command when the note it was written for goes
+
+Every gesture that removes a note or a rest — a `Backspace`, a note drawn over the top, a glue, a
+carve — asks the same question about the `v`, `y`, `q`, `@` and the like written just in front of it:
+**does anything in the edited song still play under it?**
+
+If something does, the command stays. A note you did not touch counts, and so does the note you are
+drawing, so the spot keeps its dynamics and what changed is which note sits there. If nothing does —
+it was the last note on the channel, or another `v` takes over before the next note sounds — the
+command goes with the note.
+
+The gesture is no part of the question. `Backspace` on a note and drawing over the same note get the
+same answer, which is a fact about the song rather than about how you got there. It is the driver's
+own reading, too, not a scan of the MML: a command inside a `[ ]` played twice, or a `(1)n` called
+from another channel, is followed where it actually runs.
+
+A command that stays stays exactly where you wrote it. Where the roll has to lay a whole run of new
+text over the stretch that held it — drawing over two notes with a `v200` between them — it writes
+the command out again on the tick it ran at, which splits the note you drew into two tied halves
+around it: `c4 d4 v200 e4 f4` drawn over from the `d4` comes back `c4 g4 v200 ^4 f4`. A tie is one
+note, so nothing about what you drew has changed.
+
+Song settings such as `t` and `w`, an `o` or an `l`, and the intro `/` are outside all of this and
+always stay put. So is everything written above a channel's first note, which is the channel's setup
+rather than any one note's. And a command written **inside** a note — between its head and a `^` —
+can only be kept by a run being laid over those ticks; delete or glue such a note with something
+still playing under that command and the gesture is refused instead, because there is no tick left
+to put it on. Delete it from the lane first if you meant it to go.
 
 ## What the roll will and will not do
 
@@ -195,11 +226,13 @@ slider in the inspector, which writes one note's own length and never looks at i
 - **A command written inside a note pins that note's start.** A `v200` halfway through a note stands
   a number of ticks into it, so taking ticks off that note's _front_ would carry the command along
   with it and it would sound later than you wrote it. Overwriting the head of such a note is
-  refused; overwriting its tail is not, and the command stays exactly where it is.
+  refused; overwriting its tail is not, and the command stays exactly where it is. Cutting the note
+  shorter than the ticks in front of the command is refused too — there is nowhere left inside the
+  note for it to fire.
 - **A gap is a rest.** The space between two notes is the rest between them, and moving a note
   rewrites that rest rather than moving anything else. Anything you wrote inside the gap keeps its
-  distance from the note that follows it — unless the gesture covers the whole rest, which erases
-  it like a note, the commands written for it included.
+  distance from the note that follows it, and a rest covered completely is asked the same question a
+  note is — see above.
 - **A refusal says so.** Where a gesture cannot be written, the roll turns the bars red while you
   are still holding it, and the toolbar says why in words — "there is something written where that
   note would go", and so on. A reason arrived at only when you let go stays on the toolbar until the

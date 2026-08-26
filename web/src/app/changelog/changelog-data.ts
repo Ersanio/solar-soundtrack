@@ -9,11 +9,17 @@ export interface ChangelogEntry {
 export const CHANGELOG: readonly ChangelogEntry[] = [
   // ─── newest first; add new blocks here ──────────────────────────────────
   {
-    date: '24 August 2026',
+    date: '26 August 2026',
     items: [
-      'Overwriting a note completely also clears the commands written for it',
       'The command timeline shows commands that land in a rest, which no note could draw',
+      'Deleting or drawing over a note only clears the commands written for it if nothing else still plays under them',
+      'Drawing over notes keeps the commands written between them, on the ticks they run at',
+      'Right-click a command in the timeline to delete it',
     ],
+  },
+  {
+    date: '24 August 2026',
+    items: ['Overwriting a note completely also clears the commands written for it'],
   },
   {
     date: '23 August 2026',

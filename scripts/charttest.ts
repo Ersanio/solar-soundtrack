@@ -1535,6 +1535,29 @@ console.log("\nhow the command lane stacks what lands together");
 		muted.glyphs[1].title,
 	);
 
+	// The right-click erase, and the one thing on screen that says it is there.
+	// A command written through a `"name=value"` has its span collapsed onto the
+	// call site, so deleting that range would take the expansion with it.
+	{
+		const macro = '#amk 4\n"loud=v200 y10"\n#0 loud c8\n';
+		const scanned = tokenize(macro).commands.filter((command) => command.kind === "v");
+		const spread = packCommandLane({
+			events: [{ tick: 0, channel: 0, command: scanned[0] }],
+			text: macro,
+			zoom: 2,
+			audible: new Map(),
+		});
+		check("a command that came through a replacement cannot be erased", spread.glyphs[0].removable === false);
+		check("and its hover does not offer it", !spread.glyphs[0].title.includes("right-click"), spread.glyphs[0].title);
+	}
+
+	check("a command written out in full can be", muted.glyphs[1].removable === true);
+	check(
+		"and its hover is what says so",
+		muted.glyphs[1].title.includes("right-click to delete"),
+		muted.glyphs[1].title,
+	);
+
 	// The window is a slice of the pack, so a glyph keeps the row the whole song
 	// gave it, and `depth` stays the whole song's — it is how far the lane can be
 	// scrolled, and a range that shrank as the roll moved would take the porter's

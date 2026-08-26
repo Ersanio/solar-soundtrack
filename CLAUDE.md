@@ -668,13 +668,43 @@ stats.loopTicks` pads **every other channel that would cut the song short** out 
   past would take the porter's position with it.
 - **A wholly overwritten item's declarations left for the replacement to inherit** — the erased
   note's `v200` stayed in the text, so it landed on whatever was drawn over it, and one standing
-  between two erased items refused the whole gesture as crowded. An item erased from existence takes
-  the `'note-state'` commands in its prefix with it (`prefixCommandsOf`), gated on **erasure rather
-  than removal** — the Delete key keeps them — and the channel's first item is exempt, its prefix
-  being the channel's setup. Not region-wide either: the laid-out run covers the **window**
-  (`windowOf`), the contiguous items the gesture actually touches, which is what lets a rest it
-  never reached keep its bytes and its own `v200` both — a run over the whole region would move
-  that kept command off its tick, which is the crowded refusal all over again.
+  between two erased items refused the whole gesture as crowded. An item the plan removes takes the
+  `'note-state'` commands in its prefix and inside its own unit with it, but only the ones **nothing
+  in the edited song still sounds under** (`reachesSomething`); the channel's first item is exempt,
+  its prefix being the channel's setup. Not region-wide either: the laid-out run covers the
+  **window** (`windowOf`), the contiguous items the gesture actually touches, which is what lets a
+  rest it never reached keep its bytes and its own `v200` both — a run over the whole region would
+  move that kept command off its tick, which is the crowded refusal all over again.
+- **That gate on `plan.erased`, so overwrite dropped a declaration and Backspace kept it** — only
+  `carve` fills `erased`, so the two answers differed on "did the ticks get a new occupant", which is
+  a fact about the edit path and not one a musician reasons about. And the reasoning that separated
+  them was thinner than it looked: a drawn note declares nothing of its own, so erasing `v255 c4` and
+  drawing over it re-voices everything to the right just as silently as the deletion would have. The
+  question names no gesture — a surviving note counts as a reacher and so does one being drawn, which
+  is why drawing over a note keeps its `v200` where deleting the same note takes it. `plan.erased`
+  stays, `roll-marks.ts` drawing the hatching from it.
+- **Moving a kept command to the head of the next surviving note** — the cheaper spelling, and it
+  loses the tick: in `c4 v200 d4 v100 e4 f4` overdrawn from 48 the `v100` runs 48 ticks inside the
+  drawn note and there is no surviving head at that tick, so the note's second half would sound at
+  `v200` with nothing to say so. A run splits the born note at the command's own tick and writes it
+  between the tied halves instead (`RunMark`, `spawnRun`), which is the intro `/`'s mechanism
+  widened from one tick to a list — and a tie emits `$C6`, so the two halves are still one note.
+- **Deriving a command's reach from a slot table built off the source** — the walk has already
+  resolved it, and a source-order scan is blind to a `[ ]` body played twice and to a `(1)n` called
+  from another channel. `commandsInForceOf` answers a note with the `Command` objects acting on it,
+  by the same stable identity `definedAt` compares, so "the slot changed hands" is the first note
+  the pass played without the command in its list. The identity is the trap: `channelStrip` filters
+  `index.commands` from its own `TokenIndex`, so a second `tokenize` makes every membership test
+  false and keeps every command while looking like it works — `EditContext.inForce` and
+  `Strip.commands` must come from one scan, which is what `rolltest`'s `Built.index` is for.
+- **`removeItem` splicing a multi-segment unit whole** — `growUnits` ends `unitSpan` at the **last**
+  segment (`roll-strip.ts`), so a `v200` written inside a note went out with the note in silence, and
+  a `t` or an intro `/` would have gone the same way. A command inside a removed unit is asked the
+  reach question on its own tick (`insideCommands`) and dropped where nothing sounds under it; where
+  a run is being laid over those ticks the run takes it over; and with neither, the gesture is
+  refused (`REFUSE_INSIDE`), because there is no tick left to put it on and no gesture can say which
+  side of the deletion the porter meant it to follow. `REFUSE_RAMP` keeps the one site whose reason
+  really is the length, a note cut shorter than the ticks in front of the command.
 
 ## Angular specifics
 

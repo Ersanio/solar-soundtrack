@@ -1,4 +1,5 @@
 import type { Span } from '@amk/core/types';
+import { commandRewritable } from '@amk/tokens/edits';
 import type { TimelineCommand } from '../../../state/command-timeline';
 import type { CommandGlyph } from '../../command-palette/command-icon';
 import { glyphOf } from '../../command-palette/glyph-of';
@@ -26,6 +27,14 @@ export interface LaneGlyph {
   size: number;
   /** The command's own span, which is what a click on it selects. */
   span: Span;
+  /**
+   * Whether the span is the command and nothing else, and so may be deleted.
+   *
+   * A command written through a `"name=value"` has its span collapsed onto the
+   * call site (`parser.ts:3861-3873`), so taking that range out would eat
+   * whatever else the expansion produced along with it.
+   */
+  removable: boolean;
   /** The channel's `text-ch-*`, since a glyph is tinted by `color` and not by `fill`. */
   tint: string;
   /** Dimmed rather than dropped, so a muted part still reads as part of the song. */
@@ -34,7 +43,9 @@ export interface LaneGlyph {
    * The hover, which names the channel as well as the command.
    *
    * Not optional: `styles.css` states that nothing here identifies a channel by
-   * colour alone, the eight not clearing the all-pairs separation gate.
+   * colour alone, the eight not clearing the all-pairs separation gate. It also
+   * carries the erase, which is the only thing on screen that says a glyph can
+   * be deleted at all.
    */
   title: string;
 }
@@ -120,6 +131,7 @@ export function packCommandLane(request: LaneRequest): CommandLane {
 
     const muted = audible.get(event.channel) === false;
     const written = text.slice(event.command.span.start, event.command.span.end);
+    const removable = commandRewritable(event.command);
     glyphs.push({
       // Its place in the packed list leads, because tick, channel and span do
       // not identify one: `[[ v100 v200 ]]2` holds no note, so both turns run at
@@ -130,9 +142,12 @@ export function packCommandLane(request: LaneRequest): CommandLane {
       y: row * LANE_ROW,
       size: LANE_GLYPH,
       span: event.command.span,
+      removable,
       tint: CHANNEL_TEXT[event.channel],
       opacity: muted ? MUTED_OPACITY : 1,
-      title: `${entry.label} · ${written} · #${event.channel} · tick ${event.tick}`,
+      title:
+        `${entry.label} · ${written} · #${event.channel} · tick ${event.tick}` +
+        (removable ? ' · right-click to delete' : ''),
     });
   }
 
