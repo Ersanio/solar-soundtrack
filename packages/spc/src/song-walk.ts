@@ -383,15 +383,22 @@ export interface WalkCommand {
 	/** The `$DA`-`$FE` byte itself. */
 	vcmd: number;
 	/**
-	 * Whether it took a slot rather than gave one up.
+	 * Whether a note *begins* on this very tick and sounds with it in force.
 	 *
-	 * `$DF`, `$F0`, `$FD` and `$FE` clear one, so no note's `origins` can ever
-	 * hold them and nothing asking a note what is acting on it will name them.
-	 * A reader wanting the commands a note cannot report has no other way to
-	 * tell, and reading it off {@link WalkCommand.vcmd} would restate the table
-	 * `slotsOf` already is.
+	 * Which is to say whether anything anchored on a note stands where this
+	 * command runs. It is false in five shapes, and no scope tells them apart:
+	 * a command the driver reads while its channel is resting, one it reads
+	 * inside a `$C6` tie, where the sounding note began earlier, one replaced
+	 * before the next note keys on, one with no note left after it at all, and
+	 * `$DF`, `$F0`, `$FD` and `$FE`, which clear a slot rather than take one and
+	 * so are in no {@link WalkNote.origins} at any tick.
+	 *
+	 * `origins` cannot answer this from the note end: it is anchored on a note
+	 * that sounds, and the question is about the tick. Nor can
+	 * {@link WalkCommand.vcmd}, which would restate the table `slotsOf` already
+	 * is and would still reach only the last of the five.
 	 */
-	fills: boolean;
+	onANote: boolean;
 }
 
 /** A song-wide tempo command, on the tick the driver runs it. */
@@ -544,6 +551,13 @@ interface Track {
 	state: ChannelState;
 	/** Where each of this channel's slots was last written. See {@link WalkNote.origins}. */
 	origins: (number | null)[];
+	/**
+	 * The entry that put each of those addresses there, so a slot can name the
+	 * command occupying it and not merely the byte. The address cannot: a
+	 * `[[ v100 v200 ]]2` raises two `v200` entries at one tick on one channel,
+	 * and only one of them is the one in force.
+	 */
+	owners: (WalkCommand | null)[];
 	/** The last frozen snapshot, reused until something changes. */
 	snapshot: NoteState | null;
 	/** The last frozen origins, reused on the same terms. */
@@ -665,6 +679,7 @@ export function walkSong(song: Uint8Array, aramAddress: number): SongTimeline {
 			loopCount: 0,
 			loopStart: -1,
 			origins: new Array<number | null>(CHANNEL_SLOTS).fill(null),
+			owners: new Array<WalkCommand | null>(CHANNEL_SLOTS).fill(null),
 			frozenOrigins: null,
 			state: {
 				// `main.asm:2321` calls `SetInstrument` with 0 for every channel whose
@@ -697,6 +712,8 @@ export function walkSong(song: Uint8Array, aramAddress: number): SongTimeline {
 		secondVelocityTable: true,
 		/** Song-wide slots, which every channel's next note reports. */
 		origins: new Array<number | null>(SLOTS.length).fill(null),
+		/** Their owners, as {@link Track.owners} is. Only the tail is ever used. */
+		owners: new Array<WalkCommand | null>(SLOTS.length).fill(null),
 	};
 	let loopTick = loopPhrase >= 0 ? Number.POSITIVE_INFINITY : Number.NaN;
 	let truncated = false;
@@ -730,7 +747,23 @@ export function walkSong(song: Uint8Array, aramAddress: number): SongTimeline {
 	 * one copy is what makes `invalidateAll` enough to publish it.
 	 */
 	const origins = (track: Track): readonly (number | null)[] => {
-		track.frozenOrigins ??= SLOTS.map((_, at) => (at < CHANNEL_SLOTS ? track.origins[at] : shared.origins[at]));
+		if (track.frozenOrigins === null) {
+			track.frozenOrigins = SLOTS.map((_, at) => (at < CHANNEL_SLOTS ? track.origins[at] : shared.origins[at]));
+
+			// A note keys on here, so anything in force that also *ran* here is
+			// reported by something standing on its own tick. One that ran earlier
+			// is not: the ticks between it and this note are a rest or a tie, and
+			// nothing is drawn over them. Only the first note after a slot changes
+			// hands can share a command's tick, and that note always freezes afresh
+			// — every write to a slot clears {@link Track.frozenOrigins}.
+			for (let at = 0; at < SLOTS.length; at++) {
+				const owner = at < CHANNEL_SLOTS ? track.owners[at] : shared.owners[at];
+				if (owner !== null && owner.tick === track.ticks) {
+					owner.onANote = true;
+				}
+			}
+		}
+
 		return track.frozenOrigins;
 	};
 
@@ -757,6 +790,9 @@ export function walkSong(song: Uint8Array, aramAddress: number): SongTimeline {
 			return;
 		}
 
+		// Built before the loop so a slot can be given its owner in the same
+		// statement that is given the address, and pushed only where one moved.
+		const entry: WalkCommand = { tick: track.ticks, channel, address, vcmd, onANote: false };
 		let moved = false;
 		for (const [slot, to] of [
 			[writes, address],
@@ -767,12 +803,14 @@ export function walkSong(song: Uint8Array, aramAddress: number): SongTimeline {
 			}
 
 			const at = slotAt(slot);
+			const owner = to === null ? null : entry;
 			if (at < CHANNEL_SLOTS) {
 				if (track.origins[at] === to) {
 					continue;
 				}
 
 				track.origins[at] = to;
+				track.owners[at] = owner;
 				track.frozenOrigins = null;
 			} else {
 				if (shared.origins[at] === to) {
@@ -782,6 +820,7 @@ export function walkSong(song: Uint8Array, aramAddress: number): SongTimeline {
 				// Song-wide, so every channel's next note reports it, not only this
 				// one's — the same reason {@link invalidateAll} exists.
 				shared.origins[at] = to;
+				shared.owners[at] = owner;
 				invalidateAll();
 			}
 
@@ -789,7 +828,7 @@ export function walkSong(song: Uint8Array, aramAddress: number): SongTimeline {
 		}
 
 		if (moved) {
-			commands.push({ tick: track.ticks, channel, address, vcmd, fills: writes !== null });
+			commands.push(entry);
 		}
 	};
 
@@ -938,6 +977,7 @@ export function walkSong(song: Uint8Array, aramAddress: number): SongTimeline {
 				// {@link WalkNote.drumFrom} names, which is what carries it through
 				// loops and calls the text cannot see.
 				track.origins[INSTRUMENT_SLOT] = null;
+				track.owners[INSTRUMENT_SLOT] = null;
 				track.frozenOrigins = null;
 			}
 

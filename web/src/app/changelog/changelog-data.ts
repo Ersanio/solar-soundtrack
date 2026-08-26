@@ -10,7 +10,10 @@ export const CHANGELOG: readonly ChangelogEntry[] = [
   // ─── newest first; add new blocks here ──────────────────────────────────
   {
     date: '24 August 2026',
-    items: ['Overwriting a note completely also clears the commands written for it'],
+    items: [
+      'Overwriting a note completely also clears the commands written for it',
+      'The command timeline shows commands that land in a rest, which no note could draw',
+    ],
   },
   {
     date: '23 August 2026',

@@ -628,20 +628,28 @@ stats.loopTicks` pads **every other channel that would cut the song short** out 
   cost is real and is the smaller one: a command moves along the row between the note that sets it
   and the notes after it. Not a fix in `fitBarContent` either — it is handed a count, and a layout
   that knew which glyph mattered would be a layout that knew what a glyph was.
-- **The command lane holding everything that goes in force** — a `v`, a `q`, an `@` and an `$ED` are
-  already on the note that sets them, with a chip to say so, so the lane redrew the roll's own glyph
-  work a row lower and buried the commands nothing else shows. It is the **complement** of the bars
-  (`command-timeline.ts`): `commandScope`'s `'song'`, which `commandsInForceOf` drops because it acts
-  on the song and not on a note of it, plus the `'note-state'` ones that reach no bar either —
-  `$DF`, `$F0`, `$FD` and `$FE` empty a slot, and a bar's glyphs come off `WalkNote.origins`, which
-  names what _occupies_ one. Those four are the reason the rule is not simply "`'song'`": without
-  them nothing in the app would ever say vibrato had been switched off. Told apart by
-  `WalkCommand.fills` rather than by a set of four opcodes restated in the app, which is the table
-  `slotsOf` already is.
+- **The command lane holding everything that goes in force** — a `v`, a `q`, an `@` and an `$ED`
+  written straight before the note that reads it is already on that note, with a chip to say so and
+  on the tick it runs, so the lane redrew the roll's own glyph work a row lower and buried the
+  commands nothing else shows. It holds what **no bar stands over** (`command-timeline.ts`):
+  `commandScope`'s `'song'`, which `commandsInForceOf` drops because it acts on the song and not on a
+  note of it, plus the `'note-state'` ones the driver reads where the channel keys nothing on.
+- **That second half told by scope and `WalkCommand.fills`** — sound enough to be the lane's whole
+  rule for a while, and it is only the last of five: `$DF`, `$F0`, `$FD` and `$FE` empty a slot and a
+  bar's glyphs come off `WalkNote.origins`, which names what _occupies_ one, so those reach no bar.
+  Neither does a command read in a rest, read inside a tie, replaced before the next note sounds, or
+  left with no note after it — and the first of those is the ordinary way a porter writes one. The
+  test is `WalkCommand.onANote`, whether a note **begins** on the command's own tick and sounds with
+  it in force, which is the one thing a scope cannot say and `origins` cannot either, being anchored
+  on a note where the question is about the tick. Its cost is that a command in a gap is drawn twice,
+  and the two are not repeating each other: the lane says where it runs, the chip says which note
+  plays under it. Off the address, too, and not off `origins`' addresses — `[[ v100 v200 ]]2` raises
+  two `v200` entries at one tick on one channel and only the second is in force, so the walk carries
+  the entry that owns each slot (`Track.owners`) and marks it where a note freezes its origins.
 - **Reading the lane off `definedAt` alone** — it is anchored on a _note_ and a timeline needs a
   _tick_: `emitNote` pushes a `WalkNote` for a note and not for a rest, so in `c4 v200 r4 d4` the
   `v200` runs at tick 48 and the lane drew it at 96, a whole rest late. `origins` names what
-  _occupies_ a slot, too, so the four above could never be named at all. The walk raises its own
+  _occupies_ a slot, too, so the four that empty one could never be named at all. The walk raises its own
   `WalkCommand` in `recordOrigin`, which is already the one place that knows a slot has changed
   hands, so the two agree wherever they overlap: a write of the address a slot already holds moves
   nothing, and `[ v200 c8 ]2` is one entry from either end. `definedAt` keeps the half it is exactly

@@ -93,17 +93,23 @@ Under the roll is a strip holding nothing but command icons, on the song's own t
 effect, and where, with the note data out of the way. **Commands** on the toolbar opens and closes
 it, and it stays as you left it.
 
-It holds **what the bars cannot show**, so nothing appears twice. That is two things:
+It holds **what no note has drawn over it**. A bar's icons are the commands acting on _that note_, so
+they stand where the note does; the lane stands where the driver reads the command. That is two
+things:
 
 - **The song's own settings** — `t`, `w`, `$E4` and the whole echo unit, `$EF` to `$F2` and the `$F5`
   filter. These reach every channel at once, so they act on the song rather than on any note of it,
   and no bar has ever drawn them.
-- **The commands that switch something off** — `$DF`, `$F0`, `$FD`, `$FE`. A bar names what a note is
-  playing _under_, and there is nothing to name once vibrato is off, so these appear on no bar at any
-  point in the song.
+- **Anything a channel runs where no note begins** — a `v`, an `@` or an `$ED` written in a rest,
+  written inside a tie, written after the channel's last note, or replaced before the next note
+  sounds. And the commands that switch something off, `$DF`, `$F0`, `$FD` and `$FE`: a bar names what
+  a note is playing _under_, and there is nothing to name once vibrato is off, so those appear on no
+  bar at any point in the song.
 
-Everything else stays on the bars: a `v`, a `q`, a `@`, an `$ED` and the rest of the channel state is
-already on the note that sets it, with a solid chip to say so.
+A command written in a gap is therefore in both places, and the two say different things. In
+`c4 v200 r4 d4` the lane has the `v200` where it runs, a rest before `d4`; `d4`'s chip says `d4` is
+the note playing under it. Only a command written straight before the note that reads it is on the
+bar alone, the two positions being the same one.
 
 The icons are all eight channels at once, each in its channel's colour — which for a song-wide
 command is the channel that wrote it — and a muted channel fades rather than disappears.
