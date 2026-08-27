@@ -198,6 +198,23 @@ export function spliceRange(source: string, span: Span, text: string): Edit | nu
 }
 
 /**
+ * A range taken out, with the inline whitespace in front of it.
+ *
+ * What is left behind is what was there before the range was written: a unit or
+ * a command sits after a space, and splicing the range alone leaves two. Spaces
+ * and tabs only, never a line break — a command at the head of a line belongs to
+ * that line, and eating the newline would pull it onto the one above.
+ */
+export function spliceOut(source: string, span: Span): Edit | null {
+	let start = span.start;
+	while (start > 0 && (source[start - 1] === " " || source[start - 1] === "\t")) {
+		start--;
+	}
+
+	return spliceRange(source, { ...span, start }, "");
+}
+
+/**
  * An insertion at an offset, as an empty range.
  *
  * Its own function rather than a `spliceRange` with `start === end` so that the

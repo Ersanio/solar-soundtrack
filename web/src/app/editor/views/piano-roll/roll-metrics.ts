@@ -26,6 +26,24 @@ export const OVERVIEW_PAD = 3;
 /** Height of the scrub bar: a row of bar numbers over a row of beat ticks. */
 export const SCRUB_HEIGHT = 20;
 
+/** A command glyph in the lane. The bar's own are measured against the row it sits in. */
+export const LANE_GLYPH = 12;
+
+/** Around a glyph: the gap between two stacked, and between two columns that meet. */
+export const LANE_PAD = 2;
+
+/** One row of the command lane. */
+export const LANE_ROW = LANE_GLYPH + LANE_PAD;
+
+/**
+ * Five glyphs: the height the lane opens at, and the shortest the seam above it
+ * will let it be. Deeper columns are scrolled to, not shown.
+ */
+export const LANE_HEIGHT = LANE_ROW * 5;
+
+/** The tallest that seam will let it be, at ten glyphs. */
+export const LANE_HEIGHT_MAX = LANE_ROW * 10;
+
 /** How tall the playhead's marker is. Its tip is on the bar's bottom edge. */
 export const MARKER_HEIGHT = 10;
 
@@ -45,6 +63,25 @@ export const CHANNEL_FILL: readonly string[] = [
   'fill-ch-5',
   'fill-ch-6',
   'fill-ch-7',
+];
+
+/**
+ * The same eight as `color`, and spelled out for the same reason.
+ *
+ * A palette glyph draws its own paths with `fill="currentColor"` and
+ * `stroke="currentColor"` (`command-icon.html`), so an inherited `fill` is
+ * overridden on every filled shape and the strokes are never reached at all.
+ * `color` is the one property that tints one.
+ */
+export const CHANNEL_TEXT: readonly string[] = [
+  'text-ch-0',
+  'text-ch-1',
+  'text-ch-2',
+  'text-ch-3',
+  'text-ch-4',
+  'text-ch-5',
+  'text-ch-6',
+  'text-ch-7',
 ];
 
 /** The same eight, as outlines, and spelled out for the same reason. */

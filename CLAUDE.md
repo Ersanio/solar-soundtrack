@@ -628,6 +628,177 @@ stats.loopTicks` pads **every other channel that would cut the song short** out 
   cost is real and is the smaller one: a command moves along the row between the note that sets it
   and the notes after it. Not a fix in `fitBarContent` either — it is handed a count, and a layout
   that knew which glyph mattered would be a layout that knew what a glyph was.
+- **The command lane as the complement of the bars, holding only what no bar stands over** — told by
+  `WalkCommand.onANote`, whether a note **begins** on the command's own tick and sounds with it in
+  force, which is the one thing a scope cannot say and `origins` cannot either, being anchored on a
+  note where the question is about the tick. It read as tidy and cost the lane the thing it is for: a
+  timeline with holes in it is not a timeline, and the holes were the commands written the ordinary
+  way, straight before the note that reads them. A porter scanning the lane for "what runs, and when"
+  found the `v` in a rest and not the `v` on a note, with nothing to say which kind was missing. It
+  holds **every command that takes effect** (`command-timeline.ts`), scope alone: `commandScope`'s
+  `'song'`, which `commandsInForceOf` drops because it acts on the song and not on a note of it, and
+  every `'note-state'` one wherever the driver reads it. Most are then drawn twice, and the two are
+  not repeating each other — the lane says the tick, the bar's chip says which note plays under it.
+  `q`, `h` and `@21`-`@29` stay on the bars alone, emitting no byte to address and so having no tick
+  but the note they fold into. `onANote` is kept as the walk's description of the song and read by
+  nothing; `Track.owners` is what computes it, off the entry and not the address, since
+  `[[ v100 v200 ]]2` raises two `v200` entries at one tick on one channel and only the second is in
+  force.
+- **Reading the lane off `definedAt` alone** — it is anchored on a _note_ and a timeline needs a
+  _tick_: `emitNote` pushes a `WalkNote` for a note and not for a rest, so in `c4 v200 r4 d4` the
+  `v200` runs at tick 48 and the lane drew it at 96, a whole rest late. `origins` names what
+  _occupies_ a slot, too, so the four that empty one could never be named at all. The walk raises its own
+  `WalkCommand` in `recordOrigin`, which is already the one place that knows a slot has changed
+  hands, so the two agree wherever they overlap: a write of the address a slot already holds moves
+  nothing, and `[ v200 c8 ]2` is one entry from either end. `definedAt` keeps the half it is exactly
+  right for, `q`, `h` and `@21`-`@29`, which emit no byte to address and so have no tick but the note
+  they fold into — and which a bar therefore draws.
+- **A native `overflow-y-auto` on the command lane** — nothing here styles a scrollbar, so a ~15px
+  Windows bar eats a third of a 42px lane, and its gutter narrows the content box, which puts the
+  lane's right edge a scrollbar out of step with the roll it is drawn to track — the trap `w-full` on
+  the bars over the roll already fell into. A plain wheel lifts the glyphs by a transform, and the
+  thumb saying the stack runs deeper is drawn inside the `<svg>`, where it costs no width.
+- **Packing the lane over the window on screen** — rows are first-fit, so a re-deal at every
+  `tickWindow` turnover moved glyphs up and down as the roll scrolled past them, and a glyph that
+  changes row while the roll moves is saying something about the scrolling rather than about the song.
+  `packCommandLane` runs over the whole song and `laneWindow` only slices it, keeping the whole song's
+  `depth` rather than the slice's: that is the scroll range, and one that shrank as a deep column went
+  past would take the porter's position with it.
+- **A wholly overwritten item's declarations left for the replacement to inherit** — the erased
+  note's `v200` stayed in the text, so it landed on whatever was drawn over it, and one standing
+  between two erased items refused the whole gesture as crowded. An item the plan removes takes the
+  `'note-state'` commands in its prefix and inside its own unit with it, but only the ones **nothing
+  in the edited song still sounds under** (`reachesSomething`); the channel's first item is exempt,
+  its prefix being the channel's setup. Not region-wide either: the laid-out run covers the
+  **window** (`windowOf`), the contiguous items the gesture actually touches, which is what lets a
+  rest it never reached keep its bytes and its own `v200` both — a run over the whole region would
+  move that kept command off its tick, which is the crowded refusal all over again.
+- **That gate on `plan.erased`, so overwrite dropped a declaration and Backspace kept it** — only
+  `carve` fills `erased`, so the two answers differed on "did the ticks get a new occupant", which is
+  a fact about the edit path and not one a musician reasons about. And the reasoning that separated
+  them was thinner than it looked: a drawn note declares nothing of its own, so erasing `v255 c4` and
+  drawing over it re-voices everything to the right just as silently as the deletion would have. The
+  question names no gesture — a surviving note counts as a reacher and so does one being drawn, which
+  is why drawing over a note keeps its `v200` where deleting the same note takes it. `plan.erased`
+  stays, `roll-marks.ts` drawing the hatching from it.
+- **Moving a kept command to the head of the next surviving note** — the cheaper spelling, and it
+  loses the tick: in `c4 v200 d4 v100 e4 f4` overdrawn from 48 the `v100` runs 48 ticks inside the
+  drawn note and there is no surviving head at that tick, so the note's second half would sound at
+  `v200` with nothing to say so. A run splits the born note at the command's own tick and writes it
+  between the tied halves instead (`RunMark`, `spawnRun`), which is the intro `/`'s mechanism
+  widened from one tick to a list — and a tie emits `$C6`, so the two halves are still one note.
+- **Deriving a command's reach from a slot table built off the source** — the walk has already
+  resolved it, and a source-order scan is blind to a `[ ]` body played twice and to a `(1)n` called
+  from another channel. `commandsInForceOf` answers a note with the `Command` objects acting on it,
+  by the same stable identity `definedAt` compares, so "the slot changed hands" is the first note
+  the pass played without the command in its list. The identity is the trap: `channelStrip` filters
+  `index.commands` from its own `TokenIndex`, so a second `tokenize` makes every membership test
+  false and keeps every command while looking like it works — `EditContext.inForce` and
+  `Strip.commands` must come from one scan, which is what `rolltest`'s `Built.index` is for.
+- **`removeItem` splicing a multi-segment unit whole** — `growUnits` ends `unitSpan` at the **last**
+  segment (`roll-strip.ts`), so a `v200` written inside a note went out with the note in silence, and
+  a `t` or an intro `/` would have gone the same way. A command inside a removed unit is asked the
+  reach question on its own tick (`insideCommands`) and dropped where nothing sounds under it; where
+  a run is being laid over those ticks the run takes it over; and with neither, the gesture is
+  refused (`REFUSE_INSIDE`), because there is no tick left to put it on and no gesture can say which
+  side of the deletion the porter meant it to follow. `REFUSE_RAMP` keeps the one site whose reason
+  really is the length, a note cut shorter than the ticks in front of the command.
+- **Reading the loop structure off the dispatch character alone** — `loopEventOf` switched on `[`,
+  `]`, `*` and `(`, and a hex command dispatches as `"$"`, so `[[ ]]n` raised a `subOpen`/`subClose`
+  pair and the same subloop written `$E6 $00`/`$E6 $nn` raised nothing. Normalize could not see it,
+  and the roll refused the channel through `agreesWithWalk` and offered a Normalize that had nothing
+  to unroll. The tests are on the bytes and the `inE6Loop` flag, which both spellings share, so a
+  `case "$"` reads it the same way — `grew` at 1 rather than 2, since `parseHexCommand` appends one
+  byte per dispatch. `LoopEvent.from` carries where the run began, because the flag turns over on
+  the argument byte and the event's span is that byte alone; it is a **source** offset, mapped
+  through `spanAt` like every other one the trace carries, since `hexRun` is a `scanned` offset.
+  `$E9` and `$FC` get no such reading: their address is worked out by the compiler and relocated
+  (`link.ts`), so a hand-written one names a body nothing can resolve.
+- **Writing a note's missing length in front of the dots already there** — dots compose rather than
+  add, `getNoteLengthModifier` halving the running value at each one (Music.cpp:2950), so under a
+  36-tick default `c.` is 36 + 18 while `c8..` is 24 + 12 + 6. The segment's own ticks are computed
+  and the whole length text re-spelled from the total, dots included; in the ordinary case that is
+  the same text anyway, `c` under `l4` being `c4`. And `spellDuration` rather than `spellLength`,
+  since `l=n` range-checks nothing so a segment can outrun the whole note one token stops at.
+- **Classifying the prelude event by event, with a `(` read before its `[`** — only the `[` carries
+  the loop event that says a remote definition is opening, so `orderChannels` painted the `(!n)`
+  label of one as music and set `sawMusic`; the `[` reached back and repainted it a beat later, but
+  the flag stayed. Every remote body holding an `o`, `l`, `q`, `h`, `<` or `>` was then refused
+  `SST0612` — "after music above the first channel" — on the strength of its own label, with nothing
+  above the first `#N` at all. The label is skipped by looking one event ahead, the mirror of the
+  lookbehind that paints it. Not by clearing `sawMusic` when the `[` arrives either: that would also
+  clear it for real music written before the definition, which is what the diagnostic is about.
+- **`writeNoteLengths` filtering on `onlyChannel`, the way `flattenTriplets` does** — that filter is
+  sound for a `{ }`, which is a bracketed region on one channel, and unsound for an `l`, which is one
+  variable the whole song reads: `#1`'s bare notes read `#0`'s, and a `[ ]` body's events carry
+  channel 8 rather than the channel that wrote them. A scoped run deleted the `l` and left its
+  readers alone, and the oracle refused the song — which is the one thing the scoped form exists to
+  avoid, since it is what the roll's **Normalize #N** runs. There is no correct per-channel version:
+  rewriting every reader means rewriting text a scoped run has promised to leave. It stands down
+  instead, as `orderChannels` does, and the channel keeps its `l`s — which costs the roll nothing,
+  a note's length being read off its own written text.
+- **`writeNoteLengths` working note by note** — every segment's digits are independently optional
+  and `accumulateTiedLength` folds a run across whitespace and nothing else, so one event's span can
+  cover several: `c4^` is an explicit 48 and an implied 24, `r4 r r` is one rest of three. The
+  `$DD` target note is the exception in the other direction — `parseNote` appends its byte and
+  returns before it reads a length at all (`parser.ts:2971-2975`), so a length written there is a
+  stray digit nothing reads, and `normalizetest`'s fixed-point check is what caught it.
+- **Pairing a crossed loop and subloop up, or unrolling one** — `[ c4 $E6 $00 d4 ]2 e4 $E6 $01`
+  compiles, AddmusicK guarding nesting and not crossing (`Music.cpp:1208-1290`), and `unrollLoops`'s
+  one stack popped the wrong partner at each end and dropped both in silence: no construct, no
+  diagnostic, and a dialog saying "Nothing to normalize" beside a roll refusing the channel and
+  offering Normalize as the answer. Matching the two ends up and emitting both constructs does not
+  work — the loop's range and the subloop's **partially overlap**, so neither `contains` the other,
+  both survive the `topLevel` filter and `applyEdits` throws. Neither does unrolling: a voice has one
+  subloop return (`Commands.asm:365`), so the close jumps into the other construct's body, and from
+  there the channel either ends on that body's `$00` with the call counter already spent
+  (`main.asm:2345`) — that song plays `c4 d4 c4 d4 e4 d4` and stops, with everything written after
+  the close never reached — or re-enters the `$E9` and starts its count again. `SST0616` says which
+  of the two it is. Not a check for entries left on the stack either: an unterminated `$E6 $00`
+  compiles, opens a subloop nothing closes, plays exactly what it says, and has nothing to unroll.
+- **Handing a command a deletion left behind to the next surviving note** — deleting `b3` from
+  `o4 a=27 p12,147 b3 c3` leaves the `p` in front of the rest that takes those ticks, and putting it
+  on `c3` instead loses the tick: the `p` runs at 27, where the driver read it and where the rest
+  still is, so a per-channel `$E8`, `$DC` or `$DD` would have its whole ramp shifted by whatever the
+  deleted note happened to be worth. `commandScope` sorts by reach and not by whether a command
+  evolves over ticks, so there is no axis to spare the fades on. It is the `plan.erased` split as
+  well: a note **drawn over** `b3` begins on tick 27 and keeps the `p` where it is, so only the
+  deletion would move it, and whether the gesture matters is the one thing `reachesSomething` exists
+  to answer no to. The command stays where it was written and the lane's glyph is dragged
+  (`roll-command-move.ts`), which is a tick the porter picked rather than one a deletion inferred —
+  the same standing the right-click erase already has. Horizontal only, lane rows being first-fit
+  packing; snapped to the channel's own item heads, so the insertion is always into an item's prefix
+  and no note has to be split into tied halves; in its own channel, since within one channel text
+  order is execution order; and with no target past the last item, because the pass ends at the
+  shortest channel and a command written after a channel's last note raises no `WalkCommand` at all
+  — a target out there is one a command could be dragged to and not back from.
+
+- **A muted channel's commands dimmed rather than dropped, the way its bars are** — the symmetry with
+  the roll and the overview is inviting and it takes the wrong thing as the subject: a bar stands for
+  a note, which a mute silences whole, where a glyph stands for a command, and how far a command
+  reaches is not something the channel it is written on decides. A `v`, a `y` or an `@` on a silenced
+  channel sets nothing anybody can hear and is not drawn at all; a `t`, a `w` or an echo write on
+  that same channel still runs the whole song, so it stays and is dimmed. The test is
+  `commandScope`, in `packCommandLane` rather than in `command-timeline.ts` — what the mixer silences
+  is a fact about the moment and the timeline is a fact about the compile.
+- **Packing the lane without regard to which channel is being edited** — first-fit over the whole
+  song deals a channel's commands into whatever rows are free, so the ones the porter was working on
+  were scattered down a stack many rows deep that shows three at a time, and finding them meant
+  scrolling the lane on every glance. The edited channel is packed **first** and everything else
+  strictly below it (`packCommandLane`), so its commands are always in the top rows. A band rather
+  than a preference: letting another channel fill a gap in one of those rows puts a glyph the porter
+  is not working on among the ones they are, which is the thing the split is for. Off `editChannel`
+  and not the roll's `editing`, whose fallback is the channel of the bar under the pointer — rows
+  would then be re-dealt on a hover, which is the same complaint as re-dealing them on a scroll.
+
+- **A row cap on the command lane, with the rest of a column drawn as three dots** — a stack cut to
+  keep the DOM finite is still a stack cut, and it cut the wrong thing: a tick carrying more commands
+  than the cap is a tick a porter opened the lane to read, so the one column worth the most was the
+  one it declined to show, and a count is not an answer to "what runs here". Every command the song
+  runs gets a row (`packCommandLane`), the wheel reaches the ones past the bottom and the seam above
+  the lane takes it taller. `depth` was always the scroll range; with nothing dropped it is now the
+  whole column, so a glyph can always be scrolled to. The bar's own `fitBarContent` mark is a
+  different thing and stays — a bar has a fixed width it cannot grow, where the lane has a scroll.
 
 ## Angular specifics
 

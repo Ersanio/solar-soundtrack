@@ -24,9 +24,18 @@ import { octaveFor, octaveOfNote, spellDuration, spellNote } from "@amk/core/mml
 import type { CompileResult } from "@amk/core/types";
 import { loadDriver } from "@amk/spc/driver";
 import { type SongTimeline, walkSong } from "@amk/spc/song-walk";
-import { tokenize } from "@amk/tokens";
+import { type Command, type TokenIndex, tokenize } from "@amk/tokens";
 import { NOTE_NAMES } from "@amk/tokens/commands/units";
 import type { Edit } from "@amk/tokens/edits";
+import { type TimelineCommand, commandTimeline } from "../web/src/app/state/command-timeline";
+import { commandsInForceOf } from "../web/src/app/state/commands-in-force";
+import {
+	REFUSE_MOVE_REMOTE,
+	commandMoveRefusal,
+	commandMoveTargets,
+	nearestTarget,
+	planCommandMove,
+} from "../web/src/app/editor/views/piano-roll/roll-command-move";
 import {
 	type EditContext,
 	type EditMode,
@@ -34,6 +43,7 @@ import {
 	type Plan,
 	REFUSE_CLASH,
 	REFUSE_CROWDED,
+	REFUSE_INSIDE,
 	REFUSE_RAMP,
 	REFUSE_RANGE,
 	REFUSE_ROOM,
@@ -63,6 +73,17 @@ const OPTIONS = {
 interface Built {
 	result: CompileResult;
 	timeline: SongTimeline;
+	/**
+	 * The one scan of this source, shared by every reader below.
+	 *
+	 * `planEdits` compares the commands `channelStrip` holds against the ones
+	 * {@link Built.inForce} answers with, by object identity. A second `tokenize`
+	 * would hand out a second set of objects, every comparison would be false,
+	 * and the reach rule would keep every command while looking like it worked.
+	 */
+	index: TokenIndex;
+	/** What the walk had in force at a note, as {@link EditContext.inForce} wants it. */
+	inForce: (address: number) => readonly Command[] | null;
 }
 
 function build(source: string): Built | string {
@@ -74,7 +95,25 @@ function build(source: string): Built | string {
 			.join("; ");
 	}
 
-	return { result, timeline: walkSong(result.data, ARAM) };
+	const timeline = walkSong(result.data, ARAM);
+	const index = tokenize(source);
+	const acting = commandsInForceOf({
+		index,
+		text: source,
+		commands: new Map((result.commandMap ?? []).map((entry) => [entry.address, entry])),
+		notes: new Map((result.noteMap ?? []).map((entry) => [entry.address, entry])),
+	});
+	const walked = new Map(timeline.notes.map((note) => [note.address, note]));
+
+	return {
+		result,
+		timeline,
+		index,
+		inForce: (address) => {
+			const note = walked.get(address);
+			return note === undefined ? null : acting(note);
+		},
+	};
 }
 
 function strip(source: string, built: Built, channel: number): Strip | string {
@@ -83,7 +122,7 @@ function strip(source: string, built: Built, channel: number): Strip | string {
 		channel,
 		noteMap: built.result.noteMap ?? [],
 		timeline: built.timeline,
-		index: tokenize(source),
+		index: built.index,
 		tempoRatio: built.result.stats?.tempoRatio ?? 1,
 	});
 
@@ -209,7 +248,7 @@ function introOf(built: Built): number | null {
 
 /** Every channel as somewhere rests can be appended, the way the roll builds it. */
 function tailsOf(source: string, built: Built): readonly ChannelTail[] {
-	return channelTails(source, tokenize(source), built.result.stats?.channelTicks ?? []);
+	return channelTails(source, built.index, built.result.stats?.channelTicks ?? []);
 }
 
 interface Expectation {
@@ -281,6 +320,7 @@ function expectEdit(
 		playableTicks: playable(before),
 		introTicks: introOf(before),
 		channels: tailsOf(source, before),
+		inForce: before.inForce,
 	};
 	const plan = planGesture(bar, gesture(bar), expectation.mode ?? "insert");
 	const outcome = planEdits(context, plan);
@@ -395,6 +435,7 @@ function planFor(
 		playableTicks: playable(before),
 		introTicks: introOf(before),
 		channels: tailsOf(source, before),
+		inForce: before.inForce,
 	};
 	return { plan: planGesture(bar, gesture(bar), mode), context };
 }
@@ -491,6 +532,184 @@ function noteAt(bar: Strip, nth: number): number {
 	return -1;
 }
 
+/**
+ * Every tick a command with this written text runs at on this channel.
+ *
+ * Read off the walk rather than off `commandTimeline`: a command moved onto a
+ * note's own tick leaves the lane by construction, and what a move is answerable
+ * for is where the driver reads it and not where it is drawn.
+ */
+function commandTicks(built: Built, source: string, channel: number, written: string): number[] {
+	const spans = new Map((built.result.commandMap ?? []).map((entry) => [entry.address, entry.span]));
+	const ticks: number[] = [];
+	for (const run of built.timeline.commands) {
+		const span = spans.get(run.address);
+		if (span !== undefined && run.channel === channel && source.slice(span.start, span.end) === written) {
+			ticks.push(run.tick);
+		}
+	}
+
+	return ticks.sort((a, b) => a - b);
+}
+
+/** The lane as the roll draws it, which is the list a drag picks its glyph out of. */
+function laneOf(built: Built): readonly TimelineCommand[] {
+	return commandTimeline({
+		timeline: built.timeline,
+		index: built.index,
+		commands: new Map((built.result.commandMap ?? []).map((entry) => [entry.address, entry])),
+	});
+}
+
+interface MoveExpectation {
+	/** The tick the command has to run at afterwards, which is the whole point. */
+	tick: number;
+	/** The text after the move, for the case where byte-identity is what is pinned. */
+	text?: string;
+	contains?: string | readonly string[];
+	lacks?: string | readonly string[];
+	loopsWhereItDid?: boolean;
+}
+
+/**
+ * A lane glyph dragged to a tick and let go.
+ *
+ * Checked the way every other gesture here is — the text is compiled and read
+ * back — but against a stronger claim, because a move touches no note at all:
+ * the channel has to play exactly what it played, so `played` is compared before
+ * against after rather than against a plan, and the song's length with it. A
+ * move that shifted one note would be a move that had rewritten something it was
+ * never asked to.
+ */
+function expectMove(
+	name: string,
+	source: string,
+	channel: number,
+	written: string,
+	toTick: number,
+	expectation: MoveExpectation,
+): void {
+	const before = build(source);
+	if (typeof before === "string") {
+		check(`${name}: compiles to begin with`, false, before);
+		return;
+	}
+
+	const bar = strip(source, before, channel);
+	if (typeof bar === "string") {
+		check(`${name}: the channel can be edited`, false, bar);
+		return;
+	}
+
+	const glyphs = laneOf(before).filter(
+		(event) => source.slice(event.command.span.start, event.command.span.end) === written,
+	);
+	if (glyphs.length !== 1) {
+		check(`${name}: the lane draws ${written} exactly once`, false, `${glyphs.length} of them`);
+		return;
+	}
+
+	const glyph = glyphs[0];
+	const target = nearestTarget(commandMoveTargets(bar), toTick);
+	if (target === null) {
+		check(`${name}: there is somewhere to drop it`, false, "the channel offered no target");
+		return;
+	}
+
+	const outcome = planCommandMove(source, bar, glyph.command, glyph.tick, target);
+	if (!isEdits(outcome)) {
+		check(`${name}: the move can be written`, false, outcome.refused);
+		return;
+	}
+
+	let after: string;
+	try {
+		after = apply(source, outcome);
+	} catch (error) {
+		check(`${name}: the edits apply`, false, String(error));
+		return;
+	}
+
+	const rebuilt = build(after);
+	if (typeof rebuilt === "string") {
+		check(`${name}: the result compiles`, false, `${rebuilt}\n        ${JSON.stringify(after)}`);
+		return;
+	}
+
+	// Through the tie fold, so a command taken out from between a note's head and
+	// its `^` — which leaves the two to be folded into one note map entry — reads
+	// as the one note it always sounded like.
+	check(
+		`${name}: moves no note`,
+		played(before, channel).join(" | ") === played(rebuilt, channel).join(" | "),
+		`${played(before, channel).join(" | ")}\n        -> ${played(rebuilt, channel).join(" | ")}`,
+	);
+	check(
+		`${name}: leaves the other channels alone`,
+		others(before, channel) === others(rebuilt, channel),
+		`${others(before, channel)} -> ${others(rebuilt, channel)}`,
+	);
+	check(
+		`${name}: plays for as long as it did`,
+		playable(before) === playable(rebuilt),
+		`${playable(before)} -> ${playable(rebuilt)} ticks`,
+	);
+
+	const ticks = commandTicks(rebuilt, after, channel, written);
+	check(
+		`${name}: runs at tick ${expectation.tick}`,
+		ticks.length === 1 && ticks[0] === expectation.tick,
+		`${JSON.stringify(ticks)} ${JSON.stringify(after)}`,
+	);
+
+	if (expectation.loopsWhereItDid === true) {
+		check(
+			`${name}: loops back where it did`,
+			before.timeline.loopTick === rebuilt.timeline.loopTick,
+			`${before.timeline.loopTick} -> ${rebuilt.timeline.loopTick}`,
+		);
+	}
+
+	if (expectation.text !== undefined) {
+		check(`${name}: writes what it should`, after === expectation.text, JSON.stringify(after));
+	}
+
+	for (const wanted of listOf(expectation.contains)) {
+		check(`${name}: writes ${wanted}`, after.includes(wanted), JSON.stringify(after));
+	}
+
+	for (const unwanted of listOf(expectation.lacks)) {
+		check(`${name}: does not write ${unwanted}`, !after.includes(unwanted), JSON.stringify(after));
+	}
+}
+
+/** A command the move declines to carry, on a channel that can otherwise be edited. */
+function expectNoMove(name: string, source: string, channel: number, written: string, because: string): void {
+	const before = build(source);
+	if (typeof before === "string") {
+		check(`${name}: compiles to begin with`, false, before);
+		return;
+	}
+
+	const bar = strip(source, before, channel);
+	if (typeof bar === "string") {
+		check(`${name}: the channel can be edited`, false, bar);
+		return;
+	}
+
+	const command = before.index.commands.find((each) => source.slice(each.span.start, each.span.end) === written);
+	if (command === undefined) {
+		check(`${name}: the scan holds ${written}`, false, "it does not");
+		return;
+	}
+
+	check(
+		`${name}: refused — ${because}`,
+		commandMoveRefusal(bar, command) === because,
+		String(commandMoveRefusal(bar, command)),
+	);
+}
+
 // --- the spellings the roll and the compiler have to agree on ---------------
 
 console.log("\nspelling");
@@ -526,6 +745,11 @@ expectNoStrip("a triplet", "#amk 2\n#0 o4 {c8 d8 e8} f4", 0, "{ }");
 expectNoStrip("a replacement", '#amk 2\n"x=c4"\n#0 o4 x d4', 0, "replacement");
 expectNoStrip("a tempo ratio", "#amk 2\n#halvetempo\n#0 o4 c4 d4", 0, "divides its tempo");
 expectNoStrip("a pitch slide", "#amk 2\n#0 o4 c4 $DD $00 $18 e4", 0, "$DD");
+// A subloop written as hex. The walk catches this one too where it lies inside
+// the pass, but a subloop past the shortest channel has no played note to
+// disagree with, so the gate has to name it in its own right.
+expectNoStrip("a hex subloop", "#amk 2\n#0 o4 c4 $E6 $00 d4 $E6 $01 e4", 0, "$E6");
+expectNoStrip("a hex subloop past the end of the pass", "#amk 2\n#0 o4 c4 $E6 $00 d4 $E6 $01 e4\n#1 o4 g4", 0, "$E6");
 // `<` and `>` are safe and must **not** be refused: a note's octave comes from
 // its own written byte rather than from a running sum, so either note here
 // repitches without disturbing the other.
@@ -1310,26 +1534,27 @@ expectEdit(
 	{ mode: "overwrite", playsAsLong: true, text: "#amk 2\n#0 o4 g2" },
 );
 
-// And the command written between two notes it swallows keeps its place in the
-// text. The tick it lands on is the one deleting those notes gives it — there is
-// no other answer once what it stood against has gone.
+// And the command written between two notes it swallows is deleted with the
+// note it defined: an erased note takes its `'note-state'` declarations with
+// it, and the replacement inherits nothing.
 expectEdit(
 	"a note drawn over every note of a channel, past a command written between them",
 	"#amk 2\n#0 o4 c4 v200 d4",
 	0,
 	() => ({ kind: "spawn", startTick: 0, ticks: 96, written: NOTE_MIN + 36 + 7, drum: null }),
-	{ mode: "overwrite", playsAsLong: true, text: "#amk 2\n#0 v200 o4 g2" },
+	{ mode: "overwrite", playsAsLong: true, text: "#amk 2\n#0 o4 g2" },
 );
 
-// Mid-channel, where the region is bounded either side, the command keeps its
-// tick as well: the run is written after the last item in the region, so the
-// boundary the command stands on is the one the surviving note still starts at.
+// Mid-channel, where the region is bounded either side, the `v200` is the second
+// swallowed note's declaration and `f4` still plays under it, so the run laid
+// over both notes writes it out again on its own tick — which splits the drawn
+// note into a head and a `^`, and a tie is still one note.
 expectEdit(
 	"a note drawn over two notes with a command written between them",
 	"#amk 2\n#0 o4 c4 d4 v200 e4 f4",
 	0,
 	() => ({ kind: "spawn", startTick: 48, ticks: 96, written: NOTE_MIN + 36 + 7, drum: null }),
-	{ mode: "overwrite", playsAsLong: true, text: "#amk 2\n#0 o4 c4 v200 g2 f4" },
+	{ mode: "overwrite", playsAsLong: true, text: "#amk 2\n#0 o4 c4 g4 v200 ^4 f4" },
 );
 
 // The one thing that is put back when the whole channel goes: `octave` is global
@@ -1340,7 +1565,200 @@ expectEdit(
 	"#amk 2\n#0 o4 c4 v200 d4",
 	0,
 	() => ({ kind: "spawn", startTick: 0, ticks: 96, written: NOTE_MIN + 48 + 7, drum: null }),
-	{ mode: "overwrite", playsAsLong: true, text: "#amk 2\n#0 v200 o5 g2 o4" },
+	{ mode: "overwrite", playsAsLong: true, text: "#amk 2\n#0 o5 g2 o4" },
+);
+
+// --- a removed item's commands are kept where something still plays under them ---------------------
+//
+// A `'note-state'` command written to run just before an item the gesture removes — its
+// declaration — is dropped only where nothing in the edited song sounds under it. A surviving note
+// counts and so does one the gesture is drawing, so the spot keeps its dynamics and what changed is
+// which note sits there. The gesture is no part of the question: a Backspace and a note drawn over
+// the top get the same answer.
+//
+// A kept command is left exactly where it was written. Only a run laid over the text that holds it
+// has to move it, and there it is written out again on its own tick — which splits the note it
+// lands inside into a head and a `^`.
+//
+// Song-wide commands, `o`/`l`, the intro `/` and the prefix of a channel's first item are outside
+// the rule and always stay put, and an item only partly covered keeps everything.
+
+// The reporting song: the drawn note begins on `y0`'s own tick and sounds under it, so `y0` stays
+// exactly where it was written. The rest before it is not reached and keeps its bytes.
+expectEdit(
+	"a note drawn over the whole of one whose declaration stands at its head",
+	"#amk 2\n\n#3 q7F\nl32 @17\no5 v85y20r16y0a^=1",
+	3,
+	() => ({ kind: "spawn", startTick: 12, ticks: 24, written: NOTE_MIN + 48 + 10, drum: null }),
+	{
+		mode: "overwrite",
+		playsFor: 36,
+		text: "#amk 2\n\n#3 q7F\nl32 @17\no5 v85y20r16y0 o5 a+8",
+	},
+);
+
+// The symmetry the rule is for. Backspace on the last note leaves nothing to sound under its
+// `v200`, so the command goes with it...
+expectEdit(
+	"a note deleted with nothing left to sound under its declaration",
+	"#amk 2\n#0 o4 c4 v200 d4",
+	0,
+	(bar) => ({ kind: "delete", items: [noteAt(bar, 1)] }),
+	{ text: "#amk 2\n#0 o4 c4" },
+);
+
+// ...and Backspace on the same note with one after it keeps the `v200` exactly where it was
+// written, because `e4` still plays under it. The gesture is the same; the song is what differs.
+expectEdit(
+	"a note deleted with one after it still sounding under its declaration",
+	"#amk 2\n#0 o4 c4 v200 d4 e4",
+	0,
+	(bar) => ({ kind: "delete", items: [noteAt(bar, 1)] }),
+	{ playsAsLong: true, text: "#amk 2\n#0 o4 c4 v200 r4 e4" },
+);
+
+// And the same note drawn over rather than deleted: one answer, not two.
+expectEdit(
+	"a note drawn over one whose declaration something after it still sounds under",
+	"#amk 2\n#0 o4 c4 v200 d4 e4",
+	0,
+	() => ({ kind: "spawn", startTick: 48, ticks: 48, written: NOTE_MIN + 36 + 7, drum: null }),
+	{ mode: "overwrite", playsAsLong: true, text: "#amk 2\n#0 o4 c4 v200 g4 e4" },
+);
+
+// The mirror shape: the erased note's neighbour is a rest with a declaration of
+// its own, and the run stops short of both. The `v200` is the rest's, not the
+// erased note's, and the rest was never reached.
+expectEdit(
+	"a note drawn over the whole of one, leaving the rest after it its declaration",
+	"#amk 2\n#0 o4 c4 v200 r4 d4",
+	0,
+	() => ({ kind: "spawn", startTick: 0, ticks: 48, written: NOTE_MIN + 36 + 7, drum: null }),
+	{ mode: "overwrite", playsAsLong: true, text: "#amk 2\n#0 o4 g4 v200 r4 d4" },
+);
+
+// A rest is asked the same question as a note — read off tick geometry rather than the carve, since
+// `plan.erased` never names a rest — and here `d4` still plays under the `v200`, so it stays and the
+// note drawn over the rest begins on its tick and sounds under it too.
+expectEdit(
+	"a note drawn over the whole of a rest with a declaration at its head",
+	"#amk 2\n#0 o4 c4 v200 r4 d4",
+	0,
+	() => ({ kind: "spawn", startTick: 48, ticks: 48, written: NOTE_MIN + 36 + 7, drum: null }),
+	{ mode: "overwrite", playsAsLong: true, text: "#amk 2\n#0 o4 c4 v200 g4 d4" },
+);
+
+// And a rest whose `v200` really does reach nothing: the run starts before the command's own tick,
+// so the note drawn over it does not begin under it and there is nothing after it that does.
+expectEdit(
+	"a note drawn over a rest and the note in front of it, taking the rest's declaration",
+	"#amk 2\n#0 o4 c4 v200 r4",
+	0,
+	() => ({ kind: "spawn", startTick: 0, ticks: 96, written: NOTE_MIN + 36 + 7, drum: null }),
+	{ mode: "overwrite", playsAsLong: true, text: "#amk 2\n#0 o4 g2" },
+);
+
+// A `t` acts on the song and not on the note in front of it, so it is never a declaration to drop —
+// and the `y0` beside it is one `e4` still plays under.
+expectEdit(
+	"a note drawn over the whole of one with a tempo at its head",
+	"#amk 2\n#0 o4 c4 t60 y0 d4 e4",
+	0,
+	() => ({ kind: "spawn", startTick: 48, ticks: 48, written: NOTE_MIN + 36 + 7, drum: null }),
+	{ mode: "overwrite", playsAsLong: true, contains: ["t60", "y0"] },
+);
+
+// The slot changing hands is where a command stops reaching, and the walk is what says so rather
+// than a table restated here: `e4` plays under the `y15`, not the `y0`, so deleting `d4` takes the
+// `y0` and leaves the `y15` alone.
+expectEdit(
+	"a note deleted whose declaration is replaced before the next note",
+	"#amk 2\n#0 o4 c4 y0 d4 y15 e4",
+	0,
+	(bar) => ({ kind: "delete", items: [noteAt(bar, 1)] }),
+	{ playsAsLong: true, text: "#amk 2\n#0 o4 c4 r4 y15 e4" },
+);
+
+// The channel's first item keeps its prefix even erased: what stands above the
+// first note or rest is the channel's setup rather than its declaration.
+expectEdit(
+	"a note drawn over the whole of a channel's first note, under its setup",
+	"#amk 2\n#0 v200 c4 d4",
+	0,
+	() => ({ kind: "spawn", startTick: 0, ticks: 48, written: NOTE_MIN + 36 + 7, drum: null }),
+	{ mode: "overwrite", playsAsLong: true, contains: "v200" },
+);
+
+// Two erased notes, two declarations, both still reaching `f4`. The `v200` stands on the tick the
+// run begins at and stays put; the `y15` stands inside it and is written out again there.
+expectEdit(
+	"a note drawn over two notes that each carry a declaration",
+	"#amk 2\n#0 c4 v200 d4 y15 e4 f4",
+	0,
+	() => ({ kind: "spawn", startTick: 48, ticks: 96, written: NOTE_MIN + 36 + 7, drum: null }),
+	{ mode: "overwrite", playsAsLong: true, text: "#amk 2\n#0 c4 v200 g4 y15 ^4 f4" },
+);
+
+// Two of them inside the one run, so the drawn note is split twice — and `played` folds the ties
+// back, which is what says the three pieces are still one note of 144 ticks.
+expectEdit(
+	"a note drawn over three notes that each carry a declaration",
+	"#amk 2\n#0 c4 v200 d4 y15 e4 v100 f4 g4",
+	0,
+	() => ({ kind: "spawn", startTick: 48, ticks: 144, written: NOTE_MIN + 36 + 7, drum: null }),
+	{
+		mode: "overwrite",
+		playsAsLong: true,
+		text: "#amk 2\n#0 c4 v200 g4 y15 ^4 v100 ^4 g4",
+	},
+);
+
+// The gate is coverage, not the spawn gesture: a note dragged wholly onto another removes it the
+// same way, and its `v200` is kept for the same reason — `e4` still plays under it.
+expectEdit(
+	"a note dragged wholly onto the next, which carries a declaration",
+	"#amk 2\n#0 o4 c4 v200 d4 e4",
+	0,
+	(bar) => ({
+		kind: "move",
+		items: [noteAt(bar, 0)],
+		deltaTicks: 48,
+		deltaKeys: 0,
+		copy: false,
+	}),
+	{ mode: "overwrite", playsAsLong: true, text: "#amk 2\n#0 r4 o4 c4 v200 e4" },
+);
+
+// A command written *inside* a note — between its head and a `^` continuation — is inside the span
+// `removeItem` splices, so it goes with the note unless something is put in its way. Here nothing
+// plays under it once the note is gone, so it is meant to go.
+expectEdit(
+	"a note deleted with a command inside it that reaches nothing",
+	"#amk 2\n#0 o4 c4 d4 v200 ^4",
+	0,
+	(bar) => ({ kind: "delete", items: [noteAt(bar, 1)] }),
+	{ text: "#amk 2\n#0 o4 c4" },
+);
+
+// The same note with a run being laid over its ticks: the run writes the command out again on its
+// own tick, so the drawn note is split there.
+expectEdit(
+	"a note drawn over one with a command inside it",
+	"#amk 2\n#0 o4 c4 d4 v200 ^4 e4",
+	0,
+	() => ({ kind: "spawn", startTick: 48, ticks: 96, written: NOTE_MIN + 36 + 7, drum: null }),
+	{ mode: "overwrite", playsAsLong: true, text: "#amk 2\n#0 o4 c4 g4 v200 ^4 e4" },
+);
+
+// A command in a channel the walk could not reach is never dropped: `walkSong` ends the pass at the
+// shortest channel, so `#0`'s `d4` has no note to check against and "nothing sounds under it" is a
+// thing this cannot know. `#1` is what holds the pass short.
+expectEdit(
+	"a note deleted past the end of the pass, with a declaration at its head",
+	"#amk 2\n#0 o4 c4 v200 d4\n#1 o4 c4",
+	0,
+	(bar) => ({ kind: "delete", items: [noteAt(bar, 1)] }),
+	{ text: "#amk 2\n#0 o4 c4 v200\n#1 o4 c4" },
 );
 
 console.log("\nrefusals");
@@ -1398,6 +1816,23 @@ expectRefused(
 	"#amk 2\n#0 o4 c4 v200 ^4 d4",
 	0,
 	() => ({ kind: "spawn", startTick: 0, ticks: 24, written: NOTE_MIN + 36 + 4, drum: null }),
+	"overwrite",
+	REFUSE_INSIDE,
+);
+
+// The one refusal whose reason really is the length: the note is being cut to
+// less than the ticks its first segment already holds, so the `v200` written
+// after them has nowhere left inside the note to fire.
+expectRefused(
+	"a note with a command inside it shortened to less than its head",
+	"#amk 2\n#0 o4 c4 v200 ^4 d4",
+	0,
+	(bar) => ({
+		kind: "stretch",
+		items: [noteAt(bar, 0)],
+		edge: "end",
+		deltaTicks: -72,
+	}),
 	"overwrite",
 	REFUSE_RAMP,
 );
@@ -1715,7 +2150,7 @@ expectEdit(
 console.log("\nopening a channel");
 
 // The whole text, because everything about the block is the point: the `#N`, the
-// six defaults, the blank line above it, the rest that carries the note out to
+// five defaults, the blank line above it, the rest that carries the note out to
 // its tick, the rest that runs the channel out to the song's own 192 — and that
 // the note does not repeat the `o4` the block just wrote.
 expectEdit(
@@ -1724,7 +2159,7 @@ expectEdit(
 	5,
 	() => ({ kind: "spawn", startTick: 48, ticks: 48, written: NOTE_MIN + 36 + 4, drum: null }),
 	{
-		text: "#amk 2\n#0 o4 c4 d4 e4 f4\n\n#5 o4 l8 q7F @0 v255 y10\nr4 e4 r2\n",
+		text: "#amk 2\n#0 o4 c4 d4 e4 f4\n\n#5 o4 q7F @0 v255 y10\nr4 e4 r2\n",
 		playsAsLong: true,
 		// A song with no `/` gives the channel none either.
 		lacks: "/",
@@ -1757,7 +2192,7 @@ expectEdit(
 	"#amk 2\n#0 o4 c4 d4 e4 f4\n",
 	6,
 	() => ({ kind: "spawn", startTick: 0, ticks: 24, written: NOTE_MIN + 24, drum: 21 }),
-	{ contains: "#6 o4 l8 q7F @0 v255 y10\n@21 c8 r2..", playsAsLong: true },
+	{ contains: "#6 o4 q7F @0 v255 y10\n@21 c8 r2..", playsAsLong: true },
 );
 
 // A note drawn past the end pads by nothing on its own channel and takes every
@@ -1773,7 +2208,7 @@ expectEdit(
 	5,
 	() => ({ kind: "spawn", startTick: 168, ticks: 48, written: NOTE_MIN + 36, drum: null }),
 	{
-		text: "#amk 2\n#0 o4 c4 d4 e4 f4\nr8\n\n#5 o4 l8 q7F @0 v255 y10\nr2.. c4\n",
+		text: "#amk 2\n#0 o4 c4 d4 e4 f4\nr8\n\n#5 o4 q7F @0 v255 y10\nr2.. c4\n",
 		playsFor: 216,
 	},
 );
@@ -1786,7 +2221,7 @@ expectEdit(
 	"#am4\n#0 o4 c4 d4 e4 f4\n",
 	5,
 	() => ({ kind: "spawn", startTick: 0, ticks: 48, written: NOTE_MIN + 36, drum: null }),
-	{ contains: "#5 o4 l8 q7F v255 y10\nc4 r2.", lacks: "@0", playsAsLong: true },
+	{ contains: "#5 o4 q7F v255 y10\nc4 r2.", lacks: "@0", playsAsLong: true },
 );
 
 // Every channel resumes from its own `/` on each pass round the loop, so a
@@ -1802,7 +2237,7 @@ expectEdit(
 	5,
 	() => ({ kind: "spawn", startTick: 0, ticks: 48, written: NOTE_MIN + 36, drum: null }),
 	{
-		text: "#amk 2\n#0 o4 c4 d4 / e4 f4\n\n#5 o4 l8 q7F @0 v255 y10\nc4 r4 / r2\n",
+		text: "#amk 2\n#0 o4 c4 d4 / e4 f4\n\n#5 o4 q7F @0 v255 y10\nc4 r4 / r2\n",
 		playsAsLong: true,
 		loopsWhereItDid: true,
 	},
@@ -1815,7 +2250,7 @@ expectEdit(
 	5,
 	() => ({ kind: "spawn", startTick: 48, ticks: 48, written: NOTE_MIN + 36 + 4, drum: null }),
 	{
-		text: "#amk 2\n#0 o4 c4 d4 / e4 f4\n\n#5 o4 l8 q7F @0 v255 y10\nr4 e4 / r2\n",
+		text: "#amk 2\n#0 o4 c4 d4 / e4 f4\n\n#5 o4 q7F @0 v255 y10\nr4 e4 / r2\n",
 		playsAsLong: true,
 		loopsWhereItDid: true,
 	},
@@ -1831,7 +2266,7 @@ expectEdit(
 	5,
 	() => ({ kind: "spawn", startTick: 72, ticks: 48, written: NOTE_MIN + 36 + 4, drum: null }),
 	{
-		text: "#amk 2\n#0 o4 c4 d4 / e4 f4\n\n#5 o4 l8 q7F @0 v255 y10\nr4. e8 / ^8 r4.\n",
+		text: "#amk 2\n#0 o4 c4 d4 / e4 f4\n\n#5 o4 q7F @0 v255 y10\nr4. e8 / ^8 r4.\n",
 		playsAsLong: true,
 		loopsWhereItDid: true,
 	},
@@ -1844,11 +2279,11 @@ expectEdit(
 // cases above write.
 expectEdit(
 	"a second note drawn into the rests a channel was opened with",
-	"#amk 2\n#0 o4 c4 d4 e4 f4\n\n#5 o4 l8 q7F @0 v255 y10\nr4 e4 r2\n",
+	"#amk 2\n#0 o4 c4 d4 e4 f4\n\n#5 o4 q7F @0 v255 y10\nr4 e4 r2\n",
 	5,
 	() => ({ kind: "spawn", startTick: 120, ticks: 48, written: NOTE_MIN + 36 + 7, drum: null }),
 	{
-		text: "#amk 2\n#0 o4 c4 d4 e4 f4\n\n#5 o4 l8 q7F @0 v255 y10\nr4 e4 r8 g4 r8\n",
+		text: "#amk 2\n#0 o4 c4 d4 e4 f4\n\n#5 o4 q7F @0 v255 y10\nr4 e4 r8 g4 r8\n",
 		playsAsLong: true,
 	},
 );
@@ -1858,11 +2293,11 @@ expectEdit(
 // them, the marker included, stays on its own tick.
 expectEdit(
 	"a second note drawn after the `/` a channel was opened with",
-	"#amk 2\n#0 o4 c4 d4 / e4 f4\n\n#5 o4 l8 q7F @0 v255 y10\nc4 r4 / r2\n",
+	"#amk 2\n#0 o4 c4 d4 / e4 f4\n\n#5 o4 q7F @0 v255 y10\nc4 r4 / r2\n",
 	5,
 	() => ({ kind: "spawn", startTick: 120, ticks: 48, written: NOTE_MIN + 36 + 7, drum: null }),
 	{
-		text: "#amk 2\n#0 o4 c4 d4 / e4 f4\n\n#5 o4 l8 q7F @0 v255 y10\nc4 r4 / r8 g4 r8\n",
+		text: "#amk 2\n#0 o4 c4 d4 / e4 f4\n\n#5 o4 q7F @0 v255 y10\nc4 r4 / r8 g4 r8\n",
 		playsAsLong: true,
 		loopsWhereItDid: true,
 	},
@@ -1870,11 +2305,11 @@ expectEdit(
 
 expectEdit(
 	"a second note drawn before the `/` a channel was opened with",
-	"#amk 2\n#0 o4 c4 d4 / e4 f4\n\n#5 o4 l8 q7F @0 v255 y10\nc4 r4 / r2\n",
+	"#amk 2\n#0 o4 c4 d4 / e4 f4\n\n#5 o4 q7F @0 v255 y10\nc4 r4 / r2\n",
 	5,
 	() => ({ kind: "spawn", startTick: 48, ticks: 48, written: NOTE_MIN + 36 + 7, drum: null }),
 	{
-		text: "#amk 2\n#0 o4 c4 d4 / e4 f4\n\n#5 o4 l8 q7F @0 v255 y10\nc4 g4 / r2\n",
+		text: "#amk 2\n#0 o4 c4 d4 / e4 f4\n\n#5 o4 q7F @0 v255 y10\nc4 g4 / r2\n",
 		playsAsLong: true,
 		loopsWhereItDid: true,
 	},
@@ -1884,11 +2319,56 @@ expectEdit(
 // written between them, and only the porter knows which side it belongs on.
 expectRefused(
 	"a note drawn across the `/` a channel was opened with",
-	"#amk 2\n#0 o4 c4 d4 / e4 f4\n\n#5 o4 l8 q7F @0 v255 y10\nc4 r4 / r2\n",
+	"#amk 2\n#0 o4 c4 d4 / e4 f4\n\n#5 o4 q7F @0 v255 y10\nc4 r4 / r2\n",
 	5,
 	() => ({ kind: "spawn", startTick: 72, ticks: 48, written: NOTE_MIN + 36 + 7, drum: null }),
 	"insert",
 	REFUSE_CROWDED,
+);
+
+// A run may take over a `'note-state'` command and nothing else. A `t` acts on the whole song, so
+// which of the two notes it belonged with is not something the run can decide, and it refuses.
+expectRefused(
+	"a note drawn over two notes with a tempo written between them",
+	"#amk 2\n#0 o4 c4 d4 t60 e4 f4",
+	0,
+	() => ({ kind: "spawn", startTick: 48, ticks: 96, written: NOTE_MIN + 36 + 7, drum: null }),
+	"overwrite",
+	REFUSE_CROWDED,
+);
+
+// And where no run is being laid, a command inside the note being removed has no tick left to stand
+// on: `e4` still plays under this `v200`, so it cannot go, and nothing can say which side of the
+// deletion the porter meant it to follow.
+expectRefused(
+	"a note deleted with a command inside it that something still plays under",
+	"#amk 2\n#0 o4 c4 d4 v200 ^4 e4",
+	0,
+	(bar) => ({ kind: "delete", items: [noteAt(bar, 1)] }),
+	"overwrite",
+	REFUSE_INSIDE,
+);
+
+// Glue is the same removal by another name: the second note is swallowed by the first, and the
+// command written inside it is in the span that goes.
+expectRefused(
+	"two notes glued, the second with a command inside it",
+	"#amk 2\n#0 o4 c4 d4 v200 ^4 e4",
+	0,
+	(bar) => ({ kind: "glue", items: [noteAt(bar, 0), noteAt(bar, 1)] }),
+	"overwrite",
+	REFUSE_INSIDE,
+);
+
+// Only an item wholly covered is asked the question at all: this one reaches half a rest, so the
+// rest keeps its `v200` whatever anything else plays. It stands inside the run being laid, so the
+// run writes it out again on its tick rather than refusing the gesture.
+expectEdit(
+	"a note drawn over one note and half the rest that follows it",
+	"#amk 2\n#0 o4 c4 v200 r4 d4",
+	0,
+	() => ({ kind: "spawn", startTick: 0, ticks: 72, written: NOTE_MIN + 36 + 7, drum: null }),
+	{ mode: "overwrite", playsAsLong: true, text: "#amk 2\n#0 o4 g4 v200 ^8 r8 d4" },
 );
 
 // `detectStartingChannel` probes the text for `#0` first, so writing one would
@@ -1908,11 +2388,165 @@ expectEdit(
 	"#am4\no4 c4 d4\n#1 o4 e4 f4",
 	5,
 	() => ({ kind: "spawn", startTick: 0, ticks: 48, written: NOTE_MIN + 36, drum: null }),
-	{ contains: "#5 o4 l8 q7F v255 y10", playsAsLong: true },
+	{ contains: "#5 o4 q7F v255 y10", playsAsLong: true },
 );
 
 // No marker at all means the starting channel is 0 by fallback, and a `#3`
 // written anywhere takes every note the song has over to channel 3.
 expectNoStrip("a channel opened in a song with no `#N` at all", "#am4\no4 c4 d4", 3, "above the first");
+
+// --- carrying a command to another tick -------------------------------------
+//
+// `roll-command-move.ts`, which is the only edit here that changes where a
+// command runs without touching a note. Every case asserts the same three things
+// before anything about the text: the channel plays exactly what it played, no
+// other channel moved, and the song is exactly as long. What is left to pin per
+// case is the tick the driver ends up reading the command at, which is the thing
+// the text alone cannot say — `p12,147` written before a rest and written before
+// the note after it look equally plausible and are 64 ticks apart.
+
+console.log("\ncarrying a command");
+
+/** `a=27` is 27 ticks, so the `p` runs at 27 — a tick no note begins on. */
+const VIBRATO_SONG = "#amk 4\n\n#0 t53,245 o4 q7F @0\no4 a=27 p12,147 r3 c3\n";
+
+expectMove("a command carried onto the note that reads it", VIBRATO_SONG, 0, "p12,147", 91, {
+	tick: 91,
+	contains: "r3 p12,147 c3",
+	lacks: "a=27 p12,147",
+});
+
+// Earlier as well as later, and into the first unit's own leading `o` rather
+// than in front of it: `growUnits` reaches back over that `o`, so the head of
+// the unit is where the next strip build expects to find a command.
+expectMove("a command carried back to the top of the channel", VIBRATO_SONG, 0, "p12,147", 0, {
+	tick: 0,
+	contains: "p12,147 o4 a=27",
+});
+
+// Let go where it already runs. The text is the same text — not merely one that
+// compiles to the same thing — because the whole gesture is answered before an
+// edit is built, so nothing reaches the undo history.
+expectMove("a command let go on the tick it already runs at", VIBRATO_SONG, 0, "p12,147", 27, {
+	tick: 27,
+	text: VIBRATO_SONG,
+});
+
+// A rest is a target like any other: the lane is where a command in a gap is
+// drawn, so a gap has to be somewhere it can be dragged to as well as from.
+expectMove("a command carried onto a rest", "#amk 4\n\n#0 o4 c4 v200 r4 d4 r4 e4\n", 0, "v200", 144, {
+	tick: 144,
+	contains: "d4 v200 r4 e4",
+});
+
+// Out from between a note's head and its `^`. The two are then separated by
+// whitespace alone, so `accumulateTiedLength` folds them into one note map entry
+// where they were two — same music, fewer bytes, which is why "moves no note" is
+// read through the tie fold rather than off the entries.
+expectMove(
+	"a command carried out of the note it was written inside",
+	"#amk 4\n\n#0 o4 c4 v200 ^8 d4\n",
+	0,
+	"v200",
+	72,
+	{
+		tick: 72,
+		contains: "^8 v200 d4",
+		lacks: "c4 v200 ^8",
+	},
+);
+
+// A `'song'` command carries too. It acts on every channel at once, but it is
+// written in one channel's text and snaps to that channel's boundaries, which is
+// what its colour in the lane already says.
+expectMove(
+	"a song-wide command carried along the channel that wrote it",
+	"#amk 4\n\n#0 o4 c4 t100 r4 d4\n",
+	0,
+	"t100",
+	96,
+	{
+		tick: 96,
+		contains: "r4 t100 d4",
+	},
+);
+
+// A fade is one command and moves whole. Its ramp runs off the tick it is read
+// at, so this is the case that says why a deletion may not move one for the
+// porter: 96 ticks of difference is 96 ticks of a different ramp.
+expectMove("a channel volume fade carried whole", "#amk 4\n\n#0 o4 c4 v24,200 r4 d4 r4 e4\n", 0, "v24,200", 144, {
+	tick: 144,
+	contains: "d4 v24,200 r4 e4",
+});
+
+// The intro marker, in a song of **one** channel: `loopTick` is the lowest tick
+// any channel re-enters at, so a second channel marked on the old tick would
+// hold the reading down and hide a command that had crossed the `/`. The text
+// lands to the right of it because a unit never grows back over one.
+expectMove("a command carried past the intro marker", "#amk 4\n\n#0 o4 c4 v200 r4 / d4 e4\n", 0, "v200", 96, {
+	tick: 96,
+	contains: "/ v200 d4",
+	loopsWhereItDid: true,
+});
+
+// A second channel, so a splice that reached out of its own is caught. The `v200`
+// lands on a note's own tick here, which takes it off the lane — the reading is
+// the walk's and not the lane's for exactly this reason.
+expectMove(
+	"a command carried in a song with more than one channel",
+	"#amk 4\n\n#0 o4 c4 v200 r4 d4\n#1 o4 e4 e4 e4 e4\n",
+	0,
+	"v200",
+	96,
+	{
+		tick: 96,
+		contains: "r4 v200 d4",
+	},
+);
+
+// The channel gate the drag borrows whole. A `[ ]` plays one written run more
+// than once, so an item's written tick is not the tick the driver reaches it at
+// and there is nothing to snap against.
+expectNoStrip("a command on a channel with a loop in it", "#amk 4\n\n#0 o4 [ c4 v200 r4 ]2 d4\n", 0, "uses `[`");
+
+// The one refusal `channelStrip` does not make, and the lane cannot reach it:
+// the walk does not step into a remote body, so the `v200` has no tick and no
+// glyph. The guard is the function's own, and it earns its place — the body runs
+// wherever a `$FC` fires it, so moving the command would change every call site.
+expectNoMove(
+	"a command written inside remote code",
+	"#amk 4\n\n(!1)[ v200 ]\n#0 o4 c4 d4\n",
+	0,
+	"v200",
+	REFUSE_MOVE_REMOTE,
+);
+
+// The targets themselves, without a compile in the way: one per item and none
+// past the last, since a command written after a channel's last note is read at
+// or beyond the walk's cut and has no tick to be drawn at.
+{
+	const built = build(VIBRATO_SONG);
+	const bar = typeof built === "string" ? built : strip(VIBRATO_SONG, built, 0);
+	if (typeof bar === "string") {
+		check("the targets of a channel: it can be edited", false, bar);
+	} else {
+		const targets = commandMoveTargets(bar);
+		check(
+			"a target for every item and none past the last",
+			targets.map((target) => target.tick).join(",") === "0,27,91",
+			targets.map((target) => `${target.tick}@${target.at}`).join(" "),
+		);
+		check(
+			"each target is its item's own head",
+			targets.every((target, at) => target.at === bar.items[at].unitSpan.start),
+			targets.map((target) => target.at).join(","),
+		);
+		check(
+			"a drop equidistant between two targets takes the earlier",
+			nearestTarget(targets, 13.5)?.tick === 0,
+			String(nearestTarget(targets, 13.5)?.tick),
+		);
+	}
+}
 
 summarise();

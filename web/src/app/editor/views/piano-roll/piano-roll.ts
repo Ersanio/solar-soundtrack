@@ -13,6 +13,7 @@ import {
 } from '@angular/core';
 
 import { NOTE_MIN, TICKS_PER_WHOLE } from '@amk/core/hardcoded-tables';
+import type { Command } from '@amk/tokens';
 import {
   FIRST_CUSTOM_INSTRUMENT,
   FIRST_PERCUSSION_INSTRUMENT,
@@ -58,10 +59,13 @@ import {
   xAtTick,
 } from './roll-layout';
 import { type Mark, buildMarks, buildMinimap, heldRowsAt } from './roll-marks';
+import { laneWindow, packCommandLane } from './roll-command-lane';
+import { RollCommandLane } from './roll-command-lane/roll-command-lane';
 import {
   CHANNEL_FILL,
   CHANNEL_STROKE,
   KEY_WIDTH,
+  LANE_HEIGHT,
   OVERVIEW_HEIGHT,
   SCRUB_HEIGHT,
 } from './roll-metrics';
@@ -72,6 +76,7 @@ import { RollScrub, type TimeMark } from './roll-scrub/roll-scrub';
 import {
   type Settings,
   type SnapName,
+  clampLaneHeight,
   readSettings,
   snapTicks,
   stepRowHeight,
@@ -108,6 +113,7 @@ import { RollTooltip } from './roll-tooltip/roll-tooltip';
   imports: [
     PercussionPanel,
     RollChannels,
+    RollCommandLane,
     RollEditLayer,
     RollGrid,
     RollKeys,
@@ -150,6 +156,7 @@ export class PianoRoll {
   protected readonly beatsPerBar = computed(() => this.settings().beatsPerBar);
   protected readonly beatUnit = computed(() => this.settings().beatUnit);
   protected readonly percussionOpen = computed(() => this.settings().percussionOpen);
+  protected readonly commandLaneOpen = computed(() => this.settings().commandLaneOpen);
   protected readonly editChannel = computed(() => this.settings().editChannel);
   protected readonly snap = computed(() => this.settings().snap);
   protected readonly editMode = computed(() => this.settings().editMode);
@@ -528,6 +535,86 @@ export class PianoRoll {
     return width > 0 ? `0 0 ${width} ${SCRUB_HEIGHT}` : null;
   });
 
+  // --- the command lane ----------------------------------------------------
+
+  /** How tall the lane is drawn, which the seam above it sets. */
+  protected readonly laneHeight = computed(() => this.settings().laneHeight);
+
+  /** Null until measured, so nothing renders against a zero-width box. */
+  protected readonly laneBox = computed(() => {
+    const width = this.width();
+    return width > 0 ? `0 0 ${width} ${this.laneHeight()}` : null;
+  });
+
+  protected readonly laneResizing = signal(false);
+
+  /**
+   * The height the lane was at when the drag started, with the pointer's y.
+   *
+   * Measured once: nothing can move the seam mid-gesture, and re-reading the
+   * setting per `pointermove` would compound the rounding `clampLaneHeight` does
+   * — a drag of half a pixel a frame would then never move it at all.
+   */
+  private laneGrab: { height: number; y: number } | null = null;
+
+  /**
+   * The seam above the lane, dragged upwards to make the lane taller.
+   *
+   * The same shape as the shell's own splitter (`app.ts`): the pointer is
+   * captured so the drag survives leaving the one-pixel line, which it does at
+   * once, and `pointermove` and `pointerup` are bound on the seam itself rather
+   * than on the document, so there is nothing to unsubscribe.
+   */
+  protected onLaneGrab(event: PointerEvent): void {
+    (event.target as HTMLElement).setPointerCapture(event.pointerId);
+    this.laneGrab = { height: this.laneHeight(), y: event.clientY };
+    this.laneResizing.set(true);
+    event.preventDefault(); // Or the press starts a selection in the pane above.
+  }
+
+  protected onLaneResize(event: PointerEvent): void {
+    if (!this.laneGrab) {
+      return;
+    }
+
+    // Up is taller, the lane hanging below the seam.
+    const height = this.laneGrab.height + (this.laneGrab.y - event.clientY);
+    this.settings.update((s) => ({ ...s, laneHeight: clampLaneHeight(height) }));
+  }
+
+  protected onLaneRelease(): void {
+    this.laneGrab = null;
+    this.laneResizing.set(false);
+  }
+
+  /** A double click on the seam puts the lane back to the five rows it opens at. */
+  protected resetLaneHeight(): void {
+    this.settings.update((s) => ({ ...s, laneHeight: LANE_HEIGHT }));
+  }
+
+  /**
+   * The whole song's commands, packed into rows — deliberately not windowed.
+   *
+   * Rows are dealt over the whole song so they hold still as the roll scrolls,
+   * and this rebuilds on a recompile, a zoom or a mute and never on a frame. The
+   * window is taken off it below, which is a slice rather than a second pack.
+   */
+  private readonly commandLane = computed(() =>
+    packCommandLane({
+      events: this.editor.commandTimeline(),
+      text: this.editor.source(),
+      zoom: this.zoom(),
+      audible: this.audible(),
+      active: this.editChannel(),
+      songTicks: this.songTicks(),
+    }),
+  );
+
+  protected readonly laneView = computed(() => {
+    const { from, to } = this.window();
+    return laneWindow(this.commandLane(), from, to, this.zoom());
+  });
+
   // --- marks ---------------------------------------------------------------
 
   private readonly window = computed(() =>
@@ -756,6 +843,30 @@ export class PianoRoll {
     ),
   );
 
+  /** The walk's notes by address, which is how a strip item names the one it is. */
+  private readonly walkedNotes = computed(
+    () => new Map((this.timeline()?.notes ?? []).map((note) => [note.address, note])),
+  );
+
+  /**
+   * What the walk had in force at a note, by the address of its head, or `null`
+   * for a note the pass never reached.
+   *
+   * The answers are `Command` objects out of `EditorStore.tokens()`, which is
+   * the same index {@link stripOutcome} hands `channelStrip` — so the commands
+   * `planEdits` compares are one set of objects and identity means what it says.
+   * Two scans of one text hold the same commands as different objects, and every
+   * comparison between them is silently false.
+   */
+  private readonly inForceAt = computed<(address: number) => readonly Command[] | null>(() => {
+    const acting = this.editor.commandsInForce();
+    const walked = this.walkedNotes();
+    return (address) => {
+      const note = walked.get(address);
+      return note === undefined ? null : acting(note);
+    };
+  });
+
   protected readonly gestures = rollGestures(
     {
       strip: this.strip,
@@ -771,6 +882,7 @@ export class PianoRoll {
       playableTicks: this.playableTicks,
       introTicks: this.introTicks,
       channels: this.channelTails,
+      inForce: this.inForceAt,
       source: this.editor.source,
     },
     {
@@ -1050,6 +1162,10 @@ export class PianoRoll {
 
   protected setEditMode(editMode: EditMode): void {
     this.settings.update((s) => ({ ...s, editMode }));
+  }
+
+  protected setCommandLaneOpen(commandLaneOpen: boolean): void {
+    this.settings.update((s) => ({ ...s, commandLaneOpen }));
   }
 
   protected setPercussionOpen(percussionOpen: boolean): void {

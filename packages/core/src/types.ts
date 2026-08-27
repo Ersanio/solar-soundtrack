@@ -204,16 +204,27 @@ export interface ParseState {
 	nextNoteIsForDD: boolean;
 }
 
-/** What a dispatch did to the loop structure, read off the bytes it wrote. */
+/**
+ * What a dispatch did to the loop structure, read off the bytes it wrote.
+ *
+ * `from` is the offset a subloop's `$E6` run begins at, and is set only where
+ * the porter wrote the hex rather than the brackets: one `$XX` is one dispatch,
+ * so the flag turns over on the argument byte and the event's own span covers
+ * that byte alone. A `[[` or `]]n` is one dispatch and its span is the whole of
+ * it, so it needs none.
+ */
 export type LoopEvent =
 	/** `[`, `(n)[` or `(!n)[`. `at` is the loop block offset the body starts at — its id. */
 	| { kind: "open"; at: number; label: number; remote: boolean }
 	/** `]n`. `count` is what the `$E9` carries; 1 for a remote body, which emits none. */
 	| { kind: "close"; at: number; count: number; remote: boolean }
-	/** `[[`. */
-	| { kind: "subOpen" }
-	/** `]]n`. `count` is n, the number of times the body plays. */
-	| { kind: "subClose"; count: number }
+	/** `[[`, or a hand-written `$E6 $00`. {@link from} for the second. */
+	| { kind: "subOpen"; from?: number }
+	/**
+	 * `]]n`, or a hand-written `$E6 $nn`. `count` is n, the number of times the
+	 * body plays, which is one more than the byte. {@link from} for the second.
+	 */
+	| { kind: "subClose"; count: number; from?: number }
 	/** `*n` or `(n)m`. `at` is the id of the body called; 0xffff for a `*` with no loop before it. */
 	| { kind: "call"; at: number; count: number; label: number | null };
 

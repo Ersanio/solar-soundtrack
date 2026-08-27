@@ -3,6 +3,7 @@ import { CHANNELS } from '../../../state/transport-view';
 import { clamp } from '../../../util/math';
 import { readStored, writeStored } from '../../../util/storage';
 import { EDIT_MODES, type EditMode } from './roll-edit';
+import { LANE_HEIGHT, LANE_HEIGHT_MAX } from './roll-metrics';
 import { DEFAULT_PERCUSSION, parsePercussion } from './percussion';
 
 /**
@@ -84,6 +85,10 @@ export interface Settings {
   /** Instruments drawn on percussion lanes, ascending. */
   percussion: readonly number[];
   percussionOpen: boolean;
+  /** The command lane under the roll. Open by default — it is the point of the tab. */
+  commandLaneOpen: boolean;
+  /** How tall the lane is drawn, in CSS pixels, between its own floor and ceiling. */
+  laneHeight: number;
   /** The channel the roll is editing, or null for none. One at a time. */
   editChannel: number | null;
   /**
@@ -126,6 +131,8 @@ interface StoredSettings {
   beatUnit?: unknown;
   percussion?: unknown;
   percussionOpen?: unknown;
+  commandLaneOpen?: unknown;
+  laneHeight?: unknown;
   editChannel?: unknown;
   snap?: unknown;
   editMode?: unknown;
@@ -172,6 +179,8 @@ export function readSettings(): Settings {
     beatUnit: 16,
     percussion: [...DEFAULT_PERCUSSION],
     percussionOpen: false,
+    commandLaneOpen: true,
+    laneHeight: LANE_HEIGHT,
     editChannel: null,
     snap: 'beat',
     // The first mode in the table, which is what makes that table's order the
@@ -224,6 +233,17 @@ export function readSettings(): Settings {
     settings.percussionOpen = stored.percussionOpen;
   }
 
+  if (typeof stored.commandLaneOpen === 'boolean') {
+    settings.commandLaneOpen = stored.commandLaneOpen;
+  }
+
+  // Clamped rather than rejected: it comes off a drag, so any height between the
+  // two ends is one the porter could have set, and one outside them is a window
+  // that has since been resized rather than a value that means nothing.
+  if (typeof stored.laneHeight === 'number' && Number.isFinite(stored.laneHeight)) {
+    settings.laneHeight = clampLaneHeight(stored.laneHeight);
+  }
+
   if (isChannel(stored.editChannel)) {
     settings.editChannel = stored.editChannel;
   }
@@ -274,6 +294,17 @@ export function stepRowHeight(shown: number, floor: number, direction: number): 
 /** A beats-per-bar typed into the toolbar's field, held inside the grid's range. */
 export function clampBeats(beats: number): number {
   return clamp(beats, 0, MAX_BEATS);
+}
+
+/**
+ * A lane height off the seam above it, held between five rows and ten.
+ *
+ * Rounded, because a drag is in fractional pixels and the height goes into a
+ * `viewBox` the glyphs are laid out against: one user unit is one CSS pixel
+ * there, and a fractional one would put every row's rule on a half pixel.
+ */
+export function clampLaneHeight(height: number): number {
+  return Math.round(clamp(height, LANE_HEIGHT, LANE_HEIGHT_MAX));
 }
 
 /** Whether a number off a `<select>` is one of the note values a beat can be. */

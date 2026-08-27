@@ -118,6 +118,8 @@ export interface Strip {
   ticks: number;
   /** Where its first note goes while {@link items} is empty. */
   home: ChannelHome;
+  /** The channel's own commands, for the prefix a wholly overwritten item takes with it. */
+  commands: readonly Command[];
 }
 
 /** Why a channel cannot be spliced, in the words the toolbar shows. */
@@ -225,6 +227,19 @@ function forbiddenConstruct(index: TokenIndex, channel: number, source: string):
 
     if (FORBIDDEN_KINDS.has(command.kind)) {
       return `this channel uses \`${command.kind}\`, so one written note plays more than once`;
+    }
+
+    // A subloop the porter wrote as hex rather than as `[[ ]]`. Not caught by
+    // the kinds above, which are the scanner's own, and not left to
+    // `agreesWithWalk` either: one lying entirely past the walk's cut has no
+    // played note to disagree with, so the strip would be built on the written
+    // tick count where the driver plays each note n times. `unrollLoops` clears
+    // it, so Normalize is the answer the toolbar offers beside this — except for
+    // an unterminated `$E6 $00`, which opens a subloop nothing closes and so has
+    // no construct to unroll. That is the same standing an unterminated `[[` has
+    // here, `FORBIDDEN_KINDS` refusing it and Normalize leaving it alone.
+    if (command.vcmd === 0xe6) {
+      return 'this channel uses `$E6`, so one written note plays more than once';
     }
 
     // A note used as `$DD`'s last parameter emits no note event at all
@@ -540,7 +555,7 @@ export function channelStrip(request: StripRequest): Strip | StripRefusal {
     return { refused: disagreement };
   }
 
-  return { channel, items, ticks: tick, home };
+  return { channel, items, ticks: tick, home, commands };
 }
 
 /**

@@ -13,6 +13,7 @@ import {
 } from '@amk/spc/song-walk';
 import { echoHazards } from '@amk/tokens/echo-hazards';
 import { commandsInForceOf } from './commands-in-force';
+import { type TimelineCommand, commandTimeline } from './command-timeline';
 import { type SongClock, songClock } from './song-clock';
 import { ClockMeasurer, tempoDiagnostic } from './clock-measurer';
 import { caretPosition, downloadBlob, errorMessage } from '../util/format';
@@ -222,6 +223,29 @@ export class EditorStore {
       text: this.source(),
       commands: this.commandsByAddress(),
       notes: this.notesByAddress(),
+    });
+  });
+
+  /**
+   * Every command that takes effect, and the tick it runs at — the roll's
+   * command lane. The rule itself is `command-timeline.ts`, so `walktest` can pin
+   * it; this holds it to the current scan and compile.
+   *
+   * Empty while the editor has moved past the text that compiled, for the reason
+   * {@link commandsInForce} is: a span into a document that has changed points at
+   * the wrong thing. Past that guard {@link tokens} *is* the compiled text's scan,
+   * so nothing here needs a second one held back to the compile.
+   */
+  readonly commandTimeline = computed<readonly TimelineCommand[]>(() => {
+    const timeline = this.timeline();
+    if (!timeline || this.compiledText() !== this.source()) {
+      return [];
+    }
+
+    return commandTimeline({
+      timeline,
+      index: this.tokens(),
+      commands: this.commandsByAddress(),
     });
   });
 

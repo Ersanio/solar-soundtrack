@@ -418,9 +418,87 @@ on the channel is the whole comparison. `buildMarks` gets that neighbour from th
 bars; the inspector, reached from the caret with no such loop, looks it up with `notePreceding` and
 puts the two kinds under headings of their own, having room for words where a bar has not.
 
-The song's own settings and the shape of the music get no glyph — `t`, `w`, `$E4` and the echo unit
-reach every note alike, and `o`, `<`, `>` and `l` are what the bar's row and width already are.
-`commandScope` is the one statement of that.
+The song's own settings and the shape of the music get no glyph **on a bar** — `t`, `w`, `$E4` and
+the echo unit reach every note alike, and `o`, `<`, `>` and `l` are what the bar's row and width
+already are. `commandScope` is the one statement of that.
+
+**The command lane holds every command that takes effect**, on the tick the driver reads it:
+`commandScope`'s `'song'`, which `commandsInForceOf` drops because those act on the song and not on
+any note of it, and every `'note-state'` one, whether or not a note begins where it runs. A bar's
+glyphs are the commands in force at its note, drawn on that note's own tick, so most commands are
+drawn twice and the two are answering different questions — the lane the tick it runs on, the note's
+chip which note plays under it. Those agree in `c4 v200 d4` and are a rest apart in `c4 v200 r4 d4`,
+and the lane says the same thing in both, which is what makes it the one place the whole song's
+commands can be read in the order they run. Three shapes reach no bar at all, so the lane is the only
+place they appear: a command replaced before the next note sounds, one with no note after it, and
+`$DF`, `$F0`, `$FD` and `$FE`, which empty a slot rather than take one and so are in no
+`WalkNote.origins` at any tick. `WalkCommand.onANote` is the walk's own word for whether a note
+begins on a command's tick; the lane no longer filters on it, and it is kept as a description of the
+song rather than as anyone's rule. Left to the bars alone: `q`, `h` and `@21`-`@29`, which emit
+nothing to address, so the note they fold into is their only honest tick and that note is already
+drawing them.
+
+**Its ticks are the driver's own**, which is why the walk keeps a list at all rather than the lane
+re-reading `definedAt`. That is anchored on a note, and `emitNote` pushes a `WalkNote` for a note and
+not for a rest, so in `c4 v200 r4 d4` the `v200` runs at tick 48 and a note-anchored reading would
+place it at 96, a whole rest late. `SongTimeline.commands` is raised in `recordOrigin`, already the
+one place that knows a slot has changed hands: a write of the address a slot already holds moves
+nothing and raises nothing, so `[ v200 c8 ]2` is one entry and `[ v100 c8 v200 d8 ]2` is four — the
+same answer `definedAt` gives, arrived at from the byte end. A command that writes no slot at all is
+not there (`$F6`, `$F7`, `$F9`), nor is anything inside a `$FC` body, which the walk does not follow,
+and the lane draws only what the compiler mapped, so the byte blob's own `$FA` prefix reaches no
+glyph.
+
+`state/command-timeline.ts` is that rule; `roll-command-lane.ts` beside `roll-layout.ts` is the
+geometry, first-fit rows over the whole song so that a glyph's row depends on the song, the zoom and
+which channel is being edited, and not on where the roll has been scrolled to, with `x` always
+`laneGlyphX` and never nudged sideways to make room, because where a glyph is _is_ the claim the lane
+makes. That anchors a glyph's **centre** on its tick, so a command on a beat straddles that beat's
+rule, and holds the box inside the song's own span at both ends — the tick-0 glyph would otherwise
+put half itself behind the key column, and one on the last tick would hang past the end-of-song rule.
+The bound is the song's span and not the pane's, since one against the camera would move a glyph as
+the roll scrolled past it. The
+**edited channel is packed first** and the rest strictly below it, as a band rather than a
+preference: a shared row would put another channel's glyph among the ones the porter is working on,
+which is the thing the split is for. It is `editChannel` and not the roll's `editing`, whose fallback
+is the channel of the bar under the pointer — rows would be re-dealt on a hover. The one question
+about the song this file answers is what the **mixer** silences, which is a fact about the moment
+rather than about the compile and so cannot come from the timeline: a muted channel's `'note-state'`
+commands are dropped, because they set nothing anybody can hear, and its `'song'` ones are kept and
+dimmed to `LANE_MUTED_OPACITY`, because a `t` or an echo write still runs the whole song. That is a
+much higher value than the roll's own `MUTED_OPACITY` and the gap is deliberate: a bar is a filled
+rectangle tens of pixels wide, where a glyph is line art twelve pixels square whose strokes vanish at
+a twelfth. Soloing one channel is where it tells — seven channels' song settings dimmed at once, and
+they are the only record on screen of what is still being heard. Nothing in it takes a plate: everything drawn
+there is a command going in force, so the inversion a bar draws would have nothing to distinguish. It
+is a sibling of the roll's scroller rather than a child of it, so a song too tall for the pane does
+not carry the lane off the bottom of it, and it is lifted by a transform rather than scrolled
+natively — a scrollbar would eat a third of
+its height and narrow its content box, putting its right edge out of step with the roll it tracks.
+
+**The seam above it is a real element, and the lane's only top border.** It is the shell splitter's
+shape (`app.ts`) turned on its side: pointer capture on the press so the drag survives leaving a
+one-pixel line, `pointermove` and `pointerup` bound on the seam rather than on the document so there
+is nothing to unsubscribe, a `before:-inset-y-1` grab zone, and a double click for the default. The
+height is one more field of the roll's persisted `Settings` rather than a key of its own, for the
+reason `editChannel` is; `clampLaneHeight` holds it between `LANE_HEIGHT` and `LANE_HEIGHT_MAX`, five
+rows of glyphs and ten, and
+**rounds** it, because it becomes the `viewBox` the glyphs are laid out against and a fractional user
+unit would put every row's rule on a half pixel. A stored value outside the range is clamped rather
+than rejected: it is a window that has been resized, not a value that means nothing.
+
+**A glyph is dragged sideways to move its command to another tick**, which `roll-command-move.ts`
+plans and `rolltest` drives. It is the only edit in the app that changes where a command runs without
+touching a note: everywhere else a command's position moves, a note gesture is carrying one it could
+not leave where it stood, and re-emits it on the tick it already had. Targets are the item heads of
+the command's own channel — every note and rest — so the insertion always lands in an item's prefix
+and no note is split into tied halves to make room, and the channel is `channelStrip`'s, whose gate
+the drag borrows whole rather than restating. None past the last item: the pass ends at the shortest
+channel, so a command written after a channel's last note raises no `WalkCommand`, has no tick, and
+is drawn nowhere — a target out there would be one a command could be dragged to and not back from.
+Let go on the tick it already runs at, it plans nothing, so the undo history is untouched by a
+gesture that changed nothing. Horizontal only, rows being packing; and the press neither captures the
+pointer nor prevents the default, for the reason `roll-gesture.ts` does not.
 
 Written pitch is not held to the driver's o1 c–o6 a — `o0` is legal MML and `h12 o0 c` is a note the
 driver plays — so `roll-layout.ts` grows the keyboard to take such a note in, above or below.

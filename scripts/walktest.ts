@@ -62,6 +62,7 @@ import {
 import { secondsAtTick, songClock } from "../web/src/app/state/song-clock";
 import { measureClock, tempoShortfall } from "../web/src/app/state/measure-clock";
 import { commandsInForceOf, definedAt, notePreceding } from "../web/src/app/state/commands-in-force";
+import { commandTimeline } from "../web/src/app/state/command-timeline";
 import { driverTickSeconds } from "@amk/tokens/commands/units";
 
 import { SPC_ASSETS, check, stubFetch, summarise } from "./harness";
@@ -271,6 +272,266 @@ console.log("\nthe song's tempo map");
 		timeline.notes[0]?.state.tempo === 96,
 		String(timeline.notes[0]?.state.tempo),
 	);
+}
+
+// ---------------------------------------------------------------------------
+console.log("\nthe song's command list");
+// ---------------------------------------------------------------------------
+//
+// The roll's command lane is drawn entirely from this, and it exists because the
+// two readings that look sufficient are not. `origins` names the command in
+// force *at a note*, so it dates a command to the next note that sounds — which
+// a rest between the two moves — and it can never name a command that takes a
+// slot away, there being no slot left for it to sit in.
+{
+	/**
+	 * The list, spelled as it was written — and only the part that was.
+	 *
+	 * AddmusicK prepends `$FA $04 <echo size>` and `$FA $06 $01` to the lowest
+	 * channel itself (`link.ts:prependBlobPrefix`, Music.cpp:2989-3050), so every
+	 * song opens with two entries no author typed. The walk is right to record
+	 * them — the driver runs them — and the lane drops them at the join, having
+	 * no span to draw a glyph from. The check below is what holds them to two.
+	 */
+	const map = (source: string) => {
+		const { result, timeline } = build(source);
+		const spans = new Map((result.commandMap ?? []).map((entry) => [entry.address, entry.span]));
+		return timeline.commands
+			.filter((command) => spans.has(command.address))
+			.map((command) => {
+				const span = spans.get(command.address)!;
+				return `${command.tick}:#${command.channel}:${source.slice(span.start, span.end)}`;
+			})
+			.join(" ");
+	};
+
+	{
+		const { result, timeline } = build("#amk 4\n#1 o4 c4\n");
+		const spans = new Set((result.commandMap ?? []).map((entry) => entry.address));
+		const unwritten = timeline.commands.filter((command) => !spans.has(command.address));
+		check(
+			"the blob's own prefix is two commands nobody wrote, on the lowest channel",
+			unwritten.length === 2 && unwritten.every((c) => c.vcmd === 0xfa && c.tick === 0 && c.channel === 1),
+			unwritten.map((c) => `${c.tick}:#${c.channel}:$${c.vcmd.toString(16)}`).join(" "),
+		);
+	}
+
+	const top = map("#amk 4\n#0 o4 v200 c4\n");
+	check("a command at the top is one entry on tick 0", top === "0:#0:v200", top);
+
+	const later = map("#amk 4\n#0 o4 c4 v200 c4\n");
+	check("and one after a note is where that note ends", later === "48:#0:v200", later);
+
+	// The reading `origins` cannot give. The next note that *sounds* is at 96, so
+	// a lane built from a note's own state would draw this a whole rest late.
+	const before = map("#amk 4\n#0 o4 c4 v200 r4 d4\n");
+	check("a command before a rest is on the rest's own tick", before === "48:#0:v200", before);
+
+	// `$DF` fills no slot at all, so no note can ever report it. It is here
+	// because the list records a slot changing hands rather than a slot's
+	// contents, and "there is no vibrato now" is a change.
+	const off = map("#amk 4\n#0 o4 @1 $DE $00 $0C $08 c8 $DF d8\n");
+	check("a command that clears a slot is recorded", off === "0:#0:@1 0:#0:$DE $00 $0C $08 24:#0:$DF", off);
+
+	// And one that clears nothing is not: it is a transition, not an execution.
+	const idle = map("#amk 4\n#0 o4 @1 c8 $DF d8\n");
+	check("but one with nothing to clear is not", idle === "0:#0:@1", idle);
+
+	// Whether a note *begins* where the command ran, which is the whole of what
+	// decides the lane: a bar names the commands in force at its note, on that
+	// note's own tick, so it speaks for where one ran only when the two agree.
+	// No scope can make this test and neither can `origins`, which is anchored
+	// on a note where the question is about the tick.
+	const onNotes = (source: string) => {
+		const { result, timeline } = build(source);
+		const spans = new Map((result.commandMap ?? []).map((entry) => [entry.address, entry.span]));
+		return timeline.commands
+			.filter((command) => spans.has(command.address))
+			.map(
+				(command) =>
+					`${source.slice(spans.get(command.address)!.start, spans.get(command.address)!.end)}:${command.onANote}`,
+			)
+			.join(" ");
+	};
+
+	const abutting = onNotes("#amk 4\n#0 o4 c4 v200 d4\n");
+	check("a command the next note keys on with is on a note", abutting === "v200:true", abutting);
+
+	// The case the lane exists for. The `v200` runs at 48 and the only thing
+	// drawing it is `d4`'s chip at 96, a whole rest away.
+	const resting = onNotes("#amk 4\n#0 o4 c4 v200 r4 d4\n");
+	check("but one read while the channel rests is not", resting === "v200:false", resting);
+
+	// A `$C6` sounds no note of its own — `emitNote` folds it into the one
+	// already playing — so nothing keys on at the tick between the two.
+	const tied = onNotes("#amk 4\n#0 o4 c4 v200 ^4 d4\n");
+	check("nor one read inside a tie", tied === "v200:false", tied);
+
+	// Replaced before anything sounds under it. The note at tick 0 reports the
+	// `v100`, so the `v200` is on no bar at any tick and needs the lane.
+	const replaced = onNotes("#amk 4\n#0 o4 v200 v100 c4\n");
+	check("a command replaced before the next note is not on it", replaced === "v200:false v100:true", replaced);
+
+	// The entry and not the address: both `v200`s are written once, run at tick
+	// 0 on one channel and share a span, and only the second is in force.
+	const turns = onNotes("#amk 4\n#0 o4 [[ v100 v200 ]]2 c4\n");
+	check(
+		"and only the turn still in force at the note is",
+		turns === "v100:false v200:false v100:false v200:true",
+		turns,
+	);
+
+	// Nothing left on its channel to key on with. `origins` cannot see this one
+	// at all. `#1` is what carries the pass past it: a command on the last tick
+	// of the *shortest* channel is cut from the list with the notes past it.
+	const trailing = onNotes("#amk 4\n#0 o4 c2 v200 r2\n#1 o4 c2 c2\n");
+	check("a command with no note after it is not on one", trailing === "v200:false", trailing);
+
+	// The note that would report it is past the shortest channel, so the walk
+	// sets it aside and no bar is drawn for it — while the command itself, at
+	// tick 96, is still inside the pass and still runs.
+	const beyond = onNotes("#amk 4\n#0 o4 c2 v200 r2 c2\n#1 o4 c2 r2\n");
+	check("nor one whose only note the pass never reaches", beyond === "v200:false", beyond);
+
+	// `$DF` fills no slot, so it is in no `origins` at any tick and this is
+	// false for it however it is written — the reading the lane had before.
+	const cleared = onNotes("#amk 4\n#0 o4 @1 $DE $00 $0C $08 c8 $DF d8\n");
+	check(
+		"a command that empties a slot is never on a note",
+		cleared === "@1:true $DE $00 $0C $08:true $DF:false",
+		cleared,
+	);
+
+	// `$DA` writes the instrument and clears the noise in the one execution
+	// (`slotsOf`), and it is one command, so it is one entry.
+	const two = map("#amk 4\n#0 o4 $F8 $10 c8 @1 d8\n");
+	check("a command that moves two slots is still one entry", two === "0:#0:$F8 $10 24:#0:@1", two);
+
+	// The same answer `definedAt` gives from the note end: `recordOrigin` skips a
+	// write to the address already in the slot, so a body re-running a command
+	// that changes nothing changes nothing here.
+	const body = map("#amk 4\n#0 o4 [ v200 c8 ]2\n");
+	check("a [ ] re-running an unchanged command is one entry", body === "0:#0:v200", body);
+
+	const alternating = map("#amk 4\n#0 o4 [ v100 c8 v200 d8 ]2\n");
+	check(
+		"and one that alternates is an entry every time round",
+		alternating === "0:#0:v100 24:#0:v200 48:#0:v100 72:#0:v200",
+		alternating,
+	);
+
+	// `invalidateAll` hands all eight channels a fresh `origins` array, so a
+	// reading taken per channel would report one written `t` eight times.
+	const song = map("#amk 4\n#0 o4 c4 t144 c4\n#1 o4 d4 d4\n");
+	check("a song-wide command is recorded once, not once per channel", song === "48:#0:t144", song);
+
+	// The driver's own order. Nothing sorts it; the walk emits it that way.
+	const both = map("#amk 4\n#0 o4 c4 v200 c4\n#1 o4 v100 d4 d4\n");
+	check("two channels interleave by tick, unsorted", both === "0:#1:v100 48:#0:v200", both);
+
+	// The same cut `notes` and `tempoChanges` take.
+	const past = map("#amk 4\n#0 o4 c4\n#1 o4 c4 c4 v200 c4\n");
+	check("a command past the shortest channel never runs", past === "", past);
+
+	// The join the lane is built on: every entry has to be a key into the map
+	// that turns it back into text, or it is a glyph with nothing to click.
+	const { result, timeline } = build("#amk 4\n#0 o4 @1 v200 y10 $DE $00 $0C $08 $ED $3F $4D c8 $DF d8\n");
+	const addressed = new Set((result.commandMap ?? []).map((entry) => entry.address));
+	const unmapped = timeline.commands.filter((command) => !addressed.has(command.address));
+	check(
+		"every entry addresses a command the compiler mapped, bar the blob's own prefix",
+		timeline.commands.length === 8 && unmapped.length === 2,
+		timeline.commands.map((c) => `${c.address}:$${c.vcmd.toString(16)}`).join(" "),
+	);
+}
+
+// ---------------------------------------------------------------------------
+console.log("\nwhat the roll's command lane holds");
+// ---------------------------------------------------------------------------
+//
+// The rule itself, end to end: the walk's list, the compiler's command map, the
+// scanner's spelling and `commandScope`, which between them decide everything
+// drawn under the roll. The lane holds every command that takes effect, on the
+// tick the driver reads it, so what these pin is the tick each one lands on and
+// which commands are not commands the lane can speak for at all.
+{
+	const lane = (source: string) => {
+		const { result, timeline } = build(source);
+		return commandTimeline({
+			timeline,
+			index: tokenize(source),
+			commands: new Map((result.commandMap ?? []).map((entry) => [entry.address, entry])),
+		})
+			.map(
+				(event) => `${event.tick}:#${event.channel}:${source.slice(event.command.span.start, event.command.span.end)}`,
+			)
+			.join(" ");
+	};
+
+	// Written straight before the note that reads it, so the bar stands on the
+	// same tick and draws it too. Both are asserted, because a command drawn in
+	// two places is the ordinary case rather than a fault: the lane says the
+	// tick, the chip says which note plays under it. The blob's own `$FA` prefix
+	// is in no command map and falls out at the join, which is why the lane's
+	// side is the one entry and not three.
+	{
+		const source = "#amk 4\n#0 o4 c4 v200 d4\n";
+		const { result, timeline } = build(source);
+		const at = (result.commandMap ?? []).find((entry) => source.slice(entry.span.start, entry.span.end) === "v200");
+		const d4 = timeline.notes.find((note) => note.tick === 48);
+		check("a command the next note keys on with is on the lane", lane(source) === "48:#0:v200", lane(source));
+		check(
+			"and on that note's own bar, which is the same tick",
+			at !== undefined && d4?.origins.includes(at.address) === true,
+			d4?.origins.join(","),
+		);
+	}
+
+	// The case where the two disagree, which is what makes the lane's tick worth
+	// drawing: the `v200` runs at 48, in the rest, and the note that plays under
+	// it does not begin until 96.
+	{
+		const source = "#amk 4\n#0 o4 c4 v200 r4 d4\n";
+		const { result, timeline } = build(source);
+		const at = (result.commandMap ?? []).find((entry) => source.slice(entry.span.start, entry.span.end) === "v200");
+		const d4 = timeline.notes.find((note) => note.tick === 96);
+		check("one read while the channel rests is on the lane at 48", lane(source) === "48:#0:v200", lane(source));
+		check(
+			"and on the note that plays under it, a rest later",
+			at !== undefined && d4?.origins.includes(at.address) === true,
+			d4?.origins.join(","),
+		);
+	}
+
+	// Both halves of a replacement, on the one tick and in the order the driver
+	// ran them. The `v200` reaches no bar at all — nothing sounds under it — so
+	// the lane is the only place in the app it appears.
+	const replaced = lane("#amk 4\n#0 o4 v200 v100 c4\n");
+	check(
+		"a command replaced before the next note is on the lane, and so is the one that replaced it",
+		replaced === "0:#0:v200 0:#0:v100",
+		replaced,
+	);
+
+	// The four that clear a slot rather than take one are in no `WalkNote.origins`
+	// at any tick, so a bar can never draw them: `origins` names what *occupies* a
+	// slot. The lane is where the song says vibrato was switched off.
+	const off = lane("#amk 4\n#0 o4 @1 $DE $00 $0C $08 c8 $DF d8\n");
+	check(
+		"a command that switches something off is on the lane wherever it runs",
+		off === "0:#0:@1 0:#0:$DE $00 $0C $08 24:#0:$DF",
+		off,
+	);
+
+	// `'song'` needs no rest to qualify: one DSP holds one echo unit and a
+	// tempo reaches every channel, so no bar has ever drawn either.
+	const wide = lane("#amk 4\n#0 o4 c4 t144 $F1 $0A $28 $28 c4\n");
+	check("the song's own settings are always on it", wide === "48:#0:t144 48:#0:$F1 $0A $28 $28", wide);
+
+	// `'position'` and `'structure'` are neither: an `o` and an `l` are what the
+	// roll's rows and widths already are, and `[ ]` is the shape of the music.
+	const shape = lane("#amk 4\n#0 o4 l8 [ c > d ]2\n");
+	check("but where a note sits and how the music is shaped are not", shape === "", shape);
 }
 
 // ---------------------------------------------------------------------------

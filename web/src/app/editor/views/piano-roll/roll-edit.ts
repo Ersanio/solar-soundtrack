@@ -8,7 +8,9 @@ import {
   spellQ,
 } from '@amk/core/mml-text';
 import type { Span } from '@amk/core/types';
-import { type Edit, insertAt, spliceRange } from '@amk/tokens/edits';
+import type { Command } from '@amk/tokens';
+import { commandScope } from '@amk/tokens/commands/in-force';
+import { commandRewritable, type Edit, insertAt, spliceOut, spliceRange } from '@amk/tokens/edits';
 import type { ChannelTail, Strip, StripItem } from './roll-strip';
 
 /**
@@ -140,6 +142,20 @@ export interface EditContext {
    * array rather than two arrays. What {@link padChannels} writes to.
    */
   channels: readonly ChannelTail[];
+  /**
+   * The `'note-state'` commands the walk had in force at a note, by the address
+   * of its head — `StripItem.address`, which is how the walk names a note.
+   * `null` for a note the pass never reached, where nothing can be said.
+   *
+   * What {@link reachesSomething} reads, and the reason no slot table is
+   * restated here: the walk has already resolved which command occupies which
+   * slot, through one run of bytes however many times the text plays it.
+   *
+   * Compared by **identity** against `Strip.commands`, so both must come from
+   * one scan of one text. Two scans hold the same commands as different objects,
+   * every membership test is then false, and the rule silently keeps everything.
+   */
+  inForce: (address: number) => readonly Command[] | null;
 }
 
 export const REFUSE_RANGE = 'the driver cannot play a note that high or low';
@@ -147,6 +163,7 @@ export const REFUSE_ROOM = 'there is no room to push the notes out of the way';
 export const REFUSE_SPELL = 'that length cannot be written on this AddmusicK target';
 export const REFUSE_CROWDED = 'there is something written where that note would go';
 export const REFUSE_RAMP = 'that note is too short to keep the command written inside it';
+export const REFUSE_INSIDE = 'there is a command written inside that note';
 export const REFUSE_CLASH = 'two notes would sound at once, which MML cannot say';
 
 /**
@@ -724,15 +741,18 @@ const OPENING_Q = 0x7f;
  * fresh channel runs under, so that nothing it plays depends on what the block
  * above it happened to leave standing.
  *
- * `octave` and `defaultNoteLength` are one variable each and leak past a `#N`,
- * which resets neither (`parser.ts:parseHash`), so `o4` and `l8` are what a
- * channel runs at only while nothing has moved them (`parser.ts:193`, `:195`).
- * `q` and `@` are per channel and start at `$7F` and 0 (`parser.ts:200`,
- * `:199`). `v` and `y` are not parse-time state at all: the driver boots every
- * voice at `$FF` volume and `$0A` pan, dead centre of `y`'s 0 to 20
- * (`main.asm:2134-2138`). The octave and the length are literal because each has
- * one spelling on every target — 24 ticks is `l8` wherever `192 / 24` is — and
- * `q` goes through {@link spellQ}, whose two digits are upper case.
+ * `octave` is one variable and leaks past a `#N`, which does not reset it
+ * (`parser.ts:parseHash`), so `o4` is what a channel runs at only while nothing
+ * has moved it (`parser.ts:193`). `q` and `@` are per channel and start at `$7F`
+ * and 0 (`parser.ts:200`, `:199`). `v` and `y` are not parse-time state at all:
+ * the driver boots every voice at `$FF` volume and `$0A` pan, dead centre of
+ * `y`'s 0 to 20 (`main.asm:2134-2138`). The octave is literal, having one
+ * spelling on every target, and `q` goes through {@link spellQ}, whose two
+ * digits are upper case.
+ *
+ * No `l`, which leaks the same way and would be the one thing here the roll then
+ * had to keep in step: every length it writes is the note's own
+ * ({@link spellDuration}), so nothing it puts in this channel reads a default.
  *
  * No `@` on Addmusic 4.05 or AddmusicM, where an `@` switches instrument tuning
  * on and resets `h` instead of saying what is already true; that is the gate
@@ -741,7 +761,7 @@ const OPENING_Q = 0x7f;
  * instrument's tuning rather than adding to it, so `h0` is not "no transposition".
  */
 function channelOpening(channel: number, songTargetProgram: number): string {
-  const parts = [`o${OPENING_OCTAVE}`, 'l8', spellQ(OPENING_Q)];
+  const parts = [`o${OPENING_OCTAVE}`, spellQ(OPENING_Q)];
   if (songTargetProgram === 0) {
     parts.push('@0');
   }
@@ -907,13 +927,145 @@ function exitText(note: PlacedNote, exitOctave: number | null): string | null {
 
 /** The unit and the whitespace in front of it, so a deletion leaves no double space. */
 function removeItem(source: string, item: StripItem): Edit[] {
-  let start = item.unitSpan.start;
-  while (start > 0 && (source[start - 1] === ' ' || source[start - 1] === '\t')) {
-    start--;
+  const edit = spliceOut(source, item.unitSpan);
+  return edit ? [edit] : [];
+}
+
+/**
+ * Whether anything in the edited song still sounds under a command.
+ *
+ * The one test that decides whether a removed item's declaration goes with it,
+ * and it names no gesture: what a `v200` reaches is a fact about the song after
+ * the edit, where "a carve took these ticks" is a fact about the edit path.
+ *
+ * `tick` is the command's own — the start of the item whose prefix holds it,
+ * since a prefix runs just before the item it stands in front of. The scan
+ * carries forward from that item looking for a note that **begins** at or after
+ * it with the command still in force, which is `WalkCommand.onANote`'s question
+ * asked of the plan rather than of the pass.
+ *
+ * Where a slot changes hands is the walk's own answer and not a table restated
+ * here: the first note the pass played without the command in `origins` is the
+ * note something else had taken the slot by. That is what makes `v200 c4 v100
+ * d4` answer "nothing" for the `v200` while `v200 c4 d4` answers "`d4`", with no
+ * source-side notion of which commands write the same thing.
+ *
+ * A note the pass never reached answers `true`: past the shortest channel the
+ * walk has nothing to say, and a command is dropped only where something can say
+ * it reaches nothing.
+ */
+function reachesSomething(
+  context: EditContext,
+  command: Command,
+  tick: number,
+  from: number,
+  survivors: ReadonlyMap<number, PlacedNote>,
+  born: readonly PlacedNote[],
+): boolean {
+  const { strip } = context;
+  /** Where the slot changed hands, and so where this command stops reaching. */
+  let end = Number.POSITIVE_INFINITY;
+  for (let index = from; index < strip.items.length; index++) {
+    const item = strip.items[index];
+    if (item.kind !== 'note' || item.startTick < tick) {
+      continue;
+    }
+
+    if (!item.verified) {
+      return true;
+    }
+
+    const acting = context.inForce(item.address);
+    if (acting === null) {
+      return true;
+    }
+
+    if (!acting.includes(command)) {
+      end = item.startTick;
+      break;
+    }
+
+    if (survivors.has(index)) {
+      return true;
+    }
   }
 
-  const edit = spliceRange(source, { ...item.unitSpan, start }, '');
+  return born.some((note) => note.startTick >= tick && note.startTick < end);
+}
+
+/**
+ * The commands an item wholly overwritten takes with it: the `'note-state'`
+ * ones in its prefix, which are its own declarations and nobody else's. A `t`
+ * or a `w` acts on the whole song, an `l`, an `o`, a `<` or a `>` is parse
+ * state every later note reads, and the intro `/` and a comment are not
+ * commands at all — all of those stay exactly where they are written.
+ *
+ * The scope test is also the overlap guard: a trailing `o` claimed by the
+ * previous unit (`roll-strip.ts:trailsAUnit`) lies inside both that unit's span
+ * and this prefix, and `'position'` is what keeps the deletion off it.
+ *
+ * Callers skip the channel's first item, whose prefix reaches back over the
+ * channel's own header: what stands above the first note or rest is the
+ * channel's setup rather than that item's declaration.
+ */
+function prefixCommandsOf(strip: Strip, item: StripItem): Command[] {
+  return strip.commands.filter(
+    (command) =>
+      command.span.start >= item.prefixSpan.start &&
+      command.span.end <= item.prefixSpan.end &&
+      !command.inRemoteDefinition &&
+      commandScope(command) === 'note-state',
+  );
+}
+
+/**
+ * The commands written between two of an item's segments, each on the tick it
+ * runs at.
+ *
+ * A unit is more than one segment only where the porter wrote something between
+ * the head and a `^` continuation (`roll-strip.ts:segments`), so this is the
+ * mid-note ramp and whatever else stands with it. Every scope, not just
+ * `'note-state'`: {@link removeItem} splices the whole unit, so a `t` written in
+ * there would go as quietly as a `v`, and the caller has to know it is there.
+ */
+function insideCommands(strip: Strip, item: StripItem): { command: Command; tick: number }[] {
+  const out: { command: Command; tick: number }[] = [];
+  let at = item.startTick;
+  for (let part = 1; part < item.segments.length; part++) {
+    at += item.segments[part - 1].ticks;
+    const from = item.segments[part - 1].span.end;
+    const to = item.segments[part].span.start;
+    for (const command of strip.commands) {
+      if (command.span.start >= from && command.span.end <= to) {
+        out.push({ command, tick: at });
+      }
+    }
+  }
+
+  return out;
+}
+
+/** A prefix command and the whitespace in front of it, as {@link removeItem} takes a unit. */
+function removeCommand(source: string, command: Command): Edit[] {
+  const edit = spliceOut(source, command.span);
   return edit ? [edit] : [];
+}
+
+/** Whether the born notes cover every tick of the rest. `order` is in tick order. */
+function coveredByBorn(order: readonly PlacedNote[], rest: StripItem): boolean {
+  let at = rest.startTick;
+  for (const note of order) {
+    if (note.startTick > at) {
+      return false;
+    }
+
+    at = Math.max(at, note.startTick + note.ticks);
+    if (at >= rest.startTick + rest.ticks) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 /** What one surviving note needs written, which is usually nothing at all. */
@@ -953,7 +1105,7 @@ function rewriteNote(
   // ramp written inside them fires later than it was written to. Which ticks the
   // porter meant to keep is not something the gesture says, so it is refused.
   if (note.startTick !== item.startTick) {
-    return refuse(REFUSE_RAMP);
+    return refuse(REFUSE_INSIDE);
   }
 
   // More than one segment means a command sits inside the note — a mid-note
@@ -1178,6 +1330,7 @@ function realiseRegion(
   context: EditContext,
   gap: Region,
   survivors: ReadonlyMap<number, PlacedNote>,
+  deleted: readonly Span[],
 ): Edit[] | EditRefusal {
   const { targetAMKVersion } = context;
   const edits: Edit[] = [];
@@ -1199,7 +1352,7 @@ function realiseRegion(
   }
 
   if (gap.born.length > 0) {
-    return spawnInto(context, gap, survivors);
+    return spawnInto(context, gap, survivors, deleted);
   }
 
   const runs = restRuns(context, gap);
@@ -1344,20 +1497,32 @@ function rested(rests: readonly StripItem[], from: number): number {
 }
 
 /**
- * The note and the rests either side of it, as one run of text, with the song's
- * intro marker written into it where one is asked for.
+ * A piece of text the run has to write at a tick of its own: the song's intro
+ * `/`, or a command the run is carrying over from the text it replaces.
+ */
+interface RunMark {
+  tick: number;
+  text: string;
+}
+
+/**
+ * The note and the rests either side of it, as one run of text, with whatever
+ * has to stand at a tick inside it written in.
  *
  * A `/` puts the channel's loop re-entry at the byte it stands on
  * (`parser.ts:parseIntro`) and every channel resumes from its own on each pass
  * round the loop, so a marker on the wrong tick leaves the channel playing
- * against the rest of the song. `introAt` is therefore a tick rather than a
- * place in the run, and where it does not fall on a boundary the piece it lands
- * inside is written as two: a rest as two rests, and the note as a head and a
- * `^` continuation, which is still one note — a tie emits `$C6` and the driver
- * carries the note through it.
+ * against the rest of the song; a carried `v` or `y` moved off its tick
+ * re-voices the note it was written for. A mark is therefore a tick rather than
+ * a place in the run, and where one does not fall on a boundary the piece it
+ * lands inside is written as two: a rest as two rests, and the note as a head
+ * and a `^` continuation, which is still one note — a tie emits `$C6` and the
+ * driver carries the note through it. Several marks inside one piece split it
+ * that many times.
  *
- * `exitOctave` is the octave the run leaves standing, for a channel with no note
- * left to be handed it (see {@link spawnInto}).
+ * `from` is the run's own first tick, so a mark can be given in the song's ticks
+ * as the intro is. `exitOctave` is the octave the run leaves standing, for a
+ * channel with no note left to be handed it (see {@link spawnInto}).
  *
  * `null` where a length in the run has no spelling on this target.
  */
@@ -1365,14 +1530,16 @@ function spawnRun(
   context: EditContext,
   born: readonly PlacedNote[],
   gaps: readonly number[],
+  from: number,
   running: number | null,
-  introAt: number | null,
+  marks: readonly RunMark[],
   exitOctave: number | null,
 ): string | null {
   const { targetAMKVersion } = context;
   const parts: string[] = [];
-  let at = 0;
-  let marked = introAt === null;
+  let at = from;
+  /** How far down `marks` the run has written, which is sorted by tick. */
+  let next = 0;
   /**
    * The octave the run has left standing so far.
    *
@@ -1382,43 +1549,42 @@ function spawnRun(
    */
   let inForce = running;
 
-  /** The marker where the tick falls between two pieces rather than inside one. */
+  /** Every mark the run has reached, which is where one falls between two pieces. */
   const mark = (): void => {
-    if (!marked && introAt === at) {
-      parts.push('/');
-      marked = true;
+    while (next < marks.length && marks[next].tick <= at) {
+      parts.push(marks[next].text);
+      next++;
     }
   };
 
-  /** The tick, where it falls strictly inside the piece of `ticks` starting here. */
-  const splitAt = (ticks: number): number | null =>
-    !marked && introAt !== null && introAt > at && introAt < at + ticks ? introAt : null;
+  /** Whether a mark falls strictly inside the piece running from here to `end`. */
+  const splits = (end: number): boolean =>
+    next < marks.length && marks[next].tick > at && marks[next].tick < end;
 
   const rest = (ticks: number): boolean => {
     if (ticks === 0) {
       return true;
     }
 
-    const split = splitAt(ticks);
-    if (split !== null) {
-      const first = spellDuration(split - at, targetAMKVersion);
-      const second = spellDuration(at + ticks - split, targetAMKVersion);
-      if (first === null || second === null) {
+    const end = at + ticks;
+    while (splits(end)) {
+      const piece = spellDuration(marks[next].tick - at, targetAMKVersion);
+      if (piece === null) {
         return false;
       }
 
-      parts.push(`r${first}`, '/', `r${second}`);
-      marked = true;
-    } else {
-      const whole = spellDuration(ticks, targetAMKVersion);
-      if (whole === null) {
-        return false;
-      }
-
-      parts.push(`r${whole}`);
+      parts.push(`r${piece}`);
+      at = marks[next].tick;
+      mark();
     }
 
-    at += ticks;
+    const last = spellDuration(end - at, targetAMKVersion);
+    if (last === null) {
+      return false;
+    }
+
+    parts.push(`r${last}`);
+    at = end;
     return true;
   };
 
@@ -1430,30 +1596,47 @@ function spawnRun(
   // is what the text after the run reads.
   const note = (each: PlacedNote, last: boolean): boolean => {
     const exit = last ? exitOctave : null;
-    const split = splitAt(each.ticks);
-    if (split !== null) {
-      const first = spellDuration(split - at, targetAMKVersion);
-      const second = spellDuration(at + each.ticks - split, targetAMKVersion);
-      const head = first === null ? null : noteText(each, first, null, targetAMKVersion, inForce);
-      // The `^` is where the note ends, so the octave goes after it rather than
-      // between the two halves.
-      const put = exitText(each, exit);
-      if (head === null || second === null || put === null) {
+    const end = at + each.ticks;
+    /** Whether the note's own head is still to be written. */
+    let head = true;
+    while (splits(end)) {
+      const piece = spellDuration(marks[next].tick - at, targetAMKVersion);
+      const text =
+        piece === null
+          ? null
+          : head
+            ? noteText(each, piece, null, targetAMKVersion, inForce)
+            : `^${piece}`;
+      if (text === null) {
         return false;
       }
 
-      parts.push(head, '/', `^${second}${put}`);
-      marked = true;
-    } else {
+      parts.push(text);
+      head = false;
+      at = marks[next].tick;
+      mark();
+    }
+
+    if (head) {
       const whole = noteText(each, null, exit, targetAMKVersion, inForce);
       if (whole === null) {
         return false;
       }
 
       parts.push(whole);
+    } else {
+      const piece = spellDuration(end - at, targetAMKVersion);
+      // The `^` is where the note ends, so the octave goes after it rather than
+      // between the pieces.
+      const put = exitText(each, exit);
+      if (piece === null || put === null) {
+        return false;
+      }
+
+      parts.push(`^${piece}${put}`);
     }
 
-    at += each.ticks;
+    at = end;
     inForce = leftBy(each, exit);
     return true;
   };
@@ -1511,31 +1694,148 @@ function restFor(gap: Region, born: PlacedNote): StripItem | null {
 }
 
 /**
- * Whether the region's items are written one after another with nothing but
- * whitespace between them.
+ * The interior items the run consumes: the smallest contiguous stretch holding
+ * every note this plan removes, every note being born, and every rest one of
+ * those touches. The items outside it — untouched rests, and whatever is
+ * written in their prefixes — are left byte-identical, which is what lets a
+ * note erase its neighbour without disturbing a `v200` declared for a rest the
+ * gesture never reached.
  *
- * A `v`, a `y`, a `$ED` or the intro `/` carries no ticks of its own but does
- * carry a **position**: the tick of the item boundary it stands at. A run laid
- * over the whole region moves every boundary strictly inside it, so one written
- * between two items would come out on a different tick, and only the porter
- * knows which of the two it belongs with. One written before the first item or
- * after the last stands on a boundary the region does not move — where it meets
- * the surviving note either side — and stays exactly where it is, which is why
- * only the interior is read.
+ * Every interior note is in it by construction: a surviving note would bound
+ * the region instead, so each one here is being removed and its ticks have to
+ * be re-expressed by the run. Only a rest can stand aside, and only one no
+ * born note reaches into.
  */
-function itemsRunTogether(context: EditContext, gap: Region): boolean {
-  const { source, strip } = context;
-  for (let index = gap.after + 2; index < gap.before; index++) {
-    const between = source.slice(
-      strip.items[index - 1].unitSpan.end,
-      strip.items[index].unitSpan.start,
-    );
-    if (between.trim() !== '') {
-      return false;
+function windowOf(strip: Strip, gap: Region, order: readonly PlacedNote[]): StripItem[] {
+  const interior = strip.items.slice(gap.after + 1, gap.before);
+  let from = Infinity;
+  let to = -Infinity;
+  for (const item of interior) {
+    if (item.kind !== 'rest') {
+      from = Math.min(from, item.startTick);
+      to = Math.max(to, item.startTick + item.ticks);
     }
   }
 
-  return true;
+  for (const note of order) {
+    from = Math.min(from, note.startTick);
+    to = Math.max(to, note.startTick + note.ticks);
+  }
+
+  // A rest partly under the stretch joins it whole, which can reach the next.
+  let grew = true;
+  while (grew) {
+    grew = false;
+    for (const item of interior) {
+      if (item.startTick < to && item.startTick + item.ticks > from) {
+        if (item.startTick < from) {
+          from = item.startTick;
+          grew = true;
+        }
+
+        if (item.startTick + item.ticks > to) {
+          to = item.startTick + item.ticks;
+          grew = true;
+        }
+      }
+    }
+  }
+
+  return interior.filter((item) => item.startTick < to && item.startTick + item.ticks > from);
+}
+
+/** A command a run has to write for itself, and the tick it stands on. */
+interface CarriedCommand {
+  command: Command;
+  tick: number;
+  /**
+   * Whether it stands inside a unit the plan is splicing, and so is already
+   * being taken out — a command between a note's segments goes with the note's
+   * `unitSpan`, where one between two units is left behind by both.
+   */
+  inside: boolean;
+}
+
+/**
+ * What a run laid over the window has to take over from the text it replaces,
+ * or `null` where something in there cannot be taken over at all.
+ *
+ * A `v`, a `y`, a `$ED` or the intro `/` carries no ticks of its own but does
+ * carry a **position**: the tick of the boundary it stands at. A run rewrites
+ * every boundary strictly inside the window, so anything written on one has to
+ * be re-emitted by the run itself, at that same tick — which is what a
+ * {@link RunMark} is. One written before the window's first item or after its
+ * last stands on a boundary the run starts or ends at, and stays exactly where
+ * it is, which is why only the interior is read.
+ *
+ * Two places a boundary can be written on: between two of the window's items,
+ * and inside one of them, between the head and a `^` continuation the porter
+ * put a command between (`roll-strip.ts:segments`).
+ *
+ * Only a `'note-state'` command is carried. A `t` or a `w` acts on the song and
+ * not on this channel's next note, an `l` or a naked `o` is parse state the run
+ * spells for itself and two writers on one variable is worse than a refusal, a
+ * `;` comment and the intro `/` are not commands at all, and a command written
+ * through a `"name=value"` has a span collapsed onto its call site
+ * (`edits.ts:commandRewritable`). Each of those refuses.
+ *
+ * A command this plan deletes along with the item it defined stands on no
+ * boundary at all, so the spans in `deleted` read as blank.
+ */
+function windowCarries(
+  context: EditContext,
+  window: readonly StripItem[],
+  deleted: readonly Span[],
+): CarriedCommand[] | null {
+  const { source, strip } = context;
+  const carried: CarriedCommand[] = [];
+
+  /** Everything written between two offsets, all of it standing on one tick. */
+  const between = (from: number, to: number, tick: number, inside: boolean): boolean => {
+    let at = from;
+    while (at < to) {
+      if (/\s/.test(source[at]) || deleted.some((span) => at >= span.start && at < span.end)) {
+        at++;
+        continue;
+      }
+
+      const command = strip.commands.find((each) => at >= each.span.start && at < each.span.end);
+      if (
+        command === undefined ||
+        command.inRemoteDefinition ||
+        !commandRewritable(command) ||
+        commandScope(command) !== 'note-state'
+      ) {
+        return false;
+      }
+
+      carried.push({ command, tick, inside });
+      at = command.span.end;
+    }
+
+    return true;
+  };
+
+  for (let index = 0; index < window.length; index++) {
+    const item = window[index];
+    if (index > 0) {
+      const previous = window[index - 1];
+      if (!between(previous.unitSpan.end, item.unitSpan.start, item.startTick, false)) {
+        return null;
+      }
+    }
+
+    let at = item.startTick;
+    for (let part = 1; part < item.segments.length; part++) {
+      at += item.segments[part - 1].ticks;
+      const gap = { from: item.segments[part - 1].span.end, to: item.segments[part].span.start };
+      if (!between(gap.from, gap.to, at, true)) {
+        return null;
+      }
+    }
+  }
+
+  return carried;
 }
 
 /**
@@ -1549,13 +1849,22 @@ function itemsRunTogether(context: EditContext, gap: Region): boolean {
  * it was written. This is the road for a region holding several rests with
  * something positional between them, and it takes one note at a time.
  *
- * **Laid out afresh.** Where the region's items run together
- * ({@link itemsRunTogether}) there is nothing inside it carrying a position, so
- * the whole stretch is written as one run of rests and notes. That is what lets
- * a region hold more than one note being created — a carve's split leaves a
- * tail beside the note that split it — and notes this same plan is removing,
- * whose units `planEdits` deletes on its own and whose spans only ever abut this
- * run rather than overlap it.
+ * **Laid out afresh, over the window.** The stretch the gesture actually
+ * touches ({@link windowOf}) is written as one run of rests and notes, and the
+ * items outside it are not touched at all — a rest the notes never reached
+ * keeps its bytes and its declarations both. Within the window everything but
+ * the whitespace must be leaving ({@link itemsRunTogether}): an item's unit
+ * `planEdits` removes, or a declaration deleted with the item that owned it,
+ * whose spans only ever abut this run rather than overlap it. That is what
+ * lets a region hold more than one note being created — a carve's split leaves
+ * a tail beside the note that split it — while a `v200` on the far side of the
+ * region stands.
+ *
+ * On either road, a rest the born notes wholly cover is erased from existence
+ * the way a carved-out note is, and its defining commands go with it
+ * ({@link prefixCommandsOf}) — read off tick geometry rather than off the
+ * carve, since rests are not notes and `plan.erased` never names one, which
+ * also means a note drawn exactly over a whole rest erases it in every mode.
  *
  * A builder answering `null` is refused too, rather than passed on as no edits:
  * `planEdits` pushes what each region returns and goes on to the next, so a note
@@ -1565,6 +1874,7 @@ function spawnInto(
   context: EditContext,
   gap: Region,
   survivors: ReadonlyMap<number, PlacedNote>,
+  deleted: readonly Span[],
 ): Edit[] | EditRefusal {
   const { source, strip } = context;
   if (gap.born.length === 0) {
@@ -1573,6 +1883,7 @@ function spawnInto(
 
   const order = [...gap.born].sort((a, b) => a.startTick - b.startTick);
   const born = order[order.length - 1];
+
   const empty = strip.items.length === 0;
   // A channel being written from nothing has just had its own `o4` put in front
   // of it, so a note in that octave has nothing to add (`channelOpening`).
@@ -1609,44 +1920,87 @@ function spawnInto(
    */
   const single = gap.rests.length === 1 && gap.between === 1;
   const settled = gap.tail || gap.ticks === rested(gap.rests, 0);
-  const inPlace = order.length === 1 && gap.between === gap.rests.length && settled;
+  const inPlace =
+    order.length === 1 && gap.rests.length > 0 && gap.between === gap.rests.length && settled;
 
-  /** Whether the run answers to the whole region rather than to one rest inside it. */
+  /** Whether the run is laid out afresh rather than fitted inside one rest. */
   let laidOut = true;
   let over: StripItem | null;
+  /**
+   * The interior items the run consumes ({@link windowOf}); the ones outside it
+   * keep their bytes, kept declarations included. The first two roads consume
+   * what they always did — the region's one rest, or the one the note falls
+   * inside — so for them it only feeds the bookkeeping below.
+   */
+  let window: readonly StripItem[];
   if (single) {
     over = gap.rests[0];
+    window = gap.rests;
   } else if (inPlace) {
     over = restFor(gap, born);
     laidOut = false;
-    // With no rest in it there is nothing for the run to be laid over, and so no
-    // boundary of anything that survives for it to move: the run is inserted at
-    // one offset and every item in the region is a note `planEdits` removes
-    // outright. A command written between two of them keeps its place in the
-    // text and changes tick for the reason deleting those notes changes it —
-    // what it stood against has gone. Which is the commonest region a carve
-    // leaves, since a note drawn over a run of notes swallows all of them.
-  } else if (gap.rests.length === 0 || itemsRunTogether(context, gap)) {
-    over = gap.rests[0] ?? null;
+    // A note that starts in one rest and ends in another: the run written
+    // between them would have to move, and only the porter knows which side of
+    // the note it belongs on.
+    if (over === null) {
+      return refuse(REFUSE_CROWDED);
+    }
+
+    window = [over];
   } else {
+    window = windowOf(strip, gap, order);
+    over = window.find((item) => item.kind === 'rest') ?? null;
+  }
+
+  // Everything in the window but the whitespace is either leaving — a unit
+  // `planEdits` removes, or a declaration deleted with the item that owned it,
+  // which arrives here as a span so the run can tell text that is going from
+  // text that would have to move — or is a `'note-state'` command the run writes
+  // for itself on the tick it stands on. A `t`, an `l` or a `/` in there still
+  // refuses, for the reason deleting the notes around it would move it: what it
+  // stood against has gone, and the run has nothing to say on its behalf.
+  const carried = windowCarries(context, window, deleted);
+  if (carried === null) {
     return refuse(REFUSE_CROWDED);
   }
 
-  // A note that starts in one rest and ends in another: the run written between
-  // them would have to move, and only the porter knows which side it belongs on.
-  if (over === null && gap.rests.length > 0) {
-    return refuse(REFUSE_CROWDED);
+  const wide = window.length === gap.between;
+  // A run that leaves items of the region standing cannot absorb a resize:
+  // their ticks are exactly what it must not rewrite. No gesture builds such a
+  // region — a pushed note bounds its own region, and a carve keeps the
+  // region's ticks — so this is a guard rather than a road.
+  if (laidOut && !wide && !gap.tail) {
+    let interiorTicks = 0;
+    for (let index = gap.after + 1; index < gap.before; index++) {
+      interiorTicks += strip.items[index].ticks;
+    }
+
+    if (gap.ticks !== interiorTicks) {
+      return refuse(REFUSE_CROWDED);
+    }
   }
 
-  // Only the last of the tail's rests may grow, and that is what lets a note be
-  // drawn past the end of a channel at all.
-  const grows = gap.tail && (over === null || over === gap.rests[gap.rests.length - 1]);
+  // Only a run reaching the tail's end may grow, and that is what lets a note
+  // be drawn past the end of a channel at all.
+  const grows =
+    gap.tail &&
+    (laidOut
+      ? gap.between === 0 || window[window.length - 1] === strip.items[gap.before - 1]
+      : over === gap.rests[gap.rests.length - 1]);
 
-  const runFrom = laidOut || over === null ? gap.startTick : over.startTick;
+  // A wide window answers to the region's own bounds, which for a note being
+  // fitted among pushed neighbours are not the old items' — a narrow one to its
+  // items, whose ticks the guard above holds still.
+  const windowLast = window[window.length - 1];
+  const narrow = windowLast !== undefined && !wide;
+  const runFrom =
+    laidOut || over === null ? (narrow ? window[0].startTick : gap.startTick) : over.startTick;
   const runTo = grows
     ? Math.max(end, channelEnd)
     : laidOut || over === null
-      ? gap.startTick + gap.ticks
+      ? narrow
+        ? windowLast.startTick + windowLast.ticks
+        : gap.startTick + gap.ticks
       : over.startTick + over.ticks;
 
   /** One rest before each note, and one more after the last — `order.length + 1`. */
@@ -1667,15 +2021,28 @@ function spawnInto(
 
   gaps.push(runTo - at);
 
+  /** What the run has to write at a tick of its own, in the song's ticks. */
+  const marks: RunMark[] = [];
   // The tick the song loops back to, where this channel is being opened and the
-  // run is long enough to reach it. `gap.startTick` is 0 for an empty channel —
-  // it has one region and it begins at the top — so the run's own ticks and the
-  // channel's are the same count.
-  const total = runTo - runFrom;
-  const introAt =
-    empty && context.introTicks !== null && context.introTicks >= 0 && context.introTicks <= total
-      ? context.introTicks
-      : null;
+  // run reaches it. `gap.startTick` is 0 for an empty channel — it has one
+  // region and it begins at the top — so the run covers the channel's own ticks.
+  if (
+    empty &&
+    context.introTicks !== null &&
+    context.introTicks >= runFrom &&
+    context.introTicks <= runTo
+  ) {
+    marks.push({ tick: context.introTicks, text: '/' });
+  }
+
+  for (const each of carried) {
+    marks.push({
+      tick: each.tick,
+      text: source.slice(each.command.span.start, each.command.span.end),
+    });
+  }
+
+  marks.sort((a, b) => a.tick - b.tick);
 
   /**
    * The octave the run leaves standing, which is the note's own: a spawn writes
@@ -1724,7 +2091,9 @@ function spawnInto(
    * written in a comment, which costs the note an `o` it did not need and
    * nothing else.
    */
-  const runAt = over ? over.unitSpan.start : (previous?.unitSpan.end ?? 0);
+  const runAt = over
+    ? over.unitSpan.start
+    : (windowLast?.unitSpan.end ?? previous?.unitSpan.end ?? 0);
   const inForce =
     previous !== null && !MOVES_OCTAVE.test(source.slice(previous.unitSpan.end, runAt))
       ? standing
@@ -1733,15 +2102,14 @@ function spawnInto(
   /** The head the octave would be put back at, which is where the reader begins. */
   const readAt = reader >= 0 ? strip.items[reader].unitSpan.start : 0;
   /**
-   * Where the run's text ends, which is where the splice over `over` and
-   * {@link writeInto} put it: the rest it was written over, the last item in
-   * the region, or the reader's own head for a region at the top of the channel.
+   * Where the run's text ends, which is where the splice over `over` and the
+   * insertions below put it: the rest it was written over, the window's last
+   * item, or the reader's own head for a region at the top of the channel.
    */
   const runEnd = over
     ? over.unitSpan.end
-    : gap.after >= 0
-      ? strip.items[gap.before - 1].unitSpan.end
-      : readAt;
+    : (windowLast?.unitSpan.end ??
+      (gap.after >= 0 ? strip.items[gap.before - 1].unitSpan.end : readAt));
 
   /**
    * Whether the note after the gap can be left as it is.
@@ -1757,7 +2125,15 @@ function spawnInto(
    */
   const untouched = owed === leaves && !MOVES_OCTAVE.test(source.slice(runEnd, readAt));
 
-  const run = spawnRun(context, order, gaps, opening ? OPENING_OCTAVE : inForce, introAt, trailing);
+  const run = spawnRun(
+    context,
+    order,
+    gaps,
+    runFrom,
+    opening ? OPENING_OCTAVE : inForce,
+    marks,
+    trailing,
+  );
   if (run === null) {
     return refuse(REFUSE_SPELL);
   }
@@ -1772,26 +2148,42 @@ function spawnInto(
     restore = insertAt(strip.items[reader].unitSpan.start, `${spelled} `, 1);
   }
 
-  // No rest to write over — the region holds nothing, or nothing but notes this
-  // plan is removing — so the run is inserted rather than written over anything.
-  const edit = over ? spliceRange(source, over.unitSpan, run) : writeInto(context, gap, run);
+  // No rest to write over — the window holds nothing but notes this plan is
+  // removing — so the run is inserted after its last item, where the removals
+  // leave a hole of exactly the run's ticks and the insertion only abuts them.
+  // A window with no items at all is a run written beside the region's anchors,
+  // which is {@link writeInto}'s to place.
+  const edit = over
+    ? spliceRange(source, over.unitSpan, run)
+    : windowLast !== undefined
+      ? insertAt(windowLast.unitSpan.end, ` ${run}`, 1)
+      : writeInto(context, gap, run);
   if (edit === null) {
     return refuse(REFUSE_CROWDED);
   }
 
-  // A run laid out afresh is the whole region's ticks, so the rests it did not
-  // go over are gone: what they held is in the run now. Each goes as its own
-  // edit rather than the whole stretch going as one splice, since anything
-  // between them is a unit `planEdits` is removing and two edits over one run of
-  // text is what it refuses.
+  // A run laid out afresh is the whole window's ticks, so the rests in it that
+  // it did not go over are gone: what they held is in the run now. Each goes as
+  // its own edit rather than the whole stretch going as one splice, since
+  // anything between them is a unit `planEdits` is removing and two edits over
+  // one run of text is what it refuses.
   const gone = laidOut
-    ? gap.rests.filter((rest) => rest !== over).flatMap((rest) => removeItem(source, rest))
+    ? window
+        .filter((item) => item.kind === 'rest' && item !== over)
+        .flatMap((item) => removeItem(source, item))
     : [];
+
+  // A carried command the run has re-emitted has to come out of where it was
+  // written, unless the unit it stands inside is itself being spliced — that
+  // takes it along, and taking it twice is two edits over one run of text.
+  const taken = carried
+    .filter((each) => !each.inside)
+    .flatMap((each) => removeCommand(source, each.command));
 
   // The run first where the two land on the same offset — a run inserted at the
   // head of the note it is being written in front of — so `coalesce` joins them
   // in the order they are read.
-  return restore ? [edit, ...gone, restore] : [edit, ...gone];
+  return restore ? [edit, ...gone, ...taken, restore] : [edit, ...gone, ...taken];
 }
 
 export function planEdits(context: EditContext, plan: Plan): Edit[] | EditRefusal {
@@ -1818,6 +2210,7 @@ export function planEdits(context: EditContext, plan: Plan): Edit[] | EditRefusa
   // moved out of `survivors`, which is all it takes: the loop below removes the
   // unit of anything it does not find there, and `regionsOf` hands a born note
   // to the region its new tick lands in.
+  const lifted = new Set<number>();
   for (const index of crossings(strip, survivors)) {
     const note = survivors.get(index);
     if (!note) {
@@ -1831,10 +2224,11 @@ export function planEdits(context: EditContext, plan: Plan): Edit[] | EditRefusa
     // note the porter meant it to follow is not something a drag can say. This
     // is the same ground as `rewriteNote` refusing to move such a note's start.
     if (strip.items[index].segments.length > 1) {
-      return refuse(REFUSE_RAMP);
+      return refuse(REFUSE_INSIDE);
     }
 
     survivors.delete(index);
+    lifted.add(index);
     born.push({ ...note, from: -1 });
   }
 
@@ -1842,6 +2236,65 @@ export function planEdits(context: EditContext, plan: Plan): Edit[] | EditRefusa
   // back at a note's head has to agree with what the run in front of it leaves,
   // and `survivors` and `born` are both settled once the crossings are out.
   const regions = regionsOf(strip, survivors, born);
+
+  /** The born notes in tick order, which both passes below read. */
+  const order = [...born].sort((a, b) => a.startTick - b.startTick);
+
+  // An item the plan removes takes the `'note-state'` commands written in its
+  // prefix and inside its own unit with it, but only the ones nothing still
+  // sounds under (`reachesSomething`). Removal and not erasure: a Backspace, a
+  // glue and a carve are one case, since which gesture emptied the ticks says
+  // nothing about what a command reaches. A note the plan lifts across a
+  // neighbour is moving rather than dying, so its prefix travels with it. The
+  // channel's first item is exempt whatever happens to it — its prefix reaches
+  // back over the channel's own header.
+  const unheard = new Set<Command>();
+  /** Those a removed unit's own splice takes out, and so need no edit of their own. */
+  const swallowed = new Set<Command>();
+  for (let index = 0; index < strip.items.length; index++) {
+    const item = strip.items[index];
+    const removed =
+      item.kind === 'note'
+        ? !survivors.has(index) && !lifted.has(index)
+        : coveredByBorn(order, item);
+    if (!removed) {
+      continue;
+    }
+
+    if (index > 0) {
+      for (const command of prefixCommandsOf(strip, item)) {
+        if (!reachesSomething(context, command, item.startTick, index, survivors, born)) {
+          unheard.add(command);
+        }
+      }
+    }
+
+    // A command written inside the unit is asked the same question, on its own
+    // tick — but only a `'note-state'` one may be dropped at all. A `t` acts on
+    // the song, so no note ever has it in force and the reach test would answer
+    // "nothing" for a command every channel is listening to.
+    for (const { command, tick } of insideCommands(strip, item)) {
+      if (
+        commandScope(command) === 'note-state' &&
+        !command.inRemoteDefinition &&
+        !reachesSomething(context, command, tick, index, survivors, born)
+      ) {
+        unheard.add(command);
+        swallowed.add(command);
+      }
+    }
+  }
+
+  // Every drop is written out here rather than beside the item that owned it:
+  // a rest's prefix would otherwise have nowhere to go, since the item loop
+  // below passes over rests and the run that covers one only rewrites its unit.
+  for (const command of unheard) {
+    if (!swallowed.has(command)) {
+      edits.push(...removeCommand(source, command));
+    }
+  }
+
+  const deleted: Span[] = [...unheard].map((command) => command.span);
 
   // The octave the edited text leaves in force, carried down the channel so a
   // note only writes one where the one already standing is not the one it needs.
@@ -1888,11 +2341,25 @@ export function planEdits(context: EditContext, plan: Plan): Edit[] | EditRefusa
 
     const note = survivors.get(index);
     if (!note) {
+      // A command written inside the unit is inside the span `removeItem`
+      // splices, so it would go with the note and say nothing about it. Where a
+      // run is being laid over these ticks it is taken over on its own tick
+      // (`windowCarries`); where nothing is, there is no tick left to put it on
+      // and no gesture can say which side of the deletion the porter meant it to
+      // follow, so it is refused instead of quietly eaten.
+      if (
+        !coveredByBorn(order, item) &&
+        insideCommands(strip, item).some(({ command }) => !unheard.has(command))
+      ) {
+        return refuse(REFUSE_INSIDE);
+      }
+
       // The unit takes the `o` written beside it with it (`roll-strip.ts`,
       // `growUnits`), and what stood in force for the notes after it goes too.
       // `running` is left alone: what stands after a removed unit is what stood
       // before it, which is what it already holds.
       edits.push(...removeItem(source, item));
+
       dropped = true;
       previous = item;
       continue;
@@ -2000,7 +2467,7 @@ export function planEdits(context: EditContext, plan: Plan): Edit[] | EditRefusa
   }
 
   for (const region of regions) {
-    const written = realiseRegion(context, region, survivors);
+    const written = realiseRegion(context, region, survivors, deleted);
     if (!isEdits(written)) {
       return written;
     }
@@ -2037,7 +2504,7 @@ export function planEdits(context: EditContext, plan: Plan): Edit[] | EditRefusa
  * which of them lands first decides the result, and nothing in the pair says
  * which should. One edit over the joined run has one answer.
  */
-function coalesce(sorted: readonly Edit[]): Edit[] {
+export function coalesce(sorted: readonly Edit[]): Edit[] {
   const joined: Edit[] = [];
   for (const edit of sorted) {
     const held = joined[joined.length - 1];

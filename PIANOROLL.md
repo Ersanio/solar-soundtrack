@@ -85,7 +85,88 @@ A wide bar shows more icons than a narrow one, and a bar too small for its own n
 all; three dots in the last slot mean there are more than fit, on a chip of their own when one of
 the ones they stand for starts at that note. The hover and the inspector always have the whole
 list — the inspector under two headings, one for what the note sets and one for what it plays
-under.
+under. Its buttons answer to the same pair the bar's own icons do: a click asks the inspector about
+that command and leaves you in the roll, a double click goes to it in the MML.
+
+## The command lane
+
+Under the roll is a strip holding nothing but command icons, on the song's own timeline: what takes
+effect, and where, with the note data out of the way. **Commands** on the toolbar opens and closes
+it, and it stays as you left it.
+
+It holds **every command that takes effect** — the song's own settings, `t`, `w`, `$E4` and the whole
+echo unit, `$EF` to `$F2` and the `$F5` filter, and every channel setting too: a `v`, a `y`, an `@`,
+an `$ED`, and the ones that switch something off, `$DF`, `$F0`, `$FD` and `$FE`. Each sits on the
+tick the driver reads it at, whatever else is happening there.
+
+Most of those also show as an icon on a note bar, and the two are not repeating each other. A bar's
+icons are the commands acting on _that note_, so they stand where the note does; the lane stands
+where the driver reads the command. In `c4 v200 d4` those are the same tick. In `c4 v200 r4 d4` they
+are a rest apart — the lane has the `v200` in the rest, where it runs, and `d4`'s icon says `d4` is
+the note playing under it. The lane is the one place the whole song's commands can be read in the
+order they run, which a set of per-note icons cannot be.
+
+Three things are on no bar at any point in the song, so the lane is the only place they appear at
+all: a command replaced before the next note sounds, one written after a channel's last note, and the
+four that switch something off — a bar names what a note is playing _under_, and there is nothing to
+name once vibrato is off.
+
+The other direction: `q`, `h` and `@21`-`@29` are on the bars alone and never here. They emit no
+byte, so the driver never reads them at a tick of their own; the note they fold into is their only
+honest position, and that note is already drawing them. Neither an `o` nor an `l` is a command in
+this sense — they are what the roll's rows and lengths already are.
+
+The icons are all eight channels at once, each in its channel's colour — which for a song-wide
+command is the channel that wrote it.
+
+**The channel you are editing sits in the top rows**, above every other channel's, so its commands
+are the ones you can read without lifting the stack. Pick a different channel and the rows are dealt
+again.
+
+**Muting a channel takes its own settings off the lane.** A `v`, a `y`, an `@` or an `$ED` on a
+channel you cannot hear sets nothing you can hear, so it goes rather than fading. What that channel
+contributes to the whole song stays and fades instead: a `t`, a `w` or an echo write runs whatever
+channel it happens to be written on, and muting that channel does not stop it.
+
+**Whatever command you are inspecting is outlined here**, in the same white the roll outlines a
+selected note with, however you reached it — an icon on a bar, an icon in the lane, or a button in
+the note inspector. The lane is the one place every command appears, so it is where "this is the one"
+can always be said. A command written inside a `[ ]` that plays twice is outlined at both ticks: it
+is one command, wherever the driver reads it.
+
+**Drag the line above the lane to make it taller**, the way the divider between the editor and the
+output pane works. Five icons deep is where it opens and the shortest it goes; ten is the tallest.
+Double-click the line to put it back to five. The height is remembered with the rest of the roll's
+settings.
+
+The lane scrolls sideways with the roll and carries the same grid and the same playhead, so an icon
+sits under the note it acts on and on the beat it lands on — centred on its own tick, straddling the
+bar or beat rule it runs on. The two ends are the exceptions, so that neither goes off the edge: the
+one at the very start sits just inside it, and one on the song's last tick just inside that. Where several land on one tick they stack
+upwards; five icons deep is as much as the lane opens at, and a plain wheel over it lifts the stack
+when there is more. Nothing is ever left out for want of room — however many commands land on one
+tick, each gets a row of its own, and the wheel and the seam are what reach them. Click an icon to
+ask the inspector about that command, or double-click it to go
+to it in the MML — the same as clicking one on a bar, except that it leaves the channel you are
+editing alone. **Right-click one to delete it**, in one undo step. That is the counterweight to a
+roll that keeps a command wherever something still plays under it: an edit hands the command back to
+the notes that need it, and this is how you say none of them do. A command written through a
+`"name=value"` cannot be deleted this way — its icon offers no right-click — because the text it
+would take out is the call site rather than the command.
+
+**Drag an icon sideways to move that command to another tick.** It snaps to the starts of the notes
+and rests in its own channel — the ticks where something actually begins — so it lands in front of a
+note or a rest rather than part-way through one, and it never leaves the channel it is written in,
+since within a channel the order of the text is the order things happen. Let it go where it already
+runs and nothing happens at all, not even an undo step. Dragging up or down does nothing: which row
+an icon sits on is packing, and says nothing about the song.
+
+This is also how a command written **inside** a note is got out of one — a `v200` between a note's
+head and its `^` — which is what deleting or gluing that note is otherwise refused for.
+
+A song-wide setting drags too, on the boundaries of the channel that wrote it, which is the channel
+its colour names. If the roll cannot read that channel — a `[ ]`, a `(n)` call, a `"name=value"` —
+the icon turns red while you hold it and the lane says why; letting go then changes nothing.
 
 ## Three settings that decide how a drag lands
 
@@ -146,6 +227,36 @@ It is one rule for every gesture — drawing, dragging, nudging with the arrows,
 and `Alt+Q` — so where you grabbed the bar does not change the answer. It does not reach the Length
 slider in the inspector, which writes one note's own length and never looks at its neighbours.
 
+## What happens to a command when the note it was written for goes
+
+Every gesture that removes a note or a rest — a `Backspace`, a note drawn over the top, a glue, a
+carve — asks the same question about the `v`, `y`, `q`, `@` and the like written just in front of it:
+**does anything in the edited song still play under it?**
+
+If something does, the command stays. A note you did not touch counts, and so does the note you are
+drawing, so the spot keeps its dynamics and what changed is which note sits there. If nothing does —
+it was the last note on the channel, or another `v` takes over before the next note sounds — the
+command goes with the note.
+
+The gesture is no part of the question. `Backspace` on a note and drawing over the same note get the
+same answer, which is a fact about the song rather than about how you got there. It is the driver's
+own reading, too, not a scan of the MML: a command inside a `[ ]` played twice, or a `(1)n` called
+from another channel, is followed where it actually runs.
+
+A command that stays stays exactly where you wrote it. Where the roll has to lay a whole run of new
+text over the stretch that held it — drawing over two notes with a `v200` between them — it writes
+the command out again on the tick it ran at, which splits the note you drew into two tied halves
+around it: `c4 d4 v200 e4 f4` drawn over from the `d4` comes back `c4 g4 v200 ^4 f4`. A tie is one
+note, so nothing about what you drew has changed.
+
+Song settings such as `t` and `w`, an `o` or an `l`, and the intro `/` are outside all of this: no
+note gesture moves one. Dragging its icon along the command lane is how a `t` or a `w` is moved on
+purpose, and an `o`, an `l` and the `/` are not in the lane at all. So is everything written above a
+channel's first note, which is the channel's setup rather than any one note's. And a command written **inside** a note — between its head and a `^` —
+can only be kept by a run being laid over those ticks; delete or glue such a note with something
+still playing under that command and the gesture is refused instead, because there is no tick left
+to put it on. Delete it from the lane first if you meant it to go.
+
 ## What the roll will and will not do
 
 - **No chords.** A channel plays one note at a time, so two notes can never overlap. What a gesture
@@ -158,10 +269,13 @@ slider in the inspector, which writes one note's own length and never looks at i
 - **A command written inside a note pins that note's start.** A `v200` halfway through a note stands
   a number of ticks into it, so taking ticks off that note's _front_ would carry the command along
   with it and it would sound later than you wrote it. Overwriting the head of such a note is
-  refused; overwriting its tail is not, and the command stays exactly where it is.
+  refused; overwriting its tail is not, and the command stays exactly where it is. Cutting the note
+  shorter than the ticks in front of the command is refused too — there is nowhere left inside the
+  note for it to fire.
 - **A gap is a rest.** The space between two notes is the rest between them, and moving a note
   rewrites that rest rather than moving anything else. Anything you wrote inside the gap keeps its
-  distance from the note that follows it.
+  distance from the note that follows it, and a rest covered completely is asked the same question a
+  note is — see above.
 - **A refusal says so.** Where a gesture cannot be written, the roll turns the bars red while you
   are still holding it, and the toolbar says why in words — "there is something written where that
   note would go", and so on. A reason arrived at only when you let go stays on the toolbar until the
@@ -171,7 +285,8 @@ slider in the inspector, which writes one note's own length and never looks at i
   refused: that is a change to what every note after it plays on, not a move.
 - **Drawing on an empty channel writes the channel.** Pick a channel the song has never used and draw
   on it, and the roll writes a `#N` block for it at the end of the MML, with the settings a fresh
-  channel runs under — `o4 l8 q7F @0 v255 y10` — before the note. All of it is one undo step. The
+  channel runs under — `o4 q7F @0 v255 y10` — before the note. No `l`: every length the roll writes
+  is the note's own, so nothing it puts there reads a default. All of it is one undo step. The
   block goes at the end because an octave and a default length carry across a `#N`, so a block
   dropped in between two others would change what the second one is read under; **Normalize** is what
   puts the blocks back in `#0` to `#7` order.
@@ -197,9 +312,9 @@ it is. Unmute it, or lift the solo, and it takes edits again — though the sele
 back, having been dropped rather than hidden.
 
 Some MML has no one-to-one relationship between what is written and what is played, and the roll says
-so in the toolbar rather than guessing. A `[ ]` loop, a `*` or `(n)` call, a `{ }` triplet, a
-`"name=value"` replacement, a `$DD` pitch slide or a `#halvetempo` all mean one written note is not
-one played note.
+so in the toolbar rather than guessing. A `[ ]` loop, a `[[ ]]` subloop or the same thing written as
+`$E6 $00` … `$E6 $nn`, a `*` or `(n)` call, a `{ }` triplet, a `"name=value"` replacement, a `$DD`
+pitch slide or a `#halvetempo` all mean one written note is not one played note.
 
 A remote code definition is not one of them. `(!1)[ … ]` has to be written above the first `#N`, which
 puts it on the same channel the music below that marker starts on, but its body plays only where a
@@ -207,6 +322,6 @@ puts it on the same channel the music below that marker starts on, but its body 
 and the definition is left exactly where it was written.
 
 The **Normalize #N** button beside that message rewrites just that channel into a shape the roll can
-splice — loops written out, triplets given plain lengths — and leaves every other channel of the song
-exactly as it was. The plain **Normalize** button does the whole song. Neither changes what the song
+splice — loops and subloops written out, triplets given plain lengths, and every note given its own
+length so that no `l` decides it — and leaves every other channel of the song exactly as it was. The plain **Normalize** button does the whole song. Neither changes what the song
 plays: the result is compiled and compared against the original first, and refused if anything moved.

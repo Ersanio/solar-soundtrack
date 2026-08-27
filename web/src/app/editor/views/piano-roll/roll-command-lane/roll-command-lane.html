@@ -1,0 +1,176 @@
+<svg
+  class="block select-none"
+  [attr.height]="laneHeight()"
+  [attr.viewBox]="box()"
+  [style.width.px]="width()"
+  [style.cursor]="carried() ? 'grabbing' : ''"
+  (wheel)="onWheel($event)"
+  (pointermove)="onLaneMove($event)"
+  (pointerup)="onLaneUp($event)"
+  (pointercancel)="onLaneCancel()"
+>
+  <defs>
+    <clipPath id="amk-lane-clip">
+      <rect y="0" [attr.x]="keyWidth" [attr.width]="rollWidth()" [attr.height]="laneHeight()" />
+    </clipPath>
+  </defs>
+
+  <rect
+    y="0"
+    class="fill-inset"
+    [attr.x]="keyWidth"
+    [attr.width]="rollWidth()"
+    [attr.height]="laneHeight()"
+  />
+
+  <!-- The lane's own name, in the column the keyboard has below. -->
+  <text
+    x="8"
+    class="fill-ink-muted text-[10px] font-semibold tracking-wide uppercase"
+    dominant-baseline="central"
+    [attr.y]="laneHeight() / 2"
+  >
+    Commands
+  </text>
+
+  <g clip-path="url(#amk-lane-clip)">
+    <!-- Sideways with the roll, then up by whatever the wheel has lifted. Two
+         transforms because they are two cameras: the first is the song's and is
+         shared with everything else drawn over the roll, the second is this
+         lane's alone. -->
+    <g [attr.transform]="scroll()">
+      <!-- Outside the lift: the grid belongs to the song, so it stays put while
+           the stack over it is scrolled. -->
+      <g
+        amk-roll-grid
+        [lines]="lines()"
+        [height]="laneHeight()"
+        [loopX]="loopX()"
+        [endX]="endX()"
+      />
+
+      <g [attr.transform]="stack()">
+        <!-- The lane leaves out whatever the pointer has taken over, or the
+             command would be painted twice: once here off the compiled song and
+             once again under the pointer. -->
+        @for (glyph of lane().glyphs; track glyph.id) {
+          @if (carried()?.glyph?.id !== glyph.id) {
+            <!-- The plate is the hit target as well as the hover: an SVG element
+                 takes a pointer only where it is painted, so without it a glyph is
+                 clickable on its strokes and not in the gaps between them. -->
+            <!-- `contextmenu` on the glyph and not on the lane, so a right click
+                 on the background still gives the porter their browser menu. -->
+            <!-- The cursor is the element's own, which beats anything it would
+                 inherit, and it says which of the two gestures a press starts. -->
+            <g
+              class="group"
+              [style.cursor]="glyph.cursor"
+              (pointerdown)="onGlyphDown(glyph, $event)"
+              (click)="inspect(glyph, $event)"
+              (dblclick)="inspect(glyph, $event, true)"
+              (contextmenu)="erase(glyph, $event)"
+            >
+              <title>{{ glyph.title }}</title>
+              <!-- Rung rather than recoloured, and in the roll's own words: a
+                   glyph's tint is which channel it is on, and a selection that
+                   took that away would be a selection that renamed the channel. -->
+              @if (selected() === glyph.command) {
+                <rect
+                  rx="3"
+                  fill="none"
+                  class="stroke-ink"
+                  stroke-width="1.5"
+                  [attr.x]="glyph.x - 1"
+                  [attr.y]="glyph.y - 1"
+                  [attr.width]="glyph.size + 2"
+                  [attr.height]="glyph.size + 2"
+                />
+              }
+              <rect
+                rx="2"
+                class="fill-ink/0 group-hover:fill-ink/25"
+                [attr.x]="glyph.x"
+                [attr.y]="glyph.y"
+                [attr.width]="glyph.size"
+                [attr.height]="glyph.size"
+                [attr.fill-opacity]="glyph.opacity"
+              />
+              <!-- `svg` is one of the three element names that carry a namespace
+                   implicitly, so this one takes no prefix even inside an <svg>. -->
+              <svg
+                amk-glyph
+                class="pointer-events-none"
+                [class]="glyph.tint"
+                [name]="glyph.icon"
+                [attr.x]="glyph.x"
+                [attr.y]="glyph.y"
+                [attr.width]="glyph.size"
+                [attr.height]="glyph.size"
+                [attr.opacity]="glyph.opacity"
+              ></svg>
+            </g>
+          }
+        }
+
+        <!-- The command under the pointer, on the tick it would be dropped on.
+             A refused drag keeps it where the command still is, and red. -->
+        @if (carried(); as carried) {
+          <g class="pointer-events-none">
+            <rect
+              rx="2"
+              [class]="carried.blocked ? 'fill-danger/25' : 'fill-ink/25'"
+              [attr.x]="carried.x"
+              [attr.y]="carried.glyph.y"
+              [attr.width]="carried.glyph.size"
+              [attr.height]="carried.glyph.size"
+            />
+            <svg
+              amk-glyph
+              [class]="carried.blocked ? 'text-danger' : carried.glyph.tint"
+              [name]="carried.glyph.icon"
+              [attr.x]="carried.x"
+              [attr.y]="carried.glyph.y"
+              [attr.width]="carried.glyph.size"
+              [attr.height]="carried.glyph.size"
+            ></svg>
+          </g>
+        }
+      </g>
+    </g>
+
+    <line
+      y1="0"
+      class="stroke-accent"
+      stroke-width="1.5"
+      [attr.x1]="playheadX()"
+      [attr.x2]="playheadX()"
+      [attr.y2]="laneHeight()"
+    />
+  </g>
+
+  <!-- Outside the clip and outside both transforms: a refusal is about the
+       gesture rather than about the song, so it stands still while the drag that
+       earned it runs, and cannot be scrolled away from. -->
+  @if (dragRefusal(); as reason) {
+    <text
+      class="fill-danger pointer-events-none text-[10px]"
+      [attr.x]="keyWidth + 6"
+      [attr.y]="laneHeight() - 4"
+    >
+      {{ reason }}
+    </text>
+  }
+
+  <!-- Inside the `<svg>`, so saying the stack runs deeper costs no width. -->
+  @if (thumb(); as thumb) {
+    <rect
+      rx="1.5"
+      width="3"
+      class="fill-ink-muted"
+      fill-opacity="0.5"
+      [attr.x]="width() - 5"
+      [attr.y]="thumb.y"
+      [attr.height]="thumb.height"
+    />
+  }
+</svg>

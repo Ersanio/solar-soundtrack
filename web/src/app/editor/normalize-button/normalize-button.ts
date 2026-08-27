@@ -25,11 +25,12 @@ const CHANGES: Record<NormalizePass, string> = {
   replacements:
     '"name=text" replacements written out where they are used, and their definitions removed',
   triplets: '{ } triplets written as plain note lengths',
+  lengths: 'every note given its own length, and l removed',
   loops: 'every [ ] loop, * and (n) call written out in full, once per time it plays',
   channels:
     'one block per channel, in #0 to #7 order, with music above the first #N moved under it',
   defaults:
-    'the octave, default length, quantization, instrument and tempo written where the song left them implied, and < > made absolute',
+    'the octave, quantization, instrument and tempo written where the song left them implied, and < > made absolute',
   drums: 'the drum instrument written before every drum note',
 };
 
@@ -118,7 +119,7 @@ export class NormalizeButton {
 
   protected readonly title = computed(() =>
     this.channel() === null
-      ? 'Rewrite the song for editing: #define and replacements resolved, every loop unrolled, triplets written out, one block per channel, and o/l/q/@/t written where the song left them implied. What plays does not change; refused if it would.'
+      ? 'Rewrite the song for editing: #define and replacements resolved, every loop unrolled, triplets written out, every note given its own length, one block per channel, and o/q/@/t written where the song left them implied. What plays does not change; refused if it would.'
       : `Rewrite channel ${this.channel()} for editing, and leave every other channel exactly as it is. What plays does not change; refused if it would.`,
   );
 

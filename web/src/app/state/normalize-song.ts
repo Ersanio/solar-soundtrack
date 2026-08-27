@@ -27,6 +27,7 @@ import {
   resolvePreprocessor,
   unrollLoops,
   writeDefaults,
+  writeNoteLengths,
 } from '@amk/compiler/normalize';
 import type { CompileResult, Diagnostic, NoteAddress, ParseTrace, Span } from '@amk/core/types';
 import { type NoteState, type SongTimeline, type WalkNote, walkSong } from '@amk/spc/song-walk';
@@ -34,7 +35,14 @@ import { DEFAULT_TEMPO } from '@amk/tokens/commands/units';
 
 /** The passes, in the order they run; a successful outcome names the ones that changed the song. */
 export type NormalizePass =
-  'preprocessor' | 'replacements' | 'triplets' | 'loops' | 'channels' | 'defaults' | 'drums';
+  | 'preprocessor'
+  | 'replacements'
+  | 'triplets'
+  | 'lengths'
+  | 'loops'
+  | 'channels'
+  | 'defaults'
+  | 'drums';
 
 export type NormalizeOutcome =
   | { ok: true; text: string; diagnostics: Diagnostic[]; changed: readonly NormalizePass[] }
@@ -212,6 +220,7 @@ export function normalizeSong(
     ['preprocessor', 'preprocessor directives', resolvePreprocessor],
     ['replacements', 'replacements', inlineReplacements],
     ['triplets', 'triplets', flattenTriplets],
+    ['lengths', 'note lengths', writeNoteLengths],
   ];
   for (const [pass, name, run] of steps) {
     const blockedBy = advance(pass, name, run(current));

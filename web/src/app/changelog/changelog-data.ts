@@ -9,6 +9,25 @@ export interface ChangelogEntry {
 export const CHANGELOG: readonly ChangelogEntry[] = [
   // ─── newest first; add new blocks here ──────────────────────────────────
   {
+    date: '27 August 2026',
+    items: [
+      'A command timeline under the piano roll, showing what takes effect where',
+      'The command timeline shows every command in the song, on the tick it runs',
+      'The command timeline puts the channel you are editing in its top rows',
+      'Drag the line above the command timeline to make it taller',
+      'The command timeline no longer hides a crowded tick behind three dots',
+      'The command you are inspecting is outlined in the command timeline',
+      'Inspecting a command from the note panel no longer jumps to the MML',
+      'Muting a channel hides its own commands in the timeline, keeping the song-wide ones',
+      'Right-click a command in the timeline to delete it',
+      'Drag a command in the timeline to move it to another note or rest',
+      'Overwriting a note completely also clears the commands written for it',
+      'Normalize unrolls subloops written as $E6, so the piano roll can edit that channel',
+      'Normalize gives every note its own length instead of leaving it to l',
+      'Normalize no longer refuses songs whose remote code sets an octave, length or quantization',
+    ],
+  },
+  {
     date: '23 August 2026',
     items: [
       'The piano roll & note inspector shows which note a command takes effect at, and which notes are inheriting one',
