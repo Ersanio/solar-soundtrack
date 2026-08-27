@@ -745,6 +745,19 @@ stats.loopTicks` pads **every other channel that would cut the song short** out 
   `$DD` target note is the exception in the other direction — `parseNote` appends its byte and
   returns before it reads a length at all (`parser.ts:2971-2975`), so a length written there is a
   stray digit nothing reads, and `normalizetest`'s fixed-point check is what caught it.
+- **Pairing a crossed loop and subloop up, or unrolling one** — `[ c4 $E6 $00 d4 ]2 e4 $E6 $01`
+  compiles, AddmusicK guarding nesting and not crossing (`Music.cpp:1208-1290`), and `unrollLoops`'s
+  one stack popped the wrong partner at each end and dropped both in silence: no construct, no
+  diagnostic, and a dialog saying "Nothing to normalize" beside a roll refusing the channel and
+  offering Normalize as the answer. Matching the two ends up and emitting both constructs does not
+  work — the loop's range and the subloop's **partially overlap**, so neither `contains` the other,
+  both survive the `topLevel` filter and `applyEdits` throws. Neither does unrolling: a voice has one
+  subloop return (`Commands.asm:365`), so the close jumps into the other construct's body, and from
+  there the channel either ends on that body's `$00` with the call counter already spent
+  (`main.asm:2345`) — that song plays `c4 d4 c4 d4 e4 d4` and stops, with everything written after
+  the close never reached — or re-enters the `$E9` and starts its count again. `SST0616` says which
+  of the two it is. Not a check for entries left on the stack either: an unterminated `$E6 $00`
+  compiles, opens a subloop nothing closes, plays exactly what it says, and has nothing to unroll.
 
 ## Angular specifics
 

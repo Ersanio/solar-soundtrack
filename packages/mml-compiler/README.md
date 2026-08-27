@@ -110,7 +110,11 @@ diagnostic saying why: an instrument a copy would be tuned differently under —
 instrument tuning (`parseNote`), so no `h` is ever written and `@` only for a drum remap — a `*`
 with no loop before it, a legacy `&` whose duration byte comes from a bracket, `tuning[n]=`, and a
 `(!n, type, n)` whose length argument is the `l` in force, which is the one reader of the default
-that is not a note and so has nowhere to be written out to. The passes never emit text from bytes;
+that is not a note and so has nowhere to be written out to. A loop and a subloop that **cross** —
+one opened inside the other and closed outside it, which AddmusicK builds because it guards nesting
+and not crossing — is refused there too: a voice has one subloop return (`Commands.asm:365`), so the
+close jumps into the other construct's body, and the channel either ends on that body's `$00` with
+the call counter spent or re-enters the `$E9` and starts its count again. The passes never emit text from bytes;
 the note map's tick counts are the one thing read from the compile, for the lengths a triplet's
 notes become.
 

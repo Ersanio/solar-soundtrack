@@ -242,6 +242,17 @@ expectRefused("a pitch slide across a bracket", "#amk 4\n#0 c8 & [ d8 ]2\n", "SS
 // see one at all.
 expectRefused("a pitch slide across a hex subloop", "#amk 4\n#0 c8 & $E6 $00 d8 $E6 $01\n", "SST0607");
 expectRefused("a song that retunes an instrument", "#amk 4\ntuning[0]=2\n#0 [c8]2\n", "SST0608");
+// A loop and a subloop that cross. AddmusicK guards nesting and not crossing
+// (Music.cpp:1208-1290), so both of these build, and the driver's one subloop
+// return per voice sends the close into the other construct's body — the first
+// song plays `c4 d4 c4 d4 e4 d4` and then ends, with the `e4 $E6 $01` reached
+// once and everything after it never. No number of copies says that.
+expectRefused("a subloop that closes outside its loop", "#amk 4\n#0 [ c4 $E6 $00 d4 ]2 e4 $E6 $01\n", "SST0616");
+expectRefused("a subloop that closes inside a loop", "#amk 4\n#0 $E6 $00 c4 [ d4 $E6 $01 ]2\n", "SST0616");
+// The same crossing in brackets: `[[` appends `$E6 $00` inside the loop block
+// and `]]2` appends `$E6 $01` after it, with the `]` counting 1 for want of a
+// number, so this is the first song's bytes.
+expectRefused("the same crossing written with brackets", "#amk 4\n#0 [ c4 [[ d4 ] e4 ]]2\n", "SST0616");
 
 // ---------------------------------------------------------------------------
 console.log("\ntriplets");
@@ -558,6 +569,32 @@ console.log("\nnormalizing one channel");
 	check("a channel the whole song cannot manage: the whole song is refused", !whole.ok, "it normalized");
 	check(
 		"a channel the whole song cannot manage: #0 alone still normalizes",
+		scoped.ok,
+		scoped.ok ? "" : describe(scoped.diagnostics),
+	);
+}
+
+{
+	// The crossing is `#1`'s, so it refuses the whole song and the channel it is
+	// on, and leaves `#0` to normalize. That is why the diagnostic takes its
+	// channel from the `[` and not from the `$E6`, whose dispatch inside a loop
+	// body reports channel 8.
+	const source = "#amk 2\n#0 o4 [c4 d4]2 e4\n#1 o4 [ c4 $E6 $00 d4 ]2 e4 $E6 $01\n";
+	const whole = normalize(source);
+	const mine = normalizeSong(source, ARAM, OPTIONS, 1);
+	const scoped = normalizeSong(source, ARAM, OPTIONS, 0);
+	check(
+		"a crossing on another channel: the whole song is refused with SST0616",
+		!whole.ok && whole.diagnostics.some((d) => d.code === "SST0616"),
+		describe(whole.diagnostics),
+	);
+	check(
+		"a crossing on another channel: #1 alone is refused too",
+		!mine.ok && mine.diagnostics.some((d) => d.code === "SST0616"),
+		describe(mine.diagnostics),
+	);
+	check(
+		"a crossing on another channel: #0 alone still normalizes",
 		scoped.ok,
 		scoped.ok ? "" : describe(scoped.diagnostics),
 	);

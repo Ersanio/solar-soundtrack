@@ -655,6 +655,15 @@ interface Construct {
 	channel: number;
 }
 
+/** A construct whose opening has been met and whose close has not. */
+interface Opened {
+	index: number;
+	at: number;
+	remote: boolean;
+	sub: boolean;
+	from?: number;
+}
+
 /** The parse-time state a note reads, seen from one slot. */
 interface View {
 	octave: number;
@@ -764,7 +773,35 @@ export function unrollLoops(input: NormalizeInput): PassResult {
 	const diagnostics: Diagnostic[] = [];
 	const bodies = new Map<number, Body>();
 	const constructs: Construct[] = [];
-	const open: { index: number; at: number; remote: boolean; sub: boolean; from?: number }[] = [];
+	const open: Opened[] = [];
+
+	/**
+	 * A loop and a subloop that cross — one opened inside the other and closed
+	 * outside it. AddmusicK guards nesting and not crossing (Music.cpp:1208-1290,
+	 * 1985-2005), so it builds one, and the driver answers it with the one
+	 * subloop return each voice has (`Commands.asm:365`): the close jumps into
+	 * the other construct's body, and from there the channel either ends on that
+	 * body's `$00` with the call counter already spent (`main.asm:2345`) or
+	 * re-enters the `$E9` and starts its count again. Neither is a number of
+	 * copies of anything, so it is refused.
+	 *
+	 * Both ends meet the mismatch, so it is said once, and on the channel the
+	 * loop is written on: a dispatch inside a loop body reports channel 8.
+	 */
+	let crossed = false;
+	const crossing = (loop: Opened | undefined, message: string, span: Span): void => {
+		if (crossed || loop === undefined) {
+			return;
+		}
+
+		const channel = events[loop.index].channel;
+		if (input.onlyChannel !== undefined && channel !== input.onlyChannel) {
+			return;
+		}
+
+		crossed = true;
+		diagnostics.push(diagnostic("SST0616", message, span));
+	};
 
 	events.forEach((event, index) => {
 		const loop = event.loop;
@@ -784,6 +821,15 @@ export function unrollLoops(input: NormalizeInput): PassResult {
 			case "close": {
 				const opened = open.pop();
 				if (!opened || opened.sub) {
+					// A subloop opened inside this loop is still open at the `]`. The
+					// loop is the entry below it, and is there whenever this reports:
+					// written the other way round, `subClose` meets the mismatch first
+					// and has already said so.
+					crossing(
+						open[open.length - 1],
+						"A subloop opens inside this loop and closes outside it. Its close jumps back into the loop's body, so nothing written after it is played.",
+						event.span,
+					);
 					break;
 				}
 
@@ -822,6 +868,13 @@ export function unrollLoops(input: NormalizeInput): PassResult {
 			case "subClose": {
 				const opened = open.pop();
 				if (!opened?.sub) {
+					// A loop opened inside this subloop and closed outside it, so the
+					// entry popped is that loop itself.
+					crossing(
+						opened,
+						"This subloop opens outside a loop and closes inside its body. Its close re-enters the loop, so the loop's count starts again.",
+						event.span,
+					);
 					break;
 				}
 
