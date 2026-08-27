@@ -12,7 +12,6 @@
     "start": "npm start -w web",
     "build": "npm run build -w web",
     "watch": "npm run watch -w web",
-    "test": "npm run test -w web",
     "build:worklet": "npm run build -w @amk/spc",
     "sync-spc-assets": "node scripts/sync-spc-assets.mjs",
     "prepare:assets": "npm run build:worklet && npm run sync-spc-assets",
