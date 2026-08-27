@@ -16,10 +16,10 @@ import {
   type Plan,
   REFUSE_CLASH,
   isEdits,
-  planEdits,
   planGesture,
 } from './roll-edit';
 import { type ChannelTail, type Strip, type StripItem } from './roll-strip';
+import { planEdits } from './roll-write';
 
 /**
  * The roll's pointer: what a press means, what a drag is doing, and what

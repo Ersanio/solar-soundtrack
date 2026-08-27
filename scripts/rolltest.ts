@@ -48,9 +48,9 @@ import {
 	REFUSE_RANGE,
 	REFUSE_ROOM,
 	isEdits,
-	planEdits,
 	planGesture,
 } from "../web/src/app/editor/views/piano-roll/roll-edit";
+import { planEdits } from "../web/src/app/editor/views/piano-roll/roll-write";
 import {
 	type ChannelTail,
 	type Strip,

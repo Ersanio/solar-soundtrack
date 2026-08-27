@@ -1,8 +1,9 @@
 import type { Command } from '@amk/tokens';
 import { commandScope } from '@amk/tokens/commands/in-force';
 import { type Edit, commandRewritable, insertAt, spliceOut } from '@amk/tokens/edits';
-import { type EditRefusal, REFUSE_CROWDED, coalesce } from './roll-edit';
+import { type EditRefusal, REFUSE_CROWDED } from './roll-edit';
 import type { Strip } from './roll-strip';
+import { coalesce } from './roll-write';
 
 /**
  * Moving one command along its channel: the only edit here that changes where a
