@@ -135,6 +135,28 @@ export class RollCommandLane {
    */
   private readonly inSync = computed(() => this.editor.compiledText() === this.editor.source());
 
+  /**
+   * The command the inspector is answering about, which the lane rings.
+   *
+   * Every route to it lands here, because they all move the caret: a glyph on a
+   * bar, a glyph in the lane, and a button in the note inspector all set
+   * `EditorRequests.reveal`, and the caret is the one statement of what is being
+   * inspected. So this needs to know nothing about which of the three was used.
+   *
+   * By **identity** and not by span, which is what makes `[[ v100 v200 ]]2`
+   * right: one written `v200` runs twice, so two glyphs carry the one `Command`
+   * and both are rung — it is one command, wherever the driver reads it.
+   * `EditorStore.tokens` is the single scan both this and `commandTimeline` read,
+   * so the objects compare; out of sync the lane is empty and there is nothing to
+   * ring anyway.
+   *
+   * Dismissed the way the inspector is dismissed, since the ring stands for the
+   * panel: one that outlived it would be pointing at nothing.
+   */
+  protected readonly selected = computed(() =>
+    this.requests.dismissed() === this.editor.caret() ? null : this.editor.commandAtCaret(),
+  );
+
   protected onWheel(event: WheelEvent): void {
     if (event.ctrlKey || event.metaKey || event.shiftKey) {
       this.wheeled.emit(event);

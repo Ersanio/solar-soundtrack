@@ -128,6 +128,12 @@ channel you cannot hear sets nothing you can hear, so it goes rather than fading
 contributes to the whole song stays and fades instead: a `t`, a `w` or an echo write runs whatever
 channel it happens to be written on, and muting that channel does not stop it.
 
+**Whatever command you are inspecting is outlined here**, in the same white the roll outlines a
+selected note with, however you reached it — an icon on a bar, an icon in the lane, or a button in
+the note inspector. The lane is the one place every command appears, so it is where "this is the one"
+can always be said. A command written inside a `[ ]` that plays twice is outlined at both ticks: it
+is one command, wherever the driver reads it.
+
 **Drag the line above the lane to make it taller**, the way the divider between the editor and the
 output pane works. Five icons deep is where it opens and the shortest it goes; ten is the tallest.
 Double-click the line to put it back to five. The height is remembered with the rest of the roll's

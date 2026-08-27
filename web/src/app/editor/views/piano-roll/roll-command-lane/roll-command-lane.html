@@ -71,6 +71,21 @@
               (contextmenu)="erase(glyph, $event)"
             >
               <title>{{ glyph.title }}</title>
+              <!-- Rung rather than recoloured, and in the roll's own words: a
+                   glyph's tint is which channel it is on, and a selection that
+                   took that away would be a selection that renamed the channel. -->
+              @if (selected() === glyph.command) {
+                <rect
+                  rx="3"
+                  fill="none"
+                  class="stroke-ink"
+                  stroke-width="1.5"
+                  [attr.x]="glyph.x - 1"
+                  [attr.y]="glyph.y - 1"
+                  [attr.width]="glyph.size + 2"
+                  [attr.height]="glyph.size + 2"
+                />
+              }
               <rect
                 rx="2"
                 class="fill-ink/0 group-hover:fill-ink/25"

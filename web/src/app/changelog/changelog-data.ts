@@ -16,6 +16,8 @@ export const CHANGELOG: readonly ChangelogEntry[] = [
       'The command timeline puts the channel you are editing in its top rows',
       'Drag the line above the command timeline to make it taller',
       'The command timeline no longer hides a crowded tick behind three dots',
+      'The command you are inspecting is outlined in the command timeline',
+      'Inspecting a command from the note panel no longer jumps to the MML',
       'Muting a channel hides its own commands in the timeline, keeping the song-wide ones',
       'Right-click a command in the timeline to delete it',
       'Drag a command in the timeline to move it to another note or rest',

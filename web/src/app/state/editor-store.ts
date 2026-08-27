@@ -227,7 +227,7 @@ export class EditorStore {
   });
 
   /**
-   * The commands no note bar can carry, and the ticks they run at — the roll's
+   * Every command that takes effect, and the tick it runs at — the roll's
    * command lane. The rule itself is `command-timeline.ts`, so `walktest` can pin
    * it; this holds it to the current scan and compile.
    *
