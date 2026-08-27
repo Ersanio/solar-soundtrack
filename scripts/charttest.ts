@@ -50,7 +50,7 @@ import {
 	tickWindow,
 	xAtTick,
 } from "../web/src/app/editor/views/piano-roll/roll-layout";
-import { MUTED_OPACITY, buildMinimap } from "../web/src/app/editor/views/piano-roll/roll-marks";
+import { LANE_MUTED_OPACITY, MUTED_OPACITY, buildMinimap } from "../web/src/app/editor/views/piano-roll/roll-marks";
 import {
 	type CommandLane,
 	MAX_LANE_ROWS,
@@ -1534,7 +1534,7 @@ console.log("\nhow the command lane stacks what lands together");
 	// What a mute does depends on how far the command reaches, and the two halves
 	// are the point: a `v` on a silenced channel sets a volume nobody can hear, so
 	// it is not drawn; a `t` written on that same channel still runs the whole
-	// song, so it stays and is dimmed as the roll's bars and the overview's are.
+	// song, so it stays, dimmed at the lane's own value.
 	{
 		const silenced = new Map([[3, false]]);
 		const gone = pack([{ tick: 96, channel: 3, command: kind("v") }], 2, silenced);
@@ -1547,8 +1547,18 @@ console.log("\nhow the command lane stacks what lands together");
 		const wide = pack([{ tick: 96, channel: 3, command: kind("t") }], 2, silenced);
 		check(
 			"but a song-wide command written on it stays, dimmed",
-			wide.glyphs.length === 1 && wide.glyphs[0].opacity === MUTED_OPACITY,
+			wide.glyphs.length === 1 && wide.glyphs[0].opacity === LANE_MUTED_OPACITY,
 			wide.glyphs.map((g) => g.opacity).join(","),
+		);
+		// The lane dims further than the roll does, and that gap is deliberate
+		// rather than drift: a bar is a filled rectangle tens of pixels wide where
+		// a glyph is line art twelve pixels square, so the roll's value leaves the
+		// strokes invisible. Soloing is where it tells — seven channels' song
+		// settings dimmed at once, and they are what is still being heard.
+		check(
+			"and the lane dims less far than the roll does, line art needing more",
+			LANE_MUTED_OPACITY > MUTED_OPACITY,
+			`${LANE_MUTED_OPACITY} vs ${MUTED_OPACITY}`,
 		);
 
 		// And the row it would have taken is not held open for it: the glyph is

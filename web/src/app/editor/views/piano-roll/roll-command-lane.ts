@@ -6,7 +6,7 @@ import type { TimelineCommand } from '../../../state/command-timeline';
 import type { CommandGlyph } from '../../command-palette/command-icon';
 import { glyphOf } from '../../command-palette/glyph-of';
 import { CHANNEL_TEXT, LANE_GLYPH, LANE_PAD, LANE_ROW } from './roll-metrics';
-import { MUTED_OPACITY } from './roll-marks';
+import { LANE_MUTED_OPACITY } from './roll-marks';
 
 /**
  * The command lane's layout: every command the song puts in force, stacked so
@@ -150,7 +150,7 @@ export function packCommandLane(request: LaneRequest): CommandLane {
     const muted = audible.get(event.channel) === false;
     // A muted channel's own settings reach nothing anybody can hear, so they are
     // not drawn at all; its `t`, `w` and echo writes still run the whole song,
-    // so those stay and are dimmed like the roll's own bars.
+    // so those stay, at the lane's own dim value rather than the roll's.
     if (muted && commandScope(event.command) !== 'song') {
       return;
     }
@@ -187,7 +187,7 @@ export function packCommandLane(request: LaneRequest): CommandLane {
       removable,
       cursor: removable ? 'grab' : 'pointer',
       tint: CHANNEL_TEXT[event.channel],
-      opacity: muted ? MUTED_OPACITY : 1,
+      opacity: muted ? LANE_MUTED_OPACITY : 1,
       title:
         `${entry.label} · ${written} · #${event.channel} · tick ${event.tick}` +
         (removable ? ' · drag to move · right-click to delete' : ''),

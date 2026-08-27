@@ -460,7 +460,11 @@ is the channel of the bar under the pointer — rows would be re-dealt on a hove
 about the song this file answers is what the **mixer** silences, which is a fact about the moment
 rather than about the compile and so cannot come from the timeline: a muted channel's `'note-state'`
 commands are dropped, because they set nothing anybody can hear, and its `'song'` ones are kept and
-dimmed to `MUTED_OPACITY`, because a `t` or an echo write still runs the whole song. Nothing in it takes a plate: everything drawn
+dimmed to `LANE_MUTED_OPACITY`, because a `t` or an echo write still runs the whole song. That is a
+much higher value than the roll's own `MUTED_OPACITY` and the gap is deliberate: a bar is a filled
+rectangle tens of pixels wide, where a glyph is line art twelve pixels square whose strokes vanish at
+a twelfth. Soloing one channel is where it tells — seven channels' song settings dimmed at once, and
+they are the only record on screen of what is still being heard. Nothing in it takes a plate: everything drawn
 there is a command going in force, so the inversion a bar draws would have nothing to distinguish. It
 is a sibling of the roll's scroller rather than a child of it, so a song too tall for the pane does
 not carry the lane off the bottom of it, and it is lifted by a transform rather than scrolled

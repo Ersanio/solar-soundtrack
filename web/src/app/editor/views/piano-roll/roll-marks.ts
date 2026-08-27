@@ -35,6 +35,20 @@ import type { PlacedNote, Plan } from './roll-edit';
  */
 export const MUTED_OPACITY = 0.12;
 
+/**
+ * The same idea in the command lane, and a much higher number.
+ *
+ * A bar is a filled rectangle tens of pixels wide, so a twelfth of its colour is
+ * still a shape the eye finds; a lane glyph is line art twelve pixels square,
+ * and at that value its strokes are all but gone. What is left dimmed there is
+ * also the part of a silenced channel that is still *heard* — its `t`, its `w`
+ * and its echo writes, everything else having been dropped — so it has to be
+ * legible rather than merely present. Soloing one channel is where that bites:
+ * seven channels' worth of song settings are dimmed at once, and they are the
+ * only record on screen of what is still running.
+ */
+export const LANE_MUTED_OPACITY = 0.45;
+
 /** Shared by every bar with nothing acting on it, which on a plain song is most. */
 const NOTHING_DEFINED: ReadonlySet<Command> = new Set<Command>();
 
