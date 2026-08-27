@@ -1220,8 +1220,7 @@ function spawnInto(
    * none", and reading that as nothing to fill silently eats the rest the note
    * landed in. A channel with nothing on it ends where the song does, so that
    * its first note does not make it the shortest and cut every other channel
-   * short — the driver reloads all eight track pointers the moment one voice
-   * reads its `$00` (`main.asm:L_0C01`, `Music.cpp:3209`).
+   * short, for the reason {@link padChannels} states.
    *
    * A note drawn past the end extends the channel rather than being refused, in
    * either case, and {@link padChannels} brings the rest of the song out to meet
