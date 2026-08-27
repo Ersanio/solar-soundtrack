@@ -12,7 +12,7 @@ export const CHANGELOG: readonly ChangelogEntry[] = [
     date: '27 August 2026',
     items: [
       'A command timeline under the piano roll, showing what takes effect where',
-      'The command timeline shows global commands as well as commands declared by rest notes',
+      'The command timeline shows every command in the song, on the tick it runs',
       'Right-click a command in the timeline to delete it',
       'Drag a command in the timeline to move it to another note or rest',
       'Overwriting a note completely also clears the commands written for it',

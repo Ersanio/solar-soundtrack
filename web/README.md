@@ -422,20 +422,21 @@ The song's own settings and the shape of the music get no glyph **on a bar** —
 the echo unit reach every note alike, and `o`, `<`, `>` and `l` are what the bar's row and width
 already are. `commandScope` is the one statement of that.
 
-**The command lane holds what no bar stands over**, which is not the same as what no bar draws. A
-bar's glyphs are the commands in force at its note, drawn on that note's own tick, so a bar speaks
-for where the driver read one only when the two ticks agree. Two kinds qualify. The song's own
-settings are `commandScope`'s `'song'`, which `commandsInForceOf` drops: they act on the song and not
-on any note of it. And a `'note-state'` command the driver reads where its channel keys nothing on —
-in a rest, inside a tie, replaced before the next note sounds, with no note after it at all, or
+**The command lane holds every command that takes effect**, on the tick the driver reads it:
+`commandScope`'s `'song'`, which `commandsInForceOf` drops because those act on the song and not on
+any note of it, and every `'note-state'` one, whether or not a note begins where it runs. A bar's
+glyphs are the commands in force at its note, drawn on that note's own tick, so most commands are
+drawn twice and the two are answering different questions — the lane the tick it runs on, the note's
+chip which note plays under it. Those agree in `c4 v200 d4` and are a rest apart in `c4 v200 r4 d4`,
+and the lane says the same thing in both, which is what makes it the one place the whole song's
+commands can be read in the order they run. Three shapes reach no bar at all, so the lane is the only
+place they appear: a command replaced before the next note sounds, one with no note after it, and
 `$DF`, `$F0`, `$FD` and `$FE`, which empty a slot rather than take one and so are in no
-`WalkNote.origins` at any tick, without which nothing in the app would ever say vibrato had been
-switched off. `WalkCommand.onANote` is the walk's own word for all five, kept there rather than
-restated here, and the four opcodes are the last of them rather than the whole test. A command in a
-gap is then in **both** places on purpose, each answering its own question — the lane the tick it
-runs on, the next note's chip which note plays under it. Left to the bars alone: a command written
-straight before the note that reads it, and `q`, `h` and `@21`-`@29`, which emit nothing to address,
-so the note they fold into is their only honest tick and that note is already drawing them.
+`WalkNote.origins` at any tick. `WalkCommand.onANote` is the walk's own word for whether a note
+begins on a command's tick; the lane no longer filters on it, and it is kept as a description of the
+song rather than as anyone's rule. Left to the bars alone: `q`, `h` and `@21`-`@29`, which emit
+nothing to address, so the note they fold into is their only honest tick and that note is already
+drawing them.
 
 **Its ticks are the driver's own**, which is why the walk keeps a list at all rather than the lane
 re-reading `definedAt`. That is anchored on a note, and `emitNote` pushes a `WalkNote` for a note and

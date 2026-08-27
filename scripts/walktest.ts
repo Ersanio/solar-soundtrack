@@ -451,9 +451,9 @@ console.log("\nwhat the roll's command lane holds");
 //
 // The rule itself, end to end: the walk's list, the compiler's command map, the
 // scanner's spelling and `commandScope`, which between them decide everything
-// drawn under the roll. A bar draws the commands acting on *its note*, on that
-// note's own tick, so the lane holds what no bar stands over — and nothing but
-// the join can say which of those a given command is.
+// drawn under the roll. The lane holds every command that takes effect, on the
+// tick the driver reads it, so what these pin is the tick each one lands on and
+// which commands are not commands the lane can speak for at all.
 {
 	const lane = (source: string) => {
 		const { result, timeline } = build(source);
@@ -468,38 +468,60 @@ console.log("\nwhat the roll's command lane holds");
 			.join(" ");
 	};
 
-	// Written straight before the note that reads it, so the bar stands on its
-	// tick and says everything the lane would. The blob's own `$FA` prefix is in
-	// no command map and falls out at the join, which is why this is empty.
-	const abutting = lane("#amk 4\n#0 o4 c4 v200 d4\n");
-	check("a command the next note keys on with is left to its bar", abutting === "", abutting);
-
-	// And the case the lane exists for. Both halves are asserted, because the
-	// point is that they disagree: the lane has the `v200` on the tick the
-	// driver runs it, and `d4` at 96 still carries its chip saying `d4` is the
-	// note playing under it.
+	// Written straight before the note that reads it, so the bar stands on the
+	// same tick and draws it too. Both are asserted, because a command drawn in
+	// two places is the ordinary case rather than a fault: the lane says the
+	// tick, the chip says which note plays under it. The blob's own `$FA` prefix
+	// is in no command map and falls out at the join, which is why the lane's
+	// side is the one entry and not three.
 	{
-		const source = "#amk 4\n#0 o4 c4 v200 r4 d4\n";
+		const source = "#amk 4\n#0 o4 c4 v200 d4\n";
 		const { result, timeline } = build(source);
 		const at = (result.commandMap ?? []).find((entry) => source.slice(entry.span.start, entry.span.end) === "v200");
-		const d4 = timeline.notes.find((note) => note.tick === 96);
-		check("but one read while the channel rests is on the lane", lane(source) === "48:#0:v200", lane(source));
+		const d4 = timeline.notes.find((note) => note.tick === 48);
+		check("a command the next note keys on with is on the lane", lane(source) === "48:#0:v200", lane(source));
 		check(
-			"and on the note that plays under it too, a rest later",
+			"and on that note's own bar, which is the same tick",
 			at !== undefined && d4?.origins.includes(at.address) === true,
 			d4?.origins.join(","),
 		);
 	}
 
-	// Replaced before anything sounds under it, so it is on no bar at any tick.
-	const replaced = lane("#amk 4\n#0 o4 v200 v100 c4\n");
-	check("a command replaced before the next note is on the lane", replaced === "0:#0:v200", replaced);
+	// The case where the two disagree, which is what makes the lane's tick worth
+	// drawing: the `v200` runs at 48, in the rest, and the note that plays under
+	// it does not begin until 96.
+	{
+		const source = "#amk 4\n#0 o4 c4 v200 r4 d4\n";
+		const { result, timeline } = build(source);
+		const at = (result.commandMap ?? []).find((entry) => source.slice(entry.span.start, entry.span.end) === "v200");
+		const d4 = timeline.notes.find((note) => note.tick === 96);
+		check("one read while the channel rests is on the lane at 48", lane(source) === "48:#0:v200", lane(source));
+		check(
+			"and on the note that plays under it, a rest later",
+			at !== undefined && d4?.origins.includes(at.address) === true,
+			d4?.origins.join(","),
+		);
+	}
 
-	// Scope and `onANote` are two tests and both are made. The `$DE` runs on
-	// `c8`'s own tick and is left to it; the `$DF` runs on `d8`'s and is still
-	// here, having emptied the slot rather than taken one.
+	// Both halves of a replacement, on the one tick and in the order the driver
+	// ran them. The `v200` reaches no bar at all — nothing sounds under it — so
+	// the lane is the only place in the app it appears.
+	const replaced = lane("#amk 4\n#0 o4 v200 v100 c4\n");
+	check(
+		"a command replaced before the next note is on the lane, and so is the one that replaced it",
+		replaced === "0:#0:v200 0:#0:v100",
+		replaced,
+	);
+
+	// The four that clear a slot rather than take one are in no `WalkNote.origins`
+	// at any tick, so a bar can never draw them: `origins` names what *occupies* a
+	// slot. The lane is where the song says vibrato was switched off.
 	const off = lane("#amk 4\n#0 o4 @1 $DE $00 $0C $08 c8 $DF d8\n");
-	check("a command that switches something off is on the lane wherever it runs", off === "24:#0:$DF", off);
+	check(
+		"a command that switches something off is on the lane wherever it runs",
+		off === "0:#0:@1 0:#0:$DE $00 $0C $08 24:#0:$DF",
+		off,
+	);
 
 	// `'song'` needs no rest to qualify: one DSP holds one echo unit and a
 	// tempo reaches every channel, so no bar has ever drawn either.

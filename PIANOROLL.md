@@ -93,23 +93,27 @@ Under the roll is a strip holding nothing but command icons, on the song's own t
 effect, and where, with the note data out of the way. **Commands** on the toolbar opens and closes
 it, and it stays as you left it.
 
-It holds **what no note has drawn over it**. A bar's icons are the commands acting on _that note_, so
-they stand where the note does; the lane stands where the driver reads the command. That is two
-things:
+It holds **every command that takes effect** — the song's own settings, `t`, `w`, `$E4` and the whole
+echo unit, `$EF` to `$F2` and the `$F5` filter, and every channel setting too: a `v`, a `y`, an `@`,
+an `$ED`, and the ones that switch something off, `$DF`, `$F0`, `$FD` and `$FE`. Each sits on the
+tick the driver reads it at, whatever else is happening there.
 
-- **The song's own settings** — `t`, `w`, `$E4` and the whole echo unit, `$EF` to `$F2` and the `$F5`
-  filter. These reach every channel at once, so they act on the song rather than on any note of it,
-  and no bar has ever drawn them.
-- **Anything a channel runs where no note begins** — a `v`, an `@` or an `$ED` written in a rest,
-  written inside a tie, written after the channel's last note, or replaced before the next note
-  sounds. And the commands that switch something off, `$DF`, `$F0`, `$FD` and `$FE`: a bar names what
-  a note is playing _under_, and there is nothing to name once vibrato is off, so those appear on no
-  bar at any point in the song.
+Most of those also show as an icon on a note bar, and the two are not repeating each other. A bar's
+icons are the commands acting on _that note_, so they stand where the note does; the lane stands
+where the driver reads the command. In `c4 v200 d4` those are the same tick. In `c4 v200 r4 d4` they
+are a rest apart — the lane has the `v200` in the rest, where it runs, and `d4`'s icon says `d4` is
+the note playing under it. The lane is the one place the whole song's commands can be read in the
+order they run, which a set of per-note icons cannot be.
 
-A command written in a gap is therefore in both places, and the two say different things. In
-`c4 v200 r4 d4` the lane has the `v200` where it runs, a rest before `d4`; `d4`'s chip says `d4` is
-the note playing under it. Only a command written straight before the note that reads it is on the
-bar alone, the two positions being the same one.
+Three things are on no bar at any point in the song, so the lane is the only place they appear at
+all: a command replaced before the next note sounds, one written after a channel's last note, and the
+four that switch something off — a bar names what a note is playing _under_, and there is nothing to
+name once vibrato is off.
+
+The other direction: `q`, `h` and `@21`-`@29` are on the bars alone and never here. They emit no
+byte, so the driver never reads them at a tick of their own; the note they fold into is their only
+honest position, and that note is already drawing them. Neither an `o` nor an `l` is a command in
+this sense — they are what the roll's rows and lengths already are.
 
 The icons are all eight channels at once, each in its channel's colour — which for a song-wide
 command is the channel that wrote it — and a muted channel fades rather than disappears.

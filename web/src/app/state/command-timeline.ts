@@ -21,34 +21,26 @@ export interface TimelineSources {
 }
 
 /**
- * The commands no note bar stands over, and the ticks they run at.
+ * Every command that takes effect, and the tick it runs at.
  *
- * A bar draws the commands in force at its note, on that note's own tick, so it
- * speaks for where the driver read one only when the two ticks are the same.
- * This answers the rest, and there are two kinds:
+ * The song's commands as a timeline, complete: `commandScope`'s `'song'` — `t`,
+ * `w`, `$E4` and the whole echo unit, which act on the song and not on any note
+ * of it — and every `'note-state'` one, wherever the driver reads it and whether
+ * or not a note begins there.
  *
- *   - **The song's own settings** — `t`, `w`, `$E4` and the whole echo unit.
- *     `commandScope` calls these `'song'` and `commandsInForceOf` drops them,
- *     because one DSP holds one echo unit and a global tempo reaches every
- *     channel alike: they act on the song and not on any note of it.
- *   - **The channel state no note keys on with** — a `v` or an `@` the driver
- *     reads while its channel is resting, one it reads inside a tie, one
- *     replaced before the next note sounds, one written after a channel's last
- *     note, and `$DF`, `$F0`, `$FD` and `$FE`, which empty a slot rather than
- *     take one and so are in no `WalkNote.origins` at any tick — without which
- *     nothing in the app would ever say vibrato had been switched off.
- *     `WalkCommand.onANote` is the walk's own word for all five; the four
- *     opcodes are not restated here.
+ * The bars and this answer **different questions about the same command**, so
+ * one being drawn twice is not one drawing repeating the other. A bar's chips
+ * are the commands acting on _that note_, standing where the note does; the lane
+ * stands where the driver reads the command. In `c4 v200 d4` those are the same
+ * tick and in `c4 v200 r4 d4` they are 48 apart, and the lane says the same
+ * thing in both — it is the one place the whole song's commands can be read in
+ * the order they run, which is a thing a set of per-note chips cannot be.
  *
- * A command written in a gap is therefore in **both** places, and neither is
- * repeating the other: the lane has it on the tick the driver runs it, and the
- * next note's chip says that note is the one playing under it. In
- * `c4 v200 r4 d4` those are tick 48 and tick 96, and saying only the second is
- * what this exists to correct.
- *
- * Left to the bars alone: a command written straight before the note that reads
- * it, where the two ticks agree, and `q`, `h` and `@21`-`@29`, which emit
- * nothing and whose only honest tick is the note they fold into.
+ * `'structure'` is what falls out: `$FC` arms a slot of its own, and the loop
+ * bytes are the shape of the music rather than a setting in it. So does
+ * `'position'`, and `q`, `h` and `@21`-`@29` are absent for a harder reason —
+ * they emit no byte to address, so they have no tick but the note they fold
+ * into, and that note is already drawing them.
  *
  * The ticks come from `SongTimeline.commands`, the driver's record of a slot
  * changing hands. That is why the walk keeps it: `origins` is read off a
@@ -70,10 +62,8 @@ export function commandTimeline(sources: TimelineSources): readonly TimelineComm
       continue;
     }
 
-    // `'structure'` is what falls out here: `$FC` arms a slot of its own, and
-    // the loop bytes are the shape of the music rather than a setting in it.
     const scope = commandScope(command);
-    if (scope === 'song' || (scope === 'note-state' && !run.onANote)) {
+    if (scope === 'song' || scope === 'note-state') {
       events.push({ tick: run.tick, channel: run.channel, command });
     }
   }

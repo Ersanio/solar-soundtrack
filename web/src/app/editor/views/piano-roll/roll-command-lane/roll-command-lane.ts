@@ -29,8 +29,13 @@ interface LaneDrag {
 }
 
 /**
- * The command lane: the commands a note bar cannot carry, on the song's own
+ * The command lane: every command the song puts in force, on the song's own
  * timeline and with the note data out of the way.
+ *
+ * The bars draw the commands acting on each note; this draws them where the
+ * driver reads them, whether or not a note begins there — the two answer
+ * different questions, and the lane is the only place the whole song's commands
+ * can be read in the order they run.
  *
  * Drawn in the roll's **own** coordinates, like the scrub bar above it — the
  * same `viewBox`, the same key column, the same scroll transform, and the same
