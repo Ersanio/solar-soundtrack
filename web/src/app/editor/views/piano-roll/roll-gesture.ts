@@ -8,7 +8,7 @@ import type { LaneStack } from './roll-layout';
 import { rowAtY, tickAtX } from './roll-layout';
 import { snapDuration, snapTick, stepDrawLength } from './roll-lengths';
 import { type Preview, type PreviewBar, buildPreview, rowOfPlaced } from './roll-preview';
-import { KEY_WIDTH, NOTE_GAP, ROW_GAP } from './roll-metrics';
+import { KEY_WIDTH, NOTE_GAP, barRect } from './roll-metrics';
 import {
   type EditContext,
   type EditMode,
@@ -479,9 +479,7 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
     return {
       id: 'ghost',
       x: spawnTick(tick, sources.snap(), at.fine) * zoom,
-      y: row * rowHeight + ROW_GAP,
-      w: Math.max(1, sources.lastLength() * zoom - NOTE_GAP),
-      h: Math.max(1, rowHeight - ROW_GAP * 2),
+      ...barRect(row, rowHeight, sources.lastLength(), zoom),
     };
   });
 

@@ -8,10 +8,11 @@ import { type PlaceContext, keyOf, placeOf } from './percussion';
 import {
   CHANNEL_FILL,
   KEY_WIDTH,
+  MUTED_OPACITY,
   NOTE_GAP,
-  ROW_GAP,
   OVERVIEW_HEIGHT,
   OVERVIEW_PAD,
+  barRect,
 } from './roll-metrics';
 import { fitBarContent } from './roll-bar-text';
 import { type LaneStack, keyName, noteLabel, overviewOffset } from './roll-layout';
@@ -26,28 +27,6 @@ import { type LaneStack, keyName, noteLabel, overviewOffset } from './roll-layou
  * once. Answering that question three times is how they would drift, which is
  * why the builders share a file.
  */
-
-/**
- * How far a silenced channel is dimmed, in both pictures.
- *
- * One number, so a mute reads the same on the roll as on the overview bar.
- * Dimmed rather than hidden: a muted part is still part of the song.
- */
-export const MUTED_OPACITY = 0.12;
-
-/**
- * The same idea in the command lane, and a much higher number.
- *
- * A bar is a filled rectangle tens of pixels wide, so a twelfth of its colour is
- * still a shape the eye finds; a lane glyph is line art twelve pixels square,
- * and at that value its strokes are all but gone. What is left dimmed there is
- * also the part of a silenced channel that is still *heard* — its `t`, its `w`
- * and its echo writes, everything else having been dropped — so it has to be
- * legible rather than merely present. Soloing one channel is where that bites:
- * seven channels' worth of song settings are dimmed at once, and they are the
- * only record on screen of what is still running.
- */
-export const LANE_MUTED_OPACITY = 0.45;
 
 /** Shared by every bar with nothing acting on it, which on a plain song is most. */
 const NOTHING_DEFINED: ReadonlySet<Command> = new Set<Command>();
@@ -211,10 +190,8 @@ export function buildMarks(request: MarkRequest): Mark[] {
       continue;
     }
 
-    const w = Math.max(1, note.ticks * zoom - NOTE_GAP);
-    const h = Math.max(1, rowHeight - ROW_GAP * 2);
+    const { y, w, h } = barRect(row, rowHeight, note.ticks, zoom);
     const x = note.tick * zoom;
-    const y = row * rowHeight + ROW_GAP;
 
     const acting = inForce(note).map((command) => ({
       command,

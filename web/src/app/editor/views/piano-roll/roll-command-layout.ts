@@ -6,8 +6,7 @@ import { clamp } from '../../../util/math';
 import type { TimelineCommand } from '../../../state/command-timeline';
 import type { CommandGlyph } from '../../command-palette/command-icon';
 import { glyphOf } from '../../command-palette/glyph-of';
-import { CHANNEL_TEXT, LANE_GLYPH, LANE_PAD, LANE_ROW } from './roll-metrics';
-import { LANE_MUTED_OPACITY } from './roll-marks';
+import { CHANNEL_TEXT, LANE_GLYPH, LANE_MUTED_OPACITY, LANE_PAD, LANE_ROW } from './roll-metrics';
 
 /**
  * The command lane's layout: every command the song puts in force, stacked so

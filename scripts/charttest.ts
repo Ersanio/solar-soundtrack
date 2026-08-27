@@ -49,7 +49,7 @@ import {
 import { fitBarContent } from "../web/src/app/editor/views/piano-roll/roll-bar-text";
 import { DRAW_LENGTHS, stepDrawLength } from "../web/src/app/editor/views/piano-roll/roll-lengths";
 import { advanceTick } from "../web/src/app/editor/views/piano-roll/roll-clock-step";
-import { LANE_MUTED_OPACITY, MUTED_OPACITY, buildMinimap } from "../web/src/app/editor/views/piano-roll/roll-marks";
+import { buildMinimap } from "../web/src/app/editor/views/piano-roll/roll-marks";
 import {
 	type CommandLane,
 	laneGlyphX,
@@ -61,7 +61,9 @@ import {
 	LANE_GLYPH,
 	LANE_HEIGHT,
 	LANE_HEIGHT_MAX,
+	LANE_MUTED_OPACITY,
 	LANE_ROW,
+	MUTED_OPACITY,
 } from "../web/src/app/editor/views/piano-roll/roll-metrics";
 import { clampLaneHeight } from "../web/src/app/editor/views/piano-roll/roll-settings";
 import {

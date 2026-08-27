@@ -1,6 +1,6 @@
 import type { PlacedNote, Plan } from './roll-edit';
 import type { LaneStack } from './roll-layout';
-import { NOTE_GAP, ROW_GAP } from './roll-metrics';
+import { barRect } from './roll-metrics';
 
 /**
  * A gesture in flight, drawn over the song.
@@ -83,9 +83,7 @@ export function buildPreview(request: PreviewRequest): Preview {
       : {
           id: `${kind}:${at}:${note.startTick}`,
           x: note.startTick * zoom,
-          y: row * rowHeight + ROW_GAP,
-          w: Math.max(1, note.ticks * zoom - NOTE_GAP),
-          h: Math.max(1, rowHeight - ROW_GAP * 2),
+          ...barRect(row, rowHeight, note.ticks, zoom),
         };
   };
 
