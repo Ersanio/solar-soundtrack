@@ -25,6 +25,7 @@ export const CHANGELOG: readonly ChangelogEntry[] = [
       'Normalize unrolls subloops written as $E6, so the piano roll can edit that channel',
       'Normalize gives every note its own length instead of leaving it to l',
       'Normalize no longer refuses songs whose remote code sets an octave, length or quantization',
+      'The vibrato graph says whether it is drawing a pitch swing or a volume one',
     ],
   },
   {
