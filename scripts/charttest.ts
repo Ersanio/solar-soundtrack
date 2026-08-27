@@ -1446,8 +1446,14 @@ console.log("\nhow the command lane stacks what lands together");
 		channel,
 		command: written[n % written.length],
 	});
-	const pack = (events: TimelineCommand[], zoom: number, audible = new Map<number, boolean>()) =>
-		packCommandLane({ events, text: source, zoom, audible });
+	/** Named rather than indexed where a case turns on a command's scope. */
+	const kind = (letter: string): TimelineCommand["command"] => written.find((command) => command.kind === letter)!;
+	const pack = (
+		events: TimelineCommand[],
+		zoom: number,
+		audible = new Map<number, boolean>(),
+		active: number | null = null,
+	) => packCommandLane({ events, text: source, zoom, audible, active });
 	const rows = (lane: CommandLane) => lane.glyphs.map((glyph) => glyph.y / LANE_ROW).join(",");
 
 	const together = pack([at(96, 0, 0), at(96, 1, 1), at(96, 2, 2)], 2);
@@ -1515,24 +1521,85 @@ console.log("\nhow the command lane stacks what lands together");
 		deep.more.map((m) => `${m.count}@${m.y}`).join(" "),
 	);
 
-	// Dimmed rather than dropped, as the roll's bars and the overview's are, and
-	// still taking its row: a muted channel is still part of the song.
-	const muted = pack([at(96, 3, 0), at(96, 4, 1)], 2, new Map([[3, false]]));
-	check(
-		"a silenced channel's command is dimmed and keeps its place",
-		muted.glyphs[0].opacity === MUTED_OPACITY && muted.glyphs[1].opacity === 1 && muted.depth === 2,
-		muted.glyphs.map((g) => g.opacity).join(","),
-	);
+	// What a mute does depends on how far the command reaches, and the two halves
+	// are the point: a `v` on a silenced channel sets a volume nobody can hear, so
+	// it is not drawn; a `t` written on that same channel still runs the whole
+	// song, so it stays and is dimmed as the roll's bars and the overview's are.
+	{
+		const silenced = new Map([[3, false]]);
+		const gone = pack([{ tick: 96, channel: 3, command: kind("v") }], 2, silenced);
+		check(
+			"a silenced channel's own settings are not drawn at all",
+			gone.glyphs.length === 0 && gone.depth === 0,
+			rows(gone),
+		);
+
+		const wide = pack([{ tick: 96, channel: 3, command: kind("t") }], 2, silenced);
+		check(
+			"but a song-wide command written on it stays, dimmed",
+			wide.glyphs.length === 1 && wide.glyphs[0].opacity === MUTED_OPACITY,
+			wide.glyphs.map((g) => g.opacity).join(","),
+		);
+
+		// And the row it would have taken is not held open for it: the glyph is
+		// gone, so an audible channel's command moves up into its place.
+		const beside = pack(
+			[
+				{ tick: 96, channel: 3, command: kind("v") },
+				{ tick: 96, channel: 4, command: kind("y") },
+			],
+			2,
+			silenced,
+		);
+		check(
+			"and a live channel's command takes the row the dropped one would have",
+			beside.glyphs.length === 1 && beside.glyphs[0].y === 0 && beside.depth === 1,
+			`${beside.glyphs.length} at ${rows(beside)}`,
+		);
+	}
+
+	// The edited channel is packed first and everything else strictly below it, so
+	// its commands are in the top rows and reading them needs no scroll.
+	{
+		const scattered = [at(96, 0, 0), at(96, 1, 1), at(96, 2, 2)];
+		const where = (lane: CommandLane) => lane.glyphs.map((g) => `#${g.channel}@${g.y / LANE_ROW}`).join(" ");
+		check(
+			"with no channel being edited, a tick's glyphs stack in timeline order",
+			where(pack(scattered, 2)) === "#0@0 #1@1 #2@2",
+			where(pack(scattered, 2)),
+		);
+
+		const lifted = pack(scattered, 2, new Map<number, boolean>(), 2);
+		check(
+			"the edited channel's command takes row 0 and the rest fall below it",
+			where(lifted) === "#2@0 #0@1 #1@2",
+			where(lifted),
+		);
+
+		// A band rather than a preference: the second group starts at the first row
+		// the first did not reach, so a row the edited channel leaves free at some
+		// x is still not offered to another channel there. Channel 5's two glyphs
+		// are far enough apart to share row 0, which leaves x=0 free in it.
+		const band = pack([at(0, 5, 0), at(960, 5, 1), at(0, 6, 2)], 2, new Map<number, boolean>(), 5);
+		check(
+			"a gap in the edited channel's row is not filled by another channel",
+			where(band) === "#5@0 #5@0 #6@1",
+			where(band),
+		);
+		check("and the lane is one row deeper for it", band.depth === 2, String(band.depth));
+	}
+
+	const pair = pack([at(96, 3, 0), at(96, 4, 1)], 2);
 
 	// The colour is `color` and not `fill`: a palette glyph paints its own shapes
 	// with `currentColor`, so a `fill-ch-*` would reach none of them. And the
 	// hover names the channel, because the eight colours do not identify one on
 	// their own — `styles.css` says so and this is where it is kept true.
-	check("a glyph is tinted by color, per channel", muted.glyphs[1].tint === "text-ch-4", muted.glyphs[1].tint);
+	check("a glyph is tinted by color, per channel", pair.glyphs[1].tint === "text-ch-4", pair.glyphs[1].tint);
 	check(
 		"and its hover names the command, the text, the channel and the tick",
-		muted.glyphs[1].title.includes("#4") && muted.glyphs[1].title.includes("tick 96"),
-		muted.glyphs[1].title,
+		pair.glyphs[1].title.includes("#4") && pair.glyphs[1].title.includes("tick 96"),
+		pair.glyphs[1].title,
 	);
 
 	// The right-click erase, and the one thing on screen that says it is there.
@@ -1555,19 +1622,15 @@ console.log("\nhow the command lane stacks what lands together");
 		check("and its hover does not offer that either", !spread.glyphs[0].title.includes("drag"), spread.glyphs[0].title);
 	}
 
-	check("a command written out in full can be", muted.glyphs[1].removable === true);
-	check(
-		"and its hover is what says so",
-		muted.glyphs[1].title.includes("right-click to delete"),
-		muted.glyphs[1].title,
-	);
-	check("it offers the drag as well", muted.glyphs[1].cursor === "grab", muted.glyphs[1].cursor);
-	check("and says that too", muted.glyphs[1].title.includes("drag to move"), muted.glyphs[1].title);
+	check("a command written out in full can be", pair.glyphs[1].removable === true);
+	check("and its hover is what says so", pair.glyphs[1].title.includes("right-click to delete"), pair.glyphs[1].title);
+	check("it offers the drag as well", pair.glyphs[1].cursor === "grab", pair.glyphs[1].cursor);
+	check("and says that too", pair.glyphs[1].title.includes("drag to move"), pair.glyphs[1].title);
 
 	// The tick and the channel a drag works from, carried on the glyph rather
 	// than parsed back out of the hover: the hover is prose for a person.
-	check("a glyph carries the tick it was packed at", muted.glyphs[1].tick === 96, String(muted.glyphs[1].tick));
-	check("and the channel it ran on", muted.glyphs[1].channel === 4, String(muted.glyphs[1].channel));
+	check("a glyph carries the tick it was packed at", pair.glyphs[1].tick === 96, String(pair.glyphs[1].tick));
+	check("and the channel it ran on", pair.glyphs[1].channel === 4, String(pair.glyphs[1].channel));
 
 	// The window is a slice of the pack, so a glyph keeps the row the whole song
 	// gave it, and `depth` stays the whole song's — it is how far the lane can be

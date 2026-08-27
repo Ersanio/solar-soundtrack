@@ -555,6 +555,7 @@ export class PianoRoll {
       text: this.editor.source(),
       zoom: this.zoom(),
       audible: this.audible(),
+      active: this.editChannel(),
     }),
   );
 

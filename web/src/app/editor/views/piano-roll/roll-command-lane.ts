@@ -1,5 +1,6 @@
 import type { Span } from '@amk/core/types';
 import type { Command } from '@amk/tokens';
+import { commandScope } from '@amk/tokens/commands/in-force';
 import { commandRewritable } from '@amk/tokens/edits';
 import type { TimelineCommand } from '../../../state/command-timeline';
 import type { CommandGlyph } from '../../command-palette/command-icon';
@@ -11,9 +12,11 @@ import { MUTED_OPACITY } from './roll-marks';
  * The command lane's layout: every command the song puts in force, stacked so
  * that none covers another.
  *
- * Angular-free and pinned by `charttest`, in the mould of `roll-layout.ts`. The
- * question it answers is only ever about geometry — which commands there are and
- * when is `state/command-timeline.ts`.
+ * Angular-free and pinned by `charttest`, in the mould of `roll-layout.ts`.
+ * Which commands the song has and when it runs them is
+ * `state/command-timeline.ts`; this answers the geometry, and the one question
+ * about the song it does answer is what the **mixer** silences — a fact about
+ * the moment rather than about the compile, which is why it is not up there.
  */
 
 /** How deep a column may go before the rest of it becomes a count. */
@@ -86,6 +89,16 @@ export interface LaneRequest {
   zoom: number;
   /** Channel index to whether it is heard; a missing entry counts as audible. */
   audible: ReadonlyMap<number, boolean>;
+  /**
+   * The channel being edited, whose commands take the rows above every other
+   * channel's. Null for none.
+   *
+   * `editChannel` and not the roll's `editing`, which falls back to the channel
+   * of the bar under the pointer: rows would then be re-dealt on a hover, and a
+   * glyph that changes row while the pointer wanders is saying something about
+   * the pointer rather than about the song.
+   */
+  active: number | null;
 }
 
 /**
@@ -97,17 +110,24 @@ export interface LaneRequest {
  * few ticks apart stack too once the zoom is low enough for their boxes to
  * collide, so no glyph is ever drawn over another at any zoom.
  *
+ * The **edited channel is packed first** and the rest are packed strictly below
+ * it, so its commands are always in the top rows and reading them needs no
+ * scroll. It is a band rather than a preference — the second group starts at the
+ * first row the first group did not reach — because a shared row would put
+ * another channel's glyph among the ones the porter is working on, which is the
+ * thing the split is for.
+ *
  * Over the **whole song** and not the window on screen, though only the window
- * is drawn. Rows then depend on the song and the zoom and on nothing else — a
- * window-scoped pack would re-deal them at every turnover, and a glyph that
- * changed row as the roll scrolled past it would be saying something about the
- * scrolling.
+ * is drawn. Rows then depend on the song, the zoom and which channel is being
+ * edited, and on nothing else — a window-scoped pack would re-deal them at every
+ * turnover, and a glyph that changed row as the roll scrolled past it would be
+ * saying something about the scrolling.
  *
  * `x` is `tick * zoom` and is never nudged along to make room, because where a
  * glyph is *is* the claim the lane makes. Room is found by going deeper.
  */
 export function packCommandLane(request: LaneRequest): CommandLane {
-  const { events, text, zoom, audible } = request;
+  const { events, text, zoom, audible, active } = request;
   if (zoom <= 0 || events.length === 0) {
     return EMPTY;
   }
@@ -118,28 +138,37 @@ export function packCommandLane(request: LaneRequest): CommandLane {
   /** Overflowing columns by x, so a stack too deep to draw is still counted. */
   const spilled = new Map<number, number>();
   let depth = 0;
+  /** The first row this group may use, which is everything the last one filled. */
+  let floor = 0;
 
-  for (const event of events) {
+  const place = (event: TimelineCommand): void => {
     const entry = glyphOf(event.command);
     if (entry === null) {
-      continue; // `<`, `>` and `^`, which the catalogue does not offer at all.
+      return; // `<`, `>` and `^`, which the catalogue does not offer at all.
+    }
+
+    const muted = audible.get(event.channel) === false;
+    // A muted channel's own settings reach nothing anybody can hear, so they are
+    // not drawn at all; its `t`, `w` and echo writes still run the whole song,
+    // so those stay and are dimmed like the roll's own bars.
+    if (muted && commandScope(event.command) !== 'song') {
+      return;
     }
 
     const x = event.tick * zoom;
-    let row = 0;
+    let row = floor;
     while (row < freeFrom.length && freeFrom[row] > x) {
       row++;
     }
 
     if (row >= MAX_LANE_ROWS) {
       spilled.set(x, (spilled.get(x) ?? 0) + 1);
-      continue;
+      return;
     }
 
     freeFrom[row] = x + LANE_GLYPH + LANE_PAD;
     depth = Math.max(depth, row + 1);
 
-    const muted = audible.get(event.channel) === false;
     const written = text.slice(event.command.span.start, event.command.span.end);
     const removable = commandRewritable(event.command);
     glyphs.push({
@@ -163,6 +192,24 @@ export function packCommandLane(request: LaneRequest): CommandLane {
         `${entry.label} · ${written} · #${event.channel} · tick ${event.tick}` +
         (removable ? ' · drag to move · right-click to delete' : ''),
     });
+  };
+
+  // Each group is still in the timeline's own tick order, which is what lets a
+  // row be a single high-water mark rather than a list of gaps.
+  if (active !== null) {
+    for (const event of events) {
+      if (event.channel === active) {
+        place(event);
+      }
+    }
+
+    floor = depth;
+  }
+
+  for (const event of events) {
+    if (event.channel !== active) {
+      place(event);
+    }
   }
 
   // Drawn in the deepest row rather than past it, so the mark is somewhere the

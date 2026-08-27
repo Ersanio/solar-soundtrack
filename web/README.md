@@ -449,10 +449,18 @@ not there (`$F6`, `$F7`, `$F9`), nor is anything inside a `$FC` body, which the 
 and the lane draws only what the compiler mapped, so the byte blob's own `$FA` prefix reaches no
 glyph.
 
-`state/command-timeline.ts` is that rule; `roll-command-lane.ts` beside `roll-layout.ts` is geometry
-alone, first-fit rows over the whole song so that a glyph's row depends on the song and the zoom and
-not on where the roll has been scrolled to, with `x` always `tick * zoom` and never nudged sideways,
-because where a glyph is _is_ the claim the lane makes. Nothing in it takes a plate: everything drawn
+`state/command-timeline.ts` is that rule; `roll-command-lane.ts` beside `roll-layout.ts` is the
+geometry, first-fit rows over the whole song so that a glyph's row depends on the song, the zoom and
+which channel is being edited, and not on where the roll has been scrolled to, with `x` always
+`tick * zoom` and never nudged sideways, because where a glyph is _is_ the claim the lane makes. The
+**edited channel is packed first** and the rest strictly below it, as a band rather than a
+preference: a shared row would put another channel's glyph among the ones the porter is working on,
+which is the thing the split is for. It is `editChannel` and not the roll's `editing`, whose fallback
+is the channel of the bar under the pointer — rows would be re-dealt on a hover. The one question
+about the song this file answers is what the **mixer** silences, which is a fact about the moment
+rather than about the compile and so cannot come from the timeline: a muted channel's `'note-state'`
+commands are dropped, because they set nothing anybody can hear, and its `'song'` ones are kept and
+dimmed to `MUTED_OPACITY`, because a `t` or an echo write still runs the whole song. Nothing in it takes a plate: everything drawn
 there is a command going in force, so the inversion a bar draws would have nothing to distinguish. It
 is a sibling of the roll's scroller rather than a child of it, so a song too tall for the pane does
 not carry the lane off the bottom of it, and it is lifted by a transform rather than scrolled

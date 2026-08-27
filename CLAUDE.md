@@ -773,6 +773,24 @@ stats.loopTicks` pads **every other channel that would cut the song short** out 
   shortest channel and a command written after a channel's last note raises no `WalkCommand` at all
   — a target out there is one a command could be dragged to and not back from.
 
+- **A muted channel's commands dimmed rather than dropped, the way its bars are** — the symmetry with
+  the roll and the overview is inviting and it takes the wrong thing as the subject: a bar stands for
+  a note, which a mute silences whole, where a glyph stands for a command, and how far a command
+  reaches is not something the channel it is written on decides. A `v`, a `y` or an `@` on a silenced
+  channel sets nothing anybody can hear and is not drawn at all; a `t`, a `w` or an echo write on
+  that same channel still runs the whole song, so it stays and is dimmed. The test is
+  `commandScope`, in `packCommandLane` rather than in `command-timeline.ts` — what the mixer silences
+  is a fact about the moment and the timeline is a fact about the compile.
+- **Packing the lane without regard to which channel is being edited** — first-fit over the whole
+  song deals a channel's commands into whatever rows are free, so the ones the porter was working on
+  were scattered down a stack twelve deep that shows three at a time, and finding them meant
+  scrolling the lane on every glance. The edited channel is packed **first** and everything else
+  strictly below it (`packCommandLane`), so its commands are always in the top rows. A band rather
+  than a preference: letting another channel fill a gap in one of those rows puts a glyph the porter
+  is not working on among the ones they are, which is the thing the split is for. Off `editChannel`
+  and not the roll's `editing`, whose fallback is the channel of the bar under the pointer — rows
+  would then be re-dealt on a hover, which is the same complaint as re-dealing them on a scroll.
+
 ## Angular specifics
 
 Angular 22, zoneless (scaffolded `--zoneless`, so zone.js is not a dependency and there is nothing

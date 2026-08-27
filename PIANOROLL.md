@@ -116,7 +116,16 @@ honest position, and that note is already drawing them. Neither an `o` nor an `l
 this sense — they are what the roll's rows and lengths already are.
 
 The icons are all eight channels at once, each in its channel's colour — which for a song-wide
-command is the channel that wrote it — and a muted channel fades rather than disappears.
+command is the channel that wrote it.
+
+**The channel you are editing sits in the top rows**, above every other channel's, so its commands
+are the ones you can read without lifting the stack. Pick a different channel and the rows are dealt
+again.
+
+**Muting a channel takes its own settings off the lane.** A `v`, a `y`, an `@` or an `$ED` on a
+channel you cannot hear sets nothing you can hear, so it goes rather than fading. What that channel
+contributes to the whole song stays and fades instead: a `t`, a `w` or an echo write runs whatever
+channel it happens to be written on, and muting that channel does not stop it.
 
 The lane scrolls sideways with the roll and carries the same grid and the same playhead, so an icon
 sits under the note it acts on and on the beat it lands on. Where several land on one tick they stack
