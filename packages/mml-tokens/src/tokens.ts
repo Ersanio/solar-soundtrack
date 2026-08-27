@@ -2132,19 +2132,6 @@ export function expectedArgs(vcmd: number, args: { value: number }[], target: Co
 // ===========================================================================
 
 /**
- * The command containing `offset`, or the one it sits at the very end of.
- *
- * The end is inclusive so that a caret parked just after the last argument —
- * where it lands after typing one — still inspects the command it just
- * finished, rather than nothing.
- *
- * Two commands can therefore both contain one offset: adjacent ones meeting at
- * a shared boundary, and — since a replacement collapses onto its use site —
- * every command a single macro expanded to. Both are answered with the first,
- * which is what "the command it just finished" means, and which keeps the
- * result from depending on where the binary search happened to land.
- */
-/**
  * The command that begins exactly at `offset`, or `null`.
  *
  * The lookup a *span* wants, where {@link commandAt} is the one a *caret* wants.
@@ -2179,6 +2166,19 @@ export function commandStartingAt(commands: readonly Command[], offset: number):
 	return null;
 }
 
+/**
+ * The command containing `offset`, or the one it sits at the very end of.
+ *
+ * The end is inclusive so that a caret parked just after the last argument —
+ * where it lands after typing one — still inspects the command it just
+ * finished, rather than nothing.
+ *
+ * Two commands can therefore both contain one offset: adjacent ones meeting at
+ * a shared boundary, and — since a replacement collapses onto its use site —
+ * every command a single macro expanded to. Both are answered with the first,
+ * which is what "the command it just finished" means, and which keeps the
+ * result from depending on where the binary search happened to land.
+ */
 export function commandAt(commands: Command[], offset: number): Command | null {
 	let low = 0;
 	let high = commands.length - 1;

@@ -93,9 +93,9 @@ import { RollTooltip } from './roll-tooltip/roll-tooltip';
  *
  * This holds the song's shape, the camera and the clock, and hands each of them
  * to a component that draws one thing: the toolbar, the two bars over the roll,
- * the row stripes, the grid, the notes, the keys and the hover. The four
- * `roll-*.ts` files beside it are the arithmetic, Angular-free, the way
- * `roll-layout.ts` and `percussion.ts` already were.
+ * the row stripes, the grid, the notes, the keys and the hover. The flat
+ * `roll-*.ts` files beside it are the arithmetic, Angular-free so that a harness
+ * can import it; the folders beside them are the components.
  *
  * The bars are one job each. The overview is the song drawn small and moves the
  * **view**; the scrub bar is the roll's own timeline and moves the **song**.

@@ -494,11 +494,10 @@ interface Region {
    * The stretch after the last note, which a channel may end wherever it likes.
    *
    * Carried rather than read off {@link Region.ticks} being negative: a gap
-   * between two notes can come out negative too, when a plan asks for them in an
-   * order the text does not have them in, and reading that as "the tail, so any
-   * length will do" is how such a plan used to be written out as a channel with
-   * every note after the crossing slid along. One is a fact about where the
-   * region is; the other was a guess from a number that had two meanings.
+   * between two notes comes out negative too, when a plan asks for them in an
+   * order the text does not have them in, so a negative count means either "the
+   * tail, and any length will do" or "these two notes have swapped places", and
+   * nothing in the number says which. This is a fact about where the region is.
    */
   tail: boolean;
   /** Notes being created in it, in tick order. */
@@ -1178,7 +1177,7 @@ function windowCarries(
  * touches ({@link windowOf}) is written as one run of rests and notes, and the
  * items outside it are not touched at all — a rest the notes never reached
  * keeps its bytes and its declarations both. Within the window everything but
- * the whitespace must be leaving ({@link itemsRunTogether}): an item's unit
+ * the whitespace must be leaving: an item's unit
  * `planEdits` removes, or a declaration deleted with the item that owned it,
  * whose spans only ever abut this run rather than overlap it. That is what
  * lets a region hold more than one note being created — a carve's split leaves
