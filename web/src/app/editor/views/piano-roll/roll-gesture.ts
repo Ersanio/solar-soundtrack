@@ -6,7 +6,7 @@ import type { Command } from '@amk/tokens';
 import type { Edit } from '@amk/tokens/edits';
 import type { LaneStack } from './roll-layout';
 import { rowAtY, snapDuration, snapTick, stepDrawLength, tickAtX } from './roll-layout';
-import { type Preview, type PreviewBar, buildPreview, rowOfPlaced } from './roll-marks';
+import { type Preview, type PreviewBar, buildPreview, rowOfPlaced } from './roll-preview';
 import { KEY_WIDTH, NOTE_GAP, ROW_GAP } from './roll-metrics';
 import {
   type EditContext,
