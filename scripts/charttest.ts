@@ -34,7 +34,6 @@ import { PLOT, plot } from "../web/src/app/shared/chart/plot";
 import { stackSegments } from "../web/src/app/shared/chart/stack";
 import {
 	DRAW_LENGTHS,
-	advanceTick,
 	edgeUrgency,
 	gridLines,
 	keyIsBlack,
@@ -50,6 +49,7 @@ import {
 	tickWindow,
 	xAtTick,
 } from "../web/src/app/editor/views/piano-roll/roll-layout";
+import { advanceTick } from "../web/src/app/editor/views/piano-roll/roll-clock-step";
 import { LANE_MUTED_OPACITY, MUTED_OPACITY, buildMinimap } from "../web/src/app/editor/views/piano-roll/roll-marks";
 import {
 	type CommandLane,

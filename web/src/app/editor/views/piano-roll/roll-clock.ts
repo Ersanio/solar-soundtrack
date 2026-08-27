@@ -4,7 +4,7 @@ import { ticksPerSecond } from '@amk/tokens/commands/units';
 import { frameClock } from '../../../shared/chart/frame-clock';
 import { type SongClock, ticksPerSecondAt } from '../../../state/song-clock';
 import { clamp } from '../../../util/math';
-import { advanceTick } from './roll-layout';
+import { advanceTick } from './roll-clock-step';
 
 /**
  * How far a smoothed tick may run past its anchor.
@@ -55,8 +55,8 @@ export interface RollClock {
  * called from an injection context for the same reason — it starts an effect and
  * a frame callback of its own.
  *
- * The arithmetic is `advanceTick` in `roll-layout.ts`, where `charttest` can
- * reach it. What is here is the reading of the driver that the step is given.
+ * The arithmetic is `advanceTick` in `roll-clock-step.ts`, where `charttest`
+ * can reach it. What is here is the reading of the driver that the step is given.
  */
 export function rollClock(sources: ClockSources): RollClock {
   /**
