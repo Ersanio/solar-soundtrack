@@ -9,25 +9,20 @@ export interface ChangelogEntry {
 export const CHANGELOG: readonly ChangelogEntry[] = [
   // ─── newest first; add new blocks here ──────────────────────────────────
   {
-    date: '26 August 2026',
+    date: '27 August 2026',
     items: [
-      'The command timeline shows commands that land in a rest, which no note could draw',
-      'Deleting or drawing over a note only clears the commands written for it if nothing else still plays under them',
-      'Drawing over notes keeps the commands written between them, on the ticks they run at',
+      'A command timeline under the piano roll, showing what takes effect where',
+      'The command timeline shows global commands as well as commands declared by rest notes',
       'Right-click a command in the timeline to delete it',
+      'Overwriting a note completely also clears the commands written for it',
       'Normalize unrolls subloops written as $E6, so the piano roll can edit that channel',
       'Normalize gives every note its own length instead of leaving it to l',
       'Normalize no longer refuses songs whose remote code sets an octave, length or quantization',
     ],
   },
   {
-    date: '24 August 2026',
-    items: ['Overwriting a note completely also clears the commands written for it'],
-  },
-  {
     date: '23 August 2026',
     items: [
-      'A command timeline under the piano roll, showing what takes effect where',
       'The piano roll & note inspector shows which note a command takes effect at, and which notes are inheriting one',
       '#path is ignored, since samples here are one flat folder',
       'Solar Soundtrack-specific errors are now prefeixed with SST instead of AMK',
