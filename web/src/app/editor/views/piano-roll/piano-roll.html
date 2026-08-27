@@ -200,9 +200,26 @@
      way. A sibling of the scroller and not a child of it, so it stays in view
      however far the roll overflows downwards. -->
 @if (commandLaneOpen() && laneBox(); as box) {
+  <!--
+    The seam, which is the lane's top border and its resize handle at once. The
+    line stays 1px while `before:-inset-y-1` widens the grab zone to something a
+    pointer can hit, as the shell's own splitter does; drag it up for a taller
+    lane, double-click it for the three rows it opens at.
+  -->
+  <div
+    class="bg-edge hover:bg-accent relative h-px shrink-0 cursor-row-resize touch-none before:absolute before:inset-x-0 before:-inset-y-1 before:content-['']"
+    [class.bg-accent]="laneResizing()"
+    (pointerdown)="onLaneGrab($event)"
+    (pointermove)="onLaneResize($event)"
+    (pointerup)="onLaneRelease()"
+    (pointercancel)="onLaneRelease()"
+    (dblclick)="resetLaneHeight()"
+  ></div>
+
   <amk-roll-command-lane
     [box]="box"
     [width]="width()"
+    [laneHeight]="laneHeight()"
     [rollWidth]="rollWidth()"
     [scroll]="scroll()"
     [playheadX]="playheadX()"

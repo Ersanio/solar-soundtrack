@@ -467,6 +467,16 @@ not carry the lane off the bottom of it, and it is lifted by a transform rather 
 natively — a scrollbar would eat a third of
 its height and narrow its content box, putting its right edge out of step with the roll it tracks.
 
+**The seam above it is a real element, and the lane's only top border.** It is the shell splitter's
+shape (`app.ts`) turned on its side: pointer capture on the press so the drag survives leaving a
+one-pixel line, `pointermove` and `pointerup` bound on the seam rather than on the document so there
+is nothing to unsubscribe, a `before:-inset-y-1` grab zone, and a double click for the default. The
+height is one more field of the roll's persisted `Settings` rather than a key of its own, for the
+reason `editChannel` is; `clampLaneHeight` holds it between `LANE_HEIGHT` and three times that and
+**rounds** it, because it becomes the `viewBox` the glyphs are laid out against and a fractional user
+unit would put every row's rule on a half pixel. A stored value outside the range is clamped rather
+than rejected: it is a window that has been resized, not a value that means nothing.
+
 **A glyph is dragged sideways to move its command to another tick**, which `roll-command-move.ts`
 plans and `rolltest` drives. It is the only edit in the app that changes where a command runs without
 touching a note: everywhere else a command's position moves, a note gesture is carrying one it could

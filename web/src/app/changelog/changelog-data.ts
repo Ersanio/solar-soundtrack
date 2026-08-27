@@ -14,6 +14,7 @@ export const CHANGELOG: readonly ChangelogEntry[] = [
       'A command timeline under the piano roll, showing what takes effect where',
       'The command timeline shows every command in the song, on the tick it runs',
       'The command timeline puts the channel you are editing in its top rows',
+      'Drag the line above the command timeline to make it taller',
       'Muting a channel hides its own commands in the timeline, keeping the song-wide ones',
       'Right-click a command in the timeline to delete it',
       'Drag a command in the timeline to move it to another note or rest',

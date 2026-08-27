@@ -35,8 +35,14 @@ export const LANE_PAD = 2;
 /** One row of the command lane. */
 export const LANE_ROW = LANE_GLYPH + LANE_PAD;
 
-/** Three glyphs, per the lane's brief. Deeper columns are scrolled to, not shown. */
+/**
+ * Three glyphs, per the lane's brief: the height it opens at, and the shortest
+ * the seam above it will let it be. Deeper columns are scrolled to, not shown.
+ */
 export const LANE_HEIGHT = LANE_ROW * 3;
+
+/** The tallest that seam will let it be — nine rows, which is three lanes' worth. */
+export const LANE_HEIGHT_MAX = LANE_HEIGHT * 3;
 
 /** How tall the playhead's marker is. Its tip is on the bar's bottom edge. */
 export const MARKER_HEIGHT = 10;

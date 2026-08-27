@@ -15,7 +15,7 @@ import {
 import { isEdits } from '../roll-edit';
 import { SLOP_PX } from '../roll-gesture';
 import { type GridLine, RollGrid } from '../roll-grid/roll-grid';
-import { KEY_WIDTH, LANE_HEIGHT, LANE_ROW } from '../roll-metrics';
+import { KEY_WIDTH, LANE_ROW } from '../roll-metrics';
 import { type Strip, type StripRefusal, channelStrip, isStrip } from '../roll-strip';
 
 /** A press on a glyph, held until it becomes a drag or turns out to be a click. */
@@ -55,7 +55,9 @@ interface LaneDrag {
   selector: 'amk-roll-command-lane',
   imports: [CommandIcon, RollGrid],
   templateUrl: './roll-command-lane.html',
-  host: { class: 'border-edge bg-raised block shrink-0 border-t' },
+  // No border of its own: the seam above it is a real element the porter drags,
+  // and a border under that would draw the line twice.
+  host: { class: 'bg-raised block shrink-0' },
 })
 export class RollCommandLane {
   private readonly editor = inject(EditorStore);
@@ -79,12 +81,13 @@ export class RollCommandLane {
   readonly lane = input.required<CommandLane>();
   /** Pixels per tick, which is what turns a drag's travel into ticks. */
   readonly zoom = input.required<number>();
+  /** How tall the lane is drawn, which the seam above it sets. */
+  readonly laneHeight = input.required<number>();
 
   /** A wheel the lane does not use itself, which is the roll's zoom and its pan. */
   readonly wheeled = output<WheelEvent>();
 
   protected readonly keyWidth = KEY_WIDTH;
-  protected readonly laneHeight = LANE_HEIGHT;
 
   /**
    * How far the stack is lifted, in pixels.
@@ -97,8 +100,16 @@ export class RollCommandLane {
    */
   private readonly lifted = signal(0);
 
-  /** Past the bottom of the lane, or zero where the whole stack fits. */
-  private readonly reach = computed(() => Math.max(0, this.lane().depth * LANE_ROW - LANE_HEIGHT));
+  /**
+   * Past the bottom of the lane, or zero where the whole stack fits.
+   *
+   * Taking the lane taller shrinks this, and {@link offset} is the lift held
+   * against it — so a stack scrolled to its end rises to meet the new bottom
+   * rather than leaving a band of empty rows under it.
+   */
+  private readonly reach = computed(() =>
+    Math.max(0, this.lane().depth * LANE_ROW - this.laneHeight()),
+  );
 
   protected readonly offset = computed(() => Math.min(this.lifted(), this.reach()));
 
@@ -111,9 +122,9 @@ export class RollCommandLane {
       return null;
     }
 
-    const shown = LANE_HEIGHT / (this.lane().depth * LANE_ROW);
-    const height = Math.max(6, LANE_HEIGHT * shown);
-    return { y: (this.offset() / reach) * (LANE_HEIGHT - height), height };
+    const height = this.laneHeight();
+    const shown = Math.max(6, (height * height) / (this.lane().depth * LANE_ROW));
+    return { y: (this.offset() / reach) * (height - shown), height: shown };
   });
 
   /**

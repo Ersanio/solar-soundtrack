@@ -57,7 +57,8 @@ import {
 	laneWindow,
 	packCommandLane,
 } from "../web/src/app/editor/views/piano-roll/roll-command-lane";
-import { KEY_WIDTH, LANE_GLYPH, LANE_ROW } from "../web/src/app/editor/views/piano-roll/roll-metrics";
+import { KEY_WIDTH, LANE_GLYPH, LANE_HEIGHT, LANE_ROW } from "../web/src/app/editor/views/piano-roll/roll-metrics";
+import { clampLaneHeight } from "../web/src/app/editor/views/piano-roll/roll-settings";
 import {
 	mirror,
 	readout,
@@ -1100,6 +1101,15 @@ console.log("\npercussion is a preference, not a rule");
 		parsePercussion([10, 29, 30, 200])?.join(",") === "10,29,30,200",
 		parsePercussion([10, 29, 30, 200])?.join(","),
 	);
+
+	// The lane's height comes off a drag rather than a table, so it is held
+	// between its two ends rather than checked against a list — and rounded,
+	// because it becomes the `viewBox` the glyphs are laid out against and a
+	// fractional user unit puts every row's rule on a half pixel.
+	check("the lane cannot be dragged shorter than the rows it opens at", clampLaneHeight(0) === LANE_HEIGHT);
+	check("nor taller than three of those", clampLaneHeight(9999) === LANE_HEIGHT * 3, String(clampLaneHeight(9999)));
+	check("a height between the two is kept", clampLaneHeight(LANE_HEIGHT + 20) === LANE_HEIGHT + 20);
+	check("and a drag's fractional pixel is rounded off", Number.isInteger(clampLaneHeight(LANE_HEIGHT + 7.4)));
 }
 
 console.log("\nthe transport's clock, over songs the compiler will not time");

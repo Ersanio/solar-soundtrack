@@ -76,6 +76,7 @@ import { RollScrub, type TimeMark } from './roll-scrub/roll-scrub';
 import {
   type Settings,
   type SnapName,
+  clampLaneHeight,
   readSettings,
   snapTicks,
   stepRowHeight,
@@ -536,11 +537,60 @@ export class PianoRoll {
 
   // --- the command lane ----------------------------------------------------
 
+  /** How tall the lane is drawn, which the seam above it sets. */
+  protected readonly laneHeight = computed(() => this.settings().laneHeight);
+
   /** Null until measured, so nothing renders against a zero-width box. */
   protected readonly laneBox = computed(() => {
     const width = this.width();
-    return width > 0 ? `0 0 ${width} ${LANE_HEIGHT}` : null;
+    return width > 0 ? `0 0 ${width} ${this.laneHeight()}` : null;
   });
+
+  protected readonly laneResizing = signal(false);
+
+  /**
+   * The height the lane was at when the drag started, with the pointer's y.
+   *
+   * Measured once: nothing can move the seam mid-gesture, and re-reading the
+   * setting per `pointermove` would compound the rounding `clampLaneHeight` does
+   * — a drag of half a pixel a frame would then never move it at all.
+   */
+  private laneGrab: { height: number; y: number } | null = null;
+
+  /**
+   * The seam above the lane, dragged upwards to make the lane taller.
+   *
+   * The same shape as the shell's own splitter (`app.ts`): the pointer is
+   * captured so the drag survives leaving the one-pixel line, which it does at
+   * once, and `pointermove` and `pointerup` are bound on the seam itself rather
+   * than on the document, so there is nothing to unsubscribe.
+   */
+  protected onLaneGrab(event: PointerEvent): void {
+    (event.target as HTMLElement).setPointerCapture(event.pointerId);
+    this.laneGrab = { height: this.laneHeight(), y: event.clientY };
+    this.laneResizing.set(true);
+    event.preventDefault(); // Or the press starts a selection in the pane above.
+  }
+
+  protected onLaneResize(event: PointerEvent): void {
+    if (!this.laneGrab) {
+      return;
+    }
+
+    // Up is taller, the lane hanging below the seam.
+    const height = this.laneGrab.height + (this.laneGrab.y - event.clientY);
+    this.settings.update((s) => ({ ...s, laneHeight: clampLaneHeight(height) }));
+  }
+
+  protected onLaneRelease(): void {
+    this.laneGrab = null;
+    this.laneResizing.set(false);
+  }
+
+  /** A double click on the seam puts the lane back to the three rows it opens at. */
+  protected resetLaneHeight(): void {
+    this.settings.update((s) => ({ ...s, laneHeight: LANE_HEIGHT }));
+  }
 
   /**
    * The whole song's commands, packed into rows — deliberately not windowed.
