@@ -1644,6 +1644,7 @@ console.log("\nhow the command lane stacks what lands together");
 			text: macro,
 			zoom: 2,
 			audible: new Map(),
+			active: null,
 		});
 		check("a command that came through a replacement cannot be erased", spread.glyphs[0].removable === false);
 		check("and its hover does not offer it", !spread.glyphs[0].title.includes("right-click"), spread.glyphs[0].title);
@@ -1675,7 +1676,7 @@ console.log("\nhow the command lane stacks what lands together");
 
 	check(
 		"a lane with no commands has no depth",
-		packCommandLane({ events: [], text: source, zoom: 2, audible: new Map() }).depth === 0,
+		packCommandLane({ events: [], text: source, zoom: 2, audible: new Map(), active: null }).depth === 0,
 	);
 }
 
