@@ -204,7 +204,7 @@
     The seam, which is the lane's top border and its resize handle at once. The
     line stays 1px while `before:-inset-y-1` widens the grab zone to something a
     pointer can hit, as the shell's own splitter does; drag it up for a taller
-    lane, double-click it for the three rows it opens at.
+    lane, double-click it for the five rows it opens at.
   -->
   <div
     class="bg-edge hover:bg-accent relative h-px shrink-0 cursor-row-resize touch-none before:absolute before:inset-x-0 before:-inset-y-1 before:content-['']"
@@ -220,6 +220,7 @@
     [box]="box"
     [width]="width()"
     [laneHeight]="laneHeight()"
+    [songTicks]="songTicks()"
     [rollWidth]="rollWidth()"
     [scroll]="scroll()"
     [playheadX]="playheadX()"

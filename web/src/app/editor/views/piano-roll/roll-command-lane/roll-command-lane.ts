@@ -4,7 +4,7 @@ import { spliceOut } from '@amk/tokens/edits';
 import { CommandIcon } from '../../../command-palette/command-icon';
 import { EditorRequests } from '../../../../state/editor-requests';
 import { EditorStore } from '../../../../state/editor-store';
-import type { CommandLane, LaneGlyph } from '../roll-command-lane';
+import { type CommandLane, type LaneGlyph, laneGlyphX } from '../roll-command-lane';
 import {
   type MoveTarget,
   commandMoveRefusal,
@@ -83,6 +83,8 @@ export class RollCommandLane {
   readonly zoom = input.required<number>();
   /** How tall the lane is drawn, which the seam above it sets. */
   readonly laneHeight = input.required<number>();
+  /** The song's own length, which holds the end glyphs inside it. */
+  readonly songTicks = input.required<number>();
 
   /** A wheel the lane does not use itself, which is the roll's zoom and its pan. */
   readonly wheeled = output<WheelEvent>();
@@ -275,7 +277,12 @@ export class RollCommandLane {
     const blocked = this.dragRefusal() !== null || target === null;
     return {
       glyph: drag.glyph,
-      x: blocked || target === null ? drag.glyph.x : target.tick * this.zoom(),
+      // Through the same anchoring the pack uses, or the ghost would sit half a
+      // glyph off from where letting go actually puts it.
+      x:
+        blocked || target === null
+          ? drag.glyph.x
+          : laneGlyphX(target.tick, this.zoom(), this.songTicks()),
       blocked,
     };
   });

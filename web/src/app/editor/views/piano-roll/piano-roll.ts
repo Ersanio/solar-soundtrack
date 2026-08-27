@@ -606,6 +606,7 @@ export class PianoRoll {
       zoom: this.zoom(),
       audible: this.audible(),
       active: this.editChannel(),
+      songTicks: this.songTicks(),
     }),
   );
 

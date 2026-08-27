@@ -53,6 +53,7 @@ import {
 import { LANE_MUTED_OPACITY, MUTED_OPACITY, buildMinimap } from "../web/src/app/editor/views/piano-roll/roll-marks";
 import {
 	type CommandLane,
+	laneGlyphX,
 	laneWindow,
 	packCommandLane,
 } from "../web/src/app/editor/views/piano-roll/roll-command-lane";
@@ -1479,16 +1480,37 @@ console.log("\nhow the command lane stacks what lands together");
 		zoom: number,
 		audible = new Map<number, boolean>(),
 		active: number | null = null,
-	) => packCommandLane({ events, text: source, zoom, audible, active });
+	) => packCommandLane({ events, text: source, zoom, audible, active, songTicks: 10_000 });
 	const rows = (lane: CommandLane) => lane.glyphs.map((glyph) => glyph.y / LANE_ROW).join(",");
 
 	const together = pack([at(96, 0, 0), at(96, 1, 1), at(96, 2, 2)], 2);
 	check("three commands on one tick take three rows", rows(together) === "0,1,2", rows(together));
 	check(
 		"and all three keep that tick's x",
-		together.glyphs.every((g) => g.x === 192),
+		together.glyphs.every((g) => g.x === 192 - LANE_GLYPH / 2),
+		together.glyphs.map((g) => g.x).join(","),
 	);
 	check("which is how deep the lane says it is", together.depth === 3, String(together.depth));
+
+	// Centred on its tick rather than hung off the right of it, so a command that
+	// runs on a beat straddles that beat's rule. The two ends are the exceptions,
+	// and the bound is the **song's** own span: one against the pane would move a
+	// glyph as the roll scrolled past it, which is the thing the whole-song pack
+	// exists to avoid.
+	{
+		const song = 100; // Ticks; at zoom 2 the song is 200 wide.
+		const boxAt = (tick: number) => laneGlyphX(tick, 2, song);
+		check("a glyph is centred on its tick", boxAt(50) === 100 - LANE_GLYPH / 2, String(boxAt(50)));
+		check("the first sits flush left instead of half off it", boxAt(0) === 0, String(boxAt(0)));
+		check("and the last flush right", boxAt(song) === 200 - LANE_GLYPH, String(boxAt(song)));
+		check(
+			"so no glyph is ever drawn outside the song",
+			[0, 1, 5, 49, 50, 95, 99, 100].every((t) => boxAt(t) >= 0 && boxAt(t) + LANE_GLYPH <= song * 2),
+		);
+		// A song narrower than one glyph has nowhere to put it but the start,
+		// which is the case that would otherwise clamp to a negative upper bound.
+		check("a song narrower than a glyph pins it at zero", laneGlyphX(1, 1, 4) === 0, String(laneGlyphX(1, 1, 4)));
+	}
 
 	// Far enough apart at this zoom that the first has cleared before the second
 	// begins, so the second goes back to the top rather than staying where the
@@ -1645,6 +1667,7 @@ console.log("\nhow the command lane stacks what lands together");
 			zoom: 2,
 			audible: new Map(),
 			active: null,
+			songTicks: 10_000,
 		});
 		check("a command that came through a replacement cannot be erased", spread.glyphs[0].removable === false);
 		check("and its hover does not offer it", !spread.glyphs[0].title.includes("right-click"), spread.glyphs[0].title);
@@ -1676,7 +1699,8 @@ console.log("\nhow the command lane stacks what lands together");
 
 	check(
 		"a lane with no commands has no depth",
-		packCommandLane({ events: [], text: source, zoom: 2, audible: new Map(), active: null }).depth === 0,
+		packCommandLane({ events: [], text: source, zoom: 2, audible: new Map(), active: null, songTicks: 10_000 })
+			.depth === 0,
 	);
 }
 

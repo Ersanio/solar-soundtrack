@@ -140,7 +140,9 @@ Double-click the line to put it back to five. The height is remembered with the 
 settings.
 
 The lane scrolls sideways with the roll and carries the same grid and the same playhead, so an icon
-sits under the note it acts on and on the beat it lands on. Where several land on one tick they stack
+sits under the note it acts on and on the beat it lands on — centred on its own tick, straddling the
+bar or beat rule it runs on. The two ends are the exceptions, so that neither goes off the edge: the
+one at the very start sits just inside it, and one on the song's last tick just inside that. Where several land on one tick they stack
 upwards; five icons deep is as much as the lane opens at, and a plain wheel over it lifts the stack
 when there is more. Nothing is ever left out for want of room — however many commands land on one
 tick, each gets a row of its own, and the wheel and the seam are what reach them. Click an icon to

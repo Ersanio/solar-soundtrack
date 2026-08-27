@@ -452,7 +452,12 @@ glyph.
 `state/command-timeline.ts` is that rule; `roll-command-lane.ts` beside `roll-layout.ts` is the
 geometry, first-fit rows over the whole song so that a glyph's row depends on the song, the zoom and
 which channel is being edited, and not on where the roll has been scrolled to, with `x` always
-`tick * zoom` and never nudged sideways, because where a glyph is _is_ the claim the lane makes. The
+`laneGlyphX` and never nudged sideways to make room, because where a glyph is _is_ the claim the lane
+makes. That anchors a glyph's **centre** on its tick, so a command on a beat straddles that beat's
+rule, and holds the box inside the song's own span at both ends — the tick-0 glyph would otherwise
+put half itself behind the key column, and one on the last tick would hang past the end-of-song rule.
+The bound is the song's span and not the pane's, since one against the camera would move a glyph as
+the roll scrolled past it. The
 **edited channel is packed first** and the rest strictly below it, as a band rather than a
 preference: a shared row would put another channel's glyph among the ones the porter is working on,
 which is the thing the split is for. It is `editChannel` and not the roll's `editing`, whose fallback

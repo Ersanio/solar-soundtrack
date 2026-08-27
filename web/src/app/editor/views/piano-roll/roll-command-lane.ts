@@ -2,6 +2,7 @@ import type { Span } from '@amk/core/types';
 import type { Command } from '@amk/tokens';
 import { commandScope } from '@amk/tokens/commands/in-force';
 import { commandRewritable } from '@amk/tokens/edits';
+import { clamp } from '../../../util/math';
 import type { TimelineCommand } from '../../../state/command-timeline';
 import type { CommandGlyph } from '../../command-palette/command-icon';
 import { glyphOf } from '../../command-palette/glyph-of';
@@ -86,6 +87,28 @@ export interface LaneRequest {
    * the pointer rather than about the song.
    */
   active: number | null;
+  /** The song's own length, which is what holds the end glyphs inside it. */
+  songTicks: number;
+}
+
+/**
+ * Where a glyph's box starts, in the roll's own coordinates.
+ *
+ * **Centred on its tick**, so a command that runs on a beat straddles that
+ * beat's rule rather than hanging off its right side. The box is what the packer
+ * and the template both work in, so the centring is done once, here, and every
+ * reader is spared knowing about it.
+ *
+ * Held inside the song at both ends: centring the command at tick 0 would put
+ * half its box at a negative x, behind the key column and under the clip, and
+ * one on the last tick would hang past the end-of-song rule. Those two sit flush
+ * instead. The bound is the **song's** own span and not the pane's, because a
+ * clamp against the camera would move a glyph as the roll scrolled past it, and
+ * a glyph that moves while the roll moves is saying something about the scroll.
+ */
+export function laneGlyphX(tick: number, zoom: number, songTicks: number): number {
+  const song = songTicks * zoom;
+  return clamp(tick * zoom - LANE_GLYPH / 2, 0, Math.max(0, song - LANE_GLYPH));
 }
 
 /**
@@ -110,8 +133,8 @@ export interface LaneRequest {
  * turnover, and a glyph that changed row as the roll scrolled past it would be
  * saying something about the scrolling.
  *
- * `x` is `tick * zoom` and is never nudged along to make room, because where a
- * glyph is *is* the claim the lane makes. Room is found by going deeper, and
+ * `x` is {@link laneGlyphX} and is never nudged along to make room, because
+ * where a glyph is *is* the claim the lane makes. Room is found by going deeper, and
  * there is no floor to how deep: **every command the song runs gets a row**. A
  * cap would mean a tick whose commands are the reason the porter opened the lane
  * is the one tick it declines to show, and a count in place of the glyphs is not
@@ -119,7 +142,7 @@ export interface LaneRequest {
  * lane takes it taller.
  */
 export function packCommandLane(request: LaneRequest): CommandLane {
-  const { events, text, zoom, audible, active } = request;
+  const { events, text, zoom, audible, active, songTicks } = request;
   if (zoom <= 0 || events.length === 0) {
     return EMPTY;
   }
@@ -145,7 +168,7 @@ export function packCommandLane(request: LaneRequest): CommandLane {
       return;
     }
 
-    const x = event.tick * zoom;
+    const x = laneGlyphX(event.tick, zoom, songTicks);
     let row = floor;
     while (row < freeFrom.length && freeFrom[row] > x) {
       row++;
