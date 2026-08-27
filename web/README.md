@@ -449,7 +449,7 @@ not there (`$F6`, `$F7`, `$F9`), nor is anything inside a `$FC` body, which the 
 and the lane draws only what the compiler mapped, so the byte blob's own `$FA` prefix reaches no
 glyph.
 
-`state/command-timeline.ts` is that rule; `roll-command-lane.ts` beside `roll-layout.ts` is the
+`state/command-timeline.ts` is that rule; `roll-command-layout.ts` beside `roll-layout.ts` is the
 geometry, first-fit rows over the whole song so that a glyph's row depends on the song, the zoom and
 which channel is being edited, and not on where the roll has been scrolled to, with `x` always
 `laneGlyphX` and never nudged sideways to make room, because where a glyph is _is_ the claim the lane

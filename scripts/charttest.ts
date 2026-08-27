@@ -55,7 +55,7 @@ import {
 	laneGlyphX,
 	laneWindow,
 	packCommandLane,
-} from "../web/src/app/editor/views/piano-roll/roll-command-lane";
+} from "../web/src/app/editor/views/piano-roll/roll-command-layout";
 import {
 	KEY_WIDTH,
 	LANE_GLYPH,

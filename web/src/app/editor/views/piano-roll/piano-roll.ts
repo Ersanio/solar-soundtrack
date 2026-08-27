@@ -59,7 +59,7 @@ import {
   xAtTick,
 } from './roll-layout';
 import { type Mark, buildMarks, buildMinimap, heldRowsAt } from './roll-marks';
-import { laneWindow, packCommandLane } from './roll-command-lane';
+import { laneWindow, packCommandLane } from './roll-command-layout';
 import { RollCommandLane } from './roll-command-lane/roll-command-lane';
 import {
   CHANNEL_FILL,
