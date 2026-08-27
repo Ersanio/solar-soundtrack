@@ -191,8 +191,17 @@ export class NoteCommand {
       : null,
   );
 
-  /** Jumping to a command is a jump: the source comes forward and selects it. */
-  protected reveal(acting: Acting): void {
-    this.requests.reveal.set({ span: { ...acting.span }, show: true });
+  /**
+   * A click asks the inspector about that command; a double click goes to it.
+   *
+   * The quiet form on a click, because this panel sits **beside** the roll: it
+   * is reached by clicking a bar, so bringing the source forward would take away
+   * the note the question was asked about — the difference `Reveal.show` exists
+   * for, and the same pair a bar's own glyphs and the lane's answer to. The
+   * selection still goes through the document either way, the caret being the
+   * one statement of what is being inspected.
+   */
+  protected reveal(acting: Acting, show = false): void {
+    this.requests.reveal.set({ span: { ...acting.span }, show });
   }
 }

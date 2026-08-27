@@ -85,7 +85,8 @@ A wide bar shows more icons than a narrow one, and a bar too small for its own n
 all; three dots in the last slot mean there are more than fit, on a chip of their own when one of
 the ones they stand for starts at that note. The hover and the inspector always have the whole
 list — the inspector under two headings, one for what the note sets and one for what it plays
-under.
+under. Its buttons answer to the same pair the bar's own icons do: a click asks the inspector about
+that command and leaves you in the roll, a double click goes to it in the MML.
 
 ## The command lane
 

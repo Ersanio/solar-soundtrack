@@ -20,6 +20,7 @@
               class="border-edge bg-inset text-ink hover:border-accent flex cursor-pointer items-center gap-1.5 rounded-md border px-2 py-1 text-xs"
               [title]="each.blurb"
               (click)="reveal(each)"
+              (dblclick)="reveal(each, true)"
             >
               <svg amk-glyph width="14" height="14" [name]="each.icon"></svg>
               {{ each.label }}
