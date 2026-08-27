@@ -111,7 +111,6 @@ export interface BudgetRow {
 export interface AramBudget {
 	rows: BudgetRow[];
 	layout: SpcLayout;
-	usedBytes: number;
 	freeBytes: number;
 	overflowBytes: number;
 }
@@ -181,12 +180,9 @@ export function computeBudget(
 		},
 	];
 
-	const usedBytes = ARAM_SIZE - Math.max(0, layout.freeBytes);
-
 	return {
 		rows,
 		layout,
-		usedBytes,
 		freeBytes: layout.freeBytes,
 		overflowBytes: layout.freeBytes < 0 ? -layout.freeBytes : 0,
 	};

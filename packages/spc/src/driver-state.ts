@@ -4,8 +4,6 @@
 const enum Addr {
 	/** `$30-$3F`: music track pointer, one 16-bit pointer per voice. */
 	TrackPointers = 0x30,
-	/** `$40-$41`: the phrase the song is playing, into the pointer table. */
-	PhrasePointer = 0x40,
 	/** `$44`: the sound effect tempo accumulator, stepped by the timer count. */
 	SfxPhase = 0x44,
 	/** `$49`: the music tempo accumulator, whose overflow is a music tick. */
@@ -43,8 +41,6 @@ export interface DriverState {
 	 * `0` for a voice the song does not use.
 	 */
 	trackPointers: number[];
-	/** Address of the phrase entry being played, into the song's pointer table. */
-	phrasePointer: number;
 	/** `$51` as the driver holds it, which is the `t` value **plus one**. */
 	tempo: number;
 }
@@ -54,7 +50,6 @@ const word = (aram: Uint8Array, at: number): number => aram[at] | (aram[at + 1] 
 export function readDriverState(aram: Uint8Array): DriverState {
 	return {
 		trackPointers: Array.from({ length: VOICES }, (_, voice) => word(aram, Addr.TrackPointers + voice * 2)),
-		phrasePointer: word(aram, Addr.PhrasePointer),
 		tempo: aram[Addr.Tempo],
 	};
 }
