@@ -1,11 +1,11 @@
 /**
- * Where the piano roll puts things, and when. Pure arithmetic, no Angular —
- * `charttest` covers it, because neither an off-by-one in a windowed scroller
- * nor a playhead that jerks ten times a second is visible in a screenshot, and
- * both are obvious in a number.
+ * The roll's lanes and its camera: which row a key is on, what slice of the song
+ * is on screen, where the grid lines fall, and the arithmetic between a tick and
+ * an x. Pure arithmetic, no Angular — `charttest` covers it, because an
+ * off-by-one in a windowed scroller is invisible in a screenshot and obvious in
+ * a number.
  */
 
-import { TICKS_PER_WHOLE } from '@amk/core/hardcoded-tables';
 import { KEY_COUNT } from '@amk/spc/song-walk';
 import { NOTE_NAMES } from '@amk/tokens/commands/units';
 import { clamp } from '../../../util/math';
@@ -363,103 +363,6 @@ export function gridLines(
   return lines;
 }
 
-/** A bar has room for its name below this, and for nothing at all under it. */
-const MIN_CONTENT_HEIGHT = 11;
-/** Monospace advance as a fraction of the font size, for `font-mono` at any size. */
-const ADVANCE = 0.6;
-/** Between the bar's edge and its text, and between two glyphs. */
-const CONTENT_PAD = 3;
-/** More than this on one bar is a wall of icons rather than a reading of it. */
-const MAX_GLYPHS = 5;
-
-/** Where a bar's name goes, in the same user units as the mark. */
-export interface BarName {
-  x: number;
-  y: number;
-  size: number;
-}
-
-/** Where one glyph goes. Square, so one number does for width and height. */
-export interface BarGlyph {
-  x: number;
-  y: number;
-  size: number;
-}
-
-export interface BarContent {
-  name: BarName | null;
-  /** As many as fit, in the order they were given. */
-  glyphs: readonly BarGlyph[];
-  /** Where the "and more" mark goes, when some were left off. Null when they all fit. */
-  more: BarGlyph | null;
-}
-
-/**
- * What fits inside one bar: its name on the left, its glyphs on the right.
- *
- * Measured rather than assumed, because a bar is a 32nd note at one zoom and a
- * whole note at another, and rows stretch to fill the pane. Both scale with the
- * bar's height and fill it, so a tall row is easier to read and not merely
- * emptier. The name goes first and the glyphs are dropped from the end — a bar
- * that says `C6` and nothing else is still telling you something, where glyphs
- * with no note beside them are a row of icons floating over the music.
- *
- * A bar that cannot show them all says so, in the rightmost slot: a truncated
- * list and a complete one look the same otherwise, and the difference is what
- * decides whether the hover is worth asking. The inspector lists all of them
- * for the note under the caret, and a hover names them.
- */
-export function fitBarContent(
-  width: number,
-  height: number,
-  name: string,
-  glyphs: number,
-): BarContent {
-  const empty: BarContent = { name: null, glyphs: [], more: null };
-  if (height < MIN_CONTENT_HEIGHT || width <= 0) {
-    return empty;
-  }
-
-  const size = Math.max(7, height - 4);
-  const nameWidth = name.length * size * ADVANCE;
-  // The name is the floor, not the first of several things competing for room:
-  // a bar with no room for it has none for a glyph either, and letting the
-  // glyphs take the space the name gave up means a bar that grows an icon as it
-  // shrinks. Nothing at all is the honest picture, and the hover still answers.
-  if (nameWidth + CONTENT_PAD * 2 > width) {
-    return empty;
-  }
-
-  const placed: BarName = { x: CONTENT_PAD, y: height / 2, size };
-  const left = CONTENT_PAD + nameWidth + CONTENT_PAD;
-
-  // Right-aligned and filled leftwards, so a bar that grows a glyph grows it on
-  // the side away from the name. The boxes come back in the order they were
-  // asked for, left to right, which is what lets the caller read the ones it did
-  // not get back as the tail of its own list.
-  const box = height - 2;
-  const slot = (n: number): BarGlyph => ({
-    x: width - CONTENT_PAD - (n + 1) * box - n * CONTENT_PAD,
-    y: (height - box) / 2,
-    size: box,
-  });
-
-  const room = clamp(Math.floor((width - left) / (box + CONTENT_PAD)), 0, MAX_GLYPHS);
-  // The mark takes a slot of its own, and takes it from the glyphs — a bar with
-  // room for one of four says "there are commands here" better than it says
-  // which one came first, so the last glyph gives way to it even when that
-  // leaves the mark standing alone. `MAX_GLYPHS` counts as no room: a list cut
-  // to keep the bar readable is still a list cut.
-  const short = glyphs > room;
-  const count = short ? Math.max(0, room - 1) : glyphs;
-  const laid: BarGlyph[] = [];
-  for (let n = 0; n < count; n++) {
-    laid.push(slot(short ? n + 1 : n));
-  }
-
-  return { name: placed, glyphs: laid.reverse(), more: short && room > 0 ? slot(0) : null };
-}
-
 /**
  * Where a tick sits across the roll, in px from its left edge.
  *
@@ -493,90 +396,4 @@ export function rowAtY(offsetY: number, rowHeight: number, rows: number): number
 
   const row = Math.floor(offsetY / rowHeight);
   return row >= 0 && row < rows ? row : -1;
-}
-
-/**
- * Every duration a note can be written as one length token, in ticks.
- *
- * `1`, `2`, `4`… and their dotted forms — exactly the set `spellLength` can
- * spell without falling back to `=N` — which is what a stretch snaps to. A
- * start snaps to the grid and a length snaps to this, because a note in MML is
- * a duration rather than a region and the porter thinks in note values.
- */
-export const NOTE_LENGTHS: readonly number[] = (() => {
-  const ticks = new Set<number>();
-  for (let divisor = 1; divisor <= TICKS_PER_WHOLE; divisor++) {
-    if (TICKS_PER_WHOLE % divisor !== 0) {
-      continue;
-    }
-
-    const base = TICKS_PER_WHOLE / divisor;
-    const half = Math.floor(base / 2);
-    ticks.add(base);
-    ticks.add(base + half);
-    ticks.add(base + half + Math.floor(half / 2));
-  }
-
-  // A dotted whole note is past what one token holds, and `spellLength` says so
-  // by answering `null` — so the rungs stop where the spelling does.
-  return [...ticks].filter((each) => each <= TICKS_PER_WHOLE).sort((a, b) => a - b);
-})();
-
-/** The nearest length a note can be written as, at or above one tick. */
-export function snapDuration(ticks: number): number {
-  if (ticks <= NOTE_LENGTHS[0]) {
-    return NOTE_LENGTHS[0];
-  }
-
-  // Past a whole note the ladder repeats: a tie is whole notes and a remainder,
-  // so the same rungs are what a longer note lands on.
-  const whole = Math.max(0, Math.floor((ticks - 1) / TICKS_PER_WHOLE)) * TICKS_PER_WHOLE;
-  const left = ticks - whole;
-  let nearest = NOTE_LENGTHS[0];
-  for (const rung of NOTE_LENGTHS) {
-    if (Math.abs(rung - left) < Math.abs(nearest - left)) {
-      nearest = rung;
-    }
-  }
-
-  return whole + nearest;
-}
-
-/**
- * The lengths the wheel steps a drawn note through, in ticks.
- *
- * The fourteen denominators that divide a whole note exactly — `l1`, `l2`, `l3`,
- * `l4`, `l6` … `l192` — which is the set the inspector's `l` slider stops on.
- * A stretch snaps to {@link NOTE_LENGTHS}, dotted rungs and all; a wheel does
- * not, because twice the rungs is twice the turns it takes to cross the ladder.
- */
-export const DRAW_LENGTHS: readonly number[] = NOTE_LENGTHS.filter(
-  (ticks) => TICKS_PER_WHOLE % ticks === 0,
-);
-
-/**
- * The next rung up (`1`) or down (`-1`) from a length, in ticks.
- *
- * The first rung strictly past `ticks` in the direction asked, so a length that
- * is not on the ladder at all — a tick-precise stretch, or one longer than a
- * whole note — is brought onto it by the first turn rather than ignored.
- */
-export function stepDrawLength(ticks: number, direction: number): number {
-  if (direction > 0) {
-    return DRAW_LENGTHS.find((rung) => rung > ticks) ?? DRAW_LENGTHS[DRAW_LENGTHS.length - 1];
-  }
-
-  let below = DRAW_LENGTHS[0];
-  for (const rung of DRAW_LENGTHS) {
-    if (rung < ticks) {
-      below = rung;
-    }
-  }
-
-  return below;
-}
-
-/** A tick snapped to the grid the porter chose. `0` snaps to nothing. */
-export function snapTick(tick: number, snap: number): number {
-  return snap > 0 ? Math.round(tick / snap) * snap : Math.round(tick);
 }

@@ -5,7 +5,8 @@ import { octaveFor, spellDuration, spellNote } from '@amk/core/mml-text';
 import type { Command } from '@amk/tokens';
 import type { Edit } from '@amk/tokens/edits';
 import type { LaneStack } from './roll-layout';
-import { rowAtY, snapDuration, snapTick, stepDrawLength, tickAtX } from './roll-layout';
+import { rowAtY, tickAtX } from './roll-layout';
+import { snapDuration, snapTick, stepDrawLength } from './roll-lengths';
 import { type Preview, type PreviewBar, buildPreview, rowOfPlaced } from './roll-preview';
 import { KEY_WIDTH, NOTE_GAP, ROW_GAP } from './roll-metrics';
 import {

@@ -13,7 +13,8 @@ import {
   OVERVIEW_HEIGHT,
   OVERVIEW_PAD,
 } from './roll-metrics';
-import { type LaneStack, fitBarContent, keyName, noteLabel, overviewOffset } from './roll-layout';
+import { fitBarContent } from './roll-bar-text';
+import { type LaneStack, keyName, noteLabel, overviewOffset } from './roll-layout';
 
 /**
  * The three pictures of the song, and the one function that places a note in all
