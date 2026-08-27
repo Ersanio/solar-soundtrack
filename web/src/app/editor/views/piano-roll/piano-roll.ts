@@ -587,7 +587,7 @@ export class PianoRoll {
     this.laneResizing.set(false);
   }
 
-  /** A double click on the seam puts the lane back to the three rows it opens at. */
+  /** A double click on the seam puts the lane back to the five rows it opens at. */
   protected resetLaneHeight(): void {
     this.settings.update((s) => ({ ...s, laneHeight: LANE_HEIGHT }));
   }

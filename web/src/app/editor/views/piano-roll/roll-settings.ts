@@ -297,7 +297,7 @@ export function clampBeats(beats: number): number {
 }
 
 /**
- * A lane height off the seam above it, held between three rows and nine.
+ * A lane height off the seam above it, held between five rows and ten.
  *
  * Rounded, because a drag is in fractional pixels and the height goes into a
  * `viewBox` the glyphs are laid out against: one user unit is one CSS pixel

@@ -93,7 +93,7 @@ export class RollCommandLane {
    * How far the stack is lifted, in pixels.
    *
    * A transform and not a scroller. The project styles no scrollbars, so a
-   * native one is the platform's — some fifteen pixels of a lane forty-two tall
+   * native one is the platform's — some fifteen pixels of a lane seventy tall
    * — and its gutter comes out of the content box, which would make the lane
    * narrower than the roll it is drawn to track and put its right edge out of
    * step by that much.

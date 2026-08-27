@@ -56,7 +56,13 @@ import {
 	laneWindow,
 	packCommandLane,
 } from "../web/src/app/editor/views/piano-roll/roll-command-lane";
-import { KEY_WIDTH, LANE_GLYPH, LANE_HEIGHT, LANE_ROW } from "../web/src/app/editor/views/piano-roll/roll-metrics";
+import {
+	KEY_WIDTH,
+	LANE_GLYPH,
+	LANE_HEIGHT,
+	LANE_HEIGHT_MAX,
+	LANE_ROW,
+} from "../web/src/app/editor/views/piano-roll/roll-metrics";
 import { clampLaneHeight } from "../web/src/app/editor/views/piano-roll/roll-settings";
 import {
 	mirror,
@@ -1105,8 +1111,19 @@ console.log("\npercussion is a preference, not a rule");
 	// between its two ends rather than checked against a list — and rounded,
 	// because it becomes the `viewBox` the glyphs are laid out against and a
 	// fractional user unit puts every row's rule on a half pixel.
-	check("the lane cannot be dragged shorter than the rows it opens at", clampLaneHeight(0) === LANE_HEIGHT);
-	check("nor taller than three of those", clampLaneHeight(9999) === LANE_HEIGHT * 3, String(clampLaneHeight(9999)));
+	// The two ends are whole rows, and stated in rows: the point of either is how
+	// many commands it shows, so a pixel figure that had drifted off a row
+	// boundary would leave a band too short to draw a glyph in.
+	check(
+		"the lane cannot be dragged shorter than five rows",
+		clampLaneHeight(0) === LANE_ROW * 5,
+		String(clampLaneHeight(0)),
+	);
+	check("nor taller than ten", clampLaneHeight(9999) === LANE_ROW * 10, String(clampLaneHeight(9999)));
+	check(
+		"which are the height it opens at and its ceiling",
+		LANE_HEIGHT === LANE_ROW * 5 && LANE_HEIGHT_MAX === LANE_ROW * 10,
+	);
 	check("a height between the two is kept", clampLaneHeight(LANE_HEIGHT + 20) === LANE_HEIGHT + 20);
 	check("and a drag's fractional pixel is rounded off", Number.isInteger(clampLaneHeight(LANE_HEIGHT + 7.4)));
 }

@@ -476,7 +476,8 @@ shape (`app.ts`) turned on its side: pointer capture on the press so the drag su
 one-pixel line, `pointermove` and `pointerup` bound on the seam rather than on the document so there
 is nothing to unsubscribe, a `before:-inset-y-1` grab zone, and a double click for the default. The
 height is one more field of the roll's persisted `Settings` rather than a key of its own, for the
-reason `editChannel` is; `clampLaneHeight` holds it between `LANE_HEIGHT` and three times that and
+reason `editChannel` is; `clampLaneHeight` holds it between `LANE_HEIGHT` and `LANE_HEIGHT_MAX`, five
+rows of glyphs and ten, and
 **rounds** it, because it becomes the `viewBox` the glyphs are laid out against and a fractional user
 unit would put every row's rule on a half pixel. A stored value outside the range is clamped rather
 than rejected: it is a window that has been resized, not a value that means nothing.
