@@ -1,4 +1,5 @@
 import type { Span } from '@amk/core/types';
+import type { Command } from '@amk/tokens';
 import { commandRewritable } from '@amk/tokens/edits';
 import type { TimelineCommand } from '../../../state/command-timeline';
 import type { CommandGlyph } from '../../command-palette/command-icon';
@@ -27,14 +28,23 @@ export interface LaneGlyph {
   size: number;
   /** The command's own span, which is what a click on it selects. */
   span: Span;
+  /** The tick the driver ran it at, which is what a drag moves it off. */
+  tick: number;
+  /** 0-7, so a drag knows which channel's boundaries to snap to. */
+  channel: number;
+  /** The command itself, so a move never has to find it again through a second scan. */
+  command: Command;
   /**
-   * Whether the span is the command and nothing else, and so may be deleted.
+   * Whether the span is the command and nothing else, and so may be deleted or
+   * moved.
    *
    * A command written through a `"name=value"` has its span collapsed onto the
    * call site (`parser.ts:3861-3873`), so taking that range out would eat
    * whatever else the expansion produced along with it.
    */
   removable: boolean;
+  /** `grab` for a glyph a drag can carry, `pointer` for one that can only be clicked. */
+  cursor: 'grab' | 'pointer';
   /** The channel's `text-ch-*`, since a glyph is tinted by `color` and not by `fill`. */
   tint: string;
   /** Dimmed rather than dropped, so a muted part still reads as part of the song. */
@@ -142,12 +152,16 @@ export function packCommandLane(request: LaneRequest): CommandLane {
       y: row * LANE_ROW,
       size: LANE_GLYPH,
       span: event.command.span,
+      tick: event.tick,
+      channel: event.channel,
+      command: event.command,
       removable,
+      cursor: removable ? 'grab' : 'pointer',
       tint: CHANNEL_TEXT[event.channel],
       opacity: muted ? MUTED_OPACITY : 1,
       title:
         `${entry.label} · ${written} · #${event.channel} · tick ${event.tick}` +
-        (removable ? ' · right-click to delete' : ''),
+        (removable ? ' · drag to move · right-click to delete' : ''),
     });
   }
 

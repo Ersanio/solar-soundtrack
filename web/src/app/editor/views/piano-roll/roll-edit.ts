@@ -2504,7 +2504,7 @@ export function planEdits(context: EditContext, plan: Plan): Edit[] | EditRefusa
  * which of them lands first decides the result, and nothing in the pair says
  * which should. One edit over the joined run has one answer.
  */
-function coalesce(sorted: readonly Edit[]): Edit[] {
+export function coalesce(sorted: readonly Edit[]): Edit[] {
   const joined: Edit[] = [];
   for (const edit of sorted) {
     const held = joined[joined.length - 1];

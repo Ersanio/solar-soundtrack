@@ -458,6 +458,19 @@ not carry the lane off the bottom of it, and it is lifted by a transform rather 
 natively — a scrollbar would eat a third of
 its height and narrow its content box, putting its right edge out of step with the roll it tracks.
 
+**A glyph is dragged sideways to move its command to another tick**, which `roll-command-move.ts`
+plans and `rolltest` drives. It is the only edit in the app that changes where a command runs without
+touching a note: everywhere else a command's position moves, a note gesture is carrying one it could
+not leave where it stood, and re-emits it on the tick it already had. Targets are the item heads of
+the command's own channel — every note and rest — so the insertion always lands in an item's prefix
+and no note is split into tied halves to make room, and the channel is `channelStrip`'s, whose gate
+the drag borrows whole rather than restating. None past the last item: the pass ends at the shortest
+channel, so a command written after a channel's last note raises no `WalkCommand`, has no tick, and
+is drawn nowhere — a target out there would be one a command could be dragged to and not back from.
+Let go on the tick it already runs at, it plans nothing, so the undo history is untouched by a
+gesture that changed nothing. Horizontal only, rows being packing; and the press neither captures the
+pointer nor prevents the default, for the reason `roll-gesture.ts` does not.
+
 Written pitch is not held to the driver's o1 c–o6 a — `o0` is legal MML and `h12 o0 c` is a note the
 driver plays — so `roll-layout.ts` grows the keyboard to take such a note in, above or below.
 

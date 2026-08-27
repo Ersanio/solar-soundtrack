@@ -758,6 +758,22 @@ stats.loopTicks` pads **every other channel that would cut the song short** out 
   the close never reached — or re-enters the `$E9` and starts its count again. `SST0616` says which
   of the two it is. Not a check for entries left on the stack either: an unterminated `$E6 $00`
   compiles, opens a subloop nothing closes, plays exactly what it says, and has nothing to unroll.
+- **Handing a command a deletion left behind to the next surviving note** — deleting `b3` from
+  `o4 a=27 p12,147 b3 c3` leaves the `p` in front of the rest that takes those ticks, and putting it
+  on `c3` instead loses the tick: the `p` runs at 27, where the driver read it and where the rest
+  still is, so a per-channel `$E8`, `$DC` or `$DD` would have its whole ramp shifted by whatever the
+  deleted note happened to be worth. `commandScope` sorts by reach and not by whether a command
+  evolves over ticks, so there is no axis to spare the fades on. It is the `plan.erased` split as
+  well: a note **drawn over** `b3` begins on tick 27 and keeps the `p` where it is, so only the
+  deletion would move it, and whether the gesture matters is the one thing `reachesSomething` exists
+  to answer no to. The command stays where it was written and the lane's glyph is dragged
+  (`roll-command-move.ts`), which is a tick the porter picked rather than one a deletion inferred —
+  the same standing the right-click erase already has. Horizontal only, lane rows being first-fit
+  packing; snapped to the channel's own item heads, so the insertion is always into an item's prefix
+  and no note has to be split into tied halves; in its own channel, since within one channel text
+  order is execution order; and with no target past the last item, because the pass ends at the
+  shortest channel and a command written after a channel's last note raises no `WalkCommand` at all
+  — a target out there is one a command could be dragged to and not back from.
 
 ## Angular specifics
 

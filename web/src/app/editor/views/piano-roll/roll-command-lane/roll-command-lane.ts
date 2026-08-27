@@ -5,8 +5,28 @@ import { CommandIcon } from '../../../command-palette/command-icon';
 import { EditorRequests } from '../../../../state/editor-requests';
 import { EditorStore } from '../../../../state/editor-store';
 import type { CommandLane, LaneGlyph } from '../roll-command-lane';
+import {
+  type MoveTarget,
+  commandMoveRefusal,
+  commandMoveTargets,
+  nearestTarget,
+  planCommandMove,
+} from '../roll-command-move';
+import { isEdits } from '../roll-edit';
+import { SLOP_PX } from '../roll-gesture';
 import { type GridLine, RollGrid } from '../roll-grid/roll-grid';
 import { KEY_WIDTH, LANE_HEIGHT, LANE_ROW } from '../roll-metrics';
+import { type Strip, type StripRefusal, channelStrip, isStrip } from '../roll-strip';
+
+/** A press on a glyph, held until it becomes a drag or turns out to be a click. */
+interface LaneDrag {
+  glyph: LaneGlyph;
+  /** Client coordinates at the press: the x a move is measured from, the y for the slop alone. */
+  atX: number;
+  atY: number;
+  /** The document it was made against — an edit built for one that has moved answers nothing. */
+  source: string;
+}
 
 /**
  * The command lane: the commands a note bar cannot carry, on the song's own
@@ -52,6 +72,8 @@ export class RollCommandLane {
   readonly endX = input.required<number | null>();
   /** The window's glyphs, and the whole song's depth. */
   readonly lane = input.required<CommandLane>();
+  /** Pixels per tick, which is what turns a drag's travel into ticks. */
+  readonly zoom = input.required<number>();
 
   /** A wheel the lane does not use itself, which is the roll's zoom and its pan. */
   readonly wheeled = output<WheelEvent>();
@@ -140,5 +162,177 @@ export class RollCommandLane {
 
     const edit = spliceOut(this.editor.source(), glyph.span);
     this.requests.applyAll(edit ? [edit] : null);
+  }
+
+  // --- carrying a command to another tick ------------------------------------
+
+  private readonly held = signal<LaneDrag | null>(null);
+
+  /**
+   * The tick the pointer is asking for.
+   *
+   * Its own signal rather than a field of {@link held}, so that the strip below
+   * does not depend on the pointer: `channelStrip` walks every token and every
+   * command in the song, and one object carrying both would rebuild it on every
+   * pointer move.
+   */
+  private readonly toTick = signal(0);
+
+  /** Whether the press has passed the slop and become a drag. */
+  private readonly moved = signal(false);
+
+  /** The held glyph's channel as something splices can be planned against. */
+  private readonly dragStrip = computed<Strip | StripRefusal | null>(() => {
+    const drag = this.held();
+    const result = this.editor.result();
+    const timeline = this.editor.timeline();
+    if (drag === null || !result?.ok || !timeline || !this.inSync()) {
+      return null;
+    }
+
+    return channelStrip({
+      source: this.editor.source(),
+      channel: drag.glyph.channel,
+      noteMap: result.noteMap ?? [],
+      timeline,
+      index: this.editor.tokens(),
+      tempoRatio: result.stats?.tempoRatio ?? 1,
+    });
+  });
+
+  /** Where a drop would put the held command, or `null` while there is nowhere for it. */
+  private readonly dragTarget = computed<MoveTarget | null>(() => {
+    const strip = this.dragStrip();
+    return strip !== null && isStrip(strip)
+      ? nearestTarget(commandMoveTargets(strip), this.toTick())
+      : null;
+  });
+
+  /** Why the drop will change nothing, in the words the channel or the move gives. */
+  protected readonly dragRefusal = computed<string | null>(() => {
+    const drag = this.held();
+    const strip = this.dragStrip();
+    if (drag === null || !this.moved() || strip === null) {
+      return null;
+    }
+
+    return isStrip(strip) ? commandMoveRefusal(strip, drag.glyph.command) : strip.refused;
+  });
+
+  /**
+   * The glyph as the pointer is carrying it.
+   *
+   * A refused drag keeps its glyph where the command still is, and red: the
+   * porter is being told this cannot go, which needs the thing that cannot go to
+   * still be on screen. The lane's own copy stands aside for it either way, or
+   * the command would be painted twice.
+   */
+  protected readonly carried = computed(() => {
+    const drag = this.held();
+    const target = this.dragTarget();
+    if (drag === null || !this.moved()) {
+      return null;
+    }
+
+    const blocked = this.dragRefusal() !== null || target === null;
+    return {
+      glyph: drag.glyph,
+      x: blocked || target === null ? drag.glyph.x : target.tick * this.zoom(),
+      blocked,
+    };
+  });
+
+  /**
+   * A press on a glyph, which may still turn out to be a click.
+   *
+   * Neither the pointer nor the default is taken here: both stop the browser
+   * raising `click` and `dblclick`, which are the reveal and the go-to. The
+   * capture is taken on the first move past the slop instead, which is late
+   * enough to leave a click alone and early enough to follow the pointer off the
+   * glyph — the roll's own rule.
+   */
+  protected onGlyphDown(glyph: LaneGlyph, event: PointerEvent): void {
+    if (event.button !== 0 || !glyph.removable || !this.inSync()) {
+      return;
+    }
+
+    this.held.set({ glyph, atX: event.clientX, atY: event.clientY, source: this.editor.source() });
+    this.toTick.set(glyph.tick);
+    this.moved.set(false);
+  }
+
+  /**
+   * Bound on the lane's `<svg>` and not on the glyph, which a fast first move can
+   * leave before there is a capture to hold it.
+   */
+  protected onLaneMove(event: PointerEvent): void {
+    const drag = this.held();
+    if (drag === null) {
+      return;
+    }
+
+    if (
+      !this.moved() &&
+      (Math.abs(event.clientX - drag.atX) > SLOP_PX || Math.abs(event.clientY - drag.atY) > SLOP_PX)
+    ) {
+      this.moved.set(true);
+      if (event.currentTarget instanceof Element) {
+        event.currentTarget.setPointerCapture(event.pointerId);
+      }
+    }
+
+    // The travel and not the pointer's own x: the roll scrolls under a still
+    // pointer for the whole of a followed playback, and a tick read off the
+    // camera would wander with it. Vertical movement is read for the slop above
+    // and for nothing else — lane rows are packing, so they say nothing.
+    const zoom = this.zoom();
+    this.toTick.set(
+      zoom > 0 ? drag.glyph.tick + (event.clientX - drag.atX) / zoom : drag.glyph.tick,
+    );
+  }
+
+  /** The drop. A press that never passed the slop is a click and commits nothing. */
+  protected onLaneUp(event: PointerEvent): void {
+    const drag = this.held();
+    const strip = this.dragStrip();
+    const target = this.dragTarget();
+    const moved = this.moved();
+
+    if (
+      event.currentTarget instanceof Element &&
+      event.currentTarget.hasPointerCapture(event.pointerId)
+    ) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+
+    this.held.set(null);
+    this.moved.set(false);
+    if (drag === null || !moved || strip === null || !isStrip(strip) || target === null) {
+      return;
+    }
+
+    // The glyph's span came off the lane as it was drawn for the document the
+    // press was made against.
+    if (!this.inSync() || this.editor.source() !== drag.source) {
+      return;
+    }
+
+    const outcome = planCommandMove(
+      this.editor.source(),
+      strip,
+      drag.glyph.command,
+      drag.glyph.tick,
+      target,
+    );
+    // An empty list is a drop that changes nothing, which `applyAll` ignores, so
+    // a command let go where it already runs costs no undo step.
+    if (isEdits(outcome)) {
+      this.requests.applyAll(outcome);
+    }
+  }
+
+  protected onLaneCancel(): void {
+    this.held.set(null);
+    this.moved.set(false);
   }
 }

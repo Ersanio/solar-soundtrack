@@ -1549,6 +1549,10 @@ console.log("\nhow the command lane stacks what lands together");
 		});
 		check("a command that came through a replacement cannot be erased", spread.glyphs[0].removable === false);
 		check("and its hover does not offer it", !spread.glyphs[0].title.includes("right-click"), spread.glyphs[0].title);
+		// It cannot be carried either, and the cursor is the only thing on screen
+		// that says so before the porter presses.
+		check("nor dragged", spread.glyphs[0].cursor === "pointer", spread.glyphs[0].cursor);
+		check("and its hover does not offer that either", !spread.glyphs[0].title.includes("drag"), spread.glyphs[0].title);
 	}
 
 	check("a command written out in full can be", muted.glyphs[1].removable === true);
@@ -1557,6 +1561,13 @@ console.log("\nhow the command lane stacks what lands together");
 		muted.glyphs[1].title.includes("right-click to delete"),
 		muted.glyphs[1].title,
 	);
+	check("it offers the drag as well", muted.glyphs[1].cursor === "grab", muted.glyphs[1].cursor);
+	check("and says that too", muted.glyphs[1].title.includes("drag to move"), muted.glyphs[1].title);
+
+	// The tick and the channel a drag works from, carried on the glyph rather
+	// than parsed back out of the hover: the hover is prose for a person.
+	check("a glyph carries the tick it was packed at", muted.glyphs[1].tick === 96, String(muted.glyphs[1].tick));
+	check("and the channel it ran on", muted.glyphs[1].channel === 4, String(muted.glyphs[1].channel));
 
 	// The window is a slice of the pack, so a glyph keeps the row the whole song
 	// gave it, and `depth` stays the whole song's — it is how far the lane can be

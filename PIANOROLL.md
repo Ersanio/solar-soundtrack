@@ -126,6 +126,20 @@ the notes that need it, and this is how you say none of them do. A command writt
 `"name=value"` cannot be deleted this way — its icon offers no right-click — because the text it
 would take out is the call site rather than the command.
 
+**Drag an icon sideways to move that command to another tick.** It snaps to the starts of the notes
+and rests in its own channel — the ticks where something actually begins — so it lands in front of a
+note or a rest rather than part-way through one, and it never leaves the channel it is written in,
+since within a channel the order of the text is the order things happen. Let it go where it already
+runs and nothing happens at all, not even an undo step. Dragging up or down does nothing: which row
+an icon sits on is packing, and says nothing about the song.
+
+This is also how a command written **inside** a note is got out of one — a `v200` between a note's
+head and its `^` — which is what deleting or gluing that note is otherwise refused for.
+
+A song-wide setting drags too, on the boundaries of the channel that wrote it, which is the channel
+its colour names. If the roll cannot read that channel — a `[ ]`, a `(n)` call, a `"name=value"` —
+the icon turns red while you hold it and the lane says why; letting go then changes nothing.
+
 ## Three settings that decide how a drag lands
 
 **Grid** is the time signature the bar lines are drawn from: beats in a bar, over the note value that
@@ -207,9 +221,10 @@ the command out again on the tick it ran at, which splits the note you drew into
 around it: `c4 d4 v200 e4 f4` drawn over from the `d4` comes back `c4 g4 v200 ^4 f4`. A tie is one
 note, so nothing about what you drew has changed.
 
-Song settings such as `t` and `w`, an `o` or an `l`, and the intro `/` are outside all of this and
-always stay put. So is everything written above a channel's first note, which is the channel's setup
-rather than any one note's. And a command written **inside** a note — between its head and a `^` —
+Song settings such as `t` and `w`, an `o` or an `l`, and the intro `/` are outside all of this: no
+note gesture moves one. Dragging its icon along the command lane is how a `t` or a `w` is moved on
+purpose, and an `o`, an `l` and the `/` are not in the lane at all. So is everything written above a
+channel's first note, which is the channel's setup rather than any one note's. And a command written **inside** a note — between its head and a `^` —
 can only be kept by a run being laid over those ticks; delete or glue such a note with something
 still playing under that command and the gesture is refused instead, because there is no tick left
 to put it on. Delete it from the lane first if you meant it to go.

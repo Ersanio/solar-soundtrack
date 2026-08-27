@@ -42,8 +42,8 @@ import { type ChannelTail, type Strip, type StripItem } from './roll-strip';
  */
 const EDGE_PX = 6;
 
-/** Pointer movement below this is a click, not a drag. */
-const SLOP_PX = 3;
+/** Pointer movement below this is a click, not a drag. Shared with the command lane. */
+export const SLOP_PX = 3;
 
 /**
  * How far a pointer is from each end of a bar, and how wide the stretch zone is.
