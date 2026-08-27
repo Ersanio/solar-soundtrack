@@ -134,9 +134,10 @@ to put it back to three. The height is remembered with the rest of the roll's se
 
 The lane scrolls sideways with the roll and carries the same grid and the same playhead, so an icon
 sits under the note it acts on and on the beat it lands on. Where several land on one tick they stack
-upwards; three icons deep is as much as the lane opens at, and a plain wheel over it lifts the stack when
-there is more. A tick crowded past what the lane will draw at all ends in three dots; hover them for
-how many are behind. Click an icon to ask the inspector about that command, or double-click it to go
+upwards; three icons deep is as much as the lane opens at, and a plain wheel over it lifts the stack
+when there is more. Nothing is ever left out for want of room — however many commands land on one
+tick, each gets a row of its own, and the wheel and the seam are what reach them. Click an icon to
+ask the inspector about that command, or double-click it to go
 to it in the MML — the same as clicking one on a bar, except that it leaves the channel you are
 editing alone. **Right-click one to delete it**, in one undo step. That is the counterweight to a
 roll that keeps a command wherever something still plays under it: an edit hands the command back to

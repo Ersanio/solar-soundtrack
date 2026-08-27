@@ -783,13 +783,22 @@ stats.loopTicks` pads **every other channel that would cut the song short** out 
   is a fact about the moment and the timeline is a fact about the compile.
 - **Packing the lane without regard to which channel is being edited** — first-fit over the whole
   song deals a channel's commands into whatever rows are free, so the ones the porter was working on
-  were scattered down a stack twelve deep that shows three at a time, and finding them meant
+  were scattered down a stack many rows deep that shows three at a time, and finding them meant
   scrolling the lane on every glance. The edited channel is packed **first** and everything else
   strictly below it (`packCommandLane`), so its commands are always in the top rows. A band rather
   than a preference: letting another channel fill a gap in one of those rows puts a glyph the porter
   is not working on among the ones they are, which is the thing the split is for. Off `editChannel`
   and not the roll's `editing`, whose fallback is the channel of the bar under the pointer — rows
   would then be re-dealt on a hover, which is the same complaint as re-dealing them on a scroll.
+
+- **A row cap on the command lane, with the rest of a column drawn as three dots** — a stack cut to
+  keep the DOM finite is still a stack cut, and it cut the wrong thing: a tick carrying more commands
+  than the cap is a tick a porter opened the lane to read, so the one column worth the most was the
+  one it declined to show, and a count is not an answer to "what runs here". Every command the song
+  runs gets a row (`packCommandLane`), the wheel reaches the ones past the bottom and the seam above
+  the lane takes it taller. `depth` was always the scroll range; with nothing dropped it is now the
+  whole column, so a glyph can always be scrolled to. The bar's own `fitBarContent` mark is a
+  different thing and stays — a bar has a fixed width it cannot grow, where the lane has a scroll.
 
 ## Angular specifics
 

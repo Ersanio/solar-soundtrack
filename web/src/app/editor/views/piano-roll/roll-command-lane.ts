@@ -19,9 +19,6 @@ import { LANE_MUTED_OPACITY } from './roll-marks';
  * the moment rather than about the compile, which is why it is not up there.
  */
 
-/** How deep a column may go before the rest of it becomes a count. */
-export const MAX_LANE_ROWS = 12;
-
 /** One command glyph in the lane, with everything the template needs resolved. */
 export interface LaneGlyph {
   id: string;
@@ -63,23 +60,13 @@ export interface LaneGlyph {
   title: string;
 }
 
-/** What a column had no room for, drawn where its deepest glyph would have been. */
-export interface LaneMore {
-  id: string;
-  x: number;
-  y: number;
-  size: number;
-  count: number;
-}
-
 export interface CommandLane {
   glyphs: readonly LaneGlyph[];
-  more: readonly LaneMore[];
   /** Rows in use, which is how far the lane can be scrolled. */
   depth: number;
 }
 
-const EMPTY: CommandLane = { glyphs: [], more: [], depth: 0 };
+const EMPTY: CommandLane = { glyphs: [], depth: 0 };
 
 export interface LaneRequest {
   events: readonly TimelineCommand[];
@@ -124,7 +111,12 @@ export interface LaneRequest {
  * saying something about the scrolling.
  *
  * `x` is `tick * zoom` and is never nudged along to make room, because where a
- * glyph is *is* the claim the lane makes. Room is found by going deeper.
+ * glyph is *is* the claim the lane makes. Room is found by going deeper, and
+ * there is no floor to how deep: **every command the song runs gets a row**. A
+ * cap would mean a tick whose commands are the reason the porter opened the lane
+ * is the one tick it declines to show, and a count in place of the glyphs is not
+ * an answer to "what runs here" — the stack is scrolled, and the seam above the
+ * lane takes it taller.
  */
 export function packCommandLane(request: LaneRequest): CommandLane {
   const { events, text, zoom, audible, active } = request;
@@ -135,8 +127,6 @@ export function packCommandLane(request: LaneRequest): CommandLane {
   const glyphs: LaneGlyph[] = [];
   /** Where each row is free from, in the roll's own coordinates. */
   const freeFrom: number[] = [];
-  /** Overflowing columns by x, so a stack too deep to draw is still counted. */
-  const spilled = new Map<number, number>();
   let depth = 0;
   /** The first row this group may use, which is everything the last one filled. */
   let floor = 0;
@@ -159,11 +149,6 @@ export function packCommandLane(request: LaneRequest): CommandLane {
     let row = floor;
     while (row < freeFrom.length && freeFrom[row] > x) {
       row++;
-    }
-
-    if (row >= MAX_LANE_ROWS) {
-      spilled.set(x, (spilled.get(x) ?? 0) + 1);
-      return;
     }
 
     freeFrom[row] = x + LANE_GLYPH + LANE_PAD;
@@ -212,19 +197,7 @@ export function packCommandLane(request: LaneRequest): CommandLane {
     }
   }
 
-  // Drawn in the deepest row rather than past it, so the mark is somewhere the
-  // lane can actually be scrolled to. It stands for a list and not a command, so
-  // it has no span to reveal and no handler of its own — the inspector is where
-  // the whole list is, as it is for a bar too narrow for its glyphs.
-  const more = [...spilled].map(([x, count]) => ({
-    id: `more:${x}`,
-    x,
-    y: (MAX_LANE_ROWS - 1) * LANE_ROW,
-    size: LANE_GLYPH,
-    count,
-  }));
-
-  return { glyphs, more, depth };
+  return { glyphs, depth };
 }
 
 /**
@@ -237,6 +210,8 @@ export function packCommandLane(request: LaneRequest): CommandLane {
 export function laneWindow(lane: CommandLane, from: number, to: number, zoom: number): CommandLane {
   const left = from * zoom - LANE_GLYPH;
   const right = to * zoom;
-  const inside = (item: { x: number }) => item.x >= left && item.x <= right;
-  return { glyphs: lane.glyphs.filter(inside), more: lane.more.filter(inside), depth: lane.depth };
+  return {
+    glyphs: lane.glyphs.filter((glyph) => glyph.x >= left && glyph.x <= right),
+    depth: lane.depth,
+  };
 }

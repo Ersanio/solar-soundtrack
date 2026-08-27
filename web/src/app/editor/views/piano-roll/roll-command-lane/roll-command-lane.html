@@ -120,30 +120,6 @@
             ></svg>
           </g>
         }
-
-        <!-- A column deeper than the lane will draw. It stands for a list rather
-             than a command, so it has no span to reveal and no handler; the
-             inspector is where the whole list is. -->
-        @for (more of lane().more; track more.id) {
-          <g class="fill-ink-muted">
-            <title>{{ more.count }} more here</title>
-            <circle
-              [attr.cx]="more.x + more.size * 0.26"
-              [attr.cy]="more.y + more.size / 2"
-              [attr.r]="more.size * 0.07"
-            />
-            <circle
-              [attr.cx]="more.x + more.size * 0.5"
-              [attr.cy]="more.y + more.size / 2"
-              [attr.r]="more.size * 0.07"
-            />
-            <circle
-              [attr.cx]="more.x + more.size * 0.74"
-              [attr.cy]="more.y + more.size / 2"
-              [attr.r]="more.size * 0.07"
-            />
-          </g>
-        }
       </g>
     </g>
 

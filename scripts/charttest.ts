@@ -53,7 +53,6 @@ import {
 import { LANE_MUTED_OPACITY, MUTED_OPACITY, buildMinimap } from "../web/src/app/editor/views/piano-roll/roll-marks";
 import {
 	type CommandLane,
-	MAX_LANE_ROWS,
 	laneWindow,
 	packCommandLane,
 } from "../web/src/app/editor/views/piano-roll/roll-command-lane";
@@ -1514,22 +1513,17 @@ console.log("\nhow the command lane stacks what lands together");
 
 	check("no glyph is ever drawn over another, at any zoom", overlapping === "", overlapping);
 
-	// A column deeper than the lane will draw is counted rather than dropped in
-	// silence: a stack cut to keep the DOM finite is still a stack cut.
+	// No cap: a tick whose commands are the reason the lane was opened must not be
+	// the one tick it declines to show. Every one gets a row of its own, however
+	// deep the column runs, and `depth` says so — that is the scroll range, and a
+	// glyph past a range that stopped short could never be reached.
 	const deep = pack(
-		Array.from({ length: MAX_LANE_ROWS + 3 }, (_, n) => at(48, n % 8, n)),
+		Array.from({ length: 40 }, (_, n) => at(48, n % 8, n)),
 		2,
 	);
-	check(
-		"a column past the cap keeps the cap's worth",
-		deep.glyphs.length === MAX_LANE_ROWS,
-		String(deep.glyphs.length),
-	);
-	check(
-		"and says how many it could not draw, in the deepest row",
-		deep.more.length === 1 && deep.more[0].count === 3 && deep.more[0].y === (MAX_LANE_ROWS - 1) * LANE_ROW,
-		deep.more.map((m) => `${m.count}@${m.y}`).join(" "),
-	);
+	check("a column of forty keeps all forty", deep.glyphs.length === 40, String(deep.glyphs.length));
+	check("each one row lower than the last", rows(deep) === [...Array(40).keys()].join(","), rows(deep));
+	check("and the lane says it is forty deep", deep.depth === 40, String(deep.depth));
 
 	// What a mute does depends on how far the command reaches, and the two halves
 	// are the point: a `v` on a silenced channel sets a volume nobody can hear, so
