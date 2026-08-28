@@ -316,6 +316,15 @@ so in the toolbar rather than guessing. A `[ ]` loop, a `[[ ]]` subloop or the s
 `$E6 $00` … `$E6 $nn`, a `*` or `(n)` call, a `{ }` triplet, a `"name=value"` replacement or a
 `#halvetempo` all mean one written note is not one played note.
 
+A legacy `&` is refused for a different reason, and refuses the whole song rather than one channel:
+it is an operator rather than a command, so nothing above the compiler can say which channel it is
+written on, and the bend duration it compiles to is the length of the note _before_ it — so an edit
+to that note would silently change a slide nothing on screen has drawn. **Normalize** is the way out.
+It writes every `&` as the `$DD` it already compiles to, byte for byte, after which the slide is a
+command the roll can see and the rules below apply to it. A slide it cannot write out — one standing
+after a tie, which `$DD` would move — is left alone and named in the dialog, and goes on refusing the
+song.
+
 A `$DD` pitch slide is not one of them, and is the one command with a rule of its own. It is not
 dispatched: the note before it is what reads it, by peeking at the byte standing at the track pointer
 (`main.asm:L_10E4`), and its slot in the dispatch table holds `$0000`. So its position is a **byte**

@@ -93,10 +93,10 @@ out for itself and relocates it (`link.ts`), so a hand-written one names a body 
 resolve. One guarded line in `doReplacement` records a match's extent, which is the only place it
 is known. Nothing is recorded unless asked for, and no byte changes either way.
 
-`normalize.ts` is what it exists for: eight text-to-text passes that leave a song with no
-`#define`, no replacement, no triplet, no loop or call, no `l`, one block per channel in channel
-order, `o`/`q`/`@`/`t` written where a channel left them implied, `<`/`>` made absolute and the drum
-`@` before every drum note — the shape an editor can splice. The default note length is the one
+`normalize.ts` is what it exists for: nine text-to-text passes that leave a song with no
+`#define`, no replacement, no triplet, no loop or call, no `l`, no legacy `&`, one block per channel
+in channel order, `o`/`q`/`@`/`t` written where a channel left them implied, `<`/`>` made absolute
+and the drum `@` before every drum note — the shape an editor can splice. The default note length is the one
 piece of parse state a splice cannot work around — it is one variable for the whole song and `#N`,
 `[`, `]`, `(n)`, `*`, `/` and `{ }` all leave it standing — so every note is given its own length
 instead, segment by segment, since `c4^` is an explicit 48 and an implied 24. That is always
@@ -118,6 +118,21 @@ the call counter spent or re-enters the `$E9` and starts its count again. The pa
 the note map's tick counts are the one thing read from the compile, for the lengths a triplet's
 notes become.
 
+A legacy `&` is written out as the `$DD` it compiles to (`writePitchSlides`), which is what lets the
+piano roll open a song using one: `&` is an operator rather than a command, so nothing above the
+compiler can say which channel it is on, and the roll refuses all eight while one stands. The rewrite
+is exact rather than merely equivalent — the duration is `prevNoteLength` off the trace, the target
+is the emitted byte off the note map, and the run goes where the note's own parse would have
+appended it, so the same four bytes land in the same place. It is written all in hex and never as
+`$DD`'s note-target form, which would consume the drum remap (`parseNote`) and leave the note after
+it pitched, error AMK0161 wherever a `q` is pending, and be unable to spell a rest or a tie at all —
+a `&` reaches all three. Two shapes it declines, reporting `SST0617` at info severity rather than
+refusing the song: a slide whose note is already a `$DD`'s written target, which has no note-map
+entry to read a byte from, and one standing after a tie, since `accumulateTiedLength` rewinds a tie
+out of the way of the text `$DD` on every target but out of the way of a `&` only on the legacy ones
+— so writing it out either gains that rewind or loses it, and the tie moves the slide with it. It
+runs before `drumPerNote`, whose suppression test reads only the event directly in front of a note.
+
 `NormalizeInput.onlyChannel` narrows the whole thing to one channel, which is what the piano roll
 asks for: it edits one channel at a time, so a channel it cannot splice wants putting in order on its
 own — and must not be refused because a _different_ channel has a loop that cannot be unrolled. Every
@@ -135,7 +150,10 @@ The normalizer does not check its own work, because it cannot: the walk that wou
 `@amk/spc`, which this package may not import. `web/src/app/state/normalize-song.ts` runs the
 passes, compiles and walks after each, and applies nothing unless every intermediate plays the same
 music as the original — scoped or not, the standard is the same one; `normalizetest` pins both
-halves.
+halves. `WalkNote.bend` is what makes a `$DD` visible to that comparison at all: the walk reports the
+slide on the note whose read-ahead picks it up, carrying the operands _and_ how far into that note
+the peek found them, so a rewrite that moved a slide behind a tie is caught rather than passed as the
+same music.
 
 ## `sampleList: null` is not `[]`
 

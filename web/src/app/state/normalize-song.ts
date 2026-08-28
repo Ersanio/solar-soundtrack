@@ -28,6 +28,7 @@ import {
   unrollLoops,
   writeDefaults,
   writeNoteLengths,
+  writePitchSlides,
 } from '@amk/compiler/normalize';
 import type { CompileResult, Diagnostic, NoteAddress, ParseTrace, Span } from '@amk/core/types';
 import { type NoteState, type SongTimeline, type WalkNote, walkSong } from '@amk/spc/song-walk';
@@ -42,6 +43,7 @@ export type NormalizePass =
   | 'loops'
   | 'channels'
   | 'defaults'
+  | 'slides'
   | 'drums';
 
 export type NormalizeOutcome =
@@ -262,6 +264,11 @@ export function normalizeSong(
         return out;
       },
     ],
+    // Before the drums: a rewritten slide puts its own bytes between the drum
+    // `@` and the note, and `drumPerNote` reads only the event directly in front
+    // of a note (`normalize.ts:drumPerNote`), so running it after would have it
+    // write a second `@` on the round that checks for a fixed point.
+    ['slides', 'pitch slides', writePitchSlides],
     ['drums', 'drum notes', drumPerNote],
   ];
   for (const [pass, name, run] of rest) {
@@ -361,6 +368,19 @@ export function timelinesAgree(
           address: x.address,
         };
       }
+    }
+
+    // Not a `NOTE_KEYS` entry: that loop compares with `!==`, which two equal
+    // objects never pass. `$DD` is the one command the walk reads as part of a
+    // note rather than on its own, and until this was compared a rewrite could
+    // move a slide — or drop one — with nothing here noticing.
+    const bendX = JSON.stringify(x.bend);
+    const bendY = JSON.stringify(y.bend);
+    if (bendX !== bendY) {
+      return {
+        message: `${where}: the pitch slide ${bendX} would become ${bendY}`,
+        address: x.address,
+      };
     }
 
     if (writtenA.get(x.address) !== writtenB.get(y.address)) {

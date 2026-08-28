@@ -220,11 +220,12 @@ const FORBIDDEN_KINDS = new Set(['[', ']', '*', '(', ')', '{', '}', '"']);
  * comparing ticks, and both are refused here.
  */
 function forbiddenConstruct(index: TokenIndex, channel: number, source: string): string | null {
-  // `&` is an operator rather than a command, and it takes its duration from
-  // `prevNoteLength` (`parser.ts:2772-2777`), so a length change to the note
-  // before it silently changes the slide. The scanner cannot say which channel
-  // an operator is on, so one anywhere refuses every channel — it exists only on
-  // the legacy targets, where it is rare.
+  // `&` is an operator rather than a command, and the note after it emits
+  // `$DD $00 <prevNoteLength> <note>` (`parser.ts:2963-2969`), so a length change
+  // to the note *before* it silently changes the slide. The scanner cannot say
+  // which channel an operator is on, so one anywhere refuses every channel. It
+  // is native on every target — only the tie rewind is legacy-only
+  // (`parser.ts:3027`) — and Normalize's `writePitchSlides` is what clears it.
   for (const token of index.tokens) {
     if (token.kind === 'operator' && source.slice(token.start, token.end) === '&') {
       return 'this song uses `&`, whose length comes from the note before it';

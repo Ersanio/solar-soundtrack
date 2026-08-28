@@ -13,6 +13,7 @@ export const CHANGELOG: readonly ChangelogEntry[] = [
     items: [
       'Pitch slides that name their target as a written note',
       'The piano roll edits channels that use $DD',
+      'Normalize writes legacy & pitch slides out as $DD, so the piano roll can edit those songs',
     ],
   },
   {

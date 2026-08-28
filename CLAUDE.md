@@ -824,6 +824,40 @@ stats.loopTicks` pads **every other channel that would cut the song short** out 
   the lane takes it taller. `depth` was always the scroll range; with nothing dropped it is now the
   whole column, so a glyph can always be scrolled to. The bar's own `fitBarContent` mark is a
   different thing and stays — a bar has a fixed width it cannot grow, where the lane has a scroll.
+- **Writing a rewritten `&`'s target as a note** — `$DD $00 $nn d` reads far better than
+  `$DD $00 $nn $A6`, and it is not the same music. `parseNote` runs for a written target and returns
+  before the note map is written (`parser.ts:2971-2975`), so it consumes and clears the drum remap on
+  the way past (`:2948-2960`) and the note that follows comes out pitched where the `&` used one drum
+  byte twice; it errors AMK0161 wherever a `q` is pending (`:3451`), which is anywhere the slide is
+  the first note since a bracket, a call or a `*`, `updateQ` starting true; and `isNoteLetter`
+  excludes `r` and `^` (`:167`), so `c4 & r4` — which compiles, and slides to `$C7` — has no spelling
+  at all. `writePitchSlides` writes the byte, taken from `NoteAddress.note`, which is the same byte
+  the parser computed once and wrote twice. Readability is the roll's job now that the slide is a
+  command it can see.
+- **Skipping the `&`s that cannot be written out, rather than refusing the song** — a refusal is what
+  `precheck` does for a slide whose duration comes from a bracket, and copying that here is a
+  regression: a song with one tied `&` normalizes today, and refusing would lose every other pass
+  over it. Those slides are left exactly as they are and reported as `SST0617` at **info** severity,
+  which `advance` files as a note rather than a refusal. The dialog had to grow a "What it could not
+  write out" list for it, on "nothing to normalize" as well as on a rewrite — a song whose only `&`s
+  were skipped comes back unchanged, and without the list the porter is told it normalized while the
+  roll goes on refusing all eight channels for the reason nobody mentioned.
+- **The pass last, after `drumPerNote`** — the obvious place for a ninth pass, and it breaks the
+  fixed point. `drumPerNote` stands down only when the event directly before a note is its `@`
+  (`normalize.ts:drumPerNote`), and a rewritten slide puts four argument bytes there, so the round
+  that checks for a fixed point inserts a second `@21`. It is byte-neutral, so the walk accepts it
+  and only `normalizetest`'s "names the passes that changed it" catches it. `writePitchSlides` runs
+  **before** the drums, and anchors in front of a drum `@` already leading the note, so the two stay
+  adjacent.
+- **`WalkNote.bend` as the three operand bytes, compared through `NOTE_KEYS`** — both halves wrong.
+  `NOTE_KEYS` compares with `x[key] !== y[key]` (`normalize-song.ts`), which two equal objects never
+  pass, so every song carrying a `$DD` would have been refused; the comparison is beside that loop.
+  And the operands alone do not say what a slide is: `$DD` is not dispatched, the note before it
+  peeks at the track pointer on any tick with no slide running (`main.asm:3256-3287`), and a `$C6`
+  tie is one of those ticks — so `[len note $DD]` and `[len note $C6 $DD]` carry identical operands
+  and start the slide 48 ticks apart. `afterTicks` is how far into the note the peek found it, which
+  is the whole reason `Music.cpp:2224` rewinds a tie out of a `$DD`'s way. Without it the oracle
+  passes both directions of that rewind, which is exactly the rewrite `SST0617` exists to decline.
 
 ## Angular specifics
 

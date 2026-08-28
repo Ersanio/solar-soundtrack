@@ -134,9 +134,16 @@ shape an editor can splice — `@amk/compiler`'s README has the passes. The rewr
 compiler's; `state/normalize-song.ts` is the part only the app can do, and it is here for the reason
 `song-clock.ts` is: the passes rewrite text and the walk in `@amk/spc` reads bytes, and the package
 boundary keeps each from the other. It compiles and walks the result of every pass and compares it
-to the walk of the original — every note's tick, slot, byte, state and **written** pitch, the song's
-length, loop point and tempo commands — and the document is not touched unless they all agree. The
-outcome names the passes that changed the song, and a refusal names its reason.
+to the walk of the original — every note's tick, slot, byte, state, **written** pitch and the `$DD`
+pitch slide its read-ahead picks up, the song's length, loop point and tempo commands — and the
+document is not touched unless they all agree. The outcome names the passes that changed the song,
+and a refusal names its reason.
+
+A pass can also succeed and still leave something behind, which the dialog says under "What it could
+not write out": a `&` pitch slide standing after a tie cannot become a `$DD` without moving the tie,
+so it is left alone — and it is then what goes on refusing the roll, which is why saying so matters
+more than the rewrite succeeding quietly. That list is shown on "nothing to normalize" too, since a
+song whose only `&`s were left alone is exactly what comes back unchanged.
 
 `editor/normalize-button/` is the button and the dialog behind it, one component on both toolbars.
 It runs the rewrite _before_ the dialog opens, so the dialog lists what changes in this song rather

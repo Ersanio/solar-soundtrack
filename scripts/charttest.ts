@@ -722,6 +722,7 @@ console.log("\nthe overview bar's minimap");
 	const note = (channel: number, key: number, tick: number, ticks: number): WalkNote => ({
 		origins: [],
 		drumFrom: null,
+		bend: null,
 		channel,
 		tick,
 		ticks,
@@ -995,6 +996,7 @@ console.log("\npercussion is a preference, not a rule");
 	const note = (instrument: number | null, byte: number, noise: number | null = null, address = 0): WalkNote => ({
 		origins: [],
 		drumFrom: null,
+		bend: null,
 		channel: 0,
 		tick: 0,
 		ticks: 24,

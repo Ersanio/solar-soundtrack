@@ -359,6 +359,21 @@ export interface WalkNote {
 	 * back into text.
 	 */
 	drumFrom: number | null;
+	/**
+	 * The `$DD` pitch slide this note's read-ahead picked up, or `null`.
+	 *
+	 * `$DD` is not dispatched — its slot in the command table holds `$0000` — and
+	 * is instead consumed by a peek at the track pointer during the note before
+	 * it (`main.asm:3256-3287`). So it is a property of *this* note rather than a
+	 * command in its own right, in the way {@link drumFrom} is.
+	 *
+	 * `afterTicks` is how far into this note the peek found it, and is what tells
+	 * `[len, note, $DD]` from `[len, note, $C6, $DD]`: the second starts the same
+	 * slide a tie later. That distinction is the whole reason `Music.cpp:2224`
+	 * rewinds a tie out of the way of a `$DD`, so a walk that could not see it
+	 * would call two different songs the same.
+	 */
+	bend: { delay: number; duration: number; target: number; afterTicks: number } | null;
 }
 
 /**
@@ -999,6 +1014,7 @@ export function walkSong(song: Uint8Array, aramAddress: number): SongTimeline {
 			state: snapshot(track),
 			origins: origins(track),
 			drumFrom: track.drumFrom >= 0 ? track.drumFrom : null,
+			bend: null,
 		});
 
 		track.ticks += ticks;
@@ -1030,6 +1046,30 @@ export function walkSong(song: Uint8Array, aramAddress: number): SongTimeline {
 			case 0xdb: // pan
 			case 0xdc: // pan fade — the second byte is the target
 				state.pan = vcmd === 0xdb ? arg(0) : arg(1);
+				break;
+			case 0xdd:
+				// Not dispatched by the driver at all — the note sounding now picks
+				// it up by peeking at the track pointer (`main.asm:3256-3287`), on
+				// any tick of that note where no slide is already running. A `$C6`
+				// tie is one of those ticks, which is why `Music.cpp:2224` rewinds a
+				// tie out of the way of a `$DD`, and why the peek's own position is
+				// recorded rather than just the three bytes: the same operands found
+				// a tie later are a different slide.
+				//
+				// The "no slide already running" half is not modelled: `main.asm:3248`
+				// reads it only while `$90+x` is zero, so a second `$DD` inside a
+				// slide is ignored where this records it.
+				if (track.held >= 0) {
+					const held = notes[track.held];
+					held.bend = {
+						delay: arg(0),
+						duration: arg(1),
+						target: arg(2),
+						afterTicks: track.ticks - track.duration - held.tick,
+					};
+				}
+
+				dirty = false;
 				break;
 			case 0xde:
 				state.vibrato = true;

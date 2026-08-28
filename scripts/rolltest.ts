@@ -751,6 +751,14 @@ expectNoStrip("a tempo ratio", "#amk 2\n#halvetempo\n#0 o4 c4 d4", 0, "divides i
 // disagree with, so the gate has to name it in its own right.
 expectNoStrip("a hex subloop", "#amk 2\n#0 o4 c4 $E6 $00 d4 $E6 $01 e4", 0, "$E6");
 expectNoStrip("a hex subloop past the end of the pass", "#amk 2\n#0 o4 c4 $E6 $00 d4 $E6 $01 e4\n#1 o4 g4", 0, "$E6");
+// A `&` is an operator, so `gather` raises no command for it and the scanner
+// cannot say which channel it is on — one anywhere refuses all eight, which the
+// second case is what pins. Normalize's `writePitchSlides` is the way out: it
+// writes the `$DD` the `&` compiles to, byte for byte (`normalizetest`), and a
+// channel using that form is editable, which the "a pitch slide" section below
+// is what pins. Neither half is worth much without the other.
+expectNoStrip("a legacy pitch slide", "#amk 2\n#0 o4 c4 & d4", 0, "`&`");
+expectNoStrip("a legacy pitch slide on another channel", "#amk 2\n#0 o4 c4 & d4\n#1 o4 e4 f4", 1, "`&`");
 // `<` and `>` are safe and must **not** be refused: a note's octave comes from
 // its own written byte rather than from a running sum, so either note here
 // repitches without disturbing the other.
