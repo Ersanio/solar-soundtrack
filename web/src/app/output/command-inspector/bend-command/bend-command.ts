@@ -43,6 +43,14 @@ export class BendCommand {
   /** `$DD` names a note; `$EB`/`$EC` name a distance from one. */
   protected readonly isPitchBend = computed(() => this.vcmd() === 0xdd);
 
+  /** `$DD`'s target written as a note rather than a byte, the form AMK also takes. */
+  protected readonly noteTarget = computed(() => this.command().noteTarget);
+
+  /** Two bytes and a written note is three parameters, as three bytes is. */
+  protected readonly hasTarget = computed(
+    () => this.args().length >= 3 || this.noteTarget() !== undefined,
+  );
+
   /**
    * Cleared by the re-scan a commit causes; see `dragPreview`. The sliders bind
    * to the committed values below, not to these — see the note in
@@ -101,11 +109,13 @@ export class BendCommand {
   });
 
   protected readonly note = computed(() =>
-    this.isPitchBend()
-      ? 'The slide rides on the note before it and starts on that note’s second tick, so the shape above is drawn against o4 c as a stand-in.'
-      : this.vcmd() === 0xec
-        ? 'Every later note starts this far away and arrives at its written pitch.'
-        : 'Every later note starts at its written pitch and departs by this much.',
+    this.noteTarget()
+      ? 'The slide rides on the note before it and ends on the note written after it. That note plays nothing of its own — the driver reads its pitch as this command’s last byte — and which byte that is depends on the octave in force, any h, the instrument’s tuning and a drum remap, so it is not shown here. A length written on it is not read.'
+      : this.isPitchBend()
+        ? 'The slide rides on the note before it and starts on that note’s second tick, so the shape above is drawn against o4 c as a stand-in.'
+        : this.vcmd() === 0xec
+          ? 'Every later note starts this far away and arrives at its written pitch.'
+          : 'Every later note starts at its written pitch and departs by this much.',
   );
 
   /**

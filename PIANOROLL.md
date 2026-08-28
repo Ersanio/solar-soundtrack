@@ -313,8 +313,20 @@ back, having been dropped rather than hidden.
 
 Some MML has no one-to-one relationship between what is written and what is played, and the roll says
 so in the toolbar rather than guessing. A `[ ]` loop, a `[[ ]]` subloop or the same thing written as
-`$E6 $00` … `$E6 $nn`, a `*` or `(n)` call, a `{ }` triplet, a `"name=value"` replacement, a `$DD`
-pitch slide or a `#halvetempo` all mean one written note is not one played note.
+`$E6 $00` … `$E6 $nn`, a `*` or `(n)` call, a `{ }` triplet, a `"name=value"` replacement or a
+`#halvetempo` all mean one written note is not one played note.
+
+A `$DD` pitch slide is not one of them, and is the one command with a rule of its own. It is not
+dispatched: the note before it is what reads it, by peeking at the byte standing at the track pointer
+(`main.asm:L_10E4`), and its slot in the dispatch table holds `$0000`. So its position is a **byte**
+adjacency rather than a tick — a rest written between the note and the slide sounds right up to the
+moment it plays — and its last parameter may be a note written after it, which emits nothing of its
+own and reads the octave in force where it stands. The roll keeps both: a run written after a note
+goes after the whole construct, the octave a rewrite puts back lands in front of the slide rather
+than at the next note's head, and the slide is never taken away by a deletion in the way an ordinary
+`v` or `y` is. Two gestures are refused outright, in their own words — deleting the note a slide
+rides on, and dragging the slide's own glyph along the command lane, since every place the lane can
+drop one is in front of a note where this one has to go behind one.
 
 A remote code definition is not one of them. `(!1)[ … ]` has to be written above the first `#N`, which
 puts it on the same channel the music below that marker starts on, but its body plays only where a

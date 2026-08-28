@@ -50,6 +50,7 @@ export type TokenKind =
 	| "string"
 	| "hex"
 	| "hexArg"
+	| "hexNote"
 	| "number"
 	| "hexNumber"
 	| "operator"
@@ -90,6 +91,9 @@ export const TOKEN_TAGS: Readonly<Record<TokenKind, string>> = {
 	string: "string",
 	hex: "keyword",
 	hexArg: "integer",
+	// `$DD`'s last parameter written as a note. It wears the argument colour and
+	// not the note one because it is the command's third byte and plays nothing.
+	hexNote: "integer",
 	number: "number",
 	hexNumber: "number",
 	operator: "operator",
@@ -301,6 +305,29 @@ export interface ScanState {
 	 * that one byte has to be recognised as a count rather than an argument.
 	 */
 	awaitingArpCount: boolean;
+	/**
+	 * `$DD`'s last parameter may be a note rather than a byte, and none has been
+	 * met yet.
+	 *
+	 * `parser.ts:parseHexCommand` (Music.cpp:2012-2042) settles this with a
+	 * lookahead from the second argument, over spaces, newlines, `o<int>`, `<`
+	 * and `>`. A resumable scanner cannot look ahead — `step` may not read
+	 * another line — so the question is deferred: raised where the parser's
+	 * lookahead begins, and answered by the token that arrives. `step` clears it
+	 * by default, which *is* the rule: the parser's loop ends at anything it does
+	 * not name, so only the arms it names put the flag back.
+	 */
+	ddTarget: boolean;
+	/**
+	 * An `o` inside that lookahead has been read and its digits have not.
+	 *
+	 * One-shot in {@link hexArgNext}'s mould, and consumed above the whitespace
+	 * arm for the same reason: `getInt` skips no spaces (`parser.ts:getInt`), so
+	 * `o5` carries the lookahead on where `o 5` and a bare `5` end it. Set only
+	 * where the digits are the next character, which is what keeps it inside one
+	 * line — the one piece of this that would otherwise be an approximation.
+	 */
+	ddTargetOctave: boolean;
 	/** Inside a `"…"` run, which may span lines. */
 	inString: boolean;
 	/** Open `[` brackets, for future bracket matching. */
@@ -421,6 +448,8 @@ export function startState(): ScanState {
 		currentHex: 0,
 		currentHexSub: 0,
 		awaitingArpCount: false,
+		ddTarget: false,
+		ddTargetOctave: false,
 		inString: false,
 		loopDepth: 0,
 		replacements: { entries: [], byFirstChar: new Map() },
@@ -536,6 +565,16 @@ function stepInner(
 	const sampleName = state.sampleName;
 	state.sampleName = false;
 
+	// The same, and for a stronger reason: the parser's lookahead ends at
+	// anything it does not name (`parser.ts:parseHexCommand`), so clearing by
+	// default *is* the rule. Only the arms below put it back, which leaves `|`,
+	// `{`, a marker, a bracket, a string, a replacement and every arm added
+	// later ending the run without having to say so.
+	const ddTarget = state.ddTarget;
+	const ddOctave = state.ddTargetOctave;
+	state.ddTarget = false;
+	state.ddTargetOctave = false;
+
 	// A string may run past the end of a line, so it is checked before anything
 	// else can claim the character.
 	if (state.inString) {
@@ -586,12 +625,28 @@ function stepInner(
 		}
 	}
 
+	// Deliberately above the whitespace arm; see `ScanState.ddTargetOctave`. Not
+	// `scanNumber` either, in the `signedArgNext` arm's mould: `getInt` reads
+	// digits and stops, where a dotted tail ends the parser's lookahead.
+	if (ddOctave && isDigit(c)) {
+		let end = at;
+		while (end < line.length && isDigit(line[end])) {
+			end++;
+		}
+
+		state.ddTarget = ddTarget;
+		return { kind: "number", end };
+	}
+
 	if (isSpace(c)) {
 		let end = at + 1;
 		while (end < line.length && isSpace(line[end])) {
 			end++;
 		}
 
+		// `skipSpaces` opens each pass of the lookahead (`parser.ts:parseHexCommand`),
+		// and it crosses newlines — which is the whole reason the flag is deferred.
+		state.ddTarget = ddTarget;
 		return { kind: null, end };
 	}
 
@@ -655,6 +710,10 @@ function stepInner(
 			// `preprocess.ts` strips these before the parser sees them, so the
 			// parser only ever meets AddmusicM comments — but they are comments in
 			// the source either way, and the source is what is being scanned.
+			//
+			// Transparent to a `$DD` lookahead for that same reason: what the
+			// parser reads there is text a comment has already been taken out of.
+			state.ddTarget = ddTarget;
 			return { kind: "comment", end: line.length };
 		}
 
@@ -717,6 +776,10 @@ function stepInner(
 
 		case "<":
 		case ">":
+			// One of the three things `$DD`'s lookahead steps over
+			// (`parser.ts:parseHexCommand`); it emits no byte, so the target note
+			// still follows the command's own bytes.
+			state.ddTarget = ddTarget;
 			return { kind: "octaveShift", end: at + 1 };
 
 		case "^":
@@ -766,6 +829,15 @@ function stepInner(
 	}
 
 	if (isNoteLetter(lower)) {
+		if (ddTarget) {
+			// `parser.ts:parseHexCommand` (Music.cpp:2029-2036) — the note is
+			// `$DD`'s last parameter, so the run ends here and no argument byte
+			// follows. `hexLeft` alone, because that is what the parser sets; a
+			// pending `q` here is AMK0161, which is the compiler's to raise.
+			state.hexLeft = 0;
+			return { kind: "hexNote", end: scanNoteBody(line, at + 1) };
+		}
+
 		return { kind: "note", end: scanNoteBody(line, at + 1) };
 	}
 
@@ -777,6 +849,18 @@ function stepInner(
 
 		if (lower === "h") {
 			state.signedArgNext = true;
+		}
+
+		// `parser.ts:parseHexCommand` tests the raw character, where `isNoteLetter`
+		// takes either case — so `o5 C` carries the lookahead on and `O5 c` ends it.
+		if (ddTarget && c === "o") {
+			state.ddTarget = true;
+			// Only where the digits are the very next character, because `getInt`
+			// skips no spaces (`parser.ts:getInt`): with anything else after the
+			// `o` it reads nothing, and the loop's own `skipSpaces` decides what
+			// happens next. Which is what keeps the one-shot inside one line, and
+			// so keeps `o` at the end of a line from claiming the digits below it.
+			state.ddTargetOctave = isDigit(line[at + 1]);
 		}
 
 		return { kind, end: at + 1 };
@@ -1092,6 +1176,13 @@ function scanHex(line: string, at: number, state: ScanState): StepResult {
 		}
 	}
 
+	// `parser.ts:parseHexCommand` (Music.cpp:2012-2042) — with one argument still
+	// outstanding, `$DD`'s may be a note. The parser reads ahead from here, across
+	// newlines; `step` may not, so the answer is left to the tokens that follow.
+	if (state.hexLeft === 1 && state.currentHex === 0xdd) {
+		state.ddTarget = true;
+	}
+
 	return { kind: "hexArg", end };
 }
 
@@ -1182,6 +1273,21 @@ export interface Command {
 	}[];
 	/** Every argument the command expects is present. */
 	complete: boolean;
+	/**
+	 * `$DD`'s last parameter written as a note instead of a byte — the only place
+	 * AddmusicK takes one (`parser.ts:parseHexCommand`, Music.cpp:2012-2042).
+	 *
+	 * The byte is **not** here and cannot be. `parseNote` resolves the letter
+	 * through `getPitch`, `h`, the instrument's tuning and the `@21`-`@29` remap
+	 * before appending it (`parser.ts:parseNote`), and none of those is something
+	 * a scanner can see. A reader that needs the byte must say so rather than
+	 * guess one.
+	 *
+	 * The note raises its own note {@link Command} as well, because it really is
+	 * a note to `commands/in-force.ts` — it folds and clears the drum remap like
+	 * any other pitched letter, which is what `parseNote` does before it returns.
+	 */
+	noteTarget?: { span: Span; text: string; replacement?: string };
 	/**
 	 * The replacement this was written as, when any part of it came through one.
 	 *
@@ -1761,6 +1867,10 @@ function gather(tokens: GatherToken[], text: string, transitions: TargetTransiti
 	let channelDefined = false;
 	let pendingRemote = false;
 	let remoteDepth = 0;
+	// The `$DD` a `hexNote` would complete. Carried rather than looked ahead for:
+	// a scan forward from the command would have to restate `step`'s whole
+	// pass-through set, and this module keeps exactly one statement duplicated.
+	let openDD: Command | null = null;
 
 	for (let i = 0; i < tokens.length; i++) {
 		const token = tokens[i];
@@ -1883,11 +1993,15 @@ function gather(tokens: GatherToken[], text: string, transitions: TargetTransiti
 				inRemoteDefinition: inRemote || undefined,
 				target,
 			});
+			// Off `expected` rather than a literal 3, so `expectedArgs` stays the
+			// one place a command's argument count is written down.
+			openDD =
+				vcmd === 0xdd && expected !== null && args.length === expected - 1 ? commands[commands.length - 1] : null;
 			i = j - 1;
 			continue;
 		}
 
-		if (token.kind === "note" || token.kind === "rest") {
+		if (token.kind === "note" || token.kind === "rest" || token.kind === "hexNote") {
 			const { segments, args, last, from, nextIndex } = gatherNoteLength(
 				tokens,
 				i + 1,
@@ -1912,6 +2026,22 @@ function gather(tokens: GatherToken[], text: string, transitions: TargetTransiti
 				target,
 				noteLength: segments,
 			});
+
+			// The target is the `$DD`'s last parameter *and* a note to
+			// `commands/in-force.ts`, which is why it raises both. The command's
+			// span grows over the letter and its accidental — what `getPitch`
+			// consumes — and stops there, since `parseNote` returns before it reads
+			// a length (`parser.ts:parseNote`) and a length written here is a stray
+			// digit. Written onto the pushed command because pairing them the other
+			// way would mean restating `step`'s pass-through set here.
+			if (token.kind === "hexNote" && openDD !== null) {
+				openDD.noteTarget = { span: spanOf(token), text: raw, replacement: token.replacement };
+				openDD.span = { ...openDD.span, end: token.end };
+				openDD.replacement ??= token.replacement;
+				openDD.complete = true;
+				openDD = null;
+			}
+
 			i = nextIndex - 1;
 			continue;
 		}
@@ -2053,6 +2183,11 @@ export function vcmdName(vcmd: number, args: { value: number }[], target: Comman
  * this is a pure function with no stream state — so, as with
  * `BANK_SLOT_COUNT`, the two statements share their citations and `tokentest`
  * pins them against each other at each fork's flip point.
+ *
+ * `$DD`'s note form is not a fork here, and the reason is sharper than "this
+ * cannot see a note token": it does not change the *count*. `$DD` takes three
+ * parameters under every dialect, and a note only changes where the third one is
+ * written. {@link gather} is what knows the target stands in for it.
  */
 export function expectedArgs(vcmd: number, args: { value: number }[], target: CommandTarget): number | null {
 	if (vcmd < FIRST_VCMD || vcmd > LAST_VCMD) {
@@ -2173,11 +2308,14 @@ export function commandStartingAt(commands: readonly Command[], offset: number):
  * where it lands after typing one — still inspects the command it just
  * finished, rather than nothing.
  *
- * Two commands can therefore both contain one offset: adjacent ones meeting at
- * a shared boundary, and — since a replacement collapses onto its use site —
- * every command a single macro expanded to. Both are answered with the first,
- * which is what "the command it just finished" means, and which keeps the
- * result from depending on where the binary search happened to land.
+ * Three shapes therefore put two commands over one offset: adjacent ones meeting
+ * at a shared boundary; every command a single macro expanded to, since a
+ * replacement collapses onto its use site; and a `$DD` whose span reaches to its
+ * {@link Command.noteTarget}, taking in that note's own command and any `o` the
+ * lookahead stepped over on the way. All are answered with the first, which is
+ * what "the command it just finished" means, which puts the `$DD` ahead of the
+ * parameter it owns, and which keeps the result from depending on where the
+ * binary search landed.
  */
 export function commandAt(commands: Command[], offset: number): Command | null {
 	let low = 0;

@@ -68,8 +68,8 @@ carries the definitions visible at each point as an immutable value, so `copySta
 copy and rule 1 still holds: a state captured at line 40 _is_ the set of replacements in scope at
 line 40, with nothing from line 90 leaking back.
 
-Three departures from `parser.ts` follow from that, none of them free, and `tokentest` pins all
-three so none gets "fixed":
+Four departures from `parser.ts` follow from that, none of them free, and `tokentest` pins all
+four so none gets "fixed":
 
 - **Only a definition that opens and closes on one line registers.** AMK's `getQuotedString` runs
   happily past a newline, but carrying a partial body across lines would put a growing string in the
@@ -81,6 +81,21 @@ three so none gets "fixed":
   one position. That count limits chain length; expansion here is a tree, and `"g=g g"` would be
   exponential under any depth-only cap. This runs on every keystroke, so the guard has to bound
   total work.
+- **A replacement ends `$DD`'s lookahead.** `Music.cpp:2029` reads the raw character with no
+  `doReplacement` in front of it, so AMK decides on the macro's _name_ and then expands it — and
+  where the expansion holds no note, the pending flag leaks onto the next real note in the song,
+  which then plays nothing. That is a rewrite inside a token again. Erring the other way is the safe
+  half: the run stays open and the next `$XX` reads as its argument.
+
+`$DD`'s lookahead is the clearest illustration this file has of rule 1 forcing a re-expression.
+`parser.ts:parseHexCommand` settles the last parameter by reading ahead over spaces, newlines,
+`o<int>`, `<` and `>` (Music.cpp:2012-2042) — and its `skipSpaces` crosses line breaks, which `step`
+may not do. So the question is deferred rather than asked: `ScanState.ddTarget` is raised where the
+lookahead would begin and answered by whichever token arrives, and `step` clears it by default,
+because ending at anything the parser's loop does not name _is_ the rule. What that buys is the
+token the whole thing exists for — `hexNote`, the note that is a command's third byte and plays
+nothing — and, before it, the `hexLeft` the run would otherwise be left holding, which made the
+next `$XX` anywhere in the document scan as this command's last argument.
 
 ## Writing an edit back
 

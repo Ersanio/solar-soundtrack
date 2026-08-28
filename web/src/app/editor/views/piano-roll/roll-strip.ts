@@ -70,6 +70,18 @@ export interface StripItem {
   /** The drum `@21`-`@29` folded into this note, when one was. */
   drum: Command | null;
   /**
+   * The `$DD` written between this item and the next, when there is one.
+   *
+   * `$DD` is the one command read by the *preceding* note's read-ahead rather
+   * than dispatched (`main.asm:L_10E4` peeks at `($30+x)`), so it belongs to
+   * this item however the prefix rules file it, and deleting this item leaves it
+   * with nothing to ride on. Where it also carries a `noteTarget`, that target
+   * reads the octave this item leaves standing and emits nothing, so it is in no
+   * item's `segments` and only this says it is there. The command's own span
+   * already covers it (`tokens.ts:gather`).
+   */
+  bend: Command | null;
+  /**
    * False past the end of the pass, where the walk has no note to check the
    * item against — `walkSong` cuts at the shortest channel and sets the rest
    * aside as `unreachable` (`song-walk.ts:1069-1080`). Still editable; just not
@@ -166,7 +178,18 @@ const INLINE_GAP = /^[ \t]*$/;
 /** Line breaks included, for winding back to the end of a channel's text. */
 const WHITESPACE = /\s/;
 
-/** The commands a unit may swallow on the left of its head. */
+/**
+ * The commands a unit may swallow on the left of its head.
+ *
+ * Both directions stop at a `$DD` that names its target as a note, and that is
+ * load-bearing rather than incidental: the `$DD` fails this from the left, and
+ * the target's own note command fails it from the right, since `gather` raises
+ * one for the target as well as filing it under `Command.noteTarget`. So in
+ * `$DD $00 $18 o5 e g4` the `o5` belongs to the target and no unit reaches back
+ * over the construct to claim it — which is what stops a repitch of `g4`
+ * carrying it off — and no `unitSpan` boundary, which is where every insertion
+ * in `roll-write.ts` is anchored, ever falls between the command and its target.
+ */
 function leadsAUnit(command: Command): boolean {
   return command.kind.toLowerCase() === 'o' || isPercussionInstrument(command);
 }
@@ -240,14 +263,6 @@ function forbiddenConstruct(index: TokenIndex, channel: number, source: string):
     // here, `FORBIDDEN_KINDS` refusing it and Normalize leaving it alone.
     if (command.vcmd === 0xe6) {
       return 'this channel uses `$E6`, so one written note plays more than once';
-    }
-
-    // A note used as `$DD`'s last parameter emits no note event at all
-    // (`parser.ts:2934`), so the strip believes the notes either side of the
-    // slide are adjacent — and a rest written between them breaks the lookahead,
-    // which skips only spaces, `o`, `<` and `>` (`parser.ts:3397-3428`).
-    if (command.vcmd === 0xdd) {
-      return 'this channel uses `$DD`, whose target note is not in the song data';
     }
 
     if (command.noteLength?.some((segment) => segment.triplet)) {
@@ -532,6 +547,7 @@ export function channelStrip(request: StripRequest): Strip | StripRefusal {
       exitOctave: null,
       hasLeadingOctave: false,
       drum: null,
+      bend: null,
       verified: true,
     });
 
@@ -541,13 +557,27 @@ export function channelStrip(request: StripRequest): Strip | StripRefusal {
 
   growUnits(source, commands, items);
 
-  for (const item of items) {
+  for (let at = 0; at < items.length; at++) {
+    const item = items[at];
     item.verified = timeline.ticks === 0 || item.startTick < timeline.ticks;
     // A unit that reached back over its own octave has taken text the previous
     // item's prefix would otherwise claim.
     if (item.unitSpan.start < item.prefixSpan.end) {
       item.prefixSpan = { ...item.prefixSpan, end: item.unitSpan.start };
     }
+
+    // Read off the unit boundaries rather than the prefix: a `$DD` written after
+    // the channel's last item is in no prefix at all, and it rides on that item
+    // exactly as any other does.
+    const until = items[at + 1]?.unitSpan.start ?? source.length;
+    item.bend =
+      commands.find(
+        (command) =>
+          command.vcmd === 0xdd &&
+          !command.inRemoteDefinition &&
+          command.span.start >= item.unitSpan.end &&
+          command.span.start < until,
+      ) ?? null;
   }
 
   const disagreement = agreesWithWalk(items, timeline, channel);

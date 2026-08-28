@@ -30,6 +30,7 @@ import type { Edit } from "@amk/tokens/edits";
 import { type TimelineCommand, commandTimeline } from "../web/src/app/state/command-timeline";
 import { commandsInForceOf } from "../web/src/app/state/commands-in-force";
 import {
+	REFUSE_MOVE_BEND,
 	REFUSE_MOVE_REMOTE,
 	commandMoveRefusal,
 	commandMoveTargets,
@@ -41,6 +42,7 @@ import {
 	type EditMode,
 	type Gesture,
 	type Plan,
+	REFUSE_BEND_RIDER,
 	REFUSE_CLASH,
 	REFUSE_CROWDED,
 	REFUSE_INSIDE,
@@ -744,7 +746,6 @@ expectNoStrip("a call", "#amk 2\n#0 o4 (1)[c4]2 d4\n#1 o4 (1)2", 1, "more notes 
 expectNoStrip("a triplet", "#amk 2\n#0 o4 {c8 d8 e8} f4", 0, "{ }");
 expectNoStrip("a replacement", '#amk 2\n"x=c4"\n#0 o4 x d4', 0, "replacement");
 expectNoStrip("a tempo ratio", "#amk 2\n#halvetempo\n#0 o4 c4 d4", 0, "divides its tempo");
-expectNoStrip("a pitch slide", "#amk 2\n#0 o4 c4 $DD $00 $18 e4", 0, "$DD");
 // A subloop written as hex. The walk catches this one too where it lies inside
 // the pass, but a subloop past the shortest channel has no played note to
 // disagree with, so the gate has to name it in its own right.
@@ -2546,6 +2547,175 @@ expectNoMove(
 			String(nearestTarget(targets, 13.5)?.tick),
 		);
 	}
+}
+
+// ===========================================================================
+// A `$DD` pitch slide
+// ===========================================================================
+
+// `$DD` is not dispatched: the preceding note's read-ahead peeks at the byte
+// standing at the track pointer (`main.asm:L_10E4`), and its slot in the
+// dispatch table holds `$0000`. So its position is a **byte** adjacency rather
+// than a tick, which no other command in the roll has, and every case here is
+// about something the text can be made to say while the song stops playing.
+//
+// Its last parameter may also be a written note (Music.cpp:2012-2042), which
+// emits nothing of its own and reads the octave in force where it stands.
+console.log("\na pitch slide");
+
+/**
+ * The byte `$DD` really slides to, read out of the song data.
+ *
+ * The only reading that catches a silent retarget: the target's text does not
+ * change when the octave in force at it does, so `played()` — which is off
+ * `noteMap`, and the target is in no note map — reports nothing either way.
+ */
+function bendTarget(built: Built, source: string, written: string): number | null {
+	const data = built.result.data;
+	if (!data) {
+		return null;
+	}
+
+	for (const entry of built.result.commandMap ?? []) {
+		if (!source.slice(entry.span.start, entry.span.end).startsWith(written)) {
+			continue;
+		}
+
+		const at = entry.address - ARAM;
+		if (data[at] === 0xdd) {
+			return data[at + 3];
+		}
+	}
+
+	return null;
+}
+
+{
+	// The all-hex form involves no note at all, and used to be refused with a
+	// sentence about a target note that was not there.
+	const hex = "#amk 2\n#0 o4 c4 $DD $00 $18 $A4 d4 e4";
+	expectEdit(
+		"a slide to a byte",
+		hex,
+		0,
+		(bar) => ({ kind: "move", items: [noteAt(bar, 2)], deltaTicks: 0, deltaKeys: 2, copy: false }),
+		{ contains: "$DD $00 $18 $A4" },
+	);
+
+	// The form the issue is about. Both notes stay where they are, and the `e` is
+	// the command's third byte rather than a note of its own.
+	const note = "#amk 2\n#0 o4 c4 $DD $00 $18 e g4 a4";
+	expectEdit(
+		"a slide to a note",
+		note,
+		0,
+		(bar) => ({ kind: "move", items: [noteAt(bar, 2)], deltaTicks: 0, deltaKeys: 2, copy: false }),
+		{ contains: "$DD $00 $18 e" },
+	);
+
+	// A `$DD` on one channel said nothing about another even before, but the
+	// refusal was per-channel by a filter it is worth keeping honest.
+	expectEdit(
+		"a slide on another channel",
+		"#amk 2\n#0 o4 c4 $DD $00 $18 e g4\n#1 o4 c4 d4",
+		1,
+		(bar) => ({ kind: "move", items: [noteAt(bar, 1)], deltaTicks: 0, deltaKeys: 2, copy: false }),
+		{ contains: "$DD $00 $18 e" },
+	);
+
+	// Opening a gap after the note a slide rides on. The rest must go **after**
+	// the whole construct: written between the two, the read-ahead misses and the
+	// command loop reaches a `$0000`. `playsFor` is what catches it — the text
+	// reads perfectly either way.
+	expectEdit(
+		"a gap opened under a slide",
+		hex,
+		0,
+		(bar) => ({ kind: "move", items: [noteAt(bar, 1)], deltaTicks: 24, deltaKeys: 0, copy: false }),
+		{ contains: "c4 $DD $00 $18 $A4", lacks: "c4 r" },
+	);
+	expectEdit(
+		"a gap opened under a slide to a note",
+		note,
+		0,
+		(bar) => ({ kind: "move", items: [noteAt(bar, 1)], deltaTicks: 24, deltaKeys: 0, copy: false }),
+		{ contains: "c4 $DD $00 $18 e", lacks: "c4 r" },
+	);
+
+	// The octave the target reads. `exitOctaveFor` would otherwise write no
+	// restore at all here, because the note after the slide writes its own — and
+	// the target, which is in no `segments`, reads the octave in between.
+	const before = build(note);
+	if (typeof before !== "string") {
+		check(
+			"the target's byte to begin with",
+			bendTarget(before, note, "$DD") === 0xa8,
+			String(bendTarget(before, note, "$DD")),
+		);
+	}
+
+	expectEdit(
+		"both notes moved an octave, with a slide between them",
+		note,
+		0,
+		(bar) => ({
+			kind: "move",
+			items: [noteAt(bar, 0), noteAt(bar, 1)],
+			deltaTicks: 0,
+			deltaKeys: 12,
+			copy: false,
+		}),
+		{ contains: "o4 $DD" },
+	);
+
+	// Deleting the note a slide rides on strands it, and nothing else in
+	// `roll-write.ts` can say so: `reachesSomething` asks what still sounds after
+	// a command, where the loss here is in front of it.
+	expectRefused(
+		"deleting the note a slide rides on",
+		note,
+		0,
+		(bar) => ({ kind: "delete", items: [noteAt(bar, 0)] }),
+		"insert",
+		REFUSE_BEND_RIDER,
+	);
+
+	// And a drag of the glyph. Every target `commandMoveTargets` offers is a
+	// unit's head, so a dropped `$DD` always lands in front of a note where it
+	// has to land behind one.
+	// The last route by which the target's byte can change under the roll. A
+	// drum `@` makes it a drum byte (`parser.ts:parseNote`), and the note the
+	// slide rides on has cleared the remap everywhere but `#6` and `#7` of an
+	// AddmusicK song — where `parseTimeInForce` keeps it standing, so moving the
+	// rider between lanes rewrites its `@` and the target follows.
+	// A drum `@` still in force at the target makes its byte a drum byte
+	// (`parser.ts:parseNote`), which only `#6` and `#7` of an AddmusicK song
+	// reach — everywhere else the note the slide rides on has cleared the remap.
+	// Deliberately not guarded: a slide targeting a drum byte is outside the
+	// documented `$80`-`$C5` range and was never meaningful, and the target
+	// following its channel's instrument is the only thing the text can say.
+	// What is pinned is that the byte reads as a drum byte at all, since it is
+	// the one reading that says the remap reached the target.
+	const drum = "#amk 2\n#6 @21 c8 $DD $00 $18 e";
+	const drumBuilt = build(drum);
+	check(
+		"a drum @ in force at a target makes its byte a drum byte",
+		typeof drumBuilt !== "string" && bendTarget(drumBuilt, drum, "$DD") === 0xd0,
+		typeof drumBuilt === "string" ? drumBuilt : String(bendTarget(drumBuilt, drum, "$DD")),
+	);
+	check(
+		"and off #6 the note it rides on has cleared the remap",
+		(() => {
+			const pitched = "#amk 2\n#0 @21 c8 $DD $00 $18 e";
+			const made = build(pitched);
+			return typeof made !== "string" && bendTarget(made, pitched, "$DD") === 0xa8;
+		})(),
+	);
+
+	expectNoMove("a slide", hex, 0, "$DD $00 $18 $A4", REFUSE_MOVE_BEND);
+	// And the span a `$DD` with a note target has, which reaches over the note —
+	// so `commandAt` answers this command for a caret on the `e`.
+	expectNoMove("a slide to a note", note, 0, "$DD $00 $18 e", REFUSE_MOVE_BEND);
 }
 
 summarise();

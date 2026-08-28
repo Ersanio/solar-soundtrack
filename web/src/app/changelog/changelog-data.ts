@@ -9,6 +9,13 @@ export interface ChangelogEntry {
 export const CHANGELOG: readonly ChangelogEntry[] = [
   // ─── newest first; add new blocks here ──────────────────────────────────
   {
+    date: '28 August 2026',
+    items: [
+      'Pitch slides that name their target as a written note',
+      'The piano roll edits channels that use $DD',
+    ],
+  },
+  {
     date: '27 August 2026',
     items: [
       'A command timeline under the piano roll, showing what takes effect where',

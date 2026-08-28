@@ -791,6 +791,31 @@ stats.loopTicks` pads **every other channel that would cut the song short** out 
   and not the roll's `editing`, whose fallback is the channel of the bar under the pointer — rows
   would then be re-dealt on a hover, which is the same complaint as re-dealing them on a scroll.
 
+- **Mirroring the parser's `$DD` lookahead in `step` as a lookahead** — `$DD`'s last parameter may be
+  a written note, and `parseHexCommand` settles that by reading ahead over spaces, newlines,
+  `o<int>`, `<` and `>` (Music.cpp:2012-2042). Its `skipSpaces` crosses line breaks and `step` may
+  not read another line, so a scanner that quietly did would pass a whole-document test and
+  mis-colour text after a restart, which is the one property `tokentest` exists to hold. It is a
+  deferred flag instead (`ScanState.ddTarget`), raised where the lookahead would begin and answered
+  by whichever token arrives, and **cleared by default** — ending at anything the parser's loop does
+  not name is the rule itself, so `|`, `{`, a marker and every arm added later are right by
+  construction rather than by a list. Not one flag either: `getInt` skips no spaces, so `o5` carries
+  the lookahead on where `o 5` and a bare `5` end it, and `ddTargetOctave` is what tells the two
+  apart — set only when the digits are the next character, which is what keeps it inside one line
+  and out of the approximation `awaitingAmkVersion` has to make.
+- **Refusing a piano-roll channel for using `$DD` at all** — the sentence named a target note, and
+  the all-hex `$DD $00 $18 $A4` has none, so the commonest form of the commonest bend refused the
+  channel for a reason that was not true of it. What the blanket refusal was really carrying is a
+  hazard that has nothing to do with the target: `$DD` is not dispatched, the note before it reads it
+  by peeking at the byte standing at the track pointer (`main.asm:L_10E4`), and its dispatch slot
+  holds `$0000` — so its position is a **byte** adjacency, and `writeInto` anchoring a gap's rest at
+  the note before the gap put that rest between the two. The guards are per-fact and named:
+  `StripItem.bend` says which item carries a slide, `afterBend` moves the anchor past the whole
+  construct, `prefixCommandsOf` never lets a removal take a `$DD` — `reachesSomething` scans forward
+  and the loss here is in front of the command — `exitOctaveFor` stops suppressing the octave restore
+  where a note target reads it, and deleting the rider and dragging the glyph are refused in their
+  own words. Not a narrowing to the note-target form: that would have shipped the byte-adjacency bug
+  under a sentence saying the channel was fine.
 - **A row cap on the command lane, with the rest of a column drawn as three dots** — a stack cut to
   keep the DOM finite is still a stack cut, and it cut the wrong thing: a tick carrying more commands
   than the cap is a tick a porter opened the lane to read, so the one column worth the most was the

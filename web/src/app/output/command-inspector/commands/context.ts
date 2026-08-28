@@ -44,6 +44,14 @@ export function paramContext(
  * ways.
  */
 export function argLockedBecause(command: Command, index: number): string | null {
+  // `$DD`'s third parameter, written as a note. Its byte is the octave in force,
+  // an `h`, the instrument's tuning and a drum remap resolved together
+  // (`parser.ts:parseNote`), none of which the scanner sees, so there is no
+  // value to put a control on.
+  if (index === 2 && command.noteTarget !== undefined) {
+    return 'is the note written after the command, whose byte the octave in force decides';
+  }
+
   const macro = index >= 0 ? command.args[index]?.replacement : undefined;
   return macro === undefined ? null : `comes from the "${macro}" replacement`;
 }

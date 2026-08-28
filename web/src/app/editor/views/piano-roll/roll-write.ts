@@ -15,6 +15,7 @@ import {
   type EditRefusal,
   type PlacedNote,
   type Plan,
+  REFUSE_BEND_RIDER,
   REFUSE_CLASH,
   REFUSE_CROWDED,
   REFUSE_INSIDE,
@@ -230,6 +231,14 @@ function exitOctaveFor(
 ): number | null {
   const item = strip.items[index];
   const exit = item.exitOctave ?? item.octave;
+  // A `$DD` target reads the octave where it stands, and it stands before the
+  // next item — so the next item writing its own is not an answer for it. It is
+  // in no `segments`, so `noteFrom` cannot see it and only `bend` says it is
+  // there.
+  if (item.bend?.noteTarget !== undefined) {
+    return exit;
+  }
+
   const next = noteFrom(strip, index + 1);
   return next >= 0 && writesItsOwnOctave(strip, next, survivors) ? null : exit;
 }
@@ -248,6 +257,16 @@ function exitText(note: PlacedNote, exitOctave: number | null): string | null {
 
   const spelled = spellOctave(exitOctave);
   return spelled === null ? null : ` ${spelled}`;
+}
+
+/**
+ * The end of an item, past the `$DD` it carries.
+ *
+ * Where a run is written after a note, "after" has to mean after the whole of
+ * what the driver reads as part of that note. See {@link writeInto}.
+ */
+function afterBend(item: StripItem): number {
+  return Math.max(item.unitSpan.end, item.bend?.span.end ?? 0);
 }
 
 /** The unit and the whitespace in front of it, so a deletion leaves no double space. */
@@ -339,6 +358,12 @@ function prefixCommandsOf(strip: Strip, item: StripItem): Command[] {
       command.span.start >= item.prefixSpan.start &&
       command.span.end <= item.prefixSpan.end &&
       !command.inRemoteDefinition &&
+      // `$DD` is `'note-state'` and is nonetheless never this item's
+      // declaration: it is read by the note *before* it (`main.asm:L_10E4`), so
+      // it sits in this prefix while belonging to the item behind it, and
+      // `reachesSomething` — which scans forward — has no way to say so. Left
+      // where it was written, which is where `StripItem.bend` keeps track of it.
+      command.vcmd !== 0xdd &&
       commandScope(command) === 'note-state',
   );
 }
@@ -743,7 +768,14 @@ function writeInto(context: EditContext, gap: Region, run: string): Edit | null 
     // note and the region's own items stands on the boundary the two meet at,
     // and the run belongs after it: put in front, a marker would come out a
     // whole region late, and every channel resumes from its own on each pass.
-    return insertAt(strip.items[gap.before - 1].unitSpan.end, ` ${run}`, 1);
+    //
+    // A `$DD` is the same rule for a harder reason. It is not dispatched: the
+    // preceding note's read-ahead peeks at the byte standing at the track
+    // pointer (`main.asm:L_10E4`), so anything emitting a byte in front of it
+    // means the peek misses and the command loop reaches a slot holding `$0000`.
+    // A rest written between the two would sound right up to the moment it
+    // played.
+    return insertAt(afterBend(strip.items[gap.before - 1]), ` ${run}`, 1);
   }
 
   const next = strip.items[gap.before];
@@ -1128,6 +1160,12 @@ function windowCarries(
         command === undefined ||
         command.inRemoteDefinition ||
         !commandRewritable(command) ||
+        // A `RunMark` re-emits its command at a tick, and `$DD` needs a *byte*
+        // in front of it rather than a tick (`main.asm:L_10E4`) — and where it
+        // names its target as a note, that target would read the run's octave
+        // rather than the one it was written under. `StripItem.bend` is what
+        // keeps it where it is; the run being refused here is the same answer.
+        command.vcmd === 0xdd ||
         commandScope(command) !== 'note-state'
       ) {
         return false;
@@ -1675,6 +1713,15 @@ export function planEdits(context: EditContext, plan: Plan): Edit[] | EditRefusa
         insideCommands(strip, item).some(({ command }) => !unheard.has(command))
       ) {
         return refuse(REFUSE_INSIDE);
+      }
+
+      // A `$DD` reads the note in front of it rather than being dispatched
+      // (`main.asm:L_10E4`), so taking that note away does not leave a slide
+      // that does nothing — it leaves one the command loop reaches, whose
+      // dispatch slot is `$0000`. Nothing else can decide this: `reachesSomething`
+      // asks what still sounds *after* a command, and the loss is in front of it.
+      if (item.bend !== null) {
+        return refuse(REFUSE_BEND_RIDER);
       }
 
       // The unit takes the `o` written beside it with it (`roll-strip.ts`,
