@@ -21,6 +21,7 @@ import {
 } from '@amk/spc/instruments';
 import { elementSize } from '../../../shared/chart/element-size';
 import { clamp } from '../../../util/math';
+import { onChange } from '../../../util/on-change';
 import { Audition } from '../../../state/audition';
 import { DriverStore } from '../../../state/driver-store';
 import { EditorRequests } from '../../../state/editor-requests';
@@ -59,7 +60,7 @@ import {
   xAtTick,
 } from './roll-layout';
 import { type Mark, buildMarks, buildMinimap, heldRowsAt } from './roll-marks';
-import { laneWindow, packCommandLane } from './roll-command-lane';
+import { laneWindow, packCommandLane } from './roll-command-layout';
 import { RollCommandLane } from './roll-command-lane/roll-command-lane';
 import {
   CHANNEL_FILL,
@@ -92,9 +93,9 @@ import { RollTooltip } from './roll-tooltip/roll-tooltip';
  *
  * This holds the song's shape, the camera and the clock, and hands each of them
  * to a component that draws one thing: the toolbar, the two bars over the roll,
- * the row stripes, the grid, the notes, the keys and the hover. The four
- * `roll-*.ts` files beside it are the arithmetic, Angular-free, the way
- * `roll-layout.ts` and `percussion.ts` already were.
+ * the row stripes, the grid, the notes, the keys and the hover. The flat
+ * `roll-*.ts` files beside it are the arithmetic, Angular-free so that a harness
+ * can import it; the folders beside them are the components.
  *
  * The bars are one job each. The overview is the song drawn small and moves the
  * **view**; the scrub bar is the roll's own timeline and moves the **song**.
@@ -1009,66 +1010,28 @@ export class PianoRoll {
     // beginning, so the grid is measured from it again — one still anchored on
     // some earlier scroll would draw the song's first tick at whatever offset
     // that anchor gave it. Guarded on the drag so it cannot fire in the middle
-    // of a gesture.
-    //
-    // It follows the transition and not the state: what re-measures the pages is
-    // a stop, and a roll built while the transport is already stopped has seen
-    // none — so the first run only records the state it came in on, leaving the
-    // camera it was rebuilt from alone.
-    let wasIdle = untracked(() => this.playback.isIdle());
-    effect(() => {
-      const idle = this.playback.isIdle();
-      untracked(() => {
-        if (idle === wasIdle) {
-          return;
-        }
-
-        wasIdle = idle;
-        if (idle && !this.dragging()) {
-          this.pageOrigin.set(0);
-        }
-      });
+    // of a gesture. On the transition, so a roll rebuilt while the transport is
+    // already stopped leaves the camera it came back to alone.
+    onChange(this.playback.isIdle, (idle) => {
+      if (idle && !this.dragging()) {
+        this.pageOrigin.set(0);
+      }
     });
 
     // Sanctioned effect: carrying a press on the mixer's own buttons back to the
     // channel being edited. The mixer is a strip under the whole pane rather
     // than a child of the roll, so it has no call site here to do it at, the way
-    // the picker's own chips do.
-    //
-    // It follows the transition and not the state, for the same reason as the
-    // one above: the roll is rebuilt on every tab switch, and adopting on the
-    // state alone would drag the edited channel back to a solo taken long ago
-    // each time the tab came round. The mask is the whole trigger — it changes
-    // only when M, S or Reset is pressed, so a recompile cannot fire this.
-    let wasSilenced = untracked(() => this.mixer.silenced());
-    effect(() => {
-      const silenced = this.mixer.silenced();
-      untracked(() => {
-        if (silenced === wasSilenced) {
-          return;
-        }
-
-        wasSilenced = silenced;
-        this.followMixer(silenced);
-      });
-    });
+    // the picker's own chips do. On the transition, or every tab switch would
+    // drag the edited channel back to a solo taken long ago. The mask is the
+    // whole trigger — it changes only when M, S or Reset is pressed, so a
+    // recompile cannot fire this.
+    onChange(this.mixer.silenced, (silenced) => this.followMixer(silenced));
 
     // Sanctioned effect: a selection is a set of indices into the channel's
     // strip, so a rebuild from text the roll did not write leaves the outline on
     // whatever notes now sit at those indices. The roll's own gestures clear it
     // as they commit; this is for the ones typed in the source view.
-    let wasSource = untracked(() => this.editor.source());
-    effect(() => {
-      const source = this.editor.source();
-      untracked(() => {
-        if (source === wasSource) {
-          return;
-        }
-
-        wasSource = source;
-        this.gestures.clearSelection();
-      });
-    });
+    onChange(this.editor.source, () => this.gestures.clearSelection());
 
     // Sanctioned effect: putting the vertical scroller back where the roll was
     // left. There is nothing to scroll until the pane has been measured and the

@@ -372,7 +372,7 @@ driver's own pitch for its drum, since the letter it was written under had no sa
 **A bar says what it is and what is acting on it.** Its own pitch on the left — `C6`, `C+6`, the
 compact spelling of the key column's `o6 c` — and on the right a glyph per command in force, drawn
 from the same catalogue the command palette's buttons are. A single click asks the inspector about
-that note; a double click goes to it in the source, which is what a click alone used to do. Clicking
+that note; a double click goes to it in the source. Clicking
 a glyph targets its command instead. A glyph the note itself **puts** in force is drawn inverted —
 a near-white plate with the icon in `--color-surface` — where one it carries in from an earlier note
 is a plain light icon, so a run of notes under one `v200` says which of them the `v200` landed on. It
@@ -433,7 +433,7 @@ commands can be read in the order they run. Three shapes reach no bar at all, so
 place they appear: a command replaced before the next note sounds, one with no note after it, and
 `$DF`, `$F0`, `$FD` and `$FE`, which empty a slot rather than take one and so are in no
 `WalkNote.origins` at any tick. `WalkCommand.onANote` is the walk's own word for whether a note
-begins on a command's tick; the lane no longer filters on it, and it is kept as a description of the
+begins on a command's tick; the lane does not filter on it, and it stands as a description of the
 song rather than as anyone's rule. Left to the bars alone: `q`, `h` and `@21`-`@29`, which emit
 nothing to address, so the note they fold into is their only honest tick and that note is already
 drawing them.
@@ -449,7 +449,7 @@ not there (`$F6`, `$F7`, `$F9`), nor is anything inside a `$FC` body, which the 
 and the lane draws only what the compiler mapped, so the byte blob's own `$FA` prefix reaches no
 glyph.
 
-`state/command-timeline.ts` is that rule; `roll-command-lane.ts` beside `roll-layout.ts` is the
+`state/command-timeline.ts` is that rule; `roll-command-layout.ts` beside `roll-layout.ts` is the
 geometry, first-fit rows over the whole song so that a glyph's row depends on the song, the zoom and
 which channel is being edited, and not on where the roll has been scrolled to, with `x` always
 `laneGlyphX` and never nudged sideways to make room, because where a glyph is _is_ the claim the lane
@@ -576,9 +576,14 @@ erase, through `editing`: with no channel picked, the strip is built for the cha
 pointer, so a bar can be grabbed before it has been chosen and the press names it on the way. Empty
 grid offers nothing to name, which is why drawing, the marquee and the shortcuts still need a
 channel. The chips carry the mixer's state too — struck through where the mask silences them, ringed
-where the solo is — and `Ctrl` on one isolates that channel rather than editing it. Beside them sit six Angular-free files — `roll-layout.ts` and `percussion.ts`, and `roll-metrics.ts`,
-`roll-settings.ts`, `roll-marks.ts` and `roll-clock.ts` — so the arithmetic stays where a harness can
-import it. `charttest` reaches the first two by path.
+where the solo is — and `Ctrl` on one isolates that channel rather than editing it. Beside them sit
+the flat `roll-*.ts` files, which are Angular-free so that the arithmetic stays where a harness can
+import it: `roll-layout.ts` and `percussion.ts` for the lanes and the camera, `roll-metrics.ts` and
+`roll-bar-text.ts` for what a bar is drawn as, `roll-lengths.ts` for what a gesture may land on,
+`roll-marks.ts` and `roll-preview.ts` for the pictures, `roll-clock-step.ts` for the playhead's
+motion, and `roll-settings.ts` for what is remembered. `roll-clock.ts` and `roll-gesture.ts` are the
+exceptions and say so — they are composables, so they import `@angular/core` and no harness can
+bundle them, which is why their arithmetic sits in files of its own.
 
 **The four inside the `<svg>` are attribute components on a real `<g>`**, and their templates prefix
 every element `svg:`. Both halves are required and neither fails loudly: a component _element_ in an

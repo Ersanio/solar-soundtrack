@@ -7,7 +7,7 @@ export interface EnumOption {
 }
 
 /** How the byte becomes the number a control edits. The write path needs only this. */
-export type Codec = "u8" | "s8" | "nibbles" | "bits";
+export type Codec = "u8" | "s8";
 
 /** What the number is, which is what the readout and the unit are drawn from. */
 export type Role =

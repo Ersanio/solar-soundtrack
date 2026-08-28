@@ -75,9 +75,7 @@ export function spellQ(q: number): string {
 export interface WrittenPitch {
 	/** `a`-`g`, lower case. */
 	letter: string;
-	/** +1 for `+`, -1 for `-`, 0 for neither. AddmusicK reads at most one. */
-	accidental: number;
-	/** The letter's own semitone plus {@link accidental}. */
+	/** The letter's own semitone, plus 1 for a `+` and minus 1 for a `-`. */
 	semitone: number;
 	/** Characters consumed, so a caller can keep the length text that follows. */
 	length: number;
@@ -102,7 +100,6 @@ export function parseWrittenPitch(text: string): WrittenPitch | null {
 	const accidental = sign === "+" ? 1 : sign === "-" ? -1 : 0;
 	return {
 		letter,
-		accidental,
 		semitone: PITCH_TABLE[index] + accidental,
 		length: accidental === 0 ? 1 : 2,
 	};

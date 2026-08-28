@@ -4,7 +4,8 @@
     class="bg-inset border-edge h-24 w-full rounded-sm border"
     [attr.viewBox]="plot.box"
   >
-    <!-- The unwobbled pitch, so the wave reads as a departure from it. -->
+    <!-- What the wobble departs from, so the wave reads as a departure and not
+         as a level. Pitch under `$DE` and `p`, volume under `$E5`. -->
     <line
       x1="0"
       class="stroke-edge"
@@ -32,7 +33,8 @@
   </svg>
 
   <figcaption class="text-ink-muted mt-1 flex justify-between gap-2 font-mono text-[10px]">
+    <span class="shrink-0">{{ axis() }} swing</span>
     <span>{{ cycleLabel() }}</span>
-    <span>{{ spanLabel }}</span>
+    <span class="shrink-0">{{ spanLabel }}</span>
   </figcaption>
 </figure>

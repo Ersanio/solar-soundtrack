@@ -1,6 +1,6 @@
 import { Component, input } from '@angular/core';
 
-import type { Preview, PreviewBar } from '../roll-marks';
+import type { Preview, PreviewBar } from '../roll-preview';
 
 /**
  * The gesture in flight, drawn over the song.

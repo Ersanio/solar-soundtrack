@@ -75,8 +75,8 @@ which is all either needs:
 
 ### Tests
 
-There are no `.spec.ts` files — `npm run test` is Angular scaffolding and runs nothing. The real
-suite is the fifteen harnesses under `scripts/`; **`scripts/README.md` says what each one proves**,
+There are no `.spec.ts` files, and no `npm run test` — the suite is the fifteen harnesses under
+`scripts/`; **`scripts/README.md` says what each one proves**,
 and several of those assertions are load-bearing in ways that are not obvious from the name.
 
 `scripts/Compare-Spc.ps1` and `scripts/Compare-SongBin.ps1` diff output against a real AddmusicK

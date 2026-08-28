@@ -17,6 +17,28 @@ export const ROW_GAP = 1;
 /** The surface gap between two bars that meet, per the mark spec. */
 export const NOTE_GAP = 2;
 
+/**
+ * The box a note occupies on its row, less the gaps that keep bars apart.
+ *
+ * One definition, because the roll's bars, the overview's minimap and a
+ * gesture's preview all draw the same rectangle and a bar drawn a pixel taller
+ * in one of them reads as a different kind of thing. The `x` is the caller's:
+ * the three disagree about which tick a bar starts on, which is the only thing
+ * they should disagree about.
+ */
+export function barRect(
+  row: number,
+  rowHeight: number,
+  ticks: number,
+  zoom: number,
+): { y: number; w: number; h: number } {
+  return {
+    y: row * rowHeight + ROW_GAP,
+    w: Math.max(1, ticks * zoom - NOTE_GAP),
+    h: Math.max(1, rowHeight - ROW_GAP * 2),
+  };
+}
+
 /** Height of the overview bar: room for a pitch contour, little enough to stay chrome. */
 export const OVERVIEW_HEIGHT = 36;
 
@@ -95,3 +117,25 @@ export const CHANNEL_STROKE: readonly string[] = [
   'stroke-ch-6',
   'stroke-ch-7',
 ];
+
+/**
+ * How far a silenced channel is dimmed, in both pictures.
+ *
+ * One number, so a mute reads the same on the roll as on the overview bar.
+ * Dimmed rather than hidden: a muted part is still part of the song.
+ */
+export const MUTED_OPACITY = 0.12;
+
+/**
+ * The same idea in the command lane, and a much higher number.
+ *
+ * A bar is a filled rectangle tens of pixels wide, so a twelfth of its colour is
+ * still a shape the eye finds; a lane glyph is line art twelve pixels square,
+ * and at that value its strokes are all but gone. What is left dimmed there is
+ * also the part of a silenced channel that is still *heard* — its `t`, its `w`
+ * and its echo writes, everything else having been dropped — so it has to be
+ * legible rather than merely present. Soloing one channel is where that bites:
+ * seven channels' worth of song settings are dimmed at once, and they are the
+ * only record on screen of what is still running.
+ */
+export const LANE_MUTED_OPACITY = 0.45;

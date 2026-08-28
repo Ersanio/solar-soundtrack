@@ -33,36 +33,37 @@ import {
 import { PLOT, plot } from "../web/src/app/shared/chart/plot";
 import { stackSegments } from "../web/src/app/shared/chart/stack";
 import {
-	DRAW_LENGTHS,
-	advanceTick,
 	edgeUrgency,
 	gridLines,
 	keyIsBlack,
-	fitBarContent,
 	keyName,
 	noteLabel,
 	laneStack,
 	pageStart,
 	overviewOffset,
 	overviewTick,
-	stepDrawLength,
 	tickAtX,
 	tickWindow,
 	xAtTick,
 } from "../web/src/app/editor/views/piano-roll/roll-layout";
-import { LANE_MUTED_OPACITY, MUTED_OPACITY, buildMinimap } from "../web/src/app/editor/views/piano-roll/roll-marks";
+import { fitBarContent } from "../web/src/app/editor/views/piano-roll/roll-bar-text";
+import { DRAW_LENGTHS, stepDrawLength } from "../web/src/app/editor/views/piano-roll/roll-lengths";
+import { advanceTick } from "../web/src/app/editor/views/piano-roll/roll-clock-step";
+import { buildMinimap } from "../web/src/app/editor/views/piano-roll/roll-marks";
 import {
 	type CommandLane,
 	laneGlyphX,
 	laneWindow,
 	packCommandLane,
-} from "../web/src/app/editor/views/piano-roll/roll-command-lane";
+} from "../web/src/app/editor/views/piano-roll/roll-command-layout";
 import {
 	KEY_WIDTH,
 	LANE_GLYPH,
 	LANE_HEIGHT,
 	LANE_HEIGHT_MAX,
+	LANE_MUTED_OPACITY,
 	LANE_ROW,
+	MUTED_OPACITY,
 } from "../web/src/app/editor/views/piano-roll/roll-metrics";
 import { clampLaneHeight } from "../web/src/app/editor/views/piano-roll/roll-settings";
 import {

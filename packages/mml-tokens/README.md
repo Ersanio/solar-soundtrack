@@ -159,8 +159,8 @@ nothing, and a channel written in two blocks does not carry the first block's `h
 into the loop block and a `]` copies nothing back, so `@21 [ @0 c ]2 d` folds `d` into a drum, and
 the first pitched note it folds clears it except on `#6`/`#7` under `#amk`, so `@21 c d` is one drum
 byte and one pitched one. That is the answer about _folding_. Which drum a later note still _sounds_
-on is a fact about execution — the drum byte loads the sample and it stays through the `]`, a `*`, a
-`(1)n` and a call from another channel — so the walk carries the note that loaded it
+on is a fact about execution — the drum byte loads the sample and it stays there however the notes
+after it are reached — so the walk carries the note that loaded it
 (`WalkNote.drumFrom`) and the editor asks this map about _that_ note
 (`web/src/app/state/commands-in-force.ts`). Everything that does emit a byte is the walk's to name,
 at the address the driver reads it from, and `CompileResult.commandMap` turns that back into source.

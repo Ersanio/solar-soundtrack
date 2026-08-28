@@ -4,7 +4,7 @@ import { spliceOut } from '@amk/tokens/edits';
 import { CommandIcon } from '../../../command-palette/command-icon';
 import { EditorRequests } from '../../../../state/editor-requests';
 import { EditorStore } from '../../../../state/editor-store';
-import { type CommandLane, type LaneGlyph, laneGlyphX } from '../roll-command-lane';
+import { type CommandLane, type LaneGlyph, laneGlyphX } from '../roll-command-layout';
 import {
   type MoveTarget,
   commandMoveRefusal,

@@ -74,12 +74,9 @@ export class EditorRequests {
    *
    * A fresh object each time, so writing the same edit twice still takes.
    *
-   * `expect` is what the splice believes occupies the span. Panels read the
-   * *undebounced* scan, so their spans agree with the document — but only up to
-   * the microtask that carries the edit across, and a control that fires on
-   * `pointerup` is one gesture away from a document that has moved. The editor
-   * compares before it dispatches, which turns that whole class of race from
-   * silent corruption into an edit that simply does not take.
+   * Every edit carries `expect`, the text the splice believes occupies the
+   * span, and the editor compares before it dispatches — see `web/README.md`
+   * for the race that guards against.
    */
   readonly replace = signal<EditBatch | null>(null);
 
@@ -87,10 +84,8 @@ export class EditorRequests {
    * Applies a splice built by `@amk/tokens`'s `edits.ts`, ignoring the `null`
    * those builders return when nothing would change.
    *
-   * Here rather than in each panel so the no-op check and the defensive copy are
-   * stated once: a slider fires per frame of a drag, and the builders answering
-   * "that is the text already there" is what keeps a drag from pushing dozens of
-   * identical recompiles through the typing debounce.
+   * Here rather than in each panel so the no-op check and the defensive copy
+   * are stated once.
    */
   apply(edit: Edit | null): void {
     if (edit) {

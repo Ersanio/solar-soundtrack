@@ -48,9 +48,9 @@ import {
 	REFUSE_RANGE,
 	REFUSE_ROOM,
 	isEdits,
-	planEdits,
 	planGesture,
 } from "../web/src/app/editor/views/piano-roll/roll-edit";
+import { planEdits } from "../web/src/app/editor/views/piano-roll/roll-write";
 import {
 	type ChannelTail,
 	type Strip,
@@ -2059,12 +2059,11 @@ expectEdit(
 
 console.log("\npast the end of the song");
 
-// The driver reloads all eight track pointers the moment one voice reads its
-// `$00` (`main.asm:L_0C01`, `Music.cpp:3209`), so a note past the shortest
-// channel is written, compiled and never heard. Every channel that would cut the
-// song short is padded out to meet it instead, and `playsFor` is the only
-// reading that catches a rest of the wrong length — the text looks equally
-// plausible either way, and `others` cannot see a rest at all.
+// A note past the shortest channel is written, compiled and never heard — see
+// `padChannels` for why. Every channel that would cut the song short is padded
+// out to meet it instead, and `playsFor` is the only reading that catches a rest
+// of the wrong length: the text looks equally plausible either way, and `others`
+// cannot see a rest at all.
 
 expectEdit(
 	"a note drawn past the end of the song",

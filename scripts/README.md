@@ -1,8 +1,7 @@
 # Harnesses
 
 Fifteen byte-level checks, each a standalone esbuild-bundled Node script with its own npm script.
-There are no `.spec.ts` files anywhere in the repository — `npm run test` is Angular scaffolding and
-currently runs nothing. These are the real suite.
+There are no `.spec.ts` files anywhere in the repository and no `npm run test`. These are the suite.
 
 Run one by name (`npm run selftest`). They take no filter flags, so narrowing a run means editing
 the harness. `npm run check` runs all fifteen, grouped:
