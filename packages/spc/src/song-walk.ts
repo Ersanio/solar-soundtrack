@@ -98,6 +98,10 @@ const STEP_BUDGET = 2_000_000;
  * to name it by. `q` folds into each note's duration byte, `h` and `@21`-`@29`
  * into the note byte, and `o`/`l` into neither — those have no slot and no origin,
  * and the source is where they are answered.
+ *
+ * `$DD` is a VCMD and is still not here: a slide runs once on the note that read
+ * it and leaves nothing standing for a later note to sound under, so it occupies
+ * no slot at all. {@link WalkNote.bendFrom} is where it is named.
  */
 export type StateSlot =
 	/** `$DA`. `@21`-`@29` reach {@link NoteState.instrument} without one. */
@@ -122,8 +126,6 @@ export type StateSlot =
 	| "tremolo"
 	/** `$EB`/`$EC`, cleared by `$FE`. */
 	| "pitchEnvelope"
-	/** `$DD`. */
-	| "bend"
 	/** `$FB`. */
 	| "arpeggio"
 	/** `$F4`'s nine switches, as one slot: they draw the same and read the same. */
@@ -156,7 +158,6 @@ export const SLOTS: readonly StateSlot[] = [
 	"vibrato",
 	"tremolo",
 	"pitchEnvelope",
-	"bend",
 	"arpeggio",
 	"toggles",
 	"settings",
@@ -200,8 +201,6 @@ function slotsOf(vcmd: number, sub: number): { writes: StateSlot | null; clears:
 		case 0xdb:
 		case 0xdc:
 			return { writes: "pan", clears: null };
-		case 0xdd:
-			return { writes: "bend", clears: null };
 		case 0xde:
 		case 0xea:
 			return { writes: "vibrato", clears: null };
@@ -253,7 +252,9 @@ function slotsOf(vcmd: number, sub: number): { writes: StateSlot | null; clears:
 			return { writes: null, clears: "pitchEnvelope" };
 		default:
 			// `$E6`/`$E9` are structure, and `$F6`/`$F7`/`$F9` write a register or a
-			// byte once rather than setting anything a later note reads.
+			// byte once rather than setting anything a later note reads. So does
+			// `$DD`, which runs on the note that read it and is gone: the arm in
+			// `runCommand` raises its entry and names it on that note instead.
 			return { writes: null, clears: null };
 	}
 }
@@ -374,16 +375,29 @@ export interface WalkNote {
 	 * would call two different songs the same.
 	 */
 	bend: { delay: number; duration: number; target: number; afterTicks: number } | null;
+	/**
+	 * ARAM address of that `$DD`, or `null` — a key into `CompileResult.commandMap`,
+	 * which is how a reader names the command rather than only its operands.
+	 *
+	 * Its own field and not a member of {@link bend}, because `normalize-song.ts`
+	 * compares that object between the walk of a song and the walk of its rewrite
+	 * and an address moves under one.
+	 */
+	bendFrom: number | null;
 }
 
 /**
  * One command the pass runs, on the tick it changes something.
  *
- * A *transition* and not an execution: it is raised where {@link SLOTS} changes
- * hands, which is the test `recordOrigin` already makes. So a `[ v200 c8 ]2`
- * raises one, its second pass writing the address already in the slot, and
- * `[ v100 c8 v200 d8 ]2` raises four. That is the same answer `definedAt` gives
- * from the note end, arrived at from the byte end.
+ * A *transition* and not an execution, for everything that takes a slot: it is
+ * raised where {@link SLOTS} changes hands, which is the test `recordOrigin`
+ * already makes. So a `[ v200 c8 ]2` raises one, its second pass writing the
+ * address already in the slot, and `[ v100 c8 v200 d8 ]2` raises four. That is
+ * the same answer `definedAt` gives from the note end, arrived at from the byte
+ * end.
+ *
+ * `$DD` takes no slot and so has no transition to be raised on. It is an
+ * execution, and is raised as one — see {@link SongTimeline.commands}.
  */
 export interface WalkCommand {
 	/** Ticks from the start of the pass. */
@@ -465,6 +479,14 @@ export interface SongTimeline {
 	 * register or a byte once and nothing later reads it back as state, and
 	 * `$E6`/`$E9` are the shape of the music rather than a setting. Neither is
 	 * anything inside a `$FC` body, which the walk does not follow.
+	 *
+	 * `$DD` writes no slot either and is here all the same, raised by its own arm
+	 * in `runCommand` rather than by `recordOrigin`. It is the one entry that is
+	 * an execution and not a transition, so a `[ ]` body carrying one raises it
+	 * once per pass: a slide really does run on every note that reads it, where a
+	 * `v200` rewritten to the value already in the slot moves nothing. Its tick is
+	 * the frame the read-ahead found it in, which is inside the note before it
+	 * rather than at the tick the pointer reached the byte.
 	 *
 	 * Not everything here was written by anybody: AddmusicK prepends
 	 * `$FA $04 <echo size>` and `$FA $06 $01` to the lowest channel itself
@@ -1015,6 +1037,7 @@ export function walkSong(song: Uint8Array, aramAddress: number): SongTimeline {
 			origins: origins(track),
 			drumFrom: track.drumFrom >= 0 ? track.drumFrom : null,
 			bend: null,
+			bendFrom: null,
 		});
 
 		track.ticks += ticks;
@@ -1047,7 +1070,7 @@ export function walkSong(song: Uint8Array, aramAddress: number): SongTimeline {
 			case 0xdc: // pan fade — the second byte is the target
 				state.pan = vcmd === 0xdb ? arg(0) : arg(1);
 				break;
-			case 0xdd:
+			case 0xdd: {
 				// Not dispatched by the driver at all — the note sounding now picks
 				// it up by peeking at the track pointer (`main.asm:3256-3287`), on
 				// any tick of that note where no slide is already running. A `$C6`
@@ -1059,18 +1082,39 @@ export function walkSong(song: Uint8Array, aramAddress: number): SongTimeline {
 				// The "no slide already running" half is not modelled: `main.asm:3248`
 				// reads it only while `$90+x` is zero, so a second `$DD` inside a
 				// slide is ignored where this records it.
-				if (track.held >= 0) {
-					const held = notes[track.held];
+				const address = aramAddress + track.at;
+				const held = track.held >= 0 ? notes[track.held] : null;
+
+				// The frame the peek found it in. `track.ticks` has already run on
+				// past the note and `track.duration` is that last frame's own length,
+				// so the difference is where the frame began. With no note to ride on,
+				// the command loop is what reaches the byte — and jumps to `$0000` —
+				// so `track.ticks` is the tick, that being where it does so.
+				const tick = held === null ? track.ticks : track.ticks - track.duration;
+				if (held !== null) {
 					held.bend = {
 						delay: arg(0),
 						duration: arg(1),
 						target: arg(2),
-						afterTicks: track.ticks - track.duration - held.tick,
+						afterTicks: tick - held.tick,
 					};
+					held.bendFrom = address;
 				}
+
+				// `recordOrigin` raised nothing, `$DD` taking no slot and so having no
+				// transition to be tested for. Every execution is an entry.
+				commands.push({
+					tick,
+					channel,
+					address,
+					vcmd,
+					onANote: held !== null && held.tick === tick,
+				});
 
 				dirty = false;
 				break;
+			}
+
 			case 0xde:
 				state.vibrato = true;
 				break;
@@ -1278,7 +1322,11 @@ export function walkSong(song: Uint8Array, aramAddress: number): SongTimeline {
 		// The same cut `played` takes: a command past the shortest channel is
 		// never reached, on this pass or any later one.
 		tempoChanges: tempoChanges.filter((change) => ticks === 0 || change.tick < ticks),
-		commands: commands.filter((command) => ticks === 0 || command.tick < ticks),
+		// Sorted rather than pushed in order: a `$DD` is raised on the tick of the
+		// note that read it, which is behind the tick the byte was reached at, so
+		// `c4 v200 $DD …` records the two the other way round. Stable, so within one
+		// tick the driver's own order is what stands.
+		commands: commands.filter((command) => ticks === 0 || command.tick < ticks).sort((a, b) => a.tick - b.tick),
 		channelTicks,
 		used,
 		unreachable,

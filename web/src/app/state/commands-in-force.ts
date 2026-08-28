@@ -37,6 +37,10 @@ export interface InForceSources {
  *     byte did the loading, and the source, asked about *that* note, names the
  *     `@`. Asked about the note itself it would say which `@` was folded into
  *     it, which after `@21 c d` is none for `d` while `d` plays on the drum.
+ *   - `WalkNote.bendFrom` names the `$DD` this note's own read-ahead swallowed.
+ *     It is in no `origins`, because it fills no slot: a slide runs on the note
+ *     that read it and leaves nothing standing, so `a4 $DD $00 $44 d` is a
+ *     command acting on `a4` and on nothing after it.
  *
  * Filtered to commands that act on a note at all: the song's own settings reach
  * every channel alike and where a note sits is what a roll already draws, so
@@ -53,7 +57,7 @@ export function commandsInForceOf(sources: InForceSources): (note: WalkNote) => 
   const parseTime = parseTimeInForce(index, text);
   const cache = new Map<
     readonly (number | null)[],
-    Map<Command | null, Map<number, readonly Command[]>>
+    Map<Command | null, Map<string, readonly Command[]>>
   >();
 
   /** The scanned command a walked note was written as, or `null` off the map. */
@@ -62,11 +66,16 @@ export function commandsInForceOf(sources: InForceSources): (note: WalkNote) => 
     return span === undefined ? null : commandStartingAt(commands, span.start);
   };
 
+  /** The scanned command the walk read at an ARAM address, or `null` off the map. */
+  const ran = (address: number): Command | null => {
+    const span = byAddress.get(address)?.span;
+    return span === undefined ? null : commandStartingAt(commands, span.start);
+  };
+
   const walked = (origins: readonly (number | null)[]): Command[] => {
     const acting: Command[] = [];
     for (const at of origins) {
-      const span = at === null ? undefined : byAddress.get(at)?.span;
-      const command = span === undefined ? null : commandStartingAt(commands, span.start);
+      const command = at === null ? null : ran(at);
       if (command !== null && commandScope(command) === 'note-state') {
         acting.push(command);
       }
@@ -89,8 +98,11 @@ export function commandsInForceOf(sources: InForceSources): (note: WalkNote) => 
       byWritten.set(own, byDrum);
     }
 
-    const drumKey = note.drumFrom ?? -1;
-    const found = byDrum.get(drumKey);
+    // Both addresses, because neither is in `origins`: the drum's loading note
+    // is a note byte and the `$DD` fills no slot, so two notes agreeing on
+    // everything else can still differ on either.
+    const key = `${note.drumFrom ?? -1}:${note.bendFrom ?? -1}`;
+    const found = byDrum.get(key);
     if (found !== undefined) {
       return found;
     }
@@ -102,12 +114,17 @@ export function commandsInForceOf(sources: InForceSources): (note: WalkNote) => 
     const loader = note.drumFrom === null ? null : written(note.drumFrom);
     const drum =
       loader === null ? [] : (parseTime.get(loader) ?? []).filter(isPercussionInstrument);
+    const slide = note.bendFrom === null ? null : ran(note.bendFrom);
     const acting = [
       ...folded.filter((command) => !isPercussionInstrument(command)),
       ...drum,
       ...walked(note.origins),
+      // Last, because it is the one this note carries rather than one it arrived
+      // under. Where it is drawn does not follow from that: `definedAt` finds a
+      // slide defining whatever the order, and a bar draws the defining half first.
+      ...(slide === null ? [] : [slide]),
     ];
-    byDrum.set(drumKey, acting);
+    byDrum.set(key, acting);
     return acting;
   };
 }
@@ -129,7 +146,8 @@ export function commandsInForceOf(sources: InForceSources): (note: WalkNote) => 
  * `origins` names a command by the address the driver read it from and
  * `recordOrigin` skips a write to the address already in the slot, so
  * `[ v200 c8 ]2` is answered on the first pass alone. `[ v200 c8 v100 d8 ]2`
- * answers all four, each list differing from the one before it.
+ * answers all four, each list differing from the one before it. A `$DD` in the
+ * same body is answered on both passes, for the reason below.
  *
  * A statement about the one pass the walk produces, as everything else read off
  * a `WalkNote` is.
@@ -142,7 +160,12 @@ export function definedAt(
     return new Set(acting);
   }
 
-  const held = new Set(before);
+  // A `$DD` standing in the note before is not something this note inherited.
+  // It fills no slot and nothing carries it forward, so the only way one written
+  // slide reaches two notes is by being read twice — a `[ ]` body played through
+  // — and both notes ran it. Identity is what says "the same command" everywhere
+  // else here and cannot tell those two apart.
+  const held = new Set(before.filter((command) => command.vcmd !== 0xdd));
   return new Set(acting.filter((command) => !held.has(command)));
 }
 

@@ -410,7 +410,10 @@ them in one textual pass and baked them into the notes' own bytes;
 `@amk/tokens/commands/in-force` does that half. The drum is both at once: `@21` is folded into one
 note byte, and that byte loads a sample every note after it plays on, through a `]`, a `*` and a call
 from another channel — so the walk names the note that loaded it (`WalkNote.drumFrom`) and the source
-is asked about that note. `state/commands-in-force.ts` is the join, kept out of the store so
+is asked about that note. A `$DD` is the same shape reversed: it fills no slot, so no `origins` names
+it, and the note whose read-ahead swallowed it carries the address itself (`WalkNote.bendFrom`) — one
+slide acting on one note and on nothing after it, however many notes follow.
+`state/commands-in-force.ts` is the join, kept out of the store so
 `walktest` can pin all three halves on the songs that need each.
 
 **Which of them a note puts in force is that list against the note before it on its channel**
@@ -436,10 +439,12 @@ glyphs are the commands in force at its note, drawn on that note's own tick, so 
 drawn twice and the two are answering different questions — the lane the tick it runs on, the note's
 chip which note plays under it. Those agree in `c4 v200 d4` and are a rest apart in `c4 v200 r4 d4`,
 and the lane says the same thing in both, which is what makes it the one place the whole song's
-commands can be read in the order they run. Three shapes reach no bar at all, so the lane is the only
-place they appear: a command replaced before the next note sounds, one with no note after it, and
+commands can be read in the order they run. Four shapes reach no bar at all, so the lane is the only
+place they appear: a command replaced before the next note sounds, one with no note after it,
 `$DF`, `$F0`, `$FD` and `$FE`, which empty a slot rather than take one and so are in no
-`WalkNote.origins` at any tick. `WalkCommand.onANote` is the walk's own word for whether a note
+`WalkNote.origins` at any tick, and a `$DD` with no note in front of it to read it, which the driver
+dispatches into the `$0000` its slot in the command table holds.
+`WalkCommand.onANote` is the walk's own word for whether a note
 begins on a command's tick; the lane does not filter on it, and it stands as a description of the
 song rather than as anyone's rule. Left to the bars alone: `q`, `h` and `@21`-`@29`, which emit
 nothing to address, so the note they fold into is their only honest tick and that note is already
@@ -455,6 +460,13 @@ same answer `definedAt` gives, arrived at from the byte end. A command that writ
 not there (`$F6`, `$F7`, `$F9`), nor is anything inside a `$FC` body, which the walk does not follow,
 and the lane draws only what the compiler mapped, so the byte blob's own `$FA` prefix reaches no
 glyph.
+
+`$DD` is the one entry raised outside that rule, from its own arm of the walk, because it writes no
+slot and so has no transition to be tested for. It is an execution: a `[ c4 $DD … ]2` runs the slide
+on both notes and is two entries where `[ v200 c8 ]2` is one, and its tick is the frame the driver's
+read-ahead found it in rather than the tick the read pointer reached the byte at, which is where the
+note it rides on _ends_. That is also why `definedAt` never counts a `$DD` in the note before as
+something this note inherited — one written slide reaching two notes ran twice.
 
 `state/command-timeline.ts` is that rule; `roll-command-layout.ts` beside `roll-layout.ts` is the
 geometry, first-fit rows over the whole song so that a glyph's row depends on the song, the zoom and

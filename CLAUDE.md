@@ -858,6 +858,22 @@ stats.loopTicks` pads **every other channel that would cut the song short** out 
   and start the slide 48 ticks apart. `afterTicks` is how far into the note the peek found it, which
   is the whole reason `Music.cpp:2224` rewinds a tie out of a `$DD`'s way. Without it the oracle
   passes both directions of that rewind, which is exactly the rewrite `SST0617` exists to decline.
+- **`$DD` filed as a state slot, the way `$DE` and `$ED` are** (`slotsOf`, `SLOTS[11]`) — it put a
+  slide everywhere it is not and nowhere it is, and both readings were wrong in silence. `origins` is
+  frozen when a note keys on and the walk reaches the `$DD` a byte later, so the note that _plays_ the
+  slide reported nothing and every note _after_ it reported the slide as state it sounds under —
+  which no note does, a slide running once and leaving nothing standing. And the entry `recordOrigin`
+  raised carried `track.ticks`, which by then has run on past the note, so the lane drew the slide
+  where the note it rides on **ends**. It is the note's own, as `drumFrom` is: `WalkNote.bendFrom`
+  holds the address, `commands-in-force.ts` joins it, and the bar of the note in front of the `$DD` is
+  what draws it. Its lane entry is raised from the arm itself at `track.ticks - track.duration`, the
+  frame the read-ahead found it in — so `c4^4 $DD` is 48 ticks in, which the operands cannot say — and
+  once per execution rather than once per slot change, since a `[ ]` body carrying one really does
+  slide on every pass. That is also why `definedAt` never counts a `$DD` in the previous note as
+  inherited: it is one written command reaching two notes that each ran it, and identity cannot tell
+  that from a `v200` still standing. Not a separate list beside `origins` either — a slide is a
+  command acting on a note, which is the question `commandsInForceOf` already answers, and a second
+  channel for one command would need every reader to ask twice.
 
 ## Angular specifics
 

@@ -337,6 +337,37 @@ console.log("\nthe song's command list");
 	const idle = map("#amk 4\n#0 o4 @1 c8 $DF d8\n");
 	check("but one with nothing to clear is not", idle === "0:#0:@1", idle);
 
+	// `$DD` is the one entry that is an execution, and the one raised outside
+	// `recordOrigin`. It is not dispatched: the note in front of it swallows it
+	// with a peek at the track pointer (`main.asm:3256-3287`), so it runs inside
+	// that note and not at the tick the read pointer reached the byte, which is
+	// where the note *ends* and is where every other command here would sit.
+	const slide = map("#amk 4\n#0 o4 c4 $DD $00 $18 $A6 d4\n");
+	check("a pitch slide is on the tick of the note that reads it", slide === "0:#0:$DD $00 $18 $A6", slide);
+
+	// The same reading `afterTicks` carries, arrived at from the lane's end. The
+	// peek happens again on a tie's own ticks, which is why `Music.cpp:2224`
+	// rewinds a tie out of a `$DD`'s way — so the slide starts where the last
+	// frame does and the operands alone cannot say where that is.
+	const slideTied = map("#amk 4\n#0 o4 c4^4 $DD $00 $18 $A6 d4\n");
+	check("and a tie in front of it takes the tick with the slide", slideTied === "48:#0:$DD $00 $18 $A6", slideTied);
+
+	// Being an execution is what makes this two rather than one: the slide really
+	// does run on each note that reads it, where the `[ v200 c8 ]2` above is one
+	// entry because the second pass writes the address the slot already holds.
+	const twice = map("#amk 4\n#0 o4 [ c4 $DD $00 $18 $A6 ]2\n");
+	check("one inside a [ ] is an entry every pass", twice === "0:#0:$DD $00 $18 $A6 48:#0:$DD $00 $18 $A6", twice);
+
+	// And nothing is left off the lane. With a rest in front of it no read-ahead
+	// ever sees it, the command loop reaches it first and the SPC jumps to the
+	// `$0000` its dispatch slot holds — so the tick is where the loop got to.
+	const orphan = map("#amk 4\n#0 o4 c4 r4 $DD $00 $18 $A6 d4\n");
+	check(
+		"and one with no note to ride is recorded where the loop reaches it",
+		orphan === "96:#0:$DD $00 $18 $A6",
+		orphan,
+	);
+
 	// Whether a note *begins* where the command ran, which is the whole of what
 	// decides the lane: a bar names the commands in force at its note, on that
 	// note's own tick, so it speaks for where one ran only when the two agree.
@@ -1574,6 +1605,45 @@ console.log("\nthe command in force at a note is named exactly");
 		"an intro marker is not a boundary",
 		intro.timeline.loopTick !== null && intro.defined(1) === "",
 		`${intro.timeline.loopTick} | ${intro.defined(1)}`,
+	);
+
+	// The one command that acts on the note *before* it. It is not dispatched —
+	// the note sounding swallows it with a peek at the track pointer
+	// (`main.asm:3256-3287`) — and it fills no slot, so nothing after it inherits
+	// a slide and `WalkNote.bendFrom` is the only thing that names it.
+	const slid = acting("#amk 4\n#0 o4 c4 $DD $00 $18 $A6 d4 e4\n");
+	check("a pitch slide acts on the note in front of it", slid.glyphs(0) === "$DD $00 $18 $A6", slid.glyphs(0));
+	check(
+		"and on no note after it, a slide leaving nothing standing",
+		slid.glyphs(1) === "" && slid.glyphs(2) === "",
+		`1:${slid.glyphs(1)} 2:${slid.glyphs(2)}`,
+	);
+	check("the note that reads it is what puts it in force", slid.defined(0) === "$DD $00 $18 $A6", slid.defined(0));
+
+	// The written-note form is one command whose span reaches over its target
+	// (`tokens.ts:gather`), and the target emits nothing, so there is no note of
+	// its own for it to be drawn on.
+	const target = acting("#amk 4\n#0 o4 c4 $DD $00 $18 d e4\n");
+	check("a slide naming its target as a note is one glyph", target.glyphs(0) === "$DD $00 $18 d", target.glyphs(0));
+	check("and the target sounds no note to draw", target.timeline.notes.length === 2, `${target.timeline.notes.length}`);
+
+	// Both passes ran their own slide, so neither inherited the other's. Identity
+	// cannot tell those apart — it is one written command — which is why
+	// `definedAt` never counts a `$DD` as held.
+	const twice = acting("#amk 4\n#0 o4 [ c4 $DD $00 $18 $A6 ]2\n");
+	check(
+		"a slide inside a [ ] is put in force on every pass",
+		twice.defined(0) === "$DD $00 $18 $A6" && twice.defined(1) === "$DD $00 $18 $A6",
+		`0:${twice.defined(0)} 1:${twice.defined(1)}`,
+	);
+
+	// With a rest in front of it no read-ahead sees it at all, so it reaches no
+	// bar — the lane is the only place it appears, which is where it is pinned.
+	const rested = acting("#amk 4\n#0 o4 c4 r4 $DD $00 $18 $A6 d4\n");
+	check(
+		"one with no note to ride is on no bar",
+		rested.timeline.notes.every((_, n) => rested.glyphs(n) === ""),
+		rested.timeline.notes.map((_, n) => `${n}:${rested.glyphs(n)}`).join(" "),
 	);
 }
 

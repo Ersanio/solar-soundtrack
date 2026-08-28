@@ -106,10 +106,17 @@ are a rest apart — the lane has the `v200` in the rest, where it runs, and `d4
 the note playing under it. The lane is the one place the whole song's commands can be read in the
 order they run, which a set of per-note icons cannot be.
 
-Three things are on no bar at any point in the song, so the lane is the only place they appear at
-all: a command replaced before the next note sounds, one written after a channel's last note, and the
+A `$DD` pitch slide is the one that stands _behind_ its note rather than in front of it. It is the
+note before it that reads it, so its icon is on that note's bar and on no bar after — a slide runs
+once and leaves nothing for the next note to play under — and the lane puts it on that note's own
+tick, which is where it is heard rather than where the bytes sit. In `c4 $DD $00 $18 $A6 d4` both are
+tick 0, under `c4`. The rule below says the rest of what follows from that.
+
+Four things are on no bar at any point in the song, so the lane is the only place they appear at
+all: a command replaced before the next note sounds, one written after a channel's last note, the
 four that switch something off — a bar names what a note is playing _under_, and there is nothing to
-name once vibrato is off.
+name once vibrato is off — and a `$DD` with no note in front of it to read it, which is a slide the
+driver never plays.
 
 The other direction: `q`, `h` and `@21`-`@29` are on the bars alone and never here. They emit no
 byte, so the driver never reads them at a tick of their own; the note they fold into is their only
@@ -336,6 +343,14 @@ than at the next note's head, and the slide is never taken away by a deletion in
 `v` or `y` is. Two gestures are refused outright, in their own words — deleting the note a slide
 rides on, and dragging the slide's own glyph along the command lane, since every place the lane can
 drop one is in front of a note where this one has to go behind one.
+
+The same fact decides where it is drawn. Its icon is on the bar of the note that reads it, plated the
+way anything a note starts is plated, and on no bar after it: a `v` or a `y` is state the notes that
+follow go on playing under, and a slide is over when it is over. A slide inside a `[ ]` played twice
+is two slides, so both notes carry it and both are plated. On the lane it sits on that same tick,
+which for `c4^4 $DD …` is 48 ticks into the note rather than at its head — the read-ahead does not
+find the slide until the tie's own ticks, which is why writing one after a tie is a rewrite Normalize
+declines to make.
 
 A remote code definition is not one of them. `(!1)[ … ]` has to be written above the first `#N`, which
 puts it on the same channel the music below that marker starts on, but its body plays only where a
