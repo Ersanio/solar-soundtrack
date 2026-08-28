@@ -1206,11 +1206,12 @@ console.log("\none note, auditioned where the song is playing");
 	check("a rest follows, so the note keys off and releases", short[2] === 0x7f && short[3] === 0xc7);
 	check("the block is terminated", short[short.length - 1] === 0x00);
 
-	// A `$DD` goes where `emitNote` would leave it, which is after the note's
-	// frames — so where the driver arms it is decided by how long the last frame
-	// is. `main.asm:2337-2339` skips the read-ahead on a tick that fetches, so the
-	// pointer has to be standing on the byte already.
-	const SLIDE = { delay: 0x00, duration: 0x30, target: 0xb0, afterTicks: 0 };
+	// A `$DD` goes where `emitNote` would leave it, which is after the frame the
+	// read-ahead reads it in — so that frame is what decides where the driver arms
+	// it. `main.asm:2337-2339` skips the read-ahead on a tick that fetches, so the
+	// pointer has to be standing on the byte already. `frameTicks` is that frame,
+	// and it is the whole note's here.
+	const SLIDE = { delay: 0x00, duration: 0x30, target: 0xb0, afterTicks: 0, frameTicks: 96 };
 	const head = noteFrames(NOTE, 96, null, SLIDE);
 	check(
 		"a slide arming at the head goes straight after the note byte",
@@ -1222,14 +1223,14 @@ console.log("\none note, auditioned where the song is playing");
 
 	// `Music.cpp:2224` rewinds a tie out of a `$DD`'s way so the arm lands on it,
 	// and the duration byte carries over, so `c4^4 $DD` is four bytes not five.
-	const tied = noteFrames(NOTE, 96, null, { ...SLIDE, afterTicks: 48 });
+	const tied = noteFrames(NOTE, 96, null, { ...SLIDE, afterTicks: 48, frameTicks: 48 });
 	check(
 		"an arm halfway in is a tie of the ticks left",
 		tied[0] === 48 && tied[1] === NOTE && tied[2] === 0xc6 && tied[3] === 0xdd,
 		[...tied.subarray(0, 4)].map((b) => b.toString(16)).join(" "),
 	);
 
-	const uneven = noteFrames(NOTE, 96, null, { ...SLIDE, afterTicks: 24 });
+	const uneven = noteFrames(NOTE, 96, null, { ...SLIDE, afterTicks: 24, frameTicks: 72 });
 	check(
 		"an uneven arm respells the tail's own duration",
 		uneven[0] === 24 && uneven[1] === NOTE && uneven[2] === 72 && uneven[3] === 0xc6 && uneven[4] === 0xdd,
@@ -1237,7 +1238,7 @@ console.log("\none note, auditioned where the song is playing");
 	);
 
 	// The head run *is* `emitNote`, so a chunked note needs no case of its own.
-	const chunked = noteFrames(NOTE, 200, null, { ...SLIDE, afterTicks: 192 });
+	const chunked = noteFrames(NOTE, 200, null, { ...SLIDE, afterTicks: 192, frameTicks: 8 });
 	check(
 		"a chunked note keeps its $60 head and arms on its own last frame",
 		chunked[0] === 0x60 &&
@@ -1256,31 +1257,53 @@ console.log("\none note, auditioned where the song is playing");
 		[...quantized.subarray(0, 4)].map((b) => b.toString(16)).join(" "),
 	);
 
+	// A tie written *after* the command — `f+2 $DD $00 $D6 a+^2` — leaves the note
+	// running behind the four bytes, so the `$DD` sits between two of its frames
+	// and the rest of it follows as ties. The one shape where the arm is not the
+	// note's last frame, and the reason `frameTicks` is carried at all.
+	const inside = noteFrames(NOTE, 192, null, SLIDE);
+	check(
+		"a note that goes on after the arm keeps its ties behind the slide",
+		inside[0] === 96 &&
+			inside[1] === NOTE &&
+			inside[2] === 0xdd &&
+			inside[3] === 0x00 &&
+			inside[4] === 0x30 &&
+			inside[5] === 0xb0 &&
+			inside[6] === 0xc6,
+		[...inside.subarray(0, 7)].map((b) => b.toString(16)).join(" "),
+	);
+
 	// A layout no `emitNote` could have written is dropped rather than approximated:
 	// an arm at or past the note's end belongs to the note after it, one before the
-	// head has no frame, and a tail over `$7F` is a duration byte that reads as a note.
+	// head has no frame, a frame over `$7F` is a duration byte that reads as a note,
+	// and one the note has not the ticks for is no frame of this note at all.
 	check(
 		"a slide arming past the note's end is not written",
-		identical(noteFrames(NOTE, 48, null, { ...SLIDE, afterTicks: 48 }), noteFrames(NOTE, 48)),
+		identical(noteFrames(NOTE, 48, null, { ...SLIDE, afterTicks: 48, frameTicks: 48 }), noteFrames(NOTE, 48)),
 	);
 	check(
 		"nor one arming before the note starts",
 		identical(noteFrames(NOTE, 96, null, { ...SLIDE, afterTicks: -1 }), noteFrames(NOTE, 96)),
 	);
 	check(
-		"nor one whose tail no duration byte can say",
-		identical(noteFrames(NOTE, 200, null, SLIDE), noteFrames(NOTE, 200)),
+		"nor one on a frame no duration byte can say",
+		identical(noteFrames(NOTE, 200, null, { ...SLIDE, frameTicks: 200 }), noteFrames(NOTE, 200)),
+	);
+	check(
+		"nor one on a frame the note is not long enough to hold",
+		identical(noteFrames(NOTE, 96, null, { ...SLIDE, afterTicks: 48 }), noteFrames(NOTE, 96)),
 	);
 
-	// A last frame of one tick is written all the same, and the driver then never
-	// arms it: the read-ahead is skipped on every tick that fetches music data
+	// A frame of one tick is written all the same, and the driver then never arms
+	// it: the read-ahead is skipped on every tick that fetches music data
 	// (`main.asm:2337-2339`) and a one-tick frame has no other kind, so the command
 	// loop reaches the `$DD` and dispatches it into its empty slot. AddmusicK does
 	// exactly this, and reproducing it is the point — a guard here would have the
 	// preview say a song is fine where the transport plays the same wreckage.
-	const oneTick = noteFrames(NOTE, 48, null, { ...SLIDE, afterTicks: 47 });
+	const oneTick = noteFrames(NOTE, 48, null, { ...SLIDE, afterTicks: 47, frameTicks: 1 });
 	check(
-		"a last frame of one tick is written all the same",
+		"a frame of one tick is written all the same",
 		oneTick[0] === 47 && oneTick[1] === NOTE && oneTick[2] === 1 && oneTick[3] === 0xc6 && oneTick[4] === 0xdd,
 		[...oneTick.subarray(0, 5)].map((b) => b.toString(16)).join(" "),
 	);
@@ -1551,8 +1574,8 @@ console.log("\nthat note sliding, as the $DD riding on it says");
 		`${late(low).toFixed(0)} < ${late(flat).toFixed(0)} < ${late(high).toFixed(0)}`,
 	);
 
-	const up = { delay: 0x00, duration: 0x60, target: UP, afterTicks: 0 };
-	const down = { delay: 0x00, duration: 0x60, target: DOWN, afterTicks: 0 };
+	const up = { delay: 0x00, duration: 0x60, target: UP, afterTicks: 0, frameTicks: HELD };
+	const down = { delay: 0x00, duration: 0x60, target: DOWN, afterTicks: 0, frameTicks: HELD };
 	const rising = sound(up);
 	const falling = sound(down);
 
@@ -1585,11 +1608,27 @@ console.log("\nthat note sliding, as the $DD riding on it says");
 		`${firstDifference(at0, at20)} then ${firstDifference(at20, at40)} frames`,
 	);
 
+	// A tie written after the command leaves the note running behind the four
+	// bytes, and once the slide has armed it counts off `$90`/`$91` rather than
+	// off frames — so a note split 48 and 48 around the arm sounds the same as one
+	// that arms on its only frame. `f+2 $DD $00 $D6 a+^2` is that shape.
+	const behind = sound({ ...up, frameTicks: 48 });
+	check(
+		"the ticks a note has left behind the arm do not move the slide",
+		Math.abs(late(behind) - late(rising)) < late(rising) * 0.05,
+		`${late(behind).toFixed(0)} vs ${late(rising).toFixed(0)} arming on one frame`,
+	);
+	check(
+		"and it is a slide either way, not a flat note",
+		late(behind) > late(flat) * 1.1,
+		`${late(behind).toFixed(0)} vs ${late(flat).toFixed(0)} flat`,
+	);
+
 	// The reading the whole design turns on. `afterTicks` is not an operand: it is
-	// how long the note's last frame is, so the same three bytes arm half a note
-	// apart and only the byte layout can say which.
-	const armEarly = sound({ delay: 0x00, duration: 0x30, target: UP, afterTicks: 0 });
-	const armLate = sound({ delay: 0x00, duration: 0x30, target: UP, afterTicks: 48 });
+	// where the frame the peek reads the bytes in begins, so the same three bytes
+	// arm half a note apart and only the byte layout can say which.
+	const armEarly = sound({ delay: 0x00, duration: 0x30, target: UP, afterTicks: 0, frameTicks: HELD });
+	const armLate = sound({ delay: 0x00, duration: 0x30, target: UP, afterTicks: 48, frameTicks: 48 });
 	check(
 		"afterTicks holds the pitch still until the frame the peek reads it in",
 		Math.abs(early(armLate) - early(flat)) < early(flat) * 0.05,
@@ -1606,7 +1645,7 @@ console.log("\nthat note sliding, as the $DD riding on it says");
 	// fetch tick. What it does instead is dispatch `$DD` into an empty slot, which
 	// leaves the voice sounding well past the point the same note released — the
 	// pitch is what is checked, since that is the claim being made.
-	const short = sound({ delay: 0x00, duration: 0x30, target: UP, afterTicks: HELD - 1 });
+	const short = sound({ delay: 0x00, duration: 0x30, target: UP, afterTicks: HELD - 1, frameTicks: 1 });
 	check(
 		"a slide behind a one-tick frame is never armed",
 		Math.abs(late(short) - late(flat)) < late(flat) * 0.05,

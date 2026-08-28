@@ -330,17 +330,28 @@ export interface PitchSlide {
 	 */
 	target: number;
 	/**
-	 * How far into the note the read-ahead found the `$DD`.
+	 * How far into the note the frame the read-ahead found the `$DD` in **begins**.
 	 *
-	 * The start of the note's **last frame**, which is what tells
-	 * `[len, note, $DD]` from `[len, note, $C6, $DD]`: the second starts the same
-	 * slide a tie later. The peek runs only on a tick that does *not* fetch music
-	 * data (`main.asm:2337-2339` jumps past `L_0CC6`'s read-ahead on one that
-	 * does), so the pointer has to be standing on the `$DD` already. That
-	 * distinction is the whole reason `Music.cpp:2224` rewinds a tie out of the
-	 * way of a `$DD`.
+	 * What tells `[len, note, $DD]` from `[len, note, $C6, $DD]`: the second
+	 * starts the same slide a tie later. The peek runs only on a tick that does
+	 * *not* fetch music data (`main.asm:2337-2339` jumps past `L_0CC6`'s
+	 * read-ahead on one that does), so the pointer has to be standing on the
+	 * `$DD` already. That distinction is the whole reason `Music.cpp:2224`
+	 * rewinds a tie out of the way of a `$DD`.
 	 */
 	afterTicks: number;
+	/**
+	 * That frame's own length — `$0200+x` as it stood when the peek read the byte.
+	 *
+	 * Usually the note's last frame, and not always: a tie written *after* the
+	 * command, `f+2 $DD $00 $D6 a+^2`, puts the `$DD` between two of the note's
+	 * frames, with 96 ticks of it still to come. So {@link afterTicks} says where
+	 * the arm sits and this says how long the frame holding it runs, which is the
+	 * one thing that decides whether it arms at all: every tick of a one-tick
+	 * frame fetches, so the read-ahead never runs on one and the command loop
+	 * reaches the `$DD` and its `$0000` slot instead.
+	 */
+	frameTicks: number;
 }
 
 /** One sounding note, expanded onto the song's own tick timeline. */
@@ -1119,10 +1130,12 @@ export function walkSong(song: Uint8Array, aramAddress: number): SongTimeline {
 				const held = track.held >= 0 ? notes[track.held] : null;
 
 				// The frame the peek found it in. `track.ticks` has already run on
-				// past the note and `track.duration` is that last frame's own length,
-				// so the difference is where the frame began. With no note to ride on,
-				// the command loop is what reaches the byte — and jumps to `$0000` —
-				// so `track.ticks` is the tick, that being where it does so.
+				// past that frame and `track.duration` is its own length, so the
+				// difference is where it began — which is the note's last frame in
+				// every shape but a tie written after the command, where the note goes
+				// on afterwards. With no note to ride on, the command loop is what
+				// reaches the byte — and jumps to `$0000` — so `track.ticks` is the
+				// tick, that being where it does so.
 				const tick = held === null ? track.ticks : track.ticks - track.duration;
 				if (held !== null) {
 					held.bend = {
@@ -1130,6 +1143,7 @@ export function walkSong(song: Uint8Array, aramAddress: number): SongTimeline {
 						duration: arg(1),
 						target: arg(2),
 						afterTicks: tick - held.tick,
+						frameTicks: track.duration,
 					};
 					held.bendFrom = address;
 				}

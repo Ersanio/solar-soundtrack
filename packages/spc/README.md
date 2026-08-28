@@ -128,16 +128,23 @@ would leave them and the driver is left to find them. It has to be that way roun
 not dispatched — the note before it reads it by peeking at the byte standing at the track pointer
 (`main.asm:L_10E4`), and only on a tick that does _not_ fetch music data, since `main.asm:2337-2339`
 jumps straight past `L_0CC6`'s read-ahead on one that does. So **where the slide arms is decided by
-how long the note's last frame is**: `afterTicks` ticks of note, a frame of the rest, then the
-command. That is `c4 $DD` against `c4^4 $DD`, and it is the whole reason `Music.cpp:2224` rewinds a
-tie out of a `$DD`'s way. A last frame of one tick therefore never arms at all — every tick of it is
-a fetch tick — and the command loop dispatches the `$DD` into its empty slot instead, which is what
-AddmusicK does with the same song.
+the frame the peek reads it in**: `afterTicks` ticks of note, then that frame — `frameTicks` of it —
+then the command, then whatever the note has left, as ties. That is `c4 $DD` against `c4^4 $DD`, and
+it is the whole reason `Music.cpp:2224` rewinds a tie out of a `$DD`'s way. A frame of one tick
+therefore never arms at all — every tick of it is a fetch tick — and the command loop dispatches the
+`$DD` into its empty slot instead, which is what AddmusicK does with the same song.
+
+Usually that frame is the note's last, and `f+2 $DD $00 $D6 a+^2` is where it is not: the tie is
+written after the command, so the note runs on for 96 ticks behind the four bytes. Which is why the
+frame's own length is carried rather than taken as "the rest of the note" — the two are the same
+number in every other shape, and a one-tick frame in the middle of a note arms nothing while a
+96-tick one arms at once.
 
 The operands come from `song-walk.ts` (`WalkNote.bend`) and never from the source. The text cannot
 say `afterTicks`: `emitNote` chunks a note of `$80` ticks or more inside one note-map entry, so
 `c1 $DD` arms 96 ticks in with no tie written anywhere. Anything no `emitNote` could have produced —
-an arm past the note's end, one before its head, a last frame no duration byte can say — is dropped,
+an arm past the note's end, one before its head, a frame no duration byte can say, one the note has
+not the ticks to hold — is dropped,
 and the frames come out byte for byte those of the flat note. The target arrives as the **emitted**
 byte, the driver adding `$43` and `!HTuneValues+x` itself at arm time. And the tail is not lengthened
 to cover the slide: `delay + duration` may outrun the note, and then the note keys off part way

@@ -2763,6 +2763,51 @@ function bendTarget(built: Built, source: string, written: string): number | nul
 			return typeof found !== "string" && found?.delay === 0x00 && found.duration === 0x18 && found.target === 0xa4;
 		}),
 	);
+	check(
+		"and each names the frame it was read in, which is the note's last",
+		[arm0, arm48, arm96].every((source, at) => {
+			const found = slideOf(source, 0);
+			return typeof found !== "string" && found?.frameTicks === [48, 48, 96][at];
+		}),
+	);
+
+	// The one shape where the frame the peek reads it in is *not* the note's last:
+	// a tie written after the command leaves 96 ticks of note behind the four
+	// bytes. `item.bend` has to reach inside the unit to find it, `growUnits`
+	// ending that unit at the `^2` past the `$DD`.
+	const behind = "#amk 2\n#0 o4 f+2 $DD $00 $D6 a+^2 g4";
+	check(
+		"a tie after it arms at the head of a note that runs on",
+		(() => {
+			const found = slideOf(behind, 0);
+			return typeof found !== "string" && found?.afterTicks === 0 && found.frameTicks === 96;
+		})(),
+		JSON.stringify(slideOf(behind, 0)),
+	);
+	check(
+		"and the note it rides on is the whole 192 ticks",
+		(() => {
+			const built = build(behind);
+			if (typeof built === "string") {
+				return false;
+			}
+
+			const made = strip(behind, built, 0);
+			return typeof made !== "string" && made.items[0].ticks === 192;
+		})(),
+	);
+	check(
+		"and the token is found inside the unit, not only after it",
+		(() => {
+			const built = build(behind);
+			if (typeof built === "string") {
+				return false;
+			}
+
+			const made = strip(behind, built, 0);
+			return typeof made !== "string" && made.items[0].bend?.vcmd === 0xdd;
+		})(),
+	);
 
 	check("a note with no slide carries none", slideOf(arm0, 1) === null);
 	check("nor does one on another channel", slideOf("#amk 2\n#0 o4 c4 $DD $00 $18 $A4\n#1 o4 c4 d4", 0, 1) === null);

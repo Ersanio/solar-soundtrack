@@ -386,6 +386,13 @@ function insideCommands(strip: Strip, item: StripItem): { command: Command; tick
     const from = item.segments[part - 1].span.end;
     const to = item.segments[part].span.start;
     for (const command of strip.commands) {
+      // A `$DD` between two of a note's frames is that note's rider rather than
+      // a command written inside it — it has no tick of its own, arming where
+      // the read-ahead finds it — and `StripItem.bend` is what answers for it.
+      if (command.vcmd === 0xdd) {
+        continue;
+      }
+
       if (command.span.start >= from && command.span.end <= to) {
         out.push({ command, tick: at });
       }

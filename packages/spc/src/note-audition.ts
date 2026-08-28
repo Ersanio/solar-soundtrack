@@ -227,10 +227,12 @@ function appendNote(bytes: number[], note: number, ticks: number, q: readonly nu
  * `$DD` is not dispatched: the note before it reads it by peeking at the byte
  * standing at the track pointer (`main.asm:L_10E4`), and only on a tick that does
  * not fetch music data — `main.asm:2337-2339` jumps past `L_0CC6`'s read-ahead on
- * one that does. So **where it arms is decided by how long the note's last frame
- * is**, which is what {@link PitchSlide.afterTicks} carries and why
- * `Music.cpp:2224` rewinds a tie out of a `$DD`'s way. The four bytes go after
- * that frame, which for `arm` of 0 is straight after the note byte.
+ * one that does. So **where it arms is decided by the frame the peek reads it
+ * in**, which {@link PitchSlide.afterTicks} and {@link PitchSlide.frameTicks}
+ * carry between them and which is why `Music.cpp:2224` rewinds a tie out of a
+ * `$DD`'s way. The four bytes go after that frame — straight after the note byte
+ * for an `arm` of 0 — and whatever the note has left runs on behind them as ties,
+ * which is what a tie written *after* the command leaves.
  *
  * A slide no `emitNote` could have written is **dropped**, and the frames come
  * out byte for byte those of the flat note: an approximate bend that sounds like
@@ -254,26 +256,47 @@ export function noteFrames(
 	/** `emitPendingQuantization` puts it straight after the duration byte. */
 	const q = quantization === null ? [] : [quantization];
 
-	// The frame the arm lands on, and the length of it. A negative arm is a frame
-	// before the note's head; one at or past the end belongs to the note after
-	// this one; a tail over `$7F` is a duration byte that would read as a note.
+	// Where the frame carrying the arm begins, how long it runs, and what is left
+	// of the note behind it. A negative arm is a frame before the note's head; a
+	// frame of no ticks, or one over `$7F`, is a duration byte no `emitNote`
+	// wrote; and a negative remainder is a frame the note is not long enough for.
 	const arm = slide === null ? 0 : Math.floor(slide.afterTicks);
-	const tail = held - arm;
-	const bend = slide !== null && arm >= 0 && tail >= 1 && tail <= MAX_DURATION ? slide : null;
+	const frame = slide === null ? 0 : Math.floor(slide.frameTicks);
+	const after = held - arm - frame;
+	const bend = slide !== null && arm >= 0 && frame >= 1 && frame <= MAX_DURATION && after >= 0 ? slide : null;
 
-	if (bend === null || arm === 0) {
+	if (bend === null) {
 		appendNote(bytes, note, held, q);
 	} else {
-		const previous = appendNote(bytes, note, arm, q);
-		if (tail !== previous) {
-			bytes.push(tail);
+		if (arm === 0) {
+			bytes.push(frame, ...q, note);
+		} else {
+			const previous = appendNote(bytes, note, arm, q);
+			if (frame !== previous) {
+				bytes.push(frame);
+			}
+
+			bytes.push(NOTE_TIE);
 		}
 
-		bytes.push(NOTE_TIE);
-	}
-
-	if (bend !== null) {
 		bytes.push(VCMD_PITCH_SLIDE, bend.delay, bend.duration, bend.target);
+
+		// The rest of the note, as the ties it is. Once the slide has armed it runs
+		// off `$90`/`$91` rather than off frames, so what these are is inaudible and
+		// only the total has to be right; chunking at `LONG_CHUNK` is what the
+		// compiler would have written.
+		let left = after;
+		let standing = frame;
+		while (left > 0) {
+			const step = Math.min(left, LONG_CHUNK);
+			if (step !== standing) {
+				bytes.push(step);
+			}
+
+			bytes.push(NOTE_TIE);
+			standing = step;
+			left -= step;
+		}
 	}
 
 	const rests = Math.ceil((MAX_TICK_HZ * AUDITION_TAIL_SECONDS) / MAX_DURATION) + 1;

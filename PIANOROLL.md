@@ -359,6 +359,11 @@ the lane's tick is: `c4 $DD`, `c4^4 $DD` and `c1 $DD` carry the same three bytes
 96 ticks in, and the last has no tie written anywhere. A note the roll cannot check against the song —
 one past the point the shortest channel ends — sounds flat rather than approximately right.
 
+A tie written **after** the command is the one shape where the slide is not at the end of its note:
+`f+2 $DD $00 $D6 a+^2` is a note of 192 ticks that arms at the head and goes on ringing for 96 ticks
+behind the four bytes, because `^` emits a frame of its own and a tie keys nothing on. The bar is the
+whole 192 ticks, the glyph is on it, and the preview arms where the song arms.
+
 A remote code definition is not one of them. `(!1)[ … ]` has to be written above the first `#N`, which
 puts it on the same channel the music below that marker starts on, but its body plays only where a
 `(!1, …)` call fires it — so the first channel of a song with remote code is edited like any other,

@@ -70,7 +70,8 @@ export interface StripItem {
   /** The drum `@21`-`@29` folded into this note, when one was. */
   drum: Command | null;
   /**
-   * The `$DD` written between this item and the next, when there is one.
+   * The `$DD` this item carries, when there is one — written after its first
+   * frame and before the next item, so a tie after the command is inside it.
    *
    * `$DD` is the one command read by the *preceding* note's read-ahead rather
    * than dispatched (`main.asm:L_10E4` peeks at `($30+x)`), so it belongs to
@@ -86,12 +87,12 @@ export interface StripItem {
    * no slide, and for an item past the end of the pass.
    *
    * {@link bend} is the command as it was *written*; this is the reading. The
-   * operands are both, but `PitchSlide.afterTicks` is only here: `$DD` is not
-   * dispatched, so where the driver arms it is decided by how long this note's
-   * last frame is, and `emitNote` chunks a note of `$80` ticks or more inside one
-   * `noteMap` entry — no frame boundary reaches {@link segments} at all. So
-   * `c4 $DD`, `c4^4 $DD` and `c1 $DD` carry one set of operands and arm 0, 48 and
-   * 96 ticks in.
+   * operands are both, but `PitchSlide.afterTicks` and `frameTicks` are only
+   * here: `$DD` is not dispatched, so where the driver arms it is decided by the
+   * frame the read-ahead reads it in, and `emitNote` chunks a note of `$80` ticks
+   * or more inside one `noteMap` entry — that boundary reaches {@link segments}
+   * no more than it reaches the text. So `c4 $DD`, `c4^4 $DD` and `c1 $DD` carry
+   * one set of operands and arm 0, 48 and 96 ticks in.
    */
   slide: PitchSlide | null;
   /**
@@ -583,14 +584,18 @@ export function channelStrip(request: StripRequest): Strip | StripRefusal {
 
     // Read off the unit boundaries rather than the prefix: a `$DD` written after
     // the channel's last item is in no prefix at all, and it rides on that item
-    // exactly as any other does.
+    // exactly as any other does. From the *first* segment's end and not the
+    // unit's, because a tie written after the command — `f+2 $DD $00 $D6 a+^2` —
+    // puts the `$DD` between two of the note's frames, and `growUnits` ends a
+    // unit at its last one, so a scan from there reaches past a slide the note
+    // really does carry and no item claims it at all.
     const until = items[at + 1]?.unitSpan.start ?? source.length;
     item.bend =
       commands.find(
         (command) =>
           command.vcmd === 0xdd &&
           !command.inRemoteDefinition &&
-          command.span.start >= item.unitSpan.end &&
+          command.span.start >= item.segments[0].span.end &&
           command.span.start < until,
       ) ?? null;
   }

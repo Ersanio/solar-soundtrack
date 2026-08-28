@@ -878,22 +878,36 @@ stats.loopTicks` pads **every other channel that would cut the song short** out 
   and a token cannot say when the driver arms it. `$DD` is not dispatched: the note before it peeks
   at the byte standing at the track pointer (`main.asm:L_10E4`), and only on a tick that does not
   fetch music data, `main.asm:2337-2339` jumping straight past `L_0CC6`'s read-ahead on one that
-  does. So the arm is decided by how long that note's **last frame** is, and `emitNote` chunks a note
+  does. So the arm is decided by **the frame the peek reads it in**, and `emitNote` chunks a note
   of `$80` ticks or more inside one `noteMap` entry with no boundary anywhere in its text —
   `c4 $DD`, `c4^4 $DD` and `c1 $DD` carry the same three operands and arm 0, 48 and 96 ticks in. The
-  operands come off the walk (`WalkNote.bend`, `afterTicks` with them) into `StripItem.slide`, joined
+  operands come off the walk (`WalkNote.bend`, `afterTicks` and `frameTicks` with them) into `StripItem.slide`, joined
   index by index over the list `agreesWithWalk` has already checked so the two cannot drift, and a
   note past the end of the pass auditions **flat**: an approximate bend that sounds like the real one
   is worse than none, which is the reading `commands-in-force.ts` already takes. `noteFrames` then
   writes the four bytes where `emitNote` would leave them and lets the driver find them, rather than
   reconstructing a pitch curve — the same argument as emulating the song up to the tick instead of
-  modelling what a note sounds under, and it is what makes a last frame of one tick behave here as it
+  modelling what a note sounds under, and it is what makes a frame of one tick behave here as it
   does in the song, dispatched into the empty slot and never armed. Operands no `emitNote` could have
   written are dropped rather than approximated. The target goes in as the **emitted** byte and is the
   one value on that path `Audition.transposed` must not touch: it exists to turn a written row pitch
   into an emitted one, the compiler resolved `h` and the instrument's tuning long ago
   (`writePitchSlides` writes `NoteAddress.note`), and the driver adds `$43` and `!HTuneValues+x`
   itself when it arms.
+- **Rebuilding an audition's frames from `afterTicks` and the note's length alone** — it takes the
+  arm's frame to be the note's _last_, which puts the `$DD` after every frame the note has, and
+  `f+2 $DD $00 $D6 a+^2` is where that is false: `^` emits a `$C6` frame of its own and a tie keys
+  nothing on (`main.asm:2403-2405`), so those 96 ticks land on the `f+` and the command sits between
+  the note's two frames. Read as a last frame it is a 192-tick tail, which no duration byte can say,
+  and the slide was dropped outright — the note previewed flat where the transport bent it; take the
+  tail check away and it arms 96 ticks late instead. The frame's own length is carried
+  (`PitchSlide.frameTicks`, `track.duration` at the peek) and the ticks behind it written as the ties
+  they are. It cannot be derived: `c=1 $DD $00 $18 a ^=95` and `c4 $DD $00 $18 a ^4` are both 96
+  ticks arming at 0 and only the second arms at all, and `StripItem.segments` cannot answer it either,
+  being the note map's frames and not `emitNote`'s. What the frames after the arm are is inaudible —
+  the slide counts off `$90`/`$91` — so only their total is reproduced. `StripItem.bend` reads from
+  the item's **first** segment's end for the same shape, `growUnits` ending a unit at its last
+  segment and so at a point past the `$DD`, which left every guard that reads `bend` switched off.
 
 ## Angular specifics
 
