@@ -9,13 +9,12 @@ export interface ChangelogEntry {
 export const CHANGELOG: readonly ChangelogEntry[] = [
   // ─── newest first; add new blocks here ──────────────────────────────────
   {
-    date: '28 August 2026',
+    date: '29 August 2026',
     items: [
+      'Command $DD pitch bend now accepts a note as its final argument',
       'Clicking or dragging a note in the piano roll plays its pitch slide',
-      'A pitch slide is drawn on the note that plays it, in the piano roll and the command timeline',
-      'Pitch slides that name their target as a written note',
-      'The piano roll edits channels that use $DD',
-      'Normalize writes legacy & pitch slides out as $DD, so the piano roll can edit those songs',
+      'A pitch slide is now drawn on the note that plays it, instead of the note after',
+      'Normalize writes legacy "&"-pitch slides out as $DD, so the piano roll can edit those songs',
     ],
   },
   {
