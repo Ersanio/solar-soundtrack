@@ -874,6 +874,26 @@ stats.loopTicks` pads **every other channel that would cut the song short** out 
   that from a `v200` still standing. Not a separate list beside `origins` either — a slide is a
   command acting on a note, which is the question `commandsInForceOf` already answers, and a second
   channel for one command would need every reader to ask twice.
+- **Auditioning a note's slide off the `$DD` its own text carries** — `StripItem.bend` is the token,
+  and a token cannot say when the driver arms it. `$DD` is not dispatched: the note before it peeks
+  at the byte standing at the track pointer (`main.asm:L_10E4`), and only on a tick that does not
+  fetch music data, `main.asm:2337-2339` jumping straight past `L_0CC6`'s read-ahead on one that
+  does. So the arm is decided by how long that note's **last frame** is, and `emitNote` chunks a note
+  of `$80` ticks or more inside one `noteMap` entry with no boundary anywhere in its text —
+  `c4 $DD`, `c4^4 $DD` and `c1 $DD` carry the same three operands and arm 0, 48 and 96 ticks in. The
+  operands come off the walk (`WalkNote.bend`, `afterTicks` with them) into `StripItem.slide`, joined
+  index by index over the list `agreesWithWalk` has already checked so the two cannot drift, and a
+  note past the end of the pass auditions **flat**: an approximate bend that sounds like the real one
+  is worse than none, which is the reading `commands-in-force.ts` already takes. `noteFrames` then
+  writes the four bytes where `emitNote` would leave them and lets the driver find them, rather than
+  reconstructing a pitch curve — the same argument as emulating the song up to the tick instead of
+  modelling what a note sounds under, and it is what makes a last frame of one tick behave here as it
+  does in the song, dispatched into the empty slot and never armed. Operands no `emitNote` could have
+  written are dropped rather than approximated. The target goes in as the **emitted** byte and is the
+  one value on that path `Audition.transposed` must not touch: it exists to turn a written row pitch
+  into an emitted one, the compiler resolved `h` and the instrument's tuning long ago
+  (`writePitchSlides` writes `NoteAddress.note`), and the driver adds `$43` and `!HTuneValues+x`
+  itself when it arms.
 
 ## Angular specifics
 

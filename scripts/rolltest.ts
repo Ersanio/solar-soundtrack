@@ -23,7 +23,7 @@ import { NOTE_MAX, NOTE_MIN } from "@amk/core/hardcoded-tables";
 import { octaveFor, octaveOfNote, spellDuration, spellNote } from "@amk/core/mml-text";
 import type { CompileResult } from "@amk/core/types";
 import { loadDriver } from "@amk/spc/driver";
-import { type SongTimeline, walkSong } from "@amk/spc/song-walk";
+import { type PitchSlide, type SongTimeline, walkSong } from "@amk/spc/song-walk";
 import { type Command, type TokenIndex, tokenize } from "@amk/tokens";
 import { NOTE_NAMES } from "@amk/tokens/commands/units";
 import type { Edit } from "@amk/tokens/edits";
@@ -2724,6 +2724,58 @@ function bendTarget(built: Built, source: string, written: string): number | nul
 	// And the span a `$DD` with a note target has, which reaches over the note —
 	// so `commandAt` answers this command for a caret on the `e`.
 	expectNoMove("a slide to a note", note, 0, "$DD $00 $18 e", REFUSE_MOVE_BEND);
+
+	/** The walk's reading of the slide the channel's `at`th *note* carries. */
+	const slideOf = (source: string, at: number, channel = 0): PitchSlide | null | string => {
+		const built = build(source);
+		if (typeof built === "string") {
+			return built;
+		}
+
+		const made = strip(source, built, channel);
+		if (typeof made === "string") {
+			return made;
+		}
+
+		return made.items.filter((item) => item.kind === "note")[at]?.slide ?? null;
+	};
+
+	const armAt = (source: string, at = 0): number | string => {
+		const found = slideOf(source, at);
+		return typeof found === "string" ? found : (found?.afterTicks ?? -1);
+	};
+
+	// `bend` is the token in the text and `slide` is what the driver does with it.
+	// Only the second can say when the slide arms, and these three prove it: one
+	// set of operands, three arms. The last has no tie written anywhere — a note of
+	// 192 ticks is chunked by `emitNote` inside one `noteMap` entry, so its frame
+	// boundary reaches no `segments` and no text.
+	const arm0 = "#amk 2\n#0 o4 c4 $DD $00 $18 $A4 d4";
+	const arm48 = "#amk 2\n#0 o4 c4^4 $DD $00 $18 $A4 d4";
+	const arm96 = "#amk 2\n#0 o4 c1 $DD $00 $18 $A4 d4";
+	check("a slide on a one-frame note arms at its head", armAt(arm0) === 0, String(armAt(arm0)));
+	check("a tie in front of it arms on the tie", armAt(arm48) === 48, String(armAt(arm48)));
+	check("and a chunked note arms on a boundary its text has not got", armAt(arm96) === 96, String(armAt(arm96)));
+	check(
+		"while the operands are the same three bytes throughout",
+		[arm0, arm48, arm96].every((source) => {
+			const found = slideOf(source, 0);
+			return typeof found !== "string" && found?.delay === 0x00 && found.duration === 0x18 && found.target === 0xa4;
+		}),
+	);
+
+	check("a note with no slide carries none", slideOf(arm0, 1) === null);
+	check("nor does one on another channel", slideOf("#amk 2\n#0 o4 c4 $DD $00 $18 $A4\n#1 o4 c4 d4", 0, 1) === null);
+
+	// A rest clears `track.held`, so the read-ahead reaches no note at all — and
+	// `item.bend` still finds the token, since it reads unit boundaries.
+	check("a slide behind a rest rides on nothing", slideOf("#amk 2\n#0 o4 c4 r4 $DD $00 $18 $A4 d4", 0) === null);
+
+	// Past the end of the pass there is no walk note to ask, and no fallback to
+	// the token: an approximate slide that sounds like the real one is worse than
+	// none, which is the reading `commands-in-force.ts` already takes.
+	const cut = "#amk 2\n#0 o4 c4 c4 $DD $00 $18 $A4\n#1 o4 c4";
+	check("and a note past the end of the pass carries none", slideOf(cut, 1) === null, JSON.stringify(slideOf(cut, 1)));
 }
 
 summarise();

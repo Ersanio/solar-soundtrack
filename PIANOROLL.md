@@ -17,7 +17,7 @@ no channel.
 | Drag the middle of a note        | Moves it a snap step at a time, one row per semitone up and down         |
 | Drag a note's left or right edge | Stretches that end; the other end stays put                              |
 | Hold `Alt` during any gesture    | Tick precision: no snapping, for either a position or a length           |
-| Click a note                     | Selects just that note, sounds it, and puts the caret on it in the MML   |
+| Click a note                     | Selects it, sounds it with its pitch slide, and puts the caret on it     |
 | Double-click a note              | Goes to it in the MML                                                    |
 | `Ctrl` + click a note            | Adds it to, or takes it out of, the selection                            |
 | `Ctrl` + drag on empty grid      | Draws a box and selects every note of this channel inside it             |
@@ -351,6 +351,13 @@ is two slides, so both notes carry it and both are plated. On the lane it sits o
 which for `c4^4 $DD …` is 48 ticks into the note rather than at its head — the read-ahead does not
 find the slide until the tie's own ticks, which is why writing one after a tie is a rewrite Normalize
 declines to make.
+
+And it decides what you hear. Clicking the bar plays the note **with its slide**, as does every row a
+drag of it crosses, since the target is an absolute note the bar would still slide to wherever it was
+dropped. Where the slide starts is read off the song rather than off the text, for the same reason
+the lane's tick is: `c4 $DD`, `c4^4 $DD` and `c1 $DD` carry the same three bytes and arm at 0, 48 and
+96 ticks in, and the last has no tie written anywhere. A note the roll cannot check against the song —
+one past the point the shortest channel ends — sounds flat rather than approximately right.
 
 A remote code definition is not one of them. `(!1)[ … ]` has to be written above the first `#N`, which
 puts it on the same channel the music below that marker starts on, but its body plays only where a

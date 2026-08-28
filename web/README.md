@@ -259,6 +259,12 @@ finished PCM and the context only has a buffer to play. The emulator playing the
 `AudioWorkletProcessor` and is never addressed, which is the whole of why a note can be auditioned
 over a song without disturbing it.
 
+A note of the song carries the `$DD` the walk read for it (`StripItem.slide`), so a bar that slides
+in the song slides under the pointer — clicked, and on every row a drag of it crosses, the target
+being absolute. Its target is also the one number on this path that must _not_ go through the
+transposition `Audition` applies: that turns a written row pitch into the byte the compiler would
+emit, and a slide's target already is one.
+
 The mixer is the one thing the two paths share, and only as a number. A note on a channel the mixer
 silences is refused in `Audition` before an emulator is asked for — hearing nothing does not need a
 few hundred milliseconds of fast-forward to arrive at — and a deliberate key press says why, where a

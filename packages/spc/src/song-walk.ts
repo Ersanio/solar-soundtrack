@@ -308,6 +308,41 @@ export interface NoteState {
 	globalVolume: number | null;
 }
 
+/**
+ * A `$DD` as the driver will run it, on the note that read it.
+ *
+ * Named rather than left inline because `note-audition.ts` takes one: a note
+ * auditioned on its own is handed these four bytes so the driver finds them
+ * where it finds them in the song.
+ */
+export interface PitchSlide {
+	/** `$91+x` — ticks the pitch stands still before it starts moving. */
+	delay: number;
+	/** `$90+x` — ticks it takes to arrive. */
+	duration: number;
+	/**
+	 * The note byte the slide arrives at, as the **compiler emitted** it.
+	 *
+	 * Not a written pitch: `h` and the instrument's tuning are resolved at
+	 * compile time and `writePitchSlides` writes `NoteAddress.note`. The driver
+	 * adds `$43` and `!HTuneValues+x` itself when it arms the slide
+	 * (`main.asm:3277-3285`), so nothing above it may transpose this again.
+	 */
+	target: number;
+	/**
+	 * How far into the note the read-ahead found the `$DD`.
+	 *
+	 * The start of the note's **last frame**, which is what tells
+	 * `[len, note, $DD]` from `[len, note, $C6, $DD]`: the second starts the same
+	 * slide a tie later. The peek runs only on a tick that does *not* fetch music
+	 * data (`main.asm:2337-2339` jumps past `L_0CC6`'s read-ahead on one that
+	 * does), so the pointer has to be standing on the `$DD` already. That
+	 * distinction is the whole reason `Music.cpp:2224` rewinds a tie out of the
+	 * way of a `$DD`.
+	 */
+	afterTicks: number;
+}
+
 /** One sounding note, expanded onto the song's own tick timeline. */
 export interface WalkNote {
 	/** 0-7. The voice it sounds on, even when its bytes live in the loop block. */
@@ -368,13 +403,11 @@ export interface WalkNote {
 	 * it (`main.asm:3256-3287`). So it is a property of *this* note rather than a
 	 * command in its own right, in the way {@link drumFrom} is.
 	 *
-	 * `afterTicks` is how far into this note the peek found it, and is what tells
-	 * `[len, note, $DD]` from `[len, note, $C6, $DD]`: the second starts the same
-	 * slide a tie later. That distinction is the whole reason `Music.cpp:2224`
-	 * rewinds a tie out of the way of a `$DD`, so a walk that could not see it
-	 * would call two different songs the same.
+	 * {@link PitchSlide.afterTicks} carries where in the note it was found, which
+	 * a walk that reported only the operands could not say — and two songs that
+	 * differ only there are two different songs.
 	 */
-	bend: { delay: number; duration: number; target: number; afterTicks: number } | null;
+	bend: PitchSlide | null;
 	/**
 	 * ARAM address of that `$DD`, or `null` — a key into `CompileResult.commandMap`,
 	 * which is how a reader names the command rather than only its operands.

@@ -2,6 +2,7 @@ import { DestroyRef, Service, inject, signal } from '@angular/core';
 
 import type { CompileResult } from '@amk/core/types';
 import { NOTE_MAX, NOTE_MIN } from '@amk/core/hardcoded-tables';
+import type { PitchSlide } from '@amk/spc/song-walk';
 import { SPC_CHANNELS, SPC_SAMPLE_RATE } from '@amk/spc/wasm-host';
 import { EditorStore } from './editor-store';
 import { Mixer } from './mixer';
@@ -27,6 +28,17 @@ export interface NotePlay {
   note: number;
   /** How long to hold it, in music ticks. Defaults to {@link AUDITION_TICKS}. */
   ticks?: number;
+  /**
+   * The `$DD` this note plays, as the walk read it — a note of the song is not
+   * heard as it plays without the slide riding on it.
+   *
+   * Its target is the one value here that does **not** go through
+   * {@link Audition.transposed}: that turns a written row pitch into the byte the
+   * compiler would emit, and this is already that byte. `h` and the instrument's
+   * tuning were resolved at compile time, and the driver adds `$43` and
+   * `!HTuneValues+x` itself when it arms the slide (`main.asm:3277-3285`).
+   */
+  slide?: PitchSlide | null;
   /**
    * Say nothing about a note that did not sound — out of the driver's range, or
    * on a channel the mixer has silenced. For a caller that asks on every row of
@@ -179,6 +191,7 @@ export class Audition {
         channel: request.channel,
         note,
         ticks: request.ticks ?? AUDITION_TICKS,
+        slide: request.slide ?? null,
         scratchAt,
         // Read here rather than taken from the caller, so nothing can route a
         // preview around the mixer. The target's own bit is never set — a

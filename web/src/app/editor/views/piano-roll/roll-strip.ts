@@ -1,7 +1,7 @@
 import { NOTE_REST, NOTE_TIE } from '@amk/core/hardcoded-tables';
 import { octaveOfNote } from '@amk/core/mml-text';
 import type { NoteAddress, Span } from '@amk/core/types';
-import type { SongTimeline } from '@amk/spc/song-walk';
+import type { PitchSlide, SongTimeline, WalkNote } from '@amk/spc/song-walk';
 import type { Command, TokenIndex } from '@amk/tokens';
 import { isPercussionInstrument } from '@amk/tokens/commands/in-force';
 
@@ -81,6 +81,19 @@ export interface StripItem {
    * already covers it (`tokens.ts:gather`).
    */
   bend: Command | null;
+  /**
+   * What the driver does with that `$DD`, off the walk — `null` where there is
+   * no slide, and for an item past the end of the pass.
+   *
+   * {@link bend} is the command as it was *written*; this is the reading. The
+   * operands are both, but `PitchSlide.afterTicks` is only here: `$DD` is not
+   * dispatched, so where the driver arms it is decided by how long this note's
+   * last frame is, and `emitNote` chunks a note of `$80` ticks or more inside one
+   * `noteMap` entry — no frame boundary reaches {@link segments} at all. So
+   * `c4 $DD`, `c4^4 $DD` and `c1 $DD` carry one set of operands and arm 0, 48 and
+   * 96 ticks in.
+   */
+  slide: PitchSlide | null;
   /**
    * False past the end of the pass, where the walk has no note to check the
    * item against — `walkSong` cuts at the shortest channel and sets the rest
@@ -549,6 +562,7 @@ export function channelStrip(request: StripRequest): Strip | StripRefusal {
       hasLeadingOctave: false,
       drum: null,
       bend: null,
+      slide: null,
       verified: true,
     });
 
@@ -581,9 +595,20 @@ export function channelStrip(request: StripRequest): Strip | StripRefusal {
       ) ?? null;
   }
 
-  const disagreement = agreesWithWalk(items, timeline, channel);
+  const played = timeline.notes.filter((note) => note.channel === channel);
+  const disagreement = agreesWithWalk(items, played, timeline.ticks);
   if (disagreement !== null) {
     return { refused: disagreement };
+  }
+
+  // Index by index, over the very list the agreement was just taken over — which
+  // is what makes the join exact rather than a second one that could quietly
+  // disagree with it. Past `played.length` the pass has ended and there is no
+  // walk note to ask, so those items keep no slide however plainly a `$DD` is
+  // written after them.
+  const sounded = items.filter((item) => item.kind === 'note');
+  for (let at = 0; at < played.length; at++) {
+    sounded[at].slide = played[at].bend;
   }
 
   return { channel, items, ticks: tick, home, commands };
@@ -601,10 +626,9 @@ export function channelStrip(request: StripRequest): Strip | StripRefusal {
  */
 function agreesWithWalk(
   items: readonly StripItem[],
-  timeline: SongTimeline,
-  channel: number,
+  played: readonly WalkNote[],
+  timelineTicks: number,
 ): string | null {
-  const played = timeline.notes.filter((note) => note.channel === channel);
   const written = items.filter((item) => item.kind === 'note');
 
   for (let at = 0; at < played.length; at++) {
@@ -624,7 +648,7 @@ function agreesWithWalk(
   }
 
   const first = written[played.length];
-  if (first && timeline.ticks > 0 && first.startTick < timeline.ticks) {
+  if (first && timelineTicks > 0 && first.startTick < timelineTicks) {
     return 'this channel does not play in the order it is written';
   }
 

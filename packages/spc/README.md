@@ -123,6 +123,26 @@ the song left standing apply. The exception is a channel the song has never writ
 neither a `q` nor an instrument and would otherwise play for one tick at no volume: there `@0` and
 `q7f` stand in, which are what the driver and the compiler respectively default to.
 
+**A note can carry its `$DD`**, and the same argument decides how: the four bytes go where `emitNote`
+would leave them and the driver is left to find them. It has to be that way round, because `$DD` is
+not dispatched — the note before it reads it by peeking at the byte standing at the track pointer
+(`main.asm:L_10E4`), and only on a tick that does _not_ fetch music data, since `main.asm:2337-2339`
+jumps straight past `L_0CC6`'s read-ahead on one that does. So **where the slide arms is decided by
+how long the note's last frame is**: `afterTicks` ticks of note, a frame of the rest, then the
+command. That is `c4 $DD` against `c4^4 $DD`, and it is the whole reason `Music.cpp:2224` rewinds a
+tie out of a `$DD`'s way. A last frame of one tick therefore never arms at all — every tick of it is
+a fetch tick — and the command loop dispatches the `$DD` into its empty slot instead, which is what
+AddmusicK does with the same song.
+
+The operands come from `song-walk.ts` (`WalkNote.bend`) and never from the source. The text cannot
+say `afterTicks`: `emitNote` chunks a note of `$80` ticks or more inside one note-map entry, so
+`c1 $DD` arms 96 ticks in with no tie written anywhere. Anything no `emitNote` could have produced —
+an arm past the note's end, one before its head, a last frame no duration byte can say — is dropped,
+and the frames come out byte for byte those of the flat note. The target arrives as the **emitted**
+byte, the driver adding `$43` and `!HTuneValues+x` itself at arm time. And the tail is not lengthened
+to cover the slide: `delay + duration` may outrun the note, and then the note keys off part way
+through the bend, which is what the song does — the note after it is where the slide was going.
+
 Two things it does not do. The length is fixed when the request is made — the PCM is rendered before
 it is heard, so there is nothing to send a note-off to, which is the price of not putting a second
 emulator on a second audio thread. And the echo buffer still holds the song as the mixer leaves it:

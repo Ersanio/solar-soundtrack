@@ -11,6 +11,7 @@ export const CHANGELOG: readonly ChangelogEntry[] = [
   {
     date: '28 August 2026',
     items: [
+      'Clicking or dragging a note in the piano roll plays its pitch slide',
       'A pitch slide is drawn on the note that plays it, in the piano roll and the command timeline',
       'Pitch slides that name their target as a written note',
       'The piano roll edits channels that use $DD',
