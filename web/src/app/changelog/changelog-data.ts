@@ -15,6 +15,7 @@ export const CHANGELOG: readonly ChangelogEntry[] = [
       'Clicking or dragging a note in the piano roll plays its pitch bend',
       'A pitch bend is now drawn on the note that plays it, instead of the note after',
       'Normalize writes legacy "&"-pitch bends out as $DD, so the piano roll can edit those songs',
+      'Shift + drag locks a note to the axis you drag along — sideways keeps its pitch, up and down keeps its place',
     ],
   },
   {

@@ -144,13 +144,20 @@ interface Drag {
   /** `Alt` is down: tick precision, for this gesture only. */
   fine: boolean;
   /**
-   * `Shift` is down, which locks a move to its own row.
+   * `Shift` is down, which locks a move to the axis it set off along: the row
+   * where it went sideways, the tick where it went up or down.
    *
    * Refreshed on every move as {@link Drag.fine} is, because it only constrains
    * a gesture that already exists — unlike {@link Drag.anchored}, which decides
    * what the gesture *is* and so is settled at the press.
    */
   shift: boolean;
+  /**
+   * The axis the press first moved along, in pixels: latched where the slop
+   * test passes and never re-derived, so a near-diagonal drag cannot flip a
+   * `Shift` lock mid-gesture. `null` until the press has really moved.
+   */
+  axis: 'x' | 'y' | null;
   /**
    * `Shift` was down on a press that landed on empty grid: the note is pinned to
    * the tick pressed and its end follows the pointer, rather than the whole note
@@ -376,13 +383,15 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
       };
     }
 
+    // `Shift` locks the drag to the axis it first moved along: set off sideways
+    // and the note travels the song without its pitch coming along for the
+    // ride; set off up or down and it changes pitch without leaving its tick.
     return {
       kind: 'move',
       items,
-      deltaTicks: draggedTick(held, item, snap) - item.startTick,
-      // `Shift` locks the drag to the row it started on, so a note can be moved
-      // along the song without its pitch coming along for the ride.
-      deltaKeys: held.shift ? 0 : keysBetween(stack, held.fromRow, held.row),
+      deltaTicks:
+        held.shift && held.axis === 'y' ? 0 : draggedTick(held, item, snap) - item.startTick,
+      deltaKeys: held.shift && held.axis !== 'y' ? 0 : keysBetween(stack, held.fromRow, held.row),
       copy: held.copy,
     };
   });
@@ -608,12 +617,14 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
   const soundDrag = (held: Drag, row: number): void => {
     const item = sources.strip()?.items[held.item];
     const ticks = held.kind === 'spawn' ? held.length : item?.ticks;
-    // A gesture the row is locked out of sounds the row it is pinned to, not the
-    // one the pointer wandered onto — that is where the note is going.
-    const going = held.anchored || held.shift ? held.fromRow : row;
+    // A gesture an axis is locked out of sounds where it is pinned, not where
+    // the pointer wandered — that is where the note is going.
+    const going = held.anchored || (held.shift && held.axis !== 'y') ? held.fromRow : row;
     soundRow(
       going,
-      draggedTick(held, item, sources.snap()),
+      held.shift && held.axis === 'y' && item
+        ? item.startTick
+        : draggedTick(held, item, sources.snap()),
       ticks ?? sources.lastLength(),
       item?.slide ?? null,
     );
@@ -731,6 +742,7 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
           sounded: -1,
           fine: event.altKey,
           shift: event.shiftKey,
+          axis: null,
           anchored: false,
           length: null,
           atX: event.clientX,
@@ -772,6 +784,7 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
           sounded: row,
           fine: event.altKey,
           shift: event.shiftKey,
+          axis: null,
           anchored: kind === 'spawn' && event.shiftKey,
           length: null,
           atX: event.clientX,
@@ -825,6 +838,7 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
         sounded: row,
         fine: event.altKey,
         shift: event.shiftKey,
+        axis: null,
         anchored: false,
         length: null,
         atX: event.clientX,
@@ -865,7 +879,21 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
         }
       }
 
-      const next: Drag = { ...held, tick, row, moved, fine: event.altKey, shift: event.shiftKey };
+      const next: Drag = {
+        ...held,
+        tick,
+        row,
+        moved,
+        fine: event.altKey,
+        shift: event.shiftKey,
+        axis:
+          held.axis ??
+          (moved
+            ? Math.abs(event.clientX - held.atX) >= Math.abs(event.clientY - held.atY)
+              ? 'x'
+              : 'y'
+            : null),
+      };
       if (held.kind === 'erase') {
         drag.set(next);
         const index = strip ? itemAt(strip, sources.stack(), tick, row) : -1;

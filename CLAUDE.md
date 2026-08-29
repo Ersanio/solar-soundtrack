@@ -543,8 +543,16 @@ stats.loopTicks` pads **every other channel that would cut the song short** out 
   turned off by something and would outlive the gesture that set it.
 - **One `Shift` flag for both of the gestures it changes** — `Shift` decides what a press on empty
   grid _is_ (a note pinned at the press with its end on the pointer) and merely _constrains_ a drag
-  already under way (locked to its row), and those settle at different times. `anchored` is read at
+  already under way (locked to one axis), and those settle at different times. `anchored` is read at
   the press and never again; `shift` is refreshed on every move, as `fine` is.
+- **`Shift` as a row lock alone, or `Ctrl` as the tick lock beside it** — the second has no key to
+  take: `Ctrl` at the press is a copy on a bar, the marquee on empty grid and the selection toggle
+  on a click, and every chord with it or `Alt` breaks a combination that already means something.
+  `Shift` locks the axis the drag first moved along instead — sideways is the row lock it always
+  was, up or down pins the tick. The axis is latched in pixels at the slop transition, where the
+  pointer is captured, and never re-derived: a near-diagonal drag re-read every move would flip its
+  constraint mid-gesture. `shift` itself stays per-move, so releasing it lifts the lock and
+  re-pressing it restores the same axis.
 - **Counting a remote code definition's `[ ]` against the starting channel** — AddmusicK tells a
   definition from a call by nothing but position (`Music.cpp:1015`), so `(!1)[ … ]` always sits above
   the first `#N` and its brackets gather on the starting channel like everything up there. That
