@@ -4,7 +4,7 @@ import { argEditable, argumentText, spliceArg } from '@amk/tokens/edits';
 import type { Command } from '@amk/tokens';
 import { argLockedBecause } from '../commands/context';
 import { Slider } from '../../../shared/slider/slider';
-import { EditorRequests } from '../../../state/editor-requests';
+import { CommitAudition } from '../../../state/commit-audition';
 import { EditorStore } from '../../../state/editor-store';
 import { tempoBefore } from '@amk/tokens/dialect';
 import { dragPreview } from '../commands/preview';
@@ -33,7 +33,7 @@ import { VibratoGraph } from '../vibrato-graph/vibrato-graph';
 export class VibratoCommand {
   private readonly store = inject(EditorStore);
 
-  private readonly requests = inject(EditorRequests);
+  private readonly commitAudition = inject(CommitAudition);
 
   readonly command = input.required<Command>();
 
@@ -116,7 +116,7 @@ export class VibratoCommand {
       return;
     }
 
-    this.requests.apply(
+    this.commitAudition.apply(
       spliceArg(this.store.source(), this.command(), index, argumentText(this.command(), value)),
     );
   }

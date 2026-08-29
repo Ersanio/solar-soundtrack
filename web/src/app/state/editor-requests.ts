@@ -145,13 +145,17 @@ export class EditorRequests {
   }
 
   /**
-   * Which occurrence of a note the piano roll was last asked about.
+   * The selected note: which occurrence of one the piano roll was last asked
+   * about.
    *
    * A note written once inside a loop is played many times, and the commands in
    * force can differ between them, so the caret — which names the *text* — is
-   * one answer short. Set when a bar is clicked and read only while it is still
-   * an occurrence of the note the caret is on, which is what makes moving the
-   * caret enough to retire it.
+   * one answer short. A click on a bar or on one of its glyphs sets it; a click
+   * on the command lane and the roll's `Escape` let it go, a lane glyph naming
+   * a command of the song rather than a note of it. The note panel reads it
+   * only while it is still an occurrence of the note the caret is on, and
+   * `CommitAudition` replays it after a panel's commit, resolved against the
+   * fresh compile so a note that no longer exists is silence.
    */
   readonly inspecting = signal<{ address: number; tick: number } | null>(null);
 

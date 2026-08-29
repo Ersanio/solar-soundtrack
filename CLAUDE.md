@@ -922,10 +922,12 @@ stats.loopTicks` pads **every other channel that would cut the song short** out 
 Angular 22, zoneless (scaffolded `--zoneless`, so zone.js is not a dependency and there is nothing
 to opt into), no router, no NgModules. Signals throughout: `signal`/`computed` for state, `effect`
 reserved for mirroring into imperative sinks (localStorage, the player, the DSP). State lives in
-eight `@Service()` singletons in `web/src/app/state/`. The spine runs one way, `DriverStore` →
+nine `@Service()` singletons in `web/src/app/state/`. The spine runs one way, `DriverStore` →
 `SampleStore` → `EditorStore` → `Playback`; `ClockMeasurer` feeds `EditorStore`, `Audition` hangs
-off it beside `Playback`, `Mixer` hangs off it and is read by both of those and by the roll, and
-`EditorRequests` depends on nothing at all. `web/README.md` has the rest.
+off it beside `Playback`, `Mixer` hangs off it and is read by both of those and by the roll,
+`EditorRequests` depends on nothing at all, and `CommitAudition` is the command inspector's write
+path over `EditorRequests` and `Audition` — a panel's commit replays the selected note once its
+compile lands. `web/README.md` has the rest.
 
 Selector prefix is `amk` — `amk-root`, `amk-editor-pane` for components, camelCase `amk*` for
 directives. ESLint enforces both.

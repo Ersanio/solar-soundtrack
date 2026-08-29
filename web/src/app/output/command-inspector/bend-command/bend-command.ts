@@ -4,7 +4,7 @@ import { argEditable, argumentText, spliceArg } from '@amk/tokens/edits';
 import type { Command } from '@amk/tokens';
 import { argLockedBecause } from '../commands/context';
 import { Slider } from '../../../shared/slider/slider';
-import { EditorRequests } from '../../../state/editor-requests';
+import { CommitAudition } from '../../../state/commit-audition';
 import { EditorStore } from '../../../state/editor-store';
 import { noteTicksBefore, tempoBefore } from '@amk/tokens/dialect';
 import { BendGraph } from '../bend-graph/bend-graph';
@@ -33,7 +33,7 @@ import { NotePicker } from '../note-picker/note-picker';
 export class BendCommand {
   private readonly store = inject(EditorStore);
 
-  private readonly requests = inject(EditorRequests);
+  private readonly commitAudition = inject(CommitAudition);
 
   readonly command = input.required<Command>();
 
@@ -170,7 +170,7 @@ export class BendCommand {
 
   protected setArg(index: number, value: number): void {
     const byte = value < 0 ? value + 0x100 : value;
-    this.requests.apply(
+    this.commitAudition.apply(
       spliceArg(this.store.source(), this.command(), index, argumentText(this.command(), byte)),
     );
   }

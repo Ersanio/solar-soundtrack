@@ -13,7 +13,7 @@ import { panLabel } from '@amk/tokens/commands/units';
 import { argLockedBecause, commandLockedBecause } from '../commands/context';
 import { EnumSelect } from '../../../shared/enum-select/enum-select';
 import { Slider } from '../../../shared/slider/slider';
-import { EditorRequests } from '../../../state/editor-requests';
+import { CommitAudition } from '../../../state/commit-audition';
 import { EditorStore } from '../../../state/editor-store';
 import { hex2 } from '../../../util/format';
 import { dragPreview } from '../commands/preview';
@@ -48,7 +48,7 @@ const SURROUND = [
 export class PanCommand {
   private readonly store = inject(EditorStore);
 
-  private readonly requests = inject(EditorRequests);
+  private readonly commitAudition = inject(CommitAudition);
 
   readonly command = input.required<Command>();
 
@@ -175,22 +175,26 @@ export class PanCommand {
       // panel's call to make.
       const kept = this.byte() & 0x20;
       const byte = (pan & 0x1f) | (left << 7) | (right << 6) | kept;
-      this.requests.apply(spliceArg(source, command, 0, argumentText(command, byte)));
+      this.commitAudition.apply(spliceArg(source, command, 0, argumentText(command, byte)));
       return;
     }
 
     if (command.args.length >= 3) {
-      this.requests.apply(spliceArgs(source, command, [String(pan), String(left), String(right)]));
+      this.commitAudition.apply(
+        spliceArgs(source, command, [String(pan), String(left), String(right)]),
+      );
       return;
     }
 
     if (left === 0 && right === 0) {
-      this.requests.apply(spliceArg(source, command, 0, String(pan)));
+      this.commitAudition.apply(spliceArg(source, command, 0, String(pan)));
       return;
     }
 
     // Music.cpp:718 errors on a second argument without a third, so turning one
     // flag on has to write all three.
-    this.requests.apply(spliceCommand(source, command, `${command.kind}${pan},${left},${right}`));
+    this.commitAudition.apply(
+      spliceCommand(source, command, `${command.kind}${pan},${left},${right}`),
+    );
   }
 }

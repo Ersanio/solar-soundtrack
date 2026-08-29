@@ -13,22 +13,24 @@ them.
 
 | Path                    | What it is                                                                           |
 | ----------------------- | ------------------------------------------------------------------------------------ |
-| `src/app/state/`        | Eight `@Service()` singletons in dependency order, and the transport's clock         |
+| `src/app/state/`        | Nine `@Service()` singletons in dependency order, and the transport's clock          |
 | `src/app/editor/`       | The left pane and its chrome: top bar, transport, mixer, palette, CodeMirror adapter |
 | `src/app/editor/views/` | What the pane's tabs switch between: source, sample library, piano roll              |
 | `src/app/output/`       | Diagnostics, stats, the ARAM bar, the command inspector                              |
 | `src/app/shared/`       | Form controls, panels, icons, chart helpers                                          |
 | `src/app/util/`         | Formatting, IndexedDB, `clamp`                                                       |
 
-State flows one way: `DriverStore` → `SampleStore` → `EditorStore` → `Playback`. Four more sit off
+State flows one way: `DriverStore` → `SampleStore` → `EditorStore` → `Playback`. Five more sit off
 that spine: `ClockMeasurer`, which `EditorStore` owns and which drives the measurement described
 below; `Audition`, which hangs off `EditorStore` beside `Playback` and owns the second
 `AudioContext`; `Mixer`, which holds the per-channel mutes, the solo and the output level and is
 read by `Playback`, by `Audition` and by the roll — three readers and no owner is why it is not a
 member of any of them, and the level is there for the same reason the mask is: both audio paths
 apply it, the transport to the player's gain and the previewer to a `GainNode` of its own;
-and `EditorRequests`, which injects nothing at all, because a mailbox between the panels and the
-source view has nothing to read.
+`EditorRequests`, which injects nothing at all, because a mailbox between the panels and the
+source view has nothing to read; and `CommitAudition`, the command inspector's write path, which
+forwards a panel's commit to `EditorRequests` and replays the selected note through `Audition`
+once the compile that includes it lands.
 
 `DriverStore` loads `packages/spc/assets/driver/`. The song's ARAM load address is the slot the
 driver's own song pointer table reserves, stated in the bundle's `manifest.json` and checked against
@@ -78,6 +80,10 @@ the thumb out from under the pointer.
 cannot express "the source of truth updates when I let go". Readouts are computed from the
 _previewed_ value — a label derived from the document would sit there describing the number you are
 dragging away from.
+
+The inspector's panels commit through `CommitAudition` rather than `EditorRequests` directly: same
+mailbox underneath, plus a replay of the selected note once the compile that includes the commit
+lands — heard, not just shown. A commit with no note selected replays nothing.
 
 ## Reaching into the editor
 

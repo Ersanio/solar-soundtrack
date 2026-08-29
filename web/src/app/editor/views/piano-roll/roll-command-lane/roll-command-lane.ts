@@ -174,10 +174,16 @@ export class RollCommandLane {
     this.lifted.set(Math.max(0, Math.min(this.offset() + delta, this.reach())));
   }
 
-  /** A single click asks the inspector about the command; a double click goes to it. */
+  /**
+   * A single click asks the inspector about the command; a double click goes to
+   * it. It also lets go of the selected note, because a lane glyph names a
+   * command of the song rather than a note of it — so a value committed from
+   * the panel it opens previews nothing.
+   */
   protected inspect(glyph: LaneGlyph, event: Event, show = false): void {
     event.stopPropagation();
     if (this.inSync()) {
+      this.requests.inspecting.set(null);
       this.requests.reveal.set({ span: { ...glyph.span }, show });
     }
   }

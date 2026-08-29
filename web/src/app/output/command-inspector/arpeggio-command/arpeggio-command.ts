@@ -7,7 +7,7 @@ import { ArpeggioNoteRow } from '../arpeggio-note/arpeggio-note';
 import { Button } from '../../../shared/button/button';
 import { type EnumOption, EnumSelect } from '../../../shared/enum-select/enum-select';
 import { Slider } from '../../../shared/slider/slider';
-import { EditorRequests } from '../../../state/editor-requests';
+import { CommitAudition } from '../../../state/commit-audition';
 import { EditorStore } from '../../../state/editor-store';
 import { hex2 } from '../../../util/format';
 import { fromSigned, toSigned } from '@amk/tokens/commands/param';
@@ -56,7 +56,7 @@ const LOOP_MARKER = 0x80;
 export class ArpeggioCommand {
   private readonly store = inject(EditorStore);
 
-  private readonly requests = inject(EditorRequests);
+  private readonly commitAudition = inject(CommitAudition);
 
   readonly command = input.required<Command>();
 
@@ -205,19 +205,21 @@ export class ArpeggioCommand {
   // --- editing ---------------------------------------------------------------
 
   protected setDuration(value: number): void {
-    this.requests.apply(spliceArg(this.store.source(), this.command(), 1, `$${hex2(value)}`));
+    this.commitAudition.apply(spliceArg(this.store.source(), this.command(), 1, `$${hex2(value)}`));
   }
 
   protected setNote(index: number, value: number): void {
     const byte = value < 0 ? value + 0x100 : value;
-    this.requests.apply(
+    this.commitAudition.apply(
       spliceArg(this.store.source(), this.command(), index + 2, `$${hex2(byte & 0xff)}`),
     );
   }
 
   protected setExtra(value: number): void {
     const byte = value < 0 ? value + 0x100 : value;
-    this.requests.apply(spliceArg(this.store.source(), this.command(), 2, `$${hex2(byte & 0xff)}`));
+    this.commitAudition.apply(
+      spliceArg(this.store.source(), this.command(), 2, `$${hex2(byte & 0xff)}`),
+    );
   }
 
   protected setMode(mode: number): void {
@@ -282,6 +284,6 @@ export class ArpeggioCommand {
    */
   private rewrite(values: number[]): void {
     const text = `$FB ${values.map((value) => `$${hex2(value & 0xff)}`).join(' ')}`;
-    this.requests.apply(spliceCommand(this.store.source(), this.command(), text));
+    this.commitAudition.apply(spliceCommand(this.store.source(), this.command(), text));
   }
 }

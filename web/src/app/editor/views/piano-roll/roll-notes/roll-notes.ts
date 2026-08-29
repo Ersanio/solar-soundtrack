@@ -109,9 +109,10 @@ export class RollNotes {
   /**
    * A glyph is its own target: the command it stands for, not the note under it.
    *
-   * The channel is the one exception — a glyph is drawn on a bar, so it names
-   * the same channel the bar does, and it has to say so itself because the
-   * bar's own handler never runs for it.
+   * The bar it is drawn on still speaks — a glyph names the same channel the
+   * bar does, and the bar's note becomes the selected one, so a value committed
+   * from the panel replays the note the glyph stands on. Both have to be said
+   * here because the bar's own handler never runs for a glyph.
    */
   protected inspect(mark: Mark, glyph: MarkGlyph, event: Event, show = false): void {
     // Without this the bar underneath answers as well, and the note would win.
@@ -119,6 +120,7 @@ export class RollNotes {
     this.channelPicked.emit(mark.note.channel);
 
     if (this.inSync()) {
+      this.requests.inspecting.set({ address: mark.note.address, tick: mark.note.tick });
       this.requests.reveal.set({ span: { ...glyph.span }, show });
     }
   }

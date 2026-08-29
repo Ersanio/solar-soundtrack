@@ -88,6 +88,11 @@ list — the inspector under two headings, one for what the note sets and one fo
 under. Its buttons answer to the same pair the bar's own icons do: a click asks the inspector about
 that command and leaves you in the roll, a double click goes to it in the MML.
 
+**Changing a value in the inspector replays the note.** Let a slider go and the selected note — the
+one whose bar or icon you last clicked — sounds again under the new value, once the edit has
+compiled. With no note selected — after `Escape`, or a click in the command lane — a commit makes
+no sound.
+
 ## The command lane
 
 Under the roll is a strip holding nothing but command icons, on the song's own timeline: what takes
@@ -155,7 +160,8 @@ when there is more. Nothing is ever left out for want of room — however many c
 tick, each gets a row of its own, and the wheel and the seam are what reach them. Click an icon to
 ask the inspector about that command, or double-click it to go
 to it in the MML — the same as clicking one on a bar, except that it leaves the channel you are
-editing alone. **Right-click one to delete it**, in one undo step. That is the counterweight to a
+editing alone and lets go of the selected note: a lane icon names a command of the song rather than
+a note of it, so a value committed from here replays nothing. **Right-click one to delete it**, in one undo step. That is the counterweight to a
 roll that keeps a command wherever something still plays under it: an edit hands the command back to
 the notes that need it, and this is how you say none of them do. A command written through a
 `"name=value"` cannot be deleted this way — its icon offers no right-click — because the text it
