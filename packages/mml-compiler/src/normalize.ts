@@ -1,7 +1,7 @@
 /**
  * The normalizer: rewrites a song into the shape an editor can splice.
  *
- * Seven passes, each a text-to-text rewrite driven by the parse trace of the
+ * Nine passes, each a text-to-text rewrite driven by the parse trace of the
  * text it is given, and each leaving a song that compiles to the same music:
  *
  *   A. `resolvePreprocessor` — `#define`/`#if…` lines and untaken branches go.
@@ -17,6 +17,9 @@
  *                              above the first `#N` under the starting channel.
  *   F. `writeDefaults`       — `o`, `q`, `@` and `t` written out where a channel
  *                              left them implied; `<` and `>` absolute.
+ *   I. `writePitchSlides`    — every legacy `&` becomes the `$DD` it compiles
+ *                              to, so the slide is a command with a channel
+ *                              rather than an operator nothing can place.
  *   G. `drumPerNote`         — the drum `@` immediately before every drum note.
  *
  * A `[ ]` body is compiled once, under the parse-time state standing at its
@@ -34,6 +37,7 @@
  */
 
 import { FIRST_CUSTOM_INSTRUMENT, FIRST_PERCUSSION_INSTRUMENT, TICKS_PER_WHOLE } from "@amk/core/hardcoded-tables";
+import { hex2 } from "@amk/core/hex";
 import { spellDuration, spellLength, spellOctave, spellQ } from "@amk/core/mml-text";
 import type { CompileResult, Diagnostic, ParseEvent, ParseState, ParseTrace, Span } from "@amk/core/types";
 import { preprocess } from "./preprocess";
@@ -232,12 +236,12 @@ function stateBefore(trace: ParseTrace, index: number): ParseState {
  * What no pass can rewrite, found before any runs.
  *
  * A legacy `&` emits the standing duration byte as `$DD`'s (`parser.ts:parseNote`),
- * and after a bracket or a marker that byte is `-1`; the walk does not read
- * `$DD`'s arguments, so this is the one parse-time fact the caller's comparison
- * cannot see. A slide or a `$DD` operand still pending at a bracket or a marker
- * is the same hazard from the other side. `tuning[n]=` changes the table every
- * later note is tuned by, and the trace carries one table rather than one per
- * note.
+ * and after a bracket or a marker that byte is `-1`, which reaches the stream as
+ * `$FF`: no length any text can name, so {@link writePitchSlides} cannot write
+ * it out and every pass that moves a bracket would change it. A slide or a `$DD`
+ * operand still pending at a bracket or a marker is the same hazard from the
+ * other side. `tuning[n]=` changes the table every later note is tuned by, and
+ * the trace carries one table rather than one per note.
  */
 export function precheck(input: NormalizeInput): Diagnostic[] {
 	const { text, trace, onlyChannel } = input;
@@ -1487,6 +1491,184 @@ export function writeDefaults(input: NormalizeInput, options: DefaultsOptions): 
 	if (diagnostics.some((d) => d.severity === "error")) {
 		return { text, diagnostics, changed: false };
 	}
+
+	if (edits.length === 0) {
+		return { text, diagnostics, changed: false };
+	}
+
+	return { text: applyEdits(text, edits), diagnostics, changed: true };
+}
+
+// ---------------------------------------------------------------------------
+// I. Pitch slides
+// ---------------------------------------------------------------------------
+
+/**
+ * The tie run standing before a `&`, and whether the two are whitespace-adjacent.
+ *
+ * `accumulateTiedLength` folds a `^` chain across whitespace and nothing else
+ * (`parser.ts:3003-3042`), and on the legacy targets it has already rewound the
+ * last tie out of the run in front of a `&` — so the note event before the `&`
+ * is not the whole run, and the chain has to be gathered back up across events.
+ * `segments` is what a rewind would split, counted off the text, which is exact
+ * only because `writeNoteLengths` has already made every length explicit.
+ */
+function slideRun(text: string, events: readonly ParseEvent[], slide: number): { segments: number; adjacent: boolean } {
+	const blank = (from: number, to: number): boolean => /^\s*$/.test(text.slice(from, to));
+	let at = slide - 1;
+	if (at < 0 || !isNote(events[at])) {
+		return { segments: 0, adjacent: false };
+	}
+
+	const adjacent = blank(events[at].span.end, events[slide].span.start);
+	let segments = 0;
+	for (;;) {
+		segments += [...eventText(text, events[at]).matchAll(SEGMENT)].length;
+		const previous = at > 0 ? events[at - 1] : undefined;
+		if (previous === undefined || !isNote(previous)) {
+			break;
+		}
+
+		const head = eventText(text, events[at])[0]?.toLowerCase();
+		const ties = head === "^" || (head === "r" && eventText(text, previous)[0]?.toLowerCase() === "r");
+		if (!ties || !blank(previous.span.end, events[at].span.start)) {
+			break;
+		}
+
+		at--;
+	}
+
+	return { segments, adjacent };
+}
+
+/**
+ * Every legacy `&` written out as the `$DD` it compiles to.
+ *
+ * `parsePitchSlide` only raises a flag (`parser.ts:2260-2267`); the note after it
+ * emits `$DD $00 <prevNoteLength> <note>` and then plays as well
+ * (`parser.ts:2963-2969`). So the text has to name a duration the note *before*
+ * the `&` decided — which is why an editor cannot touch that note's length while
+ * the `&` stands — and a target byte the octave, `h`, the instrument's tuning and
+ * the drum remap decided together. The trace carries the first and the note map
+ * the second.
+ *
+ * The target is written as a **byte** and never as a note. A written target is
+ * consumed by `parseNote`, which takes the drum remap with it
+ * (`parser.ts:2948-2960`) and leaves the note that follows pitched; it errors
+ * AMK0161 wherever a `q` is pending (`parser.ts:3451`); and it cannot spell a
+ * rest or a tie at all (`isNoteLetter`, `parser.ts:167`). A `&` reaches all three.
+ */
+export function writePitchSlides(input: NormalizeInput): PassResult {
+	const { text, trace, result } = input;
+	const events = trace.events;
+	const byStart = new Map((result.noteMap ?? []).map((entry) => [entry.span.start, entry]));
+	const emitted = new Set((result.commandMap ?? []).map((entry) => entry.span.start));
+	const ratio = trace.targetAMKVersion >= 4 ? trace.tempoRatio : 1;
+	const edits: TextEdit[] = [];
+	const diagnostics: Diagnostic[] = [];
+
+	events.forEach((event, index) => {
+		if (input.onlyChannel !== undefined && event.channel !== input.onlyChannel) {
+			return;
+		}
+
+		const before = stateBefore(trace, index);
+		if (!isNote(event) || !before.inPitchSlide) {
+			return;
+		}
+
+		// `precheck` refuses a slide whose duration comes from a bracket or a
+		// marker before any pass runs — `-1` reaches the stream as `$FF`, and no
+		// length written here names that. Asserted where it is read rather than
+		// inherited from the eight passes in between.
+		if (before.prevNoteLength < 0) {
+			return;
+		}
+
+		let slide = index - 1;
+		while (slide >= 0 && events[slide].char !== "&") {
+			slide--;
+		}
+
+		// `inPitchSlide` is raised only by `&` and lowered only by the note that
+		// consumes it, and a second `&` in a row is AMK0099, so the nearest one
+		// above this note is always the one it belongs to.
+		if (slide < 0) {
+			return;
+		}
+
+		const spot = events[slide].span;
+		const skip = (message: string): void => {
+			diagnostics.push(diagnostic("SST0617", message, spot, "info"));
+		};
+
+		// A note that is itself a `$DD`'s written target appends its byte and
+		// returns before the note map is written (`parser.ts:2971-2975`), so there
+		// is no entry to take the target byte from.
+		const entry = before.nextNoteIsForDD ? undefined : byStart.get(event.span.start);
+		if (entry === undefined) {
+			skip("This pitch slide lands on a note that is already a $DD's target, so it was left as it is.");
+			return;
+		}
+
+		// Where the run goes. The `$DD` bytes are appended when the *note* is
+		// parsed, so anything between that emits bytes of its own emits them first
+		// and the run has to follow it; `recordCommand` files a command only where
+		// the channel's bytes grew (`parser.ts:649`), so an event in the gap that
+		// is in no command map wrote nothing. With nothing in the way the run
+		// stays where the `&` was, which is where the tie lookahead below expects
+		// to find it.
+		let at = spot.start;
+		for (let gap = slide + 1; gap < index; gap++) {
+			if (emitted.has(events[gap].span.start)) {
+				at = event.span.start;
+			}
+		}
+
+		// A drum `@` leading the note keeps its place in front of it, so that
+		// `drumPerNote` still reads the two as one unit rather than writing a
+		// second `@` between them on the round after this.
+		const lead = events[index - 1];
+		if (at === event.span.start && lead.char === "@" && !emitted.has(lead.span.start)) {
+			at = lead.span.start;
+		}
+
+		// `accumulateTiedLength` rewinds the last tie out of the run in front of a
+		// `$DD` (`parser.ts:3026-3032`) — for the written command on every target,
+		// but for a `&` only on the legacy ones. So the rewrite turns a rewind on
+		// where `&` had none, and turns one off by moving the run past something.
+		// Either way the tie moves and the slide starts somewhere else, which no
+		// re-spelling here can put back.
+		const run = slideRun(text, events, slide);
+		const reads = run.adjacent && at === spot.start;
+		if (run.segments >= 2 && run.adjacent && reads === (trace.songTargetProgram === 0)) {
+			skip("This pitch slide follows a tie that writing it as $DD would move, so it was left as it is.");
+			return;
+		}
+
+		// Hex arguments are divided by the tempo ratio (`parser.ts:3489-3492`)
+		// where `&`'s byte is appended raw, already divided, so the text carries
+		// the undivided value. `emitNote` holds `prevNoteLength` under
+		// `divideByTempoRatio(0x80)` (`parser.ts:3071`, `:3080`), so that is at
+		// most 127 and always fits the byte. The note byte is masked because a
+		// pitch below the driver's range only warns below `#amk 4` (AMK0206,
+		// `parser.ts:2934-2945`) and stays negative, where `append` would mask it.
+		const written = `$DD $00 $${hex2(before.prevNoteLength * ratio)} $${hex2(entry.note & 0xff)} `;
+
+		// The trailing spaces go with the `&` so that replacing it in place does
+		// not leave a double one; the run brings its own.
+		let end = spot.end;
+		while (text[end] === " " || text[end] === "\t") {
+			end++;
+		}
+
+		if (at === spot.start) {
+			edits.push({ start: spot.start, end, text: written });
+			return;
+		}
+
+		edits.push({ start: spot.start, end, text: "" }, { start: at, end: at, text: written });
+	});
 
 	if (edits.length === 0) {
 		return { text, diagnostics, changed: false };

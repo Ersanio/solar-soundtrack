@@ -123,6 +123,33 @@ the song left standing apply. The exception is a channel the song has never writ
 neither a `q` nor an instrument and would otherwise play for one tick at no volume: there `@0` and
 `q7f` stand in, which are what the driver and the compiler respectively default to.
 
+**A note can carry its `$DD`**, and the same argument decides how: the four bytes go where `emitNote`
+would leave them and the driver is left to find them. It has to be that way round, because `$DD` is
+not dispatched — the note before it reads it by peeking at the byte standing at the track pointer
+(`main.asm:L_10E4`), and only on a tick that does _not_ fetch music data, since `main.asm:2337-2339`
+jumps straight past `L_0CC6`'s read-ahead on one that does. So **where the slide arms is decided by
+the frame the peek reads it in**: `afterTicks` ticks of note, then that frame — `frameTicks` of it —
+then the command, then whatever the note has left, as ties. That is `c4 $DD` against `c4^4 $DD`, and
+it is the whole reason `Music.cpp:2224` rewinds a tie out of a `$DD`'s way. A frame of one tick
+therefore never arms at all — every tick of it is a fetch tick — and the command loop dispatches the
+`$DD` into its empty slot instead, which is what AddmusicK does with the same song.
+
+Usually that frame is the note's last, and `f+2 $DD $00 $D6 a+^2` is where it is not: the tie is
+written after the command, so the note runs on for 96 ticks behind the four bytes. Which is why the
+frame's own length is carried rather than taken as "the rest of the note" — the two are the same
+number in every other shape, and a one-tick frame in the middle of a note arms nothing while a
+96-tick one arms at once.
+
+The operands come from `song-walk.ts` (`WalkNote.bend`) and never from the source. The text cannot
+say `afterTicks`: `emitNote` chunks a note of `$80` ticks or more inside one note-map entry, so
+`c1 $DD` arms 96 ticks in with no tie written anywhere. Anything no `emitNote` could have produced —
+an arm past the note's end, one before its head, a frame no duration byte can say, one the note has
+not the ticks to hold — is dropped,
+and the frames come out byte for byte those of the flat note. The target arrives as the **emitted**
+byte, the driver adding `$43` and `!HTuneValues+x` itself at arm time. And the tail is not lengthened
+to cover the slide: `delay + duration` may outrun the note, and then the note keys off part way
+through the bend, which is what the song does — the note after it is where the slide was going.
+
 Two things it does not do. The length is fixed when the request is made — the PCM is rendered before
 it is heard, so there is nothing to send a note-off to, which is the price of not putting a second
 emulator on a second audio thread. And the echo buffer still holds the song as the mixer leaves it:
@@ -188,6 +215,16 @@ reached (`song-walk.ts` lists the ways, against `main.asm:381-388`). The
 source knows which `@` was folded into _that_ note, so a reader that wants the command asks it
 there (`web/src/app/state/commands-in-force.ts`). Which of these a view chooses to draw is not this
 package's business, as the percussion set is not.
+
+`WalkNote.bendFrom` is that shape pointed the other way. `$DD` is not dispatched at all — the note
+already sounding swallows it by peeking at the track pointer (`main.asm:3256-3287`) — so it acts on
+the note _in front of_ it and fills no slot, a slide running once and leaving nothing standing for a
+later note to sound under. It is therefore in no `origins`, and `bendFrom` is the address of the
+`$DD` a note's own read-ahead picked up, beside the `WalkNote.bend` operands and separate from them
+because `normalize-song.ts` compares those between a song and its rewrite. It is also the one entry
+in `SongTimeline.commands` raised outside `slotsOf`, being an execution rather than a slot changing
+hands: a `[ ]` body carrying one raises it every pass, on the tick of the frame the peek found it in
+rather than the tick the read pointer reached the byte at.
 
 `NoteState.tempo` is deliberately not that answer. It is the tempo the song has last been _told_ to
 reach, which through a fade is the target the driver has not got to yet; the roll's tooltip wants

@@ -31,13 +31,21 @@ const CHANGES: Record<NormalizePass, string> = {
     'one block per channel, in #0 to #7 order, with music above the first #N moved under it',
   defaults:
     'the octave, quantization, instrument and tempo written where the song left them implied, and < > made absolute',
+  slides: 'every legacy & pitch slide written out as the $DD it compiles to',
   drums: 'the drum instrument written before every drum note',
 };
 
 /** What the dialog is up about. */
 type Proposal =
-  | { kind: 'rewrite'; source: string; text: string; changes: readonly string[]; size: string }
-  | { kind: 'unchanged' }
+  | {
+      kind: 'rewrite';
+      source: string;
+      text: string;
+      changes: readonly string[];
+      notes: readonly string[];
+      size: string;
+    }
+  | { kind: 'unchanged'; notes: readonly string[] }
   | { kind: 'refused'; reasons: readonly string[] };
 
 const HEADINGS: Record<Proposal['kind'], string> = {
@@ -56,8 +64,14 @@ function describe(outcome: NormalizeOutcome, source: string): Proposal {
     return { kind: 'refused', reasons: outcome.diagnostics.map((d) => `${d.code} ${d.message}`) };
   }
 
+  // A successful outcome can still carry something the porter has to know: a
+  // pitch slide a pass declined to write out is left in the song, and it is what
+  // goes on refusing the piano roll afterwards. Carried on "nothing to
+  // normalize" as well, which is exactly what a song whose only `&`s were
+  // skipped comes back as.
+  const notes = outcome.diagnostics.map((d) => d.message);
   if (outcome.text === source) {
-    return { kind: 'unchanged' };
+    return { kind: 'unchanged', notes };
   }
 
   return {
@@ -65,6 +79,7 @@ function describe(outcome: NormalizeOutcome, source: string): Proposal {
     source,
     text: outcome.text,
     changes: outcome.changed.map((pass) => CHANGES[pass]),
+    notes,
     size: `${sizeOf(source)} → ${sizeOf(outcome.text)}`,
   };
 }

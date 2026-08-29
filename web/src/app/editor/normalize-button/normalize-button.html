@@ -54,6 +54,19 @@
       } @else {
         <p>The song is already in the form the piano roll edits. Nothing was changed.</p>
       }
+
+      <!-- A pass can succeed and still leave something behind — a pitch slide it
+           cannot write without moving a tie is the commonest. It is what goes on
+           refusing the roll afterwards, so the dialog has to say it; a refusal
+           lists its own reasons above and never reaches here. -->
+      @if (proposal.kind !== 'refused' && proposal.notes.length > 0) {
+        <p class="text-warn">What it could not write out:</p>
+        <ul class="list-disc space-y-1 pl-5 text-xs">
+          @for (note of proposal.notes; track $index) {
+            <li>{{ note }}</li>
+          }
+        </ul>
+      }
     </div>
 
     <!-- Opening focuses the way out, so Enter cancels; Confirm takes nothing

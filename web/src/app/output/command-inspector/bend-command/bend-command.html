@@ -1,16 +1,20 @@
-@if (args().length < 3) {
+@if (!hasTarget()) {
   <p class="text-ink-muted text-xs leading-relaxed">
     Needs three arguments: a delay, a duration and a target.
   </p>
 } @else {
-  <!-- The dragged values, so the curve follows the pointer. -->
-  <amk-bend-graph
-    [delay]="shownDelay()"
-    [duration]="shownDuration()"
-    [from]="from()"
-    [to]="to()"
-    [tempo]="tempo()"
-  />
+  <!-- The dragged values, so the curve follows the pointer. Not drawn for a
+       target written as a note: the whole of the picture is the interval, and
+       the byte the note resolves to is not something the scanner can know. -->
+  @if (!noteTarget()) {
+    <amk-bend-graph
+      [delay]="shownDelay()"
+      [duration]="shownDuration()"
+      [from]="from()"
+      [to]="to()"
+      [tempo]="tempo()"
+    />
+  }
 
   <amk-slider
     label="Delay"
@@ -34,7 +38,17 @@
     (commit)="setArg(1, $event)"
   />
 
-  @if (isPitchBend()) {
+  @if (noteTarget(); as written) {
+    <!-- Laid out as a slider is, minus the control: the picker takes a byte and
+         there is none, so it is not rendered disabled at a made-up one. -->
+    <span class="flex flex-col gap-0.5">
+      <span class="flex items-baseline justify-between gap-2">
+        <span class="text-ink-muted text-[11px]">Target note</span>
+        <span class="text-ink font-mono text-[11px]">{{ written.text }}</span>
+      </span>
+      <span class="text-ink-muted text-[11px] leading-snug">{{ lockedBecause(2) }}</span>
+    </span>
+  } @else if (isPitchBend()) {
     <!-- A dropdown, so there is no drag to preview: it commits on choosing. -->
     <amk-note-picker
       label="Target note"

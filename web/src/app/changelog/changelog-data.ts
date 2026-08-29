@@ -9,6 +9,15 @@ export interface ChangelogEntry {
 export const CHANGELOG: readonly ChangelogEntry[] = [
   // ─── newest first; add new blocks here ──────────────────────────────────
   {
+    date: '29 August 2026',
+    items: [
+      'Command $DD pitch bend now accepts a note as its final argument',
+      'Clicking or dragging a note in the piano roll plays its pitch slide',
+      'A pitch slide is now drawn on the note that plays it, instead of the note after',
+      'Normalize writes legacy "&"-pitch slides out as $DD, so the piano roll can edit those songs',
+    ],
+  },
+  {
     date: '27 August 2026',
     items: [
       'A command timeline under the piano roll, showing what takes effect where',

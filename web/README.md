@@ -134,9 +134,16 @@ shape an editor can splice — `@amk/compiler`'s README has the passes. The rewr
 compiler's; `state/normalize-song.ts` is the part only the app can do, and it is here for the reason
 `song-clock.ts` is: the passes rewrite text and the walk in `@amk/spc` reads bytes, and the package
 boundary keeps each from the other. It compiles and walks the result of every pass and compares it
-to the walk of the original — every note's tick, slot, byte, state and **written** pitch, the song's
-length, loop point and tempo commands — and the document is not touched unless they all agree. The
-outcome names the passes that changed the song, and a refusal names its reason.
+to the walk of the original — every note's tick, slot, byte, state, **written** pitch and the `$DD`
+pitch slide its read-ahead picks up, the song's length, loop point and tempo commands — and the
+document is not touched unless they all agree. The outcome names the passes that changed the song,
+and a refusal names its reason.
+
+A pass can also succeed and still leave something behind, which the dialog says under "What it could
+not write out": a `&` pitch slide standing after a tie cannot become a `$DD` without moving the tie,
+so it is left alone — and it is then what goes on refusing the roll, which is why saying so matters
+more than the rewrite succeeding quietly. That list is shown on "nothing to normalize" too, since a
+song whose only `&`s were left alone is exactly what comes back unchanged.
 
 `editor/normalize-button/` is the button and the dialog behind it, one component on both toolbars.
 It runs the rewrite _before_ the dialog opens, so the dialog lists what changes in this song rather
@@ -251,6 +258,12 @@ silently up to the tick, hands the driver the note there and renders it, so what
 finished PCM and the context only has a buffer to play. The emulator playing the song is inside an
 `AudioWorkletProcessor` and is never addressed, which is the whole of why a note can be auditioned
 over a song without disturbing it.
+
+A note of the song carries the `$DD` the walk read for it (`StripItem.slide`), so a bar that slides
+in the song slides under the pointer — clicked, and on every row a drag of it crosses, the target
+being absolute. Its target is also the one number on this path that must _not_ go through the
+transposition `Audition` applies: that turns a written row pitch into the byte the compiler would
+emit, and a slide's target already is one.
 
 The mixer is the one thing the two paths share, and only as a number. A note on a channel the mixer
 silences is refused in `Audition` before an emulator is asked for — hearing nothing does not need a
@@ -403,7 +416,10 @@ them in one textual pass and baked them into the notes' own bytes;
 `@amk/tokens/commands/in-force` does that half. The drum is both at once: `@21` is folded into one
 note byte, and that byte loads a sample every note after it plays on, through a `]`, a `*` and a call
 from another channel — so the walk names the note that loaded it (`WalkNote.drumFrom`) and the source
-is asked about that note. `state/commands-in-force.ts` is the join, kept out of the store so
+is asked about that note. A `$DD` is the same shape reversed: it fills no slot, so no `origins` names
+it, and the note whose read-ahead swallowed it carries the address itself (`WalkNote.bendFrom`) — one
+slide acting on one note and on nothing after it, however many notes follow.
+`state/commands-in-force.ts` is the join, kept out of the store so
 `walktest` can pin all three halves on the songs that need each.
 
 **Which of them a note puts in force is that list against the note before it on its channel**
@@ -429,10 +445,12 @@ glyphs are the commands in force at its note, drawn on that note's own tick, so 
 drawn twice and the two are answering different questions — the lane the tick it runs on, the note's
 chip which note plays under it. Those agree in `c4 v200 d4` and are a rest apart in `c4 v200 r4 d4`,
 and the lane says the same thing in both, which is what makes it the one place the whole song's
-commands can be read in the order they run. Three shapes reach no bar at all, so the lane is the only
-place they appear: a command replaced before the next note sounds, one with no note after it, and
+commands can be read in the order they run. Four shapes reach no bar at all, so the lane is the only
+place they appear: a command replaced before the next note sounds, one with no note after it,
 `$DF`, `$F0`, `$FD` and `$FE`, which empty a slot rather than take one and so are in no
-`WalkNote.origins` at any tick. `WalkCommand.onANote` is the walk's own word for whether a note
+`WalkNote.origins` at any tick, and a `$DD` with no note in front of it to read it, which the driver
+dispatches into the `$0000` its slot in the command table holds.
+`WalkCommand.onANote` is the walk's own word for whether a note
 begins on a command's tick; the lane does not filter on it, and it stands as a description of the
 song rather than as anyone's rule. Left to the bars alone: `q`, `h` and `@21`-`@29`, which emit
 nothing to address, so the note they fold into is their only honest tick and that note is already
@@ -448,6 +466,13 @@ same answer `definedAt` gives, arrived at from the byte end. A command that writ
 not there (`$F6`, `$F7`, `$F9`), nor is anything inside a `$FC` body, which the walk does not follow,
 and the lane draws only what the compiler mapped, so the byte blob's own `$FA` prefix reaches no
 glyph.
+
+`$DD` is the one entry raised outside that rule, from its own arm of the walk, because it writes no
+slot and so has no transition to be tested for. It is an execution: a `[ c4 $DD … ]2` runs the slide
+on both notes and is two entries where `[ v200 c8 ]2` is one, and its tick is the frame the driver's
+read-ahead found it in rather than the tick the read pointer reached the byte at, which is where the
+note it rides on _ends_. That is also why `definedAt` never counts a `$DD` in the note before as
+something this note inherited — one written slide reaching two notes ran twice.
 
 `state/command-timeline.ts` is that rule; `roll-command-layout.ts` beside `roll-layout.ts` is the
 geometry, first-fit rows over the whole song so that a glyph's row depends on the song, the zoom and

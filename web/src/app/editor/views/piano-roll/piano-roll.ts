@@ -893,7 +893,7 @@ export class PianoRoll {
       rememberLength: (lastLength) => {
         this.settings.update((s) => (s.lastLength === lastLength ? s : { ...s, lastLength }));
       },
-      audition: (note, drum, tick, ticks) => {
+      audition: (note, drum, tick, ticks, slide) => {
         const channel = this.editChannel();
         // One render in flight: a note is heard by running the song silently up
         // to its tick, so a drag down the keyboard would otherwise queue one of
@@ -904,6 +904,7 @@ export class PianoRoll {
             tick,
             note: drum === null ? note : 0xd0 + (drum - FIRST_PERCUSSION_INSTRUMENT),
             ticks,
+            slide,
             quiet: true,
           });
         }

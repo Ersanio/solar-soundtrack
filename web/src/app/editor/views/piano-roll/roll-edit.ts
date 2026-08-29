@@ -151,6 +151,8 @@ export const REFUSE_CROWDED = 'there is something written where that note would 
 export const REFUSE_RAMP = 'that note is too short to keep the command written inside it';
 export const REFUSE_INSIDE = 'there is a command written inside that note';
 export const REFUSE_CLASH = 'two notes would sound at once, which MML cannot say';
+export const REFUSE_BEND_RIDER =
+  'a `$DD` pitch slide is written after that note, and it reads the note in front of it';
 
 /**
  * Why a plan cannot be written out, in the words the roll shows.

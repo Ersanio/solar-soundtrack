@@ -22,6 +22,7 @@
  * note-off to.
  */
 
+import type { PitchSlide } from "./song-walk";
 import { SPC_CHANNELS, SPC_SAMPLE_RATE, type SpcCore } from "./wasm-host";
 import {
 	TICK_POLL_HZ,
@@ -84,6 +85,9 @@ const TRACK_END = 0x00;
 const VCMD_INSTRUMENT = 0xda;
 const DEFAULT_INSTRUMENT = 0x00;
 
+/** `$DD`, the pitch slide, which the note before it reads rather than the command loop. */
+const VCMD_PITCH_SLIDE = 0xdd;
+
 /**
  * The `q` a channel's first note carries when the song has not set one — `q7f`,
  * a full-length note at full velocity, which is what the compiler starts every
@@ -133,6 +137,17 @@ export interface NoteAuditionRequest {
 	 */
 	scratchAt: number;
 	/**
+	 * The `$DD` this note plays, as `song-walk.ts` read it, or nothing.
+	 *
+	 * The song's own `$DD` is never reached — the voice is pointed away from the
+	 * song data before the note is handed over — so a slide has to be written into
+	 * the frames, which {@link noteFrames} does. `target` must arrive **as the
+	 * compiler emitted it**: the driver adds `$43` and `!HTuneValues+x` itself at
+	 * arm time (`main.asm:3277-3285`), so anything that transposes a written pitch
+	 * on the way here has to leave this alone.
+	 */
+	slide?: PitchSlide | null;
+	/**
 	 * Voices the mixer is silencing, as a bitmask. `0` for no mixer at all.
 	 *
 	 * Held through the fast-forward the way `worklet.ts` holds it, so the note
@@ -163,6 +178,40 @@ export interface AuditionedNote {
 }
 
 /**
+ * One run of note frames, mirroring `Parser.emitNote` (`parser.ts:2853`,
+ * Music.cpp:2254). Returns the last frame's own length, which is what the next
+ * duration byte has to be compared against — the compiler drops one that repeats.
+ */
+function appendNote(bytes: number[], note: number, ticks: number, q: readonly number[]): number {
+	let left = ticks;
+
+	if (left < LONG_NOTE) {
+		bytes.push(left, ...q, note);
+		return left;
+	}
+
+	bytes.push(LONG_CHUNK, ...q, note);
+	left -= LONG_CHUNK;
+
+	while (left > LONG_CHUNK) {
+		bytes.push(NOTE_TIE);
+		left -= LONG_CHUNK;
+	}
+
+	if (left === 0) {
+		return LONG_CHUNK;
+	}
+
+	// The duration byte carries over, so an exact chunk needs no new one.
+	if (left !== LONG_CHUNK) {
+		bytes.push(left);
+	}
+
+	bytes.push(NOTE_TIE);
+	return left;
+}
+
+/**
  * The frames the driver is handed for one note, mirroring `Parser.emitNote`
  * (`parser.ts:2853`, Music.cpp:2254) so a note auditioned here is the same bytes
  * the compiler would write for a note of that length.
@@ -174,38 +223,80 @@ export interface AuditionedNote {
  * It is supplied only for a voice that has none, where {@link DEFAULT_Q} stands
  * in for the `q` the compiler would emit with the channel's first note.
  *
+ * **A `slide` is written where `emitNote` would leave it**, rather than modelled.
+ * `$DD` is not dispatched: the note before it reads it by peeking at the byte
+ * standing at the track pointer (`main.asm:L_10E4`), and only on a tick that does
+ * not fetch music data — `main.asm:2337-2339` jumps past `L_0CC6`'s read-ahead on
+ * one that does. So **where it arms is decided by the frame the peek reads it
+ * in**, which {@link PitchSlide.afterTicks} and {@link PitchSlide.frameTicks}
+ * carry between them and which is why `Music.cpp:2224` rewinds a tie out of a
+ * `$DD`'s way. The four bytes go after that frame — straight after the note byte
+ * for an `arm` of 0 — and whatever the note has left runs on behind them as ties,
+ * which is what a tie written *after* the command leaves.
+ *
+ * A slide no `emitNote` could have written is **dropped**, and the frames come
+ * out byte for byte those of the flat note: an approximate bend that sounds like
+ * the real one is worse than none.
+ *
  * Rests follow, so the note keys off at the end of its length and its release is
  * heard, and there are enough of them to outlast {@link AUDITION_TAIL_SECONDS} at
  * a rate no driver can exceed. `$00` closes the block as a backstop; reaching it
  * would send the driver to the phrase table, which by then is underneath these
  * very bytes.
  */
-export function noteFrames(note: number, ticks: number, quantization: number | null = null): Uint8Array {
+export function noteFrames(
+	note: number,
+	ticks: number,
+	quantization: number | null = null,
+	slide: PitchSlide | null = null,
+): Uint8Array {
 	const bytes: number[] = [];
-	let left = Math.max(1, Math.floor(ticks));
+	const held = Math.max(1, Math.floor(ticks));
 
 	/** `emitPendingQuantization` puts it straight after the duration byte. */
 	const q = quantization === null ? [] : [quantization];
 
-	if (left >= LONG_NOTE) {
-		bytes.push(LONG_CHUNK, ...q, note);
-		left -= LONG_CHUNK;
+	// Where the frame carrying the arm begins, how long it runs, and what is left
+	// of the note behind it. A negative arm is a frame before the note's head; a
+	// frame of no ticks, or one over `$7F`, is a duration byte no `emitNote`
+	// wrote; and a negative remainder is a frame the note is not long enough for.
+	const arm = slide === null ? 0 : Math.floor(slide.afterTicks);
+	const frame = slide === null ? 0 : Math.floor(slide.frameTicks);
+	const after = held - arm - frame;
+	const bend = slide !== null && arm >= 0 && frame >= 1 && frame <= MAX_DURATION && after >= 0 ? slide : null;
 
-		while (left > LONG_CHUNK) {
-			bytes.push(NOTE_TIE);
-			left -= LONG_CHUNK;
-		}
-
-		if (left > 0) {
-			// The duration byte carries over, so an exact chunk needs no new one.
-			if (left !== LONG_CHUNK) {
-				bytes.push(left);
+	if (bend === null) {
+		appendNote(bytes, note, held, q);
+	} else {
+		if (arm === 0) {
+			bytes.push(frame, ...q, note);
+		} else {
+			const previous = appendNote(bytes, note, arm, q);
+			if (frame !== previous) {
+				bytes.push(frame);
 			}
 
 			bytes.push(NOTE_TIE);
 		}
-	} else {
-		bytes.push(left, ...q, note);
+
+		bytes.push(VCMD_PITCH_SLIDE, bend.delay, bend.duration, bend.target);
+
+		// The rest of the note, as the ties it is. Once the slide has armed it runs
+		// off `$90`/`$91` rather than off frames, so what these are is inaudible and
+		// only the total has to be right; chunking at `LONG_CHUNK` is what the
+		// compiler would have written.
+		let left = after;
+		let standing = frame;
+		while (left > 0) {
+			const step = Math.min(left, LONG_CHUNK);
+			if (step !== standing) {
+				bytes.push(step);
+			}
+
+			bytes.push(NOTE_TIE);
+			standing = step;
+			left -= step;
+		}
 	}
 
 	const rests = Math.ceil((MAX_TICK_HZ * AUDITION_TAIL_SECONDS) / MAX_DURATION) + 1;
@@ -233,7 +324,11 @@ export function noteFrames(note: number, ticks: number, quantization: number | n
  *    song block to write into. Tempo and the global fades (`L_0CD2`) run on
  *    regardless of voices.
  * 3. **Hand the target voice the note** — the frames at `scratchAt`, the pointer
- *    moved there, the duration counter forced to 1.
+ *    moved there, the duration counter forced to 1. A `slide` rides in those
+ *    frames; `$90+x` needs no clearing first, since `NoteVCMD` reloads it from
+ *    `$0300+x` on every key-on (`main.asm:465-466`) and the note about to sound
+ *    is a key-on. A voice under an `$EE` pitch envelope is the exception, and
+ *    does not bend in the song either.
  * 4. **Give it its volume back** without the dirty bit, so the DSP keeps 0 until
  *    the new note keys on and recomputes it. See {@link restoreTrackVolume}.
  * 5. **Count the note's ticks off the driver's tempo**, the same `sawTick`
@@ -284,8 +379,12 @@ export function auditionNote(core: SpcCore, spc: Uint8Array, request: NoteAuditi
 	// them the note plays on whatever the DSP happens to hold, for one tick, at no
 	// volume. Supplied only where they are missing, so a channel the song has
 	// written to keeps every byte of what it wrote.
+	//
+	// The prefix does not disturb a `$DD` in the frames: the command loop
+	// dispatches it on the fetch tick, several bytes before the duration byte, so
+	// the pointer standing after the note byte is the same either way.
 	const prefix = voiceHasInstrument(aram, channel) ? [] : [VCMD_INSTRUMENT, DEFAULT_INSTRUMENT];
-	const frames = noteFrames(note, held, voiceHasQuantization(aram, channel) ? null : DEFAULT_Q);
+	const frames = noteFrames(note, held, voiceHasQuantization(aram, channel) ? null : DEFAULT_Q, request.slide ?? null);
 	aram.set(prefix, scratchAt);
 	aram.set(frames, scratchAt + prefix.length);
 
@@ -366,6 +465,11 @@ function fastForward(core: SpcCore, target: number, silenced: number, backup: Mu
  * The note's length is ticks because it follows the music; the tail is seconds
  * because it does not. Both are bounded by {@link MAX_AUDITION_SECONDS}, so a
  * song at a crawl returns a short note rather than a long silence.
+ *
+ * A slide's `delay + duration` may outrun the note, and the tail is deliberately
+ * not stretched to cover it: the note keys off at its own length and the rest of
+ * the bend goes unheard, which is what the song does — the note after it is where
+ * the slide was going.
  */
 function record(core: SpcCore, held: number): { pcm: Int16Array; heldTicks: number } {
 	const cap = MAX_AUDITION_SECONDS * SPC_SAMPLE_RATE;

@@ -17,7 +17,7 @@ no channel.
 | Drag the middle of a note        | Moves it a snap step at a time, one row per semitone up and down         |
 | Drag a note's left or right edge | Stretches that end; the other end stays put                              |
 | Hold `Alt` during any gesture    | Tick precision: no snapping, for either a position or a length           |
-| Click a note                     | Selects just that note, sounds it, and puts the caret on it in the MML   |
+| Click a note                     | Selects it, sounds it with its pitch slide, and puts the caret on it     |
 | Double-click a note              | Goes to it in the MML                                                    |
 | `Ctrl` + click a note            | Adds it to, or takes it out of, the selection                            |
 | `Ctrl` + drag on empty grid      | Draws a box and selects every note of this channel inside it             |
@@ -106,10 +106,17 @@ are a rest apart — the lane has the `v200` in the rest, where it runs, and `d4
 the note playing under it. The lane is the one place the whole song's commands can be read in the
 order they run, which a set of per-note icons cannot be.
 
-Three things are on no bar at any point in the song, so the lane is the only place they appear at
-all: a command replaced before the next note sounds, one written after a channel's last note, and the
+A `$DD` pitch slide is the one that stands _behind_ its note rather than in front of it. It is the
+note before it that reads it, so its icon is on that note's bar and on no bar after — a slide runs
+once and leaves nothing for the next note to play under — and the lane puts it on that note's own
+tick, which is where it is heard rather than where the bytes sit. In `c4 $DD $00 $18 $A6 d4` both are
+tick 0, under `c4`. The rule below says the rest of what follows from that.
+
+Four things are on no bar at any point in the song, so the lane is the only place they appear at
+all: a command replaced before the next note sounds, one written after a channel's last note, the
 four that switch something off — a bar names what a note is playing _under_, and there is nothing to
-name once vibrato is off.
+name once vibrato is off — and a `$DD` with no note in front of it to read it, which is a slide the
+driver never plays.
 
 The other direction: `q`, `h` and `@21`-`@29` are on the bars alone and never here. They emit no
 byte, so the driver never reads them at a tick of their own; the note they fold into is their only
@@ -313,8 +320,49 @@ back, having been dropped rather than hidden.
 
 Some MML has no one-to-one relationship between what is written and what is played, and the roll says
 so in the toolbar rather than guessing. A `[ ]` loop, a `[[ ]]` subloop or the same thing written as
-`$E6 $00` … `$E6 $nn`, a `*` or `(n)` call, a `{ }` triplet, a `"name=value"` replacement, a `$DD`
-pitch slide or a `#halvetempo` all mean one written note is not one played note.
+`$E6 $00` … `$E6 $nn`, a `*` or `(n)` call, a `{ }` triplet, a `"name=value"` replacement or a
+`#halvetempo` all mean one written note is not one played note.
+
+A legacy `&` is refused for a different reason, and refuses the whole song rather than one channel:
+it is an operator rather than a command, so nothing above the compiler can say which channel it is
+written on, and the bend duration it compiles to is the length of the note _before_ it — so an edit
+to that note would silently change a slide nothing on screen has drawn. **Normalize** is the way out.
+It writes every `&` as the `$DD` it already compiles to, byte for byte, after which the slide is a
+command the roll can see and the rules below apply to it. A slide it cannot write out — one standing
+after a tie, which `$DD` would move — is left alone and named in the dialog, and goes on refusing the
+song.
+
+A `$DD` pitch slide is not one of them, and is the one command with a rule of its own. It is not
+dispatched: the note before it is what reads it, by peeking at the byte standing at the track pointer
+(`main.asm:L_10E4`), and its slot in the dispatch table holds `$0000`. So its position is a **byte**
+adjacency rather than a tick — a rest written between the note and the slide sounds right up to the
+moment it plays — and its last parameter may be a note written after it, which emits nothing of its
+own and reads the octave in force where it stands. The roll keeps both: a run written after a note
+goes after the whole construct, the octave a rewrite puts back lands in front of the slide rather
+than at the next note's head, and the slide is never taken away by a deletion in the way an ordinary
+`v` or `y` is. Two gestures are refused outright, in their own words — deleting the note a slide
+rides on, and dragging the slide's own glyph along the command lane, since every place the lane can
+drop one is in front of a note where this one has to go behind one.
+
+The same fact decides where it is drawn. Its icon is on the bar of the note that reads it, plated the
+way anything a note starts is plated, and on no bar after it: a `v` or a `y` is state the notes that
+follow go on playing under, and a slide is over when it is over. A slide inside a `[ ]` played twice
+is two slides, so both notes carry it and both are plated. On the lane it sits on that same tick,
+which for `c4^4 $DD …` is 48 ticks into the note rather than at its head — the read-ahead does not
+find the slide until the tie's own ticks, which is why writing one after a tie is a rewrite Normalize
+declines to make.
+
+And it decides what you hear. Clicking the bar plays the note **with its slide**, as does every row a
+drag of it crosses, since the target is an absolute note the bar would still slide to wherever it was
+dropped. Where the slide starts is read off the song rather than off the text, for the same reason
+the lane's tick is: `c4 $DD`, `c4^4 $DD` and `c1 $DD` carry the same three bytes and arm at 0, 48 and
+96 ticks in, and the last has no tie written anywhere. A note the roll cannot check against the song —
+one past the point the shortest channel ends — sounds flat rather than approximately right.
+
+A tie written **after** the command is the one shape where the slide is not at the end of its note:
+`f+2 $DD $00 $D6 a+^2` is a note of 192 ticks that arms at the head and goes on ringing for 96 ticks
+behind the four bytes, because `^` emits a frame of its own and a tie keys nothing on. The bar is the
+whole 192 ticks, the glyph is on it, and the preview arms where the song arms.
 
 A remote code definition is not one of them. `(!1)[ … ]` has to be written above the first `#N`, which
 puts it on the same channel the music below that marker starts on, but its body plays only where a

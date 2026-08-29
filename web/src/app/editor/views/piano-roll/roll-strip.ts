@@ -1,7 +1,7 @@
 import { NOTE_REST, NOTE_TIE } from '@amk/core/hardcoded-tables';
 import { octaveOfNote } from '@amk/core/mml-text';
 import type { NoteAddress, Span } from '@amk/core/types';
-import type { SongTimeline } from '@amk/spc/song-walk';
+import type { PitchSlide, SongTimeline, WalkNote } from '@amk/spc/song-walk';
 import type { Command, TokenIndex } from '@amk/tokens';
 import { isPercussionInstrument } from '@amk/tokens/commands/in-force';
 
@@ -69,6 +69,32 @@ export interface StripItem {
   hasLeadingOctave: boolean;
   /** The drum `@21`-`@29` folded into this note, when one was. */
   drum: Command | null;
+  /**
+   * The `$DD` this item carries, when there is one — written after its first
+   * frame and before the next item, so a tie after the command is inside it.
+   *
+   * `$DD` is the one command read by the *preceding* note's read-ahead rather
+   * than dispatched (`main.asm:L_10E4` peeks at `($30+x)`), so it belongs to
+   * this item however the prefix rules file it, and deleting this item leaves it
+   * with nothing to ride on. Where it also carries a `noteTarget`, that target
+   * reads the octave this item leaves standing and emits nothing, so it is in no
+   * item's `segments` and only this says it is there. The command's own span
+   * already covers it (`tokens.ts:gather`).
+   */
+  bend: Command | null;
+  /**
+   * What the driver does with that `$DD`, off the walk — `null` where there is
+   * no slide, and for an item past the end of the pass.
+   *
+   * {@link bend} is the command as it was *written*; this is the reading. The
+   * operands are both, but `PitchSlide.afterTicks` and `frameTicks` are only
+   * here: `$DD` is not dispatched, so where the driver arms it is decided by the
+   * frame the read-ahead reads it in, and `emitNote` chunks a note of `$80` ticks
+   * or more inside one `noteMap` entry — that boundary reaches {@link segments}
+   * no more than it reaches the text. So `c4 $DD`, `c4^4 $DD` and `c1 $DD` carry
+   * one set of operands and arm 0, 48 and 96 ticks in.
+   */
+  slide: PitchSlide | null;
   /**
    * False past the end of the pass, where the walk has no note to check the
    * item against — `walkSong` cuts at the shortest channel and sets the rest
@@ -166,7 +192,18 @@ const INLINE_GAP = /^[ \t]*$/;
 /** Line breaks included, for winding back to the end of a channel's text. */
 const WHITESPACE = /\s/;
 
-/** The commands a unit may swallow on the left of its head. */
+/**
+ * The commands a unit may swallow on the left of its head.
+ *
+ * Both directions stop at a `$DD` that names its target as a note, and that is
+ * load-bearing rather than incidental: the `$DD` fails this from the left, and
+ * the target's own note command fails it from the right, since `gather` raises
+ * one for the target as well as filing it under `Command.noteTarget`. So in
+ * `$DD $00 $18 o5 e g4` the `o5` belongs to the target and no unit reaches back
+ * over the construct to claim it — which is what stops a repitch of `g4`
+ * carrying it off — and no `unitSpan` boundary, which is where every insertion
+ * in `roll-write.ts` is anchored, ever falls between the command and its target.
+ */
 function leadsAUnit(command: Command): boolean {
   return command.kind.toLowerCase() === 'o' || isPercussionInstrument(command);
 }
@@ -197,11 +234,12 @@ const FORBIDDEN_KINDS = new Set(['[', ']', '*', '(', ')', '{', '}', '"']);
  * comparing ticks, and both are refused here.
  */
 function forbiddenConstruct(index: TokenIndex, channel: number, source: string): string | null {
-  // `&` is an operator rather than a command, and it takes its duration from
-  // `prevNoteLength` (`parser.ts:2772-2777`), so a length change to the note
-  // before it silently changes the slide. The scanner cannot say which channel
-  // an operator is on, so one anywhere refuses every channel — it exists only on
-  // the legacy targets, where it is rare.
+  // `&` is an operator rather than a command, and the note after it emits
+  // `$DD $00 <prevNoteLength> <note>` (`parser.ts:2963-2969`), so a length change
+  // to the note *before* it silently changes the slide. The scanner cannot say
+  // which channel an operator is on, so one anywhere refuses every channel. It
+  // is native on every target — only the tie rewind is legacy-only
+  // (`parser.ts:3027`) — and Normalize's `writePitchSlides` is what clears it.
   for (const token of index.tokens) {
     if (token.kind === 'operator' && source.slice(token.start, token.end) === '&') {
       return 'this song uses `&`, whose length comes from the note before it';
@@ -240,14 +278,6 @@ function forbiddenConstruct(index: TokenIndex, channel: number, source: string):
     // here, `FORBIDDEN_KINDS` refusing it and Normalize leaving it alone.
     if (command.vcmd === 0xe6) {
       return 'this channel uses `$E6`, so one written note plays more than once';
-    }
-
-    // A note used as `$DD`'s last parameter emits no note event at all
-    // (`parser.ts:2934`), so the strip believes the notes either side of the
-    // slide are adjacent — and a rest written between them breaks the lookahead,
-    // which skips only spaces, `o`, `<` and `>` (`parser.ts:3397-3428`).
-    if (command.vcmd === 0xdd) {
-      return 'this channel uses `$DD`, whose target note is not in the song data';
     }
 
     if (command.noteLength?.some((segment) => segment.triplet)) {
@@ -532,6 +562,8 @@ export function channelStrip(request: StripRequest): Strip | StripRefusal {
       exitOctave: null,
       hasLeadingOctave: false,
       drum: null,
+      bend: null,
+      slide: null,
       verified: true,
     });
 
@@ -541,18 +573,47 @@ export function channelStrip(request: StripRequest): Strip | StripRefusal {
 
   growUnits(source, commands, items);
 
-  for (const item of items) {
+  for (let at = 0; at < items.length; at++) {
+    const item = items[at];
     item.verified = timeline.ticks === 0 || item.startTick < timeline.ticks;
     // A unit that reached back over its own octave has taken text the previous
     // item's prefix would otherwise claim.
     if (item.unitSpan.start < item.prefixSpan.end) {
       item.prefixSpan = { ...item.prefixSpan, end: item.unitSpan.start };
     }
+
+    // Read off the unit boundaries rather than the prefix: a `$DD` written after
+    // the channel's last item is in no prefix at all, and it rides on that item
+    // exactly as any other does. From the *first* segment's end and not the
+    // unit's, because a tie written after the command — `f+2 $DD $00 $D6 a+^2` —
+    // puts the `$DD` between two of the note's frames, and `growUnits` ends a
+    // unit at its last one, so a scan from there reaches past a slide the note
+    // really does carry and no item claims it at all.
+    const until = items[at + 1]?.unitSpan.start ?? source.length;
+    item.bend =
+      commands.find(
+        (command) =>
+          command.vcmd === 0xdd &&
+          !command.inRemoteDefinition &&
+          command.span.start >= item.segments[0].span.end &&
+          command.span.start < until,
+      ) ?? null;
   }
 
-  const disagreement = agreesWithWalk(items, timeline, channel);
+  const played = timeline.notes.filter((note) => note.channel === channel);
+  const disagreement = agreesWithWalk(items, played, timeline.ticks);
   if (disagreement !== null) {
     return { refused: disagreement };
+  }
+
+  // Index by index, over the very list the agreement was just taken over — which
+  // is what makes the join exact rather than a second one that could quietly
+  // disagree with it. Past `played.length` the pass has ended and there is no
+  // walk note to ask, so those items keep no slide however plainly a `$DD` is
+  // written after them.
+  const sounded = items.filter((item) => item.kind === 'note');
+  for (let at = 0; at < played.length; at++) {
+    sounded[at].slide = played[at].bend;
   }
 
   return { channel, items, ticks: tick, home, commands };
@@ -570,10 +631,9 @@ export function channelStrip(request: StripRequest): Strip | StripRefusal {
  */
 function agreesWithWalk(
   items: readonly StripItem[],
-  timeline: SongTimeline,
-  channel: number,
+  played: readonly WalkNote[],
+  timelineTicks: number,
 ): string | null {
-  const played = timeline.notes.filter((note) => note.channel === channel);
   const written = items.filter((item) => item.kind === 'note');
 
   for (let at = 0; at < played.length; at++) {
@@ -593,7 +653,7 @@ function agreesWithWalk(
   }
 
   const first = written[played.length];
-  if (first && timeline.ticks > 0 && first.startTick < timeline.ticks) {
+  if (first && timelineTicks > 0 && first.startTick < timelineTicks) {
     return 'this channel does not play in the order it is written';
   }
 

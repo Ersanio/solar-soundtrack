@@ -791,6 +791,31 @@ stats.loopTicks` pads **every other channel that would cut the song short** out 
   and not the roll's `editing`, whose fallback is the channel of the bar under the pointer — rows
   would then be re-dealt on a hover, which is the same complaint as re-dealing them on a scroll.
 
+- **Mirroring the parser's `$DD` lookahead in `step` as a lookahead** — `$DD`'s last parameter may be
+  a written note, and `parseHexCommand` settles that by reading ahead over spaces, newlines,
+  `o<int>`, `<` and `>` (Music.cpp:2012-2042). Its `skipSpaces` crosses line breaks and `step` may
+  not read another line, so a scanner that quietly did would pass a whole-document test and
+  mis-colour text after a restart, which is the one property `tokentest` exists to hold. It is a
+  deferred flag instead (`ScanState.ddTarget`), raised where the lookahead would begin and answered
+  by whichever token arrives, and **cleared by default** — ending at anything the parser's loop does
+  not name is the rule itself, so `|`, `{`, a marker and every arm added later are right by
+  construction rather than by a list. Not one flag either: `getInt` skips no spaces, so `o5` carries
+  the lookahead on where `o 5` and a bare `5` end it, and `ddTargetOctave` is what tells the two
+  apart — set only when the digits are the next character, which is what keeps it inside one line
+  and out of the approximation `awaitingAmkVersion` has to make.
+- **Refusing a piano-roll channel for using `$DD` at all** — the sentence named a target note, and
+  the all-hex `$DD $00 $18 $A4` has none, so the commonest form of the commonest bend refused the
+  channel for a reason that was not true of it. What the blanket refusal was really carrying is a
+  hazard that has nothing to do with the target: `$DD` is not dispatched, the note before it reads it
+  by peeking at the byte standing at the track pointer (`main.asm:L_10E4`), and its dispatch slot
+  holds `$0000` — so its position is a **byte** adjacency, and `writeInto` anchoring a gap's rest at
+  the note before the gap put that rest between the two. The guards are per-fact and named:
+  `StripItem.bend` says which item carries a slide, `afterBend` moves the anchor past the whole
+  construct, `prefixCommandsOf` never lets a removal take a `$DD` — `reachesSomething` scans forward
+  and the loss here is in front of the command — `exitOctaveFor` stops suppressing the octave restore
+  where a note target reads it, and deleting the rider and dragging the glyph are refused in their
+  own words. Not a narrowing to the note-target form: that would have shipped the byte-adjacency bug
+  under a sentence saying the channel was fine.
 - **A row cap on the command lane, with the rest of a column drawn as three dots** — a stack cut to
   keep the DOM finite is still a stack cut, and it cut the wrong thing: a tick carrying more commands
   than the cap is a tick a porter opened the lane to read, so the one column worth the most was the
@@ -799,6 +824,90 @@ stats.loopTicks` pads **every other channel that would cut the song short** out 
   the lane takes it taller. `depth` was always the scroll range; with nothing dropped it is now the
   whole column, so a glyph can always be scrolled to. The bar's own `fitBarContent` mark is a
   different thing and stays — a bar has a fixed width it cannot grow, where the lane has a scroll.
+- **Writing a rewritten `&`'s target as a note** — `$DD $00 $nn d` reads far better than
+  `$DD $00 $nn $A6`, and it is not the same music. `parseNote` runs for a written target and returns
+  before the note map is written (`parser.ts:2971-2975`), so it consumes and clears the drum remap on
+  the way past (`:2948-2960`) and the note that follows comes out pitched where the `&` used one drum
+  byte twice; it errors AMK0161 wherever a `q` is pending (`:3451`), which is anywhere the slide is
+  the first note since a bracket, a call or a `*`, `updateQ` starting true; and `isNoteLetter`
+  excludes `r` and `^` (`:167`), so `c4 & r4` — which compiles, and slides to `$C7` — has no spelling
+  at all. `writePitchSlides` writes the byte, taken from `NoteAddress.note`, which is the same byte
+  the parser computed once and wrote twice. Readability is the roll's job now that the slide is a
+  command it can see.
+- **Skipping the `&`s that cannot be written out, rather than refusing the song** — a refusal is what
+  `precheck` does for a slide whose duration comes from a bracket, and copying that here is a
+  regression: a song with one tied `&` normalizes today, and refusing would lose every other pass
+  over it. Those slides are left exactly as they are and reported as `SST0617` at **info** severity,
+  which `advance` files as a note rather than a refusal. The dialog had to grow a "What it could not
+  write out" list for it, on "nothing to normalize" as well as on a rewrite — a song whose only `&`s
+  were skipped comes back unchanged, and without the list the porter is told it normalized while the
+  roll goes on refusing all eight channels for the reason nobody mentioned.
+- **The pass last, after `drumPerNote`** — the obvious place for a ninth pass, and it breaks the
+  fixed point. `drumPerNote` stands down only when the event directly before a note is its `@`
+  (`normalize.ts:drumPerNote`), and a rewritten slide puts four argument bytes there, so the round
+  that checks for a fixed point inserts a second `@21`. It is byte-neutral, so the walk accepts it
+  and only `normalizetest`'s "names the passes that changed it" catches it. `writePitchSlides` runs
+  **before** the drums, and anchors in front of a drum `@` already leading the note, so the two stay
+  adjacent.
+- **`WalkNote.bend` as the three operand bytes, compared through `NOTE_KEYS`** — both halves wrong.
+  `NOTE_KEYS` compares with `x[key] !== y[key]` (`normalize-song.ts`), which two equal objects never
+  pass, so every song carrying a `$DD` would have been refused; the comparison is beside that loop.
+  And the operands alone do not say what a slide is: `$DD` is not dispatched, the note before it
+  peeks at the track pointer on any tick with no slide running (`main.asm:3256-3287`), and a `$C6`
+  tie is one of those ticks — so `[len note $DD]` and `[len note $C6 $DD]` carry identical operands
+  and start the slide 48 ticks apart. `afterTicks` is how far into the note the peek found it, which
+  is the whole reason `Music.cpp:2224` rewinds a tie out of a `$DD`'s way. Without it the oracle
+  passes both directions of that rewind, which is exactly the rewrite `SST0617` exists to decline.
+- **`$DD` filed as a state slot, the way `$DE` and `$ED` are** (`slotsOf`, `SLOTS[11]`) — it put a
+  slide everywhere it is not and nowhere it is, and both readings were wrong in silence. `origins` is
+  frozen when a note keys on and the walk reaches the `$DD` a byte later, so the note that _plays_ the
+  slide reported nothing and every note _after_ it reported the slide as state it sounds under —
+  which no note does, a slide running once and leaving nothing standing. And the entry `recordOrigin`
+  raised carried `track.ticks`, which by then has run on past the note, so the lane drew the slide
+  where the note it rides on **ends**. It is the note's own, as `drumFrom` is: `WalkNote.bendFrom`
+  holds the address, `commands-in-force.ts` joins it, and the bar of the note in front of the `$DD` is
+  what draws it. Its lane entry is raised from the arm itself at `track.ticks - track.duration`, the
+  frame the read-ahead found it in — so `c4^4 $DD` is 48 ticks in, which the operands cannot say — and
+  once per execution rather than once per slot change, since a `[ ]` body carrying one really does
+  slide on every pass. That is also why `definedAt` never counts a `$DD` in the previous note as
+  inherited: it is one written command reaching two notes that each ran it, and identity cannot tell
+  that from a `v200` still standing. Not a separate list beside `origins` either — a slide is a
+  command acting on a note, which is the question `commandsInForceOf` already answers, and a second
+  channel for one command would need every reader to ask twice.
+- **Auditioning a note's slide off the `$DD` its own text carries** — `StripItem.bend` is the token,
+  and a token cannot say when the driver arms it. `$DD` is not dispatched: the note before it peeks
+  at the byte standing at the track pointer (`main.asm:L_10E4`), and only on a tick that does not
+  fetch music data, `main.asm:2337-2339` jumping straight past `L_0CC6`'s read-ahead on one that
+  does. So the arm is decided by **the frame the peek reads it in**, and `emitNote` chunks a note
+  of `$80` ticks or more inside one `noteMap` entry with no boundary anywhere in its text —
+  `c4 $DD`, `c4^4 $DD` and `c1 $DD` carry the same three operands and arm 0, 48 and 96 ticks in. The
+  operands come off the walk (`WalkNote.bend`, `afterTicks` and `frameTicks` with them) into `StripItem.slide`, joined
+  index by index over the list `agreesWithWalk` has already checked so the two cannot drift, and a
+  note past the end of the pass auditions **flat**: an approximate bend that sounds like the real one
+  is worse than none, which is the reading `commands-in-force.ts` already takes. `noteFrames` then
+  writes the four bytes where `emitNote` would leave them and lets the driver find them, rather than
+  reconstructing a pitch curve — the same argument as emulating the song up to the tick instead of
+  modelling what a note sounds under, and it is what makes a frame of one tick behave here as it
+  does in the song, dispatched into the empty slot and never armed. Operands no `emitNote` could have
+  written are dropped rather than approximated. The target goes in as the **emitted** byte and is the
+  one value on that path `Audition.transposed` must not touch: it exists to turn a written row pitch
+  into an emitted one, the compiler resolved `h` and the instrument's tuning long ago
+  (`writePitchSlides` writes `NoteAddress.note`), and the driver adds `$43` and `!HTuneValues+x`
+  itself when it arms.
+- **Rebuilding an audition's frames from `afterTicks` and the note's length alone** — it takes the
+  arm's frame to be the note's _last_, which puts the `$DD` after every frame the note has, and
+  `f+2 $DD $00 $D6 a+^2` is where that is false: `^` emits a `$C6` frame of its own and a tie keys
+  nothing on (`main.asm:2403-2405`), so those 96 ticks land on the `f+` and the command sits between
+  the note's two frames. Read as a last frame it is a 192-tick tail, which no duration byte can say,
+  and the slide was dropped outright — the note previewed flat where the transport bent it; take the
+  tail check away and it arms 96 ticks late instead. The frame's own length is carried
+  (`PitchSlide.frameTicks`, `track.duration` at the peek) and the ticks behind it written as the ties
+  they are. It cannot be derived: `c=1 $DD $00 $18 a ^=95` and `c4 $DD $00 $18 a ^4` are both 96
+  ticks arming at 0 and only the second arms at all, and `StripItem.segments` cannot answer it either,
+  being the note map's frames and not `emitNote`'s. What the frames after the arm are is inaudible —
+  the slide counts off `$90`/`$91` — so only their total is reproduced. `StripItem.bend` reads from
+  the item's **first** segment's end for the same shape, `growUnits` ending a unit at its last
+  segment and so at a point past the `$DD`, which left every guard that reads `bend` switched off.
 
 ## Angular specifics
 

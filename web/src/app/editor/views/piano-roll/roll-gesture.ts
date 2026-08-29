@@ -2,6 +2,7 @@ import { type Signal, computed, signal } from '@angular/core';
 
 import { NOTE_MIN } from '@amk/core/hardcoded-tables';
 import { octaveFor, spellDuration, spellNote } from '@amk/core/mml-text';
+import type { PitchSlide } from '@amk/spc/song-walk';
 import type { Command } from '@amk/tokens';
 import type { Edit } from '@amk/tokens/edits';
 import type { LaneStack } from './roll-layout';
@@ -100,8 +101,18 @@ export interface GestureSinks {
   commit: (edits: readonly Edit[]) => void;
   /** Remember the length the porter last drew or resized to. */
   rememberLength: (ticks: number) => void;
-  /** Sound a note as written, at the tick and for the length it is being put on. */
-  audition: (written: number, drum: number | null, tick: number, ticks: number) => void;
+  /**
+   * Sound a note as written, at the tick and for the length it is being put on,
+   * with the `$DD` riding on it where the walk found one — a note is not heard
+   * as it plays without its slide.
+   */
+  audition: (
+    written: number,
+    drum: number | null,
+    tick: number,
+    ticks: number,
+    slide: PitchSlide | null,
+  ) => void;
   /** Name the channel a bar belongs to, as a click on a note already does. */
   pick: (channel: number) => void;
 }
@@ -571,10 +582,15 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
     return { tick, row };
   };
 
-  const soundRow = (row: number, tick: number, ticks: number): void => {
+  const soundRow = (
+    row: number,
+    tick: number,
+    ticks: number,
+    slide: PitchSlide | null = null,
+  ): void => {
     const pitch = pitchOfRow(sources.stack(), row);
     if (pitch) {
-      sinks.audition(pitch.written, pitch.drum, Math.max(0, Math.round(tick)), ticks);
+      sinks.audition(pitch.written, pitch.drum, Math.max(0, Math.round(tick)), ticks, slide);
     }
   };
 
@@ -584,6 +600,10 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
    * Handed the drag rather than reading the signal, because both callers are
    * building the next one and neither has set it yet. A spawn's length is the one
    * the wheel chose; a move keeps the bar's own, which `Drag.length` never holds.
+   *
+   * A bar being carried keeps its slide, which a spawn has none of: the `$DD`'s
+   * target is absolute, so a note dropped on a new row really would still slide
+   * to the same note.
    */
   const soundDrag = (held: Drag, row: number): void => {
     const item = sources.strip()?.items[held.item];
@@ -591,7 +611,12 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
     // A gesture the row is locked out of sounds the row it is pinned to, not the
     // one the pointer wandered onto — that is where the note is going.
     const going = held.anchored || held.shift ? held.fromRow : row;
-    soundRow(going, draggedTick(held, item, sources.snap()), ticks ?? sources.lastLength());
+    soundRow(
+      going,
+      draggedTick(held, item, sources.snap()),
+      ticks ?? sources.lastLength(),
+      item?.slide ?? null,
+    );
   };
 
   /** Everything `planEdits` reads besides the plan itself, as of right now. */
@@ -784,7 +809,7 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
       const edge = left <= zone ? 'start' : right <= zone ? 'end' : null;
       // The bar's own tick and length: nothing has moved yet, and snapping here
       // would sound an off-grid note somewhere it has not been asked to go.
-      soundRow(row, item.startTick, item.ticks);
+      soundRow(row, item.startTick, item.ticks, item.slide);
 
       drag.set({
         kind: edge ? 'stretch' : 'move',

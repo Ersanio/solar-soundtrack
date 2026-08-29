@@ -25,6 +25,8 @@ export const REFUSE_MOVE_MACRO = 'that command is written through a "name=value"
 export const REFUSE_MOVE_KIND =
   'that command says where a note sits rather than when something happens';
 export const REFUSE_MOVE_EMPTY = 'this channel has no note or rest to put a command in front of';
+export const REFUSE_MOVE_BEND =
+  'that command is read as part of the note in front of it, so it cannot be moved on its own';
 
 /** A tick a command may be dropped on, and where its text goes to run there. */
 export interface MoveTarget {
@@ -63,6 +65,17 @@ export function commandMoveRefusal(strip: Strip, command: Command): string | nul
 
   if (!commandRewritable(command)) {
     return REFUSE_MOVE_MACRO;
+  }
+
+  // Every target below is a unit's head, which puts a dropped command *before* a
+  // note — and `$DD` is the one that has to come after one, since the preceding
+  // note's read-ahead is what reads it (`main.asm:L_10E4`) rather than the
+  // command loop, whose slot for it holds `$0000`. There is no target in the
+  // list that is right, so the refusal is the whole answer rather than a
+  // narrowing of {@link commandMoveTargets}. A note target would not survive the
+  // move either: its byte is the octave in force where it stands.
+  if (command.vcmd === 0xdd) {
+    return REFUSE_MOVE_BEND;
   }
 
   const scope = commandScope(command);

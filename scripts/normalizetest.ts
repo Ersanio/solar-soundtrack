@@ -15,6 +15,7 @@
  */
 
 import { compiler } from "@amk/compiler";
+import { writePitchSlides } from "@amk/compiler/normalize";
 import type { CompileResult, Diagnostic } from "@amk/core/types";
 import { loadDriver } from "@amk/spc/driver";
 import { type SongTimeline, walkSong } from "@amk/spc/song-walk";
@@ -448,6 +449,94 @@ expectNormalized("one drum @ per drum note on #6", "#amk 4\n#6 @21 c8 d8 e8\n", 
 expectNormalized("#0 already has one per note", "#amk 4\n#0 @21 c8 d8\n", (t) => count(t, /@21/g) === 1);
 expectNormalized("a rest between the @ and its note", "#amk 4\n#0 @21 r8 c8\n", (t) => t.includes("@21 r8 @21 c8"));
 expectNormalized("@29 o2a1b2c3 on #0 and #6", "#amk 4\n#0 @29 o2a1b2c3\n#6 @29 o2a1b2c3\n");
+
+// ---------------------------------------------------------------------------
+console.log("\npitch slides");
+// ---------------------------------------------------------------------------
+
+const dump = (data: Uint8Array | null): string =>
+	data === null ? "no data" : [...data].map((byte) => byte.toString(16).padStart(2, "0")).join(" ");
+
+/**
+ * A `&` written out with the song data unchanged, byte for byte.
+ *
+ * `expectNormalized`'s oracle is `timelinesAgree`, which is a description of the
+ * music and takes a rewrite that plays the same as a rewrite that is right. What
+ * this pass claims is stricter and exact — the same bytes in the same order,
+ * since `&` compiles to a `$DD` and the text now merely says so.
+ *
+ * So the pass is run **on its own** rather than through the pipeline: the whole
+ * of normalize legitimately moves bytes about, and a song put through it comes
+ * back with `writeDefaults`' `t` and `@` in front of everything. Isolating the
+ * one pass is what makes "the same bytes" the claim it is.
+ */
+function expectSameBytes(name: string, source: string, shape?: (text: string) => boolean): void {
+	expectNormalized(name, source, shape);
+
+	const first = compiler.compile({ source, aramAddress: ARAM, options: { ...OPTIONS, trace: true } });
+	if (!first.ok || !first.data || !first.trace) {
+		check(`${name}: compiles for the pass alone`, false, describe(first.diagnostics));
+		return;
+	}
+
+	const out = writePitchSlides({ text: source, result: first, trace: first.trace });
+	const after = compiler.compile({ source: out.text, aramAddress: ARAM, options: OPTIONS }).data;
+	check(
+		`${name}: the pass alone changes no byte`,
+		out.changed &&
+			after !== null &&
+			first.data.length === after.length &&
+			first.data.every((byte, at) => byte === after[at]),
+		out.changed ? `${dump(first.data)}\nbecame\n${dump(after)}\nfrom:\n${out.text}` : "the pass did nothing",
+	);
+}
+
+/** A `&` the pass declines to write out: the song still normalizes, and says so. */
+function expectSkipped(name: string, source: string): void {
+	const outcome = normalize(source);
+	const kept = outcome.ok && outcome.text.includes("&");
+	const said = outcome.ok && outcome.diagnostics.some((d) => d.code === "SST0617" && d.severity === "info");
+	check(
+		`${name}: is left alone, and said so`,
+		kept && said,
+		outcome.ok ? `${describe(outcome.diagnostics)}\n${outcome.text}` : describe(outcome.diagnostics),
+	);
+}
+
+expectSameBytes("a pitch slide", "#amk 4\n#0 o4 c4 & d4\n", (t) => t.includes("$DD $00 $30") && !t.includes("&"));
+expectSameBytes("a slide onto a rest", "#amk 4\n#0 o4 c4 & r4\n", (t) => t.includes("$DD $00 $30 $C7"));
+// The `$DD` bytes are appended when the *note* is parsed, so a command written
+// between the two emits its own first and the run has to follow it.
+expectSameBytes("a slide with a command in between", "#amk 4\n#0 o4 c4 & v100 d4\n", (t) => /v100\s+\$DD/.test(t));
+// A `>` emits nothing, so the run can stay where the `&` was — which is also
+// where `accumulateTiedLength` looks for it. The target byte is the one the
+// octave change resolves to, since it is read off the note map rather than
+// re-spelled: `$B2` is `o5 d`, and `writeDefaults` has made the `>` absolute.
+expectSameBytes("a slide with an octave change in between", "#amk 4\n#0 o4 c4 & > d4\n", (t) =>
+	/\$DD \$00 \$30 \$B2\s+o5/.test(t),
+);
+// The remap is consumed by the note the slide lands on, and one byte is written
+// twice — as the target and as the note. A written target would have taken the
+// remap with it and left the note pitched.
+expectSameBytes("a slide onto a drum", "#amk 4\n#0 o4 c4 @21 & d4\n", (t) => t.includes("$DD $00 $30 $D0"));
+expectSameBytes("a slide onto a drum on #6", "#amk 4\n#6 o4 @21 c4 & d4\n");
+expectSameBytes("a slide on Addmusic 4.05", "#am4\n#0 o4 c4 & d4\n");
+expectSameBytes("a slide on AddmusicM", "#amm\n#0 o4 c4 & d4\n");
+expectSameBytes("a slide inside a loop", "#amk 4\n#0 o4 [c4 & d4]2\n", (t) => count(t, /\$DD/g) === 2);
+expectSameBytes("two slides in a row", "#amk 4\n#0 o4 c4 & d4 & e4\n", (t) => count(t, /\$DD/g) === 2);
+
+// `accumulateTiedLength` rewinds the last tie out of the run in front of the
+// text `$DD` on every target, but in front of a `&` only on the legacy ones
+// (`parser.ts:3026-3032`). So on `#amk` the rewrite would gain a rewind the `&`
+// never had, and the slide would start a tie later than it does.
+expectSkipped("a slide after a tie", "#amk 4\n#0 o4 c4^8 & d4\n");
+// And the other way: the legacy targets already rewound, so moving the run past
+// a command that emits bytes would take that rewind away.
+expectSkipped("a slide after a tie on Addmusic 4.05", "#am4\n#0 o4 c4^8 & v100 d4\n");
+// A `&` whose note is already a `$DD`'s written target: `parseNote` appends the
+// byte and returns before the note map is written, so there is no entry to read
+// the slide's own target from.
+expectSkipped("a slide onto a $DD target", "#amk 4\n#0 o4 c4 & $DD $00 $18 d8\n");
 
 // ---------------------------------------------------------------------------
 console.log("\nwhole songs");
