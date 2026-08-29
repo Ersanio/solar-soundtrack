@@ -311,6 +311,19 @@ to put it on. Delete it from the lane first if you meant it to go.
 - **Every edit is one undo step**, including a whole selection moved at once, and it is the same
   history `Ctrl+Z` uses in the MML editor.
 
+## Starting from nothing
+
+**Opening the roll on a song with no playable music writes the least the song needs to compile.**
+A song is not editable here until it compiles, and a song with nothing to play does not — so the
+roll seeds one rest, and whatever has to stand in front of it. A blank document becomes `#amk 4`
+and a `#0` opened the way a drawn channel is, plus the song-wide `w255` and the driver's own boot
+tempo written out as `t53`, holding one whole rest. A document holding only a header — an `#spc`
+block counts as part of the header — gets that same channel. And once anything of yours is written,
+a `#N` or any command above the channels, only the rest goes in, at the end of the last channel's
+block: everything else the seed could write is tick-0 state, and a seeded `v255` or `t53` would
+silently win over a `v200` or `t60` already there. The seed is one undo step, and a song that
+fails to compile for reasons of its own is never written to.
+
 ## When a channel cannot be edited
 
 **A channel you cannot hear cannot be edited.** Mute it, or solo another part, and its notes go dim,

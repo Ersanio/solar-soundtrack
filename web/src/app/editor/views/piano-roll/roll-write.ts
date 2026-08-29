@@ -49,7 +49,7 @@ function committable(plan: Plan): boolean {
 }
 
 /** The document's own line ending, so a block written into it matches the rest. */
-function eol(source: string): string {
+export function eol(source: string): string {
   return source.includes('\r\n') ? '\r\n' : '\n';
 }
 
@@ -63,9 +63,8 @@ const MOVES_OCTAVE = /[o<>]/;
 const OPENING_Q = 0x7f;
 
 /**
- * A channel the song has not declared, written out: its `#N` and the state a
- * fresh channel runs under, so that nothing it plays depends on what the block
- * above it happened to leave standing.
+ * The state a fresh channel runs under, written out, so that nothing it plays
+ * depends on what the block above it happened to leave standing.
  *
  * `octave` is one variable and leaks past a `#N`, which does not reset it
  * (`parser.ts:parseHash`), so `o4` is what a channel runs at only while nothing
@@ -86,14 +85,19 @@ const OPENING_Q = 0x7f;
  * and is not what drawing one note asked for, and no `h`, which replaces an
  * instrument's tuning rather than adding to it, so `h0` is not "no transposition".
  */
-function channelOpening(channel: number, songTargetProgram: number): string {
+export function openingCommands(songTargetProgram: number): string {
   const parts = [`o${OPENING_OCTAVE}`, spellQ(OPENING_Q)];
   if (songTargetProgram === 0) {
     parts.push('@0');
   }
 
   parts.push('v255', 'y10');
-  return `#${channel} ${parts.join(' ')}`;
+  return parts.join(' ');
+}
+
+/** A channel the song has not declared, written out: its `#N` and {@link openingCommands}. */
+function channelOpening(channel: number, songTargetProgram: number): string {
+  return `#${channel} ${openingCommands(songTargetProgram)}`;
 }
 
 /** How many characters of an item's head are the note itself rather than its length. */

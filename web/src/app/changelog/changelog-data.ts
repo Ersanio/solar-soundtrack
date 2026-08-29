@@ -11,6 +11,7 @@ export const CHANGELOG: readonly ChangelogEntry[] = [
   {
     date: '29 August 2026',
     items: [
+      'Start a song from scratch in the piano roll — an empty song is set up the moment the roll opens',
       'Command $DD pitch bend now accepts a note as its final argument',
       'Clicking or dragging a note in the piano roll plays its pitch bend',
       'A pitch bend is now drawn on the note that plays it, instead of the note after',

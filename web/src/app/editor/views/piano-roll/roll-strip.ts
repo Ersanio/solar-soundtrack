@@ -359,7 +359,7 @@ function growUnits(
 }
 
 /** A real `#0`-`#7`, and where it stands. */
-interface Marker {
+export interface Marker {
   channel: number;
   start: number;
 }
@@ -372,7 +372,7 @@ interface Marker {
  * (`commands/in-force.ts`). A malformed or out-of-range one is not a marker: the
  * parser reports it and leaves the previous channel standing (AMK0030, AMK0031).
  */
-function channelMarkers(index: TokenIndex, source: string): Marker[] {
+export function channelMarkers(index: TokenIndex, source: string): Marker[] {
   const markers: Marker[] = [];
   for (const token of index.tokens) {
     if (token.kind !== 'channel') {
@@ -397,7 +397,11 @@ function channelMarkers(index: TokenIndex, source: string): Marker[] {
  * run lands against the text rather than after the blank line before whatever
  * comes next.
  */
-function channelHome(source: string, channel: number, markers: readonly Marker[]): ChannelHome {
+export function channelHome(
+  source: string,
+  channel: number,
+  markers: readonly Marker[],
+): ChannelHome {
   let own = -1;
   markers.forEach((marker, index) => {
     if (marker.channel === channel) {

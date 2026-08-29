@@ -70,6 +70,7 @@ import {
   OVERVIEW_HEIGHT,
   SCRUB_HEIGHT,
 } from './roll-metrics';
+import { seedEdits } from './roll-seed';
 import { type Strip, channelStrip, channelTails, isStrip } from './roll-strip';
 import { RollNotes } from './roll-notes/roll-notes';
 import { RollOverview } from './roll-overview/roll-overview';
@@ -1047,6 +1048,29 @@ export class PianoRoll {
       const top = rollCamera.topRow * untracked(() => this.rowHeight());
       afterNextRender(() => (this.viewport().nativeElement.scrollTop = top), {
         injector: this.injector,
+      });
+    });
+
+    // Sanctioned effect: writing the first rest a song with no playable music
+    // needs, when the roll is opened on one. It waits for a compile of the text
+    // as it stands — the result lags the source by the typing debounce, and a
+    // decision off a stale compile would read the wrong song — then decides
+    // once and stands down, so undoing the seed is never fought and a song
+    // failing for its own reasons is never written to (`roll-seed.ts`).
+    let decided = false;
+    effect(() => {
+      const source = this.editor.source();
+      const result = this.editor.result();
+      if (decided || result === null || this.editor.compiledText() !== source) {
+        return;
+      }
+
+      decided = true;
+      untracked(() => {
+        const edits = seedEdits(source, result, this.editor.tokens());
+        if (edits) {
+          this.requests.applyAll(edits);
+        }
       });
     });
 
