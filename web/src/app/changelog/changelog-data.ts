@@ -12,9 +12,9 @@ export const CHANGELOG: readonly ChangelogEntry[] = [
     date: '29 August 2026',
     items: [
       'Command $DD pitch bend now accepts a note as its final argument',
-      'Clicking or dragging a note in the piano roll plays its pitch slide',
-      'A pitch slide is now drawn on the note that plays it, instead of the note after',
-      'Normalize writes legacy "&"-pitch slides out as $DD, so the piano roll can edit those songs',
+      'Clicking or dragging a note in the piano roll plays its pitch bend',
+      'A pitch bend is now drawn on the note that plays it, instead of the note after',
+      'Normalize writes legacy "&"-pitch bends out as $DD, so the piano roll can edit those songs',
     ],
   },
   {
