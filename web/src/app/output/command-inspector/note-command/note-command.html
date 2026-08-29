@@ -35,3 +35,7 @@
 }
 
 <amk-param-table [command]="command()" />
+
+@if (palette(); as palette) {
+  <amk-note-palette [note]="command()" [model]="palette" />
+}

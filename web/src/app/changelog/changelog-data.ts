@@ -11,13 +11,14 @@ export const CHANGELOG: readonly ChangelogEntry[] = [
   {
     date: '29 August 2026',
     items: [
-      'Start a song from scratch in the piano roll — an empty song is set up the moment the roll opens',
-      'Changing a value in the command inspector replays the selected note',
       'Command $DD pitch bend now accepts a note as its final argument',
       'Clicking or dragging a note in the piano roll plays its pitch bend',
       'A pitch bend is now drawn on the note that plays it, instead of the note after',
       'Normalize writes legacy "&"-pitch bends out as $DD, so the piano roll can edit those songs',
-      'Shift + drag locks a note to the axis you drag along — sideways keeps its pitch, up and down keeps its place',
+      'Shift + drag locks a note to the axis you drag along. Sideways keeps its pitch, up and down keeps its place',
+      'Add a command to a selected note in the piano roll, through the command inspector',
+      "Editing a command's parameters in the piano roll plays the selected note for immediate feedback",
+      'The piano roll can start a song from scratch',
     ],
   },
   {

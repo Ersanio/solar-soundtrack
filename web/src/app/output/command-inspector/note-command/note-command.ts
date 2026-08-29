@@ -8,11 +8,14 @@ import { glyphOf } from '../../../editor/command-palette/glyph-of';
 import { definedAt, notePreceding } from '../../../state/commands-in-force';
 import { EditorRequests } from '../../../state/editor-requests';
 import { EditorStore } from '../../../state/editor-store';
+import { NotePalette, type NotePaletteModel } from '../note-palette/note-palette';
 import { ParamTable } from '../param-table/param-table';
 
 /** One command acting on the note, drawn as the palette draws it. */
 interface Acting {
   key: string;
+  /** `ResolvedEntry.key`, the identity the palette's duplicate rule compares. */
+  entryKey: string;
   icon: CommandGlyph;
   label: string;
   blurb: string;
@@ -55,7 +58,7 @@ interface Group {
  */
 @Component({
   selector: 'amk-note-command',
-  imports: [CommandIcon, ParamTable],
+  imports: [CommandIcon, NotePalette, ParamTable],
   templateUrl: './note-command.html',
   host: { class: 'contents' },
 })
@@ -121,6 +124,7 @@ export class NoteCommand {
         : [
             {
               key: `${command.span.start}:${command.span.end}`,
+              entryKey: entry.key,
               icon: entry.icon,
               label: entry.label,
               blurb: entry.blurb,
@@ -190,6 +194,20 @@ export class NoteCommand {
       ? 'The commands acting on a note are read off the compiled song, so they appear once it compiles.'
       : null,
   );
+
+  /** What the palette needs to hide duplicates — nothing without a pass. */
+  protected readonly palette = computed<NotePaletteModel | null>(() => {
+    const pass = this.pass();
+    if (pass === null) {
+      return null;
+    }
+
+    const defined = this.acting().filter((each) => each.defining);
+    return {
+      definedKeys: new Set(defined.map((each) => each.entryKey)),
+      hasBend: pass.bendFrom !== null,
+    };
+  });
 
   /**
    * A click asks the inspector about that command; a double click goes to it.

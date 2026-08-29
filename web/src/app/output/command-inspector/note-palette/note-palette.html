@@ -1,0 +1,49 @@
+<div class="flex flex-col gap-1">
+  <button
+    type="button"
+    class="text-ink-muted hover:text-ink cursor-pointer self-start text-xs font-semibold tracking-wide uppercase"
+    [title]="open() ? 'Hide the command palette' : 'Add a command in front of this note'"
+    (click)="open.set(!open())"
+  >
+    {{ open() ? '▾' : '▸' }} Add a command
+  </button>
+
+  @if (open()) {
+    <div class="flex flex-wrap items-center gap-1">
+      @for (chip of chips(); track chip.id) {
+        <button type="button" [class]="chip.class" (click)="filter.set(chip.id)">
+          {{ chip.label }}
+        </button>
+      }
+    </div>
+
+    <!-- `mouseleave` on the row rather than each button, so crossing the gap
+         between two of them does not blank the line and fill it again. -->
+    <div class="flex flex-wrap items-center gap-1.5" (mouseleave)="hovered.set(null)">
+      @for (entry of buttons(); track entry.key) {
+        <button
+          type="button"
+          [class]="entry.class"
+          [disabled]="entry.availability.state === 'blocked'"
+          (click)="insert(entry)"
+          (mouseenter)="hovered.set(entry)"
+          (focus)="hovered.set(entry)"
+        >
+          <svg amk-glyph width="14" height="14" [name]="entry.icon"></svg>
+          {{ entry.label }}
+        </button>
+      } @empty {
+        <span class="text-ink-muted text-xs">Everything here is already on this note.</span>
+      }
+    </div>
+
+    <p class="min-h-4 text-xs leading-4">
+      @if (readout(); as readout) {
+        <span class="text-ink font-semibold">{{ readout.label }}</span>
+        <span [class]="readout.muted ? 'text-ink-muted' : 'text-warn'"> - {{ readout.text }}</span>
+      } @else {
+        <span class="text-ink-muted">Hover over a command to see what it does.</span>
+      }
+    </p>
+  }
+</div>

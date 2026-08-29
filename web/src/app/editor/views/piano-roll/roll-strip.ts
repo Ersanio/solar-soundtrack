@@ -214,6 +214,41 @@ function trailsAUnit(command: Command): boolean {
 }
 
 /**
+ * Where text inserted "before this note" goes: the offset `growUnits` would give
+ * the note's `unitSpan.start`, computed for one note without building a strip —
+ * the note inspector serves notes inside `[ ]` bodies, which `channelStrip`
+ * refuses whole. The same absorption rule over the same channel-filtered list,
+ * so the insertion lands at a unit head on the next strip build, in front of the
+ * note's own adjacent leading `o` and drum `@` — a drum `@` kept against its
+ * note is what lets Normalize's `drumPerNote` stand down.
+ */
+export function unitStartBefore(
+  source: string,
+  commands: readonly Command[],
+  note: Command,
+): { start: number; line: number } {
+  const mine = commands.filter((command) => command.channel === note.channel);
+  let start = note.span.start;
+  let line = note.span.line;
+
+  for (let i = mine.length - 1; i >= 0; i--) {
+    const command = mine[i];
+    if (command.span.end > start) {
+      continue;
+    }
+
+    if (!INLINE_GAP.test(source.slice(command.span.end, start)) || !leadsAUnit(command)) {
+      break;
+    }
+
+    start = command.span.start;
+    line = command.span.line;
+  }
+
+  return { start, line };
+}
+
+/**
  * Constructs that make one written note into no notes, or into many played ones.
  *
  * `<` and `>` are deliberately absent: they are not commands to the scanner at

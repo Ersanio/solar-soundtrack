@@ -27,7 +27,7 @@ function readFilter(): Filter {
   return FILTERS.find((filter) => filter === stored) ?? 'notes';
 }
 
-function chipClass(selected: boolean): string {
+export function chipClass(selected: boolean): string {
   return `cursor-pointer rounded px-2 py-0.5 text-xs transition-colors ${
     selected ? 'bg-accent/20 text-accent font-semibold' : 'text-ink-muted hover:text-ink'
   }`;
@@ -46,7 +46,7 @@ function chipClass(selected: boolean): string {
  * the other direction. A `caveat` wears the same colour for the same reason —
  * it is worth reading first and it is not a refusal.
  */
-function entryClass(entry: ResolvedEntry): string {
+export function entryClass(entry: ResolvedEntry): string {
   const base =
     'border-edge inline-flex cursor-pointer items-center gap-1.5 rounded-md border px-2 py-1 text-xs whitespace-nowrap transition-colors disabled:cursor-not-allowed disabled:opacity-40';
   if (entry.availability.state === 'blocked') {

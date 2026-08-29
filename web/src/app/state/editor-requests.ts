@@ -36,6 +36,13 @@ export interface Insertion {
 export interface EditBatch {
   edits: readonly Edit[];
   immediate: boolean;
+  /**
+   * A range to select once the batch lands, in the document *after* it. How a
+   * panel puts the caret on text the batch itself writes — the note palette
+   * leaves the new command's first argument selected, and the caret is what
+   * retargets the inspector.
+   */
+  select: { anchor: number; head: number } | null;
 }
 
 /**
@@ -89,7 +96,7 @@ export class EditorRequests {
    */
   apply(edit: Edit | null): void {
     if (edit) {
-      this.replace.set({ edits: [copyEdit(edit)], immediate: false });
+      this.replace.set({ edits: [copyEdit(edit)], immediate: false, select: null });
     }
   }
 
@@ -105,9 +112,16 @@ export class EditorRequests {
    * CodeMirror merges overlapping ones rather than refusing them, so nothing
    * downstream can catch it. `roll-edit.ts` asserts it where the edits are made.
    */
-  applyAll(edits: readonly Edit[] | null): void {
+  applyAll(
+    edits: readonly Edit[] | null,
+    select: { anchor: number; head: number } | null = null,
+  ): void {
     if (edits && edits.length > 0) {
-      this.replace.set({ edits: edits.map(copyEdit), immediate: true });
+      this.replace.set({
+        edits: edits.map(copyEdit),
+        immediate: true,
+        select: select && { ...select },
+      });
     }
   }
 

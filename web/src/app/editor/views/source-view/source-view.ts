@@ -359,13 +359,30 @@ export class SourceView {
       }
     }
 
-    this.view.dispatch({
-      changes: batch.edits.map((edit) => ({
-        from: edit.span.start,
-        to: edit.span.end,
-        insert: edit.text,
-      })),
-    });
+    const changes = batch.edits.map((edit) => ({
+      from: edit.span.start,
+      to: edit.span.end,
+      insert: edit.text,
+    }));
+
+    // A carried selection is named in the post-batch document and retargets the
+    // inspector through the update listener — no focus and no tab switch, the
+    // quiet reveal's contract.
+    if (batch.select) {
+      const length = batch.edits.reduce(
+        (total, edit) => total + edit.text.length - (edit.span.end - edit.span.start),
+        doc.length,
+      );
+      this.view.dispatch({
+        changes,
+        selection: EditorSelection.range(
+          clamp(batch.select.anchor, 0, length),
+          clamp(batch.select.head, 0, length),
+        ),
+      });
+    } else {
+      this.view.dispatch({ changes });
+    }
 
     if (batch.immediate) {
       this.store.compileNow();
