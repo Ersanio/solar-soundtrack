@@ -31,15 +31,20 @@ import {
 	createMuteBackup,
 	createTickPhase,
 	type MuteBackup,
-	haltVoice,
+	inVoiceLoop,
+	parkVoice,
+	passMark,
 	restoreTrackVolume,
 	sawTick,
 	seedTickPhase,
 	startVoiceAt,
 	tickVoice,
+	voiceFetchMark,
 	voiceHasInstrument,
 	voiceHasQuantization,
+	voicePlaying,
 	voiceStarted,
+	volumesSettled,
 } from "./driver-state";
 
 /** Emulated frames per poll, matching what `worklet.ts` counts ticks at. */
@@ -109,8 +114,31 @@ const LONG_CHUNK = 0x60;
  */
 const MAX_TICK_HZ = 500;
 
-/** Blocks of silence before the note, long enough for the driver to write every `VxVOL`. */
+/**
+ * Blocks of silence before the note: the least the driver is ever given, and the
+ * most it is ever waited for.
+ *
+ * The settle runs until the driver says it has written the `VxVOL`s it was asked
+ * for, which is `$5C` going to zero (`main.asm:2512`). That is on a music tick,
+ * and a tick is 0.512 s at the slowest tempo the driver can hold, so the wait is
+ * bounded rather than left to the song — and a stopped song has no tick at all.
+ */
 const SETTLE_BLOCKS = 4;
+const MAX_SETTLE_BLOCKS = 100;
+
+/**
+ * Frames per step while waiting for a voice's fetch, and how long either half of
+ * the arrival waits.
+ *
+ * A pass of the driver's main loop is held to 2 ms by timer 0 (`main.asm:176`),
+ * and the busiest of them — one music tick fetching, dispatching and keying on
+ * for eight voices — runs past twice that, which is the same work the tempo
+ * shortfall is made of. So the budget is many passes. The step is a fraction of
+ * one; the pass boundary the second half looks for is found a frame at a time,
+ * being a boundary rather than a stretch.
+ */
+const ARRIVE_STEP = 8;
+const ARRIVE_FRAMES = SPC_SAMPLE_RATE / 20;
 
 export interface NoteAuditionRequest {
 	/** Where in the song the note is played, in music ticks. */
@@ -131,9 +159,9 @@ export interface NoteAuditionRequest {
 	 * ARAM address of a few bytes the driver can be pointed at.
 	 *
 	 * The song's own load address is the natural answer: every other voice is
-	 * halted before this is written, and the `$40` phrase table is only read when
-	 * a voice reaches `$00` (`L_0C01`), so from that moment nothing reads the song
-	 * block. Free space no ARAM budget can take away.
+	 * parked before this is written, and the `$40` phrase table is only read when
+	 * a voice reaches `$00` (`L_0C01`), which a parked voice never does. Free
+	 * space no ARAM budget can take away.
 	 */
 	scratchAt: number;
 	/**
@@ -150,14 +178,17 @@ export interface NoteAuditionRequest {
 	/**
 	 * Voices the mixer is silencing, as a bitmask. `0` for no mixer at all.
 	 *
-	 * Held through the fast-forward the way `worklet.ts` holds it, so the note
-	 * arrives over the echo the transport is making rather than over the whole
-	 * song's. Every other voice is halted before the note is handed over, so the
-	 * echo buffer is the *only* route a silenced channel has into the recording —
-	 * on a song with no echo this changes nothing at all, byte for byte.
+	 * **This is what the note is heard against.** The other seven voices are
+	 * parked rather than halted, so they go on sounding whatever they are playing
+	 * at that tick and the note arrives in the middle of it; the mask is what says
+	 * which of them. It is held through the fast-forward the way `worklet.ts`
+	 * holds it — so the echo the note lands on is the echo the transport is
+	 * making — and pressed back on after every block of the recording, since the
+	 * driver rewrites `VxVOL` as it goes and a mute that is not reapplied does not
+	 * stick.
 	 *
 	 * The target's own bit is ignored. Honouring it would take that voice's volume
-	 * during the fast-forward and step 4 below would hand it straight back, so the
+	 * during the fast-forward and step 5 below would hand it straight back, so the
 	 * note would sound anyway and the only effect would be the target going
 	 * missing from its own echo. A caller that wants silence needs no emulator.
 	 */
@@ -312,26 +343,37 @@ export function noteFrames(
  * Plays `spc` silently up to `atTicks`, then hands the driver one note and
  * records what comes out.
  *
+ * **With the rest of the song still sounding under it.** The other seven voices
+ * are parked, not halted: each one goes on playing the note it holds at that
+ * tick, keys off where its own note ends, and never reads another byte of music
+ * data. So a click on a note in a chord is that chord, and `silenced` says which
+ * of its channels are in it.
+ *
  * The recipe, all of it against `main.asm`:
  *
  * 0. **Fast-forward under the mixer's mask**, so the echo the note is about to
  *    land on is the echo the transport is making. See `silenced`.
- * 1. **Silence every voice** through {@link applyChannelMutes} and render a few
- *    blocks, so whatever was ringing stops without a click and `MuteBackup` is
- *    holding the target voice's own volume.
- * 2. **Halt the other seven** with {@link haltVoice}. Nothing else parses music
- *    data from here, which is what makes the note repeatable and what frees the
- *    song block to write into. Tempo and the global fades (`L_0CD2`) run on
- *    regardless of voices.
- * 3. **Hand the target voice the note** — the frames at `scratchAt`, the pointer
+ * 1. **Arrive**, which is not the same as reaching the tick: {@link arrive} waits
+ *    for the target voice to have read that tick's music and for the driver to be
+ *    out of its per-voice loop. Then {@link parkVoice}, so the settle cannot
+ *    carry the voice past the tick that was asked for.
+ * 2. **Silence every voice** through {@link applyChannelMutes} until the driver
+ *    has cleared `$5C`, so whatever was ringing stops without a click and
+ *    `MuteBackup` is holding the target voice's own volume. Then arrive again,
+ *    the settle having rendered.
+ * 3. **Park the other seven** with {@link parkOthers}, so they sound what they
+ *    are playing at that tick and read no further music data. Nothing else
+ *    parses from here, which is what makes the note repeatable and what frees
+ *    the song block to write into.
+ * 4. **Hand the target voice the note** — the frames at `scratchAt`, the pointer
  *    moved there, the duration counter forced to 1. A `slide` rides in those
  *    frames; `$90+x` needs no clearing first, since `NoteVCMD` reloads it from
  *    `$0300+x` on every key-on (`main.asm:465-466`) and the note about to sound
  *    is a key-on. A voice under an `$EE` pitch envelope is the exception, and
  *    does not bend in the song either.
- * 4. **Give it its volume back** without the dirty bit, so the DSP keeps 0 until
+ * 5. **Give it its volume back** without the dirty bit, so the DSP keeps 0 until
  *    the new note keys on and recomputes it. See {@link restoreTrackVolume}.
- * 5. **Count the note's ticks off the driver's tempo**, the same `sawTick`
+ * 6. **Count the note's ticks off the driver's tempo**, the same `sawTick`
  *    machinery the worklet and the clock measurement use, then render the tail.
  */
 export function auditionNote(core: SpcCore, spc: Uint8Array, request: NoteAuditionRequest): AuditionedNote {
@@ -356,22 +398,42 @@ export function auditionNote(core: SpcCore, spc: Uint8Array, request: NoteAuditi
 	// loop with 0 already in its track volume: `applyChannelMutes` keeps the value
 	// it saved earlier rather than saving that zero over it.
 	const backup = createMuteBackup();
-	const reachedTicks = fastForward(core, target, (request.silenced ?? 0) & ~(1 << channel), backup);
+	const silenced = (request.silenced ?? 0) & ~(1 << channel);
+	const reachedTicks = fastForward(core, target, channel, silenced, backup);
 
-	for (let settle = 0; settle < SETTLE_BLOCKS; settle++) {
-		applyChannelMutes(core.aram(), 0xff, backup);
+	// The target voice has read the tick's music, so it can be parked: 127 ticks
+	// it cannot fetch inside is what stops the settle below carrying it past the
+	// tick that was asked for.
+	parkVoice(core.aram(), channel);
+
+	// Silence the target, and let the driver say when it has: `L_0D1C` walks every
+	// voice and then clears `$5C` (`main.asm:2502-2512`), so a zero there is the
+	// driver's own word for "the mute has reached the DSP" where a block count can
+	// only guess at it — and the clear is on a music tick, 37 ms apart at `t55`.
+	// Two readings of it, because the walk can clear the flags out from under a
+	// write that landed inside it, and never fewer blocks than four, which is what
+	// the settle was before it was asked.
+	//
+	// The target alone, plus whatever the mixer is already holding. The other
+	// voices are about to be heard, and every one of them keyed on the note it
+	// plays at this tick during the walk the arrival waited for — muting them here
+	// would take the front off that attack and then hand it back a tick later.
+	let quiet = 0;
+	const hushed = silenced | (1 << channel);
+	for (let settle = 0; settle < MAX_SETTLE_BLOCKS && (settle < SETTLE_BLOCKS || quiet < 2); settle++) {
+		applyChannelMutes(core.aram(), hushed, backup);
 		core.renderView(BLOCK);
+		quiet = volumesSettled(core.aram()) ? quiet + 1 : 0;
 	}
+
+	// The settle rendered, so the driver has moved on: arrive again before any
+	// voice's pointer is written. The note's own fetch is long past, so what this
+	// is waiting for is the pass boundary — which is also what makes the settle's
+	// own length stop mattering, a block either way landing at the same place.
+	arrive(core, channel, true);
 
 	const aram = core.aram();
-
-	// Not called again: it would take the volume restored below straight back off
-	// the target voice. A halted voice needs no upkeep — `L_0D1C` skips it.
-	for (let voice = 0; voice < VOICES; voice++) {
-		if (voice !== channel) {
-			haltVoice(aram, voice);
-		}
-	}
+	parkOthers(aram, channel);
 
 	// A channel the song never played has neither an instrument nor a `q`, and a
 	// note wants both: the driver's own remedy for the first is `@0`
@@ -392,15 +454,37 @@ export function auditionNote(core: SpcCore, spc: Uint8Array, request: NoteAuditi
 	// (`main.asm:2137-2138`), so a channel the song never touches still has a
 	// volume to be given back and a note auditioned on it is heard.
 	startVoiceAt(aram, channel, scratchAt);
-	restoreTrackVolume(aram, channel, backup.saved[channel]);
+	restoreTrackVolume(aram, channel, backup);
 
-	return { ...record(core, held), reachedTicks };
+	return { ...record(core, held, channel, silenced, backup), reachedTicks };
+}
+
+/**
+ * Parks every voice but the target, so the song sounds under the note without
+ * reading another byte of music data.
+ *
+ * That second half is what the note rests on. The frames are written over the
+ * song's load address, which is where the `$40` phrase table sits, and a voice
+ * that reads a `$00` walks it (`L_0C01`) — reinstalling all eight track pointers
+ * from a table the audition has just written its own note over. A parked voice
+ * never reaches a `$00`, so what the phrase table now holds never matters.
+ *
+ * Called again after every block, because a park is only 127 ticks and a whole
+ * note at an ordinary tempo is longer than that.
+ */
+function parkOthers(aram: Uint8Array, channel: number): void {
+	for (let voice = 0; voice < VOICES; voice++) {
+		if (voice !== channel) {
+			parkVoice(aram, voice);
+		}
+	}
 }
 
 /**
  * Emulates up to `target` ticks and throws the audio away, stopping on the
  * driver's own tick count rather than on a sample count, as `worklet.ts`'s seek
- * does. Returns how far it actually got.
+ * does. Returns how far it actually got, and ends by {@link arrive}, which is
+ * what turns the tick it counted into a point a note can be handed over at.
  *
  * It latches on a stricter reading of "the song has started" than the worklet
  * does, and has to: a playhead a tick out is a playhead a tick out, where a note
@@ -415,15 +499,20 @@ export function auditionNote(core: SpcCore, spc: Uint8Array, request: NoteAuditi
  * The mask is constant for the whole run, which is what keeps `MuteBackup.restoring`
  * at zero: bits enter it only when they leave the mask, and none do here.
  */
-function fastForward(core: SpcCore, target: number, silenced: number, backup: MuteBackup): number {
+function fastForward(core: SpcCore, target: number, channel: number, silenced: number, backup: MuteBackup): number {
 	let ticks = 0;
 	let voice = -1;
 	const tick = createTickPhase();
 	let rendered = 0;
 	let stalledFor = 0;
+	let fetched = false;
 	const cap = MAX_SEEK_SECONDS * SPC_SAMPLE_RATE;
 
 	while (ticks < target && rendered < cap && stalledFor < SEEK_STALL_BLOCKS) {
+		// Read before the block and not after it. The fetch loop for the tick this
+		// block is about to report may run entirely inside the block, so the mark
+		// has to come from before it for the change to be visible at all.
+		const mark = voiceFetchMark(core.aram(), channel);
 		core.renderView(BLOCK);
 		rendered += BLOCK;
 
@@ -454,9 +543,69 @@ function fastForward(core: SpcCore, target: number, silenced: number, backup: Mu
 		const stepped = sawTick(tick, aram);
 		ticks += stepped;
 		stalledFor = stepped > 0 ? 0 : stalledFor + 1;
+		fetched = voiceFetchMark(aram, channel) !== mark;
 	}
 
+	arrive(core, channel, fetched);
 	return ticks;
+}
+
+/**
+ * Waits for a point the note can be handed over at: the target voice's music for
+ * the tick already read, and no voice iteration in flight.
+ *
+ * The tick count cannot be that point on its own. `sawTick` reports a tick off
+ * `$44`, which the driver writes at the top of a pass — a `$49` update and a
+ * `ProcessAPU2Input` call before that tick's music runs (`main.asm:193, 227,
+ * 239`) — and reading a tick without waiting for it is exactly what a playhead
+ * wants. A note handed over on that reading is handed to a driver that has not
+ * read it yet, and the tick a note starts on is the tick its own commands are
+ * dispatched on: the `@`, the `v` and the `y` written in front of it come out of
+ * the same fetch as the note byte (`L_0C57`, `:2340-2379`).
+ *
+ * So two things go wrong, and which one depends on where the target voice sits in
+ * a walk that runs 0 to 7 (`:2328-2459`) — identical music on two channels gets
+ * two different answers. Before its fetch, the note sounds under the previous
+ * note's instrument, volume and pan. Inside it, `L_0CB3` reloads `$70+x` from the
+ * song's own duration byte a moment after {@link startVoiceAt} has written 1
+ * there (`:2440-2441`), so the voice plays the song's note and falls into the
+ * frames at `scratchAt` when that runs out — a second key-on partway through the
+ * audition. The same reload is why the other seven have to be parked from here
+ * too: `$70+x` written into a voice already inside its fetch is overwritten a
+ * moment later, and a voice that is not parked reads on to the next note and to
+ * the `$00` past it.
+ *
+ * Bounded at both steps, because a voice the song does not play never fetches and
+ * a driver that has stopped never comes round to another pass.
+ */
+function arrive(core: SpcCore, channel: number, fetched: boolean): void {
+	const mark = voiceFetchMark(core.aram(), channel);
+	// A voice reading no music data has no fetch to wait for, and waiting for one
+	// would spend the whole budget on a channel the song never uses.
+	let moved = fetched || !voicePlaying(core.aram(), channel);
+
+	for (let waited = 0; waited < ARRIVE_FRAMES && !moved; waited += ARRIVE_STEP) {
+		core.renderView(ARRIVE_STEP);
+		moved = voiceFetchMark(core.aram(), channel) !== mark;
+	}
+
+	// And then to the top of the driver's next pass, a frame at a time. Which
+	// fetch the wait above ended on decides how far into a pass it left off, so a
+	// hand-over made there would put the key-on a few DSP cycles apart for two
+	// channels playing identical music — inaudible, and enough that one audition
+	// could not be compared with another. `$44` steps once a pass and does it
+	// before any voice loop, so it is the same point every time as well as a safe
+	// one; see {@link passMark}.
+	let pass = passMark(core.aram());
+	for (let waited = 0; waited < ARRIVE_FRAMES; waited++) {
+		core.renderView(1);
+		const aram = core.aram();
+		if (passMark(aram) !== pass && !inVoiceLoop(aram)) {
+			return;
+		}
+
+		pass = passMark(aram);
+	}
 }
 
 /**
@@ -470,8 +619,21 @@ function fastForward(core: SpcCore, target: number, silenced: number, backup: Mu
  * not stretched to cover it: the note keys off at its own length and the rest of
  * the bend goes unheard, which is what the song does — the note after it is where
  * the slide was going.
+ *
+ * The other seven are held here rather than left to themselves: {@link parkOthers}
+ * every block, so none of them reaches the next note or a `$00`, and the mixer's
+ * mask pressed back on, since the driver rewrites `VxVOL` as it goes and a mute
+ * that is not reapplied does not stick. The target is out of that mask's reach —
+ * {@link restoreTrackVolume} took it out of the backup — so the note keeps the
+ * volume it was given.
  */
-function record(core: SpcCore, held: number): { pcm: Int16Array; heldTicks: number } {
+function record(
+	core: SpcCore,
+	held: number,
+	channel: number,
+	silenced: number,
+	backup: MuteBackup,
+): { pcm: Int16Array; heldTicks: number } {
 	const cap = MAX_AUDITION_SECONDS * SPC_SAMPLE_RATE;
 	const pcm = new Int16Array(cap * SPC_CHANNELS);
 
@@ -484,6 +646,10 @@ function record(core: SpcCore, held: number): { pcm: Int16Array; heldTicks: numb
 	while (rendered < cap) {
 		pcm.set(core.renderView(BLOCK), rendered * SPC_CHANNELS);
 		rendered += BLOCK;
+
+		const aram = core.aram();
+		parkOthers(aram, channel);
+		applyChannelMutes(aram, silenced, backup);
 
 		if (tail < 0) {
 			ticks += sawTick(tick, core.aram());

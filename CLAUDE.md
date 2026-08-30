@@ -916,6 +916,42 @@ stats.loopTicks` pads **every other channel that would cut the song short** out 
   the slide counts off `$90`/`$91` — so only their total is reproduced. `StripItem.bend` reads from
   the item's **first** segment's end for the same shape, `growUnits` ending a unit at its last
   segment and so at a point past the `$DD`, which left every guard that reads `bend` switched off.
+- **Handing an auditioned note over the moment the fast-forward's tick count reached its tick** —
+  `sawTick` reads `$44`, which the driver writes at the top of a pass, a `$49` update and a
+  `ProcessAPU2Input` call before that tick's music runs (`main.asm:193, 227, 239`); reading a tick
+  without waiting for it is what a playhead wants and not what a note wants, since the tick a note
+  starts on is the tick its own commands are dispatched on — the `@`, the `v` and the `y` in front of
+  it come out of the same fetch as the note byte. Four settle blocks are 4 ms against a fetch pass
+  that runs well past that on eight busy channels, so ARAM was patched inside `L_0C4D`'s walk, which
+  runs voices 0 to 7, and identical music on two channels got two different answers. Before a voice's
+  fetch, the note sounded under the **previous** instrument. Inside it, `L_0CB3` reloaded `$70+x`
+  from the song's own duration byte over `startVoiceAt`'s 1 (`:2440-2441`), so the voice played the
+  song's note and fell into the audition's frames when it ran out — a second key-on half way through.
+  And halting another voice mid-fetch left it reading through a pointer whose high byte had just gone
+  to zero, where the `$00` it found walked the phrase table over every pointer at once and six
+  channels of eight went silent. `arrive` waits for the target voice's own fetch mark to move and for
+  `$48` to say no per-voice loop is in flight, then steps to the top of a pass so the point is the
+  same one every time; the settle waits for the driver to clear `$5C` rather than counting blocks;
+  and the voice is parked meanwhile, since a halt would stop `L_0D1C` taking its volume. Not
+  sample-identical even so, and no arrangement of this is: a mixer mask, or a different voice's fetch
+  to wait for, moves the key-on a few CPU cycles and the DSP's free-running envelope counter with it.
+  `audiotest` prices that at a few ten-thousandths of the signal, with the body of the note unmoved,
+  and the mask control there is a level for the same reason.
+- **Halting the other seven voices for an audition** — a note in a chord came back as that note
+  alone, which is not what it sounds like there and is the one question a preview is asked. They are
+  **parked** instead (`parkVoice`, `$70+2n` at the ceiling): a parked voice reads no further music
+  data but keeps everything else, so it plays out the note it holds at that tick, keys off where its
+  own note ends — `$0100+x` counts down in the read-ahead whether or not a voice is fetching
+  (`main.asm:3213`) — and takes its fade and its vibrato with it. `silenced` is then what says which
+  channels are in the chord, held through the recording as well as the fast-forward. Not a halt with
+  the volume left on, which is the cheap spelling of "let them ring": `L_0D1C` skips a halted voice
+  (`main.asm:2503-2505`), so its `VxVOL` is never rewritten again and it rings at a fixed level for
+  the whole preview instead of ending. And the park is what keeps the frames where they are — they go
+  over the song's load address and the `$40` phrase table with it, and a voice reading a `$00` walks
+  that table over all eight track pointers (`L_0C01`), which a parked voice never reaches. It lasts
+  127 ticks, so `parkOthers` runs again after every block. The settle stopped muting everything at
+  the same time: the other voices keyed on at this tick during the walk the arrival waited for, and
+  muting them there took the front off that attack and handed it back a tick later.
 
 ## Angular specifics
 

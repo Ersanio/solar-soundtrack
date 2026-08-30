@@ -9,6 +9,14 @@ export interface ChangelogEntry {
 export const CHANGELOG: readonly ChangelogEntry[] = [
   // ─── newest first; add new blocks here ──────────────────────────────────
   {
+    date: '30 August 2026',
+    items: [
+      'Playing a note in the piano roll plays the rest of the song under it, for as long as the note lasts',
+      'The mixer decides which channels are heard under a played note',
+      'A note is played under the instrument, volume and pan written in front of it',
+    ],
+  },
+  {
     date: '29 August 2026',
     items: [
       'Command $DD pitch bend now accepts a note as its final argument',

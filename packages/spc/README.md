@@ -97,24 +97,61 @@ volume; the tempo; and an echo buffer holding the last delay's worth of the song
 models some of that and says which parts it does not. The driver holds all of it, so the driver is
 asked.
 
-The fast-forward runs under the mixer's mask, held the way `worklet.ts` holds it, so the note lands
-on the echo the transport is making rather than on the whole song's. The **target's own bit is
-ignored**: honouring it would take that voice's volume on the way through and step 4 below would hand
-it straight back, so the note would sound regardless and the only effect would be the target going
-missing from its own echo. A caller that wants silence needs no emulator at all.
+**The rest of the song sounds under it.** The other seven voices are parked, not halted: each goes on
+playing the note it holds at that tick, keys off where its own note ends — `$0100+x` counts down in
+the read-ahead whether or not a voice is fetching (`main.asm:3213`) — and never reads another byte of
+music data. So a click on a note in a chord is that chord. Parking rather than halting is also what
+keeps the frames safe where they are: they are written over the song's load address, and the `$40`
+phrase table with it, and a voice that reads a `$00` walks that table (`L_0C01`) and reinstalls all
+eight track pointers from what the audition has just written. A parked voice never reaches one. It is
+only 127 ticks, so `parkOthers` runs again after every block.
+
+The mixer's mask decides which of those channels are in it, and the mask is what the fast-forward
+runs under as well — held the way `worklet.ts` holds it — so the echo the note lands on is the echo
+the transport is making. The **target's own bit is ignored**: honouring it would take that voice's
+volume on the way through and step 5 below would hand it straight back, so the note would sound
+regardless. A caller that wants silence needs no emulator at all.
+
+**Reaching the tick is not arriving at it.** `sawTick` reports a tick off `$44`, which the driver
+writes at the very top of a pass — a `$49` update and a `ProcessAPU2Input` call before that tick's
+music runs (`main.asm:193, 227, 239`) — and reading a tick without waiting for it is exactly what a
+playhead wants. A note cannot be handed over on that reading, because the tick a note starts on is
+the tick its own commands are dispatched on: the `@`, the `v` and the `y` written in front of it come
+out of the same fetch as the note byte (`L_0C57`).
+
+So `arrive` waits for two more things, and which of them is missing decides how the note goes wrong —
+by where the target voice sits in a walk that runs 0 to 7 (`main.asm:2328-2459`), so identical music
+on two channels gets two different answers. Before the voice's own fetch, the note sounds under the
+**previous** note's instrument, volume and pan. Inside it, `L_0CB3` reloads `$70+x` from the song's
+own duration byte a moment after `startVoiceAt` has written 1 there (`:2440-2441`), so the voice
+plays the song's note and falls into the frames at the scratch address when that runs out — a
+**second key-on** partway through the audition. The same reload decides when the other seven can be
+parked, too: a `$70+x` written into a voice already inside its fetch is overwritten a moment later,
+and a voice that is not parked reads on to the next note and to the `$00` past it.
 
 The recipe, once the fast-forward has arrived:
 
-1. `applyChannelMutes` over every voice, then a few blocks, so whatever is ringing stops without a
-   click and the backup is holding the target voice's own volume.
-2. `haltVoice` on the other seven. A halted voice reads no music data, so the note cannot be
-   disturbed by another channel and the song block is free to write into — the `$40` phrase table is
-   only consulted when a voice reads `$00` (`L_0C01`), and no voice will. Tempo and the global fades
-   run on regardless of voices.
-3. The note's frames at the caller's scratch address, the voice pointed there, its duration counter
+1. `parkVoice` on the target, so the settle below cannot carry it past the tick that was asked for.
+2. `applyChannelMutes` over the target voice, plus whatever the mixer is already holding, until the
+   driver has cleared `$5C`, so the note that was ringing there stops without a click and the backup
+   is holding that voice's own volume. The driver clears it once it has walked every voice
+   (`main.asm:2502-2512`), which is what a block count could only guess at — a music tick is 37 ms
+   apart at `t55`. Then arrive again, the settle having rendered. The other six are left alone: every
+   one of them keyed on the note it plays at this tick during the walk the arrival waited for, and
+   muting them here would take the front off that attack and hand it back a tick later.
+3. `parkOthers`, so nothing else reads music data from here. Tempo and the global fades run on
+   regardless, and so do every parked voice's own fade, vibrato and key-off.
+4. The note's frames at the caller's scratch address, the voice pointed there, its duration counter
    forced to 1 — which is how the driver starts its own voices (`main.asm:2314-2318`).
-4. `restoreTrackVolume`, deliberately without the `$5C` dirty bit, so the DSP keeps 0 until the new
+5. `restoreTrackVolume`, deliberately without the `$5C` dirty bit, so the DSP keeps 0 until the new
    note keys on and recomputes it. `NoteVCMD` sets the flag itself (`main.asm:459`).
+
+The hand-over therefore happens where the driver says rather than after a fixed count of blocks, and
+the last of the arrival steps to the top of a pass so that where it says is the _same_ place every
+time. It is not the same sample-for-sample: a mixer mask, or a different voice's fetch to wait for,
+moves the key-on by a few CPU cycles, and the DSP's free-running envelope counter sits differently
+under the attack. `audiotest` measures that at a few ten-thousandths of the signal, with the body of
+the note unmoved.
 
 `noteFrames` mirrors the compiler's `emitNote` (Music.cpp:2254), so the bytes are the ones a note of
 that length would really be written as. **It writes no `q` byte**, because the driver only reads one
@@ -150,18 +187,18 @@ byte, the driver adding `$43` and `!HTuneValues+x` itself at arm time. And the t
 to cover the slide: `delay + duration` may outrun the note, and then the note keys off part way
 through the bend, which is what the song does — the note after it is where the slide was going.
 
-Two things it does not do. The length is fixed when the request is made — the PCM is rendered before
+One thing it does not do: the length is fixed when the request is made — the PCM is rendered before
 it is heard, so there is nothing to send a note-off to, which is the price of not putting a second
-emulator on a second audio thread. And the echo buffer still holds the song as the mixer leaves it:
-silencing the voices for the audition stops new signal entering, but the last delay's worth decays
-under the note at the song's own feedback rate. That is what a note written there would really land
-on top of, and a song with no echo has none of it.
+emulator on a second audio thread. That bounds the whole preview, the parked voices included, so a
+click on a short note is a short answer however long the notes under it were going to be.
 
-The echo is also the whole of what the mask reaches. Every voice but the target is halted before the
-note is handed over, so a silenced channel has no other way into the recording — on a song with no
-echo, masked and unmasked auditions differ by about a thousandth of the signal, which is the cost of
-the extra `VxVOL` write taking a volume asks for and is not audible. `audiotest` pins both ends of
-that: the difference with echo, and the absence of one without.
+What the mask reaches is therefore a whole channel and not a corner of one. `audiotest` pins it as a
+level: the chord under a note is heard, silencing one of its channels sits between silencing none and
+silencing all, and silencing all of them gives back the note on its own, which is what an audition
+used to be. The echo it lands on is still the transport's, the mask being held through the
+fast-forward, and the buffer still holds the song as the mixer leaves it — the last delay's worth
+decays under the note at the song's own feedback rate, which is what a note written there would
+really land on top of.
 
 ## Reading a song without playing it
 

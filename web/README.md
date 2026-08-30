@@ -274,10 +274,13 @@ emit, and a slide's target already is one.
 The mixer is the one thing the two paths share, and only as a number. A note on a channel the mixer
 silences is refused in `Audition` before an emulator is asked for — hearing nothing does not need a
 few hundred milliseconds of fast-forward to arrive at — and a deliberate key press says why, where a
-drag asks quietly because it asks once per row. A note that does sound carries the mask with it, so
-the echo it lands on is the echo the transport is making rather than the whole song's. Neither is a
-route back to the worklet's emulator. The mutes apply with the transport stopped too: they are a
-standing monitoring state, not a property of something playing.
+drag asks quietly because it asks once per row. A note that does sound carries the mask with it, and
+the mask is now what decides **which of the other channels are heard under it**: `auditionNote` parks
+the other seven rather than halting them, so each plays out the note it holds at that tick and a
+click on a note in a chord is that chord. The mask reaching the fast-forward as well is what keeps
+the echo the note lands on the echo the transport is making. Neither is a route back to the worklet's
+emulator. The mutes apply with the transport stopped too: they are a standing monitoring state, not a
+property of something playing.
 
 That worker is separate from `clock.worker.ts` rather than another message on it. The clock
 measurement fires a second after typing stops, which is exactly when someone is about to click, and

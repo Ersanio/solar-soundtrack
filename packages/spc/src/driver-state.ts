@@ -6,6 +6,8 @@ const enum Addr {
 	TrackPointers = 0x30,
 	/** `$44`: the sound effect tempo accumulator, stepped by the timer count. */
 	SfxPhase = 0x44,
+	/** `$48`: the voice bit every per-voice loop shifts along, and out to zero. */
+	VoiceLoopBit = 0x48,
 	/** `$49`: the music tempo accumulator, whose overflow is a music tick. */
 	TickPhase = 0x49,
 	/** `$51`: music tempo, as the `t` command and any fade leave it. */
@@ -89,6 +91,86 @@ export function tickVoice(aram: Uint8Array): number {
  */
 export function voiceStarted(aram: Uint8Array, voice: number): boolean {
 	return voice >= 0 && aram[Addr.NoteDurationBytes + voice * 2] !== 0;
+}
+
+/**
+ * Whether the driver is part-way through one of its per-voice loops.
+ *
+ * Every one of them seeds `$48` with a single bit and shifts it out to zero on
+ * the last voice: the phrase start (`main.asm:2313-2326`), the music fetch
+ * (`:2330-2459`), the per-voice volume pass (`:2502-2511`), the off-tick one in
+ * the main loop (`:265-274`) and `PlaySong`'s own (`:2131-2164`). A zero is
+ * therefore the driver's own mark that no voice iteration is in flight, and it
+ * holds for most of a pass, the loop at `MainLoop` spinning on `$FD` until the
+ * timer comes round (`:186-187`).
+ *
+ * Anything writing a voice's track pointer or duration counter has to wait for
+ * one. `L_0C4D` tests `$31+x` and then goes on reading music data through it
+ * (`:2333-2341`), so a pointer taken from a voice already past that test sends
+ * the fetch it is in the middle of into low RAM — and the `$00` it finds there
+ * walks the phrase table (`L_0C01`), which reinstalls every voice's pointer from
+ * a table an audition has written its own note frames over.
+ */
+export function inVoiceLoop(aram: Uint8Array): boolean {
+	return aram[Addr.VoiceLoopBit] !== 0;
+}
+
+/**
+ * `$44`, which the driver writes at the top of a pass of its main loop.
+ *
+ * It goes down before `ProcessSFX`, before the tempo accumulator and before any
+ * voice loop (`main.asm:193`), so a change in it is both the earliest point in a
+ * pass and the most repeatable one there is — {@link sawTick} reads it for the
+ * first reason, and anything that has to hand the driver something at the same
+ * instant twice running reads it for the second.
+ */
+export function passMark(aram: Uint8Array): number {
+	return aram[Addr.SfxPhase];
+}
+
+/**
+ * A number that changes when the music fetch loop reaches a voice.
+ *
+ * The duration counter alone cannot say it: `L_0C4D` decrements `$70+x` and
+ * `L_0CB3` reloads it from the duration byte in the one pass (`main.asm:2337`,
+ * `:2440-2441`), so a run of one-tick notes leaves 1 in it on either side of the
+ * fetch. The track pointer moves on every fetch and stands still on every tick
+ * between them, so the two together cover both.
+ */
+export function voiceFetchMark(aram: Uint8Array, voice: number): number {
+	return (word(aram, Addr.TrackPointers + voice * 2) << 8) | aram[Addr.NoteDurations + voice * 2];
+}
+
+/**
+ * Stops a voice reading music data without taking it out of the driver's
+ * rotation, by putting the ceiling in its duration counter.
+ *
+ * Zeroing the track pointer's high byte would also stop it, and stops too much:
+ * a voice the fetch loop skips is skipped by the per-voice volume and fade
+ * routine as well (`L_0D1C`, `main.asm:2503-2505`), so its `VxVOL` is never
+ * rewritten and whatever is ringing on it goes on ringing at the volume it had.
+ * A parked voice keeps all of that — its fade, its vibrato, and the key-off its
+ * own note is already counting down to, since `$0100+x` is decremented by the
+ * read-ahead that runs on every tick the counter does not reach zero
+ * (`main.asm:3213`). It simply never reaches the next note.
+ *
+ * 127 ticks is 0.25 s at an ordinary tempo and less at a fast one, so a caller
+ * holding a voice for longer than that parks it again.
+ */
+export function parkVoice(aram: Uint8Array, voice: number): void {
+	aram[Addr.NoteDurations + voice * 2] = 0x7f;
+}
+
+/**
+ * Whether the driver has finished writing the `VxVOL`s it was asked for.
+ *
+ * `L_0D1C` walks every voice and then clears `$5C` (`main.asm:2502-2512`), so a
+ * zero is the driver saying it has consumed the flags rather than a caller
+ * guessing how long that takes. It is cleared on a music tick, which is 37 ms
+ * apart at `t55`, so the guess is not a small one.
+ */
+export function volumesSettled(aram: Uint8Array): boolean {
+	return aram[Addr.VolumeDirty] === 0;
 }
 
 /** What `$44` is stepped by per pass of the main loop, per timer count. */
@@ -187,20 +269,6 @@ export function voicePlaying(aram: Uint8Array, voice: number): boolean {
 }
 
 /**
- * Takes a voice out of the driver's rotation, the way a channel that has run out
- * of music data leaves it.
- *
- * The high byte alone, because that is the whole of the test above. A halted
- * voice is skipped by the fetch loop (`main.asm:2331`) and by the per-voice
- * volume and fade routine (`L_0D1C`, `main.asm:2504`), so it neither reads music
- * data nor has its `VxVOL` rewritten — which means anything already ringing on it
- * goes on ringing at whatever volume it had. Silence it first.
- */
-export function haltVoice(aram: Uint8Array, voice: number): void {
-	aram[Addr.TrackPointers + voice * 2 + 1] = 0;
-}
-
-/**
  * Points a voice at music data and makes it fetch on the driver's next pass.
  *
  * Setting the duration counter to 1 is the driver's own way of forcing a fetch:
@@ -241,16 +309,24 @@ export function voiceHasQuantization(aram: Uint8Array, voice: number): boolean {
 }
 
 /**
- * Gives a voice its track volume back without asking for a `VxVOL` rewrite.
+ * Gives a voice its track volume back without asking for a `VxVOL` rewrite, and
+ * hands it back to the caller.
  *
  * The opposite half of {@link applyChannelMutes}, which sets the dirty bit
  * precisely so a note already ringing is cut. Leaving the bit alone means the
  * DSP keeps whatever it has until the voice's next note keys on and recomputes
  * it — `NoteVCMD` sets the flag itself (`main.asm:459`). So the volume is in
  * place for the note about to start and inaudible for the one about to end.
+ *
+ * The voice leaves the backup as well, because a caller that goes on applying a
+ * mask afterwards would otherwise take this straight back off again: a voice in
+ * neither `applied` nor `restoring` is one {@link applyChannelMutes} does not
+ * touch at all.
  */
-export function restoreTrackVolume(aram: Uint8Array, voice: number, volume: number): void {
-	aram[Addr.TrackVolumes + voice * 2] = volume;
+export function restoreTrackVolume(aram: Uint8Array, voice: number, backup: MuteBackup): void {
+	aram[Addr.TrackVolumes + voice * 2] = backup.saved[voice];
+	backup.applied &= ~(1 << voice);
+	backup.restoring &= ~(1 << voice);
 }
 
 /**
