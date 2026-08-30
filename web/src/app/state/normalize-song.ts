@@ -18,14 +18,13 @@ import { compiler } from '@amk/compiler';
 import {
   type NormalizeInput,
   type PassResult,
-  UNROLL_ROUNDS,
+  declaresElsewhere,
   drumPerNote,
   flattenTriplets,
   inlineReplacements,
   orderChannels,
   precheck,
   resolvePreprocessor,
-  unrollLoops,
   writeDefaults,
   writeNoteLengths,
   writePitchSlides,
@@ -40,7 +39,6 @@ export type NormalizePass =
   | 'replacements'
   | 'triplets'
   | 'lengths'
-  | 'loops'
   | 'channels'
   | 'defaults'
   | 'slides'
@@ -231,25 +229,6 @@ export function normalizeSong(
     }
   }
 
-  for (let round = 0; ; round++) {
-    const out = unrollLoops(current);
-    if (!out.changed && out.diagnostics.length === 0) {
-      break;
-    }
-
-    if (round === UNROLL_ROUNDS) {
-      return {
-        ok: false,
-        diagnostics: [refusal('SST0614', 'The loops did not unroll within the rounds allowed.')],
-      };
-    }
-
-    const blockedBy = advance('loops', 'loops', out);
-    if (blockedBy) {
-      return { ok: false, diagnostics: blockedBy };
-    }
-  }
-
   const rest: [NormalizePass, string, (input: NormalizeInput) => PassResult][] = [
     ['channels', 'channel blocks', orderChannels],
     [
@@ -278,6 +257,21 @@ export function normalizeSong(
     }
   }
 
+  // A scoped rewrite touches a loop body only where this channel declares it;
+  // one recalled from another channel's block is left as written, and the
+  // dialog says so rather than reporting nothing while the shape stands.
+  if (onlyChannel !== undefined) {
+    const span = declaresElsewhere(current.trace, onlyChannel);
+    if (span !== null) {
+      notes.push({
+        severity: 'info',
+        code: 'SST0618',
+        message: 'A loop another channel declares was left as written.',
+        span: { ...span },
+      });
+    }
+  }
+
   return { ok: true, text: current.text, diagnostics: notes, changed };
 }
 
@@ -296,12 +290,13 @@ export function normalizeSong(
  * set one: the driver boots at that tempo, so the walk of the original reads 0
  * where the candidate reads the written value, and has one tempo command fewer.
  *
- * The notes **past** the end of the pass are deliberately not compared. They are
- * `SongTimeline.unreachable`, and unrolling changes the list by construction: a
- * note written once inside a `[ ]` is dropped once per time the loop would have
- * replayed it, and the copies it becomes are separate addresses with separate
- * pitches. `channelTicks` is what holds the tail to account, and it is compared
- * above — so a rewrite cannot quietly make a channel longer or shorter.
+ * The notes **past** the end of the pass are deliberately not compared. They
+ * are `SongTimeline.unreachable` — a list of addresses, and an address is
+ * exactly what a rewrite moves. `channelTicks` is what holds the tail to
+ * account, and it is compared above — so a rewrite cannot quietly make a
+ * channel longer or shorter. Neither is `SongTimeline.loops`, for the same
+ * reason: a run is named by its call site's and its body's addresses, and the
+ * per-note comparison already holds every pass a loop plays to account.
  */
 export function timelinesAgree(
   a: Walked,

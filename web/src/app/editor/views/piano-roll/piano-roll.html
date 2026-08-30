@@ -151,11 +151,20 @@
             [loopX]="loopX()"
             [endX]="endX()"
           />
+          <!-- The regions dim while a body-length edit is held: they are a
+               reading of the song as it stands, and the song is in motion. -->
+          <g
+            amk-roll-loops
+            [regions]="loopRegions()"
+            [attr.opacity]="gestures.shiftDelta() !== 0 ? 0.3 : null"
+          />
           <g
             amk-roll-notes
             [marks]="marks()"
             [selected]="selectedSpans()"
             [moving]="movingSpans()"
+            [boundaries]="gestures.shiftBoundaries()"
+            [shift]="gestures.shiftDelta() * zoom()"
             (entered)="enter($event)"
             (channelPicked)="selectEditChannel($event)"
           />

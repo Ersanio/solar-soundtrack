@@ -58,6 +58,19 @@ export interface PreviewRequest {
   rowHeight: number;
   /** The rows the clash wash covers, which is every row the plan touches. */
   rows: number;
+  /**
+   * The edited frame's passes, in time order — where each frame-local bar is
+   * drawn once, so a looped note's siblings move with the one under the
+   * pointer, on every voice that plays the body. One entry at tick 0 for the
+   * root frame, which is the old picture.
+   */
+  passes: readonly { tick: number; ordinal: number }[];
+  /**
+   * The frame's tick change: a pass begins at `tick + ordinal × delta`, its
+   * voice's earlier passes having already stretched or shrunk in front of it.
+   * 0 while the gesture leaves the body's length alone.
+   */
+  delta: number;
 }
 
 /**
@@ -68,27 +81,35 @@ export interface PreviewRequest {
  * commit — they are the same answer drawn twice rather than two answers.
  */
 export function buildPreview(request: PreviewRequest): Preview {
-  const { plan, stack, zoom, rowHeight } = request;
+  const { plan, stack, zoom, rowHeight, delta } = request;
+  const passes = request.passes.length > 0 ? request.passes : [{ tick: 0, ordinal: 0 }];
+  const baseOf = (pass: number): number => passes[pass].tick + passes[pass].ordinal * delta;
+
   // Structural rather than `PlacedNote`, so a run of erased ticks can be boxed
   // by the same arithmetic: all it needs is where it starts, how long it is, and
   // which row it belongs on.
   const box = (
     note: { startTick: number; ticks: number; written: number; drum: number | null },
     at: number,
+    pass: number,
     kind: string,
   ): PreviewBar | null => {
     const row = rowOfPlaced(note, stack);
     return row < 0
       ? null
       : {
-          id: `${kind}:${at}:${note.startTick}`,
-          x: note.startTick * zoom,
+          id: `${kind}:${at}:${pass}:${note.startTick}`,
+          x: (baseOf(pass) + note.startTick) * zoom,
           ...barRect(row, rowHeight, note.ticks, zoom),
         };
   };
 
   const bars = (notes: readonly PlacedNote[], kind: string): PreviewBar[] =>
-    notes.map((note, at) => box(note, at, kind)).filter((bar): bar is PreviewBar => bar !== null);
+    passes.flatMap((_, pass) =>
+      notes
+        .map((note, at) => box(note, at, pass, kind))
+        .filter((bar): bar is PreviewBar => bar !== null),
+    );
 
   return {
     live: bars(plan.touched, 'live'),
@@ -96,30 +117,35 @@ export function buildPreview(request: PreviewRequest): Preview {
     // A clash is a run of ticks rather than a note, so it is drawn down the
     // whole stack: the two notes it names are on different rows and a wash on
     // one of them would say the other was fine.
-    clash: plan.clashes.map((clash, at) => ({
-      id: `clash:${at}:${clash.from}`,
-      x: clash.from * zoom,
-      y: 0,
-      w: Math.max(1, (clash.to - clash.from) * zoom),
-      h: request.rows * rowHeight,
-    })),
+    clash: passes.flatMap((_, pass) =>
+      plan.clashes.map((clash, at) => ({
+        id: `clash:${at}:${pass}:${clash.from}`,
+        x: (baseOf(pass) + clash.from) * zoom,
+        y: 0,
+        w: Math.max(1, (clash.to - clash.from) * zoom),
+        h: request.rows * rowHeight,
+      })),
+    ),
     // A run of ticks like a clash, but drawn on the row of the note giving them
     // up rather than down the stack: it names that one note, and it is that
     // note's own bar underneath it.
-    erased: plan.erased
-      .map((span, at) =>
-        box(
-          {
-            startTick: span.from,
-            ticks: span.to - span.from,
-            written: span.written,
-            drum: span.drum,
-          },
-          at,
-          'erased',
-        ),
-      )
-      .filter((bar): bar is PreviewBar => bar !== null),
+    erased: passes.flatMap((_, pass) =>
+      plan.erased
+        .map((span, at) =>
+          box(
+            {
+              startTick: span.from,
+              ticks: span.to - span.from,
+              written: span.written,
+              drum: span.drum,
+            },
+            at,
+            pass,
+            'erased',
+          ),
+        )
+        .filter((bar): bar is PreviewBar => bar !== null),
+    ),
     refused: plan.refused,
   };
 }

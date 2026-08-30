@@ -27,6 +27,8 @@ export const REFUSE_MOVE_KIND =
 export const REFUSE_MOVE_EMPTY = 'this channel has no note or rest to put a command in front of';
 export const REFUSE_MOVE_BEND =
   'that command is read as part of the note in front of it, so it cannot be moved on its own';
+export const REFUSE_MOVE_LOOPED =
+  'that command is inside a loop, and every pass replays it where it stands';
 
 /** A tick a command may be dropped on, and where its text goes to run there. */
 export interface MoveTarget {
@@ -83,6 +85,20 @@ export function commandMoveRefusal(strip: Strip, command: Command): string | nul
     return REFUSE_MOVE_KIND;
   }
 
+  // A command between a loop's brackets runs once per pass, where it stands;
+  // the lane's targets are single ticks, and dragging it out would silently
+  // change every pass. The note gestures inside the body are how a body edits.
+  if (
+    strip.frames.some(
+      (frame) =>
+        frame.body >= 0 &&
+        command.span.start >= frame.span.start &&
+        command.span.end <= frame.span.end,
+    )
+  ) {
+    return REFUSE_MOVE_LOOPED;
+  }
+
   if (strip.items.length === 0) {
     return REFUSE_MOVE_EMPTY;
   }
@@ -106,17 +122,23 @@ export function commandMoveRefusal(strip: Strip, command: Command): string | nul
  * dragged to and not back from.
  */
 export function commandMoveTargets(strip: Strip): readonly MoveTarget[] {
-  return strip.items.map((item) => ({
-    tick: item.startTick,
-    // The unit's head rather than the prefix's end, though `channelStrip` clamps
-    // the two to one offset: it is inside the unit's own leading `o`, so the
-    // next `growUnits` finds the same boundary and a second drag of the same
-    // command writes the same text. It is also always to the right of an intro
-    // `/`, which terminates a unit's growth — and a command after the marker is
-    // the one that is re-read on every pass.
-    at: item.unitSpan.start,
-    line: item.unitSpan.line,
-  }));
+  // The root frame's heads alone: a body item's tick is its frame's own, and a
+  // command dropped between brackets would run once per pass — a decision a
+  // drag along a single timeline never asked to make. A construct's head is a
+  // real target, being the tick its whole loop begins on.
+  return strip.items
+    .filter((item) => strip.frames[item.frame].body < 0)
+    .map((item) => ({
+      tick: item.startTick,
+      // The unit's head rather than the prefix's end, though `channelStrip` clamps
+      // the two to one offset: it is inside the unit's own leading `o`, so the
+      // next `growUnits` finds the same boundary and a second drag of the same
+      // command writes the same text. It is also always to the right of an intro
+      // `/`, which terminates a unit's growth — and a command after the marker is
+      // the one that is re-read on every pass.
+      at: item.unitSpan.start,
+      line: item.unitSpan.line,
+    }));
 }
 
 /** The target nearest a tick, the earlier one on a tie. */

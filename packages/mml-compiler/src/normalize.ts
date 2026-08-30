@@ -1,7 +1,7 @@
 /**
  * The normalizer: rewrites a song into the shape an editor can splice.
  *
- * Nine passes, each a text-to-text rewrite driven by the parse trace of the
+ * Eight passes, each a text-to-text rewrite driven by the parse trace of the
  * text it is given, and each leaving a song that compiles to the same music:
  *
  *   A. `resolvePreprocessor` — `#define`/`#if…` lines and untaken branches go.
@@ -9,10 +9,6 @@
  *   D. `flattenTriplets`     — notes inside `{ }` get the length they compiled to.
  *   H. `writeNoteLengths`    — every note carries its own length, and no `l` is
  *                              left for a later one to read.
- *   C. `unrollLoops`         — `[ ]n`, `(n)[ ]n`, `(n)m`, `*n`, `[[ ]]n` and the
- *                              same subloop written `$E6 $00`/`$E6 $nn` become
- *                              n copies of the body. Repeated until none are
- *                              left, because a copy can contain a subloop.
  *   E. `orderChannels`       — one block per channel, `#0` to `#7`, the music
  *                              above the first `#N` under the starting channel.
  *   F. `writeDefaults`       — `o`, `q`, `@` and `t` written out where a channel
@@ -22,13 +18,11 @@
  *                              rather than an operator nothing can place.
  *   G. `drumPerNote`         — the drum `@` immediately before every drum note.
  *
- * A `[ ]` body is compiled once, under the parse-time state standing at its
- * `[`, and replayed from bytes. Copying its text n times is not the same thing:
- * `<`, `>` and the drum remap's clearing would run n times, and a `(1)n` called
- * from another channel would parse the body under that channel's octave,
- * length and transposition. So every copy is preceded by whatever re-creates
- * the state the body was compiled under, and the last is followed by whatever
- * restores the state that stood after the construct — both read off the trace.
+ * Loops are left exactly as written: a `[ ]`, a `(n)` or `*` recall and a
+ * `[[ ]]` subloop are shapes the piano roll edits in place, so writing them out
+ * is not something a song needs any more, and n copies of a body is n times the
+ * text. The passes that rewrite inside one work on the single parse the body
+ * gets, which is what keeps them byte-neutral there.
  *
  * What a pass cannot re-create it refuses, with a diagnostic saying why. The
  * caller compiles and walks the result of every pass against the original and
@@ -53,7 +47,7 @@ export interface NormalizeInput {
 	 * The piano roll edits one channel at a time and refuses the ones it cannot
 	 * splice, so what a porter wants when a channel is in the way is that
 	 * channel put in order — not the whole song rewritten, and above all not a
-	 * refusal because some *other* channel has a loop that cannot be unrolled.
+	 * refusal because some *other* channel holds the shape being objected to.
 	 * Every pass that works construct by construct takes this as a filter; the
 	 * two that are global by nature (the preprocessor and the replacements) run
 	 * whole either way, `orderChannels` refuses rather than moving another
@@ -73,9 +67,6 @@ export interface PassResult {
 	/** False when the pass found nothing to do, so the caller can skip the recompile. */
 	changed: boolean;
 }
-
-/** How many times `unrollLoops` may run before the caller gives up on the song. */
-export const UNROLL_ROUNDS = 8;
 
 // ---------------------------------------------------------------------------
 // Shared
@@ -228,6 +219,69 @@ function stateBefore(trace: ParseTrace, index: number): ParseState {
 	return index <= 0 ? initialState(trace) : trace.events[index - 1].state;
 }
 
+/**
+ * Which events a scoped rewrite may touch: the channel's own, and — a `[ ]`
+ * body's events carrying channel 8 — those inside a body the scoped channel
+ * itself declares, which is that channel's own text between its own brackets.
+ * A body another channel declares is left as written ({@link declaresElsewhere}
+ * is what the caller reports it with), and a remote definition's body is left
+ * to the passes' own `inRemoteDefinition` guards, unowned here.
+ *
+ * Everything for a whole-song rewrite, so a pass can take this as its filter
+ * without asking which mode it is in.
+ */
+function scopedTo(trace: ParseTrace, onlyChannel: number | undefined): (index: number) => boolean {
+	if (onlyChannel === undefined) {
+		return () => true;
+	}
+
+	const owned = new Array<boolean>(trace.events.length).fill(false);
+	// The `[` dispatch starts on the declaring channel and ends on 8, so its
+	// event's channel is the declarer; the `]` runs the other way.
+	let declarer = -1;
+	trace.events.forEach((event, index) => {
+		if (event.channel === onlyChannel || (event.channel === 8 && declarer === onlyChannel)) {
+			owned[index] = true;
+		}
+
+		if (event.loop?.kind === "open") {
+			declarer = event.loop.remote ? -1 : event.channel;
+		} else if (event.loop?.kind === "close") {
+			declarer = -1;
+		}
+	});
+
+	return (index) => owned[index];
+}
+
+/**
+ * The first `(n)m` or `*` on the scoped channel that recalls a body some other
+ * channel declares — the one shape {@link scopedTo} leaves alone that a porter
+ * may be waiting on, reported at info severity so the dialog can say the body
+ * was left as written.
+ */
+export function declaresElsewhere(trace: ParseTrace, onlyChannel: number): Span | null {
+	const declarers = new Map<number, number>();
+	for (const event of trace.events) {
+		if (event.loop?.kind === "open" && !event.loop.remote) {
+			declarers.set(event.loop.at, event.channel);
+		}
+	}
+
+	for (const event of trace.events) {
+		if (event.channel !== onlyChannel || event.loop?.kind !== "call") {
+			continue;
+		}
+
+		const declarer = declarers.get(event.loop.at);
+		if (declarer !== undefined && declarer !== onlyChannel) {
+			return event.span;
+		}
+	}
+
+	return null;
+}
+
 // ---------------------------------------------------------------------------
 // Before any pass
 // ---------------------------------------------------------------------------
@@ -273,12 +327,6 @@ export function precheck(input: NormalizeInput): Diagnostic[] {
 		if (event.char === "t" && eventText(text, event).startsWith("tuning[")) {
 			out.push(
 				diagnostic("SST0608", "Songs that retune an instrument with tuning[n]= cannot be normalized.", event.span),
-			);
-		}
-
-		if (mine && event.loop?.kind === "call" && event.loop.at === 0xffff) {
-			out.push(
-				diagnostic("SST0602", "This * repeats a loop that was never written, which cannot be unrolled.", event.span),
 			);
 		}
 	});
@@ -393,8 +441,9 @@ export function flattenTriplets(input: NormalizeInput): PassResult {
 	const diagnostics: Diagnostic[] = [];
 
 	let open = -1;
+	const owned = scopedTo(trace, input.onlyChannel);
 	events.forEach((event, index) => {
-		if (input.onlyChannel !== undefined && event.channel !== input.onlyChannel) {
+		if (!owned(index)) {
 			return;
 		}
 
@@ -630,439 +679,6 @@ export function writeNoteLengths(input: NormalizeInput): PassResult {
 	}
 
 	return { text: applyEdits(text, [...edits, ...emptiedLines(text, gone)]), diagnostics, changed: true };
-}
-
-// ---------------------------------------------------------------------------
-// C. Loops
-// ---------------------------------------------------------------------------
-
-/** The text between a pair of brackets, and the events inside it. */
-interface Body {
-	start: number;
-	end: number;
-	openIndex: number;
-	closeIndex: number;
-	remote: boolean;
-}
-
-interface Construct {
-	kind: "loop" | "subloop" | "call";
-	/** The source range the copies replace. */
-	start: number;
-	end: number;
-	/** The construct's own events, first to last inclusive. */
-	first: number;
-	last: number;
-	count: number;
-	body: Body;
-	/** The channel the construct runs on. */
-	channel: number;
-}
-
-/** A construct whose opening has been met and whose close has not. */
-interface Opened {
-	index: number;
-	at: number;
-	remote: boolean;
-	sub: boolean;
-	from?: number;
-}
-
-/** The parse-time state a note reads, seen from one slot. */
-interface View {
-	octave: number;
-	length: number;
-	q: number;
-	usingH: boolean;
-	h: number;
-	instrument: number;
-	ignoreTuning: boolean;
-}
-
-const view = (state: ParseState, slot: number): View => ({
-	octave: state.octave,
-	length: state.defaultNoteLength,
-	q: state.q[slot],
-	usingH: state.usingHTranspose,
-	h: state.hTranspose,
-	instrument: state.instrument[slot],
-	ignoreTuning: state.ignoreTuning[slot],
-});
-
-/**
- * Whether a pitched note from `from` to `to` would emit a different byte with
- * `instrument` in `slot` instead of what the parser had there, before an `@`
- * puts the two back in step.
- *
- * Follows the instrument into a `[ ]` opened on the slot, since `[` copies it
- * into the loop block, and consumes a drum remap on the first pitched note as
- * `parseNote` does — on every channel but 6 and 7 under AddmusicK.
- */
-function instrumentHazard(
-	trace: ParseTrace,
-	from: number,
-	to: number,
-	slot: number,
-	instrument: number,
-	ignoreTuning: boolean,
-	sfx: boolean,
-): boolean {
-	const textual = { instrument, ignoreTuning };
-	let inner: { instrument: number; ignoreTuning: boolean } | null = null;
-
-	for (let at = from; at < to; at++) {
-		const event = trace.events[at];
-		const before = stateBefore(trace, at);
-		const onSlot = event.channel === slot;
-		const onInner = slot < 8 && event.channel === 8 && before.prevChannel === slot;
-		if (!onSlot && !onInner) {
-			continue;
-		}
-
-		const current = onSlot ? textual : inner;
-		if (current === null) {
-			continue;
-		}
-
-		if (event.char === "@") {
-			current.instrument = event.state.instrument[event.channel];
-			current.ignoreTuning = event.state.ignoreTuning[event.channel];
-			if (onSlot) {
-				return false;
-			}
-
-			continue;
-		}
-
-		if (onSlot && event.loop?.kind === "open" && !event.loop.remote) {
-			inner = { ...textual };
-			continue;
-		}
-
-		if (!isPitched(event)) {
-			continue;
-		}
-
-		const original = { instrument: before.instrument[event.channel], ignoreTuning: before.ignoreTuning[event.channel] };
-		const drumO = isDrum(original.instrument);
-		const drumT = isDrum(current.instrument);
-		if (drumO !== drumT || (drumO && original.instrument !== current.instrument)) {
-			return true;
-		}
-
-		if (!drumO && !before.usingHTranspose) {
-			const termO = original.ignoreTuning ? 0 : trace.transposeMap[original.instrument];
-			const termT = current.ignoreTuning ? 0 : trace.transposeMap[current.instrument];
-			if (termO !== termT) {
-				return true;
-			}
-		}
-
-		if (drumT && !(trace.songTargetProgram === 0 && sfx)) {
-			current.instrument = DRUM_CONSUMED;
-		}
-	}
-
-	return false;
-}
-
-/**
- * Unrolls every top-level loop construct once. A copy of a body may hold a
- * subloop, and a subloop's copy a loop, so the caller runs this until it
- * reports no change.
- */
-export function unrollLoops(input: NormalizeInput): PassResult {
-	const { text, trace } = input;
-	const events = trace.events;
-	const diagnostics: Diagnostic[] = [];
-	const bodies = new Map<number, Body>();
-	const constructs: Construct[] = [];
-	const open: Opened[] = [];
-
-	/**
-	 * A loop and a subloop that cross — one opened inside the other and closed
-	 * outside it. AddmusicK guards nesting and not crossing (Music.cpp:1208-1290,
-	 * 1985-2005), so it builds one, and the driver answers it with the one
-	 * subloop return each voice has (`Commands.asm:365`): the close jumps into
-	 * the other construct's body, and from there the channel either ends on that
-	 * body's `$00` with the call counter already spent (`main.asm:2345`) or
-	 * re-enters the `$E9` and starts its count again. Neither is a number of
-	 * copies of anything, so it is refused.
-	 *
-	 * Both ends meet the mismatch, so it is said once, and on the channel the
-	 * loop is written on: a dispatch inside a loop body reports channel 8.
-	 */
-	let crossed = false;
-	const crossing = (loop: Opened | undefined, message: string, span: Span): void => {
-		if (crossed || loop === undefined) {
-			return;
-		}
-
-		const channel = events[loop.index].channel;
-		if (input.onlyChannel !== undefined && channel !== input.onlyChannel) {
-			return;
-		}
-
-		crossed = true;
-		diagnostics.push(diagnostic("SST0616", message, span));
-	};
-
-	events.forEach((event, index) => {
-		const loop = event.loop;
-		if (!loop) {
-			return;
-		}
-
-		switch (loop.kind) {
-			case "open":
-				open.push({ index, at: loop.at, remote: loop.remote, sub: false });
-				break;
-
-			case "subOpen":
-				open.push({ index, at: -1, remote: false, sub: true, from: loop.from });
-				break;
-
-			case "close": {
-				const opened = open.pop();
-				if (!opened || opened.sub) {
-					// A subloop opened inside this loop is still open at the `]`. The
-					// loop is the entry below it, and is there whenever this reports:
-					// written the other way round, `subClose` meets the mismatch first
-					// and has already said so.
-					crossing(
-						open[open.length - 1],
-						"A subloop opens inside this loop and closes outside it. Its close jumps back into the loop's body, so nothing written after it is played.",
-						event.span,
-					);
-					break;
-				}
-
-				const body: Body = {
-					start: events[opened.index].span.end,
-					end: event.span.start,
-					openIndex: opened.index,
-					closeIndex: index,
-					remote: opened.remote,
-				};
-				bodies.set(opened.at, body);
-				if (opened.remote) {
-					break;
-				}
-
-				// `(n)[` is two dispatches; the label is part of the construct.
-				let first = opened.index;
-				const label = events[first - 1];
-				if (first > 0 && label.char === "(" && label.span.end === events[first].span.start) {
-					first--;
-				}
-
-				constructs.push({
-					kind: "loop",
-					start: events[first].span.start,
-					end: event.span.end,
-					first,
-					last: index,
-					count: loop.count,
-					body,
-					channel: events[first].channel,
-				});
-				break;
-			}
-
-			case "subClose": {
-				const opened = open.pop();
-				if (!opened?.sub) {
-					// A loop opened inside this subloop and closed outside it, so the
-					// entry popped is that loop itself.
-					crossing(
-						opened,
-						"This subloop opens outside a loop and closes inside its body. Its close re-enters the loop, so the loop's count starts again.",
-						event.span,
-					);
-					break;
-				}
-
-				// Written as hex, the event sits on the argument byte and the run
-				// began at `from`; written as `[[`/`]]n`, the event's own span is
-				// the whole construct. Either end may be either spelling.
-				constructs.push({
-					kind: "subloop",
-					start: opened.from ?? events[opened.index].span.start,
-					end: event.span.end,
-					first: opened.index,
-					last: index,
-					count: loop.count,
-					body: {
-						start: events[opened.index].span.end,
-						end: loop.from ?? event.span.start,
-						openIndex: opened.index,
-						closeIndex: index,
-						remote: false,
-					},
-					channel: event.channel,
-				});
-				break;
-			}
-
-			case "call": {
-				const body = bodies.get(loop.at);
-				if (!body) {
-					diagnostics.push(
-						loop.at === 0xffff
-							? diagnostic(
-									"SST0602",
-									"This * repeats a loop that was never written, which cannot be unrolled.",
-									event.span,
-								)
-							: diagnostic("SST0603", "A loop call could not be matched to its body.", event.span),
-					);
-					break;
-				}
-
-				constructs.push({
-					kind: "call",
-					start: event.span.start,
-					end: event.span.end,
-					first: index,
-					last: index,
-					count: loop.count,
-					body,
-					channel: event.channel,
-				});
-				break;
-			}
-		}
-	});
-
-	if (diagnostics.length > 0) {
-		return { text, diagnostics, changed: false };
-	}
-
-	const contains = (outer: Construct, inner: Construct): boolean =>
-		outer !== inner && outer.start <= inner.start && inner.end <= outer.end;
-	const topLevel = constructs.filter(
-		(construct) =>
-			(input.onlyChannel === undefined || construct.channel === input.onlyChannel) &&
-			!stateBefore(trace, construct.first).inRemoteDefinition &&
-			!constructs.some((other) => contains(other, construct)),
-	);
-	if (topLevel.length === 0) {
-		return unchanged(text);
-	}
-
-	const lineEnd = eol(text);
-	const edits: TextEdit[] = [];
-	for (const construct of topLevel) {
-		const channel = construct.channel;
-		const slot = construct.kind === "subloop" ? channel : 8;
-		const sfx = trace.songTargetProgram === 0 && (channel === 6 || channel === 7);
-		const { body } = construct;
-		const before = view(stateBefore(trace, construct.first), channel);
-		const defined = view(events[body.openIndex].state, slot);
-		const left = view(events[body.closeIndex - 1].state, slot);
-		const after = view(events[construct.last].state, channel);
-
-		/**
-		 * What puts `to` in force where `from` stands, as text. The instrument
-		 * is only writable as a drum remap — `@n` for anything else emits a
-		 * `$DA` the original has not got — so a difference there is checked
-		 * against the notes that would read it instead.
-		 */
-		const reassert = (from: View, to: View, notesFrom: number, notesTo: number, slotOf: number): string | null => {
-			const parts: string[] = [];
-			if (to.usingH) {
-				if (!from.usingH || from.h !== to.h) {
-					parts.push(`h${to.h}`);
-				}
-			} else if (from.usingH) {
-				parts.push(`#${channel}`);
-			}
-
-			if (from.octave !== to.octave) {
-				const octave = spellOctave(to.octave);
-				if (octave === null) {
-					diagnostics.push(
-						diagnostic("SST0610", `An octave of ${to.octave} cannot be written with o.`, events[construct.first].span),
-					);
-					return null;
-				}
-
-				parts.push(octave);
-			}
-
-			if (from.length !== to.length) {
-				const length = spellLength(to.length, "l", trace.targetAMKVersion);
-				if (length === null) {
-					diagnostics.push(
-						diagnostic(
-							"SST0610",
-							`A default length of ${to.length} ticks has no l this target can write.`,
-							events[construct.first].span,
-						),
-					);
-					return null;
-				}
-
-				parts.push(`l${length}`);
-			}
-
-			if (from.q !== to.q) {
-				parts.push(spellQ(to.q));
-			}
-
-			if (from.instrument !== to.instrument || from.ignoreTuning !== to.ignoreTuning) {
-				if (isDrum(to.instrument) && from.ignoreTuning === to.ignoreTuning) {
-					parts.push(`@${to.instrument}`);
-				} else if (instrumentHazard(trace, notesFrom, notesTo, slotOf, from.instrument, from.ignoreTuning, sfx)) {
-					const code = notesFrom === body.openIndex + 1 ? "SST0604" : "SST0605";
-					const message =
-						code === "SST0604"
-							? "This loop is played under a differently tuned instrument than it was written under, so its copies would sound different."
-							: "An instrument set inside this loop would retune the notes after it once unrolled.";
-					diagnostics.push(diagnostic(code, message, events[construct.first].span));
-					return null;
-				}
-			}
-
-			return parts.join(" ");
-		};
-
-		const bodyRange: [number, number] = [body.openIndex + 1, body.closeIndex];
-		const afterRange: [number, number] = [construct.last + 1, events.length];
-		const firstCopy = reassert(before, defined, ...bodyRange, slot === 8 ? 8 : channel);
-		const nextCopy = construct.count > 1 ? reassert(left, defined, ...bodyRange, slot === 8 ? 8 : channel) : "";
-		const restore = reassert(left, after, ...afterRange, channel);
-		if (firstCopy === null || nextCopy === null || restore === null) {
-			continue;
-		}
-
-		let source = text.slice(body.start, body.end).replace(/^[ \t]+|[ \t]+$/g, "");
-		const separator = source.includes("\n") || source.includes(";") ? lineEnd : " ";
-		const copies: string[] = [];
-		for (let copy = 0; copy < construct.count; copy++) {
-			// A label defined inside a subloop is defined once; later copies of
-			// the body keep the loop and drop the label.
-			if (copy === 1) {
-				source = source.replace(/\(\d+\)(?=\[)/g, "");
-			}
-
-			const prefix = copy === 0 ? firstCopy : nextCopy;
-			copies.push(prefix ? `${prefix} ${source}` : source);
-		}
-
-		let replacement = copies.join(separator);
-		if (restore) {
-			replacement += ` ${restore}`;
-		}
-
-		edits.push({ start: construct.start, end: construct.end, text: replacement });
-	}
-
-	if (diagnostics.length > 0) {
-		return { text, diagnostics, changed: false };
-	}
-
-	return { text: applyEdits(text, edits), diagnostics, changed: true };
 }
 
 // ---------------------------------------------------------------------------
@@ -1398,8 +1014,9 @@ export function writeDefaults(input: NormalizeInput, options: DefaultsOptions): 
 	const diagnostics: Diagnostic[] = [];
 	const edits: TextEdit[] = [];
 
-	events.forEach((event) => {
-		if (input.onlyChannel !== undefined && event.channel !== input.onlyChannel) {
+	const owned = scopedTo(trace, input.onlyChannel);
+	events.forEach((event, index) => {
+		if (!owned(index)) {
 			return;
 		}
 
@@ -1567,8 +1184,9 @@ export function writePitchSlides(input: NormalizeInput): PassResult {
 	const edits: TextEdit[] = [];
 	const diagnostics: Diagnostic[] = [];
 
+	const owned = scopedTo(trace, input.onlyChannel);
 	events.forEach((event, index) => {
-		if (input.onlyChannel !== undefined && event.channel !== input.onlyChannel) {
+		if (!owned(index)) {
 			return;
 		}
 
@@ -1692,8 +1310,9 @@ export function drumPerNote(input: NormalizeInput): PassResult {
 	const events = trace.events;
 	const edits: TextEdit[] = [];
 
+	const owned = scopedTo(trace, input.onlyChannel);
 	events.forEach((event, index) => {
-		if (input.onlyChannel !== undefined && event.channel !== input.onlyChannel) {
+		if (!owned(index)) {
 			return;
 		}
 

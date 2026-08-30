@@ -1,5 +1,5 @@
 import type { Span } from '@amk/core/types';
-import type { WalkNote } from '@amk/spc/song-walk';
+import type { LoopRun, WalkNote } from '@amk/spc/song-walk';
 import type { Command } from '@amk/tokens';
 import { type CommandGlyph } from '../../command-palette/command-icon';
 import { glyphOf } from '../../command-palette/glyph-of';
@@ -347,6 +347,251 @@ export function buildMinimap(request: MinimapRequest): MinimapBar[] {
   }
 
   return [...behind.values(), ...front.values()];
+}
+
+/**
+ * The tint a loop group's box is washed with, in the channel's own colour: the
+ * declared pass — the text itself — reads the more solid, and a recall is the
+ * fainter ghost of it. The channel is still never left to the colour alone
+ * (`styles.css`) — the notes inside the box carry it as bars, and the wash only
+ * repeats what they say.
+ */
+export const DECLARED_TINT = 0.16;
+export const RECALLED_TINT = 0.08;
+
+/**
+ * One pass of one loop run, as drawn: a box around the rows its notes span,
+ * washed in the channel's colour and edged dashed at the declaration, dotted
+ * at a recall. Bounded to the group's own rows rather than the whole stack, so
+ * two channels' loops through one stretch of song do not stack their washes.
+ */
+export interface LoopRegionBox {
+  id: string;
+  /** The pass's tick range at this zoom. */
+  x: number;
+  w: number;
+  /** The rows the pass's own notes span. */
+  y: number;
+  h: number;
+  /** The textual body playing at its own position; every other pass is a recall. */
+  declared: boolean;
+  /** The channel's own colour, as the bars inside the box wear it. */
+  fill: string;
+  /** {@link DECLARED_TINT} or {@link RECALLED_TINT}, dimmed with a muted channel. */
+  tint: number;
+  /** Dimmed with the channel's bars when the mixer silences it. */
+  opacity: number;
+  /**
+   * What a press on the box's edge grabs: the voice, the body it plays —
+   * `Strip.frames` names a frame by this — and the pass's own start, which is
+   * the origin a group dragged from this pass projects through.
+   */
+  channel: number;
+  body: number;
+  tick: number;
+}
+
+export interface LoopRegionRequest {
+  loops: readonly LoopRun[];
+  notes: readonly WalkNote[];
+  stack: LaneStack;
+  context: PlaceContext;
+  /** The tick window to draw, from `tickWindow`. */
+  from: number;
+  to: number;
+  /** Pixels per tick. */
+  zoom: number;
+  rowHeight: number;
+  /** `timeline.ticks` — a pass past the pass cut never plays and is not drawn. */
+  ticks: number;
+  /** Channel index to whether it is heard; a missing entry counts as audible. */
+  audible: ReadonlyMap<number, boolean>;
+  /** ARAM addresses the command map names, which is what tells a recall from a declaration. */
+  mapped: ReadonlySet<number>;
+}
+
+/**
+ * Which runs play at the place their body is written — the declaration sites.
+ *
+ * A `]n`'s own `$E9` is dropped from the command map (`parser.ts:649`), so a
+ * call run whose `from` maps to a command is a `(n)m` or `*n` and never a
+ * declaration. The rest is enclosure: a run opened inside another run's body is
+ * a declaration only where the pass holding it is itself the declared one, so
+ * the second outer pass of `[ [[c]]2 ]2` recalls the subloop however it was
+ * spelled. The innermost body holding the run's `from` byte is the encloser,
+ * and the pass is found by the tick the run's first pass entered at.
+ */
+function declaredSites(loops: readonly LoopRun[], mapped: ReadonlySet<number>): boolean[] {
+  const resolve = (at: number, seen: ReadonlySet<number>): boolean => {
+    const run = loops[at];
+    if (run.kind === 'call' && mapped.has(run.from)) {
+      return false;
+    }
+
+    let encloser = -1;
+    for (let other = 0; other < loops.length; other++) {
+      const candidate = loops[other];
+      if (
+        other === at ||
+        seen.has(other) ||
+        candidate.channel !== run.channel ||
+        run.from < candidate.body.start ||
+        run.from >= candidate.body.end
+      ) {
+        continue;
+      }
+
+      if (
+        encloser < 0 ||
+        candidate.body.end - candidate.body.start <
+          loops[encloser].body.end - loops[encloser].body.start
+      ) {
+        encloser = other;
+      }
+    }
+
+    if (encloser < 0) {
+      return true;
+    }
+
+    const tick = run.passes[0]?.tick ?? -1;
+    const pass = loops[encloser].passes.findIndex((p) => p.tick <= tick && tick < p.tick + p.ticks);
+
+    // A run the encloser's passes cannot place is a crossed shape; nothing
+    // there is the text playing at its own position.
+    return pass === 0 && resolve(encloser, new Set([...seen, at]));
+  };
+
+  return loops.map((_, at) => resolve(at, new Set([at])));
+}
+
+/**
+ * The loop structure, drawn: one box per pass of every run on screen, around
+ * the rows that pass's own notes span.
+ *
+ * Built beside {@link buildMarks} on the mark window's cadence — never per
+ * frame, never per pointer move. A pass with no note on a row draws nothing:
+ * there is no group to draw a box around, and a stack-high wash was the shape
+ * that had two channels' loops brightening each other where they crossed.
+ */
+export function buildLoopRegions(request: LoopRegionRequest): LoopRegionBox[] {
+  const { loops, notes, stack, context, from, to, zoom, rowHeight, ticks, audible, mapped } =
+    request;
+  if (zoom <= 0 || loops.length === 0) {
+    return [];
+  }
+
+  const declared = declaredSites(loops, mapped);
+
+  interface Open {
+    id: string;
+    x: number;
+    w: number;
+    declared: boolean;
+    fill: string;
+    tint: number;
+    opacity: number;
+    channel: number;
+    body: number;
+    tick: number;
+    end: number;
+    low: number;
+    high: number;
+  }
+
+  const byChannel: Open[][] = [];
+  const opened: Open[] = [];
+
+  for (let at = 0; at < loops.length; at++) {
+    const run = loops[at];
+    const muted = audible.get(run.channel) === false;
+    for (let pass = 0; pass < run.passes.length; pass++) {
+      const { tick, ticks: length } = run.passes[pass];
+      // The cut `buildMarks` takes: a pass the song ends inside is clipped to
+      // the cut, and one past it never plays at all.
+      const end = ticks > 0 ? Math.min(tick + length, ticks) : tick + length;
+      if ((ticks > 0 && tick >= ticks) || tick > to || end < from) {
+        continue;
+      }
+
+      const isDeclared = declared[at] && pass === 0;
+      const open: Open = {
+        id: `${run.body.start}:${tick}:${run.channel}`,
+        x: tick * zoom,
+        w: Math.max(1, (end - tick) * zoom),
+        declared: isDeclared,
+        fill: CHANNEL_FILL[run.channel],
+        tint: (isDeclared ? DECLARED_TINT : RECALLED_TINT) * (muted ? MUTED_OPACITY : 1),
+        opacity: muted ? MUTED_OPACITY : 1,
+        channel: run.channel,
+        body: run.body.start,
+        tick,
+        end,
+        low: Number.POSITIVE_INFINITY,
+        high: Number.NEGATIVE_INFINITY,
+      };
+      opened.push(open);
+      (byChannel[run.channel] ??= []).push(open);
+    }
+  }
+
+  // The box is the rows the pass's own notes span. One walk over the notes,
+  // each tested against its channel's few on-screen regions; a note is in every
+  // region holding its tick, since a subloop's pass sits inside its loop's.
+  for (const note of notes) {
+    const opens = byChannel[note.channel];
+    if (!opens) {
+      continue;
+    }
+
+    let row = -2; // unasked; `rowOf` answers -1 for a note on no row
+    for (const open of opens) {
+      if (note.tick < open.tick || note.tick >= open.end) {
+        continue;
+      }
+
+      if (row === -2) {
+        row = rowOf(note, stack, context);
+      }
+
+      if (row >= 0) {
+        open.low = Math.min(open.low, row);
+        open.high = Math.max(open.high, row);
+      }
+    }
+  }
+
+  return opened
+    .filter((open) => open.low <= open.high)
+    .map(
+      ({
+        id,
+        x,
+        w,
+        declared: isDeclared,
+        fill,
+        tint,
+        opacity,
+        low,
+        high,
+        channel,
+        body,
+        tick,
+      }) => ({
+        id,
+        x,
+        w,
+        y: low * rowHeight - 2,
+        h: (high - low + 1) * rowHeight + 4,
+        declared: isDeclared,
+        fill,
+        tint,
+        opacity,
+        channel,
+        body,
+        tick,
+      }),
+    );
 }
 
 export interface HeldRequest {

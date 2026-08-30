@@ -244,9 +244,9 @@ export interface ParseEvent {
 /**
  * The parse as a sequence of states, for rewriting the source.
  *
- * A `[ ]` body is compiled once, under the state standing at its `[`, and
- * replayed from bytes; text that unrolls it has to re-create that state around
- * each copy, and only the parser can say what it was. Recorded by bracketing the
+ * A rewrite has to know what each piece of text was parsed under — the octave
+ * and default length a bare note read, the drum remap standing at it, the loop
+ * body it sits in — and only the parser can say. Recorded by bracketing the
  * scan's one dispatch loop, as the command map is, so no handler knows it exists.
  */
 export interface ParseTrace {

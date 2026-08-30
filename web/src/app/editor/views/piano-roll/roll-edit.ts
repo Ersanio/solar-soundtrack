@@ -1,7 +1,7 @@
 import { NOTE_MAX, NOTE_MIN } from '@amk/core/hardcoded-tables';
 import type { Command } from '@amk/tokens';
 import type { Edit } from '@amk/tokens/edits';
-import type { ChannelTail, Strip } from './roll-strip';
+import type { ChannelTail, Strip, StripFrame } from './roll-strip';
 
 /**
  * What a gesture on the roll does to a channel: where every note ends up, which
@@ -129,6 +129,12 @@ export interface EditContext {
    */
   channels: readonly ChannelTail[];
   /**
+   * The frame the plan's ticks are local to. `strip.frames[0]` for the
+   * channel's own text; a body frame for a gesture inside a loop, whose
+   * splices then land between the brackets.
+   */
+  frame: StripFrame;
+  /**
    * The `'note-state'` commands the walk had in force at a note, by the address
    * of its head — `StripItem.address`, which is how the walk names a note.
    * `null` for a note the pass never reached, where nothing can be said.
@@ -153,6 +159,9 @@ export const REFUSE_INSIDE = 'there is a command written inside that note';
 export const REFUSE_CLASH = 'two notes would sound at once, which MML cannot say';
 export const REFUSE_BEND_RIDER =
   'a `$DD` pitch slide is written after that note, and it reads the note in front of it';
+export const REFUSE_LOOP_WALL = 'a loop plays where that note would go';
+export const REFUSE_SPLIT = 'those notes are on both sides of a loop bracket';
+export const REFUSE_REMAP_FED = 'that note plays a drum loaded before the loop';
 
 /**
  * Why a plan cannot be written out, in the words the roll shows.
@@ -173,10 +182,11 @@ export function isEdits(outcome: Edit[] | EditRefusal): outcome is Edit[] {
 
 // --- planning ---------------------------------------------------------------
 
-/** The strip's notes as the plan's own objects, tagged with their place in `items`. */
-function placedNotes(strip: Strip): PlacedNote[] {
+/** The frame's notes as the plan's own objects, tagged with their place in `items`. */
+function placedNotes(strip: Strip, frame: StripFrame): PlacedNote[] {
   const notes: PlacedNote[] = [];
-  strip.items.forEach((item, index) => {
+  for (let index = frame.from; index < frame.to; index++) {
+    const item = strip.items[index];
     if (item.kind === 'note') {
       notes.push({
         from: index,
@@ -186,7 +196,7 @@ function placedNotes(strip: Strip): PlacedNote[] {
         drum: item.drum?.args[0]?.value ?? null,
       });
     }
-  });
+  }
 
   return notes;
 }
@@ -493,7 +503,61 @@ function resolved(
   }
 }
 
-export function planGesture(strip: Strip, gesture: Gesture, mode: EditMode): Plan {
+/**
+ * A gesture answered inside one frame, guarded by what that frame holds.
+ *
+ * `frame` defaults to the root, which is the whole story on a channel with no
+ * loops. A gesture naming items on both sides of a bracket has no one frame to
+ * be local to and refuses; one touching a note fed by a drum loaded before its
+ * `[` refuses too, since rewriting that note would move the remap's consumption
+ * onto the next; and a plan whose notes land on a construct's ticks — a loop is
+ * a wall nothing may enter — keeps its bars and turns red.
+ */
+export function planGesture(
+  strip: Strip,
+  gesture: Gesture,
+  mode: EditMode,
+  frame: StripFrame = strip.frames[0],
+): Plan {
+  const named = 'items' in gesture ? gesture.items : [];
+  if (named.some((index) => index < frame.from || index >= frame.to)) {
+    return { ...NOTHING, refused: REFUSE_SPLIT };
+  }
+
+  if (named.some((index) => strip.items[index]?.remapFed)) {
+    return { ...NOTHING, notes: placedNotes(strip, frame), refused: REFUSE_REMAP_FED };
+  }
+
+  return guarded(resolvedGesture(strip, frame, gesture, mode), strip, frame);
+}
+
+/** The wall and remap checks every arm's plan goes through on its way out. */
+function guarded(plan: Plan, strip: Strip, frame: StripFrame): Plan {
+  if (plan.refused !== null) {
+    return plan;
+  }
+
+  const overlaps = (note: PlacedNote, from: number, ticks: number): boolean =>
+    note.startTick < from + ticks && note.startTick + note.ticks > from;
+
+  for (let index = frame.from; index < frame.to; index++) {
+    const item = strip.items[index];
+    if (item.kind === 'construct') {
+      if (plan.notes.some((note) => overlaps(note, item.startTick, item.ticks))) {
+        return { ...plan, refused: REFUSE_LOOP_WALL };
+      }
+    } else if (
+      item.remapFed &&
+      plan.touched.some((note) => overlaps(note, item.startTick, item.ticks))
+    ) {
+      return { ...plan, refused: REFUSE_REMAP_FED };
+    }
+  }
+
+  return plan;
+}
+
+function resolvedGesture(strip: Strip, frame: StripFrame, gesture: Gesture, mode: EditMode): Plan {
   switch (gesture.kind) {
     case 'spawn': {
       if (gesture.drum === null && !inRange(gesture.written)) {
@@ -507,7 +571,7 @@ export function planGesture(strip: Strip, gesture: Gesture, mode: EditMode): Pla
         written: gesture.written,
         drum: gesture.drum,
       };
-      const notes = [...placedNotes(strip), born].sort(byTick);
+      const notes = [...placedNotes(strip, frame), born].sort(byTick);
       // A drawn note is put where the pointer is, so whatever was already there
       // moves later rather than earlier.
       return resolved(notes, [born], mode, 1, new Set());
@@ -518,7 +582,7 @@ export function planGesture(strip: Strip, gesture: Gesture, mode: EditMode): Pla
       const notes: PlacedNote[] = [];
       const touched: PlacedNote[] = [];
 
-      for (const note of placedNotes(strip)) {
+      for (const note of placedNotes(strip, frame)) {
         if (!chosen.has(note.from)) {
           notes.push(note);
           continue;
@@ -528,7 +592,7 @@ export function planGesture(strip: Strip, gesture: Gesture, mode: EditMode): Pla
         // lanes rather than repitching it — the letter has no say in the byte.
         const written = note.drum === null ? note.written + gesture.deltaKeys : note.written;
         if (note.drum === null && !inRange(written)) {
-          return { ...NOTHING, notes: placedNotes(strip), refused: REFUSE_RANGE };
+          return { ...NOTHING, notes: placedNotes(strip, frame), refused: REFUSE_RANGE };
         }
 
         const moved: PlacedNote = {
@@ -556,7 +620,7 @@ export function planGesture(strip: Strip, gesture: Gesture, mode: EditMode): Pla
 
     case 'stretch': {
       const chosen = new Set(gesture.items);
-      let notes = placedNotes(strip);
+      let notes = placedNotes(strip, frame);
       const touched: PlacedNote[] = [];
       const pushed: PlacedNote[] = [];
       const direction = gesture.edge === 'end' ? 1 : -1;
@@ -630,14 +694,14 @@ export function planGesture(strip: Strip, gesture: Gesture, mode: EditMode): Pla
 
     case 'delete': {
       const gone = new Set(gesture.items);
-      const notes = placedNotes(strip).filter((note) => !gone.has(note.from));
+      const notes = placedNotes(strip, frame).filter((note) => !gone.has(note.from));
       return { notes, touched: [], pushed: [], clashes: [], erased: [], refused: null };
     }
 
     case 'quantize': {
       const chosen = new Set(gesture.items);
       const snap = Math.max(1, gesture.snap);
-      const notes = placedNotes(strip)
+      const notes = placedNotes(strip, frame)
         .map((note) =>
           chosen.has(note.from)
             ? { ...note, startTick: Math.round(note.startTick / snap) * snap }
@@ -653,7 +717,7 @@ export function planGesture(strip: Strip, gesture: Gesture, mode: EditMode): Pla
 
     case 'legato': {
       const chosen = new Set(gesture.items);
-      const sorted = placedNotes(strip).sort(byTick);
+      const sorted = placedNotes(strip, frame).sort(byTick);
       const notes = sorted.map((note, at) => {
         const next = sorted[at + 1];
         return chosen.has(note.from) && next && next.startTick > note.startTick
@@ -674,7 +738,7 @@ export function planGesture(strip: Strip, gesture: Gesture, mode: EditMode): Pla
       const chosen = new Set(gesture.items);
       const notes: PlacedNote[] = [];
       const touched: PlacedNote[] = [];
-      for (const note of placedNotes(strip).sort(byTick)) {
+      for (const note of placedNotes(strip, frame).sort(byTick)) {
         const held = notes[notes.length - 1];
         if (
           held &&
@@ -697,4 +761,53 @@ export function planGesture(strip: Strip, gesture: Gesture, mode: EditMode): Pla
       return { notes, touched, pushed: [], clashes: [], erased: [], refused: null };
     }
   }
+}
+
+/**
+ * The ticks the frame will occupy once the plan is written — what prices a
+ * body-length change, whose every pass and every note after the loop move by
+ * its difference against `frame.ticks`.
+ *
+ * The commit's own layout, restated over ticks: surviving and born notes stand
+ * where the plan puts them, a construct's ticks are fixed, the regions between
+ * anchors are preserved, and the trailing rests ride the last anchor —
+ * `realiseRegion` never rewrites the tail's length, so a deleted note ahead of
+ * them slides them earlier and a moved one carries them along. A rest a born
+ * note wholly covers is gone, its ticks re-expressed by the note.
+ */
+export function plannedFrameTicks(strip: Strip, frame: StripFrame, plan: Plan): number {
+  let last = 0;
+  for (const note of plan.notes) {
+    last = Math.max(last, note.startTick + note.ticks);
+  }
+
+  const survivors = new Set(plan.notes.map((note) => note.from));
+  const covered = (from: number, ticks: number): boolean =>
+    plan.notes.some(
+      (note) => note.startTick <= from && note.startTick + note.ticks >= from + ticks,
+    );
+
+  let trailing = 0;
+  for (let index = frame.to - 1; index >= frame.from; index--) {
+    const item = strip.items[index];
+    if (item.kind === 'rest') {
+      if (!covered(item.startTick, item.ticks)) {
+        trailing += item.ticks;
+      }
+
+      continue;
+    }
+
+    if (item.kind === 'note' && !survivors.has(index)) {
+      continue; // Removed, so the rests behind it slide up to the anchor.
+    }
+
+    // The anchor the trailing rests ride: a construct's fixed end, or the
+    // surviving note's planned one.
+    const planned =
+      item.kind === 'construct' ? item : (plan.notes.find((note) => note.from === index) ?? item);
+    return Math.max(last, planned.startTick + planned.ticks + trailing);
+  }
+
+  return Math.max(last, trailing);
 }

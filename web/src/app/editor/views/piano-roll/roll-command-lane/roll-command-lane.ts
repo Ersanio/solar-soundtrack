@@ -240,6 +240,7 @@ export class RollCommandLane {
       source: this.editor.source(),
       channel: drag.glyph.channel,
       noteMap: result.noteMap ?? [],
+      commandMap: result.commandMap ?? [],
       timeline,
       index: this.editor.tokens(),
       tempoRatio: result.stats?.tempoRatio ?? 1,

@@ -59,7 +59,8 @@ import {
   tickWindow,
   xAtTick,
 } from './roll-layout';
-import { type Mark, buildMarks, buildMinimap, heldRowsAt } from './roll-marks';
+import { type Mark, buildLoopRegions, buildMarks, buildMinimap, heldRowsAt } from './roll-marks';
+import { RollLoops } from './roll-loops/roll-loops';
 import { laneWindow, packCommandLane } from './roll-command-layout';
 import { RollCommandLane } from './roll-command-lane/roll-command-lane';
 import {
@@ -120,6 +121,7 @@ import { RollTooltip } from './roll-tooltip/roll-tooltip';
     RollGrid,
     RollKeys,
     RollLanes,
+    RollLoops,
     RollNotes,
     RollOverview,
     RollScrub,
@@ -639,6 +641,33 @@ export class PianoRoll {
   });
 
   /**
+   * The addresses the command map names. What tells a loop recall from its
+   * declaration: a `]n`'s own `$E9` is the one dispatch `recordCommand` drops.
+   */
+  private readonly mappedCommands = computed(
+    () => new Set((this.editor.result()?.commandMap ?? []).map((entry) => entry.address)),
+  );
+
+  /** The loop structure behind the bars, on the mark window's own cadence. */
+  protected readonly loopRegions = computed(() => {
+    const { from, to } = this.window();
+    const timeline = this.timeline();
+    return buildLoopRegions({
+      loops: timeline?.loops ?? [],
+      notes: timeline?.notes ?? [],
+      stack: this.stack(),
+      context: this.placeContext(),
+      from,
+      to,
+      zoom: this.zoom(),
+      rowHeight: this.rowHeight(),
+      ticks: timeline?.ticks ?? 0,
+      audible: this.audible(),
+      mapped: this.mappedCommands(),
+    });
+  });
+
+  /**
    * The porter's grid, drawn by the roll and numbered by the scrub bar.
    *
    * One list for both, so a bar's number cannot land at an x its own rule is not
@@ -774,6 +803,7 @@ export class PianoRoll {
       source: this.editor.source(),
       channel,
       noteMap: result.noteMap ?? [],
+      commandMap: result.commandMap ?? [],
       timeline,
       index: this.editor.tokens(),
       tempoRatio: result.stats?.tempoRatio ?? 1,

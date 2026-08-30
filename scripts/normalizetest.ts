@@ -6,10 +6,11 @@
  * what make the first worth having: it compiles, it **plays the same music** —
  * the walk of the result agrees with the walk of the original on every note,
  * its tick, its state and the pitch it was written at — it has nothing left
- * that the roll cannot splice (no loop, call, triplet, replacement or
- * preprocessor line outside a remote definition), and it is a **fixed point**:
- * normalizing the result changes nothing. The songs that are refused are
- * refused for a named reason, and the reason is pinned too.
+ * that the roll cannot splice (no triplet, replacement or preprocessor line
+ * outside a remote definition; loops stay exactly as written, being shapes the
+ * roll edits in place), and it is a **fixed point**: normalizing the result
+ * changes nothing. The songs that are refused are refused for a named reason,
+ * and the reason is pinned too.
  *
  *   npm run normalizetest
  */
@@ -50,28 +51,26 @@ function build(source: string): { result: CompileResult; timeline: SongTimeline 
 const normalize = (source: string): NormalizeOutcome => normalizeSong(source, ARAM, OPTIONS);
 
 /**
- * What may still be there afterwards: remote code, and the quoted names and
- * braces of the header blocks. Anything else the roll would trip on is named.
+ * What may still be there afterwards: loops and their recalls, remote code, and
+ * the quoted names and braces of the header blocks. Anything else the roll
+ * would trip on is named — the triplet braces, a replacement's quotes, and the
+ * preprocessor's directives.
  */
 function residue(text: string): string | null {
 	const stripped = text
 		.replace(/#(spc|samples|instruments)\s*\{[^}]*\}/gi, "")
 		.replace(/#path\s+"[^"]*"/gi, "")
-		.replace(/\("[^"]*"\s*,[^)]*\)/g, "")
-		.replace(/\(![^)]*\)\[[^\]]*\]/g, "")
-		.replace(/\(![^)]*\)/g, "");
-	const left = /[[\]*{}"]|\(\d+\)|#(define|undef|ifdef|ifndef|if|endif)\b/.exec(stripped);
+		.replace(/\("[^"]*"\s*,[^)]*\)/g, "");
+	const left = /[{}"]|#(define|undef|ifdef|ifndef|if|endif)\b/.exec(stripped);
 	return left ? left[0] : null;
 }
 
 /**
- * The two things a regex over the text cannot answer, asked of the parse instead.
- *
- * A subloop is whatever toggled `inE6Loop`, so this catches `$E6 $00` and `[[`
- * alike and cannot fire on the `$E6 $00` inside a `$F5` filter's arguments. An
- * `l` is an `l` command, so this cannot fire on the letter in a comment, in an
- * `#spc` title or in a sample filename; the ones inside a remote definition are
- * the ones the pass is asked to leave, and govern nothing that plays.
+ * The one thing a regex over the text cannot answer, asked of the parse
+ * instead: an `l` is an `l` command, so this cannot fire on the letter in a
+ * comment, in an `#spc` title or in a sample filename; the ones inside a
+ * remote definition are the ones the pass is asked to leave, and govern
+ * nothing that plays.
  */
 function unnormalised(text: string): string | null {
 	const result = compiler.compile({ source: text, aramAddress: ARAM, options: { ...OPTIONS, trace: true } });
@@ -81,10 +80,6 @@ function unnormalised(text: string): string | null {
 	}
 
 	for (const event of events) {
-		if (event.loop?.kind === "subOpen" || event.loop?.kind === "subClose") {
-			return "a subloop";
-		}
-
 		if (event.char === "l" && !event.state.inRemoteDefinition) {
 			return `an l at ${event.span.start}`;
 		}
@@ -119,10 +114,10 @@ function expectNormalized(name: string, source: string, shape?: (text: string) =
 	}
 
 	const left = residue(outcome.text);
-	check(`${name}: nothing left to unroll`, left === null, `found ${left ?? ""} in:\n${outcome.text}`);
+	check(`${name}: nothing the roll trips on is left`, left === null, `found ${left ?? ""} in:\n${outcome.text}`);
 
 	const asked = unnormalised(outcome.text);
-	check(`${name}: no subloop and no l survive`, asked === null, `found ${asked ?? ""} in:\n${outcome.text}`);
+	check(`${name}: no l survives`, asked === null, `found ${asked ?? ""} in:\n${outcome.text}`);
 
 	const again = normalize(outcome.text);
 	check(
@@ -159,101 +154,114 @@ function expectRefused(name: string, source: string, code: string): void {
 console.log("loops");
 // ---------------------------------------------------------------------------
 
+// Loops stay exactly as written — they are shapes the roll edits in place —
+// and the passes that rewrite around and *inside* them work on the single
+// parse a body gets, which is what keeps every one of these byte-neutral.
 expectNormalized(
 	"a [ ] body with an octave step inside",
 	"#amk 4\n#0 o4 [c8 d8 > e8 f8]3 g8\n",
-	(t) => count(t, /c8/g) === 3,
+	// The body plays once per pass from one text, so its notes are written once;
+	// the `>` inside it is made absolute where it stands.
+	(t) => count(t, /c8/g) === 1 && t.includes("[c8 d8 o5 e8 f8]3"),
 );
-expectNormalized("a drum remap standing at the [", "#amk 4\n#0 @21 [ c8 ]2 d8\n", (t) => count(t, /@21/g) === 3);
+expectNormalized(
+	"a drum remap standing at the [",
+	"#amk 4\n#0 @21 [ c8 ]2 d8\n",
+	// The body's head consumes the block's copy of the remap, so `d8` outside is
+	// still on the drum and both get their own `@` — three with the original.
+	(t) => count(t, /@21/g) === 3 && t.includes("[ @21 c8 ]2"),
+);
 expectNormalized(
 	"the same on #6, where a note does not consume it",
 	"#amk 4\n#6 @21 [ c8 ]2 d8\n",
 	(t) => count(t, /@21/g) === 3,
 );
 expectNormalized("a drum remap set inside the body", "#amk 4\n#0 [ @21 c8 ]2 d8\n", (t) =>
-	t.includes("@21 c8 @21 c8 d8"),
+	t.includes("[ @21 c8 ]2 d8"),
 );
-expectNormalized("a * call", "#amk 4\n#0 [c8 d8]2 *3 e8\n", (t) => count(t, /c8/g) === 5);
+expectNormalized("a * call", "#amk 4\n#0 [c8 d8]2 *3 e8\n", (t) => t.includes("[c8 d8]2 *3 e8"));
 expectNormalized(
 	"a label loop called from another channel under another o and l",
 	"#amk 4\n#0 o4 l8 (1)[c d e]2\n#1 o3 l16 (1)3 f\n",
-	(t) => t.includes("o4 c8 d8 e8") && t.includes("o3 f16") && count(t, /c8 d8 e8/g) === 5,
+	// The `l`s go and every note gets its own length, the body's included — the
+	// body is parsed once, under the `l` standing at its `[`, so the rewrite is
+	// exact there — and the call site is one token either way.
+	(t) => t.includes("(1)[c8 d8 e8]2") && t.includes("(1)3 f16") && count(t, /c8 d8 e8/g) === 1,
 );
-expectNormalized("a subloop inside a loop", "#amk 4\n#0 [ c8 [[ d8 ]]3 e8 ]2\n", (t) => count(t, /d8/g) === 6);
-expectNormalized("a loop inside a subloop", "#amk 4\n#0 [[ c8 [ d8 ]2 e8 ]]2\n", (t) => count(t, /d8/g) === 4);
-// The same subloop written as hex. `$E6 $nn` plays the body one more time than
-// the byte says, so `$02` is three copies, and both spellings toggle the one
-// flag — so either end of a pair may be written either way.
-expectNormalized(
-	"a subloop written as hex",
-	"#amk 4\n#0 c8 $E6 $00 d8 $E6 $02 e8\n",
-	(t) => count(t, /d8/g) === 3 && !t.includes("$E6"),
+expectNormalized("a subloop inside a loop", "#amk 4\n#0 [ c8 [[ d8 ]]3 e8 ]2\n", (t) =>
+	t.includes("[ c8 [[ d8 ]]3 e8 ]2"),
 );
-expectNormalized(
-	"a hex subloop inside a [ ]",
-	"#amk 4\n#0 [ c8 $E6 $00 d8 $E6 $02 e8 ]2\n",
-	(t) => count(t, /d8/g) === 6 && !t.includes("$E6"),
+expectNormalized("a loop inside a subloop", "#amk 4\n#0 [[ c8 [ d8 ]2 e8 ]]2\n", (t) =>
+	t.includes("[[ c8 [ d8 ]2 e8 ]]2"),
 );
-expectNormalized(
-	"a [ ] inside a hex subloop",
-	"#amk 4\n#0 $E6 $00 c8 [ d8 ]2 e8 $E6 $01\n",
-	(t) => count(t, /d8/g) === 4 && !t.includes("$E6"),
+expectNormalized("a subloop written as hex", "#amk 4\n#0 c8 $E6 $00 d8 $E6 $02 e8\n", (t) =>
+	t.includes("c8 $E6 $00 d8 $E6 $02 e8"),
 );
-expectNormalized(
-	"a hex open closed by ]]",
-	"#amk 4\n#0 $E6 $00 c8 ]]3\n",
-	(t) => count(t, /c8/g) === 3 && !t.includes("$E6") && !t.includes("]]"),
+expectNormalized("a hex subloop inside a [ ]", "#amk 4\n#0 [ c8 $E6 $00 d8 $E6 $02 e8 ]2\n", (t) =>
+	t.includes("[ c8 $E6 $00 d8 $E6 $02 e8 ]2"),
 );
-expectNormalized(
-	"a [[ closed by hex",
-	"#amk 4\n#0 [[ c8 $E6 $02\n",
-	(t) => count(t, /c8/g) === 3 && !t.includes("$E6") && !t.includes("[["),
+expectNormalized("a [ ] inside a hex subloop", "#amk 4\n#0 $E6 $00 c8 [ d8 ]2 e8 $E6 $01\n", (t) =>
+	t.includes("$E6 $00 c8 [ d8 ]2 e8 $E6 $01"),
 );
-// Music.cpp:433 — under `#am4` an unfinished `$E6` is a one-byte tremolo off, so
-// it opens no subloop and there is nothing to unroll.
+expectNormalized("a hex open closed by ]]", "#amk 4\n#0 $E6 $00 c8 ]]3\n", (t) => t.includes("$E6 $00 c8 ]]3"));
+expectNormalized("a [[ closed by hex", "#amk 4\n#0 [[ c8 $E6 $02\n", (t) => t.includes("[[ c8 $E6 $02"));
+// Music.cpp:433 — under `#am4` an unfinished `$E6` is a one-byte tremolo off,
+// not a subloop.
 expectNormalized("#am4's unfinished $E6 is not a subloop", "#am4\n#0 $E6 c4 d4\n", (t) => t.includes("$E6 c4"));
-expectNormalized("a q inside the body", "#amk 4\n#0 q7F [ q3F c8 ]2 d8\n", (t) => t.includes("q7F q3F c8"));
+expectNormalized("a q inside the body", "#amk 4\n#0 q7F [ q3F c8 ]2 d8\n", (t) => t.includes("[ q3F c8 ]2"));
 expectNormalized(
 	"a custom instrument set inside the body",
 	"#amk 4\n#instruments\n{\n@0 $FF $E0 $B8 $02 $00\n}\n#0 @0 [ @30 c8 ]2 d8\n",
-	(t) => t.includes("@30 c8 @30 c8 d8"),
+	(t) => t.includes("[ @30 c8 ]2 d8"),
 );
 expectNormalized(
 	"h inside a body called from a channel without h",
 	"#amk 4\n#0 (1)[ h3 c8 d8 ]2\n#1 o4 (1)2 e8\n",
-	(t) => count(t, /h3 c8 d8/g) === 4 && t.includes("#1 e8"),
+	(t) => count(t, /h3 c8 d8/g) === 1 && t.includes("(1)2 e8"),
 );
-expectNormalized("a ] with no count", "#amk 4\n#0 [c8 d8] e8\n", (t) => count(t, /c8/g) === 1);
+expectNormalized("a ] with no count", "#amk 4\n#0 [c8 d8] e8\n", (t) => t.includes("[c8 d8] e8"));
 expectNormalized(
 	"remote code is left alone",
 	"#amk 4\n(!1)[ $F4 $02 ]\n#0 (!1, 1, 8) c8\n",
 	(t) => t.includes("(!1)[ $F4 $02 ]") && t.includes("(!1, 1, 8) c8"),
 );
 expectNormalized(
-	"the loop the roll cannot answer from the text",
+	"a recall under other state",
 	"#amk 4\n#0 v255 (1)[ c8 d8 e8 ]2 v200 (1)5\n",
-	(t) => count(t, /c8 d8 e8/g) === 7,
+	(t) => count(t, /c8 d8 e8/g) === 1,
+);
+// The recall-under-another-instrument songs the unroll era refused outright
+// (the copies would have retuned): the byte is fixed at the parse and the
+// state is the pass's, so with the loop kept there is nothing to object to.
+expectNormalized(
+	"a call under a differently tuned instrument",
+	"#amk 4\n#0 @0 (1)[c8]2\n#1 @2 (1)2\n",
+	(t) => t.includes("(1)[c8]2") && t.includes("(1)2"),
+);
+expectNormalized("an @ inside the body that retunes what follows", "#amk 4\n#0 @0 [ @2 c8 ]2 d8\n", (t) =>
+	t.includes("[ @2 c8 ]2 d8"),
+);
+// A loop and a subloop that cross. AddmusicK guards nesting and not crossing
+// (Music.cpp:1208-1290), so these build and the driver plays what `walktest`
+// pins for them; the text stands as written, and the roll is what refuses the
+// shape (`rolltest`), having runs it cannot line the brackets up with.
+expectNormalized("a subloop that closes outside its loop", "#amk 4\n#0 [ c4 $E6 $00 d4 ]2 e4 $E6 $01\n", (t) =>
+	t.includes("[ c4 $E6 $00 d4 ]2 e4 $E6 $01"),
+);
+expectNormalized("a subloop that closes inside a loop", "#amk 4\n#0 $E6 $00 c4 [ d4 $E6 $01 ]2\n", (t) =>
+	t.includes("$E6 $00 c4 [ d4 $E6 $01 ]2"),
 );
 
-expectRefused("a * before any loop", "#amk 4\n#0 *2 c4\n", "SST0602");
-expectRefused("a call under a differently tuned instrument", "#amk 4\n#0 @0 (1)[c8]2\n#1 @2 (1)2\n", "SST0604");
-expectRefused("an @ inside the body that would retune what follows", "#amk 4\n#0 @0 [ @2 c8 ]2 d8\n", "SST0605");
+// A `*` before any loop compiles to a call to nowhere (`$E9 FF FF n`,
+// Music.cpp:1321), which relocation wraps back inside the blob — the walk
+// follows it into whatever is there, deterministically, so the oracle holds
+// and the text stands. The roll's own gate is what refuses the shape.
+expectNormalized("a * before any loop", "#amk 4\n#0 *2 c4\n", (t) => t.includes("*2 c4"));
 expectRefused("a pitch slide across a bracket", "#amk 4\n#0 c8 & [ d8 ]2\n", "SST0607");
 // A hex subloop is a boundary the same way a bracket is, now that `precheck` can
 // see one at all.
 expectRefused("a pitch slide across a hex subloop", "#amk 4\n#0 c8 & $E6 $00 d8 $E6 $01\n", "SST0607");
 expectRefused("a song that retunes an instrument", "#amk 4\ntuning[0]=2\n#0 [c8]2\n", "SST0608");
-// A loop and a subloop that cross. AddmusicK guards nesting and not crossing
-// (Music.cpp:1208-1290), so both of these build, and the driver's one subloop
-// return per voice sends the close into the other construct's body — the first
-// song plays `c4 d4 c4 d4 e4 d4` and then ends, with the `e4 $E6 $01` reached
-// once and everything after it never. No number of copies says that.
-expectRefused("a subloop that closes outside its loop", "#amk 4\n#0 [ c4 $E6 $00 d4 ]2 e4 $E6 $01\n", "SST0616");
-expectRefused("a subloop that closes inside a loop", "#amk 4\n#0 $E6 $00 c4 [ d4 $E6 $01 ]2\n", "SST0616");
-// The same crossing in brackets: `[[` appends `$E6 $00` inside the loop block
-// and `]]2` appends `$E6 $01` after it, with the `]` counting 1 for want of a
-// number, so this is the first song's bytes.
-expectRefused("the same crossing written with brackets", "#amk 4\n#0 [ c4 [[ d4 ] e4 ]]2\n", "SST0616");
 
 // ---------------------------------------------------------------------------
 console.log("\ntriplets");
@@ -522,7 +530,7 @@ expectSameBytes("a slide onto a drum", "#amk 4\n#0 o4 c4 @21 & d4\n", (t) => t.i
 expectSameBytes("a slide onto a drum on #6", "#amk 4\n#6 o4 @21 c4 & d4\n");
 expectSameBytes("a slide on Addmusic 4.05", "#am4\n#0 o4 c4 & d4\n");
 expectSameBytes("a slide on AddmusicM", "#amm\n#0 o4 c4 & d4\n");
-expectSameBytes("a slide inside a loop", "#amk 4\n#0 o4 [c4 & d4]2\n", (t) => count(t, /\$DD/g) === 2);
+expectSameBytes("a slide inside a loop", "#amk 4\n#0 o4 [c4 & d4]2\n", (t) => count(t, /\$DD/g) === 1);
 expectSameBytes("two slides in a row", "#amk 4\n#0 o4 c4 & d4 & e4\n", (t) => count(t, /\$DD/g) === 2);
 
 // `accumulateTiedLength` rewinds the last tie out of the run in front of the
@@ -577,11 +585,11 @@ expectNormalized("a song that uses a little of everything", SINK);
 expectNormalized("a #1-only song with a command above it", "#amk 4\n$ED $7F $E0\n#1 o4 c8\n", (t) =>
 	/#1 [^\n]*\$ED \$7F \$E0/.test(t),
 );
-expectNormalized("an #amk 1 song", "#amk 1\n#0 o4 [c8 d8]2 e8\n", (t) => count(t, /c8/g) === 2);
+expectNormalized("an #amk 1 song", "#amk 1\n#0 o4 [c8 d8]2 e8\n", (t) => t.includes("[c8 d8]2 e8"));
 expectNormalized(
 	"an #amm song",
 	"#amm\n#0 o4 [c8 d8]2 e8 ; a comment\n",
-	(t) => count(t, /c8/g) === 2 && t.includes("; a comment"),
+	(t) => t.includes("[c8 d8]2 e8") && t.includes("; a comment"),
 );
 
 // ---------------------------------------------------------------------------
@@ -595,7 +603,9 @@ expectNormalized(
  */
 console.log("\nnormalizing one channel");
 {
-	const source = "#amk 2\n#0 o4 [c4 d4]2 e4\n#1 o4 [g4 a4]2 b4\n";
+	// The scoped form reaches inside #0's own loop body — the `{ }` there is
+	// #0's own text — and touches nothing of #1's, its loop included.
+	const source = "#amk 2\n#0 o4 [{c8 d8 e8}]2 e4\n#1 o4 [g4 a4]2 b4\n";
 	const before = build(source);
 	const scoped = normalizeSong(source, ARAM, OPTIONS, 0);
 	check("one channel: normalizes", scoped.ok, scoped.ok ? "" : describe(scoped.diagnostics));
@@ -603,8 +613,8 @@ console.log("\nnormalizing one channel");
 		const after = build(scoped.text);
 		check("one channel: the result compiles", typeof after !== "string", typeof after === "string" ? after : "");
 		check(
-			"one channel: #0's loop is gone",
-			count(scoped.text.split("#1")[0], /\[/g) === 0,
+			"one channel: the triplet inside #0's own body is written out",
+			scoped.text.includes("[c12 d12 e12]2"),
 			JSON.stringify(scoped.text),
 		);
 		check(
@@ -649,43 +659,42 @@ console.log("\nnormalizing one channel");
 }
 
 {
-	// A loop that cannot be unrolled on #1 must not stop #0 being put in order —
-	// this is the whole reason the scoped form exists rather than being the
-	// whole-song one with a filter bolted on afterwards.
-	const source = "#amk 2\n#0 o4 [c4 d4]2 e4\n#1 @0 [ @2 g4 ]2 a4\n";
+	// A crossed pair on #1 is nothing normalize objects to any more — the text
+	// stands and the roll's gate is what refuses the shape — so both scopes and
+	// the whole song rewrite around it untouched.
+	const source = "#amk 2\n#0 o4 [c4 d4]2 e4\n#1 o4 [ c4 $E6 $00 d4 ]2 e4 $E6 $01\n";
 	const whole = normalize(source);
 	const scoped = normalizeSong(source, ARAM, OPTIONS, 0);
-	check("a channel the whole song cannot manage: the whole song is refused", !whole.ok, "it normalized");
 	check(
-		"a channel the whole song cannot manage: #0 alone still normalizes",
+		"a crossing on another channel: the whole song still normalizes",
+		whole.ok && whole.text.includes("[ c4 $E6 $00 d4 ]2 e4 $E6 $01"),
+		whole.ok ? JSON.stringify(whole.text) : describe(whole.diagnostics),
+	);
+	check(
+		"a crossing on another channel: #0 alone normalizes too",
 		scoped.ok,
 		scoped.ok ? "" : describe(scoped.diagnostics),
 	);
 }
 
 {
-	// The crossing is `#1`'s, so it refuses the whole song and the channel it is
-	// on, and leaves `#0` to normalize. That is why the diagnostic takes its
-	// channel from the `[` and not from the `$E6`, whose dispatch inside a loop
-	// body reports channel 8.
-	const source = "#amk 2\n#0 o4 [c4 d4]2 e4\n#1 o4 [ c4 $E6 $00 d4 ]2 e4 $E6 $01\n";
-	const whole = normalize(source);
-	const mine = normalizeSong(source, ARAM, OPTIONS, 1);
-	const scoped = normalizeSong(source, ARAM, OPTIONS, 0);
+	// A body #0 declares and #1 recalls: scoped to #1 the body is #0's text and
+	// is left as written, and the dialog is told so — the info note is what
+	// stops "nothing to normalize" standing beside a shape the porter can see.
+	const source = "#amk 2\n#0 o4 (1)[{c8 d8 e8}]2\n#1 o4 (1)2 g4\n";
+	const scoped = normalizeSong(source, ARAM, OPTIONS, 1);
 	check(
-		"a crossing on another channel: the whole song is refused with SST0616",
-		!whole.ok && whole.diagnostics.some((d) => d.code === "SST0616"),
-		describe(whole.diagnostics),
+		"a body another channel declares: left as written and said so (SST0618)",
+		scoped.ok && scoped.text.includes("{c8 d8 e8}") && scoped.diagnostics.some((d) => d.code === "SST0618"),
+		scoped.ok ? `${describe(scoped.diagnostics)}\n${JSON.stringify(scoped.text)}` : describe(scoped.diagnostics),
 	);
+
+	// Scoped to #0 the body is its own, and the triplet inside it is written out.
+	const own = normalizeSong(source, ARAM, OPTIONS, 0);
 	check(
-		"a crossing on another channel: #1 alone is refused too",
-		!mine.ok && mine.diagnostics.some((d) => d.code === "SST0616"),
-		describe(mine.diagnostics),
-	);
-	check(
-		"a crossing on another channel: #0 alone still normalizes",
-		scoped.ok,
-		scoped.ok ? "" : describe(scoped.diagnostics),
+		"the same body scoped to its declarer: rewritten",
+		own.ok && own.text.includes("(1)[c12 d12 e12]2"),
+		own.ok ? JSON.stringify(own.text) : describe(own.diagnostics),
 	);
 }
 
@@ -708,8 +717,8 @@ console.log("\nnormalizing one channel");
 			JSON.stringify(scoped.text),
 		);
 		check(
-			"#0 under a remote definition: its own loop is still unrolled",
-			count(scoped.text.split("#1")[0], /\[/g) === 1,
+			"#0 under a remote definition: its own loop stands as written",
+			scoped.text.includes("[c4 d4]2"),
 			JSON.stringify(scoped.text),
 		);
 	}

@@ -22,8 +22,14 @@ import {
   REFUSE_RAMP,
   REFUSE_SPELL,
   isEdits,
+  plannedFrameTicks,
 } from './roll-edit';
-import type { Strip, StripItem } from './roll-strip';
+import type { Strip, StripFrame, StripItem } from './roll-strip';
+
+/** The first interior index of a region — the frame's head where no note bounds it. */
+function interiorFrom(gap: Region, frame: StripFrame): number {
+  return gap.after < 0 ? frame.from : gap.after + 1;
+}
 
 /**
  * An accepted plan as text: the splices that put it in the document.
@@ -158,9 +164,14 @@ function noteText(
   return `${lead ? `${lead} ` : ''}${head}${length}${exit}`;
 }
 
-/** The index of the next note on the channel at or after `from`, or -1 for none. */
-function noteFrom(strip: Strip, from: number): number {
-  for (let at = from; at < strip.items.length; at++) {
+/**
+ * The index of the next note at or after `from` and before `bound`, or -1 for
+ * none. The bound is the asking item's own frame's end — the flat array holds
+ * every frame's items, and a body's last note has no next note: the item after
+ * it is another frame's text entirely.
+ */
+function noteFrom(strip: Strip, from: number, bound: number): number {
+  for (let at = from; at < bound; at++) {
     if (strip.items[at].kind === 'note') {
       return at;
     }
@@ -243,7 +254,7 @@ function exitOctaveFor(
     return exit;
   }
 
-  const next = noteFrom(strip, index + 1);
+  const next = noteFrom(strip, index + 1, strip.frames[item.frame].to);
   return next >= 0 && writesItsOwnOctave(strip, next, survivors) ? null : exit;
 }
 
@@ -311,10 +322,26 @@ function reachesSomething(
   born: readonly PlacedNote[],
 ): boolean {
   const { strip } = context;
+
+  // Inside a body the question is unprovable: a command there is read once per
+  // pass under per-instance state, and a `q` written in a body writes the
+  // caller's slot as well as the block's — so the conservative answer is the
+  // one the scan already gives a note past the pass cut, and the command stays.
+  if (context.frame.body >= 0) {
+    return true;
+  }
+
   /** Where the slot changed hands, and so where this command stops reaching. */
   let end = Number.POSITIVE_INFINITY;
-  for (let index = from; index < strip.items.length; index++) {
+  for (let index = from; index < context.frame.to; index++) {
     const item = strip.items[index];
+    // A loop's body may still read the command on any of its passes, and the
+    // scan cannot see inside it — so nothing past this point can prove the
+    // command reaches no one.
+    if (item.kind === 'construct') {
+      return true;
+    }
+
     if (item.kind !== 'note' || item.startTick < tick) {
       continue;
     }
@@ -574,10 +601,11 @@ function restRuns(context: EditContext, gap: Region): RestRun[] {
   /** And whether one of those removed units is what stands between them. */
   let removed = false;
 
-  for (let index = gap.after + 1; index < gap.before; index++) {
+  const head = interiorFrom(gap, context.frame);
+  for (let index = head; index < gap.before; index++) {
     const item = strip.items[index];
     const touches =
-      index > gap.after + 1 &&
+      index > head &&
       source.slice(strip.items[index - 1].unitSpan.end, item.unitSpan.start).trim() === '';
 
     if (item.kind !== 'rest') {
@@ -789,21 +817,27 @@ function writeInto(context: EditContext, gap: Region, run: string): Edit | null 
     return insertAt(afterBend(strip.items[gap.before - 1]), ` ${run}`, 1);
   }
 
-  const next = strip.items[gap.before];
+  const next = gap.before < context.frame.to ? strip.items[gap.before] : undefined;
   if (next) {
     return insertAt(next.unitSpan.start, `${run} `, 1);
   }
 
-  // No note after it either, so the region is the whole channel and the run goes
+  // No note after it either, so the region is the whole frame and the run goes
   // where its items were: after the last of them, as the branch above puts it
   // after the note before the gap. Not at the head of the first — every item in
   // here is a unit `planEdits` removes, `removeItem` takes the whitespace in
   // front of the unit with it, and an insertion at a head therefore lands
   // strictly inside a range being deleted, which `planEdits` refuses. The end of
   // the last only abuts one.
-  const last = strip.items[gap.before - 1];
+  const last = gap.before - 1 >= context.frame.from ? strip.items[gap.before - 1] : undefined;
   if (last) {
     return insertAt(last.unitSpan.end, ` ${run}`, 1);
+  }
+
+  // A body frame holding no items at all — commands alone between its brackets.
+  // The run goes at the interior's end, against the closing arm.
+  if (context.frame.body >= 0) {
+    return insertAt(context.frame.span.end, ` ${run}`, 1);
   }
 
   const line = eol(source);
@@ -835,17 +869,24 @@ function writeInto(context: EditContext, gap: Region, run: string): Edit | null 
  * ticks it never had is not what drawing a note asked for. So is the channel
  * being edited, which the gesture's own splices already carry out to the note.
  */
-function padChannels(context: EditContext, to: number): Edit[] | null {
+function padChannels(
+  context: EditContext,
+  to: number,
+  grown: ReadonlyMap<number, number>,
+): Edit[] | null {
   const { source, strip, targetAMKVersion } = context;
   const line = eol(source);
   const edits: Edit[] = [];
 
   for (const [channel, tail] of context.channels.entries()) {
-    if (channel === strip.channel || tail.ticks <= 0 || tail.ticks >= to) {
+    // A voice that plays the edited body has already moved by its own passes'
+    // worth of the length change — its tick count here predates the edit.
+    const ticks = tail.ticks + (grown.get(channel) ?? 0);
+    if (channel === strip.channel || tail.ticks <= 0 || ticks >= to) {
       continue;
     }
 
-    const text = spellDuration(to - tail.ticks, targetAMKVersion);
+    const text = spellDuration(to - ticks, targetAMKVersion);
     if (text === null) {
       return null;
     }
@@ -1073,8 +1114,13 @@ function restFor(gap: Region, born: PlacedNote): StripItem | null {
  * be re-expressed by the run. Only a rest can stand aside, and only one no
  * born note reaches into.
  */
-function windowOf(strip: Strip, gap: Region, order: readonly PlacedNote[]): StripItem[] {
-  const interior = strip.items.slice(gap.after + 1, gap.before);
+function windowOf(
+  strip: Strip,
+  frame: StripFrame,
+  gap: Region,
+  order: readonly PlacedNote[],
+): StripItem[] {
+  const interior = strip.items.slice(interiorFrom(gap, frame), gap.before);
   let from = Infinity;
   let to = -Infinity;
   for (const item of interior) {
@@ -1274,8 +1320,12 @@ function spawnInto(
    * A note drawn past the end extends the channel rather than being refused, in
    * either case, and {@link padChannels} brings the rest of the song out to meet
    * it — so the channel does not become the long one and the note is heard.
+   *
+   * For a body frame it is the body's own length, and growing past it is the
+   * length change every pass and everything after the loop move by.
    */
-  const channelEnd = empty ? context.playableTicks : strip.ticks;
+  const channelEnd =
+    context.frame.body >= 0 ? context.frame.ticks : empty ? context.playableTicks : strip.ticks;
 
   /**
    * The rest being written over, and the ticks the run written there has to come
@@ -1320,7 +1370,7 @@ function spawnInto(
 
     window = [over];
   } else {
-    window = windowOf(strip, gap, order);
+    window = windowOf(strip, context.frame, gap, order);
     over = window.find((item) => item.kind === 'rest') ?? null;
   }
 
@@ -1343,7 +1393,7 @@ function spawnInto(
   // region's ticks — so this is a guard rather than a road.
   if (laidOut && !wide && !gap.tail) {
     let interiorTicks = 0;
-    for (let index = gap.after + 1; index < gap.before; index++) {
+    for (let index = interiorFrom(gap, context.frame); index < gap.before; index++) {
       interiorTicks += strip.items[index].ticks;
     }
 
@@ -1425,8 +1475,9 @@ function spawnInto(
   // The next *surviving* note, which is what bounds the region — `noteFrom`
   // would find the first note item, and that may be one this plan is removing:
   // an octave inserted at its head is an edit inside a range being deleted, and
-  // two edits over one run of text is what `planEdits` refuses.
-  const reader = gap.before < strip.items.length ? gap.before : -1;
+  // two edits over one run of text is what `planEdits` refuses. Bounded to the
+  // frame: past its end is another frame's text.
+  const reader = gap.before < context.frame.to ? gap.before : -1;
 
   /**
    * The note that reads the octave the run leaves, and so has to be given the
@@ -1563,7 +1614,7 @@ export function planEdits(context: EditContext, plan: Plan): Edit[] | EditRefusa
     return refuse(plan.refused ?? REFUSE_CLASH);
   }
 
-  const { source, strip } = context;
+  const { source, strip, frame } = context;
   const edits: Edit[] = [];
   const survivors = new Map<number, PlacedNote>();
   const born: PlacedNote[] = [];
@@ -1583,7 +1634,7 @@ export function planEdits(context: EditContext, plan: Plan): Edit[] | EditRefusa
   // unit of anything it does not find there, and `regionsOf` hands a born note
   // to the region its new tick lands in.
   const lifted = new Set<number>();
-  for (const index of crossings(strip, survivors)) {
+  for (const index of crossings(strip, frame, survivors)) {
     const note = survivors.get(index);
     if (!note) {
       continue;
@@ -1607,7 +1658,7 @@ export function planEdits(context: EditContext, plan: Plan): Edit[] | EditRefusa
   // Built here rather than at the pass below that realises them: an octave put
   // back at a note's head has to agree with what the run in front of it leaves,
   // and `survivors` and `born` are both settled once the crossings are out.
-  const regions = regionsOf(strip, survivors, born);
+  const regions = regionsOf(strip, frame, survivors, born);
 
   /** The born notes in tick order, which both passes below read. */
   const order = [...born].sort((a, b) => a.startTick - b.startTick);
@@ -1623,17 +1674,17 @@ export function planEdits(context: EditContext, plan: Plan): Edit[] | EditRefusa
   const unheard = new Set<Command>();
   /** Those a removed unit's own splice takes out, and so need no edit of their own. */
   const swallowed = new Set<Command>();
-  for (let index = 0; index < strip.items.length; index++) {
+  for (let index = frame.from; index < frame.to; index++) {
     const item = strip.items[index];
     const removed =
       item.kind === 'note'
         ? !survivors.has(index) && !lifted.has(index)
-        : coveredByBorn(order, item);
+        : item.kind === 'rest' && coveredByBorn(order, item);
     if (!removed) {
       continue;
     }
 
-    if (index > 0) {
+    if (index > frame.from) {
       for (const command of prefixCommandsOf(strip, item)) {
         if (!reachesSomething(context, command, item.startTick, index, survivors, born)) {
           unheard.add(command);
@@ -1688,8 +1739,16 @@ export function planEdits(context: EditContext, plan: Plan): Edit[] | EditRefusa
    */
   const restores: Edit[] = [];
 
-  for (let index = 0; index < strip.items.length; index++) {
+  for (let index = frame.from; index < frame.to; index++) {
     const item = strip.items[index];
+    if (item.kind === 'construct') {
+      // The body may leave any octave standing, so what was carried in does not
+      // come out the other side — the next note spells its own.
+      running = null;
+      previous = item;
+      continue;
+    }
+
     if (item.kind !== 'note') {
       continue;
     }
@@ -1798,7 +1857,7 @@ export function planEdits(context: EditContext, plan: Plan): Edit[] | EditRefusa
     const standing = previous.exitOctave ?? previous.octave;
     // A run spawned into the tail spells its own last note's octave, so that is
     // what the block below reads and there is nothing here to say.
-    const left = spawnLeaves(regions, strip.items.length) ?? running;
+    const left = spawnLeaves(regions, frame.to) ?? running;
     if (standing !== null && standing !== left) {
       const spelled = spellOctave(standing);
       if (spelled === null) {
@@ -1827,10 +1886,36 @@ export function planEdits(context: EditContext, plan: Plan): Edit[] | EditRefusa
    * both run, since the mode picks one.
    */
   const moved = plan.erased.length > 0 ? plan.touched : [...plan.touched, ...plan.pushed];
-  const reach = moved.reduce(
-    (furthest, note) => Math.max(furthest, note.startTick + note.ticks),
-    0,
-  );
+  let reach = moved.reduce((furthest, note) => Math.max(furthest, note.startTick + note.ticks), 0);
+
+  // A body edit's reach is in song ticks: the moved notes' furthest instance,
+  // with every pass start carried by how many of **its own voice's** passes the
+  // length change has already stretched in front of it — each voice's music
+  // slides by its own passes alone. `delta` prices the change once, off the
+  // same layout the commit writes; `grown` is each voice's own total, for the
+  // pad below, whose channel tick counts predate the edit.
+  const grown = new Map<number, number>();
+  if (frame.body >= 0) {
+    const delta = plannedFrameTicks(strip, frame, plan) - frame.ticks;
+    const flat = frame.runs
+      .flatMap((run) => run.passes.map((pass) => ({ tick: pass.tick, channel: run.channel })))
+      .sort((a, b) => a.tick - b.tick);
+    const seen = new Map<number, number>();
+    let projected = 0;
+    for (const pass of flat) {
+      const ordinal = seen.get(pass.channel) ?? 0;
+      seen.set(pass.channel, ordinal + 1);
+      for (const note of moved) {
+        projected = Math.max(projected, pass.tick + ordinal * delta + note.startTick + note.ticks);
+      }
+    }
+
+    for (const [voice, passes] of seen) {
+      grown.set(voice, passes * delta);
+    }
+
+    reach = projected;
+  }
 
   // Before the regions, and that is load-bearing rather than tidiness: a channel
   // being opened writes its `#N` at `strip.home.at`, which for an undeclared one
@@ -1839,7 +1924,7 @@ export function planEdits(context: EditContext, plan: Plan): Edit[] | EditRefusa
   // them into one, and the joined text is in this array's order. The other way
   // round, the rest lands inside the block just opened.
   if (reach > context.playableTicks) {
-    const padded = padChannels(context, reach);
+    const padded = padChannels(context, reach, grown);
     if (padded === null) {
       return refuse(REFUSE_SPELL);
     }
@@ -1926,36 +2011,65 @@ export function coalesce(sorted: readonly Edit[]): Edit[] {
  * mean lying across it, and an overlap no push resolved is a clash `committable`
  * has already turned the plan away for.
  */
-function crossings(strip: Strip, survivors: ReadonlyMap<number, PlacedNote>): number[] {
+function crossings(
+  strip: Strip,
+  frame: StripFrame,
+  survivors: ReadonlyMap<number, PlacedNote>,
+): number[] {
   const crossed: number[] = [];
   for (const [at, note] of survivors) {
     if (note.startTick === strip.items[at].startTick) {
       continue; // Where it is written, so nothing can have got past it.
     }
 
+    let over = false;
     for (const [index, other] of survivors) {
       // Written after it but played before it, or the other way about.
       if (index !== at && index > at !== other.startTick > note.startTick) {
-        crossed.push(at);
+        over = true;
         break;
       }
+    }
+
+    // A construct is a neighbour too, with a tick nothing moves: a note whose
+    // planned tick puts it on the other side of a loop than its text does has
+    // to come out and go back in over there like any other crossing.
+    for (let index = frame.from; !over && index < frame.to; index++) {
+      const item = strip.items[index];
+      if (item.kind === 'construct' && index > at !== item.startTick > note.startTick) {
+        over = true;
+      }
+    }
+
+    if (over) {
+      crossed.push(at);
     }
   }
 
   return crossed;
 }
 
-/** The stretches of text between the surviving notes, with what belongs in each. */
+/**
+ * The stretches of text between the frame's anchors, with what belongs in each.
+ *
+ * An anchor is a surviving note at its planned tick, or a construct at its
+ * fixed one — a loop bounds a region exactly as a note does, its ticks being
+ * nothing a gesture may rewrite.
+ */
 function regionsOf(
   strip: Strip,
+  frame: StripFrame,
   survivors: ReadonlyMap<number, PlacedNote>,
   born: readonly PlacedNote[],
 ): Region[] {
-  const anchors: { index: number; note: PlacedNote }[] = [];
-  for (let index = 0; index < strip.items.length; index++) {
+  const anchors: { index: number; startTick: number; end: number }[] = [];
+  for (let index = frame.from; index < frame.to; index++) {
+    const item = strip.items[index];
     const note = survivors.get(index);
     if (note) {
-      anchors.push({ index, note });
+      anchors.push({ index, startTick: note.startTick, end: note.startTick + note.ticks });
+    } else if (item.kind === 'construct') {
+      anchors.push({ index, startTick: item.startTick, end: item.startTick + item.ticks });
     }
   }
 
@@ -1964,13 +2078,13 @@ function regionsOf(
   let startTick = 0;
   for (const anchor of anchors) {
     regions.push(
-      makeRegion(strip, after, anchor.index, startTick, anchor.note.startTick - startTick),
+      makeRegion(strip, frame, after, anchor.index, startTick, anchor.startTick - startTick),
     );
     after = anchor.index;
-    startTick = anchor.note.startTick + anchor.note.ticks;
+    startTick = anchor.end;
   }
 
-  regions.push(makeRegion(strip, after, strip.items.length, startTick, -1, true));
+  regions.push(makeRegion(strip, frame, after, frame.to, startTick, -1, true));
 
   for (const note of [...born].sort((a, b) => a.startTick - b.startTick)) {
     const home =
@@ -1988,6 +2102,7 @@ function regionsOf(
 
 function makeRegion(
   strip: Strip,
+  frame: StripFrame,
   after: number,
   before: number,
   startTick: number,
@@ -1996,7 +2111,8 @@ function makeRegion(
 ): Region {
   const rests: StripItem[] = [];
   let between = 0;
-  for (let index = after + 1; index < before; index++) {
+  const head = after < 0 ? frame.from : after + 1;
+  for (let index = head; index < before; index++) {
     between++;
     if (strip.items[index].kind === 'rest') {
       rests.push(strip.items[index]);

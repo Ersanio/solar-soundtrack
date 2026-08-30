@@ -484,6 +484,38 @@ export interface TempoChange {
 	fadeTicks: number;
 }
 
+/**
+ * One execution of a loop on one voice: the call, its body, and every pass.
+ *
+ * The driver's own reading, off the same `$E9` and `$E6` frames the walk keeps
+ * per {@link Track} — nothing here is derived from source, which cannot say
+ * which voice replays a body or when. A body played from two places is two
+ * runs; a `[[ ]]` inside a `[ ]` is one run per outer pass, since each outer
+ * pass opens and closes it afresh.
+ */
+export interface LoopRun {
+	/** 0-7 — the voice the passes sound on. */
+	channel: number;
+	/** `"call"` for `$E9` (`[ ]n`, `(n)m` and `*n`); `"sub"` for `$E6` (`[[ ]]n` and hex pairs). */
+	kind: "call" | "sub";
+	/**
+	 * ARAM address of the `$E9`'s own byte, or of the closing `$E6`'s.
+	 *
+	 * A key into `CompileResult.commandMap` for a call site or either `$E6`
+	 * spelling. A `]n`'s `$E9` is the one `recordCommand` drops — the `]` moved
+	 * the channel out from under the offset (`parser.ts:649`) — so a run whose
+	 * `from` maps to no command is the textual body playing at its own position,
+	 * and that absence is how a reader tells a declaration from a recall.
+	 */
+	from: number;
+	/** ARAM range of the body's bytes, `[start, end)`. For `"sub"`, `start` is past the `$E6 $00` pair. */
+	body: { start: number; end: number };
+	/** Times the body plays here — the `]]n` / `$E6 n+1` arithmetic already resolved. */
+	count: number;
+	/** One entry per pass, in order: the tick it enters the body at, and the ticks it runs. */
+	passes: readonly { tick: number; ticks: number }[];
+}
+
 export interface SongTimeline {
 	/** Sorted by tick, then by channel. */
 	notes: readonly WalkNote[];
@@ -543,6 +575,14 @@ export interface SongTimeline {
 	 * Cut at the end of the pass the same way {@link notes} is.
 	 */
 	commands: readonly WalkCommand[];
+	/**
+	 * Every loop the walk played through, in the order the runs opened.
+	 *
+	 * **Not** cut at the end of the pass, unlike {@link notes} — the piano roll
+	 * needs the tail's runs for items past the cut, exactly as {@link channelTicks}
+	 * is a full-walk figure. A reader that draws clips at {@link ticks} itself.
+	 */
+	loops: readonly LoopRun[];
 	/** Ticks walked per channel, to cross-check against `stats.channelTicks`. */
 	channelTicks: readonly number[];
 	/** Channels the song writes to. */
@@ -629,6 +669,10 @@ interface Track {
 	 */
 	loopCount: number;
 	loopStart: number;
+	/** The `$E9` run being played, or null. One per track, as the frame is. */
+	pendingCall: PendingRun | null;
+	/** The `$E6` run being played, or null. */
+	pendingSub: PendingRun | null;
 	state: ChannelState;
 	/** Where each of this channel's slots was last written. See {@link WalkNote.origins}. */
 	origins: (number | null)[];
@@ -643,6 +687,24 @@ interface Track {
 	snapshot: NoteState | null;
 	/** The last frozen origins, reused on the same terms. */
 	frozenOrigins: readonly (number | null)[] | null;
+}
+
+/**
+ * A {@link LoopRun} still being played: the fields the finished run keeps, plus
+ * where the current pass entered and where the run stands in open order.
+ *
+ * `from` and `body.end` are -1 until the first pass closes — a `"sub"`'s `from`
+ * is its *closing* `$E6`, which the open has not seen — so a pending run that
+ * never closes a pass has neither and is dropped rather than filed.
+ */
+interface PendingRun {
+	opened: number;
+	channel: number;
+	kind: "call" | "sub";
+	from: number;
+	body: { start: number; end: number };
+	passes: { tick: number; ticks: number }[];
+	passStart: number;
 }
 
 /** The mutable half of {@link NoteState}, kept per channel. */
@@ -759,6 +821,8 @@ export function walkSong(song: Uint8Array, aramAddress: number): SongTimeline {
 			callRestart: -1,
 			loopCount: 0,
 			loopStart: -1,
+			pendingCall: null,
+			pendingSub: null,
 			origins: new Array<number | null>(CHANNEL_SLOTS).fill(null),
 			owners: new Array<WalkCommand | null>(CHANNEL_SLOTS).fill(null),
 			frozenOrigins: null,
@@ -798,6 +862,38 @@ export function walkSong(song: Uint8Array, aramAddress: number): SongTimeline {
 	};
 	let loopTick = loopPhrase >= 0 ? Number.POSITIVE_INFINITY : Number.NaN;
 	let truncated = false;
+
+	// --- loop runs -----------------------------------------------------------
+	const finishedRuns: PendingRun[] = [];
+	let runsOpened = 0;
+
+	/**
+	 * Files a run, keeping only what really played: a pending run with no closed
+	 * pass — an unterminated `$E6 $00`, or a frame clobbered before its body's
+	 * first `$00` — never entered its body's end and is dropped, which is also
+	 * what leaves an unterminated subloop with no run at all.
+	 */
+	const settleRun = (pending: PendingRun | null): void => {
+		if (pending !== null && pending.passes.length > 0) {
+			finishedRuns.push(pending);
+		}
+	};
+
+	const openRun = (
+		channel: number,
+		kind: "call" | "sub",
+		from: number,
+		bodyStart: number,
+		tick: number,
+	): PendingRun => ({
+		opened: runsOpened++,
+		channel,
+		kind,
+		from,
+		body: { start: bodyStart, end: -1 },
+		passes: [],
+		passStart: tick,
+	});
 
 	/** Freezes the state a note sounds under, reusing the last one when it stands. */
 	const snapshot = (track: Track): NoteState => {
@@ -967,9 +1063,24 @@ export function walkSong(song: Uint8Array, aramAddress: number): SongTimeline {
 					return;
 				}
 
+				// The body's terminator: one pass of the pending call run closes
+				// here, and the terminator's own address is where the body ends.
+				const pending = track.pendingCall;
+				if (pending !== null) {
+					pending.body.end = aramAddress + track.at;
+					pending.passes.push({ tick: pending.passStart, ticks: track.ticks - pending.passStart });
+				}
+
 				track.callCount--;
 				track.at = track.callCount === 0 ? track.callReturn : track.callRestart;
 				track.frameAt = -1;
+				if (track.callCount === 0) {
+					settleRun(pending);
+					track.pendingCall = null;
+				} else if (pending !== null) {
+					pending.passStart = track.ticks;
+				}
+
 				continue;
 			}
 
@@ -1227,16 +1338,36 @@ export function walkSong(song: Uint8Array, aramAddress: number): SongTimeline {
 				// closes, and the count is loaded on the first close only, so the
 				// body plays one more time than the byte says.
 				if (arg(0) === 0) {
+					// A mark while a sub is pending is the driver clobbering its one
+					// frame — a crossed construct's shape. What the old run finished
+					// is filed; a pass it never closed is not.
+					settleRun(track.pendingSub);
+					track.pendingSub = openRun(channel, "sub", -1, aramAddress + argAt + 1, track.ticks);
 					track.loopStart = argAt + 1;
 					track.loopCount = 0xff;
 				} else if (track.loopStart >= 0) {
+					// Every close ends a pass, and all of them stand at the one byte,
+					// which is both the run's `from` and where the body ends.
+					const pending = track.pendingSub;
+					if (pending !== null) {
+						pending.from = aramAddress + track.at;
+						pending.body.end = aramAddress + track.at;
+						pending.passes.push({ tick: pending.passStart, ticks: track.ticks - pending.passStart });
+					}
+
 					track.loopCount = track.loopCount === 0xff ? arg(0) : track.loopCount - 1;
 					if (track.loopCount > 0) {
+						if (pending !== null) {
+							pending.passStart = track.ticks;
+						}
+
 						track.at = track.loopStart;
 						return;
 					}
 
 					track.loopStart = -1;
+					settleRun(pending);
+					track.pendingSub = null;
 				}
 
 				dirty = false;
@@ -1263,6 +1394,10 @@ export function walkSong(song: Uint8Array, aramAddress: number): SongTimeline {
 					break;
 				}
 
+				// A call while one is pending clobbers the driver's one frame; the
+				// old run keeps what it finished, as the `$E6` mark does.
+				settleRun(track.pendingCall);
+				track.pendingCall = openRun(channel, "call", aramAddress + track.at, arg(0) | (arg(1) << 8), track.ticks);
 				track.callCount = count;
 				track.callReturn = track.at + length;
 				track.callRestart = target;
@@ -1316,6 +1451,17 @@ export function walkSong(song: Uint8Array, aramAddress: number): SongTimeline {
 	}
 
 	// --- results -------------------------------------------------------------
+	// One sweep covers every way a channel ends — its own `$00`, an error, the
+	// budget — since the pending runs stay on the track either way.
+	for (const track of tracks) {
+		settleRun(track.pendingCall);
+		settleRun(track.pendingSub);
+	}
+
+	const loops: LoopRun[] = finishedRuns
+		.sort((a, b) => a.opened - b.opened)
+		.map(({ channel, kind, from, body, passes }) => ({ channel, kind, from, body, count: passes.length, passes }));
+
 	const channelTicks = tracks.map((track) => track.ticks);
 	const playing = channelTicks.filter((_, channel) => used[channel]);
 	const ticks = playing.length > 0 ? Math.min(...playing) : 0;
@@ -1374,6 +1520,7 @@ export function walkSong(song: Uint8Array, aramAddress: number): SongTimeline {
 		// `c4 v200 $DD …` records the two the other way round. Stable, so within one
 		// tick the driver's own order is what stands.
 		commands: commands.filter((command) => ticks === 0 || command.tick < ticks).sort((a, b) => a.tick - b.tick),
+		loops,
 		channelTicks,
 		used,
 		unreachable,
@@ -1390,6 +1537,7 @@ export function walkSong(song: Uint8Array, aramAddress: number): SongTimeline {
 			loopTick: null,
 			tempoChanges: [],
 			commands: [],
+			loops: [],
 			channelTicks: new Array<number>(CHANNELS).fill(0),
 			used: new Array<boolean>(CHANNELS).fill(false),
 			unreachable: [],

@@ -3,6 +3,7 @@ import { Component, computed, inject, input, output } from '@angular/core';
 import { CommandIcon } from '../../../command-palette/command-icon';
 import { EditorRequests } from '../../../../state/editor-requests';
 import { EditorStore } from '../../../../state/editor-store';
+import type { ShiftBoundaries } from '../roll-gesture';
 import type { Mark, MarkGlyph } from '../roll-marks';
 
 /**
@@ -51,6 +52,20 @@ export class RollNotes {
   readonly moving = input.required<ReadonlySet<number>>();
 
   /**
+   * The edited body's pass ends per voice while a loop gesture is held, or
+   * `null`. What the buckets below are dealt over — fixed for the gesture, so
+   * the dealing happens at its start rather than on every pointer move.
+   */
+  readonly boundaries = input.required<ShiftBoundaries | null>();
+
+  /**
+   * Pixels one boundary crossing slides a mark — the held body-length change
+   * at the roll's zoom. The one input that moves per pointer move, and it
+   * reaches the DOM as a transform per bucket rather than a rebuild.
+   */
+  readonly shift = input.required<number>();
+
+  /**
    * The bars to draw: the song's, less the ones the preview is already drawing.
    *
    * A note being dragged is drawn once, where it is going. The ring around a
@@ -59,6 +74,52 @@ export class RollNotes {
   protected readonly shown = computed(() =>
     this.marks().filter((mark) => !this.moving().has(mark.note.address)),
   );
+
+  /**
+   * {@link shown}, dealt by how far a held body-length edit slides each mark:
+   * bucket k holds the marks with k of the body's passes wholly before them,
+   * which move by k times the change. Everything between two pass starts is
+   * outside the edited body — its own bars are stood aside and preview-drawn —
+   * so a per-bucket translate is exact, not approximate. One bucket, unmoved,
+   * while no loop gesture is held.
+   */
+  protected readonly buckets = computed<{ k: number; marks: Mark[] }[]>(() => {
+    const bounds = this.boundaries();
+    const marks = this.shown();
+    if (bounds === null) {
+      return [{ k: 0, marks: [...marks] }];
+    }
+
+    const dealt = new Map<number, Mark[]>();
+    for (const mark of marks) {
+      const ends = bounds.get(mark.note.channel) ?? [];
+      let k = 0;
+      while (k < ends.length && ends[k] <= mark.note.tick) {
+        k++;
+      }
+
+      const bucket = dealt.get(k);
+      if (bucket) {
+        bucket.push(mark);
+      } else {
+        dealt.set(k, [mark]);
+      }
+    }
+
+    return [...dealt.entries()]
+      .sort((a, b) => a[0] - b[0])
+      .map(([k, list]) => ({ k, marks: list }));
+  });
+
+  /**
+   * The instance the inspector is describing, which is the one pass of a looped
+   * note the porter actually clicked. Its ring stays solid; the siblings that
+   * ring with it — every other pass of the same address — step back, so "these
+   * change together" and "this is the one you took hold of" are both said. With
+   * nothing inspected no instance can claim to be the one, and every ring is
+   * solid.
+   */
+  protected readonly asked = this.requests.inspecting;
 
   /** The hover, which the roll turns into a tooltip beside the pointer. */
   readonly entered = output<Mark>();

@@ -965,6 +965,20 @@ stats.loopTicks` pads **every other channel that would cut the song short** out 
   code, span and message — six thousand of those are one finding. Not a cap on how many diagnostics
   a parse may hold, which would lose the six-hundredth real error in a song that has one.
 
+- **Unrolling loops as the roll's answer to a `[ ]`** — Normalize's `loops` pass wrote n copies of
+  a body under re-asserted parse state, and the roll refused every loop-bearing channel and pointed
+  at it. It is the walk instead: `SongTimeline.loops` is raised off the driver's own `$E9`/`$E6`
+  frames, the strip frames each body and edits the one text in place, and every pass is drawn,
+  auditioned and joined per instance. Unrolling turned away exactly the songs porters write — a
+  recall under another instrument was SST0604/0605, a crossed pair SST0616 — inflated a document
+  n-fold, and re-derived from text what the walk already knew; a declaration is told from a recall
+  by command-map membership, a `]n`'s own `$E9` being the one dispatch `recordCommand` drops.
+- **Editing one pass of a loop differently from its siblings** — considered and not supported, with
+  no unroll escape hatch: a body is one text, the dashed box and the sibling rings are that
+  statement drawn, and a variation on pass two is written by hand. An editor that offered to
+  diverge an instance would have to unroll behind the porter's back, which is the document
+  inflation the roll exists to avoid.
+
 ## Angular specifics
 
 Angular 22, zoneless (scaffolded `--zoneless`, so zone.js is not a dependency and there is nothing

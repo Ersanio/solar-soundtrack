@@ -11,6 +11,13 @@ export const CHANGELOG: readonly ChangelogEntry[] = [
   {
     date: '30 August 2026',
     items: [
+      'Loops are drawn in the piano roll: a dashed box around the written loop, a dotted one around every repeat, tinted in the channel colour',
+      'Loops are edited in the piano roll — moving, stretching, drawing or deleting a looped note changes every pass',
+      'A loop recalled from another channel edits from either end, and both channels follow',
+      'Normalize keeps loops in place instead of unrolling them',
+      'Clicking one pass of a looped note highlights its other passes, and plays that pass',
+      "Clicking a loop box's edge selects the whole group; dragging it moves the group as one",
+      'Stretching a looped note slides the rest of the song live, so the change is seen before it lands',
       'Playing a note in the piano roll plays the rest of the song under it, for as long as the note lasts',
       'The mixer decides which channels are heard under a played note',
       'A note is played under the instrument, volume and pan written in front of it',

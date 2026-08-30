@@ -1,68 +1,86 @@
-@for (mark of shown(); track mark.id) {
-  <!-- A click asks the inspector about this note; a double click goes to it in
+<!-- Buckets first: while a body-length edit is held, everything past k of the
+     loop's passes slides by k times the change, and the slide is one transform
+     per bucket rather than a rebuild per pointer move. One unmoved bucket the
+     rest of the time. -->
+@for (bucket of buckets(); track bucket.k) {
+  <svg:g [attr.transform]="`translate(${bucket.k * shift()} 0)`">
+    @for (mark of bucket.marks; track mark.id) {
+      <!-- A click asks the inspector about this note; a double click goes to it in
        the source. A muted note takes no pointer at all, so the live note over it
        is the one that answers.
 
        No cursor of its own, here or on the glyph plates below: an element's own
        `cursor` beats the one it inherits, and the roll's `<svg>` carries the one
        that says which gesture a press starts. -->
-  <svg:g
-    class="mark"
-    [class.pointer-events-none]="mark.muted"
-    (pointerenter)="entered.emit(mark)"
-    (click)="select(mark)"
-    (dblclick)="reveal(mark)"
-    (keydown.enter)="reveal(mark)"
-  >
-    <!-- A selected note is outlined rather than recoloured: the eight channel
-         colours are the one thing a bar always says, and a selection that took
-         one of them away would be a selection that renamed the channel. -->
-    @if (selected().has(mark.note.address)) {
-      <svg:rect
-        rx="3"
-        fill="none"
-        class="stroke-ink"
-        stroke-width="1.5"
-        [attr.x]="mark.x - 1"
-        [attr.y]="mark.y - 1"
-        [attr.width]="mark.w + 2"
-        [attr.height]="mark.h + 2"
-      />
-    }
-    <!-- The slot, then the part that actually sounds. The inner bar is `q`'s
-         gate made geometric rather than written down. -->
-    <svg:rect
-      rx="2"
-      [attr.x]="mark.x"
-      [attr.y]="mark.y"
-      [attr.width]="mark.w"
-      [attr.height]="mark.h"
-      [class]="mark.fill"
-      [attr.fill-opacity]="mark.opacity * 0.35"
-    />
-    <svg:rect
-      rx="2"
-      [attr.x]="mark.x"
-      [attr.y]="mark.y"
-      [attr.width]="mark.gateW"
-      [attr.height]="mark.h"
-      [class]="mark.fill"
-      [attr.fill-opacity]="mark.opacity"
-    />
-    @if (mark.label; as label) {
-      <svg:text
-        pointer-events="none"
-        dominant-baseline="central"
-        class="fill-ink font-mono"
-        [attr.x]="label.x"
-        [attr.y]="label.y"
-        [attr.font-size]="label.size"
-        [attr.fill-opacity]="mark.opacity"
+      <svg:g
+        class="mark"
+        [class.pointer-events-none]="mark.muted"
+        (pointerenter)="entered.emit(mark)"
+        (click)="select(mark)"
+        (dblclick)="reveal(mark)"
+        (keydown.enter)="reveal(mark)"
       >
-        {{ label.text }}
-      </svg:text>
-    }
-    <!-- The plate is the hit target, the hover highlight, and what says the note
+        <!-- A selected note is outlined rather than recoloured: the eight channel
+         colours are the one thing a bar always says, and a selection that took
+         one of them away would be a selection that renamed the channel.
+
+         Every instance of a selected address rings — a looped note's siblings
+         change together, and the rings say so — but only the pass the porter
+         clicked keeps the solid stroke; the rest step back. -->
+        @if (selected().has(mark.note.address)) {
+          @let primary = asked();
+          <svg:rect
+            rx="3"
+            fill="none"
+            class="stroke-ink"
+            stroke-width="1.5"
+            [attr.stroke-opacity]="
+              primary !== null &&
+              primary.address === mark.note.address &&
+              primary.tick !== mark.note.tick
+                ? 0.45
+                : 1
+            "
+            [attr.x]="mark.x - 1"
+            [attr.y]="mark.y - 1"
+            [attr.width]="mark.w + 2"
+            [attr.height]="mark.h + 2"
+          />
+        }
+        <!-- The slot, then the part that actually sounds. The inner bar is `q`'s
+         gate made geometric rather than written down. -->
+        <svg:rect
+          rx="2"
+          [attr.x]="mark.x"
+          [attr.y]="mark.y"
+          [attr.width]="mark.w"
+          [attr.height]="mark.h"
+          [class]="mark.fill"
+          [attr.fill-opacity]="mark.opacity * 0.35"
+        />
+        <svg:rect
+          rx="2"
+          [attr.x]="mark.x"
+          [attr.y]="mark.y"
+          [attr.width]="mark.gateW"
+          [attr.height]="mark.h"
+          [class]="mark.fill"
+          [attr.fill-opacity]="mark.opacity"
+        />
+        @if (mark.label; as label) {
+          <svg:text
+            pointer-events="none"
+            dominant-baseline="central"
+            class="fill-ink font-mono"
+            [attr.x]="label.x"
+            [attr.y]="label.y"
+            [attr.font-size]="label.size"
+            [attr.fill-opacity]="mark.opacity"
+          >
+            {{ label.text }}
+          </svg:text>
+        }
+        <!-- The plate is the hit target, the hover highlight, and what says the note
          is where its command took effect. An SVG element only takes a pointer
          where it is painted, so without it a glyph is clickable on its strokes
          and not in the gaps between them — a 1.3px target that reads as a dead
@@ -80,43 +98,43 @@
          The plate takes the mark's opacity for the same reason the glyph does: a
          chip at full strength over a muted bar would be the brightest thing on a
          channel that cannot be heard. -->
-    @for (glyph of mark.glyphs; track glyph.id) {
-      <svg:g
-        class="group"
-        (click)="inspect(mark, glyph, $event)"
-        (dblclick)="inspect(mark, glyph, $event, true)"
-      >
-        <svg:rect
-          rx="2"
-          [class]="
-            glyph.defining
-              ? 'fill-ink/70 group-hover:fill-ink'
-              : 'fill-ink/0 group-hover:fill-ink/25'
-          "
-          [attr.x]="glyph.x"
-          [attr.y]="glyph.y"
-          [attr.width]="glyph.size"
-          [attr.height]="glyph.size"
-          [attr.fill-opacity]="mark.opacity"
-        />
-        <!-- No `svg:` prefix on this one, and it must not have one: `svg` is one
+        @for (glyph of mark.glyphs; track glyph.id) {
+          <svg:g
+            class="group"
+            (click)="inspect(mark, glyph, $event)"
+            (dblclick)="inspect(mark, glyph, $event, true)"
+          >
+            <svg:rect
+              rx="2"
+              [class]="
+                glyph.defining
+                  ? 'fill-ink/70 group-hover:fill-ink'
+                  : 'fill-ink/0 group-hover:fill-ink/25'
+              "
+              [attr.x]="glyph.x"
+              [attr.y]="glyph.y"
+              [attr.width]="glyph.size"
+              [attr.height]="glyph.size"
+              [attr.fill-opacity]="mark.opacity"
+            />
+            <!-- No `svg:` prefix on this one, and it must not have one: `svg` is one
              of the three element names that carry a namespace implicitly, and the
              glyph's selector is `svg[amk-glyph]`. -->
-        <svg
-          amk-glyph
-          class="pointer-events-none"
-          [class.text-ink]="!glyph.defining"
-          [class.text-surface]="glyph.defining"
-          [name]="glyph.icon"
-          [attr.x]="glyph.x"
-          [attr.y]="glyph.y"
-          [attr.width]="glyph.size"
-          [attr.height]="glyph.size"
-          [attr.opacity]="mark.opacity"
-        ></svg>
-      </svg:g>
-    }
-    <!-- The commands the bar had no room for, on the same plate as a glyph so
+            <svg
+              amk-glyph
+              class="pointer-events-none"
+              [class.text-ink]="!glyph.defining"
+              [class.text-surface]="glyph.defining"
+              [name]="glyph.icon"
+              [attr.x]="glyph.x"
+              [attr.y]="glyph.y"
+              [attr.width]="glyph.size"
+              [attr.height]="glyph.size"
+              [attr.opacity]="mark.opacity"
+            ></svg>
+          </svg:g>
+        }
+        <!-- The commands the bar had no room for, on the same plate as a glyph so
          it reads as one of the row. Not a glyph out of the palette, though: it
          stands for a list rather than a command, so it has no span to reveal
          and no handler of its own — the plate is there to be lit, and the click
@@ -126,44 +144,46 @@
          it stands for: it is what is left of those glyphs, so a bar narrow
          enough to lose the one that took effect here would otherwise read as a
          note inheriting everything it plays under. -->
-    @if (mark.more; as more) {
-      <svg:g class="group">
-        <svg:rect
-          rx="2"
-          [class]="
-            more.defining
-              ? 'fill-ink/70 group-hover:fill-ink'
-              : 'fill-ink/0 group-hover:fill-ink/25'
-          "
-          [attr.x]="more.x"
-          [attr.y]="more.y"
-          [attr.width]="more.size"
-          [attr.height]="more.size"
-          [attr.fill-opacity]="mark.opacity"
-        />
-        <svg:g
-          class="pointer-events-none"
-          [class.fill-ink]="!more.defining"
-          [class.fill-surface]="more.defining"
-          [attr.fill-opacity]="mark.opacity"
-          [attr.transform]="`translate(${more.x} ${more.y})`"
-        >
-          <svg:circle
-            [attr.cx]="more.size * 0.26"
-            [attr.cy]="more.size / 2"
-            [attr.r]="more.size * 0.07"
-          />
-          <svg:circle
-            [attr.cx]="more.size * 0.5"
-            [attr.cy]="more.size / 2"
-            [attr.r]="more.size * 0.07"
-          />
-          <svg:circle
-            [attr.cx]="more.size * 0.74"
-            [attr.cy]="more.size / 2"
-            [attr.r]="more.size * 0.07"
-          />
-        </svg:g>
+        @if (mark.more; as more) {
+          <svg:g class="group">
+            <svg:rect
+              rx="2"
+              [class]="
+                more.defining
+                  ? 'fill-ink/70 group-hover:fill-ink'
+                  : 'fill-ink/0 group-hover:fill-ink/25'
+              "
+              [attr.x]="more.x"
+              [attr.y]="more.y"
+              [attr.width]="more.size"
+              [attr.height]="more.size"
+              [attr.fill-opacity]="mark.opacity"
+            />
+            <svg:g
+              class="pointer-events-none"
+              [class.fill-ink]="!more.defining"
+              [class.fill-surface]="more.defining"
+              [attr.fill-opacity]="mark.opacity"
+              [attr.transform]="`translate(${more.x} ${more.y})`"
+            >
+              <svg:circle
+                [attr.cx]="more.size * 0.26"
+                [attr.cy]="more.size / 2"
+                [attr.r]="more.size * 0.07"
+              />
+              <svg:circle
+                [attr.cx]="more.size * 0.5"
+                [attr.cy]="more.size / 2"
+                [attr.r]="more.size * 0.07"
+              />
+              <svg:circle
+                [attr.cx]="more.size * 0.74"
+                [attr.cy]="more.size / 2"
+                [attr.r]="more.size * 0.07"
+              />
+            </svg:g>
+          </svg:g>
+        }
       </svg:g>
     }
   </svg:g>

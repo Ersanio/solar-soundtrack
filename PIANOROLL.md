@@ -16,6 +16,8 @@ no channel.
 | Click on empty grid              | Draws the note and leaves it there                                                                  |
 | Drag the middle of a note        | Moves it a snap step at a time, one row per semitone up and down                                    |
 | Drag a note's left or right edge | Stretches that end; the other end stays put                                                         |
+| Click a loop box's edge          | Selects the loop's whole group of notes — that group and nothing else                               |
+| Drag a loop box's edge           | Moves the whole group together, from whichever pass you grabbed                                     |
 | Hold `Alt` during any gesture    | Tick precision: no snapping, for either a position or a length                                      |
 | Click a note                     | Selects it, sounds it with its pitch slide, and puts the caret on it                                |
 | Double-click a note              | Goes to it in the MML                                                                               |
@@ -338,9 +340,15 @@ it is. Unmute it, or lift the solo, and it takes edits again — though the sele
 back, having been dropped rather than hidden.
 
 Some MML has no one-to-one relationship between what is written and what is played, and the roll says
-so in the toolbar rather than guessing. A `[ ]` loop, a `[[ ]]` subloop or the same thing written as
-`$E6 $00` … `$E6 $nn`, a `*` or `(n)` call, a `{ }` triplet, a `"name=value"` replacement or a
+so in the toolbar rather than guessing. A `{ }` triplet, a `"name=value"` replacement or a
 `#halvetempo` all mean one written note is not one played note.
+
+Loops are not on that list: a `[ ]` loop, a `[[ ]]` subloop or the same thing written as
+`$E6 $00` … `$E6 $nn`, a `*` and a `(n)` call are all edited in place — see **Loops** below. What
+still refuses a loop-bearing channel is the handful of shapes the roll cannot line up with what
+plays: a loop and a subloop that _cross_ (one opens inside the other and closes outside it, which
+compiles and then plays neither construct as written), an unterminated `$E6 $00` that nothing
+closes, and a `*` or `(n)` that replays a remote code body.
 
 A legacy `&` is refused for a different reason, and refuses the whole song rather than one channel:
 it is an operator rather than a command, so nothing above the compiler can say which channel it is
@@ -388,7 +396,58 @@ puts it on the same channel the music below that marker starts on, but its body 
 `(!1, …)` call fires it — so the first channel of a song with remote code is edited like any other,
 and the definition is left exactly where it was written.
 
+## Loops
+
+A loop is one run of text the driver plays many times, and the roll draws it that way: **every pass
+is on screen**, each as a box around the rows its notes span, washed in the channel's own colour.
+The pass standing where the text is — the `[ ]` itself — wears a **dashed** edge and the solider
+wash; every other pass, the repeats at the declaration and every `(n)` or `*` recall, wears a
+**dotted** edge and a fainter one, the ghost of the group it repeats. The dashed box says "this is
+the group an edit rewrites"; a dotted one says "this plays again here".
+
+**An edit to any pass edits them all**, because there is only one text. Click the third pass of a
+looped note and every pass rings, with the one you clicked solid and its siblings stepped back —
+that is the roll saying "these change together, and this is the one you took hold of". Drag, stretch
+or delete any of them and the body is rewritten once; the recompile is what plays it everywhere.
+
+**The box's edge is the group's handle.** Click the dashed or dotted line and the loop's whole group
+of notes is selected — that group and nothing else, on whichever channel the box belongs to. Keep
+the button down and the group drags as one: sideways moves every note of the body together (the
+vacated stretch becomes a rest, and reaching past the body's end is the length change above), up or
+down transposes the lot, and `Ctrl` copies it. A click that never moves just leaves the group
+selected, ready for the arrow keys and `Delete`.
+That holds across channels too: a `(1)` loop written on `#0` and recalled on `#1` is one body both
+voices play, and editing it from either channel changes both — the sibling washes on the other
+channel are the warning and the promise at once. Editing one pass _differently_ from its siblings is
+not something the roll will do: a loop is one text, and making pass two a variation means writing
+the passes out by hand.
+
+**Clicking a pass plays that pass.** A preview is the song emulated up to the tick it is given, so
+the two passes of `@0 (1)[c4 d4]2 @17 (1)2` sound under `@0` and `@17` respectively — the note's
+byte is fixed when the text is compiled, and everything else about it is a fact about the pass.
+
+**Drawing inside any pass writes into the body.** The note lands in the text once, between the
+brackets, and appears on every pass — the ghost's siblings show it landing everywhere before the
+button is even released. A gap inside the body is a rest in the body, exactly as it is outside one.
+
+**Changing the body's length moves the song.** Stretch a looped note and every pass grows; every
+later pass, and everything written after the loop, slides by the change times the passes in front
+of it. The preview shows the whole of that while the pointer is down — the untouched notes of the
+body ride along as striped outlines, and the rest of the channel slides live — so nothing about the
+commit is a surprise. The body's last note is the body's tail, and a body is a channel in
+miniature: deleting it tightens the loop, where deleting a note in the middle leaves a rest.
+
+What a loop will not do, each in its own words on the toolbar: a note cannot be dragged **onto** a
+loop from outside — the loop's ticks are a wall, not a gap — and a selection with notes on both
+sides of a bracket has no one text to rewrite, so it refuses (deleting such a selection works, each
+side deleted in its own frame, one undo step). A note at the head of a body that plays a drum
+loaded _before_ the `[` refuses to move: rewriting it would hand the drum to the next note. And a
+command written between the brackets cannot be dragged along the command lane — it runs once per
+pass, where it stands — where deleting it from the lane still works.
+
 The **Normalize #N** button beside that message rewrites just that channel into a shape the roll can
-splice — loops and subloops written out, triplets given plain lengths, and every note given its own
-length so that no `l` decides it — and leaves every other channel of the song exactly as it was. The plain **Normalize** button does the whole song. Neither changes what the song
-plays: the result is compiled and compared against the original first, and refused if anything moved.
+splice — triplets given plain lengths, and every note given its own length so that no `l` decides
+it — and leaves every other channel of the song exactly as it was; loops stay exactly as written,
+being shapes the roll edits in place. The plain **Normalize** button does the whole song. Neither
+changes what the song plays: the result is compiled and compared against the original first, and
+refused if anything moved.

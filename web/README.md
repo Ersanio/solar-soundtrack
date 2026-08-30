@@ -168,7 +168,7 @@ does.
 channel's music and leaves every other channel of the song exactly as it was. The roll needs it
 because it edits one channel at a time and refuses the ones it cannot splice — so what a porter wants
 when a channel is in the way is that channel put in order, and above all _not_ a refusal because some
-other channel has a loop that cannot be unrolled. Every pass that works construct by construct takes
+other channel holds the shape being objected to. Every pass that works construct by construct takes
 it as a filter (`NormalizeInput.onlyChannel`); the preprocessor and the replacements are global by
 nature and run whole either way; `orderChannels` refuses with `SST0615` rather than joining one
 channel's blocks, because that moves text past the other channels and changes the `o` and `l` they

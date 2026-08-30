@@ -100,35 +100,28 @@ where the command map is, by bracketing `scan`'s one dispatch loop, and a loop e
 bytes a handler wrote rather than asked of the handler: `[` moves the channel to 8, `]` moves it back
 and leaves `$E9 lo hi n` on the caller, `*` and `(n)m` leave the same four bytes, and `]]n` leaves
 `$E6 n-1`. A subloop written `$E6 $00` … `$E6 $nn` toggles the same flag and leaves the same bytes,
-so it is read the same way and unrolls the same way, and either end of a pair may be either
+so it is read the same way, and either end of a pair may be either
 spelling; the event sits on the argument byte, one `$XX` being one dispatch, so `LoopEvent.from`
 says where the run began. `$E9` and `$FC` have no such reading — the compiler works their address
 out for itself and relocates it (`link.ts`), so a hand-written one names a body nothing can
 resolve. One guarded line in `doReplacement` records a match's extent, which is the only place it
 is known. Nothing is recorded unless asked for, and no byte changes either way.
 
-`normalize.ts` is what it exists for: nine text-to-text passes that leave a song with no
-`#define`, no replacement, no triplet, no loop or call, no `l`, no legacy `&`, one block per channel
+`normalize.ts` is what it exists for: eight text-to-text passes that leave a song with no
+`#define`, no replacement, no triplet, no `l`, no legacy `&`, one block per channel
 in channel order, `o`/`q`/`@`/`t` written where a channel left them implied, `<`/`>` made absolute
-and the drum `@` before every drum note — the shape an editor can splice. The default note length is the one
+and the drum `@` before every drum note — the shape an editor can splice. Loops stay exactly as
+written: a `[ ]`, a `(n)` or `*` recall and a `[[ ]]` subloop are shapes the piano roll edits in
+place, and the passes that rewrite inside a body work on the single parse the body gets, which is
+what keeps them byte-neutral there. The default note length is the one
 piece of parse state a splice cannot work around — it is one variable for the whole song and `#N`,
 `[`, `]`, `(n)`, `*`, `/` and `{ }` all leave it standing — so every note is given its own length
 instead, segment by segment, since `c4^` is an explicit 48 and an implied 24. That is always
 writable where an `l` was: dots and `=n` are legal on a note for every dialect and on an `l` only
-from `#amk 4`. A `[ ]` body is compiled once, under
-the state standing at its `[`, and replayed from bytes, so each copy of its text is preceded by
-whatever re-creates that state and the last copy followed by whatever restores the state that stood
-after the construct; `h` is switched off again by a `#N` re-entering the channel, which resets `h`
-and nothing else a note reads (`parseHash`). What cannot be re-created is refused with an `SST06xx`
-diagnostic saying why: an instrument a copy would be tuned differently under — `h` _replaces_
-instrument tuning (`parseNote`), so no `h` is ever written and `@` only for a drum remap — a `*`
-with no loop before it, a legacy `&` whose duration byte comes from a bracket, `tuning[n]=`, and a
+from `#amk 4`. What a pass cannot re-create is refused with an `SST06xx`
+diagnostic saying why: a legacy `&` whose duration byte comes from a bracket, `tuning[n]=`, and a
 `(!n, type, n)` whose length argument is the `l` in force, which is the one reader of the default
-that is not a note and so has nowhere to be written out to. A loop and a subloop that **cross** —
-one opened inside the other and closed outside it, which AddmusicK builds because it guards nesting
-and not crossing — is refused there too: a voice has one subloop return (`Commands.asm:365`), so the
-close jumps into the other construct's body, and the channel either ends on that body's `$00` with
-the call counter spent or re-enters the `$E9` and starts its count again. The passes never emit text from bytes;
+that is not a note and so has nowhere to be written out to. The passes never emit text from bytes;
 the note map's tick counts are the one thing read from the compile, for the lengths a triplet's
 notes become.
 
@@ -149,8 +142,13 @@ runs before `drumPerNote`, whose suppression test reads only the event directly 
 
 `NormalizeInput.onlyChannel` narrows the whole thing to one channel, which is what the piano roll
 asks for: it edits one channel at a time, so a channel it cannot splice wants putting in order on its
-own — and must not be refused because a _different_ channel has a loop that cannot be unrolled. Every
-pass that works construct by construct filters on it; `resolvePreprocessor` and `inlineReplacements`
+own — and must not be refused because a _different_ channel holds the shape being objected to. Every
+pass that works construct by construct filters on it through `scopedTo`, which owns the channel's
+own events **and** the interior of every `[ ]` body it declares — a body's events carry channel 8,
+and the body between a channel's own brackets is that channel's own text — while a body another
+channel declares is left as written and reported as `SST0618` at info severity
+(`declaresElsewhere`), so the dialog says what stands rather than reporting nothing.
+`resolvePreprocessor` and `inlineReplacements`
 are global by nature and run whole; `writeDefaults` writes no `t`, since a tempo reaches all eight
 channels however local the block it sits in; `orderChannels` refuses with `SST0615` rather than
 joining one channel's blocks, because that moves text past the others and changes the `o` and `l`

@@ -1,7 +1,7 @@
 import { NOTE_REST, NOTE_TIE } from '@amk/core/hardcoded-tables';
 import { octaveOfNote } from '@amk/core/mml-text';
-import type { NoteAddress, Span } from '@amk/core/types';
-import type { PitchSlide, SongTimeline, WalkNote } from '@amk/spc/song-walk';
+import type { CommandAddress, NoteAddress, Span } from '@amk/core/types';
+import type { LoopRun, PitchSlide, SongTimeline, WalkNote } from '@amk/spc/song-walk';
 import type { Command, TokenIndex } from '@amk/tokens';
 import { isPercussionInstrument } from '@amk/tokens/commands/in-force';
 
@@ -26,10 +26,51 @@ export interface StripSegment {
   ticks: number;
 }
 
+/**
+ * One place one item sounds: a song tick, and the walk note the expansion
+ * joined it to — `null` past the pass cut, where there is no note to ask.
+ *
+ * A root note has one; a note inside a loop body has one per pass the body
+ * plays, which is what "editing one instance edits them all" is drawn from.
+ */
+export interface StripInstance {
+  tick: number;
+  note: WalkNote | null;
+}
+
+/**
+ * One nesting level of the channel's text: the channel's own run, or one loop
+ * body it declares. Items are frame-local — a body's first note is at tick 0
+ * of its frame however many times and wherever the body plays — and
+ * {@link StripItem.instances} is where frame time becomes song time.
+ */
+export interface StripFrame {
+  /** -1 for the channel's own text; else the body's first byte's ARAM address. */
+  body: number;
+  /** `[from, to)` into {@link Strip.items} — a frame's items are contiguous there. */
+  from: number;
+  to: number;
+  /** Ticks one pass of this frame occupies (the root: the channel's own length). */
+  ticks: number;
+  /** The textual extent writes may touch: inside the brackets for a body. */
+  span: Span;
+  /** The runs that play this frame, oldest first. Empty for the root. */
+  runs: readonly LoopRun[];
+}
+
 /** One written note or rest, with every continuation of it. */
 export interface StripItem {
-  kind: 'note' | 'rest';
-  /** The head segment's address, which is what the walk names the note by. */
+  /**
+   * `'construct'` is a loop standing in its containing frame — a declaration's
+   * `[ ]n`, a `(n)m` or `*n` recall, or a `$E6` pair. It occupies ticks nothing
+   * may enter, moves nothing, and its {@link unitSpan} is the whole textual
+   * construct; its body's own notes are another frame's items.
+   */
+  kind: 'note' | 'rest' | 'construct';
+  /**
+   * The head segment's address, which is what the walk names the note by.
+   * For a construct, the body's first byte's ARAM address — its frame's id.
+   */
   address: number;
   /**
    * The head, then its `^` continuations in order.
@@ -54,11 +95,17 @@ export interface StripItem {
    * and travels with it, so a `v200` written before a note stays before it.
    */
   prefixSpan: Span;
+  /** Tick local to this item's frame. Root-frame local time is song time. */
   startTick: number;
+  /** For a construct: the ticks one execution of it occupies (every pass). */
   ticks: number;
-  /** The byte the letter and octave alone name; `$C7` for a rest. */
+  /** The byte the letter and octave alone name; `$C7` for a rest; 0 for a construct. */
   written: number;
-  /** The octave the head was written under, or `null` for a rest. */
+  /**
+   * The octave the head was written under, or `null` for a rest — and for a
+   * construct, whose body may leave any octave standing, so a reader on its far
+   * side treats the octave as unknown and spells an explicit `o`.
+   */
   octave: number | null;
   /**
    * The octave in force after the unit, where a trailing `o` moved it on. Null
@@ -99,9 +146,25 @@ export interface StripItem {
    * False past the end of the pass, where the walk has no note to check the
    * item against — `walkSong` cuts at the shortest channel and sets the rest
    * aside as `unreachable` (`song-walk.ts:1069-1080`). Still editable; just not
-   * corroborated.
+   * corroborated. For a looped note, whether its **first** instance is inside
+   * the pass.
    */
   verified: boolean;
+  /**
+   * Every song tick this item sounds at, ascending — one entry for a root item,
+   * one per pass for an item inside a loop body. Filled by the expansion
+   * agreement, which is what joins each entry to its walk note.
+   */
+  instances: readonly StripInstance[];
+  /** Index into {@link Strip.frames}. */
+  frame: number;
+  /**
+   * A body head playing a drum loaded **before** the `[` — its first instance
+   * sounds percussion while no drum `@` stands in the frame. Rewriting or
+   * removing it would move the remap's consumption onto the next pitched note,
+   * so gestures that touch it are refused.
+   */
+  remapFed: boolean;
 }
 
 /**
@@ -139,7 +202,10 @@ export interface ChannelTail {
 
 export interface Strip {
   channel: number;
+  /** The root frame's items first, in text order, then each body frame's. */
   items: readonly StripItem[];
+  /** `frames[0]` is the root; one more per loop body this channel declares. */
+  frames: readonly StripFrame[];
   /** Where the channel's own music ends, in ticks. */
   ticks: number;
   /** Where its first note goes while {@link items} is empty. */
@@ -157,6 +223,8 @@ export interface StripRequest {
   source: string;
   channel: number;
   noteMap: readonly NoteAddress[];
+  /** `CompileResult.commandMap` — what joins a loop run's call site back to text. */
+  commandMap: readonly CommandAddress[];
   timeline: SongTimeline;
   index: TokenIndex;
   /** `CompileStats.tempoRatio`. Anything but 1 is refused — see the gate. */
@@ -249,15 +317,18 @@ export function unitStartBefore(
 }
 
 /**
- * Constructs that make one written note into no notes, or into many played ones.
+ * Constructs that make one written note into no notes or into unknowable ones.
  *
  * `<` and `>` are deliberately absent: they are not commands to the scanner at
  * all, and they are harmless here. A note's octave comes from its own `written`
  * byte rather than from a running sum (`octaveOfNote`), a unit never swallows
  * one, and the octave a rewrite puts back is the one that was in force after the
  * note — so `o4 c4 > d4` repitches either note without disturbing the other.
+ *
+ * `[`, `]` and `*` are absent too: a loop is edited through its frames now, and
+ * a bracket the frames cannot account for is its own refusal (`bracketsAgree`).
  */
-const FORBIDDEN_KINDS = new Set(['[', ']', '*', '(', ')', '{', '}', '"']);
+const FORBIDDEN_KINDS = new Set(['{', '}', '"']);
 
 /**
  * Why this channel cannot be spliced, or `null`.
@@ -268,7 +339,11 @@ const FORBIDDEN_KINDS = new Set(['[', ']', '*', '(', ')', '{', '}', '"']);
  * while the text the roll would write is wrong — so neither is catchable by
  * comparing ticks, and both are refused here.
  */
-function forbiddenConstruct(index: TokenIndex, channel: number, source: string): string | null {
+function forbiddenConstruct(
+  index: TokenIndex,
+  source: string,
+  reachable: readonly Command[],
+): string | null {
   // `&` is an operator rather than a command, and the note after it emits
   // `$DD $00 <prevNoteLength> <note>` (`parser.ts:2963-2969`), so a length change
   // to the note *before* it silently changes the slide. The scanner cannot say
@@ -281,11 +356,9 @@ function forbiddenConstruct(index: TokenIndex, channel: number, source: string):
     }
   }
 
-  for (const command of index.commands) {
-    if (command.channel !== channel) {
-      continue;
-    }
-
+  // Over every command an edit here can reach — the channel's own, and the
+  // interior of every body it plays, another channel's block included.
+  for (const command of reachable) {
     // A remote definition sits above the first `#N` and so gathers on this
     // channel, but its body runs only where a `$FC` fires it and plays none of
     // what is written here twice. Left in `growUnits`'s list all the same: a `]`
@@ -300,19 +373,6 @@ function forbiddenConstruct(index: TokenIndex, channel: number, source: string):
 
     if (FORBIDDEN_KINDS.has(command.kind)) {
       return `this channel uses \`${command.kind}\`, so one written note plays more than once`;
-    }
-
-    // A subloop the porter wrote as hex rather than as `[[ ]]`. Not caught by
-    // the kinds above, which are the scanner's own, and not left to
-    // `agreesWithWalk` either: one lying entirely past the walk's cut has no
-    // played note to disagree with, so the strip would be built on the written
-    // tick count where the driver plays each note n times. `unrollLoops` clears
-    // it, so Normalize is the answer the toolbar offers beside this — except for
-    // an unterminated `$E6 $00`, which opens a subloop nothing closes and so has
-    // no construct to unroll. That is the same standing an unterminated `[[` has
-    // here, `FORBIDDEN_KINDS` refusing it and Normalize leaving it alone.
-    if (command.vcmd === 0xe6) {
-      return 'this channel uses `$E6`, so one written note plays more than once';
     }
 
     if (command.noteLength?.some((segment) => segment.triplet)) {
@@ -516,6 +576,301 @@ function movesTheStartingChannel(
   return noteMap.some((entry) => entry.span.start < first);
 }
 
+/** The sentence every expansion mismatch refuses with — one reading, one voice. */
+const OUT_OF_ORDER = 'this channel does not play in the order it is written';
+
+const runTotal = (run: LoopRun): number => run.passes.reduce((sum, pass) => sum + pass.ticks, 0);
+
+const bodyKey = (body: { start: number; end: number }): string => `${body.start}:${body.end}`;
+
+/** One call site of one body: the construct the text holds, and the runs that play it. */
+interface ConstructSeed {
+  /** The whole textual construct — brackets, label and count included. */
+  span: Span;
+  /** The body it plays, as a key into the frame table. */
+  body: string;
+  /** The runs at this site, oldest first — more than one where an outer loop replays it. */
+  runs: LoopRun[];
+}
+
+/** One body this channel declares, before its items are built. */
+interface FrameSeed {
+  body: { start: number; end: number };
+  /** The interior extent — inside the brackets — that writes may touch. */
+  span: Span;
+  runs: LoopRun[];
+}
+
+/**
+ * The loop structure of one channel, joined back to text — the frames its
+ * bodies become, and the construct each call site stands as — or the sentence
+ * refusing it.
+ *
+ * The join runs on two facts. A `]n`'s own `$E9` is the one dispatch
+ * `recordCommand` drops (`parser.ts:649`), so a run whose `from` the command
+ * map cannot name is the textual body playing at its own position, and its
+ * brackets are found by pairing the scanner's `[` and `]` commands; a `(n)m`,
+ * `*n` or either `$E6` arm is named directly. Everything the frames cannot
+ * account for refuses, so a mis-read here turns into a sentence rather than a
+ * mis-edit.
+ */
+function discoverLoops(
+  request: StripRequest,
+  commands: readonly Command[],
+): { seeds: FrameSeed[]; constructs: ConstructSeed[] } | StripRefusal {
+  const { source, channel, noteMap, commandMap, timeline, index } = request;
+  const runs = timeline.loops.filter((run) => run.channel === channel);
+  const mapped = new Map(commandMap.map((entry) => [entry.address, entry]));
+
+  // Two runs whose bodies partially overlap are a crossed loop and subloop:
+  // the driver plays them (`Music.cpp:1208-1290` guards nesting, not crossing),
+  // and what it plays is not the text in the order it is written. A body whose
+  // end stands before its start is the same shape seen from the subloop's side —
+  // its mark inside a `[ ]` body lives in the loop block and its close out in
+  // the channel, which the layout puts at a lower address.
+  const CROSSED =
+    'a loop and a subloop cross on this channel, so it does not play in the order it is written';
+  for (const run of runs) {
+    if (run.body.end < run.body.start) {
+      return { refused: CROSSED };
+    }
+
+    for (const other of runs) {
+      const overlaps = run.body.start < other.body.end && other.body.start < run.body.end;
+      const nested =
+        (run.body.start >= other.body.start && run.body.end <= other.body.end) ||
+        (other.body.start >= run.body.start && other.body.end <= run.body.end);
+      if (run !== other && overlaps && !nested) {
+        return { refused: CROSSED };
+      }
+    }
+  }
+
+  const byBody = new Map<string, FrameSeed>();
+  const sites = new Map<number, ConstructSeed>();
+  const constructs: ConstructSeed[] = [];
+  for (const run of runs) {
+    const key = bodyKey(run.body);
+    let seed = byBody.get(key);
+    if (!seed) {
+      seed = { body: run.body, span: { start: 0, end: 0, line: 1 }, runs: [] };
+      byBody.set(key, seed);
+    }
+
+    seed.runs.push(run);
+
+    let site = sites.get(run.from);
+    if (!site) {
+      site = { span: { start: 0, end: 0, line: 1 }, body: key, runs: [] };
+      sites.set(run.from, site);
+      constructs.push(site);
+    } else if (site.body !== key) {
+      // One call site playing two bodies is nothing the compiler emits.
+      return { refused: OUT_OF_ORDER };
+    }
+
+    site.runs.push(run);
+  }
+
+  // A body whose content sits inside a remote definition — a `*` or a label
+  // recalling one — is remote code, which the roll leaves alone. Its content is
+  // commands alone (a remote body may hold no note data, AMK0165), so the
+  // command map is what names it, against every channel's commands: the
+  // definition may be another channel's text.
+  for (const seed of byBody.values()) {
+    const content = commandMap.filter(
+      (entry) => entry.address >= seed.body.start && entry.address < seed.body.end,
+    );
+    const remote = index.commands.some(
+      (command) =>
+        command.inRemoteDefinition &&
+        content.some(
+          (entry) => entry.span.start >= command.span.start && entry.span.start < command.span.end,
+        ),
+    );
+    if (remote) {
+      return { refused: 'this channel replays a remote code body, which the roll leaves alone' };
+    }
+  }
+
+  // Every voice's runs of a body ride on its frame — a `(n)` declared on one
+  // channel and recalled from another moves both voices when its length moves,
+  // and the shift, the pad and the preview all read the runs to say so.
+  for (const [key, seed] of byBody) {
+    for (const run of timeline.loops) {
+      if (run.channel !== channel && bodyKey(run.body) === key) {
+        seed.runs.push(run);
+      }
+    }
+  }
+
+  // The scanner's `[` and `]` across every channel, paired by depth in text
+  // order — every channel's, because a `(n)` body this channel recalls may be
+  // declared in another channel's block. `[[` is two `[` commands and pairs
+  // inside out, which the `$E6` route below never consults — a sub's two arms
+  // are in the command map.
+  const pairs: { open: Command; close: Command }[] = [];
+  {
+    const stack: Command[] = [];
+    for (const command of index.commands) {
+      if (command.kind === '[') {
+        stack.push(command);
+      } else if (command.kind === ']') {
+        const open = stack.pop();
+        if (open) {
+          pairs.push({ open, close: command });
+        }
+      }
+    }
+  }
+
+  /** The body's own text offsets, which are what name its bracket pair. */
+  const contentOf = (seed: FrameSeed): number[] => {
+    const content: number[] = [];
+    for (const entry of noteMap) {
+      if (entry.address >= seed.body.start && entry.address < seed.body.end) {
+        content.push(entry.span.start);
+      }
+    }
+
+    for (const entry of commandMap) {
+      if (entry.address >= seed.body.start && entry.address < seed.body.end) {
+        content.push(entry.span.start);
+      }
+    }
+
+    return content;
+  };
+
+  /** A declaration's construct span reaches back over an abutting `(n)` label. */
+  const widenOverLabel = (start: number): number => {
+    if (source[start - 1] !== ')') {
+      return start;
+    }
+
+    let at = start - 2;
+    while (at >= 0 && /\d/.test(source[at])) {
+      at--;
+    }
+
+    return at >= 0 && source[at] === '(' && at < start - 2 ? at : start;
+  };
+
+  const claimed = new Set<{ open: Command; close: Command }>();
+  for (const [from, site] of sites) {
+    const seed = byBody.get(site.body)!;
+    const sub = site.runs[0].kind === 'sub';
+    const call = mapped.get(from);
+
+    if (sub) {
+      // Both `$E6` arms are in the command map whatever they were spelled as —
+      // `[[`, `]]n`, or hex — the opening pair's bytes standing two before the
+      // body (`parser.ts:parseLoopStart`, `parseHexCommand`).
+      const opening = mapped.get(seed.body.start - 2);
+      if (!call || !opening) {
+        return { refused: "the roll cannot line this channel's brackets up with what plays" };
+      }
+
+      site.span = { start: opening.span.start, end: call.span.end, line: opening.span.line };
+      seed.span = { start: opening.span.end, end: call.span.start, line: opening.span.line };
+      continue;
+    }
+
+    if (call) {
+      // A `(n)m` or `*n` — the recall is the construct, whole.
+      site.span = { ...call.span };
+      continue;
+    }
+
+    // A declaration: the pair whose interior holds the body's own text. The
+    // body's content names it — its notes, or failing those its commands.
+    const content = contentOf(seed);
+    const pair = pairs.find(
+      (each) =>
+        !claimed.has(each) &&
+        content.length > 0 &&
+        content.every((at) => at > each.open.span.end - 1 && at < each.close.span.start),
+    );
+    if (!pair) {
+      return { refused: "the roll cannot line this channel's brackets up with what plays" };
+    }
+
+    if (pair.open.inRemoteDefinition || pair.close.inRemoteDefinition) {
+      return { refused: 'this channel replays a remote code body, which the roll leaves alone' };
+    }
+
+    claimed.add(pair);
+    site.span = {
+      start: widenOverLabel(pair.open.span.start),
+      end: pair.close.span.end,
+      line: pair.open.span.line,
+    };
+    seed.span = {
+      start: pair.open.span.end,
+      end: pair.close.span.start,
+      line: pair.open.span.line,
+    };
+  }
+
+  // A body declared in another channel's block has no declaration site here to
+  // pair its brackets by, and still needs its interior located — that is where
+  // this channel's edits to it land.
+  for (const seed of byBody.values()) {
+    if (seed.span.end > 0) {
+      continue;
+    }
+
+    const content = contentOf(seed);
+    const pair = pairs.find(
+      (each) =>
+        content.length > 0 &&
+        content.every((at) => at > each.open.span.end - 1 && at < each.close.span.start),
+    );
+    if (!pair) {
+      return { refused: "the roll cannot line this channel's brackets up with what plays" };
+    }
+
+    seed.span = {
+      start: pair.open.span.end,
+      end: pair.close.span.start,
+      line: pair.open.span.line,
+    };
+  }
+
+  // Every bracket the text holds has to be accounted for by a construct, or the
+  // frames are not the reading the driver takes: an unterminated `$E6 $00`, a
+  // remote definition a `*` replays, a call whose run a crossed shape clobbered.
+  // A declaration's span runs bracket to bracket, so its body's interior
+  // brackets — a subloop's arms — are contained by it as well as by their own.
+  const spans = constructs.map((each) => each.span);
+  const covered = (command: Command): boolean =>
+    spans.some((span) => command.span.start >= span.start && command.span.end <= span.end);
+  for (const command of commands) {
+    if (command.inRemoteDefinition) {
+      continue;
+    }
+
+    if (command.vcmd === 0xe6 && !covered(command)) {
+      return {
+        refused:
+          command.args[0]?.value === 0
+            ? 'this channel opens a subloop ($E6 $00) that nothing closes'
+            : "the roll cannot line this channel's brackets up with what plays",
+      };
+    }
+
+    if (
+      (command.kind === '[' || command.kind === ']' || command.kind === '*') &&
+      !covered(command)
+    ) {
+      return { refused: "the roll cannot line this channel's brackets up with what plays" };
+    }
+  }
+
+  const seeds = [...byBody.values()].sort((a, b) => a.body.start - b.body.start);
+  return { seeds, constructs };
+}
+
 /**
  * The channel as a strip, or the reason it cannot be one.
  *
@@ -534,91 +889,221 @@ export function channelStrip(request: StripRequest): Strip | StripRefusal {
     return { refused: 'this song divides its tempo, so a written length is not a tick count' };
   }
 
-  const forbidden = forbiddenConstruct(index, channel, source);
-  if (forbidden !== null) {
-    return { refused: forbidden };
-  }
-
   const markers = channelMarkers(index, source);
   const home = channelHome(source, channel, markers);
   if (!home.declared && movesTheStartingChannel(source, channel, markers, noteMap)) {
     return { refused: 'writing this channel would move the music written above the first `#N`' };
   }
 
-  const entries = noteMap
-    .filter((entry) => entry.channel === channel)
-    .sort((a, b) => a.address - b.address);
+  const discovered = discoverLoops(
+    request,
+    index.commands.filter((command) => command.channel === channel),
+  );
+  if (!isDiscovered(discovered)) {
+    return discovered;
+  }
 
-  const commands = index.commands.filter((command) => command.channel === channel);
+  const { seeds, constructs } = discovered;
 
-  const items: StripItem[] = [];
-  let previousEnd = 0;
-  let tick = 0;
+  // Every command an edit here can reach: the channel's own, plus the interior
+  // of every body it plays — which for a `(n)` recalled across channels is
+  // another channel's text. One list serves `growUnits`, the bend join and
+  // `Strip.commands`, so identity holds across all three.
+  const commands = index.commands.filter(
+    (command) =>
+      command.channel === channel ||
+      seeds.some(
+        (seed) => command.span.start >= seed.span.start && command.span.end <= seed.span.end,
+      ),
+  );
 
-  for (const entry of entries) {
-    const text = source.slice(entry.span.start, entry.span.end);
-    const tie = entry.note === NOTE_TIE;
-    const rest = entry.note === NOTE_REST;
-    const pattern = tie ? TIE_TEXT : rest ? REST_TEXT : NOTE_TEXT;
-    if (!pattern.test(text)) {
-      return { refused: `\`${text}\` is not a note the roll can rewrite` };
-    }
+  const forbidden = forbiddenConstruct(index, source, commands);
+  if (forbidden !== null) {
+    return { refused: forbidden };
+  }
 
-    const held = items[items.length - 1];
-    if (tie) {
-      if (!held) {
-        return { refused: 'this channel opens with a tie' };
+  /** Innermost body holding an offset — the frame a piece of text belongs to. */
+  const seedAt = (predicate: (seed: FrameSeed) => boolean): number => {
+    let found = -1;
+    seeds.forEach((seed, at) => {
+      if (
+        predicate(seed) &&
+        (found < 0 ||
+          seed.body.end - seed.body.start < seeds[found].body.end - seeds[found].body.start)
+      ) {
+        found = at;
       }
-
-      held.segments = [
-        ...held.segments,
-        { address: entry.address, span: entry.span, ticks: entry.ticks },
-      ];
-      held.ticks += entry.ticks;
-      tick += entry.ticks;
-      previousEnd = entry.span.end;
-      continue;
-    }
-
-    const octave = rest ? null : octaveOfNote(entry.written, text);
-    if (!rest && octave === null) {
-      return { refused: `the roll cannot read the octave \`${text}\` was written at` };
-    }
-
-    const prefix = source.slice(previousEnd, entry.span.start);
-    const lead = prefix.length - prefix.trimStart().length;
-
-    items.push({
-      kind: rest ? 'rest' : 'note',
-      address: entry.address,
-      segments: [{ address: entry.address, span: entry.span, ticks: entry.ticks }],
-      unitSpan: { ...entry.span },
-      prefixSpan: { start: previousEnd + lead, end: entry.span.start, line: entry.span.line },
-      startTick: tick,
-      ticks: entry.ticks,
-      written: entry.written,
-      octave,
-      exitOctave: null,
-      hasLeadingOctave: false,
-      drum: null,
-      bend: null,
-      slide: null,
-      verified: true,
     });
 
-    tick += entry.ticks;
-    previousEnd = entry.span.end;
+    return found;
+  };
+
+  /** One cell of a frame's text: a note-map entry, or a whole construct. */
+  interface Cell {
+    at: number;
+    entry?: NoteAddress;
+    construct?: ConstructSeed;
+  }
+
+  const cells: Cell[][] = [[], ...seeds.map(() => [])];
+  for (const entry of noteMap) {
+    const inBody = seedAt(
+      (seed) => entry.address >= seed.body.start && entry.address < seed.body.end,
+    );
+    if (inBody >= 0) {
+      cells[inBody + 1].push({ at: entry.span.start, entry });
+    } else if (entry.channel === channel) {
+      cells[0].push({ at: entry.span.start, entry });
+    }
+  }
+
+  for (const construct of constructs) {
+    const inBody = seedAt(
+      (seed) =>
+        construct.span.start >= seed.span.start &&
+        construct.span.end <= seed.span.end &&
+        bodyKey(seed.body) !== construct.body,
+    );
+    cells[inBody >= 0 ? inBody + 1 : 0].push({ at: construct.span.start, construct });
+  }
+
+  for (const list of cells) {
+    list.sort((a, b) => a.at - b.at);
+  }
+
+  const items: StripItem[] = [];
+  const frames: StripFrame[] = [];
+  /** The construct each item index stands as, for the expansion below. */
+  const constructAt = new Map<number, ConstructSeed>();
+
+  for (let frame = 0; frame < cells.length; frame++) {
+    const seed = frame === 0 ? null : seeds[frame - 1];
+    const from = items.length;
+    let previousEnd = seed ? seed.span.start : 0;
+    let tick = 0;
+
+    for (const cell of cells[frame]) {
+      const prefixAt = previousEnd;
+
+      if (cell.construct) {
+        const construct = cell.construct;
+        const prefix = source.slice(prefixAt, construct.span.start);
+        const lead = prefix.length - prefix.trimStart().length;
+        constructAt.set(items.length, construct);
+        items.push({
+          kind: 'construct',
+          address: construct.runs[0].body.start,
+          segments: [],
+          unitSpan: { ...construct.span },
+          prefixSpan: {
+            start: prefixAt + lead,
+            end: construct.span.start,
+            line: construct.span.line,
+          },
+          startTick: tick,
+          ticks: runTotal(construct.runs[0]),
+          written: 0,
+          octave: null,
+          exitOctave: null,
+          hasLeadingOctave: false,
+          drum: null,
+          bend: null,
+          slide: null,
+          verified: true,
+          instances: [],
+          frame,
+          remapFed: false,
+        });
+
+        tick += runTotal(construct.runs[0]);
+        previousEnd = construct.span.end;
+        continue;
+      }
+
+      const entry = cell.entry!;
+      const text = source.slice(entry.span.start, entry.span.end);
+      const tie = entry.note === NOTE_TIE;
+      const rest = entry.note === NOTE_REST;
+      const pattern = tie ? TIE_TEXT : rest ? REST_TEXT : NOTE_TEXT;
+      if (!pattern.test(text)) {
+        return { refused: `\`${text}\` is not a note the roll can rewrite` };
+      }
+
+      const held = items.length > from ? items[items.length - 1] : undefined;
+      if (tie) {
+        if (!held || held.kind === 'construct') {
+          return {
+            refused: held
+              ? 'this channel ties a note across a loop bracket'
+              : 'this channel opens with a tie',
+          };
+        }
+
+        held.segments = [
+          ...held.segments,
+          { address: entry.address, span: entry.span, ticks: entry.ticks },
+        ];
+        held.ticks += entry.ticks;
+        tick += entry.ticks;
+        previousEnd = entry.span.end;
+        continue;
+      }
+
+      const octave = rest ? null : octaveOfNote(entry.written, text);
+      if (!rest && octave === null) {
+        return { refused: `the roll cannot read the octave \`${text}\` was written at` };
+      }
+
+      const prefix = source.slice(prefixAt, entry.span.start);
+      const lead = prefix.length - prefix.trimStart().length;
+
+      items.push({
+        kind: rest ? 'rest' : 'note',
+        address: entry.address,
+        segments: [{ address: entry.address, span: entry.span, ticks: entry.ticks }],
+        unitSpan: { ...entry.span },
+        prefixSpan: { start: prefixAt + lead, end: entry.span.start, line: entry.span.line },
+        startTick: tick,
+        ticks: entry.ticks,
+        written: entry.written,
+        octave,
+        exitOctave: null,
+        hasLeadingOctave: false,
+        drum: null,
+        bend: null,
+        slide: null,
+        verified: true,
+        instances: [],
+        frame,
+        remapFed: false,
+      });
+
+      tick += entry.ticks;
+      previousEnd = entry.span.end;
+    }
+
+    frames.push({
+      body: seed ? seed.body.start : -1,
+      from,
+      to: items.length,
+      ticks: tick,
+      span: seed ? { ...seed.span } : { start: 0, end: source.length, line: 1 },
+      runs: seed ? seed.runs : [],
+    });
   }
 
   growUnits(source, commands, items);
 
   for (let at = 0; at < items.length; at++) {
     const item = items[at];
-    item.verified = timeline.ticks === 0 || item.startTick < timeline.ticks;
     // A unit that reached back over its own octave has taken text the previous
     // item's prefix would otherwise claim.
     if (item.unitSpan.start < item.prefixSpan.end) {
       item.prefixSpan = { ...item.prefixSpan, end: item.unitSpan.start };
+    }
+
+    if (item.kind === 'construct') {
+      continue;
     }
 
     // Read off the unit boundaries rather than the prefix: a `$DD` written after
@@ -627,8 +1112,11 @@ export function channelStrip(request: StripRequest): Strip | StripRefusal {
     // unit's, because a tie written after the command — `f+2 $DD $00 $D6 a+^2` —
     // puts the `$DD` between two of the note's frames, and `growUnits` ends a
     // unit at its last one, so a scan from there reaches past a slide the note
-    // really does carry and no item claims it at all.
-    const until = items[at + 1]?.unitSpan.start ?? source.length;
+    // really does carry and no item claims it at all. Bounded to the item's own
+    // frame, whose text ends at the closing bracket a body's last note rides to.
+    const frame = frames[item.frame];
+    const next = at + 1 < frame.to ? items[at + 1] : null;
+    const until = next?.unitSpan.start ?? frame.span.end;
     item.bend =
       commands.find(
         (command) =>
@@ -639,62 +1127,164 @@ export function channelStrip(request: StripRequest): Strip | StripRefusal {
       ) ?? null;
   }
 
-  const played = timeline.notes.filter((note) => note.channel === channel);
-  const disagreement = agreesWithWalk(items, played, timeline.ticks);
+  const disagreement = expandAndJoin(items, frames, constructAt, timeline, channel);
   if (disagreement !== null) {
     return { refused: disagreement };
   }
 
-  // Index by index, over the very list the agreement was just taken over — which
-  // is what makes the join exact rather than a second one that could quietly
-  // disagree with it. Past `played.length` the pass has ended and there is no
-  // walk note to ask, so those items keep no slide however plainly a `$DD` is
-  // written after them.
-  const sounded = items.filter((item) => item.kind === 'note');
-  for (let at = 0; at < played.length; at++) {
-    sounded[at].slide = played[at].bend;
+  for (const item of items) {
+    // A note is corroborated by the walk note its first instance joined to; a
+    // rest or a construct sounds nothing to join, so the pass cut is the test.
+    item.verified =
+      timeline.ticks === 0 ||
+      (item.kind === 'note'
+        ? item.instances[0]?.note != null
+        : (item.instances[0]?.tick ?? 0) < timeline.ticks);
+    if (item.kind === 'note') {
+      item.slide = item.instances[0]?.note?.bend ?? null;
+      item.remapFed =
+        frames[item.frame].body >= 0 &&
+        item.drum === null &&
+        item.instances[0]?.note?.percussion != null;
+    }
   }
 
-  return { channel, items, ticks: tick, home, commands };
+  return { channel, items, frames, ticks: frames[0].ticks, home, commands };
+}
+
+function isDiscovered(
+  outcome: { seeds: FrameSeed[]; constructs: ConstructSeed[] } | StripRefusal,
+): outcome is { seeds: FrameSeed[]; constructs: ConstructSeed[] } {
+  return (outcome as StripRefusal).refused === undefined;
 }
 
 /**
- * The walk's notes on this channel against the strip's, as a **prefix**.
+ * The strip's own prediction of the voice's full play order, checked against
+ * the walk note by note — the generalization of the old prefix agreement, which
+ * it degenerates to on a channel with no constructs.
  *
- * Not an equality: `walkSong` ends the pass at the shortest channel in use and
- * sets everything past it aside (`song-walk.ts:1069-1080`), so a channel longer
- * than the shortest is simply the commonest shape a song has — an equality here
- * would refuse editing on most songs and then point at Normalize, which does not
- * fix it. What the prefix does catch is a `[ ]`, a `*n` or a `(1)n`, where one
- * written note is played several times and the two stop lining up at once.
+ * The frames are expanded through their runs: a construct asserts that the next
+ * run at its call site enters on the tick the expansion has reached, and every
+ * pass of it re-walks the body frame, so one written note predicts one instance
+ * per pass. Every walk note must then match its prediction on address, tick and
+ * ticks; predictions past the pass cut stay unmatched — editable, just not
+ * corroborated, the standing the old gate gave the tail. The matches are what
+ * fill {@link StripItem.instances}, so the join and the agreement cannot drift.
  */
-function agreesWithWalk(
-  items: readonly StripItem[],
-  played: readonly WalkNote[],
-  timelineTicks: number,
+function expandAndJoin(
+  items: StripItem[],
+  frames: readonly StripFrame[],
+  constructAt: ReadonlyMap<number, ConstructSeed>,
+  timeline: SongTimeline,
+  channel: number,
 ): string | null {
-  const written = items.filter((item) => item.kind === 'note');
+  /** Instance lists under construction — `StripItem.instances` is readonly. */
+  const collected = items.map((): StripInstance[] => []);
+  const predicted: { item: number; tick: number }[] = [];
+  /** How many runs each call site has consumed, so passes replay in walk order. */
+  const consumed = new Map<ConstructSeed, number>();
+  let failed = false;
+
+  const frameOf = new Map<number, number>();
+  frames.forEach((frame, at) => {
+    if (frame.body >= 0) {
+      frameOf.set(frame.body, at);
+    }
+  });
+
+  const expand = (frame: number, base: number, stack: readonly number[]): number => {
+    if (failed || stack.includes(frame)) {
+      failed = true;
+      return 0;
+    }
+
+    let tick = base;
+    for (let at = frames[frame].from; at < frames[frame].to; at++) {
+      const item = items[at];
+      const construct = constructAt.get(at);
+      if (item.kind === 'construct' && construct) {
+        const used = consumed.get(construct) ?? 0;
+        const run = construct.runs[used];
+        consumed.set(construct, used + 1);
+        const body = frameOf.get(item.address);
+        if (!run || body === undefined || run.passes[0].tick !== tick) {
+          failed = true;
+          return 0;
+        }
+
+        collected[at].push({ tick, note: null });
+        for (const pass of run.passes) {
+          if (pass.tick !== tick || expand(body, tick, [...stack, frame]) !== pass.ticks) {
+            failed = true;
+            return 0;
+          }
+
+          tick += pass.ticks;
+        }
+
+        continue;
+      }
+
+      collected[at].push({ tick, note: null });
+      if (item.kind === 'note') {
+        predicted.push({ item: at, tick });
+      }
+
+      tick += item.ticks;
+    }
+
+    return tick - base;
+  };
+
+  expand(0, 0, []);
+
+  // Every run has to have been consumed exactly as often as its site was
+  // reached — one left over is a call the text cannot account for.
+  for (const [construct, used] of consumed) {
+    if (used !== construct.runs.length) {
+      failed = true;
+    }
+  }
+
+  for (const construct of constructAt.values()) {
+    if (!consumed.has(construct)) {
+      failed = true;
+    }
+  }
+
+  if (failed) {
+    return OUT_OF_ORDER;
+  }
+
+  const played = timeline.notes.filter((note) => note.channel === channel);
+  if (played.length > predicted.length) {
+    return 'this channel plays more notes than it has written';
+  }
 
   for (let at = 0; at < played.length; at++) {
-    const item = written[at];
-    if (!item) {
-      return 'this channel plays more notes than it has written';
-    }
-
     const note = played[at];
-    if (
-      note.address !== item.address ||
-      note.tick !== item.startTick ||
-      note.ticks !== item.ticks
-    ) {
-      return "a loop or a call plays one of this channel's notes more than once";
+    const guess = predicted[at];
+    const item = items[guess.item];
+    if (note.address !== item.address || note.tick !== guess.tick || note.ticks !== item.ticks) {
+      return OUT_OF_ORDER;
     }
   }
 
-  const first = written[played.length];
-  if (first && timelineTicks > 0 && first.startTick < timelineTicks) {
-    return 'this channel does not play in the order it is written';
+  // The instances were collected in play order per item, and the walk's notes
+  // are matched in that same order, so the k-th entry of an item's list is its
+  // k-th pass — which is what makes the join exact rather than a second one.
+  for (let at = 0; at < played.length; at++) {
+    const guess = predicted[at];
+    const list = collected[guess.item];
+    const slot = list.findIndex((instance) => instance.tick === guess.tick);
+    if (slot >= 0) {
+      list[slot] = { tick: guess.tick, note: played[at] };
+    }
   }
+
+  items.forEach((item, at) => {
+    item.instances = collected[at];
+  });
 
   return null;
 }
