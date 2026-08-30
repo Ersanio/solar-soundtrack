@@ -72,9 +72,23 @@ Diagnostics carry stable codes and are produced on failure paths too, so partial
 The prefix says whose finding it is, not which file raises it: `AMK####` is a condition AddmusicK
 itself reports, which is nearly everything `preprocess.ts`, `parser.ts` and `link.ts` produce;
 `SST####` is one `Music.cpp` does not produce at all — `SST0504` for the `#path` this port
-deliberately ignores, `normalize.ts`'s `SST06xx` refusals, and `SST0301` on `compile()`'s ARAM
-argument rather than on anything in the MML. Constructs this compiler does not implement are
-reported as errors, never silently mis-compiled.
+deliberately ignores, `SST0505` for a replacement that expands into itself, `normalize.ts`'s
+`SST06xx` refusals, and `SST0301` on `compile()`'s ARAM argument rather than on anything in the MML.
+Constructs this compiler does not implement are reported as errors, never silently mis-compiled.
+
+`SST0505` is the one place a code covers a song AddmusicK cannot finish rather than one it rejects.
+`Music.cpp:135` counts nested expansion at a single position — that is `AMK0023` here — and so sees
+`"1=1 1"` and not `"1=[q7F @0 a1]"`, whose value starts with `[`: the recursion there runs between
+calls, `getInt` expanding the `a1` that the last expansion delivered, and the buffer outgrows `pos`
+forever. `MAX_EXPANSION_GROWTH` bounds the growth, because growth is what diverges — `scan` advances
+at least one character per dispatch, so a bounded buffer terminates. Scanning the values for their
+own keys instead would refuse `"F=$E7 $0F"`, which contains `F` and terminates, since `getHex` offers
+only the first character of its argument for replacement.
+
+Both recursion guards latch and stop the scan, which is what `Music.cpp:139`'s fatal `printError`
+does. A diagnostic already filed for the same code, span and message is not filed again: `pos`
+advances between reports, so text the author wrote cannot raise one span twice, and text that arrived
+by expansion collapses onto its use site by construction.
 
 ## The parse trace, and the normalizer built on it
 

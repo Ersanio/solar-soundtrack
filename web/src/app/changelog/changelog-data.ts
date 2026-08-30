@@ -17,6 +17,10 @@ export const CHANGELOG: readonly ChangelogEntry[] = [
     ],
   },
   {
+    date: '30 August 2026',
+    items: ['A replacement that expands into itself is reported instead of freezing the editor'],
+  },
+  {
     date: '29 August 2026',
     items: [
       'Command $DD pitch bend now accepts a note as its final argument',

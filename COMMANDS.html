@@ -1167,7 +1167,10 @@
             <td class="n">
               Text replacement from here on, longest key first, applied recursively up to 500 deep
               (“Infinite Recursion Kitty”). Trailing blanks of the key and leading blanks of the
-              value are trimmed. Fatal without <code>=</code> or with an empty key.
+              value are trimmed. Fatal without <code>=</code> or with an empty key. The 500 counts
+              nesting at one position, so it sees <code>"1=1 1"</code> and not
+              <code>"1=[q7F @0 a1]"</code>, on which AddmusicK grows its buffer forever; Solar
+              Soundtrack bounds that growth and reports <code>SST0505</code> (§B.3).
             </td>
             <td class="ok">native</td>
             <td class="ok">native</td>
@@ -4755,6 +4758,21 @@ EchoFilter1:    $7F $00 $00 $00 $00 $00 $00 $00   ; flat</code></pre>
         <code>AMK0052</code>, <code>AMK0064</code> and <code>AMK0068</code> all still reach it — and
         <code>SST0504</code> reports the no-op at <code>info</code>, once per occurrence.
         <code>packages/mml-compiler/AUDIT.md</code> carries the reasoning.
+      </li>
+      <li>
+        <code>packages/mml-compiler/src/parser.ts</code> <code>doReplacement</code> — not a
+        divergence, because the reference does not finish. <code>Music.cpp:135</code> counts nested
+        expansion at one position, which catches <code>"1=1 1"</code> (<code>AMK0023</code> here)
+        and misses <code>"1=[q7F @0 a1]"</code>: that value begins with <code>[</code>, so the
+        recursion runs between calls — <code>scan</code> expands the <code>1</code>,
+        <code>getInt</code> expands the <code>a1</code> it delivered — and
+        <code>Music.cpp:423</code>'s loop never ends. <code>MAX_EXPANSION_GROWTH</code> caps the
+        buffer at 64 KiB past what the source produced and reports <code>SST0505</code>. Growth is
+        the bound because growth is what diverges; a scan of the values for their own keys would
+        refuse <code>"F=$E7 $0F"</code>, which contains <code>F</code> and terminates,
+        <code>getHex</code> offering only the first character of its argument for replacement. Both
+        guards latch and stop the scan, which is what <code>Music.cpp:139</code>'s fatal
+        <code>printError</code> does.
       </li>
       <li>
         <code>packages/mml-tokens/src/commands/hex-params.ts</code>

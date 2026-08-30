@@ -26,6 +26,7 @@ import type {
 	ParseEvent,
 	ParseState,
 	ParseTrace,
+	Severity,
 	SongLength,
 	Span,
 	SongTags,
@@ -161,6 +162,30 @@ const TIMER_HZ = 500;
 const TEMPO_UNIT = 256;
 const TEMPO_TICK_SECONDS = (tempo: number): number => TEMPO_UNIT / (TIMER_HZ * (tempo + 1));
 
+/**
+ * Characters replacement may add to the buffer over one parse.
+ *
+ * Music.cpp:135 counts nesting at one position, which catches `"1=1 1"` — the
+ * value begins with its own key, so the next pass matches at the same `pos` —
+ * and misses `"1=[q7F @0 a1]"`, whose value begins with `[`. There the recursion
+ * runs *between* calls: `scan` expands the `1`, `getInt` reads the length of the
+ * `a1` that arrived with it and expands that, and each round advances `pos` by
+ * nine while the buffer grows by ten. Music.cpp:423's loop can then never end,
+ * so AddmusicK hangs on it too and there is no reference behaviour to report.
+ *
+ * Growth is the quantity to bound, and provably so: `scan` advances `pos` by at
+ * least one per dispatch, so a bounded buffer terminates and every run that does
+ * not terminate grows one without bound. A visited set over the values would be
+ * cheaper and wrong — `"F=$E7 $0F"` contains its own key and terminates, because
+ * `getHex` offers only the first character of its argument for replacement.
+ *
+ * 64 KiB is a couple of times the net expansion of a song that macros every
+ * drum hit, and reached in about a second: each expansion re-splices `origins`,
+ * so the time to trip grows with the square of this. Raise it if a real song
+ * ever reaches it, and expect the wait to grow faster than the number does.
+ */
+const MAX_EXPANSION_GROWTH = 1 << 16;
+
 const isSpace = (c: string): boolean => c === " " || c === "\t" || c === "\n" || c === "\r" || c === "\v" || c === "\f";
 const isDigit = (c: string): boolean => c >= "0" && c <= "9";
 const isAlpha = (c: string): boolean => (c >= "a" && c <= "z") || (c >= "A" && c <= "Z");
@@ -258,11 +283,17 @@ export class AddmusicKParser {
 	private readonly replacements = new Map<string, string>();
 	private sortedReplacements: [string, string][] = [];
 	private replacementsDirty = false;
+	/** How long the buffer may grow to before expansion is called runaway. */
+	private expansionCeiling = Infinity;
+	/** Latched by either recursion guard: no further expansion, and `scan` stops. */
+	private replacementRunaway = false;
 
 	// --- diagnostics ---------------------------------------------------------
 	private readonly diagnostics: Diagnostic[] = [];
 	private errorCount = 0;
 	private readonly warnedOnce = new Set<string>();
+	/** Code, span and message of everything filed, so a repeat is not filed twice. */
+	private readonly reported = new Set<string>();
 
 	/** Where each character of `this.text` came from in the source. */
 	private origins: number[] = [];
@@ -325,6 +356,7 @@ export class AddmusicKParser {
 			// Music.cpp:410 - Addmusic 4.05 suppresses tuning until an instrument
 			// is explicitly declared on a channel.
 			this.ignoreTuning.fill(this.songTargetProgram === 1);
+			this.expansionCeiling = this.text.length + MAX_EXPANSION_GROWTH;
 			this.scan();
 		}
 
@@ -390,7 +422,10 @@ export class AddmusicKParser {
 
 	/** The dispatch loop. Music.cpp:419-492. */
 	private scan(): void {
-		while (this.pos < this.text.length - 23) {
+		// Music.cpp:139 quits on its recursion guard. Stopping here is the same
+		// answer, and the only one that terminates: a buffer that grows faster
+		// than `pos` advances never ends the loop on its own.
+		while (this.pos < this.text.length - 23 && !this.replacementRunaway) {
 			this.doReplacement();
 			const c = this.text[this.pos];
 			const lower = c.toLowerCase();
@@ -900,7 +935,7 @@ export class AddmusicKParser {
 	 * transitive. Like the original this rewrites the buffer in place.
 	 */
 	private doReplacement(): void {
-		if (this.replacements.size === 0) {
+		if (this.replacements.size === 0 || this.replacementRunaway) {
 			return;
 		}
 
@@ -915,6 +950,22 @@ export class AddmusicKParser {
 			let matched = false;
 			for (const [find, replacement] of this.sortedReplacements) {
 				if (this.text.startsWith(find, this.pos)) {
+					if (this.text.length - find.length + replacement.length > this.expansionCeiling) {
+						// Refused before the splice, so the span still covers the use
+						// site; `spanAt` maps it back through `origins`, which for text
+						// that arrived by expansion already names the outermost use.
+						this.errorAt(
+							this.pos,
+							this.pos + find.length,
+							"SST0505",
+							`Replacement "${find}" is expanding without end. A replacement whose value contains its own ` +
+								`name, directly or through another replacement, grows the song faster than it is read; ` +
+								`AddmusicK does not stop either.`,
+						);
+						this.replacementRunaway = true;
+						return;
+					}
+
 					const useSite = this.originAt(this.pos);
 					// The only place the match's extent is known; the trace needs it to
 					// find the use site in the source.
@@ -939,7 +990,11 @@ export class AddmusicKParser {
 			}
 		}
 
+		// Music.cpp:139 passes `isFatal`, so globals.cpp:121 quits here. Latching
+		// is that: without it the guard re-fires once per dispatch on a buffer
+		// 500 characters longer each time.
 		this.error("AMK0023", "Replacement expansion did not terminate (recursive definition?).");
+		this.replacementRunaway = true;
 	}
 
 	// =========================================================================
@@ -3957,18 +4012,42 @@ export class AddmusicKParser {
 		this.errorAt(this.pos, this.pos + 1, code, message);
 	}
 
+	/**
+	 * Files one diagnostic, unless the same code has already said the same thing
+	 * about the same characters.
+	 *
+	 * `pos` advances between reports, so text the author wrote cannot raise an
+	 * identical span twice; text that arrived by expansion can, and does, because
+	 * `spanAt` collapses a whole expansion onto its use site. A song that grows
+	 * until {@link MAX_EXPANSION_GROWTH} stops it reports whatever its expansion
+	 * is made of once per round, and every copy names the one character the
+	 * author typed. Six thousand of those are one finding, not six thousand.
+	 */
+	private report(severity: Severity, start: number, end: number, code: string, message: string): void {
+		const span = this.spanAt(start, end);
+		const key = `${code}:${span.start}:${span.end}:${message}`;
+		if (this.reported.has(key)) {
+			return;
+		}
+
+		this.reported.add(key);
+		this.diagnostics.push({ severity, code, message, span });
+		if (severity === "error") {
+			this.errorCount++;
+		}
+	}
+
 	private errorAt(start: number, end: number, code: string, message: string): void {
-		this.diagnostics.push({ severity: "error", code, message, span: this.spanAt(start, end) });
-		this.errorCount++;
+		this.report("error", start, end, code, message);
 	}
 
 	private warn(start: number, end: number, code: string, message: string): void {
-		this.diagnostics.push({ severity: "warning", code, message, span: this.spanAt(start, end) });
+		this.report("warning", start, end, code, message);
 	}
 
 	/** Nothing is wrong with the song; something about it is worth saying anyway. */
 	private info(start: number, end: number, code: string, message: string): void {
-		this.diagnostics.push({ severity: "info", code, message, span: this.spanAt(start, end) });
+		this.report("info", start, end, code, message);
 	}
 
 	private warnOnce(key: string, code: string, message: string): void {

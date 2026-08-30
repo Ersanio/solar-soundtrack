@@ -163,7 +163,10 @@ partial UI stays populated. **The prefix says whose finding it is, not which fil
 `AMK####` is a condition AddmusicK itself reports, ported from `AddmusicKsrc/` with the `Music.cpp`
 line cited; `SST####` is one `Music.cpp` does not produce at all, so a porter is never told
 AddmusicK objects to something it has no opinion about. The echo hazards, the unreachable-channel
-warning, the tempo shortfall and the `#path` notice are `SST05xx`, the normalize refusals are
+warning, the tempo shortfall, the `#path` notice and the runaway-replacement guard are `SST05xx`,
+which is also where a finding goes when the reference does not _finish_ rather than not object:
+`SST0505` bounds a replacement that expands into itself, and AddmusicK grows its buffer forever on
+the same song, so there is no run to be faithful to and nothing to divide with `#path`. The normalize refusals are
 `SST06xx`, and `SST0301` guards `compile()`'s own ARAM argument. A new diagnostic takes the prefix
 of the tool that found it. Spans are mapped back to the source the author wrote — `spanAt` is the
 single choke point, and anything that bypasses it will be wrong. Constructs this compiler does not
@@ -952,6 +955,15 @@ stats.loopTicks` pads **every other channel that would cut the song short** out 
   127 ticks, so `parkOthers` runs again after every block. The settle stopped muting everything at
   the same time: the other voices keyed on at this tick during the walk the arrival waited for, and
   muting them there took the front off that attack and handed it back a tick later.
+- **Filing every parser diagnostic, a repeat of the same finding at the same span included** — sound
+  while `pos` is advancing, since text the author wrote cannot raise one span twice, and it made the
+  problems list the second freeze once `SST0505` stopped the first. A song growing until the
+  expansion ceiling stops it reports whatever its expansion is made of once per round, and `spanAt`
+  collapses every copy onto the one character that was typed: `"1=[q7F @0 a1]"` filed the same
+  "cannot nest" error 6,553 times, which CodeMirror underlines and `amk-diagnostics-list` renders a
+  row each of. `report` is the one place a diagnostic is filed and it drops a repeat of the same
+  code, span and message — six thousand of those are one finding. Not a cap on how many diagnostics
+  a parse may hold, which would lose the six-hundredth real error in a song that has one.
 
 ## Angular specifics
 
