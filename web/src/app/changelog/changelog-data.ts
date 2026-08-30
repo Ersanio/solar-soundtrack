@@ -14,11 +14,8 @@ export const CHANGELOG: readonly ChangelogEntry[] = [
       'Playing a note in the piano roll plays the rest of the song under it, for as long as the note lasts',
       'The mixer decides which channels are heard under a played note',
       'A note is played under the instrument, volume and pan written in front of it',
+      'A replacement that expands into itself is reported instead of freezing the editor',
     ],
-  },
-  {
-    date: '30 August 2026',
-    items: ['A replacement that expands into itself is reported instead of freezing the editor'],
   },
   {
     date: '29 August 2026',
