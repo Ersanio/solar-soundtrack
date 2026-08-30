@@ -162,6 +162,8 @@ export const REFUSE_BEND_RIDER =
 export const REFUSE_LOOP_WALL = 'a loop plays where that note would go';
 export const REFUSE_SPLIT = 'those notes are on both sides of a loop bracket';
 export const REFUSE_REMAP_FED = 'that note plays a drum loaded before the loop';
+export const REFUSE_SUB_SPLIT = 'a subloop has no name to call it back by';
+export const REFUSE_NESTED_LOOP = 'that loop plays inside another loop';
 
 /**
  * Why a plan cannot be written out, in the words the roll shows.

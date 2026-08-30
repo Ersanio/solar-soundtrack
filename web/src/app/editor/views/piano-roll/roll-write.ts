@@ -7,6 +7,7 @@ import {
   spellQ,
 } from '@amk/core/mml-text';
 import type { Span } from '@amk/core/types';
+import type { LoopRun } from '@amk/spc/song-walk';
 import type { Command } from '@amk/tokens';
 import { commandScope } from '@amk/tokens/commands/in-force';
 import { commandRewritable, type Edit, insertAt, spliceOut, spliceRange } from '@amk/tokens/edits';
@@ -19,8 +20,10 @@ import {
   REFUSE_CLASH,
   REFUSE_CROWDED,
   REFUSE_INSIDE,
+  REFUSE_NESTED_LOOP,
   REFUSE_RAMP,
   REFUSE_SPELL,
+  REFUSE_SUB_SPLIT,
   isEdits,
   plannedFrameTicks,
 } from './roll-edit';
@@ -898,6 +901,204 @@ function padChannels(
   }
 
   return edits;
+}
+
+/**
+ * How far the gap gesture may drag a construct leftward: the rest ticks
+ * directly in front of it that can go without moving anything else.
+ *
+ * Closing space moves every command written after it, so a command in the
+ * construct's own prefix leaves no slack at all, and a rest whose prefix holds
+ * one may itself be consumed — the command stands before it and keeps its tick
+ * — but ends the walk there: taking anything earlier would slide it. A rest
+ * with a command **inside** its unit is a barrier outright, a respelling to
+ * `r…` eating the command's text; so is one whose unit `growUnits` widened
+ * past its own segments, which holds an `o` the same way, and one carrying a
+ * `$DD`, which rides whatever stands in front of it.
+ */
+export function gapSlack(strip: Strip, at: number): number {
+  const root = strip.frames[0];
+  const construct = strip.items[at];
+  // What blocks is anything with a tick of its own: `note-state` and `song`
+  // commands, and a remote `$FC` call, which is no item and hides in a prefix.
+  // A note or rest token is its item, `o` and `l` are parse state with no tick,
+  // and both are how the windows below stay readable at all.
+  const holdsCommands = (from: number, to: number): boolean =>
+    strip.commands.some(
+      (command) =>
+        command.span.start >= from &&
+        command.span.start < to &&
+        command.noteLength === undefined &&
+        commandScope(command) !== 'position',
+    );
+
+  if (!construct || holdsCommands(construct.prefixSpan.start, construct.prefixSpan.end)) {
+    return 0;
+  }
+
+  let slack = 0;
+  for (let index = at - 1; index >= root.from; index--) {
+    const rest = strip.items[index];
+    const head = rest.segments[0];
+    const tail = rest.segments[rest.segments.length - 1];
+    if (
+      rest.kind !== 'rest' ||
+      rest.bend !== null ||
+      rest.unitSpan.start !== head?.span.start ||
+      rest.unitSpan.end !== tail?.span.end ||
+      holdsCommands(rest.unitSpan.start, rest.unitSpan.end)
+    ) {
+      break;
+    }
+
+    slack += rest.ticks;
+    if (holdsCommands(rest.prefixSpan.start, rest.prefixSpan.end)) {
+      break;
+    }
+  }
+
+  return slack;
+}
+
+/**
+ * The loop box's edge dragged: `delta` ticks of time put in (or taken out)
+ * where pass `pass` of `run` begins, everything on that voice from there on
+ * sliding by the same amount.
+ *
+ * Time in means a tied rest; where the grab was mid-run, the recall's count is
+ * split around it — `(1)5` grabbed at its third pass becomes `(1)2 r… (1)3`,
+ * a declaration's `]3` becomes `] r… *2` (or its own label where it has one) —
+ * and both halves replay the same body bytes, a recall's whole parse output
+ * being its `$E9` (`parser.ts:2427-2507`, `Music.cpp:1003-1199`). The `*` a
+ * declaration split writes directly follows its own `]` with only rests
+ * between, and `prevLoop` is set by nothing but a normal `[`
+ * (`parser.ts:2721`), so it recalls that declaration on every target. Counts
+ * are written only above 1, and never with a space in front — `getInt` skips
+ * none (`parser.ts:731`), so `(1) 2` would be `(1)1` and a stray character.
+ *
+ * Time out is only ever free space: the rests {@link gapSlack} prices, spliced
+ * from the construct backward. The gesture and this clamp through the one
+ * function, so what the drag allowed is what is written.
+ */
+export function openGap(
+  context: EditContext,
+  at: number,
+  run: LoopRun,
+  pass: number,
+  delta: number,
+): Edit[] | EditRefusal {
+  const { source, strip, targetAMKVersion } = context;
+  const item = strip.items[at];
+  const site = item?.loop;
+  if (!item || !site || delta === 0) {
+    return [];
+  }
+
+  // A construct inside another loop's body has no song-time text position to
+  // move: its text plays wherever the outer loop does. The press refuses this
+  // before a drag begins; this is the same answer for a caller that did not.
+  if (item.frame !== 0) {
+    return refuse(REFUSE_NESTED_LOOP);
+  }
+
+  const edits: Edit[] = [];
+
+  if (delta > 0) {
+    const text = spellDuration(delta, targetAMKVersion);
+    if (text === null) {
+      return refuse(REFUSE_SPELL);
+    }
+
+    const rest = `r${text}`;
+    if (pass === 0) {
+      // The whole occurrence moves: the rest goes in front of the construct,
+      // after its prefix commands, which keep their tick by running before it.
+      const start = site.text.start;
+      const lead = start > 0 && !/\s/.test(source[start - 1]) ? ' ' : '';
+      const opened = insertAt(start, `${lead}${rest} `, site.text.line);
+      if (opened) {
+        edits.push(opened);
+      }
+    } else {
+      if (site.kind === 'sub') {
+        return refuse(REFUSE_SUB_SPLIT);
+      }
+
+      const total = run.passes.length;
+      if (pass >= total) {
+        return [];
+      }
+
+      const labeled = source[site.text.start] === '(';
+      const closing = labeled ? source.indexOf(')', site.text.start) : -1;
+      const head = labeled ? source.slice(site.text.start, closing + 1) : '*';
+      if (labeled && (closing < 0 || closing >= site.text.end)) {
+        return refuse(REFUSE_SPELL);
+      }
+
+      const first = pass > 1 ? String(pass) : '';
+      const second = total - pass > 1 ? String(total - pass) : '';
+      const split =
+        site.kind === 'recall'
+          ? spliceRange(source, site.text, `${head}${first} ${rest} ${head}${second}`)
+          : site.close && spliceRange(source, site.close, `]${first} ${rest} ${head}${second}`);
+      if (!split) {
+        return refuse(REFUSE_SPELL);
+      }
+
+      edits.push(split);
+    }
+  } else {
+    if (pass !== 0) {
+      return [];
+    }
+
+    let need = Math.min(-delta, gapSlack(strip, at));
+    if (need <= 0) {
+      return [];
+    }
+
+    for (let index = at - 1; index >= strip.frames[0].from && need > 0; index--) {
+      const rest = strip.items[index];
+      if (need >= rest.ticks) {
+        const removed = spliceOut(source, rest.unitSpan);
+        if (removed) {
+          edits.push(removed);
+        }
+
+        need -= rest.ticks;
+        continue;
+      }
+
+      const text = spellDuration(rest.ticks - need, targetAMKVersion);
+      if (text === null) {
+        return refuse(REFUSE_SPELL);
+      }
+
+      const shortened = spliceRange(source, rest.unitSpan, `r${text}`);
+      if (shortened) {
+        edits.push(shortened);
+      }
+
+      need = 0;
+    }
+  }
+
+  // The voice's end moves with everything after the split, and a moved note
+  // past the song's end pads the other channels out to it, as a dragged one
+  // does — the tail was written to be heard where it is going.
+  const tail = context.channels[run.channel];
+  const reach = (tail?.ticks ?? 0) + delta;
+  if (delta > 0 && reach > context.playableTicks) {
+    const padded = padChannels(context, reach, new Map([[run.channel, delta]]));
+    if (padded === null) {
+      return refuse(REFUSE_SPELL);
+    }
+
+    edits.push(...padded);
+  }
+
+  return edits.sort((a, b) => a.span.start - b.span.start);
 }
 
 function rested(rests: readonly StripItem[], from: number): number {

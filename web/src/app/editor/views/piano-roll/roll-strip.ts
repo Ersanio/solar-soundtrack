@@ -58,6 +58,21 @@ export interface StripFrame {
   runs: readonly LoopRun[];
 }
 
+/**
+ * How a construct's text recalls its body, for the gap gesture that splits it.
+ *
+ * `text` is the exact construct span from the join — never widened the way
+ * {@link StripItem.unitSpan} may be by `growUnits` — so a rewrite of it touches
+ * the construct and nothing else.
+ */
+export interface LoopSite {
+  /** A `[ ]n` played in place, a `(n)m`/`*n` recall, or a `$E6` pair. */
+  kind: 'declaration' | 'recall' | 'sub';
+  text: Span;
+  /** The declaration's closing `]n` command, where a split rewrites; else `null`. */
+  close: Span | null;
+}
+
 /** One written note or rest, with every continuation of it. */
 export interface StripItem {
   /**
@@ -158,6 +173,8 @@ export interface StripItem {
   instances: readonly StripInstance[];
   /** Index into {@link Strip.frames}. */
   frame: number;
+  /** For a construct, how its text recalls the body; `null` for a note or rest. */
+  loop: LoopSite | null;
   /**
    * A body head playing a drum loaded **before** the `[` — its first instance
    * sounds percussion while no drum `@` stands in the frame. Rewriting or
@@ -591,6 +608,10 @@ interface ConstructSeed {
   body: string;
   /** The runs at this site, oldest first — more than one where an outer loop replays it. */
   runs: LoopRun[];
+  /** How the site recalls the body — settled where its span is. */
+  kind: LoopSite['kind'];
+  /** The declaration's closing `]n` command; `null` for the other kinds. */
+  close: Span | null;
 }
 
 /** One body this channel declares, before its items are built. */
@@ -661,7 +682,13 @@ function discoverLoops(
 
     let site = sites.get(run.from);
     if (!site) {
-      site = { span: { start: 0, end: 0, line: 1 }, body: key, runs: [] };
+      site = {
+        span: { start: 0, end: 0, line: 1 },
+        body: key,
+        runs: [],
+        kind: 'recall',
+        close: null,
+      };
       sites.set(run.from, site);
       constructs.push(site);
     } else if (site.body !== key) {
@@ -771,6 +798,7 @@ function discoverLoops(
         return { refused: "the roll cannot line this channel's brackets up with what plays" };
       }
 
+      site.kind = 'sub';
       site.span = { start: opening.span.start, end: call.span.end, line: opening.span.line };
       seed.span = { start: opening.span.end, end: call.span.start, line: opening.span.line };
       continue;
@@ -800,6 +828,8 @@ function discoverLoops(
     }
 
     claimed.add(pair);
+    site.kind = 'declaration';
+    site.close = { ...pair.close.span };
     site.span = {
       start: widenOverLabel(pair.open.span.start),
       end: pair.close.span.end,
@@ -1012,6 +1042,11 @@ export function channelStrip(request: StripRequest): Strip | StripRefusal {
           verified: true,
           instances: [],
           frame,
+          loop: {
+            kind: construct.kind,
+            text: { ...construct.span },
+            close: construct.close ? { ...construct.close } : null,
+          },
           remapFed: false,
         });
 
@@ -1075,6 +1110,7 @@ export function channelStrip(request: StripRequest): Strip | StripRefusal {
         verified: true,
         instances: [],
         frame,
+        loop: null,
         remapFed: false,
       });
 

@@ -16,7 +16,7 @@ export const CHANGELOG: readonly ChangelogEntry[] = [
       'A loop recalled from another channel edits from either end, and both channels follow',
       'Normalize keeps loops in place instead of unrolling them',
       'Clicking one pass of a looped note highlights its other passes, and plays that pass',
-      "Clicking a loop box's edge selects the whole group; dragging it moves the group as one",
+      "Clicking a loop box's edge selects the whole group; dragging it slides that pass along the song, splitting the loop repeat around a gap of rests",
       'Stretching a looped note slides the rest of the song live, so the change is seen before it lands',
       'Playing a note in the piano roll plays the rest of the song under it, for as long as the note lasts',
       'The mixer decides which channels are heard under a played note',

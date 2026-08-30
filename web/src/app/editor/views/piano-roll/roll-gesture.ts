@@ -2,7 +2,7 @@ import { type Signal, computed, signal } from '@angular/core';
 
 import { NOTE_MIN } from '@amk/core/hardcoded-tables';
 import { octaveFor, spellDuration, spellNote } from '@amk/core/mml-text';
-import type { PitchSlide } from '@amk/spc/song-walk';
+import type { LoopRun, PitchSlide } from '@amk/spc/song-walk';
 import type { Command } from '@amk/tokens';
 import type { Edit } from '@amk/tokens/edits';
 import type { LaneStack } from './roll-layout';
@@ -17,12 +17,14 @@ import {
   type PlacedNote,
   type Plan,
   REFUSE_CLASH,
+  REFUSE_NESTED_LOOP,
+  REFUSE_SUB_SPLIT,
   isEdits,
   planGesture,
   plannedFrameTicks,
 } from './roll-edit';
 import { type ChannelTail, type Strip, type StripFrame, type StripItem } from './roll-strip';
-import { planEdits } from './roll-write';
+import { gapSlack, openGap, planEdits } from './roll-write';
 
 /**
  * Where each channel's shift steps up by one more `delta` while a body-length
@@ -129,7 +131,7 @@ export interface GestureSinks {
 
 /** What the pointer is doing between down and up. */
 interface Drag {
-  kind: 'move' | 'stretch' | 'spawn' | 'marquee' | 'erase';
+  kind: 'move' | 'stretch' | 'spawn' | 'marquee' | 'erase' | 'gap';
   /** Where it started, in ticks and rows. */
   fromTick: number;
   fromRow: number;
@@ -179,11 +181,23 @@ interface Drag {
   /** The frame the gesture runs in — the grabbed item's, or the pass under a spawn. */
   frame: number;
   /**
-   * The press grabbed a loop box's edge, so the selection it set is the body's
-   * whole group: a click keeps it as the answer rather than collapsing it to
-   * the anchor note, and the wheel sizes nothing.
+   * A `'gap'` press — a loop box's edge, whose drag moves that pass occurrence
+   * in song time, opening (or closing) a gap of rests at the boundary before
+   * it. `null` on every other press. The press itself selects the body's whole
+   * group, and a click keeps that as its answer.
    */
-  group: boolean;
+  gap: {
+    /** The run whose pass was grabbed — its channel is the one voice that slides. */
+    run: LoopRun;
+    /** Which pass, 0-indexed. 0 moves the whole occurrence; later ones split the recall. */
+    pass: number;
+    /** The grabbed pass's start, in song ticks — everything at or after it slides. */
+    splitTick: number;
+    /** The rest ticks directly before the construct — the most a leftward drag may close. */
+    slack: number;
+    /** The sentence where this handle cannot be dragged at all; the selection still stands. */
+    refused: string | null;
+  } | null;
   /**
    * What turns the frame's local ticks into song ticks for this gesture: the
    * grabbed instance's pass start, or the covering pass's for a spawn. 0 on the
@@ -203,7 +217,7 @@ interface Hover {
   y: number;
   /** Over a note bar — this channel's or another's. */
   onMark: boolean;
-  /** Over a loop box's edge, which a press grabs as the whole group's handle. */
+  /** Over a loop box's edge — the handle whose press selects the group and whose drag opens a gap. */
   onEdge: boolean;
   /** `Ctrl` is down, so a press would draw a box rather than a note. */
   marquee: boolean;
@@ -388,7 +402,13 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
   const gestureNow = computed<Gesture | null>(() => {
     const held = drag();
     const strip = sources.strip();
-    if (!held || !strip || held.kind === 'marquee' || held.kind === 'erase') {
+    if (
+      !held ||
+      !strip ||
+      held.kind === 'marquee' ||
+      held.kind === 'erase' ||
+      held.kind === 'gap'
+    ) {
       return null;
     }
 
@@ -496,7 +516,28 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
   const heldFrame = computed<StripFrame | null>(() => {
     const strip = sources.strip();
     const held = drag();
-    return strip && held ? strip.frames[held.frame] : null;
+    // A gap drag holds no body-length plan: its shift comes off the drag itself
+    // (see {@link gapDelta}), so the plan-side readers stand down.
+    return strip && held && held.kind !== 'gap' ? strip.frames[held.frame] : null;
+  });
+
+  /**
+   * The held gap change, in ticks — the edge drag's inserted (positive) or
+   * closed (negative) time. The distance snaps, as a note drag's does, and the
+   * left is clamped at the free rest space the press priced ({@link gapSlack}
+   * through `Drag.gap.slack`), so the preview never promises a close the
+   * commit cannot write.
+   */
+  const gapDelta = computed<number>(() => {
+    const held = drag();
+    const gap = held?.kind === 'gap' ? held.gap : null;
+    if (!held || gap?.refused !== null || !held.moved) {
+      return 0;
+    }
+
+    const moved = held.tick - held.fromTick;
+    const snapped = held.fine ? Math.round(moved) : snapTick(moved, sources.snap());
+    return Math.max(-gap.slack, snapped);
   });
 
   /**
@@ -505,6 +546,10 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
    * root gesture, whose length change pads rather than shifts.
    */
   const frameDelta = computed<number>(() => {
+    if (drag()?.kind === 'gap') {
+      return gapDelta();
+    }
+
     const strip = sources.strip();
     const frame = heldFrame();
     const now = shownPlan();
@@ -545,6 +590,14 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
    * once per gesture rather than once per pointer move.
    */
   const shiftBoundaries = computed<ShiftBoundaries | null>(() => {
+    // A gap slides one voice past one boundary: everything at or after the
+    // grabbed pass's start moves by the whole delta, the comparison the
+    // buckets already make for a note standing exactly on a boundary.
+    const held = drag();
+    if (held?.kind === 'gap') {
+      return held.gap ? new Map([[held.gap.run.channel, [held.gap.splitTick]]]) : null;
+    }
+
     const frame = heldFrame();
     if (!frame || frame.body < 0) {
       return null;
@@ -686,6 +739,23 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
 
   const bubble = computed(() => {
     const held = drag();
+
+    // An edge drag's readout is where the grabbed pass is going; the pointer's
+    // own row places it, a construct having no row of its own.
+    if (held?.kind === 'gap') {
+      const delta = gapDelta();
+      if (!held.gap || delta === 0) {
+        return null;
+      }
+
+      const going = held.gap.splitTick + delta;
+      return {
+        text: `tick ${going}`,
+        x: going * sources.zoom(),
+        y: held.row * sources.rowHeight(),
+      };
+    }
+
     const now = shownPlan();
     if (!held || !now || now.touched.length === 0) {
       return null;
@@ -722,7 +792,7 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
       // stretch says rather than what a draw does.
       return held.kind === 'stretch' || held.anchored
         ? 'ew-resize'
-        : held.kind === 'move'
+        : held.kind === 'move' || held.kind === 'gap'
           ? 'grabbing'
           : 'crosshair';
     }
@@ -732,7 +802,7 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
       return 'default';
     }
 
-    // A loop box's edge is the group's handle, and says so the way a bar's
+    // A loop box's edge is the construct's handle, and says so the way a bar's
     // middle does.
     if (at.onEdge) {
       return 'grab';
@@ -746,7 +816,10 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
   });
 
   /** True once a gesture is really under way, so the hover tooltip stands aside. */
-  const busy = computed(() => shownPlan() !== null);
+  const busy = computed(() => {
+    const held = drag();
+    return shownPlan() !== null || (held?.kind === 'gap' && held.moved);
+  });
 
   /**
    * The reason the last commit gave for turning a gesture away, against the
@@ -770,8 +843,15 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
       return now.refused ?? (now.clashes.length > 0 ? REFUSE_CLASH : null);
     }
 
-    const held = latched();
-    return held !== null && held.source === sources.source() ? held.reason : null;
+    // An edge drag that cannot go anywhere says why for as long as it is held;
+    // the press it started as has already done its selecting.
+    const held = drag();
+    if (held?.kind === 'gap' && held.moved && held.gap?.refused) {
+      return held.gap.refused;
+    }
+
+    const kept = latched();
+    return kept !== null && kept.source === sources.source() ? kept.reason : null;
   });
 
   /** Where a pointer is, in the song's own terms. */
@@ -895,18 +975,19 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
         return;
       }
 
-      // A loop box's edge is the group's handle: a press names the channel,
-      // selects the body's whole group — that group and nothing else — and
-      // holds it as a move, so keeping the button down drags every note of the
-      // loop at once and letting go without moving is the selection. Before the
-      // strip guard, because the edge may be another channel's and naming it is
-      // what makes that channel's strip the one to read.
+      // A loop box's edge is the construct's handle: a press names the channel
+      // and selects the body's whole group — that group and nothing else — and
+      // keeping hold drags the grabbed pass along the song, opening a gap of
+      // rests at the boundary in front of it. Before the strip guard, because
+      // the edge may be another channel's and naming it is what makes that
+      // channel's strip the one to read.
       const handle =
         event.button === 0 ? (event.target as Element | null)?.closest('.loop-edge') : null;
       if (handle) {
         sinks.pick(Number(handle.getAttribute('data-channel')));
         const grabbed = sources.strip();
         const body = Number(handle.getAttribute('data-body'));
+        const passTick = Number(handle.getAttribute('data-tick'));
         const frame = grabbed?.frames.findIndex((each) => each.body === body) ?? -1;
         if (!grabbed || frame < 0) {
           return; // The channel is named; a channel that cannot edit selects nothing.
@@ -920,34 +1001,73 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
           }
         }
 
-        const anchor = group.values().next();
-        if (anchor.done) {
-          return;
-        }
-
         latched.set(null);
         selection.set(group);
+
+        // The construct the box stands for on this channel — the item whose
+        // occupation covers the grabbed pass — and the run that pass belongs
+        // to, whose own start is the boundary everything after slides past.
+        const construct = grabbed.items.findIndex(
+          (item) =>
+            item.kind === 'construct' &&
+            item.address === body &&
+            item.instances.some(
+              (instance) => instance.tick <= passTick && passTick < instance.tick + item.ticks,
+            ),
+        );
+        let run: LoopRun | undefined;
+        let pass = -1;
+        for (const each of grabbed.frames[frame].runs) {
+          const found =
+            each.channel === grabbed.channel
+              ? each.passes.findIndex((p) => p.tick === passTick)
+              : -1;
+          if (found >= 0) {
+            run = each;
+            pass = found;
+            break;
+          }
+        }
+
+        if (construct < 0 || !run) {
+          return; // The selection is the press's whole answer.
+        }
+
+        const standing = grabbed.items[construct];
+        const refused =
+          standing.frame !== 0
+            ? REFUSE_NESTED_LOOP
+            : standing.loop?.kind === 'sub' && pass > 0
+              ? REFUSE_SUB_SPLIT
+              : null;
+
         const { tick, row } = at(event, box);
         drag.set({
-          kind: 'move',
+          kind: 'gap',
           fromTick: tick,
           fromRow: row,
           tick,
           row,
           edge: 'end',
-          item: anchor.value,
+          item: construct,
           moved: false,
-          copy: event.ctrlKey || event.metaKey,
+          copy: false,
           additive: false,
-          sounded: row,
+          sounded: -1,
           fine: event.altKey,
           shift: event.shiftKey,
           axis: null,
           anchored: false,
           length: null,
           frame,
-          origin: Number(handle.getAttribute('data-tick')),
-          group: true,
+          gap: {
+            run,
+            pass,
+            splitTick: run.passes[pass].tick,
+            slack: pass === 0 && refused === null ? gapSlack(grabbed, construct) : 0,
+            refused,
+          },
+          origin: 0,
           atX: event.clientX,
           atY: event.clientY,
         });
@@ -1002,7 +1122,7 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
           length: null,
           frame: index >= 0 ? strip.items[index].frame : 0,
           origin: 0,
-          group: false,
+          gap: null,
           atX: event.clientX,
           atY: event.clientY,
         });
@@ -1050,7 +1170,7 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
           length: null,
           frame: covering.frame,
           origin: covering.base,
-          group: false,
+          gap: null,
           atX: event.clientX,
           atY: event.clientY,
         };
@@ -1114,7 +1234,7 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
         length: null,
         frame: item.frame,
         origin,
-        group: false,
+        gap: null,
         atX: event.clientX,
         atY: event.clientY,
       });
@@ -1180,8 +1300,14 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
       }
 
       // A drag sounds the note again each time it changes row, and never more
-      // often than that: one render is a whole silent run of the song.
-      if (row !== held.sounded && held.kind !== 'marquee' && held.kind !== 'stretch') {
+      // often than that: one render is a whole silent run of the song. A gap
+      // drag carries a construct, which is nothing one note could sound.
+      if (
+        row !== held.sounded &&
+        held.kind !== 'marquee' &&
+        held.kind !== 'stretch' &&
+        held.kind !== 'gap'
+      ) {
         next.sounded = row;
         soundDrag(next, row);
       }
@@ -1211,6 +1337,47 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
         return;
       }
 
+      // The edge drag lands here: the click's whole job was done at the press —
+      // the group is the selection — and a drag writes the gap it held, through
+      // the same clamp the preview showed.
+      if (held.kind === 'gap') {
+        const delta = gapDelta();
+        drag.set(null);
+        if (!held.moved || !held.gap) {
+          return;
+        }
+
+        if (held.gap.refused !== null) {
+          latched.set({ reason: held.gap.refused, source: sources.source() });
+          return;
+        }
+
+        const strip = sources.strip();
+        if (delta === 0 || !strip) {
+          return;
+        }
+
+        const outcome = openGap(
+          contextFor(strip, strip.frames[0]),
+          held.item,
+          held.gap.run,
+          held.gap.pass,
+          delta,
+        );
+        if (!isEdits(outcome)) {
+          latched.set({ reason: outcome.refused, source: sources.source() });
+          return;
+        }
+
+        latched.set(null);
+        if (outcome.length > 0) {
+          sinks.commit(outcome);
+          selection.set(new Set<number>());
+        }
+
+        return;
+      }
+
       // A press that never became a drag is a **click**, and a click on a note
       // belongs to the bar: it selects that note alone, names the channel, asks
       // the inspector about it, and a second one goes to it in the source.
@@ -1219,13 +1386,6 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
       // at all, and a press the wheel has resized has something to commit even
       // though the pointer never went anywhere.
       if (!held.moved && held.kind !== 'spawn' && held.length === null) {
-        // A click on a loop's edge already did its whole job at the press: the
-        // group is the selection, and collapsing it to the anchor would undo it.
-        if (held.group) {
-          drag.set(null);
-          return;
-        }
-
         if (held.additive) {
           this.toggle(held.item);
         } else {
@@ -1252,8 +1412,8 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
 
     stepLength(direction: number, fine: boolean): boolean {
       const held = drag();
-      // A group press has no one note the wheel could be sizing.
-      if (!held || held.group) {
+      // An edge press has no one note the wheel could be sizing.
+      if (!held || held.kind === 'gap') {
         return false;
       }
 

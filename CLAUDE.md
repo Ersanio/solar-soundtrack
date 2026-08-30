@@ -978,6 +978,15 @@ stats.loopTicks` pads **every other channel that would cut the song short** out 
   statement drawn, and a variation on pass two is written by hand. An editor that offered to
   diverge an instance would have to unroll behind the porter's back, which is the document
   inflation the roll exists to avoid.
+- **The loop box's edge drag as an in-body group move** — it slid the body's notes around inside
+  the loop, which the notes' own bars already do once the edge click has selected them, and it left
+  the roll with no way to put anything _between_ two passes of a recall. The edge is the
+  construct's handle, not the notes': dragging it moves that pass occurrence in song time —
+  `openGap` splits the recall's count around a gap of rests (`(1)5` → `(1)2 r1^1^1 (1)3`, a
+  declaration's `]3` → `] r… *2`), leftward only closes the free rest space `gapSlack` prices, and
+  the one shift boundary at the grabbed pass's start is what the preview slides. Not a second
+  channel for the preview either: the bucket comparison (`ends[k] <= tick`) already shifts a note
+  standing exactly on the boundary, which is the moved pass's own first note.
 
 ## Angular specifics
 
