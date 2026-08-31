@@ -1,7 +1,6 @@
 import { Component, computed, effect, inject, input, signal } from '@angular/core';
 
 import type { Command } from '@amk/tokens';
-import { readLoops } from '@amk/tokens/commands/loops';
 import { channelsBeginAt, songTarget } from '@amk/tokens/dialect';
 import { insertAt } from '@amk/tokens/edits';
 import {
@@ -20,6 +19,10 @@ import {
 } from '../../../editor/command-palette/command-palette';
 import { CommandIcon } from '../../../editor/command-palette/command-icon';
 import {
+  callEdits,
+  callSelection,
+  callVerdict,
+  isCall,
   isWrap,
   wrapEdits,
   wrapSelection,
@@ -119,7 +122,7 @@ export class NotePalette {
   private readonly wrap = computed(() => {
     const source = this.store.source();
     const index = this.store.tokens();
-    const reading = readLoops(source, index);
+    const reading = this.store.loops();
     const picked = this.requests.selectedRun() ?? this.store.selection();
     const run = picked.end > picked.start ? picked : null;
     const ask = (want: 'loop' | 'subloop') => wrapVerdict({ source, index, reading, run, want });
@@ -127,12 +130,29 @@ export class NotePalette {
     return { loop: ask('loop'), subloop: ask('subloop') };
   });
 
+  /**
+   * What a call written here would play.
+   *
+   * Asked about the note's own start rather than the document's caret: this
+   * palette writes in front of the note it is aimed at, and which loops are
+   * declared above that point is what decides the answer.
+   */
+  private readonly call = computed(() =>
+    callVerdict({
+      source: this.store.source(),
+      index: this.store.tokens(),
+      reading: this.store.loops(),
+      caret: this.note().span.start,
+    }),
+  );
+
   /** Whether the note sits above the first `#0`-`#7`, which two entries turn on. */
   private readonly place = computed<CaretPlace>(() => {
     const first = channelsBeginAt(this.store.tokens());
     return {
       beforeChannels: first === null || this.note().span.start <= first,
       wrap: this.wrap(),
+      call: this.call(),
     };
   });
 
@@ -200,6 +220,12 @@ export class NotePalette {
     const { start: at, line } = button.after
       ? { start: note.span.end, line: note.span.line }
       : unitStartBefore(source, this.store.tokens().commands, note);
+
+    // A call carries its own padding, having been asked about this very offset.
+    if (button.call !== undefined && isCall(button.call)) {
+      this.requests.applyAll(callEdits(button.call, at), callSelection(button.call, at));
+      return;
+    }
 
     // MML is whitespace-separated, so pad where the neighbouring character is
     // not — the same rule as the caret palette's.

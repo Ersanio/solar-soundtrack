@@ -1,6 +1,5 @@
 import { Component, computed, effect, inject, signal } from '@angular/core';
 
-import { readLoops } from '@amk/tokens/commands/loops';
 import { channelsBeginAt, hasDialectMarker, songTarget } from '@amk/tokens/dialect';
 import { EditorRequests } from '../../state/editor-requests';
 import { EditorStore } from '../../state/editor-store';
@@ -13,7 +12,16 @@ import {
   resolveEntry,
 } from './catalog';
 import { CommandIcon } from './command-icon';
-import { isWrap, wrapEdits, wrapSelection, wrapVerdict } from './loop-wrap';
+import {
+  callEdits,
+  callSelection,
+  callVerdict,
+  isCall,
+  isWrap,
+  wrapEdits,
+  wrapSelection,
+  wrapVerdict,
+} from './loop-wrap';
 import { readStored, writeStored } from '../../util/storage';
 
 type Filter = Category | 'all';
@@ -63,17 +71,22 @@ export function entryClass(entry: ResolvedEntry): string {
 /**
  * Whether the button is dead, from either of the two conditions that kill it.
  *
- * `availability` is AddmusicK's opinion of the command; `wrap` is the palette's
- * own — there is nothing selected for the brackets to go round, or the two
- * levels are already spent. Both grey the button and neither speaks for the
- * other, so the test is here rather than in `resolveEntry`.
+ * `availability` is AddmusicK's opinion of the command; `wrap` and `call` are
+ * the palette's own — there is nothing selected for the brackets to go round,
+ * the two levels are already spent, or no loop is written above the caret to
+ * play again. All of them grey the button and none speaks for the others, so the
+ * test is here rather than in `resolveEntry`.
  */
 export function entryBlocked(entry: ResolvedEntry): boolean {
   if (entry.availability.state === 'blocked') {
     return true;
   }
 
-  return entry.wraps !== undefined && (entry.wrap === undefined || !isWrap(entry.wrap));
+  if (entry.wraps !== undefined && (entry.wrap === undefined || !isWrap(entry.wrap))) {
+    return true;
+  }
+
+  return entry.calls !== undefined && (entry.call === undefined || !isCall(entry.call));
 }
 
 /**
@@ -90,7 +103,12 @@ export function entryReadout(
     return null;
   }
 
-  const refused = entry.wrap !== undefined && !isWrap(entry.wrap) ? entry.wrap.refused : null;
+  const refused =
+    entry.wrap !== undefined && !isWrap(entry.wrap)
+      ? entry.wrap.refused
+      : entry.call !== undefined && !isCall(entry.call)
+        ? entry.call.refused
+        : null;
   // The reason a button is greyed out matters more than what it would have
   // done, so it replaces the blurb rather than following it. A caveat is the
   // other way round: the command still does what the blurb says.
@@ -166,7 +184,7 @@ export class CommandPalette {
   private readonly wrap = computed(() => {
     const source = this.store.source();
     const index = this.store.tokens();
-    const reading = readLoops(source, index);
+    const reading = this.store.loops();
     const run = this.store.selection();
     const ask = (want: 'loop' | 'subloop') =>
       wrapVerdict({ source, index, reading, run: run.end > run.start ? run : null, want });
@@ -175,11 +193,22 @@ export class CommandPalette {
   });
 
   /** Whether the caret is above the first `#0`-`#7`, which two entries turn on. */
+  /** What a call written at the caret would play, or why there is nothing to. */
+  private readonly call = computed(() =>
+    callVerdict({
+      source: this.store.source(),
+      index: this.store.tokens(),
+      reading: this.store.loops(),
+      caret: this.store.caret(),
+    }),
+  );
+
   private readonly place = computed<CaretPlace>(() => {
     const first = channelsBeginAt(this.store.tokens());
     return {
       beforeChannels: first === null || this.store.caret() <= first,
       wrap: this.wrap(),
+      call: this.call(),
     };
   });
 
@@ -255,10 +284,20 @@ export class CommandPalette {
    * A bracket form goes round the selection as one splice at each end, so
    * everything between them survives as written and the pair is one undo step;
    * everything else lands at the caret.
+   *
+   * A call lands at the caret too, but it is not a snippet: the label it names
+   * is read off the song, so it goes through `applyAll` at a known offset rather
+   * than through `insert`, which lands wherever the view says the caret is.
    */
   protected insert(entry: ResolvedEntry): void {
     if (entry.wrap !== undefined && isWrap(entry.wrap)) {
       this.requests.applyAll(wrapEdits(entry.wrap), wrapSelection(entry.wrap));
+      return;
+    }
+
+    if (entry.call !== undefined && isCall(entry.call)) {
+      const caret = this.store.caret();
+      this.requests.applyAll(callEdits(entry.call, caret), callSelection(entry.call, caret));
       return;
     }
 

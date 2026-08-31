@@ -16,7 +16,7 @@ them.
 | `src/app/state/`        | Nine `@Service()` singletons in dependency order, and the transport's clock          |
 | `src/app/editor/`       | The left pane and its chrome: top bar, transport, mixer, palette, CodeMirror adapter |
 | `src/app/editor/views/` | What the pane's tabs switch between: source, sample library, piano roll              |
-| `src/app/output/`       | Diagnostics, stats, the ARAM bar, the command inspector                              |
+| `src/app/output/`       | Diagnostics, stats, the ARAM bar, the command and loop inspectors                    |
 | `src/app/shared/`       | Form controls, panels, icons, chart helpers                                          |
 | `src/app/util/`         | Formatting, IndexedDB, `clamp`                                                       |
 
@@ -96,6 +96,14 @@ pane it sits in. Three signals on `EditorRequests` are how a sibling panel asks:
 - `insertion` — type a snippet in at the caret, set when a palette button is clicked.
 - `history` — undo or redo, set by the two toolbars that carry the buttons, with `undoDepth` and
   `redoDepth` travelling the other way so a button can tell whether there is anything to do.
+
+Three more carry what only the roll knows, since the caret names text and the roll is pointing at
+something the text says twice: `inspecting`, which pass of a note a bar click was about;
+`selectedRun`, the stretch of music a whole group of bars covers; and `inspectingLoop`, which of a
+body's constructs a press on a loop box's edge took hold of — a `(1)3`'s ghost and the `(1)[ … ]2` it
+repeats leave the caret in the same place, so the press is the only thing that can tell them apart.
+All three retire themselves as the caret moves off what they name, and all three go back to `null`
+when the roll does.
 
 `reveal` carries a `show` flag, and it is the difference between a summons and a question. A
 diagnostic wants the source brought forward, scrolled to and focused. A single click on a roll bar

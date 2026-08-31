@@ -4,6 +4,7 @@ import {
   type LoopReading,
   loopContents,
   loopStateAt,
+  loopTargets,
   nextLoopLabel,
 } from '@amk/tokens/commands/loops';
 import { type Edit, insertAt } from '@amk/tokens/edits';
@@ -59,6 +60,33 @@ export const WRAP_INTRO = 'The intro marker cannot be written inside a loop (AMK
 export const WRAP_REPLACEMENT = 'That music is written through a replacement.';
 export const WRAP_DEEP = 'A loop and a subloop is as deep as AddmusicK goes.';
 export const WRAP_SUB_NESTED = 'A subloop cannot be written inside another subloop.';
+
+/**
+ * Calling a loop the song has already written.
+ *
+ * The other half of the brackets, and the same policy layer: a `(n)m` names its
+ * body, so what a click can write depends on what is declared above the caret
+ * rather than only on the dialect.
+ */
+export interface CallOffer {
+  /** The body it plays: the nearest labelled declaration above the caret. */
+  label: number;
+  /** The text to write, padding included. */
+  text: string;
+  /** The count's digits inside {@link text}, which the palette leaves selected. */
+  countAt: { start: number; end: number };
+}
+
+export type CallVerdict = CallOffer | { refused: string };
+
+export function isCall(verdict: CallVerdict): verdict is CallOffer {
+  return 'label' in verdict;
+}
+
+export const CALL_BRACKETS = 'This song’s loop brackets do not pair up.';
+export const CALL_NONE =
+  'No named loop is written above the cursor. Loops made here name themselves.';
+export const CALL_NESTED = 'A loop cannot be called from inside another loop (AMK0112).';
 
 /**
  * What a fresh loop opens on.
@@ -184,6 +212,63 @@ export function wrapVerdict(request: WrapRequest): WrapVerdict {
   const label = nextLoopLabel(reading.slots);
   const open = label === null ? '[ ' : `(${label})[ `;
   return { ...offerOf(source, at, open, ` ]${COUNT}`), kind: 'loop', label, at };
+}
+
+/**
+ * What a click on **Loop call** would write at the caret, or why it cannot.
+ *
+ * The body is the nearest labelled declaration **above** the caret, which is not
+ * a preference but the rule: `parseLoopStart` writes `loopPointers` at the
+ * opening bracket and `parseLabelLoop` refuses a label that is not in there yet
+ * (AMK0115), so a call can only ever name a loop the parser has already read.
+ * Nearest rather than lowest-numbered because that is what a porter means by
+ * "again" — and it is the one `*` used to play.
+ */
+export function callVerdict(request: {
+  source: string;
+  index: TokenIndex;
+  reading: LoopReading;
+  caret: number;
+}): CallVerdict {
+  const { source, reading, caret } = request;
+  if (!reading.sound) {
+    return { refused: CALL_BRACKETS };
+  }
+
+  // `parseLabelLoop` and `parseStarLoop` both refuse outright while the parser is
+  // writing the loop block — a call inside a `[ ]` body is AMK0112. A `[[ ]]`
+  // leaves `channel` alone, so a call inside a subloop is fine.
+  if (loopStateAt(reading, caret).inCall) {
+    return { refused: CALL_NESTED };
+  }
+
+  const above = loopTargets(reading, caret);
+  const nearest = above[above.length - 1];
+  if (nearest?.label === undefined || nearest.label === null) {
+    return { refused: CALL_NONE };
+  }
+
+  const body = `(${nearest.label})${COUNT}`;
+  const before = caret > 0 && !/\s/.test(source[caret - 1]) ? ' ' : '';
+  const after = caret < source.length && !/\s/.test(source[caret]) ? ' ' : '';
+  const text = `${before}${body}${after}`;
+  const digits = text.lastIndexOf(String(COUNT));
+
+  return {
+    label: nearest.label,
+    text,
+    countAt: { start: digits, end: digits + String(COUNT).length },
+  };
+}
+
+/** The one splice, and where the count lands afterwards. */
+export function callEdits(offer: CallOffer, caret: number): Edit[] {
+  const edit = insertAt(caret, offer.text);
+  return edit === null ? [] : [edit];
+}
+
+export function callSelection(offer: CallOffer, caret: number): { anchor: number; head: number } {
+  return { anchor: caret + offer.countAt.start, head: caret + offer.countAt.end };
 }
 
 /** The two splices, one at each end, so everything between them survives as written. */

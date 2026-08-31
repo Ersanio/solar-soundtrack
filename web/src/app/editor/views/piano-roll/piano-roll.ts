@@ -1007,6 +1007,8 @@ export class PianoRoll {
         this.audition.playRegion({ tick, ticks });
       },
       pick: (channel) => this.selectEditChannel(channel),
+      inspectLoop: (text, body) =>
+        this.requests.inspectingLoop.set({ text: { ...text }, body: { ...body } }),
     },
   );
 
@@ -1249,6 +1251,7 @@ export class PianoRoll {
       // The selection goes with the roll — it is indices into a strip this
       // component owns — so what it published goes with it too.
       this.requests.selectedRun.set(null);
+      this.requests.inspectingLoop.set(null);
       this.stopPull();
       if (this.dragging()) {
         this.anchorPages();
@@ -1782,6 +1785,7 @@ export class PianoRoll {
         // inspector is answering from the caret a click on that bar moved, and
         // nothing else would retire it.
         this.requests.inspecting.set(null);
+        this.requests.inspectingLoop.set(null);
         this.requests.dismissed.set(this.editor.caret());
       } else {
         this.clearEditChannel();

@@ -11,6 +11,7 @@ import {
   unreachableChannels,
   walkSong,
 } from '@amk/spc/song-walk';
+import { readLoops } from '@amk/tokens/commands/loops';
 import { echoHazards } from '@amk/tokens/echo-hazards';
 import { commandsInForceOf } from './commands-in-force';
 import { type TimelineCommand, commandTimeline } from './command-timeline';
@@ -353,6 +354,15 @@ export class EditorStore {
 
   /** The command the caret is in, which the command inspector renders. */
   readonly commandAtCaret = computed(() => commandAt(this.tokens().commands, this.caret()));
+
+  /**
+   * The song's loop structure, off the same undebounced scan {@link tokens} is.
+   *
+   * Here rather than in each panel because three of them ask on every keystroke —
+   * the two palettes, for what a bracket may go round, and the inspector, for
+   * what construct the caret is in — and one pass answers all three.
+   */
+  readonly loops = computed(() => readLoops(this.source(), this.tokens()));
 
   /**
    * The `#instruments` entry the caret is in, if any.

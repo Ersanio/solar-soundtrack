@@ -1,5 +1,6 @@
 /**
- * Where a song's loop brackets are, and which label numbers it has already used.
+ * Where a song's loop brackets are, what each construct repeats and names, and
+ * which label numbers it has already used.
  *
  * AddmusicK allows exactly one `[ ]` and one `[[ ]]` open at a time, in either
  * order (`parser.ts:parseLoopStart`, Music.cpp:1216 and :1229), and the two
@@ -7,6 +8,12 @@
  * two off the token stream, for a palette that has to answer "may a loop go
  * here" *before* the text exists — the same job `availability.ts` does for the
  * dialect rules, and held to the compiler the same way by `palettetest`.
+ *
+ * The same pass answers what a construct *is*, which the descriptor tables
+ * cannot: a `ParamDescriptor` is bound to one argument of one command, and
+ * a loop's count sits on the second of two `]` commands, or on no command at all
+ * for a `(n)m`, or one less than itself for a `$E6`. {@link loopAt} is that
+ * question, and {@link loopTargets} is the set of bodies a call may name.
  *
  * A construct is read off the bytes a spelling leaves rather than off the
  * dispatch character: `[[ ]]n` and a hand-written `$E6 $00` … `$E6 $nn` are one
@@ -17,6 +24,42 @@
  */
 
 import type { Command, Token, TokenIndex } from "../tokens";
+
+/** A range of the source, as this module deals in them: offsets, no line. */
+export interface LoopRange {
+	start: number;
+	end: number;
+}
+
+/**
+ * Where a construct's repeat count is written, and what it comes to.
+ *
+ * Read off the {@link Command} wherever a spelling gathers one, which is four of
+ * the five: a count written through a replacement is in the expansion `gather`
+ * sees and not in the digits, so `"n=4"` used as `[ c4 ]n` really does play four
+ * times. Only `(n)m` has no command to read — `label` is not a letter command
+ * kind — and its digits are literal by construction.
+ */
+export interface LoopCount {
+	/** The digits' own range, or an empty one at the offset a count would be written at. */
+	at: LoopRange;
+	/**
+	 * Where the command whose first argument this is begins — what
+	 * `commandStartingAt` takes — or `null` for a `(n)m`, which raises none.
+	 *
+	 * Recorded rather than looked up again: for a `]]n` it is the *second* `]`,
+	 * which nothing downstream could work out from {@link at} alone.
+	 */
+	on: number | null;
+	/**
+	 * Passes, as AddmusicK counts them. `null` where none is written and none is
+	 * implied, which is a subloop: `]]` with no count is AMK0128, where `]`, `*`
+	 * and `(n)m` all default a missing `getInt` to 1.
+	 */
+	plays: number | null;
+	/** `$E6 $nn` writes one less than the count; every other spelling writes it plain. */
+	lessOne: boolean;
+}
 
 /** One paired loop construct: its two brackets, and the body between them. */
 export interface LoopSpan {
@@ -30,13 +73,40 @@ export interface LoopSpan {
 	bodyTo: number;
 	/** Just past the closing construct, its repeat count included. */
 	to: number;
+	/**
+	 * The `n` of the `(n)` written hard against the `[`, which is what a `(n)m`
+	 * recalls it by. `null` for a bare `[`, for every subloop, and for a `(!n)`,
+	 * whose number is a remote slot rather than a label a call may name.
+	 *
+	 * A `(n)` is carried past a `[[` to the next `[` by the parser — `loopLabel`
+	 * survives from `(n)[` until the matching `]` (`parser.ts:parseLoopStart`) —
+	 * and that is not read here: the label is taken only where it is hard against
+	 * the bracket it names, so `(5)[[d]]4 [e]2` leaves the second loop unnamed
+	 * rather than named wrongly. {@link LoopReading.slots} is unaffected, so the
+	 * allocator still sees the slot as taken.
+	 */
+	label: number | null;
+	/** The digits between that `(` and its `)`, for a reader that rewrites them. */
+	labelAt: LoopRange | null;
+	/** A `(!n)[ … ]` definition. Its body cannot repeat at all — AMK0164. */
+	remote: boolean;
+	count: LoopCount;
 }
 
 /** A `$E9` written where it stands rather than closing a body: a `(n)m` or a `*n`. */
 export interface LoopRecall {
+	/** Told apart because only one of the two names the body it plays. */
+	kind: "label" | "star";
 	from: number;
 	to: number;
+	/** The `n` of a `(n)m`; `null` for a `*n`, which names its body by position. */
+	label: number | null;
+	labelAt: LoopRange | null;
+	count: LoopCount;
 }
+
+/** Either of the two, for a reader that asks "what construct is this". */
+export type LoopConstruct = LoopSpan | LoopRecall;
 
 /** Everything a reader needs to know about a song's loops, from one pass. */
 export interface LoopReading {
@@ -77,8 +147,19 @@ export function readLoops(source: string, index: TokenIndex): LoopReading {
 	const slots = new Set<number>();
 	let sound = true;
 
-	let call: { from: number; bodyFrom: number } | null = null;
+	type Named = Pick<LoopSpan, "label" | "labelAt" | "remote">;
+	let call: (Named & { from: number; bodyFrom: number }) | null = null;
 	let sub: { from: number; bodyFrom: number } | null = null;
+
+	/**
+	 * The `(n)[` met on an earlier token, waiting for its bracket.
+	 *
+	 * Not cleared between the two: `at` is the `(`'s own offset and the bracket
+	 * matches on it through `labelBefore`, which only reaches back over a `)`
+	 * hard against it — so a label left standing can never be claimed by a `[`
+	 * written somewhere else.
+	 */
+	let declared: (Named & { at: number }) | null = null;
 
 	const tokens = index.tokens;
 	for (let i = 0; i < tokens.length; i++) {
@@ -105,23 +186,44 @@ export function readLoops(source: string, index: TokenIndex): LoopReading {
 					sound = false; // AMK0123
 				}
 
-				call = { from: labelBefore(source, token.start), bodyFrom: token.end };
+				const from = labelBefore(source, token.start);
+				const named = declared !== null && declared.at === from ? declared : null;
+				call = {
+					from,
+					bodyFrom: token.end,
+					label: named?.label ?? null,
+					labelAt: named?.labelAt ?? null,
+					remote: named?.remote ?? false,
+				};
 			}
 		} else if (token.kind === "loopEnd") {
 			if (twin?.kind === "loopEnd" && twin.start === token.end) {
+				// The count is on the *second* `]`, which is the token `gather`
+				// gave it to; the first closes nothing and takes no argument.
+				const count = gatheredCount(byStart.get(twin.start), twin.end, false, null);
 				if (sub === null) {
 					sound = false; // AMK0127
 				} else {
-					spans.push({ kind: "sub", ...sub, bodyTo: token.start, to: countEnd(source, twin.end) });
+					spans.push({
+						kind: "sub",
+						...sub,
+						bodyTo: token.start,
+						to: count.at.end,
+						label: null,
+						labelAt: null,
+						remote: false,
+						count,
+					});
 				}
 
 				sub = null;
 				i++;
 			} else {
+				const count = gatheredCount(byStart.get(token.start), token.end, false, 1);
 				if (call === null) {
 					sound = false; // AMK0129
 				} else {
-					spans.push({ kind: "call", ...call, bodyTo: token.start, to: countEnd(source, token.end) });
+					spans.push({ kind: "call", ...call, bodyTo: token.start, to: count.at.end, count });
 				}
 
 				call = null;
@@ -129,16 +231,31 @@ export function readLoops(source: string, index: TokenIndex): LoopReading {
 		} else if (token.kind === "loopCall") {
 			// `*n`. No check that a previous loop exists, because the compiler has
 			// none either (`parser.ts:parseStarLoop`) — it is still a `$E9`.
-			recalls.push({ from: token.start, to: countEnd(source, token.end) });
+			const count = gatheredCount(byStart.get(token.start), token.end, false, 1);
+			recalls.push({ kind: "star", from: token.start, to: count.at.end, label: null, labelAt: null, count });
 		} else if (token.kind === "label" && token.end === token.start + 1 && source[token.start] === "(") {
 			const close = closingLabel(source, tokens, i);
 			const named = close === null ? null : labelIn(source.slice(token.end, close.start));
 			if (close !== null && named !== null) {
 				slots.add(named.slot);
+				// The digits themselves, so a rewrite touches the number and not
+				// the parentheses round it. A `(!n)` names a remote slot rather
+				// than a label a call may reach, so it offers none.
+				const labelAt = named.remote ? null : { start: token.end, end: close.start };
 				// A `(n)` with a `[` hard against it declares the body, and that `[`
 				// raises the span; anything else is a recall and emits its own `$E9`.
-				if (!named.remote && source[close.end] !== "[") {
-					recalls.push({ from: token.start, to: countEnd(source, close.end) });
+				if (source[close.end] === "[") {
+					declared = { at: token.start, label: named.remote ? null : named.written, labelAt, remote: named.remote };
+				} else if (!named.remote) {
+					const count = writtenCount(source, close.end);
+					recalls.push({
+						kind: "label",
+						from: token.start,
+						to: count.at.end,
+						label: named.written,
+						labelAt,
+						count,
+					});
 				}
 			}
 		} else if (token.kind === "hex") {
@@ -156,13 +273,101 @@ export function readLoops(source: string, index: TokenIndex): LoopReading {
 			} else if (sub === null) {
 				sound = false; // AMK0160
 			} else {
-				spans.push({ kind: "sub", ...sub, bodyTo: command.span.start, to: command.span.end });
+				// The driver plays arg + 1 passes, which is what `]]n` writes n - 1
+				// for (`parser.ts:parseLoopEnd`), so the count and the byte differ.
+				const count = gatheredCount(command, command.span.end, true, null);
+				spans.push({
+					kind: "sub",
+					...sub,
+					bodyTo: command.span.start,
+					to: command.span.end,
+					label: null,
+					labelAt: null,
+					remote: false,
+					count,
+				});
 				sub = null;
 			}
 		}
 	}
 
 	return { spans, recalls, slots, sound: sound && call === null && sub === null };
+}
+
+/**
+ * The construct whose own text `offset` sits in — a bracket, its count, its
+ * label, a `(n)m`, a `*n` or either `$E6` arm.
+ *
+ * **Not** its body, which is {@link loopStateAt}'s question. Inclusive at both
+ * ends, the convention `commandAt` takes, and the narrowest run wins so a
+ * subloop's bracket inside a loop answers for the subloop.
+ */
+export function loopAt(reading: LoopReading, offset: number): LoopConstruct | null {
+	let best: LoopConstruct | null = null;
+	let width = Number.POSITIVE_INFINITY;
+
+	const take = (construct: LoopConstruct, from: number, to: number): void => {
+		if (offset >= from && offset <= to && to - from < width) {
+			width = to - from;
+			best = construct;
+		}
+	};
+
+	for (const span of reading.spans) {
+		// Two runs, not one: the body between them belongs to the notes in it, and
+		// the opening run stops one short of `bodyFrom` for exactly that reason —
+		// the body's first character is a note's, and a caller that suppresses a
+		// command's own readout here must not suppress that note's.
+		take(span, span.from, span.bodyFrom - 1);
+		take(span, span.bodyTo, span.to);
+	}
+
+	for (const recall of reading.recalls) {
+		take(recall, recall.from, recall.to);
+	}
+
+	return best;
+}
+
+/**
+ * Every construct `offset` is inside at all — its brackets, its body, its count
+ * or its label — innermost first.
+ *
+ * The wider question {@link loopAt} narrows: a note in the middle of a body is
+ * inside the loop that plays it and is on no bracket of it, and both readings
+ * are wanted. Ordered by how much text each covers, so a subloop is named ahead
+ * of the loop around it.
+ */
+export function loopsAt(reading: LoopReading, offset: number): readonly LoopConstruct[] {
+	const found: LoopConstruct[] = [];
+	for (const span of reading.spans) {
+		if (offset >= span.from && offset <= span.to) {
+			found.push(span);
+		}
+	}
+
+	for (const recall of reading.recalls) {
+		if (offset >= recall.from && offset <= recall.to) {
+			found.push(recall);
+		}
+	}
+
+	return found.sort((a, b) => a.to - a.from - (b.to - b.from));
+}
+
+/**
+ * The labelled bodies a call written at `before` may name — `loopPointers`' own
+ * contents at that point in the parse.
+ *
+ * Opened above the offset, because that is where `parseLoopStart` writes the
+ * pointer (`parser.ts:2727`) and `parseLabelLoop` refuses a label it cannot
+ * find there (AMK0115). Never a `(!n)`: it takes a slot, so the allocator counts
+ * it, but a `$E9` into a remote body is not a call any reader here should offer.
+ */
+export function loopTargets(reading: LoopReading, before: number): readonly LoopSpan[] {
+	return reading.spans.filter(
+		(span) => span.kind === "call" && !span.remote && span.label !== null && span.from < before,
+	);
 }
 
 /** Whether `offset` sits inside a body of each kind — the parser's two variables. */
@@ -238,6 +443,44 @@ export function nextLoopLabel(slots: ReadonlySet<number>): number | null {
 	return null;
 }
 
+/**
+ * The count a `]`, a `]]`, a `*` or a `$E6` gathered, or the empty offset one
+ * would be written at.
+ *
+ * Off the {@link Command} rather than off the digits, because those are not the
+ * same thing: `"n=4"` used as `[ c4 ]n` gathers a 4 from the expansion where the
+ * source at that offset holds no digits at all. It is also what carries
+ * `edits.ts`'s per-part macro interlock through to the writer.
+ *
+ * `missing` is what the spelling plays when no count is written — 1 for `]`, `*`
+ * and `(n)m`, and `null` for a subloop, where a missing count is AMK0128.
+ */
+function gatheredCount(command: Command | undefined, at: number, lessOne: boolean, missing: number | null): LoopCount {
+	const on = command?.span.start ?? null;
+	const arg = command?.args[0];
+	if (arg === undefined) {
+		return { at: { start: at, end: at }, on, plays: missing, lessOne };
+	}
+
+	return {
+		at: { start: arg.span.start, end: arg.span.end },
+		on,
+		plays: lessOne ? arg.value + 1 : arg.value,
+		lessOne,
+	};
+}
+
+/** The same for a `(n)m`, whose digits no command gathers — `label` is not a letter command kind. */
+function writtenCount(source: string, at: number): LoopCount {
+	const end = countEnd(source, at);
+	return {
+		at: { start: at, end },
+		on: null,
+		plays: end > at ? Number.parseInt(source.slice(at, end), 10) : 1,
+		lessOne: false,
+	};
+}
+
 /** The digits a count is written with, read as `getInt` reads them: no spaces skipped. */
 function countEnd(source: string, at: number): number {
 	let end = at;
@@ -290,7 +533,7 @@ function closingLabel(source: string, tokens: readonly Token[], i: number): Toke
  * spaces where `(n)` does not, since `parseRemoteDefinition` calls `skipSpaces`
  * and `getInt` skips none.
  */
-function labelIn(text: string): { slot: number; remote: boolean } | null {
+function labelIn(text: string): { slot: number; written: number; remote: boolean } | null {
 	if (text.startsWith("!!")) {
 		return null;
 	}
@@ -302,5 +545,5 @@ function labelIn(text: string): { slot: number; remote: boolean } | null {
 	}
 
 	const written = Number.parseInt(digits, 10);
-	return { slot: remote ? written : written + 1, remote };
+	return { slot: remote ? written : written + 1, written, remote };
 }

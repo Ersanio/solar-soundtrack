@@ -28,7 +28,7 @@ import {
   formAvailability,
 } from '@amk/tokens/commands/availability';
 import type { CommandGlyph } from './command-icon';
-import type { WrapKind, WrapVerdict } from './loop-wrap';
+import type { CallVerdict, WrapKind, WrapVerdict } from './loop-wrap';
 
 export type Category = 'notes' | 'volume' | 'pitch' | 'instrument' | 'echo' | 'loops' | 'misc';
 
@@ -116,7 +116,19 @@ interface Wrapping {
   wraps?: WrapKind;
 }
 
-interface LetterEntry extends Described, Wrapping {
+/**
+ * An entry that plays a body the song has already declared, so what it writes
+ * depends on what stands above the caret rather than only on the dialect.
+ * `loop-wrap.ts`'s `callVerdict` is that reading.
+ *
+ * A flag rather than a kind: there is one construct to write, `(n)m`, and the
+ * number in it is the answer rather than a choice the button makes.
+ */
+interface Calling {
+  calls?: true;
+}
+
+interface LetterEntry extends Described, Wrapping, Calling {
   kind: 'letter';
   /** The letter, which is also its key into `LETTER_NAMES` and `LETTER_PARAMS`. */
   id: string;
@@ -142,7 +154,7 @@ interface LetterEntry extends Described, Wrapping {
   writes?: number;
 }
 
-interface SyntaxEntry extends Described, Wrapping {
+interface SyntaxEntry extends Described, Wrapping, Calling {
   kind: 'syntax';
   id: string;
   /** As {@link LetterEntry.writes}. */
@@ -478,11 +490,26 @@ export const ENTRIES: readonly Entry[] = [
     snippet: '[[ ]]2',
     syntax: null,
   },
-  letter('*', '*', {
+  // A call names the body it plays, so what it writes depends on what the song
+  // has declared above the caret rather than only on the dialect — `loop-wrap.ts`
+  // again, and the same shape as the two wraps beside it.
+  //
+  // There is no `*` button. `*` takes `prevLoop`, the last `[` opened
+  // (`parser.ts:parseStarLoop`), so what it plays is decided by where it is
+  // written and by nothing a porter can see or point at — which is the one thing
+  // a piano roll cannot draw a handle for. A `*` already in a song still reads
+  // and still edits; the inspector's **Recalls** field is where it gets a name.
+  {
+    kind: 'syntax',
     category: 'loops',
+    id: '(n)',
+    calls: true,
     icon: 'replay',
-    blurb: 'Plays the last labelled loop again from wherever you are.',
-  }),
+    label: 'loop call',
+    blurb: 'Plays a loop you have already written, again from here.',
+    snippet: '(0)2',
+    syntax: null,
+  },
   {
     kind: 'syntax',
     category: 'loops',
@@ -595,6 +622,10 @@ export interface ResolvedEntry {
    * the two meet.
    */
   wrap?: WrapVerdict;
+  /** As {@link ResolvedEntry.wraps}, for the one entry that calls a body. */
+  calls?: true;
+  /** What a click would call, or why there is nothing to. */
+  call?: CallVerdict;
 }
 
 /**
@@ -613,6 +644,11 @@ export interface CaretPlace {
    * offers the subloop. Absent where the caller has no selection to offer.
    */
   wrap?: { loop: WrapVerdict; subloop: WrapVerdict };
+  /**
+   * What a call written here would play. Absent where the caller has no caret to
+   * answer for — the roll's palette aims at a note and supplies its start.
+   */
+  call?: CallVerdict;
 }
 
 /** The position rule, which stacks on top of the dialect one. */
@@ -712,6 +748,7 @@ export function resolveEntry(
     );
     const text = swap?.text ?? entry.snippet;
     const wrap = entry.wraps === undefined ? undefined : place.wrap?.[entry.wraps];
+    const call = entry.calls === undefined ? undefined : place.call;
 
     return {
       key: `text:${entry.id}`,
@@ -732,6 +769,8 @@ export function resolveEntry(
       where: entry.kind === 'syntax' ? (entry.context ?? 'anywhere') : 'anywhere',
       wraps: entry.wraps,
       wrap,
+      calls: entry.calls,
+      call,
     };
   }
 

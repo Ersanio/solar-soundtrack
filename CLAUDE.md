@@ -1168,8 +1168,64 @@ stats.loopTicks` pads **every other channel that would cut the song short** out 
   it (`main.asm:L_10E4`), so a `]` written between the two puts the body's `$00` where the slide was.
 - **A repeat count on the loop box, or a wheel over its edge to step it** — the box's stroke is nine
   pixels and already carries three gestures, and the count is one number in the text. A wrap leaves
-  it selected, which puts the command inspector on the loop's own `]n` with the **Repeats** field it
-  already has (`letter-params.ts`); an existing loop's count changes from that same field.
+  it selected, which puts the loop inspector on the loop it just wrote with the **Repeats** field it
+  already has (`output/loop-inspector/`); an existing loop's count changes from that same field.
+- **A loop's Repeats field as a `LETTER_PARAMS` row on `]`** — a `ParamDescriptor` is bound to one
+  argument of one command, and three of the five spellings do not keep their count there. `]]4` is
+  two `]` commands with the count on the second, and `commandAt` is end-inclusive, so a caret on the
+  first bracket reaches the _note in front of it_ and the field was unreachable; a `$E6` carries one
+  less than the count it means, so the row would have read 3 for a subloop that plays 4; and a `(n)m`
+  raises no `Command` at all, `label` not being in `LETTER_COMMAND_KINDS`, so the panel said "nothing
+  at the caret" on the commonest recall in the language. The subject is the **construct**: `loopAt`
+  answers off the token stream for a bracket, a count, a label, a `*` and either `$E6` arm, and one
+  write path picks `spliceArg`, `insertAt` or `spliceRange` by what the spelling actually wrote.
+  `"["` left `letter-params.ts` with it — `parseLoopStart` never calls `getInt`, so digits after an
+  opening bracket are music and that row could never be filled.
+- **That construct drawn as a card _inside_ the command inspector** — additive over whatever else the
+  caret was on, which is the right reading of the subject and the wrong place for it: a loop is not a
+  command, so the panel that answers "what is under the cursor" was answering two questions at once,
+  and the card pushed a note's own parameters and its palette down the pane on every note of a
+  loop-heavy song. `output/loop-inspector/` is its own panel under that one, and it is **absent**
+  rather than empty when the caret is in no loop — a permanent "not in a loop" row is a cost every
+  song without one pays. The command inspector still stands its parameter table down for a caret on
+  a construct's own text (`loopAt`, not `loopFocus` — it needs to know only that the subject is a
+  loop) and says in one line where the count went, because "nothing at the caret" is untrue of a `]`.
+- **Reading that count off the digits in the source** — `countEnd` scans what is written, and
+  `[ c4 ]REP` with `"REP=4"` is written with no digits at all: the scan said "nothing, so 1" where
+  `gather`, which sees the expansion, said 4. The count comes off the `Command` wherever a spelling
+  gathers one, which is four of the five, and the digit scan survives only as the offset an absent
+  count would go at. That is also what gives the field `argEditable`'s per-part macro interlock for
+  free, instead of a `spliceRange` that would overwrite the use site.
+- **Making a `(n)m` a `Command` in `gather` instead** — the tidy-looking fix, and it moves far more
+  than it mends: `label` covers `(!n)`, `(!n,t,a)`, `(!!n)`, `("kick.brr",$02)` and `(@5,$02)` too,
+  `roll-strip.ts:discoverLoops` pairs `[`/`]` commands **by depth**, and `commandScope` would have to
+  learn a sixth structural kind — all so that one panel could ask a question `readLoops` was already
+  answering.
+- **The roll's loop hint read as a fact about the caret rather than as a redirection** — a press on a
+  box's edge leaves the caret on the body's _first note_, so a hint honoured wherever it was set
+  would go on answering about a pass clicked long ago. `EditorRequests.inspectingLoop` only ever
+  moves a construct `loopFocus` has already listed to the head of that list, and only while the caret
+  is inside the body it named. Matched on the **body span** and not on the label, because an
+  unlabelled `[ ]` recalled by a `*` has no name for `discoverLoops`'s reading and `readLoops`'s to
+  agree on; `palettetest` pins both directions, the hint honoured and a hint for another body ignored.
+- **A free number field for which loop a `(n)m` recalls** — `parseLabelLoop` refuses a label that is
+  not in `loopPointers` yet (AMK0115), `parseLoopStart` refuses a second declaration of one
+  (AMK0124), and `parseLabelLoop` refuses `n + 1 >= 0x10000` (AMK0114), so a number field would have
+  had to guard three errors to offer one useful value. It is a select over `loopTargets` — the
+  labelled bodies opened _above_ the call, which is `loopPointers`' own contents at that point in the
+  parse — and a `(!n)` is never among them: it would compile to a `$E9` into a body only a `$FC`
+  should reach.
+- **Renaming a loop from that same control** — the label is what every `(n)m` in the song names this
+  body by, so changing it points every one of them at a label nothing declares, silently and across
+  channels. A body with **no** name is offered one, which breaks nothing because nothing can be
+  calling it yet; a name already written is never touched.
+- **Keeping the palette's `*` button** — `*` takes `prevLoop`, the last `[` opened
+  (`parser.ts:parseStarLoop`, Music.cpp:1321), so what it plays is decided by where it is written and
+  by nothing a porter can point at, which is the one loop shape the roll cannot draw a handle for.
+  **Loop call** writes a `(n)m` naming the nearest loop declared above the caret — nearest because
+  that is what "again" means, and _above_ because `parseLoopStart` files `loopPointers` at the
+  opening bracket and a call below is AMK0115. A `*` already in a song still reads, still draws and
+  still edits, and its **Recalls** row is how it gets a name.
 - **The roll publishing its selection as strip indices** — an index means nothing outside the
   component that built the strip, and the panel that wants it is in the output pane.
   `EditorRequests.selectedRun` carries the **span** from the first selected item to the last, which

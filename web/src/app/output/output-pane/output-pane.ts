@@ -7,11 +7,20 @@ import { AramBudget } from '../aram-budget/aram-budget';
 import { CommandInspector } from '../command-inspector/command-inspector';
 import { DiagnosticsList } from '../diagnostics-list/diagnostics-list';
 import { HexDump } from '../hex-dump/hex-dump';
+import { LoopInspector } from '../loop-inspector/loop-inspector';
 import { StatsGrid } from '../stats-grid/stats-grid';
 
 @Component({
   selector: 'amk-output-pane',
-  imports: [Panel, AramBudget, CommandInspector, DiagnosticsList, HexDump, StatsGrid],
+  imports: [
+    Panel,
+    AramBudget,
+    CommandInspector,
+    DiagnosticsList,
+    HexDump,
+    LoopInspector,
+    StatsGrid,
+  ],
   templateUrl: './output-pane.html',
   host: { class: 'flex min-h-0 min-w-0 flex-col' },
 })

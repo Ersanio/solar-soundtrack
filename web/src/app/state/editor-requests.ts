@@ -189,6 +189,26 @@ export class EditorRequests {
   readonly selectedRun = signal<{ start: number; end: number } | null>(null);
 
   /**
+   * The loop construct the piano roll was last asked about: the text of the pass
+   * whose box was pressed, and the body that pass plays.
+   *
+   * A body played from three places is three constructs and one text, and a
+   * press on a box's edge puts the caret on the body's first note — so the caret
+   * cannot say whether the box was the declaration's or one of its recalls'.
+   * This is the roll naming which of them it took hold of, beside
+   * {@link inspecting}, which says the same thing for one pass of a note.
+   *
+   * It only ever **redirects** an answer the caret has already given: the panel
+   * reads it while the caret is still inside the body it names, so it retires
+   * itself and nothing has to clear it. Matched on the body rather than on the
+   * label, since an unlabelled `[ ]` recalled by a `*` has no name for the roll's
+   * reading and the token reading to agree on.
+   *
+   * It travels with the roll, so it goes back to `null` when the roll does.
+   */
+  readonly inspectingLoop = signal<{ text: Span; body: Span } | null>(null);
+
+  /**
    * The caret the inspector's question was withdrawn at, or `null` for none.
    *
    * The roll's `Escape` lets a note go, and the panel that was answering about

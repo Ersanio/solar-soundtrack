@@ -154,7 +154,12 @@ export const LETTER_PARAMS: Readonly<Record<string, Resolver>> = {
 	b: noteLength,
 	r: noteLength,
 	"^": noteLength,
-	"[": fixed([u8("Repeats", "index", { min: 1, describe: (n) => `plays ${n} times` })]),
+	// No `[`. `parseLoopStart` never calls `getInt`, so digits after an opening
+	// bracket are read as music and the row could never be filled; `resolveCommand`
+	// falls back to "no arguments", which is what the command has. A loop's count
+	// is `commands/loops.ts`'s answer — it sits on the second of two `]` commands
+	// for a subloop, on none at all for a `(n)m`, and one less than itself for a
+	// `$E6` — and these two are what is left when that reading declines.
 	"]": fixed([u8("Repeats", "index", { min: 1, describe: (n) => `plays ${n} times` })]),
 	"*": fixed([u8("Repeats", "index", { min: 1, describe: (n) => `replays the last loop ${n} times` })]),
 };

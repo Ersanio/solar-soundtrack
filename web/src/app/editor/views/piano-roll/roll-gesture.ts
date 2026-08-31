@@ -2,6 +2,7 @@ import { type Signal, computed, signal } from '@angular/core';
 
 import { NOTE_MIN } from '@amk/core/hardcoded-tables';
 import { octaveFor, spellDuration, spellNote } from '@amk/core/mml-text';
+import type { Span } from '@amk/core/types';
 import type { LoopRun, PitchSlide } from '@amk/spc/song-walk';
 import type { Command } from '@amk/tokens';
 import type { Edit } from '@amk/tokens/edits';
@@ -186,6 +187,16 @@ export interface GestureSinks {
   auditionSpan: (tick: number, ticks: number) => void;
   /** Name the channel a bar belongs to, as a click on a note already does. */
   pick: (channel: number) => void;
+  /**
+   * Name the loop construct a press on a box's edge took hold of, and the body
+   * that pass plays.
+   *
+   * `pick` for a loop. A body played from three places is three constructs and
+   * one text, and the press leaves the caret on the body's first note — so
+   * without this the panel beside the roll cannot tell a press on the
+   * declaration's box from one on a `(n)m`'s ghost.
+   */
+  inspectLoop: (text: Span, body: Span) => void;
 }
 
 /** What the pointer is doing between down and up. */
@@ -1344,6 +1355,13 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
 
         const { tick, row } = at(event, box);
         const standing = grabbed.items[construct];
+        if (standing.loop) {
+          // The construct is this box's own — a `(n)m` for a ghost, the
+          // `(n)[ … ]m` for the dashed one — where the frame's span is the body
+          // they share, which is what retires the answer when the caret leaves.
+          sinks.inspectLoop(standing.loop.text, grabbed.frames[frame].span);
+        }
+
         const played = grabbed.frames[frame];
         const passes = passesAt(played, grabbed.channel, passTick);
         // Two passes of a body meet at every interior edge of a loop, and their
