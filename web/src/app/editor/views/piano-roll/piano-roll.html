@@ -168,6 +168,13 @@
             (entered)="enter($event)"
             (channelPicked)="selectEditChannel($event)"
           />
+          <!-- Above the bars, because a loop's name has to be read over the
+               music it names; dimmed with the boxes it belongs to. -->
+          <g
+            amk-roll-loop-labels
+            [labels]="loopLabels()"
+            [attr.opacity]="gestures.shiftDelta() !== 0 ? 0.3 : null"
+          />
           <g
             amk-roll-edit
             [preview]="gestures.preview()"
@@ -180,9 +187,13 @@
           />
         </g>
 
+        <!-- Inert: it is drawn over everything the roll is edited through, and a
+             loop box's edge or a note's own is not to be unreachable because the
+             music happens to be standing on it. -->
         <line
           y1="0"
           class="stroke-accent"
+          pointer-events="none"
           stroke-width="1.5"
           [attr.x1]="playheadX()"
           [attr.x2]="playheadX()"

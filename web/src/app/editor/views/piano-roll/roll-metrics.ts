@@ -48,6 +48,19 @@ export const OVERVIEW_PAD = 3;
 /** Height of the scrub bar: a row of bar numbers over a row of beat ticks. */
 export const SCRUB_HEIGHT = 20;
 
+/**
+ * The loop label's own text size, in the corner of a selected loop's box.
+ *
+ * Fixed, where a bar's name is measured against the row it sits in: it names a
+ * construct, which is neither a note nor a row. The roll's `<svg>` is 1:1 with
+ * CSS pixels and `scroll()` is a translate, so this is the same size at every
+ * zoom and at every row height.
+ */
+export const LOOP_LABEL_SIZE = 9;
+
+/** Between a loop label's plate and the corner of the box it sits in. */
+export const LOOP_LABEL_INSET = 3;
+
 /** A command glyph in the lane. The bar's own are measured against the row it sits in. */
 export const LANE_GLYPH = 12;
 

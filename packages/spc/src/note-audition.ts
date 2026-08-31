@@ -1,9 +1,14 @@
 /**
- * Playing one note as it would sound at a point in the song.
+ * Playing one note as it would sound at a point in the song, or one stretch of
+ * the song as it stands.
  *
  * `driver-state.ts` reads the running driver and `song-walk.ts` predicts what the
  * song will do; this is the third use of the same knowledge — putting a note the
  * song does not contain in front of the driver and hearing what comes out.
+ *
+ * {@link auditionRegion} is the other half and the opposite of it in the one
+ * respect that matters: it injects nothing and parks nothing, so every voice
+ * reads its own music and what comes back is the song over those ticks.
  *
  * The state a note sounds under is enormous: an instrument, its sample and
  * envelope, a track volume that may be mid-fade, a pan, a tuning, `q`'s gate and
@@ -499,7 +504,13 @@ function parkOthers(aram: Uint8Array, channel: number): void {
  * The mask is constant for the whole run, which is what keeps `MuteBackup.restoring`
  * at zero: bits enter it only when they leave the mask, and none do here.
  */
-function fastForward(core: SpcCore, target: number, channel: number, silenced: number, backup: MuteBackup): number {
+function fastForward(
+	core: SpcCore,
+	target: number,
+	channel: number | null,
+	silenced: number,
+	backup: MuteBackup,
+): number {
 	let ticks = 0;
 	let voice = -1;
 	const tick = createTickPhase();
@@ -512,7 +523,7 @@ function fastForward(core: SpcCore, target: number, channel: number, silenced: n
 		// Read before the block and not after it. The fetch loop for the tick this
 		// block is about to report may run entirely inside the block, so the mark
 		// has to come from before it for the change to be visible at all.
-		const mark = voiceFetchMark(core.aram(), channel);
+		const mark = channel === null ? 0 : voiceFetchMark(core.aram(), channel);
 		core.renderView(BLOCK);
 		rendered += BLOCK;
 
@@ -543,7 +554,7 @@ function fastForward(core: SpcCore, target: number, channel: number, silenced: n
 		const stepped = sawTick(tick, aram);
 		ticks += stepped;
 		stalledFor = stepped > 0 ? 0 : stalledFor + 1;
-		fetched = voiceFetchMark(aram, channel) !== mark;
+		fetched = channel === null || voiceFetchMark(aram, channel) !== mark;
 	}
 
 	arrive(core, channel, fetched);
@@ -577,16 +588,22 @@ function fastForward(core: SpcCore, target: number, channel: number, silenced: n
  *
  * Bounded at both steps, because a voice the song does not play never fetches and
  * a driver that has stopped never comes round to another pass.
+ *
+ * A `null` channel is a caller handing nothing over — {@link auditionRegion} —
+ * and only the pass boundary is its business: `sawTick` reports off `$44`, which
+ * the driver writes at the top of a pass and before that tick's music runs, so
+ * stopping there leaves the driver about to play the tick that was asked for
+ * with its attack still ahead of it.
  */
-function arrive(core: SpcCore, channel: number, fetched: boolean): void {
-	const mark = voiceFetchMark(core.aram(), channel);
+function arrive(core: SpcCore, channel: number | null, fetched: boolean): void {
+	const mark = channel === null ? 0 : voiceFetchMark(core.aram(), channel);
 	// A voice reading no music data has no fetch to wait for, and waiting for one
 	// would spend the whole budget on a channel the song never uses.
-	let moved = fetched || !voicePlaying(core.aram(), channel);
+	let moved = channel === null || fetched || !voicePlaying(core.aram(), channel);
 
 	for (let waited = 0; waited < ARRIVE_FRAMES && !moved; waited += ARRIVE_STEP) {
 		core.renderView(ARRIVE_STEP);
-		moved = voiceFetchMark(core.aram(), channel) !== mark;
+		moved = channel !== null && voiceFetchMark(core.aram(), channel) !== mark;
 	}
 
 	// And then to the top of the driver's next pass, a frame at a time. Which
@@ -626,11 +643,16 @@ function arrive(core: SpcCore, channel: number, fetched: boolean): void {
  * that is not reapplied does not stick. The target is out of that mask's reach —
  * {@link restoreTrackVolume} took it out of the backup — so the note keeps the
  * volume it was given.
+ *
+ * A `null` channel is the region case: nothing is parked, so every voice reads
+ * on through its own music, and the mask arrives as the caller means it — there
+ * is no target to keep out of it. What ends the span parks **every** voice, so
+ * its last notes ring out and nothing new starts.
  */
 function record(
 	core: SpcCore,
 	held: number,
-	channel: number,
+	channel: number | null,
 	silenced: number,
 	backup: MuteBackup,
 ): { pcm: Int16Array; heldTicks: number } {
@@ -648,12 +670,25 @@ function record(
 		rendered += BLOCK;
 
 		const aram = core.aram();
-		parkOthers(aram, channel);
+		if (channel !== null) {
+			parkOthers(aram, channel);
+		} else if (tail >= 0) {
+			parkAll(aram);
+		}
+
 		applyChannelMutes(aram, silenced, backup);
 
 		if (tail < 0) {
 			ticks += sawTick(tick, core.aram());
 			if (ticks >= held) {
+				// The span is over. Parking every voice from here is what lets the
+				// notes standing at that tick key off where they were written to
+				// rather than being cut, without the song running on past what was
+				// asked for.
+				if (channel === null) {
+					parkAll(core.aram());
+				}
+
 				tail = rendered;
 			}
 		} else if (rendered - tail >= AUDITION_TAIL_SECONDS * SPC_SAMPLE_RATE) {
@@ -662,6 +697,58 @@ function record(
 	}
 
 	return { pcm: fadeOut(pcm.subarray(0, rendered * SPC_CHANNELS)), heldTicks: ticks };
+}
+
+/** Every voice parked, which is how a region's tail rings out with nothing new starting. */
+function parkAll(aram: Uint8Array): void {
+	for (let voice = 0; voice < VOICES; voice++) {
+		parkVoice(aram, voice);
+	}
+}
+
+/** What {@link auditionRegion} is asked for. */
+export interface RegionAuditionRequest {
+	/** Where the span starts, in music ticks. */
+	atTicks: number;
+	/** How many ticks of the song to play from there. */
+	ticks: number;
+	/**
+	 * Voices the mixer is silencing, as a bitmask. `0` for no mixer at all.
+	 *
+	 * Held through both halves, exactly as {@link auditionNote} holds it, so the
+	 * echo the span lands in is the echo the transport is making. No bit is
+	 * stripped: a region is the song rather than one channel's note, and a
+	 * silenced voice is simply not heard.
+	 */
+	silenced?: number;
+}
+
+/**
+ * Plays the song silently up to `atTicks`, then records `ticks` of it.
+ *
+ * {@link auditionNote}'s opposite in the one respect that matters: that one
+ * hands the driver a note and parks the other voices so nothing else advances,
+ * where this parks nothing and injects nothing. Every voice reads its own music,
+ * a voice that reaches its `$00` walks the phrase table exactly as the song
+ * does, and what comes back is the song over those ticks — `parkOthers` only
+ * ever existed to keep a voice off the frames a note was written over, and there
+ * are none here.
+ *
+ * At least one tick of fast-forward, for {@link auditionNote}'s own reason: the
+ * dump's PC is the driver's main loop with the song index still in `$F6`, and it
+ * takes four passes of that loop to become a song at all.
+ */
+export function auditionRegion(core: SpcCore, spc: Uint8Array, request: RegionAuditionRequest): AuditionedNote {
+	const target = Math.max(1, Math.floor(request.atTicks));
+	const span = Math.max(1, Math.floor(request.ticks));
+
+	core.loadSpc(spc);
+
+	const backup = createMuteBackup();
+	const silenced = request.silenced ?? 0;
+	const reachedTicks = fastForward(core, target, null, silenced, backup);
+
+	return { ...record(core, span, null, silenced, backup), reachedTicks };
 }
 
 /** Ramps the last {@link FADE_SECONDS} to zero, and takes a copy while it is there. */

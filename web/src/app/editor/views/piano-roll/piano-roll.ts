@@ -59,7 +59,15 @@ import {
   tickWindow,
   xAtTick,
 } from './roll-layout';
-import { type Mark, buildLoopRegions, buildMarks, buildMinimap, heldRowsAt } from './roll-marks';
+import {
+  type Mark,
+  buildLoopLabels,
+  buildLoopRegions,
+  buildMarks,
+  buildMinimap,
+  heldRowsAt,
+} from './roll-marks';
+import { RollLoopLabels } from './roll-loops/roll-loop-labels';
 import { RollLoops } from './roll-loops/roll-loops';
 import { laneWindow, packCommandLane } from './roll-command-layout';
 import { RollCommandLane } from './roll-command-lane/roll-command-lane';
@@ -72,7 +80,7 @@ import {
   SCRUB_HEIGHT,
 } from './roll-metrics';
 import { seedEdits } from './roll-seed';
-import { type Strip, channelStrip, channelTails, isStrip } from './roll-strip';
+import { type Strip, channelStrip, channelTails, constructFor, isStrip } from './roll-strip';
 import { RollNotes } from './roll-notes/roll-notes';
 import { RollOverview } from './roll-overview/roll-overview';
 import { RollScrub, type TimeMark } from './roll-scrub/roll-scrub';
@@ -121,6 +129,7 @@ import { RollTooltip } from './roll-tooltip/roll-tooltip';
     RollGrid,
     RollKeys,
     RollLanes,
+    RollLoopLabels,
     RollLoops,
     RollNotes,
     RollOverview,
@@ -668,6 +677,33 @@ export class PianoRoll {
   });
 
   /**
+   * The name a selected loop group's boxes carry, over the bars rather than
+   * under them — a second pass over {@link loopRegions}, so a selection changing
+   * does not rebuild the whole song's boxes.
+   *
+   * Off `editChannel` and not `editing`: a label appearing because the pointer
+   * wandered over another channel's bar would be saying something about the
+   * hover rather than about the selection.
+   */
+  protected readonly loopLabels = computed(() => {
+    const channel = this.editChannel();
+    const strip = this.strip();
+    if (channel === null || !strip) {
+      return [];
+    }
+
+    return buildLoopLabels({
+      regions: this.loopRegions(),
+      channel,
+      selected: this.gestures.selectedBodies(),
+      labelAt: (body, tick) => {
+        const at = constructFor(strip, body, tick);
+        return at < 0 ? null : (strip.items[at].loop?.label ?? null);
+      },
+    });
+  });
+
+  /**
    * The porter's grid, drawn by the roll and numbered by the scrub bar.
    *
    * One list for both, so a bar's number cannot land at an x its own rule is not
@@ -939,6 +975,13 @@ export class PianoRoll {
             quiet: true,
           });
         }
+      },
+      auditionSpan: (tick, ticks) => {
+        // No `notePending` gate: a press on a box or a marquee's release is one
+        // deliberate question, and `Audition.stop` drops whatever the last one
+        // was still rendering. The per-row drag sink above is the one that has
+        // to queue.
+        this.audition.playRegion({ tick, ticks });
       },
       pick: (channel) => this.selectEditChannel(channel),
     },

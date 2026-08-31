@@ -8,13 +8,15 @@ import { type PlaceContext, keyOf, placeOf } from './percussion';
 import {
   CHANNEL_FILL,
   KEY_WIDTH,
+  LOOP_LABEL_INSET,
+  LOOP_LABEL_SIZE,
   MUTED_OPACITY,
   NOTE_GAP,
   OVERVIEW_HEIGHT,
   OVERVIEW_PAD,
   barRect,
 } from './roll-metrics';
-import { fitBarContent } from './roll-bar-text';
+import { fitBarContent, plateWidth } from './roll-bar-text';
 import { type LaneStack, keyName, noteLabel, overviewOffset } from './roll-layout';
 
 /**
@@ -389,6 +391,13 @@ export interface LoopRegionBox {
   channel: number;
   body: number;
   tick: number;
+  /**
+   * The pass's length **as drawn**, which is the run's own only where the song
+   * does not end inside it. What a press measures its ends against: a handle
+   * that answered "resize" where no edge is drawn is a handle for something
+   * invisible, and the porter is aiming at what they can see.
+   */
+  ticks: number;
 }
 
 export interface LoopRegionRequest {
@@ -577,6 +586,7 @@ export function buildLoopRegions(request: LoopRegionRequest): LoopRegionBox[] {
         channel,
         body,
         tick,
+        end,
       }) => ({
         id,
         x,
@@ -590,8 +600,79 @@ export function buildLoopRegions(request: LoopRegionRequest): LoopRegionBox[] {
         channel,
         body,
         tick,
+        ticks: end - tick,
       }),
     );
+}
+
+/** A loop's own name, drawn in the corner of a box whose group is selected. */
+export interface LoopLabel {
+  id: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  /** The `n` of the `(n)` the construct is written with. */
+  text: string;
+  /** Where the glyph's baseline centre goes, inside the plate. */
+  textX: number;
+  textY: number;
+}
+
+export interface LoopLabelRequest {
+  regions: readonly LoopRegionBox[];
+  /** The channel whose selection is being shown; no other channel has one. */
+  channel: number;
+  /** The bodies every note of whose group is selected, by body address. */
+  selected: ReadonlySet<number>;
+  /** The `(n)` the construct standing where a box is drawn is written with. */
+  labelAt: (body: number, tick: number) => number | null;
+}
+
+/**
+ * The labels a selected loop group's boxes carry.
+ *
+ * A second, short pass over the boxes {@link buildLoopRegions} has already
+ * built, rather than a field on one: that list is on the mark window's cadence
+ * and a selection changes on every click, so a two-character plate would rebuild
+ * the whole song's boxes. It is drawn above the bars for the other half of the
+ * reason — the loop layer is under them, where a label cannot be read.
+ *
+ * Per **construct** and not per body: `(1)[a1]5` and its `(1)2` recall both name
+ * the body, where a `*2` recalling the very same body names nothing.
+ */
+export function buildLoopLabels(request: LoopLabelRequest): LoopLabel[] {
+  const { regions, channel, selected, labelAt } = request;
+  if (selected.size === 0) {
+    return [];
+  }
+
+  const labels: LoopLabel[] = [];
+  for (const region of regions) {
+    if (region.channel !== channel || !selected.has(region.body)) {
+      continue;
+    }
+
+    const label = labelAt(region.body, region.tick);
+    if (label === null) {
+      continue;
+    }
+
+    const text = String(label);
+    const w = plateWidth(text, LOOP_LABEL_SIZE);
+    const h = LOOP_LABEL_SIZE + LOOP_LABEL_INSET * 2;
+    // A box with no room for its name says nothing rather than something cut,
+    // which is the line `fitBarContent` takes for a bar's own.
+    if (w + LOOP_LABEL_INSET * 2 > region.w || h + LOOP_LABEL_INSET * 2 > region.h) {
+      continue;
+    }
+
+    const x = region.x + LOOP_LABEL_INSET;
+    const y = region.y + LOOP_LABEL_INSET;
+    labels.push({ id: region.id, x, y, w, h, text, textX: x + w / 2, textY: y + h / 2 });
+  }
+
+  return labels;
 }
 
 export interface HeldRequest {

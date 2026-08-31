@@ -1,7 +1,7 @@
 /// <reference lib="webworker" />
 
 /**
- * Runs {@link auditionNote} off the page.
+ * Runs {@link auditionNote} and {@link auditionRegion} off the page.
  *
  * Its own worker rather than a second message type on `clock.worker.ts`, and its
  * own emulator: the clock measurement fires a second after typing stops, which is
@@ -17,10 +17,16 @@
  * drops the ones it no longer wants.
  */
 
-import { type NoteAuditionRequest, auditionNote } from '@amk/spc/note-audition';
+import {
+  type NoteAuditionRequest,
+  type RegionAuditionRequest,
+  auditionNote,
+  auditionRegion,
+} from '@amk/spc/note-audition';
 import { coreFor } from './spc-core';
 
-export interface NoteRequest extends NoteAuditionRequest {
+/** What both kinds carry: the run's own token and what it is run against. */
+interface AuditionHeader {
   token: number;
   /** A complete `.spc` image, as `buildSpc` produces. */
   spc: Uint8Array;
@@ -28,15 +34,28 @@ export interface NoteRequest extends NoteAuditionRequest {
   wasmUrl: string;
 }
 
+/**
+ * A note, or a stretch of the song. One worker and one token for both, because
+ * they are the same kind of job and must supersede each other: pressing a note
+ * while a selection is rendering asks a new question of the same emulator.
+ */
+export type AuditionRequest =
+  | (AuditionHeader & { kind: 'note'; note: NoteAuditionRequest })
+  | (AuditionHeader & { kind: 'region'; region: RegionAuditionRequest });
+
 export type NoteReply =
   | { token: number; ok: true; pcm: Int16Array; reachedTicks: number; heldTicks: number }
   | { token: number; ok: false; message: string };
 
-addEventListener('message', (event: MessageEvent<NoteRequest>) => {
-  const { token, spc, wasmUrl, ...request } = event.data;
+addEventListener('message', (event: MessageEvent<AuditionRequest>) => {
+  const request = event.data;
+  const { token, spc, wasmUrl } = request;
   void coreFor(wasmUrl)
     .then((core) => {
-      const { pcm, reachedTicks, heldTicks } = auditionNote(core, spc, request);
+      const { pcm, reachedTicks, heldTicks } =
+        request.kind === 'note'
+          ? auditionNote(core, spc, request.note)
+          : auditionRegion(core, spc, request.region);
       // Transferred, not cloned: the PCM is a second of stereo and this end has
       // no further use for it. The SPC coming the other way is cloned, because
       // the page keeps its copy for the next audition.

@@ -56,6 +56,11 @@ export interface BarContent {
  * decides whether the hover is worth asking. The inspector lists all of them
  * for the note under the caret, and a hover names them.
  */
+/** How wide a plate of `text` at `size` comes to, padding included. */
+export function plateWidth(text: string, size: number): number {
+  return text.length * size * ADVANCE + CONTENT_PAD * 2;
+}
+
 export function fitBarContent(
   width: number,
   height: number,
@@ -68,15 +73,15 @@ export function fitBarContent(
   }
 
   const size = Math.max(7, height - 4);
-  const nameWidth = name.length * size * ADVANCE;
   // The name is the floor, not the first of several things competing for room:
   // a bar with no room for it has none for a glyph either, and letting the
   // glyphs take the space the name gave up means a bar that grows an icon as it
   // shrinks. Nothing at all is the honest picture, and the hover still answers.
-  if (nameWidth + CONTENT_PAD * 2 > width) {
+  if (plateWidth(name, size) > width) {
     return empty;
   }
 
+  const nameWidth = name.length * size * ADVANCE;
   const placed: BarName = { x: CONTENT_PAD, y: height / 2, size };
   const left = CONTENT_PAD + nameWidth + CONTENT_PAD;
 

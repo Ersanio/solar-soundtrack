@@ -1,0 +1,24 @@
+<!-- A near-white plate with the loop's number in the surface colour, which is the
+     defining glyph's idiom on a bar: the one pairing that reads against both the
+     box's wash and a bar standing under it. -->
+
+@for (label of labels(); track label.id) {
+  <svg:rect
+    rx="2"
+    class="fill-ink"
+    [attr.x]="label.x"
+    [attr.y]="label.y"
+    [attr.width]="label.w"
+    [attr.height]="label.h"
+  />
+  <svg:text
+    text-anchor="middle"
+    dominant-baseline="central"
+    class="fill-surface font-mono tabular-nums"
+    [attr.x]="label.textX"
+    [attr.y]="label.textY"
+    [attr.font-size]="size"
+  >
+    {{ label.text }}
+  </svg:text>
+}

@@ -282,6 +282,13 @@ the echo the note lands on the echo the transport is making. Neither is a route 
 emulator. The mutes apply with the transport stopped too: they are a standing monitoring state, not a
 property of something playing.
 
+`playRegion` is the same path with the note taken out of it: a selection of the roll — a loop's pass
+taken by its box, or a `Ctrl`+drag over the grid — is played as a **stretch of the song**, `Audition`
+posting the same worker a second kind of request and `auditionRegion` recording the ticks with every
+voice reading its own music. There is no refusal here, where a note on a silenced channel gets one: a
+region belongs to no one channel, so the mask simply decides what is in it. The two share one token,
+so pressing a note while a selection is rendering supersedes it rather than sounding over it.
+
 That worker is separate from `clock.worker.ts` rather than another message on it. The clock
 measurement fires a second after typing stops, which is exactly when someone is about to click, and
 an audition queued behind a whole pass of emulation would arrive hundreds of milliseconds late. They

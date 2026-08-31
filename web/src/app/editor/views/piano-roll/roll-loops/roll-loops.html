@@ -20,9 +20,11 @@
        the dashed or dotted line is grabbable without pixel-hunting. It takes
        the pointer only on the stroke — the box's inside stays the grid's and
        the bars', which are drawn above it. A press here selects the body's
-       whole group, and a drag slides this pass along the song
+       whole group and plays that pass; a drag on the top or bottom rule slides
+       the pass along the song, and one on either end resizes the loop
        (`roll-gesture.ts`); a silenced channel's edge takes no pointer, as its
-       bars do not. -->
+       bars do not. `data-ticks` is the pass as **drawn**, which is what the
+       press measures its ends against. -->
   <svg:rect
     rx="3"
     fill="none"
@@ -33,6 +35,7 @@
     [attr.data-channel]="region.channel"
     [attr.data-body]="region.body"
     [attr.data-tick]="region.tick"
+    [attr.data-ticks]="region.ticks"
     [attr.x]="region.x + 0.5"
     [attr.y]="region.y"
     [attr.width]="region.w - 1"

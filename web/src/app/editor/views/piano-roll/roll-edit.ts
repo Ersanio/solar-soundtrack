@@ -164,6 +164,11 @@ export const REFUSE_SPLIT = 'those notes are on both sides of a loop bracket';
 export const REFUSE_REMAP_FED = 'that note plays a drum loaded before the loop';
 export const REFUSE_SUB_SPLIT = 'a subloop has no name to call it back by';
 export const REFUSE_NESTED_LOOP = 'that loop plays inside another loop';
+export const REFUSE_LOOP_LEFT_PASS = "only a loop's first pass can be resized from its left end";
+export const REFUSE_LOOP_LEAD_ROOM =
+  'there is nothing but music in front of that loop to grow it into';
+export const REFUSE_LOOP_BODY_ROOM =
+  'there is no rest at that end of the loop to take those ticks from';
 
 /**
  * Why a plan cannot be written out, in the words the roll shows.
@@ -777,6 +782,59 @@ function resolvedGesture(strip: Strip, frame: StripFrame, gesture: Gesture, mode
  * them slides them earlier and a moved one carries them along. A rest a born
  * note wholly covers is gone, its ticks re-expressed by the note.
  */
+/**
+ * Where each voice's shift steps up by one more `delta` while a body-length edit
+ * is held: a mark moves by `delta` times the boundaries at or before its tick.
+ * Stable from the press — only the delta changes per move, so the buckets built
+ * over these hold still and one transform slides them.
+ */
+export type ShiftBoundaries = ReadonlyMap<number, readonly number[]>;
+
+/**
+ * The boundaries a body-length change of `edge` steps at.
+ *
+ * A change lands **once per pass**, and where in the pass it lands is the whole
+ * of it. A stretch, or a resize from the box's right end, puts the ticks at the
+ * body's tail, so everything from a pass **end** onward has taken one more step.
+ * A resize from the left end puts them at the body's head, so the step is at
+ * each pass **start** — and `held`, the grabbed occurrence's own first pass, is
+ * no step at all, its construct having been pulled back by exactly that delta.
+ *
+ * Which is why a voice that plays the same body without a construct of its own
+ * moved — another channel, or a second occurrence later on this one — keeps
+ * every one of its pass starts: nothing gave those ticks back there.
+ *
+ * Here rather than in `roll-gesture.ts` because it is the piece of the resize no
+ * walk can check: the notes on the grabbed channel look right under either list,
+ * and a harness cannot drive an Angular composable.
+ */
+export function shiftBoundariesFor(
+  frame: StripFrame,
+  edge: 'start' | 'end',
+  held: { channel: number; tick: number } | null,
+): ShiftBoundaries {
+  const boundaries = new Map<number, number[]>();
+  for (const run of frame.runs) {
+    const steps = boundaries.get(run.channel) ?? [];
+    for (const pass of run.passes) {
+      const at = edge === 'end' ? pass.tick + pass.ticks : pass.tick;
+      if (edge === 'start' && held !== null && held.channel === run.channel && held.tick === at) {
+        continue;
+      }
+
+      steps.push(at);
+    }
+
+    boundaries.set(run.channel, steps);
+  }
+
+  for (const steps of boundaries.values()) {
+    steps.sort((a, b) => a - b);
+  }
+
+  return boundaries;
+}
+
 export function plannedFrameTicks(strip: Strip, frame: StripFrame, plan: Plan): number {
   let last = 0;
   for (const note of plan.notes) {

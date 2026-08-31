@@ -81,7 +81,7 @@ cuts the one already ringing. With every voice taken the output is exactly zero 
 The module is useful beyond the transport — where each voice is right now and at what tempo is
 exactly what the piano roll follows.
 
-## Auditioning one note
+## Auditioning a note, and a stretch of the song
 
 `note-audition.ts` is the same knowledge pointed a third way: not reading the driver and not writing
 one register of it, but putting a note the song does not contain in front of it and recording what
@@ -199,6 +199,21 @@ used to be. The echo it lands on is still the transport's, the mask being held t
 fast-forward, and the buffer still holds the song as the mixer leaves it — the last delay's worth
 decays under the note at the song's own feedback rate, which is what a note written there would
 really land on top of.
+
+**`auditionRegion` is the same file's other half, and its opposite in the one respect that matters.**
+A selection of the roll is not a note: what the porter picked out is a piece of the **song**, so it
+is played as the transport would play it. Nothing is injected into ARAM and nothing is parked — every
+voice reads its own music, and a voice that reaches its `$00` walks the phrase table exactly as it
+does under the transport, there being no frames written over it to protect. The mask is honoured as
+it is given, with no target's bit stripped: a region belongs to no channel, so a silenced voice is
+simply not heard.
+
+It skips `arrive` for the same reason. Waiting for the target voice's fetch is what puts a note's
+hand-over after the tick's own commands, and here it would put the recording's first sample after the
+first note keyed on and take that attack off. `sawTick` reads `$44` at the top of a pass and before
+that tick's music runs, so stopping at the count is stopping with the tick still ahead — which is
+what a region wants and a note cannot use. What ends the span parks **every** voice: the notes
+standing at that tick ring out and key off where they were written to, and nothing new starts.
 
 ## Reading a song without playing it
 

@@ -71,6 +71,31 @@ export interface LoopSite {
   text: Span;
   /** The declaration's closing `]n` command, where a split rewrites; else `null`. */
   close: Span | null;
+  /**
+   * The `n` of the `(n)` this construct is written with — a declaration's own
+   * label, which {@link LoopSite.text} is widened back over, or a recall's.
+   *
+   * `null` for a bare `[ ]`, a `*` and a `$E6` pair, none of which name their
+   * body. Read once here so the label the roll draws and the head `openGap`
+   * writes a split with can never disagree about what the loop is called.
+   */
+  label: number | null;
+}
+
+/** The `(n)` a construct names its body by, or `null` where it names none. */
+export function labelOf(source: string, text: Span): number | null {
+  if (source[text.start] !== '(') {
+    return null;
+  }
+
+  const closing = source.indexOf(')', text.start);
+  if (closing < 0 || closing >= text.end) {
+    return null;
+  }
+
+  // Digits alone, so a `(!1)` remote definition's label is not one of these.
+  const digits = source.slice(text.start + 1, closing);
+  return /^\d+$/.test(digits) ? Number.parseInt(digits, 10) : null;
 }
 
 /** One written note or rest, with every continuation of it. */
@@ -250,6 +275,23 @@ export interface StripRequest {
 
 export function isStrip(strip: Strip | StripRefusal): strip is Strip {
   return (strip as Strip).items !== undefined;
+}
+
+/**
+ * The construct standing where a loop box is drawn: the item playing `body`
+ * whose own occupation covers `tick`. -1 for none.
+ *
+ * One answer for the press that grabs a box and the label drawn on it, so the
+ * handle and the name can never belong to different constructs — a body played
+ * from two places is two constructs, and only one of them is under the pointer.
+ */
+export function constructFor(strip: Strip, body: number, tick: number): number {
+  return strip.items.findIndex(
+    (item) =>
+      item.kind === 'construct' &&
+      item.address === body &&
+      item.instances.some((instance) => instance.tick <= tick && tick < instance.tick + item.ticks),
+  );
 }
 
 /**
@@ -1046,6 +1088,7 @@ export function channelStrip(request: StripRequest): Strip | StripRefusal {
             kind: construct.kind,
             text: { ...construct.span },
             close: construct.close ? { ...construct.close } : null,
+            label: labelOf(source, construct.span),
           },
           remapFed: false,
         });

@@ -3,7 +3,7 @@ import { Component, computed, inject, input, output } from '@angular/core';
 import { CommandIcon } from '../../../command-palette/command-icon';
 import { EditorRequests } from '../../../../state/editor-requests';
 import { EditorStore } from '../../../../state/editor-store';
-import type { ShiftBoundaries } from '../roll-gesture';
+import type { ShiftBoundaries } from '../roll-edit';
 import type { Mark, MarkGlyph } from '../roll-marks';
 
 /**

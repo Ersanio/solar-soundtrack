@@ -16,13 +16,14 @@ no channel.
 | Click on empty grid              | Draws the note and leaves it there                                                                         |
 | Drag the middle of a note        | Moves it a snap step at a time, one row per semitone up and down                                           |
 | Drag a note's left or right edge | Stretches that end; the other end stays put                                                                |
-| Click a loop box's edge          | Selects the loop's whole group of notes — that group and nothing else                                      |
-| Drag a loop box's edge           | Moves that pass along the song: rests open in front of it, splitting the recall where the grab was mid-run |
+| Click a loop box's edge          | Selects the loop's whole group of notes, plays that pass, and shows the loop's number                      |
+| Drag a loop box's top or bottom  | Moves that pass along the song: rests open in front of it, splitting the recall where the grab was mid-run |
+| Drag a loop box's left or right  | Resizes the loop — the right end moves where the body ends, the left end where it begins                   |
 | Hold `Alt` during any gesture    | Tick precision: no snapping, for either a position or a length                                             |
 | Click a note                     | Selects it, sounds it with its pitch slide, and puts the caret on it                                       |
 | Double-click a note              | Goes to it in the MML                                                                                      |
 | `Ctrl` + click a note            | Adds it to, or takes it out of, the selection                                                              |
-| `Ctrl` + drag on empty grid      | Draws a box and selects every note of this channel inside it                                               |
+| `Ctrl` + drag on empty grid      | Draws a box, selects every note of this channel inside it, and plays that stretch of the song              |
 | `Ctrl` + drag a note             | Copies it instead of moving it — the whole selection, if there is one                                      |
 | `Shift` + drag on empty grid     | Draws a note where you pressed and pulls its right edge along                                              |
 | `Shift` + drag a note            | Locks it to the axis you first drag along — sideways it keeps its row, up or down it keeps its tick        |
@@ -413,23 +414,50 @@ or delete any of them and the body is rewritten once; the recompile is what play
 **The box's edge is the pass's handle.** Click the dashed or dotted line and the loop's whole group
 of notes is selected — that group and nothing else, on whichever channel the box belongs to; a click
 that never moves just leaves it selected, ready for the arrow keys and `Delete`. Keep the button
-down and drag sideways and **that pass moves along the song**: a gap of rests opens at the boundary
-in front of it, everything from there on slides right together, and where the grab was mid-run the
-recall's count splits around the gap — `(1)5` grabbed at its third pass becomes `(1)2 r1^1^1 (1)3`,
-and an unlabeled `[c4 d4]3` becomes `[c4 d4] r… *2`, still one body played from both halves. That
-is how other notes get a place in between. Dragging left closes free space instead: the drag stops
-at the rests actually in front of the pass, and never moves a command off its tick. The notes
-_inside_ the body are still moved by dragging their bars, as above — the box is the construct's
-handle, not the notes'.
+down and drag the **top or bottom rule** sideways and **that pass moves along the song**: a gap of
+rests opens at the boundary in front of it, everything from there on slides right together, and
+where the grab was mid-run the recall's count splits around the gap — `(1)5` grabbed at its third
+pass becomes `(1)2 r1^1^1 (1)3`, and an unlabeled `[c4 d4]3` becomes `[c4 d4] r… *2`, still one body
+played from both halves. That is how other notes get a place in between. Dragging left closes free
+space instead: the drag stops at the rests actually in front of the pass, and never moves a command
+off its tick. The notes _inside_ the body are still moved by dragging their bars, as above — the box
+is the construct's handle, not the notes'.
+
+**The box's ends resize the loop.** The **right** end changes the body's own length: pull it out and
+a rest goes on the body's tail, pull it in and the body's trailing rests come off — `[a1 r1]5`
+dragged in is `[a1]5`, still one loop — stopping at the first note, which is that note's own edge to
+stretch. The **left** end moves where the loop _begins_ while the notes inside stand still: the loop
+starts earlier and the same rest goes at the **head** of the body, so the first pass plays exactly
+where it played and only the passes behind it slide. That is why growing leftward needs rests in
+front of the loop to grow into, and says so where there are none — two loops written back to back
+grow into each other only from the right, where what follows slides along instead of being written
+over. It is the **first** pass of the loop's first occurrence that has that end: a later one's start
+cannot move without splitting the recall, which is what the top and bottom rules already do. Two
+passes of the same loop meet at every edge in between, and that seam belongs to the pass on the
+left — a press there resizes from its far end rather than asking for a start that cannot move.
+
+The end you take hold of follows the pointer, whichever pass it belongs to. A pass three deep begins
+three changes later, so its far end travels four times as far as the body grows: drag it four beats
+and the loop gains one. What the readout says is the **body's** new length, which is what every pass
+of it takes.
 That holds across channels too: a `(1)` loop written on `#0` and recalled on `#1` is one body both
 voices play, and editing it from either channel changes both — the sibling washes on the other
 channel are the warning and the promise at once. Editing one pass _differently_ from its siblings is
 not something the roll will do: a loop is one text, and making pass two a variation means writing
 the passes out by hand.
 
-**Clicking a pass plays that pass.** A preview is the song emulated up to the tick it is given, so
-the two passes of `@0 (1)[c4 d4]2 @17 (1)2` sound under `@0` and `@17` respectively — the note's
-byte is fixed when the text is compiled, and everything else about it is a fact about the pass.
+**Clicking a pass plays that pass.** Its box's edge sounds the whole of it — the song emulated up to
+the tick the pass starts at and then simply let go, so every channel the mixer allows is heard and
+every command that runs in between runs. Clicking a **note** of the pass sounds that note, under the
+tick it is on: the two passes of `@0 (1)[c4 d4]2 @17 (1)2` sound under `@0` and `@17` respectively —
+the note's byte is fixed when the text is compiled, and everything else about it is a fact about the
+pass. A box drawn with `Ctrl` over any stretch of the roll plays that stretch the same way.
+
+**A labelled loop shows its number.** While its group is selected, each of its boxes carries the
+`(n)` the loop is written with, in the top-left corner. `(1)[a1]5` and its `(1)2` recall both show
+`1`; a bare `[ ]`, a `*` and a `[[ ]]` name no body and show nothing. It is a fixed size, so it
+neither grows with the zoom nor with the rows, and a box too small to hold it shows nothing rather
+than something cut.
 
 **Drawing inside any pass writes into the body.** The note lands in the text once, between the
 brackets, and appears on every pass — the ghost's siblings show it landing everywhere before the

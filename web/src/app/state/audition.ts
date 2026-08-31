@@ -6,7 +6,7 @@ import type { PitchSlide } from '@amk/spc/song-walk';
 import { SPC_CHANNELS, SPC_SAMPLE_RATE } from '@amk/spc/wasm-host';
 import { EditorStore } from './editor-store';
 import { Mixer } from './mixer';
-import type { NoteReply, NoteRequest } from './note.worker';
+import type { AuditionRequest, NoteReply } from './note.worker';
 import { transposeAt } from './note-transpose';
 import { silencedReason } from './transport-view';
 import { errorMessage } from '../util/format';
@@ -48,8 +48,17 @@ export interface NotePlay {
   quiet?: boolean;
 }
 
+/** What {@link Audition.playRegion} is asked for. */
+export interface RegionPlay {
+  /** The first tick of the span, in music ticks. */
+  tick: number;
+  /** How many ticks of the song to play from there. */
+  ticks: number;
+}
+
 /**
- * Playing one sample, or one note of the song, on its own AudioContext.
+ * Playing one sample, one note of the song, or one stretch of it, on its own
+ * AudioContext.
  *
  * Separate from `Playback` because it shares no machinery with the transport —
  * no worklet, no audio thread, no song being played — and because the separation
@@ -178,15 +187,12 @@ export class Audition {
     // status line still calling it muted.
     this.editor.clearHint();
 
-    try {
-      this.worker ??= this.startWorker();
-      this.worker.postMessage({
-        token: this.token,
-        spc,
-        // Resolved here, not in the worker: a relative fetch there would resolve
-        // against the worker's own bundled URL rather than the app's base href,
-        // which is `/<repo>/` on Pages.
-        wasmUrl: new URL('player/spc.wasm', document.baseURI).href,
+    this.render({
+      kind: 'note',
+      token: this.token,
+      spc,
+      wasmUrl: this.wasmUrl(),
+      note: {
         atTicks: Math.max(0, Math.round(request.tick)),
         channel: request.channel,
         note,
@@ -197,7 +203,58 @@ export class Audition {
         // preview around the mixer. The target's own bit is never set — a
         // silenced channel was refused above.
         silenced: this.mixer.silenced(),
-      } satisfies NoteRequest);
+      },
+    });
+  }
+
+  /**
+   * Plays a stretch of the song as it stands — the ticks a selection covers.
+   *
+   * The whole song up to the first of them is emulated, as {@link playNote}
+   * emulates up to its note, and then it is simply allowed to play: nothing is
+   * handed to the driver and no voice is parked, so what is heard is every
+   * channel the mixer allows and every command that runs in between. A span past
+   * the ceiling comes back cut and says nothing about it — the porter asked to
+   * hear the selection, and the transport is what plays a whole song.
+   *
+   * No mixer refusal either, where a note has one: a region is the song rather
+   * than one channel, so a silenced voice is not heard and that is all.
+   */
+  playRegion(request: RegionPlay): void {
+    const spc = this.songImage();
+    const ticks = Math.round(request.ticks);
+    if (!spc || ticks <= 0 || typeof Worker === 'undefined') {
+      return;
+    }
+
+    this.stop();
+    this.editor.clearHint();
+    this.render({
+      kind: 'region',
+      token: this.token,
+      spc,
+      wasmUrl: this.wasmUrl(),
+      region: {
+        atTicks: Math.max(0, Math.round(request.tick)),
+        ticks,
+        silenced: this.mixer.silenced(),
+      },
+    });
+  }
+
+  /**
+   * Resolved here and not in the worker: a relative fetch there would resolve
+   * against the worker's own bundled URL rather than the app's base href, which
+   * is `/<repo>/` on Pages.
+   */
+  private wasmUrl(): string {
+    return new URL('player/spc.wasm', document.baseURI).href;
+  }
+
+  private render(request: AuditionRequest): void {
+    try {
+      this.worker ??= this.startWorker();
+      this.worker.postMessage(request);
       this.notePending.set(true);
     } catch (error) {
       this.worker = null;

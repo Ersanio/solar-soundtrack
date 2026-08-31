@@ -987,6 +987,68 @@ stats.loopTicks` pads **every other channel that would cut the song short** out 
   the one shift boundary at the grabbed pass's start is what the preview slides. Not a second
   channel for the preview either: the bucket comparison (`ends[k] <= tick`) already shifts a note
   standing exactly on the boundary, which is the moved pass's own first note.
+- **The loop box's edge as one gesture** — a press anywhere on the stroke slid the pass, so a body's
+  length could only be changed by stretching the note at its end, and its trailing rest could not be
+  reached at all: `realiseRegion` never rewrites a tail, deliberately, and `plannedFrameTicks` prices
+  the body on that. The stroke is read by **where on it** the press landed — inside the same
+  `EDGE_PX` zone a bar's own handles use it resizes, anywhere else it slides — and `[style.cursor]`
+  says which before the press. The handle carries `data-ticks` beside `data-tick` so the press
+  measures the box as **drawn**: `buildLoopRegions` clips a pass the song ends inside and floors its
+  width at a pixel, so `run.passes[pass].ticks` would put a resize handle where no edge is.
+- **A left-end resize that moved the notes inside the body**, the mirror of the right end — not what
+  a left edge means: the porter is moving the boundary, not the music. The construct is pulled back
+  by exactly the ticks the body's head gains (`resizeLoop`, `'start'`), so the first pass's notes
+  stand still and every later pass slides by its own ordinal, and the rest goes at `frame.span.start`
+  **before** any command written at the body's head — that command then runs at body-local `delta`
+  on a pass beginning `delta` earlier, which is the tick it had. That is also what makes the two ends
+  asymmetric at the tail: a right resize moves the voice's end by `count × delta`, a left one by
+  `(count − 1) × delta`, the one delta having come out of the rests in front rather than been added
+  to the song. Offered on the voice's **first occurrence** of the body and not merely on a run's
+  first pass — a later occurrence's start is carried by the passes in front of it, so the end would
+  travel the way the pointer did not.
+- **A resize taking the pointer's travel as the body's own change** — a pass three deep begins three
+  deltas later, so its far end moves by four of them and the handle ran away from the pointer it was
+  being dragged by, which is the one thing a handle may not do. The travel is divided by the passes
+  in front (`Drag.loop.ahead`, `passesAt`) before it is snapped, so the end follows and the body
+  still changes by whole steps; the left end needs no such division, being the first occurrence's
+  alone and held under the pointer by the construct moving back with it. Not the note stretch's
+  reading, which lets the grabbed note run ahead — a note is being given a length, where an end is
+  being put somewhere.
+- **Both ends of a seam offered where two passes meet** — every interior edge of a loop is two boxes'
+  handles overlapping, the later one drawn on top, so a press on what looks like one edge asked to
+  move a later pass's start and was told it could not. The seam belongs to the pass on the **left**
+  (`passesAt().abuts`): its far end resizes from any pass. Told by another pass ending exactly there
+  rather than by "not the first pass", so `(1)[c4] r1 (1)2` keeps the honest refusal on the second
+  occurrence's own start, which really is free and really cannot move.
+- **`ShiftBoundaries` generalised to a shift per bucket** for that asymmetry — it is not a different
+  shift, it is a different **boundary**. A body-length change lands once per pass and where in the
+  pass it lands is what decides it: a stretch or a right resize puts it at the pass's tail, so the
+  step is at each pass **end**; a left resize puts it at the head, so the step is at each pass
+  **start**, and the grabbed occurrence's own start is no step at all. One list of ticks either way,
+  `roll-notes.ts`'s buckets untouched, and `shiftBoundariesFor` lives in `roll-edit.ts` beside
+  `plannedFrameTicks` — the two halves of one arithmetic — because it is the only piece of a resize
+  no walk can catch and a harness has to reach it.
+- **A region audition built out of the note previewer's frames** — a selection is not a note, and one
+  injected per note would park every other voice and play a chord the song has not got.
+  `auditionRegion` runs the same `fastForward` and then records with **nothing parked and nothing
+  injected**: every voice reads its own music, a voice that reaches its `$00` walks the phrase table
+  exactly as the song does, and what comes back is the song over those ticks. `parkOthers` was only
+  ever there to keep a voice off the frames a note was written over, and there are none here — but
+  the span's _end_ parks every voice, so its last notes ring out and nothing new starts. No `arrive`
+  either: that waits for the target voice to fetch, which is right when a note is being handed over
+  and takes the attack off the region's first note, where `sawTick` reads `$44` at the top of a pass
+  and leaves the driver about to play the tick asked for. One worker and one token with `playNote`,
+  so a note press and a box press supersede each other rather than sounding together.
+- **The loop label carried on `LoopRegionBox`** — that list is built on the mark window's cadence and
+  a selection changes on every click, so the whole on-screen box list would be rebuilt for a
+  two-character plate; and the loop layer is drawn under the bars, where a label cannot be read. It
+  is a second, short pass over the boxes already built (`buildLoopLabels`), drawn above the notes.
+  Per **construct** rather than per body: `(1)[a1]5` and `(1)2` both name the body where a `*2`
+  recalling that same body names nothing, and the digits come off `LoopSite.label` —
+  `widenOverLabel` already reaches over the `(n)` for a declaration's span, so they are read once and
+  `openGap`'s split reads the same field instead of scanning for a `)` of its own. Only the channel
+  being edited has a selection to show one for, and it is `editChannel` and not `editing`, or a label
+  would appear because the pointer wandered over another channel's bar.
 
 ## Angular specifics
 
