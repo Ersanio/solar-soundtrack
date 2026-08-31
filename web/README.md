@@ -283,8 +283,7 @@ emulator. The mutes apply with the transport stopped too: they are a standing mo
 property of something playing.
 
 `playRegion` is the same path with the note taken out of it: a selection of the roll — a loop's pass
-taken by its box, a `Ctrl`+drag over the grid, or a group of notes picked up and carried — is played
-as a **stretch of the song**, `Audition`
+taken by its box, or a `Ctrl`+drag over the grid — is played as a **stretch of the song**, `Audition`
 posting the same worker a second kind of request and `auditionRegion` recording the ticks with every
 voice reading its own music. There is no refusal here, where a note on a silenced channel gets one: a
 region belongs to no one channel, so the mask simply decides what is in it. The two share one token,

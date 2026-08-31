@@ -29,7 +29,6 @@ import {
   passShiftsFor,
   planGesture,
   plannedFrameTicks,
-  selectionSpan,
   shiftBoundariesFor,
 } from './roll-edit';
 import {
@@ -1178,35 +1177,6 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
     soundRow(going, held.origin + local, ticks ?? sources.lastLength(), item?.slide ?? null);
   };
 
-  /**
-   * Whether a press on this bar is carrying the whole selection, which is the
-   * same test `gestureNow` makes to decide what the gesture names.
-   */
-  const carriesGroup = (index: number): boolean => {
-    const chosen = selection();
-    return chosen.size > 1 && chosen.has(index);
-  };
-
-  /**
-   * Sound the stretch of song a carried selection covers.
-   *
-   * A group is not one note, so it is heard the way the marquee that selected
-   * it plays it: the song over those ticks, every channel the mixer allows.
-   * Once, where the press becomes a drag — a press that never moves is a click,
-   * and a click on a note sounds that note. The press's own `soundRow` is left
-   * to be superseded rather than skipped, `Audition.stop` bumping the token so
-   * that render is dropped rather than played under this one.
-   */
-  const soundSelection = (held: Drag): void => {
-    const strip = sources.strip();
-    const span = strip
-      ? selectionSpan(strip, strip.frames[held.frame], selection(), held.origin)
-      : null;
-    if (span) {
-      sinks.auditionSpan(span.tick, span.ticks);
-    }
-  };
-
   /** Everything `planEdits` reads besides the plan itself, as of right now. */
   const contextFor = (strip: Strip, frame: StripFrame): EditContext => ({
     source: sources.source(),
@@ -1636,13 +1606,6 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
         if (!target.hasPointerCapture(event.pointerId)) {
           target.setPointerCapture(event.pointerId);
         }
-
-        // And the moment a press carrying a group becomes a drag, that group
-        // sounds. A `stretch` never sounds at all, and `gap`, `resize` and
-        // `transpose` are loop-edge presses that have already played their pass.
-        if (held.kind === 'move' && carriesGroup(held.item)) {
-          soundSelection(held);
-        }
       }
 
       const axis =
@@ -1681,15 +1644,15 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
       // often than that: one render is a whole silent run of the song. An edge
       // drag carries a construct, which is nothing one note could sound — and a
       // transposed body is a whole set of them, which is no more one note. A
-      // carried selection is such a set too, and has already been heard whole.
+      // carried selection sounds the note under the pointer: the group moves by
+      // one delta, so that note names the interval every other note took.
       if (
         row !== held.sounded &&
         held.kind !== 'marquee' &&
         held.kind !== 'stretch' &&
         held.kind !== 'gap' &&
         held.kind !== 'resize' &&
-        held.kind !== 'transpose' &&
-        !carriesGroup(held.item)
+        held.kind !== 'transpose'
       ) {
         next.sounded = row;
         soundDrag(next, row);

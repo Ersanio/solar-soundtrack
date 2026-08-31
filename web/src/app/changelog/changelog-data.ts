@@ -11,7 +11,6 @@ export const CHANGELOG: readonly ChangelogEntry[] = [
   {
     date: '31 August 2026',
     items: [
-      'Dragging a selected group of notes plays the stretch of song it covers',
       'Normalize leaves < and > as written instead of turning them into o commands',
       'Editing a note in the piano roll no longer drops the octave written in front of it',
       "Drag a loop box's top or bottom up or down to transpose the whole loop",
