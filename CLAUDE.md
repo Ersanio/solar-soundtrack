@@ -1232,6 +1232,25 @@ stats.loopTicks` pads **every other channel that would cut the song short** out 
   is the one currency every panel already speaks, and it is `null` where the two ends sit in
   different frames — a bracket cannot straddle a `[ ]` body and the channel around it, which is
   `REFUSE_SPLIT` reached by another route.
+- **The loop box's transpose planned in the grabbed body's frame alone** — a body's notes are its
+  frame's items and a loop written inside it is an opaque `'construct'` there, so
+  `[ c4 [[d4]]2 e4 ]3` dragged up moved `c4` and `e4` and left `d4` sitting under a box drawn round
+  it: `buildLoopRegions` grows a box to every note whose tick falls in the pass, so the handle's
+  picture and the gesture's reach disagreed with nothing to say so. The press takes the frames
+  written **inside** the one it grabbed (`framesInside`) and the gesture is planned once per frame
+  and committed once (`planFrames`, `planGroupEdits`) — the split `run()`'s delete already made, the
+  rule being not that a deletion is special but that an edit **moving no tick** may cross a bracket,
+  frames being disjoint text. By text span and not by a construct's body address: a `(n)m` written
+  inside a `[[ ]]` may recall a body declared outside it — `parseLabelLoop` refuses only
+  `channel === 8`, so it is out inside a `[ ]` and in inside a `[[ ]]` — and transposing that from
+  here would move music elsewhere in the song. The **pad** is the piece that belongs to the gesture
+  rather than to a frame: two frames each padding the other channels out to their own reach writes
+  the rest twice, `coalesce` running inside a plan and not across them, so it is priced once
+  (`planReach`) and only the frame reaching furthest writes it. `playsFor` cannot catch that — an
+  over-padded channel stops being the shortest and the song's figure does not move — so
+  `rolltest`'s `channelTicks` reads the padded voice's own count. And the costs are taken rather
+  than worked around: `selectedBodies` finds the inner body whole too, so both boxes close up solid,
+  and `selectedRun` is `null`, so the palette's **Loop** greys out.
 
 ## Angular specifics
 

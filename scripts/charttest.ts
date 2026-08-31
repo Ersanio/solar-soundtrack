@@ -49,7 +49,7 @@ import {
 import { fitBarContent } from "../web/src/app/editor/views/piano-roll/roll-bar-text";
 import { DRAW_LENGTHS, stepDrawLength } from "../web/src/app/editor/views/piano-roll/roll-lengths";
 import { advanceTick } from "../web/src/app/editor/views/piano-roll/roll-clock-step";
-import type { PassShift } from "../web/src/app/editor/views/piano-roll/roll-edit";
+import type { BodyRows, PassShift } from "../web/src/app/editor/views/piano-roll/roll-edit";
 import {
 	DECLARED_TINT,
 	type LoopRegionBox,
@@ -1157,14 +1157,14 @@ console.log("\nthe loop boxes following a gesture");
 
 	const follow = (request: {
 		regions: LoopRegionBox[];
-		rows?: { body: number; low: number; high: number } | null;
+		rows?: BodyRows[];
 		boundaries?: [number, number[]][];
 		delta?: number;
 		passes?: PassShift[];
 	}) =>
 		followLoopRegions({
 			regions: request.regions,
-			rows: request.rows ?? null,
+			rows: request.rows ?? [],
 			boundaries: request.boundaries ? new Map(request.boundaries) : null,
 			delta: request.delta ?? 0,
 			passes: request.passes ?? [],
@@ -1288,23 +1288,50 @@ console.log("\nthe loop boxes following a gesture");
 	);
 
 	// A transpose moves no tick at all, so only the rows answer.
-	const up = follow({ regions: scene, rows: { body: 1000, low: 16, high: 18 } });
+	const up = follow({ regions: scene, rows: [{ body: 1000, low: 16, high: 18 }] });
 	check("a transposed body's boxes take the rows its notes now span", down(up).startsWith("158+34 158+34 "), down(up));
 	check("a box that is not its own is left alone", down(up).includes(" 198+34 "), down(up));
 	check("and the loop it plays inside grows to keep it in", down(up).endsWith(" 158+94"), down(up));
 	// Grow only: the built span has already swallowed the inner rows and cannot
 	// give them back, so a body moved inwards leaves its outer box as it was.
-	const middle = follow({ regions: scene, rows: { body: 1000, low: 20, high: 21 } });
+	const middle = follow({ regions: scene, rows: [{ body: 1000, low: 20, high: 21 }] });
 	check("and never shrinks around one that moved inwards", down(middle).endsWith(" 178+74"), down(middle));
 	// The other direction: the changed body is the outer one, and the plan knows
 	// only the notes of its own frame, so its box has to grow to keep the
 	// subloop's — one pass over what each box holds, both ways round.
-	const outer = follow({ regions: [around, at(0, 1000, 24, 48, 20, 22)], rows: { body: 3000, low: 10, high: 11 } });
+	const outer = follow({ regions: [around, at(0, 1000, 24, 48, 20, 22)], rows: [{ body: 3000, low: 10, high: 11 }] });
 	check(
 		"a changed body's own box still holds the bodies playing inside it",
 		down(outer) === "98+134 198+34",
 		down(outer),
 	);
+
+	// Two bodies moved by the one gesture, which is what a loop box's rule is
+	// once the group has been widened over the loop written inside the body.
+	// Each box takes its own plan's rows, and the outer plan leaves the inner
+	// body's notes out — the union is what puts them back, so the union is the
+	// right answer rather than either plan on its own.
+	const nested = follow({
+		regions: [around, at(0, 1000, 24, 48, 20, 22)],
+		rows: [
+			{ body: 3000, low: 10, high: 11 },
+			{ body: 1000, low: 12, high: 14 },
+		],
+	});
+	check("both bodies of a widened group take their own plan's rows", down(nested) === "98+54 118+34", down(nested));
+
+	// Three deep in one pass: enclosure is tested on the song's own ticks and
+	// tick containment is transitive, so the outermost box holds the innermost
+	// directly and no walk down the nesting is needed to reach it.
+	const deep = follow({
+		regions: [around, at(0, 1000, 24, 96, 20, 22), at(0, 2500, 36, 24, 21, 22)],
+		rows: [
+			{ body: 3000, low: 10, high: 11 },
+			{ body: 1000, low: 12, high: 13 },
+			{ body: 2500, low: 14, high: 15 },
+		],
+	});
+	check("a body three deep is reached by every box above it", down(deep) === "98+64 118+44 138+24", down(deep));
 }
 
 console.log("\nthe pull at the end of the scrub bar");

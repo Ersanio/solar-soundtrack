@@ -14,6 +14,7 @@ import { commandRewritable, type Edit, insertAt, spliceOut, spliceRange } from '
 import {
   type EditContext,
   type EditRefusal,
+  type FramePlan,
   type PlacedNote,
   type Plan,
   REFUSE_BEND_RIDER,
@@ -2121,6 +2122,108 @@ function spawnInto(
   return restore ? [edit, ...gone, ...taken, restore] : [edit, ...gone, ...taken];
 }
 
+/**
+ * How far past the song a plan reaches, and how much each voice has already
+ * grown to meet it — the two figures {@link padChannels} is asked with.
+ *
+ * The notes the gesture is answerable for are the ones it placed itself and the
+ * ones its push cascade shoved out of the way. Not every note in the plan — a
+ * channel already running past the cut is an ordinary shape, and reading its
+ * tail as "reach" would have a deletion lengthen the song. A carve fills
+ * `pushed` too, and its pieces are left out for that same reason: it only ever
+ * makes a note shorter, so every piece it leaves sits at a tick the channel had
+ * already reached, and a carve out in a channel's tail would otherwise pad every
+ * other channel out to meet a note nothing moved. `erased` is what says a carve
+ * is what filled it — the two resolvers never both run, since the mode picks one.
+ *
+ * A body edit's reach is in song ticks: the moved notes' furthest instance, with
+ * every pass start carried by how many of **its own voice's** passes the length
+ * change has already stretched in front of it, each voice's music sliding by its
+ * own passes alone. `delta` prices the change once, off the same layout the
+ * commit writes; `grown` is each voice's own total, for a pad whose channel tick
+ * counts predate the edit.
+ *
+ * Exported because the pad belongs to the **gesture** and not to a frame: a
+ * gesture spanning frames plans each of them alone, and two frames each padding
+ * the other channels out to their own reach writes the rest twice, `coalesce`
+ * concatenating rather than deduping. {@link planGroupEdits} prices it here once.
+ */
+export function planReach(
+  strip: Strip,
+  frame: StripFrame,
+  plan: Plan,
+): { reach: number; grown: ReadonlyMap<number, number> } {
+  const moved = plan.erased.length > 0 ? plan.touched : [...plan.touched, ...plan.pushed];
+  const grown = new Map<number, number>();
+  const flat = moved.reduce((furthest, note) => Math.max(furthest, note.startTick + note.ticks), 0);
+  if (frame.body < 0) {
+    return { reach: flat, grown };
+  }
+
+  const delta = plannedFrameTicks(strip, frame, plan) - frame.ticks;
+  const passes = frame.runs
+    .flatMap((run) => run.passes.map((pass) => ({ tick: pass.tick, channel: run.channel })))
+    .sort((a, b) => a.tick - b.tick);
+  const seen = new Map<number, number>();
+  let projected = 0;
+  for (const pass of passes) {
+    const ordinal = seen.get(pass.channel) ?? 0;
+    seen.set(pass.channel, ordinal + 1);
+    for (const note of moved) {
+      projected = Math.max(projected, pass.tick + ordinal * delta + note.startTick + note.ticks);
+    }
+  }
+
+  for (const [voice, count] of seen) {
+    grown.set(voice, count * delta);
+  }
+
+  return { reach: projected, grown };
+}
+
+/**
+ * Several frames' plans written out as one commit — one undo step.
+ *
+ * A gesture that moves no tick may reach into a loop written inside the one it
+ * started in (`spansFrames`), and each frame is planned and spelled on its
+ * own: the frames are disjoint text, so the pieces cannot overlap and sorting by
+ * offset is the whole of the ordering they need. One frame refusing refuses the
+ * lot, because a group half written is a song of neither shape.
+ *
+ * The frame reaching furthest is the one that pads the other channels out, and
+ * every other frame is told the song is already that long — which it will be,
+ * by the time these edits land together. `context.frame` on the way in is
+ * ignored; each plan brings its own.
+ */
+export function planGroupEdits(
+  context: EditContext,
+  plans: readonly FramePlan[],
+): Edit[] | EditRefusal {
+  const reaches = plans.map(({ frame, plan }) => planReach(context.strip, frame, plan).reach);
+  const furthest = reaches.indexOf(Math.max(...reaches, 0));
+  const edits: Edit[] = [];
+  for (let at = 0; at < plans.length; at++) {
+    const written = planEdits(
+      {
+        ...context,
+        frame: plans[at].frame,
+        playableTicks:
+          at === furthest
+            ? context.playableTicks
+            : Math.max(context.playableTicks, reaches[furthest]),
+      },
+      plans[at].plan,
+    );
+    if (!isEdits(written)) {
+      return written; // One frame refused, so nothing lands anywhere.
+    }
+
+    edits.push(...written);
+  }
+
+  return edits.sort((a, b) => a.span.start - b.span.start);
+}
+
 export function planEdits(context: EditContext, plan: Plan): Edit[] | EditRefusal {
   if (!committable(plan)) {
     return refuse(plan.refused ?? REFUSE_CLASH);
@@ -2400,51 +2503,7 @@ export function planEdits(context: EditContext, plan: Plan): Edit[] | EditRefusa
     }
   }
 
-  /**
-   * How far past the song this gesture reaches, over the notes it is answerable
-   * for: the ones it placed itself, and the ones its push cascade shoved out of
-   * the way. Not every note in the plan — a channel already running past the cut
-   * is an ordinary shape, and reading its tail as "reach" would have a deletion
-   * lengthen the song.
-   *
-   * A carve fills `pushed` too, and its pieces are left out for that same
-   * reason: it only ever makes a note shorter, so every piece it leaves sits at
-   * a tick the channel had already reached, and a carve out in a channel's tail
-   * would otherwise pad every other channel out to meet a note nothing moved.
-   * `erased` is what says a carve is what filled it — the two resolvers never
-   * both run, since the mode picks one.
-   */
-  const moved = plan.erased.length > 0 ? plan.touched : [...plan.touched, ...plan.pushed];
-  let reach = moved.reduce((furthest, note) => Math.max(furthest, note.startTick + note.ticks), 0);
-
-  // A body edit's reach is in song ticks: the moved notes' furthest instance,
-  // with every pass start carried by how many of **its own voice's** passes the
-  // length change has already stretched in front of it — each voice's music
-  // slides by its own passes alone. `delta` prices the change once, off the
-  // same layout the commit writes; `grown` is each voice's own total, for the
-  // pad below, whose channel tick counts predate the edit.
-  const grown = new Map<number, number>();
-  if (frame.body >= 0) {
-    const delta = plannedFrameTicks(strip, frame, plan) - frame.ticks;
-    const flat = frame.runs
-      .flatMap((run) => run.passes.map((pass) => ({ tick: pass.tick, channel: run.channel })))
-      .sort((a, b) => a.tick - b.tick);
-    const seen = new Map<number, number>();
-    let projected = 0;
-    for (const pass of flat) {
-      const ordinal = seen.get(pass.channel) ?? 0;
-      seen.set(pass.channel, ordinal + 1);
-      for (const note of moved) {
-        projected = Math.max(projected, pass.tick + ordinal * delta + note.startTick + note.ticks);
-      }
-    }
-
-    for (const [voice, passes] of seen) {
-      grown.set(voice, passes * delta);
-    }
-
-    reach = projected;
-  }
+  const { reach, grown } = planReach(strip, frame, plan);
 
   // Before the regions, and that is load-bearing rather than tidiness: a channel
   // being opened writes its `#N` at `strip.home.at`, which for an undeclared one

@@ -20,6 +20,7 @@ export const CHANGELOG: readonly ChangelogEntry[] = [
       'A loop call says which loop it plays, and lets you change it',
       'Loop call in the command palette now writes a call to a named loop instead of a *',
       "Drag a loop box's top or bottom up or down to transpose the whole loop",
+      'Transposing a loop carries the loops written inside it',
       "A selected loop's boxes are outlined solid",
       'Loop boxes follow the drag instead of dimming, so a box stays around its own notes',
     ],

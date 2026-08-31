@@ -453,11 +453,12 @@ that is the roll saying "these change together, and this is the one you took hol
 or delete any of them and the body is rewritten once; the recompile is what plays it everywhere.
 
 **The box's edge is the pass's handle.** Click the dashed or dotted line and the loop's whole group
-of notes is selected — that group and nothing else, on whichever channel the box belongs to; a click
-that never moves just leaves it selected, ready for the arrow keys and `Delete`. **Every box of that
-body closes its dashes up into one solid line** while it is selected, the declaration and every
-recall of it together, on every channel that plays it: the outline says "this is the group you have
-hold of" the way the ring round a note does. The Loop inspector answers about **that box**: press the
+of notes is selected — the body's own, and the notes of every loop written **inside** it, which is
+exactly what the box is drawn round; a click that never moves just leaves it selected, ready for the
+arrow keys and `Delete`. **Every box of that body closes its dashes up into one solid line** while it
+is selected, the declaration and every recall of it together, on every channel that plays it, and a
+loop written inside goes solid with it: the outline says "this is the group you have hold of" the way
+the ring round a note does. The Loop inspector answers about **that box**: press the
 dashed one and it names the `[ ]` itself, press a dotted one and it names the `(1)3` whose ghost you
 pressed, with that call's own count and the loop it plays both live. The two are one text and the
 caret lands in the same place either way, so the press is the only thing that can tell them apart.
@@ -478,11 +479,14 @@ inside another grows to keep it in.
 Drag that same rule **up or down** instead and **the whole body transposes**, one row per semitone,
 every pass of it moving together because there is one text; the readout says the interval. Which of
 the two the drag is settles the moment it starts moving and stays settled, so wandering off the
-straight does not swap one edit for the other. Drums keep their lanes — a drum's row is its
+straight does not swap one edit for the other. A loop written **inside** that one goes with it — its
+notes play only where this loop plays, so they are part of the same group and both boxes follow. A
+loop merely **called** from inside it does not: its text plays in other places in the song too, and
+moving it there is not what the box was asked for. Drums keep their lanes — a drum's row is its
 instrument, not a pitch — and a transpose that would put a note off the writable range is refused
-with the reason on the toolbar. The notes _inside_ the body are still moved one at a time by
-dragging their own bars, as above; the box is the construct's handle, and up or down it carries the
-construct's contents as one.
+with the reason on the toolbar, the whole group with it. The notes _inside_ the body are still moved
+one at a time by dragging their own bars, as above; the box is the construct's handle, and up or
+down it carries the construct's contents as one.
 
 **The box's ends resize the loop.** The **right** end changes the body's own length: pull it out and
 a rest goes on the body's tail, pull it in and the body's trailing rests come off — `[a1 r1]5`
@@ -533,8 +537,9 @@ miniature: deleting it tightens the loop, where deleting a note in the middle le
 
 What a loop will not do, each in its own words on the toolbar: a note cannot be dragged **onto** a
 loop from outside — the loop's ticks are a wall, not a gap — and a selection with notes on both
-sides of a bracket has no one text to rewrite, so it refuses (deleting such a selection works, each
-side deleted in its own frame, one undo step). A note at the head of a body that plays a drum
+sides of a bracket has no one text to rewrite, so it refuses. What a bracket cannot straddle is a
+change of **tick**: deleting or transposing such a selection works, each side planned in its own
+frame and committed as one step. A note at the head of a body that plays a drum
 loaded _before_ the `[` refuses to move: rewriting it would hand the drum to the next note. A
 command written between the brackets cannot be dragged along the command lane — it runs once per
 pass, where it stands — where deleting it from the lane still works. And the edge drag has two

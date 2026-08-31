@@ -295,6 +295,29 @@ export function constructFor(strip: Strip, body: number, tick: number): number {
 }
 
 /**
+ * The frames written **inside** this one's own text.
+ *
+ * By span containment rather than by walking the constructs a frame holds: a
+ * `(n)m` written inside a body may recall one declared outside it — `(n)` is
+ * AMK0112 inside a `[ ]` and legal inside a `[[ ]]`, so a porter can write it —
+ * and that body's text plays in other places in the song, which an edit reaching
+ * through the recall would move as well. What a loop holds is what stands
+ * between its brackets. Containment is transitive, so a body three deep is in
+ * the list of every body above it without a walk down the nesting.
+ *
+ * The root's span is the whole document and would name every body the channel
+ * plays; nothing asks it.
+ */
+export function framesInside(strip: Strip, frame: StripFrame): readonly StripFrame[] {
+  return strip.frames.filter(
+    (each) =>
+      each.body !== frame.body &&
+      each.span.start >= frame.span.start &&
+      each.span.end <= frame.span.end,
+  );
+}
+
+/**
  * Text a note, rest or tie is allowed to be for the roll to rewrite it.
  *
  * `spanAt` collapses a span that came through a `"find=value"` replacement to a

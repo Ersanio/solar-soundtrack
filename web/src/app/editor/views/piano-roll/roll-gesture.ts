@@ -9,11 +9,19 @@ import type { Edit } from '@amk/tokens/edits';
 import type { LaneStack } from './roll-layout';
 import { rowAtY, tickAtX } from './roll-layout';
 import { snapDuration, snapTick, stepDrawLength } from './roll-lengths';
-import { type Preview, type PreviewBar, buildPreview, rowOfPlaced } from './roll-preview';
+import {
+  type Preview,
+  type PreviewBar,
+  buildPreview,
+  joinPreviews,
+  rowOfPlaced,
+} from './roll-preview';
 import { KEY_WIDTH, NOTE_GAP, barRect } from './roll-metrics';
 import {
+  type BodyRows,
   type EditContext,
   type EditMode,
+  type FramePlan,
   type Gesture,
   type PassShift,
   type PlacedNote,
@@ -28,7 +36,7 @@ import {
   framePasses,
   isEdits,
   passShiftsFor,
-  planGesture,
+  planFrames,
   plannedFrameTicks,
   shiftBoundariesFor,
 } from './roll-edit';
@@ -38,6 +46,7 @@ import {
   type StripFrame,
   type StripItem,
   constructFor,
+  framesInside,
 } from './roll-strip';
 import {
   bodyRests,
@@ -45,7 +54,7 @@ import {
   gapSlack,
   openGap,
   passesAt,
-  planEdits,
+  planGroupEdits,
   resizeLoop,
 } from './roll-write';
 
@@ -389,14 +398,16 @@ export interface RollGestures {
    */
   passShifts: Signal<readonly PassShift[]>;
   /**
-   * The body a gesture is editing and the rows its notes span once the plan
-   * lands, so the loop's boxes stay round the notes they are drawn round.
+   * The bodies a gesture is editing and the rows each one's notes span once its
+   * plan lands, so the loops' boxes stay round the notes they are drawn round.
    *
-   * `null` on the root frame, which has no box, and on a plan with no notes to
-   * stand on — a refusal with nowhere to draw leaves the box where it was, which
-   * is the reading the red bars already take.
+   * One entry per frame the gesture reaches, since a transpose taken by a box's
+   * rule carries the loops written inside that body. The root has no box and is
+   * left out, and so is a plan with no notes to stand on — a refusal with
+   * nowhere to draw leaves the box where it was, which is the reading the red
+   * bars already take.
    */
-  bodyRows: Signal<{ body: number; low: number; high: number } | null>;
+  bodyRows: Signal<readonly BodyRows[]>;
   /** The marquee box, in song coordinates. */
   marquee: Signal<{ x: number; y: number; w: number; h: number } | null>;
   /** The note a press would draw, or `null` where a press would draw none. */
@@ -633,17 +644,21 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
     };
   });
 
-  const plan = computed<Plan | null>(() => {
+  /**
+   * The gesture planned in every frame it names an item in, the held frame
+   * first — one entry unless it is one of the two that may span brackets.
+   */
+  const plans = computed<readonly FramePlan[]>(() => {
     const strip = sources.strip();
     const gesture = gestureNow();
     const held = drag();
     return strip && gesture && held
-      ? planGesture(strip, gesture, sources.editMode(), strip.frames[held.frame])
-      : null;
+      ? planFrames(strip, gesture, sources.editMode(), held.frame)
+      : [];
   });
 
   /**
-   * The plan as far as the porter is concerned: nothing until a press has
+   * The plans as far as the porter is concerned: nothing until a press has
    * actually become a drag.
    *
    * A press on a note that turns out to be a click would otherwise flash a bar
@@ -651,10 +666,16 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
    * dragged state" means the new note is there from the press, and a press the
    * wheel has resized, which has something to show and no movement to show it by.
    */
-  const shownPlan = computed<Plan | null>(() => {
+  const shownPlans = computed<readonly FramePlan[]>(() => {
     const held = drag();
-    return held && (held.moved || held.kind === 'spawn' || held.length !== null) ? plan() : null;
+    return held && (held.moved || held.kind === 'spawn' || held.length !== null) ? plans() : [];
   });
+
+  /**
+   * The held frame's share of that, for the readers that price one frame — the
+   * body-length arithmetic, and the readout, both of which are its alone.
+   */
+  const shownPlan = computed<Plan | null>(() => shownPlans()[0]?.plan ?? null);
 
   /** The frame the gesture runs in, or the root while nothing is held. */
   const heldFrame = computed<StripFrame | null>(() => {
@@ -832,57 +853,74 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
     );
   });
 
-  /** The rows the edited body's notes span once the plan lands. */
-  const bodyRows = computed<{ body: number; low: number; high: number } | null>(() => {
-    const frame = heldFrame();
-    const now = shownPlan();
-    if (!frame || frame.body < 0 || !now) {
-      return null;
-    }
-
-    // The plan's whole list, not what the gesture moved: a box is drawn round
-    // every note of its pass, and the ones standing still are as much of it as
-    // the ones being carried.
+  /** The rows each edited body's notes span once its plan lands. */
+  const bodyRows = computed<readonly BodyRows[]>(() => {
     const stack = sources.stack();
-    let low = Number.POSITIVE_INFINITY;
-    let high = Number.NEGATIVE_INFINITY;
-    for (const note of now.notes) {
-      const row = rowOfPlaced(note, stack);
-      if (row >= 0) {
-        low = Math.min(low, row);
-        high = Math.max(high, row);
+    const rows: BodyRows[] = [];
+    for (const { frame, plan: now } of shownPlans()) {
+      if (frame.body < 0) {
+        continue; // The root has no box to answer for.
+      }
+
+      // The plan's whole list, not what the gesture moved: a box is drawn round
+      // every note of its pass, and the ones standing still are as much of it as
+      // the ones being carried. A frame's plan holds only the notes written in
+      // its own text, so a loop playing inside this one is another entry here
+      // and the union of the boxes is what puts the two together.
+      let low = Number.POSITIVE_INFINITY;
+      let high = Number.NEGATIVE_INFINITY;
+      for (const note of now.notes) {
+        const row = rowOfPlaced(note, stack);
+        if (row >= 0) {
+          low = Math.min(low, row);
+          high = Math.max(high, row);
+        }
+      }
+
+      if (low <= high) {
+        rows.push({ body: frame.body, low, high });
       }
     }
 
-    return low <= high ? { body: frame.body, low, high } : null;
+    return rows;
   });
 
   const preview = computed<Preview | null>(() => {
-    const held = shownPlan();
-    if (!held) {
+    const parts = shownPlans();
+    if (parts.length === 0) {
       return null;
     }
 
-    // A length change stands the whole body's bars aside (see {@link moving}),
-    // so the ones the gesture did not touch are drawn here instead — striped,
-    // the mark of a note moved as a consequence rather than by the hand.
+    const stack = sources.stack();
+    const zoom = sources.zoom();
+    const rowHeight = sources.rowHeight();
+    // The length change is the held frame's alone, and so is the striped rewrite
+    // it needs; a frame a tick-neutral gesture reached into changes no length.
     const delta = frameDelta();
-    let shown = held;
-    if (delta !== 0) {
-      const drawn = new Set([...held.touched, ...held.pushed]);
-      const carried = held.notes.filter((note) => !drawn.has(note));
-      shown = { ...held, pushed: [...held.pushed, ...carried] };
-    }
+    return joinPreviews(
+      parts.map(({ frame, plan: now }, at) => {
+        let shown = now;
+        // A length change stands the whole body's bars aside (see {@link moving}),
+        // so the ones the gesture did not touch are drawn here instead — striped,
+        // the mark of a note moved as a consequence rather than by the hand.
+        if (at === 0 && delta !== 0) {
+          const drawn = new Set([...now.touched, ...now.pushed]);
+          const carried = now.notes.filter((note) => !drawn.has(note));
+          shown = { ...now, pushed: [...now.pushed, ...carried] };
+        }
 
-    return buildPreview({
-      plan: shown,
-      stack: sources.stack(),
-      zoom: sources.zoom(),
-      rowHeight: sources.rowHeight(),
-      rows: sources.stack().lanes.length,
-      passes: heldPasses(),
-      delta,
-    });
+        return buildPreview({
+          plan: shown,
+          stack,
+          zoom,
+          rowHeight,
+          rows: stack.lanes.length,
+          passes: at === 0 ? heldPasses() : framePasses(frame),
+          delta: at === 0 ? delta : 0,
+          body: frame.body,
+        });
+      }),
+    );
   });
 
   /**
@@ -898,9 +936,11 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
    */
   const moving = computed<ReadonlySet<number>>(() => {
     const carried = new Set<number>();
-    for (const note of shownPlan()?.touched ?? []) {
-      if (note.from >= 0) {
-        carried.add(note.from);
+    for (const { plan: now } of shownPlans()) {
+      for (const note of now.touched) {
+        if (note.from >= 0) {
+          carried.add(note.from);
+        }
       }
     }
 
@@ -1097,7 +1137,7 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
   const busy = computed(() => {
     const held = drag();
     return (
-      shownPlan() !== null || ((held?.kind === 'gap' || held?.kind === 'resize') && held.moved)
+      shownPlans().length > 0 || ((held?.kind === 'gap' || held?.kind === 'resize') && held.moved)
     );
   });
 
@@ -1114,13 +1154,15 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
   const latched = signal<{ reason: string; source: string } | null>(null);
 
   const refusal = computed<string | null>(() => {
-    const now = shownPlan();
-    if (now !== null) {
-      // A gesture in flight answers for itself. The clash is spelled out here
-      // rather than carried in the plan because `planGesture` reports it as ticks
-      // for the roll to wash red; `planEdits` gives the same sentence at the
-      // commit, and this is it while the pointer is still down.
-      return now.refused ?? (now.clashes.length > 0 ? REFUSE_CLASH : null);
+    const now = shownPlans();
+    if (now.length > 0) {
+      // A gesture in flight answers for itself, and a group is written whole or
+      // not at all, so one frame's refusal is the whole gesture's. The clash is
+      // spelled out here rather than carried in the plan because `planGesture`
+      // reports it as ticks for the roll to wash red; `planEdits` gives the same
+      // sentence at the commit, and this is it while the pointer is still down.
+      const said = now.find((each) => each.plan.refused !== null)?.plan.refused;
+      return said ?? (now.some((each) => each.plan.clashes.length > 0) ? REFUSE_CLASH : null);
     }
 
     // An edge drag that cannot go anywhere says why for as long as it is held;
@@ -1209,8 +1251,12 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
    * `finish` remembers the length it drew and drops the selection, `erase` does
    * neither.
    */
-  const write = (strip: Strip, frame: StripFrame, now: Plan): readonly Edit[] | null => {
-    const outcome = planEdits(contextFor(strip, frame), now);
+  const write = (strip: Strip, parts: readonly FramePlan[]): readonly Edit[] | null => {
+    if (parts.length === 0) {
+      return null;
+    }
+
+    const outcome = planGroupEdits(contextFor(strip, parts[0].frame), parts);
     if (!isEdits(outcome)) {
       latched.set({ reason: outcome.refused, source: sources.source() });
       return null;
@@ -1222,14 +1268,15 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
 
   const finish = (): void => {
     const strip = sources.strip();
-    const now = plan();
+    const parts = plans();
+    const now = parts[0]?.plan;
     const held = drag();
     drag.set(null);
     if (!strip || !now || !held) {
       return;
     }
 
-    const edits = write(strip, strip.frames[held.frame], now);
+    const edits = write(strip, parts);
     if (edits && edits.length > 0) {
       if (now.touched.length > 0) {
         sinks.rememberLength(now.touched[0].ticks);
@@ -1318,11 +1365,22 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
           return; // The channel is named; a channel that cannot edit selects nothing.
         }
 
+        // The group is the body's own notes and the notes of every loop written
+        // inside it: the box is already drawn round them — a note is in every
+        // region holding its tick, since a subloop's pass sits inside its
+        // loop's — so a group leaving them out would be a box promising a move
+        // it could not make. A body merely *called* from inside this one is not
+        // among them (`framesInside`): its text plays elsewhere in the song too.
         const group = new Set<number>();
-        for (let index = grabbed.frames[frame].from; index < grabbed.frames[frame].to; index++) {
-          const item = grabbed.items[index];
-          if (item.kind === 'note' && item.instances.length > 0) {
-            group.add(index);
+        for (const each of [
+          grabbed.frames[frame],
+          ...framesInside(grabbed, grabbed.frames[frame]),
+        ]) {
+          for (let index = each.from; index < each.to; index++) {
+            const item = grabbed.items[index];
+            if (item.kind === 'note' && item.instances.length > 0) {
+              group.add(index);
+            }
           }
         }
 
@@ -1838,40 +1896,14 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
         return;
       }
 
-      // A delete is the one gesture allowed to span brackets: it splits into a
-      // plan per frame, and the splices land as one commit — one undo step.
-      // Frames are disjoint text, so the pieces cannot overlap.
-      if (gesture.kind === 'delete') {
-        const byFrame = new Map<number, number[]>();
-        for (const index of gesture.items) {
-          const frame = strip.items[index]?.frame ?? 0;
-          byFrame.set(frame, [...(byFrame.get(frame) ?? []), index]);
-        }
-
-        const all: Edit[] = [];
-        for (const [which, items] of byFrame) {
-          const frame = strip.frames[which];
-          const now = planGesture(strip, { kind: 'delete', items }, sources.editMode(), frame);
-          const edits = write(strip, frame, now);
-          if (!edits) {
-            return; // One frame refused, so nothing lands anywhere.
-          }
-
-          all.push(...edits);
-        }
-
-        if (all.length > 0) {
-          sinks.commit(all.sort((a, b) => a.span.start - b.span.start));
-          selection.set(new Set<number>());
-        }
-
-        return;
-      }
-
+      // A gesture that moves no tick may span brackets — a delete, and the
+      // transpose the arrow keys run over a group a loop box's rule widened. It
+      // is planned once per frame and the splices land as one commit, which is
+      // one undo step; anything that moves a tick stays one plan over one frame
+      // and is refused there in its own words.
       const first = 'items' in gesture ? gesture.items[0] : undefined;
-      const frame = strip.frames[first !== undefined ? (strip.items[first]?.frame ?? 0) : 0];
-      const now = planGesture(strip, gesture, sources.editMode(), frame);
-      const edits = write(strip, frame, now);
+      const held = first !== undefined ? (strip.items[first]?.frame ?? 0) : 0;
+      const edits = write(strip, planFrames(strip, gesture, sources.editMode(), held));
       if (edits && edits.length > 0) {
         sinks.commit(edits);
         selection.set(new Set<number>());
@@ -1915,9 +1947,9 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
       return;
     }
 
-    const frame = strip.frames[strip.items[index]?.frame ?? 0];
-    const now = planGesture(strip, { kind: 'delete', items: [index] }, sources.editMode(), frame);
-    const edits = write(strip, frame, now);
+    const held = strip.items[index]?.frame ?? 0;
+    const gesture: Gesture = { kind: 'delete', items: [index] };
+    const edits = write(strip, planFrames(strip, gesture, sources.editMode(), held));
     if (edits && edits.length > 0) {
       sinks.commit(edits);
     }
