@@ -1064,6 +1064,30 @@ stats.loopTicks` pads **every other channel that would cut the song short** out 
   a row of the keyboard being a semitone, which is what `keysBetween` computes anyway wherever both
   ends are keys. And the gesture sounds nothing while it is held: the drag carries a whole body's
   notes, which is no more one note than the construct a slide carries is.
+- **Dimming the loop boxes to 30% while a body-length edit is held** — they were the compiled
+  song's reading of a song in motion, and a fade is not a way of saying "out of date": the box sat
+  where the music used to be while the bars inside it moved out from under it, and the transpose
+  made that plain by dropping them seven rows. They **follow** (`followLoopRegions`), a second short
+  pass over the built list in `buildLoopLabels`'s mould, and the dim goes with the staleness that
+  earned it. Not a bucket transform in `RollLoops` the way `RollNotes` deals its marks, for three
+  reasons and not one: a box's width changes, its two edges take different counts so it has no one
+  bucket to sit in, and the labels are a separate layer above the bars that would have to be
+  transformed in step. A length change written by a plan is drawn as growth at the body's **tail**,
+  which is not always the truth but is the reading `buildPreview` already takes — a box telling a
+  truth the bars inside it did not would be the worse of the two answers.
+- **`ShiftBoundaries` asked about a loop box's edges** — it answers a **tick**, and a pass's edges
+  _are_ the boundaries, which is the one place that rule is discontinuous. Counting at-or-before at
+  both edges is right for a tail change by luck and wrong for a head change by a whole delta, and no
+  function of the tick can mend it: a box in front of the construct and the construct's own first
+  box both sit at or below the first pass's start and want different answers. The changed body's
+  passes are asked for by name (`passShiftsFor`, beside `shiftBoundariesFor` for its reason, and in
+  **deltas** so it holds still from the press), and every other box takes the marks' rule at each of
+  its two edges — inclusive at the left, where an insert always lands inside the box, and inclusive
+  at the right only where the box **holds** the pass that boundary is for. That one test is what
+  tells an outer loop round a growing body from a subloop sitting at that body's tail, whose edges
+  are on the same tick and whose answers are opposite, and what stops the pass in front of an
+  opening gap swallowing it. `framePasses` is the one walk `heldPasses` and `passShiftsFor` share,
+  so the pass the preview projects a bar into and the box drawn round it cannot count differently.
 - **A `selected` flag on `LoopRegionBox`** for the solid outline — the box list is built on the mark
   window's cadence and a selection changes on every click, which is the argument that kept the label
   off it too. `RollLoops` takes the body set as a second input and the template asks it per box, as

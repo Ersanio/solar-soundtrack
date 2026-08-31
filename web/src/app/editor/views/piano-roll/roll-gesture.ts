@@ -14,6 +14,7 @@ import {
   type EditContext,
   type EditMode,
   type Gesture,
+  type PassShift,
   type PlacedNote,
   type Plan,
   type ShiftBoundaries,
@@ -23,7 +24,9 @@ import {
   REFUSE_LOOP_LEFT_PASS,
   REFUSE_NESTED_LOOP,
   REFUSE_SUB_SPLIT,
+  framePasses,
   isEdits,
+  passShiftsFor,
   planGesture,
   plannedFrameTicks,
   shiftBoundariesFor,
@@ -368,6 +371,21 @@ export interface RollGestures {
   shiftBoundaries: Signal<ShiftBoundaries | null>;
   /** The held body-length change, which everything downstream slides by per boundary passed. */
   shiftDelta: Signal<number>;
+  /**
+   * Where the changed body's own passes go, which {@link shiftBoundaries} cannot
+   * say — it answers a tick, and a pass's edges are the boundaries themselves.
+   * Empty outside a body-length change.
+   */
+  passShifts: Signal<readonly PassShift[]>;
+  /**
+   * The body a gesture is editing and the rows its notes span once the plan
+   * lands, so the loop's boxes stay round the notes they are drawn round.
+   *
+   * `null` on the root frame, which has no box, and on a plan with no notes to
+   * stand on — a refusal with nowhere to draw leaves the box where it was, which
+   * is the reading the red bars already take.
+   */
+  bodyRows: Signal<{ body: number; low: number; high: number } | null>;
   /** The marquee box, in song coordinates. */
   marquee: Signal<{ x: number; y: number; w: number; h: number } | null>;
   /** The note a press would draw, or `null` where a press would draw none. */
@@ -742,19 +760,9 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
    */
   const heldPasses = computed<readonly { tick: number; ordinal: number }[]>(() => {
     const frame = heldFrame();
-    if (!frame || frame.body < 0) {
-      return [{ tick: 0, ordinal: 0 }];
-    }
-
-    const flat = frame.runs
-      .flatMap((run) => run.passes.map((pass) => ({ tick: pass.tick, channel: run.channel })))
-      .sort((a, b) => a.tick - b.tick);
-    const seen = new Map<number, number>();
-    return flat.map((pass) => {
-      const ordinal = seen.get(pass.channel) ?? 0;
-      seen.set(pass.channel, ordinal + 1);
-      return { tick: pass.tick, ordinal };
-    });
+    // The same walk {@link passShifts} counts, so the bars the preview projects
+    // into a pass and the box drawn round them cannot count it differently.
+    return frame && frame.body >= 0 ? framePasses(frame) : [{ tick: 0, ordinal: 0 }];
   });
 
   /**
@@ -787,6 +795,55 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
 
     const frame = heldFrame();
     return frame && frame.body >= 0 ? shiftBoundariesFor(frame, 'end', null) : null;
+  });
+
+  /**
+   * The same change as {@link shiftBoundaries}, for the changed body's own
+   * passes — the loop boxes drawn on them, which the marks' rule cannot place.
+   *
+   * In deltas, so it holds still from the press and only what a step is worth
+   * changes per move. A `'gap'` raises none, both frames standing down for it as
+   * they do for the preview: a slide changes no body's length, and every box
+   * including the slid pass's own moves the way a mark on its edges moves.
+   */
+  const passShifts = computed<readonly PassShift[]>(() => {
+    const held = drag();
+    const frame = resizedFrame() ?? heldFrame();
+    if (!held || !frame || frame.body < 0) {
+      return [];
+    }
+
+    const lead = held.kind === 'resize' && held.edge === 'start' ? held.loop : null;
+    return passShiftsFor(
+      frame,
+      lead ? 'start' : 'end',
+      lead ? { channel: lead.run.channel, tick: lead.splitTick } : null,
+    );
+  });
+
+  /** The rows the edited body's notes span once the plan lands. */
+  const bodyRows = computed<{ body: number; low: number; high: number } | null>(() => {
+    const frame = heldFrame();
+    const now = shownPlan();
+    if (!frame || frame.body < 0 || !now) {
+      return null;
+    }
+
+    // The plan's whole list, not what the gesture moved: a box is drawn round
+    // every note of its pass, and the ones standing still are as much of it as
+    // the ones being carried.
+    const stack = sources.stack();
+    let low = Number.POSITIVE_INFINITY;
+    let high = Number.NEGATIVE_INFINITY;
+    for (const note of now.notes) {
+      const row = rowOfPlaced(note, stack);
+      if (row >= 0) {
+        low = Math.min(low, row);
+        high = Math.max(high, row);
+      }
+    }
+
+    return low <= high ? { body: frame.body, low, high } : null;
   });
 
   const preview = computed<Preview | null>(() => {
@@ -1211,6 +1268,8 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
     moving,
     shiftBoundaries,
     shiftDelta: frameDelta,
+    passShifts,
+    bodyRows,
     marquee,
     ghost,
     bubble,

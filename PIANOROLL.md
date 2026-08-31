@@ -428,6 +428,11 @@ still one body played from both halves. That is how other notes get a place in b
 left closes free space instead: the drag stops at the rests actually in front of the pass, and never
 moves a command off its tick.
 
+**The boxes move with the music.** Whatever the drag is — a pass sliding, an end resizing, a body
+transposing, or a note inside it being carried — the tint and the outline follow the notes while the
+button is still down, so a box is always drawn round the bars it is a box for. A loop that plays
+inside another grows to keep it in.
+
 Drag that same rule **up or down** instead and **the whole body transposes**, one row per semitone,
 every pass of it moving together because there is one text; the readout says the interval. Which of
 the two the drag is settles the moment it starts moving and stays settled, so wandering off the

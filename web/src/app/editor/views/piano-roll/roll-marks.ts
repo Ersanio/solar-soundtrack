@@ -15,7 +15,9 @@ import {
   OVERVIEW_HEIGHT,
   OVERVIEW_PAD,
   barRect,
+  loopBox,
 } from './roll-metrics';
+import type { PassShift, ShiftBoundaries } from './roll-edit';
 import { fitBarContent, plateWidth } from './roll-bar-text';
 import { type LaneStack, keyName, noteLabel, overviewOffset } from './roll-layout';
 
@@ -591,8 +593,7 @@ export function buildLoopRegions(request: LoopRegionRequest): LoopRegionBox[] {
         id,
         x,
         w,
-        y: low * rowHeight - 2,
-        h: (high - low + 1) * rowHeight + 4,
+        ...loopBox(low, high, rowHeight),
         declared: isDeclared,
         fill,
         tint,
@@ -603,6 +604,142 @@ export function buildLoopRegions(request: LoopRegionRequest): LoopRegionBox[] {
         ticks: end - tick,
       }),
     );
+}
+
+export interface LoopFollowRequest {
+  regions: readonly LoopRegionBox[];
+  /**
+   * The body a gesture is editing and the rows its notes span once the plan
+   * lands — `null` where no plan is held, or where it has no notes to stand on.
+   */
+  rows: { body: number; low: number; high: number } | null;
+  /**
+   * How far a **tick** moves under a held body-length change: the same list the
+   * marks are dealt over, for every box the change is not the body of.
+   */
+  boundaries: ShiftBoundaries | null;
+  /** Ticks one boundary crossing adds. */
+  delta: number;
+  /** Where the changed body's own passes go, which {@link boundaries} cannot say. */
+  passes: readonly PassShift[];
+  zoom: number;
+  rowHeight: number;
+}
+
+/**
+ * The boxes again, drawn round where the gesture in flight is taking the notes.
+ *
+ * A second short pass over what {@link buildLoopRegions} has already built, in
+ * {@link buildLoopLabels}'s mould: the walk over every loop, pass and note is on
+ * the mark window's cadence and must not be re-run because a pointer moved.
+ * Nothing held returns the very list it was given, so an idle roll allocates
+ * nothing at all.
+ *
+ * Horizontally, the changed body's own passes are asked for by name — their
+ * edges *are* the boundaries, which is the one place the marks' rule is
+ * discontinuous. Every other box takes that rule at each of its two edges, and
+ * the difference between the counts is what it gains: a boundary at a box's
+ * **left** edge always lands inside it and counts, where one at its **right**
+ * edge counts only if the pass it belongs to is a pass the box **holds**. That
+ * one test is what tells an outer loop round a growing body, which widens by
+ * every pass it holds, from a subloop sitting at that body's tail, which is
+ * pushed along and does not grow — their edges are on the same tick and their
+ * answers are opposite. It is also what stops the pass in front of an opening
+ * gap swallowing it.
+ *
+ * A length change written by a plan is drawn as growth at the body's **tail**,
+ * which is the same reading `buildPreview` takes: the bars a box is drawn round
+ * are projected that way, and a box that told the truth about a shape the bars
+ * inside it did not would be the worse answer of the two.
+ *
+ * Vertically the plan says where the changed body's own notes went, and a box is
+ * then the union of itself with everything it holds — one pass and not a walk
+ * down the nesting, because a built box is already the union of what is inside
+ * it. A box holding one that moved therefore grows to keep it in, and one whose
+ * inner body moved inwards keeps its width: the built span has already swallowed
+ * those rows and cannot give them back.
+ *
+ * `tick`, `ticks`, `body` and `channel` stay the compiled song's — `region.id`
+ * is built from them so a moved box keeps its identity and its rect, the
+ * `.loop-edge` handle carries them as the `data-*` a press resolves against, and
+ * `buildLoopLabels` names a loop by asking the strip about that tick. Nothing
+ * reads them out of step: the hover runs only with no drag held, and a press can
+ * only reach the handle before the pointer is captured, where the delta is still
+ * zero and no box has moved.
+ */
+export function followLoopRegions(request: LoopFollowRequest): readonly LoopRegionBox[] {
+  const { regions, rows, boundaries, delta, passes, zoom, rowHeight } = request;
+  const moves = delta !== 0 && (boundaries !== null || passes.length > 0);
+  if (!moves && rows === null) {
+    return regions;
+  }
+
+  const crossed = (channel: number, tick: number, inclusive: boolean): number => {
+    const steps = boundaries?.get(channel) ?? [];
+    let count = 0;
+    while (count < steps.length && (inclusive ? steps[count] <= tick : steps[count] < tick)) {
+      count++;
+    }
+
+    return count;
+  };
+
+  /** Whether a box covers one of the passes the change lands in. */
+  const holds = (region: LoopRegionBox): boolean =>
+    passes.some(
+      (pass) =>
+        pass.channel === region.channel &&
+        region.tick <= pass.tick &&
+        pass.tick + pass.ticks <= region.tick + region.ticks,
+    );
+
+  const moved = rows === null ? null : loopBox(rows.low, rows.high, rowHeight);
+
+  /** Where a box's rows end up: the plan's for the changed body, its own else. */
+  const span = (region: LoopRegionBox): { y: number; h: number } =>
+    moved !== null && rows !== null && region.body === rows.body
+      ? moved
+      : { y: region.y, h: region.h };
+
+  return regions.map((region) => {
+    let { x, w } = region;
+    if (moves) {
+      // By body as well as by pass: a loop playing inside another begins where
+      // the outer one does, and the box that is not the changed one takes the
+      // marks' answer rather than the changed body's.
+      const own = passes.find(
+        (pass) =>
+          pass.body === region.body && pass.channel === region.channel && pass.tick === region.tick,
+      );
+      const left = own ? own.steps * delta : crossed(region.channel, region.tick, true) * delta;
+      const right = own
+        ? (own.steps + 1) * delta
+        : crossed(region.channel, region.tick + region.ticks, holds(region)) * delta;
+      x = region.x + left * zoom;
+      w = Math.max(1, region.w + (right - left) * zoom);
+    }
+
+    let { y, h } = span(region);
+    if (rows !== null) {
+      // Enclosure off the song's own ticks rather than off the drawn boxes,
+      // which have just moved apart: what holds what is a fact about the music.
+      for (const each of regions) {
+        if (
+          each !== region &&
+          each.channel === region.channel &&
+          region.tick <= each.tick &&
+          each.tick + each.ticks <= region.tick + region.ticks
+        ) {
+          const inner = span(each);
+          const top = Math.min(y, inner.y);
+          h = Math.max(y + h, inner.y + inner.h) - top;
+          y = top;
+        }
+      }
+    }
+
+    return { ...region, x, w, y, h };
+  });
 }
 
 /** A loop's own name, drawn in the corner of a box whose group is selected. */

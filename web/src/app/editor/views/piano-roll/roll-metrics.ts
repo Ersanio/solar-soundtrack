@@ -39,6 +39,19 @@ export function barRect(
   };
 }
 
+/**
+ * The box a loop's pass occupies, given the rows its notes span.
+ *
+ * Padded outward past the bars rather than fitted to them, so the outline reads
+ * as something the notes stand inside. One definition for `barRect`'s reason:
+ * the box is built from the compiled song and moved again while a gesture is
+ * held, and a rectangle two pixels shorter in one of those is a box that jumps
+ * the moment a pointer goes down.
+ */
+export function loopBox(low: number, high: number, rowHeight: number): { y: number; h: number } {
+  return { y: low * rowHeight - 2, h: (high - low + 1) * rowHeight + 4 };
+}
+
 /** Height of the overview bar: room for a pitch contour, little enough to stay chrome. */
 export const OVERVIEW_HEIGHT = 36;
 

@@ -42,6 +42,7 @@ import {
 	type EditContext,
 	type EditMode,
 	type Gesture,
+	type PassShift,
 	type Plan,
 	REFUSE_BEND_RIDER,
 	REFUSE_CLASH,
@@ -59,6 +60,7 @@ import {
 	REFUSE_SPLIT,
 	REFUSE_SUB_SPLIT,
 	isEdits,
+	passShiftsFor,
 	planGesture,
 	plannedFrameTicks,
 	shiftBoundariesFor,
@@ -2167,6 +2169,14 @@ expectResizeRefusal(
 	}
 }
 
+/** The same for the pass shifts the boxes take: `channel@tick:steps`. */
+function spelledShifts(shifts: readonly PassShift[]): string {
+	return [...shifts]
+		.sort((a, b) => a.channel - b.channel || a.tick - b.tick)
+		.map((shift) => `${shift.channel}@${shift.tick}+${shift.ticks}:${shift.steps}`)
+		.join(" ");
+}
+
 /** A boundary map, spelled so a check can read it. */
 function spelledBounds(bounds: ReadonlyMap<number, readonly number[]>): string {
 	return [...bounds]
@@ -2202,6 +2212,56 @@ function spelledBounds(bounds: ReadonlyMap<number, readonly number[]>): string {
 			"and a voice with no construct moved keeps every pass start",
 			spelledBounds(shiftBoundariesFor(body, "start", { channel: 1, tick: 0 })) === "0:0 1:48",
 			spelledBounds(shiftBoundariesFor(body, "start", { channel: 1, tick: 0 })),
+		);
+
+		// And the same change for the **boxes** drawn on those passes, which the
+		// boundary list above cannot place: a pass's edges are the boundaries
+		// themselves, so a head change comes out a whole delta too far right
+		// there. Invisible in a screenshot, and the difference between a loop
+		// box that grows leftward under the pointer and one that runs away from
+		// it.
+		check(
+			"a tail change moves each pass by its own voice's passes in front of it",
+			spelledShifts(passShiftsFor(body, "end", null)) === "0@0+48:0 1@0+48:0 1@48+48:1",
+			spelledShifts(passShiftsFor(body, "end", null)),
+		);
+		check(
+			"a head change pulls the grabbed voice's construct back by one delta",
+			spelledShifts(passShiftsFor(body, "start", { channel: 0, tick: 0 })) === "0@0+48:-1 1@0+48:0 1@48+48:1",
+			spelledShifts(passShiftsFor(body, "start", { channel: 0, tick: 0 })),
+		);
+		check(
+			"and leaves a voice whose construct did not move counting from its first pass",
+			spelledShifts(passShiftsFor(body, "start", { channel: 1, tick: 0 })) === "0@0+48:0 1@0+48:-1 1@48+48:0",
+			spelledShifts(passShiftsFor(body, "start", { channel: 1, tick: 0 })),
+		);
+	}
+}
+
+// A body that can really be resized from its left end: rests in front of the
+// construct to pull it back into, and a rest at the body's head to give up. The
+// case above has neither, so the clamp never lets it reach the `-1` step the
+// boxes turn on.
+{
+	const source = "#amk 2\n#0 o4 r4 (1)[r8 c8 d4]3";
+	const before = build(source);
+	const bar = typeof before === "string" ? "no build" : strip(source, before, 0);
+	if (typeof before === "string" || typeof bar === "string") {
+		check("the left-end pass shifts: builds", false, typeof bar === "string" ? bar : "");
+	} else {
+		const body = bar.frames[1];
+		check(
+			"a head change counts every pass of the grabbed voice from one before its own",
+			spelledShifts(passShiftsFor(body, "start", { channel: 0, tick: 48 })) === "0@48+96:-1 0@144+96:0 0@240+96:1",
+			spelledShifts(passShiftsFor(body, "start", { channel: 0, tick: 48 })),
+		);
+		// The two lists agree about the marks and differ only about the boxes:
+		// the notes inside pass `j` really do move by `j` deltas, and the pass
+		// holding them begins one delta before that.
+		check(
+			"where the marks' own list steps at each pass start but the grabbed one",
+			spelledBounds(shiftBoundariesFor(body, "start", { channel: 0, tick: 48 })) === "0:144,240",
+			spelledBounds(shiftBoundariesFor(body, "start", { channel: 0, tick: 48 })),
 		);
 	}
 }

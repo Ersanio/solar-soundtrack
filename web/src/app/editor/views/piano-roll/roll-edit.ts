@@ -771,18 +771,6 @@ function resolvedGesture(strip: Strip, frame: StripFrame, gesture: Gesture, mode
 }
 
 /**
- * The ticks the frame will occupy once the plan is written — what prices a
- * body-length change, whose every pass and every note after the loop move by
- * its difference against `frame.ticks`.
- *
- * The commit's own layout, restated over ticks: surviving and born notes stand
- * where the plan puts them, a construct's ticks are fixed, the regions between
- * anchors are preserved, and the trailing rests ride the last anchor —
- * `realiseRegion` never rewrites the tail's length, so a deleted note ahead of
- * them slides them earlier and a moved one carries them along. A rest a born
- * note wholly covers is gone, its ticks re-expressed by the note.
- */
-/**
  * Where each voice's shift steps up by one more `delta` while a body-length edit
  * is held: a mark moves by `delta` times the boundaries at or before its tick.
  * Stable from the press — only the delta changes per move, so the buckets built
@@ -835,6 +823,110 @@ export function shiftBoundariesFor(
   return boundaries;
 }
 
+/** One pass of a frame, and how many of its own voice's passes come first. */
+export interface FramePass {
+  channel: number;
+  /** The pass's start in the compiled song. */
+  tick: number;
+  ticks: number;
+  ordinal: number;
+}
+
+/**
+ * A frame's passes in tick order, each counting the passes its **own voice**
+ * plays in front of it — how many deltas its start has already taken when the
+ * body's length changes.
+ *
+ * Per voice, because each voice's music shifts by its own passes alone; in tick
+ * order, because a voice that plays the body from two constructs is two runs,
+ * and the second one's passes are the third and fourth that voice plays rather
+ * than its first and second again. One entry at 0 for the root, which has no
+ * runs and no passes to count.
+ */
+export function framePasses(frame: StripFrame): readonly FramePass[] {
+  const flat = frame.runs
+    .flatMap((run) =>
+      run.passes.map((pass) => ({ channel: run.channel, tick: pass.tick, ticks: pass.ticks })),
+    )
+    .sort((a, b) => a.tick - b.tick);
+
+  const seen = new Map<number, number>();
+  return flat.map((pass) => {
+    const ordinal = seen.get(pass.channel) ?? 0;
+    seen.set(pass.channel, ordinal + 1);
+    return { ...pass, ordinal };
+  });
+}
+
+/** Where a body-length change puts one pass of the body it changes. */
+export interface PassShift {
+  /**
+   * The body being changed, as {@link StripFrame.body} names it.
+   *
+   * Carried rather than left to the caller, because a pass is not named by its
+   * tick alone: a loop that plays inside another begins where the outer one
+   * does, and the two boxes drawn at that tick take different answers.
+   */
+  body: number;
+  channel: number;
+  /** The pass's start in the compiled song, which is a loop box's own `tick`. */
+  tick: number;
+  /** Its length, for telling a box that **holds** this pass from one that abuts it. */
+  ticks: number;
+  /** Deltas its start has already taken. Its own length gains one more. */
+  steps: number;
+}
+
+/**
+ * The same change as {@link shiftBoundariesFor}, answered for the changed body's
+ * **own passes** rather than for the marks standing in them.
+ *
+ * {@link ShiftBoundaries} answers a tick, and a pass's edges are the boundaries
+ * themselves — the one place that rule is discontinuous. Counting pass ends at
+ * or before each edge happens to be right for a tail change: pass `j` begins `j`
+ * deltas along and ends `j + 1` along, which is what the count gives. A head
+ * change is not so lucky. The construct is pulled back by one delta, so pass `j`
+ * begins `j - 1` along and ends `j` along, where the count says `j` and `j + 1`
+ * — every box a delta too far right. No function of the tick alone can mend it
+ * either: a box in front of the construct and the construct's own first box both
+ * sit at or below the first pass's start and want different answers.
+ *
+ * So the pass is asked for by name. `held` is the grabbed occurrence, as it is
+ * above, and its whole **voice** takes the pull-back: `resizeLoop` gives the
+ * delta back on that one channel and refuses a grabbed pass that is not its
+ * first, so no voice takes it twice and none takes half of it.
+ *
+ * In deltas rather than ticks, as `shiftBoundariesFor` is in ticks rather than
+ * pixels: what a step is worth is what changes per pointer move, and what the
+ * passes are is fixed from the press.
+ *
+ * Beside `shiftBoundariesFor` for its reason: this is the half of a resize no
+ * walk can catch, since the notes are right under either answer and only the
+ * box is wrong.
+ */
+export function passShiftsFor(
+  frame: StripFrame,
+  edge: 'start' | 'end',
+  held: { channel: number; tick: number } | null,
+): readonly PassShift[] {
+  return framePasses(frame).map(({ channel, tick, ticks, ordinal }) => {
+    const lead = edge === 'start' && held !== null && held.channel === channel ? -1 : 0;
+    return { body: frame.body, channel, tick, ticks, steps: ordinal + lead };
+  });
+}
+
+/**
+ * The ticks the frame will occupy once the plan is written — what prices a
+ * body-length change, whose every pass and every note after the loop move by
+ * its difference against `frame.ticks`.
+ *
+ * The commit's own layout, restated over ticks: surviving and born notes stand
+ * where the plan puts them, a construct's ticks are fixed, the regions between
+ * anchors are preserved, and the trailing rests ride the last anchor —
+ * `realiseRegion` never rewrites the tail's length, so a deleted note ahead of
+ * them slides them earlier and a moved one carries them along. A rest a born
+ * note wholly covers is gone, its ticks re-expressed by the note.
+ */
 export function plannedFrameTicks(strip: Strip, frame: StripFrame, plan: Plan): number {
   let last = 0;
   for (const note of plan.notes) {

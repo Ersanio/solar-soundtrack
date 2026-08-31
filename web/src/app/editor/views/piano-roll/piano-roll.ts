@@ -65,6 +65,7 @@ import {
   buildLoopRegions,
   buildMarks,
   buildMinimap,
+  followLoopRegions,
   heldRowsAt,
 } from './roll-marks';
 import { RollLoopLabels } from './roll-loops/roll-loop-labels';
@@ -677,9 +678,31 @@ export class PianoRoll {
   });
 
   /**
+   * The boxes as the gesture in flight is leaving them: round where the notes
+   * are going rather than where they were.
+   *
+   * A second pass over {@link loopRegions} rather than a rebuild — the walk over
+   * every loop, pass and note is on the mark window's cadence and a pointer move
+   * must not re-run it — and it hands back the very list it was given while
+   * nothing is held.
+   */
+  protected readonly shownLoopRegions = computed(() =>
+    followLoopRegions({
+      regions: this.loopRegions(),
+      rows: this.gestures.bodyRows(),
+      boundaries: this.gestures.shiftBoundaries(),
+      delta: this.gestures.shiftDelta(),
+      passes: this.gestures.passShifts(),
+      zoom: this.zoom(),
+      rowHeight: this.rowHeight(),
+    }),
+  );
+
+  /**
    * The name a selected loop group's boxes carry, over the bars rather than
-   * under them — a second pass over {@link loopRegions}, so a selection changing
-   * does not rebuild the whole song's boxes.
+   * under them — a second pass over {@link shownLoopRegions}, so a selection
+   * changing does not rebuild the whole song's boxes, and a label travels with
+   * the box it is written in the corner of.
    *
    * Off `editChannel` and not `editing`: a label appearing because the pointer
    * wandered over another channel's bar would be saying something about the
@@ -693,7 +716,7 @@ export class PianoRoll {
     }
 
     return buildLoopLabels({
-      regions: this.loopRegions(),
+      regions: this.shownLoopRegions(),
       channel,
       selected: this.gestures.selectedBodies(),
       labelAt: (body, tick) => {

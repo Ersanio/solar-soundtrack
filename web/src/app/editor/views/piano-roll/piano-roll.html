@@ -151,14 +151,12 @@
             [loopX]="loopX()"
             [endX]="endX()"
           />
-          <!-- The regions dim while a body-length edit is held: they are a
-               reading of the song as it stands, and the song is in motion. -->
-          <g
-            amk-roll-loops
-            [regions]="loopRegions()"
-            [selected]="gestures.selectedBodies()"
-            [attr.opacity]="gestures.shiftDelta() !== 0 ? 0.3 : null"
-          />
+          <!-- The regions follow the gesture in flight rather than standing at
+               the compiled song's reading of them, so a box is always round the
+               notes it is drawn round. Nothing dims them for it: a box that has
+               moved with its notes is accurate, and a faded one would be saying
+               the opposite. -->
+          <g amk-roll-loops [regions]="shownLoopRegions()" [selected]="gestures.selectedBodies()" />
           <g
             amk-roll-notes
             [marks]="marks()"
@@ -170,12 +168,9 @@
             (channelPicked)="selectEditChannel($event)"
           />
           <!-- Above the bars, because a loop's name has to be read over the
-               music it names; dimmed with the boxes it belongs to. -->
-          <g
-            amk-roll-loop-labels
-            [labels]="loopLabels()"
-            [attr.opacity]="gestures.shiftDelta() !== 0 ? 0.3 : null"
-          />
+               music it names; it travels with the box it sits in the corner
+               of, being built over the same followed list. -->
+          <g amk-roll-loop-labels [labels]="loopLabels()" />
           <g
             amk-roll-edit
             [preview]="gestures.preview()"
