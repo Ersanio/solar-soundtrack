@@ -63,6 +63,7 @@ import {
 	passShiftsFor,
 	planGesture,
 	plannedFrameTicks,
+	selectionSpan,
 	shiftBoundariesFor,
 } from "../web/src/app/editor/views/piano-roll/roll-edit";
 import { buildPreview } from "../web/src/app/editor/views/piano-roll/roll-preview";
@@ -3625,6 +3626,123 @@ expectEdit(
 		copy: true,
 	}),
 	{ contains: ["@21"] },
+);
+
+console.log("\nthe stretch a carried selection sounds");
+
+// What `roll-gesture.ts` asks `auditionSpan` for the moment a press carrying a
+// selection becomes a drag. It is heard as the song over those ticks rather than
+// as one of the notes, so the arithmetic is the whole of the feature and a span
+// an octave or a pass out sounds like a plausible answer to the wrong question.
+
+/** The notes one frame holds, which is the set a selection is picked out of. */
+function notesOfFrame(bar: Strip, frame: StripFrame): number[] {
+	const found: number[] = [];
+	for (let index = frame.from; index < frame.to; index++) {
+		if (bar.items[index].kind === "note") {
+			found.push(index);
+		}
+	}
+
+	return found;
+}
+
+/** The frame a body plays in, and the root for a channel without one. */
+function bodyFrame(bar: Strip): StripFrame {
+	return bar.frames.find((frame) => frame.body >= 0) ?? bar.frames[0];
+}
+
+function expectSpan(
+	name: string,
+	source: string,
+	channel: number,
+	pick: (bar: Strip) => { items: readonly number[]; frame: StripFrame; origin: number },
+	expected: { tick: number; ticks: number } | null,
+): void {
+	const built = build(source);
+	if (typeof built === "string") {
+		check(name, false, built);
+		return;
+	}
+
+	const bar = strip(source, built, channel);
+	if (typeof bar === "string") {
+		check(name, false, bar);
+		return;
+	}
+
+	const asked = pick(bar);
+	const span = selectionSpan(bar, asked.frame, new Set(asked.items), asked.origin);
+	const spelled = span === null ? "nothing" : `${span.tick}+${span.ticks}`;
+	const wanted = expected === null ? "nothing" : `${expected.tick}+${expected.ticks}`;
+	check(name, spelled === wanted, `${spelled}, wanted ${wanted}`);
+}
+
+// The ticks the notes cover, gap and all: the porter picked out a stretch of the
+// song and what runs between the two ends runs whether it was selected or not.
+expectSpan(
+	"two notes with a rest and a note between them",
+	"#amk 2\n#0 o4 c4 r4 d4 e4",
+	0,
+	(bar) => ({ items: [noteAt(bar, 0), noteAt(bar, 2)], frame: bar.frames[0], origin: 0 }),
+	{ tick: 0, ticks: 192 },
+);
+
+expectSpan(
+	"one note is its own span",
+	"#amk 2\n#0 o4 c4 r4 d4 e4",
+	0,
+	(bar) => ({ items: [noteAt(bar, 1)], frame: bar.frames[0], origin: 0 }),
+	{ tick: 96, ticks: 48 },
+);
+
+// A body's items are frame-local, so the pass the press landed on is the whole
+// difference between sounding the loop where it is and sounding it where it
+// first played. `origin` is what carries them, exactly as `soundDrag` does it.
+expectSpan(
+	"a body's notes at the pass they were grabbed on",
+	"#amk 2\n#0 o4 e4 r4 (1)[c4 d4]2",
+	0,
+	(bar) => {
+		const frame = bodyFrame(bar);
+		return { items: notesOfFrame(bar, frame), frame, origin: frame.runs[0].passes[1].tick };
+	},
+	{ tick: 192, ticks: 96 },
+);
+
+expectSpan(
+	"and at the first pass",
+	"#amk 2\n#0 o4 e4 r4 (1)[c4 d4]2",
+	0,
+	(bar) => {
+		const frame = bodyFrame(bar);
+		return { items: notesOfFrame(bar, frame), frame, origin: frame.runs[0].passes[0].tick };
+	},
+	{ tick: 96, ticks: 96 },
+);
+
+// A selection crossing a bracket refuses the drag outright, so the ticks the
+// gesture cannot reach are not ticks to sound: the frame is what decides, and an
+// index outside it contributes nothing rather than stretching the span over the
+// whole loop.
+expectSpan(
+	"a note outside the frame is left out",
+	"#amk 2\n#0 o4 e4 r4 (1)[c4 d4]2",
+	0,
+	(bar) => ({
+		items: [noteAt(bar, 0), ...notesOfFrame(bar, bodyFrame(bar))],
+		frame: bar.frames[0],
+		origin: 0,
+	}),
+	{ tick: 0, ticks: 48 },
+);
+
+expectSpan(
+	"and a selection naming none of the frame's notes has no span",
+	"#amk 2\n#0 o4 e4 r4 (1)[c4 d4]2",
+	0,
+	(bar) => ({ items: notesOfFrame(bar, bodyFrame(bar)), frame: bar.frames[0], origin: 0 }),
+	null,
 );
 
 console.log("\npast the end of the song");

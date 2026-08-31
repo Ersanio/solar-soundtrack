@@ -511,6 +511,37 @@ function resolved(
 }
 
 /**
+ * The song ticks the selected notes of a frame cover, or `null` where the
+ * selection names none of them.
+ *
+ * Frame-local and then carried into the grabbed pass by `origin`, for the same
+ * reason `soundDrag` works that way: a looped note's `instances` are every pass
+ * it plays, which is the whole song rather than the stretch under the pointer.
+ * Notes the selection holds in other frames are left out — `planGesture`
+ * refuses a drag that crosses a bracket, so ticks the gesture cannot touch are
+ * not ticks to sound.
+ */
+export function selectionSpan(
+  strip: Strip,
+  frame: StripFrame,
+  chosen: ReadonlySet<number>,
+  origin: number,
+): { tick: number; ticks: number } | null {
+  let low = Number.POSITIVE_INFINITY;
+  let high = 0;
+  for (const note of placedNotes(strip, frame)) {
+    if (!chosen.has(note.from)) {
+      continue;
+    }
+
+    low = Math.min(low, note.startTick);
+    high = Math.max(high, note.startTick + note.ticks);
+  }
+
+  return low === Number.POSITIVE_INFINITY ? null : { tick: origin + low, ticks: high - low };
+}
+
+/**
  * A gesture answered inside one frame, guarded by what that frame holds.
  *
  * `frame` defaults to the root, which is the whole story on a channel with no

@@ -15,6 +15,7 @@ no channel.
 | Press on empty grid                        | Draws a note there and keeps it under the pointer until you let go                                           |
 | Click on empty grid                        | Draws the note and leaves it there                                                                           |
 | Drag the middle of a note                  | Moves it a snap step at a time, one row per semitone up and down                                             |
+| Drag a selected group of notes             | Moves them together, and plays the stretch of song they cover                                                |
 | Drag a note's left or right edge           | Stretches that end; the other end stays put                                                                  |
 | Click a loop box's edge                    | Selects the loop's whole group of notes, closes its outline up, plays that pass, and shows the loop's number |
 | Drag a loop box's top or bottom sideways   | Moves that pass along the song: rests open in front of it, splitting the recall where the grab was mid-run   |
@@ -470,7 +471,10 @@ the tick the pass starts at and then simply let go, so every channel the mixer a
 every command that runs in between runs. Clicking a **note** of the pass sounds that note, under the
 tick it is on: the two passes of `@0 (1)[c4 d4]2 @17 (1)2` sound under `@0` and `@17` respectively —
 the note's byte is fixed when the text is compiled, and everything else about it is a fact about the
-pass. A box drawn with `Ctrl` over any stretch of the roll plays that stretch the same way.
+pass. A box drawn with `Ctrl` over any stretch of the roll plays that stretch the same way, and so
+does picking a group of notes up: the moment the drag starts, the ticks the selection covers sound
+as the song has them. A group is not one note, so nothing sounds again as you move it across the
+rows — a click on one of its notes, which is a press that never moved, is still that one note.
 
 **A labelled loop shows its number.** While its group is selected, each of its boxes carries the
 `(n)` the loop is written with, in the top-left corner. `(1)[a1]5` and its `(1)2` recall both show

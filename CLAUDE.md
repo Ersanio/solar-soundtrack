@@ -1120,6 +1120,19 @@ stats.loopTicks` pads **every other channel that would cut the song short** out 
   change says nothing about it. Not a narrowing of `leadsAUnit` instead — the `o` can be written on
   either side of the `@`, so the leading scan would have to know it was on a drum before it found
   the `@`, and `unitSpan`'s boundaries are where every insertion in `roll-write.ts` is anchored.
+- **Sounding a selection drag as the grabbed note, row by row** — `soundDrag` reads
+  `items[held.item]`, so ten notes carried at once played one of them, picked by where the pointer
+  happened to land and at a pitch the other nine were not at, and played it again on every row
+  crossed. What is being dragged is a stretch of the song, so it is heard the way the marquee that
+  selected it already plays it: `selectionSpan` over the frame's selected notes, and `auditionSpan`
+  once. At the **slop transition** rather than at the press, since a press that never moves is a
+  click and a click on a note sounds that note; the press's own `soundRow` is left to be superseded
+  rather than skipped, `Audition.stop` bumping the token so its render is dropped instead of played
+  under the span. Silent per row after that, for the reason `transpose` already is — a set of notes
+  is no more one note than a body is. And frame-local, carried into the grabbed pass by
+  `held.origin`, rather than read off `item.instances`: those are every pass a looped note plays,
+  which is the whole song and not the stretch under the pointer. Notes the selection holds in
+  another frame are left out, `planGesture` refusing that drag outright.
 - **Rewriting every `<` and `>` into the absolute `o` it produced** — `writeDefaults` did it so that
   the roll never had to read one, and the roll never needed it: a note's row is its own `written`
   byte (`octaveOfNote`), no unit swallows a shift, and `rolltest` has pinned `o4 c4 > d4` editable
