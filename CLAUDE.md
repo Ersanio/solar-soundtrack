@@ -1049,6 +1049,27 @@ stats.loopTicks` pads **every other channel that would cut the song short** out 
   `openGap`'s split reads the same field instead of scanning for a `)` of its own. Only the channel
   being edited has a selection to show one for, and it is `editChannel` and not `editing`, or a label
   would appear because the pointer wandered over another channel's bar.
+- **A handle of its own for the loop's transpose**, beside the rule that slides the pass — the box's
+  stroke is nine pixels and its ends are already spoken for, so a third zone on it would be a target
+  nobody could hit, and one drawn outside the box would be a second thing to find before the obvious
+  thing worked. The **axis** says which of the two a press is, the way `Shift` already picks an axis
+  for a note drag: sideways slides, up or down transposes. Latched where `Drag.axis` is and read
+  never again — a press that re-decided on every move would swap one edit for the other under the
+  hand, which is the same complaint that entry already answers. The refusals do not carry across:
+  a `'transpose'` holds `Drag.loop` and reads none of it, since a nested body that has no song-time
+  position to slide transposes like any other.
+- **`keysBetween` for that drag's semitones**, as a note drag uses it — it answers 0 wherever either
+  row is a drum or the noise lane, and a body that plays percussion has its box's rules up there, so
+  the gesture never started at all on the songs most likely to want it. It is the **rows** travelled,
+  a row of the keyboard being a semitone, which is what `keysBetween` computes anyway wherever both
+  ends are keys. And the gesture sounds nothing while it is held: the drag carries a whole body's
+  notes, which is no more one note than the construct a slide carries is.
+- **A `selected` flag on `LoopRegionBox`** for the solid outline — the box list is built on the mark
+  window's cadence and a selection changes on every click, which is the argument that kept the label
+  off it too. `RollLoops` takes the body set as a second input and the template asks it per box, as
+  `RollNotes` asks its own `selected` per mark. By **body** and not by the edited channel, unlike the
+  label: the group is one text, so a recall on another channel goes solid with its declaration, which
+  is what the rings on those notes already do.
 
 ## Angular specifics
 

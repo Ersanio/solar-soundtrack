@@ -101,7 +101,7 @@ function edgesOf(
 
 /**
  * Which end of a loop box a press landed on, or `null` for its top and bottom
- * rules, which are the pass's own handle.
+ * rules, which are the construct's own handle.
  *
  * Measured against the box **as drawn** — `data-ticks`, not the run's length,
  * which `buildLoopRegions` clips where the song ends inside a pass. The stroke
@@ -187,7 +187,7 @@ export interface GestureSinks {
 
 /** What the pointer is doing between down and up. */
 interface Drag {
-  kind: 'move' | 'stretch' | 'spawn' | 'marquee' | 'erase' | 'gap' | 'resize';
+  kind: 'move' | 'stretch' | 'spawn' | 'marquee' | 'erase' | 'gap' | 'resize' | 'transpose';
   /** Where it started, in ticks and rows. */
   fromTick: number;
   fromRow: number;
@@ -224,6 +224,12 @@ interface Drag {
    * The axis the press first moved along, in pixels: latched where the slop
    * test passes and never re-derived, so a near-diagonal drag cannot flip a
    * `Shift` lock mid-gesture. `null` until the press has really moved.
+   *
+   * It settles a loop box's rule as well as a `Shift` lock: sideways the pass
+   * slides along the song, up or down the body transposes, and the press is
+   * neither until the pointer has said which. Latched for the same reason —
+   * a gesture that changed what it was every time the pointer wandered off the
+   * diagonal would be undoing and redoing two different edits under the hand.
    */
   axis: 'x' | 'y' | null;
   /**
@@ -238,11 +244,15 @@ interface Drag {
   frame: number;
   /**
    * What a press on a loop box's edge resolved, and `null` on every other
-   * press. Both kinds it can become read the same construct, run and pass: a
+   * press. The two kinds that read it take the same construct, run and pass: a
    * `'gap'` moves that pass occurrence in song time, opening or closing a gap of
    * rests at the boundary before it, where a `'resize'` changes the body's own
    * length at the end that was grabbed. The press itself selects the body's
    * whole group and plays it, and a click keeps that as its answer.
+   *
+   * A `'transpose'` carries it and reads none of it: what it changes is the
+   * body's pitches, which no pass position and no rest space has a say in — a
+   * nested construct that cannot slide anywhere transposes like any other.
    */
   loop: {
     /** The run whose pass was grabbed — its channel is the one voice that slides. */
@@ -288,7 +298,8 @@ interface Hover {
   onMark: boolean;
   /**
    * Over a loop box's edge, and which part of it: an end resizes the body,
-   * `'slide'` — the top and bottom rules — moves the pass along the song.
+   * `'slide'` — the top and bottom rules — moves the pass along the song
+   * sideways and transposes the body up and down.
    */
   edge: 'start' | 'end' | 'slide' | null;
   /** `Ctrl` is down, so a press would draw a box rather than a note. */
@@ -340,11 +351,13 @@ export interface RollGestures {
   selection: Signal<ReadonlySet<number>>;
   /**
    * The loop bodies every note of whose group is selected, by body address.
+   * What draws a box's outline solid rather than dashed, and what puts the
+   * loop's own name in its corner.
    *
    * Read off the selection rather than latched where an edge press set it: a
    * group is as selected when a marquee or `Ctrl+A` caught all of it as when it
-   * was taken by its own box, and a label that only appeared one of those ways
-   * would be saying something about the gesture rather than about the song.
+   * was taken by its own box, and an outline that only closed up one of those
+   * ways would be saying something about the gesture rather than about the song.
    */
   selectedBodies: Signal<ReadonlySet<number>>;
   /** What to draw over the song right now, or `null` when nothing is happening. */
@@ -528,6 +541,26 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
         written: pitch.written,
         drum: pitch.drum,
       };
+    }
+
+    // A group taken by its own box transposes as one, and its notes are the
+    // selection the press put there. The travel is read in **rows**, a row of
+    // the keyboard being a semitone — not `keysBetween`, which answers 0
+    // wherever either row is a drum or the noise lane, and a body that plays
+    // percussion has its box's rules up there. `held.item` is the construct,
+    // which is a note of the channel the loop is written on and not one of the
+    // body's, so the branches below have nothing to say about this.
+    if (held.kind === 'transpose') {
+      const group = [...selection()];
+      return group.length === 0
+        ? null
+        : {
+            kind: 'move',
+            items: group,
+            deltaTicks: 0,
+            deltaKeys: held.fromRow - held.row,
+            copy: false,
+          };
     }
 
     const items = selection().has(held.item) ? [...selection()] : [held.item];
@@ -892,6 +925,22 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
       };
     }
 
+    // A transposed group moves no note in time, so the readout is the interval
+    // every one of them takes rather than a tick or a length. It follows the
+    // pointer, a body having no one row of its own to sit on.
+    if (held?.kind === 'transpose') {
+      const keys = held.fromRow - held.row;
+      if (keys === 0) {
+        return null;
+      }
+
+      return {
+        text: `${keys > 0 ? '+' : ''}${keys} ${Math.abs(keys) === 1 ? 'semitone' : 'semitones'}`,
+        x: held.tick * sources.zoom(),
+        y: held.row * sources.rowHeight(),
+      };
+    }
+
     // A resize's is the body's new length, which is what every pass of it takes,
     // read at the end being pulled.
     const resized = resizedFrame();
@@ -952,7 +1001,7 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
       // stretch says rather than what a draw does.
       return held.kind === 'stretch' || held.kind === 'resize' || held.anchored
         ? 'ew-resize'
-        : held.kind === 'move' || held.kind === 'gap'
+        : held.kind === 'move' || held.kind === 'gap' || held.kind === 'transpose'
           ? 'grabbing'
           : 'crosshair';
     }
@@ -962,8 +1011,9 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
       return 'default';
     }
 
-    // A loop box's top and bottom rules are the construct's handle, and say so
-    // the way a bar's middle does; its ends resize the loop, as a bar's do.
+    // A loop box's top and bottom rules are the whole construct's handle — it
+    // moves in both axes, so they say what a bar's middle says; its ends resize
+    // the loop, as a bar's do.
     if (at.edge !== null) {
       return at.edge === 'slide' ? 'grab' : 'ew-resize';
     }
@@ -1181,10 +1231,11 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
 
       // A loop box's edge is the construct's handle: a press names the channel,
       // selects the body's whole group — that group and nothing else — and plays
-      // the pass it landed on. Keeping hold then drags the grabbed pass along
-      // the song from the top and bottom rules, or resizes the loop from either
-      // end. Before the strip guard, because the edge may be another channel's
-      // and naming it is what makes that channel's strip the one to read.
+      // the pass it landed on. Keeping hold then resizes the loop from either
+      // end, or, from the top and bottom rules, drags the grabbed pass along the
+      // song sideways and transposes the whole body up and down. Before the
+      // strip guard, because the edge may be another channel's and naming it is
+      // what makes that channel's strip the one to read.
       const handle =
         event.button === 0 ? (event.target as Element | null)?.closest('.loop-edge') : null;
       if (handle) {
@@ -1498,20 +1549,27 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
         }
       }
 
+      const axis =
+        held.axis ??
+        (moved
+          ? Math.abs(event.clientX - held.atX) >= Math.abs(event.clientY - held.atY)
+            ? 'x'
+            : 'y'
+          : null);
       const next: Drag = {
         ...held,
+        // A press on a loop box's top or bottom rule is not yet either of the
+        // things it can be, and the axis is what says which: sideways it slides
+        // the grabbed pass along the song, up or down it transposes the whole
+        // body. Settled once, where the axis latches, so a drag that wanders off
+        // the diagonal keeps the edit it started.
+        kind: held.kind === 'gap' && axis === 'y' ? 'transpose' : held.kind,
         tick,
         row,
         moved,
         fine: event.altKey,
         shift: event.shiftKey,
-        axis:
-          held.axis ??
-          (moved
-            ? Math.abs(event.clientX - held.atX) >= Math.abs(event.clientY - held.atY)
-              ? 'x'
-              : 'y'
-            : null),
+        axis,
       };
       if (held.kind === 'erase') {
         drag.set(next);
@@ -1525,13 +1583,15 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
 
       // A drag sounds the note again each time it changes row, and never more
       // often than that: one render is a whole silent run of the song. An edge
-      // drag carries a construct, which is nothing one note could sound.
+      // drag carries a construct, which is nothing one note could sound — and a
+      // transposed body is a whole set of them, which is no more one note.
       if (
         row !== held.sounded &&
         held.kind !== 'marquee' &&
         held.kind !== 'stretch' &&
         held.kind !== 'gap' &&
-        held.kind !== 'resize'
+        held.kind !== 'resize' &&
+        held.kind !== 'transpose'
       ) {
         next.sounded = row;
         soundDrag(next, row);
@@ -1562,9 +1622,11 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
         return;
       }
 
-      // The edge drags land here: the click's whole job was done at the press —
-      // the group is the selection and the pass has sounded — and a drag writes
-      // what it held, through the same clamp the preview showed.
+      // The two edge drags that write the construct itself land here: the
+      // click's whole job was done at the press — the group is the selection and
+      // the pass has sounded — and a drag writes what it held, through the same
+      // clamp the preview showed. A transpose is an ordinary plan over the
+      // body's notes and goes out through `finish` with the rest.
       if (held.kind === 'gap' || held.kind === 'resize') {
         const delta = held.kind === 'gap' ? gapDelta() : resizeDelta();
         const clamped = held.kind === 'resize' ? refusal() : null;
@@ -1651,8 +1713,9 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
 
     stepLength(direction: number, fine: boolean): boolean {
       const held = drag();
-      // An edge press has no one note the wheel could be sizing.
-      if (!held || held.kind === 'gap' || held.kind === 'resize') {
+      // An edge press has no one note the wheel could be sizing, whichever of
+      // the three things it has become.
+      if (!held || held.kind === 'gap' || held.kind === 'resize' || held.kind === 'transpose') {
         return false;
       }
 

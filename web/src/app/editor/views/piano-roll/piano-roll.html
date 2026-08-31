@@ -156,6 +156,7 @@
           <g
             amk-roll-loops
             [regions]="loopRegions()"
+            [selected]="gestures.selectedBodies()"
             [attr.opacity]="gestures.shiftDelta() !== 0 ? 0.3 : null"
           />
           <g

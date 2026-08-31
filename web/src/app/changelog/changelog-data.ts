@@ -9,6 +9,13 @@ export interface ChangelogEntry {
 export const CHANGELOG: readonly ChangelogEntry[] = [
   // ─── newest first; add new blocks here ──────────────────────────────────
   {
+    date: '31 August 2026',
+    items: [
+      "Drag a loop box's top or bottom up or down to transpose the whole loop",
+      "A selected loop's boxes are outlined solid",
+    ],
+  },
+  {
     date: '30 August 2026',
     items: [
       'Loops are drawn in the piano roll: a dashed box around the written loop, a dotted one around every repeat, tinted in the channel colour',
