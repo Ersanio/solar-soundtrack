@@ -401,6 +401,27 @@ and the definition is left exactly where it was written.
 
 ## Loops
 
+**Select the notes you want repeated and press `Loop` in the command palette.** The brackets go
+round the whole run from the first selected note to the last, everything in between included, and
+the loop opens playing twice with its repeat count left selected — the inspector's **Repeats** field
+is beside it, so the number is one drag or one keystroke away. Nothing between the brackets is
+rewritten: the notes, the rests and every `v`, `y` and `@` among them stay exactly as they were.
+
+The palette lives in the pane beside the roll, under **Add a command**, and it opens on whatever
+note you last clicked — so a marquee, `Ctrl+A` and a press on a loop box's edge each put the caret on
+the first note they select, and the palette follows. With nothing selected the two bracket buttons
+are greyed, and the line under them says so.
+
+A fresh loop is **named with the lowest number the song is not already using**, counting from 0, so
+it can be recalled later with `(0)3` — and a `(!1)` remote definition counts as using `(0)`, since
+AddmusicK files the two in one slot. Press `Loop` **inside a loop** and you get a subloop instead:
+AddmusicK holds one `[ ]` and one `[[ ]]` at a time, in either order, and the readout says which of
+the two the button is about to write. Both spent, and the button is greyed with the reason.
+
+Two selections it will not wrap, each said in words: one with notes on both sides of a bracket, and
+one that reaches across a channel. The intro `/` cannot go inside a loop either, and neither can
+music written through a `"name=value"` replacement.
+
 A loop is one run of text the driver plays many times, and the roll draws it that way: **every pass
 is on screen**, each as a box around the rows its notes span, washed in the channel's own colour.
 The pass standing where the text is — the `[ ]` itself — wears a **dashed** edge and the solider

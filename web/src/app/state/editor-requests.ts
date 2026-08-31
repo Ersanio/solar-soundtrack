@@ -174,6 +174,21 @@ export class EditorRequests {
   readonly inspecting = signal<{ address: number; tick: number } | null>(null);
 
   /**
+   * The run of text the piano roll's note selection covers, or `null` for none.
+   *
+   * The roll's own selection is a set of indices into a channel's strip, which
+   * nothing outside the roll has any business knowing about; this is that
+   * selection said in the one currency every panel already speaks. The command
+   * palette in the inspector reads it to know what a loop's brackets would go
+   * round — a marquee over forty bars is a run the caret cannot describe.
+   *
+   * Beside {@link inspecting} because it is the same channel: the roll saying
+   * what the porter has hold of. It travels with the roll, so it goes back to
+   * `null` when the roll does.
+   */
+  readonly selectedRun = signal<{ start: number; end: number } | null>(null);
+
+  /**
    * The caret the inspector's question was withdrawn at, or `null` for none.
    *
    * The roll's `Escape` lets a note go, and the panel that was answering about

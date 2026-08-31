@@ -28,6 +28,7 @@ import {
   formAvailability,
 } from '@amk/tokens/commands/availability';
 import type { CommandGlyph } from './command-icon';
+import type { WrapKind, WrapVerdict } from './loop-wrap';
 
 export type Category = 'notes' | 'volume' | 'pitch' | 'instrument' | 'echo' | 'loops' | 'misc';
 
@@ -103,11 +104,32 @@ interface HexEntry extends Described {
   id?: string;
 }
 
-interface LetterEntry extends Described {
+/**
+ * An entry that puts brackets round the notes the porter picked out rather than
+ * dropping its snippet at a point. `loop-wrap.ts` is what it writes and why.
+ *
+ * {@link LetterEntry.snippet} stays the standalone spelling — it is what
+ * `palettetest` compiles the entry as, and it is the same construct a wrap
+ * writes with its body left out.
+ */
+interface Wrapping {
+  wraps?: WrapKind;
+}
+
+interface LetterEntry extends Described, Wrapping {
   kind: 'letter';
   /** The letter, which is also its key into `LETTER_NAMES` and `LETTER_PARAMS`. */
   id: string;
   snippet: string;
+  /**
+   * A name for the button, where `LETTER_NAMES`' is not one — as
+   * {@link HexEntry.label} is for a byte.
+   *
+   * `[` is the only one. It writes both brackets, so "loop start" names half of
+   * what the button does, and there is no `]` button beside it for the other
+   * half to belong to.
+   */
+  label?: string;
   /**
    * The VCMD this spelling compiles to, where it compiles to one.
    *
@@ -120,7 +142,7 @@ interface LetterEntry extends Described {
   writes?: number;
 }
 
-interface SyntaxEntry extends Described {
+interface SyntaxEntry extends Described, Wrapping {
   kind: 'syntax';
   id: string;
   /** As {@link LetterEntry.writes}. */
@@ -166,7 +188,7 @@ const hex = (
 const letter = (
   id: string,
   snippet: string,
-  rest: Described & { writes?: number },
+  rest: Described & { writes?: number; wraps?: WrapKind; label?: string },
 ): LetterEntry => ({
   kind: 'letter',
   id,
@@ -429,27 +451,30 @@ export const ENTRIES: readonly Entry[] = [
   }),
 
   // ─── Loops ──────────────────────────────────────────────────────────────
-  // `[` writes the pair. A lone bracket is a compile error the moment it lands,
-  // and the point of the defaults is that the song keeps compiling as you type.
+  // The two bracket forms go round the notes the porter picked out rather than
+  // landing at a point, so both are greyed until something is selected, and `*`
+  // still inserts, having no run to wrap.
+  //
+  // There is no `]` button. A wrap writes both brackets, so a lone closing one
+  // has nothing left to close: it was there to finish a `[` dropped at the caret,
+  // which is not a thing the palette does any more.
   letter('[', '[ ]4', {
     category: 'loops',
     writes: 0xe9,
+    wraps: 'loop',
+    label: 'loop',
     icon: 'repeatStart',
-    blurb: 'Opens a section that plays a set number of times.',
-  }),
-  letter(']', ']4', {
-    category: 'loops',
-    icon: 'repeatEnd',
-    blurb: 'Closes a repeated section and says how many times it plays.',
+    blurb: 'Repeats the notes you have selected.',
   }),
   {
     kind: 'syntax',
     category: 'loops',
     id: '[[',
     writes: 0xe6,
+    wraps: 'subloop',
     icon: 'repeatNested',
     label: 'subloop',
-    blurb: 'A repeat inside a repeat, for a figure that recurs within a longer phrase.',
+    blurb: 'Repeats the selected notes inside a repeat that is already running.',
     snippet: '[[ ]]2',
     syntax: null,
   },
@@ -557,6 +582,19 @@ export interface ResolvedEntry {
   caveat?: string;
   /** Where in the song this is legal, which is `'anywhere'` for all but two. */
   where: 'anywhere' | 'before-channels' | 'channel';
+  /** Which construct this entry asks for, for the two that wrap a selection. */
+  wraps?: WrapKind;
+  /**
+   * What a click would put round the selection, or why it cannot - `undefined`
+   * for every entry that does not wrap, and for a caller that supplied no
+   * selection at all.
+   *
+   * Deliberately not folded into {@link availability}, which answers to
+   * AddmusicK: "nothing is selected" is the palette's own condition and no
+   * compile of the snippet could confirm or refute it. `entryBlocked` is where
+   * the two meet.
+   */
+  wrap?: WrapVerdict;
 }
 
 /**
@@ -567,6 +605,14 @@ export interface ResolvedEntry {
  */
 export interface CaretPlace {
   beforeChannels: boolean;
+  /**
+   * What the two bracket forms would write round what is selected now.
+   *
+   * Both answers rather than one, because which of the two a click lands on is
+   * decided by where the run is: asked for a loop inside a loop, `loop-wrap.ts`
+   * offers the subloop. Absent where the caller has no selection to offer.
+   */
+  wrap?: { loop: WrapVerdict; subloop: WrapVerdict };
 }
 
 /** The position rule, which stacks on top of the dialect one. */
@@ -662,9 +708,10 @@ export function resolveEntry(
         ? (placeAvailability(entry, place) ?? reached)
         : reached;
     const label = capitalise(
-      entry.kind === 'syntax' ? entry.label : (LETTER_NAMES[entry.id] ?? entry.id),
+      entry.kind === 'syntax' ? entry.label : (entry.label ?? LETTER_NAMES[entry.id] ?? entry.id),
     );
     const text = swap?.text ?? entry.snippet;
+    const wrap = entry.wraps === undefined ? undefined : place.wrap?.[entry.wraps];
 
     return {
       key: `text:${entry.id}`,
@@ -672,11 +719,19 @@ export function resolveEntry(
       writes: entry.writes,
       icon: entry.icon,
       label,
-      blurb: entry.blurb,
+      // A loop asked for inside a loop comes back as the subloop, and the line
+      // under the strip is where that is said - the button keeps its name, as it
+      // does for the hex a dialect swaps a spelling for.
+      blurb:
+        wrap !== undefined && 'kind' in wrap && wrap.kind !== entry.wraps
+          ? INSTEAD[wrap.kind]
+          : entry.blurb,
       text,
       select: swap ? FIRST_HEX_ARG : firstNumberSpan(entry.snippet),
       availability,
       where: entry.kind === 'syntax' ? (entry.context ?? 'anywhere') : 'anywhere',
+      wraps: entry.wraps,
+      wrap,
     };
   }
 
@@ -703,6 +758,12 @@ export function resolveEntry(
     where: 'anywhere',
   };
 }
+
+/** What the readout says where a wrap lands on the other construct. */
+const INSTEAD: Readonly<Record<WrapKind, string>> = {
+  loop: 'Inside a subloop this makes an ordinary loop, which is what fits there.',
+  subloop: 'Inside a loop this makes a subloop - a repeat within the repeat.',
+};
 
 /** The two digits of a hex snippet's first argument: `$XX ` then its own `$`. */
 const FIRST_HEX_ARG: TextRange = { start: 5, end: 7 };

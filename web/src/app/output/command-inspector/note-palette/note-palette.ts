@@ -1,6 +1,7 @@
 import { Component, computed, effect, inject, input, signal } from '@angular/core';
 
 import type { Command } from '@amk/tokens';
+import { readLoops } from '@amk/tokens/commands/loops';
 import { channelsBeginAt, songTarget } from '@amk/tokens/dialect';
 import { insertAt } from '@amk/tokens/edits';
 import {
@@ -11,8 +12,19 @@ import {
   type ResolvedEntry,
   resolveEntry,
 } from '../../../editor/command-palette/catalog';
-import { chipClass, entryClass } from '../../../editor/command-palette/command-palette';
+import {
+  chipClass,
+  entryBlocked,
+  entryClass,
+  entryReadout,
+} from '../../../editor/command-palette/command-palette';
 import { CommandIcon } from '../../../editor/command-palette/command-icon';
+import {
+  isWrap,
+  wrapEdits,
+  wrapSelection,
+  wrapVerdict,
+} from '../../../editor/command-palette/loop-wrap';
 import { unitStartBefore } from '../../../editor/views/piano-roll/roll-strip';
 import { EditorRequests } from '../../../state/editor-requests';
 import { EditorStore } from '../../../state/editor-store';
@@ -50,7 +62,7 @@ export interface NotePaletteModel {
  */
 const MANY_EFFECTS = new Set([0xf4, 0xfa]);
 
-type Button = ResolvedEntry & { class: string; after: boolean };
+type Button = ResolvedEntry & { class: string; disabled: boolean; after: boolean };
 
 /**
  * The command palette, aimed at a note instead of the caret.
@@ -62,6 +74,10 @@ type Button = ResolvedEntry & { class: string; after: boolean };
  * read-ahead is what arms it. Buttons for commands the note already defines are
  * hidden rather than disabled: those are the chips above, and a second copy in
  * front of the same note is the duplicate this palette exists to refuse.
+ *
+ * The two bracket forms are the exception to all of that: they go round the run
+ * the roll's selection covers rather than landing beside one note, and with
+ * nothing selected they are greyed. See `loop-wrap.ts`.
  *
  * No `All` chip. One category is a row or two; the whole catalogue would be
  * most of the pane.
@@ -91,28 +107,39 @@ export class NotePalette {
     equal: (a, b) => a.program === b.program && a.amkVersion === b.amkVersion,
   });
 
+  /**
+   * What the two bracket forms would put round the notes the porter has picked
+   * out.
+   *
+   * The roll's own selection where there is one — it is the run of text a whole
+   * group of bars covers, which the document's caret cannot say — and the
+   * document's selection otherwise, which is what this panel answers to when it
+   * is open beside the MML rather than beside the roll.
+   */
+  private readonly wrap = computed(() => {
+    const source = this.store.source();
+    const index = this.store.tokens();
+    const reading = readLoops(source, index);
+    const picked = this.requests.selectedRun() ?? this.store.selection();
+    const run = picked.end > picked.start ? picked : null;
+    const ask = (want: 'loop' | 'subloop') => wrapVerdict({ source, index, reading, run, want });
+
+    return { loop: ask('loop'), subloop: ask('subloop') };
+  });
+
   /** Whether the note sits above the first `#0`-`#7`, which two entries turn on. */
   private readonly place = computed<CaretPlace>(() => {
     const first = channelsBeginAt(this.store.tokens());
-    return { beforeChannels: first === null || this.note().span.start <= first };
+    return {
+      beforeChannels: first === null || this.note().span.start <= first,
+      wrap: this.wrap(),
+    };
   });
 
   protected readonly hovered = signal<ResolvedEntry | null>(null);
 
   /** What the line under the buttons says right now — the palette's readout. */
-  protected readonly readout = computed(() => {
-    const entry = this.hovered();
-    if (!entry) {
-      return null;
-    }
-
-    const said = entry.availability.reason ?? entry.blurb;
-    return {
-      label: entry.label,
-      text: entry.caveat ? `${said} ${entry.caveat}` : said,
-      muted: entry.availability.state === 'ok' && entry.caveat === undefined,
-    };
-  });
+  protected readonly readout = computed(() => entryReadout(this.hovered()));
 
   protected readonly chips = computed(() => {
     const filter = this.filter();
@@ -140,7 +167,14 @@ export class NotePalette {
 
       return hidden
         ? []
-        : [{ ...resolved, class: entryClass(resolved), after: resolved.vcmd === 0xdd }];
+        : [
+            {
+              ...resolved,
+              class: entryClass(resolved),
+              disabled: entryBlocked(resolved),
+              after: resolved.vcmd === 0xdd,
+            },
+          ];
     });
   });
 
@@ -156,6 +190,11 @@ export class NotePalette {
    * value can be typed or slid at once, as the source palette leaves it.
    */
   protected insert(button: Button): void {
+    if (button.wrap !== undefined && isWrap(button.wrap)) {
+      this.requests.applyAll(wrapEdits(button.wrap), wrapSelection(button.wrap));
+      return;
+    }
+
     const source = this.store.source();
     const note = this.note();
     const { start: at, line } = button.after

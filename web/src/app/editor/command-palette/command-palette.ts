@@ -1,5 +1,6 @@
 import { Component, computed, effect, inject, signal } from '@angular/core';
 
+import { readLoops } from '@amk/tokens/commands/loops';
 import { channelsBeginAt, hasDialectMarker, songTarget } from '@amk/tokens/dialect';
 import { EditorRequests } from '../../state/editor-requests';
 import { EditorStore } from '../../state/editor-store';
@@ -12,6 +13,7 @@ import {
   resolveEntry,
 } from './catalog';
 import { CommandIcon } from './command-icon';
+import { isWrap, wrapEdits, wrapSelection, wrapVerdict } from './loop-wrap';
 import { readStored, writeStored } from '../../util/storage';
 
 type Filter = Category | 'all';
@@ -49,7 +51,7 @@ export function chipClass(selected: boolean): string {
 export function entryClass(entry: ResolvedEntry): string {
   const base =
     'border-edge inline-flex cursor-pointer items-center gap-1.5 rounded-md border px-2 py-1 text-xs whitespace-nowrap transition-colors disabled:cursor-not-allowed disabled:opacity-40';
-  if (entry.availability.state === 'blocked') {
+  if (entryBlocked(entry)) {
     return `${base} text-ink-muted`;
   }
 
@@ -59,12 +61,56 @@ export function entryClass(entry: ResolvedEntry): string {
 }
 
 /**
+ * Whether the button is dead, from either of the two conditions that kill it.
+ *
+ * `availability` is AddmusicK's opinion of the command; `wrap` is the palette's
+ * own — there is nothing selected for the brackets to go round, or the two
+ * levels are already spent. Both grey the button and neither speaks for the
+ * other, so the test is here rather than in `resolveEntry`.
+ */
+export function entryBlocked(entry: ResolvedEntry): boolean {
+  if (entry.availability.state === 'blocked') {
+    return true;
+  }
+
+  return entry.wraps !== undefined && (entry.wrap === undefined || !isWrap(entry.wrap));
+}
+
+/**
+ * The line under the strip: what a command is called, and what it does — or, for
+ * a button that is dead, why.
+ *
+ * Shared with the note palette rather than written twice: the two strips differ
+ * in where a click writes and in nothing else a reader can see.
+ */
+export function entryReadout(
+  entry: ResolvedEntry | null,
+): { label: string; text: string; muted: boolean } | null {
+  if (!entry) {
+    return null;
+  }
+
+  const refused = entry.wrap !== undefined && !isWrap(entry.wrap) ? entry.wrap.refused : null;
+  // The reason a button is greyed out matters more than what it would have
+  // done, so it replaces the blurb rather than following it. A caveat is the
+  // other way round: the command still does what the blurb says.
+  const said = entry.availability.reason ?? refused ?? entry.blurb;
+  return {
+    label: entry.label,
+    text: entry.caveat ? `${said} ${entry.caveat}` : said,
+    muted: entry.availability.state === 'ok' && entry.caveat === undefined && refused === null,
+  };
+}
+
+/**
  * The command palette: every hex and letter command, one click from the caret.
  *
  * It sits above the editor rather than beside it because what it writes lands at
- * the caret. Two things decide what it offers there: the song's dialect, which
- * is the whole file's, and whether the caret is above the first channel, which
- * only the two remote forms care about.
+ * the caret. Three things decide what it offers there: the song's dialect, which
+ * is the whole file's; whether the caret is above the first channel, which only
+ * the two remote forms care about; and what the selection covers, which only the
+ * two bracket forms do — they go round a run of music rather than landing at a
+ * point, so a bare caret leaves them greyed. See `loop-wrap.ts`.
  *
  * Inserting is deliberately only half the job. The defaults are chosen to be
  * sane, not right, and the command inspector in the output pane picks the new
@@ -110,10 +156,31 @@ export class CommandPalette {
     equal: (a, b) => a.program === b.program && a.amkVersion === b.amkVersion,
   });
 
+  /**
+   * What the two bracket forms would put round the text that is selected now.
+   *
+   * The document's own selection is what a porter picks notes out with here, and
+   * a bare caret covers none — so the buttons are dead until there is a run,
+   * which is the same rule the roll's palette follows.
+   */
+  private readonly wrap = computed(() => {
+    const source = this.store.source();
+    const index = this.store.tokens();
+    const reading = readLoops(source, index);
+    const run = this.store.selection();
+    const ask = (want: 'loop' | 'subloop') =>
+      wrapVerdict({ source, index, reading, run: run.end > run.start ? run : null, want });
+
+    return { loop: ask('loop'), subloop: ask('subloop') };
+  });
+
   /** Whether the caret is above the first `#0`-`#7`, which two entries turn on. */
   private readonly place = computed<CaretPlace>(() => {
     const first = channelsBeginAt(this.store.tokens());
-    return { beforeChannels: first === null || this.store.caret() <= first };
+    return {
+      beforeChannels: first === null || this.store.caret() <= first,
+      wrap: this.wrap(),
+    };
   });
 
   /** `#amk 4`, `#am4`, `#amm` — what the gating below is answering for. */
@@ -146,22 +213,7 @@ export class CommandPalette {
   protected readonly hovered = signal<ResolvedEntry | null>(null);
 
   /** What the line under the strip says right now. */
-  protected readonly readout = computed(() => {
-    const entry = this.hovered();
-    if (!entry) {
-      return null;
-    }
-
-    // The reason a button is greyed out matters more than what it would have
-    // done, so it replaces the blurb rather than following it. A caveat is the
-    // other way round: the command still does what the blurb says.
-    const said = entry.availability.reason ?? entry.blurb;
-    return {
-      label: entry.label,
-      text: entry.caveat ? `${said} ${entry.caveat}` : said,
-      muted: entry.availability.state === 'ok' && entry.caveat === undefined,
-    };
-  });
+  protected readonly readout = computed(() => entryReadout(this.hovered()));
 
   /**
    * The buttons, with their class resolved.
@@ -177,7 +229,7 @@ export class CommandPalette {
 
     return ENTRIES.filter((entry) => filter === 'all' || entry.category === filter).map((entry) => {
       const resolved = resolveEntry(entry, target, place);
-      return { ...resolved, class: entryClass(resolved) };
+      return { ...resolved, class: entryClass(resolved), disabled: entryBlocked(resolved) };
     });
   });
 
@@ -199,7 +251,17 @@ export class CommandPalette {
     effect(() => writeStored(FILTER_KEY, this.filter()));
   }
 
+  /**
+   * A bracket form goes round the selection as one splice at each end, so
+   * everything between them survives as written and the pair is one undo step;
+   * everything else lands at the caret.
+   */
   protected insert(entry: ResolvedEntry): void {
+    if (entry.wrap !== undefined && isWrap(entry.wrap)) {
+      this.requests.applyAll(wrapEdits(entry.wrap), wrapSelection(entry.wrap));
+      return;
+    }
+
     this.requests.insert(entry.text, entry.select);
   }
 }

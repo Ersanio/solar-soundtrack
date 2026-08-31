@@ -166,7 +166,9 @@ export class SourceView {
             }
 
             if (update.docChanged || update.selectionSet) {
-              this.store.caret.set(update.state.selection.main.head);
+              const main = update.state.selection.main;
+              this.store.caret.set(main.head);
+              this.store.selection.set({ start: main.from, end: main.to });
             }
 
             // Published rather than kept, so both toolbars' history buttons

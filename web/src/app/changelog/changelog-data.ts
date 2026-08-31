@@ -11,6 +11,9 @@ export const CHANGELOG: readonly ChangelogEntry[] = [
   {
     date: '31 August 2026',
     items: [
+      'Make a loop from the command palette: one Loop button that wraps the notes you have selected, and numbers itself',
+      'Asking for a loop inside a loop writes a subloop instead',
+      'A marquee or Ctrl+A now opens the note inspector on the first note it selects',
       'Normalize leaves < and > as written instead of turning them into o commands',
       'Editing a note in the piano roll no longer drops the octave written in front of it',
       "Drag a loop box's top or bottom up or down to transpose the whole loop",

@@ -62,6 +62,16 @@ export class EditorStore {
   readonly caret = signal(0);
 
   /**
+   * The document's own selection, ordered, written from the same update listener
+   * as {@link caret} — which is its head.
+   *
+   * A range as well as a point because the palette's two bracket forms go round
+   * a run of music rather than landing at a point, and an empty range is how the
+   * editor says there is nothing to put brackets round.
+   */
+  readonly selection = signal<{ start: number; end: number }>({ start: 0, end: 0 });
+
+  /**
    * The text the compiler last ran on. It lags `source` by the typing debounce,
    * which is why the two are separate signals: the editor stays responsive at
    * keystroke speed while compilation runs at most every {@link DEBOUNCE_MS}.

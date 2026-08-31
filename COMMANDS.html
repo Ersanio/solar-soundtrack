@@ -1057,7 +1057,10 @@
             <td class="c"><code>$E9 lo hi N</code></td>
             <td class="n">
               L 0–65534 (stored as L+1 so that label 0 works, <code>:1156</code>). Calling an
-              undefined label or redefining one is an error. <code>(L)[[</code> is an error.
+              undefined label or redefining one is an error. AMK0122 claims <code>(L)[[</code> is
+              one and never fires: its guard reads <code>text[pos - 2] == ')'</code> after both
+              brackets have been consumed (<code>:1217</code>), so that character is always the
+              first <code>[</code>, and <code>(5)[ c [[d]]4 ]</code> builds.
             </td>
             <td class="ok">native</td>
             <td class="ok">native</td>
@@ -1335,8 +1338,9 @@ instrToSample[30] = { 00 01 02 03 04 07 08 09 05 0A 0B 01 10 0C 0D 12 0C 11 01  
       <li>
         Nesting matrix: <code>[</code> in <code>[</code> — error; <code>[[</code> in
         <code>[[</code> — error; <code>[</code> in <code>[[</code> and <code>[[</code> in
-        <code>[</code> — allowed. A label loop may not define a subloop. Remote-code bodies may not
-        repeat.
+        <code>[</code> — allowed. So one of each is as deep as it goes, in either order. A subloop
+        inside a labelled loop is allowed as well — AMK0122 says otherwise and cannot fire, see
+        <code>(L)[ ]</code> above. Remote-code bodies may not repeat.
       </li>
       <li>
         Label <code>(L)</code> is stored at <code>loopPointers[L+1]</code>; an undefined label is

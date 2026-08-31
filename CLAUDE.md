@@ -1144,6 +1144,38 @@ stats.loopTicks` pads **every other channel that would cut the song short** out 
   since it moves the octave without saying what from; and `SST0610` is asked only of a block that
   says nothing about its octave at all, since an octave `o` cannot reach is one only a shift can
   have put the parser at, and refusing that song would turn away one AddmusicK builds.
+- **The loop wrap's refusal carried on `Availability`** — that field answers to AddmusicK, and
+  `palettetest` holds it to exactly that: a `blocked` entry has to come back from the compiler
+  unclean. "Nothing is selected" is the palette's own condition and the snippet compiles fine, so
+  every song would have failed the harness on a button that was correctly greyed. `ResolvedEntry`
+  carries the verdict beside `availability` and `entryBlocked` is where the two meet, in the mould of
+  `placeAvailability` being stacked on rather than folded in.
+- **Reading the brackets for that wrap off the walk, or off `ParseTrace`** — both answer the wrong
+  question. The walk says what _plays_, where a wrap asks what may be _written_, and the two part
+  company on the shape that matters: a `(1)n` recalled from another channel plays a body the text
+  there does not contain. The trace does answer it — `ParseState` carries `channel` and `inE6Loop`,
+  which are the parser's own two variables — but it is gathered only where `commandMap` is, and the
+  palette answers on every keystroke. `@amk/tokens/commands/loops` mirrors those two variables over
+  the token stream instead, which needs no compile at all; `[[` is told from `[` by adjacency because
+  that is the test `parseLoopStart` makes, and a hand-written `$E6 $00` pair counts as the subloop it
+  is, which is the reading `loopEventOf` already has to take.
+- **Starting a wrap's brackets at the first selected note** — honest about the selection and wrong
+  about the music. `[` copies the drum remap into slot 8 and the note there clears slot 8 alone
+  (`parser.ts:2725`, `:3013`), so a `@21` left outside the brackets is still standing when the loop
+  ends and hands the drum to the next note. The run reaches back over the note's own leading `o` and
+  `@` through `unitStartBefore`, which is the anchor every insertion in the roll already uses. It
+  reaches **forward** over a `$DD` for the mirror reason: the slide is read by the note in front of
+  it (`main.asm:L_10E4`), so a `]` written between the two puts the body's `$00` where the slide was.
+- **A repeat count on the loop box, or a wheel over its edge to step it** — the box's stroke is nine
+  pixels and already carries three gestures, and the count is one number in the text. A wrap leaves
+  it selected, which puts the command inspector on the loop's own `]n` with the **Repeats** field it
+  already has (`letter-params.ts`); an existing loop's count changes from that same field.
+- **The roll publishing its selection as strip indices** — an index means nothing outside the
+  component that built the strip, and the panel that wants it is in the output pane.
+  `EditorRequests.selectedRun` carries the **span** from the first selected item to the last, which
+  is the one currency every panel already speaks, and it is `null` where the two ends sit in
+  different frames — a bracket cannot straddle a `[ ]` body and the channel around it, which is
+  `REFUSE_SPLIT` reached by another route.
 
 ## Angular specifics
 

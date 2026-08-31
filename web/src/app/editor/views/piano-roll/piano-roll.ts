@@ -1055,8 +1055,62 @@ export class PianoRoll {
   /** The selected notes as spans, which is what the bars are outlined by. */
   protected readonly selectedSpans = computed(() => this.addressesOf(this.gestures.selection()));
 
+  /**
+   * The run of text the selection covers, for the command palette in the
+   * inspector to put a loop's brackets round.
+   *
+   * The span from the first selected item to the last, which is the stretch of
+   * music the porter picked out rather than only the bars they lit. One frame,
+   * because a `[ ]` body and the channel around it are two texts and a bracket
+   * cannot straddle them — `planEdits` refuses the same shape as `REFUSE_SPLIT`.
+   */
+  private readonly selectedRun = computed<{ start: number; end: number } | null>(() => {
+    const items = this.strip()?.items;
+    const chosen = [...this.gestures.selection()].sort((a, b) => a - b);
+    const first = items?.[chosen[0]];
+    const last = items?.[chosen[chosen.length - 1]];
+    if (!first || !last) {
+      return null;
+    }
+
+    return first.frame === last.frame
+      ? { start: first.unitSpan.start, end: last.unitSpan.end }
+      : null;
+  });
+
   /** The notes the preview has taken over, which the song's own bars leave out. */
   protected readonly movingSpans = computed(() => this.addressesOf(this.gestures.moving()));
+
+  /**
+   * Points the inspector at a note the selection holds, where it is not already
+   * answering about one of them.
+   *
+   * A click on a bar does this for itself (`roll-notes.ts:select`); a marquee,
+   * `Ctrl+A` and a press on a loop box's edge select without touching the caret,
+   * and the palette that puts brackets round a selection is in the panel that
+   * answers to it. Guarded on the inspected note being outside the selection so
+   * that `Ctrl`+clicking a second bar is not thrown back to the first.
+   */
+  private askAboutSelection(strip: Strip | null, chosen: readonly number[]): void {
+    const asked = this.requests.inspecting();
+    if (!strip || chosen.length === 0 || this.editor.compiledText() !== this.editor.source()) {
+      return;
+    }
+
+    const held = chosen.map((index) => strip.items[index]).filter((item) => item !== undefined);
+    if (asked !== null && held.some((item) => item.address === asked.address)) {
+      return;
+    }
+
+    const note = held.find((item) => item.kind === 'note');
+    const span = note && this.editor.notesByAddress().get(note.address)?.span;
+    if (!note || !span) {
+      return;
+    }
+
+    this.requests.inspecting.set({ address: note.address, tick: note.instances[0]?.tick ?? 0 });
+    this.requests.reveal.set({ span: { ...span }, show: false });
+  }
 
   // --- tooltip -------------------------------------------------------------
 
@@ -1131,6 +1185,23 @@ export class PianoRoll {
     // as they commit; this is for the ones typed in the source view.
     onChange(this.editor.source, () => this.gestures.clearSelection());
 
+    // Sanctioned effect: mirroring the selection into the mailbox, which is the
+    // roll's imperative sink for everything the panels beside it answer from.
+    // Two writes, because a selection has two things to say — the run a loop's
+    // brackets would go round, and, where nothing selected is being inspected,
+    // a note for the palette that writes them to open on. A marquee and
+    // `Ctrl+A` move no caret of their own, and a panel answering the caret would
+    // otherwise have nothing to show.
+    effect(() => {
+      const run = this.selectedRun();
+      const strip = this.strip();
+      const chosen = [...this.gestures.selection()].sort((a, b) => a - b);
+      untracked(() => {
+        this.requests.selectedRun.set(run);
+        this.askAboutSelection(strip, chosen);
+      });
+    });
+
     // Sanctioned effect: putting the vertical scroller back where the roll was
     // left. There is nothing to scroll until the pane has been measured and the
     // stack laid out, so it waits for a render that has both, and happens once.
@@ -1175,6 +1246,9 @@ export class PianoRoll {
     // never reports its release. Honour the gesture rather than stranding the
     // transport on a preview nothing will commit.
     this.destroyRef.onDestroy(() => {
+      // The selection goes with the roll — it is indices into a strip this
+      // component owns — so what it published goes with it too.
+      this.requests.selectedRun.set(null);
       this.stopPull();
       if (this.dragging()) {
         this.anchorPages();
