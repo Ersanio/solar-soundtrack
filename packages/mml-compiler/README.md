@@ -109,8 +109,9 @@ is known. Nothing is recorded unless asked for, and no byte changes either way.
 
 `normalize.ts` is what it exists for: eight text-to-text passes that leave a song with no
 `#define`, no replacement, no triplet, no `l`, no legacy `&`, one block per channel
-in channel order, `o`/`q`/`@`/`t` written where a channel left them implied, `<`/`>` made absolute
-and the drum `@` before every drum note — the shape an editor can splice. Loops stay exactly as
+in channel order, `o`/`q`/`@`/`t` written where a channel left them implied
+and the drum `@` before every drum note — the shape an editor can splice. `<` and `>` stay as
+written, the roll reading a note's octave off its own emitted byte. Loops stay exactly as
 written: a `[ ]`, a `(n)` or `*` recall and a `[[ ]]` subloop are shapes the piano roll edits in
 place, and the passes that rewrite inside a body work on the single parse the body gets, which is
 what keeps them byte-neutral there. The default note length is the one

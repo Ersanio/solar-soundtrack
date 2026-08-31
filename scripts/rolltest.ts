@@ -1047,6 +1047,22 @@ expectLoopEdit(
 	{ contains: "[c4 e4]2", playsFor: 240 },
 );
 
+// The same in a body written with shifts, where the note being repitched carries
+// its own leading `o` — the octave standing over it and the octave its unit says
+// are then the same number with a `<` between them, and dropping the `o` as
+// redundant hands the note to that `<`. Every pass moves, so the walk says it
+// five times over.
+expectLoopEdit(
+	"a body note repitched under a shift, with its own octave in front of it",
+	"#amk 2\n#0 (1)[o2 r64 > c+32 r64 < o3 c32 o2 r64 > c+32 < r64]5",
+	0,
+	(bar) => ({ kind: "move", items: [noteAt(bar, 1)], deltaTicks: 0, deltaKeys: 1, copy: false }),
+	// `$99` is o3 c+, which all three of the body's notes now are — the middle one
+	// on the row the porter dropped it on rather than an octave under it.
+	"3+6:$99 12+6:$99 21+6:$99 33+6:$99 42+6:$99 51+6:$99 63+6:$99 72+6:$99 81+6:$99 93+6:$99 102+6:$99 111+6:$99 123+6:$99 132+6:$99 141+6:$99",
+	{ contains: "< o3 c+32 o2" },
+);
+
 // Stretching a body note is the length change: the body grows, every pass
 // grows with it, and everything after the loop moves by passes times the delta.
 expectLoopEdit(
@@ -2315,6 +2331,34 @@ expectEdit(
 	{ contains: "o5 c4 o4" },
 );
 
+// A unit carrying its own leading `o` is the one shape where `item.octave` is
+// not what *enters* the unit — it is what that `o` put in force, and the rewrite
+// splices it away. So the two readings agree at 4 here while a `<` sits between
+// them, and dropping the `o` as redundant would hand `d+4` and `e4` both to the
+// shift. Only `played` sees it: the text reads perfectly either way.
+expectEdit(
+	"a repitch under a shift keeps the octave its unit carried",
+	"#amk 2\n#0 o4 c4 < o4 d4 e4",
+	0,
+	(bar) => ({ kind: "move", items: [noteAt(bar, 1)], deltaTicks: 0, deltaKeys: 1, copy: false }),
+	{ text: "#amk 2\n#0 o4 c4 < o4 d+4 e4" },
+);
+
+// The mirror of it on the other side of the unit. `exitOctaveFor` answers null
+// where the next note will set its own, which says the trailing `o` may go with
+// the rewrite — and there is no rewrite where the pitch and length are both
+// unchanged, so the `o3` stands and `running` must say 3 rather than `c4`'s own
+// 5. Reading it as 5 makes `d4`'s new octave the one already in force, so
+// `noteText` spells nothing, `spliceRange` finds the text already there, and the
+// drag commits nothing at all.
+expectEdit(
+	"a note dragged past the octave the note before it left standing",
+	"#amk 2\n#0 o5 c4 o3 r4 d4",
+	0,
+	(bar) => ({ kind: "move", items: [noteAt(bar, 1)], deltaTicks: 0, deltaKeys: 24, copy: false }),
+	{ text: "#amk 2\n#0 o5 c4 o3 r4 o5 d4 o3" },
+);
+
 expectEdit("a note dragged later, taking the time out of the rest after it", "#amk 2\n#0 o4 c4 r4 d4", 0, (bar) => ({
 	kind: "move",
 	items: [noteAt(bar, 1)],
@@ -2552,6 +2596,19 @@ expectEdit(
 	{ text: "#amk 2\n#0 o4 c4 > r8 o5 e8 r4 d4" },
 );
 
+// And `O` moves it too: the parser dispatches on the lowercased character
+// (`parser.ts:461`, `Music.cpp:445`), so `O5` is an octave command like any
+// other and the scan over the gap has to see one. Drawn at the octave the note
+// before the gap left standing, which is where missing it spells nothing at all
+// and hands the note to the `O5`.
+expectEdit(
+	"a note drawn past an upper-case octave written in the gap",
+	"#amk 2\n#0 o4 c4 r4 O5 r4 d4",
+	0,
+	() => ({ kind: "spawn", startTick: 96, ticks: 24, written: NOTE_MIN + 36 + 4, drum: null }),
+	{ contains: "o4 e8" },
+);
+
 // A run leaves its own octave standing, so the note that reads it is handed the
 // one it was written under — at its own head, where the text settles anyway.
 // The whole channel below would move with the drawn note otherwise.
@@ -2621,6 +2678,18 @@ expectEdit("a drum moved to another lane", "#amk 2\n#6 @21 c8 @22 c8", 6, (bar) 
 	deltaKeys: 0,
 	copy: false,
 }));
+
+// `leadsAUnit` takes an `o` and a percussion `@` alike, so a drum's unit reaches
+// back over its `@` and on to the octave in front of it — and a drum is written
+// `@21 c<length>`, which has nowhere to put one. The octave has to survive the
+// rewrite anyway: it is what the notes after the drum are standing in.
+expectEdit(
+	"a drum rewritten under an octave its unit reached back over",
+	"#amk 2\n#0 o5 c4 o3 @21 c4 d4",
+	0,
+	(bar) => ({ kind: "stretch", items: [noteAt(bar, 1)], edge: "end", deltaTicks: 24 }),
+	{ text: "#amk 2\n#0 o5 c4 o3 @21 c4. d4" },
+);
 
 expectEdit(
 	"a mid-note ramp keeps its place when the note is stretched",

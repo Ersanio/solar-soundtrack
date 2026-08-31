@@ -29,7 +29,7 @@ const CHANGES: Record<NormalizePass, string> = {
   channels:
     'one block per channel, in #0 to #7 order, with music above the first #N moved under it',
   defaults:
-    'the octave, quantization, instrument and tempo written where the song left them implied, and < > made absolute',
+    'the octave, quantization, instrument and tempo written where the song left them implied',
   slides: 'every legacy & pitch slide written out as the $DD it compiles to',
   drums: 'the drum instrument written before every drum note',
 };

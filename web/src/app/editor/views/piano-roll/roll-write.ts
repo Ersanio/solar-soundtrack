@@ -68,8 +68,14 @@ export function eol(source: string): string {
 /** The octave {@link channelOpening} writes, and so the one it leaves in force. */
 const OPENING_OCTAVE = 4;
 
-/** Everything that can move the octave, as text — see {@link spawnInto}. */
-const MOVES_OCTAVE = /[o<>]/;
+/**
+ * Everything that can move the octave, as text — see {@link spawnInto}.
+ *
+ * `O` as well as `o`: the parser dispatches on the lowercased character
+ * (`parser.ts:461`, `Music.cpp:445`), so `O5` sets the octave exactly as `o5`
+ * does, which is why `leadsAUnit` compares `kind.toLowerCase()`.
+ */
+const MOVES_OCTAVE = /[oO<>]/;
 
 /** `q[channel]` before anything sets it (`parser.ts:200`). */
 const OPENING_Q = 0x7f;
@@ -281,6 +287,30 @@ function exitText(note: PlacedNote, exitOctave: number | null): string | null {
 }
 
 /**
+ * The octaves a drum's own unit carried, as the text to put back around it.
+ *
+ * `leadsAUnit` takes an `o` as well as a percussion `@` (`roll-strip.ts`), so a
+ * drum's unit reaches over its `@` to an octave written beside it — and a drum
+ * is written `@21 c<length>`, the letter having no say in the byte, so
+ * {@link noteText} spells none and the splice would take that `o` away. It is
+ * the octave every note after the drum is standing in, and a lane change says
+ * nothing about it, so it is **restated** rather than respelled. `null` where
+ * `o` cannot reach what was written.
+ */
+function drumOctaves(item: StripItem): { lead: string; exit: string } | null {
+  // `channelStrip` refuses a channel whose note it cannot read an octave from,
+  // so `-1` is unreachable rather than a case with an answer — and it refuses
+  // through `spellOctave`, since dropping the `o` is the whole failure here.
+  const lead = item.hasLeadingOctave ? spellOctave(item.octave ?? -1) : '';
+  const exit = item.exitOctave === null ? '' : spellOctave(item.exitOctave);
+  if (lead === null || exit === null) {
+    return null;
+  }
+
+  return { lead: lead === '' ? '' : `${lead} `, exit: exit === '' ? '' : ` ${exit}` };
+}
+
+/**
  * The end of an item, past the `$DD` it carries.
  *
  * Where a run is written after a note, "after" has to mean after the whole of
@@ -480,6 +510,11 @@ function rewriteNote(
   }
 
   const exit = exitOctaveFor(strip, index, survivors);
+  // Empty for a pitched note, which spells its own octaves through `noteText`.
+  const around = note.drum === null ? { lead: '', exit: '' } : drumOctaves(item);
+  if (around === null) {
+    return refuse(REFUSE_SPELL);
+  }
 
   // One segment is one token, so the whole unit is rewritten together.
   if (item.segments.length === 1) {
@@ -489,7 +524,7 @@ function rewriteNote(
       return refuse(REFUSE_SPELL);
     }
 
-    const edit = spliceRange(source, item.unitSpan, text);
+    const edit = spliceRange(source, item.unitSpan, `${around.lead}${text}${around.exit}`);
     return edit ? [edit] : [];
   }
 
@@ -519,7 +554,7 @@ function rewriteNote(
     return refuse(REFUSE_SPELL);
   }
 
-  const headEdit = spliceRange(source, headSpan, headText);
+  const headEdit = spliceRange(source, headSpan, `${around.lead}${headText}`);
   if (headEdit) {
     edits.push(headEdit);
   }
@@ -538,7 +573,7 @@ function rewriteNote(
   const tailEdit = spliceRange(
     source,
     { start: tail.span.start, end: item.unitSpan.end, line: tail.span.line },
-    `^${length}${put}`,
+    `^${length}${put}${around.exit}`,
   );
   if (tailEdit) {
     edits.push(tailEdit);
@@ -1984,9 +2019,10 @@ function spawnInto(
    * The note before the gap gives it, out of its own byte, so a `<` or a `>`
    * written above that note is already in it. What is left is the text between
    * that note and where the run lands, which has to move the octave nowhere:
-   * only `o`, `<` and `>` can, and a channel the strip built holds no `[ ]`,
-   * `(n)` or `"x=y"` to hide one inside (`roll-strip.ts:forbiddenConstruct`), so
-   * reading the three characters off the text is exact. It over-matches one
+   * only an `o` of either case, a `<` and a `>` can, and a channel the strip
+   * built holds no `[ ]`, `(n)` or `"x=y"` to hide one inside
+   * (`roll-strip.ts:forbiddenConstruct`), so reading those characters off the
+   * text is exact. It over-matches one
    * written in a comment, which costs the note an `o` it did not need and
    * nothing else.
    */
@@ -2015,10 +2051,10 @@ function spawnInto(
    *
    * The run leaves {@link leaves} standing, so that note reads what it was
    * written under exactly when the two are the same octave and nothing between
-   * the run and its head moves the octave again. What can is the three
-   * characters the scan above reads, on the other side of the run, and for the
-   * same reason: `o`, `<` and `>` are all that move it, and a channel the strip
-   * built holds no `[ ]`, `(n)` or `"x=y"` to hide one inside. It over-matches
+   * the run and its head moves the octave again. What can is the characters the
+   * scan above reads, on the other side of the run, and for the same reason: an
+   * `o` of either case, a `<` and a `>` are all that move it, and a channel the
+   * strip built holds no `[ ]`, `(n)` or `"x=y"` to hide one inside. It over-matches
    * one written in a comment and one inside a unit this plan is deleting, which
    * costs the note an `o` it did not need and nothing else.
    */
@@ -2229,9 +2265,19 @@ export function planEdits(context: EditContext, plan: Plan): Edit[] | EditRefusa
       continue;
     }
 
-    if (previous !== null && (previous.exitOctave ?? previous.octave) !== item.octave) {
+    if (
+      item.hasLeadingOctave ||
+      (previous !== null && (previous.exitOctave ?? previous.octave) !== item.octave)
+    ) {
       // Something between the two notes moved the octave — a `<`, a `>`, or an
       // `o` no unit claimed. What we were carrying is not what enters this one.
+      //
+      // The comparison cannot answer that for a unit carrying its own leading
+      // `o`: `item.octave` is what that `o` put in force rather than what
+      // entered the unit, so in `> c+32 r64 < o3 c32` the two agree at 3 while
+      // a `<` sits between them, and the `o3` the rewrite is about to splice
+      // away is the only thing holding the note up. The octave a spliced `o`
+      // leaves behind is unknown by construction, whatever stands in front.
       running = null;
     }
 
@@ -2319,7 +2365,14 @@ export function planEdits(context: EditContext, plan: Plan): Edit[] | EditRefusa
     const exit = exitOctaveFor(strip, index, survivors);
     // A drum writes no octave, so it leaves whatever was standing.
     const own: number | null = note.drum === null ? octaveFor(note.written) : running;
-    running = exit ?? own;
+    // `exit` is null where the next note sets its own octave, which says the
+    // rewrite need not put this unit's trailing `o` back — and a unit nothing
+    // rewrote still has that `o` in it, since `rewriteNote` answers no edits at
+    // all for a note whose pitch and length are both unchanged. The text is the
+    // authority there, and reading `own` instead makes the next note's new
+    // octave look like the one already standing, so nothing is spelled and the
+    // gesture commits nothing.
+    running = written.length === 0 ? (item.exitOctave ?? own) : (exit ?? own);
     previous = item;
   }
 

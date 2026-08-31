@@ -161,8 +161,8 @@ expectNormalized(
 	"a [ ] body with an octave step inside",
 	"#amk 4\n#0 o4 [c8 d8 > e8 f8]3 g8\n",
 	// The body plays once per pass from one text, so its notes are written once;
-	// the `>` inside it is made absolute where it stands.
-	(t) => count(t, /c8/g) === 1 && t.includes("[c8 d8 o5 e8 f8]3"),
+	// the `>` inside it is left exactly where it stands.
+	(t) => count(t, /c8/g) === 1 && t.includes("[c8 d8 > e8 f8]3"),
 );
 expectNormalized(
 	"a drum remap standing at the [",
@@ -444,8 +444,32 @@ expectNormalized(
 	"#am4\n#0 o4 c8\n",
 	(t) => !t.includes("@0") && t.includes("q7F"),
 );
-expectNormalized("< and > become absolute", "#amk 4\n#0 o4 c8 > d8 < e8\n", (t) => t.includes("o4 c8 o5 d8 o4 e8"));
-expectNormalized("a > past o6 stays as written", "#amk 4\n#0 o6 c8 > < d8\n", (t) => t.includes("o6 c8 > o6 d8"));
+// The roll reads a note's octave off its own emitted byte rather than off a
+// running sum, so it has never needed these gone — and rewriting them cost the
+// porter the idiom they wrote.
+expectNormalized("< and > are left as written", "#amk 4\n#0 o4 c8 > d8 < e8\n", (t) => t.includes("o4 c8 > d8 < e8"));
+{
+	const said = "#amk 4\n#0 t53 o4 q7F @0 c8 > d8\n";
+	expectNormalized("a song that says everything, shifts included, is left as it is", said, (t) => t === said);
+}
+
+// A shift moves the octave without saying what from, so a block whose prelude
+// leads with one is not a block that has stated its octave: `#1` enters at 5,
+// and the `o5` is what makes its `<` mean o4 wherever the block ends up.
+expectNormalized(
+	"a block whose prelude leads with a shift is given the octave it entered on",
+	"#amk 4\n#0 o4 c8 >\n#1 < d8\n",
+	(t) => t.includes("#1 o5 q7F @0 < d8"),
+);
+// And where that octave is one `o` cannot reach — the parser's counter sits at 7
+// and at -1 where `o` spells 0 to 6 (Music.cpp:1400-1418) — the shift is already
+// saying what the block needs, so there is nothing to write and nothing to
+// refuse. AddmusicK compiles this, so normalizing it must not turn it away.
+expectNormalized(
+	"a block entered at an octave o cannot reach, with a shift of its own",
+	"#amk 4\n#0 o6 c8 >\n#1 < d8\n",
+	(t) => t.includes("#1 q7F @0 < d8"),
+);
 
 // ---------------------------------------------------------------------------
 console.log("\ndrums");
@@ -519,9 +543,9 @@ expectSameBytes("a slide with a command in between", "#amk 4\n#0 o4 c4 & v100 d4
 // A `>` emits nothing, so the run can stay where the `&` was — which is also
 // where `accumulateTiedLength` looks for it. The target byte is the one the
 // octave change resolves to, since it is read off the note map rather than
-// re-spelled: `$B2` is `o5 d`, and `writeDefaults` has made the `>` absolute.
+// re-spelled: `$B2` is `o5 d`, written out in front of a `>` no pass touches.
 expectSameBytes("a slide with an octave change in between", "#amk 4\n#0 o4 c4 & > d4\n", (t) =>
-	/\$DD \$00 \$30 \$B2\s+o5/.test(t),
+	/\$DD \$00 \$30 \$B2\s+>/.test(t),
 );
 // The remap is consumed by the note the slide lands on, and one byte is written
 // twice — as the target and as the note. A written target would have taken the

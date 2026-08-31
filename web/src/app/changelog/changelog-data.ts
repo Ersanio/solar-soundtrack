@@ -11,6 +11,8 @@ export const CHANGELOG: readonly ChangelogEntry[] = [
   {
     date: '31 August 2026',
     items: [
+      'Normalize leaves < and > as written instead of turning them into o commands',
+      'Editing a note in the piano roll no longer drops the octave written in front of it',
       "Drag a loop box's top or bottom up or down to transpose the whole loop",
       "A selected loop's boxes are outlined solid",
       'Loop boxes follow the drag instead of dimming, so a box stays around its own notes',

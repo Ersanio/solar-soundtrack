@@ -12,7 +12,7 @@
  *   E. `orderChannels`       — one block per channel, `#0` to `#7`, the music
  *                              above the first `#N` under the starting channel.
  *   F. `writeDefaults`       — `o`, `q`, `@` and `t` written out where a channel
- *                              left them implied; `<` and `>` absolute.
+ *                              left them implied. `<` and `>` stay as written.
  *   I. `writePitchSlides`    — every legacy `&` becomes the `$DD` it compiles
  *                              to, so the slide is a command with a channel
  *                              rather than an operator nothing can place.
@@ -996,8 +996,14 @@ export interface DefaultsOptions {
  * with the values its first note was parsed under, and `t` at the top of the
  * lowest channel for a song that never sets one. Each only where no such
  * command already precedes the channel's first note, so a song that says
- * everything is left alone. Every `<` and `>` becomes the absolute `o` it
- * produced.
+ * everything is left alone.
+ *
+ * `<` and `>` are left exactly as written — the piano roll reads a note's octave
+ * off its own emitted byte (`octaveOfNote`) rather than off a running sum, so it
+ * has never needed them gone. A shift standing in a block's prelude does not
+ * count as the octave having been stated, though: it moves the octave without
+ * saying what from, so such a block still gets the `o` it entered on and the
+ * shift then applies to a base the block itself carries.
  *
  * No `l`: {@link writeNoteLengths} has already put every note's length on the
  * note, so one written here would state what nothing reads.
@@ -1013,20 +1019,6 @@ export function writeDefaults(input: NormalizeInput, options: DefaultsOptions): 
 	const events = trace.events;
 	const diagnostics: Diagnostic[] = [];
 	const edits: TextEdit[] = [];
-
-	const owned = scopedTo(trace, input.onlyChannel);
-	events.forEach((event, index) => {
-		if (!owned(index)) {
-			return;
-		}
-
-		if ((event.char === "<" || event.char === ">") && !event.state.inRemoteDefinition) {
-			const octave = spellOctave(event.state.octave);
-			if (octave !== null) {
-				edits.push({ ...event.span, text: octave });
-			}
-		}
-	});
 
 	const firstOf = new Map<number, number>();
 	const markers = events.map((_, index) => index).filter((index) => isMarker(text, events[index]));
@@ -1054,7 +1046,7 @@ export function writeDefaults(input: NormalizeInput, options: DefaultsOptions): 
 				break;
 			}
 
-			seen.add(event.char === "<" || event.char === ">" ? "o" : event.char);
+			seen.add(event.char);
 		}
 
 		const parts: string[] = [];
@@ -1082,7 +1074,13 @@ export function writeDefaults(input: NormalizeInput, options: DefaultsOptions): 
 			const octave = spellOctave(entering.octave);
 			if (octave !== null) {
 				parts.push(octave);
-			} else if (hasNote) {
+			} else if (hasNote && !seen.has("<") && !seen.has(">")) {
+				// An octave `o` cannot reach is one only `<` and `>` can put the
+				// parser at — its counter sits at 7 and at -1 where `o` spells 0 to 6
+				// (Music.cpp:1400-1418) — so a block whose prelude carries a shift is
+				// already saying what it needs to and there is nothing to refuse. One
+				// that says nothing at all about its octave still cannot be given the
+				// one it entered on.
 				diagnostics.push(
 					diagnostic("SST0610", `An octave of ${entering.octave} cannot be written with o.`, events[index].span),
 				);

@@ -323,7 +323,9 @@ One entry each: what it was, what it is, why.
   note _before_ the gap absorbs the change, and a gap whose run holds a fade command is refused.
 - **Refusing `<` and `>` in an edited channel** — they are not commands to the scanner at all, and
   they are harmless: a note's octave comes from its own `written` byte rather than from a running
-  sum, so `o4 c4 > d4` repitches either note without disturbing the other. `rolltest` pins it.
+  sum, so `o4 c4 > d4` repitches either note without disturbing the other. `rolltest` pins it. That
+  is a statement about the **row**, and what `planEdits` carries between the notes is the entry
+  below.
 - **Capturing the pointer, and preventing the default, on the roll's `pointerdown`** — both stop
   the browser raising `click` and `dblclick` on the bar underneath, which took away everything a
   single click on a note used to do: naming its channel, asking the inspector about it, and going to
@@ -1094,6 +1096,41 @@ stats.loopTicks` pads **every other channel that would cut the song short** out 
   `RollNotes` asks its own `selected` per mark. By **body** and not by the edited channel, unlike the
   label: the group is one text, so a recall on another channel goes solid with its declaration, which
   is what the rings on those notes already do.
+- **Reading a note's entering octave off `item.octave` alone** — that number is the octave in force
+  **after** the unit's own leading `o`, and `growUnits` puts that `o` inside the `unitSpan`
+  `rewriteNote` splices whole; so in `> c+32 r64 < o3 c32` the guard compared the previous note's
+  exit against the octave the doomed `o3` had just set, agreed with itself at 3, and let the note be
+  rewritten with no octave at all — the `<` then took it to o2, and only the byte oracle could see
+  it. A unit carrying its own leading `o` leaves the octave **unknown** (`running = null`), which
+  costs a redundant absolute `o` exactly where that leading `o` was redundant anyway and is never
+  wrong in the other direction, since `null` only ever adds one. Not the `MOVES_OCTAVE` text scan
+  `spawnInto` runs on the same question: it is exact where this is conservative, and it buys the
+  tidying with a scan per note and a match that over-reads a comment. The mirror of it is on the far
+  side of the unit — `exitOctaveFor` answers `null` where the next note sets its own, which says the
+  trailing `o` may go with the rewrite, and there **is** no rewrite for a note whose pitch and length
+  are both unchanged (`rewriteNote` returns before spelling anything, and `spliceRange` answers
+  `null` for text already there). Reading the note's own octave there made a drag's destination look
+  like the octave already standing, so nothing was spelled and the gesture committed nothing at all.
+  An untouched unit leaves what its text says.
+- **Letting a drum's unit carry an octave `noteText` cannot write back** — `leadsAUnit` takes an `o`
+  as well as a percussion `@`, so the unit reaches over the `@` to the octave beside it, and a drum
+  is written `@21 c<length>`, the letter having no say in the byte. The splice took the `o` away and
+  every note after the drum moved with it, silently. `drumOctaves` **restates** what the unit
+  carried, rather than respelling it: the octave is what those notes are standing in and a lane
+  change says nothing about it. Not a narrowing of `leadsAUnit` instead — the `o` can be written on
+  either side of the `@`, so the leading scan would have to know it was on a drum before it found
+  the `@`, and `unitSpan`'s boundaries are where every insertion in `roll-write.ts` is anchored.
+- **Rewriting every `<` and `>` into the absolute `o` it produced** — `writeDefaults` did it so that
+  the roll never had to read one, and the roll never needed it: a note's row is its own `written`
+  byte (`octaveOfNote`), no unit swallows a shift, and `rolltest` has pinned `o4 c4 > d4` editable
+  throughout. What it cost is a document the porter did not write, churned on every Normalize, and a
+  silent skip wherever the shift ran past `o6` — `spellOctave` reaches 0 to 6 and the parser's own
+  counter sits at 7 and at -1 (`Music.cpp:1400-1418`) — so the one shape it could not convert was
+  the shape it was most wanted for. They are left exactly as written. What the pass still writes is
+  the entering `o` at a block whose prelude states none, a `<` or a `>` no longer counting as one
+  since it moves the octave without saying what from; and `SST0610` is asked only of a block that
+  says nothing about its octave at all, since an octave `o` cannot reach is one only a shift can
+  have put the parser at, and refusing that song would turn away one AddmusicK builds.
 
 ## Angular specifics
 
