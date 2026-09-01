@@ -577,9 +577,11 @@ pass. A box drawn with `Ctrl` over any stretch of the roll plays that stretch th
 neither grows with the zoom nor with the rows, and a box too small to hold it shows nothing rather
 than something cut.
 
-**Drawing inside any pass writes into the body.** The note lands in the text once, between the
-brackets, and appears on every pass — the ghost's siblings show it landing everywhere before the
-button is even released. A gap inside the body is a rest in the body, exactly as it is outside one.
+**Drawing inside any pass the channel plays writes into the body.** The note lands in the text once,
+between the brackets, and appears on every pass — the ghost's siblings show it landing everywhere
+before the button is even released. A gap inside the body is a rest in the body, exactly as it is
+outside one. Another voice's pass of that same body is not one of yours: draw where its box is drawn
+and the note is your own channel's music, on its own tick, in your own block.
 
 **Changing the body's length moves the song.** Stretch a looped note and every pass grows; every
 later pass, and everything written after the loop, slides by the change times the passes in front

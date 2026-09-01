@@ -33,6 +33,7 @@ import {
   REFUSE_LOOP_LEFT_PASS,
   REFUSE_NESTED_LOOP,
   REFUSE_SUB_SPLIT,
+  frameAt,
   framePasses,
   isEdits,
   passShiftsFor,
@@ -525,32 +526,6 @@ function itemAt(
   }
 
   return { index: -1, instance: 0 };
-}
-
-/**
- * The frame a press on empty grid belongs to: the deepest body whose pass holds
- * the tick, else the root. `base` is that pass's own start, which is what turns
- * a song tick into the frame's local one.
- */
-function frameAt(strip: Strip, tick: number): { frame: number; base: number } {
-  let found = { frame: 0, base: 0 };
-  let depth = Number.POSITIVE_INFINITY;
-  strip.frames.forEach((frame, at) => {
-    if (frame.body < 0) {
-      return;
-    }
-
-    for (const run of frame.runs) {
-      for (const pass of run.passes) {
-        if (tick >= pass.tick && tick < pass.tick + pass.ticks && frame.ticks < depth) {
-          found = { frame: at, base: pass.tick };
-          depth = frame.ticks;
-        }
-      }
-    }
-  });
-
-  return found;
 }
 
 function rowOfItem(item: StripItem, stack: LaneStack): number {

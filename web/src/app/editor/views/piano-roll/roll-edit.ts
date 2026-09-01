@@ -925,6 +925,45 @@ export function framePasses(frame: StripFrame): readonly FramePass[] {
   });
 }
 
+/**
+ * The frame a press on empty grid belongs to: the deepest body whose pass holds
+ * the tick, else the root. `base` is that pass's own start, which is what turns
+ * a song tick into the frame's local one.
+ *
+ * This channel's own passes, as `firstPassOn` and `passesAt` read them: a frame
+ * carries every voice's runs of its body, and a tick another voice
+ * plays that body over is a tick this one is somewhere else entirely — writing
+ * there would put the note in a body this press is nowhere near.
+ *
+ * Here rather than in `roll-gesture.ts` because it is the piece of a draw no
+ * walk can check: the text a splice lands in is a fact about the frame it was
+ * given, and a harness cannot drive an Angular composable.
+ */
+export function frameAt(strip: Strip, tick: number): { frame: number; base: number } {
+  let found = { frame: 0, base: 0 };
+  let depth = Number.POSITIVE_INFINITY;
+  strip.frames.forEach((frame, at) => {
+    if (frame.body < 0) {
+      return;
+    }
+
+    for (const run of frame.runs) {
+      if (run.channel !== strip.channel) {
+        continue;
+      }
+
+      for (const pass of run.passes) {
+        if (tick >= pass.tick && tick < pass.tick + pass.ticks && frame.ticks < depth) {
+          found = { frame: at, base: pass.tick };
+          depth = frame.ticks;
+        }
+      }
+    }
+  });
+
+  return found;
+}
+
 /** Where a body-length change puts one pass of the body it changes. */
 /**
  * The rows one body's notes span once a gesture's plan lands.

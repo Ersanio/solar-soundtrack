@@ -1404,6 +1404,19 @@ stats.loopTicks` pads **every other channel that would cut the song short** out 
   name, and a chip that disagreed with a bar about which blue channel 0 is would be worse than no
   colour at all. `util/channel-palette.ts` is the one home for all five arrays; `roll-metrics.ts`
   keeps the geometry and the two muted opacities, which are the roll's own.
+- **Routing a drawn note's frame off `StripFrame.runs` whole** — a frame carries **every** voice's
+  runs of its body on purpose (`discoverLoops`), because a body declared on one channel and recalled
+  from another moves both voices when its length changes, and `shiftBoundariesFor`, `framePasses`
+  and `planReach` all read them to say so. A press is the one reader they are wrong for: with a body
+  declared in `#3` and recalled in `#4`, `frameAt` found `#3`'s pass over ticks `#4` was nowhere
+  near, so a note drawn on channel 4 was written between `#3`'s brackets and played on every pass of
+  both voices — and the channel-3 box grew round it while the pointer was down, `BodyRows` being
+  keyed by body. It filters on `strip.channel`, as `firstPassOn` and `passesAt` already do, which
+  also puts it back in step with `StripItem.instances`: `expandAndJoin` fills those from this
+  channel's runs alone, so `itemAt` and `constructFor` were already channel-correct while `frameAt`
+  was not. In `roll-edit.ts` for `shiftBoundariesFor`'s reason — a harness cannot drive an Angular
+  composable, and `rolltest`'s `planFor` took a gesture's frame from its first item, which a `spawn`
+  has not got, so every draw case ran in the root frame and `frameAt` was never executed at all.
 
 ## Angular specifics
 

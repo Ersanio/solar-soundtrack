@@ -59,6 +59,7 @@ import {
 	REFUSE_ROOM,
 	REFUSE_SPLIT,
 	REFUSE_SUB_SPLIT,
+	frameAt,
 	isEdits,
 	passShiftsFor,
 	planFrames,
@@ -328,10 +329,21 @@ interface Expectation {
 	mode?: EditMode;
 	/**
 	 * The frame a spawn runs in, for drawing into a loop body — its ticks are
-	 * then that frame's own. A gesture with items derives the frame from them and
-	 * needs no say here.
+	 * then that frame's own. A gesture with items derives the frame from them,
+	 * and a draw is routed by `frameAt` off the song tick it names.
 	 */
 	frame?: number;
+	/**
+	 * One **other** voice's whole walk, as `[channel, plays]`, for the edit that
+	 * is meant to reach it.
+	 *
+	 * A body declared on one channel and recalled from another is one text both
+	 * voices play, so a note drawn into it lands on both — the one case where
+	 * "leaves the other channels alone" is the wrong question. Spelling that
+	 * voice's walk out is what says the reach was the shared body itself and not
+	 * a splice that wandered into another channel's block.
+	 */
+	alsoPlays?: readonly [number, string];
 	/**
 	 * How long one **other** voice must run afterwards, as `[channel, ticks]`.
 	 *
@@ -401,11 +413,8 @@ function expectEdit(
 		return;
 	}
 
-	// The gesture's own frame: the one its first item sits in, or the root — a
-	// spawn into a body names its frame through the expectation.
 	const made = gesture(bar);
-	const first = "items" in made && made.items.length > 0 ? made.items[0] : undefined;
-	const frame = bar.frames[expectation.frame ?? (first !== undefined ? (bar.items[first]?.frame ?? 0) : 0)];
+	const frame = bar.frames[frameFor(bar, made, expectation.frame)];
 	const context: EditContext = {
 		source,
 		strip: bar,
@@ -517,6 +526,34 @@ function listOf(expectation: string | readonly string[] | undefined): readonly s
 }
 
 /** The plan a gesture makes, for the assertions that are about the plan itself. */
+/**
+ * The frame a case's gesture runs in, decided the way the press decides it.
+ *
+ * A gesture with items takes its first one's frame; a draw has no item, so it is
+ * routed by `frameAt`, and the `base` that comes back turns the **song** tick a
+ * case is written in into the frame-local one the plan wants — which is what
+ * `roll-gesture.ts` does with `Drag.origin`. So a draw at a tick inside a pass
+ * this channel plays lands in the body, and one inside a pass some *other* voice
+ * plays over that body does not.
+ *
+ * An expectation naming a frame outright keeps it, its ticks being that frame's
+ * already.
+ */
+function frameFor(bar: Strip, made: Gesture, named: number | undefined): number {
+	if (named !== undefined) {
+		return named;
+	}
+
+	if (made.kind === "spawn") {
+		const drawn = frameAt(bar, made.startTick);
+		made.startTick -= drawn.base;
+		return drawn.frame;
+	}
+
+	const first = "items" in made && made.items.length > 0 ? made.items[0] : undefined;
+	return first !== undefined ? (bar.items[first]?.frame ?? 0) : 0;
+}
+
 function planFor(
 	name: string,
 	source: string,
@@ -537,8 +574,7 @@ function planFor(
 	}
 
 	const made = gesture(bar);
-	const first = "items" in made && made.items.length > 0 ? made.items[0] : undefined;
-	const frame = bar.frames[first !== undefined ? (bar.items[first]?.frame ?? 0) : 0];
+	const frame = bar.frames[frameFor(bar, made, undefined)];
 	const context: EditContext = {
 		source,
 		strip: bar,
@@ -989,8 +1025,7 @@ function expectLoopEdit(
 	}
 
 	const made = gesture(bar);
-	const first = "items" in made && made.items.length > 0 ? made.items[0] : undefined;
-	const held = expectation.frame ?? (first !== undefined ? (bar.items[first]?.frame ?? 0) : 0);
+	const held = frameFor(bar, made, expectation.frame);
 	const context: EditContext = {
 		source,
 		strip: bar,
@@ -1048,11 +1083,20 @@ function expectLoopEdit(
 		`want ${plays}\n        got  ${walked(rebuilt, channel)}\n        text ${JSON.stringify(after)}`,
 	);
 
-	check(
-		`${name}: leaves the other channels alone`,
-		walkedOthers(before, channel) === walkedOthers(rebuilt, channel),
-		`${walkedOthers(before, channel)} -> ${walkedOthers(rebuilt, channel)}`,
-	);
+	if (expectation.alsoPlays === undefined) {
+		check(
+			`${name}: leaves the other channels alone`,
+			walkedOthers(before, channel) === walkedOthers(rebuilt, channel),
+			`${walkedOthers(before, channel)} -> ${walkedOthers(rebuilt, channel)}`,
+		);
+	} else {
+		const [voice, sounds] = expectation.alsoPlays;
+		check(
+			`${name}: #${voice} plays as asked`,
+			walked(rebuilt, voice) === sounds,
+			`want ${sounds}\n        got  ${walked(rebuilt, voice)}\n        text ${JSON.stringify(after)}`,
+		);
+	}
 
 	if (expectation.playsFor !== undefined) {
 		check(
@@ -1172,6 +1216,36 @@ expectLoopEdit(
 	() => ({ kind: "spawn", startTick: 48, ticks: 48, written: NOTE_MIN + 36 + 7, drum: null }),
 	"0+48:$a4 48+48:$ab 96+48:$a4 144+48:$ab 192+48:$a8",
 	{ frame: 1, contains: "[c4 g4]2", playsFor: 240 },
+);
+
+// A frame carries every voice's runs of its body, because a length change moves
+// both voices and the shift, the pad and the preview all read them to say so.
+// A **draw** is the one reader those extra runs are wrong for: `#1` is inside
+// its own `r1` here, and the pass covering tick 48 is `#0`'s. The note is `#1`'s
+// own music, written in `#1`, sounding once.
+expectLoopEdit(
+	"a note drawn over another voice's pass of a shared body stays in this channel",
+	"#amk 2\n#0 o4 (1)[c4 r4]2 r1\n#1 o4 r1 (1)2",
+	1,
+	() => ({ kind: "spawn", startTick: 48, ticks: 48, written: NOTE_MIN + 36 + 7, drum: null }),
+	"48+48:$ab 192+48:$a4 288+48:$a4",
+	{ playsFor: 384, lacks: "[c4 g4]" },
+);
+
+// And the same draw inside a pass `#1` really does play lands in the body, where
+// both voices pick it up — the promise the sibling washes make, which the guard
+// above must not take away.
+expectLoopEdit(
+	"a note drawn into this channel's own pass of a shared body lands on both voices",
+	"#amk 2\n#0 o4 (1)[c4 r4]2 r1\n#1 o4 r1 (1)2",
+	1,
+	() => ({ kind: "spawn", startTick: 240, ticks: 48, written: NOTE_MIN + 36 + 7, drum: null }),
+	"192+48:$a4 240+48:$ab 288+48:$a4 336+48:$ab",
+	{
+		contains: "(1)[c4 g4]2",
+		alsoPlays: [0, "0+48:$a4 48+48:$ab 96+48:$a4 144+48:$ab"],
+		playsFor: 384,
+	},
 );
 
 // Deleting a body note deletes it from every pass — the gap a rest, so the
