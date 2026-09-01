@@ -995,6 +995,34 @@ export function passShiftsFor(
 }
 
 /**
+ * Where the plan leaves each note it was given, by the strip index it came in
+ * as — its place among the frame's notes once the commit is written.
+ *
+ * Text order and tick order at once, a channel being one voice, and it is what
+ * a rewrite leaves alone: `planEdits` writes the survivors and the born notes
+ * in this order, so entry `n` here is the frame's `n`th note in the text the
+ * commit produces. A note the plan does not carry is absent, which is a
+ * deletion, a glue's swallowed half and a carve that took the whole of one.
+ *
+ * The one thing an edit cannot move, which is why the roll carries a selection
+ * on it: a strip index moves the moment an item is added or removed, a tick
+ * moves for every note after a length change, and an address moves for every
+ * byte written before it. Here rather than in `roll-gesture.ts` because it is a
+ * statement about the write, and only a harness driving a real compile can
+ * check it.
+ */
+export function plannedOrdinals(plan: Plan): ReadonlyMap<number, number> {
+  const places = new Map<number, number>();
+  plan.notes.forEach((note, at) => {
+    if (note.from >= 0) {
+      places.set(note.from, at);
+    }
+  });
+
+  return places;
+}
+
+/**
  * The ticks the frame will occupy once the plan is written — what prices a
  * body-length change, whose every pass and every note after the loop move by
  * its difference against `frame.ticks`.

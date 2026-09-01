@@ -386,6 +386,14 @@ export class SourceView {
       this.view.dispatch({ changes });
     }
 
+    // Here rather than where the batch was asked for, and only now that it has
+    // gone in: a stale one is dropped above in silence, and a count that ran
+    // ahead of the document would have the roll read the next change from
+    // anywhere as one that kept its notes.
+    if (batch.keepsNotes) {
+      this.requests.notesKept.update((n) => n + 1);
+    }
+
     if (batch.immediate) {
       this.store.compileNow();
     }

@@ -37,6 +37,19 @@ export interface EditBatch {
   edits: readonly Edit[];
   immediate: boolean;
   /**
+   * Whether this batch leaves a channel's notes as they are — the same notes,
+   * in the same order, whatever their ticks do.
+   *
+   * True of a splice into one command's own text, which is every commit a panel
+   * makes and every command the piano roll's lane erases or carries. The roll
+   * reads {@link EditorRequests.notesKept} to know it, and what it does with it
+   * is keep its selection, which is a set of indices into a channel's strip: the
+   * channel is rebuilt with the same items in the same order, so those indices
+   * still name the notes they named. False is not a claim that something moved,
+   * only that nothing here says otherwise.
+   */
+  keepsNotes: boolean;
+  /**
    * A range to select once the batch lands, in the document *after* it. How a
    * panel puts the caret on text the batch itself writes — the note palette
    * leaves the new command's first argument selected, and the caret is what
@@ -96,7 +109,12 @@ export class EditorRequests {
    */
   apply(edit: Edit | null): void {
     if (edit) {
-      this.replace.set({ edits: [copyEdit(edit)], immediate: false, select: null });
+      this.replace.set({
+        edits: [copyEdit(edit)],
+        immediate: false,
+        select: null,
+        keepsNotes: true,
+      });
     }
   }
 
@@ -115,12 +133,14 @@ export class EditorRequests {
   applyAll(
     edits: readonly Edit[] | null,
     select: { anchor: number; head: number } | null = null,
+    keepsNotes = false,
   ): void {
     if (edits && edits.length > 0) {
       this.replace.set({
         edits: edits.map(copyEdit),
         immediate: true,
         select: select && { ...select },
+        keepsNotes,
       });
     }
   }
@@ -128,10 +148,11 @@ export class EditorRequests {
   /**
    * How deep the editor's undo and redo stacks are, written by the view.
    *
-   * The one thing in here that travels the other way, and it has to: CodeMirror
-   * owns the history, the roll's toolbar carries the same two buttons the source
-   * toolbar does, and a button that cannot tell whether there is anything to
-   * undo is a button that is never disabled.
+   * One of the two things in here written by the view rather than read by it
+   * ({@link notesKept} is the other), and it has to be: CodeMirror owns the
+   * history, the roll's toolbar carries the same two buttons the source toolbar
+   * does, and a button that cannot tell whether there is anything to undo is a
+   * button that is never disabled.
    */
   readonly undoDepth = signal(0);
   readonly redoDepth = signal(0);
@@ -157,6 +178,21 @@ export class EditorRequests {
   insert(text: string, select: { start: number; end: number } | null): void {
     this.insertion.set({ text, select: select && { ...select } });
   }
+
+  /**
+   * How many {@link EditBatch.keepsNotes} batches the editor has applied.
+   *
+   * Written by the view, as {@link undoDepth} is, and for the same kind of
+   * reason: only the view knows whether a batch really landed.
+   * Every `expect` is checked before anything is dispatched, so a stale batch is
+   * dropped in silence — counted where it is *asked for*, this would run ahead of
+   * the document and the next change from anywhere would be read as one that
+   * kept the notes.
+   *
+   * A count rather than a flag, because what the reader wants is the transition
+   * and nothing here is in a position to put a flag back down.
+   */
+  readonly notesKept = signal(0);
 
   /**
    * The selected note: which occurrence of one the piano roll was last asked

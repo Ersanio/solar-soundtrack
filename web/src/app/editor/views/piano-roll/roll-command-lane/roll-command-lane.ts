@@ -213,8 +213,10 @@ export class RollCommandLane {
       return;
     }
 
+    // Keeps the notes: a command taken out adds and removes none, so the roll's
+    // selection still names the notes it named.
     const edit = eraseCommand(this.editor.source(), glyph.command);
-    this.requests.applyAll(edit ? [edit] : null);
+    this.requests.applyAll(edit ? [edit] : null, null, true);
   }
 
   // --- carrying a command to another tick ------------------------------------
@@ -386,7 +388,9 @@ export class RollCommandLane {
     // An empty list is a drop that changes nothing, which `applyAll` ignores, so
     // a command let go where it already runs costs no undo step.
     if (isEdits(outcome)) {
-      this.requests.applyAll(outcome);
+      // Keeps the notes: a command carried to another tick moves none, so the
+      // roll's selection outlives the splice.
+      this.requests.applyAll(outcome, null, true);
     }
   }
 

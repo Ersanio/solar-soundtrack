@@ -40,6 +40,7 @@ import {
   plannedFrameTicks,
   shiftBoundariesFor,
 } from './roll-edit';
+import { type NoteAnchor, anchorsFor, notesAtAnchors } from './roll-selection';
 import {
   type ChannelTail,
   type Strip,
@@ -453,6 +454,25 @@ export interface RollGestures {
   stepLength(direction: number, fine: boolean): boolean;
   /** Runs a gesture the keyboard asked for — delete, nudge, quantize and the rest. */
   run(gesture: Gesture): void;
+  /**
+   * What a change to the document does to the selection.
+   *
+   * The one place it is decided, and the reason no commit clears the selection
+   * itself: a set of indices means something for exactly as long as the strip it
+   * indexes into stands, so it is dropped when that text goes and not a moment
+   * before — which is what keeps an outline on screen for the compile the roll
+   * spends with no strip at all.
+   *
+   * `keepsNotes` is `EditBatch.keepsNotes` as the editor really applied it: a
+   * splice into one command's own text, so the channel comes back with the same
+   * items in the same order and the indices still name the notes they named,
+   * with nothing to carry. A gesture's own commit carries its plan's answer
+   * instead ({@link restoreSelection}). Anything else is text the roll cannot
+   * account for, and an index into it names whatever moved into that place.
+   */
+  sourceChanged(keepsNotes: boolean): void;
+  /** Puts a carried selection back on the strip the commit it rode on produced. */
+  restoreSelection(strip: Strip): void;
   selectAll(): void;
   clearSelection(): void;
   toggle(item: number): void;
@@ -541,6 +561,21 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
   const selection = signal<ReadonlySet<number>>(new Set<number>());
   const drag = signal<Drag | null>(null);
   const hover = signal<Hover | null>(null);
+
+  /**
+   * Where the selection is going once the commit in flight has been compiled.
+   *
+   * A gesture is the one writer that can say: its plan knows where every note it
+   * did not delete ended up. Held from the commit until the strip that commit
+   * produced arrives, which is a compile away — the roll has no strip at all in
+   * between, so there is nothing to index into and nothing to draw.
+   *
+   * A plain field: nothing renders it. The channel is part of it because a strip
+   * is rebuilt for whichever channel is being edited, and with none picked that
+   * is the one under the pointer — a turnover the pointer caused must not be
+   * taken for the one the commit did.
+   */
+  let pending: { channel: number; anchors: readonly NoteAnchor[] } | null = null;
 
   /** The gesture the pointer is describing, or `null` when it is not describing one. */
   const gestureNow = computed<Gesture | null>(() => {
@@ -1262,8 +1297,7 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
    * can share it.
    *
    * Answers the edits so that each caller can do what it alone does with them —
-   * `finish` remembers the length it drew and drops the selection, `erase` does
-   * neither.
+   * `finish` remembers the length it drew, `erase` does not.
    */
   const write = (strip: Strip, parts: readonly FramePlan[]): readonly Edit[] | null => {
     if (parts.length === 0) {
@@ -1278,6 +1312,11 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
 
     latched.set(null);
     return outcome;
+  };
+
+  /** The selection as the plans leave it, kept for the strip they are about to build. */
+  const carry = (strip: Strip, parts: readonly FramePlan[]): void => {
+    pending = { channel: strip.channel, anchors: anchorsFor(strip, parts, selection()) };
   };
 
   const finish = (): void => {
@@ -1296,8 +1335,8 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
         sinks.rememberLength(now.touched[0].ticks);
       }
 
+      carry(strip, parts);
       sinks.commit(edits);
-      selection.set(new Set<number>());
     }
   };
 
@@ -1825,8 +1864,11 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
 
         latched.set(null);
         if (outcome.length > 0) {
+          // No anchors: neither of these goes through a `Plan`, and
+          // `resizeLoop` moves the brackets, so notes cross into and out of the
+          // body and the ordinals they have now are not the ones the next strip
+          // gives them. The change to the document is what drops the selection.
           sinks.commit(outcome);
-          selection.set(new Set<number>());
         }
 
         return;
@@ -1919,10 +1961,32 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
       // and is refused there in its own words.
       const first = 'items' in gesture ? gesture.items[0] : undefined;
       const held = first !== undefined ? (strip.items[first]?.frame ?? 0) : 0;
-      const edits = write(strip, planFrames(strip, gesture, sources.editMode(), held));
+      const parts = planFrames(strip, gesture, sources.editMode(), held);
+      const edits = write(strip, parts);
       if (edits && edits.length > 0) {
+        carry(strip, parts);
         sinks.commit(edits);
+      }
+    },
+
+    sourceChanged(keepsNotes: boolean): void {
+      if (!keepsNotes) {
         selection.set(new Set<number>());
+      }
+    },
+
+    /**
+     * Consumed whichever way it goes — a second strip is a second edit, and the
+     * plan spoke for one. The channel is checked because a strip is rebuilt for
+     * whichever channel is being edited, and with none picked that is the one
+     * under the pointer: a turnover the pointer caused is not the one the commit
+     * did.
+     */
+    restoreSelection(strip: Strip): void {
+      const held = pending;
+      pending = null;
+      if (held?.channel === strip.channel) {
+        selection.set(notesAtAnchors(strip, held.anchors));
       }
     },
 
@@ -1942,6 +2006,9 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
     },
 
     clearSelection(): void {
+      // The anchors go too: Escape, a channel change and a mute all say this is
+      // not the subject any more, and a carried restore would put it back.
+      pending = null;
       selection.set(new Set<number>());
     },
 
@@ -1965,8 +2032,10 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
 
     const held = strip.items[index]?.frame ?? 0;
     const gesture: Gesture = { kind: 'delete', items: [index] };
-    const edits = write(strip, planFrames(strip, gesture, sources.editMode(), held));
+    const parts = planFrames(strip, gesture, sources.editMode(), held);
+    const edits = write(strip, parts);
     if (edits && edits.length > 0) {
+      carry(strip, parts);
       sinks.commit(edits);
     }
   }

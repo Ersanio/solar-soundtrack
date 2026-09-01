@@ -11,6 +11,7 @@ export const CHANGELOG: readonly ChangelogEntry[] = [
   {
     date: '1 September 2026',
     items: [
+      'Editing a note keeps it selected — a resize in the roll, or its length dragged in the inspector',
       'The Stop button stops a note or selection being previewed, not just the song',
       "Pick a different instrument from the command inspector, the song's own included",
       'Space starts and stops the song in the piano roll',

@@ -7,6 +7,7 @@ import {
   computed,
   effect,
   inject,
+  linkedSignal,
   signal,
   untracked,
   viewChild,
@@ -1064,8 +1065,7 @@ export class PianoRoll {
    * the text and a mark by the address the walk gave it. An address is an ARAM
    * offset, so it names one note across the whole song.
    */
-  private addressesOf(indices: Iterable<number>): ReadonlySet<number> {
-    const strip = this.strip();
+  private addressesOf(strip: Strip | null, indices: Iterable<number>): ReadonlySet<number> {
     const spans = new Set<number>();
     if (strip) {
       for (const index of indices) {
@@ -1076,8 +1076,24 @@ export class PianoRoll {
     return spans;
   }
 
-  /** The selected notes as spans, which is what the bars are outlined by. */
-  protected readonly selectedSpans = computed(() => this.addressesOf(this.gestures.selection()));
+  /**
+   * The selected notes as spans, which is what the bars are outlined by.
+   *
+   * Held across a recompile rather than emptied. There is no strip from the
+   * moment the text changes until the compile lands, and the bars on screen for
+   * the whole of that are the *last* compile's — so the addresses taken from
+   * that compile outline exactly the bars being drawn, where an empty set takes
+   * every outline off for a compile and puts it straight back, which is what a
+   * commit from the inspector looked like.
+   */
+  protected readonly selectedSpans = linkedSignal<
+    { strip: Strip | null; chosen: ReadonlySet<number> },
+    ReadonlySet<number>
+  >({
+    source: () => ({ strip: this.strip(), chosen: this.gestures.selection() }),
+    computation: (now, previous) =>
+      now.strip ? this.addressesOf(now.strip, now.chosen) : (previous?.value ?? new Set<number>()),
+  });
 
   /**
    * The run of text the selection covers, for the command palette in the
@@ -1103,7 +1119,9 @@ export class PianoRoll {
   });
 
   /** The notes the preview has taken over, which the song's own bars leave out. */
-  protected readonly movingSpans = computed(() => this.addressesOf(this.gestures.moving()));
+  protected readonly movingSpans = computed(() =>
+    this.addressesOf(this.strip(), this.gestures.moving()),
+  );
 
   /**
    * Points the inspector at a note the selection holds, where it is not already
@@ -1122,8 +1140,25 @@ export class PianoRoll {
     }
 
     const held = chosen.map((index) => strip.items[index]).filter((item) => item !== undefined);
-    if (asked !== null && held.some((item) => item.address === asked.address)) {
-      return;
+    if (asked !== null) {
+      const same = held.find((item) => item.address === asked.address);
+      if (same) {
+        // An edit can move a note without moving its bytes — a resize from the
+        // left end changes where it starts, and the duration bytes on either
+        // side of it can come out the same length — so the tick the question was
+        // asked at names no pass of the note any more. Left alone, the ring for
+        // "another pass of the note you asked about" is drawn on the note
+        // itself, which has only the one. Re-pointed rather than re-asked: it is
+        // the same note, and the caret is already on its text.
+        if (!same.instances.some((each) => each.tick === asked.tick)) {
+          this.requests.inspecting.set({
+            address: asked.address,
+            tick: same.instances[0]?.tick ?? 0,
+          });
+        }
+
+        return;
+      }
     }
 
     const note = held.find((item) => item.kind === 'note');
@@ -1204,10 +1239,30 @@ export class PianoRoll {
     onChange(this.mixer.silenced, (silenced) => this.followMixer(silenced));
 
     // Sanctioned effect: a selection is a set of indices into the channel's
-    // strip, so a rebuild from text the roll did not write leaves the outline on
-    // whatever notes now sit at those indices. The roll's own gestures clear it
-    // as they commit; this is for the ones typed in the source view.
-    onChange(this.editor.source, () => this.gestures.clearSelection());
+    // strip, so text the roll cannot account for leaves the outline on whatever
+    // notes now sit at those indices. A batch that kept the notes adds none and
+    // takes none away, so those indices still hold; a gesture of the roll's own
+    // has left anchors saying where each of its notes went. Read here rather
+    // than followed on its own, because the two are one decision — the count is
+    // what says which kind of change is landing.
+    let kept = untracked(this.requests.notesKept);
+    onChange(this.editor.source, () => {
+      const now = this.requests.notesKept();
+      const keepsNotes = now !== kept;
+      kept = now;
+      this.gestures.sourceChanged(keepsNotes);
+    });
+
+    // Sanctioned effect: putting a carried selection back once the commit that
+    // moved it has been compiled. On the strip and not on the source, because
+    // the strip is what the indices are into and it is a compile behind — the
+    // roll has none at all in between. Ahead of the mirror below, so the panels
+    // are told about the selection the strip really has.
+    onChange(this.strip, (strip) => {
+      if (strip) {
+        this.gestures.restoreSelection(strip);
+      }
+    });
 
     // Sanctioned effect: mirroring the selection into the mailbox, which is the
     // roll's imperative sink for everything the panels beside it answer from.
@@ -1847,8 +1902,10 @@ export class PianoRoll {
         return;
       }
 
+      // Keeps the notes, as a panel's own commit does: taking a command out
+      // adds and removes none, so the selection still names the notes it named.
       const edit = eraseCommand(this.editor.source(), inspected);
-      this.requests.applyAll(edit ? [edit] : null);
+      this.requests.applyAll(edit ? [edit] : null, null, true);
       return;
     }
 

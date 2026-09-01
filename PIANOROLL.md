@@ -67,8 +67,8 @@ channel picked, and neither does deleting a command: a command belongs to the so
 the channel you are editing.
 
 `Delete` goes to the command whenever one is selected, however many notes are selected as well —
-none of them is touched, and the outline comes off them the way every edit takes it off. Click a
-bar's body to put the key back on the notes. A command written through a `"name=value"` cannot be
+none of them is touched, and the outline comes off them so that the key can mean nothing else. Click
+a bar's body to put it back on the notes. A command written through a `"name=value"` cannot be
 deleted, and the key does nothing at all rather than falling through to them.
 
 ## The two bars over the roll
@@ -359,6 +359,12 @@ to put it on. Delete it from the lane first if you meant it to go.
   written as `c8 / ^8`, which still sounds as one note.
 - **Every edit is one undo step**, including a whole selection moved at once, and it is the same
   history `Ctrl+Z` uses in the MML editor.
+- **An edit leaves its notes selected.** Resize a note and it is still picked out, ready to be
+  nudged or transposed; drag a group and the whole group stays lit, the notes it pushed aside
+  included. So does a value changed from the inspector — a note's length dragged there keeps its
+  bar outlined. A note the edit deleted is the one thing that does not come back. Text arriving
+  from anywhere else lets the selection go: typing in the MML, an undo, a Normalize, leaving the
+  channel, muting it, or `Escape`.
 
 ## Starting from nothing
 

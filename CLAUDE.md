@@ -1355,6 +1355,34 @@ stats.loopTicks` pads **every other channel that would cut the song short** out 
   it is a trapdoor: the note would go back to answering an `l` edited later, so a length the porter
   had chosen by ear would move on its own the next time the default did. Digits are written and
   never removed; `c8` under an `l8` is a note that has been given a length of its own.
+- **Dropping the roll's selection on every change to the document, and again in every commit** — it
+  is a set of indices into a `Strip`, and the strip is rebuilt from text the roll may not have
+  written, so clearing was the only answer that could not be wrong. It made the inspector unusable
+  on a note: the Length slider commits, the document changes, and the note the panel is answering
+  about loses its outline in the roll beside it — and the roll's own resize cleared twice over, once
+  at the commit and once at the change that commit caused. The **document change** is the one place
+  it is decided (`sourceChanged`), and no commit clears any more, which is also what lets an outline
+  stand through the compile the roll spends with no strip at all. A panel's splice rewrites one
+  command's own text and adds and removes no item, so the indices still name their notes
+  (`EditBatch.keepsNotes`, which the lane's own command writes claim too, counted by the **view** in
+  `dispatchBatch` because a batch whose `expect` has gone stale is dropped in silence and a count
+  taken where the batch was asked for would run ahead of the document); a gesture leaves
+  anchors saying where each note went — its frame, and its place among that frame's notes
+  (`plannedOrdinals`, `roll-selection.ts`), which within a frame is text order and tick order at
+  once and is what `planEdits` writes in. Every note the selection named and the plan still carries,
+  not only `touched`: a stretch pushes its neighbours, and one of those the porter had hold of is
+  still theirs. Not the tick, which a length change moves for every note after it, so a group would
+  lose everything past the one edited; not the address, which every byte written before it moves —
+  `emitNote` drops a repeated duration byte, so writing a length shifts the rest of the channel; not
+  a source offset mapped through the splices, since `growUnits` widens a unit over the very `o` a
+  commit inserts at a note's head and a note carried past a neighbour has no offset to map at all,
+  `crossings` lifting it out of the text and writing it back on the far side. The pitch is confirmed
+  on the way back in rather than trusted, so the worst a wrong claim can do is take an outline off —
+  by the `@` alone for a drum, whose letter says nothing and whose drawn form is handed the row's
+  own `c`. The loop box's gap and resize carry none: neither goes through a `Plan`, and `resizeLoop`
+  moves the brackets, so notes cross into and out of the body. And `selectedSpans` is **held** across
+  the recompile rather than emptied, in the mould of the clock measurement — the bars drawn for that
+  whole compile are the last one's, so the last one's addresses are the ones that outline them.
 
 ## Angular specifics
 
