@@ -363,19 +363,11 @@ export function loopCountEdit(source: string, focus: LoopFocus, plays: number): 
 }
 
 /**
- * The splice that points a call at another body.
- *
- * A `(n)m` rewrites its digits. A `*n` has none — naming a body is the whole
- * difference between the two spellings — so the construct itself is rewritten as
- * the labelled call that says what it plays, carrying its count across as
- * written so a bare `*` stays a single pass.
- */
-/**
  * The splice that gives an unnamed body a name.
  *
  * `parseLabelLoop` reads the number, sees the `[` hard against it and returns
  * with `loopLabel` set, which `parseLoopStart` then files in `loopPointers`
- * (`parser.ts:2727`) — so the label goes immediately in front of the bracket and
+ * (`parser.ts:2736`) — so the label goes immediately in front of the bracket and
  * nowhere else. Nothing between them: `labelBefore` and the parser's own
  * lookbehind both test adjacency.
  */
@@ -387,6 +379,14 @@ export function loopNameEdit(focus: LoopFocus, label: number): Edit | null {
   return insertAt(focus.construct.from, `(${label})`, 1);
 }
 
+/**
+ * The splice that points a call at another body.
+ *
+ * A `(n)m` rewrites its digits. A `*n` has none — naming a body is the whole
+ * difference between the two spellings — so the construct itself is rewritten as
+ * the labelled call that says what it plays, carrying its count across as
+ * written so a bare `*` stays a single pass.
+ */
 export function loopTargetEdit(source: string, focus: LoopFocus, label: number): Edit | null {
   if (label < 0 || label > MAX_LOOP_LABEL) {
     return null;

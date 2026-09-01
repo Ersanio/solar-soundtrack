@@ -464,13 +464,11 @@ export const ENTRIES: readonly Entry[] = [
 
   // ─── Loops ──────────────────────────────────────────────────────────────
   // The two bracket forms go round the notes the porter picked out rather than
-  // landing at a point, so both are greyed until something is selected, and `*`
-  // still inserts, having no run to wrap.
+  // landing at a point, so both are greyed until something is selected.
   //
-  // There is no `]` button. A wrap writes both brackets, so a lone closing one
-  // has nothing left to close: it was there to finish a `[` dropped at the caret,
-  // which is not a thing the palette does any more.
-  letter('[', '[ ]4', {
+  // There is no `]` button: a wrap writes both brackets, so there is no lone
+  // closing one left to write.
+  letter('[', '[ ]2', {
     category: 'loops',
     writes: 0xe9,
     wraps: 'loop',

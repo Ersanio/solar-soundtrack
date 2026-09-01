@@ -1819,12 +1819,6 @@ function resolveDefaultLength(raw: string, current: number, target: CommandTarge
 }
 
 /**
- * A note or rest's length segments, off the tokens starting at `startIndex` —
- * the one right after the note letter. Mirrors `accumulateTiedLength`
- * (`parser.ts`)'s do-while: the first segment is read unconditionally,
- * then one more for every `^` that follows, each optionally digit-less.
- */
-/**
  * Where one segment's digits are, or the empty span they would go in.
  *
  * The digits alone. A number token is `[=]digits[dots]` (`scanNumber`) and only
@@ -1860,6 +1854,12 @@ function digitSpan(
 	};
 }
 
+/**
+ * A note or rest's length segments, off the tokens starting at `startIndex` —
+ * the one right after the note letter. Mirrors `accumulateTiedLength`
+ * (`parser.ts`)'s do-while: the first segment is read unconditionally,
+ * then one more for every `^` that follows, each optionally digit-less.
+ */
 function gatherNoteLength(
 	tokens: GatherToken[],
 	startIndex: number,

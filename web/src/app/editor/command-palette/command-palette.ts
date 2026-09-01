@@ -192,7 +192,6 @@ export class CommandPalette {
     return { loop: ask('loop'), subloop: ask('subloop') };
   });
 
-  /** Whether the caret is above the first `#0`-`#7`, which two entries turn on. */
   /** What a call written at the caret would play, or why there is nothing to. */
   private readonly call = computed(() =>
     callVerdict({
@@ -203,6 +202,7 @@ export class CommandPalette {
     }),
   );
 
+  /** Whether the caret is above the first `#0`-`#7`, which two entries turn on. */
   private readonly place = computed<CaretPlace>(() => {
     const first = channelsBeginAt(this.store.tokens());
     return {

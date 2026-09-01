@@ -79,11 +79,12 @@ function forkEntry(command: Command): (typeof ENTRIES)[number] | undefined {
  * How a command should be drawn and named, or `null` for one with no entry.
  *
  * `null` is reachable only for a spelling the catalogue does not offer at all —
- * `<` and `>` never reach the command model, `^` folds into its note, and `]` is
- * half of what the loop button writes rather than a button of its own — so a
- * caller may treat it as "nothing to draw" rather than as an error. Every caller
- * is fed a `commandScope`-filtered list, and all three of those are `structure`
- * or nothing at all, so none of them ever asks.
+ * `<` and `>` never reach the command model, `^` folds into its note, `]` is
+ * half of what the loop button writes rather than a button of its own, and `*`
+ * replays a body nothing can point at — so a caller may treat it as "nothing to
+ * draw" rather than as an error. Every caller is fed a `commandScope`-filtered
+ * list, and all of those are `structure` or nothing at all, so none of them
+ * ever asks.
  */
 export function glyphOf(command: Command): ResolvedEntry | null {
   let entry: (typeof ENTRIES)[number] | undefined;

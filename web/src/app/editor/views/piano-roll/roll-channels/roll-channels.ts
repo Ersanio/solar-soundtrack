@@ -71,9 +71,9 @@ function chipTitle(
  *
  * Each chip wears its channel's own colour, as the mixer's strips do, so the
  * picker names the same eight the notes below it are drawn in. What that leaves
- * to say is which chip is which state, and each has a mark of its own: a ring
- * for the one being edited, the accent ring for a solo, a strike-through and a
- * dim for a channel the mask silences.
+ * to say is which chip is which state, and each has a mark of its own: a
+ * near-white ring for the one being edited, a dark one for a solo, a
+ * strike-through and a dim for a channel the mask silences.
  *
  * It emits the channel that was pressed, on the output the modifier chose, and
  * nothing more. Whether that press selects, clears or isolates is the parent's,

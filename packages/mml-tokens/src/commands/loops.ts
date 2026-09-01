@@ -141,7 +141,7 @@ export const MAX_LOOP_LABEL = 0xfffe;
  *
  * `parseLabelLoop`, `parseLoopEnd` and `parseStarLoop` each range-check 1 to 255
  * and emit nothing outside it (`parser.ts:2492`, `:2792`, `:2836`, AMK0116;
- * Music.cpp:1181 and :1332). A `]]n` is the exception and is not this: its count
+ * Music.cpp:1181 and :1329). A `]]n` is the exception and is not this: its count
  * is never range-checked and the byte written is `n - 1`.
  */
 export const MAX_LOOP_COUNT = 255;
@@ -370,7 +370,7 @@ export function loopsAt(reading: LoopReading, offset: number): readonly LoopCons
  * contents at that point in the parse.
  *
  * Opened above the offset, because that is where `parseLoopStart` writes the
- * pointer (`parser.ts:2727`) and `parseLabelLoop` refuses a label it cannot
+ * pointer (`parser.ts:2736`) and `parseLabelLoop` refuses a label it cannot
  * find there (AMK0115). Never a `(!n)`: it takes a slot, so the allocator counts
  * it, but a `$E9` into a remote body is not a call any reader here should offer.
  */

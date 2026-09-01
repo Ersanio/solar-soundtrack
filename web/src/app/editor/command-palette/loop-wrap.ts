@@ -222,7 +222,7 @@ export function wrapVerdict(request: WrapRequest): WrapVerdict {
  * opening bracket and `parseLabelLoop` refuses a label that is not in there yet
  * (AMK0115), so a call can only ever name a loop the parser has already read.
  * Nearest rather than lowest-numbered because that is what a porter means by
- * "again" — and it is the one `*` used to play.
+ * "again", and it is the body a `*` written here would play.
  */
 export function callVerdict(request: {
   source: string;

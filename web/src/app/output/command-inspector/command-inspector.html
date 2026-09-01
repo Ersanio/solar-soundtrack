@@ -3,7 +3,7 @@
     <span class="text-ink-muted text-xs font-semibold tracking-wide uppercase">
       Command inspector
     </span>
-    <!-- Muted whenever there is no command to name, which "a loop, below" is not. -->
+    <!-- Muted where there is no command to name; a loop is named by the panel below. -->
     <span class="font-mono text-xs" [class.text-ink-muted]="!entry() && !params()">
       {{ summary() }}
     </span>

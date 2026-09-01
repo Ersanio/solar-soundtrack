@@ -59,7 +59,7 @@ export interface EditBatch {
 }
 
 /**
- * What a panel asks the editor to do, and nothing else.
+ * What a panel asks the editor to do, and what the view and the roll report back.
  *
  * `editor/views/source-view/` owns the CodeMirror view, so nothing else may
  * touch it — not even the pane it sits in. These signals are how a sibling
@@ -148,11 +148,10 @@ export class EditorRequests {
   /**
    * How deep the editor's undo and redo stacks are, written by the view.
    *
-   * One of the two things in here written by the view rather than read by it
-   * ({@link notesKept} is the other), and it has to be: CodeMirror owns the
-   * history, the roll's toolbar carries the same two buttons the source toolbar
-   * does, and a button that cannot tell whether there is anything to undo is a
-   * button that is never disabled.
+   * Written by the view rather than read by it, as {@link notesKept} is, and it
+   * has to be: CodeMirror owns the history, the roll's toolbar carries the same
+   * two buttons the source toolbar does, and a button that cannot tell whether
+   * there is anything to undo is a button that is never disabled.
    */
   readonly undoDepth = signal(0);
   readonly redoDepth = signal(0);

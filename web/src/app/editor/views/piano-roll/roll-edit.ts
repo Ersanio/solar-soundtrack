@@ -964,7 +964,6 @@ export function frameAt(strip: Strip, tick: number): { frame: number; base: numb
   return found;
 }
 
-/** Where a body-length change puts one pass of the body it changes. */
 /**
  * The rows one body's notes span once a gesture's plan lands.
  *
@@ -977,6 +976,7 @@ export interface BodyRows {
   high: number;
 }
 
+/** Where a body-length change puts one pass of the body it changes. */
 export interface PassShift {
   /**
    * The body being changed, as {@link StripFrame.body} names it.

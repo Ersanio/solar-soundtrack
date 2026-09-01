@@ -157,7 +157,7 @@ export function packCommandLane(request: LaneRequest): CommandLane {
   const place = (event: TimelineCommand): void => {
     const entry = glyphOf(event.command);
     if (entry === null) {
-      return; // `<`, `>` and `^`, which the catalogue does not offer at all.
+      return; // `<`, `>`, `^`, `]` and `*`, which the catalogue does not offer at all.
     }
 
     const muted = audible.get(event.channel) === false;

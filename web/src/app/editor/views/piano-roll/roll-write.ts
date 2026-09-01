@@ -2276,12 +2276,12 @@ function spawnInto(
  * commit writes; `grown` is each voice's own total, for a pad whose channel tick
  * counts predate the edit.
  *
- * Exported because the pad belongs to the **gesture** and not to a frame: a
- * gesture spanning frames plans each of them alone, and two frames each padding
- * the other channels out to their own reach writes the rest twice, `coalesce`
- * concatenating rather than deduping. {@link planGroupEdits} prices it here once.
+ * The pad belongs to the **gesture** and not to a frame: a gesture spanning
+ * frames plans each of them alone, and two frames each padding the other
+ * channels out to their own reach writes the rest twice, `coalesce`
+ * concatenating rather than deduping. {@link planGroupEdits} prices it once.
  */
-export function planReach(
+function planReach(
   strip: Strip,
   frame: StripFrame,
   plan: Plan,

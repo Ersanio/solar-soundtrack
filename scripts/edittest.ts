@@ -2,8 +2,8 @@
  * `@amk/tokens`'s `edits.ts` — the splices the command inspector writes back.
  *
  * This is the one part of the inspector that does arithmetic on the user's
- * document, so it is the part that gets a harness. Two properties carry the
- * weight, and neither is visible from the panels that call it:
+ * document, so it is the part that gets a harness. Four properties carry the
+ * weight, and none is visible from the panels that call it:
  *
  *   1. **Gap preservation.** A splice replaces the parts that changed and copies
  *      the text between them out of the source. That is what keeps a tab, a
@@ -17,6 +17,17 @@
  *      the arguments are writable and the byte is not. Asking that question of
  *      the whole command — which is all `Command.replacement` can answer —
  *      refuses an edit that is perfectly safe.
+ *
+ *   3. **The instrument picker's list and its write are one map.** `@`, `@@`
+ *      and a raw `$DA` reach different sets, so every instrument
+ *      `instrumentReach` offers is written out and rescanned, and has to come
+ *      back as the one that was picked.
+ *
+ *   4. **A note's length is written onto the note.** A bare `c` under an `l8`
+ *      has no argument to splice and is still 24 ticks long, and its dots
+ *      compose rather than add (`Music.cpp:2950`), so the digits go in front of
+ *      them — `l8 c.` written back at its own denominator is `c8.` and still 36
+ *      ticks, not the 72 of `c4.`.
  */
 
 import {

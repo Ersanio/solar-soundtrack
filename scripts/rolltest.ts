@@ -525,7 +525,6 @@ function listOf(expectation: string | readonly string[] | undefined): readonly s
 	return typeof expectation === "string" ? [expectation] : expectation;
 }
 
-/** The plan a gesture makes, for the assertions that are about the plan itself. */
 /**
  * The frame a case's gesture runs in, decided the way the press decides it.
  *
@@ -554,6 +553,7 @@ function frameFor(bar: Strip, made: Gesture, named: number | undefined): number 
 	return first !== undefined ? (bar.items[first]?.frame ?? 0) : 0;
 }
 
+/** The plan a gesture makes, for the assertions that are about the plan itself. */
 function planFor(
 	name: string,
 	source: string,

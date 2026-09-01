@@ -365,7 +365,8 @@ to put it on. Delete it from the lane first if you meant it to go.
   included. So does a value changed from the inspector — a note's length dragged there keeps its
   bar outlined. A note the edit deleted is the one thing that does not come back. Text arriving
   from anywhere else lets the selection go: typing in the MML, an undo, a Normalize, leaving the
-  channel, muting it, or `Escape`.
+  channel, muting it, or `Escape` — and so does dragging a loop box's edge, which moves the
+  brackets and with them the notes' places in the body.
 
 ## Starting from nothing
 

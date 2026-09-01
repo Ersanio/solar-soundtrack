@@ -88,7 +88,7 @@ lands — heard, not just shown. A commit with no note selected replays nothing.
 ## Reaching into the editor
 
 `editor/views/source-view/` owns the CodeMirror view, so nothing else may touch it — not even the
-pane it sits in. Three signals on `EditorRequests` are how a sibling panel asks:
+pane it sits in. Four signals on `EditorRequests` are how a sibling panel asks:
 
 - `reveal` — select a span, set when a diagnostic or a piano roll bar is clicked.
 - `replace` — apply a batch of splices, set when a panel edits a command in place or the roll
@@ -96,14 +96,18 @@ pane it sits in. Three signals on `EditorRequests` are how a sibling panel asks:
 - `insertion` — type a snippet in at the caret, set when a palette button is clicked.
 - `history` — undo or redo, set by the two toolbars that carry the buttons, with `undoDepth` and
   `redoDepth` travelling the other way so a button can tell whether there is anything to do.
+  `notesKept` travels that way too: the view counts each batch it applied that left a channel's
+  notes as they were, so the roll can tell such a change from text typed.
 
 Three more carry what only the roll knows, since the caret names text and the roll is pointing at
 something the text says twice: `inspecting`, which pass of a note a bar click was about;
 `selectedRun`, the stretch of music a whole group of bars covers; and `inspectingLoop`, which of a
 body's constructs a press on a loop box's edge took hold of — a `(1)3`'s ghost and the `(1)[ … ]2` it
 repeats leave the caret in the same place, so the press is the only thing that can tell them apart.
-All three retire themselves as the caret moves off what they name, and all three go back to `null`
-when the roll does.
+`inspecting` and `inspectingLoop` retire themselves as the caret moves off what they name, and
+`selectedRun` follows the roll's own selection. `selectedRun` and `inspectingLoop` go back to `null`
+when the roll does; `inspecting` goes back when `Escape` or a click in the command lane lets the note
+go.
 
 `reveal` carries a `show` flag, and it is the difference between a summons and a question. A
 diagnostic wants the source brought forward, scrolled to and focused. A single click on a roll bar
@@ -629,8 +633,7 @@ take, so the picker names the eight the notes below it are drawn in; a near-whit
 says which is being edited. The chips carry the mixer's state too — struck through and dimmed where
 the mask silences them, ringed dark where the solo is, which the edited chip's own ring takes
 precedence over — and `Ctrl` on one isolates that channel rather than editing it. Both rings are
-told apart by lightness rather than by hue, since the accent that used to mark a solo disappears
-into channels 0 and 6. Beside them sit
+told apart by lightness rather than by hue, since `--color-accent` disappears into channels 0 and 6. Beside them sit
 the flat `roll-*.ts` files, which are Angular-free so that the arithmetic stays where a harness can
 import it: `roll-layout.ts` and `percussion.ts` for the lanes and the camera, `roll-metrics.ts` and
 `roll-bar-text.ts` for what a bar is drawn as, `roll-lengths.ts` for what a gesture may land on,

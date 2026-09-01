@@ -140,7 +140,8 @@ export const LETTER_PARAMS: Readonly<Record<string, Resolver>> = {
 	// falls back to "no arguments", which is what the command has. A loop's count
 	// is `commands/loops.ts`'s answer — it sits on the second of two `]` commands
 	// for a subloop, on none at all for a `(n)m`, and one less than itself for a
-	// `$E6` — and these two are what is left when that reading declines.
+	// `$E6` — and `]` is what is left for when that reading declines, which is a
+	// close with nothing open. No `*` either: `readLoops` raises a recall for every
+	// one it meets, so the construct always answers for a caret on it.
 	"]": fixed([u8("Repeats", "index", { min: 1, describe: (n) => `plays ${n} times` })]),
-	"*": fixed([u8("Repeats", "index", { min: 1, describe: (n) => `replays the last loop ${n} times` })]),
 };
