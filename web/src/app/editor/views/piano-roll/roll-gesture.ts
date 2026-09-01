@@ -678,18 +678,25 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
   });
 
   /**
-   * The plans as far as the porter is concerned: nothing until a press has
-   * actually become a drag.
+   * Whether the press has become something to draw: a drag past the slop, a note
+   * being spawned, or a press the wheel has given a length.
    *
    * A press on a note that turns out to be a click would otherwise flash a bar
    * over the note it is standing on. Two exceptions: drawing, where "in the
    * dragged state" means the new note is there from the press, and a press the
    * wheel has resized, which has something to show and no movement to show it by.
+   *
+   * It never goes back down within a gesture, which is what lets
+   * {@link shiftBoundaries} be dealt on it: the transition is the slop, where the
+   * pointer is captured and there is no longer a click to protect.
    */
-  const shownPlans = computed<readonly FramePlan[]>(() => {
+  const underWay = computed<boolean>(() => {
     const held = drag();
-    return held && (held.moved || held.kind === 'spawn' || held.length !== null) ? plans() : [];
+    return held !== null && (held.moved || held.kind === 'spawn' || held.length !== null);
   });
+
+  /** The plans as far as the porter is concerned: nothing until {@link underWay}. */
+  const shownPlans = computed<readonly FramePlan[]>(() => (underWay() ? plans() : []));
 
   /**
    * The held frame's share of that, for the readers that price one frame — the
@@ -819,10 +826,21 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
 
   /**
    * The edited body's pass ends per voice, or `null` outside a body gesture.
-   * Depends on the held frame alone, so the buckets built over it are dealt
-   * once per gesture rather than once per pointer move.
+   * Depends on the held frame and on {@link underWay} alone, so the buckets built
+   * over it are dealt once per gesture rather than once per pointer move.
+   *
+   * A press that has not become a drag deals none: the deal moves every bar past
+   * the body's first pass end into the bucket group its own count of boundaries
+   * names, and a bar re-parented while the button is down is destroyed before the
+   * release. The browser raises no `click` on a node that has gone, so a press
+   * dealt from the start would lose the inspector's question and the double
+   * click's go-to on every pass of a loop but the first.
    */
   const shiftBoundaries = computed<ShiftBoundaries | null>(() => {
+    if (!underWay()) {
+      return null;
+    }
+
     // A gap slides one voice past one boundary: everything at or after the
     // grabbed pass's start moves by the whole delta, the comparison the
     // buckets already make for a note standing exactly on a boundary.

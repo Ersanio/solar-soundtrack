@@ -1417,6 +1417,19 @@ stats.loopTicks` pads **every other channel that would cut the song short** out 
   was not. In `roll-edit.ts` for `shiftBoundariesFor`'s reason — a harness cannot drive an Angular
   composable, and `rolltest`'s `planFor` took a gesture's frame from its first item, which a `spawn`
   has not got, so every draw case ran in the root frame and `frameAt` was never executed at all.
+- **Dealing the roll's marks into shift buckets from the press** — `shiftBoundaries` answered off the
+  held frame alone, so a press on a note inside a `[ ]` body raised the boundaries before anything
+  had moved and `RollNotes.buckets` re-parented every bar past the body's first pass end into a
+  bucket `<g>` of its own. A bar re-parented while the button is down is destroyed before the
+  release, and the browser raises no `click` on a node that has gone: a click on any pass of a loop
+  but the first never reached `roll-notes.ts:select`, so the inspector's question and the double
+  click's go-to were both lost — silently, and with the ring and the caret still moving, since
+  `onPointerUp` sets the selection itself and `askAboutSelection` answers off that. The deal waits
+  for `underWay`, the three things `shownPlans` is already drawn on, whose transition is the slop:
+  the pointer is captured there and there is no click left to protect, and it never goes back down
+  within a gesture, so the boundaries are still dealt once per gesture. Not a guard on the delta
+  instead — it flips back at every zero crossing of a length drag, and a re-deal is a rebuild of
+  every bar on screen.
 
 ## Angular specifics
 
