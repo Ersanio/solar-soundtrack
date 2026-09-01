@@ -48,7 +48,7 @@ no channel.
 
 | Key                         | What it does                                                    |
 | --------------------------- | --------------------------------------------------------------- |
-| `Space`                     | Plays from the playhead, and stops back at the beginning        |
+| `Space`                     | Plays from the playhead, or stops the song and any preview      |
 | `Delete` / `Backspace`      | Deletes the selected command, or the selected notes             |
 | `Escape`                    | Drops the selection and the inspector with it, then the channel |
 | `←` `→`                     | Nudges the selection by one snap step                           |
@@ -64,7 +64,9 @@ no channel.
 Shortcuts are ignored while you are typing in the MML, so `Ctrl+A` there still selects the text.
 `Space` is the exception to the channel rule — it is the transport, not an edit, so it needs no
 channel picked, and neither does deleting a command: a command belongs to the song rather than to
-the channel you are editing.
+the channel you are editing. While the roll is showing, `Space` is always the transport: it stops
+whatever is sounding — the song, or a note or selection being previewed — and otherwise plays, even
+when a button or a panel heading has the focus, so it never presses the control under the focus.
 
 `Delete` goes to the command whenever one is picked out, however many notes are selected as well —
 none of them is touched. Picking it from a bar's icon or from the lane lets go of the notes, so the

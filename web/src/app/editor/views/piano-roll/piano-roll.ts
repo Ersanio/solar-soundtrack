@@ -29,6 +29,7 @@ import { EditorRequests } from '../../../state/editor-requests';
 import { EditorStore } from '../../../state/editor-store';
 import { Mixer } from '../../../state/mixer';
 import { Playback } from '../../../state/playback';
+import { stopAll } from '../../../state/stop-all';
 import { silencedReason, soleAudible } from '../../../state/transport-view';
 import { PercussionPanel, percussionChips } from './percussion-panel/percussion-panel';
 import { DEFAULT_PERCUSSION, type PlaceContext, rollShape } from './percussion';
@@ -1858,7 +1859,9 @@ export class PianoRoll {
     }
 
     // Space is the transport: it starts the song from wherever the playhead
-    // stands and stops it back at the beginning. It takes the keypress outright,
+    // stands and stops it back at the beginning — and stops a note or a
+    // selection being previewed, as the Stop button does, since a stop that left
+    // one sounding would start the song over it. It takes the keypress outright,
     // since the browser would otherwise scroll the page with it or press
     // whichever button was last clicked — so it means the same thing wherever
     // the pointer has been. Bare, because `Ctrl+Space` toggles an IME and
@@ -1870,8 +1873,8 @@ export class PianoRoll {
         return;
       }
 
-      if (this.playback.isPlaying()) {
-        this.playback.stop();
+      if (this.playback.isPlaying() || this.audition.previewing()) {
+        stopAll(this.playback, this.audition);
       } else if (this.editor.canCompile()) {
         // What the Play button's `disabled` says: with no driver loaded there is
         // nothing to play, and `toggle` would report an error about the song.

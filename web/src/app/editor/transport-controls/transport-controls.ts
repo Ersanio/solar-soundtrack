@@ -6,6 +6,7 @@ import { Checkbox } from '../../shared/checkbox/checkbox';
 import { EditorStore } from '../../state/editor-store';
 import { Mixer } from '../../state/mixer';
 import { Playback } from '../../state/playback';
+import { stopAll } from '../../state/stop-all';
 
 /** The volume slider's ceiling, in percent. */
 const VOLUME_MAX = 500;
@@ -56,16 +57,9 @@ export class TransportControls {
     };
   });
 
-  /** Stops whichever of the two is going, and both where both are. */
+  /** Stops whichever of the two is going, and both where both are — the roll's `Space` too. */
   protected stop(): void {
-    // Guarded rather than unconditional: `Playback.stop` rests the transport at
-    // tick 0, so a stop with it already idle would throw away a position seeked
-    // to while stopped, which is where the next press of play picks the song up.
-    if (!this.playback.isIdle()) {
-      this.playback.stop();
-    }
-
-    this.audition.stop();
+    stopAll(this.playback, this.audition);
   }
 
   protected onVolume(event: Event): void {
