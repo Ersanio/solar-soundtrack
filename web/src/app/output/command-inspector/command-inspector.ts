@@ -152,7 +152,7 @@ export class CommandInspector {
       return 'entry';
     }
 
-    const command = this.command();
+    const command = this.params();
     if (!command) {
       return null;
     }

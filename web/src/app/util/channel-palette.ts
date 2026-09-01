@@ -68,6 +68,12 @@ export const CHANNEL_BG: readonly string[] = [
   'bg-ch-7',
 ];
 
+/**
+ * A channel the mask silences, on the mixer's plate and the roll's chip alike:
+ * struck through and dimmed, so plate and digit lose their colour together.
+ */
+export const CHANNEL_QUIET = 'line-through opacity-40';
+
 /** The same eight behind a whole mixer strip, faint enough to read M and S over. */
 export const CHANNEL_WASH: readonly string[] = [
   'bg-ch-0/15',

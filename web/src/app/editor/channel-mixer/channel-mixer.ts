@@ -2,7 +2,7 @@ import { Component, computed, inject } from '@angular/core';
 
 import { Button } from '../../shared/button/button';
 import { Mixer } from '../../state/mixer';
-import { CHANNEL_BG, CHANNEL_WASH } from '../../util/channel-palette';
+import { CHANNEL_BG, CHANNEL_QUIET, CHANNEL_WASH } from '../../util/channel-palette';
 
 /** Shared by all eight strips, so a row differs from the next only in its wash. */
 const STRIP_CLASS = 'border-edge flex items-center overflow-hidden rounded-md border';
@@ -47,7 +47,7 @@ export class ChannelMixer {
       // silenced channel dims plate and digit together, which holds that
       // relation where dimming the digit alone would not.
       plate: `${PLATE_CLASS} ${CHANNEL_BG[channel.index]} text-ink font-semibold${
-        channel.audible ? '' : ' line-through opacity-40'
+        channel.audible ? '' : ` ${CHANNEL_QUIET}`
       }`,
     })),
   );

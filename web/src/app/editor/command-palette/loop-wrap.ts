@@ -258,10 +258,11 @@ export function callVerdict(request: {
   }
 
   const above = loopTargets(reading, caret);
-  const nearest = above[above.length - 1];
-  if (nearest?.label === undefined || nearest.label === null) {
+  if (above.length === 0) {
     return { refused: CALL_NONE };
   }
+
+  const nearest = above[above.length - 1];
 
   const body = `(${nearest.label})${COUNT}`;
   const { before, after } = padAround(source, caret);

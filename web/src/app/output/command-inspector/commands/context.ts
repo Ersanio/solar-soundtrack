@@ -53,7 +53,16 @@ export function argLockedBecause(command: Command, index: number): string | null
   }
 
   const macro = index >= 0 ? command.args[index]?.replacement : undefined;
-  return macro === undefined ? null : `comes from the "${macro}" replacement`;
+  return macro === undefined ? null : replacementLockedBecause(macro);
+}
+
+/**
+ * The one wording for a part that came through a macro, for the rows that are
+ * not arguments — a note's length segment, a loop's count — as well as the ones
+ * that are.
+ */
+export function replacementLockedBecause(macro: string): string {
+  return `comes from the "${macro}" replacement`;
 }
 
 /**

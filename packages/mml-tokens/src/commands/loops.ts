@@ -142,9 +142,19 @@ export const MAX_LOOP_LABEL = 0xfffe;
  * `parseLabelLoop`, `parseLoopEnd` and `parseStarLoop` each range-check 1 to 255
  * and emit nothing outside it (`parser.ts:2492`, `:2792`, `:2836`, AMK0116;
  * Music.cpp:1181 and :1329). A `]]n` is the exception and is not this: its count
- * is never range-checked and the byte written is `n - 1`.
+ * is never range-checked and the byte written is `n - 1` — {@link MAX_SUBLOOP_COUNT}.
  */
 export const MAX_LOOP_COUNT = 255;
+
+/**
+ * The most passes a subloop may ask for, which is not {@link MAX_LOOP_COUNT}.
+ *
+ * `parseLoopEnd` range-checks a `[ ]` count and does **not** check a `[[ ]]` one;
+ * it writes `count - 1` through `append`, which masks (`parser.ts:718`). So 256
+ * is the last count that means itself — `$E6 $FF`, played 256 times — and 257
+ * becomes a byte of 0 and plays once, in silence.
+ */
+export const MAX_SUBLOOP_COUNT = 256;
 
 export function readLoops(source: string, index: TokenIndex): LoopReading {
 	const byStart = new Map<number, Command>();
@@ -374,11 +384,14 @@ export function loopsAt(reading: LoopReading, offset: number): readonly LoopCons
  * find there (AMK0115). Never a `(!n)`: it takes a slot, so the allocator counts
  * it, but a `$E9` into a remote body is not a call any reader here should offer.
  */
-export function loopTargets(reading: LoopReading, before: number): readonly LoopSpan[] {
+export function loopTargets(reading: LoopReading, before: number): readonly LoopTarget[] {
 	return reading.spans.filter(
-		(span) => span.kind === "call" && !span.remote && span.label !== null && span.from < before,
+		(span): span is LoopTarget => span.kind === "call" && !span.remote && span.label !== null && span.from < before,
 	);
 }
+
+/** A body a call may name: a `[ ]` with a label, which {@link loopTargets} alone hands out. */
+export type LoopTarget = LoopSpan & { label: number };
 
 /** Whether `offset` sits inside a body of each kind — the parser's two variables. */
 export function loopStateAt(reading: LoopReading, offset: number): { inCall: boolean; inSub: boolean } {

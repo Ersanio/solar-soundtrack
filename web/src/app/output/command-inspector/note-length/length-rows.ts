@@ -3,6 +3,7 @@ import { NOTE_DENOMINATORS } from '@amk/tokens/commands/letter-params';
 import { noteLengthName } from '@amk/tokens/commands/units';
 import { type Edit, insertAt, spliceRange } from '@amk/tokens/edits';
 import { type Command, type NoteLengthSegment, noteLengthTicks } from '@amk/tokens';
+import { replacementLockedBecause } from '../commands/context';
 
 /**
  * A note's lengths as controls, and the splice each one writes back.
@@ -57,13 +58,13 @@ export function noteLengthLabel(segment: NoteLengthSegment, denominator: number)
  *
  * A macro's tokens share one collapsed span, so there is no text of the
  * author's to write over — the same interlock `argEditable` makes, in the
- * wording `describe.ts` uses for it. A segment with no denominator has no
+ * wording `context.ts` states once. A segment with no denominator has no
  * number this control could write: an `=NN` is a tick count, and an implicit
  * one under a dotted or exact `l` is a length nothing spells `1/n`.
  */
 function lockedBecause(segment: NoteLengthSegment): string | null {
   if (segment.replacement !== undefined) {
-    return `comes from the "${segment.replacement}" replacement`;
+    return replacementLockedBecause(segment.replacement);
   }
 
   if (segment.denominator === null) {

@@ -1099,6 +1099,9 @@ export class PianoRoll {
       now.strip ? this.addressesOf(now.strip, now.chosen) : (previous?.value ?? new Set<number>()),
   });
 
+  /** The selected strip indices in order, which the two readers below walk. */
+  private readonly chosen = computed(() => [...this.gestures.selection()].sort((a, b) => a - b));
+
   /**
    * The run of text the selection covers, for the command palette in the
    * inspector to put a loop's brackets round.
@@ -1110,7 +1113,7 @@ export class PianoRoll {
    */
   private readonly selectedRun = computed<{ start: number; end: number } | null>(() => {
     const items = this.strip()?.items;
-    const chosen = [...this.gestures.selection()].sort((a, b) => a - b);
+    const chosen = this.chosen();
     const first = items?.[chosen[0]];
     const last = items?.[chosen[chosen.length - 1]];
     if (!first || !last) {
@@ -1278,7 +1281,7 @@ export class PianoRoll {
     effect(() => {
       const run = this.selectedRun();
       const strip = this.strip();
-      const chosen = [...this.gestures.selection()].sort((a, b) => a - b);
+      const chosen = this.chosen();
       untracked(() => {
         this.requests.selectedRun.set(run);
         this.askAboutSelection(strip, chosen);

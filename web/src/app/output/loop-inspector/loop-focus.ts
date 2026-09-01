@@ -4,6 +4,7 @@ import type { LoopConstruct, LoopReading, LoopSpan } from '@amk/tokens/commands/
 import {
   MAX_LOOP_COUNT,
   MAX_LOOP_LABEL,
+  MAX_SUBLOOP_COUNT,
   loopAt,
   loopTargets,
   loopsAt,
@@ -18,6 +19,7 @@ import {
   spliceArg,
   spliceRange,
 } from '@amk/tokens/edits';
+import { argLockedBecause } from '../command-inspector/commands/context';
 
 /**
  * Which of the language's five loop spellings a construct is.
@@ -98,16 +100,6 @@ export interface LoopFocusRequest {
   /** What the piano roll last took hold of — see `EditorRequests.inspectingLoop`. */
   hint: { text: Span; body: Span } | null;
 }
-
-/**
- * A subloop's ceiling, which is not the others'.
- *
- * `parseLoopEnd` range-checks a `[ ]` count and does **not** check a `[[ ]]` one;
- * it writes `count - 1` through `append`, which masks (`parser.ts:718`). So 256
- * is the last count that means itself — `$E6 $FF`, played 256 times — and 257
- * becomes a byte of 0 and plays once, in silence.
- */
-const MAX_SUB_COUNT = 256;
 
 /** The most of a construct worth showing before the middle comes out. */
 const WRITTEN_MAX = 44;
@@ -214,10 +206,9 @@ function countView(
 ): LoopCountView {
   const sub = kind === 'subloop';
   const min = sub ? 2 : 1;
-  const max = sub ? MAX_SUB_COUNT : MAX_LOOP_COUNT;
+  const max = sub ? MAX_SUBLOOP_COUNT : MAX_LOOP_COUNT;
   const { plays, at } = construct.count;
   const written = at.end > at.start;
-  const macro = written ? command?.args[0]?.replacement : undefined;
 
   return {
     plays: plays ?? min,
@@ -225,8 +216,8 @@ function countView(
     max,
     note: countNote(construct, plays, written),
     editable: !written || command === null || argEditable(command, 0),
-    lockedBecause: macro === undefined ? null : `comes from the "${macro}" replacement`,
-    warn: countWarning(plays, written, kind, min, max),
+    lockedBecause: written && command !== null ? argLockedBecause(command, 0) : null,
+    warn: countWarning(plays, kind, min, max),
   };
 }
 
@@ -247,13 +238,14 @@ function countNote(construct: LoopConstruct, plays: number | null, written: bool
 
 function countWarning(
   plays: number | null,
-  written: boolean,
   kind: LoopKind,
   min: number,
   max: number,
 ): string | null {
   if (plays === null) {
-    return written ? null : 'A subloop must be given a count (AMK0128).';
+    // Only a subloop reads as none: every other spelling defaults a missing
+    // count to 1.
+    return 'A subloop must be given a count (AMK0128).';
   }
 
   if (plays < min) {
@@ -274,7 +266,7 @@ function countWarning(
 function recallView(reading: LoopReading, construct: LoopConstruct): LoopRecallView {
   const star = !isSpan(construct) && construct.kind === 'star';
   const options: EnumOption[] = loopTargets(reading, construct.from).map((span) => ({
-    value: span.label ?? 0,
+    value: span.label,
     label: `(${span.label})`,
   }));
 

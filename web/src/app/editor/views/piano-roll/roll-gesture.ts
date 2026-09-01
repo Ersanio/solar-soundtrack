@@ -1365,7 +1365,7 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
     return whole;
   });
 
-  return {
+  const api: RollGestures = {
     selection: selection.asReadonly(),
     selectedBodies,
     preview,
@@ -1494,7 +1494,12 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
                   : null
               : null;
         const free = !outer && refused === null ? gapSlack(grabbed, construct) : 0;
-        const joined = free > 0 ? loopJoin(sources.source(), grabbed, construct, run) : null;
+        // Priced only where a slide could spend it: a resize never joins, and a
+        // later pass has an earlier one of its own run in front of it.
+        const joined =
+          end === null && pass === 0 && free > 0
+            ? loopJoin(sources.source(), grabbed, construct, run)
+            : null;
 
         drag.set({
           kind: end === null ? 'gap' : 'resize',
@@ -1519,7 +1524,7 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
             pass,
             splitTick: run.passes[pass].tick,
             slack: end === null ? (pass === 0 ? free : 0) : free,
-            joins: end === null && pass === 0 ? (joined?.count ?? null) : null,
+            joins: joined?.count ?? null,
             room: end === null ? 0 : bodyRests(grabbed, played, end).ticks,
             ahead: passes.before,
             refused,
@@ -2017,20 +2022,11 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
     },
   };
 
-  function erase(index: number): void {
-    const strip = sources.strip();
-    if (!strip) {
-      return;
-    }
+  return api;
 
-    const held = strip.items[index]?.frame ?? 0;
-    const gesture: Gesture = { kind: 'delete', items: [index] };
-    const parts = planFrames(strip, gesture, sources.editMode(), held);
-    const edits = write(strip, parts);
-    if (edits && edits.length > 0) {
-      carry(strip, parts);
-      sinks.commit(edits);
-    }
+  /** The right button's delete of one note: the keyboard's, aimed by the pointer. */
+  function erase(index: number): void {
+    api.run({ kind: 'delete', items: [index] });
   }
 
   function commitMarquee(held: Drag): void {

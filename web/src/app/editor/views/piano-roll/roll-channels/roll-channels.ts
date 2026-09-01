@@ -1,7 +1,7 @@
 import { Component, computed, input, output } from '@angular/core';
 
 import { CHANNELS, type ChannelState } from '../../../../state/transport-view';
-import { CHANNEL_BG } from '../../../../util/channel-palette';
+import { CHANNEL_BG, CHANNEL_QUIET } from '../../../../util/channel-palette';
 import { KEY_WIDTH, OVERVIEW_HEIGHT } from '../roll-metrics';
 
 /**
@@ -31,12 +31,6 @@ const EDIT_CLASS = 'ring-ink ring-2 ring-inset';
  * says itself anyway, being the one channel the strike-through has left alone.
  */
 const SOLO_CLASS = 'ring-surface ring-2 ring-inset';
-
-/**
- * Not being heard, struck through and dimmed as the mixer dims its own channel
- * number, so plate and digit lose their colour together.
- */
-const QUIET_CLASS = 'line-through opacity-40';
 
 /**
  * What a chip is for, in the order a press finds out: the click, then the state
@@ -125,7 +119,7 @@ export class RollChannels {
       return {
         channel,
         title: chipTitle(channel, on, solo, quiet, song.has(channel)),
-        class: `${TOGGLE_CLASS} ${CHANNEL_BG[channel]}${ring}${quiet ? ` ${QUIET_CLASS}` : ''}`,
+        class: `${TOGGLE_CLASS} ${CHANNEL_BG[channel]}${ring}${quiet ? ` ${CHANNEL_QUIET}` : ''}`,
       };
     });
   });

@@ -591,14 +591,15 @@ export function planFrames(
     return [{ frame: home, plan: planGesture(strip, gesture, mode, home) }];
   }
 
-  const share = new Map<number, number[]>([[held, []]]);
+  const homeAt = strip.frames.indexOf(home);
+  const share = new Map<number, number[]>([[homeAt, []]]);
   for (const index of named) {
     const which = frameOf(index);
     share.set(which, [...(share.get(which) ?? []), index]);
   }
 
   return [...share.entries()]
-    .sort(([a], [b]) => (a === held ? -1 : b === held ? 1 : a - b))
+    .sort(([a], [b]) => (a === homeAt ? -1 : b === homeAt ? 1 : a - b))
     .map(([which, items]) => {
       const frame = strip.frames[which];
       return { frame, plan: planGesture(strip, { ...gesture, items }, mode, frame) };

@@ -1,4 +1,3 @@
-import type { Span } from '@amk/core/types';
 import type { LoopRun, WalkNote } from '@amk/spc/song-walk';
 import type { Command } from '@amk/tokens';
 import { type CommandGlyph } from '../../command-palette/command-icon';
@@ -42,8 +41,6 @@ export interface MarkGlyph {
   x: number;
   y: number;
   size: number;
-  /** The command's own span, which is what a click on it selects. */
-  span: Span;
   /**
    * The command itself, which is what says this glyph is the selected one.
    *
@@ -261,7 +258,6 @@ export function buildMarks(request: MarkRequest): Mark[] {
         x: x + box.x,
         y: y + box.y,
         size: box.size,
-        span: drawable[at].command.span,
         command: drawable[at].command,
         label: drawable[at].entry!.label,
         defining: defining.has(drawable[at].command),

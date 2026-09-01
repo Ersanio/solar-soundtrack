@@ -218,7 +218,7 @@ export class RollNotes {
     if (this.inSync()) {
       this.requests.inspecting.set({ address: mark.note.address, tick: mark.note.tick });
       this.commandPicked.emit();
-      this.requests.reveal.set({ span: { ...glyph.span }, show });
+      this.requests.reveal.set({ span: { ...glyph.command.span }, show });
     }
   }
 }
