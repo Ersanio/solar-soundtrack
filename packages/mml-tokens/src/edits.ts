@@ -229,3 +229,18 @@ export function insertAt(offset: number, text: string, line = 1): Edit | null {
 
 	return { span: { start: offset, end: offset, line }, text, expect: "" };
 }
+
+/**
+ * The spaces an insertion needs to stand as a token of its own: one in front
+ * where the character before `start` is not whitespace, one after where the
+ * character at `end` is not. MML is whitespace-separated, and the one rule
+ * serves a snippet landing at the caret, a command written beside a note and a
+ * pair of brackets going round a run — `start` and `end` are the run's two ends,
+ * or one offset for a point.
+ */
+export function padAround(source: string, start: number, end = start): { before: string; after: string } {
+	return {
+		before: start > 0 && !/\s/.test(source[start - 1]) ? " " : "",
+		after: end < source.length && !/\s/.test(source[end]) ? " " : "",
+	};
+}

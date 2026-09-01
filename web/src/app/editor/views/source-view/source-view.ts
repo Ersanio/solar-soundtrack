@@ -30,6 +30,7 @@ import { EditorView, keymap, lineNumbers } from '@codemirror/view';
 
 import type { Severity } from '@amk/core/types';
 import { commandAt } from '@amk/tokens';
+import { padAround } from '@amk/tokens/edits';
 import { IconWrap } from '../../../shared/icons/icon-wrap';
 import { Toolbar } from '../../../shared/toolbar/toolbar';
 import { type EditBatch, EditorRequests, type Insertion } from '../../../state/editor-requests';
@@ -434,8 +435,7 @@ export class SourceView {
       doc.length,
     );
 
-    const before = at > 0 && !/\s/.test(doc.sliceString(at - 1, at)) ? ' ' : '';
-    const after = at < doc.length && !/\s/.test(doc.sliceString(at, at + 1)) ? ' ' : '';
+    const { before, after } = padAround(doc.toString(), at);
     const text = `${before}${insertion.text}${after}`;
 
     // The selection is named in the insertion's own coordinates, so it moves

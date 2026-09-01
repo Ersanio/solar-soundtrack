@@ -11,7 +11,14 @@ import type { LoopRun } from '@amk/spc/song-walk';
 import type { Command } from '@amk/tokens';
 import { commandScope } from '@amk/tokens/commands/in-force';
 import { MAX_LOOP_COUNT } from '@amk/tokens/commands/loops';
-import { commandRewritable, type Edit, insertAt, spliceOut, spliceRange } from '@amk/tokens/edits';
+import {
+  commandRewritable,
+  type Edit,
+  insertAt,
+  padAround,
+  spliceOut,
+  spliceRange,
+} from '@amk/tokens/edits';
 import {
   type EditContext,
   type EditRefusal,
@@ -1241,7 +1248,7 @@ function openBefore(context: EditContext, site: LoopSite, ticks: number): Edit[]
 
   const { source } = context;
   const start = site.text.start;
-  const lead = start > 0 && !/\s/.test(source[start - 1]) ? ' ' : '';
+  const lead = padAround(source, start).before;
   const opened = insertAt(start, `${lead}r${text} `, site.text.line);
   return opened ? [opened] : [];
 }

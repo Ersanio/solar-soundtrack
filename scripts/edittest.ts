@@ -35,6 +35,7 @@ import {
 	argsRewritable,
 	argumentText,
 	commandRewritable,
+	padAround,
 	spliceArg,
 	spliceArgs,
 	spliceCommand,
@@ -423,6 +424,25 @@ console.log("\na note's length is written onto the note, whatever it was written
 		noteLengthLabel(plainSegment, 8) === "1/8 · an eighth note · 24 ticks",
 		noteLengthLabel(plainSegment, 8),
 	);
+}
+
+console.log("\nan insertion is padded to stand as a token of its own");
+{
+	// One rule for the caret palette, the note palette, a wrap's two brackets
+	// and the rest a loop drag opens: a space on whichever side has a character
+	// against it, and none where there is already white space or nothing at all.
+	const song = "#0 c4 d4";
+	const pad = (start: number, end = start): string => {
+		const { before, after } = padAround(song, start, end);
+		return `${before}|${after}`;
+	};
+
+	check("between two characters it takes a space on each side", pad(4) === " | ", pad(4));
+	check("after a space it takes none in front", pad(3) === "| ", pad(3));
+	check("before a space it takes none behind", pad(5) === " |", pad(5));
+	check("at the start of the text none in front", pad(0) === "| ", pad(0));
+	check("at the end none behind", pad(song.length) === " |", pad(song.length));
+	check("a run is padded by its own two ends", pad(3, 5) === "|", pad(3, 5));
 }
 
 summarise();

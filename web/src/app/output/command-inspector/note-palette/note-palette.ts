@@ -2,7 +2,7 @@ import { Component, computed, effect, inject, input, signal } from '@angular/cor
 
 import type { Command } from '@amk/tokens';
 import { channelsBeginAt, songTarget } from '@amk/tokens/dialect';
-import { insertAt } from '@amk/tokens/edits';
+import { insertAt, padAround } from '@amk/tokens/edits';
 import {
   CATEGORIES,
   type CaretPlace,
@@ -131,18 +131,28 @@ export class NotePalette {
   });
 
   /**
+   * Where a call is written: the head of the note's own unit, over its leading
+   * `o` and `@`, as every insertion in front of a note is. The verdict is asked
+   * about this offset and the splice lands at it, so the padding and the loops
+   * declared above are read at one place.
+   */
+  private readonly callAt = computed(
+    () => unitStartBefore(this.store.source(), this.store.tokens().commands, this.note()).start,
+  );
+
+  /**
    * What a call written here would play.
    *
-   * Asked about the note's own start rather than the document's caret: this
-   * palette writes in front of the note it is aimed at, and which loops are
-   * declared above that point is what decides the answer.
+   * Asked about {@link callAt} rather than the document's caret: this palette
+   * writes in front of the note it is aimed at, and which loops are declared
+   * above that point is what decides the answer.
    */
   private readonly call = computed(() =>
     callVerdict({
       source: this.store.source(),
       index: this.store.tokens(),
       reading: this.store.loops(),
-      caret: this.note().span.start,
+      caret: this.callAt(),
     }),
   );
 
@@ -215,22 +225,22 @@ export class NotePalette {
       return;
     }
 
+    // A call carries its own padding, asked about the offset it lands at.
+    if (button.call !== undefined && isCall(button.call)) {
+      const at = this.callAt();
+      this.requests.applyAll(callEdits(button.call, at), callSelection(button.call, at));
+      return;
+    }
+
     const source = this.store.source();
     const note = this.note();
     const { start: at, line } = button.after
       ? { start: note.span.end, line: note.span.line }
       : unitStartBefore(source, this.store.tokens().commands, note);
 
-    // A call carries its own padding, having been asked about this very offset.
-    if (button.call !== undefined && isCall(button.call)) {
-      this.requests.applyAll(callEdits(button.call, at), callSelection(button.call, at));
-      return;
-    }
-
     // MML is whitespace-separated, so pad where the neighbouring character is
     // not — the same rule as the caret palette's.
-    const before = at > 0 && !/\s/.test(source[at - 1]) ? ' ' : '';
-    const after = at < source.length && !/\s/.test(source[at]) ? ' ' : '';
+    const { before, after } = padAround(source, at);
     const edit = insertAt(at, `${before}${button.text}${after}`, line);
     if (!edit) {
       return;

@@ -7,7 +7,7 @@ import {
   loopTargets,
   nextLoopLabel,
 } from '@amk/tokens/commands/loops';
-import { type Edit, insertAt } from '@amk/tokens/edits';
+import { type Edit, insertAt, padAround } from '@amk/tokens/edits';
 import { caretPosition } from '../../util/format';
 import { unitStartBefore } from '../views/piano-roll/roll-strip';
 
@@ -249,8 +249,7 @@ export function callVerdict(request: {
   }
 
   const body = `(${nearest.label})${COUNT}`;
-  const before = caret > 0 && !/\s/.test(source[caret - 1]) ? ' ' : '';
-  const after = caret < source.length && !/\s/.test(source[caret]) ? ' ' : '';
+  const { before, after } = padAround(source, caret);
   const text = `${before}${body}${after}`;
   const digits = text.lastIndexOf(String(COUNT));
 
@@ -291,8 +290,8 @@ export function wrapSelection(offer: WrapOffer): { anchor: number; head: number 
  * Padding and the count's own offsets.
  *
  * MML is whitespace-separated, so a bracket lands beside a space where the
- * neighbouring character is not one — the same rule `insertAtCaret` and
- * `NotePalette.insert` already apply to a command.
+ * neighbouring character is not one — `padAround`'s rule, read at the run's two
+ * ends.
  */
 function offerOf(
   source: string,
@@ -300,8 +299,7 @@ function offerOf(
   open: string,
   close: string,
 ): { open: string; close: string; countAt: { start: number; end: number } } {
-  const before = at.start > 0 && !/\s/.test(source[at.start - 1]) ? ' ' : '';
-  const after = at.end < source.length && !/\s/.test(source[at.end]) ? ' ' : '';
+  const { before, after } = padAround(source, at.start, at.end);
   const digits = /\d+/.exec(close);
   return {
     open: `${before}${open}`,
