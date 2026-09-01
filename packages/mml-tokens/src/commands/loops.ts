@@ -78,12 +78,13 @@ export interface LoopSpan {
 	 * recalls it by. `null` for a bare `[`, for every subloop, and for a `(!n)`,
 	 * whose number is a remote slot rather than a label a call may name.
 	 *
-	 * A `(n)` is carried past a `[[` to the next `[` by the parser — `loopLabel`
-	 * survives from `(n)[` until the matching `]` (`parser.ts:parseLoopStart`) —
-	 * and that is not read here: the label is taken only where it is hard against
-	 * the bracket it names, so `(5)[[d]]4 [e]2` leaves the second loop unnamed
-	 * rather than named wrongly. {@link LoopReading.slots} is unaffected, so the
-	 * allocator still sees the slot as taken.
+	 * Filed as the parser files it: `(n)[` sets `loopLabel`, a `[[` met next
+	 * leaves it standing, and the next `[` that opens a `[ ]` takes it
+	 * (`parser.ts:2476`, `:2731-2736`) — so `(5)[[d]]4 [e]2` names the second
+	 * loop, and a `(5)3` below plays `e`. A `]` or a `(n)m` in between clears it
+	 * (`:2506`, `:2813`). {@link from} reaches back over the label only where it
+	 * is hard against the bracket; a carried label's digits are still
+	 * {@link labelAt}.
 	 */
 	label: number | null;
 	/** The digits between that `(` and its `)`, for a reader that rewrites them. */
@@ -172,12 +173,10 @@ export function readLoops(source: string, index: TokenIndex): LoopReading {
 	let sub: { from: number; bodyFrom: number } | null = null;
 
 	/**
-	 * The `(n)[` met on an earlier token, waiting for its bracket.
-	 *
-	 * Not cleared between the two: `at` is the `(`'s own offset and the bracket
-	 * matches on it through `labelBefore`, which only reaches back over a `)`
-	 * hard against it — so a label left standing can never be claimed by a `[`
-	 * written somewhere else.
+	 * The `(n)[` met on an earlier token, waiting for its bracket — the parser's
+	 * `loopLabel`. The next `[` that opens a `[ ]` takes it, a `[[` on the way
+	 * leaves it standing, and a `]` or a `(n)m` clears it, which is exactly when
+	 * `parseLoopEnd` and `parseLabelLoop` write `loopLabel = 0`.
 	 */
 	let declared: (Named & { at: number }) | null = null;
 
@@ -207,7 +206,8 @@ export function readLoops(source: string, index: TokenIndex): LoopReading {
 				}
 
 				const from = labelBefore(source, token.start);
-				const named = declared !== null && declared.at === from ? declared : null;
+				const named = declared;
+				declared = null;
 				call = {
 					from,
 					bodyFrom: token.end,
@@ -247,6 +247,7 @@ export function readLoops(source: string, index: TokenIndex): LoopReading {
 				}
 
 				call = null;
+				declared = null; // `parseLoopEnd` writes `loopLabel = 0`.
 			}
 		} else if (token.kind === "loopCall") {
 			// `*n`. No check that a previous loop exists, because the compiler has
@@ -267,6 +268,7 @@ export function readLoops(source: string, index: TokenIndex): LoopReading {
 				if (source[close.end] === "[") {
 					declared = { at: token.start, label: named.remote ? null : named.written, labelAt, remote: named.remote };
 				} else if (!named.remote) {
+					declared = null; // `parseLabelLoop` ends a recall with `loopLabel = 0`.
 					const count = writtenCount(source, close.end);
 					recalls.push({
 						kind: "label",

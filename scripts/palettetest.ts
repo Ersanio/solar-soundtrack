@@ -852,8 +852,8 @@ console.log("\nputting brackets round a selection");
 }
 
 // ---------------------------------------------------------------------------
-//
-// Reading a loop's count, and writing it back.
+console.log("\nreading a loop's count, and writing it back");
+// ---------------------------------------------------------------------------
 //
 // The same standard once more, on the other half of the brackets: `loop-focus.ts`
 // says what a construct repeats and where that number is written, and the
@@ -1023,6 +1023,21 @@ console.log("\nputting brackets round a selection");
 			"a loop that already has a name is not offered another",
 			focusOn("#amk 4\n#0 o4 (0)[c4]2 e4\n", "]2")?.name === null,
 		);
+
+		// A label the parser carries: `(n)[` sets `loopLabel`, a `[[` met next leaves
+		// it standing and the next `[` files it (`parser.ts:2731-2736`), so the
+		// second loop here is `(5)` and the call below plays `e4`. The reading has to
+		// say so too, or the panel calls a compiling song's call undeclared and
+		// offers the body a second name that would orphan the first.
+		const carried = "#amk 4\n#0 o4 (5)[[ d4 ]]4 [ e4 ]2 (5)3\n";
+		check("a label carried past a subloop compiles", errorsIn(carried).length === 0, errorsIn(carried).join(" "));
+		const took = readLoops(carried, tokenize(carried)).spans.find((span) => span.kind === "call");
+		check("and is filed on the loop that took it", took?.label === 5, String(took?.label));
+		check(
+			"so the call finds its body",
+			focusOn(carried, "(5)3")?.recalls?.options.some((option) => option.value === 5) === true,
+		);
+		check("and that body is not offered another name", focusOn(carried, "]2")?.name === null);
 	}
 
 	// A subloop's floor is 2 and a `[ ]`'s is 1, and both are the compiler's.
