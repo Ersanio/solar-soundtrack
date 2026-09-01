@@ -1228,10 +1228,12 @@ stats.loopTicks` pads **every other channel that would cut the song short** out 
   still edits, and its **Recalls** row is how it gets a name.
 - **The roll publishing its selection as strip indices** — an index means nothing outside the
   component that built the strip, and the panel that wants it is in the output pane.
-  `EditorRequests.selectedRun` carries the **span** from the first selected item to the last, which
-  is the one currency every panel already speaks, and it is `null` where the two ends sit in
-  different frames — a bracket cannot straddle a `[ ]` body and the channel around it, which is
-  `REFUSE_SPLIT` reached by another route.
+  `EditorRequests.selectedRun` carries the **span** from the lowest selected unit to the highest,
+  which is the one currency every panel already speaks. By offset and not by strip index: a body's
+  items are a frame appended after the root's, so `Ctrl+A` over `c4 [ e4 ]2 d4` has its last index
+  inside the body while the run really ends at `d4`. Whether the run may take a bracket is
+  `wrapVerdict`'s question — it widens over a construct the run covers whole and refuses one the run
+  cuts through, `WRAP_SPLIT`, which is `REFUSE_SPLIT` reached by another route.
 - **The loop box's transpose planned in the grabbed body's frame alone** — a body's notes are its
   frame's items and a loop written inside it is an opaque `'construct'` there, so
   `[ c4 [[d4]]2 e4 ]3` dragged up moved `c4` and `e4` and left `d4` sitting under a box drawn round
@@ -1250,7 +1252,8 @@ stats.loopTicks` pads **every other channel that would cut the song short** out 
   over-padded channel stops being the shortest and the song's figure does not move — so
   `rolltest`'s `channelTicks` reads the padded voice's own count. And the costs are taken rather
   than worked around: `selectedBodies` finds the inner body whole too, so both boxes close up solid,
-  and `selectedRun` is `null`, so the palette's **Loop** greys out.
+  and `selectedRun` is the whole group's text, which `wrapVerdict` reads as a run inside a loop
+  holding a subloop and refuses as `WRAP_DEEP`.
 - **The instrument picker normalising every pick to a plain `@n`** — the whole set is then always
   available and one splice serves all three spellings, and it rewrites text the author chose: a
   click on a dropdown turned `$DA $02` into `@2` and `@@5` into `@5`. Only the argument moves, in

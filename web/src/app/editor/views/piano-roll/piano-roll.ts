@@ -1106,23 +1106,31 @@ export class PianoRoll {
    * The run of text the selection covers, for the command palette in the
    * inspector to put a loop's brackets round.
    *
-   * The span from the first selected item to the last, which is the stretch of
-   * music the porter picked out rather than only the bars they lit. One frame,
-   * because a `[ ]` body and the channel around it are two texts and a bracket
-   * cannot straddle them — `planEdits` refuses the same shape as `REFUSE_SPLIT`.
+   * The stretch of text from the lowest selected unit to the highest, by offset
+   * and not by index: a body's items are a frame of their own, appended after the
+   * root's, so a whole `[ ]` selected with the notes round it has its last
+   * *index* inside the body while the run's far end is the root note after it.
+   * Whether that run may take a bracket is `wrapVerdict`'s to say — it widens
+   * over a construct the run covers whole and refuses one the run cuts through,
+   * `WRAP_SPLIT`, which is `REFUSE_SPLIT` by another route.
    */
   private readonly selectedRun = computed<{ start: number; end: number } | null>(() => {
     const items = this.strip()?.items;
-    const chosen = this.chosen();
-    const first = items?.[chosen[0]];
-    const last = items?.[chosen[chosen.length - 1]];
-    if (!first || !last) {
+    if (!items) {
       return null;
     }
 
-    return first.frame === last.frame
-      ? { start: first.unitSpan.start, end: last.unitSpan.end }
-      : null;
+    let start = Number.POSITIVE_INFINITY;
+    let end = Number.NEGATIVE_INFINITY;
+    for (const index of this.chosen()) {
+      const item = items[index];
+      if (item) {
+        start = Math.min(start, item.unitSpan.start);
+        end = Math.max(end, item.unitSpan.end);
+      }
+    }
+
+    return start <= end ? { start, end } : null;
   });
 
   /** The notes the preview has taken over, which the song's own bars leave out. */
