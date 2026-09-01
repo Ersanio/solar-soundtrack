@@ -10,6 +10,7 @@ import type { Span } from '@amk/core/types';
 import type { LoopRun } from '@amk/spc/song-walk';
 import type { Command } from '@amk/tokens';
 import { commandScope } from '@amk/tokens/commands/in-force';
+import { MAX_LOOP_COUNT } from '@amk/tokens/commands/loops';
 import { commandRewritable, type Edit, insertAt, spliceOut, spliceRange } from '@amk/tokens/edits';
 import {
   type EditContext,
@@ -956,26 +957,41 @@ function padChannels(
  * `$DD`, which rides whatever stands in front of it.
  */
 export function gapSlack(strip: Strip, at: number): number {
+  return slackBefore(strip, at).ticks;
+}
+
+/**
+ * {@link gapSlack}'s walk, with the item a full close would leave the construct
+ * against.
+ *
+ * `abuts` is `null` where nothing is left standing there to name: the walk
+ * stopped on a rest whose prefix holds a command, which keeps its tick and so
+ * stays between the two, or it ran back off the root frame's start. Where the
+ * item directly in front is not a rest at all the slack is 0 and `abuts` is
+ * that item, which is how a pair already touching is told from a pair with
+ * something between them.
+ */
+function slackBefore(strip: Strip, at: number): { ticks: number; abuts: number | null } {
   const root = strip.frames[0];
   const construct = strip.items[at];
   if (!construct || holdsCommands(strip, construct.prefixSpan.start, construct.prefixSpan.end)) {
-    return 0;
+    return { ticks: 0, abuts: null };
   }
 
-  let slack = 0;
+  let ticks = 0;
   for (let index = at - 1; index >= root.from; index--) {
     const rest = strip.items[index];
     if (!respellable(strip, rest)) {
-      break;
+      return { ticks, abuts: index };
     }
 
-    slack += rest.ticks;
+    ticks += rest.ticks;
     if (holdsCommands(strip, rest.prefixSpan.start, rest.prefixSpan.end)) {
-      break;
+      return { ticks, abuts: null };
     }
   }
 
-  return slack;
+  return { ticks, abuts: null };
 }
 
 /**
@@ -1106,6 +1122,110 @@ export function passesAt(
   return { before, abuts };
 }
 
+/** The token a recall repeats itself with: its own `(n)`, or a bare `*`. */
+function recallHead(source: string, site: LoopSite): string {
+  if (site.label === null) {
+    return '*';
+  }
+
+  return source.slice(site.text.start, source.indexOf(')', site.text.start) + 1);
+}
+
+/**
+ * The construct a full leftward close would put this one back against, and the
+ * count the two would play as one.
+ *
+ * Two occurrences of one body with nothing between them are one construct
+ * written twice, which is the split {@link openGap} writes read backwards. The
+ * body is named by its first byte's ARAM address, so two identically spelled
+ * bodies are two bodies and never join.
+ *
+ * `null` where the pair cannot be spelled as one: a right-hand half that is not
+ * a recall — a body's first occurrence is always the left one — anything but
+ * the rests standing between them, or a total past {@link MAX_LOOP_COUNT},
+ * where the gesture still closes the gap and simply leaves the two calls
+ * standing.
+ *
+ * What may stand between them is asked of the **text**, and has to be: the
+ * intro `/` has a tick and is no command at all — `gather` raises none for an
+ * operator — so {@link holdsCommands} cannot see it, and a join written over
+ * one would carry it past the whole occurrence and move the song's loop point
+ * with every note still on its tick. Blank is what the split leaves, so the
+ * round trip never meets this; a `;` comment and a stray `o5` are turned away
+ * with it, which is the price of asking a question the safe set cannot answer.
+ *
+ * The counts come off the walk and never off the digits: a count written
+ * through a `"REP=4"` replacement has none to read.
+ */
+export function loopJoin(
+  source: string,
+  strip: Strip,
+  at: number,
+  run: LoopRun,
+): { at: number; count: number } | null {
+  const item = strip.items[at];
+  const { abuts } = slackBefore(strip, at);
+  if (abuts === null || item.frame !== 0 || item.loop?.kind !== 'recall') {
+    return null;
+  }
+
+  const before = strip.items[abuts];
+  const sibling = before.loop;
+  if (before.kind !== 'construct' || before.address !== item.address || sibling === null) {
+    return null;
+  }
+
+  // A `[[ ]]` names no body a recall could reach, so the address test turns one
+  // away before this does; said rather than inferred, because the half that
+  // stays is the one being handed a count and a `$E6` pair has nowhere to take
+  // one — `close` is null and `label` is null, which spells `*n` over it.
+  if (sibling.kind === 'sub') {
+    return null;
+  }
+
+  for (let index = abuts + 1; index <= at; index++) {
+    const gap = source.slice(
+      strip.items[index - 1].unitSpan.end,
+      strip.items[index].unitSpan.start,
+    );
+    if (gap.trim() !== '') {
+      return null;
+    }
+  }
+
+  // The sibling's own run and not `passesAt`, which counts every earlier pass
+  // of the body the voice plays: the partner is the nearest occurrence, which
+  // is the only reading whose ticks close.
+  const body = strip.frames.find((frame) => frame.body === item.address);
+  const played = body?.runs.find(
+    (each) => each.channel === run.channel && each.passes[0]?.tick === before.instances[0]?.tick,
+  );
+  const count = (played?.passes.length ?? 0) + run.passes.length;
+  return played && count <= MAX_LOOP_COUNT ? { at: abuts, count } : null;
+}
+
+/**
+ * The two halves written as the one construct they play as: the count of the
+ * half in front becomes the total, and the half behind goes.
+ *
+ * The surviving half keeps its own spelling — a declaration's `]n`, a `(n)m` or
+ * a `*n` — because what makes the two joinable is that they play the same body,
+ * and that says nothing about how either was written.
+ */
+function joinInto(context: EditContext, site: LoopSite, sibling: LoopSite, count: number): Edit[] {
+  const { source } = context;
+  const target = sibling.kind === 'declaration' ? sibling.close : sibling.text;
+  if (target === null) {
+    return [];
+  }
+
+  const text =
+    sibling.kind === 'declaration' ? `]${count}` : `${recallHead(source, sibling)}${count}`;
+  const counted = spliceRange(source, target, text);
+  const removed = spliceOut(source, site.text);
+  return [counted, removed].filter((edit): edit is Edit => edit !== null);
+}
+
 /**
  * `ticks` of rest written in front of a construct, so the whole occurrence
  * starts that much later.
@@ -1189,7 +1309,10 @@ function closeBefore(context: EditContext, at: number, need: number): Edit[] | E
  *
  * Time out is only ever free space: the rests {@link gapSlack} prices, spliced
  * from the construct backward. The gesture and this clamp through the one
- * function, so what the drag allowed is what is written.
+ * function, so what the drag allowed is what is written. Spending the whole of
+ * that slack closes the gap, and where the occurrence in front plays the same
+ * body the two are written back up as one construct with the counts added
+ * ({@link loopJoin}) — the split above, read backwards.
  */
 export function openGap(
   context: EditContext,
@@ -1237,8 +1360,7 @@ export function openGap(
       return refuse(REFUSE_SPELL);
     }
 
-    const closing = site.label === null ? -1 : source.indexOf(')', site.text.start);
-    const head = site.label === null ? '*' : source.slice(site.text.start, closing + 1);
+    const head = recallHead(source, site);
     const first = pass > 1 ? String(pass) : '';
     const second = total - pass > 1 ? String(total - pass) : '';
     const split =
@@ -1255,7 +1377,8 @@ export function openGap(
       return [];
     }
 
-    const need = Math.min(-delta, gapSlack(strip, at));
+    const slack = gapSlack(strip, at);
+    const need = Math.min(-delta, slack);
     if (need <= 0) {
       return [];
     }
@@ -1266,6 +1389,16 @@ export function openGap(
     }
 
     edits.push(...closed);
+
+    // Spending the whole slack puts the construct back against the occurrence
+    // in front of it, and two occurrences of one body touching are one
+    // construct written twice. A close that stops short leaves a gap, which is
+    // still two.
+    const join = need === slack ? loopJoin(source, strip, at, run) : null;
+    const sibling = join === null ? null : strip.items[join.at].loop;
+    if (join && sibling) {
+      edits.push(...joinInto(context, site, sibling, join.count));
+    }
   }
 
   // The voice's end moves with everything after the split, and a moved note

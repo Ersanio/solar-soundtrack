@@ -9,6 +9,10 @@ export interface ChangelogEntry {
 export const CHANGELOG: readonly ChangelogEntry[] = [
   // ─── newest first; add new blocks here ──────────────────────────────────
   {
+    date: '1 September 2026',
+    items: ["Dragging a split loop's two halves back together makes them one loop call again"],
+  },
+  {
     date: '31 August 2026',
     items: [
       'Make a loop from the command palette: one Loop button that wraps the notes you have selected, and numbers itself',

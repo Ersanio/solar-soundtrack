@@ -1251,6 +1251,32 @@ stats.loopTicks` pads **every other channel that would cut the song short** out 
   `rolltest`'s `channelTicks` reads the padded voice's own count. And the costs are taken rather
   than worked around: `selectedBodies` finds the inner body whole too, so both boxes close up solid,
   and `selectedRun` is `null`, so the palette's **Loop** greys out.
+- **The loop join guarded by `holdsCommands` over the text between the two calls** — it reads
+  `strip.commands`, and the intro `/` is not one of them: `gather` raises no `Command` for an
+  operator (`tokens.ts:810`), which `prefixCommandsOf` already says out loud. So `[c4]2 / r4 *2`
+  closed and joined wrote `[c4]4 /` and moved the song's loop point by the grabbed occupation's
+  whole length, with every note still on its tick and nothing in the walk to say so — only
+  `loopTick` catches it, which is why `rolltest`'s case asks `loopsWhereItDid`. What may stand
+  between the two is asked of the **text**, which must be blank once the rests go; that also turns
+  away a `;` comment and a stray `o5` that would in fact have been harmless, and that is the trade,
+  since the safe set cannot be enumerated from a list the dangerous member is not in. The split
+  writes exactly `head first  r… head second`, so the round trip never meets the refusal.
+- **A `REFUSE_*` where the joined count passes 255** — every refusal in `roll-edit.ts` names music
+  the gesture cannot make, and this names a count that cannot be _written_: `(1)200 (1)100` is the
+  same music as the `(1)300` that has no spelling (`parser.ts:2492`, `:2792`, `:2836`, AMK0116),
+  and the pass has already moved exactly as far as the drag asked. It falls back to the plain
+  close. Not `closeBefore`'s reasoning either — `REFUSE_LOOP_LEAD_ROOM` refuses a **partial**
+  close, where this is a spelling laid on top of a complete one. A join is offered on no zero gap
+  for the mirror of that reason: with the two calls already touching the drag moves nothing, and a
+  gesture whose only visible effect is in the Source tab is worse than none.
+- **The joined count read off `passesAt().before`, or off the digits** — the first counts every
+  earlier pass of the body the voice plays, so `(1)[c4] (1)2 r4 (1)3` joined as `(1)6`; the partner
+  is the **nearest** sibling, which is the only reading whose tick arithmetic closes. The second is
+  the trap `loop-focus.ts` already records: `[ c4 ]REP` under `"REP=4"` has no digits, and a `*` or
+  a `]` at one pass has none either. Both halves come off `LoopRun.passes.length`, which is the
+  written count in any song that builds a strip — `walkSong` runs every channel to its own `$00`
+  and filters only `notes` at the pass cut, so a construct past the shortest channel is
+  `verified: false` with all its passes still there.
 
 ## Angular specifics
 

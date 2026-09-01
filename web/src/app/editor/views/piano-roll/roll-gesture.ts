@@ -52,6 +52,7 @@ import {
   bodyRests,
   firstPassOn,
   gapSlack,
+  loopJoin,
   openGap,
   passesAt,
   planGroupEdits,
@@ -286,6 +287,15 @@ interface Drag {
     splitTick: number;
     /** The rest ticks directly before the construct — the most a leftward drag may close. */
     slack: number;
+    /**
+     * The count a leftward drag spending the whole slack would write, where
+     * closing the gap puts this occurrence back against another of the same
+     * body; `null` where it would leave two constructs standing.
+     *
+     * Priced here off the same `loopJoin` the commit calls, so the readout
+     * cannot promise a join the write does not make.
+     */
+    joins: number | null;
     /**
      * Rest ticks at the end of the body being pulled: the most a resize may take
      * out of it before it would cut into a note. 0 for a slide.
@@ -1025,9 +1035,13 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
         return null;
       }
 
+      // A pull that spends the whole slack closes the gap, and where that puts
+      // the pass back against another of the same body the commit writes the
+      // two as one call: say so while the button is still down.
       const going = held.loop.splitTick + delta;
+      const joins = held.loop.joins !== null && delta === -held.loop.slack;
       return {
-        text: `tick ${going}`,
+        text: joins ? `tick ${going} · one call of ${held.loop.joins}` : `tick ${going}`,
         x: going * sources.zoom(),
         y: held.row * sources.rowHeight(),
       };
@@ -1448,6 +1462,7 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
                   : null
               : null;
         const free = !outer && refused === null ? gapSlack(grabbed, construct) : 0;
+        const joined = free > 0 ? loopJoin(sources.source(), grabbed, construct, run) : null;
 
         drag.set({
           kind: end === null ? 'gap' : 'resize',
@@ -1472,6 +1487,7 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
             pass,
             splitTick: run.passes[pass].tick,
             slack: end === null ? (pass === 0 ? free : 0) : free,
+            joins: end === null && pass === 0 ? (joined?.count ?? null) : null,
             room: end === null ? 0 : bodyRests(grabbed, played, end).ticks,
             ahead: passes.before,
             refused,

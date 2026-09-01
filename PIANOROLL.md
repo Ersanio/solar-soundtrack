@@ -9,40 +9,40 @@ no channel.
 
 ## Mouse
 
-| Gesture                                    | What it does                                                                                               |
-| ------------------------------------------ | ---------------------------------------------------------------------------------------------------------- |
-| Hover over empty grid                      | A ghost bar shows where the next note goes and how long it will be                                         |
-| Press on empty grid                        | Draws a note there and keeps it under the pointer until you let go                                         |
-| Click on empty grid                        | Draws the note and leaves it there                                                                         |
-| Drag the middle of a note                  | Moves it a snap step at a time, one row per semitone up and down                                           |
-| Drag a selected group of notes             | Moves them together, sounding the note you grabbed as it crosses rows                                      |
-| Drag a note's left or right edge           | Stretches that end; the other end stays put                                                                |
-| Click a loop box's edge                    | Selects the loop's whole group, closes its outline up, plays that pass, names it in the loop inspector     |
-| Drag a loop box's top or bottom sideways   | Moves that pass along the song: rests open in front of it, splitting the recall where the grab was mid-run |
-| Drag a loop box's top or bottom up or down | Transposes every note of the body, one row per semitone                                                    |
-| Drag a loop box's left or right            | Resizes the loop — the right end moves where the body ends, the left end where it begins                   |
-| Hold `Alt` during any gesture              | Tick precision: no snapping, for either a position or a length                                             |
-| Click a note                               | Selects it, sounds it with its pitch slide, and puts the caret on it                                       |
-| Double-click a note                        | Goes to it in the MML                                                                                      |
-| `Ctrl` + click a note                      | Adds it to, or takes it out of, the selection                                                              |
-| `Ctrl` + drag on empty grid                | Draws a box, selects every note of this channel inside it, and plays that stretch of the song              |
-| `Ctrl` + drag a note                       | Copies it instead of moving it — the whole selection, if there is one                                      |
-| `Shift` + drag on empty grid               | Draws a note where you pressed and pulls its right edge along                                              |
-| `Shift` + drag a note                      | Locks it to the axis you first drag along — sideways it keeps its row, up or down it keeps its tick        |
-| Right-click a note                         | Deletes it                                                                                                 |
-| Right-drag across notes                    | Deletes each one the pointer crosses                                                                       |
-| Middle-click                               | Nothing yet                                                                                                |
-| Middle-drag                                | Pans the roll, both ways at once                                                                           |
-| Wheel while drawing a note                 | Sizes it — `l1`, `l2`, `l3`, `l4`, `l6`, `l8` … down to `l192`                                             |
-| Wheel while holding a note still           | Resizes that note the same way, from its right edge                                                        |
-| `Alt` + wheel while sizing                 | Sizes it a tick at a time instead                                                                          |
-| `Ctrl` + wheel                             | Zooms in and out about the pointer                                                                         |
-| `Shift` + wheel                            | Scrolls the roll sideways                                                                                  |
-| `Alt` + wheel                              | Makes the rows taller and shorter, about the pointer                                                       |
-| Drag the overview bar                      | Scrolls the roll through the song — grab the lit box and it follows you                                    |
-| Drag the timeline below it                 | Moves the playhead; hold past either end and the roll scrolls along                                        |
-| Click a key on the left                    | Sounds that pitch on the channel being edited, so you can find it by ear                                   |
-| `Ctrl` + click a channel chip              | Solos that channel, which also picks it to edit                                                            |
+| Gesture                                    | What it does                                                                                              |
+| ------------------------------------------ | --------------------------------------------------------------------------------------------------------- |
+| Hover over empty grid                      | A ghost bar shows where the next note goes and how long it will be                                        |
+| Press on empty grid                        | Draws a note there and keeps it under the pointer until you let go                                        |
+| Click on empty grid                        | Draws the note and leaves it there                                                                        |
+| Drag the middle of a note                  | Moves it a snap step at a time, one row per semitone up and down                                          |
+| Drag a selected group of notes             | Moves them together, sounding the note you grabbed as it crosses rows                                     |
+| Drag a note's left or right edge           | Stretches that end; the other end stays put                                                               |
+| Click a loop box's edge                    | Selects the loop's whole group, closes its outline up, plays that pass, names it in the loop inspector    |
+| Drag a loop box's top or bottom sideways   | Moves that pass along the song: rests open in front of it and the recall splits, or close and it joins up |
+| Drag a loop box's top or bottom up or down | Transposes every note of the body, one row per semitone                                                   |
+| Drag a loop box's left or right            | Resizes the loop — the right end moves where the body ends, the left end where it begins                  |
+| Hold `Alt` during any gesture              | Tick precision: no snapping, for either a position or a length                                            |
+| Click a note                               | Selects it, sounds it with its pitch slide, and puts the caret on it                                      |
+| Double-click a note                        | Goes to it in the MML                                                                                     |
+| `Ctrl` + click a note                      | Adds it to, or takes it out of, the selection                                                             |
+| `Ctrl` + drag on empty grid                | Draws a box, selects every note of this channel inside it, and plays that stretch of the song             |
+| `Ctrl` + drag a note                       | Copies it instead of moving it — the whole selection, if there is one                                     |
+| `Shift` + drag on empty grid               | Draws a note where you pressed and pulls its right edge along                                             |
+| `Shift` + drag a note                      | Locks it to the axis you first drag along — sideways it keeps its row, up or down it keeps its tick       |
+| Right-click a note                         | Deletes it                                                                                                |
+| Right-drag across notes                    | Deletes each one the pointer crosses                                                                      |
+| Middle-click                               | Nothing yet                                                                                               |
+| Middle-drag                                | Pans the roll, both ways at once                                                                          |
+| Wheel while drawing a note                 | Sizes it — `l1`, `l2`, `l3`, `l4`, `l6`, `l8` … down to `l192`                                            |
+| Wheel while holding a note still           | Resizes that note the same way, from its right edge                                                       |
+| `Alt` + wheel while sizing                 | Sizes it a tick at a time instead                                                                         |
+| `Ctrl` + wheel                             | Zooms in and out about the pointer                                                                        |
+| `Shift` + wheel                            | Scrolls the roll sideways                                                                                 |
+| `Alt` + wheel                              | Makes the rows taller and shorter, about the pointer                                                      |
+| Drag the overview bar                      | Scrolls the roll through the song — grab the lit box and it follows you                                   |
+| Drag the timeline below it                 | Moves the playhead; hold past either end and the roll scrolls along                                       |
+| Click a key on the left                    | Sounds that pitch on the channel being edited, so you can find it by ear                                  |
+| `Ctrl` + click a channel chip              | Solos that channel, which also picks it to edit                                                           |
 
 ## Keyboard
 
@@ -470,6 +470,15 @@ at its third pass becomes `(1)2 r1^1^1 (1)3`, and an unlabeled `[c4 d4]3` become
 still one body played from both halves. That is how other notes get a place in between. Dragging
 left closes free space instead: the drag stops at the rests actually in front of the pass, and never
 moves a command off its tick.
+
+**Dragging it all the way back joins the two halves up again.** Close the gap completely and the
+pair becomes the one call it was: `(1)2 r1^1^1 (1)3` is `(1)5` again, `[c4 d4] r… *2` is
+`[c4 d4]3`, and `* r… *3` is `*4`. The half that stays keeps its own spelling and takes the other's
+repeats, so it does not matter which of the two ways the loop was written. The readout says the
+count before you let go. Anything with a tick of its own written between the two — a `v200`, a
+note, the intro `/` — keeps them apart: the space closes up to it and the two calls stay two,
+because one call has nowhere to put what was standing in the middle of it. Two calls already
+touching are left alone as well, there being no gap to close and so no drag to make.
 
 **The boxes move with the music.** Whatever the drag is — a pass sliding, an end resizing, a body
 transposing, or a note inside it being carried — the tint and the outline follow the notes while the
