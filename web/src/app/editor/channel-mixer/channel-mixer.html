@@ -1,20 +1,14 @@
 <h3 class="text-ink-muted text-xs font-semibold tracking-wide uppercase">Channels</h3>
 
-@for (channel of mixer.channels(); track channel.index) {
-  <div class="border-edge flex items-center overflow-hidden rounded-md border">
-    <span
-      class="border-edge border-r px-1.5 py-0.5 font-mono text-xs"
-      [class.text-ink-muted]="!channel.audible"
-      [class.line-through]="!channel.audible"
-    >
-      {{ channel.index }}
-    </span>
+@for (channel of rows(); track channel.index) {
+  <div [class]="channel.strip">
+    <span [class]="channel.plate">{{ channel.index }}</span>
 
     @let toggleClass = 'cursor-pointer px-1.5 py-0.5 font-mono text-xs transition-colors';
 
     <button
       type="button"
-      [class]="`${toggleClass}disabled:cursor-not-allowed disabled:opacity-40${channel.muted ? ' bg-danger/20 text-danger font-semibold' : ' text-ink-muted hover:not-disabled:text-ink'}`"
+      [class]="`${toggleClass} disabled:cursor-not-allowed disabled:opacity-40${channel.muted ? ' bg-danger/20 text-danger font-semibold' : ' text-ink-muted hover:not-disabled:text-ink'}`"
       [disabled]="mixer.isSoloing()"
       [title]="`Mute channel ${channel.index}`"
       (click)="mixer.toggleMute(channel.index)"

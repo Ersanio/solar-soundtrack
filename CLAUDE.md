@@ -1383,6 +1383,27 @@ stats.loopTicks` pads **every other channel that would cut the song short** out 
   moves the brackets, so notes cross into and out of the body. And `selectedSpans` is **held** across
   the recompile rather than emptied, in the mould of the clock measurement — the bars drawn for that
   whole compile are the last one's, so the last one's addresses are the ones that outline them.
+- **The channel mixer and the roll's picker naming their channels without tinting them**, so that
+  `--color-ch-*` lived in the roll's marks and the minimap alone — it made the two controls that
+  name a channel the two pictures that would not show its colour, and matching a note seen in the
+  roll to the chip that edits it or the buttons that silence it meant reading a digit off eight
+  identical grey plates. Both wear the channel's own colour now, from the literal `bg-ch-*` names
+  spelled out for the reason `CHANNEL_FILL` gives, with `text-ink` over it because that is what the
+  roll's own bars label themselves in on those same eight grounds. The rule the old shape was
+  protecting is untouched: the number stays, a silenced channel is still struck through, and the
+  eight still do not clear the all-pairs separation gate. What the fill can no longer say is which
+  chip is being **edited**, and that is a near-white ring rather than a dimming of the other seven:
+  dimming is what a silenced channel already means, and it would have said a channel was inaudible
+  for not being edited. The solo's own ring is no longer the accent either — `--color-accent` is a
+  mid blue that disappears into `--color-ch-0` and `--color-ch-6`, so it is a dark ring against the
+  edited one's light, which is the lightness axis the eight leave free and the same one the roll's
+  glyph plates are told apart on. It yields to the edited chip where one is both — an element has
+  one ring, and a solo says itself anyway, being the channel the strike-through has left alone.
+- **The palette's class names living in `piano-roll/roll-metrics.ts`** — the mixer is not part of
+  the roll, so it would have had to reach into it or keep a second copy of `bg-ch-*` under the same
+  name, and a chip that disagreed with a bar about which blue channel 0 is would be worse than no
+  colour at all. `util/channel-palette.ts` is the one home for all five arrays; `roll-metrics.ts`
+  keeps the geometry and the two muted opacities, which are the roll's own.
 
 ## Angular specifics
 

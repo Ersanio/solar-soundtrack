@@ -624,8 +624,13 @@ the roll is already pointing at the answer, and so does the first gesture of a d
 erase, through `editing`: with no channel picked, the strip is built for the channel under the
 pointer, so a bar can be grabbed before it has been chosen and the press names it on the way. Empty
 grid offers nothing to name, which is why drawing, the marquee and the shortcuts still need a
-channel. The chips carry the mixer's state too — struck through where the mask silences them, ringed
-where the solo is — and `Ctrl` on one isolates that channel rather than editing it. Beside them sit
+channel. Each chip wears its channel's own colour, from the same `CHANNEL_BG` the mixer's plates
+take, so the picker names the eight the notes below it are drawn in; a near-white ring is then what
+says which is being edited. The chips carry the mixer's state too — struck through and dimmed where
+the mask silences them, ringed dark where the solo is, which the edited chip's own ring takes
+precedence over — and `Ctrl` on one isolates that channel rather than editing it. Both rings are
+told apart by lightness rather than by hue, since the accent that used to mark a solo disappears
+into channels 0 and 6. Beside them sit
 the flat `roll-*.ts` files, which are Angular-free so that the arithmetic stays where a harness can
 import it: `roll-layout.ts` and `percussion.ts` for the lanes and the camera, `roll-metrics.ts` and
 `roll-bar-text.ts` for what a bar is drawn as, `roll-lengths.ts` for what a gesture may land on,

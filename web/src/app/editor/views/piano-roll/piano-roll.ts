@@ -74,14 +74,8 @@ import { RollLoops } from './roll-loops/roll-loops';
 import { laneWindow, packCommandLane } from './roll-command-layout';
 import { eraseCommand } from './roll-command-move';
 import { RollCommandLane } from './roll-command-lane/roll-command-lane';
-import {
-  CHANNEL_FILL,
-  CHANNEL_STROKE,
-  KEY_WIDTH,
-  LANE_HEIGHT,
-  OVERVIEW_HEIGHT,
-  SCRUB_HEIGHT,
-} from './roll-metrics';
+import { KEY_WIDTH, LANE_HEIGHT, OVERVIEW_HEIGHT, SCRUB_HEIGHT } from './roll-metrics';
+import { CHANNEL_FILL, CHANNEL_STROKE } from '../../../util/channel-palette';
 import { seedEdits } from './roll-seed';
 import { type Strip, channelStrip, channelTails, constructFor, isStrip } from './roll-strip';
 import { RollNotes } from './roll-notes/roll-notes';

@@ -5,8 +5,8 @@ import { type CommandGlyph } from '../../command-palette/command-icon';
 import { glyphOf } from '../../command-palette/glyph-of';
 import { definedAt } from '../../../state/commands-in-force';
 import { type PlaceContext, keyOf, placeOf } from './percussion';
+import { CHANNEL_FILL } from '../../../util/channel-palette';
 import {
-  CHANNEL_FILL,
   KEY_WIDTH,
   LOOP_LABEL_INSET,
   LOOP_LABEL_SIZE,
