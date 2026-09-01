@@ -1334,6 +1334,27 @@ stats.loopTicks` pads **every other channel that would cut the song short** out 
   also the one mark with no handler and no span to reveal, so the ring would point at nothing
   clickable. `MarkGlyph.command` rings the glyphs that are drawn, and the lane, where every command
   appears, is where one behind the dots is found.
+- **A note's Length row as a `ParamDescriptor` over `command.args`** — a descriptor is bound to one
+  argument of one command, and a note's length is not always in an argument: `c` under a standing
+  `l8` writes no digits at all, so `resolveCommand` built no rows and the inspector said "this
+  command takes no arguments" about a note plainly 24 ticks long — which is the commonest way a song
+  is written, one `l` at the head of each channel and bare notes under it. `c^8` writes one number
+  for two segments, so row 0 was labelled `Length`, bound to the tie's `8` and described from the
+  head's implied length; and `c0` writes one `getNoteLength` throws away. The subject is the
+  **segment**, which `NoteLengthSegment` already is, and `note-length/length-rows.ts` is where the
+  eleven spellings are told apart and each one's splice chosen — `insertAt` where no digits were
+  written, `spliceRange` over the digits alone where they were. The digits and nothing else, because
+  a segment's dots compose rather than add (`Music.cpp:2950`): the number that keeps `l8 c.` at 36
+  ticks is `8`, and a span reaching over the dot would write the 4 that 36 ticks is without one.
+  `denominatorFor` is what makes that safe in the other direction — it answers only an `n` that,
+  written, reproduces the length the segment already plays, and `null` where none does, which is a
+  dotted or exact `l` and an `=NN` on the note. Not a per-row write target on `ParamRow` either: the
+  generic table is one loop over `command.args` and a note-shaped exception in it would be paid for
+  by all sixty commands.
+- **Taking the digits back out when a slider lands on the `l`'s own value** — it reads as tidy and
+  it is a trapdoor: the note would go back to answering an `l` edited later, so a length the porter
+  had chosen by ear would move on its own the next time the default did. Digits are written and
+  never removed; `c8` under an `l8` is a note that has been given a length of its own.
 
 ## Angular specifics
 

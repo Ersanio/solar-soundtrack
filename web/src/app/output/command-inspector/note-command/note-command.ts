@@ -8,8 +8,8 @@ import { glyphOf } from '../../../editor/command-palette/glyph-of';
 import { definedAt, notePreceding } from '../../../state/commands-in-force';
 import { EditorRequests } from '../../../state/editor-requests';
 import { EditorStore } from '../../../state/editor-store';
+import { NoteLength } from '../note-length/note-length';
 import { NotePalette, type NotePaletteModel } from '../note-palette/note-palette';
-import { ParamTable } from '../param-table/param-table';
 
 /** One command acting on the note, drawn as the palette draws it. */
 interface Acting {
@@ -58,7 +58,7 @@ interface Group {
  */
 @Component({
   selector: 'amk-note-command',
-  imports: [CommandIcon, NotePalette, ParamTable],
+  imports: [CommandIcon, NoteLength, NotePalette],
   templateUrl: './note-command.html',
   host: { class: 'contents' },
 })

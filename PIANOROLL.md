@@ -117,6 +117,21 @@ same as a note being outlined — clicking an icon lets the outlines go and stil
 answering about that note, so the commit is heard. With no note behind the question at all — after
 `Escape`, or a click in the command lane — a commit makes no sound.
 
+**The inspector's Length slider is the note's own length**, one slider per tied piece — `Length` for
+the note and `Tied to` for each `^` after it. It reads `1/n` the way `l` does, and it moves that one
+note and nothing else.
+
+A note that never wrote a length of its own — a bare `c` under an `l8` — has one all the same, and
+the slider says which and where it came from. Move it and the digits go onto the note: `c` becomes
+`c4`, and the notes around it go on reading the `l`. They are never taken back out, so a slider let
+go on the `l`'s own value leaves `c8` rather than a bare `c` — that note has been given a length of
+its own, and an `l` edited later will not move it.
+
+Dots stay exactly as written, because that is the only reading that keeps the note where it is:
+`l8 c.` is 36 ticks and the digits that hold it there are `8`, not the 4 that 36 ticks would be
+without the dot. Two lengths have no `1/n` to drag and say so rather than guess — one written as an
+exact tick count, `c=37`, and a bare note under an `l` that is itself dotted or exact.
+
 ## The command lane
 
 Under the roll is a strip holding nothing but command icons, on the song's own timeline: what takes

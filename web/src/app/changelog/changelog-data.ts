@@ -18,6 +18,7 @@ export const CHANGELOG: readonly ChangelogEntry[] = [
       'Delete or Backspace removes the command you are inspecting',
       'The command you are inspecting is outlined on the note bars as well as in the command lane',
       'Picking a command lets go of the notes you had selected, so Delete can only mean the command',
+      'The note inspector now has a Length slider for notes that take their length from an l',
     ],
   },
   {

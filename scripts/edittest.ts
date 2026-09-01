@@ -38,6 +38,11 @@ import {
 	selectedInstrument,
 } from "@amk/tokens/commands/instruments";
 import { type Command, tokenize } from "@amk/tokens";
+import {
+	noteLengthEdit,
+	noteLengthLabel,
+	noteLengthRows,
+} from "../web/src/app/output/command-inspector/note-length/length-rows";
 import { check, summarise } from "./harness";
 
 /** The command a test is about, found by VCMD so the source can stay readable. */
@@ -308,6 +313,105 @@ console.log("\nan instrument the inspector offers is the instrument it then sele
 	check("and which #am4 spends on a custom instrument", instrumentByte(am4, LAST_DRIVER_INSTRUMENT) === null);
 	check("$13 being where its own numbering starts", instrumentByte(am4, 30) === 0x13, `${instrumentByte(am4, 30)}`);
 	check("nothing past a byte is offered", instrumentByte(plain, 256) === null);
+}
+
+console.log("\na note's length is written onto the note, whatever it was written as");
+{
+	// The one control whose subject is a *segment* rather than an argument, and
+	// the reason it is: a note under a standing `l` has no argument at all and is
+	// still a note of a definite length. Every assertion here is a round trip
+	// through `tokenize` rather than a comparison of numbers, because the failure
+	// this is guarding against — digits written in front of dots that compose
+	// rather than add (`Music.cpp:2950`) — produces text that reads perfectly and
+	// plays something else.
+	const noteIn = (source: string, needle: string): Command => {
+		const at = source.indexOf(needle);
+		const found = tokenize(source).commands.find((c) => c.noteLength !== undefined && c.span.start === at);
+		if (!found) {
+			throw new Error(`no note at ${JSON.stringify(needle)} in ${JSON.stringify(source)}`);
+		}
+
+		return found;
+	};
+
+	/** Every note and rest of a song, in ticks — what it actually plays. */
+	const ticksOf = (source: string): string =>
+		tokenize(source)
+			.commands.filter((c) => c.noteLength !== undefined)
+			.map((c) => c.noteLength!.reduce((sum, segment) => sum + segment.ticks, 0))
+			.join();
+
+	const write = (source: string, needle: string, index: number, denominator: number): string =>
+		applied(source, noteLengthEdit(source, noteIn(source, needle), index, denominator));
+
+	const bare = "#amk 2\n#0 l8 c d e\n";
+	check("a bare note reads as one editable Length row", noteLengthRows(noteIn(bare, "c ")).length === 1);
+	check("named Length", noteLengthRows(noteIn(bare, "c "))[0].label === "Length");
+	check("at the standing l's denominator", noteLengthRows(noteIn(bare, "c "))[0].value === 8);
+	check("saying the digits are not written", noteLengthRows(noteIn(bare, "c "))[0].written === false);
+	check("and editable all the same", noteLengthRows(noteIn(bare, "c "))[0].editable === true);
+
+	const lengthened = write(bare, "c ", 0, 4);
+	check("writing 4 onto it puts the digits on the note", lengthened === "#amk 2\n#0 l8 c4 d e\n", lengthened);
+	check("which is the only note that moves", ticksOf(lengthened) === "48,24,24", ticksOf(lengthened));
+	check("the l itself untouched", ticksOf(bare) === "24,24,24", ticksOf(bare));
+
+	// The point the request turned on: a value that lands back on what the `l`
+	// says is still written out. Nothing here ever takes digits away, so there is
+	// no path back to a bare note and none is wanted — the note the porter has
+	// been adjusting stops answering to an `l` edited later.
+	const same = write(bare, "c ", 0, 8);
+	check("writing the l's own value still writes it", same === "#amk 2\n#0 l8 c8 d e\n", same);
+	check("and changes nothing about what plays", ticksOf(same) === ticksOf(bare), ticksOf(same));
+
+	// Dots compose, so the digits that keep `c.` where it is are the *plain*
+	// value's — `8`, not the 36 the segment plays for. A tick comparison alone
+	// passes here while the text is wrong, which is why the string is compared.
+	const dotted = "#amk 2\n#0 l8 c. d\n";
+	check("a dotted bare note is 36 ticks", ticksOf(dotted) === "36,24", ticksOf(dotted));
+	const kept = write(dotted, "c.", 0, 8);
+	check("and writing its own denominator keeps it there", kept === "#amk 2\n#0 l8 c8. d\n", kept);
+	check("byte for byte", ticksOf(kept) === "36,24", ticksOf(kept));
+	const doubled = write(dotted, "c.", 0, 4);
+	check("where 4 dots a quarter", doubled === "#amk 2\n#0 l8 c4. d\n", doubled);
+	check("to 72 ticks, the d unmoved", ticksOf(doubled) === "72,24", ticksOf(doubled));
+
+	// One number, two segments — the misalignment an argument-indexed row had.
+	const tie = "#amk 2\n#0 c4^8\n";
+	const rows = noteLengthRows(noteIn(tie, "c4^8"));
+	check("a tie is two rows", rows.length === 2 && rows[1].label === "Tied to", `got ${rows.length}`);
+	check("each on its own segment", rows[0].value === 4 && rows[1].value === 8, `${rows[0].value},${rows[1].value}`);
+	const retied = write(tie, "c4^8", 1, 4);
+	check("and the second row writes the second", retied === "#amk 2\n#0 c4^4\n", retied);
+	check("for 96 ticks", ticksOf(retied) === "96", ticksOf(retied));
+
+	// The three refusals, each in its own words and each returning no edit at
+	// all rather than a splice over text that is not the author's.
+	const macro = noteLengthRows(noteIn('"n=c4"\n#0 n\n', "n\n"))[0];
+	check("a note through a replacement is not editable", macro.editable === false);
+	check("and says which one", macro.lockedBecause === 'comes from the "n" replacement', String(macro.lockedBecause));
+	check("with no edit behind it", noteLengthEdit('"n=c4"\n#0 n\n', noteIn('"n=c4"\n#0 n\n', "n\n"), 0, 4) === null);
+
+	const exact = noteLengthRows(noteIn("#amk 4\n#0 c=37\n", "c=37"))[0];
+	check("an exact tick count is not a note value", exact.editable === false && exact.stops === null);
+	check("and reads out as its ticks", exact.value === 37, String(exact.value));
+
+	const odd = noteLengthRows(noteIn("#amk 4\n#0 l8. c\n", "c\n"))[0];
+	check("a bare note under a dotted l has no denominator to drag", odd.editable === false);
+	check("saying so", odd.lockedBecause?.includes("standing `l`") === true, String(odd.lockedBecause));
+
+	// The readout, which is the only thing that says what a `1/n` comes to.
+	const plainSegment = noteIn("#amk 2\n#0 c4\n", "c4").noteLength![0];
+	check(
+		"the reading names the value, the note and the ticks",
+		noteLengthLabel(plainSegment, 4) === "1/4 · a quarter note · 48 ticks",
+		noteLengthLabel(plainSegment, 4),
+	);
+	check(
+		"and follows the value being dragged rather than the one written",
+		noteLengthLabel(plainSegment, 8) === "1/8 · an eighth note · 24 ticks",
+		noteLengthLabel(plainSegment, 8),
+	);
 }
 
 summarise();

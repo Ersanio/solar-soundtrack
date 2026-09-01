@@ -1,0 +1,37 @@
+<div class="flex flex-col gap-2.5">
+  @for (row of rows(); track row.key) {
+    <div class="flex flex-col gap-0.5">
+      @if (row.stops; as stops) {
+        <amk-slider
+          [label]="row.label"
+          [value]="row.value"
+          [min]="1"
+          [max]="TICKS_PER_WHOLE"
+          [stops]="stops"
+          [invert]="true"
+          [disabled]="!row.editable"
+          [valueLabel]="row.valueLabel"
+          [note]="row.note"
+          (preview)="preview(row, $event)"
+          (commit)="commit(row, $event)"
+        />
+      } @else {
+        <!-- No denominator to drag: the reading is all there is to give. -->
+        <div class="flex items-baseline justify-between gap-2">
+          <span class="text-ink-muted text-[11px]">{{ row.label }}</span>
+          <span class="text-ink font-mono text-[11px] tabular-nums">{{ row.ticks }} ticks</span>
+        </div>
+      }
+
+      <!-- Why a control is disabled, said where the control is: one segment of
+           a note may come through a macro while the next is the author's. -->
+      @if (row.lockedBecause; as reason) {
+        <span class="text-ink-muted text-[11px] leading-snug italic">{{ reason }}</span>
+      }
+
+      @if (row.editable && !row.written) {
+        <span class="text-ink-muted text-[11px] leading-snug">{{ READS_THE_DEFAULT }}</span>
+      }
+    </div>
+  }
+</div>
