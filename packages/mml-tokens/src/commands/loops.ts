@@ -136,6 +136,16 @@ export interface LoopReading {
 /** The highest `n` a `(n)` may be written with: `parseLabelLoop` rejects `n + 1 >= 0x10000`. */
 export const MAX_LOOP_LABEL = 0xfffe;
 
+/**
+ * The most passes one construct may ask for.
+ *
+ * `parseLabelLoop`, `parseLoopEnd` and `parseStarLoop` each range-check 1 to 255
+ * and emit nothing outside it (`parser.ts:2492`, `:2792`, `:2836`, AMK0116;
+ * Music.cpp:1181 and :1332). A `]]n` is the exception and is not this: its count
+ * is never range-checked and the byte written is `n - 1`.
+ */
+export const MAX_LOOP_COUNT = 255;
+
 export function readLoops(source: string, index: TokenIndex): LoopReading {
 	const byStart = new Map<number, Command>();
 	for (const command of index.commands) {

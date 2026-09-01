@@ -2,6 +2,7 @@ import type { Span } from '@amk/core/types';
 import { type Command, type TokenIndex, commandStartingAt } from '@amk/tokens';
 import type { LoopConstruct, LoopReading, LoopSpan } from '@amk/tokens/commands/loops';
 import {
+  MAX_LOOP_COUNT,
   MAX_LOOP_LABEL,
   loopAt,
   loopTargets,
@@ -97,9 +98,6 @@ export interface LoopFocusRequest {
   /** What the piano roll last took hold of — see `EditorRequests.inspectingLoop`. */
   hint: { text: Span; body: Span } | null;
 }
-
-/** `parseLoopEnd`, `parseStarLoop` and `parseLabelLoop` all reject a count outside this. */
-const MAX_COUNT = 255;
 
 /**
  * A subloop's ceiling, which is not the others'.
@@ -216,7 +214,7 @@ function countView(
 ): LoopCountView {
   const sub = kind === 'subloop';
   const min = sub ? 2 : 1;
-  const max = sub ? MAX_SUB_COUNT : MAX_COUNT;
+  const max = sub ? MAX_SUB_COUNT : MAX_LOOP_COUNT;
   const { plays, at } = construct.count;
   const written = at.end > at.start;
   const macro = written ? command?.args[0]?.replacement : undefined;
