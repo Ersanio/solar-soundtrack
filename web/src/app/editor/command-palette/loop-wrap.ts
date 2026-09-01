@@ -51,15 +51,16 @@ export function isWrap(verdict: WrapVerdict): verdict is WrapOffer {
   return 'kind' in verdict;
 }
 
+/** Said by both verdicts: with the brackets unpaired there is nothing to reason from. */
+export const BRACKETS_UNPAIRED = 'This song’s loop brackets do not pair up.';
+
 export const WRAP_NOTHING = 'Select the notes the loop should play.';
 export const WRAP_NO_NOTES = 'That selection holds no notes to loop.';
-export const WRAP_BRACKETS = 'This song’s loop brackets do not pair up.';
 export const WRAP_SPLIT = 'Those notes are on both sides of a loop bracket.';
 export const WRAP_CHANNELS = 'Those notes are on more than one channel.';
 export const WRAP_INTRO = 'The intro marker cannot be written inside a loop (AMK0080).';
 export const WRAP_REPLACEMENT = 'That music is written through a replacement.';
 export const WRAP_DEEP = 'A loop and a subloop is as deep as AddmusicK goes.';
-export const WRAP_SUB_NESTED = 'A subloop cannot be written inside another subloop.';
 
 /**
  * Calling a loop the song has already written.
@@ -83,7 +84,6 @@ export function isCall(verdict: CallVerdict): verdict is CallOffer {
   return 'label' in verdict;
 }
 
-export const CALL_BRACKETS = 'This song’s loop brackets do not pair up.';
 export const CALL_NONE =
   'No named loop is written above the cursor. Loops made here name themselves.';
 export const CALL_NESTED = 'A loop cannot be called from inside another loop (AMK0112).';
@@ -132,7 +132,7 @@ export function wrapVerdict(request: WrapRequest): WrapVerdict {
   }
 
   if (!reading.sound) {
-    return { refused: WRAP_BRACKETS };
+    return { refused: BRACKETS_UNPAIRED };
   }
 
   const channel = picked[0].channel;
@@ -201,17 +201,32 @@ export function wrapVerdict(request: WrapRequest): WrapVerdict {
   const loopFits = !inCall && !contents.holdsCall;
   const subFits = !inSub && !contents.holdsSub;
 
-  if (want === 'subloop' || !loopFits) {
-    if (!subFits) {
-      return { refused: want === 'subloop' ? WRAP_SUB_NESTED : WRAP_DEEP };
-    }
+  const loop = (): WrapOffer => {
+    const label = nextLoopLabel(reading.slots);
+    const open = label === null ? '[ ' : `(${label})[ `;
+    return { ...offerOf(source, at, open, ` ]${COUNT}`), kind: 'loop', label, at };
+  };
 
-    return { ...offerOf(source, at, '[[ ', ` ]]${COUNT}`), kind: 'subloop', label: null, at };
+  const subloop = (): WrapOffer => ({
+    ...offerOf(source, at, '[[ ', ` ]]${COUNT}`),
+    kind: 'subloop',
+    label: null,
+    at,
+  });
+
+  // The construct asked for where it fits, the other where only the other does:
+  // AddmusicK holds one of each, in either order, so the depth is what runs out
+  // and not the button. `INSTEAD` in `catalog.ts` is the readout for the swap.
+  const [first, second] = want === 'loop' ? [loopFits, subFits] : [subFits, loopFits];
+  if (first) {
+    return want === 'loop' ? loop() : subloop();
   }
 
-  const label = nextLoopLabel(reading.slots);
-  const open = label === null ? '[ ' : `(${label})[ `;
-  return { ...offerOf(source, at, open, ` ]${COUNT}`), kind: 'loop', label, at };
+  if (second) {
+    return want === 'loop' ? subloop() : loop();
+  }
+
+  return { refused: WRAP_DEEP };
 }
 
 /**
@@ -232,7 +247,7 @@ export function callVerdict(request: {
 }): CallVerdict {
   const { source, reading, caret } = request;
   if (!reading.sound) {
-    return { refused: CALL_BRACKETS };
+    return { refused: BRACKETS_UNPAIRED };
   }
 
   // `parseLabelLoop` and `parseStarLoop` both refuse outright while the parser is

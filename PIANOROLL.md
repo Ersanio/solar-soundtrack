@@ -462,9 +462,10 @@ are greyed, and the line under them says so.
 
 A fresh loop is **named with the lowest number the song is not already using**, counting from 0, so
 it can be recalled later with `(0)3` — and a `(!1)` remote definition counts as using `(0)`, since
-AddmusicK files the two in one slot. Press `Loop` **inside a loop** and you get a subloop instead:
-AddmusicK holds one `[ ]` and one `[[ ]]` at a time, in either order, and the readout says which of
-the two the button is about to write. Both spent, and the button is greyed with the reason.
+AddmusicK files the two in one slot. Press `Loop` **inside a loop** and you get a subloop instead,
+and `Subloop` inside a subloop gives a loop: AddmusicK holds one `[ ]` and one `[[ ]]` at a time, in
+either order, and the readout says which of the two the button is about to write. Both spent, and the
+button is greyed with the reason.
 
 Two selections it will not wrap, each said in words: one with notes on both sides of a bracket, and
 one that reaches across a channel. The intro `/` cannot go inside a loop either, and neither can

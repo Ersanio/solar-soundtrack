@@ -59,6 +59,7 @@ import { ENTRIES, type ResolvedEntry, resolveEntry } from "../web/src/app/editor
 import { GLYPH_NAMES } from "../web/src/app/editor/command-palette/command-icon";
 import { glyphOf } from "../web/src/app/editor/command-palette/glyph-of";
 import {
+	BRACKETS_UNPAIRED,
 	CALL_NESTED,
 	CALL_NONE,
 	callVerdict,
@@ -73,7 +74,6 @@ import {
 	WRAP_NOTHING,
 	WRAP_REPLACEMENT,
 	WRAP_SPLIT,
-	WRAP_SUB_NESTED,
 	wrapVerdict,
 } from "../web/src/app/editor/command-palette/loop-wrap";
 import { commandScope } from "@amk/tokens/commands/in-force";
@@ -769,13 +769,25 @@ console.log("\nputting brackets round a selection");
 		);
 	}
 
-	refuses(
-		"a subloop asked for inside a subloop says so in its own words",
+	// The swap in the other direction: the depth is what runs out, not the button.
+	offers(
+		"a subloop asked for inside a subloop takes the loop instead",
 		"#amk 4\n#0 o4 [[ c4 d4 ]]2\n",
 		"c4 d4",
 		"subloop",
-		WRAP_SUB_NESTED,
+		"loop",
 	);
+	refuses(
+		"and asked for inside both it is refused in the same words",
+		"#amk 4\n#0 o4 [ c4 [[ d4 e4 ]]2 f4 ]3\n",
+		"d4 e4",
+		"subloop",
+		WRAP_DEEP,
+	);
+
+	// With the brackets unpaired there is nothing to reason from, and the compiler
+	// would refuse the song anyway.
+	refuses("brackets that do not pair up refuse a wrap", "#amk 4\n#0 o4 [ c4 d4\n", "c4 d4", "loop", BRACKETS_UNPAIRED);
 
 	// The refusals that are about the run rather than about the depth.
 	refuses("nothing selected", "#amk 4\n#0 o4 c4 d4\n", "", "loop", WRAP_NOTHING);
@@ -1118,6 +1130,13 @@ console.log("\nputting brackets round a selection");
 
 		const sub = asked("#amk 4\n#0 o4 (0)[c4]2 [[d4 e4]]2\n", "e4");
 		check("but one inside a [[ ]] is not — a subloop leaves the channel alone", isCall(sub));
+
+		const unpaired = asked("#amk 4\n#0 o4 (0)[c4]2 [d4 e4\n", "e4");
+		check(
+			"and brackets that do not pair up refuse a call",
+			!isCall(unpaired) && unpaired.refused === BRACKETS_UNPAIRED,
+			isCall(unpaired) ? "offered" : unpaired.refused,
+		);
 	}
 }
 
