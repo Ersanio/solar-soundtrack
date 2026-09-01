@@ -80,7 +80,7 @@ export class LoopInspector {
   });
 
   /**
-   * Both writers go through `CommitAudition`, so the note the roll is asking
+   * All three writers go through `CommitAudition`, so the note the roll is asking
    * about sounds again once the change has compiled — a repeat count is a thing
    * you judge by ear.
    */
@@ -88,8 +88,13 @@ export class LoopInspector {
     this.commitAudition.apply(loopCountEdit(this.store.source(), focus, plays));
   }
 
+  /**
+   * The one panel commit that does not keep the roll's notes: the body a call
+   * plays is part of the calling channel's strip, so pointing it elsewhere
+   * changes which notes that strip holds and the roll's indices into it.
+   */
   protected setTarget(focus: LoopFocus, label: number): void {
-    this.commitAudition.apply(loopTargetEdit(this.store.source(), focus, label));
+    this.commitAudition.apply(loopTargetEdit(this.store.source(), focus, label), false);
   }
 
   protected setName(focus: LoopFocus, label: number): void {

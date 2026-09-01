@@ -40,8 +40,10 @@ export interface EditBatch {
    * Whether this batch leaves a channel's notes as they are — the same notes,
    * in the same order, whatever their ticks do.
    *
-   * True of a splice into one command's own text, which is every commit a panel
-   * makes and every command the piano roll's lane erases or carries. The roll
+   * True of a splice into one command's own text, which is every command the
+   * piano roll's lane erases or carries and every commit a panel makes but one:
+   * the loop inspector's Recalls points a call at another body, and the notes of
+   * the body a channel plays are items of that channel's strip. The roll
    * reads {@link EditorRequests.notesKept} to know it, and what it does with it
    * is keep its selection, which is a set of indices into a channel's strip: the
    * channel is rebuilt with the same items in the same order, so those indices
@@ -105,15 +107,16 @@ export class EditorRequests {
    * those builders return when nothing would change.
    *
    * Here rather than in each panel so the no-op check and the defensive copy
-   * are stated once.
+   * are stated once. `keepsNotes` is {@link EditBatch.keepsNotes}, and a panel's
+   * splice keeps them unless the panel knows otherwise.
    */
-  apply(edit: Edit | null): void {
+  apply(edit: Edit | null, keepsNotes = true): void {
     if (edit) {
       this.replace.set({
         edits: [copyEdit(edit)],
         immediate: false,
         select: null,
-        keepsNotes: true,
+        keepsNotes,
       });
     }
   }

@@ -1370,7 +1370,9 @@ stats.loopTicks` pads **every other channel that would cut the song short** out 
   command's own text and adds and removes no item, so the indices still name their notes
   (`EditBatch.keepsNotes`, which the lane's own command writes claim too, counted by the **view** in
   `dispatchBatch` because a batch whose `expect` has gone stale is dropped in silence and a count
-  taken where the batch was asked for would run ahead of the document); a gesture leaves
+  taken where the batch was asked for would run ahead of the document — and the loop inspector's
+  Recalls is the one panel commit that says no, the body a call plays being part of the calling
+  channel's strip); a gesture leaves
   anchors saying where each note went — its frame, and its place among that frame's notes
   (`plannedOrdinals`, `roll-selection.ts`), which within a frame is text order and tick order at
   once and is what `planEdits` writes in. Every note the selection named and the plan still carries,

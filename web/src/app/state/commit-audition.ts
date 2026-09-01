@@ -45,10 +45,11 @@ export class CommitAudition {
    * Applies a panel's splice and arms the preview for it.
    *
    * The `null` a splice builder returns for a no-op arms nothing — no text
-   * changes, so no compile would come along to deliver it.
+   * changes, so no compile would come along to deliver it. `keepsNotes` is
+   * `EditBatch.keepsNotes`, passed through for the one panel that has to say no.
    */
-  apply(edit: Edit | null): void {
-    this.requests.apply(edit);
+  apply(edit: Edit | null, keepsNotes = true): void {
+    this.requests.apply(edit, keepsNotes);
 
     if (edit) {
       this.armed = true;
