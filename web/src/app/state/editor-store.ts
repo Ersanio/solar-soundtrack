@@ -70,7 +70,12 @@ export class EditorStore {
    * a run of music rather than landing at a point, and an empty range is how the
    * editor says there is nothing to put brackets round.
    */
-  readonly selection = signal<{ start: number; end: number }>({ start: 0, end: 0 });
+  readonly selection = signal<{ start: number; end: number }>(
+    { start: 0, end: 0 },
+    // By value: the listener writes a fresh object on every caret move, and the
+    // two palettes' bracket verdicts hang off this.
+    { equal: (a, b) => a.start === b.start && a.end === b.end },
+  );
 
   /**
    * The text the compiler last ran on. It lags `source` by the typing debounce,

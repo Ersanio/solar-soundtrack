@@ -36,6 +36,7 @@ import {
   REFUSE_RAMP,
   REFUSE_SPELL,
   REFUSE_SUB_SPLIT,
+  framePasses,
   isEdits,
   plannedFrameTicks,
 } from './roll-edit';
@@ -2300,22 +2301,20 @@ function planReach(
     return { reach: flat, grown };
   }
 
+  // The same per-voice ordinals the shift and the preview count, so the pad
+  // cannot count a pass differently from the bars drawn into it.
   const delta = plannedFrameTicks(strip, frame, plan) - frame.ticks;
-  const passes = frame.runs
-    .flatMap((run) => run.passes.map((pass) => ({ tick: pass.tick, channel: run.channel })))
-    .sort((a, b) => a.tick - b.tick);
-  const seen = new Map<number, number>();
   let projected = 0;
-  for (const pass of passes) {
-    const ordinal = seen.get(pass.channel) ?? 0;
-    seen.set(pass.channel, ordinal + 1);
+  for (const pass of framePasses(frame)) {
     for (const note of moved) {
-      projected = Math.max(projected, pass.tick + ordinal * delta + note.startTick + note.ticks);
+      projected = Math.max(
+        projected,
+        pass.tick + pass.ordinal * delta + note.startTick + note.ticks,
+      );
     }
-  }
 
-  for (const [voice, count] of seen) {
-    grown.set(voice, count * delta);
+    // The last pass a voice plays leaves its whole count standing.
+    grown.set(pass.channel, (pass.ordinal + 1) * delta);
   }
 
   return { reach: projected, grown };

@@ -550,7 +550,7 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
    * is the one under the pointer — a turnover the pointer caused must not be
    * taken for the one the commit did.
    */
-  let pending: { channel: number; anchors: readonly NoteAnchor[] } | null = null;
+  let pending: { channel: number; source: string; anchors: readonly NoteAnchor[] } | null = null;
 
   /** The gesture the pointer is describing, or `null` when it is not describing one. */
   const gestureNow = computed<Gesture | null>(() => {
@@ -1309,7 +1309,11 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
 
   /** The selection as the plans leave it, kept for the strip they are about to build. */
   const carry = (strip: Strip, parts: readonly FramePlan[]): void => {
-    pending = { channel: strip.channel, anchors: anchorsFor(strip, parts, selection()) };
+    pending = {
+      channel: strip.channel,
+      source: sources.source(),
+      anchors: anchorsFor(strip, parts, selection()),
+    };
   };
 
   const finish = (): void => {
@@ -1978,12 +1982,15 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
      * plan spoke for one. The channel is checked because a strip is rebuilt for
      * whichever channel is being edited, and with none picked that is the one
      * under the pointer: a turnover the pointer caused is not the one the commit
-     * did.
+     * did. The text is checked because a batch the editor found stale is dropped
+     * in silence: a strip arriving while the document is still the one the plan
+     * was made on is not the commit's, and the anchors say where notes went in a
+     * text that never came.
      */
     restoreSelection(strip: Strip): void {
       const held = pending;
       pending = null;
-      if (held?.channel === strip.channel) {
+      if (held !== null && held.channel === strip.channel && held.source !== sources.source()) {
         selection.set(notesAtAnchors(strip, held.anchors));
       }
     },

@@ -1095,8 +1095,14 @@ export class PianoRoll {
     ReadonlySet<number>
   >({
     source: () => ({ strip: this.strip(), chosen: this.gestures.selection() }),
+    // Held only while there is something selected to hold it for: a selection
+    // let go during a compile takes its outlines with it at once.
     computation: (now, previous) =>
-      now.strip ? this.addressesOf(now.strip, now.chosen) : (previous?.value ?? new Set<number>()),
+      now.chosen.size === 0
+        ? new Set<number>()
+        : now.strip
+          ? this.addressesOf(now.strip, now.chosen)
+          : (previous?.value ?? new Set<number>()),
   });
 
   /** The selected strip indices in order, which the two readers below walk. */
