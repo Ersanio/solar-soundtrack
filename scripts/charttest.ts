@@ -2218,14 +2218,14 @@ console.log("\nhow the command lane stacks what lands together");
 	{
 		const song = "#amk 4\n#0 o4 t60 v200 c8 r8 [d8]2\n";
 		const commands = tokenize(song).commands;
-		const kind = (letter: string): Command => commands.find((command) => command.kind === letter)!;
+		const ofKind = (letter: string): Command => commands.find((command) => command.kind === letter)!;
 		const named = (name: string): Command => commands.find((command) => command.name === name)!;
-		check("a song command is inspectable", inspectable(kind("t")));
-		check("and a note-state one", inspectable(kind("v")));
+		check("a song command is inspectable", inspectable(ofKind("t")));
+		check("and a note-state one", inspectable(ofKind("v")));
 		check("a note is not", !inspectable(named("note")));
 		check("nor a rest", !inspectable(named("rest")));
-		check("nor an octave", !inspectable(kind("o")));
-		check("nor a loop bracket", !inspectable(kind("]")));
+		check("nor an octave", !inspectable(ofKind("o")));
+		check("nor a loop bracket", !inspectable(ofKind("]")));
 	}
 
 	check("a command written out in full can be", pair.glyphs[1].removable === true);
