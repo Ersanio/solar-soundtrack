@@ -1,5 +1,6 @@
 import { Component, computed, inject, signal } from '@angular/core';
 
+import { Audition } from '../../state/audition';
 import { Button } from '../../shared/button/button';
 import { Checkbox } from '../../shared/checkbox/checkbox';
 import { EditorStore } from '../../state/editor-store';
@@ -22,7 +23,19 @@ export class TransportControls {
   protected readonly playback = inject(Playback);
   protected readonly mixer = inject(Mixer);
   protected readonly store = inject(EditorStore);
+  private readonly audition = inject(Audition);
   protected readonly VOLUME_MAX = VOLUME_MAX;
+
+  /**
+   * Anything there is to stop: the song, or a note or selection being previewed.
+   *
+   * The two are asked separately because they are separate — the previewer has
+   * its own AudioContext and neither interrupts the other of its own accord — so
+   * this button is where they meet, as the volume slider is for the level.
+   */
+  protected readonly canStop = computed(
+    () => !this.playback.isIdle() || this.audition.previewing(),
+  );
 
   /** True while a pointer is down on the volume slider, or after a keyboard change until it blurs. */
   protected readonly volumeReadout = signal(false);
@@ -42,6 +55,18 @@ export class TransportControls {
       text: `${volume}%`,
     };
   });
+
+  /** Stops whichever of the two is going, and both where both are. */
+  protected stop(): void {
+    // Guarded rather than unconditional: `Playback.stop` rests the transport at
+    // tick 0, so a stop with it already idle would throw away a position seeked
+    // to while stopped, which is where the next press of play picks the song up.
+    if (!this.playback.isIdle()) {
+      this.playback.stop();
+    }
+
+    this.audition.stop();
+  }
 
   protected onVolume(event: Event): void {
     this.mixer.volume.set(Number((event.target as HTMLInputElement).value));

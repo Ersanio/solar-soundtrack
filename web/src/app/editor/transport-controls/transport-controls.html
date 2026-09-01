@@ -2,7 +2,14 @@
   {{ playback.isPlaying() ? '❚❚ Pause' : '▶ Play' }}
 </button>
 
-<button amk-button title="Stop" [disabled]="playback.isIdle()" (click)="playback.stop()">■</button>
+<button
+  amk-button
+  title="Stop the song, or a note being previewed"
+  [disabled]="!canStop()"
+  (click)="stop()"
+>
+  ■
+</button>
 
 <input
   type="range"
