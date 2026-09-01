@@ -31,6 +31,12 @@ import {
 	spliceInstrumentByte,
 	spliceInstrumentSample,
 } from "@amk/tokens/edits";
+import {
+	LAST_DRIVER_INSTRUMENT,
+	instrumentByte,
+	instrumentReach,
+	selectedInstrument,
+} from "@amk/tokens/commands/instruments";
 import { type Command, tokenize } from "@amk/tokens";
 import { check, summarise } from "./harness";
 
@@ -234,6 +240,74 @@ console.log("\nvariable-length commands do not lose their payload");
 		"and appending a note rewrites only from the count to the end",
 		applied(arp, spliceArgs(arp, arpCommand, ["$03", null, null, null])) === "#0 $FB $03 $18 $04 $07\n",
 	);
+}
+
+console.log("\nan instrument the inspector offers is the instrument it then selects");
+{
+	// The list a picker draws and the number a pick writes are two halves of one
+	// map, and the three spellings do not carry it the same way: `parseInstrument`
+	// remaps 19-29 under `@@` and emits nothing at all for a plain `@19`-`@29`,
+	// while a raw `$DA` is the byte itself — except under `#am4`, where `$13` up
+	// is a custom instrument and the driver's own last table entry has no spelling
+	// left. A list built on one reading and a write built on another offers one
+	// instrument and selects another, silently, and no assertion about the numbers
+	// on either side can see it. So this is a round trip through `tokenize`: write
+	// what the picker would write, and ask the scanner what the text now selects.
+	const CUSTOM = 2;
+	const song = (prelude: string, written: string): string =>
+		`${prelude}#instruments\n{\n\t"a.brr" $FE $6A $B8 $03 $00\n\t"b.brr" $FE $6A $B8 $03 $00\n}\n#0 ${written} c4\n`;
+
+	const instrumentIn = (source: string): Command => {
+		const found = tokenize(source).commands.find((c) => c.kind === "@" || c.vcmd === 0xda);
+		if (!found) {
+			throw new Error(`no instrument command in ${JSON.stringify(source)}`);
+		}
+
+		return found;
+	};
+
+	for (const spelling of [
+		{ name: "@n", prelude: "", written: "@0" },
+		{ name: "@@n", prelude: "", written: "@@0" },
+		{ name: "$DA", prelude: "", written: "$DA $00" },
+		{ name: "$DA under #am4", prelude: "#am4\n", written: "$DA $00" },
+	]) {
+		const source = song(spelling.prelude, spelling.written);
+		const command = instrumentIn(source);
+		const reach = instrumentReach(command, CUSTOM);
+		const offered = reach.join(" ");
+		const missed = reach.filter((instrument) => {
+			const byte = instrumentByte(command, instrument)!;
+			const after = applied(source, spliceArg(source, command, 0, argumentText(command, byte)));
+			return selectedInstrument(instrumentIn(after)) !== instrument;
+		});
+
+		check(`${spelling.name} selects every instrument it offers`, missed.length === 0, `missed ${missed.join(" ")}`);
+		check(`${spelling.name} offers this song's own two`, reach.includes(30) && reach.includes(31), `got ${offered}`);
+		check(`and not a third it has not defined`, !reach.includes(32), `got ${offered}`);
+		// 19 is a real entry that a raw `$DA` reaches; 20 is past the table under
+		// every spelling and emits nothing under any of them.
+		check(`nor 20, which no spelling reaches`, !reach.includes(20), `got ${offered}`);
+	}
+
+	const plain = instrumentIn(song("", "@0"));
+	const direct = instrumentIn(song("", "@@0"));
+	const raw = instrumentIn(song("", "$DA $00"));
+	const am4 = instrumentIn(song("#am4\n", "$DA $00"));
+
+	check("only the plain form writes a drum", instrumentReach(plain, CUSTOM).includes(21));
+	check("the direct form cannot, its 19-29 being custom instruments", instrumentByte(direct, 21) === null);
+	check("and a $DA cannot, a drum emitting no $DA at all", instrumentByte(raw, 21) === null);
+
+	check(
+		"a raw $DA is what reaches the driver's last table entry",
+		instrumentByte(raw, LAST_DRIVER_INSTRUMENT) === 0x13,
+		`${instrumentByte(raw, LAST_DRIVER_INSTRUMENT)}`,
+	);
+	check("which no @ names", instrumentByte(plain, LAST_DRIVER_INSTRUMENT) === null);
+	check("and which #am4 spends on a custom instrument", instrumentByte(am4, LAST_DRIVER_INSTRUMENT) === null);
+	check("$13 being where its own numbering starts", instrumentByte(am4, 30) === 0x13, `${instrumentByte(am4, 30)}`);
+	check("nothing past a byte is offered", instrumentByte(plain, 256) === null);
 }
 
 summarise();

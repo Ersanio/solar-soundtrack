@@ -10,7 +10,10 @@ export const CHANGELOG: readonly ChangelogEntry[] = [
   // ─── newest first; add new blocks here ──────────────────────────────────
   {
     date: '1 September 2026',
-    items: ["Dragging a split loop's two halves back together makes them one loop call again"],
+    items: [
+      "Pick a different instrument from the command inspector, the song's own included",
+      "Dragging a split loop's two halves back together makes them one loop call again",
+    ],
   },
   {
     date: '31 August 2026',

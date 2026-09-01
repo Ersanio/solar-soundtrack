@@ -1251,6 +1251,19 @@ stats.loopTicks` pads **every other channel that would cut the song short** out 
   `rolltest`'s `channelTicks` reads the padded voice's own count. And the costs are taken rather
   than worked around: `selectedBodies` finds the inner body whole too, so both boxes close up solid,
   and `selectedRun` is `null`, so the palette's **Loop** greys out.
+- **The instrument picker normalising every pick to a plain `@n`** — the whole set is then always
+  available and one splice serves all three spellings, and it rewrites text the author chose: a
+  click on a dropdown turned `$DA $02` into `@2` and `@@5` into `@5`. Only the argument moves, in
+  that spelling's own numbering (`instrumentByte`), and an instrument the spelling cannot express is
+  not listed — so `@@` and `$DA` offer no drum, neither being able to write one, and `#am4`'s `$DA`
+  writes a custom instrument from `$13`. The map and its inverse live in one file so `edittest` can
+  round-trip them: a list built on one reading of the bands and a write built on another offers one
+  instrument and selects a different one, and nothing about the numbers on either side can see it.
+  Not labelled by the sample each instrument resolves to, either — the names are SRCN-indexed and
+  a song's own `#samples` moves them, where the number is what the source says. `@19` and `@20` are
+  not offered at all, emitting nothing; a caret already on one still shows it, through
+  `amk-enum-select`'s unknown-value option, which is what keeps the control from claiming the
+  document says something it does not.
 - **The loop join guarded by `holdsCommands` over the text between the two calls** — it reads
   `strip.commands`, and the intro `/` is not one of them: `gather` raises no `Command` for an
   operator (`tokens.ts:810`), which `prefixCommandsOf` already says out loud. So `[c4]2 / r4 *2`

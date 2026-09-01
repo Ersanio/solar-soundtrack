@@ -27,6 +27,7 @@ import {
 	NSPC_VELOCITY_OFFSET,
 	VELOCITY_VALUES,
 } from "@amk/core/hardcoded-tables";
+import { LAST_DRIVER_INSTRUMENT } from "@amk/tokens/commands/instruments";
 import { type DriverManifest, UPLOAD_HEADER_BYTES } from "@amk/spc/driver";
 import {
 	FIRST_CUSTOM_INSTRUMENT,
@@ -184,6 +185,16 @@ console.log("\nentry shape");
 		"and on where percussion starts",
 		COMPILER_FIRST_PERCUSSION === FIRST_PERCUSSION_INSTRUMENT,
 		`${COMPILER_FIRST_PERCUSSION} vs ${FIRST_PERCUSSION_INSTRUMENT}`,
+	);
+
+	// A third statement of the same table, for the same reason: `@amk/tokens` may
+	// not import `@amk/spc/instruments`, so the instrument picker counts the
+	// driver's entries for itself in order to know that a raw `$DA` reaches the
+	// last of them. This is the only place both numbers are in scope.
+	check(
+		"and the token layer counts the same driver entries",
+		MELODIC_SLOTS === LAST_DRIVER_INSTRUMENT + 1,
+		`${MELODIC_SLOTS} vs ${LAST_DRIVER_INSTRUMENT} + 1`,
 	);
 }
 

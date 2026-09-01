@@ -49,7 +49,7 @@ export type CommandScope =
 	| "structure";
 
 /** `@21`-`@29`, the nine drums, which emit no `$DA` (`parser.ts:1816-1847`). */
-const LAST_PERCUSSION_INSTRUMENT = FIRST_PERCUSSION_INSTRUMENT + 8;
+export const LAST_PERCUSSION_INSTRUMENT = FIRST_PERCUSSION_INSTRUMENT + 8;
 
 const SONG_VCMDS = new Set([
 	0xe0, // global volume
