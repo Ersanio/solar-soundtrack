@@ -66,9 +66,10 @@ Shortcuts are ignored while you are typing in the MML, so `Ctrl+A` there still s
 channel picked, and neither does deleting a command: a command belongs to the song rather than to
 the channel you are editing.
 
-`Delete` goes to the command whenever one is selected, however many notes are selected as well —
-none of them is touched, and the outline comes off them so that the key can mean nothing else. Click
-a bar's body to put it back on the notes. A command written through a `"name=value"` cannot be
+`Delete` goes to the command whenever one is picked out, however many notes are selected as well —
+none of them is touched. Picking it from a bar's icon or from the lane lets go of the notes, so the
+key can mean nothing else; picked from the inspector's buttons they stay outlined and stay put. Click
+a bar's body to put the key back on the notes. A command written through a `"name=value"` cannot be
 deleted, and the key does nothing at all rather than falling through to them.
 
 ## The two bars over the roll

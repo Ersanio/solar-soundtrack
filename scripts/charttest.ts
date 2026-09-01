@@ -14,7 +14,7 @@
  */
 
 import { KEY_COUNT, type LoopRun, type SongTimeline, type TempoChange, type WalkNote } from "@amk/spc/song-walk";
-import { tokenize } from "@amk/tokens";
+import { type Command, tokenize } from "@amk/tokens";
 import type { TimelineCommand } from "../web/src/app/state/command-timeline";
 import {
 	DEFAULT_TEMPO,
@@ -65,7 +65,7 @@ import {
 	laneWindow,
 	packCommandLane,
 } from "../web/src/app/editor/views/piano-roll/roll-command-layout";
-import { eraseCommand } from "../web/src/app/editor/views/piano-roll/roll-command-move";
+import { eraseCommand, inspectable } from "../web/src/app/editor/views/piano-roll/roll-command-move";
 import {
 	KEY_WIDTH,
 	LANE_GLYPH,
@@ -2210,6 +2210,22 @@ console.log("\nhow the command lane stacks what lands together");
 		check("a literal command erases", taken !== null);
 		check("taking the space in front of it with it", taken?.expect === " v200", JSON.stringify(taken?.expect));
 		check("and putting nothing back", taken?.text === "", JSON.stringify(taken?.text));
+	}
+
+	// What the roll may point at, and so what `Delete` may take: the lane's and
+	// the bars' scopes, and nothing else. A note is a `Command` too, and the caret
+	// is on one after every click on a bar.
+	{
+		const song = "#amk 4\n#0 o4 t60 v200 c8 r8 [d8]2\n";
+		const commands = tokenize(song).commands;
+		const kind = (letter: string): Command => commands.find((command) => command.kind === letter)!;
+		const named = (name: string): Command => commands.find((command) => command.name === name)!;
+		check("a song command is inspectable", inspectable(kind("t")));
+		check("and a note-state one", inspectable(kind("v")));
+		check("a note is not", !inspectable(named("note")));
+		check("nor a rest", !inspectable(named("rest")));
+		check("nor an octave", !inspectable(kind("o")));
+		check("nor a loop bracket", !inspectable(kind("]")));
 	}
 
 	check("a command written out in full can be", pair.glyphs[1].removable === true);

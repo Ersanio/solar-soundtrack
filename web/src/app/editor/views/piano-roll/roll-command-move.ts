@@ -163,6 +163,18 @@ export function eraseCommand(source: string, command: Command): Edit | null {
   return commandRewritable(command) ? spliceOut(source, command.span) : null;
 }
 
+/**
+ * Whether the roll draws this command at all: the lane holds every `'song'`
+ * command and a bar's chips every `'note-state'` one, and nothing draws the
+ * rest. The gate the ring and the `Delete` key share, because the caret alone
+ * cannot say — a note is a `Command` too, and every click on a bar puts the
+ * caret on one.
+ */
+export function inspectable(command: Command): boolean {
+  const scope = commandScope(command);
+  return scope === 'song' || scope === 'note-state';
+}
+
 /** The target nearest a tick, the earlier one on a tie. */
 export function nearestTarget(targets: readonly MoveTarget[], toTick: number): MoveTarget | null {
   let best: MoveTarget | null = null;

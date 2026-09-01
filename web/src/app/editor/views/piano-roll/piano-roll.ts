@@ -72,7 +72,7 @@ import {
 import { RollLoopLabels } from './roll-loops/roll-loop-labels';
 import { RollLoops } from './roll-loops/roll-loops';
 import { laneWindow, packCommandLane } from './roll-command-layout';
-import { eraseCommand } from './roll-command-move';
+import { eraseCommand, inspectable } from './roll-command-move';
 import { RollCommandLane } from './roll-command-lane/roll-command-lane';
 import { KEY_WIDTH, LANE_HEIGHT, OVERVIEW_HEIGHT, SCRUB_HEIGHT } from './roll-metrics';
 import { CHANNEL_FILL, CHANNEL_STROKE } from '../../../util/channel-palette';
@@ -641,10 +641,19 @@ export class PianoRoll {
    * Held here rather than in each layer because three things read it — the lane
    * rings it, the bars ring it, and `onKey` deletes it — and two of those are
    * drawn in the same gesture. One signal is what stops them disagreeing.
+   *
+   * Only a command the roll draws (`inspectable`). A note is a `Command` too and
+   * a click on a bar puts the caret on it, so the caret alone would hand `Delete`
+   * the note itself — and an `o` or an `l` under the caret, which nothing rings.
    */
-  protected readonly inspectedCommand = computed(() =>
-    this.requests.dismissed() === this.editor.caret() ? null : this.editor.commandAtCaret(),
-  );
+  protected readonly inspectedCommand = computed(() => {
+    const command = this.editor.commandAtCaret();
+    return command !== null &&
+      inspectable(command) &&
+      this.requests.dismissed() !== this.editor.caret()
+      ? command
+      : null;
+  });
 
   // --- marks ---------------------------------------------------------------
 
@@ -1874,10 +1883,11 @@ export class PianoRoll {
 
     // A selected command owns Delete, whichever route picked it — a glyph in the
     // lane, a chip on a bar, or a button in the note inspector — since all three
-    // are the caret. No note is touched, however many are selected — the outline
-    // comes off them because the source changed, which is the reset every edit
-    // takes — and the key goes back to them the moment a click on a bar's body
-    // moves the caret off the command.
+    // are the caret. No note is touched, however many are outlined: a chip or a
+    // lane glyph lets go of them as it picks, and the splice keeps the rest where
+    // they are. The key goes back to the notes the moment a click on a bar's body
+    // moves the caret off the command — onto the note, which is a `Command` too,
+    // and which `inspectedCommand` therefore does not answer.
     //
     // Ahead of the channel guard, because a lane glyph names a command of the
     // song rather than a note of a channel and picks none: "this holds all

@@ -1293,11 +1293,15 @@ stats.loopTicks` pads **every other channel that would cut the song short** out 
 - **The selected command's `Delete` falling through to the notes where the command cannot go** —
   a `"name=value"` command's span is collapsed onto the call site, so `eraseCommand` answers `null`
   and the branch would have handed the key on to the note selection: a press aimed at a chip that
-  is visibly outlined would silently delete five notes somewhere else. The key is taken whenever a
-  command is selected, and a command that cannot be removed does nothing. It sits **ahead of the
-  channel guard** for the reason the lane picks no channel — it holds all eight and a `t` belongs to
-  none of them — and it takes only the first press of a held key: the caret lands where the command
-  was and `commandAt` is end-inclusive, so a repeat would take the neighbour nobody selected.
+  is visibly outlined would silently delete five notes somewhere else. The key is taken whenever the
+  caret is on a command the roll draws — `inspectable`, the lane's `'song'` and the bars'
+  `'note-state'` scopes — and a command that cannot be removed does nothing. Not on `commandAtCaret`
+  alone: a note is a `Command` too and every click on a bar puts the caret on one, so an ungated
+  branch would splice the note's own text out in place of the delete gesture, and would take an `o`
+  or an `l` nothing on screen rings. It sits **ahead of the channel guard** for the reason the lane
+  picks no channel — it holds all eight and a `t` belongs to none of them — and it takes only the
+  first press of a held key: the caret lands where the command was and `commandAt` is end-inclusive,
+  so a repeat would take the neighbour nobody selected.
 - **`inspecting.set(null)` taken as the lane letting go of the selected note** — "the selected note"
   is two things, and the lane owned only one of them: `EditorRequests.inspecting` is the occurrence
   the inspector is describing, where the outlines in the roll are `gestures.selection()`, a set of
