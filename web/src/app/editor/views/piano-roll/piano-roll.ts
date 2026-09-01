@@ -142,8 +142,10 @@ import { RollTooltip } from './roll-tooltip/roll-tooltip';
   host: {
     class: 'relative flex min-h-0 min-w-0 flex-col',
     // On the window rather than through a focusable element: this project ships
-    // no `tabindex` and no `role`, and a shortcut that only works while a
-    // channel is being edited needs neither. See `web/README.md`.
+    // no `tabindex` and no `role`, and these shortcuts belong to the roll as a
+    // whole rather than to anything inside it. See `web/README.md`. The binding
+    // lives and dies with the roll, which `@case ('roll')` in `editor-pane.html`
+    // destroys on a tab switch, so it is roll-only without a check of its own.
     '(window:keydown)': 'onKey($event)',
   },
 })
@@ -1764,14 +1766,44 @@ export class PianoRoll {
    * A channel really picked, rather than {@link editing}: a key has no pointer
    * to name a channel with, so `Ctrl+A` under one merely hovered would select
    * notes in a channel the toolbar says is not being edited.
+   *
+   * Space is the exception and needs no channel: it is the transport, not an
+   * edit.
    */
   protected onKey(event: KeyboardEvent): void {
     const target = event.target as HTMLElement | null;
     if (
-      this.editChannel() === null ||
       target?.closest('input, textarea, select, dialog, .cm-editor') !== null ||
       event.isComposing
     ) {
+      return;
+    }
+
+    // Space is the transport: it starts the song from wherever the playhead
+    // stands and stops it back at the beginning. It takes the keypress outright,
+    // since the browser would otherwise scroll the page with it or press
+    // whichever button was last clicked — so it means the same thing wherever
+    // the pointer has been. Bare, because `Ctrl+Space` toggles an IME and
+    // `Alt+Space` opens the window menu; and only the first press of a held bar
+    // acts, a song started and stopped thirty times a second being no use.
+    if (event.key === ' ' && !event.ctrlKey && !event.metaKey && !event.altKey && !event.shiftKey) {
+      event.preventDefault();
+      if (event.repeat) {
+        return;
+      }
+
+      if (this.playback.isPlaying()) {
+        this.playback.stop();
+      } else if (this.editor.canCompile()) {
+        // What the Play button's `disabled` says: with no driver loaded there is
+        // nothing to play, and `toggle` would report an error about the song.
+        void this.playback.toggle();
+      }
+
+      return;
+    }
+
+    if (this.editChannel() === null) {
       return;
     }
 

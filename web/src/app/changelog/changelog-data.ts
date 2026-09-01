@@ -12,6 +12,7 @@ export const CHANGELOG: readonly ChangelogEntry[] = [
     date: '1 September 2026',
     items: [
       "Pick a different instrument from the command inspector, the song's own included",
+      'Space starts and stops the song in the piano roll',
       "Dragging a split loop's two halves back together makes them one loop call again",
     ],
   },

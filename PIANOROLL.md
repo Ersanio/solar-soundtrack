@@ -4,7 +4,7 @@ A reference for the piano roll editor while there is no proper readme page for i
 is picked by the eight toggles in the corner above the keyboard, by a click on any note, or by
 soloing a part in the mixer below. It does not have to be picked first: with none picked you can
 still grab, stretch, copy or delete a note in any channel, and doing so picks that note's channel.
-Drawing a new note, the marquee and the keyboard shortcuts do need one, since empty grid belongs to
+Drawing a new note, the marquee and the editing shortcuts do need one, since empty grid belongs to
 no channel.
 
 ## Mouse
@@ -48,6 +48,7 @@ no channel.
 
 | Key                         | What it does                                                    |
 | --------------------------- | --------------------------------------------------------------- |
+| `Space`                     | Plays from the playhead, and stops back at the beginning        |
 | `Delete` / `Backspace`      | Deletes the selected notes                                      |
 | `Escape`                    | Drops the selection and the inspector with it, then the channel |
 | `←` `→`                     | Nudges the selection by one snap step                           |
@@ -61,6 +62,8 @@ no channel.
 | `Ctrl` + `Z` / `Ctrl` + `Y` | Undo and redo, the same history the MML editor uses             |
 
 Shortcuts are ignored while you are typing in the MML, so `Ctrl+A` there still selects the text.
+`Space` is the exception to the channel rule — it is the transport, not an edit, so it needs no
+channel picked.
 
 ## The two bars over the roll
 
