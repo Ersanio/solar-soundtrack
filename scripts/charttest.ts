@@ -65,6 +65,7 @@ import {
 	laneWindow,
 	packCommandLane,
 } from "../web/src/app/editor/views/piano-roll/roll-command-layout";
+import { eraseCommand } from "../web/src/app/editor/views/piano-roll/roll-command-move";
 import {
 	KEY_WIDTH,
 	LANE_GLYPH,
@@ -2189,10 +2190,26 @@ console.log("\nhow the command lane stacks what lands together");
 		});
 		check("a command that came through a replacement cannot be erased", spread.glyphs[0].removable === false);
 		check("and its hover does not offer it", !spread.glyphs[0].title.includes("right-click"), spread.glyphs[0].title);
+		// The erase both routes go through — the right click and the `Delete`
+		// key — so neither can come to a different answer about it. `removable`
+		// is this function's own precondition read back onto the glyph.
+		check("and the erase itself refuses it", eraseCommand(macro, scanned[0]) === null);
 		// It cannot be carried either, and the cursor is the only thing on screen
 		// that says so before the porter presses.
 		check("nor dragged", spread.glyphs[0].cursor === "pointer", spread.glyphs[0].cursor);
 		check("and its hover does not offer that either", !spread.glyphs[0].title.includes("drag"), spread.glyphs[0].title);
+	}
+
+	// And what the erase takes: the command plus the inline whitespace in front
+	// of it, so what is left is what was there before it was written. `expect` is
+	// the race guard `source-view` re-checks the batch against.
+	{
+		const plain = "#amk 4\n#0 v200 c8\n";
+		const literal = tokenize(plain).commands.find((command) => command.kind === "v")!;
+		const taken = eraseCommand(plain, literal);
+		check("a literal command erases", taken !== null);
+		check("taking the space in front of it with it", taken?.expect === " v200", JSON.stringify(taken?.expect));
+		check("and putting nothing back", taken?.text === "", JSON.stringify(taken?.text));
 	}
 
 	check("a command written out in full can be", pair.glyphs[1].removable === true);

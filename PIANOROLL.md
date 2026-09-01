@@ -49,7 +49,7 @@ no channel.
 | Key                         | What it does                                                    |
 | --------------------------- | --------------------------------------------------------------- |
 | `Space`                     | Plays from the playhead, and stops back at the beginning        |
-| `Delete` / `Backspace`      | Deletes the selected notes                                      |
+| `Delete` / `Backspace`      | Deletes the selected command, or the selected notes             |
 | `Escape`                    | Drops the selection and the inspector with it, then the channel |
 | `←` `→`                     | Nudges the selection by one snap step                           |
 | `↑` `↓`                     | Moves the selection a semitone                                  |
@@ -63,7 +63,13 @@ no channel.
 
 Shortcuts are ignored while you are typing in the MML, so `Ctrl+A` there still selects the text.
 `Space` is the exception to the channel rule — it is the transport, not an edit, so it needs no
-channel picked.
+channel picked, and neither does deleting a command: a command belongs to the song rather than to
+the channel you are editing.
+
+`Delete` goes to the command whenever one is selected, however many notes are selected as well —
+none of them is touched, and the outline comes off them the way every edit takes it off. Click a
+bar's body to put the key back on the notes. A command written through a `"name=value"` cannot be
+deleted, and the key does nothing at all rather than falling through to them.
 
 ## The two bars over the roll
 
@@ -81,7 +87,12 @@ have taken the roll somewhere the song is not. Tick it again to catch up with th
 
 A bar carries its own pitch on the left and, on the right, one icon per command acting on that
 note — its volume, its envelope, its instrument, and so on. Hover the bar to have them named, click
-one to ask the inspector about that command, or double-click it to go to it in the MML.
+one to ask the inspector about that command, or double-click it to go to it in the MML. **The one
+you are inspecting is outlined**, on every bar it acts on, and `Delete` removes it.
+
+**Clicking an icon lets go of whatever notes were selected**, so the command is the only thing
+picked out and `Delete` can mean nothing else. Press and hold on one instead and you are dragging
+the note, exactly as if you had pressed its bar — an icon takes the click, never the press.
 
 An icon on a **solid pale chip** is a command that note puts in force; a plain outlined icon is one
 it inherits from earlier in the channel. So a run of notes under one `v200` shows the chip on the
@@ -96,10 +107,15 @@ list — the inspector under two headings, one for what the note sets and one fo
 under. Its buttons answer to the same pair the bar's own icons do: a click asks the inspector about
 that command and leaves you in the roll, a double click goes to it in the MML.
 
-**Changing a value in the inspector replays the note.** Let a slider go and the selected note — the
-one whose bar or icon you last clicked — sounds again under the new value, once the edit has
-compiled. With no note selected — after `Escape`, or a click in the command lane — a commit makes
-no sound.
+The three dots are the one plate on a bar that does not pick a command, because they stand for a
+list rather than for any one of them — so a click there **selects that note** and the inspector
+answers with everything acting on it.
+
+**Changing a value in the inspector replays the note.** Let a slider go and the note whose bar or
+icon you last clicked sounds again under the new value, once the edit has compiled. That is not the
+same as a note being outlined — clicking an icon lets the outlines go and still leaves the inspector
+answering about that note, so the commit is heard. With no note behind the question at all — after
+`Escape`, or a click in the command lane — a commit makes no sound.
 
 ## The command lane
 
@@ -151,8 +167,9 @@ channel it happens to be written on, and muting that channel does not stop it.
 **Whatever command you are inspecting is outlined here**, in the same white the roll outlines a
 selected note with, however you reached it — an icon on a bar, an icon in the lane, or a button in
 the note inspector. The lane is the one place every command appears, so it is where "this is the one"
-can always be said. A command written inside a `[ ]` that plays twice is outlined at both ticks: it
-is one command, wherever the driver reads it.
+can always be said; the bars outline it too, wherever they have room to show it. A command written
+inside a `[ ]` that plays twice is outlined at both ticks, and one held over sixteen notes is
+outlined on all sixteen bars: it is one command, wherever it acts.
 
 **Drag the line above the lane to make it taller**, the way the divider between the editor and the
 output pane works. Five icons deep is where it opens and the shortest it goes; ten is the tallest.
@@ -168,11 +185,14 @@ when there is more. Nothing is ever left out for want of room — however many c
 tick, each gets a row of its own, and the wheel and the seam are what reach them. Click an icon to
 ask the inspector about that command, or double-click it to go
 to it in the MML — the same as clicking one on a bar, except that it leaves the channel you are
-editing alone and lets go of the selected note: a lane icon names a command of the song rather than
-a note of it, so a value committed from here replays nothing. **Right-click one to delete it**, in one undo step. That is the counterweight to a
+editing alone and goes further in letting go of the notes: both drop the outlines, and a lane icon
+drops the note behind the question as well, since it names a command of the song rather than a note
+of it — so a value committed from here replays nothing, where one committed from a bar's icon
+replays the note that icon sits on. **Right-click one to delete it**, or
+press `Delete` on the one you are inspecting, in one undo step either way. That is the counterweight to a
 roll that keeps a command wherever something still plays under it: an edit hands the command back to
 the notes that need it, and this is how you say none of them do. A command written through a
-`"name=value"` cannot be deleted this way — its icon offers no right-click — because the text it
+`"name=value"` cannot be deleted at all — its icon offers no right-click — because the text it
 would take out is the call site rather than the command.
 
 **Drag an icon sideways to move that command to another tick.** It snaps to the starts of the notes

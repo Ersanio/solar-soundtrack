@@ -15,6 +15,9 @@ export const CHANGELOG: readonly ChangelogEntry[] = [
       "Pick a different instrument from the command inspector, the song's own included",
       'Space starts and stops the song in the piano roll',
       "Dragging a split loop's two halves back together makes them one loop call again",
+      'Delete or Backspace removes the command you are inspecting',
+      'The command you are inspecting is outlined on the note bars as well as in the command lane',
+      'Picking a command lets go of the notes you had selected, so Delete can only mean the command',
     ],
   },
   {

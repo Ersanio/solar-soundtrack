@@ -1290,6 +1290,50 @@ stats.loopTicks` pads **every other channel that would cut the song short** out 
   written count in any song that builds a strip — `walkSong` runs every channel to its own `$00`
   and filters only `notes` at the pass cut, so a construct past the shortest channel is
   `verified: false` with all its passes still there.
+- **The selected command's `Delete` falling through to the notes where the command cannot go** —
+  a `"name=value"` command's span is collapsed onto the call site, so `eraseCommand` answers `null`
+  and the branch would have handed the key on to the note selection: a press aimed at a chip that
+  is visibly outlined would silently delete five notes somewhere else. The key is taken whenever a
+  command is selected, and a command that cannot be removed does nothing. It sits **ahead of the
+  channel guard** for the reason the lane picks no channel — it holds all eight and a `t` belongs to
+  none of them — and it takes only the first press of a held key: the caret lands where the command
+  was and `commandAt` is end-inclusive, so a repeat would take the neighbour nobody selected.
+- **`inspecting.set(null)` taken as the lane letting go of the selected note** — "the selected note"
+  is two things, and the lane owned only one of them: `EditorRequests.inspecting` is the occurrence
+  the inspector is describing, where the outlines in the roll are `gestures.selection()`, a set of
+  indices into a strip the lane has never seen. So `PIANOROLL.md` said a lane click let the note go
+  and the bars went on showing every one of them outlined, with `Delete` then ambiguous between the
+  command that had just been picked and eight notes still lit. The lane emits `commandPicked` and the
+  roll clears, in the mould of `RollNotes.channelPicked` — the selection is the roll's, as its
+  settings are. `RollNotes` emits the same output for the same reason; what the two do differently is
+  `inspecting`, the entry below.
+- **A bar's chip leaving its note outlined, so a commit from the panel had something to replay** —
+  it conflated two things that are not one. The outline is `gestures.selection()`, what a gesture
+  would act on; the replay reads `EditorRequests.inspecting`, which occurrence is being described.
+  Keeping the first to get the second put a note and a command on screen as subjects at once, with
+  `Delete` meaning one of them and nothing saying which. The chip clears the outlines and keeps
+  `inspecting`, so the commit is still heard; the lane clears both, having no note to describe.
+  Cleared on the **`click`** and never on the `pointerdown`, which is the whole reason a press and
+  hold on a chip still drags the note: the press is not taken there, so it reaches the gesture layer,
+  which captures the pointer past the slop and leaves no `click` to fire. The overflow dots are the
+  one plate exempt — they stand for a list rather than a command, so they have no handler at all and
+  the click falls through to the bar, which selects that note.
+- **The bar's selection ring in the lane's `stroke-ink`, the way the lane draws it** — sound in the
+  lane, where nothing wears the inverted plate, and invisible on half the chips of a bar, where a
+  defining one does: a near-white ring round a near-white plate is the same value as the thing it is
+  drawn around, and reads as the plate being a pixel bigger rather than as a selection. Moving it
+  clear of the plate is no answer either — the chips are packed within a few pixels of each other, so
+  the ring would meet its neighbour's. It takes the **pair of colours the plate already uses**, which
+  is the axis `roll-notes.html` settled on for the icon: `stroke-surface` over a defining plate,
+  `stroke-ink` where there is none, so the ring reads against whatever is behind it on all eight
+  channels. Drawn over the plate rather than under it, for the same reason.
+- **Ringing a bar's `more` dots when the selected command is one they stand for** — the plate
+  already inverts on those terms and the symmetry is inviting, but `defining` is a property of the
+  list where a ring is a claim about one command, and the dots stand for commands the bar has no
+  room to show: an outline round them says "it is here" about something that is not drawn. It is
+  also the one mark with no handler and no span to reveal, so the ring would point at nothing
+  clickable. `MarkGlyph.command` rings the glyphs that are drawn, and the lane, where every command
+  appears, is where one behind the dots is found.
 
 ## Angular specifics
 

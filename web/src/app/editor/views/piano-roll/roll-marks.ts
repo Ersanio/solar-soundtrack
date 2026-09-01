@@ -44,6 +44,15 @@ export interface MarkGlyph {
   size: number;
   /** The command's own span, which is what a click on it selects. */
   span: Span;
+  /**
+   * The command itself, which is what says this glyph is the selected one.
+   *
+   * By identity and not by span, as the lane rings by: `inForce` reads
+   * `EditorStore.tokens()`, the same scan `commandAtCaret` answers from, so the
+   * objects compare. A second `tokenize` makes every comparison false in
+   * silence, which is the trap `EditContext.inForce` already names.
+   */
+  command: Command;
   /** For the tooltip, since a glyph has no room to say what it is. */
   label: string;
   /** This note puts the command in force, where the rest of a run inherits it. */
@@ -253,6 +262,7 @@ export function buildMarks(request: MarkRequest): Mark[] {
         y: y + box.y,
         size: box.size,
         span: drawable[at].command.span,
+        command: drawable[at].command,
         label: drawable[at].entry!.label,
         defining: defining.has(drawable[at].command),
       })),

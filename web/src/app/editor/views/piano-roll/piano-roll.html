@@ -160,12 +160,14 @@
           <g
             amk-roll-notes
             [marks]="marks()"
+            [inspected]="inspectedCommand()"
             [selected]="selectedSpans()"
             [moving]="movingSpans()"
             [boundaries]="gestures.shiftBoundaries()"
             [shift]="gestures.shiftDelta() * zoom()"
             (entered)="enter($event)"
             (channelPicked)="selectEditChannel($event)"
+            (commandPicked)="gestures.clearSelection()"
           />
           <!-- Above the bars, because a loop's name has to be read over the
                music it names; it travels with the box it sits in the corner
@@ -244,7 +246,9 @@
     [loopX]="loopX()"
     [endX]="endX()"
     [lane]="laneView()"
+    [inspected]="inspectedCommand()"
     [zoom]="zoom()"
+    (commandPicked)="gestures.clearSelection()"
     (wheeled)="onWheel($event)"
   />
 }

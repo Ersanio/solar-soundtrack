@@ -71,6 +71,7 @@ import {
 import { RollLoopLabels } from './roll-loops/roll-loop-labels';
 import { RollLoops } from './roll-loops/roll-loops';
 import { laneWindow, packCommandLane } from './roll-command-layout';
+import { eraseCommand } from './roll-command-move';
 import { RollCommandLane } from './roll-command-lane/roll-command-lane';
 import {
   CHANNEL_FILL,
@@ -630,6 +631,25 @@ export class PianoRoll {
     const { from, to } = this.window();
     return laneWindow(this.commandLane(), from, to, this.zoom());
   });
+
+  /**
+   * The command the inspector is answering about: the roll's selected command.
+   *
+   * Every route to it lands here, because they all move the caret — a glyph in
+   * the lane, a chip on a bar, and a button in the note inspector all set
+   * `EditorRequests.reveal`, and the caret is the one statement of what is being
+   * inspected. So nothing here needs to know which of the three was used.
+   *
+   * Dismissed the way the inspector is dismissed, since what it stands for is
+   * that panel: a ring that outlived it would be pointing at nothing.
+   *
+   * Held here rather than in each layer because three things read it — the lane
+   * rings it, the bars ring it, and `onKey` deletes it — and two of those are
+   * drawn in the same gesture. One signal is what stops them disagreeing.
+   */
+  protected readonly inspectedCommand = computed(() =>
+    this.requests.dismissed() === this.editor.caret() ? null : this.editor.commandAtCaret(),
+  );
 
   // --- marks ---------------------------------------------------------------
 
@@ -1800,6 +1820,35 @@ export class PianoRoll {
         void this.playback.toggle();
       }
 
+      return;
+    }
+
+    // A selected command owns Delete, whichever route picked it — a glyph in the
+    // lane, a chip on a bar, or a button in the note inspector — since all three
+    // are the caret. No note is touched, however many are selected — the outline
+    // comes off them because the source changed, which is the reset every edit
+    // takes — and the key goes back to them the moment a click on a bar's body
+    // moves the caret off the command.
+    //
+    // Ahead of the channel guard, because a lane glyph names a command of the
+    // song rather than a note of a channel and picks none: "this holds all
+    // eight, and a `t` belongs to none of them". It needs no strip either — the
+    // splice is the command's own span, and no note moves.
+    //
+    // The key is taken whether or not the command can go, so a `"name=value"`
+    // one does nothing rather than falling through and deleting the notes. And
+    // only the first press of a held key acts: the caret lands where the command
+    // was and `commandAt` is end-inclusive, so a repeat would take the
+    // neighbouring command, which nobody selected.
+    const inspected = this.inspectedCommand();
+    if (inspected !== null && (event.key === 'Delete' || event.key === 'Backspace')) {
+      event.preventDefault();
+      if (event.repeat || this.editor.compiledText() !== this.editor.source()) {
+        return;
+      }
+
+      const edit = eraseCommand(this.editor.source(), inspected);
+      this.requests.applyAll(edit ? [edit] : null);
       return;
     }
 
