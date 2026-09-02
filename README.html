@@ -2383,13 +2383,1232 @@
             is not caught. Neither is a <code>$F5</code> and a <code>$F1</code> inside the same
             macro.
           </li>
-          <li>
-            <strong>No accessibility.</strong> The app ships no ARIA attributes at all, and no
-            <code>role</code> or <code>tabindex</code>. That is a deferral rather than an oversight
-            — half of it would be worse than none — and it is next on the list once the codebase
-            settles. Keyboard focus works and is visible; a screen reader will not get far.
-          </li>
         </ul>
+
+        <h2 id="codes">Error codes</h2>
+
+        <p class="lead">
+          Everything the compiler has to say about your song carries a code. They are listed in
+          <strong>Problems</strong>, pinned to the bottom of the sidebar; click one and it takes you
+          to the text that raised it. This is what all 165 of them mean.
+        </p>
+
+        <p>
+          <strong>The prefix says whose finding it is</strong>, not which part of the app noticed.
+          <code>AMK</code> is a condition AddmusicK 1.0.11 itself reports, ported from its source
+          with its own wording — see one of these and the real tool would say the same thing about
+          the same song. <code>SST</code> is Solar Soundtrack's own finding, on something AddmusicK
+          has no opinion about at all: it will not warn you, and it will not stop you.
+        </p>
+
+        <div class="wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Severity</th>
+                <th>What it means</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Error</td>
+                <td>The song does not compile. Nothing is produced and nothing plays.</td>
+              </tr>
+              <tr>
+                <td>Severe</td>
+                <td>
+                  It compiles cleanly and then misbehaves when played — music that never sounds, an
+                  echo that grows instead of fading, a tempo the driver cannot keep.
+                </td>
+              </tr>
+              <tr>
+                <td>Warning</td>
+                <td>
+                  It compiles and it plays. Something is wasteful, imprecise, or will not survive an
+                  older AddmusicK.
+                </td>
+              </tr>
+              <tr>
+                <td>Notice</td>
+                <td>Worth knowing and nothing more. There is exactly one.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p>
+          A code never changes meaning, so quoting one in a bug report is enough to say exactly what
+          you saw. The number bands are AddmusicK's own ordering rather than a grouping you need to
+          learn; the headings below are.
+        </p>
+
+        <h3 id="codes-target">Target program and the preprocessor</h3>
+
+        <div class="wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Code</th>
+                <th>Severity</th>
+                <th>What it means</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>AMK0002</code></td>
+                <td>Error</td>
+                <td>
+                  The song never said which tool it is for. Put <code>#amk 2</code>,
+                  <code>#am4</code> or <code>#amm</code> at the top.
+                </td>
+              </tr>
+              <tr>
+                <td><code>AMK0003</code></td>
+                <td>Error</td>
+                <td>The song asks for a newer AddmusicK than 1.0.11.</td>
+              </tr>
+              <tr>
+                <td><code>AMK0400</code></td>
+                <td>Error</td>
+                <td>
+                  A preprocessor directive could not be read: a missing argument to
+                  <code>#define</code>, <code>#undef</code>, <code>#ifdef</code>,
+                  <code>#ifndef</code> or <code>#if</code>, an unknown <code>#if</code> operator, an
+                  <code>#endif</code> with nothing to close, an integer that is not one, or the file
+                  ending mid-directive.
+                </td>
+              </tr>
+              <tr>
+                <td><code>AMK0401</code></td>
+                <td>Error</td>
+                <td><code>#amk</code> with no version number after it.</td>
+              </tr>
+              <tr>
+                <td><code>AMK0402</code></td>
+                <td>Error</td>
+                <td>
+                  <code>#amk 3</code> — Codec's AddmusicK Beta, which AddmusicK 1.0.11 never
+                  implemented.
+                </td>
+              </tr>
+              <tr>
+                <td><code>AMK0403</code></td>
+                <td>Error</td>
+                <td>
+                  An <code>#ifdef</code>, <code>#ifndef</code> or <code>#if</code> with no matching
+                  <code>#endif</code>.
+                </td>
+              </tr>
+              <tr>
+                <td><code>AMK0046</code></td>
+                <td>Error</td>
+                <td>
+                  A <code>#define</code> reached the parser. The preprocessor matches these
+                  case-sensitively, so <code>#DEFINE</code> is not one and survives to here.
+                </td>
+              </tr>
+              <tr>
+                <td><code>AMK0047</code></td>
+                <td>Error</td>
+                <td>The same for <code>#undef</code>.</td>
+              </tr>
+              <tr>
+                <td><code>AMK0048</code></td>
+                <td>Error</td>
+                <td>The same for <code>#ifdef</code>.</td>
+              </tr>
+              <tr>
+                <td><code>AMK0049</code></td>
+                <td>Error</td>
+                <td>The same for <code>#ifndef</code>.</td>
+              </tr>
+              <tr>
+                <td><code>AMK0054</code></td>
+                <td>Error</td>
+                <td>The same for <code>#endif</code>.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3 id="codes-replacements">Replacements and comments</h3>
+
+        <div class="wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Code</th>
+                <th>Severity</th>
+                <th>What it means</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>AMK0021</code></td>
+                <td>Error</td>
+                <td>
+                  A <code>"name=value"</code> replacement with no <code>=</code> anywhere in it.
+                </td>
+              </tr>
+              <tr>
+                <td><code>AMK0022</code></td>
+                <td>Error</td>
+                <td>A replacement whose left-hand side is empty, so it matches everything.</td>
+              </tr>
+              <tr>
+                <td><code>AMK0023</code></td>
+                <td>Error</td>
+                <td>
+                  A replacement expanded without ever finishing — almost always a value containing
+                  its own name.
+                </td>
+              </tr>
+              <tr>
+                <td><code>AMK0101</code></td>
+                <td>Error</td>
+                <td>
+                  A stray <code>;</code>. Comments are stripped before the parser for every target
+                  except <code>#amm</code>, so one reaching it is not a comment.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3 id="codes-directives">Channels and song-wide directives</h3>
+
+        <div class="wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Code</th>
+                <th>Severity</th>
+                <th>What it means</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>AMK0030</code></td>
+                <td>Error</td>
+                <td>A channel directive that could not be read.</td>
+              </tr>
+              <tr>
+                <td><code>AMK0031</code></td>
+                <td>Error</td>
+                <td>A channel outside <code>#0</code> to <code>#7</code>.</td>
+              </tr>
+              <tr>
+                <td><code>AMK0040</code></td>
+                <td>Error</td>
+                <td><code>#halvetempo</code> written after a channel has opened.</td>
+              </tr>
+              <tr>
+                <td><code>AMK0041</code></td>
+                <td>Error</td>
+                <td>An <code>#option</code> written after a channel has opened.</td>
+              </tr>
+              <tr>
+                <td><code>AMK0042</code></td>
+                <td>Error</td>
+                <td><code>#option dividetempo</code> with no number after it.</td>
+              </tr>
+              <tr>
+                <td><code>AMK0043</code></td>
+                <td>Error</td>
+                <td><code>#option dividetempo 0</code>.</td>
+              </tr>
+              <tr>
+                <td><code>AMK0044</code></td>
+                <td>Error</td>
+                <td>An <code>#option</code> the compiler does not know.</td>
+              </tr>
+              <tr>
+                <td><code>AMK0045</code></td>
+                <td>Error</td>
+                <td><code>#option</code> does not exist in <code>#amk 1</code>.</td>
+              </tr>
+              <tr>
+                <td><code>AMK0215</code></td>
+                <td>Error</td>
+                <td>
+                  The tempo divisor has grown past what a byte holds —
+                  <code>#halvetempo</code> used too many times.
+                </td>
+              </tr>
+              <tr>
+                <td><code>AMK0052</code></td>
+                <td>Error</td>
+                <td><code>#path</code> without a quoted string after it.</td>
+              </tr>
+              <tr>
+                <td><code>AMK0053</code></td>
+                <td>Error</td>
+                <td><code>#pad</code> whose size is not a <code>$</code> hex value.</td>
+              </tr>
+              <tr>
+                <td><code>AMK0060</code></td>
+                <td>Error</td>
+                <td><code>#spc</code> with no <code>{</code> after it.</td>
+              </tr>
+              <tr>
+                <td><code>AMK0061</code></td>
+                <td>Error</td>
+                <td>An <code>#spc</code> block that is never closed.</td>
+              </tr>
+              <tr>
+                <td><code>AMK0062</code></td>
+                <td>Error</td>
+                <td>
+                  Something inside <code>#spc</code> that is neither a field name nor the
+                  <code>}</code>.
+                </td>
+              </tr>
+              <tr>
+                <td><code>AMK0063</code></td>
+                <td>Error</td>
+                <td>An <code>#spc</code> field with no quoted value.</td>
+              </tr>
+              <tr>
+                <td><code>AMK0064</code></td>
+                <td>Error</td>
+                <td>A quoted string with no closing quote.</td>
+              </tr>
+              <tr>
+                <td><code>AMK0065</code></td>
+                <td>Error</td>
+                <td>An <code>#spc</code> field name the tag has no room for.</td>
+              </tr>
+              <tr>
+                <td><code>AMK0066</code></td>
+                <td>Error</td>
+                <td>
+                  <code>#spc #length</code> that is neither <code>"m:ss"</code> nor
+                  <code>"auto"</code>.
+                </td>
+              </tr>
+              <tr>
+                <td><code>AMK0067</code></td>
+                <td>Error</td>
+                <td>A stated length past 16:39, which the SPC format cannot hold.</td>
+              </tr>
+              <tr>
+                <td><code>AMK0068</code></td>
+                <td>Error</td>
+                <td>
+                  An escape sequence inside a string other than <code>\"</code>, the only one
+                  allowed.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3 id="codes-samples">Samples and instruments</h3>
+
+        <div class="wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Code</th>
+                <th>Severity</th>
+                <th>What it means</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>AMK0050</code></td>
+                <td>Error</td>
+                <td><code>#samples</code> with no <code>{</code> after it.</td>
+              </tr>
+              <tr>
+                <td><code>AMK0056</code></td>
+                <td>Error</td>
+                <td>A sample that is neither a <code>.brr</code> nor a <code>.bnk</code>.</td>
+              </tr>
+              <tr>
+                <td><code>AMK0057</code></td>
+                <td>Error</td>
+                <td>A character inside <code>#samples</code> that belongs to nothing.</td>
+              </tr>
+              <tr>
+                <td><code>AMK0058</code></td>
+                <td>Error</td>
+                <td>
+                  A sample by that name is not in the library. Check the spelling in the
+                  <a href="#c-samples">sample browser</a>, and note that a <code>#path</code> prefix
+                  will never resolve here.
+                </td>
+              </tr>
+              <tr>
+                <td><code>AMK0059</code></td>
+                <td>Error</td>
+                <td>A <code>#</code> sample group that does not exist.</td>
+              </tr>
+              <tr>
+                <td><code>AMK0107</code></td>
+                <td>Error</td>
+                <td>A sample name with no extension on it.</td>
+              </tr>
+              <tr>
+                <td><code>AMK0108</code></td>
+                <td>Error</td>
+                <td>The file ended inside <code>#samples</code>.</td>
+              </tr>
+              <tr>
+                <td><code>AMK0131</code></td>
+                <td>Error</td>
+                <td>
+                  The song plays custom samples but never declared a <code>#samples</code> block.
+                </td>
+              </tr>
+              <tr>
+                <td><code>AMK0051</code></td>
+                <td>Error</td>
+                <td><code>#instruments</code> with no <code>{</code> after it.</td>
+              </tr>
+              <tr>
+                <td><code>AMK0069</code></td>
+                <td>Error</td>
+                <td>The file ended inside <code>#instruments</code>.</td>
+              </tr>
+              <tr>
+                <td><code>AMK0087</code></td>
+                <td>Error</td>
+                <td>
+                  A custom instrument that is not six bytes: a sample followed by five
+                  <code>$xx</code> values.
+                </td>
+              </tr>
+              <tr>
+                <td><code>AMK0088</code></td>
+                <td>Error</td>
+                <td>One of those five is not a one-byte hex value.</td>
+              </tr>
+              <tr>
+                <td><code>AMK0089</code></td>
+                <td>Error</td>
+                <td>
+                  A custom instrument naming a sample the song never listed in
+                  <code>#samples</code>.
+                </td>
+              </tr>
+              <tr>
+                <td><code>AMK0102</code></td>
+                <td>Error</td>
+                <td>The <code>@n</code> instrument-copy form could not be read.</td>
+              </tr>
+              <tr>
+                <td><code>AMK0103</code></td>
+                <td>Error</td>
+                <td>A custom instrument used as the base for another custom instrument.</td>
+              </tr>
+              <tr>
+                <td><code>AMK0104</code></td>
+                <td>Error</td>
+                <td>The <code>nXX</code> noise form could not be read.</td>
+              </tr>
+              <tr>
+                <td><code>AMK0105</code></td>
+                <td>Error</td>
+                <td>A noise pitch outside <code>$00</code>–<code>$1F</code>.</td>
+              </tr>
+              <tr>
+                <td><code>AMK0106</code></td>
+                <td>Error</td>
+                <td>
+                  Something inside <code>#instruments</code> that is not a quoted sample name,
+                  <code>@n</code> or <code>nXX</code>.
+                </td>
+              </tr>
+              <tr>
+                <td><code>AMK0090</code></td>
+                <td>Error</td>
+                <td>An <code>@</code> command with no readable number.</td>
+              </tr>
+              <tr>
+                <td><code>AMK0091</code></td>
+                <td>Error</td>
+                <td>An <code>@</code> number outside what the target allows.</td>
+              </tr>
+              <tr>
+                <td><code>AMK0092</code></td>
+                <td>Error</td>
+                <td>
+                  A custom <code>@n</code> played before the <code>#instruments</code> block defines
+                  it.
+                </td>
+              </tr>
+              <tr>
+                <td><code>AMK0109</code></td>
+                <td>Error</td>
+                <td>
+                  An <code>@</code> whose sample slot is past the end of this song's
+                  <code>#samples</code> list.
+                </td>
+              </tr>
+              <tr>
+                <td><code>AMK0110</code></td>
+                <td>Error</td>
+                <td>
+                  A sample load naming something other than a stock instrument, as in
+                  <code>(@1, $02)</code>.
+                </td>
+              </tr>
+              <tr>
+                <td><code>AMK0132</code></td>
+                <td>Error</td>
+                <td>A sample load naming a file the song never listed in <code>#samples</code>.</td>
+              </tr>
+              <tr>
+                <td><code>AMK0133</code></td>
+                <td>Error</td>
+                <td>A sample load with no comma, as in <code>("kick.brr", $02)</code>.</td>
+              </tr>
+              <tr>
+                <td><code>AMK0134</code></td>
+                <td>Error</td>
+                <td>A sample load whose tuning multiplier is not a <code>$xx</code> value.</td>
+              </tr>
+              <tr>
+                <td><code>AMK0135</code></td>
+                <td>Error</td>
+                <td>A sample load whose tuning value could not be read.</td>
+              </tr>
+              <tr>
+                <td><code>AMK0136</code></td>
+                <td>Error</td>
+                <td>A sample load with no closing <code>)</code>.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3 id="codes-mml">Notes and MML commands</h3>
+
+        <div class="wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Code</th>
+                <th>Severity</th>
+                <th>What it means</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>AMK0010</code></td>
+                <td>Error</td>
+                <td>A note length that could not be read.</td>
+              </tr>
+              <tr>
+                <td><code>AMK0011</code></td>
+                <td>Error</td>
+                <td>
+                  <code>#halvetempo</code> or <code>#option dividetempo</code> would turn this value
+                  into a fraction.
+                </td>
+              </tr>
+              <tr>
+                <td><code>AMK0012</code></td>
+                <td>Error</td>
+                <td>The same division would overflow instead.</td>
+              </tr>
+              <tr>
+                <td><code>AMK0070</code></td>
+                <td>Error</td>
+                <td>An <code>l</code> default-length directive that could not be read.</td>
+              </tr>
+              <tr>
+                <td><code>AMK0071</code></td>
+                <td>Error</td>
+                <td>An <code>l</code> value outside what a length can be.</td>
+              </tr>
+              <tr>
+                <td><code>AMK0072</code></td>
+                <td>Error</td>
+                <td>
+                  A <code>w</code> global volume that could not be read, or whose value or fade
+                  duration is out of range.
+                </td>
+              </tr>
+              <tr>
+                <td><code>AMK0073</code></td>
+                <td>Error</td>
+                <td>The same for <code>v</code>, channel volume.</td>
+              </tr>
+              <tr>
+                <td><code>AMK0074</code></td>
+                <td>Error</td>
+                <td>
+                  A <code>q</code> quantization that is not a hex value from <code>01</code> to
+                  <code>7F</code>.
+                </td>
+              </tr>
+              <tr>
+                <td><code>AMK0075</code></td>
+                <td>Error</td>
+                <td>A <code>y</code> pan command that could not be read.</td>
+              </tr>
+              <tr>
+                <td><code>AMK0076</code></td>
+                <td>Error</td>
+                <td>
+                  A <code>y</code> value outside 0 to 20, or a surround flag that is not 0 or 1.
+                </td>
+              </tr>
+              <tr>
+                <td><code>AMK0077</code></td>
+                <td>Error</td>
+                <td>A <code>t</code> tempo command that could not be read.</td>
+              </tr>
+              <tr>
+                <td><code>AMK0078</code></td>
+                <td>Error</td>
+                <td>A <code>t</code> value or fade duration outside what a byte holds.</td>
+              </tr>
+              <tr>
+                <td><code>AMK0079</code></td>
+                <td>Error</td>
+                <td>
+                  <code>#halvetempo</code> or <code>#option dividetempo</code> has divided this
+                  tempo down to zero.
+                </td>
+              </tr>
+              <tr>
+                <td><code>AMK0080</code></td>
+                <td>Error</td>
+                <td>An intro <code>/</code> written inside a loop.</td>
+              </tr>
+              <tr>
+                <td><code>AMK0081</code></td>
+                <td>Error</td>
+                <td>A <code>tuning[ ]</code> directive that could not be read.</td>
+              </tr>
+              <tr>
+                <td><code>AMK0082</code></td>
+                <td>Error</td>
+                <td>A <code>tuning[ ]</code> instrument or value outside 0 to 255.</td>
+              </tr>
+              <tr>
+                <td><code>AMK0083</code></td>
+                <td>Error</td>
+                <td>An <code>o</code> octave directive that could not be read.</td>
+              </tr>
+              <tr>
+                <td><code>AMK0084</code></td>
+                <td>Error</td>
+                <td>An <code>o</code> outside 0 to 6.</td>
+              </tr>
+              <tr>
+                <td><code>AMK0085</code></td>
+                <td>Error</td>
+                <td>A <code>&gt;</code> that would take the octave above 6.</td>
+              </tr>
+              <tr>
+                <td><code>AMK0086</code></td>
+                <td>Error</td>
+                <td>A <code>&lt;</code> that would take it below 0.</td>
+              </tr>
+              <tr>
+                <td><code>AMK0093</code></td>
+                <td>Error</td>
+                <td>An <code>h</code> transpose that could not be read.</td>
+              </tr>
+              <tr>
+                <td><code>AMK0094</code></td>
+                <td>Error</td>
+                <td>An <code>n</code> noise pitch outside <code>0</code>–<code>1F</code>.</td>
+              </tr>
+              <tr>
+                <td><code>AMK0095</code></td>
+                <td>Error</td>
+                <td>A <code>p</code> vibrato command that could not be read.</td>
+              </tr>
+              <tr>
+                <td><code>AMK0096</code></td>
+                <td>Error</td>
+                <td>A vibrato delay, rate or extent outside what a byte holds.</td>
+              </tr>
+              <tr>
+                <td><code>AMK0097</code></td>
+                <td>Error</td>
+                <td>A <code>{</code> opened inside a triplet that is already open.</td>
+              </tr>
+              <tr>
+                <td><code>AMK0098</code></td>
+                <td>Error</td>
+                <td>A <code>}</code> with no triplet open.</td>
+              </tr>
+              <tr>
+                <td><code>AMK0099</code></td>
+                <td>Error</td>
+                <td>Two <code>&amp;</code> pitch slides in a row.</td>
+              </tr>
+              <tr>
+                <td><code>AMK0140</code></td>
+                <td>Error</td>
+                <td>Notes written before any <code>#0</code>–<code>#7</code> opened a channel.</td>
+              </tr>
+              <tr>
+                <td><code>AMK0141</code></td>
+                <td>Error</td>
+                <td>
+                  A note the driver has no byte for, once its octave, <code>h</code> and the
+                  instrument's tuning are added up. Too low.
+                </td>
+              </tr>
+              <tr>
+                <td><code>AMK0142</code></td>
+                <td>Error</td>
+                <td>The same, too high.</td>
+              </tr>
+              <tr>
+                <td><code>AMK0100</code></td>
+                <td>Warning</td>
+                <td>
+                  A character that means nothing here. It is skipped, and the song still builds.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3 id="codes-loops">Loops and remote code</h3>
+
+        <div class="wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Code</th>
+                <th>Severity</th>
+                <th>What it means</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>AMK0112</code></td>
+                <td>Error</td>
+                <td>A loop opened inside another loop.</td>
+              </tr>
+              <tr>
+                <td><code>AMK0113</code></td>
+                <td>Error</td>
+                <td>A <code>(n)</code> label loop that could not be read.</td>
+              </tr>
+              <tr>
+                <td><code>AMK0114</code></td>
+                <td>Error</td>
+                <td>A loop label too large to store.</td>
+              </tr>
+              <tr>
+                <td><code>AMK0115</code></td>
+                <td>Error</td>
+                <td>
+                  A <code>(n)</code> or <code>(!n)</code> call above the body it names. A label has
+                  to be declared before it is called, so move the declaration up.
+                </td>
+              </tr>
+              <tr>
+                <td><code>AMK0116</code></td>
+                <td>Error</td>
+                <td>A repeat count that is not between 1 and 255.</td>
+              </tr>
+              <tr>
+                <td><code>AMK0117</code></td>
+                <td>Error</td>
+                <td>
+                  A <code>!</code> in a target that has no remote code — <code>#amk 1</code> and
+                  below.
+                </td>
+              </tr>
+              <tr>
+                <td><code>AMK0120</code></td>
+                <td>Error</td>
+                <td>
+                  <code>[[[</code>, which could be read two ways. Put a space between the
+                  <code>[[</code> and the <code>[</code>.
+                </td>
+              </tr>
+              <tr>
+                <td><code>AMK0121</code></td>
+                <td>Error</td>
+                <td>A <code>[[ ]]</code> subloop inside another subloop.</td>
+              </tr>
+              <tr>
+                <td><code>AMK0122</code></td>
+                <td>Error</td>
+                <td>A label loop cannot declare a subloop; use a standard or remote loop.</td>
+              </tr>
+              <tr>
+                <td><code>AMK0123</code></td>
+                <td>Error</td>
+                <td>A <code>[ ]</code> opened inside another <code>[ ]</code>.</td>
+              </tr>
+              <tr>
+                <td><code>AMK0124</code></td>
+                <td>Error</td>
+                <td>The same label declared twice.</td>
+              </tr>
+              <tr>
+                <td><code>AMK0125</code></td>
+                <td>Error</td>
+                <td><code>]]]</code>, the closing half of <code>AMK0120</code>. Separate them.</td>
+              </tr>
+              <tr>
+                <td><code>AMK0126</code></td>
+                <td>Error</td>
+                <td>A subloop written to repeat once, which does nothing.</td>
+              </tr>
+              <tr>
+                <td><code>AMK0127</code></td>
+                <td>Error</td>
+                <td>A <code>]]</code> with no subloop open.</td>
+              </tr>
+              <tr>
+                <td><code>AMK0128</code></td>
+                <td>Error</td>
+                <td>A <code>]]</code> with no repeat count after it.</td>
+              </tr>
+              <tr>
+                <td><code>AMK0129</code></td>
+                <td>Error</td>
+                <td>A <code>]</code> with no loop open.</td>
+              </tr>
+              <tr>
+                <td><code>AMK0159</code></td>
+                <td>Error</td>
+                <td>An <code>$E6</code> loop opened inside another one.</td>
+              </tr>
+              <tr>
+                <td><code>AMK0160</code></td>
+                <td>Error</td>
+                <td>An <code>$E6</code> end with no <code>$E6 $00</code> to close.</td>
+              </tr>
+              <tr>
+                <td><code>AMK0111</code></td>
+                <td>Error</td>
+                <td>
+                  A <code>(!n)</code> remote code definition that could not be read, or one missing
+                  its <code>)</code>.
+                </td>
+              </tr>
+              <tr>
+                <td><code>AMK0137</code></td>
+                <td>Error</td>
+                <td>A remote code definition with no body after it.</td>
+              </tr>
+              <tr>
+                <td><code>AMK0138</code></td>
+                <td>Error</td>
+                <td>A <code>(!!n)</code> remote code reset with no number.</td>
+              </tr>
+              <tr>
+                <td><code>AMK0139</code></td>
+                <td>Error</td>
+                <td>The same, with no closing <code>)</code>.</td>
+              </tr>
+              <tr>
+                <td><code>AMK0143</code></td>
+                <td>Error</td>
+                <td>A <code>(!n, t, a)</code> remote code setup that could not be read.</td>
+              </tr>
+              <tr>
+                <td><code>AMK0144</code></td>
+                <td>Error</td>
+                <td>The same, with a comma missing.</td>
+              </tr>
+              <tr>
+                <td><code>AMK0145</code></td>
+                <td>Error</td>
+                <td>The same, with no event type.</td>
+              </tr>
+              <tr>
+                <td><code>AMK0146</code></td>
+                <td>Error</td>
+                <td>An event type that needs a third argument and did not get one.</td>
+              </tr>
+              <tr>
+                <td><code>AMK0147</code></td>
+                <td>Error</td>
+                <td>That third argument is not a hex value.</td>
+              </tr>
+              <tr>
+                <td><code>AMK0148</code></td>
+                <td>Error</td>
+                <td>A remote code note length larger than a byte.</td>
+              </tr>
+              <tr>
+                <td><code>AMK0149</code></td>
+                <td>Error</td>
+                <td>A remote code setup with no closing <code>)</code>.</td>
+              </tr>
+              <tr>
+                <td><code>AMK0153</code></td>
+                <td>Error</td>
+                <td>
+                  A remote code body defined inside a channel. Definitions go above the first
+                  <code>#N</code>.
+                </td>
+              </tr>
+              <tr>
+                <td><code>AMK0164</code></td>
+                <td>Error</td>
+                <td>A repeat count on a remote code definition.</td>
+              </tr>
+              <tr>
+                <td><code>AMK0165</code></td>
+                <td>Error</td>
+                <td>Notes inside a remote code definition.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3 id="codes-hex">Hex commands</h3>
+
+        <div class="wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Code</th>
+                <th>Severity</th>
+                <th>What it means</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>AMK0150</code></td>
+                <td>Error</td>
+                <td>A <code>$</code> value that is not a readable hex byte.</td>
+              </tr>
+              <tr>
+                <td><code>AMK0151</code></td>
+                <td>Error</td>
+                <td>
+                  A byte used as a command that is not one. Commands run
+                  <code>$DA</code>–<code>$FE</code>.
+                </td>
+              </tr>
+              <tr>
+                <td><code>AMK0152</code></td>
+                <td>Error</td>
+                <td>A byte in that range that this target has no command for.</td>
+              </tr>
+              <tr>
+                <td><code>AMK0154</code></td>
+                <td>Error</td>
+                <td>A <code>$FB</code> with no length byte after it.</td>
+              </tr>
+              <tr>
+                <td><code>AMK0155</code></td>
+                <td>Error</td>
+                <td>
+                  Something that is not a hex byte where a command's arguments were still expected.
+                </td>
+              </tr>
+              <tr>
+                <td><code>AMK0156</code></td>
+                <td>Error</td>
+                <td>An AddmusicM command that AddmusicK never implemented.</td>
+              </tr>
+              <tr>
+                <td><code>AMK0157</code></td>
+                <td>Error</td>
+                <td><code>$FA $05</code>, which <code>#amk 2</code> replaced with remote code.</td>
+              </tr>
+              <tr>
+                <td><code>AMK0158</code></td>
+                <td>Error</td>
+                <td>
+                  A <code>$F1</code> FIR table that is not <code>$00</code> or <code>$01</code>.
+                </td>
+              </tr>
+              <tr>
+                <td><code>AMK0161</code></td>
+                <td>Error</td>
+                <td>
+                  A written note as the last argument of <code>$DD</code> with a <code>qXX</code>
+                  immediately before it. Write the note byte out instead.
+                </td>
+              </tr>
+              <tr>
+                <td><code>AMK0162</code></td>
+                <td>Error</td>
+                <td>A hex command argument outside the range that command accepts.</td>
+              </tr>
+              <tr>
+                <td><code>AMK0163</code></td>
+                <td>Error</td>
+                <td>
+                  An <code>$ED</code> HFD command — Addmusic 4.05's extension set — that the
+                  compiler cannot read.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3 id="codes-warnings">Warnings</h3>
+
+        <p>
+          These all compile and play. They are AddmusicK's own remarks about waste, imprecision, and
+          songs that will not survive an older version of the tool.
+        </p>
+
+        <div class="wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Code</th>
+                <th>Severity</th>
+                <th>What it means</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>AMK0200</code></td>
+                <td>Warning</td>
+                <td>
+                  A note length that does not divide 192 ticks, so it rounds. Dots and triplets both
+                  reach this.
+                </td>
+              </tr>
+              <tr>
+                <td><code>AMK0201</code></td>
+                <td>Warning</td>
+                <td>
+                  <code>#halvetempo</code> or <code>#option dividetempo</code> produced a fraction,
+                  which is rounded.
+                </td>
+              </tr>
+              <tr>
+                <td><code>AMK0202</code></td>
+                <td>Warning</td>
+                <td>
+                  <code>#option nspcvtable</code> when that is already the default. Three wasted
+                  bytes.
+                </td>
+              </tr>
+              <tr>
+                <td><code>AMK0203</code></td>
+                <td>Warning</td>
+                <td>
+                  <code>#option smwvtable</code> when the song already uses it. Three wasted bytes.
+                </td>
+              </tr>
+              <tr>
+                <td><code>AMK0204</code></td>
+                <td>Warning</td>
+                <td><code>#louder</code>, which does nothing in <code>#amk 2</code> and above.</td>
+              </tr>
+              <tr>
+                <td><code>AMK0205</code></td>
+                <td>Warning</td>
+                <td>
+                  An <code>#spc</code> field longer than the 32 characters ID666 holds, so it was
+                  truncated — or an <code>h</code> in an <code>#am4</code> song, where it is not
+                  native.
+                </td>
+              </tr>
+              <tr>
+                <td><code>AMK0206</code></td>
+                <td>Warning</td>
+                <td>
+                  An older AddmusicK song whose note byte comes out invalid; it may be inaudible.
+                </td>
+              </tr>
+              <tr>
+                <td><code>AMK0207</code></td>
+                <td>Warning</td>
+                <td>A hex command that is not native to the target the song declared.</td>
+              </tr>
+              <tr>
+                <td><code>AMK0208</code></td>
+                <td>Warning</td>
+                <td>A hex byte the driver will play as a note rather than run as a command.</td>
+              </tr>
+              <tr>
+                <td><code>AMK0209</code></td>
+                <td>Warning</td>
+                <td>A hex byte that will be read as a duration or quantization byte.</td>
+              </tr>
+              <tr>
+                <td><code>AMK0210</code></td>
+                <td>Warning</td>
+                <td>
+                  A hex byte that will be read as a phrase end marker, which ends the song early —
+                  and ends it for every channel at once.
+                </td>
+              </tr>
+              <tr>
+                <td><code>AMK0211</code></td>
+                <td>Warning</td>
+                <td>
+                  <code>$FC</code>, which errors on AddmusicK 1.0.8 and lower. For remote gain write
+                  <code>$FC $xx $01 $yy $zz</code>.
+                </td>
+              </tr>
+              <tr>
+                <td><code>AMK0212</code></td>
+                <td>Warning</td>
+                <td>
+                  A <code>$F1</code> FIR table ID past <code>$01</code>, which reads out of bounds.
+                  Use <code>$F5</code> for coefficients of your own.
+                </td>
+              </tr>
+              <tr>
+                <td><code>AMK0213</code></td>
+                <td>Warning</td>
+                <td>The song has outgrown the space <code>#pad</code> reserved for it.</td>
+              </tr>
+              <tr>
+                <td><code>AMK0214</code></td>
+                <td>Warning</td>
+                <td><code>#option dividetempo 1</code>, which changes nothing.</td>
+              </tr>
+              <tr>
+                <td><code>AMK0216</code></td>
+                <td>Warning</td>
+                <td>
+                  Upper-case note letters, which AddmusicK 1.0.8 and lower translate incorrectly.
+                </td>
+              </tr>
+              <tr>
+                <td><code>AMK0217</code></td>
+                <td>Warning</td>
+                <td>
+                  A <code>t</code> written past the point the song stops playing, so it never runs.
+                </td>
+              </tr>
+              <tr>
+                <td><code>AMK0218</code></td>
+                <td>Warning</td>
+                <td>
+                  An <code>o</code> after a <code>$DD</code>, which freezes hex validation on
+                  AddmusicK 1.0.8 and lower.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3 id="codes-output">The finished song</h3>
+
+        <div class="wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Code</th>
+                <th>Severity</th>
+                <th>What it means</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>AMK0300</code></td>
+                <td>Error</td>
+                <td>
+                  The song data runs past the end of ARAM. The
+                  <a href="#c-topbar">ARAM meter</a> in the top bar shows what is taking the room.
+                </td>
+              </tr>
+              <tr>
+                <td><code>AMK0302</code></td>
+                <td>Error</td>
+                <td>No channel emitted any bytes — there is no music in the document yet.</td>
+              </tr>
+              <tr>
+                <td><code>AMK0303</code></td>
+                <td>Error</td>
+                <td>Bytes were emitted, but nothing that takes any time to play.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3 id="codes-sst">Solar Soundtrack's own</h3>
+
+        <p>
+          Seven findings AddmusicK does not make. Six are about what a song <em>does</em> rather
+          than about whether it builds, so real AddmusicK will compile every one of these without
+          comment.
+        </p>
+
+        <div class="wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Code</th>
+                <th>Severity</th>
+                <th>What it means</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>SST0301</code></td>
+                <td>Error</td>
+                <td>
+                  The ARAM address the song was asked to build at is outside the 64 KiB address
+                  space. Nothing you can write causes this.
+                </td>
+              </tr>
+              <tr>
+                <td><code>SST0500</code></td>
+                <td>Severe</td>
+                <td>
+                  Custom <code>$F5</code> coefficients and the feedback in force make the echo grow
+                  instead of fade, so the song gets louder and distorts. Lower the feedback, or the
+                  filter's gain — the <a href="#highlights">FIR designer</a> plots both.
+                </td>
+              </tr>
+              <tr>
+                <td><code>SST0501</code></td>
+                <td>Severe</td>
+                <td>
+                  The same, through one of <code>$F1</code>'s two built-in tables. Lower the
+                  feedback, or select filter 1, which cannot run away on its own.
+                </td>
+              </tr>
+              <tr>
+                <td><code>SST0502</code></td>
+                <td>Severe</td>
+                <td>
+                  A channel holds more music than the song is long. The driver ends the song the
+                  moment <em>any</em> channel runs out, so everything past the shortest channel is
+                  dropped in silence — nearly always a loop count or a note length out by a factor
+                  of two.
+                </td>
+              </tr>
+              <tr>
+                <td><code>SST0503</code></td>
+                <td>Severe</td>
+                <td>
+                  The driver cannot run the song as fast as it is written, so it plays slower than
+                  the <code>t</code> says. Measured, not predicted — see
+                  <a href="#c-status">the status bar</a>, which shows the two rates side by side.
+                </td>
+              </tr>
+              <tr>
+                <td><code>SST0504</code></td>
+                <td>Notice</td>
+                <td>
+                  The song uses <code>#path</code>, which does nothing here: the sample library is
+                  one flat list of names. This is the one deliberate difference from AddmusicK, and
+                  it is why you are told.
+                </td>
+              </tr>
+              <tr>
+                <td><code>SST0505</code></td>
+                <td>Error</td>
+                <td>
+                  A replacement whose value contains its own name, so expanding it never finishes.
+                  AddmusicK grows its buffer forever on the same song rather than stopping, so there
+                  is no run to be faithful to.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
 
         <h2 id="reporting">Reporting a bug</h2>
 
