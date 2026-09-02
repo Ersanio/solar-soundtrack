@@ -77,7 +77,7 @@ function chipTitle(
   selector: 'amk-roll-channels',
   templateUrl: './roll-channels.html',
   host: {
-    class: 'bg-raised absolute top-0 left-0 grid grid-cols-4 grid-rows-2 gap-px p-0.5',
+    class: 'bg-surface absolute top-0 left-0 grid grid-cols-4 grid-rows-2 gap-px p-0.5',
     '[style.width.px]': 'keyWidth',
     '[style.height.px]': 'barHeight',
   },

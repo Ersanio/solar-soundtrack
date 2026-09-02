@@ -1,6 +1,7 @@
 import { Component, computed, effect, inject, signal } from '@angular/core';
 
 import { channelsBeginAt, hasDialectMarker, songTarget } from '@amk/tokens/dialect';
+import { Toggle } from '../../shared/toggle/toggle';
 import { EditorRequests } from '../../state/editor-requests';
 import { EditorStore } from '../../state/editor-store';
 import {
@@ -37,19 +38,11 @@ function readFilter(): Filter {
   return FILTERS.find((filter) => filter === stored) ?? 'notes';
 }
 
-export function chipClass(selected: boolean): string {
-  return `cursor-pointer rounded px-2 py-0.5 text-xs transition-colors ${
-    selected ? 'bg-control/20 text-ink font-semibold' : 'text-ink-muted hover:text-ink'
-  }`;
-}
-
 /**
- * The editor's word-wrap toggle with a name beside the glyph.
- *
- * Same border, same radius, same transition, and the `ok` state's colours are
- * that button's off state — an icon control in this app looks like this one.
- * `inline-flex` and the horizontal padding are the only departures, and they
- * are what the label costs.
+ * An `amk-toggle` in its off state, with a glyph beside the name: the same
+ * border, radius, `sm` height and transition, and the `ok` state's colours are
+ * that toggle's. Not the component itself, because `caution` and a `caveat`
+ * wear a colour of their own that a toggle has no state for.
  *
  * `caution` keeps the button live: AddmusicK compiles those, and a control that
  * refused what the real tool accepts would be the compiler being permissive in
@@ -58,7 +51,7 @@ export function chipClass(selected: boolean): string {
  */
 export function entryClass(entry: ResolvedEntry): string {
   const base =
-    'border-edge inline-flex cursor-pointer items-center gap-1.5 rounded-md border px-2 py-1 text-xs whitespace-nowrap transition-colors disabled:cursor-not-allowed disabled:opacity-40';
+    'border-edge inline-flex h-7 cursor-pointer items-center gap-1.5 rounded-md border px-2 text-xs whitespace-nowrap transition-colors disabled:cursor-not-allowed disabled:opacity-40';
   if (entryBlocked(entry)) {
     return `${base} text-ink-muted`;
   }
@@ -137,9 +130,9 @@ export function entryReadout(
  */
 @Component({
   selector: 'amk-command-palette',
-  imports: [CommandIcon],
+  imports: [CommandIcon, Toggle],
   templateUrl: './command-palette.html',
-  host: { class: 'border-edge bg-raised flex shrink-0 flex-col gap-2 border-b px-3 py-2' },
+  host: { class: 'border-edge bg-raised flex shrink-0 flex-col gap-2 border-b px-2 py-1.5' },
 })
 export class CommandPalette {
   private readonly store = inject(EditorStore);
@@ -263,14 +256,14 @@ export class CommandPalette {
   });
 
   /** The category chips, likewise — `All` is one of them rather than a special case. */
-  protected readonly chips = computed<{ id: Filter; label: string; class: string }[]>(() => {
+  protected readonly chips = computed<{ id: Filter; label: string; selected: boolean }[]>(() => {
     const filter = this.filter();
     return [
-      { id: 'all', label: 'All', class: chipClass(filter === 'all') },
+      { id: 'all', label: 'All', selected: filter === 'all' },
       ...CATEGORIES.map((category) => ({
         id: category.id,
         label: category.label,
-        class: chipClass(filter === category.id),
+        selected: filter === category.id,
       })),
     ];
   });

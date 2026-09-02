@@ -25,7 +25,7 @@ const STORAGE_KEY = 'solar-soundtrack.theme';
  * effect has written a thing.
  *
  * An unregistered custom property is returned as it was authored rather than
- * computed, so `#191919` comes back as `#191919` — which is the spelling
+ * computed, so `#1e272e` comes back as `#1e272e` — which is the spelling
  * `<input type="color">` wants.
  */
 function readDefaults(): Palette {
@@ -197,7 +197,7 @@ export class ThemeStore {
     this.overrides.set({ ...preset.overrides });
   }
 
-  /** Back to the stylesheet on every token, which is the Graphite preset. */
+  /** Back to the stylesheet on every token, which is the Studio preset. */
   resetAll(): void {
     this.previewing.set({});
     this.overrides.set({});

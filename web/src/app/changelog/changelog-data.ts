@@ -11,7 +11,15 @@ export const CHANGELOG: readonly ChangelogEntry[] = [
   {
     date: '2 September 2026',
     items: [
-      'A neutral grey look, and a theme picker: four presets, or set any colour yourself',
+      'A new default look: blue-grey chrome and an orange playhead. The old grey is the Graphite preset',
+      'Transport with Play, Pause and Stop buttons, a time display, and Loop and Live switches',
+      'ARAM meter in the top bar',
+      'Inspector-first sidebar, with Problems always in view',
+      'Status bar',
+      'View tabs with icons',
+      'On a tablet the sidebar becomes a drawer under the editor',
+      'Lit mute and solo buttons on each channel',
+      'A theme picker: five presets, or set any colour yourself',
       'The source view has its own colours now — notes, commands, loops and the rest, set one by one',
       'Escape deselects the command you are inspecting',
       'Changing a command picked in the command lane previews the note it acts on',

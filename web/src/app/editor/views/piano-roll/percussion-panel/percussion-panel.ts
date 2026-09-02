@@ -1,7 +1,8 @@
-import { Component, computed, input, output } from '@angular/core';
+import { Component, input, output } from '@angular/core';
 
 import { noteName } from '@amk/tokens/commands/units';
 import { Button } from '../../../../shared/button/button';
+import { Toggle } from '../../../../shared/toggle/toggle';
 
 /** One instrument the song plays, as the panel needs it. */
 export interface PercussionChip {
@@ -34,26 +35,21 @@ export function percussionChips(
   });
 }
 
-function chipClass(on: boolean): string {
-  return `cursor-pointer rounded px-2 py-0.5 font-mono text-xs transition-colors ${
-    on ? 'bg-control/20 text-ink font-semibold' : 'text-ink-muted hover:text-ink'
-  }`;
-}
-
 /**
  * Which of the song's instruments are drawn on percussion lanes.
  *
  * A preference rather than a fact about the song: the driver's `@21`-`@29` are
  * drums whatever the porter says, and a sampled kick loaded as `@30` is one only
  * because they say so. The parent holds the chosen set, since the lane stack and
- * the minimap are both built from it.
+ * the minimap are both built from it. Each chip is an `amk-toggle`, lit while
+ * its instrument is in the set.
  */
 @Component({
   selector: 'amk-percussion-panel',
-  imports: [Button],
+  imports: [Button, Toggle],
   templateUrl: './percussion-panel.html',
   host: {
-    class: 'border-edge bg-raised flex shrink-0 flex-wrap items-center gap-2 border-b px-3 py-2',
+    class: 'border-edge bg-raised flex shrink-0 flex-wrap items-center gap-1.5 border-b px-2 py-1',
   },
 })
 export class PercussionPanel {
@@ -62,9 +58,4 @@ export class PercussionPanel {
 
   readonly toggled = output<number>();
   readonly resetAll = output<void>();
-
-  /** One view model rather than a class method called per chip. */
-  protected readonly rows = computed(() =>
-    this.chips().map((chip) => ({ ...chip, class: chipClass(chip.on) })),
-  );
 }

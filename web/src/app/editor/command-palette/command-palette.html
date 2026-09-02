@@ -1,14 +1,14 @@
 <div class="flex flex-wrap items-center gap-2">
   <div class="flex flex-wrap items-center gap-1">
     @for (chip of chips(); track chip.id) {
-      <button type="button" [class]="chip.class" (click)="filter.set(chip.id)">
+      <button amk-toggle size="sm" [pressed]="chip.selected" (click)="filter.set(chip.id)">
         {{ chip.label }}
       </button>
     }
   </div>
 
   <span
-    class="bg-accent/20 text-accent ml-auto shrink-0 rounded px-1.5 py-px font-mono text-[10px] font-semibold"
+    class="bg-accent/20 text-accent ml-auto shrink-0 rounded px-1.5 py-px font-mono text-[11px] font-semibold"
     [title]="
       assumed()
         ? 'No #amk, #am4 or #amm marker anywhere in the song, so the palette assumes what the parser assumes. AddmusicK itself rejects a song with no marker (AMK0002).'

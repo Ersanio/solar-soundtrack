@@ -1,5 +1,6 @@
 import { Component, computed, inject } from '@angular/core';
 
+import { Button } from '../../shared/button/button';
 import { IconRedo } from '../../shared/icons/icon-redo';
 import { IconUndo } from '../../shared/icons/icon-undo';
 import { EditorRequests } from '../../state/editor-requests';
@@ -24,7 +25,7 @@ const HISTORY_KEYS = /Mac|iP/.test(navigator.platform)
  */
 @Component({
   selector: 'amk-history-buttons',
-  imports: [IconUndo, IconRedo],
+  imports: [Button, IconUndo, IconRedo],
   templateUrl: './history-buttons.html',
   host: { class: 'contents' },
 })

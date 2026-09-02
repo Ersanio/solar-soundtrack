@@ -9,9 +9,14 @@ import { Component } from '@angular/core';
  * source. A shared header could only ever show one view's controls to all of
  * them.
  *
+ * Groups of controls are separated with `<span class="bg-edge h-5 w-px shrink-0"></span>`.
+ * The strip wraps: a half-width pane at 1024px is about 510px, where the
+ * roll's controls need two rows.
+ *
  * ```html
  * <amk-toolbar>
  *   <button …></button>
+ *   <span class="bg-edge h-5 w-px shrink-0"></span>
  *   <span class="ml-auto">…</span>
  * </amk-toolbar>
  * ```
@@ -20,7 +25,7 @@ import { Component } from '@angular/core';
   selector: 'amk-toolbar',
   template: '<ng-content />',
   host: {
-    class: 'border-edge bg-raised flex shrink-0 flex-wrap items-center gap-3 border-b px-3 py-2',
+    class: 'border-edge bg-raised flex shrink-0 flex-wrap items-center gap-2 border-b px-2 py-1',
   },
 })
 export class Toolbar {}

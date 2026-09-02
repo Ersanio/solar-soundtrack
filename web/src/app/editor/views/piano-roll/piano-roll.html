@@ -34,7 +34,7 @@
 }
 
 @if (problems().length > 0) {
-  <ul class="border-edge text-warn border-b px-3 py-2 text-xs leading-relaxed">
+  <ul class="border-edge bg-warn/10 text-warn border-b px-3 py-2 text-xs leading-relaxed">
     @for (problem of problems(); track problem) {
       <li>{{ problem }}</li>
     }
@@ -217,12 +217,12 @@
 @if (laneBox(); as box) {
   <!--
     The seam, which is the lane's top border and its resize handle at once. The
-    line stays 1px while `before:-inset-y-1` widens the grab zone to something a
+    line stays 1px while `before:-inset-y-1.5` widens the grab zone to something a
     pointer can hit, as the shell's own splitter does; drag it up for a taller
     lane, double-click it for the five rows it opens at.
   -->
   <div
-    class="bg-edge hover:bg-control relative h-px shrink-0 cursor-row-resize touch-none before:absolute before:inset-x-0 before:-inset-y-1 before:content-['']"
+    class="bg-edge hover:bg-control relative h-px shrink-0 cursor-row-resize touch-none before:absolute before:inset-x-0 before:-inset-y-1.5 before:content-['']"
     [class.bg-control]="laneResizing()"
     (pointerdown)="onLaneGrab($event)"
     (pointermove)="onLaneResize($event)"

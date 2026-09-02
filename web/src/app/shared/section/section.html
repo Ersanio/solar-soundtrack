@@ -1,0 +1,36 @@
+<!-- One header, rendered as a button or a div; the outlet keeps its content written once. -->
+<ng-template #inner>
+  <span class="flex items-center gap-1.5">
+    @if (collapsible()) {
+      @if (open()) {
+        <amk-icon-chevron-down />
+      } @else {
+        <amk-icon-chevron-right />
+      }
+    }
+    <span class="text-ink-muted text-xs font-semibold tracking-wide uppercase">{{
+      heading()
+    }}</span>
+  </span>
+  <ng-content select="[sectionAside]" />
+</ng-template>
+
+@if (collapsible()) {
+  <button
+    type="button"
+    class="border-edge bg-raised flex h-9 w-full shrink-0 cursor-pointer items-center justify-between gap-3 border-b px-3 text-left"
+    (click)="open.set(!open())"
+  >
+    <ng-container *ngTemplateOutlet="inner" />
+  </button>
+} @else {
+  <div
+    class="border-edge bg-raised flex h-9 w-full shrink-0 items-center justify-between gap-3 border-b px-3"
+  >
+    <ng-container *ngTemplateOutlet="inner" />
+  </div>
+}
+
+<div class="min-h-0 flex-1" [class.hidden]="collapsible() && !open()">
+  <ng-content />
+</div>

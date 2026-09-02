@@ -1,9 +1,11 @@
 import { Component, computed, inject } from '@angular/core';
 
 import { loopAt } from '@amk/tokens/commands/loops';
+import { Section } from '../../shared/section/section';
 import { EditorRequests } from '../../state/editor-requests';
 import { EditorStore } from '../../state/editor-store';
 import { hex2 } from '../../util/format';
+import { LoopInspector } from '../loop-inspector/loop-inspector';
 import { AdsrCommand } from './adsr-command/adsr-command';
 import { ArpeggioCommand } from './arpeggio-command/arpeggio-command';
 import { BendCommand } from './bend-command/bend-command';
@@ -78,11 +80,13 @@ const LETTER_VIEWS: Readonly<Record<string, string>> = {
     FirDesigner,
     InstrumentEntryEditor,
     InstrumentInspector,
+    LoopInspector,
     NoteCommand,
     PanCommand,
     ParamTable,
     QuantizationCommand,
     BendCommand,
+    Section,
     VibratoCommand,
   ],
   templateUrl: './command-inspector.html',
@@ -204,7 +208,7 @@ export class CommandInspector {
    */
   protected readonly replacement = computed(() => this.params()?.replacement ?? null);
 
-  /** Shown in the summary row, so the section reads without being opened. */
+  /** Shown beside the section's heading, so the subject reads at a glance. */
   protected readonly summary = computed(() => {
     const entry = this.entry();
     if (entry) {
@@ -213,7 +217,7 @@ export class CommandInspector {
 
     const command = this.params();
     if (!command) {
-      return this.loop() ? 'a loop, below' : 'nothing at the caret';
+      return this.loop() ? 'a loop' : 'nothing at the caret';
     }
 
     const via = this.replacement();

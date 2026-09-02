@@ -18,30 +18,31 @@
  * one.
  */
 @theme static {
-  --color-surface: #191919;
-  --color-raised: #212121;
-  --color-inset: #141414;
-  --color-edge: #333333;
+  --color-surface: #1e272e;
+  --color-raised: #2f3c45;
+  --color-inset: #171f25;
+  --color-edge: #42525c;
 
-  --color-ink: #e3e3e3;
-  --color-ink-muted: #909090;
+  --color-ink: #dbe3e8;
+  --color-ink-muted: #9aaab5;
 
   /*
    * What a control is emphasised in: a primary button's plate, a checked box, a
    * slider's filled half and its thumb, a toggle chip that is on, and the border
    * a button takes under the pointer.
    *
-   * Its own token rather than `--color-accent`, because the two are asked
-   * different questions. The accent means *this is where the music is* — the
-   * playhead, a lit key, the caret, a keyword — and it is read against the roll
-   * and the source. This is read against a button, and it is neutral so that the
-   * chrome stays out of the way of the eight channel colours next to it. A
-   * porter who wants coloured buttons sets this one and leaves the roll alone.
+   * A blue-grey a step lighter than the chrome, so a button reads as the same
+   * material as the toolbar it sits in and the accent stays the one warm thing
+   * on screen. Its own token rather than `--color-accent`, because the two are
+   * asked different questions. The accent means *this is where the music is* —
+   * the playhead, a lit key, the caret — and it is read against the roll and
+   * the source. This is chrome emphasis, read against a button. A porter who
+   * wants coloured buttons sets this one and leaves the roll alone.
    */
-  --color-control: #a8a8a8;
+  --color-control: #7ea6c4;
 
-  --color-accent: #6ea8fe;
-  --color-accent-soft: #a7c4e8;
+  --color-accent: #ffa53a;
+  --color-accent-soft: #ffd08a;
   --color-danger: #ff7b72;
   --color-severe: #f0883e;
   --color-warn: #e3b341;
@@ -49,30 +50,27 @@
 
   /*
    * The source view's colouring, one token per tag in `TOKEN_TAGS`
-   * (`packages/mml-tokens/src/tokens.ts`), and shared with nothing.
-   *
-   * They started as the palette above and are now their own, because a porter
+   * (`packages/mml-tokens/src/tokens.ts`), and shared with nothing: a porter
    * reading MML all day wants the colouring under their own hand and should not
-   * have to move a button or a diagnostic to get it. The defaults are what the
-   * shared tokens used to give, so the source reads as it always did until
-   * somebody changes one.
+   * have to move a button or a diagnostic to get it.
    *
-   * Notes and numbers stay primary ink on purpose — the melody is the text, and
-   * everything else is annotation around it. The hex arguments are the one tag
-   * carrying a colour spent nowhere else: repeating the command's own colour
-   * would flatten `$E7 $02` into one undifferentiated run.
+   * Notes and numbers are the ink and comments and operators the muted ink, on
+   * purpose — the melody is the text, and everything else is annotation around
+   * it. The hex arguments are the one tag carrying a colour spent nowhere else:
+   * repeating the command's own colour would flatten `$E7 $02` into one
+   * undifferentiated run.
    */
-  --color-syn-note: #e3e3e3;
+  --color-syn-note: #dbe3e8;
   --color-syn-command: #7ee787;
   --color-syn-hex: #6ea8fe;
   --color-syn-hex-arg: #a7c4e8;
-  --color-syn-number: #e3e3e3;
+  --color-syn-number: #dbe3e8;
   --color-syn-loop: #f0883e;
-  --color-syn-operator: #909090;
+  --color-syn-operator: #9aaab5;
   --color-syn-directive: #6ea8fe;
   --color-syn-channel: #6ea8fe;
   --color-syn-string: #e3b341;
-  --color-syn-comment: #909090;
+  --color-syn-comment: #9aaab5;
   --color-syn-invalid: #ff7b72;
 
   /*
@@ -84,14 +82,17 @@
   --color-seg-song: #199e70;
   --color-seg-samples: #c98500;
   --color-seg-echo: #d55181;
-  --color-seg-free: #383838;
+  --color-seg-free: #3a4852;
 
   /*
    * The eight music channels, used by the piano roll's marks, by the overview
    * bar's minimap of them, by the roll's channel picker and by the channel
-   * mixer's strips, and nowhere else. All four are drawn on --color-surface,
-   * which is the contrast these defaults were validated against — the mixer's
-   * wash mixes down to it, and the picker's plate is a shade of it.
+   * mixer's strips, and nowhere else. All four are drawn on --color-surface —
+   * the mixer's wash mixes down to it, and the picker's plate is a shade of it.
+   * The set is validated with the dataviz palette validator in dark mode
+   * against `--color-surface` `#1e272e`, every check passing and the worst
+   * contrast at ch-5 (3.07:1); it drops below 3:1 above about `#1f282f`, so
+   * that default may not be lighter than that without re-validating.
    *
    * Eight is past what any categorical set can keep separable for every pair of
    * viewers, so **nothing identifies a channel by colour alone**: a mark's

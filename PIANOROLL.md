@@ -66,7 +66,7 @@ Shortcuts are ignored while you are typing in the MML, so `Ctrl+A` there still s
 channel picked, and neither does deleting a command: a command belongs to the song rather than to
 the channel you are editing. While the roll is showing, `Space` is always the transport: it stops
 whatever is sounding — the song, or a note or selection being previewed — and otherwise plays, even
-when a button or a panel heading has the focus, so it never presses the control under the focus.
+when a button or a section heading has the focus, so it never presses the control under the focus.
 
 `Delete` goes to the command whenever one is picked out, however many notes are selected as well —
 none of them is touched. Picking it from a bar's icon or from the lane lets go of the notes, so the
@@ -82,9 +82,9 @@ to go straight there.
 
 The thin one under it is the **timeline** — bar numbers, beat ticks, and a triangle whose tip is on
 the playhead. Drag the triangle to move the music, and keep dragging past either end of it to carry
-the roll along with you. Anything that moves the **view** unticks **Follow playback** — the wide
-bar always, the timeline only when a drag runs off the end of it and starts scrolling — since you
-have taken the roll somewhere the song is not. Tick it again to catch up with the music.
+the roll along with you. Anything that moves the **view** switches **Follow playback** off — the
+wide bar always, the timeline only when a drag runs off the end of it and starts scrolling — since
+you have taken the roll somewhere the song is not. Press it again to catch up with the music.
 
 ## What a note's icons mean
 
@@ -138,8 +138,7 @@ exact tick count, `c=37`, and a bare note under an `l` that is itself dotted or 
 ## The command lane
 
 Under the roll is a strip holding nothing but command icons, on the song's own timeline: what takes
-effect, and where, with the note data out of the way. **Commands** on the toolbar opens and closes
-it, and it stays as you left it.
+effect, and where, with the note data out of the way. It is always there, under every song.
 
 It holds **every command that takes effect** — the song's own settings, `t`, `w`, `$E4` and the whole
 echo unit, `$EF` to `$F2` and the `$F5` filter, and every channel setting too: a `v`, a `y`, an `@`,
@@ -190,7 +189,7 @@ inside a `[ ]` that plays twice is outlined at both ticks, and one held over six
 outlined on all sixteen bars: it is one command, wherever it acts.
 
 **Drag the line above the lane to make it taller**, the way the divider between the editor and the
-output pane works. Five icons deep is where it opens and the shortest it goes; ten is the tallest.
+sidebar works. Five icons deep is where it opens and the shortest it goes; ten is the tallest.
 Double-click the line to put it back to five. The height is remembered with the rest of the roll's
 settings.
 
@@ -451,7 +450,7 @@ the loop opens playing twice with its repeat count left selected — the **Loop 
 **Repeats** field is beside it, so the number is one keystroke away. Nothing between the brackets is rewritten: the
 notes, the rests and every `v`, `y` and `@` among them stay exactly as they were.
 
-The palette lives in the pane beside the roll, under **Add a command**, and it opens on whatever
+The palette lives in the sidebar's Inspector, under **Add a command**, and it opens on whatever
 note you last clicked — so a marquee, `Ctrl+A` and a press on a loop box's edge each put the caret on
 the first note they select, and the palette follows. With nothing selected the two bracket buttons
 are greyed, and the line under them says so.
@@ -477,7 +476,7 @@ shape the roll cannot draw a handle for. A `*` already in a song still plays, st
 edits.
 
 **The Loop inspector names the loop the cursor is in.** Put it on a loop's brackets, its repeat
-count, its call, or anywhere inside its body, and that panel — in the pane beside the roll, under the
+count, its call, or anywhere inside its body, and that panel — in the sidebar's Inspector, under the
 command inspector — says what the construct is and lets its **Repeats** be changed: one card per
 loop, and two for a note inside a subloop inside a loop, innermost first. With the cursor in no loop
 the panel is not there at all. A call's card also says **which** loop it plays, chosen from the ones declared above

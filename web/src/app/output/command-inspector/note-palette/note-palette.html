@@ -1,17 +1,22 @@
 <div class="flex flex-col gap-1">
   <button
     type="button"
-    class="text-ink-muted hover:text-ink cursor-pointer self-start text-xs font-semibold tracking-wide uppercase"
+    class="text-ink-muted hover:text-ink flex cursor-pointer items-center gap-1 self-start text-xs font-semibold tracking-wide uppercase"
     [title]="open() ? 'Hide the command palette' : 'Add a command in front of this note'"
     (click)="open.set(!open())"
   >
-    {{ open() ? '▾' : '▸' }} Add a command
+    @if (open()) {
+      <amk-icon-chevron-down />
+    } @else {
+      <amk-icon-chevron-right />
+    }
+    Add a command
   </button>
 
   @if (open()) {
     <div class="flex flex-wrap items-center gap-1">
       @for (chip of chips(); track chip.id) {
-        <button type="button" [class]="chip.class" (click)="filter.set(chip.id)">
+        <button amk-toggle size="sm" [pressed]="chip.pressed" (click)="filter.set(chip.id)">
           {{ chip.label }}
         </button>
       }

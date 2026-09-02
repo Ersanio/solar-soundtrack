@@ -1,0 +1,35 @@
+<span [class]="dotClass()"></span>
+
+<span class="font-mono" [class]="textClass()">{{ store.status().text }}</span>
+
+<button
+  type="button"
+  class="cursor-pointer hover:underline"
+  [class]="problemsClass()"
+  (click)="requests.revealSection.set('problems')"
+>
+  {{ problemsLabel() }}
+</button>
+
+<button
+  type="button"
+  class="cursor-pointer font-mono tabular-nums hover:underline"
+  title="Free ARAM — opens the build details"
+  [class]="aramClass()"
+  (click)="requests.revealSection.set('build')"
+>
+  ARAM {{ store.freeLabel() }}
+</button>
+
+<div class="ml-auto flex items-center gap-3">
+  <span class="text-ink-muted">In active development — back up your work</span>
+
+  <a
+    href="https://ersan.io/"
+    target="_blank"
+    rel="noopener noreferrer"
+    class="text-ink-muted hover:text-ink hover:underline"
+  >
+    Made by Ersanio
+  </a>
+</div>

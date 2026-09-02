@@ -11,14 +11,15 @@ them.
 
 ## Layout
 
-| Path                    | What it is                                                                           |
-| ----------------------- | ------------------------------------------------------------------------------------ |
-| `src/app/state/`        | Ten `@Service()` singletons in dependency order, and the transport's clock           |
-| `src/app/editor/`       | The left pane and its chrome: top bar, transport, mixer, palette, CodeMirror adapter |
-| `src/app/editor/views/` | What the pane's tabs switch between: source, sample library, piano roll              |
-| `src/app/output/`       | Diagnostics, stats, the ARAM bar, the command and loop inspectors                    |
-| `src/app/shared/`       | Form controls, panels, icons, chart helpers                                          |
-| `src/app/util/`         | Formatting, IndexedDB, `clamp`                                                       |
+| Path                    | What it is                                                                                         |
+| ----------------------- | -------------------------------------------------------------------------------------------------- |
+| `src/app/state/`        | Ten `@Service()` singletons in dependency order, and the transport's clock                         |
+| `src/app/editor/`       | The editor pane and its chrome: top bar, transport, ARAM meter, mixer, palette, CodeMirror adapter |
+| `src/app/editor/views/` | What the pane's tabs switch between: source, sample library, piano roll                            |
+| `src/app/output/`       | The sidebar: the command and loop inspectors, stats, the ARAM budget, the hex dump, diagnostics    |
+| `src/app/status-bar/`   | The status bar: compile status, the problems count, the development notice, the credit             |
+| `src/app/shared/`       | Form controls, toggles, sections, popovers, tabs, icons, chart helpers                             |
+| `src/app/util/`         | Formatting, IndexedDB, `clamp`                                                                     |
 
 State flows one way: `DriverStore` → `SampleStore` → `EditorStore` → `Playback`. Six more sit off
 that spine: `ClockMeasurer`, which `EditorStore` owns and which drives the measurement described
@@ -47,13 +48,18 @@ wasted work on each keystroke.
 ## Adding a view
 
 `editor-pane.ts` is a shell. It owns which tab is selected and nothing else, so a view is a folder
-under `editor/views/`, an entry in its `VIEWS` const and a `@case` in its template.
+under `editor/views/`, an entry in its `VIEWS` const and a `@case` in its template. The tab row is
+built from that const: each entry is a `TabDef`, which carries the view's icon and whether it sits
+on the right of the row (`aside`) — Samples stands apart from Source and Piano roll that way, being
+a library rather than a view of the song.
 
-**A view brings its own controls.** The panel header is the tab strip and only that; anything that is
-a setting on one view goes in an `<amk-toolbar>` as that view's first child. This is the point of the
-arrangement — word wrap is meaningless in the sample library, and a piano roll's zoom and snap will be
-meaningless in the source, so there is no honest way for one shared header to serve all of them. Host
-class is `flex min-h-0 min-w-0 flex-col`, as the panes' own is.
+**A view brings its own controls.** The tab row is the tab row and only that; anything that is a
+setting on one view goes in an `<amk-toolbar>` as that view's first child, grouped with dividers,
+and a mode — Follow playback, Scroll the notes, All octaves, word wrap, Percussion — is an
+`amk-toggle` there, a button whose lit plate is the state, rather than a checkbox. This is the point
+of the arrangement — word wrap is meaningless in the sample library, and a piano roll's zoom and snap
+will be meaningless in the source, so there is no honest way for one shared header to serve all of
+them. Host class is `flex min-h-0 min-w-0 flex-col`, as the panes' own is.
 
 **The source view is the one that is hidden rather than destroyed**, because CodeMirror holds undo
 history, scroll position and selection that nothing could restore. So it is alive while another tab is
@@ -64,6 +70,27 @@ view is a no-op and the render barrier has to be taken first. The rest are `@cas
 view with a position worth keeping hands it to a module that outlives it rather than joining the source
 view: the piano roll's camera and the row its scroller sits at live in `roll-camera.ts`, which is four
 numbers, where CodeMirror's undo history is not something anything could hand back.
+
+## The sidebar
+
+`output/output-pane/` is three sections, in the order a porter needs them. **Inspector** is first —
+the command inspector, with the loop inspector under it — because it is what a porter edits with,
+and it answers every click in the source and every click on a bar. **Build** is collapsible under
+it: the stats, the ARAM budget and the hex dump, read once a session and folded away the rest of
+the time. **Problems** is pinned below the scroll column with a count badge, so a diagnostic stays
+in view whatever height the inspector takes. Each is an `amk-section`, and whether Build and
+Problems are open is persisted (`solar-soundtrack.build`, `solar-soundtrack.problems`).
+
+Below `lg` the pane is a drawer under the editor rather than a column beside it: a row-resize seam
+over it, in the column splitter's mould, and a fold that takes it down to its header
+(`solar-soundtrack.drawer`, `solar-soundtrack.drawer-collapsed`), so the editor keeps a tablet's
+screen and the sidebar is a pull away.
+
+Two things outside the pane point at a section of it — the ARAM meter in the top bar at Build, the
+problems count in the status bar at Problems — and `EditorRequests.revealSection`
+(`'build' | 'problems'`) is how they ask. The pane consumes it on the spot: it opens the section,
+unfolds the drawer where there is one, scrolls to it and puts the signal back to `null`, so asking
+for the same section twice still takes.
 
 ## Preview and commit
 
@@ -283,15 +310,20 @@ consumer reaches it through `var()` — the Tailwind utilities, `codemirror/mml-
 That is what makes the theme changeable at runtime for free. `state/theme-store.ts` puts the
 porter's chosen colours on `document.documentElement` as inline custom properties, which outrank the
 `:root` rule Tailwind emits, so one write re-tints the whole app including the piano roll. The
-picker in the top bar (`theme/theme-picker/`) offers the presets in `theme/theme-presets.ts` and a
-`shared/color-field/` per token; `theme/theme-tokens.ts` is the list, and the property name is
-derived from each token's name rather than spelled twice.
+picker in the top bar (`theme/theme-picker/`, on the `shared/popover/` the changelog shares) offers
+the presets in `theme/theme-presets.ts` and a `shared/color-field/` per token;
+`theme/theme-tokens.ts` is the list, and the property name is derived from each token's name rather
+than spelled twice. **Studio** is the default and carries no overrides at all — it is the
+stylesheet's own values, a blue-grey chrome with an orange accent — and **Graphite** is the neutral
+grey; every other preset names its accent explicitly, so it renders the same whatever the
+stylesheet's accent is.
 
 Two families of token are deliberately not shared. `--color-control` is what a control is
-emphasised in — a primary button's plate, a checked box, a slider's fill, a toggle chip that is on —
-and it is separate from `--color-accent`, which means _this is where the music is_: the playhead, a
-lit key, the caret. Painting the chrome with the accent meant neutral buttons could not be had
-without a neutral playhead. And `--color-syn-*` is the source view's colouring, one token per tag in
+emphasised in — a primary button's plate, a checked box, a slider's fill, a toggle that is on — a
+steel blue a step lighter than the chrome, so a button reads as the same material as the toolbar it
+sits in. It is separate from `--color-accent`, which means _this is where the music is_: the
+playhead, a lit key, the caret, the focus ring. One token for both would make a neutral chrome cost
+a neutral playhead. And `--color-syn-*` is the source view's colouring, one token per tag in
 `TOKEN_TAGS`, shared with nothing at all — `codemirror/mml-theme.ts`'s highlight table reads only
 those, while its structure block (gutters, tooltips, diagnostic underlines) stays on the app's
 palette, being chrome rather than MML.
@@ -412,9 +444,9 @@ a glyph targets its command instead. A glyph the note itself **puts** in force i
 a near-white plate with the icon in `--color-surface` — where one it carries in from an earlier note
 is a plain light icon, so a run of notes under one `v200` says which of them the `v200` landed on. It
 is a plate and not a tint because the eight channel fills are mid-tone and chromatic, and the axis
-they leave free is lightness: `--color-accent` is a blue of much the same lightness as
-`--color-ch-0`, `--color-warn` sits on `--color-ch-3`, and each would be the colour that vanished on
-one channel. On a plate the glyph reads against the plate, so one pair of colours does for all eight.
+they leave free is lightness: `--color-control` is a blue of much the same lightness as
+`--color-ch-0`, `--color-accent` an orange beside `--color-ch-1`, `--color-warn` sits on
+`--color-ch-3`, and each would be the colour that vanished on one channel. On a plate the glyph reads against the plate, so one pair of colours does for all eight.
 The glyphs a note puts in force lead, the slot order the walk gives holding within each half, so a
 narrow bar keeps what starts at that note and drops what it carries in. What fits is measured
 (`fitBarContent`): the name has priority and the glyphs drop from the end, because a bar that says
@@ -627,7 +659,7 @@ take, so the picker names the eight the notes below it are drawn in; a near-whit
 says which is being edited. The chips carry the mixer's state too — struck through and dimmed where
 the mask silences them, ringed dark where the solo is, which the edited chip's own ring takes
 precedence over — and `Ctrl` on one isolates that channel rather than editing it. Both rings are
-told apart by lightness rather than by hue, since `--color-accent` disappears into channels 0 and 6. Beside them sit
+told apart by lightness rather than by hue, since a mid blue such as `--color-control` disappears into channels 0 and 6. Beside them sit
 the flat `roll-*.ts` files, which are Angular-free so that the arithmetic stays where a harness can
 import it: `roll-layout.ts` and `percussion.ts` for the lanes and the camera, `roll-metrics.ts` and
 `roll-bar-text.ts` for what a bar is drawn as, `roll-lengths.ts` for what a gesture may land on,
@@ -644,9 +676,9 @@ proves it — `<svg amk-glyph>` needs no prefix, `svg` being one of the three na
 namespace implicitly. The `transform` binding stays in the parent, above children that take no
 frame-rate input, so the frame clock reaches it and stops there.
 
-**Which of the two moves is a view option**, "Scroll the notes" on the roll's own toolbar. Ticked,
-it pins the playhead a fifth across the pane and slides the music under it; unticked — the default —
-the roll pages: the music holds still and the playhead crosses it,
+**Which of the two moves is a view option**, "Scroll the notes" on the roll's own toolbar. On, it
+pins the playhead a fifth across the pane and slides the music under it; off — the default — the
+roll pages: the music holds still and the playhead crosses it,
 turning the roll over by 80% of a pane once the line reaches 90% of it — so it lands a tenth in with
 the bar it has just played still on screen. **Every page opens on that tenth, the first one
 included**: page zero starts before tick 0, so a song is drawn with the margin it keeps for the rest
@@ -656,7 +688,7 @@ space that vanished again on the way back to the song. Both are the same arithme
 the roll the **camera** holds the playhead, so a pinned playhead is simply the value that number
 holds still at. The line itself is drawn at the song's own tick in the camera's coordinates
 (`xAtTick`), which comes to the same place while the roll is on the song and does not once it is
-parked: **"Follow playback" stops the view following the music, not the line**. Unticked, the notes
+parked: **"Follow playback" stops the view following the music, not the line**. Off, the notes
 stand still and the playhead goes on crossing them and off the pane, where the clip hides it —
 the honest picture, since a line held at the edge would say the song was there. `xAtTick` therefore
 does not clamp, and `charttest` pins both halves. `pageStart` is a closed form and not a counter, so given its
@@ -717,8 +749,8 @@ two notes scattered up the keyboard — the pitched ones only look melodic becau
 stops remapping after the first. The pitch they were written at is still true and still in the
 tooltip; it just does not decide where the mark goes.
 
-**Which instruments are percussion is the porter's to say**, from the toolbar's `▸ Percussion`
-strip. `percussion.ts` holds the default — `@21`-`@29` plus `@10` — and the whole of the reasoning,
+**Which instruments are percussion is the porter's to say**, from the strip the toolbar's
+**Percussion** toggle opens. `percussion.ts` holds the default — `@21`-`@29` plus `@10` — and the whole of the reasoning,
 including why nothing is derived: the obvious rule is to look at the sample an instrument resolves
 to and ask whether the driver's drums play it, and that says no the moment a porter swaps one drum
 sample for another. Nothing in the data answers "is this a drum", so the question goes to the person

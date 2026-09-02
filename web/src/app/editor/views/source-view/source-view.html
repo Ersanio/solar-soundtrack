@@ -1,7 +1,8 @@
 <amk-toolbar>
   <button
-    type="button"
-    [class]="wrapButtonClass()"
+    amk-toggle
+    icon
+    [pressed]="wordWrap()"
     [title]="wordWrap() ? 'Word wrap: on' : 'Word wrap: off'"
     (click)="toggleWordWrap()"
   >
@@ -11,16 +12,26 @@
   <!-- The same pair the roll's toolbar carries. -->
   <amk-history-buttons />
 
+  <span class="bg-edge h-5 w-px shrink-0"></span>
+
+  <!-- The switch on the toolbar and the palette below it: a closed palette would
+       otherwise be one row of chrome that still had to be drawn. The chevron
+       says which way it is. -->
   <button
-    type="button"
-    class="text-ink-muted hover:text-ink cursor-pointer text-xs font-semibold tracking-wide uppercase"
+    amk-toggle
+    [pressed]="paletteOpen()"
     [title]="paletteOpen() ? 'Hide the command palette' : 'Show the command palette'"
     (click)="paletteOpen.set(!paletteOpen())"
   >
-    {{ paletteOpen() ? '▾' : '▸' }} Commands
+    @if (paletteOpen()) {
+      <amk-icon-chevron-down />
+    } @else {
+      <amk-icon-chevron-right />
+    }
+    Commands
   </button>
 
-  <span class="text-ink-muted font-mono text-xs">{{ store.caretLabel() }}</span>
+  <span class="text-ink-muted ml-auto font-mono text-xs">{{ store.caretLabel() }}</span>
 </amk-toolbar>
 
 <!-- Above the editor rather than beside it: what it writes lands at the caret,

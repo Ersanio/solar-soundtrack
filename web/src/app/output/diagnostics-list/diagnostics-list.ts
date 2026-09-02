@@ -12,11 +12,12 @@ export class DiagnosticsList {
   protected readonly store = inject(EditorStore);
   protected readonly requests = inject(EditorRequests);
 
+  /** The severity chip; complete literals, as Tailwind needs. */
   protected readonly severityClass: Record<Severity, string> = {
-    error: 'text-danger',
-    severe: 'text-severe',
-    warning: 'text-warn',
-    info: 'text-ink-muted',
+    error: 'rounded-md bg-danger/15 px-1.5 text-danger',
+    severe: 'rounded-md bg-severe/15 px-1.5 text-severe',
+    warning: 'rounded-md bg-warn/15 px-1.5 text-warn',
+    info: 'rounded-md bg-ink-muted/15 px-1.5 text-ink-muted',
   };
 
   protected reveal(diagnostic: Diagnostic): void {

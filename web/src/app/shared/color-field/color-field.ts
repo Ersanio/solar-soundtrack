@@ -9,7 +9,7 @@ import { Component, input, output } from '@angular/core';
  * wants the first; a listener writing it down wants the second.
  *
  * ```html
- * <amk-color-field label="Surface" value="#191919" [overridden]="true"
+ * <amk-color-field label="Surface" value="#1e272e" [overridden]="true"
  *                  (preview)="show($event)" (commit)="set($event)" (cleared)="clear()" />
  * ```
  */

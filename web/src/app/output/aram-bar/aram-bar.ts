@@ -69,6 +69,13 @@ let nextId = 0;
 export class AramBar {
   readonly segments = input.required<Segment[]>();
 
+  /**
+   * Whether hovering a segment shows its tooltip. The tooltip is drawn above
+   * the bar, so a bar sitting in the top bar turns it off — up there it would
+   * land above the viewport.
+   */
+  readonly hoverTip = input(true);
+
   private readonly svg = viewChild.required<ElementRef<SVGSVGElement>>('svg');
   private readonly size = elementSize(this.svg);
 
@@ -119,7 +126,7 @@ export class AramBar {
 
   protected readonly tooltip = computed(() => {
     const mark = this.hover();
-    if (!mark) {
+    if (!mark || !this.hoverTip()) {
       return null;
     }
 

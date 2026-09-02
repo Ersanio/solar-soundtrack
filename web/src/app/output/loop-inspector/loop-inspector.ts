@@ -17,8 +17,9 @@ import {
 /**
  * The loops the caret is inside, and what each of them repeats.
  *
- * A panel of its own rather than an arm of the command inspector, because a loop
- * is not a command and the two questions do not share an answer. A `(n)m` raises
+ * A panel of its own, drawn under the command inspector's body inside the one
+ * Inspector section rather than as an arm of it, because a loop is not a
+ * command and the two questions do not share an answer. A `(n)m` raises
  * no `Command` at all — `label` is not a letter command kind — so a dispatcher
  * over the caret's command could never reach it; and a note in the middle of a
  * body is a note *and* inside a loop, which is two subjects rather than a choice
@@ -68,7 +69,7 @@ export class LoopInspector {
         }),
   );
 
-  /** Shown in the summary row, so the section reads without being opened. */
+  /** Shown in the caption row beside the heading, so the loop reads at a glance. */
   protected readonly summary = computed(() => {
     const loops = this.loops();
     const first = loops[0];

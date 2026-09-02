@@ -1,7 +1,6 @@
 import {
   afterNextRender,
   Component,
-  computed,
   DestroyRef,
   type ElementRef,
   effect,
@@ -31,7 +30,10 @@ import { EditorView, keymap, lineNumbers } from '@codemirror/view';
 import type { Severity } from '@amk/core/types';
 import { commandAt } from '@amk/tokens';
 import { padAround } from '@amk/tokens/edits';
+import { IconChevronDown } from '../../../shared/icons/icon-chevron-down';
+import { IconChevronRight } from '../../../shared/icons/icon-chevron-right';
 import { IconWrap } from '../../../shared/icons/icon-wrap';
+import { Toggle } from '../../../shared/toggle/toggle';
 import { Toolbar } from '../../../shared/toolbar/toolbar';
 import { type EditBatch, EditorRequests, type Insertion } from '../../../state/editor-requests';
 import { EditorStore } from '../../../state/editor-store';
@@ -80,7 +82,15 @@ const LINT_SEVERITY: Record<Severity, 'error' | 'warning' | 'info'> = {
  */
 @Component({
   selector: 'amk-source-view',
-  imports: [Toolbar, IconWrap, CommandPalette, HistoryButtons],
+  imports: [
+    Toolbar,
+    Toggle,
+    IconWrap,
+    IconChevronDown,
+    IconChevronRight,
+    CommandPalette,
+    HistoryButtons,
+  ],
   templateUrl: './source-view.html',
   host: { class: 'flex min-h-0 min-w-0 flex-col' },
 })
@@ -103,14 +113,6 @@ export class SourceView {
    */
   protected readonly wordWrap = signal(false);
   private readonly wrapCompartment = new Compartment();
-
-  /** Mirrors the mute/solo toggles' own on/off styling in `channel-mixer.html`. */
-  protected readonly wrapButtonClass = computed(
-    () =>
-      `border-edge cursor-pointer rounded-md border px-1.5 py-1.5 transition-colors ${
-        this.wordWrap() ? 'bg-control/20 text-ink font-semibold' : 'text-ink-muted hover:text-ink'
-      }`,
-  );
 
   /**
    * Whether the command palette is showing.

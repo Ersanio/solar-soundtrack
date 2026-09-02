@@ -2,7 +2,12 @@ import { Component, computed, inject, signal } from '@angular/core';
 
 import { Audition } from '../../state/audition';
 import { Button } from '../../shared/button/button';
-import { Checkbox } from '../../shared/checkbox/checkbox';
+import { IconLoop } from '../../shared/icons/icon-loop';
+import { IconPause } from '../../shared/icons/icon-pause';
+import { IconPlay } from '../../shared/icons/icon-play';
+import { IconStop } from '../../shared/icons/icon-stop';
+import { IconVolume } from '../../shared/icons/icon-volume';
+import { Toggle } from '../../shared/toggle/toggle';
 import { EditorStore } from '../../state/editor-store';
 import { Mixer } from '../../state/mixer';
 import { Playback } from '../../state/playback';
@@ -16,9 +21,12 @@ const THUMB_WIDTH = 16;
 
 @Component({
   selector: 'amk-transport-controls',
-  imports: [Button, Checkbox],
+  imports: [Button, Toggle, IconLoop, IconPause, IconPlay, IconStop, IconVolume],
   templateUrl: './transport-controls.html',
-  host: { class: 'border-edge flex items-center gap-2 border-r pr-3' },
+  host: {
+    class:
+      'border-edge bg-inset/50 flex h-10 min-w-0 items-center gap-1.5 rounded-md border px-1.5',
+  },
 })
 export class TransportControls {
   protected readonly playback = inject(Playback);

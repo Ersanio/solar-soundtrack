@@ -2,33 +2,58 @@
 <amk-top-bar />
 
 <!--
-  The seam between the panes is a real grid track, not a border: `--amk-split`
-  carries the live width and the `lg:` utility below is what applies it, so the
-  breakpoint stays Tailwind's business and the stacked layout ignores it.
+  Two seams, one shape on two axes. Each is a real track rather than a border:
+  `--amk-split` carries the live column width and `--amk-drawer` the live drawer
+  height, and the `lg:` and `max-lg:` utilities are what apply them, so the
+  breakpoint stays Tailwind's business. At `lg` the panes sit side by side and
+  the column seam is the one to drag; below it they stack, the output pane is a
+  drawer hanging from the bottom, and the row seam is.
 -->
 <main
   #shell
-  class="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[var(--amk-split,50%)_auto_1fr]"
+  class="flex min-h-0 flex-1 flex-col lg:grid lg:grid-cols-[var(--amk-split,50%)_auto_1fr]"
   [style.--amk-split]="splitCss()"
+  [style.--amk-drawer]="drawerCss()"
   [class.select-none]="dragging()"
 >
-  <amk-editor-pane class="min-h-0" />
+  <amk-editor-pane class="min-h-0 flex-1" />
 
   <!--
-    Hidden below `lg`, where the panes stack and there is no middle to drag —
-    `display:none` takes it out of the grid entirely, so that layout stays two
-    rows. The line itself stays 1px wide, while `before:-inset-x-1` widens the
-    grab zone to something a pointer can hit.
+    The column seam. Hidden below `lg`, where there is no middle to drag —
+    `display:none` takes it out of the layout entirely. The line itself stays
+    1px wide, while `before:-inset-x-1.5` widens the grab zone to something a
+    pointer can hit.
   -->
   <div
-    class="bg-edge hover:bg-control relative hidden w-px cursor-col-resize touch-none before:absolute before:inset-y-0 before:-inset-x-1 before:content-[''] lg:block"
+    class="bg-edge hover:bg-control relative hidden w-px cursor-col-resize touch-none before:absolute before:inset-y-0 before:-inset-x-1.5 before:content-[''] lg:block"
     [class.bg-control]="dragging()"
-    (pointerdown)="onGrab($event)"
+    (pointerdown)="onGrab($event, 'x')"
     (pointermove)="onDrag($event)"
     (pointerup)="onRelease()"
     (pointercancel)="onRelease()"
     (dblclick)="split.set(DEFAULT_SPLIT)"
   ></div>
 
-  <amk-output-pane class="border-edge min-h-0 max-lg:border-t" />
+  <!--
+    The row seam, between the editor and the drawer. Its class carries `hidden`
+    at `lg` and whenever the drawer is folded, since a folded drawer has no
+    height to drag.
+  -->
+  <div
+    [class]="rowSeamClass()"
+    [class.bg-control]="dragging()"
+    (pointerdown)="onGrab($event, 'y')"
+    (pointermove)="onDrag($event)"
+    (pointerup)="onRelease()"
+    (pointercancel)="onRelease()"
+    (dblclick)="drawer.set(DEFAULT_DRAWER)"
+  ></div>
+
+  <amk-output-pane
+    [class]="sidebarClass()"
+    [collapsed]="drawerCollapsed()"
+    (collapseToggle)="toggleDrawer()"
+  />
 </main>
+
+<amk-status-bar />

@@ -1,15 +1,12 @@
-<details class="border-edge border-b" open>
-  <summary class="hover:bg-raised flex cursor-pointer items-center justify-between gap-3 px-3 py-2">
-    <span class="text-ink-muted text-xs font-semibold tracking-wide uppercase">
-      Command inspector
-    </span>
-    <!-- Muted where there is no command to name; a loop is named by the panel below. -->
-    <span class="font-mono text-xs" [class.text-ink-muted]="!entry() && !params()">
-      {{ summary() }}
-    </span>
-  </summary>
+<!-- Below `lg` the pane is a drawer whose own header already says "Inspector",
+     so this section's header row (its first child) is hidden there. -->
+<amk-section heading="Inspector" class="max-lg:[&>*:first-child]:hidden">
+  <!-- Muted where there is no command to name; a loop is named by the Loop panel under this. -->
+  <span sectionAside class="font-mono text-xs" [class.text-ink-muted]="!entry() && !params()">{{
+    summary()
+  }}</span>
 
-  <div class="flex flex-col gap-3 px-3 pt-1 pb-3">
+  <div class="flex flex-col gap-3 px-3 pt-2 pb-3">
     <!-- An entry wins over any command inside it: most of one is not a command
          at all, and the two forms that are mean something else in a channel. -->
     @if (entry(); as definition) {
@@ -74,13 +71,13 @@
         }
       }
 
-      <!-- A loop's brackets are a construct rather than a command, and the loop
-           inspector under this one is where they are read and edited. Said here
+      <!-- A loop's brackets are a construct rather than a command, and the Loop
+           panel under this body is where they are read and edited. Said here
            because the cursor really is on something. -->
       @if (loop()) {
         <p class="text-ink-muted text-xs leading-relaxed">
           The cursor is on a loop, which is not a command. The
-          <span class="text-ink">Loop inspector</span> below has what it repeats.
+          <span class="text-ink">Loop</span> panel under this has what it repeats.
         </p>
       }
 
@@ -93,4 +90,9 @@
       }
     }
   </div>
-</details>
+
+  <!-- Under the command's own body because it answers the same question about a
+       different subject, and it is not there at all when the cursor is in no
+       loop — so it costs a song without one nothing. -->
+  <amk-loop-inspector />
+</amk-section>

@@ -25,10 +25,10 @@
     <span class="flex min-w-0 flex-1 flex-col">
       <span class="text-ink truncate text-[11px]">{{ label() }}</span>
       @if (hint(); as text) {
-        <span class="text-ink-muted truncate text-[10px] leading-snug">{{ text }}</span>
+        <span class="text-ink-muted truncate text-[11px] leading-snug">{{ text }}</span>
       }
     </span>
-    <span class="text-ink-muted shrink-0 font-mono text-[10px] tabular-nums uppercase">
+    <span class="text-ink-muted shrink-0 font-mono text-[11px] tabular-nums uppercase">
       {{ value() }}
     </span>
   </label>
@@ -37,7 +37,7 @@
     @if (overridden()) {
       <button
         type="button"
-        class="text-ink-muted hover:text-ink cursor-pointer text-[10px] hover:underline"
+        class="text-ink-muted hover:text-ink cursor-pointer text-[11px] hover:underline"
         title="Back to the default colour"
         (click)="cleared.emit()"
       >

@@ -1,43 +1,30 @@
-<amk-panel class="min-h-0 flex-1">
-  <div panelHeading class="flex flex-wrap items-center gap-2">
-    <amk-tabs [tabs]="VIEWS" [(active)]="view" />
+<amk-tabs [tabs]="VIEWS" [(active)]="view" />
 
-    <!-- One group, so a narrow pane never wraps the rule away from the notice. -->
-    <span class="flex items-center gap-2">
-      <span class="bg-edge h-4 w-px shrink-0"></span>
-      <span class="text-ink-muted text-[11px]">
-        Solar Soundtrack is currently in active development and is subject to changes. Make backups
-        regularly.
-      </span>
-    </span>
+<div class="flex min-h-0 flex-1 flex-col">
+  <!--
+    Hidden rather than destroyed, so the CodeMirror view keeps its undo
+    history, scroll position and selection. Every other view is built on
+    selection and thrown away again, having nothing that could not be rebuilt.
+  -->
+  <div class="flex min-h-0 flex-1 flex-col" [class.hidden]="view() !== 'source'">
+    <amk-source-view
+      class="min-h-0 flex-1"
+      [active]="view() === 'source'"
+      (activate)="view.set('source')"
+    />
   </div>
 
-  <div class="flex h-full min-h-0 flex-col">
-    <!--
-      Hidden rather than destroyed, so the CodeMirror view keeps its undo
-      history, scroll position and selection. Every other view is built on
-      selection and thrown away again, having nothing that could not be rebuilt.
-    -->
-    <div class="flex min-h-0 flex-1 flex-col" [class.hidden]="view() !== 'source'">
-      <amk-source-view
-        class="min-h-0 flex-1"
-        [active]="view() === 'source'"
-        (activate)="view.set('source')"
-      />
-    </div>
-
-    @switch (view()) {
-      @case ('samples') {
-        <amk-sample-browser class="min-h-0 flex-1" />
-      }
-      @case ('roll') {
-        <amk-piano-roll class="min-h-0 flex-1" />
-      }
-      @default {
-        <!-- Source, which is rendered above and hidden rather than built. -->
-      }
+  @switch (view()) {
+    @case ('samples') {
+      <amk-sample-browser class="min-h-0 flex-1" />
     }
-  </div>
-</amk-panel>
+    @case ('roll') {
+      <amk-piano-roll class="min-h-0 flex-1" />
+    }
+    @default {
+      <!-- Source, which is rendered above and hidden rather than built. -->
+    }
+  }
+</div>
 
 <amk-channel-mixer />

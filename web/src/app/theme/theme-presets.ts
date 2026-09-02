@@ -2,8 +2,9 @@
  * The themes the picker offers by name.
  *
  * A preset carries only what it moves off the stylesheet's own values, so the
- * default one carries nothing at all and every preset follows `styles.css` on
- * whatever it does not mention. None of them touch `--color-ch-*`: the eight are
+ * default one, Studio, carries nothing at all. Every other preset names every
+ * token it needs, the accent included, so it renders the same whatever the
+ * stylesheet's own accent is. None of them touch `--color-ch-*`: the eight are
  * a set that was validated together, and repainting one channel is what the
  * per-colour rows are for.
  */
@@ -20,10 +21,31 @@ export interface ThemePreset {
 
 export const PRESETS: readonly ThemePreset[] = [
   {
+    id: 'studio',
+    name: 'Studio',
+    note: 'Blue-grey chrome with an orange playhead, and what the app ships as',
+    overrides: {},
+  },
+  {
     id: 'graphite',
     name: 'Graphite',
-    note: 'Neutral grey, and what the app ships as',
-    overrides: {},
+    note: 'Neutral grey',
+    overrides: {
+      surface: '#191919',
+      raised: '#212121',
+      inset: '#141414',
+      edge: '#333333',
+      ink: '#e3e3e3',
+      'ink-muted': '#909090',
+      control: '#a8a8a8',
+      accent: '#6ea8fe',
+      'accent-soft': '#a7c4e8',
+      'syn-note': '#e3e3e3',
+      'syn-number': '#e3e3e3',
+      'syn-comment': '#909090',
+      'syn-operator': '#909090',
+      'seg-free': '#383838',
+    },
   },
   {
     id: 'midnight',
@@ -36,9 +58,11 @@ export const PRESETS: readonly ThemePreset[] = [
       edge: '#2c313b',
       ink: '#d8dce4',
       'ink-muted': '#838b9b',
-      // The controls were the accent back then, which is the half of this
-      // preset a porter is most likely to have come back for.
+      // The controls take the accent blue here, which is the half of this
+      // preset a porter is most likely to want.
       control: '#6ea8fe',
+      accent: '#6ea8fe',
+      'accent-soft': '#a7c4e8',
       'syn-note': '#d8dce4',
       'syn-number': '#d8dce4',
       'syn-comment': '#838b9b',
@@ -59,6 +83,7 @@ export const PRESETS: readonly ThemePreset[] = [
       'ink-muted': '#b0b0b0',
       control: '#c8c8c8',
       accent: '#8cbcff',
+      'accent-soft': '#a7c4e8',
       'syn-note': '#f5f5f5',
       'syn-number': '#f5f5f5',
       'syn-comment': '#b0b0b0',
@@ -81,6 +106,8 @@ export const PRESETS: readonly ThemePreset[] = [
       ink: '#e6e3dd',
       'ink-muted': '#968f86',
       control: '#a8a29a',
+      accent: '#6ea8fe',
+      'accent-soft': '#a7c4e8',
       'syn-note': '#e6e3dd',
       'syn-number': '#e6e3dd',
       'syn-comment': '#968f86',

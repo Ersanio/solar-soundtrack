@@ -14,6 +14,9 @@ export interface Reveal {
   show: boolean;
 }
 
+/** A section of the output pane a panel elsewhere can ask to have opened. */
+export type SidebarSection = 'build' | 'problems';
+
 /** Text bound for the caret, and which slice of it to leave selected. */
 export interface Insertion {
   text: string;
@@ -87,6 +90,18 @@ export class EditorRequests {
    * statement of what is being inspected and panels do not write it.
    */
   readonly reveal = signal<Reveal | null>(null);
+
+  /**
+   * A section of the output pane to open, set by the top bar's ARAM meter and
+   * the status bar's problems count.
+   *
+   * The counterpart of {@link reveal} for the other pane: that one asks the
+   * source view for a selection, this one asks the output pane for a section.
+   * The pane consumes it on the spot — it opens that section, un-collapses the
+   * drawer it folds into below the `lg` breakpoint, and scrolls to it — and
+   * puts it back to `null`, so asking for the same section twice still takes.
+   */
+  readonly revealSection = signal<SidebarSection | null>(null);
 
   /**
    * A splice the editor should apply, set when a panel edits a command in

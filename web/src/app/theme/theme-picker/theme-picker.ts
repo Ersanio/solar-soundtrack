@@ -1,9 +1,9 @@
-import { Component, ElementRef, computed, inject, signal, viewChild } from '@angular/core';
+import { Component, computed, inject, signal } from '@angular/core';
 
 import { Button } from '../../shared/button/button';
 import { ColorField } from '../../shared/color-field/color-field';
-import { IconClose } from '../../shared/icons/icon-close';
 import { IconPalette } from '../../shared/icons/icon-palette';
+import { Popover } from '../../shared/popover/popover';
 import { ThemeStore } from '../../state/theme-store';
 import { type ThemePreset } from '../theme-presets';
 import { THEME_GROUPS, THEME_TOKENS, type ThemeTokenName } from '../theme-tokens';
@@ -32,23 +32,19 @@ interface ColourGroup {
  */
 @Component({
   selector: 'amk-theme-picker',
-  imports: [Button, ColorField, IconClose, IconPalette],
-  host: {
-    class: 'relative',
-    '(document:pointerdown)': 'onDocumentPointerDown($event)',
-  },
+  imports: [Button, ColorField, IconPalette, Popover],
   templateUrl: './theme-picker.html',
 })
 export class ThemePicker {
-  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   protected readonly theme = inject(ThemeStore);
-
-  private readonly trigger = viewChild.required<ElementRef<HTMLButtonElement>>('trigger');
-
-  protected readonly open = signal(false);
 
   /** Shown after a paste that was not a theme, and cleared by the next one. */
   protected readonly importFailed = signal(false);
+
+  /** A preset's button, and the first one spanning both columns so five do not leave an orphan. */
+  private static readonly PRESET =
+    'border-edge bg-inset hover:border-control flex cursor-pointer flex-col gap-1 rounded-md border px-2 py-1.5 text-left transition-colors';
+  private static readonly PRESET_WIDE = `${ThemePicker.PRESET} col-span-2`;
 
   /**
    * Every row of the panel, built in one pass.
@@ -79,9 +75,10 @@ export class ThemePicker {
     const active = this.theme.activePreset();
     const defaults = this.theme.palette();
 
-    return this.theme.presets.map((preset) => ({
+    return this.theme.presets.map((preset, index) => ({
       preset,
       active: preset.id === active,
+      class: index === 0 ? ThemePicker.PRESET_WIDE : ThemePicker.PRESET,
       swatches: (['surface', 'raised', 'edge', 'ink'] as const).map(
         (name) => preset.overrides[name] ?? defaults[name],
       ),
@@ -96,45 +93,6 @@ export class ThemePicker {
    * as the normalised JSON, which is what says the paste was understood.
    */
   protected readonly exported = computed(() => this.theme.exportJson());
-
-  protected toggle(): void {
-    this.open.update((open) => !open);
-  }
-
-  /** Closing from inside the panel, so focus has to go somewhere deliberate. */
-  protected dismiss(): void {
-    this.open.set(false);
-    this.trigger().nativeElement.focus();
-  }
-
-  protected onKeydown(event: KeyboardEvent): void {
-    switch (event.key) {
-      case 'Escape':
-        break;
-      default:
-        return;
-    }
-
-    event.preventDefault();
-    this.dismiss();
-  }
-
-  /**
-   * `pointerdown` rather than `click`, so the panel closes as the press lands
-   * rather than on release. The trigger is inside the host, so its own press is
-   * left to `toggle()` — closing here first would let the click reopen it.
-   */
-  protected onDocumentPointerDown(event: PointerEvent): void {
-    if (!this.open()) {
-      return;
-    }
-
-    if (this.host.nativeElement.contains(event.target as Node)) {
-      return;
-    }
-
-    this.open.set(false);
-  }
 
   protected usePreset(preset: ThemePreset): void {
     this.importFailed.set(false);

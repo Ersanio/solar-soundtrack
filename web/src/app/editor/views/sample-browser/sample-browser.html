@@ -1,6 +1,8 @@
 <amk-toolbar>
+  <!-- A `<label>` so the hidden file input opens on the click, which
+       `button[amk-button]` cannot be; it wears the `md` button's look by hand. -->
   <label
-    class="border-edge bg-inset text-ink hover:border-control cursor-pointer rounded-md border px-3 py-1.5 text-sm"
+    class="border-edge bg-inset text-ink hover:border-control inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-md border px-3 text-sm transition-colors"
   >
     Add samples…
     <input type="file" class="hidden" accept=".brr,.bnk" multiple (change)="onFiles($event)" />
@@ -9,7 +11,7 @@
   <amk-checkbox class="text-xs" [(checked)]="library.optimize">Optimize samples</amk-checkbox>
 
   @if (library.overrideCount() > 0) {
-    <button amk-button variant="ghost" (click)="library.resetAll()">
+    <button amk-button variant="ghost" size="sm" (click)="library.resetAll()">
       Reset all ({{ library.overrideCount() }})
     </button>
   }

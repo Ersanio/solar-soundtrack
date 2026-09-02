@@ -12,7 +12,6 @@ import {
   resolveEntry,
 } from '../../../editor/command-palette/catalog';
 import {
-  chipClass,
   entryBlocked,
   entryClass,
   entryReadout,
@@ -29,6 +28,9 @@ import {
   wrapVerdict,
 } from '../../../editor/command-palette/loop-wrap';
 import { unitStartBefore } from '../../../editor/views/piano-roll/roll-strip';
+import { IconChevronDown } from '../../../shared/icons/icon-chevron-down';
+import { IconChevronRight } from '../../../shared/icons/icon-chevron-right';
+import { Toggle } from '../../../shared/toggle/toggle';
 import { EditorRequests } from '../../../state/editor-requests';
 import { EditorStore } from '../../../state/editor-store';
 import { readStored, writeStored } from '../../../util/storage';
@@ -87,7 +89,7 @@ type Button = ResolvedEntry & { class: string; disabled: boolean; after: boolean
  */
 @Component({
   selector: 'amk-note-palette',
-  imports: [CommandIcon],
+  imports: [CommandIcon, IconChevronDown, IconChevronRight, Toggle],
   templateUrl: './note-palette.html',
   host: { class: 'contents' },
 })
@@ -176,7 +178,7 @@ export class NotePalette {
     return CATEGORIES.map((category) => ({
       id: category.id,
       label: category.label,
-      class: chipClass(filter === category.id),
+      pressed: filter === category.id,
     }));
   });
 

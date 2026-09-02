@@ -1,7 +1,12 @@
 import { Component, computed, inject, input, output } from '@angular/core';
 
 import { ticksPerSecond } from '@amk/tokens/commands/units';
-import { Checkbox } from '../../../../shared/checkbox/checkbox';
+import { Button } from '../../../../shared/button/button';
+import { IconChevronDown } from '../../../../shared/icons/icon-chevron-down';
+import { IconChevronRight } from '../../../../shared/icons/icon-chevron-right';
+import { IconMinus } from '../../../../shared/icons/icon-minus';
+import { IconPlus } from '../../../../shared/icons/icon-plus';
+import { Toggle } from '../../../../shared/toggle/toggle';
 import { Toolbar } from '../../../../shared/toolbar/toolbar';
 import { EditorStore } from '../../../../state/editor-store';
 import { Playback } from '../../../../state/playback';
@@ -31,7 +36,16 @@ import {
  */
 @Component({
   selector: 'amk-roll-toolbar',
-  imports: [Checkbox, HistoryButtons, Toolbar],
+  imports: [
+    Button,
+    Toggle,
+    IconMinus,
+    IconPlus,
+    IconChevronDown,
+    IconChevronRight,
+    HistoryButtons,
+    Toolbar,
+  ],
   templateUrl: './roll-toolbar.html',
   host: { class: 'contents' },
 })

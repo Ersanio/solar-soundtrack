@@ -4,20 +4,25 @@ import { Button } from '../../shared/button/button';
 import { Mixer } from '../../state/mixer';
 import { CHANNEL_BG, CHANNEL_QUIET, CHANNEL_WASH } from '../../util/channel-palette';
 
-/** Shared by all eight strips, so a row differs from the next only in its wash. */
-const STRIP_CLASS = 'border-edge flex items-center overflow-hidden rounded-md border';
+/**
+ * Shared by all eight strips, so a row differs from the next only in its wash.
+ * One `sm` control tall, so the rack sits on the same 28px grid as the buttons
+ * beside it; the plate and the toggles stretch to fill it.
+ */
+const STRIP_CLASS = 'border-edge flex h-8 items-stretch overflow-hidden rounded-md border';
 
 /** Shared by all eight plates, the colour and the silencing coming after it. */
-const PLATE_CLASS = 'border-edge border-r px-1.5 py-0.5 font-mono text-xs';
+const PLATE_CLASS = 'border-edge flex w-6 items-center justify-center border-r font-mono text-xs';
 
 /** Shared by M and S, the state's own colours coming after it. */
-const TOGGLE_CLASS = 'cursor-pointer px-1.5 py-0.5 font-mono text-xs transition-colors';
+const TOGGLE_CLASS =
+  'flex w-7 cursor-pointer items-center justify-center font-mono text-xs font-semibold transition-colors';
 
 /** A toggle that is off: quiet, and lifted only by a hover it can take. */
 const TOGGLE_OFF = 'text-ink-muted hover:not-disabled:text-ink';
 
 /** M on a muted channel. */
-const MUTE_ON = 'bg-danger/20 text-danger font-semibold';
+const MUTE_ON = 'bg-danger/25 text-danger';
 
 /**
  * `text-ink` over a channel's own colour, which is what the roll's bars label
@@ -50,7 +55,7 @@ const ON_CHANNEL = 'text-ink font-semibold';
   selector: 'amk-channel-mixer',
   imports: [Button],
   templateUrl: './channel-mixer.html',
-  host: { class: 'border-edge flex flex-wrap items-center gap-2 border-t px-3 py-2' },
+  host: { class: 'border-edge flex flex-wrap items-center gap-2 border-t px-3 py-1.5' },
 })
 export class ChannelMixer {
   protected readonly mixer = inject(Mixer);

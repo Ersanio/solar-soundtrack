@@ -1,21 +1,62 @@
-<button amk-button variant="primary" [disabled]="!store.canCompile()" (click)="playback.toggle()">
-  {{ playback.isPlaying() ? '❚❚ Pause' : '▶ Play' }}
+<button
+  amk-button
+  variant="primary"
+  size="lg"
+  icon
+  [title]="playback.isPlaying() ? 'Pause' : 'Play'"
+  [disabled]="!store.canCompile()"
+  (click)="playback.toggle()"
+>
+  @if (playback.isPlaying()) {
+    <amk-icon-pause />
+  } @else {
+    <amk-icon-play />
+  }
 </button>
 
 <button
   amk-button
+  size="md"
+  icon
   title="Stop the song, or a note being previewed"
   [disabled]="!canStop()"
   (click)="stop()"
 >
-  ■
+  <amk-icon-stop />
 </button>
+
+<button
+  amk-toggle
+  size="md"
+  title="Keep playing past the end, round the song's loop"
+  [pressed]="playback.loop()"
+  (click)="playback.loop.set(!playback.loop())"
+>
+  <amk-icon-loop />
+  Loop
+</button>
+
+<button
+  amk-toggle
+  size="md"
+  title="While playing, reload the song at the same position whenever it recompiles"
+  [pressed]="playback.live()"
+  (click)="playback.live.set(!playback.live())"
+>
+  Live
+</button>
+
+<span
+  class="bg-inset text-ink flex h-7 items-center rounded-md px-2 font-mono text-sm tabular-nums whitespace-nowrap"
+>
+  {{ playback.timeLabel() }} / {{ playback.durationLabel() }}
+</span>
 
 <input
   type="range"
   min="0"
   step="1"
-  class="accent-control w-24 cursor-pointer disabled:cursor-not-allowed disabled:opacity-40"
+  class="accent-control max-w-80 min-w-24 flex-1 cursor-pointer disabled:cursor-not-allowed disabled:opacity-40"
   title="Seek — the song replays silently to reach the new position"
   [max]="playback.durationTicks()"
   [value]="playback.position()"
@@ -26,20 +67,7 @@
   (pointercancel)="playback.commitScrub()"
 />
 
-<span class="text-ink-muted w-20 font-mono text-xs tabular-nums">
-  {{ playback.timeLabel() }} / {{ playback.durationLabel() }}
-</span>
-
-<amk-checkbox
-  title="While playing, reload the song at the same position whenever it recompiles"
-  [(checked)]="playback.live"
->
-  Live
-</amk-checkbox>
-
-<amk-checkbox title="Keep playing past the end, round the song's loop" [(checked)]="playback.loop">
-  Loop
-</amk-checkbox>
+<amk-icon-volume class="text-ink-muted" />
 
 <span class="relative flex">
   <input

@@ -5,61 +5,53 @@
        same pair. -->
   <amk-history-buttons />
 
+  <span class="bg-edge h-5 w-px shrink-0"></span>
+
   <div class="flex items-center gap-1">
     <span class="text-ink-muted text-xs">Zoom</span>
-    <button
-      class="border-edge bg-inset text-ink hover:border-control cursor-pointer rounded-md border px-2 leading-6"
-      (click)="zoomBy.emit(-1)"
-    >
-      −
+    <button amk-button size="sm" icon title="Zoom out" (click)="zoomBy.emit(-1)">
+      <amk-icon-minus />
     </button>
-    <button
-      class="border-edge bg-inset text-ink hover:border-control cursor-pointer rounded-md border px-2 leading-6"
-      (click)="zoomBy.emit(1)"
-    >
-      +
+    <button amk-button size="sm" icon title="Zoom in" (click)="zoomBy.emit(1)">
+      <amk-icon-plus />
     </button>
   </div>
 
   <div class="flex items-center gap-1">
     <span class="text-ink-muted text-xs">Rows</span>
-    <button
-      class="border-edge bg-inset text-ink hover:border-control cursor-pointer rounded-md border px-2 leading-6"
-      (click)="rowHeightBy.emit(-1)"
-    >
-      −
+    <button amk-button size="sm" icon title="Shorter rows" (click)="rowHeightBy.emit(-1)">
+      <amk-icon-minus />
     </button>
-    <button
-      class="border-edge bg-inset text-ink hover:border-control cursor-pointer rounded-md border px-2 leading-6"
-      (click)="rowHeightBy.emit(1)"
-    >
-      +
+    <button amk-button size="sm" icon title="Taller rows" (click)="rowHeightBy.emit(1)">
+      <amk-icon-plus />
     </button>
   </div>
 
-  <amk-checkbox
-    class="text-xs"
+  <span class="bg-edge h-5 w-px shrink-0"></span>
+
+  <!-- Three ways of looking at the roll, each a lit plate while it is on. -->
+  <button
+    amk-toggle
     title="Keep the roll on the playing song, including after a scroll seeks it"
-    [checked]="follow()"
-    (checkedChange)="followChange.emit($event)"
+    [pressed]="follow()"
+    (click)="followChange.emit(!follow())"
   >
     Follow playback
-  </amk-checkbox>
-  <amk-checkbox
-    class="text-xs"
+  </button>
+  <button
+    amk-toggle
     title="Slide the music under a fixed playhead, rather than turning a page when the playhead reaches the edge"
-    [checked]="scrollNotes()"
-    (checkedChange)="scrollNotesChange.emit($event)"
+    [pressed]="scrollNotes()"
+    (click)="scrollNotesChange.emit(!scrollNotes())"
   >
     Scroll the notes
-  </amk-checkbox>
-  <amk-checkbox
-    class="text-xs"
-    [checked]="allOctaves()"
-    (checkedChange)="allOctavesChange.emit($event)"
-  >
+  </button>
+  <button amk-toggle [pressed]="allOctaves()" (click)="allOctavesChange.emit(!allOctaves())">
     All octaves
-  </amk-checkbox>
+  </button>
+
+  <span class="bg-edge h-5 w-px shrink-0"></span>
+
   <!-- Beats per bar over the note value that gets the beat, which is an MML note
        length: 6/8 is six `l8`s. MML has no signature of its own, so this is the
        porter's. -->
@@ -70,7 +62,7 @@
     <span class="text-ink-muted text-xs">Grid</span>
     <input
       type="number"
-      class="bg-inset border-edge text-ink w-12 rounded-md border px-1.5 font-mono text-xs leading-6 tabular-nums"
+      class="bg-inset border-edge text-ink h-7 w-12 rounded-md border px-1.5 font-mono text-xs tabular-nums"
       min="0"
       step="1"
       [max]="maxBeats"
@@ -79,7 +71,7 @@
     />
     <span class="text-ink-muted text-xs">/</span>
     <select
-      class="bg-inset border-edge text-ink cursor-pointer rounded-md border px-1.5 font-mono text-xs leading-6 tabular-nums"
+      class="bg-inset border-edge text-ink h-7 cursor-pointer rounded-md border px-1.5 font-mono text-xs tabular-nums"
       [value]="beatUnit()"
       (change)="setBeatUnit($event)"
     >
@@ -98,7 +90,7 @@
   >
     <span class="text-ink-muted text-xs">Snap</span>
     <select
-      class="bg-inset border-edge text-ink cursor-pointer rounded-md border px-1.5 text-xs leading-6"
+      class="bg-inset border-edge text-ink h-7 cursor-pointer rounded-md border px-1.5 text-xs"
       [value]="snap()"
       (change)="setSnap($event)"
     >
@@ -117,7 +109,7 @@
   >
     <span class="text-ink-muted text-xs">Edits</span>
     <select
-      class="bg-inset border-edge text-ink cursor-pointer rounded-md border px-1.5 text-xs leading-6"
+      class="bg-inset border-edge text-ink h-7 cursor-pointer rounded-md border px-1.5 text-xs"
       [value]="editMode()"
       (change)="setEditMode($event)"
     >
@@ -129,33 +121,42 @@
     </select>
   </div>
 
+  <span class="bg-edge h-5 w-px shrink-0"></span>
+
   <!-- The switch on the toolbar and the panel below it, as the source view does
        for the command palette: a closed strip would otherwise be one row of
-       chrome that still had to be drawn. -->
+       chrome that still had to be drawn. The chevron says which way it is. -->
   <button
-    type="button"
-    class="text-ink-muted hover:text-ink cursor-pointer text-xs font-semibold tracking-wide uppercase"
+    amk-toggle
+    [pressed]="percussionOpen()"
     [title]="
       percussionOpen() ? 'Hide the percussion set' : 'Choose which instruments are percussion'
     "
     (click)="percussionOpenChange.emit(!percussionOpen())"
   >
-    {{ percussionOpen() ? '▾' : '▸' }} Percussion
+    @if (percussionOpen()) {
+      <amk-icon-chevron-down />
+    } @else {
+      <amk-icon-chevron-right />
+    }
+    Percussion
   </button>
 
-  <span class="text-ink-muted font-mono text-xs">{{ editLabel() }}</span>
-  <!-- Why a channel cannot be edited is said here rather than in a dialog: it is
-       a property of the song, or of the mixer for a muted channel, and not the
-       answer to a click. -->
-  @if (editRefusal(); as reason) {
-    <span class="text-warn text-xs">cannot edit: {{ reason }}</span>
-  }
-  <!-- And why the last gesture was not written out. A refusal the plan carries
-       is on show while the pointer is down, beside the red bars saying the same
-       thing; one the splice makes arrives at the pointer-up that undoes the
-       gesture, so it stands until the document moves under it. -->
-  @if (gestureRefusal(); as reason) {
-    <span class="text-warn text-xs">refused: {{ reason }}</span>
-  }
-  <span class="text-ink-muted font-mono text-xs">{{ readout() }}</span>
+  <span class="ml-auto flex items-center gap-3 font-mono text-xs">
+    <span class="text-ink-muted">{{ editLabel() }}</span>
+    <!-- Why a channel cannot be edited is said here rather than in a dialog: it
+         is a property of the song, or of the mixer for a muted channel, and not
+         the answer to a click. -->
+    @if (editRefusal(); as reason) {
+      <span class="text-warn">cannot edit: {{ reason }}</span>
+    }
+    <!-- And why the last gesture was not written out. A refusal the plan
+         carries is on show while the pointer is down, beside the red bars saying
+         the same thing; one the splice makes arrives at the pointer-up that
+         undoes the gesture, so it stands until the document moves under it. -->
+    @if (gestureRefusal(); as reason) {
+      <span class="text-warn">refused: {{ reason }}</span>
+    }
+    <span class="text-ink-muted">{{ readout() }}</span>
+  </span>
 </amk-toolbar>

@@ -3,6 +3,7 @@ import { Component, computed, inject } from '@angular/core';
 import { EditorStore } from '../../state/editor-store';
 import { hex4 } from '../../util/format';
 import { AramBar, type Group, type Segment } from '../aram-bar/aram-bar';
+import { budgetSegments } from '../aram-bar/aram-segments';
 
 /** A budget row as the table renders it: a bar segment plus its text columns. */
 interface TableRow extends Segment {
@@ -33,10 +34,7 @@ export class AramBudget {
   };
 
   /**
-   * The table's rows, which are also the bar's segments.
-   *
-   * `computeBudget` already emits exactly the five regions the bar draws, so
-   * there is nothing to roll up here — one pass builds both.
+   * The table's rows: the bar's segments with their text columns.
    *
    * `free` is kept even at zero bytes: "no room left" is precisely what you
    * come to this table to read, and a missing row says it far less clearly.
@@ -59,10 +57,7 @@ export class AramBudget {
       }));
   });
 
-  /** The bar has no zero-width mark to draw, so it omits what the table lists. */
-  protected readonly segments = computed<Segment[]>(() =>
-    this.rows().filter((row) => row.bytes > 0),
-  );
+  protected readonly segments = computed<Segment[]>(() => budgetSegments(this.store.budget()));
 
   protected readonly overflowing = computed(() => (this.store.budget()?.overflowBytes ?? 0) > 0);
 

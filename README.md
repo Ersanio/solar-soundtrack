@@ -31,6 +31,8 @@ games, and even for homebrew. A huge library of music is available at [SMW Centr
 - **Compile as you type**, with a **Live** mode that reloads the song at the position it
   was already playing. You can keep editing and the music never stops.
 - **Seek, loop and volume**, and per-channel **mute** and **solo** controls.
+- **A layout in FL Studio's mould** — transport and ARAM meter in the top bar, an inspector-first
+  sidebar, a status bar, and a tablet drawer; the theme picker recolours any of it.
 - **A sample browser** where you can import `.brr` files or whole `.bnk` banks, see what each sample
   costs in ARAM, and mark them as important for use in global songs or sound effects.
 - **An ARAM budget** that tells you how your work fits within the ARAM.
@@ -93,7 +95,7 @@ against known-good byte output. `scripts/README.md` says what each one actually 
 Three things run automatically before the commands above (via `pre*` npm hooks), so you never need
 to invoke them yourself: the audio worklet is bundled with esbuild, the SPC package's driver and
 emulator assets are mirrored into `web/public/`, and the current commit SHA is written to a
-gitignored file that powers the toolbar's commit link. The SHA is captured once when the dev server
+gitignored file that powers the top bar's commit link. The SHA is captured once when the dev server
 starts, so it goes stale if you commit while `npm start` keeps running — restart to refresh it.
 
 ## How it works
