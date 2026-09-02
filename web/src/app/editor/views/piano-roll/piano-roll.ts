@@ -913,15 +913,6 @@ export class PianoRoll {
     return outcome && !isStrip(outcome) ? outcome.refused : null;
   });
 
-  /**
-   * Whether rewriting the channel is the answer to the refusal on show.
-   *
-   * It is for every refusal `channelStrip` gives, which are all things the text
-   * says. It is not for a mute: nothing written in the channel is what is
-   * stopping it, and a Normalize offered there is a rewrite that changes nothing.
-   */
-  protected readonly normalizable = computed(() => this.silencedEdit() === null);
-
   private readonly targetAMKVersion = computed(
     () => this.editor.result()?.stats?.targetAMKVersion ?? 4,
   );
@@ -1856,7 +1847,7 @@ export class PianoRoll {
    * The roll's shortcuts, while a channel is being edited.
    *
    * Ignored while the text or a modal has focus, so `Ctrl+A` in the source still
-   * selects the source and the normalize dialog keeps its own Escape. Everything
+   * selects the source and a dialog keeps its own Escape. Everything
    * that edits goes through the same {@link Gesture} the pointer uses, so a
    * nudge and a drag commit the same way.
    *

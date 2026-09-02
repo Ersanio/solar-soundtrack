@@ -12,8 +12,8 @@ const HISTORY_KEYS = /Mac|iP/.test(navigator.platform)
 /**
  * Undo and redo, for the two toolbars that need them.
  *
- * One component in the `normalize-button` mould — `display: contents`, so the
- * pair is a direct flex child of whichever `<amk-toolbar>` hosts it — because
+ * One component with `display: contents` — so the pair is a direct flex child
+ * of whichever `<amk-toolbar>` hosts it — because
  * the piano roll writes MML now and an edit made there has to be undoable
  * without going to the Source tab to do it.
  *

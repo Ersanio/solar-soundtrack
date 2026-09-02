@@ -347,8 +347,7 @@ to put it on. Delete it from the lane first if you meant it to go.
   channel runs under — `o4 q7F @0 v255 y10` — before the note. No `l`: every length the roll writes
   is the note's own, so nothing it puts there reads a default. All of it is one undo step. The
   block goes at the end because an octave and a default length carry across a `#N`, so a block
-  dropped in between two others would change what the second one is read under; **Normalize** is what
-  puts the blocks back in `#0` to `#7` order.
+  dropped in between two others would change what the second one is read under.
 - **And fills it out with rests to the length of the song.** A song is only as long as its shortest
   channel — the driver stops every channel the moment one of them runs out — so a new channel holding
   one note would cut the rest of the song off at that note and hide it from the roll. The rest after
@@ -366,8 +365,8 @@ to put it on. Delete it from the lane first if you meant it to go.
   nudged or transposed; drag a group and the whole group stays lit, the notes it pushed aside
   included. So does a value changed from the inspector — a note's length dragged there keeps its
   bar outlined. A note the edit deleted is the one thing that does not come back. Text arriving
-  from anywhere else lets the selection go: typing in the MML, an undo, a Normalize, leaving the
-  channel, muting it, or `Escape` — and so does dragging a loop box's edge, which moves the
+  from anywhere else lets the selection go: typing in the MML, an undo, leaving the channel, muting
+  it, or `Escape` — and so does dragging a loop box's edge, which moves the
   brackets and with them the notes' places in the body.
 
 ## Starting from nothing
@@ -404,11 +403,9 @@ closes, and a `*` or `(n)` that replays a remote code body.
 A legacy `&` is refused for a different reason, and refuses the whole song rather than one channel:
 it is an operator rather than a command, so nothing above the compiler can say which channel it is
 written on, and the bend duration it compiles to is the length of the note _before_ it — so an edit
-to that note would silently change a slide nothing on screen has drawn. **Normalize** is the way out.
-It writes every `&` as the `$DD` it already compiles to, byte for byte, after which the slide is a
-command the roll can see and the rules below apply to it. A slide it cannot write out — one standing
-after a tie, which `$DD` would move — is left alone and named in the dialog, and goes on refusing the
-song.
+to that note would silently change a slide nothing on screen has drawn. Written as the `$DD` it
+compiles to — `$DD $00 <length> <note>`, in the Source tab — the slide is a command the roll can see,
+and the rules below apply to it.
 
 A `$DD` pitch slide is not one of them, and is the one command with a rule of its own. It is not
 dispatched: the note before it is what reads it, by peeking at the byte standing at the track pointer
@@ -427,8 +424,7 @@ way anything a note starts is plated, and on no bar after it: a `v` or a `y` is 
 follow go on playing under, and a slide is over when it is over. A slide inside a `[ ]` played twice
 is two slides, so both notes carry it and both are plated. On the lane it sits on that same tick,
 which for `c4^4 $DD …` is 48 ticks into the note rather than at its head — the read-ahead does not
-find the slide until the tie's own ticks, which is why writing one after a tie is a rewrite Normalize
-declines to make.
+find the slide until the tie's own ticks.
 
 And it decides what you hear. Clicking the bar plays the note **with its slide**, as does every row a
 drag of it crosses, since the target is an absolute note the bar would still slide to wherever it was
@@ -606,10 +602,3 @@ pass, where it stands — where deleting it from the lane still works. And the e
 refusals of its own: a subloop grabbed past its first pass has no name to call it back by — `[[ ]]`
 has no label and no `*`, and a single pass cannot even be spelled, `]]1` being the `$E6 $00` open
 byte — and a loop that plays inside another loop has no song-time position of its own to move.
-
-The **Normalize #N** button beside that message rewrites just that channel into a shape the roll can
-splice — triplets given plain lengths, and every note given its own length so that no `l` decides
-it — and leaves every other channel of the song exactly as it was; loops stay exactly as written,
-being shapes the roll edits in place. The plain **Normalize** button does the whole song. Neither
-changes what the song plays: the result is compiled and compared against the original first, and
-refused if anything moved.

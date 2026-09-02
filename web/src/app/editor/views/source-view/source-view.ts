@@ -39,7 +39,6 @@ import { Playback } from '../../../state/playback';
 import { clamp } from '../../../util/math';
 import { CommandPalette } from '../../command-palette/command-palette';
 import { HistoryButtons } from '../../history-buttons/history-buttons';
-import { NormalizeButton } from '../../normalize-button/normalize-button';
 import { commandHover } from '../../codemirror/command-hover';
 import { mmlLanguage } from '../../codemirror/mml-language';
 import { mmlTheme } from '../../codemirror/mml-theme';
@@ -81,7 +80,7 @@ const LINT_SEVERITY: Record<Severity, 'error' | 'warning' | 'info'> = {
  */
 @Component({
   selector: 'amk-source-view',
-  imports: [Toolbar, IconWrap, CommandPalette, HistoryButtons, NormalizeButton],
+  imports: [Toolbar, IconWrap, CommandPalette, HistoryButtons],
   templateUrl: './source-view.html',
   host: { class: 'flex min-h-0 min-w-0 flex-col' },
 })

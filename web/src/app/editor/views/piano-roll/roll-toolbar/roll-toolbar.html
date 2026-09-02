@@ -153,19 +153,12 @@
        and a keystroke undo in the order they happened. -->
   <amk-history-buttons />
 
-  <!-- The same button the source toolbar carries, dialog and all. -->
-  <amk-normalize-button />
-
   <span class="text-ink-muted font-mono text-xs">{{ editLabel() }}</span>
-  <!-- Why a channel cannot be edited is said here rather than in a dialog; the
-       narrower Normalize beside it is the answer where the reason is something
-       the text says, and its own refusals go in its own dialog. A muted channel
-       is the reason that is not: nothing written in it is what is stopping it. -->
+  <!-- Why a channel cannot be edited is said here rather than in a dialog: it is
+       a property of the song, or of the mixer for a muted channel, and not the
+       answer to a click. -->
   @if (editRefusal(); as reason) {
     <span class="text-warn text-xs">cannot edit: {{ reason }}</span>
-    @if (normalizable()) {
-      <amk-normalize-button [channel]="editChannel() ?? 0" />
-    }
   }
   <!-- And why the last gesture was not written out. A refusal the plan carries
        is on show while the pointer is down, beside the red bars saying the same

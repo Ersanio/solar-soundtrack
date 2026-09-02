@@ -7,7 +7,6 @@ import { EditorStore } from '../../../../state/editor-store';
 import { Playback } from '../../../../state/playback';
 import { ticksPerSecondAt } from '../../../../state/song-clock';
 import { HistoryButtons } from '../../../history-buttons/history-buttons';
-import { NormalizeButton } from '../../../normalize-button/normalize-button';
 import { EDIT_MODES, type EditMode } from '../roll-edit';
 import {
   BEAT_UNITS,
@@ -32,7 +31,7 @@ import {
  */
 @Component({
   selector: 'amk-roll-toolbar',
-  imports: [Checkbox, HistoryButtons, NormalizeButton, Toolbar],
+  imports: [Checkbox, HistoryButtons, Toolbar],
   templateUrl: './roll-toolbar.html',
   host: { class: 'contents' },
 })
@@ -53,8 +52,6 @@ export class RollToolbar {
   readonly editRefusal = input.required<string | null>();
   /** Why the last gesture was not written out, or null when it was. */
   readonly gestureRefusal = input.required<string | null>();
-  /** Whether a rewrite of that channel is the answer to the refusal. */
-  readonly normalizable = input.required<boolean>();
   /** How many notes are selected, for the readout. */
   readonly selected = input.required<number>();
   /** The channel the corner's picker has selected, or null when none is. */

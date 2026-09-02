@@ -20,7 +20,6 @@ import { ClockMeasurer, tempoDiagnostic } from './clock-measurer';
 import { caretPosition, downloadBlob, errorMessage } from '../util/format';
 import { readStored, writeStored } from '../util/storage';
 import { DriverStore } from './driver-store';
-import { type NormalizeOutcome, normalizeSong } from './normalize-song';
 import { SAMPLE_SONG } from './sample-song';
 import { SampleStore } from './sample-store';
 
@@ -110,8 +109,7 @@ export class EditorStore {
    * What the sample library holds, and what the user asked to be done with it.
    * A compiler that does not understand these keys ignores them, per the
    * `CompileRequest.options` contract. Read inside {@link compilation}, so the
-   * compile tracks the library; read again by {@link normalize}, which compiles
-   * the same song several times over and has to do it under the same options.
+   * compile tracks the library.
    */
   private compileOptions(): Record<string, unknown> {
     return {
@@ -427,36 +425,6 @@ export class EditorStore {
   /** Compilation is gated on a driver, so every producing action is too. */
   readonly canCompile = computed(() => this.drivers.ready());
   readonly canDownload = computed(() => this.result()?.ok === true && this.result()?.data !== null);
-  /**
-   * Normalizing rewrites the whole document off the compile of it, so the two
-   * have to be the same text: while a keystroke is still inside the debounce
-   * the spans the rewrite is built on point into a document that has moved.
-   */
-  readonly canNormalize = computed(
-    () => this.result()?.ok === true && this.compiledText() === this.source(),
-  );
-
-  /**
-   * The song rewritten for editing, or the reasons it cannot be — see
-   * `normalize-song.ts`. `null` without a driver, since there is no address to
-   * compile at. Reads the live document rather than `committed`, which is what
-   * {@link canNormalize} guards.
-   *
-   * With a channel, only that channel's music is rewritten and every other one
-   * is left exactly as it was — which is what the roll asks for when one channel
-   * is in the way, and which above all does not refuse because some *other*
-   * channel holds the shape being objected to. The check is the same either
-   * way: the result is walked and compared against the original before anything
-   * is applied.
-   */
-  normalize(channel?: number): NormalizeOutcome | null {
-    const driver = this.drivers.driver();
-    if (!driver) {
-      return null;
-    }
-
-    return normalizeSong(this.source(), driver.manifest.localPos, this.compileOptions(), channel);
-  }
 
   constructor() {
     // Sanctioned effect: mirroring signal state into an imperative store.

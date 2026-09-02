@@ -324,7 +324,7 @@ export interface PitchSlide {
 	 * The note byte the slide arrives at, as the **compiler emitted** it.
 	 *
 	 * Not a written pitch: `h` and the instrument's tuning are resolved at
-	 * compile time and `writePitchSlides` writes `NoteAddress.note`. The driver
+	 * compile time into `NoteAddress.note`, which is the byte here. The driver
 	 * adds `$43` and `!HTuneValues+x` itself when it arms the slide
 	 * (`main.asm:3277-3285`), so nothing above it may transpose this again.
 	 */
@@ -423,9 +423,8 @@ export interface WalkNote {
 	 * ARAM address of that `$DD`, or `null` — a key into `CompileResult.commandMap`,
 	 * which is how a reader names the command rather than only its operands.
 	 *
-	 * Its own field and not a member of {@link bend}, because `normalize-song.ts`
-	 * compares that object between the walk of a song and the walk of its rewrite
-	 * and an address moves under one.
+	 * Its own field and not a member of {@link bend}: `bend` is the operands the
+	 * driver runs, and this is where they were read from.
 	 */
 	bendFrom: number | null;
 }

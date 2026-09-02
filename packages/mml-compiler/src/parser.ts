@@ -20,17 +20,7 @@
  */
 
 import { hex2 } from "@amk/core/hex";
-import type {
-	Diagnostic,
-	LoopEvent,
-	ParseEvent,
-	ParseState,
-	ParseTrace,
-	Severity,
-	SongLength,
-	Span,
-	SongTags,
-} from "@amk/core/types";
+import type { Diagnostic, Severity, SongLength, Span, SongTags } from "@amk/core/types";
 import { TARGET_AM4, TARGET_AMM, TARGET_NONE, preprocess } from "./preprocess";
 import {
 	DEFAULT_TRANSPOSE,
@@ -127,8 +117,6 @@ export interface ParseOutput {
 	tempoRatio: number;
 	diagnostics: Diagnostic[];
 	errorCount: number;
-	/** Only when the parser was asked to trace. See `ParseTrace`. */
-	trace: ParseTrace | null;
 }
 
 /**
@@ -304,20 +292,11 @@ export class AddmusicKParser {
 	/** Offsets in {@link scanned} at which each line after the first begins; built on first use. */
 	private lineStarts: number[] | null = null;
 
-	// --- trace ---------------------------------------------------------------
-	/** One event per dispatch, or null when no trace was asked for. See `ParseTrace`. */
-	private readonly traceEvents: ParseEvent[] | null;
-	/** The source span of every replacement match, kept beside the events. */
-	private readonly expansions: Span[] | null;
-
 	constructor(
 		private readonly source: string,
 		private readonly options?: AddmusicKOptions,
-		trace = false,
 	) {
 		this.text = "";
-		this.traceEvents = trace ? [] : null;
-		this.expansions = trace ? [] : null;
 	}
 
 	// =========================================================================
@@ -446,16 +425,6 @@ export class AddmusicKParser {
 			const commandChannel = this.channel;
 			const commandOffset = this.data[this.channel].length;
 			const midRun = this.hexLeft !== 0;
-			// The trace's view of the same moment. `lengthsBefore` is what lets a
-			// loop event be read off the bytes a handler wrote, and is only taken
-			// when a trace was asked for.
-			const lengthsBefore = this.traceEvents === null ? null : this.data.map((channel) => channel.length);
-			const wasRemote = this.inRemoteDefinition;
-			const wasE6 = this.inE6Loop;
-			// Where the hex run this dispatch belongs to began, taken before
-			// `recordCommand` consumes it. A subloop written as `$E6 $00` turns the
-			// flag over on the argument byte, and the run is what a rewrite replaces.
-			const runFrom = this.hexRun?.start;
 
 			// prettier-ignore
 			switch (lower) {
@@ -501,148 +470,6 @@ export class AddmusicKParser {
 			}
 
 			this.recordCommand(lower, commandAt, commandChannel, commandOffset, midRun);
-			if (lengthsBefore !== null && !isSpace(c)) {
-				this.recordTrace(lower, commandAt, commandChannel, lengthsBefore, wasRemote, wasE6, runFrom);
-			}
-		}
-	}
-
-	/**
-	 * The parse trace: the state each dispatch left behind, and what it did to
-	 * the loop structure. Nothing AddmusicK records — see `ParseTrace`.
-	 *
-	 * Here beside {@link recordCommand} for the same reason it is: the dispatch
-	 * is the one place every command passes through. What a bracket did is read
-	 * off the bytes rather than asked of the handler — `[` moves the channel to
-	 * 8, `]` moves it back and leaves `$E9 lo hi n` on the caller, `*` and `(n)m`
-	 * leave the same four bytes, `[[` and `]]n` toggle `inE6Loop` and `]]n`
-	 * leaves `$E6 n-1` — and every handler writes only on its success path, so
-	 * a dispatch that errored records no loop event. A subloop written as
-	 * `$E6 $00` toggles the same flag and leaves the same bytes, so it is read
-	 * the same way; `runFrom` is what says where its run began.
-	 */
-	private recordTrace(
-		lower: string,
-		start: number,
-		channel: number,
-		lengthsBefore: number[],
-		wasRemote: boolean,
-		wasE6: boolean,
-		runFrom: number | undefined,
-	): void {
-		if (this.traceEvents === null) {
-			return;
-		}
-
-		let end = this.pos;
-		while (end > start && isSpace(this.text[end - 1])) {
-			end--;
-		}
-
-		const event: ParseEvent = { span: this.spanAt(start, end), char: lower, channel, state: this.snapshotState() };
-		// Every offset a trace event carries is a source one, and `runFrom` is a
-		// {@link scanned} offset like the rest of the scan's bookkeeping.
-		const runAt = runFrom === undefined ? undefined : this.spanAt(runFrom, runFrom).start;
-		const loop = this.loopEventOf(lower, start, channel, lengthsBefore, wasRemote, wasE6, runAt);
-		if (loop) {
-			event.loop = loop;
-		}
-
-		this.traceEvents.push(event);
-	}
-
-	private snapshotState(): ParseState {
-		return {
-			channel: this.channel,
-			prevChannel: this.prevChannel,
-			octave: this.octave,
-			defaultNoteLength: this.defaultNoteLength,
-			prevNoteLength: this.prevNoteLength,
-			triplet: this.triplet,
-			hTranspose: this.hTranspose,
-			usingHTranspose: this.usingHTranspose,
-			instrument: [...this.instrument],
-			q: [...this.q],
-			ignoreTuning: [...this.ignoreTuning],
-			inRemoteDefinition: this.inRemoteDefinition,
-			inE6Loop: this.inE6Loop,
-			prevLoop: this.prevLoop,
-			loopLabel: this.loopLabel,
-			channelDefined: this.channelDefined,
-			inPitchSlide: this.inPitchSlide,
-			nextNoteIsForDD: this.nextNoteIsForDD,
-		};
-	}
-
-	private loopEventOf(
-		lower: string,
-		start: number,
-		channel: number,
-		lengthsBefore: number[],
-		wasRemote: boolean,
-		wasE6: boolean,
-		runFrom: number | undefined,
-	): LoopEvent | undefined {
-		const grew = (slot: number): number => this.data[slot].length - lengthsBefore[slot];
-		const tail = (slot: number, back: number): number => this.data[slot][this.data[slot].length - back];
-
-		switch (lower) {
-			case "[":
-				if (channel < 8 && this.channel === 8) {
-					return { kind: "open", at: this.prevLoop, label: this.loopLabel, remote: this.inRemoteDefinition };
-				}
-
-				if (!wasE6 && this.inE6Loop) {
-					return { kind: "subOpen" };
-				}
-
-				return undefined;
-
-			case "]":
-				if (channel === 8 && this.channel < 8) {
-					const called = grew(this.channel) === 4 && tail(this.channel, 4) === 0xe9;
-					return { kind: "close", at: this.prevLoop, count: called ? tail(this.channel, 1) : 1, remote: wasRemote };
-				}
-
-				if (wasE6 && !this.inE6Loop && grew(channel) === 2 && tail(channel, 2) === 0xe6) {
-					return { kind: "subClose", count: tail(channel, 1) + 1 };
-				}
-
-				return undefined;
-
-			case "*":
-			case "(":
-				if (channel < 8 && grew(channel) === 4 && tail(channel, 4) === 0xe9) {
-					// `(n)m` reads its label as `parseLabelLoop` does, one higher than
-					// written, so it matches the `open` event's label.
-					const written = lower === "(" ? /^\((\d+)\)/.exec(this.text.slice(start, start + 8)) : null;
-					return {
-						kind: "call",
-						at: tail(channel, 3) | (tail(channel, 2) << 8),
-						count: tail(channel, 1),
-						label: written ? Number.parseInt(written[1], 10) + 1 : null,
-					};
-				}
-
-				return undefined;
-
-			// A subloop the porter wrote as hex. `parseHexCommand` turns the flag
-			// over on the argument byte and appends one byte per dispatch, so this
-			// is the same pair of tests as `[` and `]` above with `grew` at 1
-			// rather than 2, and `from` carries the `$E6` the run opened with.
-			case "$":
-				if (!wasE6 && this.inE6Loop) {
-					return { kind: "subOpen", from: runFrom };
-				}
-
-				if (wasE6 && !this.inE6Loop && grew(channel) === 1 && tail(channel, 2) === 0xe6) {
-					return { kind: "subClose", count: tail(channel, 1) + 1, from: runFrom };
-				}
-
-				return undefined;
-
-			default:
-				return undefined;
 		}
 	}
 
@@ -967,11 +794,6 @@ export class AddmusicKParser {
 					}
 
 					const useSite = this.originAt(this.pos);
-					// The only place the match's extent is known; the trace needs it to
-					// find the use site in the source.
-					if (this.expansions !== null) {
-						this.expansions.push(this.spanAt(this.pos, this.pos + find.length));
-					}
 
 					this.text = this.text.slice(0, this.pos) + replacement + this.text.slice(this.pos + find.length);
 					// `concat` rather than `splice(...)` with a spread: a long
@@ -4126,20 +3948,6 @@ export class AddmusicKParser {
 			tempoRatio: this.tempoRatio,
 			diagnostics: this.diagnostics,
 			errorCount: this.errorCount,
-			trace:
-				this.traceEvents === null
-					? null
-					: {
-							events: this.traceEvents,
-							buffer: this.text,
-							origins: this.origins,
-							expansions: this.expansions ?? [],
-							startingChannel: this.resizedChannel,
-							targetAMKVersion: this.targetAMKVersion,
-							songTargetProgram: this.songTargetProgram,
-							tempoRatio: this.tempoRatio,
-							transposeMap: [...this.transposeMap],
-						},
 		};
 	}
 }

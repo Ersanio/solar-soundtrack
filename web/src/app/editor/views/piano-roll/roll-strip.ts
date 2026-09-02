@@ -369,8 +369,8 @@ function trailsAUnit(command: Command): boolean {
  * the note inspector serves notes inside `[ ]` bodies, which `channelStrip`
  * refuses whole. The same absorption rule over the same channel-filtered list,
  * so the insertion lands at a unit head on the next strip build, in front of the
- * note's own adjacent leading `o` and drum `@` — a drum `@` kept against its
- * note is what lets Normalize's `drumPerNote` stand down.
+ * note's own adjacent leading `o` and drum `@`, which keeps a drum `@` against
+ * its note.
  */
 export function unitStartBefore(
   source: string,
@@ -431,7 +431,7 @@ function forbiddenConstruct(
   // to the note *before* it silently changes the slide. The scanner cannot say
   // which channel an operator is on, so one anywhere refuses every channel. It
   // is native on every target — only the tie rewind is legacy-only
-  // (`parser.ts:3027`) — and Normalize's `writePitchSlides` is what clears it.
+  // (`parser.ts:3027`).
   for (const token of index.tokens) {
     if (token.kind === 'operator' && source.slice(token.start, token.end) === '&') {
       return 'this song uses `&`, whose length comes from the note before it';
@@ -630,9 +630,8 @@ export function channelTails(
  *
  * The music is counted off the **note map** rather than off `index.commands`,
  * because an `#instruments` entry's bytes and a remote definition's body both
- * gather as commands standing above the first marker, and `orderChannels` keeps
- * both in the header — a refusal earned by those could not be cleared by the
- * Normalize button offered beside it. Two consequences, both deliberate: a
+ * gather as commands standing above the first marker, and neither is music.
+ * Two consequences, both deliberate: a
  * prelude of commands with no notes in it is not caught, and AddmusicK refuses
  * notes outside a channel outright (AMK0140, `parser.ts:2880`), so a song that
  * can earn this at all is an `#am4` or `#amm` one.

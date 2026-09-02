@@ -146,48 +146,6 @@ The whole write-back path rests on one fact: the source view is hidden, never de
 tab is showing, so its effects are live while the roll is in front. If that `[class.hidden]` in
 `editor-pane.html` ever became an `@if`, every roll edit would vanish silently.
 
-## Normalizing a song
-
-The **Normalize** button on the Source and Piano Roll toolbars rewrites the whole document into the
-shape an editor can splice — `@amk/compiler`'s README has the passes. The rewrite itself is the
-compiler's; `state/normalize-song.ts` is the part only the app can do, and it is here for the reason
-`song-clock.ts` is: the passes rewrite text and the walk in `@amk/spc` reads bytes, and the package
-boundary keeps each from the other. It compiles and walks the result of every pass and compares it
-to the walk of the original — every note's tick, slot, byte, state, **written** pitch and the `$DD`
-pitch slide its read-ahead picks up, the song's length, loop point and tempo commands — and the
-document is not touched unless they all agree. The outcome names the passes that changed the song,
-and a refusal names its reason.
-
-A pass can also succeed and still leave something behind, which the dialog says under "What it could
-not write out": a `&` pitch slide standing after a tie cannot become a `$DD` without moving the tie,
-so it is left alone — and it is then what goes on refusing the roll, which is why saying so matters
-more than the rewrite succeeding quietly. That list is shown on "nothing to normalize" too, since a
-song whose only `&`s were left alone is exactly what comes back unchanged.
-
-`editor/normalize-button/` is the button and the dialog behind it, one component on both toolbars.
-It runs the rewrite _before_ the dialog opens, so the dialog lists what changes in this song rather
-than what the passes do in general, and so a refusal — or a song already in shape — is said in the
-same place. It is a native `<dialog>` shown modally, which keeps the document still while the
-question is open, and its Confirm is held for three seconds.
-
-The write is one `EditorRequests.replace` over the whole document, so it is one CodeMirror
-transaction and one undo step, and its `expect` is the text the rewrite was built from, so a
-keystroke that lands in between makes it a no-op rather than an overwrite. `EditorStore.canNormalize`
-is the same guard from the other side: the button is off while the document has moved past the
-compile. The module is pure and takes no Angular, and `normalizetest` drives it the way the button
-does.
-
-**One channel at a time.** `normalizeSong` takes an optional channel, and with one it rewrites that
-channel's music and leaves every other channel of the song exactly as it was. The roll needs it
-because it edits one channel at a time and refuses the ones it cannot splice — so what a porter wants
-when a channel is in the way is that channel put in order, and above all _not_ a refusal because some
-other channel holds the shape being objected to. Every pass that works construct by construct takes
-it as a filter (`NormalizeInput.onlyChannel`); the preprocessor and the replacements are global by
-nature and run whole either way; `orderChannels` refuses with `SST0615` rather than joining one
-channel's blocks, because that moves text past the other channels and changes the `o` and `l` they
-inherit. The oracle does not change — the result is still walked and compared — so a scoped rewrite is
-held to exactly the standard a whole one is.
-
 ## Editing from the piano roll
 
 `editor/views/piano-roll/roll-strip.ts` and `roll-edit.ts` are the two halves of a roll gesture, and

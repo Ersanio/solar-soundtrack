@@ -108,8 +108,8 @@ const OPENING_Q = 0x7f;
  * ({@link spellDuration}), so nothing it puts in this channel reads a default.
  *
  * No `@` on Addmusic 4.05 or AddmusicM, where an `@` switches instrument tuning
- * on and resets `h` instead of saying what is already true; that is the gate
- * `normalize.ts:writeDefaults` takes. No `t`, which reaches all eight channels
+ * on and resets `h` instead of saying what is already true. No `t`, which
+ * reaches all eight channels
  * and is not what drawing one note asked for, and no `h`, which replaces an
  * instrument's tuning rather than adding to it, so `h0` is not "no transposition".
  */

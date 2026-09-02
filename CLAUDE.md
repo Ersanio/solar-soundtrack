@@ -18,7 +18,7 @@ packages/mml-compiler/  @amk/compiler  preprocess -> parser -> link
 packages/mml-tokens/    @amk/tokens    scanner, splices, command model
 packages/spc/           @amk/spc       BRR, echo FIR, ARAM, emulator, worklet
 web/                    the Angular editor
-scripts/                fifteen byte-level harnesses
+scripts/                fourteen byte-level harnesses
 ```
 
 ```
@@ -42,15 +42,15 @@ AddmusicK release if they are missing.
 
 Node 24 is what CI uses. CI runs `npm run lint` then `npm run check`.
 
-| Command             | What it does                                                         |
-| ------------------- | -------------------------------------------------------------------- |
-| `npm start`         | Dev server on `http://localhost:4200/`.                              |
-| `npm run build`     | Production build into `web/dist/`.                                   |
-| `npm run watch`     | Dev-configuration build with `--watch`, no server.                   |
-| `npm run lint`      | ESLint over every workspace.                                         |
-| `npm run format`    | Prettier over the workspace.                                         |
-| `npm run typecheck` | The app. `:packages` and `:scripts` cover the rest.                  |
-| `npm run check`     | The merge gate: formatting, three typechecks, all fifteen harnesses. |
+| Command             | What it does                                                          |
+| ------------------- | --------------------------------------------------------------------- |
+| `npm start`         | Dev server on `http://localhost:4200/`.                               |
+| `npm run build`     | Production build into `web/dist/`.                                    |
+| `npm run watch`     | Dev-configuration build with `--watch`, no server.                    |
+| `npm run lint`      | ESLint over every workspace.                                          |
+| `npm run format`    | Prettier over the workspace.                                          |
+| `npm run typecheck` | The app. `:packages` and `:scripts` cover the rest.                   |
+| `npm run check`     | The merge gate: formatting, three typechecks, all fourteen harnesses. |
 
 `npm run check` does **not** compile Angular templates, and neither does `npm run typecheck` — `tsc`
 does not run the template compiler, so a bad binding (`viewBox=` instead of `[attr.viewBox]=`)
@@ -75,7 +75,7 @@ which is all either needs:
 
 ### Tests
 
-There are no `.spec.ts` files, and no `npm run test` — the suite is the fifteen harnesses under
+There are no `.spec.ts` files, and no `npm run test` — the suite is the fourteen harnesses under
 `scripts/`; **`scripts/README.md` says what each one proves**,
 and several of those assertions are load-bearing in ways that are not obvious from the name.
 
@@ -166,8 +166,8 @@ AddmusicK objects to something it has no opinion about. The echo hazards, the un
 warning, the tempo shortfall, the `#path` notice and the runaway-replacement guard are `SST05xx`,
 which is also where a finding goes when the reference does not _finish_ rather than not object:
 `SST0505` bounds a replacement that expands into itself, and AddmusicK grows its buffer forever on
-the same song, so there is no run to be faithful to and nothing to divide with `#path`. The normalize refusals are
-`SST06xx`, and `SST0301` guards `compile()`'s own ARAM argument. A new diagnostic takes the prefix
+the same song, so there is no run to be faithful to and nothing to divide with `#path`. `SST0301`
+guards `compile()`'s own ARAM argument. A new diagnostic takes the prefix
 of the tool that found it. Spans are mapped back to the source the author wrote — `spanAt` is the
 single choke point, and anything that bypasses it will be wrong. Constructs this compiler does not
 implement are reported as errors, never silently mis-compiled.
@@ -288,32 +288,15 @@ One entry each: what it was, what it is, why.
   beat, `0` beats for no grid at all, and `gridLines` counts beats from tick 0 so a bar line is a
   bar's first beat by construction. Not a `tick % barTicks` either — `tickWindow` snaps to a whole
   note, a 7/8 bar is 168 ticks, and the two align only by coincidence.
-- **Unrolling loops from the text alone, or decompiling the walk into MML** — a `[ ]` body is
-  compiled once, under the parse-time state at its `[`, and replayed from bytes, so copying its
-  text n times replays `<`, `>` and the drum remap's clearing n times, and a `(1)n` called from
-  another channel parses the body under that channel's `o`, `l` and `h`; and bytes cannot say what
-  was written. The parser records the state each body was compiled under (`ParseTrace`, gathered
-  where `commandMap` is), the rewrite is text to text (`normalize.ts`), and the walk of every
-  pass's result is compared to the walk of the original before anything reaches the document
-  (`state/normalize-song.ts`). No `h` is ever written either: it replaces the instrument's tuning
-  rather than adding to it, so `h0` is not "no transposition".
-- **Normalize refusals in the roll's problems strip** — the button is on the Source toolbar too,
-  which has no strip, and a refusal is the answer to a click rather than a property of the song.
-  The dialog that asks before the rewrite (`editor/normalize-button/`) is where a refusal shows,
-  and a song already in shape gets the same dialog rather than a click that does nothing.
 - **A strict one-to-one gate between the walk's notes and the roll's strip** — `walkSong` ends the
   pass at the shortest channel in use and sets everything after it aside as `unreachable`, so a
   channel longer than the shortest is the commonest shape a song has and an equality check refused
-  editing on nearly all of them, pointing at Normalize, which does not fix it. The agreement is a
-  **prefix** (`agreesWithWalk`), and the items past the cut are editable and carry `verified: false`.
+  editing on nearly all of them. The agreement is a **prefix** (`expandAndJoin`), and the items past
+  the cut are editable and carry `verified: false`.
 - **Deciding a push's direction per neighbour**, by which half of each one the overlap lands on —
   A shoves B right, B shoves C right, C shoves B left, and it never terminates. The half-rule picks
   the direction at the _first_ neighbour, which is the one the porter can see, and the cascade keeps
   it: every later shove then moves a note strictly away over a finite ordered set.
-- **`unreachable` in `timelinesAgree`** — sound-looking and wrong: unrolling changes the list by
-  construction, since a note inside a `[ ]` is dropped once per replay and the copies it becomes are
-  separate addresses. `channelTicks` is what holds a channel's tail to account. `normalizetest`
-  caught it.
 - **A trailing octave run winning over a leading one** — in `c4 o5 d4` the `o5` is adjacent to both
   notes, and two edit units claiming it produce overlapping splices that CodeMirror merges rather
   than refuses. Leading wins (`growUnits`), which is also what makes the restore stable: a repitch
@@ -371,10 +354,8 @@ One entry each: what it was, what it is, why.
   song plays for as long after a channel is opened as before it, which `rolltest` pins per case.
 - **Writing a channel the roll opens into its place in `#0`-`#7` order** — `octave` and
   `defaultNoteLength` are one variable each and `parseHash` resets neither, so a block dropped
-  between two others changes what the second is parsed under, and only `ParseTrace` knows what to
-  restore. The roll's compile carries no trace, and asking for one costs an event per dispatch. A new
-  `#N` goes at the **end of the document**, where nothing follows it to be disturbed; `orderChannels`
-  is what puts the blocks in order afterwards, and it writes the `o` and `l` a moved block needs.
+  between two others changes what the second is parsed under. A new `#N` goes at the **end of the
+  document**, where nothing follows it to be disturbed.
 - **Counting music ticks off a voice's note duration counter** — `$70+2n` is decremented once a tick
   and reloaded from the duration byte the moment it reaches zero, both in the one pass
   (`main.asm:2337, 2440-2441`), so a note one tick long is handed the 1 the counter already held and
@@ -561,8 +542,7 @@ stats.loopTicks` pads **every other channel that would cut the song short** out 
 - **Counting a remote code definition's `[ ]` against the starting channel** — AddmusicK tells a
   definition from a call by nothing but position (`Music.cpp:1015`), so `(!1)[ … ]` always sits above
   the first `#N` and its brackets gather on the starting channel like everything up there. That
-  refused channel 0 outright on every song with one, and pointed at Normalize, which leaves remote
-  code alone by design and could never clear it. `gather` marks the body and both its brackets
+  refused channel 0 outright on every song with one. `gather` marks the body and both its brackets
   `inRemoteDefinition` and the roll's gate skips them. Not by exempting everything above the first
   `#N` — a `[ ]` written up there that no `(!n)` armed is the channel's own music and does play it
   twice — and not by giving the body `channel: 8` the way the compiler's `commandMap` does, which
@@ -716,59 +696,6 @@ stats.loopTicks` pads **every other channel that would cut the song short** out 
   refused (`REFUSE_INSIDE`), because there is no tick left to put it on and no gesture can say which
   side of the deletion the porter meant it to follow. `REFUSE_RAMP` keeps the one site whose reason
   really is the length, a note cut shorter than the ticks in front of the command.
-- **Reading the loop structure off the dispatch character alone** — `loopEventOf` switched on `[`,
-  `]`, `*` and `(`, and a hex command dispatches as `"$"`, so `[[ ]]n` raised a `subOpen`/`subClose`
-  pair and the same subloop written `$E6 $00`/`$E6 $nn` raised nothing. Normalize could not see it,
-  and the roll refused the channel through `agreesWithWalk` and offered a Normalize that had nothing
-  to unroll. The tests are on the bytes and the `inE6Loop` flag, which both spellings share, so a
-  `case "$"` reads it the same way — `grew` at 1 rather than 2, since `parseHexCommand` appends one
-  byte per dispatch. `LoopEvent.from` carries where the run began, because the flag turns over on
-  the argument byte and the event's span is that byte alone; it is a **source** offset, mapped
-  through `spanAt` like every other one the trace carries, since `hexRun` is a `scanned` offset.
-  `$E9` and `$FC` get no such reading: their address is worked out by the compiler and relocated
-  (`link.ts`), so a hand-written one names a body nothing can resolve.
-- **Writing a note's missing length in front of the dots already there** — dots compose rather than
-  add, `getNoteLengthModifier` halving the running value at each one (Music.cpp:2950), so under a
-  36-tick default `c.` is 36 + 18 while `c8..` is 24 + 12 + 6. The segment's own ticks are computed
-  and the whole length text re-spelled from the total, dots included; in the ordinary case that is
-  the same text anyway, `c` under `l4` being `c4`. And `spellDuration` rather than `spellLength`,
-  since `l=n` range-checks nothing so a segment can outrun the whole note one token stops at.
-- **Classifying the prelude event by event, with a `(` read before its `[`** — only the `[` carries
-  the loop event that says a remote definition is opening, so `orderChannels` painted the `(!n)`
-  label of one as music and set `sawMusic`; the `[` reached back and repainted it a beat later, but
-  the flag stayed. Every remote body holding an `o`, `l`, `q`, `h`, `<` or `>` was then refused
-  `SST0612` — "after music above the first channel" — on the strength of its own label, with nothing
-  above the first `#N` at all. The label is skipped by looking one event ahead, the mirror of the
-  lookbehind that paints it. Not by clearing `sawMusic` when the `[` arrives either: that would also
-  clear it for real music written before the definition, which is what the diagnostic is about.
-- **`writeNoteLengths` filtering on `onlyChannel`, the way `flattenTriplets` does** — that filter is
-  sound for a `{ }`, which is a bracketed region on one channel, and unsound for an `l`, which is one
-  variable the whole song reads: `#1`'s bare notes read `#0`'s, and a `[ ]` body's events carry
-  channel 8 rather than the channel that wrote them. A scoped run deleted the `l` and left its
-  readers alone, and the oracle refused the song — which is the one thing the scoped form exists to
-  avoid, since it is what the roll's **Normalize #N** runs. There is no correct per-channel version:
-  rewriting every reader means rewriting text a scoped run has promised to leave. It stands down
-  instead, as `orderChannels` does, and the channel keeps its `l`s — which costs the roll nothing,
-  a note's length being read off its own written text.
-- **`writeNoteLengths` working note by note** — every segment's digits are independently optional
-  and `accumulateTiedLength` folds a run across whitespace and nothing else, so one event's span can
-  cover several: `c4^` is an explicit 48 and an implied 24, `r4 r r` is one rest of three. The
-  `$DD` target note is the exception in the other direction — `parseNote` appends its byte and
-  returns before it reads a length at all (`parser.ts:2971-2975`), so a length written there is a
-  stray digit nothing reads, and `normalizetest`'s fixed-point check is what caught it.
-- **Pairing a crossed loop and subloop up, or unrolling one** — `[ c4 $E6 $00 d4 ]2 e4 $E6 $01`
-  compiles, AddmusicK guarding nesting and not crossing (`Music.cpp:1208-1290`), and `unrollLoops`'s
-  one stack popped the wrong partner at each end and dropped both in silence: no construct, no
-  diagnostic, and a dialog saying "Nothing to normalize" beside a roll refusing the channel and
-  offering Normalize as the answer. Matching the two ends up and emitting both constructs does not
-  work — the loop's range and the subloop's **partially overlap**, so neither `contains` the other,
-  both survive the `topLevel` filter and `applyEdits` throws. Neither does unrolling: a voice has one
-  subloop return (`Commands.asm:365`), so the close jumps into the other construct's body, and from
-  there the channel either ends on that body's `$00` with the call counter already spent
-  (`main.asm:2345`) — that song plays `c4 d4 c4 d4 e4 d4` and stops, with everything written after
-  the close never reached — or re-enters the `$E9` and starts its count again. `SST0616` says which
-  of the two it is. Not a check for entries left on the stack either: an unterminated `$E6 $00`
-  compiles, opens a subloop nothing closes, plays exactly what it says, and has nothing to unroll.
 - **Handing a command a deletion left behind to the next surviving note** — deleting `b3` from
   `o4 a=27 p12,147 b3 c3` leaves the `p` in front of the rest that takes those ticks, and putting it
   on `c3` instead loses the tick: the `p` runs at 27, where the driver read it and where the rest
@@ -837,40 +764,6 @@ stats.loopTicks` pads **every other channel that would cut the song short** out 
   the lane takes it taller. `depth` was always the scroll range; with nothing dropped it is now the
   whole column, so a glyph can always be scrolled to. The bar's own `fitBarContent` mark is a
   different thing and stays — a bar has a fixed width it cannot grow, where the lane has a scroll.
-- **Writing a rewritten `&`'s target as a note** — `$DD $00 $nn d` reads far better than
-  `$DD $00 $nn $A6`, and it is not the same music. `parseNote` runs for a written target and returns
-  before the note map is written (`parser.ts:2971-2975`), so it consumes and clears the drum remap on
-  the way past (`:2948-2960`) and the note that follows comes out pitched where the `&` used one drum
-  byte twice; it errors AMK0161 wherever a `q` is pending (`:3451`), which is anywhere the slide is
-  the first note since a bracket, a call or a `*`, `updateQ` starting true; and `isNoteLetter`
-  excludes `r` and `^` (`:167`), so `c4 & r4` — which compiles, and slides to `$C7` — has no spelling
-  at all. `writePitchSlides` writes the byte, taken from `NoteAddress.note`, which is the same byte
-  the parser computed once and wrote twice. Readability is the roll's job now that the slide is a
-  command it can see.
-- **Skipping the `&`s that cannot be written out, rather than refusing the song** — a refusal is what
-  `precheck` does for a slide whose duration comes from a bracket, and copying that here is a
-  regression: a song with one tied `&` normalizes today, and refusing would lose every other pass
-  over it. Those slides are left exactly as they are and reported as `SST0617` at **info** severity,
-  which `advance` files as a note rather than a refusal. The dialog had to grow a "What it could not
-  write out" list for it, on "nothing to normalize" as well as on a rewrite — a song whose only `&`s
-  were skipped comes back unchanged, and without the list the porter is told it normalized while the
-  roll goes on refusing all eight channels for the reason nobody mentioned.
-- **The pass last, after `drumPerNote`** — the obvious place for a ninth pass, and it breaks the
-  fixed point. `drumPerNote` stands down only when the event directly before a note is its `@`
-  (`normalize.ts:drumPerNote`), and a rewritten slide puts four argument bytes there, so the round
-  that checks for a fixed point inserts a second `@21`. It is byte-neutral, so the walk accepts it
-  and only `normalizetest`'s "names the passes that changed it" catches it. `writePitchSlides` runs
-  **before** the drums, and anchors in front of a drum `@` already leading the note, so the two stay
-  adjacent.
-- **`WalkNote.bend` as the three operand bytes, compared through `NOTE_KEYS`** — both halves wrong.
-  `NOTE_KEYS` compares with `x[key] !== y[key]` (`normalize-song.ts`), which two equal objects never
-  pass, so every song carrying a `$DD` would have been refused; the comparison is beside that loop.
-  And the operands alone do not say what a slide is: `$DD` is not dispatched, the note before it
-  peeks at the track pointer on any tick with no slide running (`main.asm:3256-3287`), and a `$C6`
-  tie is one of those ticks — so `[len note $DD]` and `[len note $C6 $DD]` carry identical operands
-  and start the slide 48 ticks apart. `afterTicks` is how far into the note the peek found it, which
-  is the whole reason `Music.cpp:2224` rewinds a tie out of a `$DD`'s way. Without it the oracle
-  passes both directions of that rewind, which is exactly the rewrite `SST0617` exists to decline.
 - **`$DD` filed as a state slot, the way `$DE` and `$ED` are** (`slotsOf`, `SLOTS[11]`) — it put a
   slide everywhere it is not and nowhere it is, and both readings were wrong in silence. `origins` is
   frozen when a note keys on and the walk reaches the `$DD` a byte later, so the note that _plays_ the
@@ -895,7 +788,7 @@ stats.loopTicks` pads **every other channel that would cut the song short** out 
   of `$80` ticks or more inside one `noteMap` entry with no boundary anywhere in its text —
   `c4 $DD`, `c4^4 $DD` and `c1 $DD` carry the same three operands and arm 0, 48 and 96 ticks in. The
   operands come off the walk (`WalkNote.bend`, `afterTicks` and `frameTicks` with them) into `StripItem.slide`, joined
-  index by index over the list `agreesWithWalk` has already checked so the two cannot drift, and a
+  index by index over the list `expandAndJoin` has already checked so the two cannot drift, and a
   note past the end of the pass auditions **flat**: an approximate bend that sounds like the real one
   is worse than none, which is the reading `commands-in-force.ts` already takes. `noteFrames` then
   writes the four bytes where `emitNote` would leave them and lets the driver find them, rather than
@@ -904,8 +797,8 @@ stats.loopTicks` pads **every other channel that would cut the song short** out 
   does in the song, dispatched into the empty slot and never armed. Operands no `emitNote` could have
   written are dropped rather than approximated. The target goes in as the **emitted** byte and is the
   one value on that path `Audition.transposed` must not touch: it exists to turn a written row pitch
-  into an emitted one, the compiler resolved `h` and the instrument's tuning long ago
-  (`writePitchSlides` writes `NoteAddress.note`), and the driver adds `$43` and `!HTuneValues+x`
+  into an emitted one, the compiler resolved `h` and the instrument's tuning long ago into
+  `NoteAddress.note`, and the driver adds `$43` and `!HTuneValues+x`
   itself when it arms.
 - **Rebuilding an audition's frames from `afterTicks` and the note's length alone** — it takes the
   arm's frame to be the note's _last_, which puts the `$DD` after every frame the note has, and
@@ -967,12 +860,12 @@ stats.loopTicks` pads **every other channel that would cut the song short** out 
   code, span and message — six thousand of those are one finding. Not a cap on how many diagnostics
   a parse may hold, which would lose the six-hundredth real error in a song that has one.
 
-- **Unrolling loops as the roll's answer to a `[ ]`** — Normalize's `loops` pass wrote n copies of
-  a body under re-asserted parse state, and the roll refused every loop-bearing channel and pointed
-  at it. It is the walk instead: `SongTimeline.loops` is raised off the driver's own `$E9`/`$E6`
+- **Unrolling loops as the roll's answer to a `[ ]`** — a rewrite wrote n copies of a body under
+  re-asserted parse state, and the roll refused every loop-bearing channel and pointed at it. It is
+  the walk instead: `SongTimeline.loops` is raised off the driver's own `$E9`/`$E6`
   frames, the strip frames each body and edits the one text in place, and every pass is drawn,
   auditioned and joined per instance. Unrolling turned away exactly the songs porters write — a
-  recall under another instrument was SST0604/0605, a crossed pair SST0616 — inflated a document
+  recall under another instrument, a loop and a subloop that cross — inflated a document
   n-fold, and re-derived from text what the walk already knew; a declaration is told from a recall
   by command-map membership, a `]n`'s own `$E9` being the one dispatch `recordCommand` drops.
 - **Editing one pass of a loop differently from its siblings** — considered and not supported, with
@@ -1133,32 +1026,21 @@ stats.loopTicks` pads **every other channel that would cut the song short** out 
   worker `playNote` shares, so it also stood in front of the per-row renders that would have said
   something. `auditionSpan` keeps the `Ctrl` marquee and the loop box's edge, where the question
   really is which notes were just picked out.
-- **Rewriting every `<` and `>` into the absolute `o` it produced** — `writeDefaults` did it so that
-  the roll never had to read one, and the roll never needed it: a note's row is its own `written`
-  byte (`octaveOfNote`), no unit swallows a shift, and `rolltest` has pinned `o4 c4 > d4` editable
-  throughout. What it cost is a document the porter did not write, churned on every Normalize, and a
-  silent skip wherever the shift ran past `o6` — `spellOctave` reaches 0 to 6 and the parser's own
-  counter sits at 7 and at -1 (`Music.cpp:1400-1418`) — so the one shape it could not convert was
-  the shape it was most wanted for. They are left exactly as written. What the pass still writes is
-  the entering `o` at a block whose prelude states none, a `<` or a `>` no longer counting as one
-  since it moves the octave without saying what from; and `SST0610` is asked only of a block that
-  says nothing about its octave at all, since an octave `o` cannot reach is one only a shift can
-  have put the parser at, and refusing that song would turn away one AddmusicK builds.
 - **The loop wrap's refusal carried on `Availability`** — that field answers to AddmusicK, and
   `palettetest` holds it to exactly that: a `blocked` entry has to come back from the compiler
   unclean. "Nothing is selected" is the palette's own condition and the snippet compiles fine, so
   every song would have failed the harness on a button that was correctly greyed. `ResolvedEntry`
   carries the verdict beside `availability` and `entryBlocked` is where the two meet, in the mould of
   `placeAvailability` being stacked on rather than folded in.
-- **Reading the brackets for that wrap off the walk, or off `ParseTrace`** — both answer the wrong
+- **Reading the brackets for that wrap off the walk, or off a parse trace** — both answer the wrong
   question. The walk says what _plays_, where a wrap asks what may be _written_, and the two part
   company on the shape that matters: a `(1)n` recalled from another channel plays a body the text
-  there does not contain. The trace does answer it — `ParseState` carries `channel` and `inE6Loop`,
-  which are the parser's own two variables — but it is gathered only where `commandMap` is, and the
-  palette answers on every keystroke. `@amk/tokens/commands/loops` mirrors those two variables over
+  there does not contain. A trace of the parser's own `channel` and `inE6Loop` would answer it, at an
+  event per dispatch of a compile, where the palette answers on every keystroke.
+  `@amk/tokens/commands/loops` mirrors those two variables over
   the token stream instead, which needs no compile at all; `[[` is told from `[` by adjacency because
   that is the test `parseLoopStart` makes, and a hand-written `$E6 $00` pair counts as the subloop it
-  is, which is the reading `loopEventOf` already has to take.
+  is.
 - **Starting a wrap's brackets at the first selected note** — honest about the selection and wrong
   about the music. `[` copies the drum remap into slot 8 and the note there clears slot 8 alone
   (`parser.ts:2725`, `:3013`), so a `@21` left outside the brackets is still standing when the loop
@@ -1448,6 +1330,17 @@ stats.loopTicks` pads **every other channel that would cut the song short** out 
   steps over one a command was read inside a tie of; a `'song'` command, which no bar draws, takes
   the next note to begin. Off `commandsInForce` and not off the tick alone, so the lane and the
   bars cannot name different notes for one command; `walktest` pins the seven shapes.
+- **A Normalize button, and the parse trace and walk-comparison oracle behind it** — eight
+  text-to-text passes over a trace of the parser's state at every dispatch, each result compiled,
+  walked and compared against the walk of the original before the document was touched, offered on
+  both toolbars and beside every refusal in the roll. It was written to make a song editable in the
+  piano roll, and the roll went the other way: it took loops over in place, reads a note's octave
+  off its own byte and its length off its own text, and no roll code ever read the trace or the
+  oracle. What was left was four refusals it could clear — `&`, `"name=value"`, `{ }` and music
+  above the first `#N` — for some 2,800 lines, a trace the parser gathered on request, and a button
+  standing beside a dozen refusals it could not clear. The roll edits the song as written and says
+  what it refuses; the parser records the command map and nothing else. `SST06xx` is retired with
+  it — a new editor-side diagnostic takes the next band, not this one.
 
 ## Angular specifics
 

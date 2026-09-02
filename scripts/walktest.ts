@@ -1051,8 +1051,7 @@ console.log("\nthe pitch slide a note reads ahead into");
 	);
 	check("and the notes after it do not", slid.notes[1].bend === null && slid.notes[2].bend === null, "carried on");
 
-	// A `&` compiles to exactly that, which is what lets `writePitchSlides`
-	// rewrite one into the other without moving a byte.
+	// A `&` compiles to exactly that: the two spellings are one command to the walk.
 	const amp = build("#amk 4\n#0 o4 c4 & d4\n").timeline;
 	check(
 		"a legacy & reads the same",

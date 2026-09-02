@@ -1,6 +1,6 @@
 /**
  * The piano roll's edits: `roll-strip.ts` and `roll-edit.ts`, driven the way the
- * roll drives them and checked the way the normalizer's output is checked.
+ * roll drives them and checked against the walk of what they wrote.
  *
  * A gesture is not verified by looking at the text it produced. It is verified
  * by **compiling that text and walking it**: every note the plan said the
@@ -908,10 +908,8 @@ expectNoStrip(
 );
 // A `&` is an operator, so `gather` raises no command for it and the scanner
 // cannot say which channel it is on — one anywhere refuses all eight, which the
-// second case is what pins. Normalize's `writePitchSlides` is the way out: it
-// writes the `$DD` the `&` compiles to, byte for byte (`normalizetest`), and a
-// channel using that form is editable, which the "a pitch slide" section below
-// is what pins. Neither half is worth much without the other.
+// second case is what pins. A channel using the `$DD` form it compiles to is
+// editable, which the "a pitch slide" section below is what pins.
 expectNoStrip("a legacy pitch slide", "#amk 2\n#0 o4 c4 & d4", 0, "`&`");
 expectNoStrip("a legacy pitch slide on another channel", "#amk 2\n#0 o4 c4 & d4\n#1 o4 e4 f4", 1, "`&`");
 // `<` and `>` are safe and must **not** be refused: a note's octave comes from
@@ -4320,8 +4318,7 @@ expectEdit(
 );
 
 // `@` switches instrument tuning on under Addmusic 4.05 rather than saying what
-// is already true, so the opening leaves it out — `normalize.ts:writeDefaults`
-// takes the same gate.
+// is already true, so the opening leaves it out.
 expectEdit(
 	"a channel opened on a target where an `@` is not a no-op",
 	"#am4\n#0 o4 c4 d4 e4 f4\n",

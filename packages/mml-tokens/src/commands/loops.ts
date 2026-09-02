@@ -17,8 +17,8 @@
  *
  * A construct is read off the bytes a spelling leaves rather than off the
  * dispatch character: `[[ ]]n` and a hand-written `$E6 $00` … `$E6 $nn` are one
- * construct and are counted as one, which is the reading `parser.ts:loopEventOf`
- * has to take too. `[[` is told from `[` by **adjacency**, because that is what
+ * construct and are counted as one. `[[` is told from `[` by **adjacency**,
+ * because that is what
  * the parser tests — `text[this.pos] === "["`, with no space skipped — so `[ [`
  * is a nested standard loop and an error rather than a subloop.
  */
