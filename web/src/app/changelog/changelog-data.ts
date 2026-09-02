@@ -9,6 +9,10 @@ export interface ChangelogEntry {
 export const CHANGELOG: readonly ChangelogEntry[] = [
   // ─── newest first; add new blocks here ──────────────────────────────────
   {
+    date: '3 September 2026',
+    items: ['A readme page covering every control'],
+  },
+  {
     date: '2 September 2026',
     items: [
       'A new default look: blue-grey chrome and an orange playhead. The old grey is the Graphite preset',

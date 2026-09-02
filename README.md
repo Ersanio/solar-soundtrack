@@ -6,7 +6,8 @@ Installing AddmusicK is not needed, nor is a ROM. The tool is a static site and 
 
 <!-- TODO: demo gif goes here -->
 
-**[Try it →](https://ersanio.github.io/solar-soundtrack/)**
+**[Try it →](https://ersanio.github.io/solar-soundtrack/)** ·
+**[Porter's manual →](README.html)** — what it does, and every control in it.
 
 ## Why this exists
 
@@ -86,9 +87,9 @@ Node 24 is what CI uses.
 | `npm run watch`  | Dev-configuration build with `--watch`, no server.                |
 | `npm run lint`   | ESLint over every workspace.                                      |
 | `npm run format` | Prettier over the workspace.                                      |
-| `npm run check`  | The merge gate: formatting, three typechecks, thirteen harnesses. |
+| `npm run check`  | The merge gate: formatting, three typechecks, fourteen harnesses. |
 
-`npm run check` is what CI runs. The thirteen harnesses pin the compiler, the scanner, SPC assembly,
+`npm run check` is what CI runs. The fourteen harnesses pin the compiler, the scanner, SPC assembly,
 the headless MML → SPC → PCM chain, the worklet, BRR decoding, the echo FIR and the envelope maths
 against known-good byte output. `scripts/README.md` says what each one actually proves.
 
@@ -119,7 +120,7 @@ Nothing in `packages/` touches a framework or the DOM beyond three `fetch` calls
 the same modules run in Node under the test harnesses, on the main thread, and inside an audio
 worklet.
 
-On testing: `npm run check` runs thirteen byte-level harnesses — see `scripts/README.md`. Separately,
+On testing: `npm run check` runs fourteen byte-level harnesses — see `scripts/README.md`. Separately,
 `scripts/Compare-Spc.ps1` and `Compare-SongBin.ps1` diff this compiler's output against a native
 AddmusicK build, byte for byte.
 

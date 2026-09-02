@@ -1,0 +1,2630 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Solar Soundtrack — a porter's manual</title>
+    <meta
+      name="description"
+      content="What Solar Soundtrack is, what it fixes about porting music for Super Mario World, and every control in it."
+    />
+    <style>
+      /*
+       * The app's own Studio theme, copied from `web/src/styles.css`. Keep the two
+       * in step: this page is meant to look like the tool it documents.
+       */
+      :root {
+        --surface: #1e272e;
+        --raised: #2f3c45;
+        --inset: #171f25;
+        --edge: #42525c;
+
+        --ink: #dbe3e8;
+        --ink-muted: #9aaab5;
+
+        --control: #7ea6c4;
+        --accent: #ffa53a;
+        --accent-soft: #ffd08a;
+        --danger: #ff7b72;
+        --warn: #e3b341;
+        --good: #7ee787;
+
+        --ch-0: #3987e5;
+        --ch-1: #d95926;
+        --ch-2: #199e70;
+        --ch-3: #c98500;
+        --ch-4: #d55181;
+        --ch-5: #008300;
+        --ch-6: #9085e9;
+        --ch-7: #e66767;
+
+        --sans: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+        --mono: ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace;
+
+        --rail: 17rem;
+      }
+
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+      }
+
+      html {
+        color-scheme: dark;
+        scroll-behavior: smooth;
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        html {
+          scroll-behavior: auto;
+        }
+      }
+
+      body {
+        margin: 0;
+        background: var(--surface);
+        color: var(--ink);
+        font-family: var(--sans);
+        font-size: 15px;
+        line-height: 1.6;
+        -webkit-text-size-adjust: 100%;
+      }
+
+      /* ─── shell ──────────────────────────────────────────────────────────── */
+
+      .shell {
+        display: grid;
+        grid-template-columns: var(--rail) minmax(0, 1fr);
+        gap: 0;
+        max-width: 1500px;
+        margin: 0 auto;
+      }
+
+      main {
+        min-width: 0;
+        padding: 2.5rem 2.5rem 8rem;
+      }
+
+      /* ─── the contents rail ──────────────────────────────────────────────── */
+
+      .rail {
+        position: sticky;
+        top: 0;
+        align-self: start;
+        height: 100vh;
+        overflow-y: auto;
+        padding: 2rem 1rem 3rem 1.5rem;
+        border-right: 1px solid var(--edge);
+        background: var(--inset);
+      }
+
+      .rail-title {
+        margin: 0 0 0.15rem;
+        font-size: 0.95rem;
+        font-weight: 600;
+        letter-spacing: 0.01em;
+      }
+
+      .rail-sub {
+        margin: 0 0 1.25rem;
+        color: var(--ink-muted);
+        font-size: 0.78rem;
+      }
+
+      .rail nav ul {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+      }
+
+      .rail nav a {
+        display: block;
+        padding: 0.24rem 0.5rem;
+        border-left: 2px solid transparent;
+        color: var(--ink-muted);
+        font-size: 0.83rem;
+        line-height: 1.35;
+        text-decoration: none;
+      }
+
+      .rail nav a:hover {
+        color: var(--ink);
+        background: color-mix(in srgb, var(--raised) 60%, transparent);
+      }
+
+      .rail nav a.sub {
+        padding-left: 1.35rem;
+        font-size: 0.79rem;
+      }
+
+      .rail nav a.here {
+        border-left-color: var(--accent);
+        color: var(--accent);
+        background: color-mix(in srgb, var(--accent) 10%, transparent);
+      }
+
+      .rail-foot {
+        margin-top: 1.5rem;
+        padding-top: 1rem;
+        border-top: 1px solid var(--edge);
+        color: var(--ink-muted);
+        font-size: 0.78rem;
+      }
+
+      .rail-foot a {
+        color: var(--control);
+      }
+
+      /* The rail's toggle, shown only once the rail goes off-canvas. */
+      .rail-toggle {
+        display: none;
+      }
+
+      /* ─── type ───────────────────────────────────────────────────────────── */
+
+      h1 {
+        margin: 0 0 0.35rem;
+        font-size: 2.1rem;
+        line-height: 1.15;
+        letter-spacing: -0.01em;
+      }
+
+      h2 {
+        margin: 3.5rem 0 1rem;
+        padding-top: 0.85rem;
+        border-top: 2px solid var(--edge);
+        font-size: 1.5rem;
+        line-height: 1.25;
+        scroll-margin-top: 1rem;
+      }
+
+      h3 {
+        margin: 2.25rem 0 0.6rem;
+        color: var(--accent-soft);
+        font-size: 1.08rem;
+        scroll-margin-top: 1rem;
+      }
+
+      h4 {
+        margin: 1.5rem 0 0.4rem;
+        font-size: 0.97rem;
+      }
+
+      p,
+      li {
+        max-width: 82ch;
+      }
+
+      a {
+        color: var(--accent);
+        text-decoration-color: color-mix(in srgb, var(--accent) 45%, transparent);
+        text-underline-offset: 2px;
+      }
+
+      a:hover {
+        text-decoration-color: var(--accent);
+      }
+
+      .lead {
+        margin: 0 0 1.5rem;
+        max-width: 74ch;
+        color: var(--ink-muted);
+        font-size: 1.08rem;
+      }
+
+      strong {
+        color: #fff;
+        font-weight: 600;
+      }
+
+      code {
+        padding: 0.08em 0.32em;
+        border-radius: 3px;
+        background: var(--inset);
+        color: var(--accent-soft);
+        font-family: var(--mono);
+        font-size: 0.88em;
+        white-space: nowrap;
+      }
+
+      pre {
+        margin: 1rem 0;
+        padding: 0.85rem 1rem;
+        overflow-x: auto;
+        border: 1px solid var(--edge);
+        border-radius: 6px;
+        background: var(--inset);
+        line-height: 1.45;
+      }
+
+      pre code {
+        padding: 0;
+        background: none;
+        color: var(--ink);
+        white-space: pre;
+      }
+
+      kbd {
+        display: inline-block;
+        padding: 0.05em 0.4em;
+        border: 1px solid var(--control);
+        border-bottom-width: 2px;
+        border-radius: 4px;
+        background: var(--inset);
+        color: var(--ink);
+        font-family: var(--mono);
+        font-size: 0.82em;
+        line-height: 1.5;
+        white-space: nowrap;
+      }
+
+      /* ─── the hero ───────────────────────────────────────────────────────── */
+
+      .hero {
+        padding-bottom: 0.5rem;
+        border-bottom: 2px solid var(--accent);
+      }
+
+      .tagline {
+        margin: 0 0 1.25rem;
+        color: var(--accent);
+        font-size: 1.05rem;
+        font-weight: 500;
+      }
+
+      .cta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.6rem;
+        align-items: center;
+        margin: 1.25rem 0 1.5rem;
+      }
+
+      .btn {
+        display: inline-block;
+        padding: 0.5rem 1.1rem;
+        border: 1px solid color-mix(in srgb, var(--control) 60%, transparent);
+        border-radius: 6px;
+        background: color-mix(in srgb, var(--control) 15%, transparent);
+        color: var(--ink);
+        font-size: 0.95rem;
+        font-weight: 500;
+        text-decoration: none;
+      }
+
+      .btn:hover {
+        border-color: var(--control);
+        background: color-mix(in srgb, var(--control) 25%, transparent);
+      }
+
+      .btn-primary {
+        border-color: var(--accent);
+        background: color-mix(in srgb, var(--accent) 18%, transparent);
+        color: #fff;
+      }
+
+      .btn-primary:hover {
+        background: color-mix(in srgb, var(--accent) 30%, transparent);
+      }
+
+      /* ─── callouts ───────────────────────────────────────────────────────── */
+
+      .note {
+        margin: 1.25rem 0;
+        padding: 0.85rem 1.1rem;
+        border-left: 3px solid var(--control);
+        border-radius: 0 6px 6px 0;
+        background: color-mix(in srgb, var(--raised) 55%, transparent);
+      }
+
+      .note > :first-child {
+        margin-top: 0;
+      }
+
+      .note > :last-child {
+        margin-bottom: 0;
+      }
+
+      .note.beta {
+        border-left-color: var(--warn);
+        background: color-mix(in srgb, var(--warn) 9%, transparent);
+      }
+
+      .note.stop {
+        border-left-color: var(--danger);
+        background: color-mix(in srgb, var(--danger) 9%, transparent);
+      }
+
+      .note-label {
+        display: block;
+        margin-bottom: 0.2rem;
+        color: var(--warn);
+        font-size: 0.76rem;
+        font-weight: 700;
+        letter-spacing: 0.09em;
+        text-transform: uppercase;
+      }
+
+      .note.stop .note-label {
+        color: var(--danger);
+      }
+
+      .note:not(.beta):not(.stop) .note-label {
+        color: var(--control);
+      }
+
+      blockquote {
+        margin: 1.25rem 0;
+        padding: 0.25rem 0 0.25rem 1.1rem;
+        border-left: 3px solid var(--edge);
+        max-width: 78ch;
+        color: var(--ink-muted);
+        font-style: italic;
+      }
+
+      blockquote p {
+        margin: 0.4rem 0;
+      }
+
+      /* ─── cards ──────────────────────────────────────────────────────────── */
+
+      .cards {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(19rem, 1fr));
+        gap: 1rem;
+        margin: 1.5rem 0;
+      }
+
+      .card {
+        padding: 1rem 1.15rem;
+        border: 1px solid var(--edge);
+        border-radius: 8px;
+        background: color-mix(in srgb, var(--raised) 45%, transparent);
+      }
+
+      .card h4 {
+        margin: 0 0 0.35rem;
+        color: var(--accent-soft);
+        font-size: 0.98rem;
+      }
+
+      .card p {
+        margin: 0;
+        max-width: none;
+        color: var(--ink-muted);
+        font-size: 0.9rem;
+      }
+
+      .card p + p {
+        margin-top: 0.5rem;
+      }
+
+      /* ─── tables ─────────────────────────────────────────────────────────── */
+
+      .wrap {
+        margin: 1rem 0 1.75rem;
+        overflow-x: auto;
+        border: 1px solid var(--edge);
+        border-radius: 8px;
+      }
+
+      table {
+        border-collapse: collapse;
+        width: 100%;
+        min-width: 34rem;
+        font-size: 0.88rem;
+      }
+
+      thead th {
+        position: sticky;
+        top: 0;
+        z-index: 1;
+        background: var(--raised);
+        color: #fff;
+        font-size: 0.8rem;
+        letter-spacing: 0.03em;
+        text-transform: uppercase;
+      }
+
+      th,
+      td {
+        padding: 0.45rem 0.75rem;
+        border-bottom: 1px solid color-mix(in srgb, var(--edge) 55%, transparent);
+        text-align: left;
+        vertical-align: top;
+      }
+
+      tbody tr:last-child td {
+        border-bottom: none;
+      }
+
+      tbody tr:hover td {
+        background: color-mix(in srgb, var(--raised) 30%, transparent);
+      }
+
+      td:first-child {
+        white-space: nowrap;
+      }
+
+      td.free:first-child {
+        white-space: normal;
+      }
+
+      table p {
+        margin: 0;
+        max-width: none;
+      }
+
+      /* ─── channel swatches ───────────────────────────────────────────────── */
+
+      .channels {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.4rem;
+        margin: 1rem 0 1.5rem;
+        padding: 0;
+        list-style: none;
+      }
+
+      .channels li {
+        display: flex;
+        gap: 0.45rem;
+        align-items: center;
+        padding: 0.25rem 0.6rem 0.25rem 0.35rem;
+        border: 1px solid var(--edge);
+        border-radius: 5px;
+        background: var(--inset);
+        font-family: var(--mono);
+        font-size: 0.8rem;
+      }
+
+      .channels i {
+        width: 0.85rem;
+        height: 0.85rem;
+        border-radius: 3px;
+      }
+
+      /* ─── misc ───────────────────────────────────────────────────────────── */
+
+      .steps {
+        counter-reset: step;
+        margin: 1.25rem 0;
+        padding: 0;
+        list-style: none;
+      }
+
+      .steps > li {
+        position: relative;
+        margin-bottom: 0.9rem;
+        padding-left: 2.4rem;
+      }
+
+      .steps > li::before {
+        position: absolute;
+        left: 0;
+        display: grid;
+        width: 1.65rem;
+        height: 1.65rem;
+        border: 1px solid color-mix(in srgb, var(--accent) 55%, transparent);
+        border-radius: 50%;
+        background: color-mix(in srgb, var(--accent) 14%, transparent);
+        color: var(--accent);
+        content: counter(step);
+        counter-increment: step;
+        font-size: 0.82rem;
+        font-weight: 700;
+        place-items: center;
+      }
+
+      .yes {
+        color: var(--good);
+        font-weight: 700;
+      }
+
+      .no {
+        color: var(--danger);
+        font-weight: 700;
+      }
+
+      footer {
+        margin-top: 4rem;
+        padding-top: 1.25rem;
+        border-top: 1px solid var(--edge);
+        color: var(--ink-muted);
+        font-size: 0.86rem;
+      }
+
+      /* ─── the rail goes off-canvas ───────────────────────────────────────── */
+
+      @media (max-width: 960px) {
+        .shell {
+          display: block;
+        }
+
+        main {
+          padding: 1.25rem 1.25rem 6rem;
+        }
+
+        .rail-toggle {
+          position: sticky;
+          top: 0;
+          z-index: 20;
+          display: flex;
+          gap: 0.6rem;
+          align-items: center;
+          width: 100%;
+          padding: 0.6rem 1.25rem;
+          border: none;
+          border-bottom: 1px solid var(--edge);
+          background: var(--inset);
+          color: var(--ink);
+          cursor: pointer;
+          font-family: inherit;
+          font-size: 0.9rem;
+          font-weight: 500;
+        }
+
+        .rail-toggle::before {
+          color: var(--accent);
+          content: '\2630';
+          font-size: 1.05rem;
+        }
+
+        .rail {
+          position: fixed;
+          top: 2.6rem;
+          bottom: 0;
+          left: 0;
+          z-index: 19;
+          width: min(21rem, 86vw);
+          height: auto;
+          border-right: 1px solid var(--edge);
+          box-shadow: 0 0 3rem rgb(0 0 0 / 55%);
+        }
+
+        .rail[hidden] {
+          display: none;
+        }
+
+        h1 {
+          font-size: 1.65rem;
+        }
+
+        h2 {
+          margin-top: 2.75rem;
+          font-size: 1.3rem;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <button class="rail-toggle" id="rail-toggle" type="button">Contents</button>
+
+    <div class="shell">
+      <div class="rail" id="rail">
+        <p class="rail-title">Solar Soundtrack</p>
+        <p class="rail-sub">A porter's manual</p>
+        <nav id="toc"></nav>
+        <div class="rail-foot">
+          <p>
+            <a href="https://ersanio.github.io/solar-soundtrack/">Open the editor</a><br />
+            <a href="https://github.com/Ersanio/solar-soundtrack">Source on GitHub</a><br />
+            <a href="https://github.com/Ersanio/solar-soundtrack/issues">Report a bug</a>
+          </p>
+        </div>
+      </div>
+
+      <main>
+        <div class="hero">
+          <h1>Solar Soundtrack</h1>
+          <p class="tagline">Write it, hear it, edit it, export it — without leaving the tab.</p>
+        </div>
+
+        <p class="lead">
+          A browser-based AddmusicK 1.0.11 music editor. It compiles your MML to N-SPC song data,
+          assembles a playable <code>.spc</code>, and plays it through an emulated SPC700 — all in
+          the browser, with no AddmusicK install, no ROM and no server.
+        </p>
+
+        <div class="cta">
+          <a class="btn btn-primary" href="https://ersanio.github.io/solar-soundtrack/"
+            >Open the editor →</a
+          >
+          <a class="btn" href="#controls">Jump to the controls</a>
+        </div>
+
+        <div class="note beta">
+          <span class="note-label">Beta</span>
+          <p>
+            <strong>In active development — back up your work.</strong> Your draft lives in this
+            browser, not in a file. It is here to be broken on purpose: if something is wrong,
+            confusing, or just slower than doing it by hand,
+            <a href="#reporting">that is the thing worth telling me about</a>.
+          </p>
+        </div>
+
+        <h2 id="what">What this is</h2>
+
+        <p>
+          AddmusicK is the custom music tool SMW Central uses, and this is a complete editor built
+          around it. It is not a wrapper that shells out to <code>AddmusicK.exe</code> — the
+          compiler is a port of AddmusicK 1.0.11's own <code>Music.cpp</code>, running in the page,
+          and the SPC700 is emulated beside it. So the song you hear is compiled by the same rules
+          the real tool compiles by, and played by the same chip your port will end up on.
+        </p>
+
+        <p>It reads the same target markers AddmusicK does:</p>
+
+        <div class="wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Marker</th>
+                <th>What it selects</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>#amk 4</code></td>
+                <td>AddmusicK 1.0.9 and later — what you almost certainly want</td>
+              </tr>
+              <tr>
+                <td><code>#amk 2</code></td>
+                <td>AddmusicK 1.0 to 1.0.8</td>
+              </tr>
+              <tr>
+                <td><code>#amk 1</code></td>
+                <td>The AddmusicK beta</td>
+              </tr>
+              <tr>
+                <td><code>#am4</code></td>
+                <td>Addmusic 4.05</td>
+              </tr>
+              <tr>
+                <td><code>#amm</code></td>
+                <td>AddmusicM</td>
+              </tr>
+              <tr>
+                <td><code>#amk 3</code></td>
+                <td>
+                  Rejected, with <code>AMK0402</code> — Codec's beta is not implemented in AddmusicK
+                  itself either
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p>
+          It is a static site, so there is nothing to install and nothing to keep updated. It also
+          installs as an app and works offline once it has loaded. What it does need is a browser
+          with <strong>AudioWorklet</strong> and <strong>WebAssembly</strong> — any current Firefox,
+          Chrome, Edge or Safari has both. Without WebAssembly it will tell you so rather than
+          failing quietly.
+        </p>
+
+        <h2 id="fixes">What it fixes</h2>
+
+        <p>
+          Porting music with Addmusic has always been one of my favourite things to do in this
+          hobby. What was never fun was the loop around it: to actually <em>hear</em> a port you had
+          to insert it into a ROM, open an emulator, and go to the level that plays it. Change a
+          note, and you do all of it again. AddmusicK's porter mode makes that easier, but it still
+          means switching windows.
+        </p>
+
+        <p>So the idea was one tool for everything, and the loop closes to nothing:</p>
+
+        <div class="wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>The usual way</th>
+                <th>Here</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="free">Install AddmusicK, keep a clean ROM to hand</td>
+                <td>Open a URL</td>
+              </tr>
+              <tr>
+                <td class="free">Insert the port into the ROM to hear it</td>
+                <td>It is already playing</td>
+              </tr>
+              <tr>
+                <td class="free">Open an emulator, find the level that plays it</td>
+                <td>Press <kbd>Space</kbd></td>
+              </tr>
+              <tr>
+                <td class="free">Change one note; repeat all of the above</td>
+                <td>
+                  <strong>Hot Reload</strong> puts the edit into the running song at the position it
+                  had already reached. The music never stops.
+                </td>
+              </tr>
+              <tr>
+                <td class="free">Wait through the intro to reach bar 40</td>
+                <td>Drag the timeline. Seeking is exact, to the tick</td>
+              </tr>
+              <tr>
+                <td class="free">Comment a channel out and recompile to hear the rest</td>
+                <td>Mute and solo per channel, instantly</td>
+              </tr>
+              <tr>
+                <td class="free">Read a compiler error, then go hunting for it</td>
+                <td>
+                  The offending character is underlined in place, with a code and a sentence saying
+                  what is wrong
+                </td>
+              </tr>
+              <tr>
+                <td class="free">Guess whether it still fits in ARAM</td>
+                <td>A meter in the top bar, exact to the byte</td>
+              </tr>
+              <tr>
+                <td class="free">Write eight <code>$F5</code> coefficients and hope</td>
+                <td>Draw the curve you want and let it fit them</td>
+              </tr>
+              <tr>
+                <td class="free">Read MML to work out what the arrangement is doing</td>
+                <td>A piano roll over your actual MML text, editable in place</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p>
+          AddmusicK also has room to grow past SMW, in my opinion: the same engine has potential for
+          other games and for homebrew, and there is a
+          <a href="https://www.smwcentral.net/?p=section&amp;s=smwmusic">huge library of music</a>
+          already written for it.
+        </p>
+
+        <h2 id="highlights">What you get</h2>
+
+        <div class="cards">
+          <div class="card">
+            <h4>Compile as you type</h4>
+            <p>
+              There is no compile button, and no manual reload. Every keystroke recompiles, and with
+              <strong>Hot Reload</strong> on the running song is swapped out at the position it had
+              already reached — so you keep editing and the music keeps playing.
+            </p>
+          </div>
+
+          <div class="card">
+            <h4>An editable piano roll</h4>
+            <p>
+              Draw, drag, stretch, copy, quantize and delete notes, and the MML is rewritten to
+              match — your MML, with your spacing and your comments left where you put them. It
+              edits the song <em>as written</em>: loops stay loops, and every pass of one is drawn
+              and edited in place rather than unrolled behind your back.
+            </p>
+          </div>
+
+          <div class="card">
+            <h4>A playhead that is the truth</h4>
+            <p>
+              The highlighted note is the note you are hearing, in every channel, because the
+              playhead follows the driver rather than estimating from the tempo byte. Not one second
+              of it is predicted.
+            </p>
+          </div>
+
+          <div class="card">
+            <h4>Hear one note in context</h4>
+            <p>
+              Click a note in the roll and you hear that note, at that point in the song, with the
+              rest of the arrangement still sounding under it — its instrument, its volume, its
+              echo, its pitch slide. Click a loop's box and you hear that whole pass. The song being
+              played is never disturbed.
+            </p>
+          </div>
+
+          <div class="card">
+            <h4>An exact ARAM budget</h4>
+            <p>
+              A meter in the top bar and a table under Build: driver, song, samples, echo buffer,
+              free. It needs no guesswork, because everything AddmusicK occupies before your song is
+              physically present in the driver image the editor loads.
+            </p>
+            <p>
+              It is a shade stricter than AddmusicK, which reserves nothing for the echo write and
+              would let samples run into it.
+            </p>
+          </div>
+
+          <div class="card">
+            <h4>An echo FIR designer</h4>
+            <p>
+              The eight coefficients of <code>$F5</code> are the least readable thing in the
+              language, so put the cursor on one and you get a frequency-response plot, named
+              presets — including Super Mario World's own filter, verbatim — a dark-to-bright tone
+              control, and FIRcon-style draw-a-curve-and-fit.
+            </p>
+            <p>
+              It plots the echo tail repeat by repeat, since the filter sits inside the feedback
+              loop and each pass is filtered again; it shades the region below about 2 kHz where
+              eight taps at 32 kHz have no real say; and it warns when the feedback and the filter
+              together make an echo that builds instead of dying away.
+            </p>
+          </div>
+
+          <div class="card">
+            <h4>A command inspector</h4>
+            <p>
+              It explains whatever the cursor is sitting on, in real units: <code>t54</code> as a
+              tempo in BPM, <code>@2</code> as the sample it actually plays, <code>$F1</code> as a
+              delay in milliseconds and a buffer size in KiB. Vibrato, tremolo and pitch bends are
+              drawn as shapes; ADSR and GAIN get an envelope graph and presets.
+            </p>
+            <p>Everything it shows, it can also edit — and the edit is a splice, not a rewrite.</p>
+          </div>
+
+          <div class="card">
+            <h4>A command timeline</h4>
+            <p>
+              A strip under the roll holding nothing but commands, on the song's own timeline: every
+              <code>t</code>, <code>v</code>, <code>y</code>, <code>@</code> and echo write, on the
+              tick the driver actually reads it. It is the one place the whole song's commands can
+              be read in the order they run. Drag one to move it; right-click to delete it.
+            </p>
+          </div>
+
+          <div class="card">
+            <h4>Diagnostics that point at the character</h4>
+            <p>
+              165 codes: 158 <code>AMK</code> ones AddmusicK itself reports, and 7
+              <code>SST</code> ones it has no opinion about. The span lands on the offending
+              character rather than merely near it — even through a <code>"name=value"</code>
+              replacement, where the error is attributed back to where you wrote it.
+            </p>
+          </div>
+
+          <div class="card">
+            <h4>It tells you when the driver cannot keep up</h4>
+            <p>
+              The driver runs at most one tick per pass of its main loop, so a busy song at a high
+              tempo simply gets fewer ticks than it asked for. One channel at
+              <code>t254</code> reaches 99.6% of its 498 ticks a second; eight channels reach about
+              half, and a real eight-channel <code>t254</code> song reaches 46%.
+            </p>
+            <p>
+              No formula predicts that, so the editor plays your song silently on a worker and times
+              it. A SNES drops the same ticks — this is a fact about the song, not about the editor.
+            </p>
+          </div>
+
+          <div class="card">
+            <h4>Monitoring that does not lie</h4>
+            <p>
+              Mute and solo work on channel volume, deliberately not on the driver's own
+              <code>$5E</code>. A disabled channel makes each pass of the main loop cheaper, so
+              muting seven voices on a <code>t254</code> song speeds it up by 29% — and a mute that
+              plays your music faster is telling you something untrue about it.
+            </p>
+          </div>
+
+          <div class="card">
+            <h4>A sample library</h4>
+            <p>
+              Import <code>.brr</code> files or whole <code>.bnk</code> banks, audition any of them
+              on the spot, see what each costs in ARAM, and mark the ones to keep loaded even when
+              the song never plays them — which is what global songs and sound effects need.
+            </p>
+            <p>
+              The waveform drawn is the waveform the player will produce: the decoder is a
+              transcription of the same core that does the playing.
+            </p>
+          </div>
+
+          <div class="card">
+            <h4>Export</h4>
+            <p>
+              A finished <code>.spc</code> with its ID666 tags, or the raw song-data
+              <code>.bin</code> — which past AddmusicK's 12-byte RATS header is byte-for-byte the
+              same file AddmusicK writes to <code>asm/SNES/bin/musicXX.bin</code>. That is what
+              makes it diffable against the real tool.
+            </p>
+          </div>
+
+          <div class="card">
+            <h4>Yours to recolour</h4>
+            <p>
+              Five theme presets, or set any of the twenty-five colours yourself — the chrome, the
+              eight channel colours, and the source view's syntax colours one by one. Nothing here
+              says anything with colour alone, so you can put two channels on one hue and break
+              nothing.
+            </p>
+          </div>
+        </div>
+
+        <h2 id="fidelity">Why you can trust the output</h2>
+
+        <p>
+          The whole point is that a song written here goes into AddmusicK. So a divergence in
+          <em>either</em> direction is a bug:
+        </p>
+
+        <blockquote>
+          <p>
+            More permissive than AddmusicK is the dangerous one — it compiles here, plays here, and
+            then the real tool refuses it. Stricter than AddmusicK is merely annoying, but still
+            wrong: it rejects a song that works.
+          </p>
+        </blockquote>
+
+        <p>
+          Which means being friendlier is never a reason to widen what is accepted. Where AddmusicK
+          is case-sensitive, so is this: <code>#Title</code> is not a title,
+          <code>"kick.BRR"</code> is not a sample, and <code>#DEFINE</code> is not a define. Where
+          AddmusicK is unhelpful, so is this — an unknown <code>#directive</code> is read as music,
+          and a <code>*</code> with no loop before it emits a call to nowhere, because that is what
+          the reference does.
+        </p>
+
+        <p>What backs that up:</p>
+
+        <ul>
+          <li>
+            <strong>A line-by-line audit.</strong> Every symbol in the parser, preprocessor and
+            linker was mapped to its C++ counterpart and both sides read. A finding had to carry a
+            <code>file:line</code> on both sides, a reproducer of ten lines or fewer, and an
+            observed result from actually running it.
+            <strong>All twenty-three confirmed divergences are fixed</strong>, each with a test
+            written before the fix and failing without it.
+          </li>
+          <li>
+            <strong>One deliberate divergence</strong>, and it is <code>#path</code>: it is read,
+            validated, and applied to nothing, because a directory prefix has nothing to mean in a
+            library that is one flat list of names. You are told about it (<code>SST0504</code>),
+            and AddmusicK still accepts the directive.
+          </li>
+          <li>
+            <strong>Fourteen byte-level harnesses</strong> run on every push, covering the compiler,
+            the scanner, SPC assembly, BRR decoding, the echo FIR, the envelope maths, the audio
+            worklet, the piano roll's edits, and the whole MML → SPC → PCM chain through the real
+            emulator.
+          </li>
+        </ul>
+
+        <div class="note">
+          <span class="note-label">The honest limit</span>
+          <p>
+            Those harnesses catch gross breakage. What actually establishes fidelity is diffing the
+            output against a real AddmusicK build, which is what
+            <code>scripts/Compare-Spc.ps1</code> and <code>scripts/Compare-SongBin.ps1</code> are
+            for.
+            <strong
+              >If you have AddmusicK to hand, that is the single most useful thing you can do as a
+              tester</strong
+            >: compile a port both ways and diff the two <code>.bin</code> files. Any difference is
+            a real compiler difference, and I want to hear about it.
+          </p>
+        </div>
+
+        <h2 id="first">Your first session</h2>
+
+        <ol class="steps">
+          <li>
+            <strong
+              >Open <a href="https://ersanio.github.io/solar-soundtrack/">the editor</a>.</strong
+            >
+            It opens on the Source tab with whatever you last had; a fresh visit gets an empty
+            document.
+          </li>
+          <li>
+            <strong>Paste your MML in</strong>, or type something small to feel it out. The status
+            bar says whether it compiled, and the Problems section fills up if it did not.
+          </li>
+          <li>
+            <strong>Press <kbd>Space</kbd></strong> — or Play in the top bar. It compiles, assembles
+            an SPC and starts playing.
+          </li>
+          <li>
+            <strong>Turn on Hot Reload</strong> and edit while it plays. Change a <code>v</code>, a
+            <code>y</code>, an <code>@</code>, the tempo — the song reloads at the position it had
+            reached and carries on.
+          </li>
+          <li>
+            <strong>Put the cursor on a command</strong> and read the Inspector in the sidebar. Try
+            it on a <code>$F5</code> coefficient to get the FIR designer, or on an
+            <code>$ED</code> for the envelope tuner.
+          </li>
+          <li>
+            <strong>Open the Piano roll tab.</strong> Click notes to hear them in context, drag one
+            to move it, and watch the MML change under you in the Source tab.
+          </li>
+          <li>
+            <strong>Check the ARAM meter</strong> in the top bar, and click it for the full table.
+          </li>
+          <li>
+            <strong>Export.</strong> <em>Export .spc</em> gives you something you can play anywhere;
+            <em>Download .bin</em> gives you the raw song data.
+          </li>
+        </ol>
+
+        <div class="note stop">
+          <span class="note-label">Getting your work out</span>
+          <p>
+            <strong>There is no MML file open or save yet.</strong> Your draft is kept in this
+            browser's local storage and your sample library in IndexedDB, so closing the tab does
+            not lose them — but clearing site data will, and there is no file on disk until you make
+            one. To take a song to AddmusicK,
+            <strong
+              >select the text in the Source tab and copy it into your own <code>.txt</code></strong
+            >. Back up work you care about.
+          </p>
+        </div>
+
+        <h2 id="controls">Controls</h2>
+
+        <p class="lead">
+          Everything the editor responds to. If something here disagrees with the app, the app is
+          right and this page is a bug.
+        </p>
+
+        <h3 id="c-transport">Transport</h3>
+
+        <div class="wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Control</th>
+                <th>What it does</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>Play</strong> / <strong>Pause</strong></td>
+                <td>
+                  Starts or pauses the song. Greyed out while the song cannot compile — there is
+                  nothing to play.
+                </td>
+              </tr>
+              <tr>
+                <td><strong>Stop</strong></td>
+                <td>
+                  Stops the song <em>or</em> a note or selection being previewed, whichever is
+                  sounding.
+                </td>
+              </tr>
+              <tr>
+                <td><strong>Loop</strong></td>
+                <td>Keeps playing past the end, round the song's own loop point.</td>
+              </tr>
+              <tr>
+                <td><strong>Hot Reload</strong></td>
+                <td>
+                  While playing, reloads the song at the same position whenever it recompiles. This
+                  is the one to leave on.
+                </td>
+              </tr>
+              <tr>
+                <td>The clock</td>
+                <td>
+                  Click it to switch between <code>m:ss / total</code> and
+                  <code>tick n / total</code>. Your choice is remembered.
+                </td>
+              </tr>
+              <tr>
+                <td>Seek bar</td>
+                <td>
+                  Drag to move the playhead. It is denominated in ticks, not seconds, so it lands
+                  exactly where you asked — the song is replayed silently to reach the position.
+                </td>
+              </tr>
+              <tr>
+                <td>Volume</td>
+                <td>0% to 500%, with a readout while you drag it.</td>
+              </tr>
+              <tr>
+                <td><kbd>Space</kbd></td>
+                <td>
+                  Play or stop, while the Piano roll tab is showing. It always means the transport,
+                  even when a button has the focus.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3 id="c-topbar">Top bar</h3>
+
+        <div class="wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Control</th>
+                <th>What it does</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>Download .bin</strong></td>
+                <td>The compiled song data on its own. Greyed out until the song compiles.</td>
+              </tr>
+              <tr>
+                <td><strong>Export .spc</strong></td>
+                <td>A finished, playable SPC with its ID666 tags.</td>
+              </tr>
+              <tr>
+                <td>ARAM meter</td>
+                <td>
+                  How the song fits in the SPC700's 64 KiB. Hover for a region-by-region line; click
+                  to open the Build section in the sidebar.
+                </td>
+              </tr>
+              <tr>
+                <td>Palette icon</td>
+                <td>The theme picker.</td>
+              </tr>
+              <tr>
+                <td>Book icon</td>
+                <td>The changelog — what each day of work added.</td>
+              </tr>
+              <tr>
+                <td>GitHub icon</td>
+                <td>Opens the exact commit this build came from.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3 id="c-status">Status bar</h3>
+
+        <div class="wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Item</th>
+                <th>What it says</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Status dot</td>
+                <td>Whether the current text compiled.</td>
+              </tr>
+              <tr>
+                <td>Problems count</td>
+                <td>Click to open and scroll to the Problems section.</td>
+              </tr>
+              <tr>
+                <td>Free ARAM</td>
+                <td>Click to open the Build section.</td>
+              </tr>
+              <tr>
+                <td>Note count</td>
+                <td>How many notes the song plays.</td>
+              </tr>
+              <tr>
+                <td class="free">Tempo and tick rate</td>
+                <td>
+                  The tempo at the playhead, and the ticks a second the driver manages there. It
+                  reads <code>t254 · 231.9 of 498.0 ticks/s</code> when the driver cannot keep up
+                  with what the tempo asks, and the plain figure when it can.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3 id="c-layout">Panes and tabs</h3>
+
+        <div class="wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Control</th>
+                <th>What it does</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="free">Tabs: Source · Piano roll · Samples</td>
+                <td>
+                  Views of the editor pane. Samples sits apart on the right, being a library rather
+                  than a view of the song. Which tab you were on is remembered.
+                </td>
+              </tr>
+              <tr>
+                <td><kbd>←</kbd> <kbd>→</kbd></td>
+                <td>Previous or next tab, wrapping — while a tab has the keyboard focus.</td>
+              </tr>
+              <tr>
+                <td><kbd>Home</kbd> <kbd>End</kbd></td>
+                <td>First or last tab.</td>
+              </tr>
+              <tr>
+                <td class="free">The seam between the panes</td>
+                <td>
+                  Drag to resize, between a quarter and three quarters of the width. Double-click to
+                  put it back to half.
+                </td>
+              </tr>
+              <tr>
+                <td class="free">On a narrow screen</td>
+                <td>
+                  The sidebar becomes a drawer under the editor: drag its seam to resize it, or
+                  click its header to fold it down to a single line.
+                </td>
+              </tr>
+              <tr>
+                <td class="free">Sidebar sections</td>
+                <td>
+                  <strong>Inspector</strong> first, with the loop inspector under it;
+                  <strong>Build</strong> — stats, ARAM budget, hex dump — folds away;
+                  <strong>Problems</strong> is pinned at the bottom with a count, so a diagnostic
+                  stays in view. Click a heading to fold or unfold.
+                </td>
+              </tr>
+              <tr>
+                <td class="free">A row in Problems</td>
+                <td>Click it to select the offending span in the source.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3 id="c-source">Source view</h3>
+
+        <div class="wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Control</th>
+                <th>What it does</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><kbd>Ctrl</kbd> + <kbd>Enter</kbd></td>
+                <td>
+                  Compile now, without waiting for the typing pause. Easy to miss, and the fastest
+                  way to hear a change.
+                </td>
+              </tr>
+              <tr>
+                <td><kbd>Ctrl</kbd> + <kbd>Z</kbd> / <kbd>Ctrl</kbd> + <kbd>Y</kbd></td>
+                <td>
+                  Undo and redo. On a Mac, <kbd>⌘Z</kbd> and <kbd>⇧⌘Z</kbd>. It is one history
+                  shared with the piano roll.
+                </td>
+              </tr>
+              <tr>
+                <td><kbd>Tab</kbd></td>
+                <td>
+                  Inserts a tab. <kbd>Shift</kbd> + <kbd>Tab</kbd> is left free so the keyboard
+                  focus can get back out.
+                </td>
+              </tr>
+              <tr>
+                <td>Move the cursor onto a command</td>
+                <td>
+                  The Inspector describes it. That is the whole interaction — there is nothing to
+                  click.
+                </td>
+              </tr>
+              <tr>
+                <td>Hover a command</td>
+                <td>
+                  A tooltip naming it and its arguments, including
+                  <em>incomplete — expects more arguments</em>.
+                </td>
+              </tr>
+              <tr>
+                <td>Word wrap</td>
+                <td>A toggle on the view's own toolbar. Off to begin with, and not remembered.</td>
+              </tr>
+              <tr>
+                <td><strong>Commands</strong></td>
+                <td>Shows or hides the command palette. Remembered.</td>
+              </tr>
+              <tr>
+                <td class="free">Underlines</td>
+                <td>
+                  A wavy underline is a diagnostic. A second, separate one marks notes that never
+                  sound because another channel ends first (<code>SST0502</code>).
+                </td>
+              </tr>
+              <tr>
+                <td class="free">While playing</td>
+                <td>
+                  The note sounding in each channel is highlighted, driven by the driver itself.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3 id="c-palette">Command palette</h3>
+
+        <p>
+          A button for every MML command, above the source and again in the sidebar under
+          <strong>Add a command</strong>.
+        </p>
+
+        <div class="wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Control</th>
+                <th>What it does</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="free">Category chips</td>
+                <td>
+                  <em>All</em>, <em>Notes</em>, <em>Volume</em>, <em>Pitch</em>,
+                  <em>Instrument</em>, <em>Echo</em>, <em>Loops</em>, <em>Misc</em>. It opens on
+                  Notes; your choice is remembered.
+                </td>
+              </tr>
+              <tr>
+                <td>Dialect chip</td>
+                <td>
+                  Which target the song is being read as, with a trailing <code>?</code> when no
+                  marker was written and it is being assumed.
+                </td>
+              </tr>
+              <tr>
+                <td>Click a command</td>
+                <td>
+                  Inserts it at the cursor with the first argument selected, ready to type over. It
+                  never deletes your selection and never lands inside another command.
+                </td>
+              </tr>
+              <tr>
+                <td>Hover or focus one</td>
+                <td>A one-line explanation appears under the buttons.</td>
+              </tr>
+              <tr>
+                <td class="free">A greyed-out button</td>
+                <td>
+                  Three reasons, and the line underneath says which: the song's dialect does not
+                  have that command, nothing is selected for a bracket to go round, or there is no
+                  loop above the cursor to call. Some commands are also flagged for crashing the
+                  driver.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3 id="c-mixer">Channel mixer</h3>
+
+        <div class="wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Control</th>
+                <th>What it does</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>M</strong></td>
+                <td>Mutes that channel. Disabled while something is soloed.</td>
+              </tr>
+              <tr>
+                <td><strong>S</strong></td>
+                <td>Solos it — and in the piano roll, picks it to edit.</td>
+              </tr>
+              <tr>
+                <td><strong>Reset</strong></td>
+                <td>Clears every mute and solo. Greyed out when there are none.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p>
+          Mutes are a monitoring state, not a property of playback: they apply with the transport
+          stopped, they decide what you hear under an auditioned note, and they never touch the song
+          data — so a preview and an export build identical bytes.
+        </p>
+
+        <h3 id="c-roll-toolbar">Piano roll — toolbar</h3>
+
+        <div class="wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Control</th>
+                <th>What it does</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>Zoom X</strong> − / +</td>
+                <td>Horizontal zoom, through 0.5, 1, 2, 4 and 8.</td>
+              </tr>
+              <tr>
+                <td><strong>Zoom Y</strong> − / +</td>
+                <td>Row height, through 6, 9, 13, 18, 26 and 36 pixels.</td>
+              </tr>
+              <tr>
+                <td><strong>Follow playback</strong></td>
+                <td>
+                  Keeps the view on the playing song. Anything that moves the view yourself switches
+                  it off; press it again to catch up.
+                </td>
+              </tr>
+              <tr>
+                <td><strong>Scroll the notes</strong></td>
+                <td>
+                  On, the playhead is pinned a fifth across and the music slides under it. Off — the
+                  default — the music holds still and the roll turns a page at a time.
+                </td>
+              </tr>
+              <tr>
+                <td><strong>All octaves</strong></td>
+                <td>Show every octave, rather than only the range the song uses.</td>
+              </tr>
+              <tr>
+                <td><strong>Grid</strong></td>
+                <td>
+                  The time signature the bar lines come from: beats in a bar over the note value
+                  that gets the beat. <code>6</code>/<code>8</code> is six <code>l8</code>s to a
+                  bar. MML carries no time signature, so this one is yours. Zero beats draws no grid
+                  at all.
+                </td>
+              </tr>
+              <tr>
+                <td><strong>Snap</strong></td>
+                <td>
+                  The step a note moves in: <em>Bar</em>, <em>Beat</em>, <em>½ beat</em>,
+                  <em>¼ beat</em>, <em>⅛ beat</em>, <em>⅟₁₆ beat</em>, or <em>Off</em>. Bar and Beat
+                  are read off the Grid.
+                </td>
+              </tr>
+              <tr>
+                <td><strong>Edits</strong></td>
+                <td>
+                  What happens when two notes would overlap — <em>Overwrite</em>, <em>Insert</em> or
+                  <em>Strict</em>. See <a href="#c-overlap">below</a>.
+                </td>
+              </tr>
+              <tr>
+                <td><strong>Percussion</strong></td>
+                <td>
+                  Opens a strip of every instrument in the song, so you can say which ones are drums
+                  and belong on the drum lanes. <code>@21</code>–<code>@29</code> and
+                  <code>@10</code> are on it to begin with, and any of them can come off.
+                </td>
+              </tr>
+              <tr>
+                <td class="free">The readouts on the right</td>
+                <td>
+                  How many notes are selected, and — when it applies — why this channel cannot be
+                  edited, or why the last gesture was refused.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3 id="c-roll-channel">Piano roll — picking a channel</h3>
+
+        <p>The eight chips in the corner above the keyboard, each in its channel's own colour:</p>
+
+        <ul class="channels">
+          <li><i style="background: var(--ch-0)"></i>#0</li>
+          <li><i style="background: var(--ch-1)"></i>#1</li>
+          <li><i style="background: var(--ch-2)"></i>#2</li>
+          <li><i style="background: var(--ch-3)"></i>#3</li>
+          <li><i style="background: var(--ch-4)"></i>#4</li>
+          <li><i style="background: var(--ch-5)"></i>#5</li>
+          <li><i style="background: var(--ch-6)"></i>#6</li>
+          <li><i style="background: var(--ch-7)"></i>#7</li>
+        </ul>
+
+        <div class="wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Gesture</th>
+                <th>What it does</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Click a chip</td>
+                <td>Edits that channel. Click the one already being edited to stop editing.</td>
+              </tr>
+              <tr>
+                <td><kbd>Ctrl</kbd> + click a chip</td>
+                <td>Solos that channel, which also picks it to edit.</td>
+              </tr>
+              <tr>
+                <td class="free">What the chip says</td>
+                <td>
+                  A near-white ring means it is being edited; a dark ring means it is soloed; struck
+                  through and dimmed means you cannot hear it.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p>
+          <strong>You do not have to pick one first.</strong> With none picked you can still grab,
+          stretch, copy or delete a note in any channel, and doing so picks that note's channel.
+          Drawing a new note, the marquee and the keyboard shortcuts do need one, because empty grid
+          belongs to no channel.
+        </p>
+
+        <h3 id="c-roll-mouse">Piano roll — mouse</h3>
+
+        <div class="wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Gesture</th>
+                <th>What it does</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="free">Hover over empty grid</td>
+                <td>A ghost bar shows where the next note goes and how long it will be.</td>
+              </tr>
+              <tr>
+                <td class="free">Press on empty grid</td>
+                <td>Draws a note there and keeps it under the pointer until you let go.</td>
+              </tr>
+              <tr>
+                <td class="free">Click on empty grid</td>
+                <td>Draws the note and leaves it there.</td>
+              </tr>
+              <tr>
+                <td class="free">Drag the middle of a note</td>
+                <td>Moves it a snap step at a time, one row per semitone up and down.</td>
+              </tr>
+              <tr>
+                <td class="free">Drag a selected group</td>
+                <td>Moves them together, sounding the note you grabbed as it crosses rows.</td>
+              </tr>
+              <tr>
+                <td class="free">Drag a note's left or right edge</td>
+                <td>Stretches that end; the other end stays put.</td>
+              </tr>
+              <tr>
+                <td class="free">Click a note</td>
+                <td>
+                  Selects it, sounds it with its pitch slide in the context of the song, and puts
+                  the cursor on it. It also sets the length the next drawn note will take.
+                </td>
+              </tr>
+              <tr>
+                <td class="free">Double-click a note</td>
+                <td>Goes to it in the MML.</td>
+              </tr>
+              <tr>
+                <td class="free"><kbd>Ctrl</kbd> + click a note</td>
+                <td>Adds it to, or takes it out of, the selection.</td>
+              </tr>
+              <tr>
+                <td class="free"><kbd>Ctrl</kbd> + drag on empty grid</td>
+                <td>
+                  Draws a box, selects every note of this channel inside it, and plays that stretch
+                  of the song.
+                </td>
+              </tr>
+              <tr>
+                <td class="free"><kbd>Ctrl</kbd> + drag a note</td>
+                <td>Copies it instead of moving it — the whole selection, if there is one.</td>
+              </tr>
+              <tr>
+                <td class="free"><kbd>Shift</kbd> + drag on empty grid</td>
+                <td>Draws a note where you pressed and pulls its right edge along.</td>
+              </tr>
+              <tr>
+                <td class="free"><kbd>Shift</kbd> + drag a note</td>
+                <td>
+                  Locks it to the axis you first drag along — sideways it keeps its row, up or down
+                  it keeps its tick.
+                </td>
+              </tr>
+              <tr>
+                <td class="free"><kbd>Alt</kbd> during any gesture</td>
+                <td>Tick precision: no snapping, for either a position or a length.</td>
+              </tr>
+              <tr>
+                <td class="free">Right-click a note</td>
+                <td>Deletes it.</td>
+              </tr>
+              <tr>
+                <td class="free">Right-drag across notes</td>
+                <td>Deletes each one the pointer crosses.</td>
+              </tr>
+              <tr>
+                <td class="free">Middle-drag</td>
+                <td>Pans the roll, both ways at once. No channel needed.</td>
+              </tr>
+              <tr>
+                <td class="free">Wheel while drawing a note</td>
+                <td>
+                  Sizes it — <code>l1</code>, <code>l2</code>, <code>l3</code>, <code>l4</code>,
+                  <code>l6</code>, <code>l8</code> and on down to <code>l192</code>. Where you let
+                  go is where the next note starts.
+                </td>
+              </tr>
+              <tr>
+                <td class="free">Wheel while holding a note still</td>
+                <td>Resizes that note the same way, from its right edge.</td>
+              </tr>
+              <tr>
+                <td class="free"><kbd>Alt</kbd> + wheel while sizing</td>
+                <td>Sizes it a tick at a time instead.</td>
+              </tr>
+              <tr>
+                <td class="free"><kbd>Ctrl</kbd> + wheel</td>
+                <td>Zooms in and out about the pointer.</td>
+              </tr>
+              <tr>
+                <td class="free"><kbd>Shift</kbd> + wheel</td>
+                <td>Scrolls the roll sideways.</td>
+              </tr>
+              <tr>
+                <td class="free"><kbd>Alt</kbd> + wheel</td>
+                <td>Makes the rows taller and shorter, about the pointer.</td>
+              </tr>
+              <tr>
+                <td class="free">Plain wheel</td>
+                <td>Scrolls the roll up and down.</td>
+              </tr>
+              <tr>
+                <td class="free">Click a key on the left</td>
+                <td>
+                  Sounds that pitch on the channel being edited, so you can find a note by ear. On a
+                  drum lane it sounds that drum.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3 id="c-roll-keys">Piano roll — keyboard</h3>
+
+        <div class="wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Key</th>
+                <th>What it does</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><kbd>Space</kbd></td>
+                <td>
+                  Plays from the playhead, or stops the song and any preview. It needs no channel —
+                  it is the transport, not an edit.
+                </td>
+              </tr>
+              <tr>
+                <td><kbd>Delete</kbd> / <kbd>Backspace</kbd></td>
+                <td>Deletes the selected command, or else the selected notes.</td>
+              </tr>
+              <tr>
+                <td><kbd>Escape</kbd></td>
+                <td>
+                  Steps back one level per press: the inspected command, then the selection and the
+                  inspector with it, then the channel.
+                </td>
+              </tr>
+              <tr>
+                <td><kbd>←</kbd> <kbd>→</kbd></td>
+                <td>Nudges the selection by one snap step.</td>
+              </tr>
+              <tr>
+                <td><kbd>↑</kbd> <kbd>↓</kbd></td>
+                <td>Moves the selection a semitone.</td>
+              </tr>
+              <tr>
+                <td><kbd>Shift</kbd> + <kbd>↑</kbd> <kbd>↓</kbd></td>
+                <td>Moves it an octave.</td>
+              </tr>
+              <tr>
+                <td><kbd>Ctrl</kbd> + <kbd>A</kbd></td>
+                <td>Selects every note on this channel.</td>
+              </tr>
+              <tr>
+                <td><kbd>Alt</kbd> + <kbd>Q</kbd></td>
+                <td>Quantize — pulls each selected note's start onto the snap.</td>
+              </tr>
+              <tr>
+                <td><kbd>Alt</kbd> + <kbd>L</kbd></td>
+                <td>Legato — stretches each selected note until it touches the next.</td>
+              </tr>
+              <tr>
+                <td><kbd>Ctrl</kbd> + <kbd>J</kbd></td>
+                <td>Glue — joins selected notes that already touch into one.</td>
+              </tr>
+              <tr>
+                <td><kbd>Ctrl</kbd> + <kbd>B</kbd></td>
+                <td>Copies the selection one bar to the right.</td>
+              </tr>
+              <tr>
+                <td><kbd>Ctrl</kbd> + <kbd>Z</kbd> / <kbd>Ctrl</kbd> + <kbd>Y</kbd></td>
+                <td>Undo and redo — the same history the MML editor uses.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="note">
+          <span class="note-label">When they apply</span>
+          <p>
+            All of these need the <strong>Piano roll tab showing</strong>, and they are ignored
+            while you are typing in a text field — so <kbd>Ctrl</kbd> + <kbd>A</kbd> in the MML
+            still selects the text. <kbd>Space</kbd>, <kbd>Escape</kbd> and deleting a command need
+            no channel picked; <kbd>Ctrl</kbd> + <kbd>Z</kbd> and everything below it need one, and
+            the arrows, <kbd>Delete</kbd> and the <kbd>Alt</kbd> pair also need something selected.
+          </p>
+          <p>
+            <kbd>Delete</kbd> goes to the command whenever one is picked out, however many notes are
+            selected as well — none of them is touched. Click a bar's body to put the key back on
+            the notes.
+          </p>
+        </div>
+
+        <h3 id="c-roll-bars">The two bars over the roll</h3>
+
+        <p>
+          They look similar and they do opposite things. The wide one moves the <em>view</em>; the
+          thin one moves the <em>song</em>.
+        </p>
+
+        <div class="wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Gesture</th>
+                <th>What it does</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="free">Press the wide bar</td>
+                <td>
+                  It is the whole song at once, with the part you are looking at marked on it. Press
+                  anywhere to go straight there.
+                </td>
+              </tr>
+              <tr>
+                <td class="free">Drag the lit box on it</td>
+                <td>The box follows the pointer and the roll scrolls with it.</td>
+              </tr>
+              <tr>
+                <td class="free">Drag the thin bar under it</td>
+                <td>
+                  The timeline — bar numbers, beat ticks, and a triangle whose tip is on the
+                  playhead. Drag it to move the music.
+                </td>
+              </tr>
+              <tr>
+                <td class="free">Hold past either end of it</td>
+                <td>The roll scrolls along with you, faster the further out you hold.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p>
+          Anything that moves the view switches <strong>Follow playback</strong> off — the wide bar
+          always, the thin one only when a drag runs off the end and starts scrolling — because you
+          have taken the roll somewhere the song is not.
+        </p>
+
+        <h3 id="c-roll-icons">What the icons on a note mean</h3>
+
+        <p>
+          A bar carries its own pitch on the left and, on the right, one icon per command acting on
+          that note — its volume, its envelope, its instrument, and so on.
+        </p>
+
+        <div class="wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Gesture</th>
+                <th>What it does</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Hover the bar</td>
+                <td>Names every command acting on the note, in words.</td>
+              </tr>
+              <tr>
+                <td>Click an icon</td>
+                <td>
+                  Asks the Inspector about that command, and lets go of whatever notes were selected
+                  so <kbd>Delete</kbd> can only mean the command.
+                </td>
+              </tr>
+              <tr>
+                <td>Double-click an icon</td>
+                <td>Goes to that command in the MML.</td>
+              </tr>
+              <tr>
+                <td>Press and hold an icon</td>
+                <td>
+                  Drags the note, exactly as if you had pressed its bar. An icon takes the click,
+                  never the press.
+                </td>
+              </tr>
+              <tr>
+                <td>Click the three dots</td>
+                <td>
+                  Selects the note — they stand for a list rather than any one command, so the
+                  Inspector answers with everything acting on it.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p>
+          <strong
+            >A solid pale chip is a command that note puts in force; a plain outlined icon is one it
+            inherits</strong
+          >
+          from earlier in the channel. So a run of notes under one <code>v200</code> shows the chip
+          on the note the <code>v200</code> landed on and the outline on the rest, and the hover
+          says the same in words — "sets volume" against "under volume". The chips come first, so a
+          narrow bar spends its room on what starts at that note. Whatever you are inspecting is
+          outlined, on every bar it acts on.
+        </p>
+
+        <p>
+          Changing a value in the Inspector <strong>replays the note</strong> once the edit has
+          compiled, so you hear what you just did.
+        </p>
+
+        <h3 id="c-lane">The command lane</h3>
+
+        <p>
+          The strip under the roll, holding nothing but commands on the song's own timeline: what
+          takes effect, and where, with the notes out of the way. It holds every command that takes
+          effect, on the tick the driver reads it, across all eight channels at once — and the
+          channel you are editing sits in the top rows.
+        </p>
+
+        <div class="wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Gesture</th>
+                <th>What it does</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Click an icon</td>
+                <td>Asks the Inspector about that command.</td>
+              </tr>
+              <tr>
+                <td>Double-click an icon</td>
+                <td>Goes to it in the MML.</td>
+              </tr>
+              <tr>
+                <td>Right-click an icon</td>
+                <td>
+                  Deletes the command, in one undo step. This is how you say that none of the notes
+                  needs it any more.
+                </td>
+              </tr>
+              <tr>
+                <td>Drag an icon sideways</td>
+                <td>
+                  Moves the command to another tick. It snaps to the starts of the notes and rests
+                  in its own channel, and never leaves that channel. Let it go where it already runs
+                  and nothing happens at all.
+                </td>
+              </tr>
+              <tr>
+                <td>Drag it up or down</td>
+                <td>
+                  Nothing. Which row an icon sits on is packing, and says nothing about the song.
+                </td>
+              </tr>
+              <tr>
+                <td>Wheel over the lane</td>
+                <td>Lifts the stack when several commands land on one tick.</td>
+              </tr>
+              <tr>
+                <td>Drag the line above the lane</td>
+                <td>
+                  Makes it taller — five icons deep to ten. Double-click to put it back to five.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p>
+          Most commands appear both here and as an icon on a note, and the two are not repeating
+          each other:
+          <strong
+            >the lane says the tick the driver reads it at, and a bar's chip says which note plays
+            under it</strong
+          >. In <code>c4 v200 d4</code> those are the same tick. In <code>c4 v200 r4 d4</code> they
+          are a rest apart.
+        </p>
+
+        <h3 id="c-overlap">Grid, Snap and Edits</h3>
+
+        <p>
+          Three settings on the roll's toolbar decide how a drag lands, and they are worth knowing
+          before you wonder why a note went where it did.
+        </p>
+
+        <p>
+          <strong>Dragging moves a note by whole steps; it does not pull it onto the grid.</strong>
+          A note written a little before the beat is meant to be there, and dragging it a bar later
+          leaves it a little before that beat too. Drawing a <em>new</em> note is the exception — it
+          has no position of its own to keep, so it lands on the grid where the ghost said it would.
+          <kbd>Alt</kbd> + <kbd>Q</kbd> is the one thing that pulls a note onto the grid, which is
+          what quantizing is for.
+        </p>
+
+        <p>
+          <strong>Stretching does not use Snap.</strong> A length lands on the note values
+          themselves — a whole, a half, a quarter, an eighth and their dotted forms — because a note
+          in MML is a duration rather than a region on a timeline. The bubble that follows the edge
+          says which one you are on, and reads the note as it will be written.
+        </p>
+
+        <p>
+          <strong>A channel plays one note at a time</strong>, so two notes can never overlap, and
+          <em>Edits</em> is where you say what a gesture does about that:
+        </p>
+
+        <div class="wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Mode</th>
+                <th>What happens when notes would overlap</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>Overwrite</strong></td>
+                <td>
+                  The note you are placing takes the ticks. What was under it keeps whatever it did
+                  not cover — the ticks being taken are hatched in red while you drag, and what
+                  survives is drawn as a striped outline. A note you land wholly inside comes back
+                  as two, at the same pitch. This is where a fresh roll starts.
+                </td>
+              </tr>
+              <tr>
+                <td><strong>Insert</strong></td>
+                <td>
+                  The notes in the way move out of the way, in the direction you are dragging, and
+                  the notes <em>they</em> run into go too. It can run out of room, and says so.
+                </td>
+              </tr>
+              <tr>
+                <td><strong>Strict</strong></td>
+                <td>
+                  Never writes an overlap. The bar turns red, the clashing ticks are washed red down
+                  the roll, and letting go changes nothing.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p>
+          It is one rule for every gesture — drawing, dragging, nudging with the arrows, stretching
+          an edge and <kbd>Alt</kbd> + <kbd>Q</kbd> alike — so where you grabbed the bar does not
+          change the answer.
+        </p>
+
+        <h3 id="c-loops">Loops</h3>
+
+        <p>
+          A loop is one run of text the driver plays many times, and the roll draws it that way:
+          <strong>every pass is on screen</strong>, each as a box around the rows its notes span,
+          washed in the channel's colour.
+        </p>
+
+        <div class="wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>What you see</th>
+                <th>What it means</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>A <strong>dashed</strong> edge</td>
+                <td>The pass standing where the text is — the group an edit rewrites.</td>
+              </tr>
+              <tr>
+                <td>A <strong>dotted</strong> edge</td>
+                <td>
+                  This plays again here — a repeat, or a <code>(n)</code> or <code>*</code> recall.
+                </td>
+              </tr>
+              <tr>
+                <td>A <strong>solid</strong> edge</td>
+                <td>The group is selected.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p>
+          <strong>An edit to any pass edits them all</strong>, because there is only one text. Click
+          the third pass of a looped note and every pass rings, with the one you clicked solid and
+          its siblings stepped back. That holds across channels too: a loop declared on
+          <code>#0</code> and recalled on <code>#1</code> is one body both voices play, and editing
+          it from either changes both.
+        </p>
+
+        <div class="wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Gesture</th>
+                <th>What it does</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="free">Click a box's edge</td>
+                <td>
+                  Selects the loop's whole group, closes every box of that body up into one solid
+                  line, plays that pass, and names it in the loop inspector.
+                </td>
+              </tr>
+              <tr>
+                <td class="free">Drag the top or bottom rule sideways</td>
+                <td>
+                  Moves that pass along the song: rests open in front of it and the recall splits.
+                  Dragging back closes the gap and joins the two halves up again.
+                </td>
+              </tr>
+              <tr>
+                <td class="free">Drag the top or bottom rule up or down</td>
+                <td>
+                  Transposes the whole body, one row per semitone, every pass moving together. A
+                  loop written inside it goes too; one merely <em>called</em> from inside does not.
+                </td>
+              </tr>
+              <tr>
+                <td class="free">Drag the right end</td>
+                <td>
+                  Changes the body's own length — a rest goes on its tail, or its trailing rests
+                  come off.
+                </td>
+              </tr>
+              <tr>
+                <td class="free">Drag the left end</td>
+                <td>
+                  Moves where the loop begins while the notes inside stand still, so the first pass
+                  plays exactly where it did and only the passes behind it slide. It needs rests in
+                  front of the loop to grow into.
+                </td>
+              </tr>
+              <tr>
+                <td class="free">Draw inside any pass</td>
+                <td>
+                  Writes into the body once, between the brackets, and it appears on every pass —
+                  the ghost's siblings show it landing everywhere before you let go.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p>
+          Which of the three the drag is settles the moment it starts moving and stays settled, so
+          wandering off the straight does not swap one edit for another. The pointer's cursor says
+          which one a press will start before you commit to it.
+        </p>
+
+        <h4>Making one</h4>
+
+        <p>
+          <strong
+            >Select the notes you want repeated and press <em>Loop</em> in the command
+            palette</strong
+          >
+          — it is in the sidebar's Inspector, under <em>Add a command</em>. The brackets go round
+          the whole run, nothing between them is rewritten, and the loop opens playing twice with
+          its repeat count selected so the number is one keystroke away. A fresh loop is named with
+          the lowest number the song is not already using, so it can be recalled later with
+          <code>(0)3</code>.
+        </p>
+
+        <p>
+          Press <em>Loop</em> <em>inside</em> a loop and you get a subloop instead, and vice versa —
+          AddmusicK holds one <code>[ ]</code> and one <code>[[ ]]</code> at a time, and the readout
+          says which the button is about to write. <strong><em>Loop call</em></strong> plays a loop
+          you have already written, again from here; it names the nearest one above the cursor,
+          because AddmusicK reads a song in order and a call can only reach a loop it has already
+          met.
+        </p>
+
+        <p>
+          <strong>The loop inspector names the loop the cursor is in</strong>, under the command
+          inspector: one card per loop, with its <em>Repeats</em> to change, which loop a call
+          plays, and an offer to name a body that has not got one. With the cursor in no loop the
+          panel is not there at all.
+        </p>
+
+        <h3 id="c-samples">Sample browser</h3>
+
+        <div class="wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Control</th>
+                <th>What it does</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>Add samples…</strong></td>
+                <td>
+                  Imports <code>.brr</code> files or whole <code>.bnk</code> banks, several at once.
+                  A file that will not do is listed with the reason rather than dropped.
+                </td>
+              </tr>
+              <tr>
+                <td><strong>Optimize samples</strong></td>
+                <td>Leaves out directory entries the song never plays.</td>
+              </tr>
+              <tr>
+                <td>▶ / ■</td>
+                <td>Auditions a sample. Press it again to stop.</td>
+              </tr>
+              <tr>
+                <td><strong>keep</strong></td>
+                <td>
+                  Keeps that sample in ARAM even when the song never plays it — which is what global
+                  songs and sound effects need. A bank defers to its slots.
+                </td>
+              </tr>
+              <tr>
+                <td><strong>Revert</strong></td>
+                <td>Puts a replaced stock sample back.</td>
+              </tr>
+              <tr>
+                <td><strong>Delete</strong></td>
+                <td>Removes one you added.</td>
+              </tr>
+              <tr>
+                <td><strong>Reset all</strong></td>
+                <td>Clears every override at once.</td>
+              </tr>
+              <tr>
+                <td>The arrow on a bank</td>
+                <td>Unfolds its 64 slots, which start collapsed because 64 is a lot.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p>
+          Bundled files and your uploads are one list, because that is how they behave: a bundled
+          name whose bytes you have replaced is still the same SRCN, and pretending otherwise would
+          hide the only thing that matters about it.
+        </p>
+
+        <h3 id="c-theme">Theme picker and changelog</h3>
+
+        <div class="wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Control</th>
+                <th>What it does</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Presets</td>
+                <td>
+                  Five of them. <em>Studio</em> is the default blue-grey; <em>Graphite</em> is the
+                  older neutral grey.
+                </td>
+              </tr>
+              <tr>
+                <td>A colour swatch</td>
+                <td>
+                  Previews as you drag it and is written down when you let go. The button beside it
+                  clears that one colour back to the default.
+                </td>
+              </tr>
+              <tr>
+                <td><strong>Save or paste a theme</strong></td>
+                <td>
+                  The text box exports the colours you changed; paste one in and click away to load
+                  it.
+                </td>
+              </tr>
+              <tr>
+                <td><strong>Reset all</strong></td>
+                <td>Back to the shipped colours.</td>
+              </tr>
+              <tr>
+                <td><kbd>Escape</kbd>, or a click outside</td>
+                <td>Closes either popover.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p>
+          Only the colours you actually move are stored, so changing one still leaves the rest
+          following the app as it changes.
+        </p>
+
+        <h2 id="wont">What it will not do</h2>
+
+        <p class="lead">
+          Stated plainly so you do not spend time filing these. If one of them is in your way, say
+          so — knowing which limits actually bite is exactly what a beta is for.
+        </p>
+
+        <h3 id="wont-roll">The piano roll turns some channels away</h3>
+
+        <p>
+          It edits your MML as written, and refuses rather than guessing wherever what is written
+          and what is played are not one to one. The toolbar says which in words.
+        </p>
+
+        <div class="wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>What it refuses</th>
+                <th>Why</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="free">
+                  A channel written through a <code>"name=value"</code> replacement
+                </td>
+                <td>
+                  One written note is not one played note, and an edit has no single place to go.
+                </td>
+              </tr>
+              <tr>
+                <td class="free">A channel using <code>{ }</code> triplets</td>
+                <td>Every length is two thirds of what it says.</td>
+              </tr>
+              <tr>
+                <td class="free">A song using <code>#halvetempo</code></td>
+                <td>Same reason.</td>
+              </tr>
+              <tr>
+                <td class="free">A song using a legacy <code>&amp;</code></td>
+                <td>
+                  This one refuses the <em>whole song</em>. It is an operator rather than a command,
+                  so nothing above the compiler can say which channel it is on, and the bend it
+                  compiles to takes its length from the note <em>before</em> it. Write it as the
+                  <code>$DD</code> it compiles to and the roll can see it.
+                </td>
+              </tr>
+              <tr>
+                <td class="free">A loop and a subloop that <em>cross</em></td>
+                <td>
+                  One opens inside the other and closes outside it, which plays neither construct as
+                  written.
+                </td>
+              </tr>
+              <tr>
+                <td class="free">An unterminated <code>$E6 $00</code></td>
+                <td>Nothing closes it.</td>
+              </tr>
+              <tr>
+                <td class="free">
+                  A <code>*</code> or <code>(n)</code> replaying a remote code body
+                </td>
+                <td>The roll cannot line that up with what plays.</td>
+              </tr>
+              <tr>
+                <td class="free">A channel you cannot hear</td>
+                <td>
+                  Mute it or solo another part and its notes go dim and stop answering the pointer.
+                  Unmute it and it takes edits again.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p>
+          <strong>Ordinary loops are not on that list.</strong> A <code>[ ]</code>, a
+          <code>[[ ]]</code>, the same thing written as <code>$E6</code>, a <code>*</code> and a
+          <code>(n)</code> call are all drawn and edited in place — see
+          <a href="#c-loops">Loops</a> above. This changed, so older notes may say otherwise.
+        </p>
+
+        <h3 id="wont-other">Everywhere else</h3>
+
+        <ul>
+          <li>
+            <strong>No chords.</strong> A channel plays one note at a time. What a gesture does
+            about an overlap is the <em>Edits</em> setting, and it is the same answer for every
+            gesture.
+          </li>
+          <li>
+            <strong>No MML file open or save.</strong> Copy and paste is the way in and out for now.
+          </li>
+          <li>
+            <strong><code>#path</code> does nothing.</strong> It is read and validated and applied
+            to nothing, because the library here is one flat list of names. This is the one
+            deliberate difference from AddmusicK, and you are told when a song uses one.
+          </li>
+          <li>
+            <strong>Some songs get no predicted length.</strong> A song with a tempo fade, or a
+            <code>t</code> that runs more than once, has no length the compiler will state —
+            AddmusicK gives up on the same songs, and this reproduces that. The measured clock
+            covers it for the transport.
+          </li>
+          <li>
+            <strong>The echo hazard check has a blind spot.</strong> A <code>$F1</code> in one
+            channel and a <code>$F5</code> in another do interact on the real chip, and that pairing
+            is not caught. Neither is a <code>$F5</code> and a <code>$F1</code> inside the same
+            macro.
+          </li>
+          <li>
+            <strong>No accessibility.</strong> The app ships no ARIA attributes at all, and no
+            <code>role</code> or <code>tabindex</code>. That is a deferral rather than an oversight
+            — half of it would be worse than none — and it is next on the list once the codebase
+            settles. Keyboard focus works and is visible; a screen reader will not get far.
+          </li>
+        </ul>
+
+        <h2 id="reporting">Reporting a bug</h2>
+
+        <p>
+          This is the part I actually need.
+          <strong>Please test it functionally and tell me what breaks</strong> — bugs, ideas and
+          feature requests are all wanted.
+        </p>
+
+        <p>What makes a report easy to act on:</p>
+
+        <ul>
+          <li>
+            <strong>The MML.</strong> The smallest song that still shows it, pasted in — this
+            matters more than anything else.
+          </li>
+          <li><strong>What you expected, and what happened instead.</strong></li>
+          <li>
+            <strong>Your browser and platform</strong>, since the audio path differs between them.
+          </li>
+          <li>
+            <strong>The commit</strong>, from the GitHub icon in the top bar, so I know which build
+            you were on.
+          </li>
+        </ul>
+
+        <div class="note">
+          <span class="note-label">Especially valuable</span>
+          <p>
+            Two classes of bug are hard for me to catch and easy for you to trip over. The first is
+            <strong>anything visual that is simply missing</strong> — a blank icon, a bar with no
+            glyphs, a graph that does not draw — because none of the automated checks run the
+            template compiler, so that kind of fault reaches production. The second is
+            <strong>output that differs from real AddmusicK</strong>: if you can compile a port both
+            ways and diff the two <code>.bin</code> files, any difference is a genuine compiler bug.
+          </p>
+        </div>
+
+        <p>
+          <a href="https://github.com/Ersanio/solar-soundtrack/issues">GitHub Issues</a> is the best
+          place, and it is also where the ideas, planned features and known issues live. Failing
+          that, the best way to reach me is a <strong>Discord DM</strong> — I am in the SnesLab and
+          SMW Central servers — or a private message on SMW Central.
+        </p>
+
+        <div class="note beta">
+          <span class="note-label">About the code</span>
+          <p>
+            <strong>Effectively all of the code in this repository was written by AI.</strong> It
+            works, it is tested, and I have read and steered it to the best of my abilities, but it
+            has not had the kind of human touch a codebase deserves before people build on it. So
+            for now I would much rather you tested the application and reported bugs than tried to
+            contribute code — I am working on making it maintainable, but it is slow. If you are
+            planning something large, please talk to me first.
+          </p>
+        </div>
+
+        <h2 id="more">Further reading</h2>
+
+        <div class="wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Document</th>
+                <th>What it covers</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><a href="README.md">README.md</a></td>
+                <td>
+                  The developer-facing readme: how to run it locally, how the packages fit together.
+                </td>
+              </tr>
+              <tr>
+                <td><a href="PIANOROLL.md">PIANOROLL.md</a></td>
+                <td>
+                  The piano roll in far more depth than this page — every refusal, what happens to a
+                  command when the note it was written for goes, and the whole of the loop
+                  behaviour.
+                </td>
+              </tr>
+              <tr>
+                <td><a href="COMMANDS.html">COMMANDS.html</a></td>
+                <td>
+                  A truth table for every MML command, <code>#</code> directive and hex command in
+                  AddmusicK 1.0.11: what the driver does with it, what the compiler does with it,
+                  and which dialects accept it. A developer reference rather than a porter's manual.
+                </td>
+              </tr>
+              <tr>
+                <td>The changelog</td>
+                <td>In the top bar, behind the book icon. What each day of work added.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h2 id="credits">Credits</h2>
+
+        <p>This project stands on other people's work:</p>
+
+        <ul>
+          <li>
+            <strong>Blargg</strong> — <code>snes_spc</code>, the SPC700 emulator core that makes any
+            of this audible.
+          </li>
+          <li>
+            <strong>Telinc1 and SMW Central</strong> — the
+            <a href="https://codeberg.org/Telinc1/smwcentral-spc-player">WebAssembly SPC player</a>
+            built on it, which this project uses.
+          </li>
+          <li>
+            <strong>The AddmusicK maintainers</strong>, from its changelog — Kipernal, KungFuFurby,
+            KevinM, Medic, HertzDevil, Atari 2.0, nyanpasu64, the JUMP Team, SimFan96, Anas,
+            HuFlungDu, lx5, Pinci, 6646, Akaginite, Aikku, Sinc-X, Lui, Vitor, Barrels O' Fun and
+            Yoshifanatic.
+          </li>
+          <li>
+            <strong><a href="https://smwc.me/u/3342">blackhole89</a></strong> — the name.
+            <em>Solar Soundtrack</em> was
+            <a
+              href="https://web.archive.org/web/20210403023416/http://twilightro.kafuka.org/~blackhole89/sst.php"
+              >originally their idea</a
+            >: a piano-roll style editor for the N-SPC engine, which I assume was never finished.
+            The name was too good to leave unused, and this project is a different shape to what
+            they had in mind, but the credit is theirs.
+          </li>
+        </ul>
+
+        <footer>
+          <p>
+            MIT licensed. The bundled third-party material keeps its own terms: the emulator core is
+            LGPL 2.1, and the driver bundle is AddmusicK output whose <code>#default</code> samples
+            originate from Super Mario World. <code>LICENSE</code> spells both out.
+          </p>
+          <p>
+            Made by <strong>Ersanio</strong> — <a href="https://github.com/ersanio">GitHub</a> ·
+            <a href="https://smwc.me/u/3">SMW Central</a> · <a href="https://ersan.io/">ersan.io</a>
+          </p>
+        </footer>
+      </main>
+    </div>
+
+    <script>
+      // The contents rail is built from the document's own headings, so adding a
+      // section needs no second edit here.
+      (function () {
+        var main = document.querySelector('main');
+        var toc = document.getElementById('toc');
+        var rail = document.getElementById('rail');
+        var toggle = document.getElementById('rail-toggle');
+        if (!main || !toc || !rail || !toggle) return;
+
+        var headings = [].slice.call(main.querySelectorAll('h2[id], h3[id]'));
+        var list = document.createElement('ul');
+        var links = {};
+
+        headings.forEach(function (heading) {
+          var item = document.createElement('li');
+          var link = document.createElement('a');
+          link.href = '#' + heading.id;
+          link.textContent = heading.textContent;
+          if (heading.tagName === 'H3') link.className = 'sub';
+          item.appendChild(link);
+          list.appendChild(item);
+          links[heading.id] = link;
+        });
+
+        toc.appendChild(list);
+
+        // Off-canvas below the layout breakpoint: the rail is a panel the button
+        // opens, and any link in it closes again.
+        var narrow = window.matchMedia('(max-width: 960px)');
+
+        function applyWidth() {
+          rail.hidden = narrow.matches;
+        }
+
+        applyWidth();
+        if (narrow.addEventListener) narrow.addEventListener('change', applyWidth);
+        else narrow.addListener(applyWidth);
+
+        toggle.addEventListener('click', function () {
+          rail.hidden = !rail.hidden;
+        });
+
+        toc.addEventListener('click', function (event) {
+          if (event.target.tagName === 'A' && narrow.matches) rail.hidden = true;
+        });
+
+        document.addEventListener('keydown', function (event) {
+          if (event.key === 'Escape' && narrow.matches && !rail.hidden) rail.hidden = true;
+        });
+
+        // Scroll-spy. The current section is the last heading to have crossed the
+        // top of the viewport, which is what a reader means by "where I am" — an
+        // observer alone would hand it to whichever heading happens to be visible.
+        var current = null;
+
+        function mark(id) {
+          if (id === current) return;
+          if (current && links[current]) links[current].classList.remove('here');
+          if (links[id]) links[id].classList.add('here');
+          current = id;
+        }
+
+        function spy() {
+          var line = window.innerHeight * 0.25;
+          var found = headings.length ? headings[0].id : null;
+          for (var i = 0; i < headings.length; i++) {
+            if (headings[i].getBoundingClientRect().top <= line) found = headings[i].id;
+            else break;
+          }
+          if (found) mark(found);
+        }
+
+        var queued = false;
+
+        window.addEventListener(
+          'scroll',
+          function () {
+            if (queued) return;
+            queued = true;
+            requestAnimationFrame(function () {
+              queued = false;
+              spy();
+            });
+          },
+          { passive: true },
+        );
+
+        window.addEventListener('resize', spy);
+        spy();
+      })();
+    </script>
+  </body>
+</html>
