@@ -29,7 +29,7 @@ games, and even for homebrew. A huge library of music is available at [SMW Centr
 - **An AddmusicK-compatible MML compiler**, ported from C++ to TypeScript. It reads
   these target markers: `#amk 1`, `#amk 2`, `#amk 4`, `#am4`, `#amm`. (`#amk 3` is unsupported, the same as in AddmusicK itself.)
 - **SPC700 emulation** using Blargg's `snes_spc` as a WebAssembly module.
-- **Compile as you type**, with a **Live** mode that reloads the song at the position it
+- **Compile as you type**, with a **Hot Reload** mode that reloads the song at the position it
   was already playing. You can keep editing and the music never stops.
 - **Seek, loop and volume**, and per-channel **mute** and **solo** controls.
 - **A layout in FL Studio's mould** — transport and ARAM meter in the top bar, an inspector-first
@@ -48,7 +48,7 @@ games, and even for homebrew. A huge library of music is available at [SMW Centr
   inside the feedback loop and each pass is filtered again; it shades the region below ~2 kHz where
   eight taps at 32 kHz have no real say; and it warns when the feedback and the filter together
   make an echo that builds up instead of dying away. Edits go straight back into the MML, so with
-  **Live** on you hear the change on the running song.
+  **Hot Reload** on you hear the change on the running song.
 - **Syntax highlighting**, and a **live playhead** that follows the driver rather than estimating —
   so the highlighted note is the note you are hearing, in every channel.
 - **A hex dump** of the compiled song data, just because.

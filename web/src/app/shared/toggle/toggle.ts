@@ -20,7 +20,7 @@ const SEGMENT_OFF = 'text-ink-muted hover:not-disabled:text-ink';
 /**
  * A two-state button whose lit plate is the state.
  *
- * Loop, Live and Follow on the transport and the editor's word wrap are all
+ * Loop, Hot Reload and Follow on the transport and the editor's word wrap are all
  * one of these. The plate says which state it is in and nothing else does — the
  * project ships no ARIA, so there is no `aria-pressed`. There is no output
  * either: what a press means is the caller's business, so it binds `(click)`

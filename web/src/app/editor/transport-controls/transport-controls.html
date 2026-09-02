@@ -40,8 +40,8 @@
   amk-toggle
   size="md"
   title="While playing, reload the song at the same position whenever it recompiles"
-  [pressed]="playback.live()"
-  (click)="playback.live.set(!playback.live())"
+  [pressed]="playback.hotReload()"
+  (click)="playback.hotReload.set(!playback.hotReload())"
 >
   Hot Reload
 </button>

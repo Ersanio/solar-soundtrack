@@ -43,7 +43,7 @@ export class Playback {
    */
   readonly driver = signal<DriverState | null>(null);
   /** Reload the running song in place whenever it recompiles. */
-  readonly live = signal(true);
+  readonly hotReload = signal(true);
   readonly loop = signal(false);
 
   /** Where the seek bar is being dragged to, in ticks, while the drag goes on. */
@@ -138,7 +138,7 @@ export class Playback {
    * nothing.
    *
    * Empty unless the editor shows exactly the text that is playing: while an
-   * edit is mid-debounce, after editing with live reload off, or on a failed
+   * edit is mid-debounce, after editing with Hot Reload off, or on a failed
    * compile, a highlight would point into the wrong document, so there is
    * none. The comparison is by reference in the common case, since `edit()`
    * commits the same string instance `source` holds.
@@ -169,12 +169,12 @@ export class Playback {
     effect(() => this.player.setVolume(this.mixer.volume() / 100));
     effect(() => this.player.setLoop(this.loop()));
 
-    // Live reload: swap the running song for the newly compiled one and
+    // Hot Reload: swap the running song for the newly compiled one and
     // fast-forward back to where it was, so editing does not restart playback.
     effect(() => {
       const result = this.editor.result();
       untracked(() => {
-        if (this.live() && result?.ok) {
+        if (this.hotReload() && result?.ok) {
           this.reload(result);
         }
       });

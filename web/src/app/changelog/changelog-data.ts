@@ -16,7 +16,7 @@ export const CHANGELOG: readonly ChangelogEntry[] = [
     date: '2 September 2026',
     items: [
       'A new default look: blue-grey chrome and an orange playhead. The old grey is the Graphite preset',
-      'Transport with Play, Pause and Stop buttons, a time display, and Loop and Live switches',
+      'Transport with Play, Pause and Stop buttons, a time display, and Loop and Hot Reload switches',
       'ARAM meter in the top bar',
       'Inspector-first sidebar, with Problems always in view',
       'Status bar',
