@@ -1,5 +1,5 @@
 import { NgTemplateOutlet } from '@angular/common';
-import { Component, booleanAttribute, input, model } from '@angular/core';
+import { Component, booleanAttribute, computed, input, model } from '@angular/core';
 
 import { IconChevronDown } from '../icons/icon-chevron-down';
 import { IconChevronRight } from '../icons/icon-chevron-right';
@@ -30,4 +30,15 @@ export class Section {
   readonly heading = input.required<string>();
   readonly collapsible = input(false, { transform: booleanAttribute });
   readonly open = model(true);
+
+  /**
+   * The body’s classes, as one string rather than a `[class.hidden]` over a
+   * base carrying `flex`: both are `display` utilities, so which of the two won
+   * would be Tailwind’s emission order. The column is what lets a section hold
+   * an `overflow-auto` child — in a block body that child sits at its content
+   * height, and a long list spills past the pane.
+   */
+  protected readonly bodyClass = computed(() =>
+    this.collapsible() && !this.open() ? 'hidden' : 'flex min-h-0 flex-1 flex-col',
+  );
 }
