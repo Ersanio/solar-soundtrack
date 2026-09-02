@@ -58,11 +58,6 @@ games, and even for homebrew. A huge library of music is available at [SMW Centr
 - **A changelog** in the top bar, listing what each day of work added. It is a plain hand-edited
   list in `web/src/app/changelog/changelog-data.ts` — add a block at the top when you add a feature.
 
-## What is not there yet
-
-- **No accessibility.** The app ships no ARIA attributes at all. That is a deferral rather than an
-  oversight, and it is next on the list once the codebase settles.
-
 See the [GitHub Issues](https://github.com/ersanio/solar-soundtrack/issues) for a list of
 ideas, planned features and known issues.
 

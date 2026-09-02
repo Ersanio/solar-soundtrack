@@ -213,9 +213,8 @@ module.exports = defineConfig([
 
   // --- Templates ----------------------------------------------------------
   //
-  // `templateAccessibility` is deliberately absent: this project ships no ARIA
-  // attributes and no `role`/`tabindex`, by decision rather than by oversight.
-  // See the accessibility note in CLAUDE.md.
+  // `templateAccessibility` is deliberately absent: accessibility is not
+  // supported. See the note in CLAUDE.md.
   {
     files: ['web/src/**/*.html'],
     extends: [angular.configs.templateRecommended],

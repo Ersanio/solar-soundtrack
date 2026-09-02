@@ -138,11 +138,11 @@ import { RollTooltip } from './roll-tooltip/roll-tooltip';
   templateUrl: './piano-roll.html',
   host: {
     class: 'relative flex min-h-0 min-w-0 flex-col',
-    // On the window rather than through a focusable element: this project ships
-    // no `tabindex` and no `role`, and these shortcuts belong to the roll as a
-    // whole rather than to anything inside it. See `web/README.md`. The binding
-    // lives and dies with the roll, which `@case ('roll')` in `editor-pane.html`
-    // destroys on a tab switch, so it is roll-only without a check of its own.
+    // On the window rather than through a focusable element: these shortcuts
+    // belong to the roll as a whole rather than to anything inside it. The
+    // binding lives and dies with the roll, which `@case ('roll')` in
+    // `editor-pane.html` destroys on a tab switch, so it is roll-only without a
+    // check of its own.
     '(window:keydown)': 'onKey($event)',
   },
 })

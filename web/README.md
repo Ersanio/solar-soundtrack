@@ -245,12 +245,6 @@ wants, and `TOKEN_TAGS` holds `@lezer/highlight` tag _names_ as strings so the p
 CodeMirror-free. This is the one place those names resolve to `Tag` values, and `tokentest` asserts
 every one of them is real, so the cast is a checked one.
 
-## Accessibility
-
-**This app ships no ARIA attributes and no `role` or `tabindex`.** That is a deferral, not an
-oversight — see the note in the root `CLAUDE.md`. The global `:focus-visible` outline in
-`styles.css` is a different concern and must not be removed by components.
-
 ## Two AudioContexts
 
 `SpcPlayer` owns one for song playback. `Audition` owns a second for one-shot audition — a sample, or

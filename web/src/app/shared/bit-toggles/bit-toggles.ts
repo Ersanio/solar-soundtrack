@@ -16,9 +16,9 @@ export const VOICE_LABELS = ['0', '1', '2', '3', '4', '5', '6', '7'];
  * looking for voice 7 expects it.
  *
  * A `<fieldset>` with a `<legend>` rather than a row of labelled boxes, so the
- * group has a name a screen reader announces once instead of eight unrelated
- * checkboxes. Raw inputs rather than `amk-checkbox`, whose two-way `checked`
- * cannot express a bit derived from a byte the parent owns.
+ * group is named once instead of eight unrelated checkboxes. Raw inputs rather
+ * than `amk-checkbox`, whose two-way `checked` cannot express a bit derived from
+ * a byte the parent owns.
  *
  * ```html
  * <amk-bit-toggles legend="Channels" [value]="mask()" [labels]="voiceLabels"

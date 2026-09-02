@@ -3,9 +3,8 @@ import { Component, model } from '@angular/core';
 /**
  * A labelled checkbox with two-way `checked` binding.
  *
- * The `<input>` lives inside the `<label>`, so the projected text is the
- * accessible name and clicking it toggles — no `for`/`id` pairing to keep in
- * sync across call sites.
+ * The `<input>` lives inside the `<label>`, so the projected text labels it and
+ * clicking it toggles — no `for`/`id` pairing to keep in sync across call sites.
  *
  * ```html
  * <amk-checkbox [(checked)]="library.optimize">Optimize samples</amk-checkbox>
