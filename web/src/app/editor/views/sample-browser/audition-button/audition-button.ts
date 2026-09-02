@@ -18,7 +18,7 @@ import { SampleStore } from '../../../../state/sample-store';
   template: `
     <button
       type="button"
-      class="border-edge bg-inset text-ink-muted hover:text-ink hover:border-accent shrink-0 cursor-pointer rounded border px-2 py-1 font-mono text-xs disabled:cursor-not-allowed disabled:opacity-40"
+      class="border-edge bg-inset text-ink-muted hover:text-ink hover:border-control shrink-0 cursor-pointer rounded border px-2 py-1 font-mono text-xs disabled:cursor-not-allowed disabled:opacity-40"
       [disabled]="disabled()"
       (click)="toggle()"
     >

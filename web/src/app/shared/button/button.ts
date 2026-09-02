@@ -29,10 +29,18 @@ export class Button {
     'whitespace-nowrap transition-colors cursor-pointer ' +
     'disabled:cursor-not-allowed disabled:opacity-40';
 
+  /**
+   * `primary` is told from `default` by weight and lightness rather than by
+   * hue: the plate is a step up from `inset`, the border a step up from `edge`,
+   * and the label is full ink where the default's is not. `--color-control` is
+   * neutral, so the emphasis has to come from those three rather than from a
+   * colour, and `danger` keeps its hue because it is saying something the shape
+   * of a button cannot.
+   */
   private static readonly VARIANTS: Record<ButtonVariant, string> = {
-    default: 'border-edge bg-inset text-ink hover:not-disabled:border-accent',
+    default: 'border-edge bg-inset text-ink hover:not-disabled:border-control',
     primary:
-      'border-accent/60 bg-accent/15 text-accent font-medium hover:not-disabled:bg-accent/25',
+      'border-control/60 bg-control/15 text-ink font-medium hover:not-disabled:bg-control/25',
     ghost: 'border-transparent bg-transparent text-ink-muted hover:not-disabled:text-ink',
     danger: 'border-danger/60 bg-danger/15 text-danger font-medium hover:not-disabled:bg-danger/25',
   };

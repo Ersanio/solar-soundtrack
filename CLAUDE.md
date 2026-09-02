@@ -1341,18 +1341,60 @@ stats.loopTicks` pads **every other channel that would cut the song short** out 
   standing beside a dozen refusals it could not clear. The roll edits the song as written and says
   what it refuses; the parser records the command map and nothing else. `SST06xx` is retired with
   it — a new editor-side diagnostic takes the next band, not this one.
+- **The theme's default colours written a second time in TypeScript**, beside the `@theme` block
+  they came from — two sources of truth for one set of colours, and the first edit to either would
+  have moved them apart with nothing to notice. `readDefaults` reads them off the document with
+  `getComputedStyle` at construction, before the store's own effect has written anything: a
+  stylesheet is render-blocking, so it is parsed before Angular bootstraps, and an unregistered
+  custom property comes back as it was authored rather than computed. `styles.css` stays the one
+  definition, and `@theme static` is what guarantees all of them reach `:root` — Tailwind emits a
+  theme variable only where something uses it, and a reset is `removeProperty`, so a token no
+  utility happens to name still needs its default sitting there to fall back to.
+- **Storing the whole palette rather than only what was changed** — it reads as the simpler shape
+  and it freezes a porter on the defaults of the day they first opened the picker: change one
+  colour, and the other twenty-four stop following the app for good. `ThemeStore.overrides` holds
+  only the tokens moved off a default, which is also what makes a per-token reset exact rather than
+  approximate — the property is removed and whatever `styles.css` now says shows through.
+- **Re-hueing the eight channels for the neutral theme**, on the reading that a blue-grey chrome was
+  what the set was validated against — `--color-surface` moves from a relative luminance of 0.00913
+  to 0.00972, which is a 6% change in a number already at the bottom of the scale, and every
+  channel's contrast against it moves by about 1%. The set is validated where it was; what changed
+  was the four greys around it.
+- **The controls painted in `--color-accent`** — a primary button's plate, a checked box, a slider's
+  fill and every toggle chip were the same token as the playhead, the lit keys, the caret and a
+  syntax keyword, so there was no way to make the chrome neutral without taking the roll's own
+  markers with it. `--color-control` is its own token and neutral by default, and `primary` is told
+  from `default` by lightness and weight — a plate a step up from `inset`, a border a step up from
+  `edge`, full ink on the label — because a neutral colour cannot carry that difference by hue.
+  `danger` keeps its hue, saying something the shape of a button cannot. The focus ring stays on the
+  accent: it is an affordance rather than a decoration, and it is the one place the blue earns being
+  the odd one out.
+- **The source view's colouring drawn from the app's palette** — twelve tags in `TOKEN_TAGS` sharing
+  eight shared tokens, so re-colouring the notes moved the body text with them and re-colouring the
+  loop brackets moved every severe warning, and the one surface a porter looks at for hours could
+  not be touched without disturbing the chrome. `--color-syn-*` is one token per tag, shared with
+  nothing, defaulting to what the shared tokens used to give so the source reads as it did. The
+  editor's _structure_ stays on the app's palette on purpose — a gutter, a tooltip, the caret and a
+  diagnostic's underline are chrome and findings rather than MML, and a porter re-colouring their
+  notes is not asking for a different error underline.
+- **A preview folded into the stored overrides** — `<input type="color">` reports every step of a
+  drag through the operating system's picker on `input`, so that is a synchronous `localStorage`
+  write per frame of a drag. `ThemeStore.previewing` is a transient signal laid over the stored one,
+  which is the `preview`/`commit` split `Slider` and `NumberField` already make.
 
 ## Angular specifics
 
 Angular 22, zoneless (scaffolded `--zoneless`, so zone.js is not a dependency and there is nothing
 to opt into), no router, no NgModules. Signals throughout: `signal`/`computed` for state, `effect`
 reserved for mirroring into imperative sinks (localStorage, the player, the DSP). State lives in
-nine `@Service()` singletons in `web/src/app/state/`. The spine runs one way, `DriverStore` →
+ten `@Service()` singletons in `web/src/app/state/`. The spine runs one way, `DriverStore` →
 `SampleStore` → `EditorStore` → `Playback`; `ClockMeasurer` feeds `EditorStore`, `Audition` hangs
-off it beside `Playback`, `Mixer` hangs off it and is read by both of those and by the roll,
-`EditorRequests` depends on nothing at all, and `CommitAudition` is the command inspector's write
-path over `EditorRequests` and `Audition` — a panel's commit replays the selected note once its
-compile lands. `web/README.md` has the rest.
+off it beside `Playback`, `Mixer` hangs off it and is read by both of those and by the roll, and
+`CommitAudition` is the command inspector's write path over `EditorRequests` and `Audition` — a
+panel's commit replays the selected note once its compile lands. `EditorRequests` and `ThemeStore`
+depend on nothing at all, and nothing depends on the second either: it puts the porter's colours on
+`<html>` as inline custom properties, and everything downstream reads those as CSS rather than
+asking the service. `web/README.md` has the rest.
 
 Selector prefix is `amk` — `amk-root`, `amk-editor-pane` for components, camelCase `amk*` for
 directives. ESLint enforces both.
@@ -1360,11 +1402,19 @@ directives. ESLint enforces both.
 Styling is Tailwind v4, with the entire theme as CSS variables in `web/src/styles.css` (v4 has no
 `tailwind.config.js`). Dark-only on purpose. Two **validated categorical sets** live there —
 `--color-seg-*` for the ARAM bar and `--color-ch-*` for the eight music channels — and neither may be
-reordered or re-hued without re-validating, since adjacent-pair CVD separation and contrast against
-`--color-surface` are the properties being preserved. The order is the mechanism, not decoration: it
-is what the adjacent-pair check runs against. `--color-ch-*` does not clear the all-pairs gate and no
-set of eight can, so nothing may leave channel identity to colour alone; `styles.css` says what
-carries it instead.
+reordered or re-hued **in that file** without re-validating, since adjacent-pair CVD separation and
+contrast against `--color-surface` are the properties being preserved. The order is the mechanism,
+not decoration: it is what the adjacent-pair check runs against. `--color-ch-*` does not clear the
+all-pairs gate and no set of eight can, so nothing may leave channel identity to colour alone;
+`styles.css` says what carries it instead.
+
+Those values are **defaults**, and `ThemeStore` lets a porter override any of them — the eight
+channels included — from the top bar's picker. That is not a hole in the paragraph above, it is what
+the paragraph's last sentence buys: the app never said anything with a channel's colour that it was
+not also saying with a number, a tooltip or a strike-through, so a porter putting two channels on
+one hue loses a convenience and breaks no claim. What still has to be re-validated is a change to
+the defaults themselves, which is the set every porter starts from. A preset in
+`theme-presets.ts` is held to the same bar and none of the shipped four touch the eight.
 
 Framework-generic Angular 22 conventions (signal APIs, `@Service()`, host bindings, control flow)
 live in `web/.claude/CLAUDE.md`, which the Angular CLI generated via `--ai-config=claude` and can

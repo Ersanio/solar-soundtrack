@@ -39,7 +39,7 @@ function readFilter(): Filter {
 
 export function chipClass(selected: boolean): string {
   return `cursor-pointer rounded px-2 py-0.5 text-xs transition-colors ${
-    selected ? 'bg-accent/20 text-accent font-semibold' : 'text-ink-muted hover:text-ink'
+    selected ? 'bg-control/20 text-ink font-semibold' : 'text-ink-muted hover:text-ink'
   }`;
 }
 
@@ -65,7 +65,7 @@ export function entryClass(entry: ResolvedEntry): string {
 
   return entry.availability.state === 'caution' || entry.caveat !== undefined
     ? `${base} text-warn border-warn/40 hover:border-warn`
-    : `${base} text-ink-muted hover:text-ink hover:border-accent`;
+    : `${base} text-ink-muted hover:text-ink hover:border-control`;
 }
 
 /**

@@ -78,29 +78,33 @@ const structure = EditorView.theme(
 );
 
 /**
- * One entry per tag named in `TOKEN_TAGS`. Notes and plain numbers stay primary
- * ink on purpose — the melody is the text, and everything else is annotation
- * around it.
+ * One entry per tag named in `TOKEN_TAGS`, and every one of them on a
+ * `--color-syn-*` token of its own.
  *
- * A hex command's argument bytes are the one tag that carries a colour of its
- * own rather than one already spent elsewhere. They are not `--color-accent`:
- * repeating the command byte's colour would flatten `$E7 $02` into one
- * undifferentiated blue run, and on `tags.number` they would be
- * indistinguishable from notes and body text.
+ * Shared with nothing, deliberately: the source's colouring is the one thing a
+ * porter looks at for hours, and while these were the app's own palette a
+ * change to the notes moved the body text with them and a change to the loop
+ * brackets moved every severe warning. `styles.css` carries the defaults, which
+ * are what the shared tokens used to give here, so the source reads as it did
+ * until somebody sets one.
+ *
+ * The structure above is not part of this. A gutter, a tooltip and a
+ * diagnostic's underline are the editor's chrome and the app's own findings,
+ * not MML, so they stay on the tokens the rest of the app uses.
  */
 const highlight = HighlightStyle.define([
-  { tag: tags.comment, color: 'var(--color-ink-muted)', fontStyle: 'italic' },
-  { tag: tags.meta, color: 'var(--color-accent)' },
-  { tag: tags.labelName, color: 'var(--color-accent)', fontWeight: '600' },
-  { tag: tags.literal, color: 'var(--color-ink)' },
-  { tag: tags.variableName, color: 'var(--color-good)' },
-  { tag: tags.bracket, color: 'var(--color-severe)' },
-  { tag: tags.operator, color: 'var(--color-ink-muted)' },
-  { tag: tags.string, color: 'var(--color-warn)' },
-  { tag: tags.keyword, color: 'var(--color-accent)' },
-  { tag: tags.number, color: 'var(--color-ink)' },
-  { tag: tags.integer, color: 'var(--color-accent-soft)' },
-  { tag: tags.invalid, color: 'var(--color-danger)' },
+  { tag: tags.comment, color: 'var(--color-syn-comment)', fontStyle: 'italic' },
+  { tag: tags.meta, color: 'var(--color-syn-directive)' },
+  { tag: tags.labelName, color: 'var(--color-syn-channel)', fontWeight: '600' },
+  { tag: tags.literal, color: 'var(--color-syn-note)' },
+  { tag: tags.variableName, color: 'var(--color-syn-command)' },
+  { tag: tags.bracket, color: 'var(--color-syn-loop)' },
+  { tag: tags.operator, color: 'var(--color-syn-operator)' },
+  { tag: tags.string, color: 'var(--color-syn-string)' },
+  { tag: tags.keyword, color: 'var(--color-syn-hex)' },
+  { tag: tags.number, color: 'var(--color-syn-number)' },
+  { tag: tags.integer, color: 'var(--color-syn-hex-arg)' },
+  { tag: tags.invalid, color: 'var(--color-syn-invalid)' },
 ]);
 
 export const mmlTheme: Extension = [structure, syntaxHighlighting(highlight)];

@@ -21,8 +21,8 @@
     grab zone to something a pointer can hit.
   -->
   <div
-    class="bg-edge hover:bg-accent relative hidden w-px cursor-col-resize touch-none before:absolute before:inset-y-0 before:-inset-x-1 before:content-[''] lg:block"
-    [class.bg-accent]="dragging()"
+    class="bg-edge hover:bg-control relative hidden w-px cursor-col-resize touch-none before:absolute before:inset-y-0 before:-inset-x-1 before:content-[''] lg:block"
+    [class.bg-control]="dragging()"
     (pointerdown)="onGrab($event)"
     (pointermove)="onDrag($event)"
     (pointerup)="onRelease()"

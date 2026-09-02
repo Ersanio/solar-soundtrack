@@ -1,7 +1,7 @@
 # The editor
 
 The Angular application. Everything it compiles, assembles and plays lives in `../packages`; what is
-here is the UI, the eight state services, and the adapters that join CodeMirror and Web Audio to
+here is the UI, the ten state services, and the adapters that join CodeMirror and Web Audio to
 framework-free code.
 
 Run everything from the repository root, not from here. `npm start`, `npm run build` and
@@ -13,14 +13,14 @@ them.
 
 | Path                    | What it is                                                                           |
 | ----------------------- | ------------------------------------------------------------------------------------ |
-| `src/app/state/`        | Nine `@Service()` singletons in dependency order, and the transport's clock          |
+| `src/app/state/`        | Ten `@Service()` singletons in dependency order, and the transport's clock           |
 | `src/app/editor/`       | The left pane and its chrome: top bar, transport, mixer, palette, CodeMirror adapter |
 | `src/app/editor/views/` | What the pane's tabs switch between: source, sample library, piano roll              |
 | `src/app/output/`       | Diagnostics, stats, the ARAM bar, the command and loop inspectors                    |
 | `src/app/shared/`       | Form controls, panels, icons, chart helpers                                          |
 | `src/app/util/`         | Formatting, IndexedDB, `clamp`                                                       |
 
-State flows one way: `DriverStore` → `SampleStore` → `EditorStore` → `Playback`. Five more sit off
+State flows one way: `DriverStore` → `SampleStore` → `EditorStore` → `Playback`. Six more sit off
 that spine: `ClockMeasurer`, which `EditorStore` owns and which drives the measurement described
 below; `Audition`, which hangs off `EditorStore` beside `Playback` and owns the second
 `AudioContext`; `Mixer`, which holds the per-channel mutes, the solo and the output level and is
@@ -28,7 +28,9 @@ read by `Playback`, by `Audition` and by the roll — three readers and no owner
 member of any of them, and the level is there for the same reason the mask is: both audio paths
 apply it, the transport to the player's gain and the previewer to a `GainNode` of its own;
 `EditorRequests`, which injects nothing at all, because a mailbox between the panels and the
-source view has nothing to read; and `CommitAudition`, the command inspector's write path, which
+source view has nothing to read; `ThemeStore`, which injects nothing either and which nothing
+injects, because what it writes is CSS custom properties on `<html>` and every reader of those is
+a stylesheet; and `CommitAudition`, the command inspector's write path, which
 forwards a panel's commit to `EditorRequests` and replays the selected note through `Audition`
 once the compile that includes it lands.
 
@@ -270,6 +272,39 @@ share `spc-core.ts`, which is the one-emulator-per-worker bootstrap both need.
 The MML draft goes to `localStorage`; the sample library to IndexedDB via `util/idb.ts`, which
 resolves rather than rejects on every path. Storage is genuinely optional — private browsing, an
 exhausted quota — and must never stop someone compiling a song.
+
+## The theme is one file, and the porter may change it
+
+Every colour the app draws in is a `--color-*` custom property in `src/styles.css`, and every
+consumer reaches it through `var()` — the Tailwind utilities, `codemirror/mml-theme.ts`,
+`shared/slider/slider-track.ts`, and the roll's SVG through the class-name arrays in
+`util/channel-palette.ts`. Nothing anywhere holds a hex literal.
+
+That is what makes the theme changeable at runtime for free. `state/theme-store.ts` puts the
+porter's chosen colours on `document.documentElement` as inline custom properties, which outrank the
+`:root` rule Tailwind emits, so one write re-tints the whole app including the piano roll. The
+picker in the top bar (`theme/theme-picker/`) offers the presets in `theme/theme-presets.ts` and a
+`shared/color-field/` per token; `theme/theme-tokens.ts` is the list, and the property name is
+derived from each token's name rather than spelled twice.
+
+Two families of token are deliberately not shared. `--color-control` is what a control is
+emphasised in — a primary button's plate, a checked box, a slider's fill, a toggle chip that is on —
+and it is separate from `--color-accent`, which means _this is where the music is_: the playhead, a
+lit key, the caret. Painting the chrome with the accent meant neutral buttons could not be had
+without a neutral playhead. And `--color-syn-*` is the source view's colouring, one token per tag in
+`TOKEN_TAGS`, shared with nothing at all — `codemirror/mml-theme.ts`'s highlight table reads only
+those, while its structure block (gutters, tooltips, diagnostic underlines) stays on the app's
+palette, being chrome rather than MML.
+
+Three things are worth knowing before changing any of it. The defaults are read _off the document_
+rather than copied into TypeScript, so `styles.css` stays the only place they are written, and
+resetting a token removes the inline property rather than writing a default back. Only the tokens
+actually changed are stored, so a porter who moved one colour still follows the app on the rest. And
+a colour input reports a drag continuously, so `preview` and `commit` are split the way
+`shared/slider/`'s are — only the second is written down.
+
+The one thing outside CSS is `<meta name="theme-color">` in `index.html`, which the store keeps in
+step; the manifest's copy is baked into an installed app and cannot follow.
 
 ## Charts
 

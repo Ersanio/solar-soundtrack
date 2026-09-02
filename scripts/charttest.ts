@@ -2301,7 +2301,7 @@ console.log("\nthe slider's track, whose two rules fail invisibly");
 	for (let percent = 0; percent <= 100; percent += 5) {
 		const image = trackImage(percent / 100, true);
 		const detent = image.indexOf("--color-ink-muted");
-		const fill = image.indexOf("--color-accent");
+		const fill = image.indexOf("--color-control");
 		if (detent < 0 || fill < 0 || detent > fill) {
 			detentBehind += ` ${percent}%`;
 		}

@@ -11,6 +11,8 @@ export const CHANGELOG: readonly ChangelogEntry[] = [
   {
     date: '2 September 2026',
     items: [
+      'A neutral grey look, and a theme picker: four presets, or set any colour yourself',
+      'The source view has its own colours now — notes, commands, loops and the rest, set one by one',
       'Escape deselects the command you are inspecting',
       'Changing a command picked in the command lane previews the note it acts on',
       'The Normalize button is gone: the piano roll edits a song as it is written',

@@ -222,8 +222,8 @@
     lane, double-click it for the five rows it opens at.
   -->
   <div
-    class="bg-edge hover:bg-accent relative h-px shrink-0 cursor-row-resize touch-none before:absolute before:inset-x-0 before:-inset-y-1 before:content-['']"
-    [class.bg-accent]="laneResizing()"
+    class="bg-edge hover:bg-control relative h-px shrink-0 cursor-row-resize touch-none before:absolute before:inset-x-0 before:-inset-y-1 before:content-['']"
+    [class.bg-control]="laneResizing()"
     (pointerdown)="onLaneGrab($event)"
     (pointermove)="onLaneResize($event)"
     (pointerup)="onLaneRelease()"

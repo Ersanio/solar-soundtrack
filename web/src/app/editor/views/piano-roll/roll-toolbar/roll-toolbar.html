@@ -1,14 +1,20 @@
 <amk-toolbar>
+  <!-- First, and ahead of every setting: one history, so a roll gesture and a
+       keystroke undo in the order they happened, and the roll is where a
+       gesture is most easily made by accident. The source toolbar carries the
+       same pair. -->
+  <amk-history-buttons />
+
   <div class="flex items-center gap-1">
     <span class="text-ink-muted text-xs">Zoom</span>
     <button
-      class="border-edge bg-inset text-ink hover:border-accent cursor-pointer rounded-md border px-2 leading-6"
+      class="border-edge bg-inset text-ink hover:border-control cursor-pointer rounded-md border px-2 leading-6"
       (click)="zoomBy.emit(-1)"
     >
       −
     </button>
     <button
-      class="border-edge bg-inset text-ink hover:border-accent cursor-pointer rounded-md border px-2 leading-6"
+      class="border-edge bg-inset text-ink hover:border-control cursor-pointer rounded-md border px-2 leading-6"
       (click)="zoomBy.emit(1)"
     >
       +
@@ -18,13 +24,13 @@
   <div class="flex items-center gap-1">
     <span class="text-ink-muted text-xs">Rows</span>
     <button
-      class="border-edge bg-inset text-ink hover:border-accent cursor-pointer rounded-md border px-2 leading-6"
+      class="border-edge bg-inset text-ink hover:border-control cursor-pointer rounded-md border px-2 leading-6"
       (click)="rowHeightBy.emit(-1)"
     >
       −
     </button>
     <button
-      class="border-edge bg-inset text-ink hover:border-accent cursor-pointer rounded-md border px-2 leading-6"
+      class="border-edge bg-inset text-ink hover:border-control cursor-pointer rounded-md border px-2 leading-6"
       (click)="rowHeightBy.emit(1)"
     >
       +
@@ -136,10 +142,6 @@
   >
     {{ percussionOpen() ? '▾' : '▸' }} Percussion
   </button>
-
-  <!-- The same pair the source toolbar carries: one history, so a roll gesture
-       and a keystroke undo in the order they happened. -->
-  <amk-history-buttons />
 
   <span class="text-ink-muted font-mono text-xs">{{ editLabel() }}</span>
   <!-- Why a channel cannot be edited is said here rather than in a dialog: it is

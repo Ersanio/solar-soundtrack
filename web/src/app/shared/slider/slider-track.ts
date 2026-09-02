@@ -92,7 +92,7 @@ export function trackFraction(position: number, bounds: TrackBounds): number {
  */
 export function trackImage(fraction: number, centred: boolean): string {
   const track = 'var(--color-edge)';
-  const fill = 'var(--color-accent)';
+  const fill = 'var(--color-control)';
   const at = clamp(fraction * 100, 0, 100);
 
   if (!centred) {

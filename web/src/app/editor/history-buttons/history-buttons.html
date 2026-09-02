@@ -1,9 +1,13 @@
 <!-- The editor's own history, which the keyboard reaches already; the same two
-     commands for the mouse, from whichever toolbar is in front. -->
+     commands for the mouse, from whichever toolbar is in front.
+
+     They wear the primary button's plate, which is what the transport's Play
+     wears: undo is the thing a porter reaches for most from either toolbar, and
+     it is the one control there that has to be found without reading. -->
 <div class="flex items-center gap-1">
   <button
     type="button"
-    class="border-edge text-ink-muted hover:not-disabled:text-ink cursor-pointer rounded-md border px-1.5 py-1.5 transition-colors disabled:cursor-not-allowed disabled:opacity-40"
+    class="border-control/60 bg-control/15 text-ink hover:not-disabled:bg-control/25 cursor-pointer rounded-md border px-1.5 py-1.5 transition-colors disabled:cursor-not-allowed disabled:opacity-40"
     [title]="`Undo (${historyKeys.undo})`"
     [disabled]="!canUndo()"
     (click)="undo()"
@@ -12,7 +16,7 @@
   </button>
   <button
     type="button"
-    class="border-edge text-ink-muted hover:not-disabled:text-ink cursor-pointer rounded-md border px-1.5 py-1.5 transition-colors disabled:cursor-not-allowed disabled:opacity-40"
+    class="border-control/60 bg-control/15 text-ink hover:not-disabled:bg-control/25 cursor-pointer rounded-md border px-1.5 py-1.5 transition-colors disabled:cursor-not-allowed disabled:opacity-40"
     [title]="`Redo (${historyKeys.redo})`"
     [disabled]="!canRedo()"
     (click)="redo()"

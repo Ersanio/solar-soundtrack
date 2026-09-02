@@ -108,7 +108,7 @@ export class SourceView {
   protected readonly wrapButtonClass = computed(
     () =>
       `border-edge cursor-pointer rounded-md border px-1.5 py-1.5 transition-colors ${
-        this.wordWrap() ? 'bg-accent/20 text-accent font-semibold' : 'text-ink-muted hover:text-ink'
+        this.wordWrap() ? 'bg-control/20 text-ink font-semibold' : 'text-ink-muted hover:text-ink'
       }`,
   );
 

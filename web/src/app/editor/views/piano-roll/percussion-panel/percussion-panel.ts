@@ -36,7 +36,7 @@ export function percussionChips(
 
 function chipClass(on: boolean): string {
   return `cursor-pointer rounded px-2 py-0.5 font-mono text-xs transition-colors ${
-    on ? 'bg-accent/20 text-accent font-semibold' : 'text-ink-muted hover:text-ink'
+    on ? 'bg-control/20 text-ink font-semibold' : 'text-ink-muted hover:text-ink'
   }`;
 }
 

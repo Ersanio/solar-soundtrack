@@ -1,0 +1,48 @@
+<div class="flex items-center gap-2">
+  <!-- The reset sits outside the label: inside it, a press would open the picker. -->
+  <label class="flex min-w-0 flex-1 cursor-pointer items-center gap-2">
+    <!--
+      The swatch is the span, and the input over it is transparent. A colour
+      input paints its own well in the user agent's colours — a white plate
+      around the value — so a dark theme colour reads as a light one. The value
+      goes on the span instead, and `has-[:focus-visible]` puts back the ring
+      an invisible input can no longer show.
+    -->
+    <span
+      class="border-edge has-[:focus-visible]:outline-accent relative size-6 shrink-0 rounded-sm border has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-1"
+      [class.opacity-40]="disabled()"
+      [style.background-color]="value()"
+    >
+      <input
+        type="color"
+        class="absolute inset-0 size-full cursor-pointer opacity-0 disabled:cursor-not-allowed"
+        [disabled]="disabled()"
+        [value]="value()"
+        (input)="onPreview($event)"
+        (change)="onCommit($event)"
+      />
+    </span>
+    <span class="flex min-w-0 flex-1 flex-col">
+      <span class="text-ink truncate text-[11px]">{{ label() }}</span>
+      @if (hint(); as text) {
+        <span class="text-ink-muted truncate text-[10px] leading-snug">{{ text }}</span>
+      }
+    </span>
+    <span class="text-ink-muted shrink-0 font-mono text-[10px] tabular-nums uppercase">
+      {{ value() }}
+    </span>
+  </label>
+
+  <span class="flex w-10 shrink-0 justify-end">
+    @if (overridden()) {
+      <button
+        type="button"
+        class="text-ink-muted hover:text-ink cursor-pointer text-[10px] hover:underline"
+        title="Back to the default colour"
+        (click)="cleared.emit()"
+      >
+        reset
+      </button>
+    }
+  </span>
+</div>

@@ -15,7 +15,7 @@
   type="range"
   min="0"
   step="1"
-  class="accent-accent w-24 cursor-pointer disabled:cursor-not-allowed disabled:opacity-40"
+  class="accent-control w-24 cursor-pointer disabled:cursor-not-allowed disabled:opacity-40"
   title="Seek — the song replays silently to reach the new position"
   [max]="playback.durationTicks()"
   [value]="playback.position()"
@@ -45,7 +45,7 @@
   <input
     type="range"
     min="0"
-    class="accent-accent w-20 cursor-pointer"
+    class="accent-control w-20 cursor-pointer"
     title="Volume"
     [max]="VOLUME_MAX"
     [value]="mixer.volume()"

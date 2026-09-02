@@ -100,8 +100,8 @@ export class NotePalette {
 
   readonly model = input.required<NotePaletteModel>();
 
-  /** Closed by default: the inspector's chips are the more asked-for half. */
-  protected readonly open = signal(readStored(OPEN_KEY) === 'open');
+  /** Open by default; only a porter's own close is remembered. */
+  protected readonly open = signal(readStored(OPEN_KEY) !== 'closed');
 
   protected readonly filter = signal<Category>(readFilter());
 
