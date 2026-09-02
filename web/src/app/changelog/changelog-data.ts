@@ -9,6 +9,10 @@ export interface ChangelogEntry {
 export const CHANGELOG: readonly ChangelogEntry[] = [
   // ─── newest first; add new blocks here ──────────────────────────────────
   {
+    date: '2 September 2026',
+    items: ['Escape deselects the command you are inspecting'],
+  },
+  {
     date: '1 September 2026',
     items: [
       'Clicking and double-clicking a note in a loop works on every pass, not just the first',

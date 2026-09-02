@@ -640,8 +640,9 @@ export class PianoRoll {
    * that panel: a ring that outlived it would be pointing at nothing.
    *
    * Held here rather than in each layer because three things read it — the lane
-   * rings it, the bars ring it, and `onKey` deletes it — and two of those are
-   * drawn in the same gesture. One signal is what stops them disagreeing.
+   * rings it, the bars ring it, and `onKey` deletes it and lets it go — and two
+   * of those are drawn in the same gesture. One signal is what stops them
+   * disagreeing.
    *
    * Only a command the roll draws (`inspectable`). A note is a `Command` too and
    * a click on a bar puts the caret on it, so the caret alone would hand `Delete`
@@ -1863,8 +1864,8 @@ export class PianoRoll {
    * to name a channel with, so `Ctrl+A` under one merely hovered would select
    * notes in a channel the toolbar says is not being edited.
    *
-   * Space is the exception and needs no channel: it is the transport, not an
-   * edit.
+   * Space needs no channel, being the transport rather than an edit, and nor do
+   * the keys a selected command takes: a lane glyph names a command of the song.
    */
   protected onKey(event: KeyboardEvent): void {
     const target = event.target as HTMLElement | null;
@@ -1933,15 +1934,17 @@ export class PianoRoll {
       return;
     }
 
-    if (this.editChannel() === null) {
-      return;
-    }
-
-    // Escape steps back out, one level per press: the selection, then the
-    // channel itself. Ahead of the strip, and needing none — a channel the roll
-    // has refused is exactly the one the porter wants to leave.
+    // Escape steps back out, one level per press: the command, then the
+    // selection, then the channel itself. Ahead of the channel guard because a
+    // lane glyph picks no channel and its ring still has to go; ahead of the
+    // strip, and needing none — a channel the roll has refused is exactly the
+    // one the porter wants to leave.
     if (event.key === 'Escape') {
-      if (this.gestures.selection().size > 0) {
+      if (inspected !== null) {
+        // Letting the command go is letting the inspector go: the ring stands
+        // for that panel, and `inspectedCommand` reads the same `dismissed`.
+        this.requests.dismissed.set(this.editor.caret());
+      } else if (this.gestures.selection().size > 0) {
         this.gestures.clearSelection();
         // Letting the note go lets go of the question asked about it: the
         // inspector is answering from the caret a click on that bar moved, and
@@ -1949,10 +1952,14 @@ export class PianoRoll {
         this.requests.inspecting.set(null);
         this.requests.inspectingLoop.set(null);
         this.requests.dismissed.set(this.editor.caret());
-      } else {
+      } else if (this.editChannel() !== null) {
         this.clearEditChannel();
       }
 
+      return;
+    }
+
+    if (this.editChannel() === null) {
       return;
     }
 
