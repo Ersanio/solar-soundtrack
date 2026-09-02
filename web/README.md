@@ -737,8 +737,12 @@ clock's rate holds it inside a 32nd. In the browser the roll leads the transport
 12 ticks at `t254`, which is that anchor's own staleness and nothing more.
 
 The transport's clock runs on the same display clock when it is showing ticks (click it to switch
-between m:ss and ticks), so the number and the line cannot disagree; the shortfall itself is what
-`SST0503` reports.
+between m:ss and ticks), so the number and the line cannot disagree. The status bar says the rate at
+the playhead — `t254 · 231.9 of 498.0 ticks/s` when the two part company by more than a twentieth,
+the plain figure when they agree — from the measurement's shortfall over the whole pass, which is the
+figure `SST0503` is raised on, applied at the playhead's tempo. Not the clock's slope at the tick:
+the measurement polls once a tick in 5 ms blocks, so one segment reads 100 or 125 ticks/s on a song
+that plays at 107.
 
 Only what the song uses gets a row: the pitched range is fitted and rounded out to whole octaves,
 and a drum or noise lane appears only when something plays it. Rows then stretch to fill the pane,

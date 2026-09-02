@@ -141,8 +141,12 @@ export function measureClock(core: SpcCore, spc: Uint8Array, passTicks: number):
 
     ticks += stepped;
     if (lead < 0) {
-      // The first tick seen; the comparison starts here.
+      // The first tick seen; the comparison starts here, and so does the music:
+      // a point of its own, so the boot is a segment of the clock rather than
+      // a stretch folded into the first music segment's slope.
       lead = rendered / SPC_SAMPLE_RATE;
+      marked = ticks;
+      points.push({ tick: ticks, seconds: lead });
     } else {
       // Priced at the tempo standing when the tick was seen, so a song that
       // changes tempo — or fades one — is compared against what it asked for at

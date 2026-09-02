@@ -1,7 +1,12 @@
 import { Component, computed, inject } from '@angular/core';
 
+import type { SongTimeline } from '@amk/spc/song-walk';
+import { DEFAULT_TEMPO, ticksPerSecond } from '@amk/tokens/commands/units';
+import { ClockMeasurer } from '../state/clock-measurer';
 import { EditorRequests } from '../state/editor-requests';
 import { type StatusKind, EditorStore } from '../state/editor-store';
+import { tempoShortfall } from '../state/measure-clock';
+import { Playback } from '../state/playback';
 
 /**
  * The dot per status, spelled out in full: Tailwind finds classes by scanning
@@ -15,6 +20,23 @@ const DOT: Record<StatusKind, string> = {
   busy: 'size-2 shrink-0 rounded-full bg-ink-muted animate-pulse',
 };
 
+/**
+ * The last `t` written at or before a tick, or the driver's own default where
+ * none is. A fade is taken at its target, which is what stands once it is done.
+ */
+function writtenTempoAt(song: SongTimeline, tick: number): number {
+  let tempo = DEFAULT_TEMPO;
+  for (const change of song.tempoChanges) {
+    if (change.tick > tick) {
+      break;
+    }
+
+    tempo = change.tempo;
+  }
+
+  return tempo;
+}
+
 const TEXT: Record<StatusKind, string> = {
   ok: 'text-good',
   info: 'text-ink-muted',
@@ -26,12 +48,13 @@ const TEXT: Record<StatusKind, string> = {
  * The one-row footer: FL's hint bar.
  *
  * It holds the compile status, the problem count, the free ARAM, the note
- * count and the credits — five things that are each a line long and belong to
- * the whole song rather than to either pane, so they sit at the same height on
- * every screen and no pane has to keep a header for them. The status, the
- * counts and the free space are what a porter glances at between keystrokes;
- * the problem count and the space are buttons because the answer to "what
- * problems?" and "what is using it?" is a section of the output pane.
+ * count, the tempo and tick rate at the playhead, and the credits — each a
+ * line long and belonging to the whole song rather than to either pane, so
+ * they sit at the same height on every screen and no pane has to keep a header
+ * for them. The status, the counts, the space and the rate are what a porter
+ * glances at between keystrokes; the problem count and the space are buttons
+ * because the answer to "what problems?" and "what is using it?" is a section
+ * of the output pane.
  */
 @Component({
   selector: 'amk-status-bar',
@@ -43,6 +66,8 @@ const TEXT: Record<StatusKind, string> = {
 export class StatusBar {
   protected readonly store = inject(EditorStore);
   protected readonly requests = inject(EditorRequests);
+  private readonly playback = inject(Playback);
+  private readonly measurer = inject(ClockMeasurer);
 
   protected readonly dotClass = computed(() => DOT[this.store.status().kind]);
   protected readonly textClass = computed(() => TEXT[this.store.status().kind]);
@@ -80,6 +105,47 @@ export class StatusBar {
   protected readonly notesLabel = computed(() => {
     const song = this.store.timeline();
     return song ? `${song.notes.length.toLocaleString()} notes` : null;
+  });
+
+  /**
+   * The tempo at the playhead and the ticks per second the driver manages there.
+   *
+   * The tempo is the driver's own while it is playing and the walk's last `t`
+   * at or before the playhead otherwise, as `t` writes it — `DriverState.tempo`
+   * is `$51`, one higher. The rate the song is *getting* is not always the rate
+   * the tempo byte asks for: the driver runs at most one tick per pass of its
+   * main loop, so a busy song gets fewer. Both are shown when they part company
+   * by enough to matter, since `t254 · 231 ticks/s` on its own reads like a bug.
+   *
+   * The shortfall is the measurement's over the whole pass, the same figure
+   * `SST0503` is raised on, applied at the playhead's tempo. Not the measured
+   * clock's slope at the tick: the measurement polls once a tick in 5 ms
+   * blocks, so a single segment reads 100 or 125 ticks/s on a song that plays
+   * at 107, and a readout built on one would flicker between the two forms.
+   * The measurement is the latest to land, which stands until the next does.
+   */
+  protected readonly rateLabel = computed(() => {
+    const song = this.store.timeline();
+    if (!song) {
+      return null;
+    }
+
+    const tick = this.playback.position();
+    const driver = this.playback.driver();
+    const tempo = driver && driver.tempo > 0 ? driver.tempo - 1 : writtenTempoAt(song, tick);
+    if (tempo <= 0) {
+      return null;
+    }
+
+    const asked = ticksPerSecond(tempo);
+    const measured = this.measurer.measured();
+    const shortfall = measured ? tempoShortfall(measured) : null;
+    const got = shortfall ? asked / shortfall : asked;
+    const rate =
+      got > 0 && got < asked * 0.95
+        ? `${got.toFixed(1)} of ${asked.toFixed(1)} ticks/s`
+        : `${asked.toFixed(1)} ticks/s`;
+    return `t${tempo} · ${rate}`;
   });
 
   /** Red once the song no longer fits, which is the one reading that changes what a porter does next. */

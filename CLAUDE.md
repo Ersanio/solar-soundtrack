@@ -1438,8 +1438,11 @@ stats.loopTicks` pads **every other channel that would cut the song short** out 
   transport's, whose clock well shows either m:ss or `tick N / M` and flips on a click
   (`solar-soundtrack.clock`). The tick face runs on the roll's own display clock (`rollClock`) at
   frame rate rather than on a half-second sample, so the number and the line it stands for cannot
-  disagree, and `slowTick` went with the readout. What stays on the toolbar is what only the roll
-  can say: how many notes are selected, and why a channel or a gesture was refused.
+  disagree, and `slowTick` went with the readout. The tempo and the tick rate are the status bar's
+  too, read at the playhead — the driver's tempo while it plays and the walk's last `t` otherwise —
+  so a song the driver cannot keep up with says `231.9 of 498.0 ticks/s` from any view. What stays
+  on the toolbar is what only the roll can say: how many notes are selected, and why a channel or a
+  gesture was refused.
 
 ## Angular specifics
 

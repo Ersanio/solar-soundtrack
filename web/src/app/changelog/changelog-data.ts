@@ -20,7 +20,7 @@ export const CHANGELOG: readonly ChangelogEntry[] = [
       'On a tablet the sidebar becomes a drawer under the editor',
       'Lit mute and solo buttons on each channel',
       'The transport clock shows ticks as well as time — click it to switch',
-      'Note count in the status bar',
+      'Note count, tempo and tick rate in the status bar',
       'A theme picker: five presets, or set any colour yourself',
       'The source view has its own colours now — notes, commands, loops and the rest, set one by one',
       'Escape deselects the command you are inspecting',
