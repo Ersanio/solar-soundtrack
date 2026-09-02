@@ -69,6 +69,8 @@ export class Playback {
    * between the cursor and the song until the button comes back up.
    */
   readonly position = computed(() => this.scrubbing() ?? this.songTicks().ticks);
+  /** Whether {@link position} is the drag's target rather than the song's own count. */
+  readonly isScrubbing = computed(() => this.scrubbing() !== null);
   readonly timeLabel = computed(() => formatTime(this.secondsAt(this.position())));
 
   /**

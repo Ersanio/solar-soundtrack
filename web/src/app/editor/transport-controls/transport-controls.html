@@ -43,14 +43,18 @@
   [pressed]="playback.live()"
   (click)="playback.live.set(!playback.live())"
 >
-  Live
+  Hot Reload
 </button>
 
-<span
-  class="bg-inset text-ink flex h-7 items-center rounded-md px-2 font-mono text-sm tabular-nums whitespace-nowrap"
+<!-- One well with two faces: the m:ss the clock gives a tick, or the tick itself. -->
+<button
+  type="button"
+  class="bg-inset text-ink hover:bg-inset/70 flex h-7 cursor-pointer items-center rounded-md px-2 font-mono text-sm tabular-nums whitespace-nowrap"
+  [title]="clockTitle()"
+  (click)="toggleClockFace()"
 >
-  {{ playback.timeLabel() }} / {{ playback.durationLabel() }}
-</span>
+  {{ clockLabel() }}
+</button>
 
 <input
   type="range"

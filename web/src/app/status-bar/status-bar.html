@@ -21,6 +21,10 @@
   ARAM {{ store.freeLabel() }}
 </button>
 
+@if (notesLabel(); as label) {
+  <span class="text-ink-muted font-mono tabular-nums">{{ label }}</span>
+}
+
 <div class="ml-auto flex items-center gap-3">
   <span class="text-ink-muted">In active development — back up your work</span>
 

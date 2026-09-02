@@ -143,7 +143,9 @@
   </button>
 
   <span class="ml-auto flex items-center gap-3 font-mono text-xs">
-    <span class="text-ink-muted">{{ editLabel() }}</span>
+    @if (selectedLabel(); as label) {
+      <span class="text-ink-muted">{{ label }}</span>
+    }
     <!-- Why a channel cannot be edited is said here rather than in a dialog: it
          is a property of the song, or of the mixer for a muted channel, and not
          the answer to a click. -->
@@ -157,6 +159,5 @@
     @if (gestureRefusal(); as reason) {
       <span class="text-warn">refused: {{ reason }}</span>
     }
-    <span class="text-ink-muted">{{ readout() }}</span>
   </span>
 </amk-toolbar>

@@ -25,13 +25,13 @@ const TEXT: Record<StatusKind, string> = {
 /**
  * The one-row footer: FL's hint bar.
  *
- * It holds the compile status, the problem count, the free ARAM and the
- * credits — four things that are each a line long and belong to the whole app
- * rather than to either pane, so they sit at the same height on every screen
- * and no pane has to keep a header for them. The status, the count and the
- * free space are what a porter glances at between keystrokes; the count and
- * the space are buttons because the answer to "what problems?" and "what is
- * using it?" is a section of the output pane.
+ * It holds the compile status, the problem count, the free ARAM, the note
+ * count and the credits — five things that are each a line long and belong to
+ * the whole song rather than to either pane, so they sit at the same height on
+ * every screen and no pane has to keep a header for them. The status, the
+ * counts and the free space are what a porter glances at between keystrokes;
+ * the problem count and the space are buttons because the answer to "what
+ * problems?" and "what is using it?" is a section of the output pane.
  */
 @Component({
   selector: 'amk-status-bar',
@@ -74,6 +74,12 @@ export class StatusBar {
     }
 
     return 'text-ink-muted';
+  });
+
+  /** The walk's note count: a fact about the song, so it is here whatever view is showing. */
+  protected readonly notesLabel = computed(() => {
+    const song = this.store.timeline();
+    return song ? `${song.notes.length.toLocaleString()} notes` : null;
   });
 
   /** Red once the song no longer fits, which is the one reading that changes what a porter does next. */

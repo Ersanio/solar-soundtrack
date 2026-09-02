@@ -1431,6 +1431,15 @@ stats.loopTicks` pads **every other channel that would cut the song short** out 
   scrolling body and a footer row that hides itself when nothing is projected into it. The two
   components project their icon and their content and keep only what is theirs — the picker its
   rows and its import, the changelog its entries.
+- **The roll toolbar's readout line** — `editing: #0 · tick 7,534 of 14,592 · t55 · 109.4 ticks/s ·
+3,468 notes`, rewritten twice a second while playing. It said five things in one place, four of
+  which were not the roll's: the channel is what the corner picker already shows, the note count is
+  a fact about the song and sits in the status bar whatever view is up, and the tick is the
+  transport's, whose clock well shows either m:ss or `tick N / M` and flips on a click
+  (`solar-soundtrack.clock`). The tick face runs on the roll's own display clock (`rollClock`) at
+  frame rate rather than on a half-second sample, so the number and the line it stands for cannot
+  disagree, and `slowTick` went with the readout. What stays on the toolbar is what only the roll
+  can say: how many notes are selected, and why a channel or a gesture was refused.
 
 ## Angular specifics
 

@@ -370,17 +370,6 @@ export class PianoRoll {
   });
 
   /**
-   * Whether the roll is showing the song's position rather than a parked one.
-   *
-   * Idle and not playing are different things. A pause leaves the song where it
-   * is and resumes from there, so the roll stays there too; only a stop puts it
-   * back at the beginning, which is what the transport's own readout does. This
-   * is deliberately not `isPlaying()`, which would count a pause as "gone" and
-   * throw the view back to tick 0.
-   */
-  private readonly following = computed(() => !this.playback.isIdle() && this.follow());
-
-  /**
    * Where the song itself is, parked or not.
    *
    * Deliberately free of {@link follow}: coming off the song stops the *view*
@@ -1190,22 +1179,7 @@ export class PianoRoll {
   /** The hovered mark, while there is still a song for it to have come from. */
   protected readonly tooltipFor = computed(() => (this.timeline() ? this.hovered() : null));
 
-  // --- the readout ---------------------------------------------------------
-
-  /**
-   * The tick the readout reports.
-   *
-   * Slow only while the song is carrying the playhead along. A parked or stopped
-   * roll is not moving, so there is nothing to blur and the reading is exact —
-   * and a scroll's own readout must answer the wheel rather than half a second
-   * after it.
-   *
-   * A scrub answers the drag, which is the one reading that is neither the
-   * camera's nor the song's: it is where the song is being asked to go.
-   */
-  protected readonly readoutTick = computed(
-    () => this.seeking() ?? (this.following() ? this.playhead.slowTick() : this.playTick()),
-  );
+  // --- the problems list ---------------------------------------------------
 
   /** Anything the walk could not make sense of, said in words rather than colour. */
   protected readonly problems = computed(() => this.timeline()?.problems ?? []);

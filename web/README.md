@@ -736,8 +736,9 @@ therefore races between anchors and settles a steady distance ahead of the notes
 clock's rate holds it inside a 32nd. In the browser the roll leads the transport's anchor by about
 12 ticks at `t254`, which is that anchor's own staleness and nothing more.
 
-The `ticks/s` in the roll's readout says the same thing: it shows `231.9 of 498.0 ticks/s` when the
-two part company by more than a twentieth, and the plain figure when they agree.
+The transport's clock runs on the same display clock when it is showing ticks (click it to switch
+between m:ss and ticks), so the number and the line cannot disagree; the shortfall itself is what
+`SST0503` reports.
 
 Only what the song uses gets a row: the pitched range is fitted and rounded out to whole octaves,
 and a drum or noise lane appears only when something plays it. Rows then stretch to fill the pane,
