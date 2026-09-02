@@ -10,6 +10,23 @@ const STRIP_CLASS = 'border-edge flex items-center overflow-hidden rounded-md bo
 /** Shared by all eight plates, the colour and the silencing coming after it. */
 const PLATE_CLASS = 'border-edge border-r px-1.5 py-0.5 font-mono text-xs';
 
+/** Shared by M and S, the state's own colours coming after it. */
+const TOGGLE_CLASS = 'cursor-pointer px-1.5 py-0.5 font-mono text-xs transition-colors';
+
+/** A toggle that is off: quiet, and lifted only by a hover it can take. */
+const TOGGLE_OFF = 'text-ink-muted hover:not-disabled:text-ink';
+
+/** M on a muted channel. */
+const MUTE_ON = 'bg-danger/20 text-danger font-semibold';
+
+/**
+ * `text-ink` over a channel's own colour, which is what the roll's bars label
+ * themselves in (`fill-ink` in `roll-notes.html`): a digit on a plate and a name
+ * on a bar are the same colour on the same eight grounds. The plate wears it
+ * always; S wears it while the channel is soloed.
+ */
+const ON_CHANNEL = 'text-ink font-semibold';
+
 /**
  * Per-channel mute and solo for previewing parts in isolation.
  *
@@ -22,10 +39,12 @@ const PLATE_CLASS = 'border-edge border-r px-1.5 py-0.5 font-mono text-xs';
  * previewer too, which refuses to sound a channel these buttons have silenced.
  *
  * Each strip wears its channel's own colour, so a note seen in the roll is
- * matched to its buttons by colour rather than by reading a digit. The digit
- * stays, and so does the strike-through over a silenced one: the eight hues do
- * not clear the all-pairs separation gate, so neither identity nor state is ever
- * left to the colour alone.
+ * matched to its buttons by colour rather than by reading a digit, and a solo
+ * lights its S in that colour rather than in the accent, a mid blue that
+ * disappears into channels 0 and 6. The digit stays, and so does the
+ * strike-through over a silenced one: the eight hues do not clear the all-pairs
+ * separation gate, so neither identity nor state is ever left to the colour
+ * alone.
  */
 @Component({
   selector: 'amk-channel-mixer',
@@ -41,13 +60,16 @@ export class ChannelMixer {
     this.mixer.channels().map((channel) => ({
       ...channel,
       strip: `${STRIP_CLASS} ${CHANNEL_WASH[channel.index]}`,
-      // `text-ink` over the plate, which is what the roll's own bars label
-      // themselves in (`fill-ink` in `roll-notes.html`) — a digit on a plate and
-      // a name on a bar are the same colour on the same eight grounds. A
-      // silenced channel dims plate and digit together, which holds that
-      // relation where dimming the digit alone would not.
-      plate: `${PLATE_CLASS} ${CHANNEL_BG[channel.index]} text-ink font-semibold${
+      // A silenced channel dims plate and digit together, which holds the
+      // relation to the roll's bars where dimming the digit alone would not.
+      plate: `${PLATE_CLASS} ${CHANNEL_BG[channel.index]} ${ON_CHANNEL}${
         channel.audible ? '' : ` ${CHANNEL_QUIET}`
+      }`,
+      mute: `${TOGGLE_CLASS} disabled:cursor-not-allowed disabled:opacity-40 ${
+        channel.muted ? MUTE_ON : TOGGLE_OFF
+      }`,
+      solo: `${TOGGLE_CLASS} ${
+        channel.soloed ? `${CHANNEL_BG[channel.index]} ${ON_CHANNEL}` : TOGGLE_OFF
       }`,
     })),
   );
