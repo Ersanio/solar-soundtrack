@@ -202,12 +202,13 @@ export class EditorRequests {
    *
    * A note written once inside a loop is played many times, and the commands in
    * force can differ between them, so the caret — which names the *text* — is
-   * one answer short. A click on a bar or on one of its glyphs sets it; a click
-   * on the command lane and the roll's `Escape` let it go, a lane glyph naming
-   * a command of the song rather than a note of it. The note panel reads it
-   * only while it is still an occurrence of the note the caret is on, and
-   * `CommitAudition` replays it after a panel's commit, resolved against the
-   * fresh compile so a note that no longer exists is silence.
+   * one answer short. A click on a bar or on one of its glyphs sets it, and a
+   * click on a lane glyph points it at the note the command is heard on
+   * (`noteHeardOn`), so a value committed for either has a note to replay; the
+   * roll's `Escape` lets it go. The note panel reads it only while it is still
+   * an occurrence of the note the caret is on, and `CommitAudition` replays it
+   * after a panel's commit, resolved against the fresh compile so a note that
+   * no longer exists is silence.
    */
   readonly inspecting = signal<{ address: number; tick: number } | null>(null);
 

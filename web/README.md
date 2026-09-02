@@ -106,8 +106,9 @@ body's constructs a press on a loop box's edge took hold of — a `(1)3`'s ghost
 repeats leave the caret in the same place, so the press is the only thing that can tell them apart.
 `inspecting` and `inspectingLoop` retire themselves as the caret moves off what they name, and
 `selectedRun` follows the roll's own selection. `selectedRun` and `inspectingLoop` go back to `null`
-when the roll does; `inspecting` goes back when `Escape` or a click in the command lane lets the note
-go.
+when the roll does; `inspecting` goes back when `Escape` lets the note go, and a click in the
+command lane points it at the note the command is heard on, so a value committed from the panel has
+a note to replay.
 
 `reveal` carries a `show` flag, and it is the difference between a summons and a question. A
 diagnostic wants the source brought forward, scrolled to and focused. A single click on a roll bar

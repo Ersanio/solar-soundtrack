@@ -2,6 +2,7 @@ import { Component, computed, inject, input, output, signal } from '@angular/cor
 
 import type { Command } from '@amk/tokens';
 import { CommandIcon } from '../../../command-palette/command-icon';
+import { noteHeardOn } from '../../../../state/commands-in-force';
 import { EditorRequests } from '../../../../state/editor-requests';
 import { EditorStore } from '../../../../state/editor-store';
 import { type CommandLane, type LaneGlyph, laneGlyphX } from '../roll-command-layout';
@@ -174,19 +175,26 @@ export class RollCommandLane {
 
   /**
    * A single click asks the inspector about the command; a double click goes to
-   * it. It also lets go of the notes, because a lane glyph names a command of
-   * the song rather than a note of it — so a value committed from the panel it
-   * opens previews nothing.
+   * it. It points `inspecting` at the note the command is heard on, so a value
+   * committed from the panel it opens replays that note, as one committed for a
+   * bar's chip replays the bar's — and at nothing where no note is left to hear it.
    *
-   * That takes both halves of "the selected note", which are two things: the
-   * occurrence the inspector is describing, which is `inspecting` and is this
-   * component's to clear, and the outlines in the roll, which are indices into a
-   * strip only the roll has and so go back up as {@link commandPicked}.
+   * It lets go of the roll's outlines, which are indices into a strip only the
+   * roll has and so go back up as {@link commandPicked}: a lane glyph names a
+   * command of the song, and a note outlined beside it would be two subjects at
+   * once, with `Delete` meaning one of them.
    */
   protected inspect(glyph: LaneGlyph, event: Event, show = false): void {
     event.stopPropagation();
     if (this.inSync()) {
-      this.requests.inspecting.set(null);
+      const heard = noteHeardOn(
+        this.editor.timeline()?.notes ?? [],
+        this.editor.commandsInForce(),
+        glyph,
+      );
+      this.requests.inspecting.set(
+        heard === null ? null : { address: heard.address, tick: heard.tick },
+      );
       this.commandPicked.emit();
       this.requests.reveal.set({ span: { ...glyph.span }, show });
     }

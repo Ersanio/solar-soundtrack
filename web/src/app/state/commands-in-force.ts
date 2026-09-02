@@ -6,6 +6,7 @@ import {
   isPercussionInstrument,
   parseTimeInForce,
 } from '@amk/tokens/commands/in-force';
+import type { TimelineCommand } from './command-timeline';
 
 /** What the join reads: the scan of `text`, and the compiler's two maps for the bytes it walked. */
 export interface InForceSources {
@@ -191,4 +192,33 @@ export function notePreceding(notes: readonly WalkNote[], note: WalkNote): WalkN
   }
 
   return before;
+}
+
+/**
+ * The note a command is heard on — the one whose bar would draw it as a chip —
+ * for a caller holding a lane glyph and wanting a note to replay.
+ *
+ * The first note on the command's channel that is still sounding at its tick or
+ * begins after it and has the command in force: that reaches back to the note a
+ * `$DD` rides, whose tick is inside it, and steps over one a command was read
+ * inside a tie of, whose `origins` froze at key-on. Where no bar holds it — a
+ * `'song'` command acts on no note of the channel, and a replaced one reaches no
+ * note at all — it is the next note to begin, and `null` past the channel's last.
+ */
+export function noteHeardOn(
+  notes: readonly WalkNote[],
+  inForce: (note: WalkNote) => readonly Command[],
+  at: TimelineCommand,
+): WalkNote | null {
+  for (const note of notes) {
+    if (note.channel !== at.channel || note.tick + note.ticks <= at.tick) {
+      continue; // sorted by tick, so these are over before the command runs
+    }
+
+    if (note.tick >= at.tick || inForce(note).includes(at.command)) {
+      return note;
+    }
+  }
+
+  return null;
 }

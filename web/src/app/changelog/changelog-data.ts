@@ -10,7 +10,10 @@ export const CHANGELOG: readonly ChangelogEntry[] = [
   // ─── newest first; add new blocks here ──────────────────────────────────
   {
     date: '2 September 2026',
-    items: ['Escape deselects the command you are inspecting'],
+    items: [
+      'Escape deselects the command you are inspecting',
+      'Changing a command picked in the command lane previews the note it acts on',
+    ],
   },
   {
     date: '1 September 2026',

@@ -1439,6 +1439,15 @@ stats.loopTicks` pads **every other channel that would cut the song short** out 
   within a gesture, so the boundaries are still dealt once per gesture. Not a guard on the delta
   instead — it flips back at every zero crossing of a length drag, and a re-deal is a rebuild of
   every bar on screen.
+- **A lane glyph clearing `inspecting`, as naming a command of the song rather than a note of it**
+  — true of what the glyph is and wrong about what a commit from its panel should sound: a `v`
+  picked there previewed nothing, where the same `v` picked off a bar's chip replayed the bar's
+  note. The lane points `inspecting` at the note the command is **heard on** (`noteHeardOn`): the
+  first on its channel, still sounding at the tick or beginning after it, whose commands in force
+  hold it — the bar that would draw it as a chip, which reaches back to the note a `$DD` rides and
+  steps over one a command was read inside a tie of; a `'song'` command, which no bar draws, takes
+  the next note to begin. Off `commandsInForce` and not off the tick alone, so the lane and the
+  bars cannot name different notes for one command; `walktest` pins the seven shapes.
 
 ## Angular specifics
 
