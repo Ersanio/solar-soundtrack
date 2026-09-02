@@ -1,7 +1,9 @@
 <div class="flex flex-wrap items-center gap-2">
-  <div class="flex flex-wrap items-center gap-1">
+  <!-- A segmented track: one category is showing, and picking another is not
+       an action on the song, where every button under it is. -->
+  <div class="bg-inset inline-flex flex-wrap items-center gap-0.5 rounded-md p-0.5">
     @for (chip of chips(); track chip.id) {
-      <button amk-toggle size="sm" [pressed]="chip.selected" (click)="filter.set(chip.id)">
+      <button amk-toggle variant="segment" [pressed]="chip.selected" (click)="filter.set(chip.id)">
         {{ chip.label }}
       </button>
     }

@@ -14,9 +14,11 @@
   </button>
 
   @if (open()) {
-    <div class="flex flex-wrap items-center gap-1">
+    <!-- The source palette's segmented track, for the same reason: a category
+         is a filter, and it must not look like the command buttons it shows. -->
+    <div class="bg-inset inline-flex flex-wrap items-center gap-0.5 rounded-md p-0.5">
       @for (chip of chips(); track chip.id) {
-        <button amk-toggle size="sm" [pressed]="chip.pressed" (click)="filter.set(chip.id)">
+        <button amk-toggle variant="segment" [pressed]="chip.pressed" (click)="filter.set(chip.id)">
           {{ chip.label }}
         </button>
       }

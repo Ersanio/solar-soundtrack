@@ -39,10 +39,12 @@ function readFilter(): Filter {
 }
 
 /**
- * An `amk-toggle` in its off state, with a glyph beside the name: the same
- * border, radius, `sm` height and transition, and the `ok` state's colours are
- * that toggle's. Not the component itself, because `caution` and a `caveat`
- * wear a colour of their own that a toggle has no state for.
+ * A bordered button with a glyph beside the name: the `sm` height, radius and
+ * transition of an `amk-toggle` in its off state, and the `ok` state's colours
+ * are that toggle's. Not the component itself, because `caution` and a `caveat`
+ * wear a colour of their own that a toggle has no state for. Bordered on
+ * purpose, where the category segments above it are not: each of these acts on
+ * the song, and the segments only choose which of them are shown.
  *
  * `caution` keeps the button live: AddmusicK compiles those, and a control that
  * refused what the real tool accepts would be the compiler being permissive in
