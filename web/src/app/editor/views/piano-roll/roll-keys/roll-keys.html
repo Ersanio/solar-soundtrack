@@ -13,9 +13,25 @@
     [class.cursor-pointer]="playable()"
     (pointerdown)="pressed.emit(key.row)"
   />
+  @if (pressing() === key.row) {
+    <!-- Its own element, inset: a stroke is centred on the path, so one on the
+         key itself would lose its left half off the edge of the column. -->
+    <svg:rect
+      x="0.75"
+      rx="1"
+      fill="none"
+      stroke-width="1.5"
+      pointer-events="none"
+      class="stroke-ink"
+      [attr.y]="key.y + 0.75"
+      [attr.width]="keyWidth - 6.5"
+      [attr.height]="key.height - 1.5"
+    />
+  }
   @if (showLabels()) {
     <svg:text
       x="4"
+      pointer-events="none"
       dominant-baseline="central"
       [class]="lit ? 'fill-surface font-mono' : key.textFill"
       [attr.y]="key.textY"

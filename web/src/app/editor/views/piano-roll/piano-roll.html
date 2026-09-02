@@ -131,7 +131,7 @@
         [lanes]="lanes()"
         [rowHeight]="rowHeight()"
         [width]="width()"
-        [held]="heldRows()"
+        [held]="soundingRows()"
       />
 
       <g clip-path="url(#amk-roll-clip)">
@@ -199,7 +199,8 @@
         [lanes]="lanes()"
         [rowHeight]="rowHeight()"
         [height]="stackHeight()"
-        [held]="heldRows()"
+        [held]="soundingRows()"
+        [pressing]="pressedKey()"
         [showLabels]="showLabels()"
         [labelSize]="labelSize()"
         [playable]="editChannel() !== null"

@@ -806,6 +806,38 @@ export class PianoRoll {
     });
   });
 
+  /** The row the last press asked for, whether or not it is still being heard. */
+  private readonly pressedRow = signal<number | null>(null);
+
+  /**
+   * That row for as long as its note is on its way or sounding, and `null` the
+   * moment it is not.
+   *
+   * `previewing` is the only thing that says how long a press lasts: a preview
+   * carries no pitch back, and `playNote` hands out neither a length nor a
+   * finish. It covers a sample and a region as well, which is why the row is
+   * only ever set by a press that reached the worker.
+   */
+  protected readonly pressedKey = computed(() =>
+    this.audition.previewing() ? this.pressedRow() : null,
+  );
+
+  /**
+   * What the key column and the lane bands light: the song's rows, and the one
+   * a press is playing. A press is a row sounding like any other.
+   */
+  protected readonly soundingRows = computed<ReadonlySet<number>>(() => {
+    const rows = this.heldRows();
+    const pressed = this.pressedKey();
+    if (pressed === null) {
+      return rows;
+    }
+
+    const all = new Set(rows);
+    all.add(pressed);
+    return all;
+  });
+
   // --- editing -------------------------------------------------------------
 
   /**
@@ -2017,6 +2049,10 @@ export class PianoRoll {
         tick: Math.max(0, Math.round(this.playTick())),
         note,
       });
+      // A silenced channel and a note out of range are both refused before a
+      // render is asked for, and `notePending` is set nowhere else, so it is
+      // what tells a press that sounds from one that only said why it did not.
+      this.pressedRow.set(this.audition.notePending() ? row : null);
     }
   }
 

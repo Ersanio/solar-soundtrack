@@ -41,6 +41,14 @@ export class RollKeys {
   readonly height = input.required<number>();
   /** The rows sounding right now. Changes every frame; nothing is derived from it. */
   readonly held = input.required<ReadonlySet<number>>();
+  /**
+   * The row a press is sounding, which {@link held} holds as well.
+   *
+   * The two say different things about one key: `held` that the row is sounding,
+   * whoever set it going, and this that a press is what set it going. The ring
+   * is that difference drawn.
+   */
+  readonly pressing = input.required<number | null>();
   readonly showLabels = input.required<boolean>();
   readonly labelSize = input.required<number>();
   /** Whether a press sounds anything, which needs a channel to sound it on. */
