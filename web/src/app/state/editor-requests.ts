@@ -14,6 +14,9 @@ export interface Reveal {
   show: boolean;
 }
 
+/** A section of the output pane a panel elsewhere can ask to have opened. */
+export type SidebarSection = 'build' | 'problems';
+
 /** Text bound for the caret, and which slice of it to leave selected. */
 export interface Insertion {
   text: string;
@@ -37,6 +40,21 @@ export interface EditBatch {
   edits: readonly Edit[];
   immediate: boolean;
   /**
+   * Whether this batch leaves a channel's notes as they are — the same notes,
+   * in the same order, whatever their ticks do.
+   *
+   * True of a splice into one command's own text, which is every command the
+   * piano roll's lane erases or carries and every commit a panel makes but one:
+   * the loop inspector's Recalls points a call at another body, and the notes of
+   * the body a channel plays are items of that channel's strip. The roll
+   * reads {@link EditorRequests.notesKept} to know it, and what it does with it
+   * is keep its selection, which is a set of indices into a channel's strip: the
+   * channel is rebuilt with the same items in the same order, so those indices
+   * still name the notes they named. False is not a claim that something moved,
+   * only that nothing here says otherwise.
+   */
+  keepsNotes: boolean;
+  /**
    * A range to select once the batch lands, in the document *after* it. How a
    * panel puts the caret on text the batch itself writes — the note palette
    * leaves the new command's first argument selected, and the caret is what
@@ -46,7 +64,7 @@ export interface EditBatch {
 }
 
 /**
- * What a panel asks the editor to do, and nothing else.
+ * What a panel asks the editor to do, and what the view and the roll report back.
  *
  * `editor/views/source-view/` owns the CodeMirror view, so nothing else may
  * touch it — not even the pane it sits in. These signals are how a sibling
@@ -74,6 +92,18 @@ export class EditorRequests {
   readonly reveal = signal<Reveal | null>(null);
 
   /**
+   * A section of the output pane to open, set by the top bar's ARAM meter and
+   * the status bar's problems count.
+   *
+   * The counterpart of {@link reveal} for the other pane: that one asks the
+   * source view for a selection, this one asks the output pane for a section.
+   * The pane consumes it on the spot — it opens that section, un-collapses the
+   * drawer it folds into below the `lg` breakpoint, and scrolls to it — and
+   * puts it back to `null`, so asking for the same section twice still takes.
+   */
+  readonly revealSection = signal<SidebarSection | null>(null);
+
+  /**
    * A splice the editor should apply, set when a panel edits a command in
    * place. The counterpart to {@link reveal}: that one asks for a selection,
    * this one asks for a change, and both exist because the editor owns the view
@@ -92,11 +122,17 @@ export class EditorRequests {
    * those builders return when nothing would change.
    *
    * Here rather than in each panel so the no-op check and the defensive copy
-   * are stated once.
+   * are stated once. `keepsNotes` is {@link EditBatch.keepsNotes}, and a panel's
+   * splice keeps them unless the panel knows otherwise.
    */
-  apply(edit: Edit | null): void {
+  apply(edit: Edit | null, keepsNotes = true): void {
     if (edit) {
-      this.replace.set({ edits: [copyEdit(edit)], immediate: false, select: null });
+      this.replace.set({
+        edits: [copyEdit(edit)],
+        immediate: false,
+        select: null,
+        keepsNotes,
+      });
     }
   }
 
@@ -115,12 +151,14 @@ export class EditorRequests {
   applyAll(
     edits: readonly Edit[] | null,
     select: { anchor: number; head: number } | null = null,
+    keepsNotes = false,
   ): void {
     if (edits && edits.length > 0) {
       this.replace.set({
         edits: edits.map(copyEdit),
         immediate: true,
         select: select && { ...select },
+        keepsNotes,
       });
     }
   }
@@ -128,10 +166,10 @@ export class EditorRequests {
   /**
    * How deep the editor's undo and redo stacks are, written by the view.
    *
-   * The one thing in here that travels the other way, and it has to: CodeMirror
-   * owns the history, the roll's toolbar carries the same two buttons the source
-   * toolbar does, and a button that cannot tell whether there is anything to
-   * undo is a button that is never disabled.
+   * Written by the view rather than read by it, as {@link notesKept} is, and it
+   * has to be: CodeMirror owns the history, the roll's toolbar carries the same
+   * two buttons the source toolbar does, and a button that cannot tell whether
+   * there is anything to undo is a button that is never disabled.
    */
   readonly undoDepth = signal(0);
   readonly redoDepth = signal(0);
@@ -159,33 +197,85 @@ export class EditorRequests {
   }
 
   /**
+   * How many {@link EditBatch.keepsNotes} batches the editor has applied.
+   *
+   * Written by the view, as {@link undoDepth} is, and for the same kind of
+   * reason: only the view knows whether a batch really landed.
+   * Every `expect` is checked before anything is dispatched, so a stale batch is
+   * dropped in silence — counted where it is *asked for*, this would run ahead of
+   * the document and the next change from anywhere would be read as one that
+   * kept the notes.
+   *
+   * A count rather than a flag, because what the reader wants is the transition
+   * and nothing here is in a position to put a flag back down.
+   */
+  readonly notesKept = signal(0);
+
+  /**
    * The selected note: which occurrence of one the piano roll was last asked
    * about.
    *
    * A note written once inside a loop is played many times, and the commands in
    * force can differ between them, so the caret — which names the *text* — is
-   * one answer short. A click on a bar or on one of its glyphs sets it; a click
-   * on the command lane and the roll's `Escape` let it go, a lane glyph naming
-   * a command of the song rather than a note of it. The note panel reads it
-   * only while it is still an occurrence of the note the caret is on, and
-   * `CommitAudition` replays it after a panel's commit, resolved against the
-   * fresh compile so a note that no longer exists is silence.
+   * one answer short. A click on a bar or on one of its glyphs sets it, and a
+   * click on a lane glyph points it at the note the command is heard on
+   * (`noteHeardOn`), so a value committed for either has a note to replay; the
+   * roll's `Escape` lets it go. The note panel reads it only while it is still
+   * an occurrence of the note the caret is on, and `CommitAudition` replays it
+   * after a panel's commit, resolved against the fresh compile so a note that
+   * no longer exists is silence.
    */
   readonly inspecting = signal<{ address: number; tick: number } | null>(null);
 
   /**
+   * The run of text the piano roll's note selection covers, or `null` for none.
+   *
+   * The roll's own selection is a set of indices into a channel's strip, which
+   * nothing outside the roll has any business knowing about; this is that
+   * selection said in the one currency every panel already speaks. The command
+   * palette in the inspector reads it to know what a loop's brackets would go
+   * round — a marquee over forty bars is a run the caret cannot describe.
+   *
+   * Beside {@link inspecting} because it is the same channel: the roll saying
+   * what the porter has hold of. It travels with the roll, so it goes back to
+   * `null` when the roll does.
+   */
+  readonly selectedRun = signal<{ start: number; end: number } | null>(null);
+
+  /**
+   * The loop construct the piano roll was last asked about: the text of the pass
+   * whose box was pressed, and the body that pass plays.
+   *
+   * A body played from three places is three constructs and one text, and a
+   * press on a box's edge puts the caret on the body's first note — so the caret
+   * cannot say whether the box was the declaration's or one of its recalls'.
+   * This is the roll naming which of them it took hold of, beside
+   * {@link inspecting}, which says the same thing for one pass of a note.
+   *
+   * It only ever **redirects** an answer the caret has already given: the panel
+   * reads it while the caret is still inside the body it names, so it retires
+   * itself and nothing has to clear it. Matched on the body rather than on the
+   * label, since an unlabelled `[ ]` recalled by a `*` has no name for the roll's
+   * reading and the token reading to agree on.
+   *
+   * It travels with the roll, so it goes back to `null` when the roll does.
+   */
+  readonly inspectingLoop = signal<{ text: Span; body: Span } | null>(null);
+
+  /**
    * The caret the inspector's question was withdrawn at, or `null` for none.
    *
-   * The roll's `Escape` lets a note go, and the panel that was answering about
-   * it has to let go too. It cannot be done by moving the caret: `commandAt` is
-   * inclusive at both ends, so `c8 d8` has no offset between the two that
-   * belongs to neither, and there is nowhere neutral to put it.
+   * The roll's `Escape` lets a note or a command go, and the panel that was
+   * answering about it has to let go too. It cannot be done by moving the
+   * caret: `commandAt` is inclusive at both ends, so `c8 d8` has no offset
+   * between the two that belongs to neither, and there is nowhere neutral to
+   * put it.
    *
    * An offset rather than a flag, so it retires itself the way
    * {@link inspecting} does — the panel is blank only while the caret is still
    * the one it was dismissed at, and any move at all, in the roll or in the
    * text, brings it back. {@link reveal} clears it outright, for asking again
-   * about the very note it was dismissed on.
+   * about the very thing it was dismissed on.
    */
   readonly dismissed = signal<number | null>(null);
 }

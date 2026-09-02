@@ -10,10 +10,19 @@ import type { Span } from '@amk/core/types';
 import type { LoopRun } from '@amk/spc/song-walk';
 import type { Command } from '@amk/tokens';
 import { commandScope } from '@amk/tokens/commands/in-force';
-import { commandRewritable, type Edit, insertAt, spliceOut, spliceRange } from '@amk/tokens/edits';
+import { MAX_LOOP_COUNT } from '@amk/tokens/commands/loops';
+import {
+  commandRewritable,
+  type Edit,
+  insertAt,
+  padAround,
+  spliceOut,
+  spliceRange,
+} from '@amk/tokens/edits';
 import {
   type EditContext,
   type EditRefusal,
+  type FramePlan,
   type PlacedNote,
   type Plan,
   REFUSE_BEND_RIDER,
@@ -27,6 +36,7 @@ import {
   REFUSE_RAMP,
   REFUSE_SPELL,
   REFUSE_SUB_SPLIT,
+  framePasses,
   isEdits,
   plannedFrameTicks,
 } from './roll-edit';
@@ -98,8 +108,8 @@ const OPENING_Q = 0x7f;
  * ({@link spellDuration}), so nothing it puts in this channel reads a default.
  *
  * No `@` on Addmusic 4.05 or AddmusicM, where an `@` switches instrument tuning
- * on and resets `h` instead of saying what is already true; that is the gate
- * `normalize.ts:writeDefaults` takes. No `t`, which reaches all eight channels
+ * on and resets `h` instead of saying what is already true. No `t`, which
+ * reaches all eight channels
  * and is not what drawing one note asked for, and no `h`, which replaces an
  * instrument's tuning rather than adding to it, so `h0` is not "no transposition".
  */
@@ -955,26 +965,41 @@ function padChannels(
  * `$DD`, which rides whatever stands in front of it.
  */
 export function gapSlack(strip: Strip, at: number): number {
+  return slackBefore(strip, at).ticks;
+}
+
+/**
+ * {@link gapSlack}'s walk, with the item a full close would leave the construct
+ * against.
+ *
+ * `abuts` is `null` where nothing is left standing there to name: the walk
+ * stopped on a rest whose prefix holds a command, which keeps its tick and so
+ * stays between the two, or it ran back off the root frame's start. Where the
+ * item directly in front is not a rest at all the slack is 0 and `abuts` is
+ * that item, which is how a pair already touching is told from a pair with
+ * something between them.
+ */
+function slackBefore(strip: Strip, at: number): { ticks: number; abuts: number | null } {
   const root = strip.frames[0];
   const construct = strip.items[at];
   if (!construct || holdsCommands(strip, construct.prefixSpan.start, construct.prefixSpan.end)) {
-    return 0;
+    return { ticks: 0, abuts: null };
   }
 
-  let slack = 0;
+  let ticks = 0;
   for (let index = at - 1; index >= root.from; index--) {
     const rest = strip.items[index];
     if (!respellable(strip, rest)) {
-      break;
+      return { ticks, abuts: index };
     }
 
-    slack += rest.ticks;
+    ticks += rest.ticks;
     if (holdsCommands(strip, rest.prefixSpan.start, rest.prefixSpan.end)) {
-      break;
+      return { ticks, abuts: null };
     }
   }
 
-  return slack;
+  return { ticks, abuts: null };
 }
 
 /**
@@ -1105,6 +1130,110 @@ export function passesAt(
   return { before, abuts };
 }
 
+/** The token a recall repeats itself with: its own `(n)`, or a bare `*`. */
+function recallHead(source: string, site: LoopSite): string {
+  if (site.label === null) {
+    return '*';
+  }
+
+  return source.slice(site.text.start, source.indexOf(')', site.text.start) + 1);
+}
+
+/**
+ * The construct a full leftward close would put this one back against, and the
+ * count the two would play as one.
+ *
+ * Two occurrences of one body with nothing between them are one construct
+ * written twice, which is the split {@link openGap} writes read backwards. The
+ * body is named by its first byte's ARAM address, so two identically spelled
+ * bodies are two bodies and never join.
+ *
+ * `null` where the pair cannot be spelled as one: a right-hand half that is not
+ * a recall — a body's first occurrence is always the left one — anything but
+ * the rests standing between them, or a total past {@link MAX_LOOP_COUNT},
+ * where the gesture still closes the gap and simply leaves the two calls
+ * standing.
+ *
+ * What may stand between them is asked of the **text**, and has to be: the
+ * intro `/` has a tick and is no command at all — `gather` raises none for an
+ * operator — so {@link holdsCommands} cannot see it, and a join written over
+ * one would carry it past the whole occurrence and move the song's loop point
+ * with every note still on its tick. Blank is what the split leaves, so the
+ * round trip never meets this; a `;` comment and a stray `o5` are turned away
+ * with it, which is the price of asking a question the safe set cannot answer.
+ *
+ * The counts come off the walk and never off the digits: a count written
+ * through a `"REP=4"` replacement has none to read.
+ */
+export function loopJoin(
+  source: string,
+  strip: Strip,
+  at: number,
+  run: LoopRun,
+): { at: number; count: number } | null {
+  const item = strip.items[at];
+  const { abuts } = slackBefore(strip, at);
+  if (abuts === null || item.frame !== 0 || item.loop?.kind !== 'recall') {
+    return null;
+  }
+
+  const before = strip.items[abuts];
+  const sibling = before.loop;
+  if (before.kind !== 'construct' || before.address !== item.address || sibling === null) {
+    return null;
+  }
+
+  // A `[[ ]]` names no body a recall could reach, so the address test turns one
+  // away before this does; said rather than inferred, because the half that
+  // stays is the one being handed a count and a `$E6` pair has nowhere to take
+  // one — `close` is null and `label` is null, which spells `*n` over it.
+  if (sibling.kind === 'sub') {
+    return null;
+  }
+
+  for (let index = abuts + 1; index <= at; index++) {
+    const gap = source.slice(
+      strip.items[index - 1].unitSpan.end,
+      strip.items[index].unitSpan.start,
+    );
+    if (gap.trim() !== '') {
+      return null;
+    }
+  }
+
+  // The sibling's own run and not `passesAt`, which counts every earlier pass
+  // of the body the voice plays: the partner is the nearest occurrence, which
+  // is the only reading whose ticks close.
+  const body = strip.frames.find((frame) => frame.body === item.address);
+  const played = body?.runs.find(
+    (each) => each.channel === run.channel && each.passes[0]?.tick === before.instances[0]?.tick,
+  );
+  const count = (played?.passes.length ?? 0) + run.passes.length;
+  return played && count <= MAX_LOOP_COUNT ? { at: abuts, count } : null;
+}
+
+/**
+ * The two halves written as the one construct they play as: the count of the
+ * half in front becomes the total, and the half behind goes.
+ *
+ * The surviving half keeps its own spelling — a declaration's `]n`, a `(n)m` or
+ * a `*n` — because what makes the two joinable is that they play the same body,
+ * and that says nothing about how either was written.
+ */
+function joinInto(context: EditContext, site: LoopSite, sibling: LoopSite, count: number): Edit[] {
+  const { source } = context;
+  const target = sibling.kind === 'declaration' ? sibling.close : sibling.text;
+  if (target === null) {
+    return [];
+  }
+
+  const text =
+    sibling.kind === 'declaration' ? `]${count}` : `${recallHead(source, sibling)}${count}`;
+  const counted = spliceRange(source, target, text);
+  const removed = spliceOut(source, site.text);
+  return [counted, removed].filter((edit): edit is Edit => edit !== null);
+}
+
 /**
  * `ticks` of rest written in front of a construct, so the whole occurrence
  * starts that much later.
@@ -1120,7 +1249,7 @@ function openBefore(context: EditContext, site: LoopSite, ticks: number): Edit[]
 
   const { source } = context;
   const start = site.text.start;
-  const lead = start > 0 && !/\s/.test(source[start - 1]) ? ' ' : '';
+  const lead = padAround(source, start).before;
   const opened = insertAt(start, `${lead}r${text} `, site.text.line);
   return opened ? [opened] : [];
 }
@@ -1188,7 +1317,10 @@ function closeBefore(context: EditContext, at: number, need: number): Edit[] | E
  *
  * Time out is only ever free space: the rests {@link gapSlack} prices, spliced
  * from the construct backward. The gesture and this clamp through the one
- * function, so what the drag allowed is what is written.
+ * function, so what the drag allowed is what is written. Spending the whole of
+ * that slack closes the gap, and where the occurrence in front plays the same
+ * body the two are written back up as one construct with the counts added
+ * ({@link loopJoin}) — the split above, read backwards.
  */
 export function openGap(
   context: EditContext,
@@ -1236,8 +1368,7 @@ export function openGap(
       return refuse(REFUSE_SPELL);
     }
 
-    const closing = site.label === null ? -1 : source.indexOf(')', site.text.start);
-    const head = site.label === null ? '*' : source.slice(site.text.start, closing + 1);
+    const head = recallHead(source, site);
     const first = pass > 1 ? String(pass) : '';
     const second = total - pass > 1 ? String(total - pass) : '';
     const split =
@@ -1254,7 +1385,8 @@ export function openGap(
       return [];
     }
 
-    const need = Math.min(-delta, gapSlack(strip, at));
+    const slack = gapSlack(strip, at);
+    const need = Math.min(-delta, slack);
     if (need <= 0) {
       return [];
     }
@@ -1265,6 +1397,16 @@ export function openGap(
     }
 
     edits.push(...closed);
+
+    // Spending the whole slack puts the construct back against the occurrence
+    // in front of it, and two occurrences of one body touching are one
+    // construct written twice. A close that stops short leaves a gap, which is
+    // still two.
+    const join = need === slack ? loopJoin(source, strip, at, run) : null;
+    const sibling = join === null ? null : strip.items[join.at].loop;
+    if (join && sibling) {
+      edits.push(...joinInto(context, site, sibling, join.count));
+    }
   }
 
   // The voice's end moves with everything after the split, and a moved note
@@ -2121,6 +2263,106 @@ function spawnInto(
   return restore ? [edit, ...gone, ...taken, restore] : [edit, ...gone, ...taken];
 }
 
+/**
+ * How far past the song a plan reaches, and how much each voice has already
+ * grown to meet it — the two figures {@link padChannels} is asked with.
+ *
+ * The notes the gesture is answerable for are the ones it placed itself and the
+ * ones its push cascade shoved out of the way. Not every note in the plan — a
+ * channel already running past the cut is an ordinary shape, and reading its
+ * tail as "reach" would have a deletion lengthen the song. A carve fills
+ * `pushed` too, and its pieces are left out for that same reason: it only ever
+ * makes a note shorter, so every piece it leaves sits at a tick the channel had
+ * already reached, and a carve out in a channel's tail would otherwise pad every
+ * other channel out to meet a note nothing moved. `erased` is what says a carve
+ * is what filled it — the two resolvers never both run, since the mode picks one.
+ *
+ * A body edit's reach is in song ticks: the moved notes' furthest instance, with
+ * every pass start carried by how many of **its own voice's** passes the length
+ * change has already stretched in front of it, each voice's music sliding by its
+ * own passes alone. `delta` prices the change once, off the same layout the
+ * commit writes; `grown` is each voice's own total, for a pad whose channel tick
+ * counts predate the edit.
+ *
+ * The pad belongs to the **gesture** and not to a frame: a gesture spanning
+ * frames plans each of them alone, and two frames each padding the other
+ * channels out to their own reach writes the rest twice, `coalesce`
+ * concatenating rather than deduping. {@link planGroupEdits} prices it once.
+ */
+function planReach(
+  strip: Strip,
+  frame: StripFrame,
+  plan: Plan,
+): { reach: number; grown: ReadonlyMap<number, number> } {
+  const moved = plan.erased.length > 0 ? plan.touched : [...plan.touched, ...plan.pushed];
+  const grown = new Map<number, number>();
+  const flat = moved.reduce((furthest, note) => Math.max(furthest, note.startTick + note.ticks), 0);
+  if (frame.body < 0) {
+    return { reach: flat, grown };
+  }
+
+  // The same per-voice ordinals the shift and the preview count, so the pad
+  // cannot count a pass differently from the bars drawn into it.
+  const delta = plannedFrameTicks(strip, frame, plan) - frame.ticks;
+  let projected = 0;
+  for (const pass of framePasses(frame)) {
+    for (const note of moved) {
+      projected = Math.max(
+        projected,
+        pass.tick + pass.ordinal * delta + note.startTick + note.ticks,
+      );
+    }
+
+    // The last pass a voice plays leaves its whole count standing.
+    grown.set(pass.channel, (pass.ordinal + 1) * delta);
+  }
+
+  return { reach: projected, grown };
+}
+
+/**
+ * Several frames' plans written out as one commit — one undo step.
+ *
+ * A gesture that moves no tick may reach into a loop written inside the one it
+ * started in (`spansFrames`), and each frame is planned and spelled on its
+ * own: the frames are disjoint text, so the pieces cannot overlap and sorting by
+ * offset is the whole of the ordering they need. One frame refusing refuses the
+ * lot, because a group half written is a song of neither shape.
+ *
+ * The frame reaching furthest is the one that pads the other channels out, and
+ * every other frame is told the song is already that long — which it will be,
+ * by the time these edits land together. `context.frame` on the way in is
+ * ignored; each plan brings its own.
+ */
+export function planGroupEdits(
+  context: EditContext,
+  plans: readonly FramePlan[],
+): Edit[] | EditRefusal {
+  const reaches = plans.map(({ frame, plan }) => planReach(context.strip, frame, plan).reach);
+  const furthest = reaches.indexOf(Math.max(...reaches, 0));
+  const edits: Edit[] = [];
+  for (let at = 0; at < plans.length; at++) {
+    const written = planEdits(
+      {
+        ...context,
+        frame: plans[at].frame,
+        playableTicks:
+          at === furthest
+            ? context.playableTicks
+            : Math.max(context.playableTicks, reaches[furthest]),
+      },
+      plans[at].plan,
+    );
+    if (!isEdits(written)) {
+      return written; // One frame refused, so nothing lands anywhere.
+    }
+
+    edits.push(...written);
+  }
+
+  return edits.sort((a, b) => a.span.start - b.span.start);
+}
+
 export function planEdits(context: EditContext, plan: Plan): Edit[] | EditRefusal {
   if (!committable(plan)) {
     return refuse(plan.refused ?? REFUSE_CLASH);
@@ -2400,51 +2642,7 @@ export function planEdits(context: EditContext, plan: Plan): Edit[] | EditRefusa
     }
   }
 
-  /**
-   * How far past the song this gesture reaches, over the notes it is answerable
-   * for: the ones it placed itself, and the ones its push cascade shoved out of
-   * the way. Not every note in the plan — a channel already running past the cut
-   * is an ordinary shape, and reading its tail as "reach" would have a deletion
-   * lengthen the song.
-   *
-   * A carve fills `pushed` too, and its pieces are left out for that same
-   * reason: it only ever makes a note shorter, so every piece it leaves sits at
-   * a tick the channel had already reached, and a carve out in a channel's tail
-   * would otherwise pad every other channel out to meet a note nothing moved.
-   * `erased` is what says a carve is what filled it — the two resolvers never
-   * both run, since the mode picks one.
-   */
-  const moved = plan.erased.length > 0 ? plan.touched : [...plan.touched, ...plan.pushed];
-  let reach = moved.reduce((furthest, note) => Math.max(furthest, note.startTick + note.ticks), 0);
-
-  // A body edit's reach is in song ticks: the moved notes' furthest instance,
-  // with every pass start carried by how many of **its own voice's** passes the
-  // length change has already stretched in front of it — each voice's music
-  // slides by its own passes alone. `delta` prices the change once, off the
-  // same layout the commit writes; `grown` is each voice's own total, for the
-  // pad below, whose channel tick counts predate the edit.
-  const grown = new Map<number, number>();
-  if (frame.body >= 0) {
-    const delta = plannedFrameTicks(strip, frame, plan) - frame.ticks;
-    const flat = frame.runs
-      .flatMap((run) => run.passes.map((pass) => ({ tick: pass.tick, channel: run.channel })))
-      .sort((a, b) => a.tick - b.tick);
-    const seen = new Map<number, number>();
-    let projected = 0;
-    for (const pass of flat) {
-      const ordinal = seen.get(pass.channel) ?? 0;
-      seen.set(pass.channel, ordinal + 1);
-      for (const note of moved) {
-        projected = Math.max(projected, pass.tick + ordinal * delta + note.startTick + note.ticks);
-      }
-    }
-
-    for (const [voice, passes] of seen) {
-      grown.set(voice, passes * delta);
-    }
-
-    reach = projected;
-  }
+  const { reach, grown } = planReach(strip, frame, plan);
 
   // Before the regions, and that is load-bearing rather than tidiness: a channel
   // being opened writes its `#N` at `strip.home.at`, which for an undeclared one

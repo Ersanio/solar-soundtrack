@@ -1,0 +1,16 @@
+<button
+  type="button"
+  class="hover:bg-control/10 flex h-8 shrink-0 cursor-pointer items-center gap-2 rounded-md px-1.5"
+  [title]="breakdown()"
+  (click)="requests.revealSection.set('build')"
+>
+  <span class="text-ink-muted text-[11px] font-semibold tracking-wide uppercase">ARAM</span>
+  <amk-aram-bar class="w-28" [segments]="segments()" [hoverTip]="false" />
+  <!-- The figure is on the status bar at every width; here it shows only where the row has room. -->
+  <span
+    class="font-mono text-xs tabular-nums whitespace-nowrap max-2xl:hidden"
+    [class.text-danger]="overflowing()"
+  >
+    {{ store.freeLabel() }}
+  </span>
+</button>

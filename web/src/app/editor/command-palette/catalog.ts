@@ -28,6 +28,7 @@ import {
   formAvailability,
 } from '@amk/tokens/commands/availability';
 import type { CommandGlyph } from './command-icon';
+import type { CallVerdict, WrapKind, WrapVerdict } from './loop-wrap';
 
 export type Category = 'notes' | 'volume' | 'pitch' | 'instrument' | 'echo' | 'loops' | 'misc';
 
@@ -103,11 +104,44 @@ interface HexEntry extends Described {
   id?: string;
 }
 
-interface LetterEntry extends Described {
+/**
+ * An entry that puts brackets round the notes the porter picked out rather than
+ * dropping its snippet at a point. `loop-wrap.ts` is what it writes and why.
+ *
+ * {@link LetterEntry.snippet} stays the standalone spelling — it is what
+ * `palettetest` compiles the entry as, and it is the same construct a wrap
+ * writes with its body left out.
+ */
+interface Wrapping {
+  wraps?: WrapKind;
+}
+
+/**
+ * An entry that plays a body the song has already declared, so what it writes
+ * depends on what stands above the caret rather than only on the dialect.
+ * `loop-wrap.ts`'s `callVerdict` is that reading.
+ *
+ * A flag rather than a kind: there is one construct to write, `(n)m`, and the
+ * number in it is the answer rather than a choice the button makes.
+ */
+interface Calling {
+  calls?: true;
+}
+
+interface LetterEntry extends Described, Wrapping, Calling {
   kind: 'letter';
   /** The letter, which is also its key into `LETTER_NAMES` and `LETTER_PARAMS`. */
   id: string;
   snippet: string;
+  /**
+   * A name for the button, where `LETTER_NAMES`' is not one — as
+   * {@link HexEntry.label} is for a byte.
+   *
+   * `[` is the only one. It writes both brackets, so "loop start" names half of
+   * what the button does, and there is no `]` button beside it for the other
+   * half to belong to.
+   */
+  label?: string;
   /**
    * The VCMD this spelling compiles to, where it compiles to one.
    *
@@ -120,7 +154,7 @@ interface LetterEntry extends Described {
   writes?: number;
 }
 
-interface SyntaxEntry extends Described {
+interface SyntaxEntry extends Described, Wrapping, Calling {
   kind: 'syntax';
   id: string;
   /** As {@link LetterEntry.writes}. */
@@ -166,7 +200,7 @@ const hex = (
 const letter = (
   id: string,
   snippet: string,
-  rest: Described & { writes?: number },
+  rest: Described & { writes?: number; wraps?: WrapKind; label?: string },
 ): LetterEntry => ({
   kind: 'letter',
   id,
@@ -429,35 +463,51 @@ export const ENTRIES: readonly Entry[] = [
   }),
 
   // ─── Loops ──────────────────────────────────────────────────────────────
-  // `[` writes the pair. A lone bracket is a compile error the moment it lands,
-  // and the point of the defaults is that the song keeps compiling as you type.
-  letter('[', '[ ]4', {
+  // The two bracket forms go round the notes the porter picked out rather than
+  // landing at a point, so both are greyed until something is selected.
+  //
+  // There is no `]` button: a wrap writes both brackets, so there is no lone
+  // closing one left to write.
+  letter('[', '[ ]2', {
     category: 'loops',
     writes: 0xe9,
+    wraps: 'loop',
+    label: 'loop',
     icon: 'repeatStart',
-    blurb: 'Opens a section that plays a set number of times.',
-  }),
-  letter(']', ']4', {
-    category: 'loops',
-    icon: 'repeatEnd',
-    blurb: 'Closes a repeated section and says how many times it plays.',
+    blurb: 'Repeats the notes you have selected.',
   }),
   {
     kind: 'syntax',
     category: 'loops',
     id: '[[',
     writes: 0xe6,
+    wraps: 'subloop',
     icon: 'repeatNested',
     label: 'subloop',
-    blurb: 'A repeat inside a repeat, for a figure that recurs within a longer phrase.',
+    blurb: 'Repeats the selected notes inside a repeat that is already running.',
     snippet: '[[ ]]2',
     syntax: null,
   },
-  letter('*', '*', {
+  // A call names the body it plays, so what it writes depends on what the song
+  // has declared above the caret rather than only on the dialect — `loop-wrap.ts`
+  // again, and the same shape as the two wraps beside it.
+  //
+  // There is no `*` button. `*` takes `prevLoop`, the last `[` opened
+  // (`parser.ts:parseStarLoop`), so what it plays is decided by where it is
+  // written and by nothing a porter can see or point at — which is the one thing
+  // a piano roll cannot draw a handle for. A `*` already in a song still reads
+  // and still edits; the inspector's **Recalls** field is where it gets a name.
+  {
+    kind: 'syntax',
     category: 'loops',
+    id: '(n)',
+    calls: true,
     icon: 'replay',
-    blurb: 'Plays the last labelled loop again from wherever you are.',
-  }),
+    label: 'loop call',
+    blurb: 'Plays a loop you have already written, again from here.',
+    snippet: '(0)2',
+    syntax: null,
+  },
   {
     kind: 'syntax',
     category: 'loops',
@@ -557,6 +607,23 @@ export interface ResolvedEntry {
   caveat?: string;
   /** Where in the song this is legal, which is `'anywhere'` for all but two. */
   where: 'anywhere' | 'before-channels' | 'channel';
+  /** Which construct this entry asks for, for the two that wrap a selection. */
+  wraps?: WrapKind;
+  /**
+   * What a click would put round the selection, or why it cannot - `undefined`
+   * for every entry that does not wrap, and for a caller that supplied no
+   * selection at all.
+   *
+   * Deliberately not folded into {@link availability}, which answers to
+   * AddmusicK: "nothing is selected" is the palette's own condition and no
+   * compile of the snippet could confirm or refute it. `entryBlocked` is where
+   * the two meet.
+   */
+  wrap?: WrapVerdict;
+  /** As {@link ResolvedEntry.wraps}, for the one entry that calls a body. */
+  calls?: true;
+  /** What a click would call, or why there is nothing to. */
+  call?: CallVerdict;
 }
 
 /**
@@ -567,6 +634,19 @@ export interface ResolvedEntry {
  */
 export interface CaretPlace {
   beforeChannels: boolean;
+  /**
+   * What the two bracket forms would write round what is selected now.
+   *
+   * Both answers rather than one, because which of the two a click lands on is
+   * decided by where the run is: asked for a loop inside a loop, `loop-wrap.ts`
+   * offers the subloop. Absent where the caller has no selection to offer.
+   */
+  wrap?: { loop: WrapVerdict; subloop: WrapVerdict };
+  /**
+   * What a call written here would play. Absent where the caller has no caret to
+   * answer for — the roll's palette aims at a note and supplies its start.
+   */
+  call?: CallVerdict;
 }
 
 /** The position rule, which stacks on top of the dialect one. */
@@ -662,9 +742,11 @@ export function resolveEntry(
         ? (placeAvailability(entry, place) ?? reached)
         : reached;
     const label = capitalise(
-      entry.kind === 'syntax' ? entry.label : (LETTER_NAMES[entry.id] ?? entry.id),
+      entry.kind === 'syntax' ? entry.label : (entry.label ?? LETTER_NAMES[entry.id] ?? entry.id),
     );
     const text = swap?.text ?? entry.snippet;
+    const wrap = entry.wraps === undefined ? undefined : place.wrap?.[entry.wraps];
+    const call = entry.calls === undefined ? undefined : place.call;
 
     return {
       key: `text:${entry.id}`,
@@ -672,11 +754,21 @@ export function resolveEntry(
       writes: entry.writes,
       icon: entry.icon,
       label,
-      blurb: entry.blurb,
+      // A loop asked for inside a loop comes back as the subloop, and the line
+      // under the strip is where that is said - the button keeps its name, as it
+      // does for the hex a dialect swaps a spelling for.
+      blurb:
+        wrap !== undefined && 'kind' in wrap && wrap.kind !== entry.wraps
+          ? INSTEAD[wrap.kind]
+          : entry.blurb,
       text,
       select: swap ? FIRST_HEX_ARG : firstNumberSpan(entry.snippet),
       availability,
       where: entry.kind === 'syntax' ? (entry.context ?? 'anywhere') : 'anywhere',
+      wraps: entry.wraps,
+      wrap,
+      calls: entry.calls,
+      call,
     };
   }
 
@@ -703,6 +795,12 @@ export function resolveEntry(
     where: 'anywhere',
   };
 }
+
+/** What the readout says where a wrap lands on the other construct. */
+const INSTEAD: Readonly<Record<WrapKind, string>> = {
+  loop: 'Inside a subloop this makes an ordinary loop, which is what fits there.',
+  subloop: 'Inside a loop this makes a subloop - a repeat within the repeat.',
+};
 
 /** The two digits of a hex snippet's first argument: `$XX ` then its own `$`. */
 const FIRST_HEX_ARG: TextRange = { start: 5, end: 7 };

@@ -1,12 +1,11 @@
-import type { Span } from '@amk/core/types';
 import type { LoopRun, WalkNote } from '@amk/spc/song-walk';
 import type { Command } from '@amk/tokens';
 import { type CommandGlyph } from '../../command-palette/command-icon';
 import { glyphOf } from '../../command-palette/glyph-of';
 import { definedAt } from '../../../state/commands-in-force';
 import { type PlaceContext, keyOf, placeOf } from './percussion';
+import { CHANNEL_FILL } from '../../../util/channel-palette';
 import {
-  CHANNEL_FILL,
   KEY_WIDTH,
   LOOP_LABEL_INSET,
   LOOP_LABEL_SIZE,
@@ -17,7 +16,7 @@ import {
   barRect,
   loopBox,
 } from './roll-metrics';
-import type { PassShift, ShiftBoundaries } from './roll-edit';
+import type { BodyRows, PassShift, ShiftBoundaries } from './roll-edit';
 import { fitBarContent, plateWidth } from './roll-bar-text';
 import { type LaneStack, keyName, noteLabel, overviewOffset } from './roll-layout';
 
@@ -42,8 +41,15 @@ export interface MarkGlyph {
   x: number;
   y: number;
   size: number;
-  /** The command's own span, which is what a click on it selects. */
-  span: Span;
+  /**
+   * The command itself, which is what says this glyph is the selected one.
+   *
+   * By identity and not by span, as the lane rings by: `inForce` reads
+   * `EditorStore.tokens()`, the same scan `commandAtCaret` answers from, so the
+   * objects compare. A second `tokenize` makes every comparison false in
+   * silence, which is the trap `EditContext.inForce` already names.
+   */
+  command: Command;
   /** For the tooltip, since a glyph has no room to say what it is. */
   label: string;
   /** This note puts the command in force, where the rest of a run inherits it. */
@@ -252,7 +258,7 @@ export function buildMarks(request: MarkRequest): Mark[] {
         x: x + box.x,
         y: y + box.y,
         size: box.size,
-        span: drawable[at].command.span,
+        command: drawable[at].command,
         label: drawable[at].entry!.label,
         defining: defining.has(drawable[at].command),
       })),
@@ -609,10 +615,14 @@ export function buildLoopRegions(request: LoopRegionRequest): LoopRegionBox[] {
 export interface LoopFollowRequest {
   regions: readonly LoopRegionBox[];
   /**
-   * The body a gesture is editing and the rows its notes span once the plan
-   * lands — `null` where no plan is held, or where it has no notes to stand on.
+   * The rows each body a gesture is editing will span once its plan lands.
+   *
+   * A list because one gesture may edit several: a loop box's rule carries the
+   * loops written inside that body too, and each of them is a frame with a plan
+   * and boxes of its own. Empty where no plan is held, and a body with no notes
+   * to stand on is left out of it.
    */
-  rows: { body: number; low: number; high: number } | null;
+  rows: readonly BodyRows[];
   /**
    * How far a **tick** moves under a held body-length change: the same list the
    * marks are dealt over, for every box the change is not the body of.
@@ -652,12 +662,17 @@ export interface LoopFollowRequest {
  * are projected that way, and a box that told the truth about a shape the bars
  * inside it did not would be the worse answer of the two.
  *
- * Vertically the plan says where the changed body's own notes went, and a box is
- * then the union of itself with everything it holds — one pass and not a walk
- * down the nesting, because a built box is already the union of what is inside
- * it. A box holding one that moved therefore grows to keep it in, and one whose
- * inner body moved inwards keeps its width: the built span has already swallowed
- * those rows and cannot give them back.
+ * Vertically the plans say where each edited body's own notes went — one per
+ * frame the gesture reaches, a frame's plan holding only the notes written in
+ * its own text and a loop written inside it being another frame's. A box is then
+ * the union of itself with everything it holds, and that union is what makes the
+ * outer box right rather than merely tidy: its own plan leaves the inner body's
+ * notes out, and nothing else puts them back. One pass and not a walk down the
+ * nesting, because enclosure is tested on the song's own ticks and tick
+ * containment is transitive — a body three deep is held directly by every box
+ * above it. A box holding one that moved therefore grows to keep it in, and one
+ * whose inner body moved inwards keeps its height: the built span has already
+ * swallowed those rows and cannot give them back.
  *
  * `tick`, `ticks`, `body` and `channel` stay the compiled song's — `region.id`
  * is built from them so a moved box keeps its identity and its rect, the
@@ -670,7 +685,7 @@ export interface LoopFollowRequest {
 export function followLoopRegions(request: LoopFollowRequest): readonly LoopRegionBox[] {
   const { regions, rows, boundaries, delta, passes, zoom, rowHeight } = request;
   const moves = delta !== 0 && (boundaries !== null || passes.length > 0);
-  if (!moves && rows === null) {
+  if (!moves && rows.length === 0) {
     return regions;
   }
 
@@ -693,13 +708,13 @@ export function followLoopRegions(request: LoopFollowRequest): readonly LoopRegi
         pass.tick + pass.ticks <= region.tick + region.ticks,
     );
 
-  const moved = rows === null ? null : loopBox(rows.low, rows.high, rowHeight);
+  const moved = new Map(
+    rows.map((each) => [each.body, loopBox(each.low, each.high, rowHeight)] as const),
+  );
 
-  /** Where a box's rows end up: the plan's for the changed body, its own else. */
+  /** Where a box's rows end up: its body's plan where there is one, its own else. */
   const span = (region: LoopRegionBox): { y: number; h: number } =>
-    moved !== null && rows !== null && region.body === rows.body
-      ? moved
-      : { y: region.y, h: region.h };
+    moved.get(region.body) ?? { y: region.y, h: region.h };
 
   return regions.map((region) => {
     let { x, w } = region;
@@ -720,7 +735,7 @@ export function followLoopRegions(request: LoopFollowRequest): readonly LoopRegi
     }
 
     let { y, h } = span(region);
-    if (rows !== null) {
+    if (rows.length > 0) {
       // Enclosure off the song's own ticks rather than off the drawn boxes,
       // which have just moved apart: what holds what is a fact about the music.
       for (const each of regions) {

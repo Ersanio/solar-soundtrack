@@ -4,51 +4,52 @@ A reference for the piano roll editor while there is no proper readme page for i
 is picked by the eight toggles in the corner above the keyboard, by a click on any note, or by
 soloing a part in the mixer below. It does not have to be picked first: with none picked you can
 still grab, stretch, copy or delete a note in any channel, and doing so picks that note's channel.
-Drawing a new note, the marquee and the keyboard shortcuts do need one, since empty grid belongs to
+Drawing a new note, the marquee and the editing shortcuts do need one, since empty grid belongs to
 no channel.
 
 ## Mouse
 
-| Gesture                                    | What it does                                                                                                 |
-| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------ |
-| Hover over empty grid                      | A ghost bar shows where the next note goes and how long it will be                                           |
-| Press on empty grid                        | Draws a note there and keeps it under the pointer until you let go                                           |
-| Click on empty grid                        | Draws the note and leaves it there                                                                           |
-| Drag the middle of a note                  | Moves it a snap step at a time, one row per semitone up and down                                             |
-| Drag a selected group of notes             | Moves them together, sounding the note you grabbed as it crosses rows                                        |
-| Drag a note's left or right edge           | Stretches that end; the other end stays put                                                                  |
-| Click a loop box's edge                    | Selects the loop's whole group of notes, closes its outline up, plays that pass, and shows the loop's number |
-| Drag a loop box's top or bottom sideways   | Moves that pass along the song: rests open in front of it, splitting the recall where the grab was mid-run   |
-| Drag a loop box's top or bottom up or down | Transposes every note of the body, one row per semitone                                                      |
-| Drag a loop box's left or right            | Resizes the loop — the right end moves where the body ends, the left end where it begins                     |
-| Hold `Alt` during any gesture              | Tick precision: no snapping, for either a position or a length                                               |
-| Click a note                               | Selects it, sounds it with its pitch slide, and puts the caret on it                                         |
-| Double-click a note                        | Goes to it in the MML                                                                                        |
-| `Ctrl` + click a note                      | Adds it to, or takes it out of, the selection                                                                |
-| `Ctrl` + drag on empty grid                | Draws a box, selects every note of this channel inside it, and plays that stretch of the song                |
-| `Ctrl` + drag a note                       | Copies it instead of moving it — the whole selection, if there is one                                        |
-| `Shift` + drag on empty grid               | Draws a note where you pressed and pulls its right edge along                                                |
-| `Shift` + drag a note                      | Locks it to the axis you first drag along — sideways it keeps its row, up or down it keeps its tick          |
-| Right-click a note                         | Deletes it                                                                                                   |
-| Right-drag across notes                    | Deletes each one the pointer crosses                                                                         |
-| Middle-click                               | Nothing yet                                                                                                  |
-| Middle-drag                                | Pans the roll, both ways at once                                                                             |
-| Wheel while drawing a note                 | Sizes it — `l1`, `l2`, `l3`, `l4`, `l6`, `l8` … down to `l192`                                               |
-| Wheel while holding a note still           | Resizes that note the same way, from its right edge                                                          |
-| `Alt` + wheel while sizing                 | Sizes it a tick at a time instead                                                                            |
-| `Ctrl` + wheel                             | Zooms in and out about the pointer                                                                           |
-| `Shift` + wheel                            | Scrolls the roll sideways                                                                                    |
-| `Alt` + wheel                              | Makes the rows taller and shorter, about the pointer                                                         |
-| Drag the overview bar                      | Scrolls the roll through the song — grab the lit box and it follows you                                      |
-| Drag the timeline below it                 | Moves the playhead; hold past either end and the roll scrolls along                                          |
-| Click a key on the left                    | Sounds that pitch on the channel being edited, so you can find it by ear                                     |
-| `Ctrl` + click a channel chip              | Solos that channel, which also picks it to edit                                                              |
+| Gesture                                    | What it does                                                                                              |
+| ------------------------------------------ | --------------------------------------------------------------------------------------------------------- |
+| Hover over empty grid                      | A ghost bar shows where the next note goes and how long it will be                                        |
+| Press on empty grid                        | Draws a note there and keeps it under the pointer until you let go                                        |
+| Click on empty grid                        | Draws the note and leaves it there                                                                        |
+| Drag the middle of a note                  | Moves it a snap step at a time, one row per semitone up and down                                          |
+| Drag a selected group of notes             | Moves them together, sounding the note you grabbed as it crosses rows                                     |
+| Drag a note's left or right edge           | Stretches that end; the other end stays put                                                               |
+| Click a loop box's edge                    | Selects the loop's whole group, closes its outline up, plays that pass, names it in the loop inspector    |
+| Drag a loop box's top or bottom sideways   | Moves that pass along the song: rests open in front of it and the recall splits, or close and it joins up |
+| Drag a loop box's top or bottom up or down | Transposes every note of the body, one row per semitone                                                   |
+| Drag a loop box's left or right            | Resizes the loop — the right end moves where the body ends, the left end where it begins                  |
+| Hold `Alt` during any gesture              | Tick precision: no snapping, for either a position or a length                                            |
+| Click a note                               | Selects it, sounds it with its pitch slide, and puts the caret on it                                      |
+| Double-click a note                        | Goes to it in the MML                                                                                     |
+| `Ctrl` + click a note                      | Adds it to, or takes it out of, the selection                                                             |
+| `Ctrl` + drag on empty grid                | Draws a box, selects every note of this channel inside it, and plays that stretch of the song             |
+| `Ctrl` + drag a note                       | Copies it instead of moving it — the whole selection, if there is one                                     |
+| `Shift` + drag on empty grid               | Draws a note where you pressed and pulls its right edge along                                             |
+| `Shift` + drag a note                      | Locks it to the axis you first drag along — sideways it keeps its row, up or down it keeps its tick       |
+| Right-click a note                         | Deletes it                                                                                                |
+| Right-drag across notes                    | Deletes each one the pointer crosses                                                                      |
+| Middle-click                               | Nothing yet                                                                                               |
+| Middle-drag                                | Pans the roll, both ways at once                                                                          |
+| Wheel while drawing a note                 | Sizes it — `l1`, `l2`, `l3`, `l4`, `l6`, `l8` … down to `l192`                                            |
+| Wheel while holding a note still           | Resizes that note the same way, from its right edge                                                       |
+| `Alt` + wheel while sizing                 | Sizes it a tick at a time instead                                                                         |
+| `Ctrl` + wheel                             | Zooms in and out about the pointer                                                                        |
+| `Shift` + wheel                            | Scrolls the roll sideways                                                                                 |
+| `Alt` + wheel                              | Makes the rows taller and shorter, about the pointer                                                      |
+| Drag the overview bar                      | Scrolls the roll through the song — grab the lit box and it follows you                                   |
+| Drag the timeline below it                 | Moves the playhead; hold past either end and the roll scrolls along                                       |
+| Click a key on the left                    | Sounds that pitch on the channel being edited, so you can find it by ear                                  |
+| `Ctrl` + click a channel chip              | Solos that channel, which also picks it to edit                                                           |
 
 ## Keyboard
 
 | Key                         | What it does                                                    |
 | --------------------------- | --------------------------------------------------------------- |
-| `Delete` / `Backspace`      | Deletes the selected notes                                      |
+| `Space`                     | Plays from the playhead, or stops the song and any preview      |
+| `Delete` / `Backspace`      | Deletes the selected command, or the selected notes             |
 | `Escape`                    | Drops the selection and the inspector with it, then the channel |
 | `←` `→`                     | Nudges the selection by one snap step                           |
 | `↑` `↓`                     | Moves the selection a semitone                                  |
@@ -61,6 +62,17 @@ no channel.
 | `Ctrl` + `Z` / `Ctrl` + `Y` | Undo and redo, the same history the MML editor uses             |
 
 Shortcuts are ignored while you are typing in the MML, so `Ctrl+A` there still selects the text.
+`Space` is the exception to the channel rule — it is the transport, not an edit, so it needs no
+channel picked, and neither does deleting a command: a command belongs to the song rather than to
+the channel you are editing. While the roll is showing, `Space` is always the transport: it stops
+whatever is sounding — the song, or a note or selection being previewed — and otherwise plays, even
+when a button or a section heading has the focus, so it never presses the control under the focus.
+
+`Delete` goes to the command whenever one is picked out, however many notes are selected as well —
+none of them is touched. Picking it from a bar's icon or from the lane lets go of the notes, so the
+key can mean nothing else; picked from the inspector's buttons they stay outlined and stay put. Click
+a bar's body to put the key back on the notes. A command written through a `"name=value"` cannot be
+deleted, and the key does nothing at all rather than falling through to them.
 
 ## The two bars over the roll
 
@@ -70,15 +82,20 @@ to go straight there.
 
 The thin one under it is the **timeline** — bar numbers, beat ticks, and a triangle whose tip is on
 the playhead. Drag the triangle to move the music, and keep dragging past either end of it to carry
-the roll along with you. Anything that moves the **view** unticks **Follow playback** — the wide
-bar always, the timeline only when a drag runs off the end of it and starts scrolling — since you
-have taken the roll somewhere the song is not. Tick it again to catch up with the music.
+the roll along with you. Anything that moves the **view** switches **Follow playback** off — the
+wide bar always, the timeline only when a drag runs off the end of it and starts scrolling — since
+you have taken the roll somewhere the song is not. Press it again to catch up with the music.
 
 ## What a note's icons mean
 
 A bar carries its own pitch on the left and, on the right, one icon per command acting on that
 note — its volume, its envelope, its instrument, and so on. Hover the bar to have them named, click
-one to ask the inspector about that command, or double-click it to go to it in the MML.
+one to ask the inspector about that command, or double-click it to go to it in the MML. **The one
+you are inspecting is outlined**, on every bar it acts on, and `Delete` removes it.
+
+**Clicking an icon lets go of whatever notes were selected**, so the command is the only thing
+picked out and `Delete` can mean nothing else. Press and hold on one instead and you are dragging
+the note, exactly as if you had pressed its bar — an icon takes the click, never the press.
 
 An icon on a **solid pale chip** is a command that note puts in force; a plain outlined icon is one
 it inherits from earlier in the channel. So a run of notes under one `v200` shows the chip on the
@@ -93,16 +110,35 @@ list — the inspector under two headings, one for what the note sets and one fo
 under. Its buttons answer to the same pair the bar's own icons do: a click asks the inspector about
 that command and leaves you in the roll, a double click goes to it in the MML.
 
-**Changing a value in the inspector replays the note.** Let a slider go and the selected note — the
-one whose bar or icon you last clicked — sounds again under the new value, once the edit has
-compiled. With no note selected — after `Escape`, or a click in the command lane — a commit makes
-no sound.
+The three dots are the one plate on a bar that does not pick a command, because they stand for a
+list rather than for any one of them — so a click there **selects that note** and the inspector
+answers with everything acting on it.
+
+**Changing a value in the inspector replays the note.** Let a slider go and the note whose bar or
+icon you last clicked sounds again under the new value, once the edit has compiled. That is not the
+same as a note being outlined — clicking an icon lets the outlines go and still leaves the inspector
+answering about that note, so the commit is heard. With no note behind the question at all — after
+`Escape`, or a click in the command lane — a commit makes no sound.
+
+**The inspector's Length slider is the note's own length**, one slider per tied piece — `Length` for
+the note and `Tied to` for each `^` after it. It reads `1/n` the way `l` does, and it moves that one
+note and nothing else.
+
+A note that never wrote a length of its own — a bare `c` under an `l8` — has one all the same, and
+the slider says which and where it came from. Move it and the digits go onto the note: `c` becomes
+`c4`, and the notes around it go on reading the `l`. They are never taken back out, so a slider let
+go on the `l`'s own value leaves `c8` rather than a bare `c` — that note has been given a length of
+its own, and an `l` edited later will not move it.
+
+Dots stay exactly as written, because that is the only reading that keeps the note where it is:
+`l8 c.` is 36 ticks and the digits that hold it there are `8`, not the 4 that 36 ticks would be
+without the dot. Two lengths have no `1/n` to drag and say so rather than guess — one written as an
+exact tick count, `c=37`, and a bare note under an `l` that is itself dotted or exact.
 
 ## The command lane
 
 Under the roll is a strip holding nothing but command icons, on the song's own timeline: what takes
-effect, and where, with the note data out of the way. **Commands** on the toolbar opens and closes
-it, and it stays as you left it.
+effect, and where, with the note data out of the way. It is always there, under every song.
 
 It holds **every command that takes effect** — the song's own settings, `t`, `w`, `$E4` and the whole
 echo unit, `$EF` to `$F2` and the `$F5` filter, and every channel setting too: a `v`, a `y`, an `@`,
@@ -148,11 +184,12 @@ channel it happens to be written on, and muting that channel does not stop it.
 **Whatever command you are inspecting is outlined here**, in the same white the roll outlines a
 selected note with, however you reached it — an icon on a bar, an icon in the lane, or a button in
 the note inspector. The lane is the one place every command appears, so it is where "this is the one"
-can always be said. A command written inside a `[ ]` that plays twice is outlined at both ticks: it
-is one command, wherever the driver reads it.
+can always be said; the bars outline it too, wherever they have room to show it. A command written
+inside a `[ ]` that plays twice is outlined at both ticks, and one held over sixteen notes is
+outlined on all sixteen bars: it is one command, wherever it acts.
 
 **Drag the line above the lane to make it taller**, the way the divider between the editor and the
-output pane works. Five icons deep is where it opens and the shortest it goes; ten is the tallest.
+sidebar works. Five icons deep is where it opens and the shortest it goes; ten is the tallest.
 Double-click the line to put it back to five. The height is remembered with the rest of the roll's
 settings.
 
@@ -165,11 +202,14 @@ when there is more. Nothing is ever left out for want of room — however many c
 tick, each gets a row of its own, and the wheel and the seam are what reach them. Click an icon to
 ask the inspector about that command, or double-click it to go
 to it in the MML — the same as clicking one on a bar, except that it leaves the channel you are
-editing alone and lets go of the selected note: a lane icon names a command of the song rather than
-a note of it, so a value committed from here replays nothing. **Right-click one to delete it**, in one undo step. That is the counterweight to a
+editing alone and goes further in letting go of the notes: both drop the outlines, and a lane icon
+drops the note behind the question as well, since it names a command of the song rather than a note
+of it — so a value committed from here replays nothing, where one committed from a bar's icon
+replays the note that icon sits on. **Right-click one to delete it**, or
+press `Delete` on the one you are inspecting, in one undo step either way. That is the counterweight to a
 roll that keeps a command wherever something still plays under it: an edit hands the command back to
 the notes that need it, and this is how you say none of them do. A command written through a
-`"name=value"` cannot be deleted this way — its icon offers no right-click — because the text it
+`"name=value"` cannot be deleted at all — its icon offers no right-click — because the text it
 would take out is the call site rather than the command.
 
 **Drag an icon sideways to move that command to another tick.** It snaps to the starts of the notes
@@ -306,8 +346,7 @@ to put it on. Delete it from the lane first if you meant it to go.
   channel runs under — `o4 q7F @0 v255 y10` — before the note. No `l`: every length the roll writes
   is the note's own, so nothing it puts there reads a default. All of it is one undo step. The
   block goes at the end because an octave and a default length carry across a `#N`, so a block
-  dropped in between two others would change what the second one is read under; **Normalize** is what
-  puts the blocks back in `#0` to `#7` order.
+  dropped in between two others would change what the second one is read under.
 - **And fills it out with rests to the length of the song.** A song is only as long as its shortest
   channel — the driver stops every channel the moment one of them runs out — so a new channel holding
   one note would cut the rest of the song off at that note and hide it from the roll. The rest after
@@ -321,6 +360,13 @@ to put it on. Delete it from the lane first if you meant it to go.
   written as `c8 / ^8`, which still sounds as one note.
 - **Every edit is one undo step**, including a whole selection moved at once, and it is the same
   history `Ctrl+Z` uses in the MML editor.
+- **An edit leaves its notes selected.** Resize a note and it is still picked out, ready to be
+  nudged or transposed; drag a group and the whole group stays lit, the notes it pushed aside
+  included. So does a value changed from the inspector — a note's length dragged there keeps its
+  bar outlined. A note the edit deleted is the one thing that does not come back. Text arriving
+  from anywhere else lets the selection go: typing in the MML, an undo, leaving the channel, muting
+  it, or `Escape` — and so does dragging a loop box's edge, which moves the
+  brackets and with them the notes' places in the body.
 
 ## Starting from nothing
 
@@ -356,11 +402,9 @@ closes, and a `*` or `(n)` that replays a remote code body.
 A legacy `&` is refused for a different reason, and refuses the whole song rather than one channel:
 it is an operator rather than a command, so nothing above the compiler can say which channel it is
 written on, and the bend duration it compiles to is the length of the note _before_ it — so an edit
-to that note would silently change a slide nothing on screen has drawn. **Normalize** is the way out.
-It writes every `&` as the `$DD` it already compiles to, byte for byte, after which the slide is a
-command the roll can see and the rules below apply to it. A slide it cannot write out — one standing
-after a tie, which `$DD` would move — is left alone and named in the dialog, and goes on refusing the
-song.
+to that note would silently change a slide nothing on screen has drawn. Written as the `$DD` it
+compiles to — `$DD $00 <length> <note>`, in the Source tab — the slide is a command the roll can see,
+and the rules below apply to it.
 
 A `$DD` pitch slide is not one of them, and is the one command with a rule of its own. It is not
 dispatched: the note before it is what reads it, by peeking at the byte standing at the track pointer
@@ -379,8 +423,7 @@ way anything a note starts is plated, and on no bar after it: a `v` or a `y` is 
 follow go on playing under, and a slide is over when it is over. A slide inside a `[ ]` played twice
 is two slides, so both notes carry it and both are plated. On the lane it sits on that same tick,
 which for `c4^4 $DD …` is 48 ticks into the note rather than at its head — the read-ahead does not
-find the slide until the tie's own ticks, which is why writing one after a tie is a rewrite Normalize
-declines to make.
+find the slide until the tie's own ticks.
 
 And it decides what you hear. Clicking the bar plays the note **with its slide**, as does every row a
 drag of it crosses, since the target is an absolute note the bar would still slide to wherever it was
@@ -401,6 +444,45 @@ and the definition is left exactly where it was written.
 
 ## Loops
 
+**Select the notes you want repeated and press `Loop` in the command palette.** The brackets go
+round the whole run from the first selected note to the last, everything in between included, and
+the loop opens playing twice with its repeat count left selected — the **Loop inspector**'s
+**Repeats** field is beside it, so the number is one keystroke away. Nothing between the brackets is rewritten: the
+notes, the rests and every `v`, `y` and `@` among them stay exactly as they were.
+
+The palette lives in the sidebar's Inspector, under **Add a command**, and it opens on whatever
+note you last clicked — so a marquee, `Ctrl+A` and a press on a loop box's edge each put the caret on
+the first note they select, and the palette follows. With nothing selected the two bracket buttons
+are greyed, and the line under them says so.
+
+A fresh loop is **named with the lowest number the song is not already using**, counting from 0, so
+it can be recalled later with `(0)3` — and a `(!1)` remote definition counts as using `(0)`, since
+AddmusicK files the two in one slot. Press `Loop` **inside a loop** and you get a subloop instead,
+and `Subloop` inside a subloop gives a loop: AddmusicK holds one `[ ]` and one `[[ ]]` at a time, in
+either order, and the readout says which of the two the button is about to write. Both spent, and the
+button is greyed with the reason.
+
+Two selections it will not wrap, each said in words: one with notes on both sides of a bracket, and
+one that reaches across a channel. The intro `/` cannot go inside a loop either, and neither can
+music written through a `"name=value"` replacement.
+
+**`Loop call` plays a loop you have already written, again from here.** It names the nearest loop
+written above the cursor, which is not a preference: AddmusicK reads a song in order, so a call can
+only reach a loop it has already met. The button is greyed where there is nothing above to call, and
+where the cursor is inside a `[ ]` body — a loop cannot be called from inside another loop, though
+one inside a `[[ ]]` is fine. There is no `*` button: a `*` replays whichever loop was opened above
+it, which is decided by where it is written and by nothing you can point at, so it is the one loop
+shape the roll cannot draw a handle for. A `*` already in a song still plays, still draws and still
+edits.
+
+**The Loop inspector names the loop the cursor is in.** Put it on a loop's brackets, its repeat
+count, its call, or anywhere inside its body, and that panel — in the sidebar's Inspector, under the
+command inspector — says what the construct is and lets its **Repeats** be changed: one card per
+loop, and two for a note inside a subloop inside a loop, innermost first. With the cursor in no loop
+the panel is not there at all. A call's card also says **which** loop it plays, chosen from the ones declared above
+it. A loop with no name of its own offers to take one, so that a call can reach it; a name already
+written is never changed, since every call in the song is written against it.
+
 A loop is one run of text the driver plays many times, and the roll draws it that way: **every pass
 is on screen**, each as a box around the rows its notes span, washed in the channel's own colour.
 The pass standing where the text is — the `[ ]` itself — wears a **dashed** edge and the solider
@@ -415,11 +497,15 @@ that is the roll saying "these change together, and this is the one you took hol
 or delete any of them and the body is rewritten once; the recompile is what plays it everywhere.
 
 **The box's edge is the pass's handle.** Click the dashed or dotted line and the loop's whole group
-of notes is selected — that group and nothing else, on whichever channel the box belongs to; a click
-that never moves just leaves it selected, ready for the arrow keys and `Delete`. **Every box of that
-body closes its dashes up into one solid line** while it is selected, the declaration and every
-recall of it together, on every channel that plays it: the outline says "this is the group you have
-hold of" the way the ring round a note does.
+of notes is selected — the body's own, and the notes of every loop written **inside** it, which is
+exactly what the box is drawn round; a click that never moves just leaves it selected, ready for the
+arrow keys and `Delete`. **Every box of that body closes its dashes up into one solid line** while it
+is selected, the declaration and every recall of it together, on every channel that plays it, and a
+loop written inside goes solid with it: the outline says "this is the group you have hold of" the way
+the ring round a note does. The Loop inspector answers about **that box**: press the
+dashed one and it names the `[ ]` itself, press a dotted one and it names the `(1)3` whose ghost you
+pressed, with that call's own count and the loop it plays both live. The two are one text and the
+caret lands in the same place either way, so the press is the only thing that can tell them apart.
 
 Keep the button down and drag the **top or bottom rule** sideways and **that pass moves along the
 song**: a gap of rests opens at the boundary in front of it, everything from there on slides right
@@ -429,6 +515,15 @@ still one body played from both halves. That is how other notes get a place in b
 left closes free space instead: the drag stops at the rests actually in front of the pass, and never
 moves a command off its tick.
 
+**Dragging it all the way back joins the two halves up again.** Close the gap completely and the
+pair becomes the one call it was: `(1)2 r1^1^1 (1)3` is `(1)5` again, `[c4 d4] r… *2` is
+`[c4 d4]3`, and `* r… *3` is `*4`. The half that stays keeps its own spelling and takes the other's
+repeats, so it does not matter which of the two ways the loop was written. The readout says the
+count before you let go. Anything with a tick of its own written between the two — a `v200`, a
+note, the intro `/` — keeps them apart: the space closes up to it and the two calls stay two,
+because one call has nowhere to put what was standing in the middle of it. Two calls already
+touching are left alone as well, there being no gap to close and so no drag to make.
+
 **The boxes move with the music.** Whatever the drag is — a pass sliding, an end resizing, a body
 transposing, or a note inside it being carried — the tint and the outline follow the notes while the
 button is still down, so a box is always drawn round the bars it is a box for. A loop that plays
@@ -437,11 +532,14 @@ inside another grows to keep it in.
 Drag that same rule **up or down** instead and **the whole body transposes**, one row per semitone,
 every pass of it moving together because there is one text; the readout says the interval. Which of
 the two the drag is settles the moment it starts moving and stays settled, so wandering off the
-straight does not swap one edit for the other. Drums keep their lanes — a drum's row is its
+straight does not swap one edit for the other. A loop written **inside** that one goes with it — its
+notes play only where this loop plays, so they are part of the same group and both boxes follow. A
+loop merely **called** from inside it does not: its text plays in other places in the song too, and
+moving it there is not what the box was asked for. Drums keep their lanes — a drum's row is its
 instrument, not a pitch — and a transpose that would put a note off the writable range is refused
-with the reason on the toolbar. The notes _inside_ the body are still moved one at a time by
-dragging their own bars, as above; the box is the construct's handle, and up or down it carries the
-construct's contents as one.
+with the reason on the toolbar, the whole group with it. The notes _inside_ the body are still moved
+one at a time by dragging their own bars, as above; the box is the construct's handle, and up or
+down it carries the construct's contents as one.
 
 **The box's ends resize the loop.** The **right** end changes the body's own length: pull it out and
 a rest goes on the body's tail, pull it in and the body's trailing rests come off — `[a1 r1]5`
@@ -479,9 +577,11 @@ pass. A box drawn with `Ctrl` over any stretch of the roll plays that stretch th
 neither grows with the zoom nor with the rows, and a box too small to hold it shows nothing rather
 than something cut.
 
-**Drawing inside any pass writes into the body.** The note lands in the text once, between the
-brackets, and appears on every pass — the ghost's siblings show it landing everywhere before the
-button is even released. A gap inside the body is a rest in the body, exactly as it is outside one.
+**Drawing inside any pass the channel plays writes into the body.** The note lands in the text once,
+between the brackets, and appears on every pass — the ghost's siblings show it landing everywhere
+before the button is even released. A gap inside the body is a rest in the body, exactly as it is
+outside one. Another voice's pass of that same body is not one of yours: draw where its box is drawn
+and the note is your own channel's music, on its own tick, in your own block.
 
 **Changing the body's length moves the song.** Stretch a looped note and every pass grows; every
 later pass, and everything written after the loop, slides by the change times the passes in front
@@ -492,18 +592,12 @@ miniature: deleting it tightens the loop, where deleting a note in the middle le
 
 What a loop will not do, each in its own words on the toolbar: a note cannot be dragged **onto** a
 loop from outside — the loop's ticks are a wall, not a gap — and a selection with notes on both
-sides of a bracket has no one text to rewrite, so it refuses (deleting such a selection works, each
-side deleted in its own frame, one undo step). A note at the head of a body that plays a drum
+sides of a bracket has no one text to rewrite, so it refuses. What a bracket cannot straddle is a
+change of **tick**: deleting or transposing such a selection works, each side planned in its own
+frame and committed as one step. A note at the head of a body that plays a drum
 loaded _before_ the `[` refuses to move: rewriting it would hand the drum to the next note. A
 command written between the brackets cannot be dragged along the command lane — it runs once per
 pass, where it stands — where deleting it from the lane still works. And the edge drag has two
 refusals of its own: a subloop grabbed past its first pass has no name to call it back by — `[[ ]]`
 has no label and no `*`, and a single pass cannot even be spelled, `]]1` being the `$E6 $00` open
 byte — and a loop that plays inside another loop has no song-time position of its own to move.
-
-The **Normalize #N** button beside that message rewrites just that channel into a shape the roll can
-splice — triplets given plain lengths, and every note given its own length so that no `l` decides
-it — and leaves every other channel of the song exactly as it was; loops stay exactly as written,
-being shapes the roll edits in place. The plain **Normalize** button does the whole song. Neither
-changes what the song plays: the result is compiled and compared against the original first, and
-refused if anything moved.

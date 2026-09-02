@@ -6,7 +6,8 @@ Installing AddmusicK is not needed, nor is a ROM. The tool is a static site and 
 
 <!-- TODO: demo gif goes here -->
 
-**[Try it →](https://ersanio.github.io/solar-soundtrack/)**
+**[Try it →](https://ersanio.github.io/solar-soundtrack/)** ·
+**[Porter's manual →](README.html)** — what it does, and every control in it.
 
 ## Why this exists
 
@@ -28,9 +29,11 @@ games, and even for homebrew. A huge library of music is available at [SMW Centr
 - **An AddmusicK-compatible MML compiler**, ported from C++ to TypeScript. It reads
   these target markers: `#amk 1`, `#amk 2`, `#amk 4`, `#am4`, `#amm`. (`#amk 3` is unsupported, the same as in AddmusicK itself.)
 - **SPC700 emulation** using Blargg's `snes_spc` as a WebAssembly module.
-- **Compile as you type**, with a **Live** mode that reloads the song at the position it
+- **Compile as you type**, with a **Hot Reload** mode that reloads the song at the position it
   was already playing. You can keep editing and the music never stops.
 - **Seek, loop and volume**, and per-channel **mute** and **solo** controls.
+- **A layout in FL Studio's mould** — transport and ARAM meter in the top bar, an inspector-first
+  sidebar, a status bar, and a tablet drawer; the theme picker recolours any of it.
 - **A sample browser** where you can import `.brr` files or whole `.bnk` banks, see what each sample
   costs in ARAM, and mark them as important for use in global songs or sound effects.
 - **An ARAM budget** that tells you how your work fits within the ARAM.
@@ -45,7 +48,7 @@ games, and even for homebrew. A huge library of music is available at [SMW Centr
   inside the feedback loop and each pass is filtered again; it shades the region below ~2 kHz where
   eight taps at 32 kHz have no real say; and it warns when the feedback and the filter together
   make an echo that builds up instead of dying away. Edits go straight back into the MML, so with
-  **Live** on you hear the change on the running song.
+  **Hot Reload** on you hear the change on the running song.
 - **Syntax highlighting**, and a **live playhead** that follows the driver rather than estimating —
   so the highlighted note is the note you are hearing, in every channel.
 - **A hex dump** of the compiled song data, just because.
@@ -84,16 +87,16 @@ Node 24 is what CI uses.
 | `npm run watch`  | Dev-configuration build with `--watch`, no server.                |
 | `npm run lint`   | ESLint over every workspace.                                      |
 | `npm run format` | Prettier over the workspace.                                      |
-| `npm run check`  | The merge gate: formatting, three typechecks, thirteen harnesses. |
+| `npm run check`  | The merge gate: formatting, three typechecks, fourteen harnesses. |
 
-`npm run check` is what CI runs. The thirteen harnesses pin the compiler, the scanner, SPC assembly,
+`npm run check` is what CI runs. The fourteen harnesses pin the compiler, the scanner, SPC assembly,
 the headless MML → SPC → PCM chain, the worklet, BRR decoding, the echo FIR and the envelope maths
 against known-good byte output. `scripts/README.md` says what each one actually proves.
 
 Three things run automatically before the commands above (via `pre*` npm hooks), so you never need
 to invoke them yourself: the audio worklet is bundled with esbuild, the SPC package's driver and
 emulator assets are mirrored into `web/public/`, and the current commit SHA is written to a
-gitignored file that powers the toolbar's commit link. The SHA is captured once when the dev server
+gitignored file that powers the top bar's commit link. The SHA is captured once when the dev server
 starts, so it goes stale if you commit while `npm start` keeps running — restart to refresh it.
 
 ## How it works
@@ -117,7 +120,7 @@ Nothing in `packages/` touches a framework or the DOM beyond three `fetch` calls
 the same modules run in Node under the test harnesses, on the main thread, and inside an audio
 worklet.
 
-On testing: `npm run check` runs thirteen byte-level harnesses — see `scripts/README.md`. Separately,
+On testing: `npm run check` runs fourteen byte-level harnesses — see `scripts/README.md`. Separately,
 `scripts/Compare-Spc.ps1` and `Compare-SongBin.ps1` diff this compiler's output against a native
 AddmusicK build, byte for byte.
 

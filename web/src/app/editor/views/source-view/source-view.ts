@@ -1,7 +1,6 @@
 import {
   afterNextRender,
   Component,
-  computed,
   DestroyRef,
   type ElementRef,
   effect,
@@ -30,7 +29,11 @@ import { EditorView, keymap, lineNumbers } from '@codemirror/view';
 
 import type { Severity } from '@amk/core/types';
 import { commandAt } from '@amk/tokens';
+import { padAround } from '@amk/tokens/edits';
+import { IconChevronDown } from '../../../shared/icons/icon-chevron-down';
+import { IconChevronRight } from '../../../shared/icons/icon-chevron-right';
 import { IconWrap } from '../../../shared/icons/icon-wrap';
+import { Toggle } from '../../../shared/toggle/toggle';
 import { Toolbar } from '../../../shared/toolbar/toolbar';
 import { type EditBatch, EditorRequests, type Insertion } from '../../../state/editor-requests';
 import { EditorStore } from '../../../state/editor-store';
@@ -38,7 +41,6 @@ import { Playback } from '../../../state/playback';
 import { clamp } from '../../../util/math';
 import { CommandPalette } from '../../command-palette/command-palette';
 import { HistoryButtons } from '../../history-buttons/history-buttons';
-import { NormalizeButton } from '../../normalize-button/normalize-button';
 import { commandHover } from '../../codemirror/command-hover';
 import { mmlLanguage } from '../../codemirror/mml-language';
 import { mmlTheme } from '../../codemirror/mml-theme';
@@ -80,7 +82,15 @@ const LINT_SEVERITY: Record<Severity, 'error' | 'warning' | 'info'> = {
  */
 @Component({
   selector: 'amk-source-view',
-  imports: [Toolbar, IconWrap, CommandPalette, HistoryButtons, NormalizeButton],
+  imports: [
+    Toolbar,
+    Toggle,
+    IconWrap,
+    IconChevronDown,
+    IconChevronRight,
+    CommandPalette,
+    HistoryButtons,
+  ],
   templateUrl: './source-view.html',
   host: { class: 'flex min-h-0 min-w-0 flex-col' },
 })
@@ -103,14 +113,6 @@ export class SourceView {
    */
   protected readonly wordWrap = signal(false);
   private readonly wrapCompartment = new Compartment();
-
-  /** Mirrors the mute/solo toggles' own on/off styling in `channel-mixer.html`. */
-  protected readonly wrapButtonClass = computed(
-    () =>
-      `border-edge cursor-pointer rounded-md border px-1.5 py-1.5 transition-colors ${
-        this.wordWrap() ? 'bg-accent/20 text-accent font-semibold' : 'text-ink-muted hover:text-ink'
-      }`,
-  );
 
   /**
    * Whether the command palette is showing.
@@ -166,7 +168,9 @@ export class SourceView {
             }
 
             if (update.docChanged || update.selectionSet) {
-              this.store.caret.set(update.state.selection.main.head);
+              const main = update.state.selection.main;
+              this.store.caret.set(main.head);
+              this.store.selection.set({ start: main.from, end: main.to });
             }
 
             // Published rather than kept, so both toolbars' history buttons
@@ -384,6 +388,14 @@ export class SourceView {
       this.view.dispatch({ changes });
     }
 
+    // Here rather than where the batch was asked for, and only now that it has
+    // gone in: a stale one is dropped above in silence, and a count that ran
+    // ahead of the document would have the roll read the next change from
+    // anywhere as one that kept its notes.
+    if (batch.keepsNotes) {
+      this.requests.notesKept.update((n) => n + 1);
+    }
+
     if (batch.immediate) {
       this.store.compileNow();
     }
@@ -424,8 +436,7 @@ export class SourceView {
       doc.length,
     );
 
-    const before = at > 0 && !/\s/.test(doc.sliceString(at - 1, at)) ? ' ' : '';
-    const after = at < doc.length && !/\s/.test(doc.sliceString(at, at + 1)) ? ' ' : '';
+    const { before, after } = padAround(doc.toString(), at);
     const text = `${before}${insertion.text}${after}`;
 
     // The selection is named in the insertion's own coordinates, so it moves

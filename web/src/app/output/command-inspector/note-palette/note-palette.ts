@@ -2,7 +2,7 @@ import { Component, computed, effect, inject, input, signal } from '@angular/cor
 
 import type { Command } from '@amk/tokens';
 import { channelsBeginAt, songTarget } from '@amk/tokens/dialect';
-import { insertAt } from '@amk/tokens/edits';
+import { insertAt, padAround } from '@amk/tokens/edits';
 import {
   CATEGORIES,
   type CaretPlace,
@@ -11,9 +11,26 @@ import {
   type ResolvedEntry,
   resolveEntry,
 } from '../../../editor/command-palette/catalog';
-import { chipClass, entryClass } from '../../../editor/command-palette/command-palette';
+import {
+  entryBlocked,
+  entryClass,
+  entryReadout,
+} from '../../../editor/command-palette/command-palette';
 import { CommandIcon } from '../../../editor/command-palette/command-icon';
+import {
+  callEdits,
+  callSelection,
+  callVerdict,
+  isCall,
+  isWrap,
+  wrapEdits,
+  wrapSelection,
+  wrapVerdict,
+} from '../../../editor/command-palette/loop-wrap';
 import { unitStartBefore } from '../../../editor/views/piano-roll/roll-strip';
+import { IconChevronDown } from '../../../shared/icons/icon-chevron-down';
+import { IconChevronRight } from '../../../shared/icons/icon-chevron-right';
+import { Toggle } from '../../../shared/toggle/toggle';
 import { EditorRequests } from '../../../state/editor-requests';
 import { EditorStore } from '../../../state/editor-store';
 import { readStored, writeStored } from '../../../util/storage';
@@ -50,7 +67,7 @@ export interface NotePaletteModel {
  */
 const MANY_EFFECTS = new Set([0xf4, 0xfa]);
 
-type Button = ResolvedEntry & { class: string; after: boolean };
+type Button = ResolvedEntry & { class: string; disabled: boolean; after: boolean };
 
 /**
  * The command palette, aimed at a note instead of the caret.
@@ -63,12 +80,16 @@ type Button = ResolvedEntry & { class: string; after: boolean };
  * hidden rather than disabled: those are the chips above, and a second copy in
  * front of the same note is the duplicate this palette exists to refuse.
  *
+ * The two bracket forms are the exception to all of that: they go round the run
+ * the roll's selection covers rather than landing beside one note, and with
+ * nothing selected they are greyed. See `loop-wrap.ts`.
+ *
  * No `All` chip. One category is a row or two; the whole catalogue would be
  * most of the pane.
  */
 @Component({
   selector: 'amk-note-palette',
-  imports: [CommandIcon],
+  imports: [CommandIcon, IconChevronDown, IconChevronRight, Toggle],
   templateUrl: './note-palette.html',
   host: { class: 'contents' },
 })
@@ -81,8 +102,8 @@ export class NotePalette {
 
   readonly model = input.required<NotePaletteModel>();
 
-  /** Closed by default: the inspector's chips are the more asked-for half. */
-  protected readonly open = signal(readStored(OPEN_KEY) === 'open');
+  /** Open by default; only a porter's own close is remembered. */
+  protected readonly open = signal(readStored(OPEN_KEY) !== 'closed');
 
   protected readonly filter = signal<Category>(readFilter());
 
@@ -91,35 +112,73 @@ export class NotePalette {
     equal: (a, b) => a.program === b.program && a.amkVersion === b.amkVersion,
   });
 
+  /**
+   * What the two bracket forms would put round the notes the porter has picked
+   * out.
+   *
+   * The roll's own selection where there is one — it is the run of text a whole
+   * group of bars covers, which the document's caret cannot say — and the
+   * document's selection otherwise, which is what this panel answers to when it
+   * is open beside the MML rather than beside the roll.
+   */
+  private readonly wrap = computed(() => {
+    const source = this.store.source();
+    const index = this.store.tokens();
+    const reading = this.store.loops();
+    const picked = this.requests.selectedRun() ?? this.store.selection();
+    const run = picked.end > picked.start ? picked : null;
+    const ask = (want: 'loop' | 'subloop') => wrapVerdict({ source, index, reading, run, want });
+
+    return { loop: ask('loop'), subloop: ask('subloop') };
+  });
+
+  /**
+   * Where a call is written: the head of the note's own unit, over its leading
+   * `o` and `@`, as every insertion in front of a note is. The verdict is asked
+   * about this offset and the splice lands at it, so the padding and the loops
+   * declared above are read at one place.
+   */
+  private readonly callAt = computed(
+    () => unitStartBefore(this.store.source(), this.store.tokens().commands, this.note()).start,
+  );
+
+  /**
+   * What a call written here would play.
+   *
+   * Asked about {@link callAt} rather than the document's caret: this palette
+   * writes in front of the note it is aimed at, and which loops are declared
+   * above that point is what decides the answer.
+   */
+  private readonly call = computed(() =>
+    callVerdict({
+      source: this.store.source(),
+      index: this.store.tokens(),
+      reading: this.store.loops(),
+      caret: this.callAt(),
+    }),
+  );
+
   /** Whether the note sits above the first `#0`-`#7`, which two entries turn on. */
   private readonly place = computed<CaretPlace>(() => {
     const first = channelsBeginAt(this.store.tokens());
-    return { beforeChannels: first === null || this.note().span.start <= first };
+    return {
+      beforeChannels: first === null || this.note().span.start <= first,
+      wrap: this.wrap(),
+      call: this.call(),
+    };
   });
 
   protected readonly hovered = signal<ResolvedEntry | null>(null);
 
   /** What the line under the buttons says right now — the palette's readout. */
-  protected readonly readout = computed(() => {
-    const entry = this.hovered();
-    if (!entry) {
-      return null;
-    }
-
-    const said = entry.availability.reason ?? entry.blurb;
-    return {
-      label: entry.label,
-      text: entry.caveat ? `${said} ${entry.caveat}` : said,
-      muted: entry.availability.state === 'ok' && entry.caveat === undefined,
-    };
-  });
+  protected readonly readout = computed(() => entryReadout(this.hovered()));
 
   protected readonly chips = computed(() => {
     const filter = this.filter();
     return CATEGORIES.map((category) => ({
       id: category.id,
       label: category.label,
-      class: chipClass(filter === category.id),
+      pressed: filter === category.id,
     }));
   });
 
@@ -140,7 +199,14 @@ export class NotePalette {
 
       return hidden
         ? []
-        : [{ ...resolved, class: entryClass(resolved), after: resolved.vcmd === 0xdd }];
+        : [
+            {
+              ...resolved,
+              class: entryClass(resolved),
+              disabled: entryBlocked(resolved),
+              after: resolved.vcmd === 0xdd,
+            },
+          ];
     });
   });
 
@@ -156,6 +222,18 @@ export class NotePalette {
    * value can be typed or slid at once, as the source palette leaves it.
    */
   protected insert(button: Button): void {
+    if (button.wrap !== undefined && isWrap(button.wrap)) {
+      this.requests.applyAll(wrapEdits(button.wrap), wrapSelection(button.wrap));
+      return;
+    }
+
+    // A call carries its own padding, asked about the offset it lands at.
+    if (button.call !== undefined && isCall(button.call)) {
+      const at = this.callAt();
+      this.requests.applyAll(callEdits(button.call, at), callSelection(button.call, at));
+      return;
+    }
+
     const source = this.store.source();
     const note = this.note();
     const { start: at, line } = button.after
@@ -164,8 +242,7 @@ export class NotePalette {
 
     // MML is whitespace-separated, so pad where the neighbouring character is
     // not — the same rule as the caret palette's.
-    const before = at > 0 && !/\s/.test(source[at - 1]) ? ' ' : '';
-    const after = at < source.length && !/\s/.test(source[at]) ? ' ' : '';
+    const { before, after } = padAround(source, at);
     const edit = insertAt(at, `${before}${button.text}${after}`, line);
     if (!edit) {
       return;

@@ -91,9 +91,7 @@ export interface CompileStats {
 	 * Load-bearing for writing text, not a statistic: every note's {@link
 	 * NoteAddress.ticks} and every walked tick is already **divided** by it
 	 * (`parser.ts:divideByTempoRatio`), so a length spelled from a tick count has
-	 * to be multiplied back up first or the song is silently halved. Only
-	 * {@link ParseTrace} carried it before, and a trace costs an event per
-	 * dispatch where this costs nothing.
+	 * to be multiplied back up first or the song is silently halved.
 	 */
 	tempoRatio: number;
 }
@@ -169,103 +167,6 @@ export interface CommandAddress {
 	span: Span;
 }
 
-/**
- * The parser's note state, as it stands between two dispatches.
- *
- * Everything the parser resolves at parse time and folds into the bytes it
- * emits — so everything a text that re-spells a command has to put back. The
- * nine-slot arrays are per channel with slot 8 for the loop block, exactly as
- * the parser keeps them.
- */
-export interface ParseState {
-	channel: number;
-	prevChannel: number;
-	/** -1 to 7 as the parser holds it; `<` under `o0` and `>` over `o6` reach the ends. */
-	octave: number;
-	/** The `l` in force, in ticks. */
-	defaultNoteLength: number;
-	/** The last duration byte written, or -1 after anything that forces the next note to carry one. */
-	prevNoteLength: number;
-	triplet: boolean;
-	hTranspose: number;
-	usingHTranspose: boolean;
-	/** Per slot. 21-29 is a drum remap waiting for a note; 0xff is one that note consumed. */
-	instrument: readonly number[];
-	q: readonly number[];
-	/** Per slot; only Addmusic 4.05 ever sets one. */
-	ignoreTuning: readonly boolean[];
-	inRemoteDefinition: boolean;
-	inE6Loop: boolean;
-	/** The loop block offset the last `[` opened at, which is the id a `*` or `(n)m` calls. */
-	prevLoop: number;
-	loopLabel: number;
-	channelDefined: boolean;
-	inPitchSlide: boolean;
-	nextNoteIsForDD: boolean;
-}
-
-/**
- * What a dispatch did to the loop structure, read off the bytes it wrote.
- *
- * `from` is the offset a subloop's `$E6` run begins at, and is set only where
- * the porter wrote the hex rather than the brackets: one `$XX` is one dispatch,
- * so the flag turns over on the argument byte and the event's own span covers
- * that byte alone. A `[[` or `]]n` is one dispatch and its span is the whole of
- * it, so it needs none.
- */
-export type LoopEvent =
-	/** `[`, `(n)[` or `(!n)[`. `at` is the loop block offset the body starts at — its id. */
-	| { kind: "open"; at: number; label: number; remote: boolean }
-	/** `]n`. `count` is what the `$E9` carries; 1 for a remote body, which emits none. */
-	| { kind: "close"; at: number; count: number; remote: boolean }
-	/** `[[`, or a hand-written `$E6 $00`. {@link from} for the second. */
-	| { kind: "subOpen"; from?: number }
-	/**
-	 * `]]n`, or a hand-written `$E6 $nn`. `count` is n, the number of times the
-	 * body plays, which is one more than the byte. {@link from} for the second.
-	 */
-	| { kind: "subClose"; count: number; from?: number }
-	/** `*n` or `(n)m`. `at` is the id of the body called; 0xffff for a `*` with no loop before it. */
-	| { kind: "call"; at: number; count: number; label: number | null };
-
-/** One dispatch of the parser's scan loop. */
-export interface ParseEvent {
-	/** The command's source text, trailing whitespace trimmed. */
-	span: Span;
-	/** The lower-cased character the scan dispatched on. */
-	char: string;
-	/** The channel the dispatch started on; 8 inside a loop body. */
-	channel: number;
-	/** The parser's state once the dispatch returned. */
-	state: ParseState;
-	loop?: LoopEvent;
-}
-
-/**
- * The parse as a sequence of states, for rewriting the source.
- *
- * A rewrite has to know what each piece of text was parsed under — the octave
- * and default length a bare note read, the drum remap standing at it, the loop
- * body it sits in — and only the parser can say. Recorded by bracketing the
- * scan's one dispatch loop, as the command map is, so no handler knows it exists.
- */
-export interface ParseTrace {
-	events: readonly ParseEvent[];
-	/** The parser's buffer once the scan is done: preprocessed, every replacement expanded. */
-	buffer: string;
-	/** One source offset per character of {@link buffer}, before the BOM adjustment spans carry. */
-	origins: readonly number[];
-	/** The source span of every `"find=value"` match the parser expanded, in parse order. */
-	expansions: readonly Span[];
-	/** The channel text above the first `#N` is written to. */
-	startingChannel: number;
-	targetAMKVersion: number;
-	songTargetProgram: number;
-	tempoRatio: number;
-	/** The instrument transposition table as the scan left it. */
-	transposeMap: readonly number[];
-}
-
 export interface CompileResult {
 	ok: boolean;
 	/** Relocated song data, ready to paste at `aramAddress`. Null if `!ok`. */
@@ -287,8 +188,6 @@ export interface CompileResult {
 	diagnostics: Diagnostic[];
 	/** Present even on failure where possible, so the UI can still show partials. */
 	stats: CompileStats | null;
-	/** The parse trace, only when the request's options asked for one (`trace: true`) and the song compiled. */
-	trace?: ParseTrace;
 }
 
 // ---------------------------------------------------------------------------

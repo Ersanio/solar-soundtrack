@@ -1,8 +1,10 @@
 <span class="text-ink-muted text-xs">On percussion lanes</span>
-@for (chip of rows(); track chip.instrument) {
+@for (chip of chips(); track chip.instrument) {
   <button
-    type="button"
-    [class]="chip.class"
+    amk-toggle
+    size="sm"
+    class="font-mono"
+    [pressed]="chip.on"
     [title]="chip.title"
     (click)="toggled.emit(chip.instrument)"
   >
@@ -14,6 +16,7 @@
 <button
   amk-button
   variant="ghost"
+  size="sm"
   class="ml-auto"
   [disabled]="!hasOverrides()"
   (click)="resetAll.emit()"

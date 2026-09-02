@@ -1,10 +1,15 @@
 <!-- Which of the two the DSP obeys. A pair of buttons rather than a select:
      it is one binary choice and it changes everything below it. -->
 <div class="border-edge flex gap-1 border-b pb-2">
+  <!-- The variant carries which one is on, rather than a colour laid over the
+       ghost's own: `Button` binds the whole `class` attribute, so a utility
+       added beside it wins or loses on the order Tailwind happened to emit the
+       two in, and `text-ink-muted` sorts after every colour it would be
+       overriding. The selected one is the primary button, which is the plate
+       Play wears. -->
   <button
     amk-button
-    variant="ghost"
-    [class.text-accent]="usingAdsr()"
+    [variant]="usingAdsr() ? 'primary' : 'ghost'"
     [disabled]="disabled()"
     (click)="setMode(true)"
   >
@@ -12,8 +17,7 @@
   </button>
   <button
     amk-button
-    variant="ghost"
-    [class.text-accent]="!usingAdsr()"
+    [variant]="usingAdsr() ? 'ghost' : 'primary'"
     [disabled]="disabled()"
     (click)="setMode(false)"
   >

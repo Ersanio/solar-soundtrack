@@ -1,4 +1,7 @@
 @for (tab of rows(); track tab.id) {
+  @if (tab.firstAside) {
+    <span class="bg-edge my-2 ml-auto w-px"></span>
+  }
   <button
     #tabButton
     type="button"
@@ -6,6 +9,9 @@
     (click)="active.set(tab.id)"
     (keydown)="onKeydown($event, $index)"
   >
+    @if (tab.icon) {
+      <ng-container *ngComponentOutlet="tab.icon" />
+    }
     {{ tab.label }}
   </button>
 }

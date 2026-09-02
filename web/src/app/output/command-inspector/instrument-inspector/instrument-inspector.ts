@@ -6,13 +6,17 @@ import {
   type InstrumentEntry,
   MELODIC_SLOTS,
 } from '@amk/spc/instruments';
+import { emittedInstrument } from '@amk/tokens/commands/instruments';
 import type { Command } from '@amk/tokens';
+import { CommitAudition } from '../../../state/commit-audition';
 import { DriverStore } from '../../../state/driver-store';
 import { EditorStore } from '../../../state/editor-store';
+import { EnumSelect } from '../../../shared/enum-select/enum-select';
 import { hex2 } from '../../../util/format';
 import { AdsrGraph } from '../adsr-graph/adsr-graph';
 import { InstrumentEntryEditor } from '../instrument-entry/instrument-entry';
 import { HexPipe } from '../../../util/hex.pipe';
+import { instrumentEdit, instrumentPicker } from './instrument-choices';
 import { type DetailRow, detailRows, sampleByte } from './instrument-rows';
 
 /** Which of the things `@n` — or a raw `$DA` — can mean. */
@@ -28,13 +32,15 @@ type Band = 'melodic' | 'unsupported' | 'percussion' | 'custom' | 'undefined' | 
  */
 @Component({
   selector: 'amk-instrument-inspector',
-  imports: [AdsrGraph, HexPipe, InstrumentEntryEditor],
+  imports: [AdsrGraph, EnumSelect, HexPipe, InstrumentEntryEditor],
   templateUrl: './instrument-inspector.html',
   host: { class: 'block' },
 })
 export class InstrumentInspector {
   private readonly store = inject(EditorStore);
   private readonly drivers = inject(DriverStore);
+
+  private readonly commitAudition = inject(CommitAudition);
 
   readonly command = input.required<Command>();
 
@@ -55,36 +61,12 @@ export class InstrumentInspector {
   /**
    * The number that reaches `$DA`, or `null` when nothing is emitted.
    *
-   * `parser.ts`'s `parseInstrument` remaps the direct form's 19-29 to custom
-   * instruments, and it does so unconditionally — AddmusicK guards it with
-   * `convert`, which is on unless its CLI is given `-c`. So `@@19` is `@30`, not
-   * driver entry 19.
-   *
-   * A hand-written `$DA` goes through none of this: the byte is the byte, which
-   * is what makes it the only way to reach table entry 19.
+   * The map lives in `@amk/tokens`, beside the inverse the picker below writes
+   * through: a list of instruments and a write that disagreed about what a
+   * number means would put an author on one they did not choose, and `edittest`
+   * round-trips the pair to hold them together.
    */
-  protected readonly emitted = computed<number | null>(() => {
-    const n = this.written();
-    if (n < 0) {
-      return null;
-    }
-
-    if (this.raw()) {
-      // parser.ts's $DA remap in parseHexCommand (Music.cpp:1976) — Addmusic 4.05 numbered custom
-      // instruments from $13, so a raw $DA remaps before any band is judged.
-      if (this.command().target.program === 1 && n >= 0x13) {
-        return n - 0x13 + FIRST_CUSTOM_INSTRUMENT;
-      }
-
-      return n;
-    }
-
-    if (n <= 18 || this.direct() || n >= FIRST_CUSTOM_INSTRUMENT) {
-      return n >= 0x13 && n < FIRST_CUSTOM_INSTRUMENT ? n - 0x13 + FIRST_CUSTOM_INSTRUMENT : n;
-    }
-
-    return null;
-  });
+  protected readonly emitted = computed<number | null>(() => emittedInstrument(this.command()));
 
   /**
    * The `#instruments` entry the caret is sitting *inside*, if any.
@@ -131,6 +113,24 @@ export class InstrumentInspector {
 
   /** How many entries the song's `#instruments` blocks define. */
   protected readonly customCount = computed(() => this.store.tokens().instruments.length);
+
+  /**
+   * The dropdown: every instrument this command's spelling can reach.
+   *
+   * Drawn above the bands rather than inside the one that reads the bytes, since
+   * `@19`, a `$DA` past the table and a custom instrument the song has not
+   * defined are exactly where a porter wants to change the number.
+   */
+  protected readonly picker = computed(() => instrumentPicker(this.command(), this.customCount()));
+
+  /**
+   * Through `CommitAudition`, so the note the roll is asking about sounds again
+   * under the new instrument once the change has compiled — which is the whole
+   * reason to pick one from here rather than from the text.
+   */
+  protected setInstrument(instrument: number): void {
+    this.commitAudition.apply(instrumentEdit(this.store.source(), this.command(), instrument));
+  }
 
   /**
    * Which `#instruments` entry `@n` is, counting from 1 — `@30` is the first.

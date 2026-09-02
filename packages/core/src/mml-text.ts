@@ -2,8 +2,8 @@
  * How a parse-time value is spelled as MML.
  *
  * Shared by everything that writes a note length, an octave or a `q` back into
- * the source, so that one spelling rule exists — the normalizer's and the piano
- * roll's text have to agree with each other and with what `parser.ts` reads.
+ * the source, so that one spelling rule exists — the piano roll's text has to
+ * agree with what `parser.ts` reads.
  */
 
 import { NOTE_MAX, NOTE_MIN, PITCH_TABLE, TICKS_PER_WHOLE } from "./hardcoded-tables";

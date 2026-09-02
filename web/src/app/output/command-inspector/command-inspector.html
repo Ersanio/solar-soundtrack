@@ -1,81 +1,98 @@
-<details class="border-edge border-b" open>
-  <summary class="hover:bg-raised flex cursor-pointer items-center justify-between gap-3 px-3 py-2">
-    <span class="text-ink-muted text-xs font-semibold tracking-wide uppercase">
-      Command inspector
-    </span>
-    <span class="font-mono text-xs" [class.text-ink-muted]="!command() && !entry()">
-      {{ summary() }}
-    </span>
-  </summary>
+<!-- Below `lg` the pane is a drawer whose own header already says "Inspector",
+     so this section's header row (its first child) is hidden there. -->
+<amk-section heading="Inspector" class="max-lg:[&>*:first-child]:hidden">
+  <!-- Muted where there is no command to name; a loop is named by the Loop panel under this. -->
+  <span sectionAside class="font-mono text-xs" [class.text-ink-muted]="!entry() && !params()">{{
+    summary()
+  }}</span>
 
-  <div class="flex flex-col gap-3 px-3 pt-1 pb-3">
+  <div class="flex flex-col gap-3 px-3 pt-2 pb-3">
     <!-- An entry wins over any command inside it: most of one is not a command
          at all, and the two forms that are mean something else in a channel. -->
     @if (entry(); as definition) {
       <amk-instrument-entry [entry]="definition" />
-    } @else if (command(); as current) {
-      <div class="flex items-baseline gap-2">
-        <span class="text-accent font-mono text-sm">{{ label() }}</span>
-        <span class="text-ink text-sm">{{ current.name }}</span>
-        @if (replacement(); as via) {
-          <span class="text-ink-muted font-mono text-xs">via "{{ via }}"</span>
-        }
-      </div>
-
-      @if (replacement(); as via) {
-        <p class="text-ink-muted text-xs leading-relaxed">
-          Written as the <code class="text-ink">"{{ via }}"</code> replacement, so the cursor is on
-          the macro's name rather than on the command itself.
-        </p>
-      }
-
-      @if (incomplete()) {
-        <p class="text-warn text-xs leading-relaxed">
-          This command is missing arguments, so what it does cannot be read off yet.
-        </p>
-      }
-
-      @switch (view()) {
-        @case ('fir') {
-          <amk-fir-designer [command]="current" />
-        }
-        @case ('echo') {
-          <amk-echo-inspector [command]="current" />
-        }
-        @case ('instrument') {
-          <amk-instrument-inspector [command]="current" />
-        }
-        @case ('adsr') {
-          <amk-adsr-command [command]="current" />
-        }
-        @case ('arpeggio') {
-          <amk-arpeggio-command [command]="current" />
-        }
-        @case ('quantization') {
-          <amk-quantization-command [command]="current" />
-        }
-        @case ('pan') {
-          <amk-pan-command [command]="current" />
-        }
-        @case ('vibrato') {
-          <amk-vibrato-command [command]="current" />
-        }
-        @case ('bend') {
-          <amk-bend-command [command]="current" />
-        }
-        @case ('note') {
-          <amk-note-command [command]="current" />
-        }
-        @default {
-          <amk-param-table [command]="current" />
-        }
-      }
     } @else {
-      <p class="text-ink-muted text-xs leading-relaxed">
-        Put the cursor on a command in the editor — a hex command like
-        <code class="text-ink">$F5</code>, or a letter one like <code class="text-ink">t</code> — to
-        see what it does.
-      </p>
+      @if (params(); as current) {
+        <div class="flex items-baseline gap-2">
+          <span class="text-accent font-mono text-sm">{{ label() }}</span>
+          <span class="text-ink text-sm">{{ current.name }}</span>
+          @if (replacement(); as via) {
+            <span class="text-ink-muted font-mono text-xs">via "{{ via }}"</span>
+          }
+        </div>
+
+        @if (replacement(); as via) {
+          <p class="text-ink-muted text-xs leading-relaxed">
+            Written as the <code class="text-ink">"{{ via }}"</code> replacement, so the cursor is
+            on the macro's name rather than on the command itself.
+          </p>
+        }
+
+        @if (incomplete()) {
+          <p class="text-warn text-xs leading-relaxed">
+            This command is missing arguments, so what it does cannot be read off yet.
+          </p>
+        }
+
+        @switch (view()) {
+          @case ('fir') {
+            <amk-fir-designer [command]="current" />
+          }
+          @case ('echo') {
+            <amk-echo-inspector [command]="current" />
+          }
+          @case ('instrument') {
+            <amk-instrument-inspector [command]="current" />
+          }
+          @case ('adsr') {
+            <amk-adsr-command [command]="current" />
+          }
+          @case ('arpeggio') {
+            <amk-arpeggio-command [command]="current" />
+          }
+          @case ('quantization') {
+            <amk-quantization-command [command]="current" />
+          }
+          @case ('pan') {
+            <amk-pan-command [command]="current" />
+          }
+          @case ('vibrato') {
+            <amk-vibrato-command [command]="current" />
+          }
+          @case ('bend') {
+            <amk-bend-command [command]="current" />
+          }
+          @case ('note') {
+            <amk-note-command [command]="current" />
+          }
+          @default {
+            <amk-param-table [command]="current" />
+          }
+        }
+      }
+
+      <!-- A loop's brackets are a construct rather than a command, and the Loop
+           panel under this body is where they are read and edited. Said here
+           because the cursor really is on something. -->
+      @if (loop()) {
+        <p class="text-ink-muted text-xs leading-relaxed">
+          The cursor is on a loop, which is not a command. The
+          <span class="text-ink">Loop</span> panel under this has what it repeats.
+        </p>
+      }
+
+      @if (empty()) {
+        <p class="text-ink-muted text-xs leading-relaxed">
+          Put the cursor on a command in the editor — a hex command like
+          <code class="text-ink">$F5</code>, or a letter one like <code class="text-ink">t</code> —
+          to see what it does.
+        </p>
+      }
     }
   </div>
-</details>
+
+  <!-- Under the command's own body because it answers the same question about a
+       different subject, and it is not there at all when the cursor is in no
+       loop — so it costs a song without one nothing. -->
+  <amk-loop-inspector />
+</amk-section>

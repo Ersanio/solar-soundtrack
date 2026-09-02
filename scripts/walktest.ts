@@ -61,7 +61,7 @@ import {
 } from "@amk/spc/song-walk";
 import { secondsAtTick, songClock } from "../web/src/app/state/song-clock";
 import { measureClock, tempoShortfall } from "../web/src/app/state/measure-clock";
-import { commandsInForceOf, definedAt, notePreceding } from "../web/src/app/state/commands-in-force";
+import { commandsInForceOf, definedAt, noteHeardOn, notePreceding } from "../web/src/app/state/commands-in-force";
 import { commandTimeline } from "../web/src/app/state/command-timeline";
 import { driverTickSeconds } from "@amk/tokens/commands/units";
 
@@ -694,6 +694,53 @@ console.log("\nwhat the roll's command lane holds");
 	// roll's rows and widths already are, and `[ ]` is the shape of the music.
 	const shape = lane("#amk 4\n#0 o4 l8 [ c > d ]2\n");
 	check("but where a note sits and how the music is shaped are not", shape === "", shape);
+
+	// The note a glyph is **heard on**, which is what a value committed for it
+	// replays: the bar that would draw the command as a chip, off the same
+	// `inForce` the bars read, else the next note to begin. Spelled as the note's
+	// tick and length, which name one note in songs this small.
+	const heardOn = (source: string, text: string) => {
+		const { result, timeline } = build(source);
+		const index = tokenize(source);
+		const commands = new Map((result.commandMap ?? []).map((entry) => [entry.address, entry]));
+		const inForce = commandsInForceOf({
+			index,
+			text: source,
+			commands,
+			notes: new Map((result.noteMap ?? []).map((entry) => [entry.address, entry])),
+		});
+		const event = commandTimeline({ timeline, index, commands }).find(
+			(each) => source.slice(each.command.span.start, each.command.span.end) === text,
+		);
+		if (event === undefined) {
+			return "no entry";
+		}
+
+		const note = noteHeardOn(timeline.notes, inForce, event);
+		return note === null ? "none" : `${note.tick}+${note.ticks}`;
+	};
+
+	const keyed = heardOn("#amk 4\n#0 o4 c4 v200 d4\n", "v200");
+	check("a command is heard on the note that keys on with it", keyed === "48+48", keyed);
+	const rested = heardOn("#amk 4\n#0 o4 c4 v200 r4 d4\n", "v200");
+	check("across a rest, on the note a rest later", rested === "96+48", rested);
+	// The sounding note's `origins` froze at key-on, so the bar that draws the
+	// `v200` is the next one — a tick-alone reading would name the tied note.
+	const inTie = heardOn("#amk 4\n#0 o4 c4 v200 ^4 d4\n", "v200");
+	check("past a note it was read inside a tie of, on the next to begin", inTie === "96+48", inTie);
+	// The one command whose tick is inside the note that plays it, and the other
+	// direction a tick-alone reading gets wrong: it would name the note after.
+	const slid = heardOn("#amk 4\n#0 o4 c4^4 $DD $00 $18 $A6 d4\n", "$DD $00 $18 $A6");
+	check("a $DD on the note that reads it, whose tick is inside it", slid === "0+96", slid);
+	const wideOn = heardOn("#amk 4\n#0 o4 c4 t144 d4\n", "t144");
+	check("a t, which no bar draws, on the next note to begin", wideOn === "48+48", wideOn);
+	const replacedOn = heardOn("#amk 4\n#0 o4 v200 v100 c4\n", "v200");
+	check("one replaced before the next note keyed on, on that note all the same", replacedOn === "0+48", replacedOn);
+	// The rest keeps the channel in the pass, so the command runs; with the `$00`
+	// straight after it the pass would end at the command and it would be no
+	// entry at all.
+	const last = heardOn("#amk 4\n#0 o4 c2 v200 r2\n#1 o4 c2 c2\n", "v200");
+	check("and one past the channel's last note on none", last === "none", last);
 }
 
 // ---------------------------------------------------------------------------
@@ -1004,8 +1051,7 @@ console.log("\nthe pitch slide a note reads ahead into");
 	);
 	check("and the notes after it do not", slid.notes[1].bend === null && slid.notes[2].bend === null, "carried on");
 
-	// A `&` compiles to exactly that, which is what lets `writePitchSlides`
-	// rewrite one into the other without moving a byte.
+	// A `&` compiles to exactly that: the two spellings are one command to the walk.
 	const amp = build("#amk 4\n#0 o4 c4 & d4\n").timeline;
 	check(
 		"a legacy & reads the same",

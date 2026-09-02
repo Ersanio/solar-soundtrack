@@ -71,6 +71,15 @@ export interface PreviewRequest {
    * 0 while the gesture leaves the body's length alone.
    */
   delta: number;
+  /**
+   * The frame the plan is local to, as `StripFrame.body` names it — part of
+   * every bar's `id`.
+   *
+   * A gesture reaching into a loop written inside the one it started in is one
+   * plan per frame drawn as one list, and two frames each hold a note at their
+   * own local tick 0: `@for`'s `track` throws on a repeated key.
+   */
+  body: number;
 }
 
 /**
@@ -81,7 +90,7 @@ export interface PreviewRequest {
  * commit — they are the same answer drawn twice rather than two answers.
  */
 export function buildPreview(request: PreviewRequest): Preview {
-  const { plan, stack, zoom, rowHeight, delta } = request;
+  const { plan, stack, zoom, rowHeight, delta, body } = request;
   const passes = request.passes.length > 0 ? request.passes : [{ tick: 0, ordinal: 0 }];
   const baseOf = (pass: number): number => passes[pass].tick + passes[pass].ordinal * delta;
 
@@ -98,7 +107,7 @@ export function buildPreview(request: PreviewRequest): Preview {
     return row < 0
       ? null
       : {
-          id: `${kind}:${at}:${pass}:${note.startTick}`,
+          id: `${kind}:${body}:${at}:${pass}:${note.startTick}`,
           x: (baseOf(pass) + note.startTick) * zoom,
           ...barRect(row, rowHeight, note.ticks, zoom),
         };
@@ -119,7 +128,7 @@ export function buildPreview(request: PreviewRequest): Preview {
     // one of them would say the other was fine.
     clash: passes.flatMap((_, pass) =>
       plan.clashes.map((clash, at) => ({
-        id: `clash:${at}:${pass}:${clash.from}`,
+        id: `clash:${body}:${at}:${pass}:${clash.from}`,
         x: (baseOf(pass) + clash.from) * zoom,
         y: 0,
         w: Math.max(1, (clash.to - clash.from) * zoom),
@@ -147,5 +156,28 @@ export function buildPreview(request: PreviewRequest): Preview {
         .filter((bar): bar is PreviewBar => bar !== null),
     ),
     refused: plan.refused,
+  };
+}
+
+/**
+ * Several frames' previews as one list of bars.
+ *
+ * `refused` is the first frame that has one: a group is written whole or not at
+ * all, so one frame's refusal reddens every bar in the list — the bars of a
+ * frame whose own plan was fine included, which is the honest picture of what
+ * pointer-up will do. Hands back the one preview it was given where there is
+ * only one, which is every gesture but a transpose reaching into a nested loop.
+ */
+export function joinPreviews(parts: readonly Preview[]): Preview {
+  if (parts.length === 1) {
+    return parts[0];
+  }
+
+  return {
+    live: parts.flatMap((each) => each.live),
+    pushed: parts.flatMap((each) => each.pushed),
+    clash: parts.flatMap((each) => each.clash),
+    erased: parts.flatMap((each) => each.erased),
+    refused: parts.find((each) => each.refused !== null)?.refused ?? null,
   };
 }

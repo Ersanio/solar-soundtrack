@@ -54,7 +54,6 @@ export const GLYPH_NAMES = [
   'filter',
   // Loops
   'repeatStart',
-  'repeatEnd',
   'repeatNested',
   'replay',
   'triggerDefine',

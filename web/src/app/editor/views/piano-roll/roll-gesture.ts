@@ -2,17 +2,26 @@ import { type Signal, computed, signal } from '@angular/core';
 
 import { NOTE_MIN } from '@amk/core/hardcoded-tables';
 import { octaveFor, spellDuration, spellNote } from '@amk/core/mml-text';
+import type { Span } from '@amk/core/types';
 import type { LoopRun, PitchSlide } from '@amk/spc/song-walk';
 import type { Command } from '@amk/tokens';
 import type { Edit } from '@amk/tokens/edits';
 import type { LaneStack } from './roll-layout';
 import { rowAtY, tickAtX } from './roll-layout';
 import { snapDuration, snapTick, stepDrawLength } from './roll-lengths';
-import { type Preview, type PreviewBar, buildPreview, rowOfPlaced } from './roll-preview';
+import {
+  type Preview,
+  type PreviewBar,
+  buildPreview,
+  joinPreviews,
+  rowOfPlaced,
+} from './roll-preview';
 import { KEY_WIDTH, NOTE_GAP, barRect } from './roll-metrics';
 import {
+  type BodyRows,
   type EditContext,
   type EditMode,
+  type FramePlan,
   type Gesture,
   type PassShift,
   type PlacedNote,
@@ -24,27 +33,31 @@ import {
   REFUSE_LOOP_LEFT_PASS,
   REFUSE_NESTED_LOOP,
   REFUSE_SUB_SPLIT,
+  frameAt,
   framePasses,
   isEdits,
   passShiftsFor,
-  planGesture,
+  planFrames,
   plannedFrameTicks,
   shiftBoundariesFor,
 } from './roll-edit';
+import { type NoteAnchor, anchorsFor, notesAtAnchors } from './roll-selection';
 import {
   type ChannelTail,
   type Strip,
   type StripFrame,
   type StripItem,
   constructFor,
+  framesInside,
 } from './roll-strip';
 import {
   bodyRests,
   firstPassOn,
   gapSlack,
+  loopJoin,
   openGap,
   passesAt,
-  planEdits,
+  planGroupEdits,
   resizeLoop,
 } from './roll-write';
 
@@ -186,6 +199,16 @@ export interface GestureSinks {
   auditionSpan: (tick: number, ticks: number) => void;
   /** Name the channel a bar belongs to, as a click on a note already does. */
   pick: (channel: number) => void;
+  /**
+   * Name the loop construct a press on a box's edge took hold of, and the body
+   * that pass plays.
+   *
+   * `pick` for a loop. A body played from three places is three constructs and
+   * one text, and the press leaves the caret on the body's first note — so
+   * without this the panel beside the roll cannot tell a press on the
+   * declaration's box from one on a `(n)m`'s ghost.
+   */
+  inspectLoop: (text: Span, body: Span) => void;
 }
 
 /** What the pointer is doing between down and up. */
@@ -266,6 +289,15 @@ interface Drag {
     splitTick: number;
     /** The rest ticks directly before the construct — the most a leftward drag may close. */
     slack: number;
+    /**
+     * The count a leftward drag spending the whole slack would write, where
+     * closing the gap puts this occurrence back against another of the same
+     * body; `null` where it would leave two constructs standing.
+     *
+     * Priced here off the same `loopJoin` the commit calls, so the readout
+     * cannot promise a join the write does not make.
+     */
+    joins: number | null;
     /**
      * Rest ticks at the end of the body being pulled: the most a resize may take
      * out of it before it would cut into a note. 0 for a slide.
@@ -378,14 +410,16 @@ export interface RollGestures {
    */
   passShifts: Signal<readonly PassShift[]>;
   /**
-   * The body a gesture is editing and the rows its notes span once the plan
-   * lands, so the loop's boxes stay round the notes they are drawn round.
+   * The bodies a gesture is editing and the rows each one's notes span once its
+   * plan lands, so the loops' boxes stay round the notes they are drawn round.
    *
-   * `null` on the root frame, which has no box, and on a plan with no notes to
-   * stand on — a refusal with nowhere to draw leaves the box where it was, which
-   * is the reading the red bars already take.
+   * One entry per frame the gesture reaches, since a transpose taken by a box's
+   * rule carries the loops written inside that body. The root has no box and is
+   * left out, and so is a plan with no notes to stand on — a refusal with
+   * nowhere to draw leaves the box where it was, which is the reading the red
+   * bars already take.
    */
-  bodyRows: Signal<{ body: number; low: number; high: number } | null>;
+  bodyRows: Signal<readonly BodyRows[]>;
   /** The marquee box, in song coordinates. */
   marquee: Signal<{ x: number; y: number; w: number; h: number } | null>;
   /** The note a press would draw, or `null` where a press would draw none. */
@@ -421,6 +455,25 @@ export interface RollGestures {
   stepLength(direction: number, fine: boolean): boolean;
   /** Runs a gesture the keyboard asked for — delete, nudge, quantize and the rest. */
   run(gesture: Gesture): void;
+  /**
+   * What a change to the document does to the selection.
+   *
+   * The one place it is decided, and the reason no commit clears the selection
+   * itself: a set of indices means something for exactly as long as the strip it
+   * indexes into stands, so it is dropped when that text goes and not a moment
+   * before — which is what keeps an outline on screen for the compile the roll
+   * spends with no strip at all.
+   *
+   * `keepsNotes` is `EditBatch.keepsNotes` as the editor really applied it: a
+   * splice into one command's own text, so the channel comes back with the same
+   * items in the same order and the indices still name the notes they named,
+   * with nothing to carry. A gesture's own commit carries its plan's answer
+   * instead ({@link restoreSelection}). Anything else is text the roll cannot
+   * account for, and an index into it names whatever moved into that place.
+   */
+  sourceChanged(keepsNotes: boolean): void;
+  /** Puts a carried selection back on the strip the commit it rode on produced. */
+  restoreSelection(strip: Strip): void;
   selectAll(): void;
   clearSelection(): void;
   toggle(item: number): void;
@@ -475,32 +528,6 @@ function itemAt(
   return { index: -1, instance: 0 };
 }
 
-/**
- * The frame a press on empty grid belongs to: the deepest body whose pass holds
- * the tick, else the root. `base` is that pass's own start, which is what turns
- * a song tick into the frame's local one.
- */
-function frameAt(strip: Strip, tick: number): { frame: number; base: number } {
-  let found = { frame: 0, base: 0 };
-  let depth = Number.POSITIVE_INFINITY;
-  strip.frames.forEach((frame, at) => {
-    if (frame.body < 0) {
-      return;
-    }
-
-    for (const run of frame.runs) {
-      for (const pass of run.passes) {
-        if (tick >= pass.tick && tick < pass.tick + pass.ticks && frame.ticks < depth) {
-          found = { frame: at, base: pass.tick };
-          depth = frame.ticks;
-        }
-      }
-    }
-  });
-
-  return found;
-}
-
 function rowOfItem(item: StripItem, stack: LaneStack): number {
   return rowOfPlaced({ written: item.written, drum: item.drum?.args[0]?.value ?? null }, stack);
 }
@@ -509,6 +536,21 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
   const selection = signal<ReadonlySet<number>>(new Set<number>());
   const drag = signal<Drag | null>(null);
   const hover = signal<Hover | null>(null);
+
+  /**
+   * Where the selection is going once the commit in flight has been compiled.
+   *
+   * A gesture is the one writer that can say: its plan knows where every note it
+   * did not delete ended up. Held from the commit until the strip that commit
+   * produced arrives, which is a compile away — the roll has no strip at all in
+   * between, so there is nothing to index into and nothing to draw.
+   *
+   * A plain field: nothing renders it. The channel is part of it because a strip
+   * is rebuilt for whichever channel is being edited, and with none picked that
+   * is the one under the pointer — a turnover the pointer caused must not be
+   * taken for the one the commit did.
+   */
+  let pending: { channel: number; source: string; anchors: readonly NoteAnchor[] } | null = null;
 
   /** The gesture the pointer is describing, or `null` when it is not describing one. */
   const gestureNow = computed<Gesture | null>(() => {
@@ -622,28 +664,45 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
     };
   });
 
-  const plan = computed<Plan | null>(() => {
+  /**
+   * The gesture planned in every frame it names an item in, the held frame
+   * first — one entry unless it is one of the two that may span brackets.
+   */
+  const plans = computed<readonly FramePlan[]>(() => {
     const strip = sources.strip();
     const gesture = gestureNow();
     const held = drag();
     return strip && gesture && held
-      ? planGesture(strip, gesture, sources.editMode(), strip.frames[held.frame])
-      : null;
+      ? planFrames(strip, gesture, sources.editMode(), held.frame)
+      : [];
   });
 
   /**
-   * The plan as far as the porter is concerned: nothing until a press has
-   * actually become a drag.
+   * Whether the press has become something to draw: a drag past the slop, a note
+   * being spawned, or a press the wheel has given a length.
    *
    * A press on a note that turns out to be a click would otherwise flash a bar
    * over the note it is standing on. Two exceptions: drawing, where "in the
    * dragged state" means the new note is there from the press, and a press the
    * wheel has resized, which has something to show and no movement to show it by.
+   *
+   * It never goes back down within a gesture, which is what lets
+   * {@link shiftBoundaries} be dealt on it: the transition is the slop, where the
+   * pointer is captured and there is no longer a click to protect.
    */
-  const shownPlan = computed<Plan | null>(() => {
+  const underWay = computed<boolean>(() => {
     const held = drag();
-    return held && (held.moved || held.kind === 'spawn' || held.length !== null) ? plan() : null;
+    return held !== null && (held.moved || held.kind === 'spawn' || held.length !== null);
   });
+
+  /** The plans as far as the porter is concerned: nothing until {@link underWay}. */
+  const shownPlans = computed<readonly FramePlan[]>(() => (underWay() ? plans() : []));
+
+  /**
+   * The held frame's share of that, for the readers that price one frame — the
+   * body-length arithmetic, and the readout, both of which are its alone.
+   */
+  const shownPlan = computed<Plan | null>(() => shownPlans()[0]?.plan ?? null);
 
   /** The frame the gesture runs in, or the root while nothing is held. */
   const heldFrame = computed<StripFrame | null>(() => {
@@ -767,10 +826,21 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
 
   /**
    * The edited body's pass ends per voice, or `null` outside a body gesture.
-   * Depends on the held frame alone, so the buckets built over it are dealt
-   * once per gesture rather than once per pointer move.
+   * Depends on the held frame and on {@link underWay} alone, so the buckets built
+   * over it are dealt once per gesture rather than once per pointer move.
+   *
+   * A press that has not become a drag deals none: the deal moves every bar past
+   * the body's first pass end into the bucket group its own count of boundaries
+   * names, and a bar re-parented while the button is down is destroyed before the
+   * release. The browser raises no `click` on a node that has gone, so a press
+   * dealt from the start would lose the inspector's question and the double
+   * click's go-to on every pass of a loop but the first.
    */
   const shiftBoundaries = computed<ShiftBoundaries | null>(() => {
+    if (!underWay()) {
+      return null;
+    }
+
     // A gap slides one voice past one boundary: everything at or after the
     // grabbed pass's start moves by the whole delta, the comparison the
     // buckets already make for a note standing exactly on a boundary.
@@ -821,57 +891,74 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
     );
   });
 
-  /** The rows the edited body's notes span once the plan lands. */
-  const bodyRows = computed<{ body: number; low: number; high: number } | null>(() => {
-    const frame = heldFrame();
-    const now = shownPlan();
-    if (!frame || frame.body < 0 || !now) {
-      return null;
-    }
-
-    // The plan's whole list, not what the gesture moved: a box is drawn round
-    // every note of its pass, and the ones standing still are as much of it as
-    // the ones being carried.
+  /** The rows each edited body's notes span once its plan lands. */
+  const bodyRows = computed<readonly BodyRows[]>(() => {
     const stack = sources.stack();
-    let low = Number.POSITIVE_INFINITY;
-    let high = Number.NEGATIVE_INFINITY;
-    for (const note of now.notes) {
-      const row = rowOfPlaced(note, stack);
-      if (row >= 0) {
-        low = Math.min(low, row);
-        high = Math.max(high, row);
+    const rows: BodyRows[] = [];
+    for (const { frame, plan: now } of shownPlans()) {
+      if (frame.body < 0) {
+        continue; // The root has no box to answer for.
+      }
+
+      // The plan's whole list, not what the gesture moved: a box is drawn round
+      // every note of its pass, and the ones standing still are as much of it as
+      // the ones being carried. A frame's plan holds only the notes written in
+      // its own text, so a loop playing inside this one is another entry here
+      // and the union of the boxes is what puts the two together.
+      let low = Number.POSITIVE_INFINITY;
+      let high = Number.NEGATIVE_INFINITY;
+      for (const note of now.notes) {
+        const row = rowOfPlaced(note, stack);
+        if (row >= 0) {
+          low = Math.min(low, row);
+          high = Math.max(high, row);
+        }
+      }
+
+      if (low <= high) {
+        rows.push({ body: frame.body, low, high });
       }
     }
 
-    return low <= high ? { body: frame.body, low, high } : null;
+    return rows;
   });
 
   const preview = computed<Preview | null>(() => {
-    const held = shownPlan();
-    if (!held) {
+    const parts = shownPlans();
+    if (parts.length === 0) {
       return null;
     }
 
-    // A length change stands the whole body's bars aside (see {@link moving}),
-    // so the ones the gesture did not touch are drawn here instead — striped,
-    // the mark of a note moved as a consequence rather than by the hand.
+    const stack = sources.stack();
+    const zoom = sources.zoom();
+    const rowHeight = sources.rowHeight();
+    // The length change is the held frame's alone, and so is the striped rewrite
+    // it needs; a frame a tick-neutral gesture reached into changes no length.
     const delta = frameDelta();
-    let shown = held;
-    if (delta !== 0) {
-      const drawn = new Set([...held.touched, ...held.pushed]);
-      const carried = held.notes.filter((note) => !drawn.has(note));
-      shown = { ...held, pushed: [...held.pushed, ...carried] };
-    }
+    return joinPreviews(
+      parts.map(({ frame, plan: now }, at) => {
+        let shown = now;
+        // A length change stands the whole body's bars aside (see {@link moving}),
+        // so the ones the gesture did not touch are drawn here instead — striped,
+        // the mark of a note moved as a consequence rather than by the hand.
+        if (at === 0 && delta !== 0) {
+          const drawn = new Set([...now.touched, ...now.pushed]);
+          const carried = now.notes.filter((note) => !drawn.has(note));
+          shown = { ...now, pushed: [...now.pushed, ...carried] };
+        }
 
-    return buildPreview({
-      plan: shown,
-      stack: sources.stack(),
-      zoom: sources.zoom(),
-      rowHeight: sources.rowHeight(),
-      rows: sources.stack().lanes.length,
-      passes: heldPasses(),
-      delta,
-    });
+        return buildPreview({
+          plan: shown,
+          stack,
+          zoom,
+          rowHeight,
+          rows: stack.lanes.length,
+          passes: at === 0 ? heldPasses() : framePasses(frame),
+          delta: at === 0 ? delta : 0,
+          body: frame.body,
+        });
+      }),
+    );
   });
 
   /**
@@ -887,9 +974,11 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
    */
   const moving = computed<ReadonlySet<number>>(() => {
     const carried = new Set<number>();
-    for (const note of shownPlan()?.touched ?? []) {
-      if (note.from >= 0) {
-        carried.add(note.from);
+    for (const { plan: now } of shownPlans()) {
+      for (const note of now.touched) {
+        if (note.from >= 0) {
+          carried.add(note.from);
+        }
       }
     }
 
@@ -974,9 +1063,13 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
         return null;
       }
 
+      // A pull that spends the whole slack closes the gap, and where that puts
+      // the pass back against another of the same body the commit writes the
+      // two as one call: say so while the button is still down.
       const going = held.loop.splitTick + delta;
+      const joins = held.loop.joins !== null && delta === -held.loop.slack;
       return {
-        text: `tick ${going}`,
+        text: joins ? `tick ${going} · one call of ${held.loop.joins}` : `tick ${going}`,
         x: going * sources.zoom(),
         y: held.row * sources.rowHeight(),
       };
@@ -1086,7 +1179,7 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
   const busy = computed(() => {
     const held = drag();
     return (
-      shownPlan() !== null || ((held?.kind === 'gap' || held?.kind === 'resize') && held.moved)
+      shownPlans().length > 0 || ((held?.kind === 'gap' || held?.kind === 'resize') && held.moved)
     );
   });
 
@@ -1103,13 +1196,15 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
   const latched = signal<{ reason: string; source: string } | null>(null);
 
   const refusal = computed<string | null>(() => {
-    const now = shownPlan();
-    if (now !== null) {
-      // A gesture in flight answers for itself. The clash is spelled out here
-      // rather than carried in the plan because `planGesture` reports it as ticks
-      // for the roll to wash red; `planEdits` gives the same sentence at the
-      // commit, and this is it while the pointer is still down.
-      return now.refused ?? (now.clashes.length > 0 ? REFUSE_CLASH : null);
+    const now = shownPlans();
+    if (now.length > 0) {
+      // A gesture in flight answers for itself, and a group is written whole or
+      // not at all, so one frame's refusal is the whole gesture's. The clash is
+      // spelled out here rather than carried in the plan because `planGesture`
+      // reports it as ticks for the roll to wash red; `planEdits` gives the same
+      // sentence at the commit, and this is it while the pointer is still down.
+      const said = now.find((each) => each.plan.refused !== null)?.plan.refused;
+      return said ?? (now.some((each) => each.plan.clashes.length > 0) ? REFUSE_CLASH : null);
     }
 
     // An edge drag that cannot go anywhere says why for as long as it is held;
@@ -1195,11 +1290,14 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
    * can share it.
    *
    * Answers the edits so that each caller can do what it alone does with them —
-   * `finish` remembers the length it drew and drops the selection, `erase` does
-   * neither.
+   * `finish` remembers the length it drew, `erase` does not.
    */
-  const write = (strip: Strip, frame: StripFrame, now: Plan): readonly Edit[] | null => {
-    const outcome = planEdits(contextFor(strip, frame), now);
+  const write = (strip: Strip, parts: readonly FramePlan[]): readonly Edit[] | null => {
+    if (parts.length === 0) {
+      return null;
+    }
+
+    const outcome = planGroupEdits(contextFor(strip, parts[0].frame), parts);
     if (!isEdits(outcome)) {
       latched.set({ reason: outcome.refused, source: sources.source() });
       return null;
@@ -1209,23 +1307,33 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
     return outcome;
   };
 
+  /** The selection as the plans leave it, kept for the strip they are about to build. */
+  const carry = (strip: Strip, parts: readonly FramePlan[]): void => {
+    pending = {
+      channel: strip.channel,
+      source: sources.source(),
+      anchors: anchorsFor(strip, parts, selection()),
+    };
+  };
+
   const finish = (): void => {
     const strip = sources.strip();
-    const now = plan();
+    const parts = plans();
+    const now = parts[0]?.plan;
     const held = drag();
     drag.set(null);
     if (!strip || !now || !held) {
       return;
     }
 
-    const edits = write(strip, strip.frames[held.frame], now);
+    const edits = write(strip, parts);
     if (edits && edits.length > 0) {
       if (now.touched.length > 0) {
         sinks.rememberLength(now.touched[0].ticks);
       }
 
+      carry(strip, parts);
       sinks.commit(edits);
-      selection.set(new Set<number>());
     }
   };
 
@@ -1261,7 +1369,7 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
     return whole;
   });
 
-  return {
+  const api: RollGestures = {
     selection: selection.asReadonly(),
     selectedBodies,
     preview,
@@ -1307,11 +1415,22 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
           return; // The channel is named; a channel that cannot edit selects nothing.
         }
 
+        // The group is the body's own notes and the notes of every loop written
+        // inside it: the box is already drawn round them — a note is in every
+        // region holding its tick, since a subloop's pass sits inside its
+        // loop's — so a group leaving them out would be a box promising a move
+        // it could not make. A body merely *called* from inside this one is not
+        // among them (`framesInside`): its text plays elsewhere in the song too.
         const group = new Set<number>();
-        for (let index = grabbed.frames[frame].from; index < grabbed.frames[frame].to; index++) {
-          const item = grabbed.items[index];
-          if (item.kind === 'note' && item.instances.length > 0) {
-            group.add(index);
+        for (const each of [
+          grabbed.frames[frame],
+          ...framesInside(grabbed, grabbed.frames[frame]),
+        ]) {
+          for (let index = each.from; index < each.to; index++) {
+            const item = grabbed.items[index];
+            if (item.kind === 'note' && item.instances.length > 0) {
+              group.add(index);
+            }
           }
         }
 
@@ -1344,6 +1463,13 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
 
         const { tick, row } = at(event, box);
         const standing = grabbed.items[construct];
+        if (standing.loop) {
+          // The construct is this box's own — a `(n)m` for a ghost, the
+          // `(n)[ … ]m` for the dashed one — where the frame's span is the body
+          // they share, which is what retires the answer when the caret leaves.
+          sinks.inspectLoop(standing.loop.text, grabbed.frames[frame].span);
+        }
+
         const played = grabbed.frames[frame];
         const passes = passesAt(played, grabbed.channel, passTick);
         // Two passes of a body meet at every interior edge of a loop, and their
@@ -1372,6 +1498,12 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
                   : null
               : null;
         const free = !outer && refused === null ? gapSlack(grabbed, construct) : 0;
+        // Priced only where a slide could spend it: a resize never joins, and a
+        // later pass has an earlier one of its own run in front of it.
+        const joined =
+          end === null && pass === 0 && free > 0
+            ? loopJoin(sources.source(), grabbed, construct, run)
+            : null;
 
         drag.set({
           kind: end === null ? 'gap' : 'resize',
@@ -1396,6 +1528,7 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
             pass,
             splitTick: run.passes[pass].tick,
             slack: end === null ? (pass === 0 ? free : 0) : free,
+            joins: joined?.count ?? null,
             room: end === null ? 0 : bodyRests(grabbed, played, end).ticks,
             ahead: passes.before,
             refused,
@@ -1733,8 +1866,11 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
 
         latched.set(null);
         if (outcome.length > 0) {
+          // No anchors: neither of these goes through a `Plan`, and
+          // `resizeLoop` moves the brackets, so notes cross into and out of the
+          // body and the ordinals they have now are not the ones the next strip
+          // gives them. The change to the document is what drops the selection.
           sinks.commit(outcome);
-          selection.set(new Set<number>());
         }
 
         return;
@@ -1820,43 +1956,42 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
         return;
       }
 
-      // A delete is the one gesture allowed to span brackets: it splits into a
-      // plan per frame, and the splices land as one commit — one undo step.
-      // Frames are disjoint text, so the pieces cannot overlap.
-      if (gesture.kind === 'delete') {
-        const byFrame = new Map<number, number[]>();
-        for (const index of gesture.items) {
-          const frame = strip.items[index]?.frame ?? 0;
-          byFrame.set(frame, [...(byFrame.get(frame) ?? []), index]);
-        }
-
-        const all: Edit[] = [];
-        for (const [which, items] of byFrame) {
-          const frame = strip.frames[which];
-          const now = planGesture(strip, { kind: 'delete', items }, sources.editMode(), frame);
-          const edits = write(strip, frame, now);
-          if (!edits) {
-            return; // One frame refused, so nothing lands anywhere.
-          }
-
-          all.push(...edits);
-        }
-
-        if (all.length > 0) {
-          sinks.commit(all.sort((a, b) => a.span.start - b.span.start));
-          selection.set(new Set<number>());
-        }
-
-        return;
-      }
-
+      // A gesture that moves no tick may span brackets — a delete, and the
+      // transpose the arrow keys run over a group a loop box's rule widened. It
+      // is planned once per frame and the splices land as one commit, which is
+      // one undo step; anything that moves a tick stays one plan over one frame
+      // and is refused there in its own words.
       const first = 'items' in gesture ? gesture.items[0] : undefined;
-      const frame = strip.frames[first !== undefined ? (strip.items[first]?.frame ?? 0) : 0];
-      const now = planGesture(strip, gesture, sources.editMode(), frame);
-      const edits = write(strip, frame, now);
+      const held = first !== undefined ? (strip.items[first]?.frame ?? 0) : 0;
+      const parts = planFrames(strip, gesture, sources.editMode(), held);
+      const edits = write(strip, parts);
       if (edits && edits.length > 0) {
+        carry(strip, parts);
         sinks.commit(edits);
+      }
+    },
+
+    sourceChanged(keepsNotes: boolean): void {
+      if (!keepsNotes) {
         selection.set(new Set<number>());
+      }
+    },
+
+    /**
+     * Consumed whichever way it goes — a second strip is a second edit, and the
+     * plan spoke for one. The channel is checked because a strip is rebuilt for
+     * whichever channel is being edited, and with none picked that is the one
+     * under the pointer: a turnover the pointer caused is not the one the commit
+     * did. The text is checked because a batch the editor found stale is dropped
+     * in silence: a strip arriving while the document is still the one the plan
+     * was made on is not the commit's, and the anchors say where notes went in a
+     * text that never came.
+     */
+    restoreSelection(strip: Strip): void {
+      const held = pending;
+      pending = null;
+      if (held !== null && held.channel === strip.channel && held.source !== sources.source()) {
+        selection.set(notesAtAnchors(strip, held.anchors));
       }
     },
 
@@ -1876,6 +2011,9 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
     },
 
     clearSelection(): void {
+      // The anchors go too: Escape, a channel change and a mute all say this is
+      // not the subject any more, and a carried restore would put it back.
+      pending = null;
       selection.set(new Set<number>());
     },
 
@@ -1891,18 +2029,11 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
     },
   };
 
-  function erase(index: number): void {
-    const strip = sources.strip();
-    if (!strip) {
-      return;
-    }
+  return api;
 
-    const frame = strip.frames[strip.items[index]?.frame ?? 0];
-    const now = planGesture(strip, { kind: 'delete', items: [index] }, sources.editMode(), frame);
-    const edits = write(strip, frame, now);
-    if (edits && edits.length > 0) {
-      sinks.commit(edits);
-    }
+  /** The right button's delete of one note: the keyboard's, aimed by the pointer. */
+  function erase(index: number): void {
+    api.run({ kind: 'delete', items: [index] });
   }
 
   function commitMarquee(held: Drag): void {

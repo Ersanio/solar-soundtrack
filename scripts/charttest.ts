@@ -14,7 +14,7 @@
  */
 
 import { KEY_COUNT, type LoopRun, type SongTimeline, type TempoChange, type WalkNote } from "@amk/spc/song-walk";
-import { tokenize } from "@amk/tokens";
+import { type Command, tokenize } from "@amk/tokens";
 import type { TimelineCommand } from "../web/src/app/state/command-timeline";
 import {
 	DEFAULT_TEMPO,
@@ -49,7 +49,7 @@ import {
 import { fitBarContent } from "../web/src/app/editor/views/piano-roll/roll-bar-text";
 import { DRAW_LENGTHS, stepDrawLength } from "../web/src/app/editor/views/piano-roll/roll-lengths";
 import { advanceTick } from "../web/src/app/editor/views/piano-roll/roll-clock-step";
-import type { PassShift } from "../web/src/app/editor/views/piano-roll/roll-edit";
+import type { BodyRows, PassShift } from "../web/src/app/editor/views/piano-roll/roll-edit";
 import {
 	DECLARED_TINT,
 	type LoopRegionBox,
@@ -65,6 +65,7 @@ import {
 	laneWindow,
 	packCommandLane,
 } from "../web/src/app/editor/views/piano-roll/roll-command-layout";
+import { eraseCommand, inspectable } from "../web/src/app/editor/views/piano-roll/roll-command-move";
 import {
 	KEY_WIDTH,
 	LANE_GLYPH,
@@ -1157,14 +1158,14 @@ console.log("\nthe loop boxes following a gesture");
 
 	const follow = (request: {
 		regions: LoopRegionBox[];
-		rows?: { body: number; low: number; high: number } | null;
+		rows?: BodyRows[];
 		boundaries?: [number, number[]][];
 		delta?: number;
 		passes?: PassShift[];
 	}) =>
 		followLoopRegions({
 			regions: request.regions,
-			rows: request.rows ?? null,
+			rows: request.rows ?? [],
 			boundaries: request.boundaries ? new Map(request.boundaries) : null,
 			delta: request.delta ?? 0,
 			passes: request.passes ?? [],
@@ -1288,23 +1289,50 @@ console.log("\nthe loop boxes following a gesture");
 	);
 
 	// A transpose moves no tick at all, so only the rows answer.
-	const up = follow({ regions: scene, rows: { body: 1000, low: 16, high: 18 } });
+	const up = follow({ regions: scene, rows: [{ body: 1000, low: 16, high: 18 }] });
 	check("a transposed body's boxes take the rows its notes now span", down(up).startsWith("158+34 158+34 "), down(up));
 	check("a box that is not its own is left alone", down(up).includes(" 198+34 "), down(up));
 	check("and the loop it plays inside grows to keep it in", down(up).endsWith(" 158+94"), down(up));
 	// Grow only: the built span has already swallowed the inner rows and cannot
 	// give them back, so a body moved inwards leaves its outer box as it was.
-	const middle = follow({ regions: scene, rows: { body: 1000, low: 20, high: 21 } });
+	const middle = follow({ regions: scene, rows: [{ body: 1000, low: 20, high: 21 }] });
 	check("and never shrinks around one that moved inwards", down(middle).endsWith(" 178+74"), down(middle));
 	// The other direction: the changed body is the outer one, and the plan knows
 	// only the notes of its own frame, so its box has to grow to keep the
 	// subloop's — one pass over what each box holds, both ways round.
-	const outer = follow({ regions: [around, at(0, 1000, 24, 48, 20, 22)], rows: { body: 3000, low: 10, high: 11 } });
+	const outer = follow({ regions: [around, at(0, 1000, 24, 48, 20, 22)], rows: [{ body: 3000, low: 10, high: 11 }] });
 	check(
 		"a changed body's own box still holds the bodies playing inside it",
 		down(outer) === "98+134 198+34",
 		down(outer),
 	);
+
+	// Two bodies moved by the one gesture, which is what a loop box's rule is
+	// once the group has been widened over the loop written inside the body.
+	// Each box takes its own plan's rows, and the outer plan leaves the inner
+	// body's notes out — the union is what puts them back, so the union is the
+	// right answer rather than either plan on its own.
+	const nested = follow({
+		regions: [around, at(0, 1000, 24, 48, 20, 22)],
+		rows: [
+			{ body: 3000, low: 10, high: 11 },
+			{ body: 1000, low: 12, high: 14 },
+		],
+	});
+	check("both bodies of a widened group take their own plan's rows", down(nested) === "98+54 118+34", down(nested));
+
+	// Three deep in one pass: enclosure is tested on the song's own ticks and
+	// tick containment is transitive, so the outermost box holds the innermost
+	// directly and no walk down the nesting is needed to reach it.
+	const deep = follow({
+		regions: [around, at(0, 1000, 24, 96, 20, 22), at(0, 2500, 36, 24, 21, 22)],
+		rows: [
+			{ body: 3000, low: 10, high: 11 },
+			{ body: 1000, low: 12, high: 13 },
+			{ body: 2500, low: 14, high: 15 },
+		],
+	});
+	check("a body three deep is reached by every box above it", down(deep) === "98+64 118+44 138+24", down(deep));
 }
 
 console.log("\nthe pull at the end of the scrub bar");
@@ -2162,10 +2190,42 @@ console.log("\nhow the command lane stacks what lands together");
 		});
 		check("a command that came through a replacement cannot be erased", spread.glyphs[0].removable === false);
 		check("and its hover does not offer it", !spread.glyphs[0].title.includes("right-click"), spread.glyphs[0].title);
+		// The erase both routes go through — the right click and the `Delete`
+		// key — so neither can come to a different answer about it. `removable`
+		// is this function's own precondition read back onto the glyph.
+		check("and the erase itself refuses it", eraseCommand(macro, scanned[0]) === null);
 		// It cannot be carried either, and the cursor is the only thing on screen
 		// that says so before the porter presses.
 		check("nor dragged", spread.glyphs[0].cursor === "pointer", spread.glyphs[0].cursor);
 		check("and its hover does not offer that either", !spread.glyphs[0].title.includes("drag"), spread.glyphs[0].title);
+	}
+
+	// And what the erase takes: the command plus the inline whitespace in front
+	// of it, so what is left is what was there before it was written. `expect` is
+	// the race guard `source-view` re-checks the batch against.
+	{
+		const plain = "#amk 4\n#0 v200 c8\n";
+		const literal = tokenize(plain).commands.find((command) => command.kind === "v")!;
+		const taken = eraseCommand(plain, literal);
+		check("a literal command erases", taken !== null);
+		check("taking the space in front of it with it", taken?.expect === " v200", JSON.stringify(taken?.expect));
+		check("and putting nothing back", taken?.text === "", JSON.stringify(taken?.text));
+	}
+
+	// What the roll may point at, and so what `Delete` may take: the lane's and
+	// the bars' scopes, and nothing else. A note is a `Command` too, and the caret
+	// is on one after every click on a bar.
+	{
+		const song = "#amk 4\n#0 o4 t60 v200 c8 r8 [d8]2\n";
+		const commands = tokenize(song).commands;
+		const ofKind = (letter: string): Command => commands.find((command) => command.kind === letter)!;
+		const named = (name: string): Command => commands.find((command) => command.name === name)!;
+		check("a song command is inspectable", inspectable(ofKind("t")));
+		check("and a note-state one", inspectable(ofKind("v")));
+		check("a note is not", !inspectable(named("note")));
+		check("nor a rest", !inspectable(named("rest")));
+		check("nor an octave", !inspectable(ofKind("o")));
+		check("nor a loop bracket", !inspectable(ofKind("]")));
 	}
 
 	check("a command written out in full can be", pair.glyphs[1].removable === true);
@@ -2241,7 +2301,7 @@ console.log("\nthe slider's track, whose two rules fail invisibly");
 	for (let percent = 0; percent <= 100; percent += 5) {
 		const image = trackImage(percent / 100, true);
 		const detent = image.indexOf("--color-ink-muted");
-		const fill = image.indexOf("--color-accent");
+		const fill = image.indexOf("--color-control");
 		if (detent < 0 || fill < 0 || detent > fill) {
 			detentBehind += ` ${percent}%`;
 		}

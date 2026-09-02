@@ -38,13 +38,12 @@
     "edittest": "esbuild scripts/edittest.ts --bundle --platform=node --format=esm --outfile=.selftest/edittest.mjs --log-level=warning && node .selftest/edittest.mjs",
     "walktest": "esbuild scripts/walktest.ts --bundle --platform=node --format=esm --outfile=.selftest/walktest.mjs --log-level=warning && node .selftest/walktest.mjs",
     "palettetest": "esbuild scripts/palettetest.ts --bundle --platform=node --format=esm --outfile=.selftest/palettetest.mjs --log-level=warning && node .selftest/palettetest.mjs",
-    "normalizetest": "esbuild scripts/normalizetest.ts --bundle --platform=node --format=esm --outfile=.selftest/normalizetest.mjs --log-level=warning && node .selftest/normalizetest.mjs",
     "check:compiler": "npm run selftest",
     "check:tokens": "npm run tokentest && npm run edittest && npm run palettetest",
     "check:spc": "npm run adsrtest && npm run instrtest && npm run brrtest && npm run firtest",
     "check:integration": "npm run spctest && npm run audiotest && npm run worklettest && npm run walktest",
     "rolltest": "esbuild scripts/rolltest.ts --bundle --platform=node --format=esm --outfile=.selftest/rolltest.mjs --log-level=warning && node .selftest/rolltest.mjs",
-    "check:app": "npm run charttest && npm run normalizetest && npm run rolltest",
+    "check:app": "npm run charttest && npm run rolltest",
     "check": "npm run format:check && npm run typecheck && npm run typecheck:packages && npm run typecheck:scripts && npm run check:compiler && npm run check:tokens && npm run check:spc && npm run check:integration && npm run check:app"
   },
   "devDependencies": {

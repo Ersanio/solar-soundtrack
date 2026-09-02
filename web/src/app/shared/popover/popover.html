@@ -1,0 +1,36 @@
+<button
+  #trigger
+  amk-button
+  variant="ghost"
+  size="md"
+  icon
+  [title]="title()"
+  (click)="toggle()"
+  (keydown)="onKeydown($event)"
+>
+  <ng-content select="[popoverIcon]" />
+</button>
+
+@if (open()) {
+  <div
+    class="border-edge bg-raised text-ink absolute top-full right-0 z-20 mt-2 flex max-h-[70vh] w-80 max-w-[calc(100vw-2rem)] flex-col rounded-md border shadow-lg"
+    (keydown)="onKeydown($event)"
+  >
+    <div
+      class="border-edge bg-raised flex shrink-0 items-center justify-between gap-3 rounded-t-md border-b px-3 py-2"
+    >
+      <h2 class="text-ink-muted text-xs font-semibold tracking-wide uppercase">{{ heading() }}</h2>
+      <button amk-button variant="ghost" size="sm" icon title="Close" (click)="dismiss()">
+        <amk-icon-close />
+      </button>
+    </div>
+
+    <div class="min-h-0 flex-1 overflow-auto px-3 py-2">
+      <ng-content />
+    </div>
+
+    <div class="border-edge flex shrink-0 justify-end border-t px-3 py-2 empty:hidden">
+      <ng-content select="[popoverFooter]" />
+    </div>
+  </div>
+}

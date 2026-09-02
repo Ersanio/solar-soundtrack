@@ -1,5 +1,6 @@
 import { Component, computed, inject } from '@angular/core';
 
+import { Button } from '../../shared/button/button';
 import { IconRedo } from '../../shared/icons/icon-redo';
 import { IconUndo } from '../../shared/icons/icon-undo';
 import { EditorRequests } from '../../state/editor-requests';
@@ -12,8 +13,8 @@ const HISTORY_KEYS = /Mac|iP/.test(navigator.platform)
 /**
  * Undo and redo, for the two toolbars that need them.
  *
- * One component in the `normalize-button` mould — `display: contents`, so the
- * pair is a direct flex child of whichever `<amk-toolbar>` hosts it — because
+ * One component with `display: contents` — so the pair is a direct flex child
+ * of whichever `<amk-toolbar>` hosts it — because
  * the piano roll writes MML now and an edit made there has to be undoable
  * without going to the Source tab to do it.
  *
@@ -24,7 +25,7 @@ const HISTORY_KEYS = /Mac|iP/.test(navigator.platform)
  */
 @Component({
   selector: 'amk-history-buttons',
-  imports: [IconUndo, IconRedo],
+  imports: [Button, IconUndo, IconRedo],
   templateUrl: './history-buttons.html',
   host: { class: 'contents' },
 })

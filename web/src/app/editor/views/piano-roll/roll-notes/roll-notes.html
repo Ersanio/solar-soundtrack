@@ -117,6 +117,27 @@
               [attr.height]="glyph.size"
               [attr.fill-opacity]="mark.opacity"
             />
+            <!-- The lane's ring, in the pair of colours the plate already uses.
+                 The lane's own white will not do on its own: a defining chip's
+                 plate is near-white, so a white ring on one is the same value as
+                 the thing it is drawn around, and the chips sit too close
+                 together to move it clear of the plate instead. So it reads
+                 against the plate where there is one, exactly as the icon on it
+                 does, and against the bar where there is not. Over the plate,
+                 and it takes the mark's opacity for the reason the plate does. -->
+            @if (inspected() === glyph.command) {
+              <svg:rect
+                rx="3"
+                fill="none"
+                stroke-width="1.5"
+                [class]="glyph.defining ? 'stroke-surface' : 'stroke-ink'"
+                [attr.x]="glyph.x - 1"
+                [attr.y]="glyph.y - 1"
+                [attr.width]="glyph.size + 2"
+                [attr.height]="glyph.size + 2"
+                [attr.stroke-opacity]="mark.opacity"
+              />
+            }
             <!-- No `svg:` prefix on this one, and it must not have one: `svg` is one
              of the three element names that carry a namespace implicitly, and the
              glyph's selector is `svg[amk-glyph]`. -->

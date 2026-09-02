@@ -18,6 +18,7 @@ app.
 | `fir-override.ts`          | Which `$F5`s a later `$F1` throws away                                          |
 | `commands/`                | What each argument _means_, in a form a panel can render and edit               |
 | `commands/availability.ts` | Which dialects will take a command, for a palette asking before the text exists |
+| `commands/loops.ts`        | Where a song's brackets are, what each construct repeats, and what it names     |
 
 ## A resumable scanner, not a second parser
 
@@ -211,6 +212,21 @@ Warnings only. Where a dialect refuses a spelling the palette writes the bytes i
 to instead, and says nothing — a porter asked for a volume fade and gets one, and which of the two
 spellings their `#amk` line takes is the palette's business rather than theirs. `palettetest`
 compiles both forms and compares them byte for byte, and that proof is what lets the swap stay quiet.
+
+`loops.ts` is the third question over the same stream, and it is there because a descriptor cannot
+answer it. A descriptor is bound to **one argument of one command**, and a loop's repeat count is not
+reliably either: `]]4` is two `]` commands with the count on the second, a `(n)m` raises no command
+at all — `label` is not a letter command kind — and a `$E6` carries one less than the count it means.
+So the subject here is the **construct**. `readLoops` walks the token stream once, mirroring the two
+variables `parseLoopStart` and `parseLoopEnd` decide nesting with (`channel === 8` and `inE6Loop`),
+and hands back every paired construct with its label, its count and where that count is written;
+`loopAt`, `loopsAt` and `loopTargets` are the three questions asked of it. The count comes off the
+`Command` wherever a spelling gathers one rather than off the digits, because those are not the same
+thing — `"n=4"` used as `[ c4 ]n` gathers a 4 the source at that offset does not contain — and that
+is also what carries `edits.ts`'s per-part macro interlock through to anything that writes it back.
+
+`palettetest` holds all of it to the compiler in notes played: every count it reads is written back
+and the result walked, so a reading one out cannot hide behind a plausible-looking number.
 
 One rule keeps the tables honest: **a descriptor never states how many arguments a command takes.**
 `tokens.ts` already carries that twice on purpose — as `scanHex`'s `hexLeft` mutations and as

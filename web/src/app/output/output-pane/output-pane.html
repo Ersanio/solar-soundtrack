@@ -1,8 +1,23 @@
-<amk-panel heading="Compiler Output" class="min-h-0 flex-1">
-  <span panelAside class="font-mono text-xs" [class]="statusColor()">
-    {{ store.status().text }}
+<!-- The drawer's own header, below `lg` only: it stands in for the Inspector
+     section's header there, which `command-inspector.html` hides at the same
+     breakpoint, so the drawer folds to one row that names what is inside it. -->
+<button
+  type="button"
+  class="border-edge bg-raised flex h-9 shrink-0 cursor-pointer items-center justify-between gap-3 border-b px-3 lg:hidden"
+  (click)="collapseToggle.emit()"
+>
+  <span class="text-ink-muted text-xs font-semibold tracking-wide uppercase">Inspector</span>
+  <span class="text-ink-muted flex items-center gap-2 text-xs">
+    {{ collapsed() ? 'Show' : 'Hide' }}
+    @if (collapsed()) {
+      <amk-icon-chevron-right />
+    } @else {
+      <amk-icon-chevron-down />
+    }
   </span>
+</button>
 
+<div [class]="bodyClass()">
   @if (blocked()) {
     <p class="text-danger m-3 text-xs leading-relaxed">
       Cannot compile without a driver — {{ drivers.loadError() ?? 'still loading…' }} The song's
@@ -10,16 +25,30 @@
       against.
     </p>
   } @else {
-    <amk-stats-grid />
-    <amk-aram-budget />
+    <div class="min-h-0 flex-1 overflow-auto">
+      <amk-command-inspector />
 
-    <div class="border-edge border-b px-3 py-1.5">
-      <h3 class="text-ink-muted text-xs font-semibold tracking-wide uppercase">Diagnostics</h3>
+      <amk-section #build heading="Build" collapsible [(open)]="buildOpen">
+        <span sectionAside class="font-mono text-xs" [class.text-danger]="overflowing()">{{
+          store.freeLabel()
+        }}</span>
+        <amk-stats-grid />
+        <amk-aram-budget />
+        <amk-hex-dump />
+      </amk-section>
     </div>
-    <amk-diagnostics-list />
 
-    <amk-command-inspector />
-
-    <amk-hex-dump />
+    <!-- Pinned under the scroll column, so it stays in view whatever the inspector's height. -->
+    <amk-section
+      heading="Problems"
+      collapsible
+      class="max-h-[30%] shrink-0"
+      [(open)]="problemsOpen"
+    >
+      <span sectionAside [class]="problemsBadgeClass()">{{ problemsCount() }}</span>
+      <div class="min-h-0 flex-1 overflow-auto">
+        <amk-diagnostics-list />
+      </div>
+    </amk-section>
   }
-</amk-panel>
+</div>

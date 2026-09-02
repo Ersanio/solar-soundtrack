@@ -141,6 +141,40 @@ export function commandMoveTargets(strip: Strip): readonly MoveTarget[] {
     }));
 }
 
+/**
+ * The command taken out of the text, or `null` where the span is not its own.
+ *
+ * The one erase both routes to it go through — the right click on a lane glyph
+ * and the `Delete` key — so the two cannot come to disagree about what a command
+ * costs to remove.
+ *
+ * `commandRewritable` is the whole precondition and it is not negotiable: a
+ * command written through a `"name=value"` has its span collapsed onto the call
+ * site, so splicing that range out takes the rest of the expansion with it.
+ * `spliceOut` takes the inline whitespace in front, leaving what was there
+ * before the command was written.
+ *
+ * None of {@link commandMoveRefusal}'s other tests apply. They are about where a
+ * command may be put, and this puts it nowhere: a command inside a loop, one in
+ * remote code, and a `$DD` read by the note in front of it are all commands that
+ * simply stop running once their text is gone.
+ */
+export function eraseCommand(source: string, command: Command): Edit | null {
+  return commandRewritable(command) ? spliceOut(source, command.span) : null;
+}
+
+/**
+ * Whether the roll draws this command at all: the lane holds every `'song'`
+ * command and a bar's chips every `'note-state'` one, and nothing draws the
+ * rest. The gate the ring and the `Delete` key share, because the caret alone
+ * cannot say — a note is a `Command` too, and every click on a bar puts the
+ * caret on one.
+ */
+export function inspectable(command: Command): boolean {
+  const scope = commandScope(command);
+  return scope === 'song' || scope === 'note-state';
+}
+
 /** The target nearest a tick, the earlier one on a tie. */
 export function nearestTarget(targets: readonly MoveTarget[], toTick: number): MoveTarget | null {
   let best: MoveTarget | null = null;

@@ -538,6 +538,74 @@ export function planGesture(
   return guarded(resolvedGesture(strip, frame, gesture, mode), strip, frame);
 }
 
+/** One frame of a gesture, and what the gesture does there. */
+export interface FramePlan {
+  frame: StripFrame;
+  plan: Plan;
+}
+
+/**
+ * Whether a gesture may be planned frame by frame and committed as one step.
+ *
+ * The test is that it moves no note in time. A frame's ticks are its own — a
+ * body's first note is at 0 however many times and wherever the body plays — so
+ * a gesture that changes a tick has one frame's layout to answer to, and
+ * {@link planGesture} turns it away as {@link REFUSE_SPLIT}. One that changes
+ * only the row a note is on, or takes it away, leaves every frame's layout
+ * exactly as it was, and frames are disjoint text, so the pieces cannot overlap.
+ *
+ * On the ticks alone and not on `copy` as well: a copy that moves nothing lands
+ * on top of its own original and clashes wherever it is planned, and no gesture
+ * the roll makes produces one.
+ */
+export function spansFrames(gesture: Gesture): boolean {
+  return gesture.kind === 'delete' || (gesture.kind === 'move' && gesture.deltaTicks === 0);
+}
+
+/**
+ * A gesture as one plan per frame it names an item in, the held frame first.
+ *
+ * One entry for everything {@link spansFrames} turns down, so a drag sideways
+ * over a selection spanning brackets stays one plan over one frame and is
+ * refused there in the same words. The held frame is kept even where the gesture
+ * names nothing in it — a body whose whole text is another body has no notes of
+ * its own — because the readers that price a body-length change ask for entry 0
+ * by name.
+ */
+export function planFrames(
+  strip: Strip,
+  gesture: Gesture,
+  mode: EditMode,
+  held = 0,
+): readonly FramePlan[] {
+  const home = strip.frames[held] ?? strip.frames[0];
+  const named = 'items' in gesture ? gesture.items : [];
+  const frameOf = (index: number): number => strip.items[index]?.frame ?? 0;
+  // `spansFrames` states the rule and is not a type predicate, so the two kinds
+  // it admits are named again for the narrowing the spread below needs.
+  if (
+    !spansFrames(gesture) ||
+    (gesture.kind !== 'delete' && gesture.kind !== 'move') ||
+    named.every((index) => strip.frames[frameOf(index)] === home)
+  ) {
+    return [{ frame: home, plan: planGesture(strip, gesture, mode, home) }];
+  }
+
+  const homeAt = strip.frames.indexOf(home);
+  const share = new Map<number, number[]>([[homeAt, []]]);
+  for (const index of named) {
+    const which = frameOf(index);
+    share.set(which, [...(share.get(which) ?? []), index]);
+  }
+
+  return [...share.entries()]
+    .sort(([a], [b]) => (a === homeAt ? -1 : b === homeAt ? 1 : a - b))
+    .map(([which, items]) => {
+      const frame = strip.frames[which];
+      return { frame, plan: planGesture(strip, { ...gesture, items }, mode, frame) };
+    });
+}
+
 /** The wall and remap checks every arm's plan goes through on its way out. */
 function guarded(plan: Plan, strip: Strip, frame: StripFrame): Plan {
   if (plan.refused !== null) {
@@ -858,6 +926,57 @@ export function framePasses(frame: StripFrame): readonly FramePass[] {
   });
 }
 
+/**
+ * The frame a press on empty grid belongs to: the deepest body whose pass holds
+ * the tick, else the root. `base` is that pass's own start, which is what turns
+ * a song tick into the frame's local one.
+ *
+ * This channel's own passes, as `firstPassOn` and `passesAt` read them: a frame
+ * carries every voice's runs of its body, and a tick another voice
+ * plays that body over is a tick this one is somewhere else entirely — writing
+ * there would put the note in a body this press is nowhere near.
+ *
+ * Here rather than in `roll-gesture.ts` because it is the piece of a draw no
+ * walk can check: the text a splice lands in is a fact about the frame it was
+ * given, and a harness cannot drive an Angular composable.
+ */
+export function frameAt(strip: Strip, tick: number): { frame: number; base: number } {
+  let found = { frame: 0, base: 0 };
+  let depth = Number.POSITIVE_INFINITY;
+  strip.frames.forEach((frame, at) => {
+    if (frame.body < 0) {
+      return;
+    }
+
+    for (const run of frame.runs) {
+      if (run.channel !== strip.channel) {
+        continue;
+      }
+
+      for (const pass of run.passes) {
+        if (tick >= pass.tick && tick < pass.tick + pass.ticks && frame.ticks < depth) {
+          found = { frame: at, base: pass.tick };
+          depth = frame.ticks;
+        }
+      }
+    }
+  });
+
+  return found;
+}
+
+/**
+ * The rows one body's notes span once a gesture's plan lands.
+ *
+ * By body, as {@link StripFrame.body} names it, so every box of that body takes
+ * the same answer — the declaration's and every recall's, on every voice.
+ */
+export interface BodyRows {
+  body: number;
+  low: number;
+  high: number;
+}
+
 /** Where a body-length change puts one pass of the body it changes. */
 export interface PassShift {
   /**
@@ -913,6 +1032,34 @@ export function passShiftsFor(
     const lead = edge === 'start' && held !== null && held.channel === channel ? -1 : 0;
     return { body: frame.body, channel, tick, ticks, steps: ordinal + lead };
   });
+}
+
+/**
+ * Where the plan leaves each note it was given, by the strip index it came in
+ * as — its place among the frame's notes once the commit is written.
+ *
+ * Text order and tick order at once, a channel being one voice, and it is what
+ * a rewrite leaves alone: `planEdits` writes the survivors and the born notes
+ * in this order, so entry `n` here is the frame's `n`th note in the text the
+ * commit produces. A note the plan does not carry is absent, which is a
+ * deletion, a glue's swallowed half and a carve that took the whole of one.
+ *
+ * The one thing an edit cannot move, which is why the roll carries a selection
+ * on it: a strip index moves the moment an item is added or removed, a tick
+ * moves for every note after a length change, and an address moves for every
+ * byte written before it. Here rather than in `roll-gesture.ts` because it is a
+ * statement about the write, and only a harness driving a real compile can
+ * check it.
+ */
+export function plannedOrdinals(plan: Plan): ReadonlyMap<number, number> {
+  const places = new Map<number, number>();
+  plan.notes.forEach((note, at) => {
+    if (note.from >= 0) {
+      places.set(note.from, at);
+    }
+  });
+
+  return places;
 }
 
 /**

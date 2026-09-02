@@ -18,7 +18,7 @@ packages/mml-compiler/  @amk/compiler  preprocess -> parser -> link
 packages/mml-tokens/    @amk/tokens    scanner, splices, command model
 packages/spc/           @amk/spc       BRR, echo FIR, ARAM, emulator, worklet
 web/                    the Angular editor
-scripts/                fifteen byte-level harnesses
+scripts/                fourteen byte-level harnesses
 ```
 
 ```
@@ -42,15 +42,15 @@ AddmusicK release if they are missing.
 
 Node 24 is what CI uses. CI runs `npm run lint` then `npm run check`.
 
-| Command             | What it does                                                         |
-| ------------------- | -------------------------------------------------------------------- |
-| `npm start`         | Dev server on `http://localhost:4200/`.                              |
-| `npm run build`     | Production build into `web/dist/`.                                   |
-| `npm run watch`     | Dev-configuration build with `--watch`, no server.                   |
-| `npm run lint`      | ESLint over every workspace.                                         |
-| `npm run format`    | Prettier over the workspace.                                         |
-| `npm run typecheck` | The app. `:packages` and `:scripts` cover the rest.                  |
-| `npm run check`     | The merge gate: formatting, three typechecks, all fifteen harnesses. |
+| Command             | What it does                                                          |
+| ------------------- | --------------------------------------------------------------------- |
+| `npm start`         | Dev server on `http://localhost:4200/`.                               |
+| `npm run build`     | Production build into `web/dist/`.                                    |
+| `npm run watch`     | Dev-configuration build with `--watch`, no server.                    |
+| `npm run lint`      | ESLint over every workspace.                                          |
+| `npm run format`    | Prettier over the workspace.                                          |
+| `npm run typecheck` | The app. `:packages` and `:scripts` cover the rest.                   |
+| `npm run check`     | The merge gate: formatting, three typechecks, all fourteen harnesses. |
 
 `npm run check` does **not** compile Angular templates, and neither does `npm run typecheck` — `tsc`
 does not run the template compiler, so a bad binding (`viewBox=` instead of `[attr.viewBox]=`)
@@ -69,13 +69,13 @@ which is all either needs:
 - **`sync-spc-assets`** — mirrors `packages/spc/assets/` into `web/public/`. The Angular builder
   refuses an asset path outside its own workspace root; the copies are gitignored and
   `packages/spc/assets/` is the only source of truth.
-- **`generate-git-info`** — writes `web/src/app/git-info.generated.ts` for the toolbar's commit link
+- **`generate-git-info`** — writes `web/src/app/git-info.generated.ts` for the top bar's commit link
   (generated, gitignored). Captured once at startup, so it goes stale if you commit while
   `npm start` is running; restart to refresh.
 
 ### Tests
 
-There are no `.spec.ts` files, and no `npm run test` — the suite is the fifteen harnesses under
+There are no `.spec.ts` files, and no `npm run test` — the suite is the fourteen harnesses under
 `scripts/`; **`scripts/README.md` says what each one proves**,
 and several of those assertions are load-bearing in ways that are not obvious from the name.
 
@@ -166,8 +166,8 @@ AddmusicK objects to something it has no opinion about. The echo hazards, the un
 warning, the tempo shortfall, the `#path` notice and the runaway-replacement guard are `SST05xx`,
 which is also where a finding goes when the reference does not _finish_ rather than not object:
 `SST0505` bounds a replacement that expands into itself, and AddmusicK grows its buffer forever on
-the same song, so there is no run to be faithful to and nothing to divide with `#path`. The normalize refusals are
-`SST06xx`, and `SST0301` guards `compile()`'s own ARAM argument. A new diagnostic takes the prefix
+the same song, so there is no run to be faithful to and nothing to divide with `#path`. `SST0301`
+guards `compile()`'s own ARAM argument. A new diagnostic takes the prefix
 of the tool that found it. Spans are mapped back to the source the author wrote — `spanAt` is the
 single choke point, and anything that bypasses it will be wrong. Constructs this compiler does not
 implement are reported as errors, never silently mis-compiled.
@@ -288,32 +288,15 @@ One entry each: what it was, what it is, why.
   beat, `0` beats for no grid at all, and `gridLines` counts beats from tick 0 so a bar line is a
   bar's first beat by construction. Not a `tick % barTicks` either — `tickWindow` snaps to a whole
   note, a 7/8 bar is 168 ticks, and the two align only by coincidence.
-- **Unrolling loops from the text alone, or decompiling the walk into MML** — a `[ ]` body is
-  compiled once, under the parse-time state at its `[`, and replayed from bytes, so copying its
-  text n times replays `<`, `>` and the drum remap's clearing n times, and a `(1)n` called from
-  another channel parses the body under that channel's `o`, `l` and `h`; and bytes cannot say what
-  was written. The parser records the state each body was compiled under (`ParseTrace`, gathered
-  where `commandMap` is), the rewrite is text to text (`normalize.ts`), and the walk of every
-  pass's result is compared to the walk of the original before anything reaches the document
-  (`state/normalize-song.ts`). No `h` is ever written either: it replaces the instrument's tuning
-  rather than adding to it, so `h0` is not "no transposition".
-- **Normalize refusals in the roll's problems strip** — the button is on the Source toolbar too,
-  which has no strip, and a refusal is the answer to a click rather than a property of the song.
-  The dialog that asks before the rewrite (`editor/normalize-button/`) is where a refusal shows,
-  and a song already in shape gets the same dialog rather than a click that does nothing.
 - **A strict one-to-one gate between the walk's notes and the roll's strip** — `walkSong` ends the
   pass at the shortest channel in use and sets everything after it aside as `unreachable`, so a
   channel longer than the shortest is the commonest shape a song has and an equality check refused
-  editing on nearly all of them, pointing at Normalize, which does not fix it. The agreement is a
-  **prefix** (`agreesWithWalk`), and the items past the cut are editable and carry `verified: false`.
+  editing on nearly all of them. The agreement is a **prefix** (`expandAndJoin`), and the items past
+  the cut are editable and carry `verified: false`.
 - **Deciding a push's direction per neighbour**, by which half of each one the overlap lands on —
   A shoves B right, B shoves C right, C shoves B left, and it never terminates. The half-rule picks
   the direction at the _first_ neighbour, which is the one the porter can see, and the cascade keeps
   it: every later shove then moves a note strictly away over a finite ordered set.
-- **`unreachable` in `timelinesAgree`** — sound-looking and wrong: unrolling changes the list by
-  construction, since a note inside a `[ ]` is dropped once per replay and the copies it becomes are
-  separate addresses. `channelTicks` is what holds a channel's tail to account. `normalizetest`
-  caught it.
 - **A trailing octave run winning over a leading one** — in `c4 o5 d4` the `o5` is adjacent to both
   notes, and two edit units claiming it produce overlapping splices that CodeMirror merges rather
   than refuses. Leading wins (`growUnits`), which is also what makes the restore stable: a repitch
@@ -371,10 +354,8 @@ One entry each: what it was, what it is, why.
   song plays for as long after a channel is opened as before it, which `rolltest` pins per case.
 - **Writing a channel the roll opens into its place in `#0`-`#7` order** — `octave` and
   `defaultNoteLength` are one variable each and `parseHash` resets neither, so a block dropped
-  between two others changes what the second is parsed under, and only `ParseTrace` knows what to
-  restore. The roll's compile carries no trace, and asking for one costs an event per dispatch. A new
-  `#N` goes at the **end of the document**, where nothing follows it to be disturbed; `orderChannels`
-  is what puts the blocks in order afterwards, and it writes the `o` and `l` a moved block needs.
+  between two others changes what the second is parsed under. A new `#N` goes at the **end of the
+  document**, where nothing follows it to be disturbed.
 - **Counting music ticks off a voice's note duration counter** — `$70+2n` is decremented once a tick
   and reloaded from the duration byte the moment it reaches zero, both in the one pass
   (`main.asm:2337, 2440-2441`), so a note one tick long is handed the 1 the counter already held and
@@ -561,8 +542,7 @@ stats.loopTicks` pads **every other channel that would cut the song short** out 
 - **Counting a remote code definition's `[ ]` against the starting channel** — AddmusicK tells a
   definition from a call by nothing but position (`Music.cpp:1015`), so `(!1)[ … ]` always sits above
   the first `#N` and its brackets gather on the starting channel like everything up there. That
-  refused channel 0 outright on every song with one, and pointed at Normalize, which leaves remote
-  code alone by design and could never clear it. `gather` marks the body and both its brackets
+  refused channel 0 outright on every song with one. `gather` marks the body and both its brackets
   `inRemoteDefinition` and the roll's gate skips them. Not by exempting everything above the first
   `#N` — a `[ ]` written up there that no `(!n)` armed is the channel's own music and does play it
   twice — and not by giving the body `channel: 8` the way the compiler's `commandMap` does, which
@@ -716,59 +696,6 @@ stats.loopTicks` pads **every other channel that would cut the song short** out 
   refused (`REFUSE_INSIDE`), because there is no tick left to put it on and no gesture can say which
   side of the deletion the porter meant it to follow. `REFUSE_RAMP` keeps the one site whose reason
   really is the length, a note cut shorter than the ticks in front of the command.
-- **Reading the loop structure off the dispatch character alone** — `loopEventOf` switched on `[`,
-  `]`, `*` and `(`, and a hex command dispatches as `"$"`, so `[[ ]]n` raised a `subOpen`/`subClose`
-  pair and the same subloop written `$E6 $00`/`$E6 $nn` raised nothing. Normalize could not see it,
-  and the roll refused the channel through `agreesWithWalk` and offered a Normalize that had nothing
-  to unroll. The tests are on the bytes and the `inE6Loop` flag, which both spellings share, so a
-  `case "$"` reads it the same way — `grew` at 1 rather than 2, since `parseHexCommand` appends one
-  byte per dispatch. `LoopEvent.from` carries where the run began, because the flag turns over on
-  the argument byte and the event's span is that byte alone; it is a **source** offset, mapped
-  through `spanAt` like every other one the trace carries, since `hexRun` is a `scanned` offset.
-  `$E9` and `$FC` get no such reading: their address is worked out by the compiler and relocated
-  (`link.ts`), so a hand-written one names a body nothing can resolve.
-- **Writing a note's missing length in front of the dots already there** — dots compose rather than
-  add, `getNoteLengthModifier` halving the running value at each one (Music.cpp:2950), so under a
-  36-tick default `c.` is 36 + 18 while `c8..` is 24 + 12 + 6. The segment's own ticks are computed
-  and the whole length text re-spelled from the total, dots included; in the ordinary case that is
-  the same text anyway, `c` under `l4` being `c4`. And `spellDuration` rather than `spellLength`,
-  since `l=n` range-checks nothing so a segment can outrun the whole note one token stops at.
-- **Classifying the prelude event by event, with a `(` read before its `[`** — only the `[` carries
-  the loop event that says a remote definition is opening, so `orderChannels` painted the `(!n)`
-  label of one as music and set `sawMusic`; the `[` reached back and repainted it a beat later, but
-  the flag stayed. Every remote body holding an `o`, `l`, `q`, `h`, `<` or `>` was then refused
-  `SST0612` — "after music above the first channel" — on the strength of its own label, with nothing
-  above the first `#N` at all. The label is skipped by looking one event ahead, the mirror of the
-  lookbehind that paints it. Not by clearing `sawMusic` when the `[` arrives either: that would also
-  clear it for real music written before the definition, which is what the diagnostic is about.
-- **`writeNoteLengths` filtering on `onlyChannel`, the way `flattenTriplets` does** — that filter is
-  sound for a `{ }`, which is a bracketed region on one channel, and unsound for an `l`, which is one
-  variable the whole song reads: `#1`'s bare notes read `#0`'s, and a `[ ]` body's events carry
-  channel 8 rather than the channel that wrote them. A scoped run deleted the `l` and left its
-  readers alone, and the oracle refused the song — which is the one thing the scoped form exists to
-  avoid, since it is what the roll's **Normalize #N** runs. There is no correct per-channel version:
-  rewriting every reader means rewriting text a scoped run has promised to leave. It stands down
-  instead, as `orderChannels` does, and the channel keeps its `l`s — which costs the roll nothing,
-  a note's length being read off its own written text.
-- **`writeNoteLengths` working note by note** — every segment's digits are independently optional
-  and `accumulateTiedLength` folds a run across whitespace and nothing else, so one event's span can
-  cover several: `c4^` is an explicit 48 and an implied 24, `r4 r r` is one rest of three. The
-  `$DD` target note is the exception in the other direction — `parseNote` appends its byte and
-  returns before it reads a length at all (`parser.ts:2971-2975`), so a length written there is a
-  stray digit nothing reads, and `normalizetest`'s fixed-point check is what caught it.
-- **Pairing a crossed loop and subloop up, or unrolling one** — `[ c4 $E6 $00 d4 ]2 e4 $E6 $01`
-  compiles, AddmusicK guarding nesting and not crossing (`Music.cpp:1208-1290`), and `unrollLoops`'s
-  one stack popped the wrong partner at each end and dropped both in silence: no construct, no
-  diagnostic, and a dialog saying "Nothing to normalize" beside a roll refusing the channel and
-  offering Normalize as the answer. Matching the two ends up and emitting both constructs does not
-  work — the loop's range and the subloop's **partially overlap**, so neither `contains` the other,
-  both survive the `topLevel` filter and `applyEdits` throws. Neither does unrolling: a voice has one
-  subloop return (`Commands.asm:365`), so the close jumps into the other construct's body, and from
-  there the channel either ends on that body's `$00` with the call counter already spent
-  (`main.asm:2345`) — that song plays `c4 d4 c4 d4 e4 d4` and stops, with everything written after
-  the close never reached — or re-enters the `$E9` and starts its count again. `SST0616` says which
-  of the two it is. Not a check for entries left on the stack either: an unterminated `$E6 $00`
-  compiles, opens a subloop nothing closes, plays exactly what it says, and has nothing to unroll.
 - **Handing a command a deletion left behind to the next surviving note** — deleting `b3` from
   `o4 a=27 p12,147 b3 c3` leaves the `p` in front of the rest that takes those ticks, and putting it
   on `c3` instead loses the tick: the `p` runs at 27, where the driver read it and where the rest
@@ -837,40 +764,6 @@ stats.loopTicks` pads **every other channel that would cut the song short** out 
   the lane takes it taller. `depth` was always the scroll range; with nothing dropped it is now the
   whole column, so a glyph can always be scrolled to. The bar's own `fitBarContent` mark is a
   different thing and stays — a bar has a fixed width it cannot grow, where the lane has a scroll.
-- **Writing a rewritten `&`'s target as a note** — `$DD $00 $nn d` reads far better than
-  `$DD $00 $nn $A6`, and it is not the same music. `parseNote` runs for a written target and returns
-  before the note map is written (`parser.ts:2971-2975`), so it consumes and clears the drum remap on
-  the way past (`:2948-2960`) and the note that follows comes out pitched where the `&` used one drum
-  byte twice; it errors AMK0161 wherever a `q` is pending (`:3451`), which is anywhere the slide is
-  the first note since a bracket, a call or a `*`, `updateQ` starting true; and `isNoteLetter`
-  excludes `r` and `^` (`:167`), so `c4 & r4` — which compiles, and slides to `$C7` — has no spelling
-  at all. `writePitchSlides` writes the byte, taken from `NoteAddress.note`, which is the same byte
-  the parser computed once and wrote twice. Readability is the roll's job now that the slide is a
-  command it can see.
-- **Skipping the `&`s that cannot be written out, rather than refusing the song** — a refusal is what
-  `precheck` does for a slide whose duration comes from a bracket, and copying that here is a
-  regression: a song with one tied `&` normalizes today, and refusing would lose every other pass
-  over it. Those slides are left exactly as they are and reported as `SST0617` at **info** severity,
-  which `advance` files as a note rather than a refusal. The dialog had to grow a "What it could not
-  write out" list for it, on "nothing to normalize" as well as on a rewrite — a song whose only `&`s
-  were skipped comes back unchanged, and without the list the porter is told it normalized while the
-  roll goes on refusing all eight channels for the reason nobody mentioned.
-- **The pass last, after `drumPerNote`** — the obvious place for a ninth pass, and it breaks the
-  fixed point. `drumPerNote` stands down only when the event directly before a note is its `@`
-  (`normalize.ts:drumPerNote`), and a rewritten slide puts four argument bytes there, so the round
-  that checks for a fixed point inserts a second `@21`. It is byte-neutral, so the walk accepts it
-  and only `normalizetest`'s "names the passes that changed it" catches it. `writePitchSlides` runs
-  **before** the drums, and anchors in front of a drum `@` already leading the note, so the two stay
-  adjacent.
-- **`WalkNote.bend` as the three operand bytes, compared through `NOTE_KEYS`** — both halves wrong.
-  `NOTE_KEYS` compares with `x[key] !== y[key]` (`normalize-song.ts`), which two equal objects never
-  pass, so every song carrying a `$DD` would have been refused; the comparison is beside that loop.
-  And the operands alone do not say what a slide is: `$DD` is not dispatched, the note before it
-  peeks at the track pointer on any tick with no slide running (`main.asm:3256-3287`), and a `$C6`
-  tie is one of those ticks — so `[len note $DD]` and `[len note $C6 $DD]` carry identical operands
-  and start the slide 48 ticks apart. `afterTicks` is how far into the note the peek found it, which
-  is the whole reason `Music.cpp:2224` rewinds a tie out of a `$DD`'s way. Without it the oracle
-  passes both directions of that rewind, which is exactly the rewrite `SST0617` exists to decline.
 - **`$DD` filed as a state slot, the way `$DE` and `$ED` are** (`slotsOf`, `SLOTS[11]`) — it put a
   slide everywhere it is not and nowhere it is, and both readings were wrong in silence. `origins` is
   frozen when a note keys on and the walk reaches the `$DD` a byte later, so the note that _plays_ the
@@ -895,7 +788,7 @@ stats.loopTicks` pads **every other channel that would cut the song short** out 
   of `$80` ticks or more inside one `noteMap` entry with no boundary anywhere in its text —
   `c4 $DD`, `c4^4 $DD` and `c1 $DD` carry the same three operands and arm 0, 48 and 96 ticks in. The
   operands come off the walk (`WalkNote.bend`, `afterTicks` and `frameTicks` with them) into `StripItem.slide`, joined
-  index by index over the list `agreesWithWalk` has already checked so the two cannot drift, and a
+  index by index over the list `expandAndJoin` has already checked so the two cannot drift, and a
   note past the end of the pass auditions **flat**: an approximate bend that sounds like the real one
   is worse than none, which is the reading `commands-in-force.ts` already takes. `noteFrames` then
   writes the four bytes where `emitNote` would leave them and lets the driver find them, rather than
@@ -904,8 +797,8 @@ stats.loopTicks` pads **every other channel that would cut the song short** out 
   does in the song, dispatched into the empty slot and never armed. Operands no `emitNote` could have
   written are dropped rather than approximated. The target goes in as the **emitted** byte and is the
   one value on that path `Audition.transposed` must not touch: it exists to turn a written row pitch
-  into an emitted one, the compiler resolved `h` and the instrument's tuning long ago
-  (`writePitchSlides` writes `NoteAddress.note`), and the driver adds `$43` and `!HTuneValues+x`
+  into an emitted one, the compiler resolved `h` and the instrument's tuning long ago into
+  `NoteAddress.note`, and the driver adds `$43` and `!HTuneValues+x`
   itself when it arms.
 - **Rebuilding an audition's frames from `afterTicks` and the note's length alone** — it takes the
   arm's frame to be the note's _last_, which puts the `$DD` after every frame the note has, and
@@ -967,12 +860,12 @@ stats.loopTicks` pads **every other channel that would cut the song short** out 
   code, span and message — six thousand of those are one finding. Not a cap on how many diagnostics
   a parse may hold, which would lose the six-hundredth real error in a song that has one.
 
-- **Unrolling loops as the roll's answer to a `[ ]`** — Normalize's `loops` pass wrote n copies of
-  a body under re-asserted parse state, and the roll refused every loop-bearing channel and pointed
-  at it. It is the walk instead: `SongTimeline.loops` is raised off the driver's own `$E9`/`$E6`
+- **Unrolling loops as the roll's answer to a `[ ]`** — a rewrite wrote n copies of a body under
+  re-asserted parse state, and the roll refused every loop-bearing channel and pointed at it. It is
+  the walk instead: `SongTimeline.loops` is raised off the driver's own `$E9`/`$E6`
   frames, the strip frames each body and edits the one text in place, and every pass is drawn,
   auditioned and joined per instance. Unrolling turned away exactly the songs porters write — a
-  recall under another instrument was SST0604/0605, a crossed pair SST0616 — inflated a document
+  recall under another instrument, a loop and a subloop that cross — inflated a document
   n-fold, and re-derived from text what the walk already knew; a declaration is told from a recall
   by command-map membership, a `]n`'s own `$E9` being the one dispatch `recordCommand` drops.
 - **Editing one pass of a loop differently from its siblings** — considered and not supported, with
@@ -1133,29 +1026,438 @@ stats.loopTicks` pads **every other channel that would cut the song short** out 
   worker `playNote` shares, so it also stood in front of the per-row renders that would have said
   something. `auditionSpan` keeps the `Ctrl` marquee and the loop box's edge, where the question
   really is which notes were just picked out.
-- **Rewriting every `<` and `>` into the absolute `o` it produced** — `writeDefaults` did it so that
-  the roll never had to read one, and the roll never needed it: a note's row is its own `written`
-  byte (`octaveOfNote`), no unit swallows a shift, and `rolltest` has pinned `o4 c4 > d4` editable
-  throughout. What it cost is a document the porter did not write, churned on every Normalize, and a
-  silent skip wherever the shift ran past `o6` — `spellOctave` reaches 0 to 6 and the parser's own
-  counter sits at 7 and at -1 (`Music.cpp:1400-1418`) — so the one shape it could not convert was
-  the shape it was most wanted for. They are left exactly as written. What the pass still writes is
-  the entering `o` at a block whose prelude states none, a `<` or a `>` no longer counting as one
-  since it moves the octave without saying what from; and `SST0610` is asked only of a block that
-  says nothing about its octave at all, since an octave `o` cannot reach is one only a shift can
-  have put the parser at, and refusing that song would turn away one AddmusicK builds.
+- **The loop wrap's refusal carried on `Availability`** — that field answers to AddmusicK, and
+  `palettetest` holds it to exactly that: a `blocked` entry has to come back from the compiler
+  unclean. "Nothing is selected" is the palette's own condition and the snippet compiles fine, so
+  every song would have failed the harness on a button that was correctly greyed. `ResolvedEntry`
+  carries the verdict beside `availability` and `entryBlocked` is where the two meet, in the mould of
+  `placeAvailability` being stacked on rather than folded in.
+- **Reading the brackets for that wrap off the walk, or off a parse trace** — both answer the wrong
+  question. The walk says what _plays_, where a wrap asks what may be _written_, and the two part
+  company on the shape that matters: a `(1)n` recalled from another channel plays a body the text
+  there does not contain. A trace of the parser's own `channel` and `inE6Loop` would answer it, at an
+  event per dispatch of a compile, where the palette answers on every keystroke.
+  `@amk/tokens/commands/loops` mirrors those two variables over
+  the token stream instead, which needs no compile at all; `[[` is told from `[` by adjacency because
+  that is the test `parseLoopStart` makes, and a hand-written `$E6 $00` pair counts as the subloop it
+  is.
+- **Starting a wrap's brackets at the first selected note** — honest about the selection and wrong
+  about the music. `[` copies the drum remap into slot 8 and the note there clears slot 8 alone
+  (`parser.ts:2725`, `:3013`), so a `@21` left outside the brackets is still standing when the loop
+  ends and hands the drum to the next note. The run reaches back over the note's own leading `o` and
+  `@` through `unitStartBefore`, which is the anchor every insertion in the roll already uses. It
+  reaches **forward** over a `$DD` for the mirror reason: the slide is read by the note in front of
+  it (`main.asm:L_10E4`), so a `]` written between the two puts the body's `$00` where the slide was.
+- **A repeat count on the loop box, or a wheel over its edge to step it** — the box's stroke is nine
+  pixels and already carries three gestures, and the count is one number in the text. A wrap leaves
+  it selected, which puts the loop inspector on the loop it just wrote with the **Repeats** field it
+  already has (`output/loop-inspector/`); an existing loop's count changes from that same field.
+- **A loop's Repeats field as a `LETTER_PARAMS` row on `]`** — a `ParamDescriptor` is bound to one
+  argument of one command, and three of the five spellings do not keep their count there. `]]4` is
+  two `]` commands with the count on the second, and `commandAt` is end-inclusive, so a caret on the
+  first bracket reaches the _note in front of it_ and the field was unreachable; a `$E6` carries one
+  less than the count it means, so the row would have read 3 for a subloop that plays 4; and a `(n)m`
+  raises no `Command` at all, `label` not being in `LETTER_COMMAND_KINDS`, so the panel said "nothing
+  at the caret" on the commonest recall in the language. The subject is the **construct**: `loopAt`
+  answers off the token stream for a bracket, a count, a label, a `*` and either `$E6` arm, and one
+  write path picks `spliceArg`, `insertAt` or `spliceRange` by what the spelling actually wrote.
+  `"["` left `letter-params.ts` with it — `parseLoopStart` never calls `getInt`, so digits after an
+  opening bracket are music and that row could never be filled.
+- **That construct drawn as a card _inside_ the command inspector** — additive over whatever else the
+  caret was on, which is the right reading of the subject and the wrong place for it: a loop is not a
+  command, so the panel that answers "what is under the cursor" was answering two questions at once,
+  and the card pushed a note's own parameters and its palette down the pane on every note of a
+  loop-heavy song. `output/loop-inspector/` is its own panel under that one, and it is **absent**
+  rather than empty when the caret is in no loop — a permanent "not in a loop" row is a cost every
+  song without one pays. The command inspector still stands its parameter table down for a caret on
+  a construct's own text (`loopAt`, not `loopFocus` — it needs to know only that the subject is a
+  loop) and says in one line where the count went, because "nothing at the caret" is untrue of a `]`.
+- **Reading that count off the digits in the source** — `countEnd` scans what is written, and
+  `[ c4 ]REP` with `"REP=4"` is written with no digits at all: the scan said "nothing, so 1" where
+  `gather`, which sees the expansion, said 4. The count comes off the `Command` wherever a spelling
+  gathers one, which is four of the five, and the digit scan survives only as the offset an absent
+  count would go at. That is also what gives the field `argEditable`'s per-part macro interlock for
+  free, instead of a `spliceRange` that would overwrite the use site.
+- **Making a `(n)m` a `Command` in `gather` instead** — the tidy-looking fix, and it moves far more
+  than it mends: `label` covers `(!n)`, `(!n,t,a)`, `(!!n)`, `("kick.brr",$02)` and `(@5,$02)` too,
+  `roll-strip.ts:discoverLoops` pairs `[`/`]` commands **by depth**, and `commandScope` would have to
+  learn a sixth structural kind — all so that one panel could ask a question `readLoops` was already
+  answering.
+- **The roll's loop hint read as a fact about the caret rather than as a redirection** — a press on a
+  box's edge leaves the caret on the body's _first note_, so a hint honoured wherever it was set
+  would go on answering about a pass clicked long ago. `EditorRequests.inspectingLoop` only ever
+  moves a construct `loopFocus` has already listed to the head of that list, and only while the caret
+  is inside the body it named. Matched on the **body span** and not on the label, because an
+  unlabelled `[ ]` recalled by a `*` has no name for `discoverLoops`'s reading and `readLoops`'s to
+  agree on; `palettetest` pins both directions, the hint honoured and a hint for another body ignored.
+- **A free number field for which loop a `(n)m` recalls** — `parseLabelLoop` refuses a label that is
+  not in `loopPointers` yet (AMK0115), `parseLoopStart` refuses a second declaration of one
+  (AMK0124), and `parseLabelLoop` refuses `n + 1 >= 0x10000` (AMK0114), so a number field would have
+  had to guard three errors to offer one useful value. It is a select over `loopTargets` — the
+  labelled bodies opened _above_ the call, which is `loopPointers`' own contents at that point in the
+  parse — and a `(!n)` is never among them: it would compile to a `$E9` into a body only a `$FC`
+  should reach.
+- **Renaming a loop from that same control** — the label is what every `(n)m` in the song names this
+  body by, so changing it points every one of them at a label nothing declares, silently and across
+  channels. A body with **no** name is offered one, which breaks nothing because nothing can be
+  calling it yet; a name already written is never touched.
+- **Keeping the palette's `*` button** — `*` takes `prevLoop`, the last `[` opened
+  (`parser.ts:parseStarLoop`, Music.cpp:1321), so what it plays is decided by where it is written and
+  by nothing a porter can point at, which is the one loop shape the roll cannot draw a handle for.
+  **Loop call** writes a `(n)m` naming the nearest loop declared above the caret — nearest because
+  that is what "again" means, and _above_ because `parseLoopStart` files `loopPointers` at the
+  opening bracket and a call below is AMK0115. A `*` already in a song still reads, still draws and
+  still edits, and its **Recalls** row is how it gets a name.
+- **The roll publishing its selection as strip indices** — an index means nothing outside the
+  component that built the strip, and the panel that wants it is in the output pane.
+  `EditorRequests.selectedRun` carries the **span** from the lowest selected unit to the highest,
+  which is the one currency every panel already speaks. By offset and not by strip index: a body's
+  items are a frame appended after the root's, so `Ctrl+A` over `c4 [ e4 ]2 d4` has its last index
+  inside the body while the run really ends at `d4`. Whether the run may take a bracket is
+  `wrapVerdict`'s question — it widens over a construct the run covers whole and refuses one the run
+  cuts through, `WRAP_SPLIT`, which is `REFUSE_SPLIT` reached by another route.
+- **The loop box's transpose planned in the grabbed body's frame alone** — a body's notes are its
+  frame's items and a loop written inside it is an opaque `'construct'` there, so
+  `[ c4 [[d4]]2 e4 ]3` dragged up moved `c4` and `e4` and left `d4` sitting under a box drawn round
+  it: `buildLoopRegions` grows a box to every note whose tick falls in the pass, so the handle's
+  picture and the gesture's reach disagreed with nothing to say so. The press takes the frames
+  written **inside** the one it grabbed (`framesInside`) and the gesture is planned once per frame
+  and committed once (`planFrames`, `planGroupEdits`) — the split `run()`'s delete already made, the
+  rule being not that a deletion is special but that an edit **moving no tick** may cross a bracket,
+  frames being disjoint text. By text span and not by a construct's body address: a `(n)m` written
+  inside a `[[ ]]` may recall a body declared outside it — `parseLabelLoop` refuses only
+  `channel === 8`, so it is out inside a `[ ]` and in inside a `[[ ]]` — and transposing that from
+  here would move music elsewhere in the song. The **pad** is the piece that belongs to the gesture
+  rather than to a frame: two frames each padding the other channels out to their own reach writes
+  the rest twice, `coalesce` running inside a plan and not across them, so it is priced once
+  (`planReach`) and only the frame reaching furthest writes it. `playsFor` cannot catch that — an
+  over-padded channel stops being the shortest and the song's figure does not move — so
+  `rolltest`'s `channelTicks` reads the padded voice's own count. And the costs are taken rather
+  than worked around: `selectedBodies` finds the inner body whole too, so both boxes close up solid,
+  and `selectedRun` is the whole group's text, which `wrapVerdict` reads as a run inside a loop
+  holding a subloop and refuses as `WRAP_DEEP`.
+- **The instrument picker normalising every pick to a plain `@n`** — the whole set is then always
+  available and one splice serves all three spellings, and it rewrites text the author chose: a
+  click on a dropdown turned `$DA $02` into `@2` and `@@5` into `@5`. Only the argument moves, in
+  that spelling's own numbering (`instrumentByte`), and an instrument the spelling cannot express is
+  not listed — so `@@` and `$DA` offer no drum, neither being able to write one, and `#am4`'s `$DA`
+  writes a custom instrument from `$13`. The map and its inverse live in one file so `edittest` can
+  round-trip them: a list built on one reading of the bands and a write built on another offers one
+  instrument and selects a different one, and nothing about the numbers on either side can see it.
+  Not labelled by the sample each instrument resolves to, either — the names are SRCN-indexed and
+  a song's own `#samples` moves them, where the number is what the source says. `@19` and `@20` are
+  not offered at all, emitting nothing; a caret already on one still shows it, through
+  `amk-enum-select`'s unknown-value option, which is what keeps the control from claiming the
+  document says something it does not.
+- **The loop join guarded by `holdsCommands` over the text between the two calls** — it reads
+  `strip.commands`, and the intro `/` is not one of them: `gather` raises no `Command` for an
+  operator (`tokens.ts:810`), which `prefixCommandsOf` already says out loud. So `[c4]2 / r4 *2`
+  closed and joined wrote `[c4]4 /` and moved the song's loop point by the grabbed occupation's
+  whole length, with every note still on its tick and nothing in the walk to say so — only
+  `loopTick` catches it, which is why `rolltest`'s case asks `loopsWhereItDid`. What may stand
+  between the two is asked of the **text**, which must be blank once the rests go; that also turns
+  away a `;` comment and a stray `o5` that would in fact have been harmless, and that is the trade,
+  since the safe set cannot be enumerated from a list the dangerous member is not in. The split
+  writes exactly `head first  r… head second`, so the round trip never meets the refusal.
+- **A `REFUSE_*` where the joined count passes 255** — every refusal in `roll-edit.ts` names music
+  the gesture cannot make, and this names a count that cannot be _written_: `(1)200 (1)100` is the
+  same music as the `(1)300` that has no spelling (`parser.ts:2492`, `:2792`, `:2836`, AMK0116),
+  and the pass has already moved exactly as far as the drag asked. It falls back to the plain
+  close. Not `closeBefore`'s reasoning either — `REFUSE_LOOP_LEAD_ROOM` refuses a **partial**
+  close, where this is a spelling laid on top of a complete one. A join is offered on no zero gap
+  for the mirror of that reason: with the two calls already touching the drag moves nothing, and a
+  gesture whose only visible effect is in the Source tab is worse than none.
+- **The joined count read off `passesAt().before`, or off the digits** — the first counts every
+  earlier pass of the body the voice plays, so `(1)[c4] (1)2 r4 (1)3` joined as `(1)6`; the partner
+  is the **nearest** sibling, which is the only reading whose tick arithmetic closes. The second is
+  the trap `loop-focus.ts` already records: `[ c4 ]REP` under `"REP=4"` has no digits, and a `*` or
+  a `]` at one pass has none either. Both halves come off `LoopRun.passes.length`, which is the
+  written count in any song that builds a strip — `walkSong` runs every channel to its own `$00`
+  and filters only `notes` at the pass cut, so a construct past the shortest channel is
+  `verified: false` with all its passes still there.
+- **The selected command's `Delete` falling through to the notes where the command cannot go** —
+  a `"name=value"` command's span is collapsed onto the call site, so `eraseCommand` answers `null`
+  and the branch would have handed the key on to the note selection: a press aimed at a chip that
+  is visibly outlined would silently delete five notes somewhere else. The key is taken whenever the
+  caret is on a command the roll draws — `inspectable`, the lane's `'song'` and the bars'
+  `'note-state'` scopes — and a command that cannot be removed does nothing. Not on `commandAtCaret`
+  alone: a note is a `Command` too and every click on a bar puts the caret on one, so an ungated
+  branch would splice the note's own text out in place of the delete gesture, and would take an `o`
+  or an `l` nothing on screen rings. It sits **ahead of the channel guard** for the reason the lane
+  picks no channel — it holds all eight and a `t` belongs to none of them — and it takes only the
+  first press of a held key: the caret lands where the command was and `commandAt` is end-inclusive,
+  so a repeat would take the neighbour nobody selected.
+- **`inspecting.set(null)` taken as the lane letting go of the selected note** — "the selected note"
+  is two things, and the lane owned only one of them: `EditorRequests.inspecting` is the occurrence
+  the inspector is describing, where the outlines in the roll are `gestures.selection()`, a set of
+  indices into a strip the lane has never seen. So `PIANOROLL.md` said a lane click let the note go
+  and the bars went on showing every one of them outlined, with `Delete` then ambiguous between the
+  command that had just been picked and eight notes still lit. The lane emits `commandPicked` and the
+  roll clears, in the mould of `RollNotes.channelPicked` — the selection is the roll's, as its
+  settings are. `RollNotes` emits the same output for the same reason; what the two do differently is
+  `inspecting`, the entry below.
+- **A bar's chip leaving its note outlined, so a commit from the panel had something to replay** —
+  it conflated two things that are not one. The outline is `gestures.selection()`, what a gesture
+  would act on; the replay reads `EditorRequests.inspecting`, which occurrence is being described.
+  Keeping the first to get the second put a note and a command on screen as subjects at once, with
+  `Delete` meaning one of them and nothing saying which. The chip clears the outlines and keeps
+  `inspecting`, so the commit is still heard; the lane clears both, having no note to describe.
+  Cleared on the **`click`** and never on the `pointerdown`, which is the whole reason a press and
+  hold on a chip still drags the note: the press is not taken there, so it reaches the gesture layer,
+  which captures the pointer past the slop and leaves no `click` to fire. The overflow dots are the
+  one plate exempt — they stand for a list rather than a command, so they have no handler at all and
+  the click falls through to the bar, which selects that note.
+- **The bar's selection ring in the lane's `stroke-ink`, the way the lane draws it** — sound in the
+  lane, where nothing wears the inverted plate, and invisible on half the chips of a bar, where a
+  defining one does: a near-white ring round a near-white plate is the same value as the thing it is
+  drawn around, and reads as the plate being a pixel bigger rather than as a selection. Moving it
+  clear of the plate is no answer either — the chips are packed within a few pixels of each other, so
+  the ring would meet its neighbour's. It takes the **pair of colours the plate already uses**, which
+  is the axis `roll-notes.html` settled on for the icon: `stroke-surface` over a defining plate,
+  `stroke-ink` where there is none, so the ring reads against whatever is behind it on all eight
+  channels. Drawn over the plate rather than under it, for the same reason.
+- **Ringing a bar's `more` dots when the selected command is one they stand for** — the plate
+  already inverts on those terms and the symmetry is inviting, but `defining` is a property of the
+  list where a ring is a claim about one command, and the dots stand for commands the bar has no
+  room to show: an outline round them says "it is here" about something that is not drawn. It is
+  also the one mark with no handler and no span to reveal, so the ring would point at nothing
+  clickable. `MarkGlyph.command` rings the glyphs that are drawn, and the lane, where every command
+  appears, is where one behind the dots is found.
+- **A note's Length row as a `ParamDescriptor` over `command.args`** — a descriptor is bound to one
+  argument of one command, and a note's length is not always in an argument: `c` under a standing
+  `l8` writes no digits at all, so `resolveCommand` built no rows and the inspector said "this
+  command takes no arguments" about a note plainly 24 ticks long — which is the commonest way a song
+  is written, one `l` at the head of each channel and bare notes under it. `c^8` writes one number
+  for two segments, so row 0 was labelled `Length`, bound to the tie's `8` and described from the
+  head's implied length; and `c0` writes one `getNoteLength` throws away. The subject is the
+  **segment**, which `NoteLengthSegment` already is, and `note-length/length-rows.ts` is where the
+  eleven spellings are told apart and each one's splice chosen — `insertAt` where no digits were
+  written, `spliceRange` over the digits alone where they were. The digits and nothing else, because
+  a segment's dots compose rather than add (`Music.cpp:2950`): the number that keeps `l8 c.` at 36
+  ticks is `8`, and a span reaching over the dot would write the 4 that 36 ticks is without one.
+  `denominatorFor` is what makes that safe in the other direction — it answers only an `n` that,
+  written, reproduces the length the segment already plays, and `null` where none does, which is a
+  dotted or exact `l` and an `=NN` on the note. Not a per-row write target on `ParamRow` either: the
+  generic table is one loop over `command.args` and a note-shaped exception in it would be paid for
+  by all sixty commands.
+- **Taking the digits back out when a slider lands on the `l`'s own value** — it reads as tidy and
+  it is a trapdoor: the note would go back to answering an `l` edited later, so a length the porter
+  had chosen by ear would move on its own the next time the default did. Digits are written and
+  never removed; `c8` under an `l8` is a note that has been given a length of its own.
+- **Dropping the roll's selection on every change to the document, and again in every commit** — it
+  is a set of indices into a `Strip`, and the strip is rebuilt from text the roll may not have
+  written, so clearing was the only answer that could not be wrong. It made the inspector unusable
+  on a note: the Length slider commits, the document changes, and the note the panel is answering
+  about loses its outline in the roll beside it — and the roll's own resize cleared twice over, once
+  at the commit and once at the change that commit caused. The **document change** is the one place
+  it is decided (`sourceChanged`), and no commit clears any more, which is also what lets an outline
+  stand through the compile the roll spends with no strip at all. A panel's splice rewrites one
+  command's own text and adds and removes no item, so the indices still name their notes
+  (`EditBatch.keepsNotes`, which the lane's own command writes claim too, counted by the **view** in
+  `dispatchBatch` because a batch whose `expect` has gone stale is dropped in silence and a count
+  taken where the batch was asked for would run ahead of the document — and the loop inspector's
+  Recalls is the one panel commit that says no, the body a call plays being part of the calling
+  channel's strip); a gesture leaves
+  anchors saying where each note went — its frame, and its place among that frame's notes
+  (`plannedOrdinals`, `roll-selection.ts`), which within a frame is text order and tick order at
+  once and is what `planEdits` writes in. Every note the selection named and the plan still carries,
+  not only `touched`: a stretch pushes its neighbours, and one of those the porter had hold of is
+  still theirs. Not the tick, which a length change moves for every note after it, so a group would
+  lose everything past the one edited; not the address, which every byte written before it moves —
+  `emitNote` drops a repeated duration byte, so writing a length shifts the rest of the channel; not
+  a source offset mapped through the splices, since `growUnits` widens a unit over the very `o` a
+  commit inserts at a note's head and a note carried past a neighbour has no offset to map at all,
+  `crossings` lifting it out of the text and writing it back on the far side. The pitch is confirmed
+  on the way back in rather than trusted, so the worst a wrong claim can do is take an outline off —
+  by the `@` alone for a drum, whose letter says nothing and whose drawn form is handed the row's
+  own `c`. The loop box's gap and resize carry none: neither goes through a `Plan`, and `resizeLoop`
+  moves the brackets, so notes cross into and out of the body. And `selectedSpans` is **held** across
+  the recompile rather than emptied, in the mould of the clock measurement — the bars drawn for that
+  whole compile are the last one's, so the last one's addresses are the ones that outline them.
+- **The channel mixer and the roll's picker naming their channels without tinting them**, so that
+  `--color-ch-*` lived in the roll's marks and the minimap alone — it made the two controls that
+  name a channel the two pictures that would not show its colour, and matching a note seen in the
+  roll to the chip that edits it or the buttons that silence it meant reading a digit off eight
+  identical grey plates. Both wear the channel's own colour now, from the literal `bg-ch-*` names
+  spelled out for the reason `CHANNEL_FILL` gives, with `text-ink` over it because that is what the
+  roll's own bars label themselves in on those same eight grounds. The rule the old shape was
+  protecting is untouched: the number stays, a silenced channel is still struck through, and the
+  eight still do not clear the all-pairs separation gate. What the fill can no longer say is which
+  chip is being **edited**, and that is a near-white ring rather than a dimming of the other seven:
+  dimming is what a silenced channel already means, and it would have said a channel was inaudible
+  for not being edited. The solo's own ring is not a blue either — a mid blue disappears into
+  `--color-ch-0` and `--color-ch-6` — so it is a dark ring against the
+  edited one's light, which is the lightness axis the eight leave free and the same one the roll's
+  glyph plates are told apart on. It yields to the edited chip where one is both — an element has
+  one ring, and a solo says itself anyway, being the channel the strike-through has left alone.
+- **The palette's class names living in `piano-roll/roll-metrics.ts`** — the mixer is not part of
+  the roll, so it would have had to reach into it or keep a second copy of `bg-ch-*` under the same
+  name, and a chip that disagreed with a bar about which blue channel 0 is would be worse than no
+  colour at all. `util/channel-palette.ts` is the one home for all five arrays; `roll-metrics.ts`
+  keeps the geometry and the two muted opacities, which are the roll's own.
+- **Routing a drawn note's frame off `StripFrame.runs` whole** — a frame carries **every** voice's
+  runs of its body on purpose (`discoverLoops`), because a body declared on one channel and recalled
+  from another moves both voices when its length changes, and `shiftBoundariesFor`, `framePasses`
+  and `planReach` all read them to say so. A press is the one reader they are wrong for: with a body
+  declared in `#3` and recalled in `#4`, `frameAt` found `#3`'s pass over ticks `#4` was nowhere
+  near, so a note drawn on channel 4 was written between `#3`'s brackets and played on every pass of
+  both voices — and the channel-3 box grew round it while the pointer was down, `BodyRows` being
+  keyed by body. It filters on `strip.channel`, as `firstPassOn` and `passesAt` already do, which
+  also puts it back in step with `StripItem.instances`: `expandAndJoin` fills those from this
+  channel's runs alone, so `itemAt` and `constructFor` were already channel-correct while `frameAt`
+  was not. In `roll-edit.ts` for `shiftBoundariesFor`'s reason — a harness cannot drive an Angular
+  composable, and `rolltest`'s `planFor` took a gesture's frame from its first item, which a `spawn`
+  has not got, so every draw case ran in the root frame and `frameAt` was never executed at all.
+- **Dealing the roll's marks into shift buckets from the press** — `shiftBoundaries` answered off the
+  held frame alone, so a press on a note inside a `[ ]` body raised the boundaries before anything
+  had moved and `RollNotes.buckets` re-parented every bar past the body's first pass end into a
+  bucket `<g>` of its own. A bar re-parented while the button is down is destroyed before the
+  release, and the browser raises no `click` on a node that has gone: a click on any pass of a loop
+  but the first never reached `roll-notes.ts:select`, so the inspector's question and the double
+  click's go-to were both lost — silently, and with the ring and the caret still moving, since
+  `onPointerUp` sets the selection itself and `askAboutSelection` answers off that. The deal waits
+  for `underWay`, the three things `shownPlans` is already drawn on, whose transition is the slop:
+  the pointer is captured there and there is no click left to protect, and it never goes back down
+  within a gesture, so the boundaries are still dealt once per gesture. Not a guard on the delta
+  instead — it flips back at every zero crossing of a length drag, and a re-deal is a rebuild of
+  every bar on screen.
+- **A lane glyph clearing `inspecting`, as naming a command of the song rather than a note of it**
+  — true of what the glyph is and wrong about what a commit from its panel should sound: a `v`
+  picked there previewed nothing, where the same `v` picked off a bar's chip replayed the bar's
+  note. The lane points `inspecting` at the note the command is **heard on** (`noteHeardOn`): the
+  first on its channel, still sounding at the tick or beginning after it, whose commands in force
+  hold it — the bar that would draw it as a chip, which reaches back to the note a `$DD` rides and
+  steps over one a command was read inside a tie of; a `'song'` command, which no bar draws, takes
+  the next note to begin. Off `commandsInForce` and not off the tick alone, so the lane and the
+  bars cannot name different notes for one command; `walktest` pins the seven shapes.
+- **A Normalize button, and the parse trace and walk-comparison oracle behind it** — eight
+  text-to-text passes over a trace of the parser's state at every dispatch, each result compiled,
+  walked and compared against the walk of the original before the document was touched, offered on
+  both toolbars and beside every refusal in the roll. It was written to make a song editable in the
+  piano roll, and the roll went the other way: it took loops over in place, reads a note's octave
+  off its own byte and its length off its own text, and no roll code ever read the trace or the
+  oracle. What was left was four refusals it could clear — `&`, `"name=value"`, `{ }` and music
+  above the first `#N` — for some 2,800 lines, a trace the parser gathered on request, and a button
+  standing beside a dozen refusals it could not clear. The roll edits the song as written and says
+  what it refuses; the parser records the command map and nothing else. `SST06xx` is retired with
+  it — a new editor-side diagnostic takes the next band, not this one.
+- **The theme's default colours written a second time in TypeScript**, beside the `@theme` block
+  they came from — two sources of truth for one set of colours, and the first edit to either would
+  have moved them apart with nothing to notice. `readDefaults` reads them off the document with
+  `getComputedStyle` at construction, before the store's own effect has written anything: a
+  stylesheet is render-blocking, so it is parsed before Angular bootstraps, and an unregistered
+  custom property comes back as it was authored rather than computed. `styles.css` stays the one
+  definition, and `@theme static` is what guarantees all of them reach `:root` — Tailwind emits a
+  theme variable only where something uses it, and a reset is `removeProperty`, so a token no
+  utility happens to name still needs its default sitting there to fall back to.
+- **Storing the whole palette rather than only what was changed** — it reads as the simpler shape
+  and it freezes a porter on the defaults of the day they first opened the picker: change one
+  colour, and the other twenty-four stop following the app for good. `ThemeStore.overrides` holds
+  only the tokens moved off a default, which is also what makes a per-token reset exact rather than
+  approximate — the property is removed and whatever `styles.css` now says shows through.
+- **Re-hueing the eight channels for a preset's chrome** — the set is validated once, against the
+  default `--color-surface` `#1e272e`, and every shipped preset's surface is darker than that
+  (Graphite `#191919`, Midnight `#16181d`, Contrast `#0a0a0a`, Warm grey `#1a1918`), so under each
+  of them every channel's contrast only rises and the worst pair stays above 3:1. The one direction
+  that would need re-validating is a **lighter** default, and `#1f282f` is where ch-5 crosses 3:1.
+- **The controls painted in `--color-accent`** — a primary button's plate, a checked box, a slider's
+  fill and every toggle were the same token as the playhead, the lit keys, the caret and a syntax
+  keyword, so there was no way to recolour the chrome without taking the roll's own markers with it.
+  `--color-control` is its own token, and `primary` is told from `default` by weight and a tint of
+  it — `bg-control/15`, a `border-control/60`, a medium label — rather than by a hue of its own.
+  `danger` keeps its hue, saying something the shape of a button cannot. The focus ring stays on the
+  accent: it is an affordance rather than a decoration, and it is the one place the music's colour
+  reaches the chrome.
+- **The source view's colouring drawn from the app's palette** — twelve tags in `TOKEN_TAGS` sharing
+  eight shared tokens, so re-colouring the notes moved the body text with them and re-colouring the
+  loop brackets moved every severe warning, and the one surface a porter looks at for hours could
+  not be touched without disturbing the chrome. `--color-syn-*` is one token per tag, shared with
+  nothing, defaulting to what the shared tokens used to give so the source reads as it did. The
+  editor's _structure_ stays on the app's palette on purpose — a gutter, a tooltip, the caret and a
+  diagnostic's underline are chrome and findings rather than MML, and a porter re-colouring their
+  notes is not asking for a different error underline.
+- **A preview folded into the stored overrides** — `<input type="color">` reports every step of a
+  drag through the operating system's picker on `input`, so that is a synchronous `localStorage`
+  write per frame of a drag. `ThemeStore.previewing` is a transient signal laid over the stored one,
+  which is the `preview`/`commit` split `Slider` and `NumberField` already make.
+- **The view tabs in the editor panel's header, with the development notice beside them** — a
+  header that is a tab strip and a warning at once says two things in one row, and the notice was
+  the one thing on it that no view owned. The pane opens with a tab row of its own (`amk-tabs`, each
+  `TabDef` carrying its icon and whether it sits `aside`), Samples set apart on the right because it
+  is a library and not a view of the song, and the notice is the status bar's, beside the compile
+  status it belongs with.
+- **Hot Reload, Loop and Follow playback as checkboxes** — a checkbox is a form field, a value
+  waiting to be submitted, and each of these is a mode the transport or the roll is in. They are
+  `amk-toggle`s, a button whose lit plate is the state, as Scroll the notes, All octaves, word wrap
+  and Percussion are; the project ships no ARIA, so the plate is the whole of what says which state
+  a toggle is in.
+- **The compile status in the output panel's header** — it took the one line that could name what
+  the pane holds, so the sidebar could not say it was the Inspector. The status bar holds it
+  (`status-bar/`), with the problems count beside it, and the sidebar's headers name their sections.
+- **The sidebar ordered stats, ARAM, diagnostics, inspector, hex dump** — the inspector is what a
+  porter edits with, and it sat under three sections read once a session, so on a short pane it was
+  off the bottom on every click in the source. It is the **Inspector** section first, the command
+  inspector with the loop inspector under it; **Build** — stats, the ARAM budget, the hex dump — is
+  collapsible under that; and **Problems** is pinned below the scroll column with a count badge,
+  because a diagnostic has to stay in view whatever height the inspector takes.
+- **The sidebar's sections as native `<details>`** — an element that opens on its own click and
+  tells nothing about it, so the ARAM meter in the top bar and the problems count in the status bar
+  had no way to open the section they point at. `amk-section` carries `open` as a model, persisted
+  per section (`solar-soundtrack.build`, `solar-soundtrack.problems`), and
+  `EditorRequests.revealSection` is the request: the pane opens the section, unfolds the drawer,
+  scrolls to it and puts the signal back to `null`, so the same section can be asked for twice.
+- **The two panes stacked below `lg` with no seam between them** — a sidebar at its content height
+  under the editor pushed the editor off a tablet's screen, and nothing on it could be made shorter.
+  Below `lg` the sidebar is a drawer (`solar-soundtrack.drawer`, `solar-soundtrack.drawer-collapsed`):
+  a row-resize seam over it in the column splitter's mould, and a fold that takes it down to its
+  header, so the editor keeps the screen and the sidebar is a pull away.
+- **`--color-control` a neutral grey** — a chrome with no hue at all reads as unfinished rather
+  than as calm, and the reason the token is separate from `--color-accent` never needed it to be
+  grey. It is a steel blue a step lighter than the chrome (`#7ea6c4`), so a button reads as the
+  toolbar's own material; the accent is the orange (`#ffa53a`) and still means one thing, _this is
+  where the music is_ — the playhead, the lit keys, the caret and the focus ring.
+- **The default surface at `#191919`** — a neutral grey ground and the four greys around it. The
+  default is the Studio blue-grey, in the mould of the DAW the editor's interactions are drawn from —
+  `surface #1e272e`, `raised #2f3c45`, `inset #171f25`, `edge #42525c` — and it carries a ceiling:
+  the eight channels are validated against `#1e272e`, ch-5 crosses 3:1 above `#1f282f`, and the
+  default may not be lighter than that without re-validating the set. The grey is the Graphite
+  preset, a snapshot of the fourteen tokens it moves.
+- **The mixer's solo `S` lit on `bg-control/25`** — considered and refused for the reason the
+  picker's solo ring is not a blue: the control blue is a mid blue, and a mid blue vanishes on
+  `--color-ch-0` and `--color-ch-6`. A lit `S` takes the channel's own colour, the one ground it is
+  certain to be seen against, and the strip's number is what names the channel either way.
+- **The theme picker and the changelog each carrying a trigger, a panel, `Escape` and the
+  outside-press close of their own** — two copies of one drop-down, and the second edit to either
+  would have moved them apart. `shared/popover/` is the one: a ghost icon trigger, a heading, a
+  scrolling body and a footer row that hides itself when nothing is projected into it. The two
+  components project their icon and their content and keep only what is theirs — the picker its
+  rows and its import, the changelog its entries.
+- **The roll toolbar's readout line** — `editing: #0 · tick 7,534 of 14,592 · t55 · 109.4 ticks/s ·
+3,468 notes`, rewritten twice a second while playing. It said five things in one place, four of
+  which were not the roll's: the channel is what the corner picker already shows, the note count is
+  a fact about the song and sits in the status bar whatever view is up, and the tick is the
+  transport's, whose clock well shows either m:ss or `tick N / M` and flips on a click
+  (`solar-soundtrack.clock`). The tick face runs on the roll's own display clock (`rollClock`) at
+  frame rate rather than on a half-second sample, so the number and the line it stands for cannot
+  disagree, and `slowTick` went with the readout. The tempo and the tick rate are the status bar's
+  too, read at the playhead — the driver's tempo while it plays and the walk's last `t` otherwise —
+  so a song the driver cannot keep up with says `231.9 of 498.0 ticks/s` from any view. What stays
+  on the toolbar is what only the roll can say: how many notes are selected, and why a channel or a
+  gesture was refused.
 
 ## Angular specifics
 
 Angular 22, zoneless (scaffolded `--zoneless`, so zone.js is not a dependency and there is nothing
 to opt into), no router, no NgModules. Signals throughout: `signal`/`computed` for state, `effect`
 reserved for mirroring into imperative sinks (localStorage, the player, the DSP). State lives in
-nine `@Service()` singletons in `web/src/app/state/`. The spine runs one way, `DriverStore` →
+ten `@Service()` singletons in `web/src/app/state/`. The spine runs one way, `DriverStore` →
 `SampleStore` → `EditorStore` → `Playback`; `ClockMeasurer` feeds `EditorStore`, `Audition` hangs
-off it beside `Playback`, `Mixer` hangs off it and is read by both of those and by the roll,
-`EditorRequests` depends on nothing at all, and `CommitAudition` is the command inspector's write
-path over `EditorRequests` and `Audition` — a panel's commit replays the selected note once its
-compile lands. `web/README.md` has the rest.
+off it beside `Playback`, `Mixer` hangs off it and is read by both of those and by the roll, and
+`CommitAudition` is the command inspector's write path over `EditorRequests` and `Audition` — a
+panel's commit replays the selected note once its compile lands. `EditorRequests` and `ThemeStore`
+depend on nothing at all, and nothing depends on the second either: it puts the porter's colours on
+`<html>` as inline custom properties, and everything downstream reads those as CSS rather than
+asking the service. `web/README.md` has the rest.
 
 Selector prefix is `amk` — `amk-root`, `amk-editor-pane` for components, camelCase `amk*` for
 directives. ESLint enforces both.
@@ -1163,11 +1465,22 @@ directives. ESLint enforces both.
 Styling is Tailwind v4, with the entire theme as CSS variables in `web/src/styles.css` (v4 has no
 `tailwind.config.js`). Dark-only on purpose. Two **validated categorical sets** live there —
 `--color-seg-*` for the ARAM bar and `--color-ch-*` for the eight music channels — and neither may be
-reordered or re-hued without re-validating, since adjacent-pair CVD separation and contrast against
-`--color-surface` are the properties being preserved. The order is the mechanism, not decoration: it
-is what the adjacent-pair check runs against. `--color-ch-*` does not clear the all-pairs gate and no
-set of eight can, so nothing may leave channel identity to colour alone; `styles.css` says what
-carries it instead.
+reordered or re-hued **in that file** without re-validating, since adjacent-pair CVD separation and
+contrast against `--color-surface` are the properties being preserved. The order is the mechanism,
+not decoration: it is what the adjacent-pair check runs against. The ground is part of the
+validation too: both sets are validated against `--color-surface` at `#1e272e`, every check passing
+and the worst contrast at ch-5 (3.07:1), and the eight drop below 3:1 above `#1f282f`, so the
+default surface may not be lighter than that without re-validating. `--color-ch-*` does not clear
+the all-pairs gate and no set of eight can, so nothing may leave channel identity to colour alone;
+`styles.css` says what carries it instead.
+
+Those values are **defaults**, and `ThemeStore` lets a porter override any of them — the eight
+channels included — from the top bar's picker. That is not a hole in the paragraph above, it is what
+the paragraph's last sentence buys: the app never said anything with a channel's colour that it was
+not also saying with a number, a tooltip or a strike-through, so a porter putting two channels on
+one hue loses a convenience and breaks no claim. What still has to be re-validated is a change to
+the defaults themselves, which is the set every porter starts from. A preset in
+`theme-presets.ts` is held to the same bar and none of the shipped five touch the eight.
 
 Framework-generic Angular 22 conventions (signal APIs, `@Service()`, host bindings, control flow)
 live in `web/.claude/CLAUDE.md`, which the Angular CLI generated via `--ai-config=claude` and can

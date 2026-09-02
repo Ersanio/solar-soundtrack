@@ -1,0 +1,68 @@
+<amk-popover heading="Theme" title="Theme">
+  <amk-icon-palette popoverIcon />
+
+  <h3 class="text-ink-muted text-xs font-semibold tracking-wide uppercase">Presets</h3>
+  <div class="mt-1.5 grid grid-cols-2 gap-1.5">
+    @for (item of presetButtons(); track item.preset.id) {
+      <button
+        type="button"
+        [class]="item.class"
+        [class.border-ink]="item.active"
+        [title]="item.preset.note"
+        (click)="usePreset(item.preset)"
+      >
+        <span class="flex gap-0.5">
+          @for (swatch of item.swatches; track $index) {
+            <span
+              class="border-edge size-3 rounded-[2px] border"
+              [style.background-color]="swatch"
+            ></span>
+          }
+        </span>
+        <span class="text-ink truncate text-[11px]">{{ item.preset.name }}</span>
+      </button>
+    }
+  </div>
+
+  @for (group of groups(); track group.id) {
+    <h3 class="text-ink-muted mt-4 text-xs font-semibold tracking-wide uppercase">
+      {{ group.label }}
+    </h3>
+    <div class="mt-1.5 flex flex-col gap-1.5">
+      @for (row of group.rows; track row.name) {
+        <amk-color-field
+          [label]="row.label"
+          [hint]="row.hint"
+          [value]="row.value"
+          [overridden]="row.overridden"
+          (preview)="theme.preview(row.name, $event)"
+          (commit)="theme.set(row.name, $event)"
+          (cleared)="theme.reset(row.name)"
+        />
+      }
+    </div>
+  }
+
+  <h3 class="text-ink-muted mt-4 text-xs font-semibold tracking-wide uppercase">
+    Save or paste a theme
+  </h3>
+  <p class="text-ink-muted mt-1 text-[11px] leading-snug">
+    Only the colours you have changed. Paste one here to take it on.
+  </p>
+  <textarea
+    rows="4"
+    spellcheck="false"
+    class="bg-inset border-edge text-ink mt-1.5 w-full resize-y rounded-sm border px-1.5 py-1 font-mono text-[11px]"
+    [value]="exported()"
+    (change)="onImport($event)"
+  ></textarea>
+  @if (importFailed()) {
+    <p class="text-danger mt-1 text-[11px] leading-snug">
+      That is not a theme — nothing was changed.
+    </p>
+  }
+
+  <button popoverFooter amk-button size="sm" [disabled]="!theme.customised()" (click)="resetAll()">
+    Reset all
+  </button>
+</amk-popover>

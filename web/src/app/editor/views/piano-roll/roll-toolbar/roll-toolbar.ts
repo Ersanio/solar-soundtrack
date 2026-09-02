@@ -1,13 +1,13 @@
-import { Component, computed, inject, input, output } from '@angular/core';
+import { Component, computed, input, output } from '@angular/core';
 
-import { ticksPerSecond } from '@amk/tokens/commands/units';
-import { Checkbox } from '../../../../shared/checkbox/checkbox';
+import { Button } from '../../../../shared/button/button';
+import { IconChevronDown } from '../../../../shared/icons/icon-chevron-down';
+import { IconChevronRight } from '../../../../shared/icons/icon-chevron-right';
+import { IconMinus } from '../../../../shared/icons/icon-minus';
+import { IconPlus } from '../../../../shared/icons/icon-plus';
+import { Toggle } from '../../../../shared/toggle/toggle';
 import { Toolbar } from '../../../../shared/toolbar/toolbar';
-import { EditorStore } from '../../../../state/editor-store';
-import { Playback } from '../../../../state/playback';
-import { ticksPerSecondAt } from '../../../../state/song-clock';
 import { HistoryButtons } from '../../../history-buttons/history-buttons';
-import { NormalizeButton } from '../../../normalize-button/normalize-button';
 import { EDIT_MODES, type EditMode } from '../roll-edit';
 import {
   BEAT_UNITS,
@@ -32,35 +32,34 @@ import {
  */
 @Component({
   selector: 'amk-roll-toolbar',
-  imports: [Checkbox, HistoryButtons, NormalizeButton, Toolbar],
+  imports: [
+    Button,
+    Toggle,
+    IconMinus,
+    IconPlus,
+    IconChevronDown,
+    IconChevronRight,
+    HistoryButtons,
+    Toolbar,
+  ],
   templateUrl: './roll-toolbar.html',
   host: { class: 'contents' },
 })
 export class RollToolbar {
-  private readonly editor = inject(EditorStore);
-  private readonly playback = inject(Playback);
-
   readonly follow = input.required<boolean>();
   readonly scrollNotes = input.required<boolean>();
   readonly allOctaves = input.required<boolean>();
   readonly beatsPerBar = input.required<number>();
   readonly beatUnit = input.required<number>();
   readonly percussionOpen = input.required<boolean>();
-  readonly commandLaneOpen = input.required<boolean>();
   readonly snap = input.required<SnapName>();
   readonly editMode = input.required<EditMode>();
   /** Why the picked channel cannot be edited, or null when it can. */
   readonly editRefusal = input.required<string | null>();
   /** Why the last gesture was not written out, or null when it was. */
   readonly gestureRefusal = input.required<string | null>();
-  /** Whether a rewrite of that channel is the answer to the refusal. */
-  readonly normalizable = input.required<boolean>();
-  /** How many notes are selected, for the readout. */
+  /** How many notes are selected. */
   readonly selected = input.required<number>();
-  /** The channel the corner's picker has selected, or null when none is. */
-  readonly editChannel = input.required<number | null>();
-  /** The tick the readout reports, which the parent takes slowly while playing. */
-  readonly tick = input.required<number>();
 
   readonly zoomBy = output<number>();
   readonly rowHeightBy = output<number>();
@@ -70,7 +69,6 @@ export class RollToolbar {
   readonly beatsPerBarChange = output<number>();
   readonly beatUnitChange = output<number>();
   readonly percussionOpenChange = output<boolean>();
-  readonly commandLaneOpenChange = output<boolean>();
   readonly snapChange = output<SnapName>();
   readonly editModeChange = output<EditMode>();
 
@@ -100,51 +98,12 @@ export class RollToolbar {
   };
 
   /**
-   * Which channel the picker has selected, named in the roll's own terms.
-   *
-   * Nothing acts on the selection yet, so this is how it is read at all. Its own
-   * label rather than a part of {@link readout}, since the two answer different
-   * questions and one of them is scaffolding.
+   * How many notes are selected, said only while any are. Which channel is
+   * being edited is the corner picker's to say, and the rings say which notes.
    */
-  protected readonly editLabel = computed(() => {
-    const channel = this.editChannel();
-    if (channel === null) {
-      return 'editing: none';
-    }
-
+  protected readonly selectedLabel = computed(() => {
     const selected = this.selected();
-    const chosen = selected > 0 ? ` · ${selected} selected` : '';
-    return `editing: #${channel}${chosen}`;
-  });
-
-  protected readonly readout = computed(() => {
-    const song = this.editor.timeline();
-    if (!song) {
-      return 'no song';
-    }
-
-    const driver = this.playback.driver();
-    // `DriverState.tempo` is `$51`, one higher than `t`.
-    const tempo = driver && driver.tempo > 0 ? driver.tempo - 1 : 0;
-    const tick = this.tick();
-    const parts = [`tick ${Math.round(tick).toLocaleString()} of ${song.ticks.toLocaleString()}`];
-    if (tempo > 0) {
-      // The rate the song is *getting*, which on a busy one is not the rate the
-      // tempo byte asks for — the driver runs at most one tick per pass of its
-      // main loop. Both are shown when they part company by enough to matter,
-      // since "t254 · 231 ticks/s" on its own reads like a bug in the readout.
-      const clock = this.editor.clock();
-      const asked = ticksPerSecond(tempo);
-      const got = clock ? ticksPerSecondAt(clock, tick) : asked;
-      const rate =
-        got > 0 && got < asked * 0.95
-          ? `${got.toFixed(1)} of ${asked.toFixed(1)} ticks/s`
-          : `${asked.toFixed(1)} ticks/s`;
-      parts.push(`t${tempo} · ${rate}`);
-    }
-
-    parts.push(`${song.notes.length.toLocaleString()} notes`);
-    return parts.join(' · ');
+    return selected > 0 ? `${selected.toLocaleString()} selected` : null;
   });
 
   /**

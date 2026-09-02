@@ -1,5 +1,6 @@
 import { Component, computed, inject, input, output } from '@angular/core';
 
+import type { Command } from '@amk/tokens';
 import { CommandIcon } from '../../../command-palette/command-icon';
 import { EditorRequests } from '../../../../state/editor-requests';
 import { EditorStore } from '../../../../state/editor-store';
@@ -50,6 +51,17 @@ export class RollNotes {
    * them to. By address, as {@link selected} is.
    */
   readonly moving = input.required<ReadonlySet<number>>();
+
+  /**
+   * The command the inspector is answering about, which every chip standing for
+   * it is rung with — the one the lane rings, so a click on a chip lights the
+   * chip that was clicked and not only a glyph somewhere else on screen.
+   *
+   * Every bar it acts on, inherited chips included: one written command is one
+   * command wherever it acts, which is the reading the lane takes for
+   * `[[ v100 v200 ]]2`. Compared by identity, `MarkGlyph.command` says why.
+   */
+  readonly inspected = input.required<Command | null>();
 
   /**
    * The edited body's pass ends per voice while a loop gesture is held, or
@@ -128,6 +140,14 @@ export class RollNotes {
   readonly channelPicked = output<number>();
 
   /**
+   * A command was picked on a bar, so the roll should let go of its notes.
+   *
+   * An output for the reason {@link channelPicked} is one: the selection is a
+   * set of indices into the roll's own strip, which this does not have.
+   */
+  readonly commandPicked = output<void>();
+
+  /**
    * Whether the editor still shows the text that compiled.
    *
    * Everything joined back to the source takes this test. A boolean rather than
@@ -170,10 +190,25 @@ export class RollNotes {
   /**
    * A glyph is its own target: the command it stands for, not the note under it.
    *
-   * The bar it is drawn on still speaks — a glyph names the same channel the
-   * bar does, and the bar's note becomes the selected one, so a value committed
-   * from the panel replays the note the glyph stands on. Both have to be said
-   * here because the bar's own handler never runs for a glyph.
+   * The bar it is drawn on still speaks — a glyph names the same channel the bar
+   * does, and the bar's note is the occurrence the inspector describes, so a
+   * value committed from the panel replays the note the glyph stands on. Both
+   * have to be said here because the bar's own handler never runs for a glyph.
+   *
+   * What it does **not** leave behind is a selection. The press underneath has
+   * already outlined the bar, and a note outlined beside a command that has just
+   * been picked is two subjects at once, with `Delete` meaning one of them and
+   * nothing on screen saying which. `inspecting` is not the same thing and stays:
+   * it is which occurrence is being described, not what a gesture would act on.
+   *
+   * On the `click`, which is the whole reason a drag off a glyph still works: the
+   * press is never taken here, so it reaches the roll's own gesture layer, and a
+   * press that passes the slop is captured there and raises no `click` at all.
+   *
+   * The overflow mark runs none of this. It stands for a list rather than a
+   * command, so it has no span to reveal and no handler; the click it does not
+   * stop reaches the bar, which selects that note and answers with the whole
+   * list — which is the one place a glyph plate leaves a note selected.
    */
   protected inspect(mark: Mark, glyph: MarkGlyph, event: Event, show = false): void {
     // Without this the bar underneath answers as well, and the note would win.
@@ -182,7 +217,8 @@ export class RollNotes {
 
     if (this.inSync()) {
       this.requests.inspecting.set({ address: mark.note.address, tick: mark.note.tick });
-      this.requests.reveal.set({ span: { ...glyph.span }, show });
+      this.commandPicked.emit();
+      this.requests.reveal.set({ span: { ...glyph.command.span }, show });
     }
   }
 }

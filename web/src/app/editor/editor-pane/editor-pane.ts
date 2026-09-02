@@ -1,6 +1,8 @@
 import { Component, effect, signal } from '@angular/core';
 
-import { Panel } from '../../shared/panel/panel';
+import { IconRoll } from '../../shared/icons/icon-roll';
+import { IconSamples } from '../../shared/icons/icon-samples';
+import { IconSource } from '../../shared/icons/icon-source';
 import { type TabDef, Tabs } from '../../shared/tabs/tabs';
 import { ChannelMixer } from '../channel-mixer/channel-mixer';
 import { PianoRoll } from '../views/piano-roll/piano-roll';
@@ -13,9 +15,9 @@ type ViewId = 'source' | 'samples' | 'roll';
 const VIEW_KEY = 'solar-soundtrack.view';
 
 const VIEWS: readonly TabDef<ViewId>[] = [
-  { id: 'source', label: 'Source' },
-  { id: 'samples', label: 'Samples' },
-  { id: 'roll', label: 'Piano Roll' },
+  { id: 'source', label: 'Source', icon: IconSource },
+  { id: 'roll', label: 'Piano roll', icon: IconRoll },
+  { id: 'samples', label: 'Samples', icon: IconSamples, aside: true },
 ];
 
 /** The stored view, or the one the pane opens on when there is none. */
@@ -36,11 +38,11 @@ function readView(): ViewId {
  * else: each view brings its own controls in an `amk-toolbar` of its own, since
  * word wrap means nothing in the sample library and a piano roll's zoom will
  * mean nothing in the source. Adding a view is a folder under `views/`, an
- * entry in {@link VIEWS} and a `@case`.
+ * entry in {@link VIEWS} with its icon, and a `@case`.
  */
 @Component({
   selector: 'amk-editor-pane',
-  imports: [Panel, Tabs, ChannelMixer, SourceView, SampleBrowser, PianoRoll],
+  imports: [Tabs, ChannelMixer, SourceView, SampleBrowser, PianoRoll],
   templateUrl: './editor-pane.html',
   host: { class: 'flex min-h-0 min-w-0 flex-col' },
 })

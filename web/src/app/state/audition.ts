@@ -1,4 +1,4 @@
-import { DestroyRef, Service, inject, signal } from '@angular/core';
+import { DestroyRef, Service, computed, inject, signal } from '@angular/core';
 
 import type { CompileResult } from '@amk/core/types';
 import { NOTE_MAX, NOTE_MIN } from '@amk/core/hardcoded-tables';
@@ -88,7 +88,8 @@ export class Audition {
   private readonly mixer = inject(Mixer);
 
   private context: AudioContext | null = null;
-  private source: AudioBufferSourceNode | null = null;
+  /** The node sounding right now, and so what {@link previewing} is built on. */
+  private readonly source = signal<AudioBufferSourceNode | null>(null);
   /** The slider's level, between every source and the destination. */
   private gain: GainNode | null = null;
   private worker: Worker | null = null;
@@ -110,15 +111,26 @@ export class Audition {
   readonly playing = signal<string | null>(null);
 
   /**
-   * Whether a note is being rendered right now.
+   * Whether a render whose answer is still wanted is in flight.
    *
    * A note is heard by running the song silently up to its tick, which costs
    * what the fast-forward costs — so a drag across twenty rows would queue
    * twenty of them on the worker and hear them long after the pointer stopped.
    * The roll waits for this to clear and then asks for the row it is on *now*,
    * which keeps one render in flight and always the latest pitch.
+   *
+   * *Wanted* rather than merely running, because a run cannot be cancelled: a
+   * {@link stop} clears this while the worker goes on rendering an answer that
+   * will be dropped, and a reply the token has passed by leaves it alone rather
+   * than clearing the flag of the request that superseded it.
    */
   readonly notePending = signal(false);
+
+  /**
+   * Whether a preview is on its way or sounding — what there is for a stop to
+   * stop, and the one question the transport's button asks here.
+   */
+  readonly previewing = computed(() => this.notePending() || this.source() !== null);
 
   constructor() {
     inject(DestroyRef).onDestroy(() => {
@@ -264,11 +276,14 @@ export class Audition {
   }
 
   stop(): void {
-    // Anything still rendering belongs to the audition being replaced.
+    // Anything still rendering belongs to the audition being replaced, so its
+    // answer is no longer wanted — a caller replacing it sets the flag again in
+    // `render` a moment later, and one that is only stopping has nothing coming.
     this.token++;
+    this.notePending.set(false);
 
-    const source = this.source;
-    this.source = null;
+    const source = this.source();
+    this.source.set(null);
     this.playing.set(null);
     if (!source) {
       return;
@@ -320,15 +335,15 @@ export class Audition {
       source.buffer = buffer;
       source.connect(this.gain);
       source.onended = () => {
-        if (this.source === source) {
-          this.source = null;
+        if (this.source() === source) {
+          this.source.set(null);
           this.playing.set(null);
         }
       };
 
       source.start();
 
-      this.source = source;
+      this.source.set(source);
       this.playing.set(name);
       void context.resume();
     } catch (error) {
@@ -375,13 +390,15 @@ export class Audition {
     const worker = new Worker(new URL('./note.worker', import.meta.url), { type: 'module' });
     worker.onmessage = (event: MessageEvent<NoteReply>) => {
       const reply = event.data;
-      this.notePending.set(false);
       // Superseded while it rendered: a run cannot be cancelled, so late answers
-      // are dropped here rather than played over the newer one.
+      // are dropped here rather than played over the newer one — and the flag is
+      // left alone with them, since it belongs to whatever was asked for last
+      // and `playRegion` may have asked while this one was still running.
       if (reply.token !== this.token) {
         return;
       }
 
+      this.notePending.set(false);
       if (!reply.ok) {
         this.editor.fail(reply.message);
         return;

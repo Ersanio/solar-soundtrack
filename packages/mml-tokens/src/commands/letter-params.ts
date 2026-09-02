@@ -58,7 +58,7 @@ const vibrato: Resolver = (command) =>
 			};
 
 /** The length denominators worth stopping on: every one that divides 192 evenly. */
-const NOTE_DENOMINATORS = [1, 2, 3, 4, 6, 8, 12, 16, 24, 32, 48, 64, 96, 192] as const;
+export const NOTE_DENOMINATORS = [1, 2, 3, 4, 6, 8, 12, 16, 24, 32, 48, 64, 96, 192] as const;
 
 /** `l` — the length later notes fall back to (`parser.ts:parseDefaultLength`). Default: l8 */
 const defaultLength: Resolver = (command) => ({
@@ -84,24 +84,6 @@ const defaultLength: Resolver = (command) => ({
 		command.target.amkVersion >= 4
 			? "l=NN writes an exact tick count instead, and dots are allowed — both need #amk 4."
 			: undefined,
-});
-
-/** A note or rest, whose arguments are the lengths of its tied segments. */
-const noteLength: Resolver = (command) => ({
-	params: command.args.map((_argument, index) =>
-		u8(index === 0 ? "Length" : `Tied to`, "denominator", {
-			min: 1,
-			max: TICKS_PER_WHOLE,
-			stops: NOTE_DENOMINATORS,
-			describe: (value) => {
-				const resolved = command.noteLength?.[index]?.ticks;
-				const named = resolved === undefined ? null : noteLengthName(resolved);
-				return [`1/${value}`, named, resolved === undefined ? null : `${resolved} tick${resolved === 1 ? "" : "s"}`]
-					.filter((part) => part !== null)
-					.join(" · ");
-			},
-		}),
-	),
 });
 
 export const LETTER_PARAMS: Readonly<Record<string, Resolver>> = {
@@ -145,16 +127,21 @@ export const LETTER_PARAMS: Readonly<Record<string, Resolver>> = {
 		"Replaces the instrument’s sample with noise until the next instrument change. The value of the latest n-command being played takes precedence.",
 	),
 	p: vibrato,
-	c: noteLength,
-	d: noteLength,
-	e: noteLength,
-	f: noteLength,
-	g: noteLength,
-	a: noteLength,
-	b: noteLength,
-	r: noteLength,
-	"^": noteLength,
-	"[": fixed([u8("Repeats", "index", { min: 1, describe: (n) => `plays ${n} times` })]),
+	// No note letters, no `r` and no `^`. A `ParamDescriptor` is bound to one
+	// argument of one command, and a note's length is not always in an argument:
+	// `c` under a standing `l` writes none, `c^8` writes one for two segments,
+	// and `c0` writes one `getNoteLength` then throws away. The subject is the
+	// **segment**, which `NoteLengthSegment` already is —
+	// `command-inspector/note-length/` is where the eleven spellings are told
+	// apart and where each one's splice is chosen.
+	//
+	// No `[`. `parseLoopStart` never calls `getInt`, so digits after an opening
+	// bracket are read as music and the row could never be filled; `resolveCommand`
+	// falls back to "no arguments", which is what the command has. A loop's count
+	// is `commands/loops.ts`'s answer — it sits on the second of two `]` commands
+	// for a subloop, on none at all for a `(n)m`, and one less than itself for a
+	// `$E6` — and `]` is what is left for when that reading declines, which is a
+	// close with nothing open. No `*` either: `readLoops` raises a recall for every
+	// one it meets, so the construct always answers for a caret on it.
 	"]": fixed([u8("Repeats", "index", { min: 1, describe: (n) => `plays ${n} times` })]),
-	"*": fixed([u8("Repeats", "index", { min: 1, describe: (n) => `replays the last loop ${n} times` })]),
 };

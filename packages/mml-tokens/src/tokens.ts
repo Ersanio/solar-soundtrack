@@ -1227,6 +1227,32 @@ export interface NoteLengthSegment {
 	triplet: boolean;
 	/** The denominator or exact count as written, digits only — `""` when {@link implicit}. */
 	written: string;
+	/**
+	 * The `n` of `1/n` this segment's *plain* length — before its dots and any
+	 * `{ }` — is named by: its own digits where they are in range, and the
+	 * standing `l`'s where it wrote none or wrote one the parser then ignored
+	 * (`parser.ts:getNoteLength` falls back to the default at `n < 1 || n > 192`).
+	 *
+	 * So writing this many digits at {@link digits} reproduces {@link ticks}
+	 * exactly, dots and triplet included, which is what the inspector's Length
+	 * slider needs of it. `null` where no denominator does: an `=NN` segment,
+	 * and an implicit one under a standing length a denominator cannot reach —
+	 * a dotted `l8.` is 36 ticks and nothing is written `1/n` for that.
+	 */
+	denominator: number | null;
+	/**
+	 * Where this segment's digits are, or the empty span they would go in.
+	 *
+	 * The digits alone: the number token is `[=]digits[dots]` (`scanNumber`) and
+	 * the dots are the segment's own, which compose rather than add
+	 * (`Music.cpp:2950`), so a write that reached over them would change the
+	 * length while looking as though it kept it. Empty for an implicit segment,
+	 * at the end of the token that opened it — the note letter, or the `^` — so
+	 * digits inserted there land in front of whatever dots follow.
+	 */
+	digits: Span;
+	/** The macro a token of this segment came through, when one did. */
+	replacement?: string;
 }
 
 /** A command with its arguments gathered: `$F5 $7F …`, or `t144`. */
@@ -1661,18 +1687,48 @@ function applyTriplet(ticks: number, triplet: boolean): number {
 }
 
 /**
+ * The `n` a plain length can be written as, or `null` where none can.
+ *
+ * The exact divisor where there is one, which is every value a porter reaches
+ * by writing `l1` through `l192`. Otherwise any `n` whose *floored* division
+ * comes to it: `getNoteLength` floors (`parser.ts`), so `l15` and `l16` are 12
+ * ticks alike and either digit reproduces the length — which is all this is
+ * asked for. `null` for a length no denominator reaches at all, which a dotted
+ * `l8.` (36 ticks) leaves standing.
+ */
+function denominatorFor(ticks: number): number | null {
+	if (ticks >= 1 && ticks <= TICKS_PER_WHOLE && TICKS_PER_WHOLE % ticks === 0) {
+		return TICKS_PER_WHOLE / ticks;
+	}
+
+	for (let n = 1; n <= TICKS_PER_WHOLE; n++) {
+		if (Math.floor(TICKS_PER_WHOLE / n) === ticks) {
+			return n;
+		}
+	}
+
+	return null;
+}
+
+/**
  * One length segment of a note or a rest — `getNoteLength`
  * (`parser.ts`). `raw` is the segment's number-token text, `""` when
  * it wrote no digits of its own; `defaultTicks` is the `l` length currently in
  * effect, `triplet` whether a `{ }` block is open, and `target` picks the same
  * forks {@link Command.target} carries everywhere else.
+ *
+ * Everything here is a function of that text. Where the segment *is* in the
+ * document — {@link NoteLengthSegment.digits} and its `replacement` — is the
+ * caller's to add, since only the token run says it.
  */
+type ResolvedSegment = Omit<NoteLengthSegment, "digits" | "replacement">;
+
 function resolveNoteSegment(
 	raw: string,
 	defaultTicks: number,
 	triplet: boolean,
 	target: CommandTarget,
-): NoteLengthSegment {
+): ResolvedSegment {
 	const exact = raw.startsWith("=");
 	const { digits, dots: written } = splitLengthText(exact ? raw.slice(1) : raw);
 	const dots = dotsApplied(written, target);
@@ -1686,14 +1742,23 @@ function resolveNoteSegment(
 		if (target.amkVersion < 4) {
 			// Exact counts predate the modifiers entirely: the early return is
 			// ahead of both the dots and the triplet.
-			return { ticks, dots: 0, implicit, exact, triplet: false, written: digits };
+			return { ticks, dots: 0, implicit, exact, triplet: false, written: digits, denominator: null };
 		}
 
-		return { ticks: applyTriplet(applyDots(ticks, dots), triplet), dots, implicit, exact, triplet, written: digits };
+		return {
+			ticks: applyTriplet(applyDots(ticks, dots), triplet),
+			dots,
+			implicit,
+			exact,
+			triplet,
+			written: digits,
+			denominator: null,
+		};
 	}
 
 	const n = implicit ? -1 : Number.parseInt(digits, 10);
-	const plain = n < 1 || n > TICKS_PER_WHOLE ? defaultTicks : Math.floor(TICKS_PER_WHOLE / n);
+	const inRange = n >= 1 && n <= TICKS_PER_WHOLE;
+	const plain = inRange ? Math.floor(TICKS_PER_WHOLE / n) : defaultTicks;
 	return {
 		ticks: applyTriplet(applyDots(plain, dots), triplet),
 		dots,
@@ -1701,7 +1766,28 @@ function resolveNoteSegment(
 		exact,
 		triplet,
 		written: digits,
+		// The digits themselves where the parser read them, and the standing
+		// length's own where it threw them away — `c0` plays the default, so the
+		// default is what a slider on it is showing.
+		denominator: inRange ? n : denominatorFor(defaultTicks),
 	};
+}
+
+/**
+ * What a segment would play at `1/n`, its dots and any `{ }` folded in the same
+ * order {@link resolveNoteSegment} folds them. No target: `dots` has already
+ * been through {@link dotsApplied}, which is the only fork there is.
+ *
+ * Exported so the inspector's readout can follow a drag without restating the
+ * arithmetic, which is how a panel and the scanner come to disagree about what
+ * the document says.
+ */
+export function noteLengthTicks(segment: NoteLengthSegment, denominator: number): number {
+	if (denominator < 1 || denominator > TICKS_PER_WHOLE) {
+		return segment.ticks;
+	}
+
+	return applyTriplet(applyDots(Math.floor(TICKS_PER_WHOLE / denominator), segment.dots), segment.triplet);
 }
 
 /**
@@ -1730,6 +1816,42 @@ function resolveDefaultLength(raw: string, current: number, target: CommandTarge
 	}
 
 	return applyDots(Math.floor(TICKS_PER_WHOLE / n), dotsApplied(dots, target));
+}
+
+/**
+ * Where one segment's digits are, or the empty span they would go in.
+ *
+ * The digits alone. A number token is `[=]digits[dots]` (`scanNumber`) and only
+ * the digits name the segment's length: its dots compose rather than add
+ * (`Music.cpp:2950`), so a write reaching over them would change the length
+ * while looking as though it kept it, and one reaching over the `=` would turn
+ * a tick count into a denominator. With no number token at all the span is
+ * empty, at the end of the token that opened the segment, which puts digits
+ * inserted there in front of whatever dots follow.
+ *
+ * Clamped inside the token, because an expanded macro's tokens share one
+ * collapsed span (`spanAt`) and the text is not the document's.
+ */
+function digitSpan(
+	first: GatherToken | undefined,
+	opener: GatherToken | undefined,
+	textOf: (token: GatherToken) => string,
+	spanOf: (token: Token) => Span,
+): Span {
+	if (!first) {
+		const at = opener ? spanOf(opener).end : 0;
+		return { start: at, end: at, line: opener?.line ?? 1 };
+	}
+
+	const text = textOf(first);
+	const lead = text.startsWith("=") ? 1 : 0;
+	const { digits } = splitLengthText(text.slice(lead));
+	const span = spanOf(first);
+	return {
+		start: Math.min(span.start + lead, span.end),
+		end: Math.min(span.start + lead + digits.length, span.end),
+		line: span.line,
+	};
 }
 
 /**
@@ -1767,12 +1889,21 @@ function gatherNoteLength(
 	// token is read as the segment's length; AMK's own getInt would have
 	// folded the rest into it, which this scanner cannot do.
 	const readSegment = (): void => {
+		// What opened this segment: the note letter for the first, the `^` for
+		// each one after it. Digits with none of their own go at its end.
+		const opener = tokens[index - 1];
 		let first: GatherToken | undefined;
 		let dots = "";
+		// Any token of the segment having come through a macro, which is what
+		// stops a write over text that is not in the document. `??=` keeps the
+		// first, so a run split across an expansion is caught by whichever half
+		// carries the name.
+		let macro: string | undefined = opener?.replacement;
 		while (index < tokens.length) {
 			const next = tokens[index];
 			if (next.kind === "number" || next.kind === "hexNumber") {
 				first ??= next;
+				macro ??= next.replacement;
 				args.push({ value: numberValue(textOf(next), next.kind), span: spanOf(next), replacement: next.replacement });
 				from ??= next.replacement;
 				last = next;
@@ -1786,6 +1917,7 @@ function gatherNoteLength(
 			// So it scans as `unknown` and is claimed back here.
 			if (next.kind === "unknown" && textOf(next) === ".") {
 				dots += ".";
+				macro ??= next.replacement;
 				last = next;
 				index++;
 				continue;
@@ -1799,7 +1931,11 @@ function gatherNoteLength(
 			break;
 		}
 
-		segments.push(resolveNoteSegment((first ? textOf(first) : "") + dots, defaultTicks, triplet, target));
+		segments.push({
+			...resolveNoteSegment((first ? textOf(first) : "") + dots, defaultTicks, triplet, target),
+			digits: digitSpan(first, opener, textOf, spanOf),
+			replacement: macro,
+		});
 	};
 
 	readSegment();

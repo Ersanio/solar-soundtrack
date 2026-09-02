@@ -1,7 +1,7 @@
 <label class="flex flex-col gap-0.5">
   <span class="text-ink-muted text-[11px]">{{ label() }}</span>
   <select
-    class="bg-inset border-edge text-ink w-full rounded-sm border px-1.5 py-0.5 text-xs disabled:cursor-not-allowed disabled:opacity-40"
+    class="bg-inset border-edge text-ink w-full rounded-md border px-1.5 py-0.5 text-xs disabled:cursor-not-allowed disabled:opacity-40"
     [disabled]="disabled()"
     [value]="value()"
     (change)="onCommit($event)"

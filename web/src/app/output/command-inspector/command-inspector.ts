@@ -1,8 +1,11 @@
 import { Component, computed, inject } from '@angular/core';
 
+import { loopAt } from '@amk/tokens/commands/loops';
+import { Section } from '../../shared/section/section';
 import { EditorRequests } from '../../state/editor-requests';
 import { EditorStore } from '../../state/editor-store';
 import { hex2 } from '../../util/format';
+import { LoopInspector } from '../loop-inspector/loop-inspector';
 import { AdsrCommand } from './adsr-command/adsr-command';
 import { ArpeggioCommand } from './arpeggio-command/arpeggio-command';
 import { BendCommand } from './bend-command/bend-command';
@@ -77,11 +80,13 @@ const LETTER_VIEWS: Readonly<Record<string, string>> = {
     FirDesigner,
     InstrumentEntryEditor,
     InstrumentInspector,
+    LoopInspector,
     NoteCommand,
     PanCommand,
     ParamTable,
     QuantizationCommand,
     BendCommand,
+    Section,
     VibratoCommand,
   ],
   templateUrl: './command-inspector.html',
@@ -118,13 +123,40 @@ export class CommandInspector {
     this.dismissed() ? null : this.store.instrumentAtCaret(),
   );
 
+  /**
+   * The loop construct the caret's own text belongs to, if any.
+   *
+   * The token question rather than the panel one: `amk-loop-inspector` owns what
+   * a loop *says*, and this only needs to know whether the subject at the caret
+   * is one — so it asks `loopAt` and not `loopFocus`.
+   */
+  protected readonly loop = computed(() =>
+    this.dismissed() ? null : loopAt(this.store.loops(), this.store.caret()),
+  );
+
+  /**
+   * The command the parameter table answers for.
+   *
+   * `null` where a loop has the caret's own text, because the loop inspector
+   * draws that count and draws it better: the table would show the empty
+   * `Repeats` of a `]]4`'s *first* bracket, or a `$E6`'s byte, which is one less
+   * than the count it means. And it is the command rather than the header that
+   * stands down — `commandAt` is end-inclusive, so the caret on the `]` of
+   * `c4]2` finds the note in front of it, and a heading naming that note over
+   * parameters nothing draws would be worse than no heading at all.
+   */
+  protected readonly params = computed(() => (this.loop() ? null : this.command()));
+
+  /** Nothing at the caret at all, which is the one state with a sentence of its own. */
+  protected readonly empty = computed(() => !this.entry() && !this.params() && !this.loop());
+
   /** Which view to render; `null` falls through to the parameter table. */
   protected readonly view = computed(() => {
     if (this.entry()) {
       return 'entry';
     }
 
-    const command = this.command();
+    const command = this.params();
     if (!command) {
       return null;
     }
@@ -159,7 +191,7 @@ export class CommandInspector {
 
   /** `$F5` and the like; a letter command has no VCMD byte. */
   protected readonly label = computed(() => {
-    const command = this.command();
+    const command = this.params();
     if (!command) {
       return '';
     }
@@ -174,18 +206,18 @@ export class CommandInspector {
    * this the panel would claim a `$EF` is under a cursor that is plainly not
    * sitting on one.
    */
-  protected readonly replacement = computed(() => this.command()?.replacement ?? null);
+  protected readonly replacement = computed(() => this.params()?.replacement ?? null);
 
-  /** Shown in the summary row, so the section reads without being opened. */
+  /** Shown beside the section's heading, so the subject reads at a glance. */
   protected readonly summary = computed(() => {
     const entry = this.entry();
     if (entry) {
       return `@${entry.number} instrument definition`;
     }
 
-    const command = this.command();
+    const command = this.params();
     if (!command) {
-      return 'nothing at the caret';
+      return this.loop() ? 'a loop' : 'nothing at the caret';
     }
 
     const via = this.replacement();
@@ -196,5 +228,5 @@ export class CommandInspector {
    * A half-written command is worth saying so about rather than rendering as
    * though its missing arguments were zero.
    */
-  protected readonly incomplete = computed(() => this.command()?.complete === false);
+  protected readonly incomplete = computed(() => this.params()?.complete === false);
 }

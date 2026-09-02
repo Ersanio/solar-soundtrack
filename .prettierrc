@@ -10,7 +10,7 @@
       }
     },
     {
-      "files": "COMMANDS.html",
+      "files": ["COMMANDS.html", "README.html"],
       "options": {
         "parser": "html"
       }

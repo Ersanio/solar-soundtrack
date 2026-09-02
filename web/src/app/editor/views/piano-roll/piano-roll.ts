@@ -7,6 +7,7 @@ import {
   computed,
   effect,
   inject,
+  linkedSignal,
   signal,
   untracked,
   viewChild,
@@ -28,6 +29,7 @@ import { EditorRequests } from '../../../state/editor-requests';
 import { EditorStore } from '../../../state/editor-store';
 import { Mixer } from '../../../state/mixer';
 import { Playback } from '../../../state/playback';
+import { stopAll } from '../../../state/stop-all';
 import { silencedReason, soleAudible } from '../../../state/transport-view';
 import { PercussionPanel, percussionChips } from './percussion-panel/percussion-panel';
 import { DEFAULT_PERCUSSION, type PlaceContext, rollShape } from './percussion';
@@ -71,15 +73,10 @@ import {
 import { RollLoopLabels } from './roll-loops/roll-loop-labels';
 import { RollLoops } from './roll-loops/roll-loops';
 import { laneWindow, packCommandLane } from './roll-command-layout';
+import { eraseCommand, inspectable } from './roll-command-move';
 import { RollCommandLane } from './roll-command-lane/roll-command-lane';
-import {
-  CHANNEL_FILL,
-  CHANNEL_STROKE,
-  KEY_WIDTH,
-  LANE_HEIGHT,
-  OVERVIEW_HEIGHT,
-  SCRUB_HEIGHT,
-} from './roll-metrics';
+import { KEY_WIDTH, LANE_HEIGHT, OVERVIEW_HEIGHT, SCRUB_HEIGHT } from './roll-metrics';
+import { CHANNEL_FILL, CHANNEL_STROKE } from '../../../util/channel-palette';
 import { seedEdits } from './roll-seed';
 import { type Strip, channelStrip, channelTails, constructFor, isStrip } from './roll-strip';
 import { RollNotes } from './roll-notes/roll-notes';
@@ -142,8 +139,10 @@ import { RollTooltip } from './roll-tooltip/roll-tooltip';
   host: {
     class: 'relative flex min-h-0 min-w-0 flex-col',
     // On the window rather than through a focusable element: this project ships
-    // no `tabindex` and no `role`, and a shortcut that only works while a
-    // channel is being edited needs neither. See `web/README.md`.
+    // no `tabindex` and no `role`, and these shortcuts belong to the roll as a
+    // whole rather than to anything inside it. See `web/README.md`. The binding
+    // lives and dies with the roll, which `@case ('roll')` in `editor-pane.html`
+    // destroys on a tab switch, so it is roll-only without a check of its own.
     '(window:keydown)': 'onKey($event)',
   },
 })
@@ -170,7 +169,6 @@ export class PianoRoll {
   protected readonly beatsPerBar = computed(() => this.settings().beatsPerBar);
   protected readonly beatUnit = computed(() => this.settings().beatUnit);
   protected readonly percussionOpen = computed(() => this.settings().percussionOpen);
-  protected readonly commandLaneOpen = computed(() => this.settings().commandLaneOpen);
   protected readonly editChannel = computed(() => this.settings().editChannel);
   protected readonly snap = computed(() => this.settings().snap);
   protected readonly editMode = computed(() => this.settings().editMode);
@@ -370,17 +368,6 @@ export class PianoRoll {
     tempo: this.tempo,
     pass: this.songTicks,
   });
-
-  /**
-   * Whether the roll is showing the song's position rather than a parked one.
-   *
-   * Idle and not playing are different things. A pause leaves the song where it
-   * is and resumes from there, so the roll stays there too; only a stop puts it
-   * back at the beginning, which is what the transport's own readout does. This
-   * is deliberately not `isPlaying()`, which would count a pause as "gone" and
-   * throw the view back to tick 0.
-   */
-  private readonly following = computed(() => !this.playback.isIdle() && this.follow());
 
   /**
    * Where the song itself is, parked or not.
@@ -629,6 +616,35 @@ export class PianoRoll {
     return laneWindow(this.commandLane(), from, to, this.zoom());
   });
 
+  /**
+   * The command the inspector is answering about: the roll's selected command.
+   *
+   * Every route to it lands here, because they all move the caret — a glyph in
+   * the lane, a chip on a bar, and a button in the note inspector all set
+   * `EditorRequests.reveal`, and the caret is the one statement of what is being
+   * inspected. So nothing here needs to know which of the three was used.
+   *
+   * Dismissed the way the inspector is dismissed, since what it stands for is
+   * that panel: a ring that outlived it would be pointing at nothing.
+   *
+   * Held here rather than in each layer because three things read it — the lane
+   * rings it, the bars ring it, and `onKey` deletes it and lets it go — and two
+   * of those are drawn in the same gesture. One signal is what stops them
+   * disagreeing.
+   *
+   * Only a command the roll draws (`inspectable`). A note is a `Command` too and
+   * a click on a bar puts the caret on it, so the caret alone would hand `Delete`
+   * the note itself — and an `o` or an `l` under the caret, which nothing rings.
+   */
+  protected readonly inspectedCommand = computed(() => {
+    const command = this.editor.commandAtCaret();
+    return command !== null &&
+      inspectable(command) &&
+      this.requests.dismissed() !== this.editor.caret()
+      ? command
+      : null;
+  });
+
   // --- marks ---------------------------------------------------------------
 
   private readonly window = computed(() =>
@@ -790,6 +806,38 @@ export class PianoRoll {
     });
   });
 
+  /** The row the last press asked for, whether or not it is still being heard. */
+  private readonly pressedRow = signal<number | null>(null);
+
+  /**
+   * That row for as long as its note is on its way or sounding, and `null` the
+   * moment it is not.
+   *
+   * `previewing` is the only thing that says how long a press lasts: a preview
+   * carries no pitch back, and `playNote` hands out neither a length nor a
+   * finish. It covers a sample and a region as well, which is why the row is
+   * only ever set by a press that reached the worker.
+   */
+  protected readonly pressedKey = computed(() =>
+    this.audition.previewing() ? this.pressedRow() : null,
+  );
+
+  /**
+   * What the key column and the lane bands light: the song's rows, and the one
+   * a press is playing. A press is a row sounding like any other.
+   */
+  protected readonly soundingRows = computed<ReadonlySet<number>>(() => {
+    const rows = this.heldRows();
+    const pressed = this.pressedKey();
+    if (pressed === null) {
+      return rows;
+    }
+
+    const all = new Set(rows);
+    all.add(pressed);
+    return all;
+  });
+
   // --- editing -------------------------------------------------------------
 
   /**
@@ -884,15 +932,6 @@ export class PianoRoll {
     const outcome = this.editChannel() === null ? null : this.stripOutcome();
     return outcome && !isStrip(outcome) ? outcome.refused : null;
   });
-
-  /**
-   * Whether rewriting the channel is the answer to the refusal on show.
-   *
-   * It is for every refusal `channelStrip` gives, which are all things the text
-   * says. It is not for a mute: nothing written in the channel is what is
-   * stopping it, and a Normalize offered there is a rewrite that changes nothing.
-   */
-  protected readonly normalizable = computed(() => this.silencedEdit() === null);
 
   private readonly targetAMKVersion = computed(
     () => this.editor.result()?.stats?.targetAMKVersion ?? 4,
@@ -1007,6 +1046,8 @@ export class PianoRoll {
         this.audition.playRegion({ tick, ticks });
       },
       pick: (channel) => this.selectEditChannel(channel),
+      inspectLoop: (text, body) =>
+        this.requests.inspectingLoop.set({ text: { ...text }, body: { ...body } }),
     },
   );
 
@@ -1040,8 +1081,7 @@ export class PianoRoll {
    * the text and a mark by the address the walk gave it. An address is an ARAM
    * offset, so it names one note across the whole song.
    */
-  private addressesOf(indices: Iterable<number>): ReadonlySet<number> {
-    const strip = this.strip();
+  private addressesOf(strip: Strip | null, indices: Iterable<number>): ReadonlySet<number> {
     const spans = new Set<number>();
     if (strip) {
       for (const index of indices) {
@@ -1052,11 +1092,117 @@ export class PianoRoll {
     return spans;
   }
 
-  /** The selected notes as spans, which is what the bars are outlined by. */
-  protected readonly selectedSpans = computed(() => this.addressesOf(this.gestures.selection()));
+  /**
+   * The selected notes as spans, which is what the bars are outlined by.
+   *
+   * Held across a recompile rather than emptied. There is no strip from the
+   * moment the text changes until the compile lands, and the bars on screen for
+   * the whole of that are the *last* compile's — so the addresses taken from
+   * that compile outline exactly the bars being drawn, where an empty set takes
+   * every outline off for a compile and puts it straight back, which is what a
+   * commit from the inspector looked like.
+   */
+  protected readonly selectedSpans = linkedSignal<
+    { strip: Strip | null; chosen: ReadonlySet<number> },
+    ReadonlySet<number>
+  >({
+    source: () => ({ strip: this.strip(), chosen: this.gestures.selection() }),
+    // Held only while there is something selected to hold it for: a selection
+    // let go during a compile takes its outlines with it at once.
+    computation: (now, previous) =>
+      now.chosen.size === 0
+        ? new Set<number>()
+        : now.strip
+          ? this.addressesOf(now.strip, now.chosen)
+          : (previous?.value ?? new Set<number>()),
+  });
+
+  /** The selected strip indices in order, which the two readers below walk. */
+  private readonly chosen = computed(() => [...this.gestures.selection()].sort((a, b) => a - b));
+
+  /**
+   * The run of text the selection covers, for the command palette in the
+   * inspector to put a loop's brackets round.
+   *
+   * The stretch of text from the lowest selected unit to the highest, by offset
+   * and not by index: a body's items are a frame of their own, appended after the
+   * root's, so a whole `[ ]` selected with the notes round it has its last
+   * *index* inside the body while the run's far end is the root note after it.
+   * Whether that run may take a bracket is `wrapVerdict`'s to say — it widens
+   * over a construct the run covers whole and refuses one the run cuts through,
+   * `WRAP_SPLIT`, which is `REFUSE_SPLIT` by another route.
+   */
+  private readonly selectedRun = computed<{ start: number; end: number } | null>(() => {
+    const items = this.strip()?.items;
+    if (!items) {
+      return null;
+    }
+
+    let start = Number.POSITIVE_INFINITY;
+    let end = Number.NEGATIVE_INFINITY;
+    for (const index of this.chosen()) {
+      const item = items[index];
+      if (item) {
+        start = Math.min(start, item.unitSpan.start);
+        end = Math.max(end, item.unitSpan.end);
+      }
+    }
+
+    return start <= end ? { start, end } : null;
+  });
 
   /** The notes the preview has taken over, which the song's own bars leave out. */
-  protected readonly movingSpans = computed(() => this.addressesOf(this.gestures.moving()));
+  protected readonly movingSpans = computed(() =>
+    this.addressesOf(this.strip(), this.gestures.moving()),
+  );
+
+  /**
+   * Points the inspector at a note the selection holds, where it is not already
+   * answering about one of them.
+   *
+   * A click on a bar does this for itself (`roll-notes.ts:select`); a marquee,
+   * `Ctrl+A` and a press on a loop box's edge select without touching the caret,
+   * and the palette that puts brackets round a selection is in the panel that
+   * answers to it. Guarded on the inspected note being outside the selection so
+   * that `Ctrl`+clicking a second bar is not thrown back to the first.
+   */
+  private askAboutSelection(strip: Strip | null, chosen: readonly number[]): void {
+    const asked = this.requests.inspecting();
+    if (!strip || chosen.length === 0 || this.editor.compiledText() !== this.editor.source()) {
+      return;
+    }
+
+    const held = chosen.map((index) => strip.items[index]).filter((item) => item !== undefined);
+    if (asked !== null) {
+      const same = held.find((item) => item.address === asked.address);
+      if (same) {
+        // An edit can move a note without moving its bytes — a resize from the
+        // left end changes where it starts, and the duration bytes on either
+        // side of it can come out the same length — so the tick the question was
+        // asked at names no pass of the note any more. Left alone, the ring for
+        // "another pass of the note you asked about" is drawn on the note
+        // itself, which has only the one. Re-pointed rather than re-asked: it is
+        // the same note, and the caret is already on its text.
+        if (!same.instances.some((each) => each.tick === asked.tick)) {
+          this.requests.inspecting.set({
+            address: asked.address,
+            tick: same.instances[0]?.tick ?? 0,
+          });
+        }
+
+        return;
+      }
+    }
+
+    const note = held.find((item) => item.kind === 'note');
+    const span = note && this.editor.notesByAddress().get(note.address)?.span;
+    if (!note || !span) {
+      return;
+    }
+
+    this.requests.inspecting.set({ address: note.address, tick: note.instances[0]?.tick ?? 0 });
+    this.requests.reveal.set({ span: { ...span }, show: false });
+  }
 
   // --- tooltip -------------------------------------------------------------
 
@@ -1065,22 +1211,7 @@ export class PianoRoll {
   /** The hovered mark, while there is still a song for it to have come from. */
   protected readonly tooltipFor = computed(() => (this.timeline() ? this.hovered() : null));
 
-  // --- the readout ---------------------------------------------------------
-
-  /**
-   * The tick the readout reports.
-   *
-   * Slow only while the song is carrying the playhead along. A parked or stopped
-   * roll is not moving, so there is nothing to blur and the reading is exact —
-   * and a scroll's own readout must answer the wheel rather than half a second
-   * after it.
-   *
-   * A scrub answers the drag, which is the one reading that is neither the
-   * camera's nor the song's: it is where the song is being asked to go.
-   */
-  protected readonly readoutTick = computed(
-    () => this.seeking() ?? (this.following() ? this.playhead.slowTick() : this.playTick()),
-  );
+  // --- the problems list ---------------------------------------------------
 
   /** Anything the walk could not make sense of, said in words rather than colour. */
   protected readonly problems = computed(() => this.timeline()?.problems ?? []);
@@ -1126,10 +1257,47 @@ export class PianoRoll {
     onChange(this.mixer.silenced, (silenced) => this.followMixer(silenced));
 
     // Sanctioned effect: a selection is a set of indices into the channel's
-    // strip, so a rebuild from text the roll did not write leaves the outline on
-    // whatever notes now sit at those indices. The roll's own gestures clear it
-    // as they commit; this is for the ones typed in the source view.
-    onChange(this.editor.source, () => this.gestures.clearSelection());
+    // strip, so text the roll cannot account for leaves the outline on whatever
+    // notes now sit at those indices. A batch that kept the notes adds none and
+    // takes none away, so those indices still hold; a gesture of the roll's own
+    // has left anchors saying where each of its notes went. Read here rather
+    // than followed on its own, because the two are one decision — the count is
+    // what says which kind of change is landing.
+    let kept = untracked(this.requests.notesKept);
+    onChange(this.editor.source, () => {
+      const now = this.requests.notesKept();
+      const keepsNotes = now !== kept;
+      kept = now;
+      this.gestures.sourceChanged(keepsNotes);
+    });
+
+    // Sanctioned effect: putting a carried selection back once the commit that
+    // moved it has been compiled. On the strip and not on the source, because
+    // the strip is what the indices are into and it is a compile behind — the
+    // roll has none at all in between. Ahead of the mirror below, so the panels
+    // are told about the selection the strip really has.
+    onChange(this.strip, (strip) => {
+      if (strip) {
+        this.gestures.restoreSelection(strip);
+      }
+    });
+
+    // Sanctioned effect: mirroring the selection into the mailbox, which is the
+    // roll's imperative sink for everything the panels beside it answer from.
+    // Two writes, because a selection has two things to say — the run a loop's
+    // brackets would go round, and, where nothing selected is being inspected,
+    // a note for the palette that writes them to open on. A marquee and
+    // `Ctrl+A` move no caret of their own, and a panel answering the caret would
+    // otherwise have nothing to show.
+    effect(() => {
+      const run = this.selectedRun();
+      const strip = this.strip();
+      const chosen = this.chosen();
+      untracked(() => {
+        this.requests.selectedRun.set(run);
+        this.askAboutSelection(strip, chosen);
+      });
+    });
 
     // Sanctioned effect: putting the vertical scroller back where the roll was
     // left. There is nothing to scroll until the pane has been measured and the
@@ -1175,6 +1343,10 @@ export class PianoRoll {
     // never reports its release. Honour the gesture rather than stranding the
     // transport on a preview nothing will commit.
     this.destroyRef.onDestroy(() => {
+      // The selection goes with the roll — it is indices into a strip this
+      // component owns — so what it published goes with it too.
+      this.requests.selectedRun.set(null);
+      this.requests.inspectingLoop.set(null);
       this.stopPull();
       if (this.dragging()) {
         this.anchorPages();
@@ -1246,10 +1418,6 @@ export class PianoRoll {
 
   protected setEditMode(editMode: EditMode): void {
     this.settings.update((s) => ({ ...s, editMode }));
-  }
-
-  protected setCommandLaneOpen(commandLaneOpen: boolean): void {
-    this.settings.update((s) => ({ ...s, commandLaneOpen }));
   }
 
   protected setPercussionOpen(percussionOpen: boolean): void {
@@ -1680,39 +1848,110 @@ export class PianoRoll {
    * The roll's shortcuts, while a channel is being edited.
    *
    * Ignored while the text or a modal has focus, so `Ctrl+A` in the source still
-   * selects the source and the normalize dialog keeps its own Escape. Everything
+   * selects the source and a dialog keeps its own Escape. Everything
    * that edits goes through the same {@link Gesture} the pointer uses, so a
    * nudge and a drag commit the same way.
    *
    * A channel really picked, rather than {@link editing}: a key has no pointer
    * to name a channel with, so `Ctrl+A` under one merely hovered would select
    * notes in a channel the toolbar says is not being edited.
+   *
+   * Space needs no channel, being the transport rather than an edit, and nor do
+   * the keys a selected command takes: a lane glyph names a command of the song.
    */
   protected onKey(event: KeyboardEvent): void {
     const target = event.target as HTMLElement | null;
     if (
-      this.editChannel() === null ||
       target?.closest('input, textarea, select, dialog, .cm-editor') !== null ||
       event.isComposing
     ) {
       return;
     }
 
-    // Escape steps back out, one level per press: the selection, then the
-    // channel itself. Ahead of the strip, and needing none — a channel the roll
-    // has refused is exactly the one the porter wants to leave.
+    // Space is the transport: it starts the song from wherever the playhead
+    // stands and stops it back at the beginning — and stops a note or a
+    // selection being previewed, as the Stop button does, since a stop that left
+    // one sounding would start the song over it. It takes the keypress outright,
+    // since the browser would otherwise scroll the page with it or press
+    // whichever button was last clicked — so it means the same thing wherever
+    // the pointer has been. Bare, because `Ctrl+Space` toggles an IME and
+    // `Alt+Space` opens the window menu; and only the first press of a held bar
+    // acts, a song started and stopped thirty times a second being no use.
+    if (event.key === ' ' && !event.ctrlKey && !event.metaKey && !event.altKey && !event.shiftKey) {
+      event.preventDefault();
+      if (event.repeat) {
+        return;
+      }
+
+      if (this.playback.isPlaying() || this.audition.previewing()) {
+        stopAll(this.playback, this.audition);
+      } else if (this.editor.canCompile()) {
+        // What the Play button's `disabled` says: with no driver loaded there is
+        // nothing to play, and `toggle` would report an error about the song.
+        void this.playback.toggle();
+      }
+
+      return;
+    }
+
+    // A selected command owns Delete, whichever route picked it — a glyph in the
+    // lane, a chip on a bar, or a button in the note inspector — since all three
+    // are the caret. No note is touched, however many are outlined: a chip or a
+    // lane glyph lets go of them as it picks, and the splice keeps the rest where
+    // they are. The key goes back to the notes the moment a click on a bar's body
+    // moves the caret off the command — onto the note, which is a `Command` too,
+    // and which `inspectedCommand` therefore does not answer.
+    //
+    // Ahead of the channel guard, because a lane glyph names a command of the
+    // song rather than a note of a channel and picks none: "this holds all
+    // eight, and a `t` belongs to none of them". It needs no strip either — the
+    // splice is the command's own span, and no note moves.
+    //
+    // The key is taken whether or not the command can go, so a `"name=value"`
+    // one does nothing rather than falling through and deleting the notes. And
+    // only the first press of a held key acts: the caret lands where the command
+    // was and `commandAt` is end-inclusive, so a repeat would take the
+    // neighbouring command, which nobody selected.
+    const inspected = this.inspectedCommand();
+    if (inspected !== null && (event.key === 'Delete' || event.key === 'Backspace')) {
+      event.preventDefault();
+      if (event.repeat || this.editor.compiledText() !== this.editor.source()) {
+        return;
+      }
+
+      // Keeps the notes, as a panel's own commit does: taking a command out
+      // adds and removes none, so the selection still names the notes it named.
+      const edit = eraseCommand(this.editor.source(), inspected);
+      this.requests.applyAll(edit ? [edit] : null, null, true);
+      return;
+    }
+
+    // Escape steps back out, one level per press: the command, then the
+    // selection, then the channel itself. Ahead of the channel guard because a
+    // lane glyph picks no channel and its ring still has to go; ahead of the
+    // strip, and needing none — a channel the roll has refused is exactly the
+    // one the porter wants to leave.
     if (event.key === 'Escape') {
-      if (this.gestures.selection().size > 0) {
+      if (inspected !== null) {
+        // Letting the command go is letting the inspector go: the ring stands
+        // for that panel, and `inspectedCommand` reads the same `dismissed`.
+        this.requests.dismissed.set(this.editor.caret());
+      } else if (this.gestures.selection().size > 0) {
         this.gestures.clearSelection();
         // Letting the note go lets go of the question asked about it: the
         // inspector is answering from the caret a click on that bar moved, and
         // nothing else would retire it.
         this.requests.inspecting.set(null);
+        this.requests.inspectingLoop.set(null);
         this.requests.dismissed.set(this.editor.caret());
-      } else {
+      } else if (this.editChannel() !== null) {
         this.clearEditChannel();
       }
 
+      return;
+    }
+
+    if (this.editChannel() === null) {
       return;
     }
 
@@ -1810,6 +2049,10 @@ export class PianoRoll {
         tick: Math.max(0, Math.round(this.playTick())),
         note,
       });
+      // A silenced channel and a note out of range are both refused before a
+      // render is asked for, and `notePending` is set nowhere else, so it is
+      // what tells a press that sounds from one that only said why it did not.
+      this.pressedRow.set(this.audition.notePending() ? row : null);
     }
   }
 

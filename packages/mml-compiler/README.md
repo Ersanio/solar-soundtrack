@@ -72,8 +72,8 @@ Diagnostics carry stable codes and are produced on failure paths too, so partial
 The prefix says whose finding it is, not which file raises it: `AMK####` is a condition AddmusicK
 itself reports, which is nearly everything `preprocess.ts`, `parser.ts` and `link.ts` produce;
 `SST####` is one `Music.cpp` does not produce at all — `SST0504` for the `#path` this port
-deliberately ignores, `SST0505` for a replacement that expands into itself, `normalize.ts`'s
-`SST06xx` refusals, and `SST0301` on `compile()`'s ARAM argument rather than on anything in the MML.
+deliberately ignores, `SST0505` for a replacement that expands into itself, and `SST0301` on
+`compile()`'s ARAM argument rather than on anything in the MML.
 Constructs this compiler does not implement are reported as errors, never silently mis-compiled.
 
 `SST0505` is the one place a code covers a song AddmusicK cannot finish rather than one it rejects.
@@ -89,84 +89,6 @@ Both recursion guards latch and stop the scan, which is what `Music.cpp:139`'s f
 does. A diagnostic already filed for the same code, span and message is not filed again: `pos`
 advances between reports, so text the author wrote cannot raise one span twice, and text that arrived
 by expansion collapses onto its use site by construction.
-
-## The parse trace, and the normalizer built on it
-
-`compile({ …, options: { trace: true } })` returns `CompileResult.trace`: one event per dispatch of
-the scan loop — its source span, the character it dispatched on, the parser's state once it
-returned, and what it did to the loop structure — plus the final buffer and its `origins`, the span
-of every replacement the parser expanded, and the table every note was tuned by. It is gathered
-where the command map is, by bracketing `scan`'s one dispatch loop, and a loop event is read off the
-bytes a handler wrote rather than asked of the handler: `[` moves the channel to 8, `]` moves it back
-and leaves `$E9 lo hi n` on the caller, `*` and `(n)m` leave the same four bytes, and `]]n` leaves
-`$E6 n-1`. A subloop written `$E6 $00` … `$E6 $nn` toggles the same flag and leaves the same bytes,
-so it is read the same way, and either end of a pair may be either
-spelling; the event sits on the argument byte, one `$XX` being one dispatch, so `LoopEvent.from`
-says where the run began. `$E9` and `$FC` have no such reading — the compiler works their address
-out for itself and relocates it (`link.ts`), so a hand-written one names a body nothing can
-resolve. One guarded line in `doReplacement` records a match's extent, which is the only place it
-is known. Nothing is recorded unless asked for, and no byte changes either way.
-
-`normalize.ts` is what it exists for: eight text-to-text passes that leave a song with no
-`#define`, no replacement, no triplet, no `l`, no legacy `&`, one block per channel
-in channel order, `o`/`q`/`@`/`t` written where a channel left them implied
-and the drum `@` before every drum note — the shape an editor can splice. `<` and `>` stay as
-written, the roll reading a note's octave off its own emitted byte. Loops stay exactly as
-written: a `[ ]`, a `(n)` or `*` recall and a `[[ ]]` subloop are shapes the piano roll edits in
-place, and the passes that rewrite inside a body work on the single parse the body gets, which is
-what keeps them byte-neutral there. The default note length is the one
-piece of parse state a splice cannot work around — it is one variable for the whole song and `#N`,
-`[`, `]`, `(n)`, `*`, `/` and `{ }` all leave it standing — so every note is given its own length
-instead, segment by segment, since `c4^` is an explicit 48 and an implied 24. That is always
-writable where an `l` was: dots and `=n` are legal on a note for every dialect and on an `l` only
-from `#amk 4`. What a pass cannot re-create is refused with an `SST06xx`
-diagnostic saying why: a legacy `&` whose duration byte comes from a bracket, `tuning[n]=`, and a
-`(!n, type, n)` whose length argument is the `l` in force, which is the one reader of the default
-that is not a note and so has nowhere to be written out to. The passes never emit text from bytes;
-the note map's tick counts are the one thing read from the compile, for the lengths a triplet's
-notes become.
-
-A legacy `&` is written out as the `$DD` it compiles to (`writePitchSlides`), which is what lets the
-piano roll open a song using one: `&` is an operator rather than a command, so nothing above the
-compiler can say which channel it is on, and the roll refuses all eight while one stands. The rewrite
-is exact rather than merely equivalent — the duration is `prevNoteLength` off the trace, the target
-is the emitted byte off the note map, and the run goes where the note's own parse would have
-appended it, so the same four bytes land in the same place. It is written all in hex and never as
-`$DD`'s note-target form, which would consume the drum remap (`parseNote`) and leave the note after
-it pitched, error AMK0161 wherever a `q` is pending, and be unable to spell a rest or a tie at all —
-a `&` reaches all three. Two shapes it declines, reporting `SST0617` at info severity rather than
-refusing the song: a slide whose note is already a `$DD`'s written target, which has no note-map
-entry to read a byte from, and one standing after a tie, since `accumulateTiedLength` rewinds a tie
-out of the way of the text `$DD` on every target but out of the way of a `&` only on the legacy ones
-— so writing it out either gains that rewind or loses it, and the tie moves the slide with it. It
-runs before `drumPerNote`, whose suppression test reads only the event directly in front of a note.
-
-`NormalizeInput.onlyChannel` narrows the whole thing to one channel, which is what the piano roll
-asks for: it edits one channel at a time, so a channel it cannot splice wants putting in order on its
-own — and must not be refused because a _different_ channel holds the shape being objected to. Every
-pass that works construct by construct filters on it through `scopedTo`, which owns the channel's
-own events **and** the interior of every `[ ]` body it declares — a body's events carry channel 8,
-and the body between a channel's own brackets is that channel's own text — while a body another
-channel declares is left as written and reported as `SST0618` at info severity
-(`declaresElsewhere`), so the dialog says what stands rather than reporting nothing.
-`resolvePreprocessor` and `inlineReplacements`
-are global by nature and run whole; `writeDefaults` writes no `t`, since a tempo reaches all eight
-channels however local the block it sits in; `orderChannels` refuses with `SST0615` rather than
-joining one channel's blocks, because that moves text past the others and changes the `o` and `l`
-they inherit; and `writeNoteLengths` stands down entirely, so a scoped run keeps its `l`s. Scoping
-the rewrite does not scope the reader there: one `l` is read by every later channel's bare notes and
-by every `[ ]` body, whose events carry channel 8, so taking one out means rewriting text a scoped
-run has promised to leave alone. The roll is unharmed by that — a note's length is read off its own
-written text — which is why the pass is a property of the whole song rather than of a channel.
-
-The normalizer does not check its own work, because it cannot: the walk that would is in
-`@amk/spc`, which this package may not import. `web/src/app/state/normalize-song.ts` runs the
-passes, compiles and walks after each, and applies nothing unless every intermediate plays the same
-music as the original — scoped or not, the standard is the same one; `normalizetest` pins both
-halves. `WalkNote.bend` is what makes a `$DD` visible to that comparison at all: the walk reports the
-slide on the note whose read-ahead picks it up, carrying the operands _and_ how far into that note
-the peek found them, so a rewrite that moved a slide behind a tie is caught rather than passed as the
-same music.
 
 ## `sampleList: null` is not `[]`
 

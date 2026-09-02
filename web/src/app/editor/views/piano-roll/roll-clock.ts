@@ -16,9 +16,6 @@ import { advanceTick } from './roll-clock-step';
  */
 const MAX_EXTRAPOLATION = 0.15;
 
-/** How often the readout is rewritten. Prose is read, not watched. */
-const READOUT_MS = 500;
-
 export interface ClockSources {
   /** Only run a frame callback while something is actually moving. */
   running: Signal<boolean>;
@@ -35,25 +32,18 @@ export interface ClockSources {
 export interface RollClock {
   /** The playhead, in ticks, at frame rate. */
   tick: Signal<number>;
-  /**
-   * The playhead as the readout states it, twice a second.
-   *
-   * The transform wants a tick every frame; a line of text does not. A count and
-   * a ticks-per-second restated sixty times a second are a blur the eye cannot
-   * read at all, so the readout takes the same clock slowly and the display
-   * keeps the frame-rate one to itself.
-   */
-  slowTick: Signal<number>;
   /** Put the playhead where a seek has just asked for, without waiting for an anchor. */
   jumpTo(tick: number): void;
 }
 
 /**
- * The roll's display clock: the driver's ten anchors a second, at frame rate.
+ * A display clock: the driver's ten anchors a second, at frame rate.
  *
- * A composable in the shape of `shared/chart/frame-clock.ts`, and it must be
- * called from an injection context for the same reason — it starts an effect and
- * a frame callback of its own.
+ * The roll's playhead runs on one, and so does the transport's tick readout, so
+ * a number and the line it stands for cannot disagree. A composable in the
+ * shape of `shared/chart/frame-clock.ts`, and it must be called from an
+ * injection context for the same reason — it starts an effect and a frame
+ * callback of its own.
  *
  * The arithmetic is `advanceTick` in `roll-clock-step.ts`, where `charttest`
  * can reach it. What is here is the reading of the driver that the step is given.
@@ -65,9 +55,7 @@ export function rollClock(sources: ClockSources): RollClock {
    * arithmetic both live.
    */
   const shown = signal(0);
-  const slow = signal(0);
   let lastFrameAt = 0;
-  let lastReadoutAt = 0;
 
   const frame = frameClock(sources.running);
 
@@ -110,11 +98,6 @@ export function rollClock(sources: ClockSources): RollClock {
         pass,
       }),
     );
-
-    if (at - lastReadoutAt >= READOUT_MS) {
-      lastReadoutAt = at;
-      slow.set(shown());
-    }
   };
 
   // Sanctioned effect: driving the display clock. The frame stamp is the only
@@ -127,7 +110,6 @@ export function rollClock(sources: ClockSources): RollClock {
 
   return {
     tick: shown.asReadonly(),
-    slowTick: slow.asReadonly(),
     jumpTo: (tick: number) => shown.set(tick),
   };
 }

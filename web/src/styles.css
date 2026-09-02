@@ -7,45 +7,107 @@
  *
  * The interface is dark-only on purpose: it is a code editor that sits beside a
  * hex dump, and a light theme would need its own validated bar palette.
+ *
+ * These are the **defaults**. `ThemeStore` may set any of them as an inline
+ * custom property on `<html>`, which outranks the `:root` rule this block emits,
+ * so a porter's chosen colour reaches every utility and every `var()` reader
+ * without a second selector. Resetting a token removes that inline property and
+ * lets the value below show through again, which is why the block is
+ * `@theme static`: Tailwind emits a theme variable only where something uses it,
+ * and reset needs all of them present whether or not a utility happens to name
+ * one.
  */
-@theme {
-  --color-surface: #16181d;
-  --color-raised: #1d2027;
-  --color-inset: #12141a;
-  --color-edge: #2c313b;
+@theme static {
+  --color-surface: #1e272e;
+  --color-raised: #2f3c45;
+  --color-inset: #171f25;
+  --color-edge: #42525c;
 
-  --color-ink: #d8dce4;
-  --color-ink-muted: #838b9b;
+  --color-ink: #dbe3e8;
+  --color-ink-muted: #9aaab5;
 
-  --color-accent: #6ea8fe;
-  --color-accent-soft: #a7c4e8;
+  /*
+   * What a control is emphasised in: a primary button's plate, a checked box, a
+   * slider's filled half and its thumb, a toggle chip that is on, and the border
+   * a button takes under the pointer.
+   *
+   * A blue-grey a step lighter than the chrome, so a button reads as the same
+   * material as the toolbar it sits in and the accent stays the one warm thing
+   * on screen. Its own token rather than `--color-accent`, because the two are
+   * asked different questions. The accent means *this is where the music is* —
+   * the playhead, a lit key, the caret — and it is read against the roll and
+   * the source. This is chrome emphasis, read against a button. A porter who
+   * wants coloured buttons sets this one and leaves the roll alone.
+   */
+  --color-control: #7ea6c4;
+
+  --color-accent: #ffa53a;
+  --color-accent-soft: #ffd08a;
   --color-danger: #ff7b72;
   --color-severe: #f0883e;
   --color-warn: #e3b341;
   --color-good: #7ee787;
 
   /*
+   * The source view's colouring, one token per tag in `TOKEN_TAGS`
+   * (`packages/mml-tokens/src/tokens.ts`), and shared with nothing: a porter
+   * reading MML all day wants the colouring under their own hand and should not
+   * have to move a button or a diagnostic to get it.
+   *
+   * Notes and numbers are the ink and comments and operators the muted ink, on
+   * purpose — the melody is the text, and everything else is annotation around
+   * it. The hex arguments are the one tag carrying a colour spent nowhere else:
+   * repeating the command's own colour would flatten `$E7 $02` into one
+   * undifferentiated run.
+   */
+  --color-syn-note: #dbe3e8;
+  --color-syn-command: #7ee787;
+  --color-syn-hex: #6ea8fe;
+  --color-syn-hex-arg: #a7c4e8;
+  --color-syn-number: #dbe3e8;
+  --color-syn-loop: #f0883e;
+  --color-syn-operator: #9aaab5;
+  --color-syn-directive: #6ea8fe;
+  --color-syn-channel: #6ea8fe;
+  --color-syn-string: #e3b341;
+  --color-syn-comment: #9aaab5;
+  --color-syn-invalid: #ff7b72;
+
+  /*
    * ARAM budget bar. A categorical set — the segments are identities (driver,
-   * song, samples, echo).
+   * song, samples, echo). `--color-seg-free` is the exception and is neutral:
+   * it is what the bar has *not* spent, so it names no identity.
    */
   --color-seg-driver: #3987e5;
   --color-seg-song: #199e70;
   --color-seg-samples: #c98500;
   --color-seg-echo: #d55181;
-  --color-seg-free: #333844;
+  --color-seg-free: #3a4852;
 
   /*
-   * The eight music channels, used by the piano roll's marks and by the overview
-   * bar's minimap of them, and nowhere else. Both are drawn on --color-surface,
-   * which is the contrast this set was validated against.
+   * The eight music channels, used by the piano roll's marks, by the overview
+   * bar's minimap of them, by the roll's channel picker and by the channel
+   * mixer's strips, and nowhere else. All four are drawn on --color-surface —
+   * the mixer's wash mixes down to it, and the picker's plate is a shade of it.
+   * The set is validated with the dataviz palette validator in dark mode
+   * against `--color-surface` `#1e272e`, every check passing and the worst
+   * contrast at ch-5 (3.07:1); it drops below 3:1 above about `#1f282f`, so
+   * that default may not be lighter than that without re-validating.
    *
    * Eight is past what any categorical set can keep separable for every pair of
    * viewers, so **nothing identifies a channel by colour alone**: a mark's
-   * tooltip names its channel, and the mixer numbers its chips rather than
-   * tinting them. The minimap needs no tooltip of its own — every bar on it is a
+   * tooltip names its channel, and the mixer's strip and the picker's chip are
+   * numbered as well as tinted and struck through where the channel is
+   * silenced. The minimap needs no tooltip of its own — every bar on it is a
    * note in the roll below, in the same hue and under the roll's own naming, so
    * its colours repeat what is already said in words rather than being the only
    * place something is said.
+   *
+   * That is also what makes these eight safe to hand to a porter. The picker
+   * will take any colour for any of them and the app does not re-validate the
+   * set, so a porter can put two channels on one hue — and nothing breaks,
+   * because nothing here was ever saying anything with colour that it was not
+   * also saying in words.
    */
   --color-ch-0: #3987e5;
   --color-ch-1: #d95926;

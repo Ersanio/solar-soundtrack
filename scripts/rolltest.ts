@@ -1,6 +1,6 @@
 /**
  * The piano roll's edits: `roll-strip.ts` and `roll-edit.ts`, driven the way the
- * roll drives them and checked the way the normalizer's output is checked.
+ * roll drives them and checked against the walk of what they wrote.
  *
  * A gesture is not verified by looking at the text it produced. It is verified
  * by **compiling that text and walking it**: every note the plan said the
@@ -24,7 +24,7 @@ import { octaveFor, octaveOfNote, spellDuration, spellNote } from "@amk/core/mml
 import type { CompileResult } from "@amk/core/types";
 import { loadDriver } from "@amk/spc/driver";
 import { type LoopRun, type PitchSlide, type SongTimeline, walkSong } from "@amk/spc/song-walk";
-import { type Command, type TokenIndex, tokenize } from "@amk/tokens";
+import { type Command, type TokenIndex, commandAt, tokenize } from "@amk/tokens";
 import { NOTE_NAMES } from "@amk/tokens/commands/units";
 import type { Edit } from "@amk/tokens/edits";
 import { type TimelineCommand, commandTimeline } from "../web/src/app/state/command-timeline";
@@ -59,12 +59,17 @@ import {
 	REFUSE_ROOM,
 	REFUSE_SPLIT,
 	REFUSE_SUB_SPLIT,
+	frameAt,
 	isEdits,
 	passShiftsFor,
+	planFrames,
 	planGesture,
 	plannedFrameTicks,
 	shiftBoundariesFor,
+	spansFrames,
 } from "../web/src/app/editor/views/piano-roll/roll-edit";
+import { noteLengthEdit } from "../web/src/app/output/command-inspector/note-length/length-rows";
+import { anchorsFor, notesAtAnchors } from "../web/src/app/editor/views/piano-roll/roll-selection";
 import { buildPreview } from "../web/src/app/editor/views/piano-roll/roll-preview";
 import { laneStack } from "../web/src/app/editor/views/piano-roll/roll-layout";
 import { SEED_SONG, seedEdits, seededChannel } from "../web/src/app/editor/views/piano-roll/roll-seed";
@@ -75,6 +80,7 @@ import {
 	openGap,
 	passesAt,
 	planEdits,
+	planGroupEdits,
 	resizeLoop,
 } from "../web/src/app/editor/views/piano-roll/roll-write";
 import {
@@ -83,6 +89,7 @@ import {
 	type StripFrame,
 	channelStrip,
 	channelTails,
+	framesInside,
 	isStrip,
 } from "../web/src/app/editor/views/piano-roll/roll-strip";
 import { SAMPLE_SONG } from "../web/src/app/state/sample-song";
@@ -322,10 +329,69 @@ interface Expectation {
 	mode?: EditMode;
 	/**
 	 * The frame a spawn runs in, for drawing into a loop body — its ticks are
-	 * then that frame's own. A gesture with items derives the frame from them and
-	 * needs no say here.
+	 * then that frame's own. A gesture with items derives the frame from them,
+	 * and a draw is routed by `frameAt` off the song tick it names.
 	 */
 	frame?: number;
+	/**
+	 * One **other** voice's whole walk, as `[channel, plays]`, for the edit that
+	 * is meant to reach it.
+	 *
+	 * A body declared on one channel and recalled from another is one text both
+	 * voices play, so a note drawn into it lands on both — the one case where
+	 * "leaves the other channels alone" is the wrong question. Spelling that
+	 * voice's walk out is what says the reach was the shared body itself and not
+	 * a splice that wandered into another channel's block.
+	 */
+	alsoPlays?: readonly [number, string];
+	/**
+	 * How long one **other** voice must run afterwards, as `[channel, ticks]`.
+	 *
+	 * {@link Expectation.playsFor} reads the song, which is the shortest channel,
+	 * so a channel padded further than the gesture asked is invisible there: the
+	 * over-pad stops it being the shortest and the figure does not move. This is
+	 * the reading that says a pad landed once.
+	 */
+	channelTicks?: readonly [number, number];
+}
+
+/**
+ * The plan's ordinals name the notes the commit wrote.
+ *
+ * `planEdits` lays a frame's notes down in the plan's own tick order, and
+ * `plannedOrdinals` is the roll reading that back: it is what a selection is
+ * carried across an edit on, since a strip index moves the moment an item is
+ * added or removed, a tick moves for every note after a length change, and an
+ * address moves for every byte written before it. Nothing else here can see it —
+ * a channel plays the same music whichever ordinal a note is at — so the day a
+ * region is written in an order the plan did not have it in, this is the only
+ * check that fails.
+ */
+function expectOrdinals(name: string, plan: Plan, after: Strip, frame: number): void {
+	const bar = after.frames[frame];
+	if (!bar) {
+		check(`${name}: the plan's frame is still there`, false, `frame ${frame}`);
+		return;
+	}
+
+	// A drum is named by its instrument alone: its letter says nothing, so the
+	// row's own `c` and whatever letter the text carries are the same note.
+	const spell = (written: number, drum: number | null): string => (drum === null ? String(written) : `@${drum}`);
+
+	const got: string[] = [];
+	for (let index = bar.from; index < bar.to; index++) {
+		const item = after.items[index];
+		if (item.kind === "note") {
+			got.push(spell(item.written, item.drum?.args[0]?.value ?? null));
+		}
+	}
+
+	const want = plan.notes.map((note) => spell(note.written, note.drum));
+	check(
+		`${name}: the plan's ordinals name the notes it wrote`,
+		want.join(" ") === got.join(" "),
+		`want ${want.join(" ")}\n        got  ${got.join(" ")}`,
+	);
 }
 
 function expectEdit(
@@ -347,11 +413,8 @@ function expectEdit(
 		return;
 	}
 
-	// The gesture's own frame: the one its first item sits in, or the root — a
-	// spawn into a body names its frame through the expectation.
 	const made = gesture(bar);
-	const first = "items" in made && made.items.length > 0 ? made.items[0] : undefined;
-	const frame = bar.frames[expectation.frame ?? (first !== undefined ? (bar.items[first]?.frame ?? 0) : 0)];
+	const frame = bar.frames[frameFor(bar, made, expectation.frame)];
 	const context: EditContext = {
 		source,
 		strip: bar,
@@ -386,6 +449,14 @@ function expectEdit(
 		return;
 	}
 
+	// A channel the roll can no longer frame — every note in it deleted, say — has
+	// no ordinals to speak of, and no strip for the selection to be put back on
+	// either. `expectNoStrip` is where a refusal is pinned.
+	const again = strip(after, rebuilt, channel);
+	if (typeof again !== "string") {
+		expectOrdinals(name, plan, again, bar.frames.indexOf(frame));
+	}
+
 	const want = planned(plan);
 	const got = played(rebuilt, channel);
 	check(
@@ -418,6 +489,12 @@ function expectEdit(
 		);
 	}
 
+	if (expectation.channelTicks !== undefined) {
+		const [voice, wanted] = expectation.channelTicks;
+		const ran = rebuilt.result.stats?.channelTicks?.[voice] ?? -1;
+		check(`${name}: #${voice} runs ${wanted} ticks`, ran === wanted, `${ran}`);
+	}
+
 	if (expectation.loopsWhereItDid === true) {
 		check(
 			`${name}: loops back where it did`,
@@ -448,6 +525,34 @@ function listOf(expectation: string | readonly string[] | undefined): readonly s
 	return typeof expectation === "string" ? [expectation] : expectation;
 }
 
+/**
+ * The frame a case's gesture runs in, decided the way the press decides it.
+ *
+ * A gesture with items takes its first one's frame; a draw has no item, so it is
+ * routed by `frameAt`, and the `base` that comes back turns the **song** tick a
+ * case is written in into the frame-local one the plan wants — which is what
+ * `roll-gesture.ts` does with `Drag.origin`. So a draw at a tick inside a pass
+ * this channel plays lands in the body, and one inside a pass some *other* voice
+ * plays over that body does not.
+ *
+ * An expectation naming a frame outright keeps it, its ticks being that frame's
+ * already.
+ */
+function frameFor(bar: Strip, made: Gesture, named: number | undefined): number {
+	if (named !== undefined) {
+		return named;
+	}
+
+	if (made.kind === "spawn") {
+		const drawn = frameAt(bar, made.startTick);
+		made.startTick -= drawn.base;
+		return drawn.frame;
+	}
+
+	const first = "items" in made && made.items.length > 0 ? made.items[0] : undefined;
+	return first !== undefined ? (bar.items[first]?.frame ?? 0) : 0;
+}
+
 /** The plan a gesture makes, for the assertions that are about the plan itself. */
 function planFor(
 	name: string,
@@ -469,8 +574,7 @@ function planFor(
 	}
 
 	const made = gesture(bar);
-	const first = "items" in made && made.items.length > 0 ? made.items[0] : undefined;
-	const frame = bar.frames[first !== undefined ? (bar.items[first]?.frame ?? 0) : 0];
+	const frame = bar.frames[frameFor(bar, made, undefined)];
 	const context: EditContext = {
 		source,
 		strip: bar,
@@ -804,10 +908,8 @@ expectNoStrip(
 );
 // A `&` is an operator, so `gather` raises no command for it and the scanner
 // cannot say which channel it is on — one anywhere refuses all eight, which the
-// second case is what pins. Normalize's `writePitchSlides` is the way out: it
-// writes the `$DD` the `&` compiles to, byte for byte (`normalizetest`), and a
-// channel using that form is editable, which the "a pitch slide" section below
-// is what pins. Neither half is worth much without the other.
+// second case is what pins. A channel using the `$DD` form it compiles to is
+// editable, which the "a pitch slide" section below is what pins.
 expectNoStrip("a legacy pitch slide", "#amk 2\n#0 o4 c4 & d4", 0, "`&`");
 expectNoStrip("a legacy pitch slide on another channel", "#amk 2\n#0 o4 c4 & d4\n#1 o4 e4 f4", 1, "`&`");
 // `<` and `>` are safe and must **not** be refused: a note's octave comes from
@@ -894,6 +996,11 @@ function walkedOthers(built: Built, channel: number): string {
  * or the gesture's items name, written, applied, recompiled — and then held to
  * `plays`, the edited voice's whole walk spelled out by hand, which is the one
  * reading that covers every pass of every body.
+ *
+ * Through `planFrames` and `planGroupEdits` rather than `planGesture` and
+ * `planEdits`, which is the road the roll takes: a gesture moving no tick may
+ * name items in several frames, and the two degenerate to the single-frame pair
+ * for every gesture that does not.
  */
 function expectLoopEdit(
 	name: string,
@@ -916,8 +1023,7 @@ function expectLoopEdit(
 	}
 
 	const made = gesture(bar);
-	const first = "items" in made && made.items.length > 0 ? made.items[0] : undefined;
-	const frame = bar.frames[expectation.frame ?? (first !== undefined ? (bar.items[first]?.frame ?? 0) : 0)];
+	const held = frameFor(bar, made, expectation.frame);
 	const context: EditContext = {
 		source,
 		strip: bar,
@@ -926,10 +1032,11 @@ function expectLoopEdit(
 		playableTicks: playable(before),
 		introTicks: introOf(before),
 		channels: tailsOf(source, before),
-		frame,
+		frame: bar.frames[held],
 		inForce: before.inForce,
 	};
-	const outcome = planEdits(context, planGesture(bar, made, expectation.mode ?? "insert", frame));
+	const parts = planFrames(bar, made, expectation.mode ?? "insert", held);
+	const outcome = planGroupEdits(context, parts);
 	if (!isEdits(outcome)) {
 		check(`${name}: the gesture can be written`, false, outcome.refused);
 		return;
@@ -959,17 +1066,35 @@ function expectLoopEdit(
 		typeof again === "string" ? `${again}\n        ${JSON.stringify(after)}` : "",
 	);
 
+	// Per frame, and at the frame's own index: a gesture reaching into a body
+	// opens no bracket, so the frame it was planned in is the frame it comes back
+	// as, which is what the roll's carried anchors are numbered by.
+	if (typeof again !== "string") {
+		for (const part of parts) {
+			expectOrdinals(name, part.plan, again, bar.frames.indexOf(part.frame));
+		}
+	}
+
 	check(
 		`${name}: every pass plays as asked`,
 		walked(rebuilt, channel) === plays,
 		`want ${plays}\n        got  ${walked(rebuilt, channel)}\n        text ${JSON.stringify(after)}`,
 	);
 
-	check(
-		`${name}: leaves the other channels alone`,
-		walkedOthers(before, channel) === walkedOthers(rebuilt, channel),
-		`${walkedOthers(before, channel)} -> ${walkedOthers(rebuilt, channel)}`,
-	);
+	if (expectation.alsoPlays === undefined) {
+		check(
+			`${name}: leaves the other channels alone`,
+			walkedOthers(before, channel) === walkedOthers(rebuilt, channel),
+			`${walkedOthers(before, channel)} -> ${walkedOthers(rebuilt, channel)}`,
+		);
+	} else {
+		const [voice, sounds] = expectation.alsoPlays;
+		check(
+			`${name}: #${voice} plays as asked`,
+			walked(rebuilt, voice) === sounds,
+			`want ${sounds}\n        got  ${walked(rebuilt, voice)}\n        text ${JSON.stringify(after)}`,
+		);
+	}
 
 	if (expectation.playsFor !== undefined) {
 		check(
@@ -977,6 +1102,12 @@ function expectLoopEdit(
 			playable(rebuilt) === expectation.playsFor,
 			`${playable(before)} -> ${playable(rebuilt)} ticks`,
 		);
+	}
+
+	if (expectation.channelTicks !== undefined) {
+		const [voice, wanted] = expectation.channelTicks;
+		const ran = rebuilt.result.stats?.channelTicks?.[voice] ?? -1;
+		check(`${name}: #${voice} runs ${wanted} ticks`, ran === wanted, `${ran}`);
 	}
 
 	if (expectation.loopsWhereItDid === true) {
@@ -1083,6 +1214,36 @@ expectLoopEdit(
 	() => ({ kind: "spawn", startTick: 48, ticks: 48, written: NOTE_MIN + 36 + 7, drum: null }),
 	"0+48:$a4 48+48:$ab 96+48:$a4 144+48:$ab 192+48:$a8",
 	{ frame: 1, contains: "[c4 g4]2", playsFor: 240 },
+);
+
+// A frame carries every voice's runs of its body, because a length change moves
+// both voices and the shift, the pad and the preview all read them to say so.
+// A **draw** is the one reader those extra runs are wrong for: `#1` is inside
+// its own `r1` here, and the pass covering tick 48 is `#0`'s. The note is `#1`'s
+// own music, written in `#1`, sounding once.
+expectLoopEdit(
+	"a note drawn over another voice's pass of a shared body stays in this channel",
+	"#amk 2\n#0 o4 (1)[c4 r4]2 r1\n#1 o4 r1 (1)2",
+	1,
+	() => ({ kind: "spawn", startTick: 48, ticks: 48, written: NOTE_MIN + 36 + 7, drum: null }),
+	"48+48:$ab 192+48:$a4 288+48:$a4",
+	{ playsFor: 384, lacks: "[c4 g4]" },
+);
+
+// And the same draw inside a pass `#1` really does play lands in the body, where
+// both voices pick it up — the promise the sibling washes make, which the guard
+// above must not take away.
+expectLoopEdit(
+	"a note drawn into this channel's own pass of a shared body lands on both voices",
+	"#amk 2\n#0 o4 (1)[c4 r4]2 r1\n#1 o4 r1 (1)2",
+	1,
+	() => ({ kind: "spawn", startTick: 240, ticks: 48, written: NOTE_MIN + 36 + 7, drum: null }),
+	"192+48:$a4 240+48:$ab 288+48:$a4 336+48:$ab",
+	{
+		contains: "(1)[c4 g4]2",
+		alsoPlays: [0, "0+48:$a4 48+48:$ab 96+48:$a4 144+48:$ab"],
+		playsFor: 384,
+	},
 );
 
 // Deleting a body note deletes it from every pass — the gap a rest, so the
@@ -1221,50 +1382,213 @@ expectRefused(
 	REFUSE_REMAP_FED,
 );
 
-// A cross-frame delete commits both frames' removals as one step.
-{
-	const source = "#amk 2\n#0 o4 [c4 d4]2 e4";
-	const before = build(source);
-	const bar = typeof before === "string" ? "no build" : strip(source, before, 0);
-	if (typeof before === "string" || typeof bar === "string") {
-		check("a delete across a bracket: builds", false, typeof bar === "string" ? bar : "");
-	} else {
-		// One item from each frame: the body's d4 and the root's e4. The split is
-		// the caller's (`roll-gesture.ts:run`), so the harness makes the same two
-		// plans and concatenates, which is what one commit holds.
-		const context = (frame: StripFrame): EditContext => ({
-			source,
-			strip: bar,
-			targetAMKVersion: before.result.stats?.targetAMKVersion ?? 4,
-			songTargetProgram: before.result.stats?.songTargetProgram ?? 0,
-			playableTicks: playable(before),
-			introTicks: introOf(before),
-			channels: tailsOf(source, before),
-			frame,
-			inForce: before.inForce,
-		});
-		const body = planEdits(
-			context(bar.frames[1]),
-			planGesture(bar, { kind: "delete", items: [bar.frames[1].from + 1] }, "insert", bar.frames[1]),
-		);
-		const root = planEdits(
-			context(bar.frames[0]),
-			planGesture(bar, { kind: "delete", items: [noteAt(bar, 0)] }, "insert", bar.frames[0]),
-		);
-		if (!isEdits(body) || !isEdits(root)) {
-			check("a delete across a bracket: both plans write", false, "");
-		} else {
-			const after = apply(
-				source,
-				[...body, ...root].sort((a, b) => a.span.start - b.span.start),
-			);
-			const rebuilt = build(after);
-			check(
-				"a delete across a bracket lands in one text",
-				typeof rebuilt !== "string" && walked(rebuilt, 0) === "0+48:$a4 48+48:$a4",
-				typeof rebuilt === "string" ? rebuilt : `${walked(rebuilt, 0)} ${JSON.stringify(after)}`,
-			);
+// A cross-frame delete commits both frames' removals as one step: the body's
+// `d4` and the root's `e4` in one gesture, split by `planFrames` and written by
+// `planGroupEdits`, which is the road `roll-gesture.ts:run` takes.
+expectLoopEdit(
+	"a delete across a bracket lands in one text",
+	"#amk 2\n#0 o4 [c4 d4]2 e4",
+	0,
+	(bar) => ({ kind: "delete", items: [bar.frames[1].from + 1, noteAt(bar, 0)] }),
+	"0+48:$a4 48+48:$a4",
+	{ contains: "[c4]2" },
+);
+
+// --- a loop carries the loops written inside it -------------------------------
+//
+// A loop box's rule transposes the body, and a loop written between those
+// brackets plays only where this one plays — so it is part of the same group and
+// moves with it. The group is widened at the press (`framesInside`), planned once
+// per frame (`planFrames`) and written as one commit (`planGroupEdits`); only a
+// gesture that moves no tick may do it, a frame's ticks being its own.
+
+/** The playable note indices of a frame — the scan the press makes. */
+function notesIn(bar: Strip, frame: StripFrame): number[] {
+	const found: number[] = [];
+	for (let index = frame.from; index < frame.to; index++) {
+		const item = bar.items[index];
+		if (item.kind === "note" && item.instances.length > 0) {
+			found.push(index);
 		}
+	}
+
+	return found;
+}
+
+/** The group a press on a body's box installs: its notes and every nested body's. */
+function bodyGroup(bar: Strip, body: number): number[] {
+	const frame = bar.frames.find((each) => each.body === body) ?? bar.frames[0];
+	return [frame, ...framesInside(bar, frame)].flatMap((each) => notesIn(bar, each));
+}
+
+check(
+	"only a gesture that moves no tick may span frames",
+	spansFrames({ kind: "delete", items: [] }) &&
+		spansFrames({ kind: "move", items: [], deltaTicks: 0, deltaKeys: 7, copy: false }) &&
+		!spansFrames({ kind: "move", items: [], deltaTicks: 48, deltaKeys: 0, copy: false }) &&
+		!spansFrames({ kind: "stretch", items: [], edge: "end", deltaTicks: 24 }),
+);
+
+// A subloop inside a loop. `+5` keeps every result a natural, so the text can be
+// pinned exactly; the body is 192 ticks and plays three times.
+expectLoopEdit(
+	"a loop transposed carries the subloop written inside it",
+	"#amk 2\n#0 o4 [ c4 [[d4]]2 e4 ]3",
+	0,
+	(bar) => ({
+		kind: "move",
+		items: bodyGroup(bar, bar.frames[1].body),
+		deltaTicks: 0,
+		deltaKeys: 5,
+		copy: false,
+	}),
+	"0+48:$a9 48+48:$ab 96+48:$ab 144+48:$ad 192+48:$a9 240+48:$ab 288+48:$ab 336+48:$ad 384+48:$a9 432+48:$ab 480+48:$ab 528+48:$ad",
+	{ contains: "[ f4 [[g4]]2 a4 ]3", playsAsLong: true },
+);
+
+// The other nesting direction, which the parser allows — `parseLoopStart`
+// refuses a `[` only on channel 8, and the driver's `$E9` call frame and `$E6`
+// sub frame are separate registers. What is inside what is a fact about the
+// text, so the frames read it the same way round. The body is 144 ticks.
+expectLoopEdit(
+	"a subloop transposed carries the loop written inside it",
+	"#amk 2\n#0 o4 [[ c4 [ d4 ]2 ]]3",
+	0,
+	(bar) => ({
+		kind: "move",
+		items: bodyGroup(bar, bar.frames[1].body),
+		deltaTicks: 0,
+		deltaKeys: 5,
+		copy: false,
+	}),
+	"0+48:$a9 48+48:$ab 96+48:$ab 144+48:$a9 192+48:$ab 240+48:$ab 288+48:$a9 336+48:$ab 384+48:$ab",
+	{ contains: "[[ f4 [ g4 ]2 ]]3", playsAsLong: true },
+);
+
+// The inner box grabbed instead: its own group and nothing above it.
+expectLoopEdit(
+	"and the inner box moves only its own body",
+	"#amk 2\n#0 o4 [ c4 [[d4]]2 e4 ]3",
+	0,
+	(bar) => ({
+		kind: "move",
+		items: bodyGroup(bar, bar.frames[2].body),
+		deltaTicks: 0,
+		deltaKeys: 5,
+		copy: false,
+	}),
+	"0+48:$a4 48+48:$ab 96+48:$ab 144+48:$a8 192+48:$a4 240+48:$ab 288+48:$ab 336+48:$a8 384+48:$a4 432+48:$ab 480+48:$ab 528+48:$a8",
+	{ contains: "[ c4 [[g4]]2 e4 ]3", playsAsLong: true },
+);
+
+// Span containment and not a walk of construct addresses: the `(1)2` written
+// inside the subloop plays a body declared **outside** it, whose text sounds in
+// other places in the song as well. `framesInside` does not name it, so the
+// group does not hold `c4` and the transpose leaves it exactly where it was.
+{
+	const source = "#amk 2\n#0 o4 (1)[ c4 ]2 [[ d4 (1)2 ]]3";
+	const before = build(source);
+	const bar = typeof before === "string" ? before : strip(source, before, 0);
+	check(
+		"a body merely called from inside another is not inside it",
+		typeof bar !== "string" && framesInside(bar, bar.frames[1]).length === 0,
+		typeof bar === "string" ? bar : JSON.stringify(bar.frames.map((each) => each.span)),
+	);
+}
+
+expectLoopEdit(
+	"and a transpose leaves that called body alone",
+	"#amk 2\n#0 o4 (1)[ c4 ]2 [[ d4 (1)2 ]]3",
+	0,
+	(bar) => ({
+		kind: "move",
+		items: bodyGroup(bar, bar.frames[1].body),
+		deltaTicks: 0,
+		deltaKeys: 5,
+		copy: false,
+	}),
+	"0+48:$a4 48+48:$a4 96+48:$ab 144+48:$a4 192+48:$a4 240+48:$ab 288+48:$a4 336+48:$a4 384+48:$ab 432+48:$a4 480+48:$a4",
+	{ contains: ["(1)[ c4 ]2", "[[ g4 (1)2 ]]3"], playsAsLong: true },
+);
+
+// The pad belongs to the gesture and not to either frame: both reach past `#1`'s
+// 384 ticks — the outer to 576 and the subloop to 528 — and two frames each
+// padding `#1` out to their own reach writes the rest twice, `coalesce` running
+// inside a plan rather than across them. `playsFor` cannot see it: an over-padded
+// `#1` stops being the shortest channel and the song's figure does not move. Its
+// own tick count is the reading, and a rest of the wrong length reads exactly
+// like a rest of the right one in the text.
+expectLoopEdit(
+	"a nested transpose pads the song once, not once per frame",
+	"#amk 2\n#0 o4 [ c4 [[d4]]2 e4 ]3\n#1 o4 g1 g1",
+	0,
+	(bar) => ({
+		kind: "move",
+		items: bodyGroup(bar, bar.frames[1].body),
+		deltaTicks: 0,
+		deltaKeys: 5,
+		copy: false,
+	}),
+	"0+48:$a9 48+48:$ab 96+48:$ab 144+48:$ad 192+48:$a9 240+48:$ab 288+48:$ab 336+48:$ad 384+48:$a9 432+48:$ab 480+48:$ab 528+48:$ad",
+	{ contains: "[ f4 [[g4]]2 a4 ]3", playsFor: 576, channelTicks: [1, 576] },
+);
+
+// A group spanning frames is only allowed to move where it moves no tick.
+expectRefused(
+	"a widened loop group dragged sideways",
+	"#amk 2\n#0 o4 [ c4 [[d4]]2 e4 ]3",
+	0,
+	(bar) => ({
+		kind: "move",
+		items: bodyGroup(bar, bar.frames[1].body),
+		deltaTicks: 48,
+		deltaKeys: 0,
+		copy: false,
+	}),
+	"insert",
+	REFUSE_SPLIT,
+);
+
+// One frame refused refuses the lot: `o6 a` is `$C5`, the top byte the driver
+// plays, so a semitone up is out of range for the subloop's frame and fine for
+// the outer one — and the outer frame's edits are thrown away with the rest.
+{
+	const source = "#amk 2\n#0 o4 [ c4 [[ o6 a4 ]]2 ]3";
+	const before = build(source);
+	const bar = typeof before === "string" ? before : strip(source, before, 0);
+	if (typeof before === "string" || typeof bar === "string") {
+		check("a group with one frame out of range: builds", false, typeof bar === "string" ? bar : "no build");
+	} else {
+		const outcome = planGroupEdits(
+			{
+				source,
+				strip: bar,
+				targetAMKVersion: before.result.stats?.targetAMKVersion ?? 4,
+				songTargetProgram: before.result.stats?.songTargetProgram ?? 0,
+				playableTicks: playable(before),
+				introTicks: introOf(before),
+				channels: tailsOf(source, before),
+				frame: bar.frames[1],
+				inForce: before.inForce,
+			},
+			planFrames(
+				bar,
+				{
+					kind: "move",
+					items: bodyGroup(bar, bar.frames[1].body),
+					deltaTicks: 0,
+					deltaKeys: 1,
+					copy: false,
+				},
+				"insert",
+				1,
+			),
+		);
+		check(
+			"one frame out of range refuses the whole group",
+			!isEdits(outcome) && outcome.refused === REFUSE_RANGE,
+			isEdits(outcome) ? `wrote ${outcome.length} edits` : outcome.refused,
+		);
 	}
 }
 
@@ -1518,6 +1842,16 @@ function expectGap(
 		);
 	}
 
+	// The one reading that catches an intro `/` carried across a construct: every
+	// note is still on its tick, and only the marker has moved.
+	if (expectation.loopsWhereItDid === true) {
+		check(
+			`${name}: loops back where it did`,
+			before.timeline.loopTick === rebuilt.timeline.loopTick,
+			`${before.timeline.loopTick} -> ${rebuilt.timeline.loopTick}`,
+		);
+	}
+
 	for (const wanted of listOf(expectation.contains)) {
 		check(`${name}: writes ${wanted}`, after.includes(wanted), JSON.stringify(after));
 	}
@@ -1738,6 +2072,206 @@ expectGap(
 	}
 }
 
+// --- and joins the halves back up ---------------------------------------------
+//
+// A leftward drag that spends the whole slack puts the pass back against the
+// occurrence in front of it, and two occurrences of one body touching are one
+// construct written twice. `loopJoin` is the reading; each case here is the
+// round trip of a split above it.
+
+console.log("\nthe loop box's edge joins a split loop");
+
+expectGap(
+	"a split recall joined back up",
+	"#amk 4\n#0 o4 (1)[c1] (1)2 r1^1^1 (1)3",
+	0,
+	1152,
+	-576,
+	"0+192:$a4 192+192:$a4 384+192:$a4 576+192:$a4 768+192:$a4 960+192:$a4",
+	{ contains: "(1)[c1] (1)5", lacks: "r1", playsFor: 1152 },
+);
+
+// The half that stays keeps its own spelling: what makes the two joinable is
+// that they play the same body, which says nothing about how either is written.
+expectGap(
+	"a declaration joined with its star",
+	"#amk 2\n#0 o4 [c4 d4] r2 *2",
+	0,
+	192,
+	-96,
+	"0+48:$a4 48+48:$a6 96+48:$a4 144+48:$a6 192+48:$a4 240+48:$a6",
+	{ contains: "[c4 d4]3", lacks: "*", playsFor: 288 },
+);
+expectGap(
+	"a labeled declaration joined with its recall",
+	"#amk 2\n#0 o4 (1)[c4 d4] r2 (1)2",
+	0,
+	192,
+	-96,
+	"0+48:$a4 48+48:$a6 96+48:$a4 144+48:$a6 192+48:$a4 240+48:$a6",
+	{ contains: "(1)[c4 d4]3", playsFor: 288 },
+);
+expectGap(
+	"two stars joined",
+	"#amk 2\n#0 o4 [c4] * r4 *3",
+	0,
+	144,
+	-48,
+	"0+48:$a4 48+48:$a4 96+48:$a4 144+48:$a4 192+48:$a4",
+	{ contains: "[c4] *4", playsFor: 240 },
+);
+
+// Joining a recall of another channel's body edits the recalling channel alone,
+// as splitting one does.
+expectGap(
+	"a cross-channel recall joined",
+	"#amk 2\n#0 o4 (1)[c4 d4] e4 r2\n#1 o4 (1) r4 (1)",
+	1,
+	144,
+	-48,
+	"0+48:$a4 48+48:$a6 96+48:$a4 144+48:$a6",
+	{ contains: "(1)2" },
+);
+
+// The count is the neighbour's own run and not every earlier pass the voice
+// plays: three occurrences join two of them, which `passesAt().before` cannot
+// say — it would answer 3 here and write `(1)6`.
+expectGap(
+	"three occurrences join only the neighbour",
+	"#amk 2\n#0 o4 (1)[c4] (1)2 r4 (1)3",
+	0,
+	192,
+	-48,
+	"0+48:$a4 48+48:$a4 96+48:$a4 144+48:$a4 192+48:$a4 240+48:$a4",
+	{ contains: "(1)[c4] (1)5", lacks: "(1)6", playsFor: 288 },
+);
+
+// A close that stops short leaves a gap, which is still two constructs.
+expectGap(
+	"a partial close joins nothing",
+	"#amk 4\n#0 o4 (1)[c1] (1)2 r1^1^1 (1)3",
+	0,
+	1152,
+	-192,
+	"0+192:$a4 192+192:$a4 384+192:$a4 960+192:$a4 1152+192:$a4 1344+192:$a4",
+	{ contains: ["(1)2", "(1)3"], lacks: "(1)5", playsFor: 1536 },
+);
+
+// And anything with a tick of its own left standing between the two halves
+// keeps them apart: the `v200` ends the slack walk holding its own tick, and a
+// note ends it outright.
+expectGap(
+	"a command between the halves joins nothing",
+	"#amk 2\n#0 o4 [c4 d4] r2 v200 r2 *2",
+	0,
+	288,
+	-480,
+	"0+48:$a4 48+48:$a6 192+48:$a4 240+48:$a6 288+48:$a4 336+48:$a6",
+	{ contains: "v200 *2", lacks: "]3" },
+);
+expectGap(
+	"a note between the halves joins nothing",
+	"#amk 2\n#0 o4 [c4 d4] r4 e4 r4 *2",
+	0,
+	240,
+	-480,
+	"0+48:$a4 48+48:$a6 144+48:$a8 192+48:$a4 240+48:$a6 288+48:$a4 336+48:$a6",
+	{ contains: "e4 *2", lacks: "]3" },
+);
+
+// The intro `/` is the one thing between two calls that `strip.commands` cannot
+// see — `gather` raises no command for an operator — so the guard is on the
+// text and not on the command list. A join written over one would carry it past
+// the whole occurrence with every note still on its tick, which only `loopTick`
+// catches.
+expectGap(
+	"the intro marker between the halves joins nothing",
+	"#amk 2\n#0 o4 [c4]2 / r4 *2 e4",
+	0,
+	144,
+	-48,
+	"0+48:$a4 48+48:$a4 96+48:$a4 144+48:$a4 192+48:$a8",
+	{ contains: "[c4]2 / *2", lacks: "]4", loopsWhereItDid: true, playsFor: 240 },
+);
+
+// Split and join are the one gesture in two directions, so the text that comes
+// back is the text that went in, character for character — anything else is a
+// spelling the second drag invented. Two documents, which `expectGap` cannot
+// express.
+{
+	const source = "#amk 4\n#0 o4 (1)[c1] (1)5";
+	const contextFor = (text: string, built: Built, bar: Strip): EditContext => ({
+		source: text,
+		strip: bar,
+		targetAMKVersion: built.result.stats?.targetAMKVersion ?? 4,
+		songTargetProgram: built.result.stats?.songTargetProgram ?? 0,
+		playableTicks: playable(built),
+		introTicks: introOf(built),
+		channels: tailsOf(text, built),
+		frame: bar.frames[0],
+		inForce: built.inForce,
+	});
+
+	const before = build(source);
+	const bar = typeof before === "string" ? "no build" : strip(source, before, 0);
+	const out = typeof bar === "string" ? null : grabEdge(bar, 576);
+	if (typeof before === "string" || typeof bar === "string" || !out) {
+		check("a split joined back: builds", false, typeof bar === "string" ? bar : source);
+	} else {
+		const split = openGap(contextFor(source, before, bar), out.item, out.run, out.pass, 576);
+		const opened = isEdits(split) ? apply(source, split) : "";
+		const grown = opened === "" ? "no build" : build(opened);
+		const again = typeof grown === "string" ? "no build" : strip(opened, grown, 0);
+		const back = typeof again === "string" ? null : grabEdge(again, 1152);
+		if (typeof grown === "string" || typeof again === "string" || !back) {
+			check("a split joined back: the split builds", false, JSON.stringify(opened));
+		} else {
+			const join = openGap(contextFor(opened, grown, again), back.item, back.run, back.pass, -576);
+			check(
+				"a split joined back is the text it started as",
+				isEdits(join) && apply(opened, join) === source,
+				isEdits(join) ? JSON.stringify(apply(opened, join)) : join.refused,
+			);
+		}
+	}
+}
+
+// A total past 255 is not a count any of the three spellings can carry
+// (`parser.ts:2492`, `:2792`, `:2836`, AMK0116), so the gap closes and the two
+// calls stand. Driven bare: a 300-pass walk is not a readable expectation.
+{
+	const source = "#amk 2\n#0 o4 (1)[c4] (1)200 r4 (1)100";
+	const before = build(source);
+	const bar = typeof before === "string" ? "no build" : strip(source, before, 0);
+	if (typeof before === "string" || typeof bar === "string") {
+		check("a count past 255: builds", false, typeof bar === "string" ? bar : "");
+	} else {
+		const found = grabEdge(bar, 9696);
+		if (!found) {
+			check("a count past 255: the grabbed pass names a construct", false, "nothing at 9696");
+		} else {
+			const context: EditContext = {
+				source,
+				strip: bar,
+				targetAMKVersion: before.result.stats?.targetAMKVersion ?? 4,
+				songTargetProgram: before.result.stats?.songTargetProgram ?? 0,
+				playableTicks: playable(before),
+				introTicks: introOf(before),
+				channels: tailsOf(source, before),
+				frame: bar.frames[0],
+				inForce: before.inForce,
+			};
+			const outcome = openGap(context, found.item, found.run, found.pass, -48);
+			const after = isEdits(outcome) ? apply(source, outcome) : outcome.refused;
+			check(
+				"a count past 255 closes the gap and leaves two calls",
+				after === "#amk 2\n#0 o4 (1)[c4] (1)200 (1)100",
+				JSON.stringify(after),
+			);
+		}
+	}
+}
+
 // The preview's projection: a frame-local plan is drawn once per pass, and a
 // length change slides pass k by k deltas — the honest picture of requirement
 // six while the pointer is still down.
@@ -1770,6 +2304,7 @@ expectGap(
 			rows: 40,
 			passes,
 			delta,
+			body: frame.body,
 		});
 		check(
 			"the live bar is drawn once per pass, later passes slid by the growth",
@@ -3783,8 +4318,7 @@ expectEdit(
 );
 
 // `@` switches instrument tuning on under Addmusic 4.05 rather than saying what
-// is already true, so the opening leaves it out — `normalize.ts:writeDefaults`
-// takes the same gate.
+// is already true, so the opening leaves it out.
 expectEdit(
 	"a channel opened on a target where an `@` is not a no-op",
 	"#am4\n#0 o4 c4 d4 e4 f4\n",
@@ -4382,6 +4916,182 @@ function bendTarget(built: Built, source: string, written: string): number | nul
 	// none, which is the reading `commands-in-force.ts` already takes.
 	const cut = "#amk 2\n#0 o4 c4 c4 $DD $00 $18 $A4\n#1 o4 c4";
 	check("and a note past the end of the pass carries none", slideOf(cut, 1) === null, JSON.stringify(slideOf(cut, 1)));
+}
+
+// --- the selection survives an edit -----------------------------------------
+
+// A set of indices means something for exactly as long as the strip it indexes
+// into stands, so a gesture anchors what is selected on the frame and ordinal
+// its plan gives each note (`roll-selection.ts`) and picks them out again in the
+// strip the commit builds. The round trip is what is pinned here; that the plan
+// and the written text agree about the order is pinned on every case above.
+
+/**
+ * The notes a selection comes back as, spelled as the text the commit wrote.
+ *
+ * A string is a refusal or a failure to rebuild — a channel the roll would have
+ * no strip for, and so nothing to put a selection back on.
+ */
+function carriedSelection(
+	source: string,
+	channel: number,
+	gesture: (bar: Strip) => Gesture,
+	chosen: (bar: Strip) => readonly number[],
+	mode: EditMode,
+): readonly string[] | string {
+	const before = build(source);
+	if (typeof before === "string") {
+		return before;
+	}
+
+	const bar = strip(source, before, channel);
+	if (typeof bar === "string") {
+		return bar;
+	}
+
+	const made = gesture(bar);
+	const first = "items" in made && made.items.length > 0 ? made.items[0] : undefined;
+	const held = first !== undefined ? (bar.items[first]?.frame ?? 0) : 0;
+	const context: EditContext = {
+		source,
+		strip: bar,
+		targetAMKVersion: before.result.stats?.targetAMKVersion ?? 4,
+		songTargetProgram: before.result.stats?.songTargetProgram ?? 0,
+		playableTicks: playable(before),
+		introTicks: introOf(before),
+		channels: tailsOf(source, before),
+		frame: bar.frames[held],
+		inForce: before.inForce,
+	};
+
+	const parts = planFrames(bar, made, mode, held);
+	const outcome = planGroupEdits(context, parts);
+	if (!isEdits(outcome)) {
+		return outcome.refused;
+	}
+
+	const anchors = anchorsFor(bar, parts, new Set(chosen(bar)));
+	const after = apply(source, outcome);
+	const rebuilt = build(after);
+	if (typeof rebuilt === "string") {
+		return rebuilt;
+	}
+
+	const again = strip(after, rebuilt, channel);
+	if (typeof again === "string") {
+		return again;
+	}
+
+	return [...notesAtAnchors(again, anchors)]
+		.sort((a, b) => a - b)
+		.map((index) => after.slice(again.items[index].unitSpan.start, again.items[index].unitSpan.end).trim());
+}
+
+function expectSelection(
+	name: string,
+	source: string,
+	channel: number,
+	gesture: (bar: Strip) => Gesture,
+	chosen: (bar: Strip) => readonly number[],
+	wanted: readonly string[],
+	mode: EditMode = "insert",
+): void {
+	const got = carriedSelection(source, channel, gesture, chosen, mode);
+	check(
+		name,
+		Array.isArray(got) && got.join(" | ") === wanted.join(" | "),
+		Array.isArray(got) ? `want ${wanted.join(" | ")}\n        got  ${got.join(" | ")}` : String(got),
+	);
+}
+
+{
+	const four = "#amk 2\n#0 o4 c8 d8 e8 f8";
+
+	// The gesture's own note and the ones it pushed out of the way both come
+	// back: a stretch moves its neighbours, and a selected note it reached is
+	// still the note the porter has hold of.
+	expectSelection(
+		"a stretch keeps the notes it was made on",
+		four,
+		0,
+		() => ({ kind: "stretch", items: [1], edge: "end", deltaTicks: 24 }),
+		() => [0, 1, 2],
+		["o4 c8", "d4", "e8"],
+	);
+
+	// The discriminator for the whole currency. `c8` crosses `d8` and carves the
+	// two notes after it, so it comes back as the frame's *third* note where it
+	// went in as the first — and index 0 now names the rest left behind. Only the
+	// plan's ordinal follows the note itself.
+	expectSelection(
+		"a note carried past another is still the note that was picked",
+		four,
+		0,
+		() => ({ kind: "move", items: [0], deltaTicks: 60, deltaKeys: 0, copy: false }),
+		() => [0, 1],
+		["o4 d8", "c8"],
+		"overwrite",
+	);
+
+	// A note the plan does not carry has gone, and takes its outline with it.
+	expectSelection(
+		"a deleted note is not put back",
+		four,
+		0,
+		() => ({ kind: "delete", items: [1] }),
+		() => [0, 1, 2],
+		["o4 c8", "e8"],
+	);
+
+	// A drum is confirmed by its `@` alone. Its letter says nothing — a drawn one
+	// is handed the row's own `c` whatever the text carries — so a pitch compared
+	// there would turn every percussion anchor away.
+	expectSelection(
+		"a drum comes back on its instrument",
+		"#amk 2\n#0 o4 @21 c8 @23 c8 e8",
+		0,
+		() => ({ kind: "stretch", items: [2], edge: "end", deltaTicks: 24 }),
+		() => [0, 1],
+		["o4 @21 c8", "@23 c8"],
+	);
+
+	// The inspector's own half rests on a different claim, and it is the whole of
+	// why that half carries no anchors: a panel's splice rewrites one command's
+	// text, so the channel comes back with the same items in the same order and
+	// the indices the roll already holds still name the notes they named.
+	{
+		const song = "#amk 2\n#0 o4 c8 d8 e8";
+		const spelled = (bar: Strip): string => bar.items.map((item) => `${item.kind}:${item.written}`).join(" ");
+		const before = build(song);
+		const bar = typeof before === "string" ? before : strip(song, before, 0);
+		const note = typeof before === "string" ? null : commandAt(before.index.commands, song.indexOf("d8"));
+		const edit = note && noteLengthEdit(song, note, 0, 4);
+		const after = edit ? apply(song, [edit]) : song;
+		const rebuilt = build(after);
+		const again = typeof rebuilt === "string" ? rebuilt : strip(after, rebuilt, 0);
+
+		check("a note's length is written into its own text", after === "#amk 2\n#0 o4 c8 d4 e8", JSON.stringify(after));
+		check(
+			"and the channel comes back with the same items at the same indices",
+			typeof bar !== "string" && typeof again !== "string" && spelled(bar) === spelled(again),
+			typeof bar === "string" || typeof again === "string" ? "no strip" : `${spelled(bar)} -> ${spelled(again)}`,
+		);
+	}
+
+	// A body is its own frame and its notes are numbered within it, so an anchor
+	// carries the frame's index too.
+	{
+		const looped = "#amk 2\n#0 o4 [ c8 d8 ]2 e8";
+		const body = (bar: Strip): readonly number[] => notesIn(bar, bar.frames[1]);
+		expectSelection(
+			"a note inside a loop body keeps its place",
+			looped,
+			0,
+			(bar) => ({ kind: "move", items: [body(bar)[1]], deltaTicks: 0, deltaKeys: 2, copy: false }),
+			(bar) => body(bar),
+			["c8", "e8"],
+		);
+	}
 }
 
 // --- seeding a song with no playable music ----------------------------------

@@ -2,8 +2,8 @@
  * `@amk/tokens`'s `edits.ts` — the splices the command inspector writes back.
  *
  * This is the one part of the inspector that does arithmetic on the user's
- * document, so it is the part that gets a harness. Two properties carry the
- * weight, and neither is visible from the panels that call it:
+ * document, so it is the part that gets a harness. Four properties carry the
+ * weight, and none is visible from the panels that call it:
  *
  *   1. **Gap preservation.** A splice replaces the parts that changed and copies
  *      the text between them out of the source. That is what keeps a tab, a
@@ -17,6 +17,17 @@
  *      the arguments are writable and the byte is not. Asking that question of
  *      the whole command — which is all `Command.replacement` can answer —
  *      refuses an edit that is perfectly safe.
+ *
+ *   3. **The instrument picker's list and its write are one map.** `@`, `@@`
+ *      and a raw `$DA` reach different sets, so every instrument
+ *      `instrumentReach` offers is written out and rescanned, and has to come
+ *      back as the one that was picked.
+ *
+ *   4. **A note's length is written onto the note.** A bare `c` under an `l8`
+ *      has no argument to splice and is still 24 ticks long, and its dots
+ *      compose rather than add (`Music.cpp:2950`), so the digits go in front of
+ *      them — `l8 c.` written back at its own denominator is `c8.` and still 36
+ *      ticks, not the 72 of `c4.`.
  */
 
 import {
@@ -24,6 +35,7 @@ import {
 	argsRewritable,
 	argumentText,
 	commandRewritable,
+	padAround,
 	spliceArg,
 	spliceArgs,
 	spliceCommand,
@@ -31,7 +43,18 @@ import {
 	spliceInstrumentByte,
 	spliceInstrumentSample,
 } from "@amk/tokens/edits";
+import {
+	LAST_DRIVER_INSTRUMENT,
+	instrumentByte,
+	instrumentReach,
+	selectedInstrument,
+} from "@amk/tokens/commands/instruments";
 import { type Command, tokenize } from "@amk/tokens";
+import {
+	noteLengthEdit,
+	noteLengthLabel,
+	noteLengthRows,
+} from "../web/src/app/output/command-inspector/note-length/length-rows";
 import { check, summarise } from "./harness";
 
 /** The command a test is about, found by VCMD so the source can stay readable. */
@@ -234,6 +257,192 @@ console.log("\nvariable-length commands do not lose their payload");
 		"and appending a note rewrites only from the count to the end",
 		applied(arp, spliceArgs(arp, arpCommand, ["$03", null, null, null])) === "#0 $FB $03 $18 $04 $07\n",
 	);
+}
+
+console.log("\nan instrument the inspector offers is the instrument it then selects");
+{
+	// The list a picker draws and the number a pick writes are two halves of one
+	// map, and the three spellings do not carry it the same way: `parseInstrument`
+	// remaps 19-29 under `@@` and emits nothing at all for a plain `@19`-`@29`,
+	// while a raw `$DA` is the byte itself — except under `#am4`, where `$13` up
+	// is a custom instrument and the driver's own last table entry has no spelling
+	// left. A list built on one reading and a write built on another offers one
+	// instrument and selects another, silently, and no assertion about the numbers
+	// on either side can see it. So this is a round trip through `tokenize`: write
+	// what the picker would write, and ask the scanner what the text now selects.
+	const CUSTOM = 2;
+	const song = (prelude: string, written: string): string =>
+		`${prelude}#instruments\n{\n\t"a.brr" $FE $6A $B8 $03 $00\n\t"b.brr" $FE $6A $B8 $03 $00\n}\n#0 ${written} c4\n`;
+
+	const instrumentIn = (source: string): Command => {
+		const found = tokenize(source).commands.find((c) => c.kind === "@" || c.vcmd === 0xda);
+		if (!found) {
+			throw new Error(`no instrument command in ${JSON.stringify(source)}`);
+		}
+
+		return found;
+	};
+
+	for (const spelling of [
+		{ name: "@n", prelude: "", written: "@0" },
+		{ name: "@@n", prelude: "", written: "@@0" },
+		{ name: "$DA", prelude: "", written: "$DA $00" },
+		{ name: "$DA under #am4", prelude: "#am4\n", written: "$DA $00" },
+	]) {
+		const source = song(spelling.prelude, spelling.written);
+		const command = instrumentIn(source);
+		const reach = instrumentReach(command, CUSTOM);
+		const offered = reach.join(" ");
+		const missed = reach.filter((instrument) => {
+			const byte = instrumentByte(command, instrument)!;
+			const after = applied(source, spliceArg(source, command, 0, argumentText(command, byte)));
+			return selectedInstrument(instrumentIn(after)) !== instrument;
+		});
+
+		check(`${spelling.name} selects every instrument it offers`, missed.length === 0, `missed ${missed.join(" ")}`);
+		check(`${spelling.name} offers this song's own two`, reach.includes(30) && reach.includes(31), `got ${offered}`);
+		check(`and not a third it has not defined`, !reach.includes(32), `got ${offered}`);
+		// 19 is a real entry that a raw `$DA` reaches; 20 is past the table under
+		// every spelling and emits nothing under any of them.
+		check(`nor 20, which no spelling reaches`, !reach.includes(20), `got ${offered}`);
+	}
+
+	const plain = instrumentIn(song("", "@0"));
+	const direct = instrumentIn(song("", "@@0"));
+	const raw = instrumentIn(song("", "$DA $00"));
+	const am4 = instrumentIn(song("#am4\n", "$DA $00"));
+
+	check("only the plain form writes a drum", instrumentReach(plain, CUSTOM).includes(21));
+	check("the direct form cannot, its 19-29 being custom instruments", instrumentByte(direct, 21) === null);
+	check("and a $DA cannot, a drum emitting no $DA at all", instrumentByte(raw, 21) === null);
+
+	check(
+		"a raw $DA is what reaches the driver's last table entry",
+		instrumentByte(raw, LAST_DRIVER_INSTRUMENT) === 0x13,
+		`${instrumentByte(raw, LAST_DRIVER_INSTRUMENT)}`,
+	);
+	check("which no @ names", instrumentByte(plain, LAST_DRIVER_INSTRUMENT) === null);
+	check("and which #am4 spends on a custom instrument", instrumentByte(am4, LAST_DRIVER_INSTRUMENT) === null);
+	check("$13 being where its own numbering starts", instrumentByte(am4, 30) === 0x13, `${instrumentByte(am4, 30)}`);
+	check("nothing past a byte is offered", instrumentByte(plain, 256) === null);
+}
+
+console.log("\na note's length is written onto the note, whatever it was written as");
+{
+	// The one control whose subject is a *segment* rather than an argument, and
+	// the reason it is: a note under a standing `l` has no argument at all and is
+	// still a note of a definite length. Every assertion here is a round trip
+	// through `tokenize` rather than a comparison of numbers, because the failure
+	// this is guarding against — digits written in front of dots that compose
+	// rather than add (`Music.cpp:2950`) — produces text that reads perfectly and
+	// plays something else.
+	const noteIn = (source: string, needle: string): Command => {
+		const at = source.indexOf(needle);
+		const found = tokenize(source).commands.find((c) => c.noteLength !== undefined && c.span.start === at);
+		if (!found) {
+			throw new Error(`no note at ${JSON.stringify(needle)} in ${JSON.stringify(source)}`);
+		}
+
+		return found;
+	};
+
+	/** Every note and rest of a song, in ticks — what it actually plays. */
+	const ticksOf = (source: string): string =>
+		tokenize(source)
+			.commands.filter((c) => c.noteLength !== undefined)
+			.map((c) => c.noteLength!.reduce((sum, segment) => sum + segment.ticks, 0))
+			.join();
+
+	const write = (source: string, needle: string, index: number, denominator: number): string =>
+		applied(source, noteLengthEdit(source, noteIn(source, needle), index, denominator));
+
+	const bare = "#amk 2\n#0 l8 c d e\n";
+	check("a bare note reads as one editable Length row", noteLengthRows(noteIn(bare, "c ")).length === 1);
+	check("named Length", noteLengthRows(noteIn(bare, "c "))[0].label === "Length");
+	check("at the standing l's denominator", noteLengthRows(noteIn(bare, "c "))[0].value === 8);
+	check("saying the digits are not written", noteLengthRows(noteIn(bare, "c "))[0].written === false);
+	check("and editable all the same", noteLengthRows(noteIn(bare, "c "))[0].editable === true);
+
+	const lengthened = write(bare, "c ", 0, 4);
+	check("writing 4 onto it puts the digits on the note", lengthened === "#amk 2\n#0 l8 c4 d e\n", lengthened);
+	check("which is the only note that moves", ticksOf(lengthened) === "48,24,24", ticksOf(lengthened));
+	check("the l itself untouched", ticksOf(bare) === "24,24,24", ticksOf(bare));
+
+	// The point the request turned on: a value that lands back on what the `l`
+	// says is still written out. Nothing here ever takes digits away, so there is
+	// no path back to a bare note and none is wanted — the note the porter has
+	// been adjusting stops answering to an `l` edited later.
+	const same = write(bare, "c ", 0, 8);
+	check("writing the l's own value still writes it", same === "#amk 2\n#0 l8 c8 d e\n", same);
+	check("and changes nothing about what plays", ticksOf(same) === ticksOf(bare), ticksOf(same));
+
+	// Dots compose, so the digits that keep `c.` where it is are the *plain*
+	// value's — `8`, not the 36 the segment plays for. A tick comparison alone
+	// passes here while the text is wrong, which is why the string is compared.
+	const dotted = "#amk 2\n#0 l8 c. d\n";
+	check("a dotted bare note is 36 ticks", ticksOf(dotted) === "36,24", ticksOf(dotted));
+	const kept = write(dotted, "c.", 0, 8);
+	check("and writing its own denominator keeps it there", kept === "#amk 2\n#0 l8 c8. d\n", kept);
+	check("byte for byte", ticksOf(kept) === "36,24", ticksOf(kept));
+	const doubled = write(dotted, "c.", 0, 4);
+	check("where 4 dots a quarter", doubled === "#amk 2\n#0 l8 c4. d\n", doubled);
+	check("to 72 ticks, the d unmoved", ticksOf(doubled) === "72,24", ticksOf(doubled));
+
+	// One number, two segments — the misalignment an argument-indexed row had.
+	const tie = "#amk 2\n#0 c4^8\n";
+	const rows = noteLengthRows(noteIn(tie, "c4^8"));
+	check("a tie is two rows", rows.length === 2 && rows[1].label === "Tied to", `got ${rows.length}`);
+	check("each on its own segment", rows[0].value === 4 && rows[1].value === 8, `${rows[0].value},${rows[1].value}`);
+	const retied = write(tie, "c4^8", 1, 4);
+	check("and the second row writes the second", retied === "#amk 2\n#0 c4^4\n", retied);
+	check("for 96 ticks", ticksOf(retied) === "96", ticksOf(retied));
+
+	// The three refusals, each in its own words and each returning no edit at
+	// all rather than a splice over text that is not the author's.
+	const macro = noteLengthRows(noteIn('"n=c4"\n#0 n\n', "n\n"))[0];
+	check("a note through a replacement is not editable", macro.editable === false);
+	check("and says which one", macro.lockedBecause === 'comes from the "n" replacement', String(macro.lockedBecause));
+	check("with no edit behind it", noteLengthEdit('"n=c4"\n#0 n\n', noteIn('"n=c4"\n#0 n\n', "n\n"), 0, 4) === null);
+
+	const exact = noteLengthRows(noteIn("#amk 4\n#0 c=37\n", "c=37"))[0];
+	check("an exact tick count is not a note value", exact.editable === false && exact.stops === null);
+	check("and reads out as its ticks", exact.value === 37, String(exact.value));
+
+	const odd = noteLengthRows(noteIn("#amk 4\n#0 l8. c\n", "c\n"))[0];
+	check("a bare note under a dotted l has no denominator to drag", odd.editable === false);
+	check("saying so", odd.lockedBecause?.includes("standing `l`") === true, String(odd.lockedBecause));
+
+	// The readout, which is the only thing that says what a `1/n` comes to.
+	const plainSegment = noteIn("#amk 2\n#0 c4\n", "c4").noteLength![0];
+	check(
+		"the reading names the value, the note and the ticks",
+		noteLengthLabel(plainSegment, 4) === "1/4 · a quarter note · 48 ticks",
+		noteLengthLabel(plainSegment, 4),
+	);
+	check(
+		"and follows the value being dragged rather than the one written",
+		noteLengthLabel(plainSegment, 8) === "1/8 · an eighth note · 24 ticks",
+		noteLengthLabel(plainSegment, 8),
+	);
+}
+
+console.log("\nan insertion is padded to stand as a token of its own");
+{
+	// One rule for the caret palette, the note palette, a wrap's two brackets
+	// and the rest a loop drag opens: a space on whichever side has a character
+	// against it, and none where there is already white space or nothing at all.
+	const song = "#0 c4 d4";
+	const pad = (start: number, end = start): string => {
+		const { before, after } = padAround(song, start, end);
+		return `${before}|${after}`;
+	};
+
+	check("between two characters it takes a space on each side", pad(4) === " | ", pad(4));
+	check("after a space it takes none in front", pad(3) === "| ", pad(3));
+	check("before a space it takes none behind", pad(5) === " |", pad(5));
+	check("at the start of the text none in front", pad(0) === "| ", pad(0));
+	check("at the end none behind", pad(song.length) === " |", pad(song.length));
+	check("a run is padded by its own two ends", pad(3, 5) === "|", pad(3, 5));
 }
 
 summarise();

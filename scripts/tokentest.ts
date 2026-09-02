@@ -528,6 +528,93 @@ console.log("\nthe default length follows `l`");
 	check("the l command itself carries no note length", at("#0 l16\n", 3)?.noteLength === undefined);
 }
 
+console.log("\nevery segment says which denominator names it, and where the digits go");
+{
+	// The inspector's Length slider is a `1/n` over these two fields, and both
+	// halves are load-bearing in a way a tick count cannot see. `denominator` has
+	// to be a value that, *written*, reproduces the ticks the segment already
+	// plays for — otherwise letting a slider go where it was picked up changes
+	// the music. `digits` has to cover the digits and nothing else: the dots of a
+	// segment compose rather than add (`Music.cpp:2950`), so a span reaching over
+	// them writes 48 where the note was 36, and one reaching over an `=` turns a
+	// tick count into a denominator.
+	const segmentOf = (source: string, needle: string) => lengthOf(source, needle)?.[0];
+	const digitsOf = (source: string, needle: string) => {
+		const span = segmentOf(source, needle)?.digits;
+		return span === undefined ? null : source.slice(span.start, span.end);
+	};
+
+	check("a written denominator is its own", segmentOf("#0 c4\n", "c4")?.denominator === 4);
+	check("and its digits are the digits", digitsOf("#0 c4\n", "c4") === "4", String(digitsOf("#0 c4\n", "c4")));
+
+	// The whole reason this exists: a bare note has no argument to hang a
+	// descriptor on and is still a note of a definite length.
+	const bare = segmentOf("#0 l8 c\n", "c\n");
+	check("a bare note reads the standing l's denominator", bare?.denominator === 8, String(bare?.denominator));
+	check("and its digit span is empty", bare?.digits.start === bare?.digits.end);
+	check(
+		"sitting right after the letter",
+		bare?.digits.start === "#0 l8 c\n".indexOf("c\n") + 1,
+		String(bare?.digits.start),
+	);
+
+	// In front of the dots rather than after them, so `c8.` is the 36 ticks `c.`
+	// already was and not the 72 that `c` + `4.` would be.
+	const dotted = "#0 l8 c.\n";
+	check("a dotted bare note keeps its dot out of the span", digitsOf(dotted, "c.") === "");
+	check("with the span before it", segmentOf(dotted, "c.")?.digits.start === dotted.indexOf("c.") + 1);
+	check("and the denominator that reproduces it", segmentOf(dotted, "c.")?.denominator === 8);
+
+	check("a written dotted note spans its digits alone", digitsOf("#0 c8.\n", "c8") === "8");
+	check("an exact count spans the number and not the =", digitsOf("#0 c=48\n", "c=48") === "48");
+	check("and names no denominator", segmentOf("#0 c=48\n", "c=48")?.denominator === null);
+
+	// A length nothing can be written as `1/n`. `l8.` is 36 ticks and every
+	// denominator floors to 38 or 32 either side of it.
+	check("a dotted l leaves a bare note with no denominator", segmentOf("#0 l8. c\n", "c\n")?.denominator === null);
+	// Where an exact one happens to land on a divisor, it does have one.
+	check("an exact l that lands on a note value has one", segmentOf("#0 l=48 c\n", "c\n")?.denominator === 4);
+
+	// getNoteLength discards a written length outside 1..192 and plays the
+	// standing default, so that is the number a control on it is showing.
+	check("c200 reads the standing l's denominator", segmentOf("#0 l16 c200\n", "c200")?.denominator === 16);
+
+	// The misalignment an argument-indexed row had: one number, two segments.
+	const tied = lengthOf("#0 c^8\n", "c^8");
+	check("c^8 is two segments", tied?.length === 2, `got ${tied?.length}`);
+	check("the head takes the default's denominator", tied?.[0].denominator === 8);
+	check("the tie takes its own", tied?.[1].denominator === 8 && tied[1].written === "8");
+	check("and the head's digits go before the ^", tied?.[0].digits.start === "#0 c^8\n".indexOf("c^8") + 1);
+	check("where the tie's are its number", tied?.[1].digits.start === "#0 c^8\n".indexOf("8"));
+
+	// The macro interlock, per segment: an expansion's tokens share one collapsed
+	// span, so there is no text of the author's to write the digits over.
+	const macro = lengthOf('"n=c4"\n#0 n\n', "n\n");
+	check("a note through a macro says so", macro?.[0].replacement === "n", macro?.[0].replacement);
+	check("a note written out does not", segmentOf("#0 c4\n", "c4")?.replacement === undefined);
+
+	// The property the whole field exists for, over every `l` a porter can
+	// write: the denominator a bare note reports, written onto that note, plays
+	// exactly what the note was already playing.
+	let reproduced = 0;
+	let unreachable = 0;
+	for (let n = 1; n <= 192; n++) {
+		const standing = segmentOf(`#0 l${n} c\n`, "c\n");
+		if (standing?.denominator == null) {
+			unreachable++;
+			continue;
+		}
+
+		const written = segmentOf(`#0 l${n} c${standing.denominator}\n`, `c${standing.denominator}`);
+		if (written?.ticks === standing.ticks) {
+			reproduced++;
+		}
+	}
+
+	check(`every l from 1 to 192 reproduces its own length (${reproduced})`, reproduced === 192, String(reproduced));
+	check("and none of them is unreachable", unreachable === 0, String(unreachable));
+}
+
 console.log("\ndots and exact lengths fork by dialect");
 {
 	// Music.cpp:2960 — Addmusic 4.05 stops after the second dot.

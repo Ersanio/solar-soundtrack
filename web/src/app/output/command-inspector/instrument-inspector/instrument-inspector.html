@@ -1,167 +1,190 @@
+<!-- An entry defines an instrument where everything below selects one, so the
+     picker has no place in it: `amk-instrument-entry` is the editor there. -->
 @if (definingEntry(); as entry) {
   <amk-instrument-entry [entry]="entry" />
-} @else if (written() < 0) {
-  <p class="text-ink-muted text-xs leading-relaxed">No number given, so this changes nothing.</p>
 } @else {
   <div class="space-y-3">
-    @switch (band()) {
-      @case ('unsupported') {
-        <div class="text-warn space-y-2 text-xs leading-relaxed">
-          <p>
-            <code class="text-ink">&#64;{{ written() }}</code> emits nothing. AddmusicK writes a
-            <code class="text-ink">$DA</code> only for <code class="text-ink">&#64;0</code>–<code
-              class="text-ink"
-              >&#64;18</code
-            >
-            and <code class="text-ink">&#64;30</code> upward, so the sound does not change — the
-            channel keeps whatever instrument it already had, or instrument 0 if none was ever set.
-            That is why it appears to be the same as <code class="text-ink">&#64;0</code>.
-          </p>
-          <p>
-            It is not inert, though. It still records itself as the channel's instrument, which
-            cancels a pending <code class="text-ink">&#64;21</code>–<code class="text-ink"
-              >&#64;29</code
-            >
-            drum and clears the current instrument's built-in transposition. So
-            <code class="text-ink">&#64;2 c4 &#64;19 c4</code> plays one timbre at two different
-            pitches.
-          </p>
-          <p>Valid instruments are {{ validRanges }}.</p>
-          @if (!direct()) {
+    <div class="flex flex-col gap-0.5">
+      <amk-enum-select
+        label="Instrument"
+        [value]="picker().selected"
+        [options]="picker().options"
+        [disabled]="!picker().editable"
+        [note]="picker().note"
+        [unknownLabel]="picker().unknownLabel"
+        (commit)="setInstrument($event)"
+      />
+      @if (picker().lockedBecause; as reason) {
+        <span class="text-ink-muted text-[11px] leading-snug italic">{{ reason }}</span>
+      }
+    </div>
+
+    @if (written() < 0) {
+      <p class="text-ink-muted text-xs leading-relaxed">
+        No number given, so this changes nothing.
+      </p>
+    } @else {
+      @switch (band()) {
+        @case ('unsupported') {
+          <div class="text-warn space-y-2 text-xs leading-relaxed">
             <p>
-              <code class="text-ink">&#64;&#64;{{ written() }}</code> does not help: the direct form
-              is remapped to <code class="text-ink">&#64;{{ written() + 11 }}</code
-              >, a custom instrument. Only a raw
-              <code class="text-ink">$DA ${{ written() | hex }}</code>
-              reaches the driver's own entry.
+              <code class="text-ink">&#64;{{ written() }}</code> emits nothing. AddmusicK writes a
+              <code class="text-ink">$DA</code> only for <code class="text-ink">&#64;0</code>–<code
+                class="text-ink"
+                >&#64;18</code
+              >
+              and <code class="text-ink">&#64;30</code> upward, so the sound does not change — the
+              channel keeps whatever instrument it already had, or instrument 0 if none was ever
+              set. That is why it appears to be the same as <code class="text-ink">&#64;0</code>.
             </p>
-          }
-        </div>
-      }
-
-      @case ('beyond') {
-        <p class="text-warn text-xs leading-relaxed">
-          <code class="text-ink">$DA ${{ written() | hex }}</code> reads past the driver's 20-entry
-          instrument table. Where it lands depends on how that driver indexes the table, which is
-          not something this editor can read, so the bytes it picks up are not shown. Percussion is
-          not reached this way — that is <code class="text-ink">&#64;21</code>–<code
-            class="text-ink"
-            >&#64;29</code
-          >, which rewrite the note instead.
-        </p>
-      }
-
-      @case ('undefined') {
-        <p class="text-warn text-xs leading-relaxed">
-          @if (direct()) {
-            The direct form <code class="text-ink">&#64;&#64;{{ written() }}</code> is remapped to
-            <code class="text-ink">&#64;{{ emitted() }}</code
-            >, a custom instrument —
-          } @else if (rawRemapped()) {
-            Under <code class="text-ink">#am4</code>,
-            <code class="text-ink">$DA ${{ written() | hex }}</code> means
-            <code class="text-ink">&#64;{{ emitted() }}</code
-            >, a custom instrument —
-          } @else {
-            <code class="text-ink">&#64;{{ written() }}</code> is a custom instrument, but
-          }
-          @if (customCount() === 0) {
-            this song defines none. Add an <code class="text-ink">#instruments</code> block; its
-            first entry is <code class="text-ink">&#64;30</code>.
-          } @else {
-            this song defines {{ customCount() }}, so the highest is
-            <code class="text-ink">&#64;{{ 29 + customCount() }}</code
-            >.
-          }
-        </p>
-      }
-
-      @default {
-        <table class="w-full border-collapse text-xs">
-          <tbody>
-            <tr class="border-edge/60 border-t first:border-t-0">
-              <td class="text-ink-muted py-1 pr-3 whitespace-nowrap">Instrument</td>
-              <td class="py-1 font-mono tabular-nums">
-                {{ writtenLabel() }}
-                <span class="text-ink-muted block font-sans text-[11px]">
-                  @switch (band()) {
-                    @case ('percussion') {
-                      drum {{ drumIndex() }} of 9 — no <code>$DA</code> is emitted
-                    }
-                    @case ('custom') {
-                      custom instrument, entry {{ customEntry() }} of {{ customCount() }}
-                    }
-                    @default {
-                      @if (raw()) {
-                        driver instrument table entry {{ emitted() }}
-                      } @else {
-                        stock instrument
-                      }
-                    }
-                  }
-                </span>
-              </td>
-            </tr>
-
-            @if (byteLabel(); as bytes) {
-              <tr class="border-edge/60 border-t">
-                <td class="text-ink-muted py-1 pr-3 whitespace-nowrap">Bytes</td>
-                <td class="py-1 font-mono tabular-nums">{{ bytes }}</td>
-              </tr>
+            <p>
+              It is not inert, though. It still records itself as the channel's instrument, which
+              cancels a pending <code class="text-ink">&#64;21</code>–<code class="text-ink"
+                >&#64;29</code
+              >
+              drum and clears the current instrument's built-in transposition. So
+              <code class="text-ink">&#64;2 c4 &#64;19 c4</code> plays one timbre at two different
+              pitches.
+            </p>
+            <p>Valid instruments are {{ validRanges }}.</p>
+            @if (!direct()) {
+              <p>
+                <code class="text-ink">&#64;&#64;{{ written() }}</code> does not help: the direct
+                form is remapped to <code class="text-ink">&#64;{{ written() + 11 }}</code
+                >, a custom instrument. Only a raw
+                <code class="text-ink">$DA ${{ written() | hex }}</code>
+                reaches the driver's own entry.
+              </p>
             }
-
-            @if (customSample(); as sample) {
-              <tr class="border-edge/60 border-t">
-                <td class="text-ink-muted py-1 pr-3 whitespace-nowrap">Defined as</td>
-                <td class="py-1 font-mono tabular-nums">{{ sample }}</td>
-              </tr>
-            }
-
-            @for (row of rows(); track row.label) {
-              <tr class="border-edge/60 border-t">
-                <td class="text-ink-muted py-1 pr-3 whitespace-nowrap">{{ row.label }}</td>
-                <td class="py-1 font-mono tabular-nums">
-                  {{ row.value }}
-                  @if (row.note) {
-                    <span class="text-ink-muted block font-sans text-[11px]">{{ row.note }}</span>
-                  }
-                </td>
-              </tr>
-            }
-          </tbody>
-        </table>
-
-        @if (incompleteCustom()) {
-          <p class="text-warn text-xs leading-relaxed">
-            This entry is unfinished. Each one needs a sample and five
-            <code class="text-ink">$xx</code> bytes.
-          </p>
-        }
-
-        @if (hasEnvelope()) {
-          <div>
-            <div class="text-ink-muted mb-1 text-[11px] tracking-wide uppercase">Envelope</div>
-            <amk-adsr-graph [adsr1]="adsr1()" [adsr2]="adsr2()" [gain]="gain()" />
           </div>
         }
 
-        @if (band() === 'percussion') {
-          <p class="text-ink-muted text-xs leading-relaxed">
-            The pitch you write is discarded —
-            <code class="text-ink">&#64;{{ written() }} c4</code> and
-            <code class="text-ink">&#64;{{ written() }} g4</code> are the same drum at the same
-            pitch, and only the length differs. It applies to the next note only, then the channel
-            reverts.
+        @case ('beyond') {
+          <p class="text-warn text-xs leading-relaxed">
+            <code class="text-ink">$DA ${{ written() | hex }}</code> reads past the driver's
+            20-entry instrument table. Where it lands depends on how that driver indexes the table,
+            which is not something this editor can read, so the bytes it picks up are not shown.
+            Percussion is not reached this way — that is <code class="text-ink">&#64;21</code>–<code
+              class="text-ink"
+              >&#64;29</code
+            >, which rewrite the note instead.
           </p>
         }
 
-        @if (direct() && written() <= 18) {
-          <p class="text-ink-muted text-xs leading-relaxed">
-            The direct form. For <code class="text-ink">&#64;0</code>–<code class="text-ink"
-              >&#64;18</code
-            >
-            it does exactly what the plain form does.
+        @case ('undefined') {
+          <p class="text-warn text-xs leading-relaxed">
+            @if (direct()) {
+              The direct form <code class="text-ink">&#64;&#64;{{ written() }}</code> is remapped to
+              <code class="text-ink">&#64;{{ emitted() }}</code
+              >, a custom instrument —
+            } @else if (rawRemapped()) {
+              Under <code class="text-ink">#am4</code>,
+              <code class="text-ink">$DA ${{ written() | hex }}</code> means
+              <code class="text-ink">&#64;{{ emitted() }}</code
+              >, a custom instrument —
+            } @else {
+              <code class="text-ink">&#64;{{ written() }}</code> is a custom instrument, but
+            }
+            @if (customCount() === 0) {
+              this song defines none. Add an <code class="text-ink">#instruments</code> block; its
+              first entry is <code class="text-ink">&#64;30</code>.
+            } @else {
+              this song defines {{ customCount() }}, so the highest is
+              <code class="text-ink">&#64;{{ 29 + customCount() }}</code
+              >.
+            }
           </p>
+        }
+
+        @default {
+          <table class="w-full border-collapse text-xs">
+            <tbody>
+              <tr class="border-edge/60 border-t first:border-t-0">
+                <!-- The spelling, not the instrument — the picker above says
+                     which instrument, and one word for the two names neither. -->
+                <td class="text-ink-muted py-1 pr-3 whitespace-nowrap">Written as</td>
+                <td class="py-1 font-mono tabular-nums">
+                  {{ writtenLabel() }}
+                  <span class="text-ink-muted block font-sans text-[11px]">
+                    @switch (band()) {
+                      @case ('percussion') {
+                        drum {{ drumIndex() }} of 9 — no <code>$DA</code> is emitted
+                      }
+                      @case ('custom') {
+                        custom instrument, entry {{ customEntry() }} of {{ customCount() }}
+                      }
+                      @default {
+                        @if (raw()) {
+                          driver instrument table entry {{ emitted() }}
+                        } @else {
+                          stock instrument
+                        }
+                      }
+                    }
+                  </span>
+                </td>
+              </tr>
+
+              @if (byteLabel(); as bytes) {
+                <tr class="border-edge/60 border-t">
+                  <td class="text-ink-muted py-1 pr-3 whitespace-nowrap">Bytes</td>
+                  <td class="py-1 font-mono tabular-nums">{{ bytes }}</td>
+                </tr>
+              }
+
+              @if (customSample(); as sample) {
+                <tr class="border-edge/60 border-t">
+                  <td class="text-ink-muted py-1 pr-3 whitespace-nowrap">Defined as</td>
+                  <td class="py-1 font-mono tabular-nums">{{ sample }}</td>
+                </tr>
+              }
+
+              @for (row of rows(); track row.label) {
+                <tr class="border-edge/60 border-t">
+                  <td class="text-ink-muted py-1 pr-3 whitespace-nowrap">{{ row.label }}</td>
+                  <td class="py-1 font-mono tabular-nums">
+                    {{ row.value }}
+                    @if (row.note) {
+                      <span class="text-ink-muted block font-sans text-[11px]">{{ row.note }}</span>
+                    }
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+
+          @if (incompleteCustom()) {
+            <p class="text-warn text-xs leading-relaxed">
+              This entry is unfinished. Each one needs a sample and five
+              <code class="text-ink">$xx</code> bytes.
+            </p>
+          }
+
+          @if (hasEnvelope()) {
+            <div>
+              <div class="text-ink-muted mb-1 text-[11px] tracking-wide uppercase">Envelope</div>
+              <amk-adsr-graph [adsr1]="adsr1()" [adsr2]="adsr2()" [gain]="gain()" />
+            </div>
+          }
+
+          @if (band() === 'percussion') {
+            <p class="text-ink-muted text-xs leading-relaxed">
+              The pitch you write is discarded —
+              <code class="text-ink">&#64;{{ written() }} c4</code> and
+              <code class="text-ink">&#64;{{ written() }} g4</code> are the same drum at the same
+              pitch, and only the length differs. It applies to the next note only, then the channel
+              reverts.
+            </p>
+          }
+
+          @if (direct() && written() <= 18) {
+            <p class="text-ink-muted text-xs leading-relaxed">
+              The direct form. For <code class="text-ink">&#64;0</code>–<code class="text-ink"
+                >&#64;18</code
+              >
+              it does exactly what the plain form does.
+            </p>
+          }
         }
       }
     }

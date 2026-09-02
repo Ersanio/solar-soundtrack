@@ -1,7 +1,8 @@
 import { Component, computed, inject, input, output, signal } from '@angular/core';
 
-import { spliceOut } from '@amk/tokens/edits';
+import type { Command } from '@amk/tokens';
 import { CommandIcon } from '../../../command-palette/command-icon';
+import { noteHeardOn } from '../../../../state/commands-in-force';
 import { EditorRequests } from '../../../../state/editor-requests';
 import { EditorStore } from '../../../../state/editor-store';
 import { type CommandLane, type LaneGlyph, laneGlyphX } from '../roll-command-layout';
@@ -9,6 +10,7 @@ import {
   type MoveTarget,
   commandMoveRefusal,
   commandMoveTargets,
+  eraseCommand,
   nearestTarget,
   planCommandMove,
 } from '../roll-command-move';
@@ -85,9 +87,28 @@ export class RollCommandLane {
   readonly laneHeight = input.required<number>();
   /** The song's own length, which holds the end glyphs inside it. */
   readonly songTicks = input.required<number>();
+  /**
+   * The command the inspector is answering about, which the lane rings.
+   *
+   * The roll's, rather than read off the caret here: the bars ring it too, and
+   * one signal is what stops the two layers coming to different answers.
+   * Compared by **identity**, which is what makes `[[ v100 v200 ]]2` right — one
+   * written `v200` runs twice, so two glyphs carry the one `Command` and both are
+   * rung, it being one command wherever the driver reads it.
+   */
+  readonly inspected = input.required<Command | null>();
 
   /** A wheel the lane does not use itself, which is the roll's zoom and its pan. */
   readonly wheeled = output<WheelEvent>();
+
+  /**
+   * A command was picked here, so the roll should let go of its notes.
+   *
+   * An output, as `RollNotes.channelPicked` is one, and for the same reason: the
+   * selection is a set of indices into the roll's own strip, which this knows
+   * nothing about and holds all eight channels' commands regardless.
+   */
+  readonly commandPicked = output<void>();
 
   protected readonly keyWidth = KEY_WIDTH;
 
@@ -137,28 +158,6 @@ export class RollCommandLane {
    */
   private readonly inSync = computed(() => this.editor.compiledText() === this.editor.source());
 
-  /**
-   * The command the inspector is answering about, which the lane rings.
-   *
-   * Every route to it lands here, because they all move the caret: a glyph on a
-   * bar, a glyph in the lane, and a button in the note inspector all set
-   * `EditorRequests.reveal`, and the caret is the one statement of what is being
-   * inspected. So this needs to know nothing about which of the three was used.
-   *
-   * By **identity** and not by span, which is what makes `[[ v100 v200 ]]2`
-   * right: one written `v200` runs twice, so two glyphs carry the one `Command`
-   * and both are rung — it is one command, wherever the driver reads it.
-   * `EditorStore.tokens` is the single scan both this and `commandTimeline` read,
-   * so the objects compare; out of sync the lane is empty and there is nothing to
-   * ring anyway.
-   *
-   * Dismissed the way the inspector is dismissed, since the ring stands for the
-   * panel: one that outlived it would be pointing at nothing.
-   */
-  protected readonly selected = computed(() =>
-    this.requests.dismissed() === this.editor.caret() ? null : this.editor.commandAtCaret(),
-  );
-
   protected onWheel(event: WheelEvent): void {
     if (event.ctrlKey || event.metaKey || event.shiftKey) {
       this.wheeled.emit(event);
@@ -176,14 +175,27 @@ export class RollCommandLane {
 
   /**
    * A single click asks the inspector about the command; a double click goes to
-   * it. It also lets go of the selected note, because a lane glyph names a
-   * command of the song rather than a note of it — so a value committed from
-   * the panel it opens previews nothing.
+   * it. It points `inspecting` at the note the command is heard on, so a value
+   * committed from the panel it opens replays that note, as one committed for a
+   * bar's chip replays the bar's — and at nothing where no note is left to hear it.
+   *
+   * It lets go of the roll's outlines, which are indices into a strip only the
+   * roll has and so go back up as {@link commandPicked}: a lane glyph names a
+   * command of the song, and a note outlined beside it would be two subjects at
+   * once, with `Delete` meaning one of them.
    */
   protected inspect(glyph: LaneGlyph, event: Event, show = false): void {
     event.stopPropagation();
     if (this.inSync()) {
-      this.requests.inspecting.set(null);
+      const heard = noteHeardOn(
+        this.editor.timeline()?.notes ?? [],
+        this.editor.commandsInForce(),
+        glyph,
+      );
+      this.requests.inspecting.set(
+        heard === null ? null : { address: heard.address, tick: heard.tick },
+      );
+      this.commandPicked.emit();
       this.requests.reveal.set({ span: { ...glyph.span }, show });
     }
   }
@@ -197,17 +209,22 @@ export class RollCommandLane {
    * `<svg>` is a sibling of the roll's scroller, so nothing there sees the event
    * and the browser menu would open over the lane.
    *
-   * Through `applyAll`, so one right click is one undo step.
+   * Through `applyAll`, so one right click is one undo step; and through
+   * `eraseCommand`, which the `Delete` key goes through as well — `removable` is
+   * that function's own precondition, kept on the glyph for the cursor and the
+   * hover, which are the only things on screen that say the delete is there.
    */
   protected erase(glyph: LaneGlyph, event: Event): void {
     event.preventDefault();
     event.stopPropagation();
-    if (!glyph.removable || !this.inSync()) {
+    if (!this.inSync()) {
       return;
     }
 
-    const edit = spliceOut(this.editor.source(), glyph.span);
-    this.requests.applyAll(edit ? [edit] : null);
+    // Keeps the notes: a command taken out adds and removes none, so the roll's
+    // selection still names the notes it named.
+    const edit = eraseCommand(this.editor.source(), glyph.command);
+    this.requests.applyAll(edit ? [edit] : null, null, true);
   }
 
   // --- carrying a command to another tick ------------------------------------
@@ -379,7 +396,9 @@ export class RollCommandLane {
     // An empty list is a drop that changes nothing, which `applyAll` ignores, so
     // a command let go where it already runs costs no undo step.
     if (isEdits(outcome)) {
-      this.requests.applyAll(outcome);
+      // Keeps the notes: a command carried to another tick moves none, so the
+      // roll's selection outlives the splice.
+      this.requests.applyAll(outcome, null, true);
     }
   }
 

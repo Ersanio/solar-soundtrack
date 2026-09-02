@@ -1,7 +1,8 @@
 /**
- * The command palette's catalogue.
+ * The command palette's catalogue, and the loop reading the two bracket buttons
+ * and the loop inspector share.
  *
- * Four assertions carry the weight here, and none is visible from the table
+ * Five assertions carry the weight here, and none is visible from the table
  * itself:
  *
  * 1. **The palette is not a third statement of arity.** An entry lists argument
@@ -32,6 +33,14 @@
  *    and compared byte for byte, which is `SUPERSEDED`'s standard applied to the
  *    other direction. Proving them equal is what lets the swap stay quiet.
  *
+ * 5. **A loop's count is priced in notes played, never in text.** Each of the
+ *    five spellings keeps its number somewhere else — on the second of two `]`
+ *    commands, on no command at all, or one less than itself — so a reading that
+ *    is wrong about which produces a perfectly plausible field over the wrong
+ *    number. Every count `loop-focus.ts` reads is written back and the result
+ *    walked, and a retarget is compared by *pitch*, since two bodies of one note
+ *    each play the same number of notes either way.
+ *
  *   npm run palettetest
  */
 
@@ -39,13 +48,41 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { compiler } from "@amk/compiler";
-import { type CommandTarget, commandAt, expectedArgs, tokenize, VCMD_NAMES } from "@amk/tokens";
+import type { Span } from "@amk/core/types";
+import { walkSong } from "@amk/spc/song-walk";
+import { type CommandTarget, commandAt, commandStartingAt, expectedArgs, tokenize, VCMD_NAMES } from "@amk/tokens";
+import type { Edit } from "@amk/tokens/edits";
 import { formAvailability } from "@amk/tokens/commands/availability";
+import { readLoops } from "@amk/tokens/commands/loops";
 import { channelsBeginAt, songTarget } from "@amk/tokens/dialect";
 import { ENTRIES, type ResolvedEntry, resolveEntry } from "../web/src/app/editor/command-palette/catalog";
 import { GLYPH_NAMES } from "../web/src/app/editor/command-palette/command-icon";
 import { glyphOf } from "../web/src/app/editor/command-palette/glyph-of";
+import {
+	BRACKETS_UNPAIRED,
+	CALL_NESTED,
+	CALL_NONE,
+	callVerdict,
+	isCall,
+	isWrap,
+	type WrapKind,
+	type WrapOffer,
+	WRAP_CHANNELS,
+	WRAP_DEEP,
+	WRAP_INTRO,
+	WRAP_NO_NOTES,
+	WRAP_NOTHING,
+	WRAP_REPLACEMENT,
+	WRAP_SPLIT,
+	wrapVerdict,
+} from "../web/src/app/editor/command-palette/loop-wrap";
 import { commandScope } from "@amk/tokens/commands/in-force";
+import {
+	loopCountEdit,
+	loopFocus,
+	loopNameEdit,
+	loopTargetEdit,
+} from "../web/src/app/output/loop-inspector/loop-focus";
 
 import { check, summarise } from "./harness";
 
@@ -68,19 +105,21 @@ const ARAM = 0x0800;
  * channel (`parseOpenParen`, and `channelsBeginAt`'s comment). Everything else
  * goes inside `#0`, which is where a caret usually is.
  *
- * `PARTNERS` is the third shape, for the two entries that open something. `]4`
- * outside a loop is AMK0129 and a `$E6 $00` that never closes leaves the
- * channel with no data at all (AMK0303) — both true of the text a *person*
- * types too, and both fixed by the next thing they type. The palette writes one
- * command per click, so the probe supplies the partner rather than the entry
- * pretending to be a pair.
+ * `PARTNERS` is the third shape, for an entry that needs something else in the
+ * song before it means anything. The palette writes one command per click, so
+ * the probe supplies the partner rather than the entry pretending to be a pair.
  */
 const PARTNERS: Readonly<Record<string, { above?: string; before?: string }>> = {
-	"text:]": { before: "[c4 " },
 	// A remote call is inert without a body to call, and AddmusicK says so
 	// (AMK0115). Its definition has to sit above the first channel, which is the
 	// other half of the rule the palette's own `context` encodes.
 	"text:(!n,": { above: "(!1)[$F4 $09]" },
+	// The same rule for the same reason: a `(n)m` names a body, and
+	// `parseLabelLoop` refuses a label that is not in `loopPointers` yet. The
+	// palette's own `callVerdict` never offers one there — this is the snippet
+	// compiled standalone, which is a claim about the spelling and not about
+	// where a click would put it.
+	"text:(n)": { before: "(0)[c4]2 " },
 };
 
 function probe(marker: string, entry: ResolvedEntry, beforeChannels: boolean): { song: string; at: number } {
@@ -611,6 +650,509 @@ console.log("\na command read back out of a song finds its glyph");
 	// them apart and a rule that preferred the written name would lose them.
 	check("$EF keeps the label that tells it from $F1", named("#amk 4", "$EF $FF $28 $28") === "Echo channels & volume");
 	check("and $F1 keeps its own", named("#amk 4", "$F1 $02 $00 $00") === "Echo delay & feedback");
+}
+
+// ---------------------------------------------------------------------------
+console.log("\nputting brackets round a selection");
+// ---------------------------------------------------------------------------
+//
+// The same standard as `formAvailability` above, applied to a rule about
+// structure rather than about dialect: `loop-wrap.ts` says which of the two
+// constructs may be written round a run *before* the brackets exist, and the
+// compiler is asked afterwards whether it was right. An offer that does not
+// compile is the promise broken; a refusal that would have compiled is a button
+// dead for nothing, so both directions are checked — the construct the verdict
+// declined is written out by hand and has to fail.
+{
+	const wrapped = (song: string, pick: string, want: WrapKind) => {
+		const index = tokenize(song);
+		const at = song.indexOf(pick);
+		return wrapVerdict({
+			source: song,
+			index,
+			reading: readLoops(song, index),
+			run: at < 0 || pick === "" ? null : { start: at, end: at + pick.length },
+			want,
+		});
+	};
+
+	const applied = (song: string, offer: WrapOffer) =>
+		song.slice(0, offer.at.start) +
+		offer.open +
+		song.slice(offer.at.start, offer.at.end) +
+		offer.close +
+		song.slice(offer.at.end);
+
+	const errorsIn = (song: string) =>
+		compiler
+			.compile({ source: song, aramAddress: ARAM })
+			.diagnostics.filter((diagnostic) => diagnostic.severity === "error")
+			.map((diagnostic) => diagnostic.code);
+
+	/** Notes the pass plays on channel 0 — how a wrap is proved to have repeated them. */
+	const played = (song: string) => {
+		const data = compiler.compile({ source: song, aramAddress: ARAM }).data;
+		return data === null || data === undefined
+			? -1
+			: walkSong(data, ARAM).notes.filter((note) => note.channel === 0).length;
+	};
+
+	/** An offer, compiled; the label says what was asked for and where. */
+	const offers = (label: string, song: string, pick: string, want: WrapKind, kind: WrapKind) => {
+		const verdict = wrapped(song, pick, want);
+		if (!isWrap(verdict)) {
+			check(label, false, `refused: ${verdict.refused}`);
+			return null;
+		}
+
+		check(label, verdict.kind === kind, `offered the ${verdict.kind}`);
+		const out = applied(song, verdict);
+		check(`${label}, and AddmusicK takes it silently`, errorsIn(out).length === 0, errorsIn(out).join(" "));
+		return out;
+	};
+
+	const refuses = (label: string, song: string, pick: string, want: WrapKind, because: string) => {
+		const verdict = wrapped(song, pick, want);
+		check(label, !isWrap(verdict) && verdict.refused === because, isWrap(verdict) ? "offered" : verdict.refused);
+	};
+
+	// The plain case, and the claim that gives a wrap its point.
+	{
+		const song = "#amk 4\n#0 o4 c4 d4 e4 f4\n";
+		const out = offers("a run outside every bracket takes a loop", song, "c4 d4", "loop", "loop");
+		check("and the loop is labelled from 0", out?.includes("(0)[") === true, out ?? "");
+		check(
+			"and the two notes inside it now play twice",
+			out !== null && played(out) === played(song) + 2,
+			`${out === null ? "?" : played(out)} against ${played(song)}`,
+		);
+	}
+
+	// The switch the feature is named for, in both directions.
+	offers(
+		"a run inside a loop takes the subloop instead",
+		"#amk 4\n#0 o4 (0)[ c4 d4 e4 ]2\n",
+		"c4 d4",
+		"loop",
+		"subloop",
+	);
+	offers("a run inside a subloop takes the loop", "#amk 4\n#0 o4 [[ c4 d4 ]]2 e4\n", "c4 d4", "loop", "loop");
+	offers(
+		"a run holding a loop takes the subloop round it",
+		"#amk 4\n#0 o4 (0)[ c4 d4 ]2 e4\n",
+		"(0)[ c4 d4 ]2",
+		"loop",
+		"subloop",
+	);
+	offers(
+		"and a hand-written $E6 pair counts as the subloop it is",
+		"#amk 4\n#0 o4 $E6 $00 c4 d4 $E6 $01\n",
+		"c4 d4",
+		"loop",
+		"loop",
+	);
+
+	// Both levels spent. The proof it is a real limit and not a guess: writing
+	// either construct there by hand is one of the two errors named below.
+	{
+		const song = "#amk 4\n#0 o4 [ c4 [[ d4 e4 ]]2 f4 ]3\n";
+		refuses("a run inside both is refused", song, "d4 e4", "loop", WRAP_DEEP);
+		check(
+			"and a loop written there really is AMK0123",
+			errorsIn(song.replace("d4 e4", "[ d4 e4 ]2")).includes("AMK0123"),
+			errorsIn(song.replace("d4 e4", "[ d4 e4 ]2")).join(" "),
+		);
+		check(
+			"and a subloop really is AMK0121",
+			errorsIn(song.replace("d4 e4", "[[ d4 e4 ]]2")).includes("AMK0121"),
+			errorsIn(song.replace("d4 e4", "[[ d4 e4 ]]2")).join(" "),
+		);
+	}
+
+	// The swap in the other direction: the depth is what runs out, not the button.
+	offers(
+		"a subloop asked for inside a subloop takes the loop instead",
+		"#amk 4\n#0 o4 [[ c4 d4 ]]2\n",
+		"c4 d4",
+		"subloop",
+		"loop",
+	);
+	refuses(
+		"and asked for inside both it is refused in the same words",
+		"#amk 4\n#0 o4 [ c4 [[ d4 e4 ]]2 f4 ]3\n",
+		"d4 e4",
+		"subloop",
+		WRAP_DEEP,
+	);
+
+	// With the brackets unpaired there is nothing to reason from, and the compiler
+	// would refuse the song anyway.
+	refuses("brackets that do not pair up refuse a wrap", "#amk 4\n#0 o4 [ c4 d4\n", "c4 d4", "loop", BRACKETS_UNPAIRED);
+
+	// The refusals that are about the run rather than about the depth.
+	refuses("nothing selected", "#amk 4\n#0 o4 c4 d4\n", "", "loop", WRAP_NOTHING);
+	refuses("a selection with no note in it", "#amk 4\n#0 o4 c4 d4\n", "o4", "loop", WRAP_NO_NOTES);
+	refuses("a run across a bracket", "#amk 4\n#0 o4 (0)[ c4 d4 ]2 e4\n", "d4 ]2 e4", "loop", WRAP_SPLIT);
+	refuses("a run across a channel marker", "#amk 4\n#0 o4 c4\n#1 o4 d4\n", "c4\n#1 o4 d4", "loop", WRAP_CHANNELS);
+	refuses("a run holding the intro marker", "#amk 4\n#0 o4 c4 / d4\n", "c4 / d4", "loop", WRAP_INTRO);
+	refuses(
+		"a run written through a replacement",
+		'#amk 4\n"two=c4 d4"\n#0 o4 two e4\n',
+		"two e4",
+		"loop",
+		WRAP_REPLACEMENT,
+	);
+
+	// The label, which is the one piece of state a wrap has to read off the whole
+	// song. `parseLabelLoop` stores `n + 1` and `parseRemoteDefinition` stores `n`
+	// (`parser.ts:2460`, `:2517-2518`), so `(0)` and `(!1)` are one slot and
+	// writing both is AMK0124 — which is exactly what an allocator that counted
+	// only its own kind would walk into.
+	{
+		const next = (song: string, pick: string) => {
+			const verdict = wrapped(song, pick, "loop");
+			return isWrap(verdict) ? verdict.label : null;
+		};
+
+		check("a song with no loops offers 0", next("#amk 4\n#0 o4 c4\n", "c4") === 0);
+		check("a song already using (0) offers 1", next("#amk 4\n#0 o4 (0)[ c4 ]2 d4\n", "d4") === 1);
+		check(
+			"and a remote (!1) takes 0's slot, so the wrap offers 1",
+			next("#amk 4\n(!1)[$F4 $09]\n#0 o4 c4\n", "c4") === 1,
+			String(next("#amk 4\n(!1)[$F4 $09]\n#0 o4 c4\n", "c4")),
+		);
+		check(
+			"and writing (0) beside that (!1) really is AMK0124",
+			errorsIn("#amk 4\n(!1)[$F4 $09]\n#0 o4 (0)[ c4 ]2\n").includes("AMK0124"),
+			errorsIn("#amk 4\n(!1)[$F4 $09]\n#0 o4 (0)[ c4 ]2\n").join(" "),
+		);
+	}
+
+	// A `$DD` is read by the note in front of it rather than dispatched
+	// (`main.asm:L_10E4`), so a closing bracket written between the two puts the
+	// body's own `$00` where the slide was.
+	{
+		const out = offers(
+			"a slide riding on the last note goes inside the brackets",
+			"#amk 4\n#0 o4 c4 $DD $00 $18 $A4 d4\n",
+			"c4",
+			"loop",
+			"loop",
+		);
+		check("and the bracket really is past it", out?.includes("$A4 ]2") === true, out ?? "");
+	}
+
+	// A drum's `@21`-`@29` comes inside with its note: `[` copies the remap into
+	// slot 8 and the note there clears slot 8 alone (`parser.ts:2725`, `:3013`),
+	// so one left outside would still be standing when the loop ends.
+	{
+		const out = offers("a drum takes its own @ in with it", "#amk 4\n#0 @21 c4 d4\n", "c4", "loop", "loop");
+		check("and the @ is inside the brackets", out?.includes("[ @21 c4 ]") === true, out ?? "");
+	}
+}
+
+// ---------------------------------------------------------------------------
+console.log("\nreading a loop's count, and writing it back");
+// ---------------------------------------------------------------------------
+//
+// The same standard once more, on the other half of the brackets: `loop-focus.ts`
+// says what a construct repeats and where that number is written, and the
+// compiler is asked whether it was right. The claim is priced in **notes played**
+// rather than in text, because every one of the five spellings keeps its count
+// somewhere else — on the second of two `]` commands, on no command at all, or
+// one less than itself — and a reading that is wrong about which produces a
+// perfectly plausible field over the wrong number.
+{
+	const errorsIn = (song: string) =>
+		compiler
+			.compile({ source: song, aramAddress: ARAM })
+			.diagnostics.filter((diagnostic) => diagnostic.severity === "error")
+			.map((diagnostic) => diagnostic.code);
+
+	/** What channel 0 plays, by written pitch and in order — the oracle for a retarget. */
+	const notesIn = (song: string) => {
+		const data = compiler.compile({ source: song, aramAddress: ARAM }).data;
+		return data === null || data === undefined
+			? null
+			: walkSong(data, ARAM)
+					.notes.filter((note) => note.channel === 0)
+					.map((note) => note.note);
+	};
+
+	const played = (song: string) => notesIn(song)?.length ?? -1;
+
+	const focusOn = (song: string, pick: string) => {
+		const index = tokenize(song);
+		const at = song.indexOf(pick);
+		return loopFocus({ source: song, index, reading: readLoops(song, index), caret: at, hint: null })[0];
+	};
+
+	const applied = (song: string, edit: Edit | null) =>
+		edit === null ? song : song.slice(0, edit.span.start) + edit.text + song.slice(edit.span.end);
+
+	// Every spelling, its count read and then written, priced against the walk.
+	// A body of one note means "notes played" *is* the count, so a reading one
+	// out — the `$E6`'s byte, the `]]`'s second bracket — cannot hide.
+	{
+		const cases: { name: string; song: string; pick: string; plays: number }[] = [
+			{ name: "a [ ]n loop", song: "#amk 4\n#0 o4 [c4]4 e4\n", pick: "]4", plays: 4 },
+			{ name: "a [ ] with no count", song: "#amk 4\n#0 o4 [c4] e4\n", pick: "]", plays: 1 },
+			{ name: "a [[ ]]n subloop", song: "#amk 4\n#0 o4 [[c4]]4 e4\n", pick: "]]4", plays: 4 },
+			{
+				name: "a hand-written $E6 pair",
+				song: "#amk 4\n#0 o4 $E6 $00 c4 $E6 $03 e4\n",
+				pick: "$E6 $03",
+				plays: 4,
+			},
+			{ name: "a (n)m call", song: "#amk 4\n#0 o4 (0)[c4]2 (0)3 e4\n", pick: "(0)3", plays: 3 },
+			{ name: "a *n call", song: "#amk 4\n#0 o4 [c4]2 *3 e4\n", pick: "*3", plays: 3 },
+		];
+
+		for (const { name, song, pick, plays } of cases) {
+			const focus = focusOn(song, pick);
+			check(`${name} reads its count`, focus?.count?.plays === plays, String(focus?.count?.plays));
+
+			const out = applied(song, focus ? loopCountEdit(song, focus, plays + 2) : null);
+			check(`${name}, written up by two, compiles`, errorsIn(out).length === 0, errorsIn(out).join(" "));
+			check(
+				`${name}, written up by two, plays two more notes`,
+				played(out) === played(song) + 2,
+				`${played(out)} against ${played(song)}`,
+			);
+		}
+	}
+
+	// The wart the loop reading exists to retire. `gather` gives `]]4` two `]`
+	// commands and the count lands on the second, so the first is a command whose
+	// Repeats row can never be filled — and a caret there does not even reach it,
+	// `commandAt` being end-inclusive and handing back the note in front instead.
+	// Three claims, so a change to any of them is caught.
+	{
+		const song = "#amk 4\n#0 o4 [[c4]]4 e4\n";
+		const commands = tokenize(song).commands;
+		const at = song.indexOf("]]");
+		const first = commandStartingAt(commands, at);
+		check("the first ] of a ]]4 gathers no count of its own", first?.args.length === 0, String(first?.args.length));
+		check("and a caret on it does not even reach that bracket", commandAt(commands, at)?.name === "note");
+		check("where the loop reading finds the 4", focusOn(song, "]]")?.count?.plays === 4);
+	}
+
+	// A count written through a replacement is in the expansion `gather` sees and
+	// not in the digits, so a reading off the source would say "nothing written,
+	// so 1". Writing it is refused for the same reason `edits.ts` refuses every
+	// macro'd part: the splice would overwrite the use site.
+	{
+		const song = '#amk 4\n"REP=4"\n#0 o4 [c4]REP e4\n';
+		const focus = focusOn(song, "]REP");
+		check("a count through a replacement is read as 4", focus?.count?.plays === 4, String(focus?.count?.plays));
+		check("and is not editable", focus?.count?.editable === false);
+		check("and the splice refuses", focus !== undefined && loopCountEdit(song, focus, 5) === null);
+	}
+
+	// Retargeting a call. Counted in *pitches* rather than in note totals: two
+	// bodies of one note each play the same number of notes either way, so only
+	// what is heard can tell a retarget from a no-op.
+	{
+		const song = "#amk 4\n#0 o4 (0)[c4]2 (1)[d4]2 (0)3 e4\n";
+		const focus = focusOn(song, "(0)3");
+		check(
+			"a call offers every label declared above it",
+			focus?.recalls?.options.map((option) => option.value).join(",") === "0,1",
+			focus?.recalls?.options.map((option) => option.label).join(" ") ?? "",
+		);
+
+		const out = applied(song, focus ? loopTargetEdit(song, focus, 1) : null);
+		check("and pointing it at (1) compiles", errorsIn(out).length === 0, errorsIn(out).join(" "));
+		const before = notesIn(song) ?? [];
+		const after = notesIn(out) ?? [];
+		check(
+			"and the three notes it played are now the other body's",
+			before.length === after.length && before.join() !== after.join(),
+			`${before.join()} -> ${after.join()}`,
+		);
+	}
+
+	// A label declared *below* a call is one AddmusicK refuses outright, which is
+	// why the control is a select over what is above rather than a number field.
+	{
+		const song = "#amk 4\n#0 o4 (0)3 (0)[c4]2 e4\n";
+		check(
+			"a call offers nothing where its body is declared below it",
+			focusOn(song, "(0)3")?.recalls?.options.length === 0,
+		);
+		check("and writing that call really is AMK0115", errorsIn(song).includes("AMK0115"), errorsIn(song).join(" "));
+	}
+
+	// A `*` names no body, so the select's own entry is the honest description of
+	// what it plays; choosing a label writes the call that says it out loud.
+	{
+		const song = "#amk 4\n#0 o4 (0)[c4]2 *3 e4\n";
+		const focus = focusOn(song, "*3");
+		check("a * reports no label", focus?.recalls?.label === -1, String(focus?.recalls?.label));
+		const out = applied(song, focus ? loopTargetEdit(song, focus, 0) : null);
+		check("and naming its body writes a (0) call", out.includes("(0)3"), out);
+		check("which compiles", errorsIn(out).length === 0, errorsIn(out).join(" "));
+		check("and plays exactly what the * did", notesIn(out)?.join() === notesIn(song)?.join());
+	}
+
+	// A remote body is jumped into by a `$FC` rather than looped over, so a count
+	// on it means nothing and AddmusicK says so.
+	{
+		const song = "#amk 4\n(!1)[$F4 $09]\n#0 o4 c4\n";
+		const focus = focusOn(song, "$F4");
+		check("a remote definition offers no count", focus?.kind === "remote" && focus.count === null);
+		check(
+			"and writing one really is AMK0164",
+			errorsIn("#amk 4\n(!1)[$F4 $09]2\n#0 o4 c4\n").includes("AMK0164"),
+			errorsIn("#amk 4\n(!1)[$F4 $09]2\n#0 o4 c4\n").join(" "),
+		);
+	}
+
+	// Naming a body, which is what makes an unnamed hand-written loop reachable
+	// by a call at all. The allocator counts a `(!n)` too, or it walks into
+	// AMK0124 — the same rule the wrap's own label test above pins.
+	{
+		const song = "#amk 4\n#0 o4 [c4]2 e4\n";
+		const focus = focusOn(song, "]2");
+		check("an unnamed loop offers the lowest free label", focus?.name?.label === 0, String(focus?.name?.label));
+		const out = applied(song, focus ? loopNameEdit(focus, 0) : null);
+		check("and naming it writes the (0) hard against the [", out.includes("(0)[c4]2"), out);
+		check("which compiles", errorsIn(out).length === 0, errorsIn(out).join(" "));
+		check("and plays what it played", notesIn(out)?.join() === notesIn(song)?.join());
+		check(
+			"a loop that already has a name is not offered another",
+			focusOn("#amk 4\n#0 o4 (0)[c4]2 e4\n", "]2")?.name === null,
+		);
+
+		// A label the parser carries: `(n)[` sets `loopLabel`, a `[[` met next leaves
+		// it standing and the next `[` files it (`parser.ts:2731-2736`), so the
+		// second loop here is `(5)` and the call below plays `e4`. The reading has to
+		// say so too, or the panel calls a compiling song's call undeclared and
+		// offers the body a second name that would orphan the first.
+		const carried = "#amk 4\n#0 o4 (5)[[ d4 ]]4 [ e4 ]2 (5)3\n";
+		check("a label carried past a subloop compiles", errorsIn(carried).length === 0, errorsIn(carried).join(" "));
+		const took = readLoops(carried, tokenize(carried)).spans.find((span) => span.kind === "call");
+		check("and is filed on the loop that took it", took?.label === 5, String(took?.label));
+		check(
+			"so the call finds its body",
+			focusOn(carried, "(5)3")?.recalls?.options.some((option) => option.value === 5) === true,
+		);
+		check("and that body is not offered another name", focusOn(carried, "]2")?.name === null);
+	}
+
+	// A subloop's floor is 2 and a `[ ]`'s is 1, and both are the compiler's.
+	{
+		check("a subloop's count starts at 2", focusOn("#amk 4\n#0 o4 [[c4]]4\n", "]]4")?.count?.min === 2);
+		check("a loop's starts at 1", focusOn("#amk 4\n#0 o4 [c4]4\n", "]4")?.count?.min === 1);
+		check(
+			"and ]]1 really is AMK0126",
+			errorsIn("#amk 4\n#0 o4 [[c4]]1\n").includes("AMK0126"),
+			errorsIn("#amk 4\n#0 o4 [[c4]]1\n").join(" "),
+		);
+	}
+
+	// The list, and its order. A note inside a nested body is inside both, and
+	// the innermost is the one an edit there is about.
+	{
+		const song = "#amk 4\n#0 o4 (1)[c4 [[d4]]3 ]2 (1)5\n";
+		const index = tokenize(song);
+		const at = (pick: string) =>
+			loopFocus({
+				source: song,
+				index,
+				reading: readLoops(song, index),
+				caret: song.indexOf(pick, 10),
+				hint: null,
+			});
+
+		check("a note in one body names one loop", at("c4").length === 1 && at("c4")[0].kind === "loop");
+		check(
+			"a note in a nested body names both, innermost first",
+			at("d4")
+				.map((focus) => focus.kind)
+				.join() === "subloop,loop",
+			at("d4")
+				.map((focus) => focus.kind)
+				.join(),
+		);
+		check("and a caret on a call's own text says so", at("(1)5")[0]?.onText === true);
+		check("where a caret inside a body does not", at("d4")[0]?.onText === false);
+	}
+
+	// What the roll's press adds, and the only thing it adds: which of a body's
+	// constructs the porter took hold of. The caret is on the body's first note
+	// either way, so without the hint every press answers with the declaration.
+	{
+		const song = "#amk 4\n#0 o4 (1)[c4 d4]2 e4 (1)3\n";
+		const index = tokenize(song);
+		const reading = readLoops(song, index);
+		const body = reading.spans[0];
+		const recall = reading.recalls[0];
+		const ask = (hint: { text: Span; body: Span } | null) =>
+			loopFocus({ source: song, index, reading, caret: body.bodyFrom, hint })[0];
+
+		check("with no hint the body's own declaration leads", ask(null)?.kind === "loop");
+		check(
+			"a press on the recall's box puts that call first",
+			ask({
+				text: { start: recall.from, end: recall.to, line: 1 },
+				body: { start: body.bodyFrom, end: body.bodyTo, line: 1 },
+			})?.kind === "call",
+		);
+		check(
+			"and a hint for another body is ignored",
+			ask({
+				text: { start: recall.from, end: recall.to, line: 1 },
+				body: { start: 0, end: 1, line: 1 },
+			})?.kind === "loop",
+		);
+	}
+
+	// The palette's own half: what **Loop call** writes, and when it will not.
+	{
+		const asked = (song: string, pick: string) => {
+			const index = tokenize(song);
+			return callVerdict({ source: song, index, reading: readLoops(song, index), caret: song.indexOf(pick) });
+		};
+
+		const song = "#amk 4\n#0 o4 (0)[c4]2 (1)[d4]2 e4\n";
+		const offer = asked(song, "e4");
+		check("a call is offered where a named loop stands above the caret", isCall(offer));
+		if (isCall(offer)) {
+			check("and it names the nearest one", offer.label === 1, String(offer.label));
+			const out = song.slice(0, song.indexOf("e4")) + offer.text + song.slice(song.indexOf("e4"));
+			check("and AddmusicK takes it silently", errorsIn(out).length === 0, errorsIn(out).join(" "));
+			check(
+				"and it plays the body it named",
+				played(out) === played(song) + 2,
+				`${played(out)} against ${played(song)}`,
+			);
+		}
+
+		const none = asked("#amk 4\n#0 o4 [c4]2 e4\n", "e4");
+		check("an unnamed loop is nothing a call can reach", !isCall(none) && none.refused === CALL_NONE);
+
+		const above = asked("#amk 4\n#0 o4 c4 (0)[d4]2\n", "c4");
+		check("nor is one written below the caret", !isCall(above) && above.refused === CALL_NONE);
+
+		const inside = asked("#amk 4\n#0 o4 (0)[c4]2 [d4 e4]2\n", "e4");
+		check("a call inside a [ ] body is refused", !isCall(inside) && inside.refused === CALL_NESTED);
+		check(
+			"and writing one really is AMK0112",
+			errorsIn("#amk 4\n#0 o4 (0)[c4]2 [d4 (0)2]2\n").includes("AMK0112"),
+			errorsIn("#amk 4\n#0 o4 (0)[c4]2 [d4 (0)2]2\n").join(" "),
+		);
+
+		const sub = asked("#amk 4\n#0 o4 (0)[c4]2 [[d4 e4]]2\n", "e4");
+		check("but one inside a [[ ]] is not — a subloop leaves the channel alone", isCall(sub));
+
+		const unpaired = asked("#amk 4\n#0 o4 (0)[c4]2 [d4 e4\n", "e4");
+		check(
+			"and brackets that do not pair up refuse a call",
+			!isCall(unpaired) && unpaired.refused === BRACKETS_UNPAIRED,
+			isCall(unpaired) ? "offered" : unpaired.refused,
+		);
+	}
 }
 
 summarise();

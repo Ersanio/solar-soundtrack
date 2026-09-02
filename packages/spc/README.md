@@ -272,8 +272,8 @@ package's business, as the percussion set is not.
 already sounding swallows it by peeking at the track pointer (`main.asm:3256-3287`) — so it acts on
 the note _in front of_ it and fills no slot, a slide running once and leaving nothing standing for a
 later note to sound under. It is therefore in no `origins`, and `bendFrom` is the address of the
-`$DD` a note's own read-ahead picked up, beside the `WalkNote.bend` operands and separate from them
-because `normalize-song.ts` compares those between a song and its rewrite. It is also the one entry
+`$DD` a note's own read-ahead picked up, beside the `WalkNote.bend` operands and separate from them,
+the operands being what the driver runs and the address where it read them. It is also the one entry
 in `SongTimeline.commands` raised outside `slotsOf`, being an execution rather than a slot changing
 hands: a `[ ]` body carrying one raises it every pass, on the tick of the frame the peek found it in
 rather than the tick the read pointer reached the byte at.

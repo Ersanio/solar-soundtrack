@@ -11,6 +11,7 @@ import {
   unreachableChannels,
   walkSong,
 } from '@amk/spc/song-walk';
+import { readLoops } from '@amk/tokens/commands/loops';
 import { echoHazards } from '@amk/tokens/echo-hazards';
 import { commandsInForceOf } from './commands-in-force';
 import { type TimelineCommand, commandTimeline } from './command-timeline';
@@ -19,7 +20,6 @@ import { ClockMeasurer, tempoDiagnostic } from './clock-measurer';
 import { caretPosition, downloadBlob, errorMessage } from '../util/format';
 import { readStored, writeStored } from '../util/storage';
 import { DriverStore } from './driver-store';
-import { type NormalizeOutcome, normalizeSong } from './normalize-song';
 import { SAMPLE_SONG } from './sample-song';
 import { SampleStore } from './sample-store';
 
@@ -62,6 +62,21 @@ export class EditorStore {
   readonly caret = signal(0);
 
   /**
+   * The document's own selection, ordered, written from the same update listener
+   * as {@link caret} — which is its head.
+   *
+   * A range as well as a point because the palette's two bracket forms go round
+   * a run of music rather than landing at a point, and an empty range is how the
+   * editor says there is nothing to put brackets round.
+   */
+  readonly selection = signal<{ start: number; end: number }>(
+    { start: 0, end: 0 },
+    // By value: the listener writes a fresh object on every caret move, and the
+    // two palettes' bracket verdicts hang off this.
+    { equal: (a, b) => a.start === b.start && a.end === b.end },
+  );
+
+  /**
    * The text the compiler last ran on. It lags `source` by the typing debounce,
    * which is why the two are separate signals: the editor stays responsive at
    * keystroke speed while compilation runs at most every {@link DEBOUNCE_MS}.
@@ -94,8 +109,7 @@ export class EditorStore {
    * What the sample library holds, and what the user asked to be done with it.
    * A compiler that does not understand these keys ignores them, per the
    * `CompileRequest.options` contract. Read inside {@link compilation}, so the
-   * compile tracks the library; read again by {@link normalize}, which compiles
-   * the same song several times over and has to do it under the same options.
+   * compile tracks the library.
    */
   private compileOptions(): Record<string, unknown> {
     return {
@@ -345,6 +359,15 @@ export class EditorStore {
   readonly commandAtCaret = computed(() => commandAt(this.tokens().commands, this.caret()));
 
   /**
+   * The song's loop structure, off the same undebounced scan {@link tokens} is.
+   *
+   * Here rather than in each panel because three of them ask on every keystroke —
+   * the two palettes, for what a bracket may go round, and the inspector, for
+   * what construct the caret is in — and one pass answers all three.
+   */
+  readonly loops = computed(() => readLoops(this.source(), this.tokens()));
+
+  /**
    * The `#instruments` entry the caret is in, if any.
    *
    * Needed alongside {@link commandAtCaret} rather than derived from it: most of
@@ -402,36 +425,6 @@ export class EditorStore {
   /** Compilation is gated on a driver, so every producing action is too. */
   readonly canCompile = computed(() => this.drivers.ready());
   readonly canDownload = computed(() => this.result()?.ok === true && this.result()?.data !== null);
-  /**
-   * Normalizing rewrites the whole document off the compile of it, so the two
-   * have to be the same text: while a keystroke is still inside the debounce
-   * the spans the rewrite is built on point into a document that has moved.
-   */
-  readonly canNormalize = computed(
-    () => this.result()?.ok === true && this.compiledText() === this.source(),
-  );
-
-  /**
-   * The song rewritten for editing, or the reasons it cannot be — see
-   * `normalize-song.ts`. `null` without a driver, since there is no address to
-   * compile at. Reads the live document rather than `committed`, which is what
-   * {@link canNormalize} guards.
-   *
-   * With a channel, only that channel's music is rewritten and every other one
-   * is left exactly as it was — which is what the roll asks for when one channel
-   * is in the way, and which above all does not refuse because some *other*
-   * channel holds the shape being objected to. The check is the same either
-   * way: the result is walked and compared against the original before anything
-   * is applied.
-   */
-  normalize(channel?: number): NormalizeOutcome | null {
-    const driver = this.drivers.driver();
-    if (!driver) {
-      return null;
-    }
-
-    return normalizeSong(this.source(), driver.manifest.localPos, this.compileOptions(), channel);
-  }
 
   constructor() {
     // Sanctioned effect: mirroring signal state into an imperative store.
