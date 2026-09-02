@@ -14,6 +14,7 @@ export const CHANGELOG: readonly ChangelogEntry[] = [
       'Escape deselects the command you are inspecting',
       'Changing a command picked in the command lane previews the note it acts on',
       'The Normalize button is gone: the piano roll edits a song as it is written',
+      'The command lane is always shown below the piano roll',
     ],
   },
   {

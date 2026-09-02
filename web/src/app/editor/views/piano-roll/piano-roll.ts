@@ -169,7 +169,6 @@ export class PianoRoll {
   protected readonly beatsPerBar = computed(() => this.settings().beatsPerBar);
   protected readonly beatUnit = computed(() => this.settings().beatUnit);
   protected readonly percussionOpen = computed(() => this.settings().percussionOpen);
-  protected readonly commandLaneOpen = computed(() => this.settings().commandLaneOpen);
   protected readonly editChannel = computed(() => this.settings().editChannel);
   protected readonly snap = computed(() => this.settings().snap);
   protected readonly editMode = computed(() => this.settings().editMode);
@@ -1413,10 +1412,6 @@ export class PianoRoll {
 
   protected setEditMode(editMode: EditMode): void {
     this.settings.update((s) => ({ ...s, editMode }));
-  }
-
-  protected setCommandLaneOpen(commandLaneOpen: boolean): void {
-    this.settings.update((s) => ({ ...s, commandLaneOpen }));
   }
 
   protected setPercussionOpen(percussionOpen: boolean): void {

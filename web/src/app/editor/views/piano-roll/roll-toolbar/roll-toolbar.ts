@@ -45,7 +45,6 @@ export class RollToolbar {
   readonly beatsPerBar = input.required<number>();
   readonly beatUnit = input.required<number>();
   readonly percussionOpen = input.required<boolean>();
-  readonly commandLaneOpen = input.required<boolean>();
   readonly snap = input.required<SnapName>();
   readonly editMode = input.required<EditMode>();
   /** Why the picked channel cannot be edited, or null when it can. */
@@ -67,7 +66,6 @@ export class RollToolbar {
   readonly beatsPerBarChange = output<number>();
   readonly beatUnitChange = output<number>();
   readonly percussionOpenChange = output<boolean>();
-  readonly commandLaneOpenChange = output<boolean>();
   readonly snapChange = output<SnapName>();
   readonly editModeChange = output<EditMode>();
 

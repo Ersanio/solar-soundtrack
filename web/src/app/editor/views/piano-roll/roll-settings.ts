@@ -85,9 +85,7 @@ export interface Settings {
   /** Instruments drawn on percussion lanes, ascending. */
   percussion: readonly number[];
   percussionOpen: boolean;
-  /** The command lane under the roll. Open by default — it is the point of the tab. */
-  commandLaneOpen: boolean;
-  /** How tall the lane is drawn, in CSS pixels, between its own floor and ceiling. */
+  /** How tall the command lane under the roll is drawn, in CSS pixels, between its own floor and ceiling. */
   laneHeight: number;
   /** The channel the roll is editing, or null for none. One at a time. */
   editChannel: number | null;
@@ -131,7 +129,6 @@ interface StoredSettings {
   beatUnit?: unknown;
   percussion?: unknown;
   percussionOpen?: unknown;
-  commandLaneOpen?: unknown;
   laneHeight?: unknown;
   editChannel?: unknown;
   snap?: unknown;
@@ -179,7 +176,6 @@ export function readSettings(): Settings {
     beatUnit: 16,
     percussion: [...DEFAULT_PERCUSSION],
     percussionOpen: false,
-    commandLaneOpen: true,
     laneHeight: LANE_HEIGHT,
     editChannel: null,
     snap: 'beat',
@@ -231,10 +227,6 @@ export function readSettings(): Settings {
 
   if (typeof stored.percussionOpen === 'boolean') {
     settings.percussionOpen = stored.percussionOpen;
-  }
-
-  if (typeof stored.commandLaneOpen === 'boolean') {
-    settings.commandLaneOpen = stored.commandLaneOpen;
   }
 
   // Clamped rather than rejected: it comes off a drag, so any height between the
