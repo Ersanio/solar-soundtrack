@@ -303,3 +303,21 @@ export function clampLaneHeight(height: number): number {
 export function isBeatUnit(value: number): boolean {
   return BEAT_UNITS.includes(value as (typeof BEAT_UNITS)[number]);
 }
+
+/**
+ * Put an instrument on the drum lanes, or take it off. Kept sorted, so
+ * comparing against the default is a string compare.
+ */
+export function togglePercussion(settings: Settings, instrument: number): Settings {
+  const next = new Set(settings.percussion);
+  if (!next.delete(instrument)) {
+    next.add(instrument);
+  }
+
+  return { ...settings, percussion: [...next].sort((a, b) => a - b) };
+}
+
+/** Back to `@21`-`@29` plus `@10`, which is what `percussion.ts` says a drum is. */
+export function resetPercussion(settings: Settings): Settings {
+  return { ...settings, percussion: [...DEFAULT_PERCUSSION] };
+}

@@ -636,10 +636,11 @@ the transport's 10 Hz anchor, snapped outward to a whole note, so the DOM rebuil
 screen; the scroll is a `computed` over `shared/chart/frame-clock.ts` and is one `transform` that
 nothing beneath reads. That is why the roll can run at 240 Hz without the note list knowing.
 
-**The folder is a parent and ten children**, as `output/command-inspector/` is. `piano-roll.ts`
-holds the song's shape, the camera and the clock and hands each child what it draws:
-`roll-toolbar/`, `percussion-panel/`, `roll-overview/`, `roll-scrub/`, `roll-channels/` and
-`roll-tooltip/` in the ordinary namespace, `roll-lanes/`, `roll-grid/`, `roll-notes/` and
+**The folder is a parent and thirteen children**, as `output/command-inspector/` is. `piano-roll.ts`
+holds the song's shape and the porter's settings and hands each child what it draws:
+`roll-toolbar/`, `percussion-panel/`, `roll-overview/`, `roll-scrub/`, `roll-channels/`,
+`roll-command-lane/` and `roll-tooltip/` in the ordinary namespace, `roll-lanes/`, `roll-grid/`,
+`roll-loops/` — which holds two, the boxes and their labels — `roll-notes/`, `roll-edit-layer/` and
 `roll-keys/` inside the roll's own `<svg>`. `roll-channels/` is the odd one: it draws nothing of the
 song, and takes the corner the overview bar leaves empty above the key column to say which channel
 is being edited. Its eight toggles
@@ -658,11 +659,23 @@ the flat `roll-*.ts` files, which are Angular-free so that the arithmetic stays 
 import it: `roll-layout.ts` and `percussion.ts` for the lanes and the camera, `roll-metrics.ts` and
 `roll-bar-text.ts` for what a bar is drawn as, `roll-lengths.ts` for what a gesture may land on,
 `roll-marks.ts` and `roll-preview.ts` for the pictures, `roll-clock-step.ts` for the playhead's
-motion, and `roll-settings.ts` for what is remembered. `roll-clock.ts` and `roll-gesture.ts` are the
-exceptions and say so — they are composables, so they import `@angular/core` and no harness can
-bundle them, which is why their arithmetic sits in files of its own.
+motion, `roll-selection.ts` for what a commit hands back, `roll-seed.ts` for the first rest a song
+with no music gets, `roll-strip.ts` and `roll-edit.ts` and `roll-write.ts` for a gesture's three
+stages, `roll-command-layout.ts` and `roll-command-move.ts` for the lane, `roll-shortcuts.ts` for
+the keyboard, and `roll-settings.ts` for what is remembered.
 
-**The four inside the `<svg>` are attribute components on a real `<g>`**, and their templates prefix
+**Six files in the folder import `@angular/core`, and each says which kind it is.**
+`roll-camera.ts` is a module record — four signals that outlive a component rebuilt on every tab
+switch. The other five are composables, called from `piano-roll.ts`'s field initialisers in the
+order they depend on each other: `roll-view.ts` for the camera, the display clock and the two
+drags over the roll; `roll-target.ts` for the channel a gesture acts on and the strip it splices;
+`roll-gesture.ts` for the gesture itself; `roll-pictures.ts` for what is drawn, after the gestures
+because the loop boxes follow the one in flight; and `roll-clock.ts`, which `roll-view.ts` calls.
+No harness can bundle any of them, which is why the arithmetic each one leans on sits in a flat
+file of its own — `roll-clock-step.ts` under `roll-clock.ts`, `roll-edit.ts` under
+`roll-gesture.ts`, `roll-marks.ts` under `roll-pictures.ts`.
+
+**The seven inside the `<svg>` are attribute components on a real `<g>`**, and their templates prefix
 every element `svg:`. Both halves are required and neither fails loudly: a component _element_ in an
 `<svg>` is an unknown SVG element with no layout box, and a child template has no namespace of its
 own because Angular takes one from the parent in the same template. The glyph is the exception that

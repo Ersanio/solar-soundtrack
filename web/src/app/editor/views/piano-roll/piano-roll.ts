@@ -13,8 +13,7 @@ import {
   viewChild,
 } from '@angular/core';
 
-import { NOTE_MIN, TICKS_PER_WHOLE } from '@amk/core/hardcoded-tables';
-import type { Command } from '@amk/tokens';
+import { NOTE_MIN } from '@amk/core/hardcoded-tables';
 import {
   FIRST_CUSTOM_INSTRUMENT,
   FIRST_PERCUSSION_INSTRUMENT,
@@ -30,85 +29,66 @@ import { EditorStore } from '../../../state/editor-store';
 import { Mixer } from '../../../state/mixer';
 import { Playback } from '../../../state/playback';
 import { stopAll } from '../../../state/stop-all';
-import { silencedReason, soleAudible } from '../../../state/transport-view';
+import { soleAudible } from '../../../state/transport-view';
 import { PercussionPanel, percussionChips } from './percussion-panel/percussion-panel';
 import { DEFAULT_PERCUSSION, type PlaceContext, rollShape } from './percussion';
-import {
-  PAGE_LEAD_IN,
-  PAGE_STEP,
-  PAGE_TURN_AT,
-  PLAYHEAD_AT,
-  PULL_PANES_PER_SEC,
-  SCROLL_END_AT,
-  rollCamera,
-} from './roll-camera';
+import { rollCamera } from './roll-camera';
 import { RollChannels } from './roll-channels/roll-channels';
-import { rollClock } from './roll-clock';
 import { RollGrid } from './roll-grid/roll-grid';
 import { RollKeys } from './roll-keys/roll-keys';
 import { RollLanes } from './roll-lanes/roll-lanes';
-import type { EditMode, Gesture } from './roll-edit';
+import type { EditMode } from './roll-edit';
 import { RollEditLayer } from './roll-edit-layer/roll-edit-layer';
 import { rollGestures } from './roll-gesture';
-import {
-  edgeUrgency,
-  gridLines,
-  laneStack,
-  overviewOffset,
-  overviewTick,
-  pageStart,
-  tickAtX,
-  tickWindow,
-  xAtTick,
-} from './roll-layout';
-import {
-  type Mark,
-  buildLoopLabels,
-  buildLoopRegions,
-  buildMarks,
-  buildMinimap,
-  followLoopRegions,
-  heldRowsAt,
-} from './roll-marks';
+import { laneStack, tickAtX } from './roll-layout';
+import { type Mark, heldRowsAt } from './roll-marks';
 import { RollLoopLabels } from './roll-loops/roll-loop-labels';
 import { RollLoops } from './roll-loops/roll-loops';
-import { laneWindow, packCommandLane } from './roll-command-layout';
-import { eraseCommand, inspectable } from './roll-command-move';
+import { inspectable } from './roll-command-move';
 import { RollCommandLane } from './roll-command-lane/roll-command-lane';
-import { KEY_WIDTH, LANE_HEIGHT, OVERVIEW_HEIGHT, SCRUB_HEIGHT } from './roll-metrics';
+import { KEY_WIDTH, LANE_HEIGHT } from './roll-metrics';
 import { CHANNEL_FILL, CHANNEL_STROKE } from '../../../util/channel-palette';
 import { seedEdits } from './roll-seed';
-import { type Strip, channelStrip, channelTails, constructFor, isStrip } from './roll-strip';
+import type { Strip } from './roll-strip';
 import { RollNotes } from './roll-notes/roll-notes';
 import { RollOverview } from './roll-overview/roll-overview';
-import { RollScrub, type TimeMark } from './roll-scrub/roll-scrub';
+import { RollScrub } from './roll-scrub/roll-scrub';
 import {
   type Settings,
   type SnapName,
   clampLaneHeight,
   readSettings,
+  resetPercussion,
   snapTicks,
   stepRowHeight,
   stepZoom,
+  togglePercussion,
   writeSettings,
 } from './roll-settings';
 import { RollToolbar } from './roll-toolbar/roll-toolbar';
+import { rollPictures } from './roll-pictures';
+import { rollShortcut } from './roll-shortcuts';
+import { rollTarget } from './roll-target';
+import { rollView } from './roll-view';
 import { RollTooltip } from './roll-tooltip/roll-tooltip';
 
 /**
  * The song as music: a keyboard down the left, time running right, and all
  * eight channels in one roll.
  *
- * This holds the song's shape, the camera and the clock, and hands each of them
- * to a component that draws one thing: the toolbar, the two bars over the roll,
- * the row stripes, the grid, the notes, the keys and the hover. The flat
- * `roll-*.ts` files beside it are the arithmetic, Angular-free so that a harness
- * can import it; the folders beside them are the components.
+ * This holds the song's shape and the porter's settings, and hands what each
+ * child draws to a component that draws one thing: the toolbar, the two bars
+ * over the roll, the row stripes, the grid, the notes, the keys and the hover.
+ * Four composables hold the rest — `roll-view.ts` the camera and the clock,
+ * `roll-target.ts` what a gesture acts on, `roll-gesture.ts` the gesture itself
+ * and `roll-pictures.ts` what is drawn. The flat `roll-*.ts` files beside them
+ * are the arithmetic, Angular-free so that a harness can import it; the folders
+ * beside them are the components.
  *
  * The bars are one job each. The overview is the song drawn small and moves the
  * **view**; the scrub bar is the roll's own timeline and moves the **song**.
  * Both are pointer reporters that emit an x and nothing else, because both
- * mappings need the camera, which is here.
+ * mappings need the camera.
  *
  * Two clocks drive it and keeping them apart is what makes it smooth. The mark
  * list is a `computed` over the transport's 10 Hz anchor, snapped to a whole
@@ -175,27 +155,6 @@ export class PianoRoll {
   protected readonly snapTicks = computed(() =>
     snapTicks(this.settings().snap, this.beatsPerBar(), this.beatUnit()),
   );
-
-  /**
-   * The camera, which outlives the component — see `roll-camera.ts`. Aliased so
-   * that reading and moving it stays an ordinary signal read and an ordinary set.
-   */
-  private readonly panTick = rollCamera.panTick;
-  private readonly panLead = rollCamera.panLead;
-  private readonly pageOrigin = rollCamera.pageOrigin;
-
-  /**
-   * The tick a scrub is asking for, or null when none is.
-   *
-   * A seek is previewed rather than made per move — the emulator has no snapshot
-   * to jump to, so one seek per pixel is one silent replay per pixel — and this
-   * is where the roll shows the preview. The camera does not read it: see
-   * {@link playTick}.
-   */
-  private readonly seeking = signal<number | null>(null);
-
-  /** A pointer is down on one of the two bars. */
-  private readonly dragging = signal(false);
 
   protected readonly timeline = computed(() => this.editor.timeline());
 
@@ -318,223 +277,26 @@ export class PianoRoll {
   protected readonly showLabels = computed(() => this.rowHeight() >= 11);
   protected readonly labelSize = computed(() => clamp(this.rowHeight() - 4, 7, 11));
 
-  // --- the camera ----------------------------------------------------------
-
-  /** Ticks across the roll at this zoom, which is what a page is measured in. */
-  private readonly screenTicks = computed(() =>
-    this.zoom() > 0 ? this.rollWidth() / this.zoom() : 0,
+  /**
+   * The camera, the display clock and the geometry of the two bars over the
+   * roll — see `roll-view.ts`. The Follow setting is written from there so that
+   * coming off the song always parks the camera first.
+   */
+  protected readonly view = rollView(
+    {
+      zoom: this.zoom,
+      follow: this.follow,
+      scrollNotes: this.scrollNotes,
+      songTicks: this.songTicks,
+      width: this.width,
+      rollWidth: this.rollWidth,
+    },
+    {
+      writeFollow: (follow) => {
+        this.settings.update((s) => ({ ...s, follow }));
+      },
+    },
   );
-
-  /** As far right as a scroll goes: the last tick, at {@link SCROLL_END_AT}. */
-  private readonly maxPanTick = computed(
-    () => this.songTicks() + (this.rollWidth() * (this.panLead() - SCROLL_END_AT)) / this.zoom(),
-  );
-
-  /**
-   * Where a parked view actually sits, held inside the song.
-   *
-   * Clamped on the way out rather than on the way in, because the range moves:
-   * a zoom or a resize changes what the end of the song is worth in ticks, and a
-   * position written before either would be left outside it. An unknown song —
-   * nothing compiled, or a failed compile — has no end to hold against, so it
-   * keeps the floor alone and pans freely.
-   */
-  private readonly parkedTick = computed(() => {
-    const pass = this.songTicks();
-    return pass > 0 ? clamp(this.panTick(), 0, this.maxPanTick()) : Math.max(0, this.panTick());
-  });
-
-  // --- the clock -----------------------------------------------------------
-
-  /**
-   * Only run a frame callback while something is actually moving.
-   *
-   * Which is any playing song, parked or not: a parked roll holds the music
-   * still and the playhead goes on crossing it, so the line still needs a frame
-   * clock — and costs less than a following one, whose transform moves too.
-   */
-  private readonly running = computed(() => this.playback.isPlaying());
-
-  /** The tempo as `t` writes it — `DriverState.tempo` is `$51`, one higher. */
-  private readonly tempo = computed(() => {
-    const driver = this.playback.driver();
-    return driver && driver.tempo > 0 ? driver.tempo - 1 : 0;
-  });
-
-  private readonly playhead = rollClock({
-    running: this.running,
-    anchor: this.playback.songTicks,
-    clock: this.editor.clock,
-    tempo: this.tempo,
-    pass: this.songTicks,
-  });
-
-  /**
-   * Where the song itself is, parked or not.
-   *
-   * Deliberately free of {@link follow}: coming off the song stops the *view*
-   * following it, and a line that stopped as well would leave nothing in the
-   * roll saying where the music had got to. Parked, this runs on past the pane
-   * and the clip takes it from there.
-   *
-   * It asks the transport when idle rather than assuming the beginning. A stop
-   * does put it back to tick 0 and the line follows it there, but a scrub made
-   * while the song is stopped seeks without starting it, and a roll that read a
-   * stopped transport as tick 0 would throw that scrub away the moment it was
-   * released — the marker would move, the song would not, and nothing would say
-   * why.
-   */
-  private readonly songHead = computed(() =>
-    this.playback.isIdle() ? this.playback.songTicks().ticks : this.playhead.tick(),
-  );
-
-  /**
-   * Where the playhead is drawn: the song's own tick, or the one a scrub is
-   * asking for while it is asking.
-   *
-   * `scrubTo` previews a seek without moving the transport (`playback.ts`), so
-   * during a drag the song is still where it was and the marker is where the
-   * pointer is. That difference is the whole reason a preview is worth showing.
-   */
-  private readonly headTick = computed(() => this.seeking() ?? this.songHead());
-
-  /**
-   * Where the camera is: on the song while it is following it, and wherever it
-   * was parked otherwise.
-   *
-   * The other half of {@link headTick}, and the reason the two are separate.
-   * Everything about what is *drawn* — the transform, the mark window, the
-   * readout — is this one; the playhead alone is the other.
-   *
-   * It reads {@link songHead} rather than {@link headTick}, so a scrub's preview
-   * moves the marker and not the view: a camera that chased the preview would
-   * slide the music sideways under the pointer and put the marker back at
-   * {@link lead} the moment it was grabbed.
-   */
-  protected readonly playTick = computed(() =>
-    this.follow() ? this.songHead() : this.parkedTick(),
-  );
-
-  /**
-   * The 10 Hz anchor the mark window is snapped around, so it moves rarely.
-   *
-   * Follows the same rule as {@link playTick} and must: the transform and the
-   * marks are two halves of one picture, so a pause that moved one and not the
-   * other would scroll to the paused position and find nothing drawn there.
-   */
-  private readonly windowTick = computed(() =>
-    this.follow() ? this.playback.songTicks().ticks : this.parkedTick(),
-  );
-
-  /**
-   * Where the camera holds the playhead, as a fraction of the roll's width.
-   *
-   * The whole difference between the two view modes. Scrolling the notes pins
-   * the playhead and slides the music under it, so the fraction is fixed at
-   * {@link PLAYHEAD_AT}; paging, the default, holds the music still and lets the
-   * playhead cross the pane, so the fraction is how far into the current page it
-   * has got. Parked, it is whatever it was when the view came off the song.
-   *
-   * The camera's alone, and not where the line is drawn: parked, the camera
-   * stands still and the song goes on without it. {@link playheadX} is the line.
-   */
-  private readonly lead = computed(() => {
-    if (this.scrollNotes()) {
-      return PLAYHEAD_AT;
-    }
-
-    if (!this.follow()) {
-      return this.panLead();
-    }
-
-    const screen = this.screenTicks();
-    if (screen <= 0) {
-      return PLAYHEAD_AT;
-    }
-
-    const from = pageStart(this.playTick(), screen, PAGE_TURN_AT, PAGE_STEP, this.pageOrigin());
-    return clamp((this.playTick() - from) / screen, 0, 1);
-  });
-
-  /** The tick at the roll's left edge, which is the camera. */
-  protected readonly viewTick = computed(() => this.playTick() - this.screenTicks() * this.lead());
-
-  /**
-   * The song's own tick, in the camera's coordinates. One rule for all three
-   * views: a following roll puts it at {@link lead} across the pane by
-   * construction, since that is where the camera was built around it, and a
-   * parked one lets it cross the music and leave — the clip is what hides it.
-   */
-  protected readonly playheadX = computed(() =>
-    xAtTick(this.headTick(), this.viewTick(), this.zoom()),
-  );
-
-  protected readonly scroll = computed(() => {
-    const x = KEY_WIDTH - this.viewTick() * this.zoom();
-    return `translate(${x.toFixed(2)} 0)`;
-  });
-
-  // --- the overview bar ----------------------------------------------------
-
-  /** Null until measured, so nothing renders against a zero-width box. */
-  protected readonly overviewBox = computed(() => {
-    const width = this.width();
-    return width > 0 ? `0 0 ${width} ${OVERVIEW_HEIGHT}` : null;
-  });
-
-  /**
-   * The whole song, drawn small — and deliberately not from {@link playTick}, so
-   * it rebuilds on a recompile, a percussion change, a mute or a resize and never
-   * on a frame. Its rows come from the same `rowOf` the marks ask and its colours
-   * from the same `CHANNEL_FILL`.
-   */
-  protected readonly minimap = computed(() =>
-    buildMinimap({
-      notes: this.timeline()?.notes ?? [],
-      stack: this.stack(),
-      context: this.placeContext(),
-      ticks: this.songTicks(),
-      width: this.rollWidth(),
-      audible: this.audible(),
-    }),
-  );
-
-  /**
-   * Where the playhead sits along the bar — the song's tick, as the roll's own
-   * line is. The three are one playhead drawn three times, and the box beside
-   * this one is what says where the view is.
-   */
-  protected readonly overviewX = computed(
-    () => KEY_WIDTH + overviewOffset(this.headTick(), this.songTicks(), this.rollWidth()),
-  );
-
-  /**
-   * The slice of the song the roll is showing, as a box on the bar. The bar's
-   * own thumb: a press inside it is a grab, and a press outside it a jump.
-   *
-   * Runs off both ends by design — a paged roll opens before tick 0 and the last
-   * page reaches past the end — so the strip clips it rather than this clamping
-   * it into something narrower than the pane it stands for.
-   */
-  protected readonly overviewWindow = computed(() => {
-    const ticks = this.songTicks();
-    const width = this.rollWidth();
-    if (ticks <= 0 || width <= 0) {
-      return null;
-    }
-
-    const from = (this.viewTick() / ticks) * width;
-    const w = (this.screenTicks() / ticks) * width;
-    return { x: KEY_WIDTH + from, w: Math.max(1, w) };
-  });
-
-  // --- the scrub bar -------------------------------------------------------
-
-  /** Null until measured, so nothing renders against a zero-width box. */
-  protected readonly scrubBox = computed(() => {
-    const width = this.width();
-    return width > 0 ? `0 0 ${width} ${SCRUB_HEIGHT}` : null;
-  });
 
   // --- the command lane ----------------------------------------------------
 
@@ -594,29 +356,6 @@ export class PianoRoll {
   }
 
   /**
-   * The whole song's commands, packed into rows — deliberately not windowed.
-   *
-   * Rows are dealt over the whole song so they hold still as the roll scrolls,
-   * and this rebuilds on a recompile, a zoom or a mute and never on a frame. The
-   * window is taken off it below, which is a slice rather than a second pack.
-   */
-  private readonly commandLane = computed(() =>
-    packCommandLane({
-      events: this.editor.commandTimeline(),
-      text: this.editor.source(),
-      zoom: this.zoom(),
-      audible: this.audible(),
-      active: this.editChannel(),
-      songTicks: this.songTicks(),
-    }),
-  );
-
-  protected readonly laneView = computed(() => {
-    const { from, to } = this.window();
-    return laneWindow(this.commandLane(), from, to, this.zoom());
-  });
-
-  /**
    * The command the inspector is answering about: the roll's selected command.
    *
    * Every route to it lands here, because they all move the caret — a glyph in
@@ -645,137 +384,6 @@ export class PianoRoll {
       : null;
   });
 
-  // --- marks ---------------------------------------------------------------
-
-  private readonly window = computed(() =>
-    tickWindow(this.windowTick(), this.rollWidth(), this.zoom(), PLAYHEAD_AT),
-  );
-
-  protected readonly marks = computed(() => {
-    const { from, to } = this.window();
-    return buildMarks({
-      notes: this.timeline()?.notes ?? [],
-      stack: this.stack(),
-      context: this.placeContext(),
-      from,
-      to,
-      zoom: this.zoom(),
-      rowHeight: this.rowHeight(),
-      audible: this.audible(),
-      inForce: this.editor.commandsInForce(),
-    });
-  });
-
-  /**
-   * The addresses the command map names. What tells a loop recall from its
-   * declaration: a `]n`'s own `$E9` is the one dispatch `recordCommand` drops.
-   */
-  private readonly mappedCommands = computed(
-    () => new Set((this.editor.result()?.commandMap ?? []).map((entry) => entry.address)),
-  );
-
-  /** The loop structure behind the bars, on the mark window's own cadence. */
-  protected readonly loopRegions = computed(() => {
-    const { from, to } = this.window();
-    const timeline = this.timeline();
-    return buildLoopRegions({
-      loops: timeline?.loops ?? [],
-      notes: timeline?.notes ?? [],
-      stack: this.stack(),
-      context: this.placeContext(),
-      from,
-      to,
-      zoom: this.zoom(),
-      rowHeight: this.rowHeight(),
-      ticks: timeline?.ticks ?? 0,
-      audible: this.audible(),
-      mapped: this.mappedCommands(),
-    });
-  });
-
-  /**
-   * The boxes as the gesture in flight is leaving them: round where the notes
-   * are going rather than where they were.
-   *
-   * A second pass over {@link loopRegions} rather than a rebuild — the walk over
-   * every loop, pass and note is on the mark window's cadence and a pointer move
-   * must not re-run it — and it hands back the very list it was given while
-   * nothing is held.
-   */
-  protected readonly shownLoopRegions = computed(() =>
-    followLoopRegions({
-      regions: this.loopRegions(),
-      rows: this.gestures.bodyRows(),
-      boundaries: this.gestures.shiftBoundaries(),
-      delta: this.gestures.shiftDelta(),
-      passes: this.gestures.passShifts(),
-      zoom: this.zoom(),
-      rowHeight: this.rowHeight(),
-    }),
-  );
-
-  /**
-   * The name a selected loop group's boxes carry, over the bars rather than
-   * under them — a second pass over {@link shownLoopRegions}, so a selection
-   * changing does not rebuild the whole song's boxes, and a label travels with
-   * the box it is written in the corner of.
-   *
-   * Off `editChannel` and not `editing`: a label appearing because the pointer
-   * wandered over another channel's bar would be saying something about the
-   * hover rather than about the selection.
-   */
-  protected readonly loopLabels = computed(() => {
-    const channel = this.editChannel();
-    const strip = this.strip();
-    if (channel === null || !strip) {
-      return [];
-    }
-
-    return buildLoopLabels({
-      regions: this.shownLoopRegions(),
-      channel,
-      selected: this.gestures.selectedBodies(),
-      labelAt: (body, tick) => {
-        const at = constructFor(strip, body, tick);
-        return at < 0 ? null : (strip.items[at].loop?.label ?? null);
-      },
-    });
-  });
-
-  /**
-   * The porter's grid, drawn by the roll and numbered by the scrub bar.
-   *
-   * One list for both, so a bar's number cannot land at an x its own rule is not
-   * at. The number is the count of whole bars before it, from 1 at tick 0 — a
-   * strong line is a bar's first beat by construction (`gridLines`), so the
-   * division is exact and the rounding is only for the float.
-   */
-  protected readonly lines = computed((): TimeMark[] => {
-    const beats = this.beatsPerBar();
-    if (beats === 0) {
-      return []; // No grid asked for.
-    }
-
-    const { from, to } = this.window();
-    const beatTicks = TICKS_PER_WHOLE / this.beatUnit();
-    const barTicks = beatTicks * beats;
-    return gridLines(from, to, beatTicks, beats).map((line) => ({
-      ...line,
-      x: line.tick * this.zoom(),
-      bar: line.strong ? Math.round(line.tick / barTicks) + 1 : null,
-    }));
-  });
-
-  protected readonly loopX = computed(() => {
-    const loop = this.timeline()?.loopTick;
-    return loop === null || loop === undefined || loop === 0 ? null : loop * this.zoom();
-  });
-
-  protected readonly endX = computed(() => {
-    const ticks = this.songTicks();
-    return ticks > 0 ? ticks * this.zoom() : null;
-  });
-
   // --- keyboard ------------------------------------------------------------
 
   /**
@@ -801,7 +409,7 @@ export class PianoRoll {
       notes: song.notes,
       stack: this.stack(),
       context: this.placeContext(),
-      tick: this.headTick(),
+      tick: this.view.headTick(),
       audible: this.audible(),
     });
   });
@@ -841,178 +449,38 @@ export class PianoRoll {
   // --- editing -------------------------------------------------------------
 
   /**
-   * The bar under the pointer. Read by the tooltip and by {@link hoverChannel},
+   * The bar under the pointer. Read by the tooltip and by `roll-target.ts`,
    * which is why it sits above both rather than with the rest of the tooltip.
    */
   protected readonly hovered = signal<Mark | null>(null);
 
   /**
-   * The channel of the bar under the pointer.
-   *
-   * A muted bar takes no pointer at all (`roll-notes.html`), so it never sets
-   * this and a channel nothing can be heard on is never offered.
+   * What a gesture acts on, and whether it may — see `roll-target.ts`. Named
+   * here rather than there because picking a channel has to let go of a
+   * selection, which is indices into a strip that file has never seen.
    */
-  private readonly hoverChannel = computed(() => this.hovered()?.note.channel ?? null);
-
-  /**
-   * The channel a gesture acts on: the one being edited, or — while none is —
-   * the one under the pointer, so a press on a bar can take the channel with it.
-   *
-   * The press then names it for real, through the `pick` sink `onPointerDown`
-   * already calls. Empty grid offers nothing, so drawing, the marquee and the
-   * shortcuts still need a channel chosen: only a bar can say which channel a
-   * gesture on it belongs to.
-   */
-  private readonly editing = computed(() => this.editChannel() ?? this.hoverChannel());
-
-  /**
-   * Why the channel about to be edited is not being heard, or `null` where it is.
-   *
-   * A channel nothing can be heard on takes no interaction, which is the rule its
-   * bars already keep by taking no pointer; editing is the rest of it, since a
-   * note drawn there is one the porter can neither hear nor click. The same
-   * sentence the note previewer refuses to sound it in.
-   */
-  private readonly silencedEdit = computed(() => {
-    const channel = this.editing();
-    return channel !== null && (this.mixer.silenced() & (1 << channel)) !== 0
-      ? silencedReason(channel, this.mixer.soloed())
-      : null;
-  });
-
-  /**
-   * The channel being edited, as a sequence the roll can splice — or the reason
-   * it cannot be one.
-   *
-   * Everything span-based takes the same staleness test: a span into a document
-   * that has moved points at the wrong thing. Here it is the difference between
-   * an edit and a corruption, so it is the first check rather than the last.
-   */
-  private readonly stripOutcome = computed(() => {
-    const channel = this.editing();
-    const result = this.editor.result();
-    const timeline = this.timeline();
-    if (
-      channel === null ||
-      !result?.ok ||
-      !timeline ||
-      this.editor.compiledText() !== this.editor.source()
-    ) {
-      return null;
-    }
-
-    const quiet = this.silencedEdit();
-    if (quiet !== null) {
-      return { refused: quiet };
-    }
-
-    return channelStrip({
-      source: this.editor.source(),
-      channel,
-      noteMap: result.noteMap ?? [],
-      commandMap: result.commandMap ?? [],
-      timeline,
-      index: this.editor.tokens(),
-      tempoRatio: result.stats?.tempoRatio ?? 1,
-    });
-  });
-
-  protected readonly strip = computed<Strip | null>(() => {
-    const outcome = this.stripOutcome();
-    return outcome && isStrip(outcome) ? outcome : null;
-  });
-
-  /**
-   * Why the picked channel cannot be edited, for the toolbar to say.
-   *
-   * Only for a channel really picked: a hovered one is not being edited, and the
-   * toolbar would be explaining a refusal beside the words "editing: none".
-   */
-  protected readonly editRefusal = computed(() => {
-    const outcome = this.editChannel() === null ? null : this.stripOutcome();
-    return outcome && !isStrip(outcome) ? outcome.refused : null;
-  });
-
-  private readonly targetAMKVersion = computed(
-    () => this.editor.result()?.stats?.targetAMKVersion ?? 4,
-  );
-
-  private readonly songTargetProgram = computed(
-    () => this.editor.result()?.stats?.songTargetProgram ?? 0,
-  );
-
-  /**
-   * How long the song plays, which is how far a channel being opened is filled
-   * out with rests. The transport's own figure rather than {@link songTicks},
-   * which is the walk's — see `EditContext.playableTicks`.
-   */
-  private readonly playableTicks = computed(() => {
-    const stats = this.editor.result()?.stats;
-    return stats ? stats.introTicks + stats.loopTicks : 0;
-  });
-
-  /** Where the song loops back to, so a channel being opened re-enters with it. */
-  private readonly introTicks = computed(() => {
-    const stats = this.editor.result()?.stats;
-    return stats?.hasIntro === true ? stats.introTicks : null;
-  });
-
-  /**
-   * Every channel as somewhere rests can be appended, so a gesture reaching past
-   * the end of the song can bring the other channels out with it.
-   *
-   * Off the same result and the same source {@link stripOutcome} reads, so the
-   * tick counts and the offsets come from one compile — and off `channelTicks`,
-   * which {@link playableTicks} is the smallest non-zero member of.
-   */
-  private readonly channelTails = computed(() =>
-    channelTails(
-      this.editor.source(),
-      this.editor.tokens(),
-      this.editor.result()?.stats?.channelTicks ?? [],
-    ),
-  );
-
-  /** The walk's notes by address, which is how a strip item names the one it is. */
-  private readonly walkedNotes = computed(
-    () => new Map((this.timeline()?.notes ?? []).map((note) => [note.address, note])),
-  );
-
-  /**
-   * What the walk had in force at a note, by the address of its head, or `null`
-   * for a note the pass never reached.
-   *
-   * The answers are `Command` objects out of `EditorStore.tokens()`, which is
-   * the same index {@link stripOutcome} hands `channelStrip` — so the commands
-   * `planEdits` compares are one set of objects and identity means what it says.
-   * Two scans of one text hold the same commands as different objects, and every
-   * comparison between them is silently false.
-   */
-  private readonly inForceAt = computed<(address: number) => readonly Command[] | null>(() => {
-    const acting = this.editor.commandsInForce();
-    const walked = this.walkedNotes();
-    return (address) => {
-      const note = walked.get(address);
-      return note === undefined ? null : acting(note);
-    };
+  protected readonly target = rollTarget({
+    hovered: this.hovered,
+    editChannel: this.editChannel,
+    timeline: this.timeline,
   });
 
   protected readonly gestures = rollGestures(
     {
-      strip: this.strip,
+      strip: this.target.strip,
       stack: this.stack,
       zoom: this.zoom,
       rowHeight: this.rowHeight,
-      viewTick: this.viewTick,
+      viewTick: this.view.viewTick,
       snap: this.snapTicks,
       editMode: this.editMode,
       lastLength: computed(() => this.settings().lastLength),
-      targetAMKVersion: this.targetAMKVersion,
-      songTargetProgram: this.songTargetProgram,
-      playableTicks: this.playableTicks,
-      introTicks: this.introTicks,
-      channels: this.channelTails,
-      inForce: this.inForceAt,
+      targetAMKVersion: this.target.targetAMKVersion,
+      songTargetProgram: this.target.songTargetProgram,
+      playableTicks: this.target.playableTicks,
+      introTicks: this.target.introTicks,
+      channels: this.target.channelTails,
+      inForce: this.target.inForceAt,
       source: this.editor.source,
     },
     {
@@ -1051,15 +519,36 @@ export class PianoRoll {
     },
   );
 
+  /**
+   * What the roll draws — see `roll-pictures.ts`. After the gestures, because
+   * the loop boxes follow the one in flight.
+   */
+  protected readonly pictures = rollPictures({
+    timeline: this.timeline,
+    stack: this.stack,
+    context: this.placeContext,
+    audible: this.audible,
+    zoom: this.zoom,
+    rowHeight: this.rowHeight,
+    rollWidth: this.rollWidth,
+    songTicks: this.songTicks,
+    windowTick: this.view.windowTick,
+    beatsPerBar: this.beatsPerBar,
+    beatUnit: this.beatUnit,
+    editChannel: this.editChannel,
+    strip: this.target.strip,
+    gestures: this.gestures,
+  });
+
   /** The channel's own colour, so a note being dragged stays the colour it is. */
   protected readonly editFill = computed(() => {
-    const channel = this.editing();
+    const channel = this.target.editing();
     return channel === null ? CHANNEL_FILL[0] : CHANNEL_FILL[channel];
   });
 
   /** The same colour as an outline, which is what the ghost is drawn with. */
   protected readonly editStroke = computed(() => {
-    const channel = this.editing();
+    const channel = this.target.editing();
     return channel === null ? CHANNEL_STROKE[0] : CHANNEL_STROKE[channel];
   });
 
@@ -1106,7 +595,7 @@ export class PianoRoll {
     { strip: Strip | null; chosen: ReadonlySet<number> },
     ReadonlySet<number>
   >({
-    source: () => ({ strip: this.strip(), chosen: this.gestures.selection() }),
+    source: () => ({ strip: this.target.strip(), chosen: this.gestures.selection() }),
     // Held only while there is something selected to hold it for: a selection
     // let go during a compile takes its outlines with it at once.
     computation: (now, previous) =>
@@ -1133,7 +622,7 @@ export class PianoRoll {
    * `WRAP_SPLIT`, which is `REFUSE_SPLIT` by another route.
    */
   private readonly selectedRun = computed<{ start: number; end: number } | null>(() => {
-    const items = this.strip()?.items;
+    const items = this.target.strip()?.items;
     if (!items) {
       return null;
     }
@@ -1153,7 +642,7 @@ export class PianoRoll {
 
   /** The notes the preview has taken over, which the song's own bars leave out. */
   protected readonly movingSpans = computed(() =>
-    this.addressesOf(this.strip(), this.gestures.moving()),
+    this.addressesOf(this.target.strip(), this.gestures.moving()),
   );
 
   /**
@@ -1235,18 +724,6 @@ export class PianoRoll {
     // does for the selected tab.
     effect(() => writeSettings(this.settings()));
 
-    // Sanctioned effect: re-measuring the pages on a stop. A stop is back to the
-    // beginning, so the grid is measured from it again — one still anchored on
-    // some earlier scroll would draw the song's first tick at whatever offset
-    // that anchor gave it. Guarded on the drag so it cannot fire in the middle
-    // of a gesture. On the transition, so a roll rebuilt while the transport is
-    // already stopped leaves the camera it came back to alone.
-    onChange(this.playback.isIdle, (idle) => {
-      if (idle && !this.dragging()) {
-        this.pageOrigin.set(0);
-      }
-    });
-
     // Sanctioned effect: carrying a press on the mixer's own buttons back to the
     // channel being edited. The mixer is a strip under the whole pane rather
     // than a child of the roll, so it has no call site here to do it at, the way
@@ -1276,7 +753,7 @@ export class PianoRoll {
     // the strip is what the indices are into and it is a compile behind — the
     // roll has none at all in between. Ahead of the mirror below, so the panels
     // are told about the selection the strip really has.
-    onChange(this.strip, (strip) => {
+    onChange(this.target.strip, (strip) => {
       if (strip) {
         this.gestures.restoreSelection(strip);
       }
@@ -1291,7 +768,7 @@ export class PianoRoll {
     // otherwise have nothing to show.
     effect(() => {
       const run = this.selectedRun();
-      const strip = this.strip();
+      const strip = this.target.strip();
       const chosen = this.chosen();
       untracked(() => {
         this.requests.selectedRun.set(run);
@@ -1338,31 +815,12 @@ export class PianoRoll {
       });
     });
 
-    // A drag can be one pointer-down away from a component that no longer
-    // exists — the roll is rebuilt on every tab switch, and a captured pointer
-    // never reports its release. Honour the gesture rather than stranding the
-    // transport on a preview nothing will commit.
+    // The selection goes with the roll — it is indices into a strip this
+    // component owns — so what it published goes with it too.
     this.destroyRef.onDestroy(() => {
-      // The selection goes with the roll — it is indices into a strip this
-      // component owns — so what it published goes with it too.
       this.requests.selectedRun.set(null);
       this.requests.inspectingLoop.set(null);
-      this.stopPull();
-      if (this.dragging()) {
-        this.anchorPages();
-        this.commitSeek();
-      }
     });
-  }
-
-  /**
-   * The lead a view coming off the song keeps, so the picture does not move.
-   *
-   * Held off both edges: a parked view needs room after the last tick for the
-   * end-of-song marker, which is the distance {@link maxPanTick} measures.
-   */
-  private parkedLead(): number {
-    return clamp(this.lead(), Math.max(SCROLL_END_AT, PAGE_LEAD_IN), PAGE_TURN_AT);
   }
 
   protected setZoom(direction: number): void {
@@ -1374,26 +832,6 @@ export class PianoRoll {
     if (next !== undefined) {
       this.settings.update((s) => ({ ...s, rowHeight: next }));
     }
-  }
-
-  /**
-   * Coming off the song parks the camera where the camera already is.
-   *
-   * {@link playTick} and not the song's own tick: a transport stopped part-way
-   * through is showing that position while it is followed, and parking on the
-   * tick the camera was last *left* at would drop the view somewhere the porter
-   * had not been since. Done here rather than in an effect watching the flag,
-   * because an effect runs after the handler and would overwrite a position set
-   * in the same gesture that took the roll off the song.
-   */
-  protected setFollow(follow: boolean): void {
-    if (!follow) {
-      const tick = this.playTick();
-      this.panLead.set(this.parkedLead());
-      this.panTick.set(tick);
-    }
-
-    this.settings.update((s) => ({ ...s, follow }));
   }
 
   protected setScrollNotes(scrollNotes: boolean): void {
@@ -1499,189 +937,12 @@ export class PianoRoll {
     }
   }
 
-  /** Kept sorted, so comparing against the default is a string compare. */
   protected togglePercussion(instrument: number): void {
-    this.settings.update((s) => {
-      const next = new Set(s.percussion);
-      if (!next.delete(instrument)) {
-        next.add(instrument);
-      }
-
-      return { ...s, percussion: [...next].sort((a, b) => a - b) };
-    });
+    this.settings.update((s) => togglePercussion(s, instrument));
   }
 
   protected resetPercussion(): void {
-    this.settings.update((s) => ({ ...s, percussion: [...DEFAULT_PERCUSSION] }));
-  }
-
-  // --- the overview bar's drag ---------------------------------------------
-
-  /**
-   * Where in the window box it was grabbed, in the bar's own pixels.
-   *
-   * A scrollbar's thumb stays under the pointer, so what a move sets is the
-   * box's left edge rather than the tick under the pointer — held from the
-   * press, or the drag would jolt the moment it began.
-   */
-  private grabOffset = 0;
-
-  /**
-   * Take the roll off the song, and decide what the press grabbed.
-   *
-   * Panning takes the roll off the song, which is what the Follow switch already
-   * means, so it goes through {@link setFollow} the way a `Shift`+wheel pan does
-   * rather than parking behind the switch's back. The lead that leaves is read
-   * **once**, there, and held for the whole drag: re-reading it per move would
-   * slide the music sideways under a pointer that had not moved.
-   *
-   * A press outside the box centres it on the pointer first, which is the jump
-   * half of a scrollbar; the drag then carries on from the middle of the box.
-   *
-   * The box is measured **before** the park, against the one the porter pressed
-   * on: parking holds the lead off both edges, so a view sitting past
-   * {@link PAGE_TURN_AT} moves a little as it comes off the song, and the first
-   * move puts the box back where it was grabbed rather than where the park left
-   * it.
-   */
-  protected onPanStart(offset: number): void {
-    const box = this.overviewWindow();
-    const inside = box !== null && offset >= box.x && offset <= box.x + box.w;
-    this.grabOffset = box === null ? 0 : inside ? offset - box.x : box.w / 2;
-
-    this.dragging.set(true);
-    this.setFollow(false);
-    this.onPanTo(offset);
-  }
-
-  /** One step of a drag: the box's left edge follows the pointer, and the view with it. */
-  protected onPanTo(offset: number): void {
-    const left = overviewTick(
-      offset - this.grabOffset - KEY_WIDTH,
-      this.songTicks(),
-      this.rollWidth(),
-    );
-    // The inverse of `viewTick`, which is where the camera holds the playhead
-    // less the music before it.
-    this.panTick.set(left + this.screenTicks() * this.panLead());
-  }
-
-  protected onPanEnd(): void {
-    this.dragging.set(false);
-    this.anchorPages();
-  }
-
-  /**
-   * Re-anchor the pages on the view a scroll is leaving, so the notes stay
-   * exactly where they were put: a grid still measured from some earlier
-   * position would turn over at an offset this view knows nothing about.
-   */
-  private anchorPages(): void {
-    const to = this.parkedTick();
-    this.pageOrigin.set(
-      to - this.screenTicks() * this.panLead() + this.screenTicks() * PAGE_LEAD_IN,
-    );
-  }
-
-  // --- the scrub bar's drag ------------------------------------------------
-
-  /** The pull's frame callback, where it left the pointer, and when it last ran. */
-  private pull: number | null = null;
-  private pullFrom = 0;
-  private pullAt = 0;
-
-  protected onScrubStart(offset: number): void {
-    this.dragging.set(true);
-    this.onScrubTo(offset);
-  }
-
-  /** One step of a drag: preview the seek, and pull the view if it has run off the end. */
-  protected onScrubTo(offset: number): void {
-    this.seekTo(offset);
-    if (edgeUrgency(offset, this.width()) === 0) {
-      this.stopPull();
-      return;
-    }
-
-    this.startPull(offset);
-  }
-
-  protected onScrubEnd(): void {
-    this.dragging.set(false);
-    this.stopPull();
-    this.commitSeek();
-  }
-
-  /**
-   * Where a pointer on the scrub bar is asking the song to go. Previewed, not made.
-   *
-   * The offset is held inside the bar before the tick is read off it, so a drag
-   * that has run off the end asks for the last tick it can see rather than for
-   * one it cannot: the marker stays against the edge, in view, while the pull
-   * brings the music to it — where a marker off the pane would leave a scroll
-   * happening with nothing on screen to say what it was reaching for.
-   */
-  private seekTo(offset: number): void {
-    const onBar = clamp(offset, KEY_WIDTH, this.width());
-    const tick = clamp(tickAtX(onBar, this.viewTick(), this.zoom()), 0, this.songTicks());
-    this.seeking.set(tick);
-    this.playback.scrubTo(tick);
-  }
-
-  /** The end of a scrub: the song jumps to where the marker was left. */
-  private commitSeek(): void {
-    const to = this.seeking();
-    this.seeking.set(null);
-    if (to === null || !this.playback.canSeek()) {
-      return;
-    }
-
-    this.playhead.jumpTo(to);
-    this.playback.seek(to);
-  }
-
-  /**
-   * Start, or aim, the frame callback that pulls the view along.
-   *
-   * A drag can only ask for a tick that is on screen, so a seek across a long
-   * song has to be able to take the view with it. A frame callback rather than
-   * something the moves drive, because a pointer held off the end is not moving
-   * and is exactly when the pull is wanted.
-   *
-   * It goes through {@link setFollow} rather than parking behind the switch, as
-   * {@link onPanStart} does: the roll has come off the song and the toolbar is
-   * where that is said. Once per pull, not per frame, or every frame would read
-   * the lead back off a camera the last frame had already moved.
-   */
-  private startPull(offset: number): void {
-    this.pullFrom = offset;
-    if (this.pull !== null) {
-      return;
-    }
-
-    this.setFollow(false);
-    this.pullAt = performance.now();
-    const step = (now: number): void => {
-      this.pull = requestAnimationFrame(step);
-      // Capped, so a tab that comes back after a minute away does not arrive a
-      // minute further into the song.
-      const seconds = Math.min((now - this.pullAt) / 1000, 0.1);
-      this.pullAt = now;
-      const panes = edgeUrgency(this.pullFrom, this.width()) * PULL_PANES_PER_SEC * seconds;
-      this.panTick.update((tick) => tick + (panes * this.rollWidth()) / this.zoom());
-      // After the camera, and off the pointer's own unmoved x: the tick under it
-      // is a different one now, which is what makes the drag reach.
-      this.seekTo(this.pullFrom);
-    };
-
-    this.pull = requestAnimationFrame(step);
-  }
-
-  private stopPull(): void {
-    if (this.pull !== null) {
-      cancelAnimationFrame(this.pull);
-      this.pull = null;
-    }
+    this.settings.update(resetPercussion);
   }
 
   // --- the pointer, and the keys ------------------------------------------
@@ -1719,11 +980,11 @@ export class PianoRoll {
     if (event.button === 1) {
       event.preventDefault();
       (event.currentTarget as Element).setPointerCapture(event.pointerId);
-      this.setFollow(false);
+      this.view.setFollow(false);
       this.panning.set({
         x: event.clientX,
         y: event.clientY,
-        fromTick: this.panTick(),
+        fromTick: this.view.panTick(),
         fromTop: this.viewport().nativeElement.scrollTop,
       });
       return;
@@ -1737,7 +998,7 @@ export class PianoRoll {
     if (pan) {
       const zoom = this.zoom();
       if (zoom > 0) {
-        this.panTick.set(pan.fromTick - (event.clientX - pan.x) / zoom);
+        this.view.panTick.set(pan.fromTick - (event.clientX - pan.x) / zoom);
       }
 
       this.viewport().nativeElement.scrollTop = pan.fromTop - (event.clientY - pan.y);
@@ -1772,7 +1033,7 @@ export class PianoRoll {
 
   /** The right button erases, so the browser's own menu would be in the way. */
   protected onContextMenu(event: Event): void {
-    if (this.strip()) {
+    if (this.target.strip()) {
       event.preventDefault();
     }
   }
@@ -1797,15 +1058,15 @@ export class PianoRoll {
     if (event.ctrlKey || event.metaKey) {
       event.preventDefault();
       const box = this.svgBox(event);
-      const under = tickAtX(event.clientX - box.left, this.viewTick(), this.zoom());
-      const before = this.viewTick();
+      const under = tickAtX(event.clientX - box.left, this.view.viewTick(), this.zoom());
+      const before = this.view.viewTick();
       this.setZoom(delta < 0 ? 1 : -1);
       // Hold the tick that was under the pointer, so a zoom happens where the
       // eye is rather than dragging the music sideways under it. Only when the
       // roll is parked: a following roll is anchored on the playhead instead.
       if (!this.follow()) {
         const kept = under - (event.clientX - box.left - KEY_WIDTH) / this.zoom();
-        this.panTick.update((tick) => tick + (kept - before));
+        this.view.panTick.update((tick) => tick + (kept - before));
       }
 
       return;
@@ -1839,192 +1100,44 @@ export class PianoRoll {
       event.preventDefault();
       // Panning takes the roll off the song, which is what the Follow switch
       // already means; ticking it again is how the porter comes back.
-      this.setFollow(false);
-      this.panTick.update((tick) => tick + delta / this.zoom());
+      this.view.setFollow(false);
+      this.view.panTick.update((tick) => tick + delta / this.zoom());
     }
   }
 
   /**
-   * The roll's shortcuts, while a channel is being edited.
-   *
-   * Ignored while the text or a modal has focus, so `Ctrl+A` in the source still
-   * selects the source and a dialog keeps its own Escape. Everything
-   * that edits goes through the same {@link Gesture} the pointer uses, so a
-   * nudge and a drag commit the same way.
-   *
-   * A channel really picked, rather than {@link editing}: a key has no pointer
-   * to name a channel with, so `Ctrl+A` under one merely hovered would select
-   * notes in a channel the toolbar says is not being edited.
-   *
-   * Space needs no channel, being the transport rather than an edit, and nor do
-   * the keys a selected command takes: a lane glyph names a command of the song.
+   * The roll's shortcuts — see `roll-shortcuts.ts`, which is where they are
+   * decided. What is here is the bag it decides them against.
    */
   protected onKey(event: KeyboardEvent): void {
-    const target = event.target as HTMLElement | null;
-    if (
-      target?.closest('input, textarea, select, dialog, .cm-editor') !== null ||
-      event.isComposing
-    ) {
-      return;
-    }
-
-    // Space is the transport: it starts the song from wherever the playhead
-    // stands and stops it back at the beginning — and stops a note or a
-    // selection being previewed, as the Stop button does, since a stop that left
-    // one sounding would start the song over it. It takes the keypress outright,
-    // since the browser would otherwise scroll the page with it or press
-    // whichever button was last clicked — so it means the same thing wherever
-    // the pointer has been. Bare, because `Ctrl+Space` toggles an IME and
-    // `Alt+Space` opens the window menu; and only the first press of a held bar
-    // acts, a song started and stopped thirty times a second being no use.
-    if (event.key === ' ' && !event.ctrlKey && !event.metaKey && !event.altKey && !event.shiftKey) {
-      event.preventDefault();
-      if (event.repeat) {
-        return;
-      }
-
-      if (this.playback.isPlaying() || this.audition.previewing()) {
-        stopAll(this.playback, this.audition);
-      } else if (this.editor.canCompile()) {
-        // What the Play button's `disabled` says: with no driver loaded there is
-        // nothing to play, and `toggle` would report an error about the song.
-        void this.playback.toggle();
-      }
-
-      return;
-    }
-
-    // A selected command owns Delete, whichever route picked it — a glyph in the
-    // lane, a chip on a bar, or a button in the note inspector — since all three
-    // are the caret. No note is touched, however many are outlined: a chip or a
-    // lane glyph lets go of them as it picks, and the splice keeps the rest where
-    // they are. The key goes back to the notes the moment a click on a bar's body
-    // moves the caret off the command — onto the note, which is a `Command` too,
-    // and which `inspectedCommand` therefore does not answer.
-    //
-    // Ahead of the channel guard, because a lane glyph names a command of the
-    // song rather than a note of a channel and picks none: "this holds all
-    // eight, and a `t` belongs to none of them". It needs no strip either — the
-    // splice is the command's own span, and no note moves.
-    //
-    // The key is taken whether or not the command can go, so a `"name=value"`
-    // one does nothing rather than falling through and deleting the notes. And
-    // only the first press of a held key acts: the caret lands where the command
-    // was and `commandAt` is end-inclusive, so a repeat would take the
-    // neighbouring command, which nobody selected.
-    const inspected = this.inspectedCommand();
-    if (inspected !== null && (event.key === 'Delete' || event.key === 'Backspace')) {
-      event.preventDefault();
-      if (event.repeat || this.editor.compiledText() !== this.editor.source()) {
-        return;
-      }
-
-      // Keeps the notes, as a panel's own commit does: taking a command out
-      // adds and removes none, so the selection still names the notes it named.
-      const edit = eraseCommand(this.editor.source(), inspected);
-      this.requests.applyAll(edit ? [edit] : null, null, true);
-      return;
-    }
-
-    // Escape steps back out, one level per press: the command, then the
-    // selection, then the channel itself. Ahead of the channel guard because a
-    // lane glyph picks no channel and its ring still has to go; ahead of the
-    // strip, and needing none — a channel the roll has refused is exactly the
-    // one the porter wants to leave.
-    if (event.key === 'Escape') {
-      if (inspected !== null) {
-        // Letting the command go is letting the inspector go: the ring stands
-        // for that panel, and `inspectedCommand` reads the same `dismissed`.
-        this.requests.dismissed.set(this.editor.caret());
-      } else if (this.gestures.selection().size > 0) {
-        this.gestures.clearSelection();
-        // Letting the note go lets go of the question asked about it: the
-        // inspector is answering from the caret a click on that bar moved, and
-        // nothing else would retire it.
+    rollShortcut(event, {
+      playing: () => this.playback.isPlaying(),
+      previewing: () => this.audition.previewing(),
+      canCompile: () => this.editor.canCompile(),
+      toggleTransport: () => void this.playback.toggle(),
+      stopSound: () => stopAll(this.playback, this.audition),
+      source: () => this.editor.source(),
+      inSync: () => this.editor.compiledText() === this.editor.source(),
+      caret: () => this.editor.caret(),
+      inspectedCommand: () => this.inspectedCommand(),
+      applyEdit: (edit) => this.requests.applyAll(edit ? [edit] : null, null, true),
+      dismiss: (caret) => this.requests.dismissed.set(caret),
+      stopInspecting: () => {
         this.requests.inspecting.set(null);
         this.requests.inspectingLoop.set(null);
-        this.requests.dismissed.set(this.editor.caret());
-      } else if (this.editChannel() !== null) {
-        this.clearEditChannel();
-      }
-
-      return;
-    }
-
-    if (this.editChannel() === null) {
-      return;
-    }
-
-    // Undo and redo, on the same history the two toolbars' buttons drive and the
-    // MML editor's own keymap walks. Bound here because that keymap only fires
-    // while the editor has focus, and the roll never gives it any. Ahead of the
-    // strip and the selection, neither of which an undo needs.
-    const control = event.ctrlKey || event.metaKey;
-    const pressed = event.key.toLowerCase();
-    if (control && (pressed === 'z' || pressed === 'y')) {
-      event.preventDefault();
-      this.requests.history.set(pressed === 'y' || event.shiftKey ? 'redo' : 'undo');
-      return;
-    }
-
-    const strip = this.strip();
-    if (!strip) {
-      return;
-    }
-
-    const chosen = [...this.gestures.selection()];
-    const run = (gesture: Gesture): void => {
-      event.preventDefault();
-      this.gestures.run(gesture);
-    };
-
-    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'a') {
-      event.preventDefault();
-      this.gestures.selectAll();
-      return;
-    }
-
-    if (chosen.length === 0) {
-      return;
-    }
-
-    switch (event.key) {
-      case 'Delete':
-      case 'Backspace':
-        run({ kind: 'delete', items: chosen });
-        return;
-      case 'ArrowLeft':
-      case 'ArrowRight': {
-        const step = Math.max(1, this.snapTicks()) * (event.key === 'ArrowRight' ? 1 : -1);
-        run({ kind: 'move', items: chosen, deltaTicks: step, deltaKeys: 0, copy: false });
-        return;
-      }
-
-      case 'ArrowUp':
-      case 'ArrowDown': {
-        const semitones = (event.shiftKey ? 12 : 1) * (event.key === 'ArrowUp' ? 1 : -1);
-        run({ kind: 'move', items: chosen, deltaTicks: 0, deltaKeys: semitones, copy: false });
-        return;
-      }
-
-      default:
-        break;
-    }
-
-    const key = event.key.toLowerCase();
-    if (event.altKey && key === 'q') {
-      run({ kind: 'quantize', items: chosen, snap: Math.max(1, this.snapTicks()) });
-    } else if (event.altKey && key === 'l') {
-      run({ kind: 'legato', items: chosen });
-    } else if ((event.ctrlKey || event.metaKey) && key === 'j') {
-      run({ kind: 'glue', items: chosen });
-    } else if ((event.ctrlKey || event.metaKey) && key === 'b') {
-      // The grid's own bar rather than the snap step's, or the copy lands a
-      // different distance away every time Snap is changed.
-      const beat = TICKS_PER_WHOLE / this.beatUnit();
-      const bar = Math.max(1, beat * Math.max(1, this.beatsPerBar()));
-      run({ kind: 'move', items: chosen, deltaTicks: bar, deltaKeys: 0, copy: true });
-    }
+      },
+      clearEditChannel: () => this.clearEditChannel(),
+      history: (command) => this.requests.history.set(command),
+      selection: () => this.gestures.selection(),
+      clearSelection: () => this.gestures.clearSelection(),
+      selectAll: () => this.gestures.selectAll(),
+      run: (gesture) => this.gestures.run(gesture),
+      editChannel: () => this.editChannel(),
+      hasStrip: () => this.target.strip() !== null,
+      snapTicks: () => this.snapTicks(),
+      beatsPerBar: () => this.beatsPerBar(),
+      beatUnit: () => this.beatUnit(),
+    });
   }
 
   /** A key on the left column, sounded on the channel being edited. */
@@ -2046,7 +1159,7 @@ export class PianoRoll {
       // sounds nothing is worth an answer. The drag sink is the per-row caller.
       this.audition.playNote({
         channel,
-        tick: Math.max(0, Math.round(this.playTick())),
+        tick: Math.max(0, Math.round(this.view.playTick())),
         note,
       });
       // A silenced channel and a note out of range are both refused before a

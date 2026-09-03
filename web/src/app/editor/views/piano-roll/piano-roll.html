@@ -7,14 +7,14 @@
   [percussionOpen]="percussionOpen()"
   [snap]="snap()"
   [editMode]="editMode()"
-  [editRefusal]="editRefusal()"
+  [editRefusal]="target.editRefusal()"
   [gestureRefusal]="gestures.refusal()"
   [selected]="gestures.selection().size"
   (zoomBy)="setZoom($event)"
   (snapChange)="setSnap($event)"
   (editModeChange)="setEditMode($event)"
   (rowHeightBy)="setRowHeight($event)"
-  (followChange)="setFollow($event)"
+  (followChange)="view.setFollow($event)"
   (scrollNotesChange)="setScrollNotes($event)"
   (allOctavesChange)="setAllOctaves($event)"
   (beatsPerBarChange)="setBeatsPerBar($event)"
@@ -45,19 +45,19 @@
 
      The channel picker sits over the corner the bar leaves empty, inside the
      same `@if` so the corner arrives with the bar it is a corner of. -->
-@if (overviewBox(); as box) {
+@if (view.overviewBox(); as box) {
   <div class="relative shrink-0">
     <amk-roll-overview
       [box]="box"
       [width]="width()"
       [rollWidth]="rollWidth()"
       [ticks]="songTicks()"
-      [bars]="minimap()"
-      [playheadX]="overviewX()"
-      [viewWindow]="overviewWindow()"
-      (panStart)="onPanStart($event)"
-      (panTo)="onPanTo($event)"
-      (panEnd)="onPanEnd()"
+      [bars]="pictures.minimap()"
+      [playheadX]="view.overviewX()"
+      [viewWindow]="view.overviewWindow()"
+      (panStart)="view.onPanStart($event)"
+      (panTo)="view.onPanTo($event)"
+      (panEnd)="view.onPanEnd()"
     />
 
     <amk-roll-channels
@@ -73,18 +73,18 @@
 <!-- The scrub bar: the roll's own timeline, and the drag that moves the song
      along it. Directly over the roll, in the roll's coordinates, so the
      marker's tip lands on the playhead line it is handed the x of. -->
-@if (scrubBox(); as box) {
+@if (view.scrubBox(); as box) {
   <amk-roll-scrub
     [box]="box"
     [width]="width()"
     [rollWidth]="rollWidth()"
     [ticks]="songTicks()"
-    [marks]="lines()"
-    [scroll]="scroll()"
-    [playheadX]="playheadX()"
-    (scrubStart)="onScrubStart($event)"
-    (scrubTo)="onScrubTo($event)"
-    (scrubEnd)="onScrubEnd()"
+    [marks]="pictures.lines()"
+    [scroll]="view.scroll()"
+    [playheadX]="view.playheadX()"
+    (scrubStart)="view.onScrubStart($event)"
+    (scrubTo)="view.onScrubTo($event)"
+    (scrubEnd)="view.onScrubEnd()"
   />
 }
 
@@ -138,23 +138,27 @@
         <!-- The frame clock reaches exactly this far. Both children below take
              the mark window's cadence instead, so neither is re-checked per
              frame just because the music has moved a pixel. -->
-        <g [attr.transform]="scroll()">
+        <g [attr.transform]="view.scroll()">
           <g
             amk-roll-grid
-            [lines]="lines()"
+            [lines]="pictures.lines()"
             [height]="stackHeight()"
-            [loopX]="loopX()"
-            [endX]="endX()"
+            [loopX]="pictures.loopX()"
+            [endX]="pictures.endX()"
           />
           <!-- The regions follow the gesture in flight rather than standing at
                the compiled song's reading of them, so a box is always round the
                notes it is drawn round. Nothing dims them for it: a box that has
                moved with its notes is accurate, and a faded one would be saying
                the opposite. -->
-          <g amk-roll-loops [regions]="shownLoopRegions()" [selected]="gestures.selectedBodies()" />
+          <g
+            amk-roll-loops
+            [regions]="pictures.shownLoopRegions()"
+            [selected]="gestures.selectedBodies()"
+          />
           <g
             amk-roll-notes
-            [marks]="marks()"
+            [marks]="pictures.marks()"
             [inspected]="inspectedCommand()"
             [selected]="selectedSpans()"
             [moving]="movingSpans()"
@@ -167,7 +171,7 @@
           <!-- Above the bars, because a loop's name has to be read over the
                music it names; it travels with the box it sits in the corner
                of, being built over the same followed list. -->
-          <g amk-roll-loop-labels [labels]="loopLabels()" />
+          <g amk-roll-loop-labels [labels]="pictures.loopLabels()" />
           <g
             amk-roll-edit
             [preview]="gestures.preview()"
@@ -188,8 +192,8 @@
           class="stroke-accent"
           pointer-events="none"
           stroke-width="1.5"
-          [attr.x1]="playheadX()"
-          [attr.x2]="playheadX()"
+          [attr.x1]="view.playheadX()"
+          [attr.x2]="view.playheadX()"
           [attr.y2]="stackHeight()"
         />
       </g>
@@ -236,12 +240,12 @@
     [laneHeight]="laneHeight()"
     [songTicks]="songTicks()"
     [rollWidth]="rollWidth()"
-    [scroll]="scroll()"
-    [playheadX]="playheadX()"
-    [lines]="lines()"
-    [loopX]="loopX()"
-    [endX]="endX()"
-    [lane]="laneView()"
+    [scroll]="view.scroll()"
+    [playheadX]="view.playheadX()"
+    [lines]="pictures.lines()"
+    [loopX]="pictures.loopX()"
+    [endX]="pictures.endX()"
+    [lane]="pictures.laneView()"
     [inspected]="inspectedCommand()"
     [zoom]="zoom()"
     (commandPicked)="gestures.clearSelection()"
