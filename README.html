@@ -876,7 +876,7 @@
           <div class="card">
             <h4>Diagnostics that point at the character</h4>
             <p>
-              165 codes: 158 <code>AMK</code> ones AddmusicK itself reports, and 7
+              168 codes: 158 <code>AMK</code> ones AddmusicK itself reports, and 10
               <code>SST</code> ones it has no opinion about. The span lands on the offending
               character rather than merely near it — even through a <code>"name=value"</code>
               replacement, where the error is attributed back to where you wrote it.
@@ -2390,7 +2390,7 @@
         <p class="lead">
           Everything the compiler has to say about your song carries a code. They are listed in
           <strong>Problems</strong>, pinned to the bottom of the sidebar; click one and it takes you
-          to the text that raised it. This is what all 165 of them mean.
+          to the text that raised it. This is what all 168 of them mean.
         </p>
 
         <p>
@@ -3529,8 +3529,8 @@
         <h3 id="codes-sst">Solar Soundtrack's own</h3>
 
         <p>
-          Seven findings AddmusicK does not make. Six are about what a song <em>does</em> rather
-          than about whether it builds, so real AddmusicK will compile every one of these without
+          Ten findings AddmusicK does not make. Nine are about what a song <em>does</em> rather than
+          about whether it builds, so real AddmusicK will compile every one of these without
           comment.
         </p>
 
@@ -3604,6 +3604,35 @@
                   A replacement whose value contains its own name, so expanding it never finishes.
                   AddmusicK grows its buffer forever on the same song rather than stopping, so there
                   is no run to be faithful to.
+                </td>
+              </tr>
+              <tr>
+                <td><code>SST0506</code></td>
+                <td>Severe</td>
+                <td>
+                  The song writes <code>$F7</code>, a command this driver never implemented: its
+                  slot in the command table is zero, so the SPC jumps to address zero and the song
+                  stops. AddmusicK compiles it without a word. There is no working form of it.
+                </td>
+              </tr>
+              <tr>
+                <td><code>SST0507</code></td>
+                <td>Severe</td>
+                <td>
+                  A <code>$DD</code> pitch bend the driver cannot reach. It is not run as a command
+                  at all — the note in front of it picks it up by looking one byte ahead — so it has
+                  to be written directly after a note of two ticks or more. Anywhere else, the same
+                  jump to address zero as above: first thing in a channel, after another command, or
+                  after a note only one tick long.
+                </td>
+              </tr>
+              <tr>
+                <td><code>SST0508</code></td>
+                <td>Warning</td>
+                <td>
+                  A <code>$E4</code> transpose under <code>#am4</code>, where the compiler adds one
+                  to it in silence, so it lands a semitone above what is written. Write one less
+                  than you want, or move the song to <code>#amk</code>.
                 </td>
               </tr>
             </tbody>

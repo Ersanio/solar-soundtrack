@@ -9,16 +9,17 @@ an echo will run away. Nothing else. No CodeMirror, no Angular, no third-party d
 `TOKEN_TAGS` holds `@lezer/highlight` tag _names_ as plain strings so the adapter can live in the
 app.
 
-| Module                     | What it is                                                                      |
-| -------------------------- | ------------------------------------------------------------------------------- |
-| `tokens.ts`                | The scanner: `step`, `tokenize`, `Command`, `InstrumentDefinition`              |
-| `edits.ts`                 | Splices that rewrite a command in the source it was scanned from                |
-| `dialect.ts`               | What was in force at a point in the song — dialect, tempo, v-table              |
-| `echo-hazards.ts`          | Diagnostics for an echo that compounds instead of decaying                      |
-| `fir-override.ts`          | Which `$F5`s a later `$F1` throws away                                          |
-| `commands/`                | What each argument _means_, in a form a panel can render and edit               |
-| `commands/availability.ts` | Which dialects will take a command, for a palette asking before the text exists |
-| `commands/loops.ts`        | Where a song's brackets are, what each construct repeats, and what it names     |
+| Module                     | What it is                                                                       |
+| -------------------------- | -------------------------------------------------------------------------------- |
+| `tokens.ts`                | The scanner: `step`, `tokenize`, `Command`, `InstrumentDefinition`               |
+| `edits.ts`                 | Splices that rewrite a command in the source it was scanned from                 |
+| `dialect.ts`               | What was in force at a point in the song — dialect, tempo, v-table               |
+| `echo-hazards.ts`          | Diagnostics for an echo that compounds instead of decaying                       |
+| `command-hazards.ts`       | Bytes that compile clean and then break the song: `$F7`, a stranded `$DD`, `$E4` |
+| `fir-override.ts`          | Which `$F5`s a later `$F1` throws away                                           |
+| `commands/`                | What each argument _means_, in a form a panel can render and edit                |
+| `commands/availability.ts` | Which dialects will take a command, for a palette asking before the text exists  |
+| `commands/loops.ts`        | Where a song's brackets are, what each construct repeats, and what it names      |
 
 ## A resumable scanner, not a second parser
 
@@ -118,8 +119,8 @@ text, stays editable. Asking it of the whole command would refuse an edit that i
 
 ## Source order is execution order within one channel only
 
-`echo-hazards.ts` and `fir-override.ts` both walk the command list looking backwards, and both stop
-at the channel boundary. Within one channel source order is execution order; across channels the
+`echo-hazards.ts`, `fir-override.ts` and `command-hazards.ts` all walk the command list looking
+backwards, and all stop at the channel boundary. Within one channel source order is execution order; across channels the
 driver interleaves by time, so "later in the file" would not mean "runs afterwards" and the warning
 would be guesswork.
 
@@ -151,10 +152,11 @@ upstream has an opinion to report. That is why the echo diagnostics are `SST05xx
 anything: the prefix is the claim that AddmusicK would say nothing here.
 
 That is the whole band, and what puts it under `SST` is that **`Music.cpp` produces none of them**:
-`SST0500`/`SST0501` here, `SST0502` in `@amk/spc`, `SST0503` in the app, and `SST0504` for a `#path`
-this editor deliberately ignores. Four of the five are `severe` because what they report compiles
-cleanly and then misbehaves on playback, but the severity is a property of each rather than of the
-range — `SST0504` is `info`, since nothing about that song misbehaves anywhere.
+`SST0500`/`SST0501` and `SST0506`-`SST0508` here, `SST0502` in `@amk/spc`, `SST0503` in the app, and
+`SST0504` for a `#path` this editor deliberately ignores. Six of the eight are `severe` because what
+they report compiles cleanly and then misbehaves on playback, but the severity is a property of each
+rather than of the range — `SST0504` is `info`, since nothing about that song misbehaves anywhere,
+and `SST0508` is a plain `warning`, since a song a semitone out plays perfectly well.
 
 There is one blind spot, left alone deliberately: a replacement collapses everything it expands to
 onto its use site, so a `$F5` and a `$F1` written inside the _same_ macro share a `span.start` and
@@ -203,10 +205,15 @@ to hold the two answers together: `blocked` means the compile is not clean, `cau
 a warning to read, `ok` means silence.
 
 **The compiler is the whole of its oracle, and that bounds what it may say.** A byte that compiles
-without a word and then jumps the SPC to `$0000` — `$F7`, a `$DD` written anywhere but straight after
-a note — has no state here, and neither has `#am4`'s `$E4`, which the parser rewrites in silence.
-Those live beside the button as the catalogue's `caveat` rather than inside the model, because a rule
-no harness can check is a rule that drifts.
+without a word and then jumps the SPC to `$0000` — `$F7`, a `$DD` no note's read-ahead can reach —
+has no state here, and neither has `#am4`'s `$E4`, which the parser rewrites in silence. Those are
+`command-hazards.ts`'s, raised against the byte as written: `availability.ts` answers about text that
+does not exist yet, and all three are facts about where a byte _stands_, which only text can carry.
+The palette still says the `$DD` and `$E4` ones in prose under the button; `$F7` has no button to say
+it on, being `withheld` from the strip precisely because there is no working form of it to offer, so
+there the diagnostic is the whole of the warning. `palettetest` holds all three together — a
+`caveat` with no diagnostic behind it, a diagnostic nothing warns of, or a byte withheld with no
+diagnostic to withhold it for, all fail there.
 
 Warnings only. Where a dialect refuses a spelling the palette writes the bytes it would have compiled
 to instead, and says nothing — a porter asked for a volume fade and gets one, and which of the two

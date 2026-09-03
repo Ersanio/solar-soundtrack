@@ -13,6 +13,7 @@ import {
 } from '@amk/spc/song-walk';
 import { readLoops } from '@amk/tokens/commands/loops';
 import { echoHazards } from '@amk/tokens/echo-hazards';
+import { commandHazards } from '@amk/tokens/command-hazards';
 import { commandsInForceOf } from './commands-in-force';
 import { type TimelineCommand, commandTimeline } from './command-timeline';
 import { type SongClock, songClock } from './song-clock';
@@ -170,11 +171,11 @@ export class EditorStore {
    * Errors first, then by position — the order you want to fix them in.
    *
    * Two sources, running at different speeds on purpose. The compiler's come off `committed` and so
-   * lag by the typing debounce; the echo hazards are scanned from {@link tokens}, which does not, so
-   * a runaway echo is reported by the very keystroke or paste that writes it. A warning about what
-   * the song will do the moment you press play is not worth holding back 150 ms, and the compiler
-   * has no opinion to offer anyway: it copies `$F5` through on its length alone, because
-   * `Music.cpp` has no `$F5` code to port.
+   * lag by the typing debounce; the echo hazards and the command hazards are scanned from
+   * {@link tokens}, which does not, so a runaway echo or a stranded `$DD` is reported by the very
+   * keystroke or paste that writes it. A warning about what the song will do the moment you press
+   * play is not worth holding back 150 ms, and the compiler has no opinion to offer anyway: it
+   * copies `$F5` through on its length alone, because `Music.cpp` has no `$F5` code to port.
    */
   readonly diagnostics = computed<Diagnostic[]>(() => {
     const order = { error: 0, severe: 1, warning: 2, info: 3 } as const;
@@ -182,6 +183,7 @@ export class EditorStore {
     const all = [
       ...(this.result()?.diagnostics ?? []), // Compiler diagnostics
       ...echoHazards(this.tokens().commands), // Echo hazard diagnostics
+      ...commandHazards(this.tokens()), // Bytes that compile clean and then break the song
       ...(timeline ? unreachableChannels(timeline, this.result()?.noteMap ?? []) : []), // Unreachable notes in channels
       // The driver cannot keep up with the tempo. It stands on the last
       // measurement rather than only on one taken from the current bytes, which

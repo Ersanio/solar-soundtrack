@@ -163,14 +163,15 @@ partial UI stays populated. **The prefix says whose finding it is, not which fil
 `AMK####` is a condition AddmusicK itself reports, ported from `AddmusicKsrc/` with the `Music.cpp`
 line cited; `SST####` is one `Music.cpp` does not produce at all, so a porter is never told
 AddmusicK objects to something it has no opinion about. The echo hazards, the unreachable-channel
-warning, the tempo shortfall, the `#path` notice and the runaway-replacement guard are `SST05xx`,
-which is also where a finding goes when the reference does not _finish_ rather than not object:
-`SST0505` bounds a replacement that expands into itself, and AddmusicK grows its buffer forever on
-the same song, so there is no run to be faithful to and nothing to divide with `#path`. `SST0301`
-guards `compile()`'s own ARAM argument. A new diagnostic takes the prefix
-of the tool that found it. Spans are mapped back to the source the author wrote — `spanAt` is the
-single choke point, and anything that bypasses it will be wrong. Constructs this compiler does not
-implement are reported as errors, never silently mis-compiled.
+warning, the tempo shortfall, the `#path` notice, the runaway-replacement guard and the three
+command hazards — `$F7`'s dead dispatch slot, a `$DD` no note's read-ahead can reach, and `#am4`'s
+silent `$E4` offset — are `SST05xx`, which is also where a finding goes when the reference does not
+_finish_ rather than not object: `SST0505` bounds a replacement that expands into itself, and
+AddmusicK grows its buffer forever on the same song, so there is no run to be faithful to and
+nothing to divide with `#path`. `SST0301` guards `compile()`'s own ARAM argument. A new diagnostic
+takes the prefix of the tool that found it. Spans are mapped back to the source the author wrote —
+`spanAt` is the single choke point, and anything that bypasses it will be wrong. Constructs this
+compiler does not implement are reported as errors, never silently mis-compiled.
 
 **Accessibility is not supported.** The app ships no ARIA attributes and no `role` or `tabindex`,
 and none are planned. `angular.configs.templateAccessibility` is therefore absent from the
@@ -1430,6 +1431,42 @@ stats.loopTicks` pads **every other channel that would cut the song short** out 
   scrolling body and a footer row that hides itself when nothing is projected into it. The two
   components project their icon and their content and keep only what is theirs — the picker its
   rows and its import, the changelog its entries.
+- **A `Write byte` button, and then deleting the row to take it away** — two shapes, both wrong,
+  and the second is the one worth naming. `$F7`'s body is commented out (`Commands.asm:633`) and
+  its dispatch slot is `$0000`, so the button offered a command with no working form: every use of
+  it was a dead SPC, and `SST0506` reporting that afterwards does not make offering it reasonable.
+  But the catalogue is two tables in one — `glyphOf` reads the same rows _backwards_ to name and
+  draw a command already in a song, and `palettetest` counts them to prove every VCMD `$DA`-`$FE`
+  is covered — so deleting the row would have blanked a hand-written `$F7` in the command lane and
+  on a roll bar, orphaned the `chipWrite` glyph, and turned a coverage proof into a hole. The row
+  stays and carries `withheld: true`; `OFFERED` is what the two strips read and `ENTRIES` is what
+  every reverse lookup reads. It carries no `caveat` either, nothing being able to hover a button
+  that is not drawn, and `palettetest` holds a withheld byte to raising a diagnostic — so a byte
+  cannot quietly leave the palette with nothing put in its place.
+- **Yellow on a palette button, for a `caution` availability and for a `caveat`** — it painted an
+  alarm the button could not stand behind, and it was wrong in both directions at once. A `caution`
+  is a warning AddmusicK itself prints the moment the text exists — `palettetest` pins that there is
+  one — so the colour was a dimmer second copy of a finding already in Problems; and the three
+  caveats were the palette carrying a driver fact nothing checked, which is the arrangement
+  `packages/mml-tokens/README.md` itself called a rule that drifts. The colour was also the _only_
+  channel either way, so a `$F7` typed by hand, pasted, or clicked once and forgotten was never
+  mentioned at all. Only `blocked` keeps a treatment, which is grey and is the disabled button; the
+  three facts are `SST0506`-`SST0508` (`command-hazards.ts`), raised on the byte as written. The
+  `caveat` field stays as the readout's prose, since it can speak before there is any text to raise
+  a diagnostic against and it is the only home for `$E4`'s dialect-conditional note, and
+  `palettetest` holds the two to each other in both directions. The readout line keeps the amber for
+  a **dead** button's reason alone (`muted`), which is one rule with one meaning and a fact the
+  greyed face already shows — the same standing `roll-toolbar.html`'s `cannot edit:` has.
+- **Answering “is this `$DD` armed” with a tick count and a `null`** — it could not say that a `v`
+  stood between the note and the command, so the inspector priced a slide that never arms at “95
+  ticks to run in” while the song jumped to `$0000`; and it summed a tied note's segments where the
+  driver reloads its counter per frame (`main.asm:2440-2441`) and `accumulateTiedLength` rewinds the
+  tie out of a `$DD`'s way (`parser.ts:2895-2909`), so `c4^8 $DD` read 72 where the read-ahead gets 24. `bendAnchor` answers with the three ways it fails and the one way it works, which is
+  `COMMANDS.html`'s own enumeration, and one pass serves the panel and the diagnostic so the two
+  cannot disagree. A rest is an anchor like any note, `$C7` being a note byte to the driver — the
+  reading that excluded it would have called a song that plays fine a dead SPC. And “nothing before
+  it” is asked ahead of “something in the way”, since nothing can stand _between_ the command and a
+  note that is not there: that is what the head of a `(!n)[ … ]` body answers.
 - **The roll toolbar's readout line** — `editing: #0 · tick 7,534 of 14,592 · t55 · 109.4 ticks/s ·
 3,468 notes`, rewritten twice a second while playing. It said five things in one place, four of
   which were not the roll's: the channel is what the corner picker already shows, the note count is

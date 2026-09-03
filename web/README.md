@@ -391,15 +391,15 @@ would throw every answer away, and a second of quiet is far less than it takes t
 transport. The predicted clock stands in the meantime and stands for good if the measurement fails,
 which is why it is still worth having.
 
-`SST0503` is the same finding pointed at the porter: past 10% the song is not playing at the tempo it
-was written at, and a SNES drops the same ticks, so it is a fact about the song rather than about
-this editor. `severe`, beside the echo hazards and `SST0502` — it compiles cleanly and then
-misbehaves on playback. What the `SST05xx` band shares is not that, but that `Music.cpp` produces
-none of them: `SST0504`, for a `#path` this editor deliberately ignores, is `info` and is about the
-editor rather than the song. The comparison starts at the first tick: the driver's boot, and the echo
-buffer `$FA $04` zeroes in the song's first tick — some 26 ms per delay unit, a pause AddmusicK puts
-at the top of every song on purpose — are one-off costs, and a short song would read them as a rate.
-The pass length keeps them, since they are heard.
+`SST0503` is the same finding pointed at the porter: past 10% the song is not playing at the tempo
+it was written at, and a SNES drops the same ticks, so it is a fact about the song rather than about
+this editor. `severe`, beside the echo hazards, `SST0502` and the two command hazards — it compiles
+cleanly and then misbehaves on playback. What the `SST05xx` band shares is not that, but that
+`Music.cpp` produces none of them: `SST0504`, for a `#path` this editor deliberately ignores, is
+`info` and is about the editor rather than the song. The comparison starts at the first tick: the
+driver's boot, and the echo buffer `$FA $04` zeroes in the song's first tick — some 26 ms per delay
+unit, a pause AddmusicK puts at the top of every song on purpose — are one-off costs, and a short
+song would read them as a rate. The pass length keeps them, since they are heard.
 
 **Nothing that follows the music is denominated in seconds**, the seek bar included: its `min`, `max`
 and `value` are driver ticks, `Playback.position` and `scrubbing` are ticks, `player.seek` and the

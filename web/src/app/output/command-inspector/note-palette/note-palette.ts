@@ -7,7 +7,7 @@ import {
   CATEGORIES,
   type CaretPlace,
   type Category,
-  ENTRIES,
+  OFFERED,
   type ResolvedEntry,
   resolveEntry,
 } from '../../../editor/command-palette/catalog';
@@ -189,7 +189,7 @@ export class NotePalette {
     const filter = this.filter();
     const model = this.model();
 
-    return ENTRIES.filter((entry) => entry.category === filter).flatMap((entry) => {
+    return OFFERED.filter((entry) => entry.category === filter).flatMap((entry) => {
       const resolved = resolveEntry(entry, target, place);
       const hidden =
         resolved.vcmd === 0xdd

@@ -32,7 +32,8 @@ import {
 } from "@amk/tokens";
 import { type CommandScope, commandScope, parseTimeInForce } from "@amk/tokens/commands/in-force";
 
-import { noteTicksBefore, velocityTableAt } from "@amk/tokens/dialect";
+import { velocityTableAt } from "@amk/tokens/dialect";
+import { type BendAnchor, bendAnchor, commandHazards } from "@amk/tokens/command-hazards";
 import { resolveCommand } from "@amk/tokens/commands/describe";
 import {
 	DEFAULT_TEMPO,
@@ -46,6 +47,26 @@ import {
 import { check, summarise } from "./harness";
 
 const at = (text: string, offset: number) => commandAt(tokenize(text).commands, offset);
+
+/**
+ * One string per {@link BendAnchor}, so a case reads as what the driver finds.
+ *
+ * `blocked` carries the command's name rather than its span: what the diagnostic
+ * says is which command the driver read instead, and a span would pin the
+ * harness to offsets that move whenever a case's text is edited.
+ */
+function said(anchor: BendAnchor): string {
+	switch (anchor.kind) {
+		case "rides":
+			return `rides:${anchor.ticks}`;
+		case "tooShort":
+			return `tooShort:${anchor.ticks}`;
+		case "blocked":
+			return `blocked:${anchor.by.name}`;
+		case "nothing":
+			return "nothing";
+	}
+}
 
 /**
  * The token containing `offset`, notes included.
@@ -1649,8 +1670,8 @@ console.log("\n$DD takes a note as its last parameter");
 	// pointer. Counting the target as a note put a plausible tick figure there.
 	const chain = tokenize("#amk 4\n#0 o4 c4 $DD $00 $18 e $DD $00 $18 g\n");
 	const slides = chain.commands.filter((command) => command.vcmd === 0xdd);
-	check("the first slide rides on the note before it", noteTicksBefore(slides[0], chain.commands) === 48);
-	check("and the second rides on nothing", noteTicksBefore(slides[1], chain.commands) === null);
+	check("the first slide rides on the note before it", said(bendAnchor(slides[0], chain)) === "rides:48");
+	check("and the second rides on nothing", said(bendAnchor(slides[1], chain)) === "nothing");
 
 	// A fourth departure, and the README lists it. `Music.cpp:2029` reads
 	// `text[pos]` raw, with no `doReplacement` in front of it, so AMK decides the
@@ -1673,6 +1694,111 @@ console.log("\n$DD takes a note as its last parameter");
 	check("and clears it behind itself", drum("d") === "", drum("d"));
 	const sfx = inForceAt("#amk 4\n#6 @21 $DD $00 $18 c d\n");
 	check("but not on #6, where the remap survives its note", sfx("d") === "@21", sfx("d"));
+}
+
+console.log("\ncommand hazards — bytes that compile clean and then break the song");
+{
+	const anchorsIn = (source: string): string => {
+		const index = tokenize(source);
+		return index.commands
+			.filter((command) => command.vcmd === 0xdd)
+			.map((command) => said(bendAnchor(command, index)))
+			.join();
+	};
+
+	const codesIn = (source: string): string =>
+		commandHazards(tokenize(source))
+			.map((d) => d.code)
+			.join();
+
+	// `$DD` is picked up by a peek at the byte standing at the track pointer
+	// (`main.asm:L_10E4`) and its own dispatch slot is `$0000`, so what decides it
+	// is a byte adjacency rather than anything about the operands. These are the
+	// four answers the driver distinguishes.
+	for (const [name, source, want] of [
+		["a note of two ticks or more", "#amk 4\n#0 o4 c4 $DD $00 $18 $A4\n", "rides:48"],
+		// A rest is a note byte to the driver: `$C7` runs the same path
+		// (`main.asm:2393-2441`) and sets the same counters, so the slide arms on a
+		// keyed-off voice and is inaudible rather than fatal.
+		["a rest", "#amk 4\n#0 o4 r4 $DD $00 $18 $A4\n", "rides:48"],
+		// The tie is a frame of its own: `accumulateTiedLength` rewinds it out of the
+		// `$DD`'s way (`parser.ts:2895-2909`, Music.cpp:2224), so the peek gets 24
+		// ticks and not the 72 the note is written as.
+		["a tied note", "#amk 4\n#0 o4 c4^8 $DD $00 $18 $A4\n", "rides:24"],
+		["a tie of one tick", "#amk 4\n#0 o4 c4^192 $DD $00 $18 $A4\n", "tooShort:1"],
+		["a one-tick note", "#amk 4\n#0 o4 c192 $DD $00 $18 $A4\n", "tooShort:1"],
+		["nothing at all", "#amk 4\n#0 $DD $00 $18 $A4\n", "nothing"],
+		["another channel's note", "#amk 4\n#0 o4 c4\n#1 $DD $00 $18 $A4\n", "nothing"],
+		// A target keys nothing on, so a chained `$DD` has no note in front of it.
+		["a chained slide", "#amk 4\n#0 o4 c4 $DD $00 $18 e $DD $00 $18 g\n", "rides:48,nothing"],
+		// Anything writing bytes is what the peek reads instead.
+		["a volume", "#amk 4\n#0 o4 c4 v200 $DD $00 $18 $A4\n", "blocked:volume"],
+		["a hex run", "#amk 4\n#0 o4 c4 $E7 $C8 $DD $00 $18 $A4\n", "blocked:volume"],
+		["a loop bracket", "#amk 4\n#0 o4 c4 [ $DD $00 $18 $A4 ]2\n", "blocked:loop start"],
+		// `label` raises no command at all, which is why this asks the whole index.
+		["a loop call", "#amk 4\n#0 (1)[ o4 c4 ]2 c4 (1)3 $DD $00 $18 $A4\n", "blocked:loop call"],
+		// and `l` are resolved at parse time.
+		["an octave", "#amk 4\n#0 o4 c4 o5 $DD $00 $18 $A4\n", "rides:48"],
+		["a default length", "#amk 4\n#0 o4 c4 l8 $DD $00 $18 $A4\n", "rides:48"],
+		["a quantize", "#amk 4\n#0 o4 c4 q7F $DD $00 $18 $A4\n", "rides:48"],
+		["a transpose letter", "#amk 4\n#0 o4 c4 h1 $DD $00 $18 $A4\n", "rides:48"],
+		["a drum", "#amk 4\n#0 o4 c4 @21 $DD $00 $18 $A4\n", "rides:48"],
+	] as const) {
+		check(`a slide after ${name} is ${want}`, anchorsIn(source) === want, anchorsIn(source));
+	}
+
+	// Only the failures are reported, and each of them once.
+	check("a reachable slide raises nothing", codesIn("#amk 4\n#0 o4 c4 $DD $00 $18 $A4\n") === "");
+	check("a stranded one is SST0507", codesIn("#amk 4\n#0 $DD $00 $18 $A4\n") === "SST0507");
+	check(
+		"and says which command the driver read instead",
+		commandHazards(tokenize("#amk 4\n#0 o4 c4 v200 $DD $00 $18 $A4\n"))[0].message.includes("The volume written"),
+	);
+
+	// `Commands.asm:633` leaves the body commented out, so the label collapses onto
+	// cmdF9 and the slot is `$0000` (main.bin @ $13A6). No argument redeems it, and
+	// no dialect does either.
+	for (const target of ["#amk 1", "#amk 2", "#amk 4", "#am4", "#amm"] as const) {
+		check(`$F7 is SST0506 under ${target}`, codesIn(`${target}\n#0 $F7 $00 $00 $00 c4\n`) === "SST0506");
+	}
+
+	// Music.cpp:1863 — Addmusic 4.05 stored one more than was written, and only
+	// there, so the finding is the dialect's rather than the byte's.
+	check("$E4 under #am4 is SST0508", codesIn("#am4\n#0 $E4 $02 c4\n") === "SST0508");
+	for (const target of ["#amk 1", "#amk 2", "#amk 4", "#amm"] as const) {
+		check(`and nothing under ${target}`, codesIn(`${target}\n#0 $E4 $02 c4\n`) === "");
+	}
+
+	check(
+		"SST0508 is a warning where the other two are severe",
+		commandHazards(tokenize("#am4\n#0 $E4 $02 c4\n"))[0].severity === "warning" &&
+			commandHazards(tokenize("#amk 4\n#0 $F7 $00 $00 $00 c4\n"))[0].severity === "severe",
+	);
+
+	// The span is the whole run, as the echo hazards' is, so the underline covers
+	// the command a porter has to delete rather than its first byte.
+	const spanned = commandHazards(tokenize("#amk 4\n#0 $F7 $00 $00 $00 c4\n"))[0];
+	check(
+		"and the span covers the whole run",
+		spanned.span.end - spanned.span.start === 15,
+		String(spanned.span.end - spanned.span.start),
+	);
+	check("and carries its line", spanned.span.line === 2, String(spanned.span.line));
+
+	// Nothing here waits for `complete`, where the echo hazards do: no argument
+	// redeems a `$F7` or moves a `$DD` off the byte in front of it, so there is no
+	// half-written state either finding would be wrong about.
+	check("a half-written $DD is still reported", codesIn("#amk 4\n#0 $DD $00\n") === "SST0507");
+
+	// A `(!n)[ … ]` body compiles to the loop block, so nothing in it is adjacent to
+	// the channel’s own stream — in either direction. It has to be written above the
+	// first `#N` to be a definition at all (Music.cpp:1015), which is where `gather`
+	// marks the body and both its brackets.
+	check(
+		"a remote body's own note anchors its slide",
+		anchorsIn("#amk 4\n(!1)[ o4 c4 $DD $00 $18 $A4 ]\n#0 c4\n") === "rides:48",
+	);
+	check("and a note outside it does not", anchorsIn("#amk 4\no4 c4\n(!1)[ $DD $00 $18 $A4 ]\n#0 d4\n") === "nothing");
 }
 
 console.log("\nrestartability — the property CodeMirror relies on");

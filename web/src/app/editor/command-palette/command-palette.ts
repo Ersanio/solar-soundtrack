@@ -8,7 +8,7 @@ import {
   CATEGORIES,
   type CaretPlace,
   type Category,
-  ENTRIES,
+  OFFERED,
   type ResolvedEntry,
   resolveEntry,
 } from './catalog';
@@ -40,16 +40,21 @@ function readFilter(): Filter {
 
 /**
  * A bordered button with a glyph beside the name: the `sm` height, radius and
- * transition of an `amk-toggle` in its off state, and the `ok` state's colours
- * are that toggle's. Not the component itself, because `caution` and a `caveat`
- * wear a colour of their own that a toggle has no state for. Bordered on
- * purpose, where the category segments above it are not: each of these acts on
- * the song, and the segments only choose which of them are shown.
+ * transition of an `amk-toggle` in its off state, and its colours are that
+ * toggle's. Not the component itself, because a disabled bordered button is not
+ * one of a toggle's states. Bordered on purpose, where the category segments above
+ * it are not: each of these acts on the song, and the segments only choose which
+ * of them are shown.
  *
- * `caution` keeps the button live: AddmusicK compiles those, and a control that
- * refused what the real tool accepts would be the compiler being permissive in
- * the other direction. A `caveat` wears the same colour for the same reason —
- * it is worth reading first and it is not a refusal.
+ * Nothing here is tinted for a hazard. What a command does to a song is the
+ * editor's to report once the text exists — a `caution` is a warning AddmusicK
+ * itself prints, and the three `caveat` bytes are `SST0506`-`SST0508`
+ * (`@amk/tokens/command-hazards`) — so a colour here would be a second, dimmer
+ * copy of a finding already in Problems.
+ *
+ * `caution` still keeps the button live: AddmusicK compiles those, and a control
+ * that refused what the real tool accepts would be the compiler being permissive
+ * in the other direction.
  */
 export function entryClass(entry: ResolvedEntry): string {
   const base =
@@ -58,9 +63,7 @@ export function entryClass(entry: ResolvedEntry): string {
     return `${base} text-ink-muted`;
   }
 
-  return entry.availability.state === 'caution' || entry.caveat !== undefined
-    ? `${base} text-warn border-warn/40 hover:border-warn`
-    : `${base} text-ink-muted hover:text-ink hover:border-control`;
+  return `${base} text-ink-muted hover:text-ink hover:border-control`;
 }
 
 /**
@@ -111,7 +114,13 @@ export function entryReadout(
   return {
     label: entry.label,
     text: entry.caveat ? `${said} ${entry.caveat}` : said,
-    muted: entry.availability.state === 'ok' && entry.caveat === undefined && refused === null,
+    // The one thing left that wears a colour here, and it says only that the
+    // button will not act — which the greyed face already shows and the porter
+    // can therefore check. Everything that is a claim about the *song* is a
+    // diagnostic now, so a caution reason and a caveat both read plain. Off what
+    // the readout holds rather than `entryBlocked`, which is also true when no
+    // selection was offered at all and there is no reason to colour a blurb.
+    muted: entry.availability.state !== 'blocked' && refused === null,
   };
 }
 
@@ -251,7 +260,7 @@ export class CommandPalette {
     const place = this.place();
     const filter = this.filter();
 
-    return ENTRIES.filter((entry) => filter === 'all' || entry.category === filter).map((entry) => {
+    return OFFERED.filter((entry) => filter === 'all' || entry.category === filter).map((entry) => {
       const resolved = resolveEntry(entry, target, place);
       return { ...resolved, class: entryClass(resolved), disabled: entryBlocked(resolved) };
     });

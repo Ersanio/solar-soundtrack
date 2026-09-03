@@ -27,6 +27,8 @@ export const CHANGELOG: readonly ChangelogEntry[] = [
       'Loops are drawn in the piano roll: a dashed box around the written loop, a dotted one around every repeat, tinted in the channel colour',
       'Make a loop from the command palette: one Loop button that wraps the notes you have selected, and numbers itself',
       'A loop inspector, naming the loop the cursor is in and putting its repeat count one field away',
+      'Warnings for commands that compile fine and then break the song: write byte, and a pitch bend the driver cannot reach',
+      'The write byte button is gone from the command palette: this driver never implemented it, so there is nothing it could do',
     ],
   },
   {

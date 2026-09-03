@@ -6,7 +6,8 @@ import { argLockedBecause } from '../commands/context';
 import { Slider } from '../../../shared/slider/slider';
 import { CommitAudition } from '../../../state/commit-audition';
 import { EditorStore } from '../../../state/editor-store';
-import { noteTicksBefore, tempoBefore } from '@amk/tokens/dialect';
+import { tempoBefore } from '@amk/tokens/dialect';
+import { bendAnchor } from '@amk/tokens/command-hazards';
 import { BendGraph } from '../bend-graph/bend-graph';
 import { toSigned } from '@amk/tokens/commands/param';
 import { dragPreview } from '../commands/preview';
@@ -118,39 +119,45 @@ export class BendCommand {
           : 'Every later note starts at its written pitch and departs by this much.',
   );
 
-  /**
-   * Ticks of the note this bend rides on that it can actually use.
-   *
-   * One less than the note's own length: the driver's read-ahead cannot run on
-   * the tick a note begins (`main.asm:2338`), so the slide starts on the second.
-   */
-  private readonly window = computed(() => {
-    const ticks = noteTicksBefore(this.command(), this.store.tokens().commands);
-    return ticks === null ? null : ticks - 1;
-  });
+  /** What the slide rides on, and so whether the driver arms it at all. */
+  private readonly anchor = computed(() => bendAnchor(this.command(), this.store.tokens()));
 
   /**
-   * Whether the bend fits in the note it rides on, and what is lost if not.
+   * Whether the driver reaches this bend, and whether it fits the note it rides on.
    *
-   * The seconds beside the two sliders are unconditional, and the song is not:
-   * the next key-on overwrites the slide state outright (`main.asm:465-466`), so
-   * a `$DD` that outlasts its note is simply cut off mid-slide and never reaches
-   * the target. This is what says so.
+   * Three of the four answers are fatal rather than merely lossy, and they say what
+   * `SST0507` says: `$DD` is picked up by a peek at the byte standing at the track
+   * pointer (`main.asm:L_10E4`) and its own dispatch slot is `$0000`, so anything
+   * that breaks that adjacency stops the song rather than shortening the slide.
+   *
+   * Where it does ride, the seconds beside the two sliders are unconditional and the
+   * song is not: the next key-on overwrites the slide state outright
+   * (`main.asm:465-466`), so a `$DD` that outlasts its note is cut off mid-slide and
+   * never reaches the target. The window is one less than the frame, the read-ahead
+   * being unable to run on the tick a note begins (`main.asm:2338`).
    */
   protected readonly reachability = computed(() => {
     if (!this.isPitchBend()) {
       return null;
     }
 
-    const window = this.window();
-    if (window === null) {
-      return 'No note precedes this on the channel, so there is nothing for the slide to ride on and nothing is heard.';
+    const anchor = this.anchor();
+    switch (anchor.kind) {
+      case 'nothing':
+        return 'No note plays before this on the channel, so the driver runs the slide as a command, jumps to address zero and the song stops.';
+      case 'blocked':
+        return `The ${anchor.by.name} written between this and the note before it is what the driver reads instead, so the slide runs as a command, jumps to address zero and the song stops.`;
+      case 'tooShort':
+        return 'The note before this lasts one tick, and the read-ahead cannot run on the tick a note begins, so the slide runs as a command, jumps to address zero and the song stops.';
+      case 'rides':
+        break;
     }
 
+    const window = anchor.ticks - 1;
     const delay = this.shownDelay();
     const span = delay + this.shownDuration();
     if (delay >= window) {
-      return `The note before this is ${window + 1} ticks, so the slide has ${window} to run in — the delay alone uses them all and none of the bend is heard.`;
+      return `The note before this gives the slide ${window} ticks; the delay alone uses them all and none of the bend is heard.`;
     }
 
     if (span > window) {

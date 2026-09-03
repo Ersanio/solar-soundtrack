@@ -2,7 +2,7 @@
  * The command palette's catalogue, and the loop reading the two bracket buttons
  * and the loop inspector share.
  *
- * Five assertions carry the weight here, and none is visible from the table
+ * Six assertions carry the weight here, and none is visible from the table
  * itself:
  *
  * 1. **The palette is not a third statement of arity.** An entry lists argument
@@ -19,8 +19,9 @@
  *    A `blocked` entry that compiles cleanly is a button greyed out for nothing;
  *    an `ok` entry that errors is the one promise the palette makes, broken; and
  *    a `caution` is a warning the author is told to read, so there has to be one.
- *    What the compiler cannot answer — the driver's own lethal bytes, a dialect
- *    that rewrites in silence — is a `caveat` and is checked only for compiling.
+ *    What the compiler cannot answer — the driver’s own lethal bytes, a dialect
+ *    that rewrites in silence — is a `caveat`, which is checked for compiling
+ *    here and for saying the same thing as its diagnostic in 6.
  *
  * 3. **Every command stays reachable in every dialect.** Coverage counted at
  *    `#amk 4` alone misses the case that matters: a byte whose only spelling is
@@ -41,6 +42,16 @@
  *    walked, and a retarget is compared by *pitch*, since two bodies of one note
  *    each play the same number of notes either way.
  *
+ * 6. **A hazard the compiler is silent about is said somewhere, or the byte is
+ *    not offered.** `SST0506`-`SST0508` and the catalogue are held to the same
+ *    set at every dialect: a `caveat` with no diagnostic behind it is a warning
+ *    nothing checks, and a diagnostic no button warns of is a hazard the palette
+ *    writes in silence. Neither half can be read off the other, so the iff is
+ *    the only thing holding them together — which is what lets the buttons wear
+ *    no colour of their own. A `withheld` entry satisfies it the other way:
+ *    `$F7` cannot be written from the palette at all, so it needs no caveat and
+ *    must not carry one, nothing being able to hover a button that is not drawn.
+ *
  *   npm run palettetest
  */
 
@@ -54,8 +65,9 @@ import { type CommandTarget, commandAt, commandStartingAt, expectedArgs, tokeniz
 import type { Edit } from "@amk/tokens/edits";
 import { formAvailability } from "@amk/tokens/commands/availability";
 import { readLoops } from "@amk/tokens/commands/loops";
+import { commandHazards } from "@amk/tokens/command-hazards";
 import { channelsBeginAt, songTarget } from "@amk/tokens/dialect";
-import { ENTRIES, type ResolvedEntry, resolveEntry } from "../web/src/app/editor/command-palette/catalog";
+import { ENTRIES, OFFERED, type ResolvedEntry, resolveEntry } from "../web/src/app/editor/command-palette/catalog";
 import { GLYPH_NAMES } from "../web/src/app/editor/command-palette/command-icon";
 import { glyphOf } from "../web/src/app/editor/command-palette/glyph-of";
 import {
@@ -276,6 +288,27 @@ console.log("\ncatalogue");
 	check("every superseded byte has an entry claiming to write it", orphaned.length === 0, orphaned.join(", "));
 
 	check("entry keys are unique", keys.size === entries.length);
+
+	// A withheld byte is still catalogued, and has to be: `glyphOf` reads these
+	// rows backwards, so a `$F7` a porter typed by hand still earns its glyph and
+	// its name on a roll bar and in the command lane. What it may not do is appear
+	// on a strip. Both halves are checked, because deleting the row instead would
+	// pass the second and silently fail the first.
+	const READ = { beforeChannels: false };
+	const withheld = ENTRIES.filter((entry) => entry.withheld === true);
+	check("something is withheld, or this block proves nothing", withheld.length > 0);
+
+	const leaked = withheld.filter((entry) => OFFERED.includes(entry)).map((entry) => entry.category);
+	check("a withheld entry is never offered", leaked.length === 0, leaked.join(", "));
+
+	// The reason it may be withheld at all: the editor says so when one is written.
+	// Without this a byte could quietly leave the palette with nothing in its place.
+	const unexplained = withheld.filter(
+		(entry) =>
+			commandHazards(tokenize(probe(DIALECTS[2].marker, resolveEntry(entry, DIALECTS[2].target, READ), false).song))
+				.length === 0,
+	);
+	check("and every withheld byte is reported when it is written", unexplained.length === 0, String(unexplained.length));
 }
 
 // Every entry can be drawn and can be explained. An icon nobody drew renders as
@@ -403,8 +436,8 @@ for (const entry of ENTRIES) {
 
 	// And that it says nothing about having done so. The button is named for the
 	// command, both spellings are that command, and which one a dialect takes is
-	// not the porter's business — a `caveat` here would cost the button its
-	// ordinary colour for no warning worth reading.
+	// not the porter’s business — a `caveat` here would be a hazard warning about
+	// a byte the porter did not choose to write, and an `SST05xx` beside it.
 	check(`${spelled.key}: swaps silently`, swapped.caveat === undefined, swapped.caveat);
 }
 
@@ -535,6 +568,28 @@ for (const { marker, target } of DIALECTS) {
 			if (entry.caveat !== undefined) {
 				check(`${label}: carries a caveat, and still compiles`, errors.length === 0, say(errors));
 			}
+
+			// 6. And that the warning under the button and the finding in Problems are
+			//    the same set. This is the half `availability` cannot hold: a caveat
+			//    with no diagnostic behind it is a warning nothing checks, and a
+			//    diagnostic no button warns of is a hazard the palette writes in
+			//    silence. Matched on the span, so the finding has to be about the
+			//    snippet rather than about the `c4` the probe writes after it.
+			//
+			//    A withheld byte is the other way of satisfying it: there is no button
+			//    to warn on, so the diagnostic is the whole of the warning.
+			const hazards = commandHazards(tokenize(song)).filter((d) => d.span.start === at);
+			const warned = entry.caveat !== undefined || original.withheld === true;
+			check(
+				`${label}: a hazard is warned of, and a warning has a hazard`,
+				warned === hazards.length > 0,
+				entry.caveat ?? hazards.map((d) => d.code).join(),
+			);
+			check(
+				`${label}: a withheld entry carries no caveat`,
+				original.withheld !== true || entry.caveat === undefined,
+				entry.caveat,
+			);
 		}
 	}
 }

@@ -4740,7 +4740,10 @@ EchoFilter1:    $7F $00 $00 $00 $00 $00 $00 $00   ; flat</code></pre>
         <code>$F4</code> and <code>$FA</code> sub-bytes: unbounded in the driver, unchecked in the
         compiler.
       </li>
-      <li><code>$DD</code>: a null dispatch slot; the compiler accepts it anywhere.</li>
+      <li>
+        <code>$DD</code>: a null dispatch slot; the compiler accepts it anywhere. Solar Soundtrack
+        does not — <code>SST0507</code> reports one no note’s read-ahead can reach.
+      </li>
       <li>
         <code>$FB</code> and <code>$FF</code>: placeholder lengths differ (3 vs 2; 0 vs absent) —
         harmless for <code>$FB</code>, fatal for <code>$FF</code>.
@@ -4788,12 +4791,19 @@ EchoFilter1:    $7F $00 $00 $00 $00 $00 $00 $00   ; flat</code></pre>
       <li>
         <code>packages/mml-tokens/src/tokens.ts</code>
         <code>VCMD_NAMES</code> still names <code>$F7</code> “write byte”, which is what it was
-        meant to be; the palette entry in
-        <code>web/src/app/editor/command-palette/catalog.ts</code> carries a
-        <code>caveat</code> saying the slot is <code>$0000</code> and the SPC dies. A
-        <code>$DD</code> away from a note and <code>#am4</code>'s silent <code>$E4</code> offset are
-        said the same way — <code>availability.ts</code> answers to the compiler's diagnostics, and
-        none of the three produces one.
+        meant to be; <code>packages/mml-tokens/src/command-hazards.ts</code> raises
+        <code>SST0506</code> wherever one is written, saying the slot is <code>$0000</code> and the
+        SPC dies. A <code>$DD</code> no note’s read-ahead can reach is <code>SST0507</code>, and
+        <code>#am4</code>'s silent <code>$E4</code> offset is <code>SST0508</code> —
+        <code>availability.ts</code> answers to the compiler's diagnostics and none of the three
+        produces one, so these are the editor's own findings rather than AddmusicK's. The catalogue
+        in <code>web/src/app/editor/command-palette/catalog.ts</code> carries the
+        <code>$DD</code> and <code>$E4</code> notes as a <code>caveat</code>, which is the same
+        sentence read before the byte is written instead of after. <code>$F7</code> is
+        <code>withheld</code> there — in the table, so a written one is still named and drawn, but
+        never offered as a button, since a palette that hands out a command with no working form is
+        worse than one that omits it; <code>SST0506</code> is then the whole of the warning.
+        <code>palettetest</code> holds all of that in both directions.
       </li>
       <li>
         <code>packages/core/src/hardcoded-tables.ts</code>

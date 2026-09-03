@@ -66,6 +66,21 @@ interface Described {
    * the whole of the hover text and the whole of the line under the strip.
    */
   blurb: string;
+  /**
+   * In the catalogue, but never a button.
+   *
+   * The table answers two questions: what can I add, and what is this. Only
+   * the first is a palette — {@link glyphOf} reads the same rows backwards to
+   * name and draw a command already written in a song, and the coverage check
+   * in `palettetest` counts them. A byte the driver does not implement has to
+   * stay here for those and must not be offered, so it is withheld rather than
+   * deleted; {@link OFFERED} is what the two strips read.
+   *
+   * It carries no {@link HexEntry.caveat}: nothing can hover a button that is
+   * not drawn, so the warning is the diagnostic's alone. `palettetest` holds
+   * every withheld entry to raising one.
+   */
+  withheld?: true;
 }
 
 interface HexEntry extends Described {
@@ -74,16 +89,18 @@ interface HexEntry extends Described {
   /** The bytes after the command byte, in order. */
   args: readonly number[];
   /**
-   * What to know before writing the byte that no diagnostic will tell you.
+   * What to know before writing the byte, said where it is read first.
    *
    * `availability` answers to AddmusicK, and `palettetest` holds it to that: a
    * `caution` has to produce a warning and an `ok` has to compile silently.
    * Neither fits a byte that compiles clean and jumps the SPC into the direct
    * page, nor one the dialect rewrites without a word, so those are said here.
    *
-   * Only those. It costs the button its ordinary colour, which is worth a
-   * crashed SPC and not worth a note about which of two spellings a dialect
-   * takes - that is the palette's job to know and nobody else's to read.
+   * Only what `@amk/tokens/command-hazards` also raises, and `palettetest`
+   * checks the two both ways round: a caveat with no diagnostic behind it, or a
+   * diagnostic no button warns of, fails there. This is the sentence read before
+   * the byte is written and `SST0506`-`SST0508` the one read after, so it costs
+   * the button nothing - not its colour, which no entry wears any more.
    */
   caveat?: (target: CommandTarget) => string | undefined;
   /**
@@ -358,7 +375,7 @@ export const ENTRIES: readonly Entry[] = [
     blurb: 'Slides smoothly from the note playing now to another one.',
     // main.asm:3256-3287 — the per-tick read-ahead peeks for $DD and swallows
     // all four bytes, and its dispatch slot is $0000 for anything the command
-    // loop reaches first.
+    // loop reaches first. SST0507 is the same fact about a written one.
     caveat: () =>
       'Write it directly after a note of two ticks or more. Anywhere else the driver jumps to address zero and the SPC dies.',
   }),
@@ -383,7 +400,7 @@ export const ENTRIES: readonly Entry[] = [
     blurb: 'Shifts every channel at once up or down by a number of semitones.',
     // `parser.ts:parseHexCommand` (Music.cpp:1863) — Addmusic 4.05 stored one
     // more than was written, and AddmusicK reproduces it in silence. Below
-    // `$F2`, so the non-native warning never covers it either.
+    // `$F2`, so the non-native warning never covers it either; SST0508 does.
     caveat: (target) =>
       target.program === 1
         ? 'Under #am4 the compiler adds one, so the transpose lands a semitone above what is written.'
@@ -573,9 +590,10 @@ export const ENTRIES: readonly Entry[] = [
     blurb: 'AddmusicM’s command for writing a byte anywhere in the driver’s memory.',
     // Commands.asm:633 — the body is commented out, so the label collapses onto
     // cmdF9 and the dispatch slot is $0000 (main.bin @ $13A6). AddmusicK
-    // compiles it without a word.
-    caveat: () =>
-      'This driver never implemented it: the SPC jumps to address zero and dies. AddmusicK compiles it anyway.',
+    // compiles it without a word, and SST0506 is what says so. Offering the
+    // button as well would be handing a porter a command that cannot work; the
+    // row stays for `glyphOf`, so one already written is still named and drawn.
+    withheld: true,
   }),
   hex(0xf9, [0x00, 0x00], {
     category: 'misc',
@@ -584,6 +602,16 @@ export const ENTRIES: readonly Entry[] = [
   }),
 ];
 
+/**
+ * The entries a palette offers, which is every one the driver can actually run.
+ *
+ * {@link ENTRIES} is the whole catalogue and stays that way: `glyphOf` reads it
+ * backwards to name a command already in a song, and `palettetest` counts it to
+ * prove every VCMD is covered. This is the half a porter is offered, and the two
+ * strips read it rather than filtering for themselves, so a byte cannot be
+ * withheld from one and offered by the other.
+ */
+export const OFFERED: readonly Entry[] = ENTRIES.filter((entry) => entry.withheld !== true);
 /** One button, resolved against the dialect in force where it would land. */
 export interface ResolvedEntry {
   key: string;
@@ -603,6 +631,9 @@ export interface ResolvedEntry {
    * A warning {@link availability} cannot carry, because it answers to the
    * compiler and this does not - what the driver does with the byte, or a
    * rewrite the dialect makes without a word. {@link HexEntry.caveat}.
+   *
+   * `command-hazards.ts` carries the same fact once there is text to raise it
+   * against; this is the half that can speak before there is any.
    */
   caveat?: string;
   /** Where in the song this is legal, which is `'anywhere'` for all but two. */

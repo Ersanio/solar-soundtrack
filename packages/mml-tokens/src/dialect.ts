@@ -94,48 +94,6 @@ export function tempoBefore(command: Command, commands: readonly Command[]): num
 	return found;
 }
 
-/** Note and rest letters, whose commands carry a resolved `noteLength`. */
-const NOTE_KINDS = new Set(["c", "d", "e", "f", "g", "a", "b", "r"]);
-
-/**
- * How many ticks a command has to work with, taken from the note it rides on.
- *
- * Asked only of `$DD`, which is read by the preceding note's read-ahead rather
- * than dispatched — `main.asm:L_10E4` peeks at the byte standing at the track
- * pointer. So an earlier `$DD` clears the answer twice over: its four bytes come
- * between the note and this command, and its last parameter may be a written
- * note that keys nothing on, `parseNote` appending that byte and returning
- * (`parser.ts:parseNote`). A chained `$DD` really does have no note in front of
- * it. Nothing else standing in the way is accounted for — a `v` between the two
- * breaks the read-ahead just as surely, and that is the panel's gap to close
- * rather than this one's to guess at.
- */
-export function noteTicksBefore(command: Command, commands: readonly Command[]): number | null {
-	let found: number | null = null;
-	const targets = new Set(
-		commands.flatMap((other) => (other.noteTarget === undefined ? [] : [other.noteTarget.span.start])),
-	);
-
-	for (const other of commands) {
-		if (other.span.start >= command.span.start) {
-			break;
-		}
-
-		if (other.channel !== command.channel || targets.has(other.span.start)) {
-			continue;
-		}
-
-		if (other.vcmd === 0xdd) {
-			found = null;
-		} else if (NOTE_KINDS.has(other.kind.toLowerCase()) && other.noteLength) {
-			// Tied segments are one note to the driver: `c4^8` keys on once.
-			found = other.noteLength.reduce((total, segment) => total + segment.ticks, 0);
-		}
-	}
-
-	return found;
-}
-
 /**
  * Which velocity table is live where a command was written; SMW's or N-SPC's.
  *
