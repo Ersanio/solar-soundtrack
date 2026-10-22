@@ -237,7 +237,7 @@ export const ENTRIES: readonly Entry[] = [
   letter('l', 'l8', {
     category: 'notes',
     icon: 'note',
-    blurb: 'The default length notes take when you do not write one on them.',
+    blurb: 'The default length notes take, when you do not write one on them. Compile-time command.',
   }),
   {
     kind: 'syntax',
@@ -245,31 +245,31 @@ export const ENTRIES: readonly Entry[] = [
     id: 'l=',
     icon: 'noteTicks',
     label: 'default length, in ticks',
-    blurb: 'Sets the default note length as an exact number of ticks.',
+    blurb: 'Sets the default note length as an exact number of ticks. Compile-time command.',
     snippet: 'l=48',
     syntax: 'exactLength',
   },
   letter('o', 'o4', {
     category: 'notes',
     icon: 'octave',
-    blurb: 'Which octave the notes after it are played in.',
+    blurb: 'Which octave the notes after it are played in. Compile-time command.',
   }),
   letter('<', '<', {
     category: 'notes',
     icon: 'octaveDown',
-    blurb: 'Drops everything after it by one octave.',
+    blurb: 'Drops everything after it by one octave. Compile-time command.',
   }),
   letter('>', '>', {
     category: 'notes',
     icon: 'octaveUp',
-    blurb: 'Lifts everything after it by one octave.',
+    blurb: 'Lifts everything after it by one octave. Compile-time command.',
   }),
   letter('q', 'q7f', {
     category: 'notes',
     icon: 'staccato',
     blurb: 'How much of each note actually sounds before it is cut short.',
   }),
-  letter('t', 't144', {
+  letter('t', 't48', {
     category: 'notes',
     writes: 0xe2,
     icon: 'metronome',
@@ -282,7 +282,7 @@ export const ENTRIES: readonly Entry[] = [
     writes: 0xe3,
     icon: 'metronomeFade',
     label: 'tempo fade',
-    blurb: 'Slides the tempo to a new speed over time - an accelerando or a ritardando.',
+    blurb: 'Slides the tempo to a new speed over time (accelerando/ritardando).',
     snippet: 't18,144',
     syntax: 'fade',
     fallback: [0x12, 0x90],
@@ -302,7 +302,7 @@ export const ENTRIES: readonly Entry[] = [
     writes: 0xe8,
     icon: 'hairpin',
     label: 'volume fade',
-    blurb: "Slides this channel's volume over time - a crescendo or a diminuendo.",
+    blurb: "Slides this channel's volume over time (crescendo/diminuendo).",
     snippet: 'v18,200',
     syntax: 'fade',
     fallback: [0x12, 0xc8],
@@ -311,7 +311,7 @@ export const ENTRIES: readonly Entry[] = [
     category: 'volume',
     writes: 0xe0,
     icon: 'speakerMaster',
-    blurb: 'How loud the whole song plays, every channel at once.',
+    blurb: 'How loud the whole song plays, affects every channel.',
   }),
   {
     kind: 'syntax',
@@ -320,7 +320,7 @@ export const ENTRIES: readonly Entry[] = [
     writes: 0xe1,
     icon: 'hairpinMaster',
     label: 'global volume fade',
-    blurb: 'Slides the whole song louder or quieter over time - a fade-in or a fade-out.',
+    blurb: 'Slides the whole song louder or quieter over time (fade-in/fade-out).',
     snippet: 'w18,200',
     syntax: 'fade',
     fallback: [0x12, 0xc8],
@@ -329,29 +329,29 @@ export const ENTRIES: readonly Entry[] = [
     category: 'volume',
     writes: 0xdb,
     icon: 'pan',
-    blurb: 'Where this channel sits between the left and right speakers.',
+    blurb: "Set the channel's sound position between the left and right speaker.",
   }),
   hex(0xdc, [0x18, 0x0a], {
     category: 'volume',
     icon: 'panFade',
-    blurb: 'Slides this channel across the stereo field over time.',
+    blurb: "Slides this channel's sound position between the left and right speaker over time.",
   }),
   hex(0xe5, [0x00, 0x12, 0x08], {
     category: 'volume',
     icon: 'tremolo',
-    blurb: 'A steady wobble in volume; the sound pulses without changing pitch.',
+    blurb: "A steady wobble in volume. The channel's volume pulses.",
   }),
   hex(0xfd, [], {
     category: 'volume',
     icon: 'tremoloOff',
-    blurb: 'Stops the volume wobble and holds the note steady.',
+    blurb: 'Stops the volume wobble.',
   }),
 
   // ─── Pitch ──────────────────────────────────────────────────────────────
   letter('h', 'h0', {
     category: 'pitch',
     icon: 'sharp',
-    blurb: 'Shifts every note written after it up or down by a number of semitones.',
+    blurb: 'Shifts every note written after it up or down by a number of semitones. Compile-time command.',
   }),
   letter('p', 'p12,8', {
     category: 'pitch',
@@ -362,12 +362,12 @@ export const ENTRIES: readonly Entry[] = [
   hex(0xdf, [], {
     category: 'pitch',
     icon: 'waveOff',
-    blurb: 'Stops the pitch wobble and holds the note still.',
+    blurb: 'Stops the pitch wobble.',
   }),
   hex(0xea, [0x18], {
     category: 'pitch',
     icon: 'waveFade',
-    blurb: 'Eases the vibrato in or out instead of switching it on at full depth.',
+    blurb: 'Eases the vibrato in or out instead of switching it on at full depth. Must be used after a `p` or `$DE` command.',
   }),
   hex(0xdd, [0x00, 0x18, 0xa4], {
     category: 'pitch',
@@ -377,27 +377,27 @@ export const ENTRIES: readonly Entry[] = [
     // all four bytes, and its dispatch slot is $0000 for anything the command
     // loop reaches first. SST0507 is the same fact about a written one.
     caveat: () =>
-      'Write it directly after a note of two ticks or more. Anywhere else the driver jumps to address zero and the SPC dies.',
+      'Write it directly after a note of two ticks or more, otherwise it crashes the SPC.',
   }),
   hex(0xec, [0x00, 0x18, 0x02], {
     category: 'pitch',
     icon: 'envelopeUp',
-    blurb: 'Starts the note flat and bends it up into tune - a scoop into the pitch.',
+    blurb: 'Starts with the specified semitones difference applied, and bends it into the note that follows.',
   }),
   hex(0xeb, [0x00, 0x18, 0x02], {
     category: 'pitch',
     icon: 'envelopeDown',
-    blurb: 'Lets the note fall away in pitch as it ends - a drop or a doit.',
+    blurb: 'Starts with the note that follows, and bends it into the specified semitones difference.',
   }),
   hex(0xfe, [], {
     category: 'pitch',
     icon: 'envelopeOff',
-    blurb: 'Stops notes bending into or out of tune.',
+    blurb: 'Stops the pitch bends through the envelope commands.',
   }),
   hex(0xe4, [0x00], {
     category: 'pitch',
     icon: 'sharpMaster',
-    blurb: 'Shifts every channel at once up or down by a number of semitones.',
+    blurb: 'Shifts the pitch up or down by a number of semitones. Applies to the entire song.',
     // `parser.ts:parseHexCommand` (Music.cpp:1863) — Addmusic 4.05 stored one
     // more than was written, and AddmusicK reproduces it in silence. Below
     // `$F2`, so the non-native warning never covers it either; SST0508 does.
@@ -409,7 +409,7 @@ export const ENTRIES: readonly Entry[] = [
   hex(0xee, [0x00], {
     category: 'pitch',
     icon: 'tuningFork',
-    blurb: 'Nudges the pitch by a fraction of a semitone, for detuning against another channel.',
+    blurb: 'Nudges the pitch by a fraction of a semitone, applies to the current channel only.',
   }),
   hex(0xfb, [0x02, 0x06, 0xa4, 0xa7], {
     category: 'pitch',
@@ -442,7 +442,7 @@ export const ENTRIES: readonly Entry[] = [
     category: 'instrument',
     icon: 'gain',
     label: 'GAIN',
-    blurb: 'Drives the note’s loudness directly instead, holding or sliding it to a level.',
+    blurb: 'Drives the note\'s loudness directly instead, holding or sliding it to a level.',
   }),
   hex(0xf3, [0x00, 0x04], {
     category: 'instrument',
@@ -455,7 +455,7 @@ export const ENTRIES: readonly Entry[] = [
     category: 'echo',
     icon: 'echo',
     label: 'echo channels & volume',
-    blurb: 'Adds delayed copies of the sound behind the music - a reverb.',
+    blurb: 'Adds a reverb effect for the specified channels, and how loud it is.',
   }),
   hex(0xf1, [0x02, 0x00, 0x00], {
     category: 'echo',
@@ -466,17 +466,17 @@ export const ENTRIES: readonly Entry[] = [
   hex(0xf2, [0x18, 0x28, 0x28], {
     category: 'echo',
     icon: 'echoFade',
-    blurb: 'Fades the echo up or down over time without touching the music in front of it.',
+    blurb: 'Fades the echo to the specified volume over time.',
   }),
   hex(0xf0, [], {
     category: 'echo',
     icon: 'echoOff',
-    blurb: 'Turns the echo off and leaves the music dry.',
+    blurb: 'Turns the echo off.',
   }),
   hex(0xf5, [0xff, 0x08, 0x17, 0x24, 0x24, 0x17, 0x08, 0xff], {
     category: 'echo',
     icon: 'filter',
-    blurb: 'Shapes the tone of the echo: how bright or muffled the repeats sound.',
+    blurb: 'Shapes the tone of the echo by selectively reducing or emphasizing frequencies. It affects how bright or muffled the repeats sound.',
   }),
 
   // ─── Loops ──────────────────────────────────────────────────────────────
@@ -531,7 +531,7 @@ export const ENTRIES: readonly Entry[] = [
     id: '(!n)',
     icon: 'triggerDefine',
     label: 'remote code',
-    blurb: 'Writes a snippet the driver can run by itself later. Goes above the first channel.',
+    blurb: 'Writes a command snippet the song can run by itself later. Goes above the first channel.',
     snippet: '(!1)[$F4 $09]',
     syntax: 'remoteLoop',
     context: 'before-channels',
@@ -582,12 +582,12 @@ export const ENTRIES: readonly Entry[] = [
   hex(0xf6, [0x0c, 0x7f], {
     category: 'misc',
     icon: 'chip',
-    blurb: 'Writes a value straight into one of the sound chip’s registers.',
+    blurb: 'Writes a value straight into one of the sound chip\'s registers.',
   }),
   hex(0xf7, [0x00, 0x00, 0x00], {
     category: 'misc',
     icon: 'chipWrite',
-    blurb: 'AddmusicM’s command for writing a byte anywhere in the driver’s memory.',
+    blurb: 'AddmusicM\'s command for writing a byte anywhere in the driver\'s memory.',
     // Commands.asm:633 — the body is commented out, so the label collapses onto
     // cmdF9 and the dispatch slot is $0000 (main.bin @ $13A6). AddmusicK
     // compiles it without a word, and SST0506 is what says so. Offering the

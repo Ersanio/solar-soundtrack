@@ -16,7 +16,7 @@ const VIEW_KEY = 'solar-soundtrack.view';
 
 const VIEWS: readonly TabDef<ViewId>[] = [
   { id: 'source', label: 'Source', icon: IconSource },
-  { id: 'roll', label: 'Piano roll', icon: IconRoll },
+  { id: 'roll', label: 'Piano roll (work in progress)', icon: IconRoll },
   { id: 'samples', label: 'Samples', icon: IconSamples, aside: true },
 ];
 

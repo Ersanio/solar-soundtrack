@@ -212,7 +212,7 @@ export function commandHazards(index: TokenIndex): Diagnostic[] {
 				severity: "severe",
 				code: CODE_DEAD_VCMD,
 				message:
-					"$F7 was never implemented in this driver: its dispatch slot is $0000, so the SPC jumps to address zero and the song stops. AddmusicK compiles it without a word. There is no working form of this command — remove it.",
+					"$F7 was never implemented in this driver: its dispatch slot is $0000, so the SPC jumps to address zero and the song stops. Remove the command.",
 				span: { ...command.span },
 			});
 			continue;
@@ -238,7 +238,7 @@ export function commandHazards(index: TokenIndex): Diagnostic[] {
 				severity: "warning",
 				code: CODE_AM4_TRANSPOSE,
 				message:
-					"Under #am4 the compiler adds one to this transpose, so it lands a semitone above what is written. AddmusicK does this in silence — write one less than you want.",
+					"Under #am4, the compiler adds one to this transpose, so it lands a semitone above what is written. Double check to write one less than you want.",
 				span: { ...command.span },
 			});
 		}
