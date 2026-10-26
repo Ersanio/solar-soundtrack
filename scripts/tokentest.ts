@@ -58,7 +58,7 @@ const at = (text: string, offset: number) => commandAt(tokenize(text).commands, 
 function said(anchor: BendAnchor): string {
 	switch (anchor.kind) {
 		case "rides":
-			return `rides:${anchor.ticks}`;
+			return `rides:${anchor.frame}`;
 		case "tooShort":
 			return `tooShort:${anchor.ticks}`;
 		case "blocked":
@@ -1727,6 +1727,11 @@ console.log("\ncommand hazards — bytes that compile clean and then break the s
 		["a tied note", "#amk 4\n#0 o4 c4^8 $DD $00 $18 $A4\n", "rides:24"],
 		["a tie of one tick", "#amk 4\n#0 o4 c4^192 $DD $00 $18 $A4\n", "tooShort:1"],
 		["a one-tick note", "#amk 4\n#0 o4 c192 $DD $00 $18 $A4\n", "tooShort:1"],
+		// `emitNote` writes a note of `$80` ticks or more in `$60`-tick pieces, and
+		// the peek runs in the last of them.
+		["a whole note", "#amk 4\n#0 o4 c1 $DD $00 $18 $A4\n", "rides:96"],
+		["a note of 129 ticks", "#amk 4\n#0 o4 c=129 $DD $00 $18 $A4\n", "rides:33"],
+		["a note whose last piece is one tick", "#amk 4\n#0 o4 c=193 $DD $00 $18 $A4\n", "tooShort:193"],
 		["nothing at all", "#amk 4\n#0 $DD $00 $18 $A4\n", "nothing"],
 		["another channel's note", "#amk 4\n#0 o4 c4\n#1 $DD $00 $18 $A4\n", "nothing"],
 		// A target keys nothing on, so a chained `$DD` has no note in front of it.
@@ -1747,12 +1752,45 @@ console.log("\ncommand hazards — bytes that compile clean and then break the s
 		check(`a slide after ${name} is ${want}`, anchorsIn(source) === want, anchorsIn(source));
 	}
 
+	// The ticks a slide has before a key-on resets it. It steps only on ticks that
+	// fetch nothing, so each frame gives one fewer than it lasts, and a tie after the
+	// command keys nothing on. Every figure here is what the emulated driver gives.
+	const windowIn = (source: string): string => {
+		const index = tokenize(source);
+		const slide = index.commands.find((command) => command.vcmd === 0xdd);
+		const anchor = slide ? bendAnchor(slide, index) : null;
+		return anchor?.kind === "rides" ? String(anchor.window) : String(anchor?.kind);
+	};
+
+	for (const [name, body, want] of [
+		["a note alone", "c4 $DD $00 $FF $B0 d4", "47"],
+		["an odd length", "c=7 $DD $00 $FF $B0 d4", "6"],
+		["a tie after it", "c4 $DD $00 $FF $B0 ^4 d4", "94"],
+		["a run of ties written against it", "a96 $DD $00 $FF $80^1^4^16^192 d4", "251"],
+		["a whole note", "c1 $DD $00 $FF $B0 d4", "95"],
+		["a long tie, in pieces", "c4 $DD $00 $FF $B0 ^=193 d4", "237"],
+		["two ties, which fold into one", "c4 $DD $00 $FF $B0 ^4 ^8 d4", "118"],
+		["two ties a command apart", "c4 $DD $00 $FF $B0 ^4 v180 ^8 d4", "117"],
+		["a tie after a written target", "c4 $DD $00 $FF b ^4 d4", "94"],
+		["a rest, which silences it", "c4 $DD $00 $FF $B0 r4 ^4 d4", "47"],
+		["a loop, which is not followed", "c4 $DD $00 $FF $B0 [^4]2 d4", "47"],
+		["ties that give their last piece up to the next slide", "c4 $DD $00 $08 $B0 ^4^8 $DD $00 $08 $B5 d4", "117"],
+		["another channel's tie", "c4 $DD $00 $FF $B0\n#1 ^4", "47"],
+	] as const) {
+		const got = windowIn(`#amk 4\n#0 o4 ${body}\n`);
+		check(`a slide has ${want} ticks with ${name}`, got === want, got);
+	}
+
 	// Only the failures are reported, and each of them once.
 	check("a reachable slide raises nothing", codesIn("#amk 4\n#0 o4 c4 $DD $00 $18 $A4\n") === "");
 	check("a stranded one is SST0507", codesIn("#amk 4\n#0 $DD $00 $18 $A4\n") === "SST0507");
 	check(
 		"and says which command the driver read instead",
 		commandHazards(tokenize("#amk 4\n#0 o4 c4 v200 $DD $00 $18 $A4\n"))[0].message.includes("The volume written"),
+	);
+	check(
+		"and says when a long note's last piece is the one tick",
+		commandHazards(tokenize("#amk 4\n#0 o4 c=193 $DD $00 $18 $A4\n"))[0].message.includes("pieces of 96"),
 	);
 
 	// `Commands.asm:633` leaves the body commented out, so the label collapses onto

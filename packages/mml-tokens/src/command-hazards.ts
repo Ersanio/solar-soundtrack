@@ -1,4 +1,4 @@
-import type { Command, Token, TokenIndex } from "./tokens";
+import type { Command, NoteLengthSegment, Token, TokenIndex } from "./tokens";
 import type { Diagnostic, Span } from "@amk/core/types";
 import { commandScope, isPercussionInstrument } from "./commands/in-force";
 
@@ -44,9 +44,12 @@ export const MIN_BEND_TICKS = 2;
 
 /** What stands in front of a `$DD`, and therefore whether it arms. */
 export type BendAnchor =
-	/** A note or rest of {@link MIN_BEND_TICKS} or more: the read-ahead arms the slide. */
-	| { kind: "rides"; ticks: number }
-	/** One tick, so no read-ahead ever runs on it. */
+	/**
+	 * The read-ahead arms the slide in a frame of {@link MIN_BEND_TICKS} or more, and `window` is
+	 * how many ticks it then has before a key-on resets it.
+	 */
+	| { kind: "rides"; frame: number; window: number }
+	/** The note's last frame is one tick, so no read-ahead ever runs on it. `ticks` is the note's own length. */
 	| { kind: "tooShort"; ticks: number }
 	/** Something writing bytes stands between the note and the command. */
 	| { kind: "blocked"; by: { name: string; span: Span } }
@@ -79,6 +82,83 @@ function callBetween(tokens: readonly Token[], from: number, to: number): Token 
 	return tokens.find((token) => token.kind === "label" && token.start >= from && token.end <= to) ?? null;
 }
 
+/** The frames `emitNote` writes a note of `ticks` as: `$60`-tick pieces once it reaches `$80` (`parser.ts:2921`). */
+function framesOf(ticks: number): number[] {
+	if (ticks < 0x80) {
+		return ticks > 0 ? [ticks] : [];
+	}
+
+	const frames = [0x60];
+	let left = ticks - 0x60;
+	while (left > 0x60) {
+		frames.push(0x60);
+		left -= 0x60;
+	}
+
+	if (left > 0) {
+		frames.push(left);
+	}
+
+	return frames;
+}
+
+/** A slide steps only on ticks that fetch no music data (`main.asm:2337-2339`), so a frame gives it one fewer than it lasts. */
+function roomIn(frames: readonly number[]): number {
+	return frames.reduce((sum, frame) => sum + Math.max(frame - 1, 0), 0);
+}
+
+/**
+ * The ticks a slide armed in a frame of `frame` has before a key-on overwrites it (`main.asm:465-466`).
+ *
+ * A tie written after the command keys nothing on, so each one adds its frames. A note, a rest, the
+ * next `$DD` or a loop ends the count; a rest leaves the slide running, but on a keyed-off voice.
+ */
+function slideWindow(command: Command, index: TokenIndex, frame: number): number {
+	const { commands, tokens, ties } = index;
+	const remote = command.inRemoteDefinition ?? false;
+	const ours = (other: { channel: number; inRemoteDefinition?: boolean }): boolean =>
+		other.channel === command.channel && (other.inRemoteDefinition ?? false) === remote;
+
+	const stop =
+		commands.find(
+			(other) =>
+				other.span.start >= command.span.end &&
+				ours(other) &&
+				(other.vcmd === 0xdd || commandScope(other) === "structure"),
+		) ?? null;
+	const call = tokens.find((token) => token.kind === "label" && token.start >= command.span.end) ?? null;
+	const end = Math.min(stop?.span.start ?? Infinity, call?.start ?? Infinity);
+
+	// `accumulateTiedLength` folds a run into one note, but gives its last segment up as a note of
+	// its own to a `$DD` straight after it (`parser.ts:2895-2909`). Comments are gone by then.
+	const framesOfRun = (segments: readonly NoteLengthSegment[], runEnd: number): number[] => {
+		const next = tokens.find((token) => token.start >= runEnd && token.kind !== "comment");
+		const total = segments.reduce((sum, segment) => sum + segment.ticks, 0);
+		const last = segments[segments.length - 1]?.ticks ?? 0;
+		return stop?.vcmd === 0xdd && next?.start === stop.span.start && segments.length > 1
+			? [...framesOf(total - last), ...framesOf(last)]
+			: framesOf(total);
+	};
+
+	let window = frame - 1;
+
+	// A target written as a note returns before its length is read (`parser.ts:2848-2852`), so the
+	// ties `gather` gave it are a tie of their own.
+	const target = command.noteTarget;
+	const targetNote = target && commands.find((other) => other.head.start === target.span.start && other.noteLength);
+	if (targetNote?.noteLength && targetNote.noteLength.length > 1) {
+		window += roomIn(framesOfRun(targetNote.noteLength.slice(1), targetNote.span.end));
+	}
+
+	for (const run of ties) {
+		if (run.span.start >= command.span.end && run.span.start < end && ours(run)) {
+			window += roomIn(framesOfRun(run.segments, run.span.end));
+		}
+	}
+
+	return window;
+}
+
 /**
  * What a `$DD` rides on, or why it rides on nothing.
  *
@@ -88,11 +168,12 @@ function callBetween(tokens: readonly Token[], from: number, to: number): Token 
  * it — nothing in front of it, something emitting in front of it, and a frame
  * too short for the peek to run in.
  *
- * The anchor is the note's **last** segment rather than the sum of them.
+ * The anchor is the note's **last frame** rather than the sum of its segments.
  * `accumulateTiedLength` rewinds a tie out of a `$DD`'s way (`parser.ts:2895-2909`,
  * Music.cpp:2224), so `c4^8 $DD` emits the tie as its own `[24][$C6]` frame and
  * `$70+x` is reloaded from it (`main.asm:2440-2441`) — 24 ticks is what the peek
- * gets, not 72.
+ * gets, not 72. A segment of `$80` ticks or more is `emitNote`'s `$60`-tick pieces,
+ * so `c1 $DD` arms in a frame of 96 and `c=193 $DD` in one of a single tick.
  *
  * A rest anchors a bend as a note does: `$C7` goes through the same note path
  * (`main.asm:2393-2441`) and sets the same counters, so `c4 r4 $DD` arms a slide
@@ -103,12 +184,10 @@ function callBetween(tokens: readonly Token[], from: number, to: number): Token 
  * nothing on, `parseNote` appending that byte and returning. A chained `$DD`
  * really does have no note in front of it.
  *
- * Two limits, stated rather than modelled, both of which need the walk to see.
- * `#halvetempo` halves every note in the compiler (`parser.ts:2855`) and this
- * package has no tempo ratio, so a written two-tick note can be a one-tick
- * emitted one. And `emitNote` chunks a note of `$80` ticks or more into frames,
- * so a 129-tick note ends in a one-tick frame that never arms.
- * `WalkNote.bend.frameTicks` is the authority for both.
+ * One limit, stated rather than modelled: `#halvetempo` halves every note and
+ * every piece in the compiler (`parser.ts:2855`) and this package has no tempo
+ * ratio, so a written two-tick note can be a one-tick emitted one.
+ * `WalkNote.bend.frameTicks` is the authority there.
  */
 export function bendAnchor(command: Command, index: TokenIndex): BendAnchor {
 	const { commands, tokens } = index;
@@ -173,7 +252,11 @@ export function bendAnchor(command: Command, index: TokenIndex): BendAnchor {
 
 	const segments = anchor.noteLength ?? [];
 	const ticks = segments[segments.length - 1]?.ticks ?? 0;
-	return ticks >= MIN_BEND_TICKS ? { kind: "rides", ticks } : { kind: "tooShort", ticks };
+	const frames = framesOf(ticks);
+	const frame = frames[frames.length - 1] ?? 0;
+	return frame >= MIN_BEND_TICKS
+		? { kind: "rides", frame, window: slideWindow(command, index, frame) }
+		: { kind: "tooShort", ticks };
 }
 
 /** What the slide does instead of sliding, and the way out. One line per way it fails. */
@@ -189,7 +272,9 @@ function describeBend(anchor: BendAnchor): string {
 				` — the read-ahead only ever looks at the very next byte — ${dies} Move it to directly after the note.`
 			);
 		case "tooShort":
-			return `The note before this $DD lasts one tick, and the read-ahead cannot run on the tick a note begins, ${dies} Give that note two ticks or more.`;
+			return anchor.ticks > 1
+				? `The note before this $DD is ${anchor.ticks} ticks, which the compiler writes in pieces of 96 with one tick left over at the end, and the read-ahead cannot run on the tick a note begins, ${dies} Make that note a tick longer or shorter.`
+				: `The note before this $DD lasts one tick, and the read-ahead cannot run on the tick a note begins, ${dies} Give that note two ticks or more.`;
 		case "rides":
 			return "";
 	}

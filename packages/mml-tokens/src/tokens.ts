@@ -1404,9 +1404,22 @@ export interface InstrumentDefinition {
 	span: Span;
 }
 
+/**
+ * A `^` no note opened, such as one written after a command. `parseNote` reads it as a `$C6` note
+ * of its own, which keys nothing on, so it is not a {@link Command}.
+ */
+export interface TieRun {
+	span: Span;
+	channel: number;
+	inRemoteDefinition?: boolean;
+	segments: NoteLengthSegment[];
+}
+
 export interface TokenIndex {
 	tokens: Token[];
 	commands: Command[];
+	/** Every {@link TieRun}, in source order. */
+	ties: TieRun[];
 	/**
 	 * Every `#instruments` entry in the document, in `@30`-upward order.
 	 *
@@ -1542,9 +1555,11 @@ export function tokenize(text: string): TokenIndex {
 	}
 
 	const stream_ = stream ?? tokens;
+	const { commands, ties } = gather(stream_, text, transitions);
 	return {
 		tokens,
-		commands: gather(stream_, text, transitions),
+		commands,
+		ties,
 		instruments: gatherInstruments(stream_, text),
 		targets: transitions,
 	};
@@ -1974,8 +1989,13 @@ function startingChannel(tokens: GatherToken[], textOf: (token: GatherToken) => 
 }
 
 /** Groups the flat token list into commands with their arguments. */
-function gather(tokens: GatherToken[], text: string, transitions: TargetTransition[]): Command[] {
+function gather(
+	tokens: GatherToken[],
+	text: string,
+	transitions: TargetTransition[],
+): { commands: Command[]; ties: TieRun[] } {
 	const commands: Command[] = [];
+	const ties: TieRun[] = [];
 	const spanOf = (token: Token): Span => ({ start: token.start, end: token.end, line: token.line });
 	// A token from an expansion stands for text that is not in the document, so
 	// its own `text` wins over the span it was stamped with.
@@ -2182,6 +2202,27 @@ function gather(tokens: GatherToken[], text: string, transitions: TargetTransiti
 			continue;
 		}
 
+		// A tie after a note's own length was taken with that note above.
+		if (token.kind === "tie") {
+			const { segments, last, nextIndex } = gatherNoteLength(
+				tokens,
+				i + 1,
+				defaultNoteLength,
+				triplet,
+				target,
+				textOf,
+				spanOf,
+			);
+			ties.push({
+				span: { start: token.start, end: (last ?? token).end, line: token.line },
+				channel,
+				inRemoteDefinition: inRemote || undefined,
+				segments,
+			});
+			i = nextIndex - 1;
+			continue;
+		}
+
 		if (!LETTER_COMMAND_KINDS.has(token.kind)) {
 			continue;
 		}
@@ -2241,7 +2282,7 @@ function gather(tokens: GatherToken[], text: string, transitions: TargetTransiti
 		i = j - 1;
 	}
 
-	return commands;
+	return { commands, ties };
 }
 
 function nameForNote(kind: TokenKind): string {

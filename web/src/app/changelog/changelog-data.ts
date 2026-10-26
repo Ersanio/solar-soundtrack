@@ -9,6 +9,12 @@ export interface ChangelogEntry {
 export const CHANGELOG: readonly ChangelogEntry[] = [
   // ─── newest first; add new blocks here ──────────────────────────────────
   {
+    date: '26 October 2026',
+    items: [
+      'A pitch bend given more time with ties after it, is no longer wrongly warned as cut off',
+    ],
+  },
+  {
     date: '3 September 2026',
     items: [
       'A new default look and layout: blue-grey chrome and an orange playhead. The old theme is the Midnight preset',

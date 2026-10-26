@@ -2757,10 +2757,17 @@ instrToSample[30] = { 00 01 02 03 04 07 08 09 05 0A 0B 01 10 0C 0D 12 0C 11 01  
           channel the four bytes are skipped (<code>:3263-3271</code>). The source's own comment: “I
           don't know why this is here instead of in its dispatch table. Maybe so that it can
           properly do the read-ahead effect?” Because the peek runs on the ticks <em>during</em> a
-          note, a <code>$DD</code> is only ever picked up when it directly follows a note lasting at
-          least two ticks. Anywhere else — first thing in a channel, after another command, after a
+          note, a <code>$DD</code> is only ever picked up when it directly follows a note whose last
+          frame lasts at least two ticks — a note of <code>$80</code> ticks or more is written in
+          <code>$60</code>-tick frames (<code>Music.cpp:2254</code>), so <code>c=193</code> ends in
+          a frame of one. Anywhere else — first thing in a channel, after another command, after a
           one-tick note — the command loop reaches it first, dispatches it, and the SPC jumps to
-          <code>$0000</code>.
+          <code>$0000</code>. Once armed, the slide steps only on ticks that fetch no music data
+          (<code>main.asm:2337-2339</code>), so each frame gives it one tick fewer than it lasts. A
+          <code>$C6</code> tie keys nothing on, so ties written after the command extend it frame by
+          frame, until the next key-on overwrites
+          <code>$90+x</code> (<code>main.asm:465-466</code>):
+          <code>a96 $DD $00 $FF $80^1^4^16^192</code> has 1 + 95 + 95 + 60 = 251 ticks.
         </dd>
         <dt>Compiler</dt>
         <dd>
@@ -4536,7 +4543,7 @@ EchoFilter1:    $7F $00 $00 $00 $00 $00 $00 $00   ; flat</code></pre>
             <td class="c"><code>$DD</code> where a command is read</td>
             <td class="ok">accepted</td>
             <td class="dead">jump to <code>$0000</code></td>
-            <td>any <code>$DD</code> not directly after a note of ≥ 2 ticks</td>
+            <td>any <code>$DD</code> not directly after a note whose last frame is ≥ 2 ticks</td>
           </tr>
           <tr>
             <td class="c"><code>$FF</code></td>

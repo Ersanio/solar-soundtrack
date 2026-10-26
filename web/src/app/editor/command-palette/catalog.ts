@@ -237,7 +237,8 @@ export const ENTRIES: readonly Entry[] = [
   letter('l', 'l8', {
     category: 'notes',
     icon: 'note',
-    blurb: 'The default length notes take, when you do not write one on them. Compile-time command.',
+    blurb:
+      'The default length notes take, when you do not write one on them. Compile-time command.',
   }),
   {
     kind: 'syntax',
@@ -351,7 +352,8 @@ export const ENTRIES: readonly Entry[] = [
   letter('h', 'h0', {
     category: 'pitch',
     icon: 'sharp',
-    blurb: 'Shifts every note written after it up or down by a number of semitones. Compile-time command.',
+    blurb:
+      'Shifts every note written after it up or down by a number of semitones. Compile-time command.',
   }),
   letter('p', 'p12,8', {
     category: 'pitch',
@@ -367,7 +369,8 @@ export const ENTRIES: readonly Entry[] = [
   hex(0xea, [0x18], {
     category: 'pitch',
     icon: 'waveFade',
-    blurb: 'Eases the vibrato in or out instead of switching it on at full depth. Must be used after a `p` or `$DE` command.',
+    blurb:
+      'Eases the vibrato in or out instead of switching it on at full depth. Must be used after a vibrato (`p`) command.',
   }),
   hex(0xdd, [0x00, 0x18, 0xa4], {
     category: 'pitch',
@@ -382,12 +385,14 @@ export const ENTRIES: readonly Entry[] = [
   hex(0xec, [0x00, 0x18, 0x02], {
     category: 'pitch',
     icon: 'envelopeUp',
-    blurb: 'Starts with the specified semitones difference applied, and bends it into the note that follows.',
+    blurb:
+      'Starts with the specified semitones difference applied, and bends it into the note that follows.',
   }),
   hex(0xeb, [0x00, 0x18, 0x02], {
     category: 'pitch',
     icon: 'envelopeDown',
-    blurb: 'Starts with the note that follows, and bends it into the specified semitones difference.',
+    blurb:
+      'Starts with the note that follows, and bends it into the specified semitones difference.',
   }),
   hex(0xfe, [], {
     category: 'pitch',
@@ -442,7 +447,7 @@ export const ENTRIES: readonly Entry[] = [
     category: 'instrument',
     icon: 'gain',
     label: 'GAIN',
-    blurb: 'Drives the note\'s loudness directly instead, holding or sliding it to a level.',
+    blurb: "Drives the note's loudness directly instead, holding or sliding it to a level.",
   }),
   hex(0xf3, [0x00, 0x04], {
     category: 'instrument',
@@ -476,7 +481,8 @@ export const ENTRIES: readonly Entry[] = [
   hex(0xf5, [0xff, 0x08, 0x17, 0x24, 0x24, 0x17, 0x08, 0xff], {
     category: 'echo',
     icon: 'filter',
-    blurb: 'Shapes the tone of the echo by selectively reducing or emphasizing frequencies. It affects how bright or muffled the repeats sound.',
+    blurb:
+      'Shapes the tone of the echo by selectively reducing or emphasizing frequencies. It affects how bright or muffled the repeats sound.',
   }),
 
   // ─── Loops ──────────────────────────────────────────────────────────────
@@ -531,7 +537,8 @@ export const ENTRIES: readonly Entry[] = [
     id: '(!n)',
     icon: 'triggerDefine',
     label: 'remote code',
-    blurb: 'Writes a command snippet the song can run by itself later. Goes above the first channel.',
+    blurb:
+      'Writes a command snippet the song can run by itself later. Goes above the first channel.',
     snippet: '(!1)[$F4 $09]',
     syntax: 'remoteLoop',
     context: 'before-channels',
@@ -582,12 +589,12 @@ export const ENTRIES: readonly Entry[] = [
   hex(0xf6, [0x0c, 0x7f], {
     category: 'misc',
     icon: 'chip',
-    blurb: 'Writes a value straight into one of the sound chip\'s registers.',
+    blurb: "Writes a value straight into one of the sound chip's registers.",
   }),
   hex(0xf7, [0x00, 0x00, 0x00], {
     category: 'misc',
     icon: 'chipWrite',
-    blurb: 'AddmusicM\'s command for writing a byte anywhere in the driver\'s memory.',
+    blurb: "AddmusicM's command for writing a byte anywhere in the driver's memory.",
     // Commands.asm:633 — the body is commented out, so the label collapses onto
     // cmdF9 and the dispatch slot is $0000 (main.bin @ $13A6). AddmusicK
     // compiles it without a word, and SST0506 is what says so. Offering the

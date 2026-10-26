@@ -1467,6 +1467,16 @@ stats.loopTicks` pads **every other channel that would cut the song short** out 
   reading that excluded it would have called a song that plays fine a dead SPC. And “nothing before
   it” is asked ahead of “something in the way”, since nothing can stand _between_ the command and a
   note that is not there: that is what the head of a `(!n)[ … ]` body answers.
+- **A slide's room read off the note in front of it alone** — that note's last segment less one, so
+  a tie written after the `$DD`, which keys nothing on and is how a porter gives a slide more room,
+  counted for nothing, and `c1 $DD` read 191 where the driver gives 95. The slide steps only on ticks
+  that fetch nothing (`main.asm:2337-2339`) until a key-on overwrites it (`main.asm:465-466`), so its
+  room is every frame from the one it arms in to that key-on, one tick fewer each — and a frame is
+  `emitNote`'s, a note of `$80` ticks or more going out in `$60`-tick pieces, which is also what
+  makes `c=193 $DD` arm nothing. `BendAnchor.window` is that sum, read off `TokenIndex.ties` since a
+  `^` no note opened is no `Command`. Not the note's length plus its ties either, which is a tick
+  over per frame: `a96 $DD $00 $FF $80^1^4^16^192` reads 255 that way and the driver gives it 251. A
+  rest ends the count although the slide runs on under it, the voice being keyed off.
 - **The roll toolbar's readout line** — `editing: #0 · tick 7,534 of 14,592 · t55 · 109.4 ticks/s ·
 3,468 notes`, rewritten twice a second while playing. It said five things in one place, four of
   which were not the roll's: the channel is what the corner picker already shows, the note count is

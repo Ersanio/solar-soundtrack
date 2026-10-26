@@ -132,9 +132,8 @@ export class BendCommand {
    *
    * Where it does ride, the seconds beside the two sliders are unconditional and the
    * song is not: the next key-on overwrites the slide state outright
-   * (`main.asm:465-466`), so a `$DD` that outlasts its note is cut off mid-slide and
-   * never reaches the target. The window is one less than the frame, the read-ahead
-   * being unable to run on the tick a note begins (`main.asm:2338`).
+   * (`main.asm:465-466`), so a `$DD` that outlasts its window is cut off mid-slide and
+   * never reaches the target. `bendAnchor` says how long that window is.
    */
   protected readonly reachability = computed(() => {
     if (!this.isPitchBend()) {
@@ -148,20 +147,22 @@ export class BendCommand {
       case 'blocked':
         return `The ${anchor.by.name} written between this and the note before it is what the driver reads instead, so the slide runs as a command, jumps to address zero and the song stops.`;
       case 'tooShort':
-        return 'The note before this lasts one tick, and the read-ahead cannot run on the tick a note begins, so the slide runs as a command, jumps to address zero and the song stops.';
+        return anchor.ticks > 1
+          ? `The note before this is ${anchor.ticks} ticks, which the compiler writes in pieces of 96 with one tick left over at the end, and the read-ahead cannot run on the tick a note begins, so the slide runs as a command, jumps to address zero and the song stops.`
+          : 'The note before this lasts one tick, and the read-ahead cannot run on the tick a note begins, so the slide runs as a command, jumps to address zero and the song stops.';
       case 'rides':
         break;
     }
 
-    const window = anchor.ticks - 1;
+    const { window } = anchor;
     const delay = this.shownDelay();
     const span = delay + this.shownDuration();
     if (delay >= window) {
-      return `The note before this gives the slide ${window} ticks; the delay alone uses them all and none of the bend is heard.`;
+      return `The slide has ${window} ticks before the next note, and the delay alone uses them all, so none of the bend is heard. A tie written after this command gives it more.`;
     }
 
     if (span > window) {
-      return `The note before this gives the slide ${window} ticks; this asks for ${span}, so it is cut off partway and never reaches the target.`;
+      return `The slide has ${window} ticks before the next note and this asks for ${span}, so it is cut off partway and never reaches the target. A tie written after this command gives it more.`;
     }
 
     return null;

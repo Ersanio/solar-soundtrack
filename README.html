@@ -3623,7 +3623,9 @@
                   at all — the note in front of it picks it up by looking one byte ahead — so it has
                   to be written directly after a note of two ticks or more. Anywhere else, the same
                   jump to address zero as above: first thing in a channel, after another command, or
-                  after a note only one tick long.
+                  after a note only one tick long. That includes a long note whose last piece is one
+                  tick: the compiler writes a note of 128 ticks or more in pieces of 96, so a note
+                  of 193 ticks ends on a piece of one.
                 </td>
               </tr>
               <tr>
