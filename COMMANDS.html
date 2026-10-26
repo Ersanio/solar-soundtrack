@@ -1299,11 +1299,26 @@
       The readme: “The first digit specifies how long of a delay there is between each note … The
       second digit controls the volume” (<code>syntax_reference.html:107</code>). The driver
       (<code>main.asm:2366-2380</code>): the high nybble is <code>and #$07</code> and indexes
-      <code>NoteDurations</code> — a <em>gate time</em> in 256ths of the note, so
-      <code>q7x</code> sounds for the whole note and <code>q8x</code>–<code>qFx</code> alias
+      <code>NoteDurations</code>, and <code>q8x</code>–<code>qFx</code> alias
       <code>q0x</code>–<code>q7x</code>; the low nybble indexes <code>VelocityValues</code>, a
       non-linear 16-entry table of which there are two, chosen by <code>!SecondVTable</code>. The
       compiler accepts <code>$01</code>–<code>$7F</code> and never sees the aliasing. Tables in §5.
+    </p>
+    <p>
+      The high nybble is not a fraction of the note. <code>L_0CB3</code> loads the key-off counter
+      <code>$0100+x</code> with the high byte of <em>frame</em> × <code>NoteDurations</code>,
+      floored at 1 (<code>main.asm:2439-2449</code>), and the read-ahead keys the voice off when
+      that counter reaches zero <em>or</em> when the duration counter reaches
+      <code>!WaitTime</code>, whichever comes first (<code>main.asm:3212-3243</code>).
+      <code>!WaitTime</code> is 2, and <code>$F4 $02</code> flips it between 2 and 1. A frame is
+      what <code>emitNote</code> writes: a note of <code>$80</code> ticks or more goes out as
+      <code>$60</code>-tick pieces joined by ties (§2.1), the read-ahead never keys off in front of
+      a tie (<code>main.asm:2983-2984</code>), so only the last piece is cut. Hence
+      <code>q7x</code> never sounds whole — a <code>q7F</code> eighth sounds 22 of 24 ticks — and
+      <code>q0x</code> plays 19% of a quarter but 60% of a whole note. A last piece of one tick has
+      no read-ahead tick at all and sounds through. <code>frameSoundingTicks</code> and
+      <code>noteSoundingTicks</code> (<code>@amk/core</code>) state it; <code>walktest</code> holds
+      it to the emulator.
     </p>
 
     <h3>2.3 <code>@</code>, the percussion set and the built-in tables</h3>
@@ -4195,7 +4210,7 @@ instrToSample[30] = { 00 01 02 03 04 07 08 09 05 0A 0B 01 10 0C 0D 12 0C 11 01  
             <td>
               A duration in ticks → <code>$0200+x</code>. If the <em>next</em> byte is also positive
               it is the note-parameter byte: high nybble <code>and #$07</code> →
-              <code>NoteDurations</code> → <code>$0201+x</code> (gate, in 256ths); low nybble
+              <code>NoteDurations</code> → <code>$0201+x</code> (gate multiplier, §2.2); low nybble
               (+<code>$10</code> when <code>!SecondVTable ≠ 0</code>) →
               <code>VelocityValues</code> → <code>$0211+x</code>.
             </td>
@@ -4280,7 +4295,7 @@ instrToSample[30] = { 00 01 02 03 04 07 08 09 05 0A 0B 01 10 0C 0D 12 0C 11 01  
     </div>
 
     <h3>5.1 The lookup tables</h3>
-    <pre><code>; main.asm:3477-3478 — q high nybble (masked to 3 bits): gate time in 256ths of the note
+    <pre><code>; main.asm:3477-3478 — q high nybble (masked to 3 bits): gate multiplier on a note's last frame, in 256ths (§2.2)
 NoteDurations:  $33 $66 $80 $99 $B3 $CC $E6 $FF
 
 ; main.asm:3481-3483 — q low nybble

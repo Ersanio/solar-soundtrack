@@ -14,6 +14,7 @@ import {
 import { readLoops } from '@amk/tokens/commands/loops';
 import { echoHazards } from '@amk/tokens/echo-hazards';
 import { commandHazards } from '@amk/tokens/command-hazards';
+import { songTarget } from '@amk/tokens/dialect';
 import { commandsInForceOf } from './commands-in-force';
 import { type TimelineCommand, commandTimeline } from './command-timeline';
 import { type SongClock, songClock } from './song-clock';
@@ -130,6 +131,14 @@ export class EditorStore {
    * usually by reference, since {@link edit} commits the same string instance.
    */
   readonly compiledText = computed(() => this.compilation()?.text ?? null);
+
+  /**
+   * What the compiler divided every note length by (`#halvetempo`, `#option dividetempo`).
+   * `divideByTempoRatio` (`parser.ts:702`) does nothing below `#amk 4`, whatever the directives say.
+   */
+  readonly tempoRatio = computed(() =>
+    songTarget(this.tokens()).amkVersion >= 4 ? (this.result()?.stats?.tempoRatio ?? 1) : 1,
+  );
 
   /** The song as a timeline of notes on ticks, for the piano roll. */
   readonly timeline = computed<SongTimeline | null>(() => {

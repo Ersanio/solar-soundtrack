@@ -88,7 +88,7 @@ export class NoteCommand {
   });
 
   /** The pass being described: the one the roll asked about, else the first. */
-  private readonly pass = computed<WalkNote | null>(() => {
+  protected readonly pass = computed<WalkNote | null>(() => {
     const passes = this.passes();
     if (passes.length === 0) {
       return null;

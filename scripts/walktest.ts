@@ -42,12 +42,19 @@ import { join } from "node:path";
 
 import { compiler } from "@amk/compiler";
 import { type CompileResult, noteAddressAt } from "@amk/core/types";
-import { FIRST_VCMD, LAST_VCMD } from "@amk/core/hardcoded-tables";
+import { FIRST_VCMD, LAST_VCMD, NOTE_DURATIONS, WAIT_TIME, noteSoundingTicks } from "@amk/core/hardcoded-tables";
 import { commandStartingAt, expectedArgs, tokenize } from "@amk/tokens";
 import { commandScope, parseTimeInForce } from "@amk/tokens/commands/in-force";
 import { loadDriver } from "@amk/spc/driver";
 import { buildSpc } from "@amk/spc/export";
-import { readDriverState } from "@amk/spc/driver-state";
+import {
+	TICK_POLL_HZ,
+	createTickPhase,
+	passMark,
+	readDriverState,
+	sawTick,
+	seedTickPhase,
+} from "@amk/spc/driver-state";
 import { emptySample } from "@amk/spc/brr";
 import { SPC_SAMPLE_RATE, instantiate } from "@amk/spc/wasm-host";
 import {
@@ -1012,21 +1019,59 @@ console.log("\nties, gates and the pitched range");
 
 	const gated = build("#amk 4\n#0 o4 q7F c4 q44 d4\n").timeline;
 
-	// Even `q7F` does not sound for the whole slot. `NoteDurations[7]` is `$FF`
-	// and `main.asm:2443` keeps only the high byte of `duration × $FF`, so the
-	// longest gate there is is 255/256 of the note — 47 ticks of a 48-tick
-	// quarter. A roll that drew the two as equal would be drawing the wrong
-	// thing, so this pins the arithmetic rather than the intent.
-	check(
-		"the longest gate is 255/256 of the slot",
-		gated.notes[0].gateTicks === (gated.notes[0].ticks * 0xff) >> 8,
-		`${gated.notes[0].gateTicks} of ${gated.notes[0].ticks}`,
-	);
+	// Even `q7F` does not sound for the whole slot, and not for 255/256 of it
+	// either: the read-ahead keys off when the duration counter reaches
+	// `!WaitTime` if the gate counter has not run out first (`main.asm:3237-3243`),
+	// so a 48-tick quarter sounds for 46. The emulator section below is what says
+	// this is the driver and not a reading of it.
+	check("q7F keys a quarter off two ticks early", gated.notes[0].gateTicks === 46, `${gated.notes[0].gateTicks} of 48`);
 	check(
 		"a short gate sounds for less",
 		gated.notes[1].gateTicks < gated.notes[0].gateTicks && gated.notes[1].gateTicks > 0,
 		`${gated.notes[1].gateTicks} against ${gated.notes[0].gateTicks}`,
 	);
+
+	// `$F4 $02` flips `!WaitTime` between 2 and 1 for the whole song.
+	const light = build("#amk 4\n#0 o4 $F4 $02 q7F c4 $F4 $02 c4\n").timeline;
+	check(
+		"light staccato keys off one tick early, and toggles back",
+		light.notes[0].gateTicks === 47 && light.notes[1].gateTicks === 46,
+		light.notes.map((note) => note.gateTicks).join(", "),
+	);
+	const across = build("#amk 4\n#0 o4 $F4 $02 q7F c4 c4\n#1 o4 q7F r4 c4\n").timeline;
+	check(
+		"and is one switch for every channel",
+		across.notes.every((note) => note.gateTicks === 47),
+		across.notes.map((note) => `#${note.channel} ${note.gateTicks}`).join(", "),
+	);
+
+	// `noteSoundingTicks` is what the note inspector prices a dragged length with,
+	// worked out rather than walked from bytes. It restates `emitNote`'s pieces, so it
+	// is held to the walk at every length and every gate, and under a tempo ratio,
+	// which shrinks the pieces with the notes.
+	let disagreed = "";
+	for (const [ratio, prefix] of [
+		[1, ""],
+		[2, "#halvetempo\n"],
+	] as const) {
+		for (let gate = 0; gate < 8; gate++) {
+			const lengths = Array.from({ length: 300 }, (_, at) => (at + 1) * ratio);
+			const swept = build(`#amk 4\n${prefix}#0 o4 q${gate}F ${lengths.map((n) => `c=${n}`).join(" ")}\n`).timeline;
+			if (swept.notes.length !== lengths.length) {
+				disagreed += ` ratio ${ratio} q${gate}x: ${swept.notes.length} notes`;
+				continue;
+			}
+
+			for (const note of swept.notes) {
+				const expected = noteSoundingTicks(note.ticks, NOTE_DURATIONS[gate], WAIT_TIME, ratio);
+				if (note.gateTicks !== expected) {
+					disagreed += ` ratio ${ratio} q${gate}x ${note.ticks}t: ${note.gateTicks}!=${expected}`;
+				}
+			}
+		}
+	}
+
+	check("noteSoundingTicks agrees with the walk at every length and gate", disagreed === "", disagreed.slice(0, 300));
 
 	// The two ends of the keyboard, on the notes themselves rather than through
 	// an aggregate: `key` is what a row is chosen by, and `$80` is o1 c.
@@ -1276,6 +1321,82 @@ console.log("\nthe driver plays what the walk says it will");
 		looked > 0 && agreed / looked > 0.95,
 		`${agreed}/${looked} agreed`,
 	);
+}
+
+// ---------------------------------------------------------------------------
+console.log("\nthe driver keys a note off where the walk says it does");
+// ---------------------------------------------------------------------------
+{
+	// `!PlayingVoices` is set in `KeyOnVoices` and cleared in `KeyOffVoices` and
+	// nowhere else (`main.asm:2537, 2578`), so each run of its voice-0 bit, counted
+	// in the driver's own ticks, is how long one note sounded. The lengths straddle
+	// every case `frameSoundingTicks` has: frames too short for the gate to matter,
+	// short ones where `!WaitTime` wins, the 127/128 split into 96-tick pieces, and
+	// 193, whose last piece is one tick with no read-ahead tick to key off on.
+	const PLAYING_VOICES = 0x0382;
+	const lengths = [2, 3, 4, 6, 8, 12, 24, 48, 96, 127, 128, 144, 192, 193, 200];
+	const spread = lengths.map((n) => `c=${n} r8`).join(" ");
+	const source =
+		`#amk 4\n#0 t200 v200 @0 o4 q0F ${spread} q3F ${spread} q7F ${spread} ` +
+		`$F4 $02 ${spread} $F4 $02 c8 c8 c8 c8 r8\n`;
+	const { result, timeline } = build(source);
+
+	const emu = instantiate(new WebAssembly.Module(readFileSync(join(SPC_ASSETS, "player", "spc.wasm"))));
+	const samples = (result.sampleList ?? []).map((name) => BY_NAME.get(name) ?? emptySample(name));
+	emu.loadSpc(
+		buildSpc({
+			songData: result.data ?? new Uint8Array(0),
+			driver,
+			samples,
+			echoBufferSize: result.stats?.echoBufferSize,
+			date: new Date(2026, 6, 28),
+		}).spc,
+	);
+
+	// A key-off happens inside the voice loop, after the pass's `$44` write, so it
+	// belongs to the tick counted by then. A key-on is the last thing a pass does
+	// (`main.asm:2532`), so one first seen by a poll that also crossed into the next
+	// pass belongs to the tick before. Polled well inside a pass so a short note's
+	// key-on and key-off are never seen by the same poll.
+	const POLLS_PER_TICK_POLL = 8;
+	const sounded: number[] = [];
+	const phase = createTickPhase();
+	let seeded = false;
+	let ticks = 0;
+	let on = false;
+	let since = 0;
+	let pass = 0;
+	const limit = 120 * TICK_POLL_HZ * POLLS_PER_TICK_POLL;
+	for (let poll = 0; poll < limit && sounded.length < timeline.notes.length; poll++) {
+		emu.renderView(SPC_SAMPLE_RATE / TICK_POLL_HZ / POLLS_PER_TICK_POLL);
+		const aram = emu.aram();
+		if (!seeded) {
+			seedTickPhase(phase, aram);
+			pass = passMark(aram);
+			seeded = true;
+			continue;
+		}
+
+		const before = ticks;
+		const crossed = passMark(aram) !== pass;
+		pass = passMark(aram);
+		ticks += sawTick(phase, aram);
+		const now = (aram[PLAYING_VOICES] & 1) !== 0;
+		if (now && !on) {
+			since = crossed ? before : ticks;
+		} else if (!now && on) {
+			sounded.push(ticks - since);
+		}
+
+		on = now;
+	}
+
+	const walked = timeline.notes.map((note) => note.gateTicks);
+	check("every note keyed on and off once", sounded.length === walked.length, `${sounded.length} of ${walked.length}`);
+	const differ = walked
+		.map((gate, at) => (sounded[at] === gate ? null : `#${at} ${timeline.notes[at].ticks}t: ${sounded[at]}!=${gate}`))
+		.filter((line) => line !== null);
+	check("each sounds as long as the walk's gateTicks", differ.length === 0, differ.slice(0, 8).join(", "));
 }
 
 // ---------------------------------------------------------------------------

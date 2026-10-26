@@ -1,5 +1,6 @@
 import type { Command, NoteLengthSegment, Token, TokenIndex } from "./tokens";
 import type { Diagnostic, Span } from "@amk/core/types";
+import { noteFrames } from "@amk/core/hardcoded-tables";
 import { commandScope, isPercussionInstrument } from "./commands/in-force";
 
 /**
@@ -82,26 +83,6 @@ function callBetween(tokens: readonly Token[], from: number, to: number): Token 
 	return tokens.find((token) => token.kind === "label" && token.start >= from && token.end <= to) ?? null;
 }
 
-/** The frames `emitNote` writes a note of `ticks` as: `$60`-tick pieces once it reaches `$80` (`parser.ts:2921`). */
-function framesOf(ticks: number): number[] {
-	if (ticks < 0x80) {
-		return ticks > 0 ? [ticks] : [];
-	}
-
-	const frames = [0x60];
-	let left = ticks - 0x60;
-	while (left > 0x60) {
-		frames.push(0x60);
-		left -= 0x60;
-	}
-
-	if (left > 0) {
-		frames.push(left);
-	}
-
-	return frames;
-}
-
 /** A slide steps only on ticks that fetch no music data (`main.asm:2337-2339`), so a frame gives it one fewer than it lasts. */
 function roomIn(frames: readonly number[]): number {
 	return frames.reduce((sum, frame) => sum + Math.max(frame - 1, 0), 0);
@@ -136,8 +117,8 @@ function slideWindow(command: Command, index: TokenIndex, frame: number): number
 		const total = segments.reduce((sum, segment) => sum + segment.ticks, 0);
 		const last = segments[segments.length - 1]?.ticks ?? 0;
 		return stop?.vcmd === 0xdd && next?.start === stop.span.start && segments.length > 1
-			? [...framesOf(total - last), ...framesOf(last)]
-			: framesOf(total);
+			? [...noteFrames(total - last), ...noteFrames(last)]
+			: noteFrames(total);
 	};
 
 	let window = frame - 1;
@@ -252,7 +233,7 @@ export function bendAnchor(command: Command, index: TokenIndex): BendAnchor {
 
 	const segments = anchor.noteLength ?? [];
 	const ticks = segments[segments.length - 1]?.ticks ?? 0;
-	const frames = framesOf(ticks);
+	const frames = noteFrames(ticks);
 	const frame = frames[frames.length - 1] ?? 0;
 	return frame >= MIN_BEND_TICKS
 		? { kind: "rides", frame, window: slideWindow(command, index, frame) }

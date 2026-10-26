@@ -283,6 +283,14 @@ reach, which through a fade is the target the driver has not got to yet; the rol
 what was asked for, and anything wanting what is actually playing reads `tempoChanges` or the live
 `$51`.
 
+`WalkNote.gateTicks` is where the driver keys a note off, which is not `q`'s fraction of it. The
+read-ahead keys off when the gate counter runs out or when the duration counter reaches `!WaitTime`,
+whichever is first (`main.asm:3212-3243`), so `q7F` cuts a quarter to 46 ticks and not 47; and a
+note long enough to be written as tied `$60`-tick pieces is cut only in its last one. `!WaitTime` is
+2 until a `$F4 $02` flips it, for every channel at once, so the walk carries it as song-wide state.
+`frameSoundingTicks` in `@amk/core` is the arithmetic, shared with the note inspector, and `walktest`
+times each note's key-on and key-off on the running driver against it.
+
 The traps are all in the grammar and each carries its citation in the source: a `$00` after a
 duration byte is a quantization byte and not the end of the channel, `$C7`-`$CF` are _all_ rests,
 `$FA $FE` runs on for every trailing byte with the high bit set, `$FB`'s operands are `$80`-range

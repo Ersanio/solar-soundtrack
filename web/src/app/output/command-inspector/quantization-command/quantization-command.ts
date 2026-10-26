@@ -4,8 +4,8 @@ import { argEditable, spliceArg } from '@amk/tokens/edits';
 import {
   NOTE_DURATIONS,
   NSPC_VELOCITY_OFFSET,
-  TICKS_PER_WHOLE,
   VELOCITY_VALUES,
+  WAIT_TIME,
 } from '@amk/core/hardcoded-tables';
 import type { Command } from '@amk/tokens';
 import { argLockedBecause } from '../commands/context';
@@ -22,12 +22,11 @@ import { dragPreview } from '../commands/preview';
  * The readme says the first digit is "how long of a delay there is between each
  * note" and the second "controls the volume". Neither is what the driver does.
  *
- * `main.asm:2365-2379` masks the high nibble to three bits, indexes
- * `NoteDurations`, and multiplies the note's own duration by the result before
- * taking the high byte — so it is a **gate time in 256ths of the note**, and the
- * "delay" is trailing silence proportional to how long the note is rather than a
- * fixed count. `aram_map.html:667` states it outright: "quantization, which is
- * in 256ths of a note".
+ * The high nibble, masked to three bits, picks a multiplier from `NoteDurations`
+ * (`main.asm:2365-2379`), and what it comes to depends on the note's length:
+ * only a note's last frame is cut, and the driver keys off `!WaitTime` ticks
+ * before the end at the latest. So no single percentage is shown here: a
+ * note's own inspector says what it comes to for that note.
  *
  * The low nibble indexes `VelocityValues`, which is two tables of sixteen and
  * neither of them linear — so it is an index, not a volume, and *which* table
@@ -60,7 +59,7 @@ export class QuantizationCommand {
    * The two nibbles as the sliders are showing them.
    *
    * Every readout below reads these rather than the committed pair, so the
-   * percentage, the example and the out-of-range warning all answer for the
+   * gate, the velocity and the out-of-range warning all answer for the
    * value under the pointer. The sliders themselves keep binding to the
    * committed nibbles — `amk-slider` compares against the value bound to it to
    * decide whether a gesture changed anything, and a preview fed back in reads
@@ -91,13 +90,15 @@ export class QuantizationCommand {
       VELOCITY_VALUES[this.shownVelocity() + (this.table() === 'nspc' ? NSPC_VELOCITY_OFFSET : 0)],
   );
 
-  protected readonly gateLabel = computed(
-    () => `${Math.round((this.gateByte() / 256) * 100)}% of the note`,
-  );
+  protected readonly gateLabel = computed(() => `$${hex2(this.gateByte())}/256`);
 
-  protected readonly gateNote = computed(
-    () => `$${hex2(this.gateByte())} of $FF — the rest of the note is silence`,
-  );
+  /** `parser.ts:emitNote` cuts a note of `$80` ticks or more into `$60`-tick pieces. */
+  protected readonly gateNote = computed(() => {
+    const ratio = this.store.tempoRatio();
+    const piece = Math.floor(0x60 / ratio);
+    const long = Math.floor(0x80 / ratio);
+    return `of a note sounds — of its last ${piece} ticks, once it is ${long} or longer — and never closer than ${WAIT_TIME} ticks to its end`;
+  });
 
   protected readonly velocityLabel = computed(() => `$${hex2(this.velocityByte())}`);
 
@@ -105,20 +106,6 @@ export class QuantizationCommand {
     () =>
       `${Math.round((this.velocityByte() / 0xff) * 100)}% of full, from the ${this.tableName()} table`,
   );
-
-  /**
-   * What the setting comes to for a note of the length in effect.
-   *
-   * The gate is a fraction, so it says nothing on its own; against a real length
-   * it becomes "sounds for 23 of 24 ticks", which is the sentence somebody
-   * tuning staccato actually wants. The driver's own arithmetic, minimum of one
-   * tick included (`main.asm:2445-2449`).
-   */
-  protected readonly example = computed(() => {
-    const ticks = TICKS_PER_WHOLE / 8;
-    const sounding = Math.max(1, (ticks * this.gateByte()) >> 8);
-    return `at l8 (${ticks} ticks) a note sounds for ${sounding}, then ${ticks - sounding} of silence`;
-  });
 
   /**
    * `parser.ts`'s `parseQuantization` — `q00` is an error, so the gate never

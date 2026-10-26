@@ -12,6 +12,7 @@ export const CHANGELOG: readonly ChangelogEntry[] = [
     date: '26 October 2026',
     items: [
       'A pitch bend given more time with ties after it, is no longer wrongly warned as cut off',
+      'A note shows how many of its ticks really sound under its quantization, and the piano roll draws notes that long',
     ],
   },
   {

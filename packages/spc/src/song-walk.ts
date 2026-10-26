@@ -45,6 +45,8 @@ import {
 	NOTE_DURATIONS,
 	NSPC_VELOCITY_OFFSET,
 	VELOCITY_VALUES,
+	WAIT_TIME,
+	frameSoundingTicks,
 } from "@amk/core/hardcoded-tables";
 import type { Diagnostic, NoteAddress } from "@amk/core/types";
 
@@ -279,8 +281,10 @@ export interface NoteState {
 	pan: number | null;
 	/** The raw `q` byte, or `null` while the channel has not set one. */
 	quantization: number | null;
-	/** `NoteDurations[(q >> 4) & 7]` — the fraction of the slot that sounds. */
+	/** `NoteDurations[(q >> 4) & 7]`, the multiplier on a note's last frame — see {@link WalkNote.gateTicks}. */
 	gate: number;
+	/** `!WaitTime` at the note's key-on: 2, or 1 while `$F4 $02` has it flipped. */
+	waitTime: number;
 	/** `VelocityValues[...]`, through whichever table is selected. */
 	velocity: number;
 	vibrato: boolean;
@@ -362,7 +366,10 @@ export interface WalkNote {
 	tick: number;
 	/** Ticks the slot occupies. `$C6` ties are folded in. */
 	ticks: number;
-	/** Ticks it actually sounds: `main.asm:2439-2449`, floored at one. */
+	/**
+	 * Ticks it actually sounds before the key-off: `frameSoundingTicks` of the last frame, under the
+	 * `!WaitTime` in force at its key-on, with every frame tied in front of it whole.
+	 */
 	gateTicks: number;
 	/** The emitted byte. `$80`-`$C5` pitched, `$D0`-`$D8` a drum. */
 	note: number;
@@ -854,6 +861,8 @@ export function walkSong(song: Uint8Array, aramAddress: number): SongTimeline {
 		tempo: 0,
 		globalVolume: null as number | null,
 		secondVelocityTable: true,
+		/** `!WaitTime`, which `$F4 $02` flips between 2 and 1 for every channel at once. */
+		waitTime: WAIT_TIME,
 		/** Song-wide slots, which every channel's next note reports. */
 		origins: new Array<number | null>(SLOTS.length).fill(null),
 		/** Their owners, as {@link Track.owners} is. Only the tail is ever used. */
@@ -902,6 +911,7 @@ export function walkSong(song: Uint8Array, aramAddress: number): SongTimeline {
 			pan: track.state.pan,
 			quantization: track.state.quantization,
 			gate: track.state.gate,
+			waitTime: shared.waitTime,
 			velocity: track.state.velocity,
 			vibrato: track.state.vibrato,
 			tremolo: track.state.tremolo,
@@ -1137,7 +1147,7 @@ export function walkSong(song: Uint8Array, aramAddress: number): SongTimeline {
 				previous.ticks += ticks;
 				// Every segment before the last sounds in full — the tie never keys
 				// off — and only this one is cut short by the gate in force now.
-				previous.gateTicks = previous.ticks - ticks + gateTicks(ticks, track.state.gate);
+				previous.gateTicks = previous.ticks - ticks + frameSoundingTicks(ticks, track.state.gate, shared.waitTime);
 			}
 
 			track.ticks += ticks;
@@ -1182,7 +1192,7 @@ export function walkSong(song: Uint8Array, aramAddress: number): SongTimeline {
 			channel,
 			tick: track.ticks,
 			ticks,
-			gateTicks: gateTicks(ticks, track.state.gate),
+			gateTicks: frameSoundingTicks(ticks, track.state.gate, shared.waitTime),
 			note: byte,
 			key: percussion === null ? byte - NOTE_LOWEST : null,
 			percussion,
@@ -1314,6 +1324,19 @@ export function walkSong(song: Uint8Array, aramAddress: number): SongTimeline {
 				break;
 			case 0xf8:
 				state.noise = arg(0);
+				break;
+			case 0xf4:
+				// `eor !WaitTime, #$03` (`Commands.asm:595-597`). Read at a note
+				// key-on, where the driver reads it at the key-off check, so a toggle
+				// on another channel in between is not seen until the next note.
+				if (arg(0) === 0x02) {
+					shared.waitTime ^= 3;
+					for (const each of tracks) {
+						each.snapshot = null;
+					}
+				}
+
+				dirty = false;
 				break;
 			case 0xfa:
 				// `$FA $06` picks the velocity table. `main.asm:2379` tests it
@@ -1623,13 +1646,4 @@ export function unreachableChannels(timeline: SongTimeline, noteMap: readonly No
 			span: first?.span ?? last?.span ?? { start: 0, end: 0, line: 1 },
 		},
 	];
-}
-
-/**
- * How much of a slot a note sounds for. `main.asm:2439-2449`:
- * `mul ya` over the duration and `NoteDurations[...]`, keep the high byte, and
- * `inc a` when it came out zero — so the shortest staccato is still one tick.
- */
-function gateTicks(ticks: number, gate: number): number {
-	return Math.max(1, (ticks * gate) >> 8);
 }

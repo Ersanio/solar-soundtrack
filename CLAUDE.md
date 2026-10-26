@@ -1489,6 +1489,17 @@ stats.loopTicks` pads **every other channel that would cut the song short** out 
   so a song the driver cannot keep up with says `231.9 of 498.0 ticks/s` from any view. What stays
   on the toolbar is what only the roll can say: how many notes are selected, and why a channel or a
   gesture was refused.
+- **`q`'s high nybble read as a percentage of the note**, and a note's gate as
+  `frame × NoteDurations >> 8` alone — the inspector called `q7x` "100% of the note" and the roll
+  drew a `q7F` quarter 47 ticks long, and both were wrong the same way. The read-ahead keys off at
+  that counter or at `!WaitTime` ticks before the frame ends, whichever is first
+  (`main.asm:3212-3243`), `!WaitTime` being 2 until a `$F4 $02` flips it; and only the last of a long
+  note's `$60`-tick pieces is cut, the read-ahead never keying off in front of a tie
+  (`main.asm:2983-2984`). So no one percentage describes a `q` — `q0x` is 19% of a quarter and 60%
+  of a whole note — and the note inspector says what the selected note comes to instead. `noteFrames`,
+  `frameSoundingTicks` and `noteSoundingTicks` in `@amk/core` are the one statement of it, read by
+  the walk and the inspector both, and `walktest` times every note's key-on and key-off on the
+  running driver through `!PlayingVoices`.
 
 ## Angular specifics
 
