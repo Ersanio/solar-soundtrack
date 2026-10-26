@@ -2476,13 +2476,18 @@ export class AddmusicKParser {
 			return this.errorAt(start, this.pos, "AMK0153", "Remote code cannot be defined within a channel.");
 		}
 
-		const target = this.loopPointers.get(label);
-		if (target === undefined) {
-			// AMK appends `loopPointers[i]` unchecked here, which for an undefined
-			// label is its -1 initialiser — two 0xFF bytes that relocation then
-			// turns into a pointer to nowhere.
-			return this.errorAt(start, this.pos, "AMK0115", `Remote code (!${label}) has not been defined yet.`);
-		}
+		// Music.cpp:1116-1122 appends `loopPointers[i]` unchecked. That array is an
+		// `unsigned short[0x10000]` filled with `~0` (Music.h:44, Music.cpp:290), so
+		// a label no body was recorded for writes $FFFF, and relocation
+		// (AddmusicK.cpp:1225-1228, `link.ts:relocateLoopPointers`) wraps it onto
+		// the byte just below the loop block — the last channel's terminating $00
+		// (Music.cpp:3053-3059). Label 0 is always such a label: `parseLoopStart`
+		// records a body only when `loopLabel > 0` (Music.cpp:1242-1251), so even a
+		// `(!0)[ … ]` written above the channels leaves slot 0 at $FFFF. A label of
+		// 0x10000 or more reads past the end of the reference's array, which is
+		// undefined there, and is treated here as unrecorded.
+		const recorded = this.loopPointers.get(label);
+		const target = recorded ?? 0xffff;
 
 		this.append(0xfc);
 		this.loopLocations[this.channel].push(this.data[this.channel].length);
@@ -2490,6 +2495,28 @@ export class AddmusicKParser {
 		this.append(target >> 8);
 		this.append(type & 0xff);
 		this.append(argument & 0xff);
+
+		// Types $00, $07 and $08 pop the pointer and discard it (Commands.asm:1247-1258,
+		// :1307-1351), which is the readme's "whatever code is used for this event is
+		// not run, so any code can be used" — `(!0, 0)` is how a song switches its
+		// remote code off. Every other type stores the pointer, and running the $00
+		// it lands on returns at once, so the event does nothing; type 3 still
+		// cancels the note cut (main.asm:3133-3156). AddmusicK says nothing about
+		// either, so SST0509 is this tool's finding. The test is on the emitted byte,
+		// since that is what `cmdFC` compares.
+		const discardsPointer = [0x00, 0x07, 0x08].includes(type & 0xff);
+		if (recorded === undefined && !discardsPointer) {
+			this.warn(
+				start,
+				this.pos,
+				"SST0509",
+				label === 0
+					? "Remote code (!0) can never be called: AddmusicK only records the address of a remote " +
+							"body numbered from 1, so this event runs nothing. Number the body from 1."
+					: `No remote code (!${label}) is defined above the first channel, so this event runs ` +
+							"nothing. AddmusicK compiles it without a word.",
+			);
+		}
 	}
 
 	/** `getIntWithNegative`, but reporting absence instead of throwing. */

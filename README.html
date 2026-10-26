@@ -3104,8 +3104,8 @@
                 <td><code>AMK0115</code></td>
                 <td>Error</td>
                 <td>
-                  A <code>(n)</code> or <code>(!n)</code> call above the body it names. A label has
-                  to be declared before it is called, so move the declaration up.
+                  A <code>(n)</code> call above the body it names. A label has to be declared before
+                  it is called, so move the declaration up.
                 </td>
               </tr>
               <tr>
@@ -3635,6 +3635,18 @@
                   A <code>$E4</code> transpose under <code>#am4</code>, where the compiler adds one
                   to it in silence, so it lands a semitone above what is written. Write one less
                   than you want, or move the song to <code>#amk</code>.
+                </td>
+              </tr>
+              <tr>
+                <td><code>SST0509</code></td>
+                <td>Warning</td>
+                <td>
+                  A <code>(!n, …)</code> remote code call with no <code>(!n)[ ]</code> body above
+                  the first channel, so the event has no code to run. AddmusicK compiles it without
+                  a word. <code>(!0)</code> is always one of these, even when you define it, because
+                  AddmusicK only keeps bodies numbered from 1. Event types 0, 7 and 8 are exempt:
+                  they switch remote code off and never look at the body, so <code>(!0, 0)</code> is
+                  fine.
                 </td>
               </tr>
             </tbody>

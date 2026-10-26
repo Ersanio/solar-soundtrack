@@ -163,9 +163,10 @@ partial UI stays populated. **The prefix says whose finding it is, not which fil
 `AMK####` is a condition AddmusicK itself reports, ported from `AddmusicKsrc/` with the `Music.cpp`
 line cited; `SST####` is one `Music.cpp` does not produce at all, so a porter is never told
 AddmusicK objects to something it has no opinion about. The echo hazards, the unreachable-channel
-warning, the tempo shortfall, the `#path` notice, the runaway-replacement guard and the three
+warning, the tempo shortfall, the `#path` notice, the runaway-replacement guard, the three
 command hazards — `$F7`'s dead dispatch slot, a `$DD` no note's read-ahead can reach, and `#am4`'s
-silent `$E4` offset — are `SST05xx`, which is also where a finding goes when the reference does not
+silent `$E4` offset — and a remote call that points at no body (`SST0509`) are `SST05xx`, which is
+also where a finding goes when the reference does not
 _finish_ rather than not object: `SST0505` bounds a replacement that expands into itself, and
 AddmusicK grows its buffer forever on the same song, so there is no run to be faithful to and
 nothing to divide with `#path`. `SST0301` guards `compile()`'s own ARAM argument. A new diagnostic
@@ -1500,6 +1501,15 @@ stats.loopTicks` pads **every other channel that would cut the song short** out 
   `frameSoundingTicks` and `noteSoundingTicks` in `@amk/core` are the one statement of it, read by
   the walk and the inspector both, and `walktest` times every note's key-on and key-off on the
   running driver through `!PlayingVoices`.
+- **Refusing a `(!n, type)` whose body was never recorded, as AMK0115** — it turned away `(!0, 0)`,
+  which is how a song switches its remote code off, and AddmusicK has no such check:
+  `Music.cpp:1116-1122` writes `loopPointers[i]` unchecked, and that is `$FFFF` for a label with no
+  body (`Music.cpp:290`), which relocation lands on the last channel's terminating `$00`. Types 0, 7
+  and 8 never read the address (`Commands.asm:1247-1258`), and the readme says "any code can be
+  used". AMK0115 is a label-loop finding (`Music.cpp:1178`) and has no remote form. The call writes
+  the same bytes AddmusicK writes, and `SST0509` warns for any other type, where the event runs
+  that `$00` and does nothing. `(!0)` is always unrecorded, since `parseLoopStart` keeps only
+  `loopLabel > 0` (`Music.cpp:1242-1251`), so even a song that defines it is told.
 
 ## Angular specifics
 

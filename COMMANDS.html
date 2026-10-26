@@ -1123,7 +1123,13 @@
             <td class="n">
               Remote-code call. T is a signed integer; A is required for T = 1 or 2, as
               <code>$hex</code> or a note-length number (256 → 0, larger is an error). Event types
-              are in the <code>$FC</code> card, §4.4.
+              are in the <code>$FC</code> card, §4.4. L is not checked: an L no body was recorded
+              for writes <code>loopPointers</code>' <code>$FFFF</code> (<code>Music.cpp:290</code>),
+              which relocation lands on the last channel's terminating <code>$00</code>, and L = 0
+              is always one, since only <code>loopLabel &gt; 0</code> is recorded
+              (<code>Music.cpp:1242-1251</code>). Harmless for T = 0, 7 and 8, which never read it —
+              <code>(!0, 0)</code> is the usual way to switch remote code off — and SST0509 for any
+              other T.
             </td>
             <td class="err">error</td>
             <td class="ok">native</td>
@@ -3928,10 +3934,11 @@ instrToSample[30] = { 00 01 02 03 04 07 08 09 05 0A 0B 01 10 0C 0D 12 0C 11 01  
       <dl>
         <dt>Syntax</dt>
         <dd>
-          LL/HH: address of a <code>(!L)[ ]</code> body (“not used for event type 0”); TT: event
-          type; AA: ticks for types 1 and 2 (“a value of $00 is treated as $0100”). Since 1.0.9,
-          <code>$FC $GG $01 $TT $AA</code> with HH = <code>$01</code> is <em>remote gain</em>: GG is
-          a GAIN value applied instead of running code.
+          LL/HH: address of a <code>(!L)[ ]</code> body (“not used for event type 0”, nor for 7 or
+          8, so the compiler writes whatever <code>loopPointers[L]</code> holds unchecked); TT:
+          event type; AA: ticks for types 1 and 2 (“a value of $00 is treated as $0100”). Since
+          1.0.9, <code>$FC $GG $01 $TT $AA</code> with HH = <code>$01</code> is
+          <em>remote gain</em>: GG is a GAIN value applied instead of running code.
           <span class="cite"
             >hex_command_reference.html:855-894, syntax_reference.html:183-199</span
           >
@@ -4765,6 +4772,13 @@ EchoFilter1:    $7F $00 $00 $00 $00 $00 $00 $00   ; flat</code></pre>
       <li>
         <code>$DD</code>: a null dispatch slot; the compiler accepts it anywhere. Solar Soundtrack
         does not — <code>SST0507</code> reports one no note’s read-ahead can reach.
+      </li>
+      <li>
+        <code>$FC</code>: the driver ignores the address for types 0, 7 and 8, and the compiler
+        writes <code>loopPointers[L]</code> without checking that a body is there
+        (<code>Commands.asm:1247-1258</code>; <code>Music.cpp:1116-1122</code>). Solar Soundtrack
+        writes the same bytes, and <code>SST0509</code> reports a call of any other type that points
+        at no body.
       </li>
       <li>
         <code>$FB</code> and <code>$FF</code>: placeholder lengths differ (3 vs 2; 0 vs absent) —

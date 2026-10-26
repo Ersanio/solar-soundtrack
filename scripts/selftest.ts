@@ -1311,11 +1311,84 @@ console.log("\nremote code");
 		);
 	}
 
+	// A call to a label no body was recorded for writes `loopPointers`' $FFFF
+	// (Music.cpp:290, :1116-1122), which relocation lands on the last channel's
+	// terminating $00. Types 0, 7 and 8 never read it, so they say nothing.
+	for (const type of [0, 7, 8]) {
+		const result = compile(`#amk 4\n#0 o4 c4 (!0, ${type}) c4\n`);
+		check(
+			`(!0, ${type}) with no (!0) compiles clean`,
+			result.ok && result.diagnostics.length === 0,
+			result.diagnostics.map((d) => `${d.code} ${d.message}`).join("; "),
+		);
+
+		const bytes = [...(result.data ?? [])];
+		const fc = bytes.indexOf(0xfc);
+		const pointer = fc === -1 ? -1 : (bytes[fc + 2] << 8) | bytes[fc + 1];
+		const blockAt = 0x3e00 + (result.stats?.totalSize ?? 0) - (result.stats?.loopDataSize ?? 0);
+		check(
+			`(!0, ${type}) emits $FC <ptr> ${type.toString(16).padStart(2, "0")} 00`,
+			fc !== -1 && bytes[fc + 3] === type && bytes[fc + 4] === 0,
+			fc === -1 ? "no $FC" : hex(Uint8Array.from(bytes.slice(fc, fc + 5))),
+		);
+		check(
+			`(!0, ${type}) points one byte below the loop block, at a $00`,
+			pointer !== -1 && ((pointer + 1) & 0xffff) === (blockAt & 0xffff) && bytes[pointer - 0x3e00] === 0x00,
+			`pointer $${pointer.toString(16)}, block $${blockAt.toString(16)}`,
+		);
+	}
+
+	// Two bodies armed, then both switched off through a body that does not exist.
+	const switchedOff = compile(
+		"#amk 4\n#instruments\n{\n@1 $ff $e0 $b8 $03 $00\n}\n(!100)[$f4 $09]\n(!101)[$fa $01 $b8]\n" +
+			"#0 t61 w220 $f4 $02 /\n@30 (!100, -1) (!101, 3)\nc8r8\n(!0,0)\nc8r8\n",
+	);
+	check(
+		"switching remote code off with (!0,0) compiles clean",
+		switchedOff.ok && switchedOff.diagnostics.length === 0,
+		switchedOff.diagnostics.map((d) => `${d.code} ${d.message}`).join("; "),
+	);
+
+	// Every other type reads the pointer, so the event runs that $00 and does
+	// nothing. AddmusicK compiles it in silence; SST0509 is the port's finding.
+	{
+		const source = "#amk 4\n#0 o4 (!9, 1, 8) c4\n";
+		const result = compile(source);
+		const found = result.diagnostics.filter((d) => d.code === "SST0509");
+		const call = source.indexOf("(!9, 1, 8)");
+		check(
+			"a call to an undefined label compiles",
+			result.ok,
+			result.diagnostics.map((d) => `${d.code} ${d.message}`).join("; "),
+		);
+		check(
+			"and raises SST0509 as a warning, spanning the call",
+			found.length === 1 &&
+				found[0].severity === "warning" &&
+				found[0].span.start === call &&
+				found[0].span.end === call + "(!9, 1, 8)".length,
+			found.map((d) => `${d.severity} ${d.span.start}-${d.span.end}`).join("; "),
+		);
+	}
+
+	// Body 0 is never recorded (Music.cpp:1242), so defining it does not help.
+	const bodyZero = compile("#amk 4\n(!0)[$F4 $02]\n#0 o4 (!0, -1) c4\n");
+	check(
+		"calling a defined (!0) raises SST0509 all the same",
+		bodyZero.ok && bodyZero.diagnostics.some((d) => d.code === "SST0509" && d.message.includes("(!0)")),
+		bodyZero.diagnostics.map((d) => `${d.code} ${d.message}`).join("; "),
+	);
+	const bodyOne = compile("#amk 4\n(!1)[$F4 $02]\n#0 o4 (!1, -1) c4\n");
+	check(
+		"and a defined (!1) raises none",
+		bodyOne.ok && !bodyOne.diagnostics.some((d) => d.code === "SST0509"),
+		bodyOne.diagnostics.map((d) => `${d.code} ${d.message}`).join("; "),
+	);
+
 	for (const [source, code, label] of [
 		["#amk 1\n#0 o4 (!1, 1, 8) c4\n", "AMK0117", "remote code in #amk 1"],
 		["#amk 4\n(!1)[$F4 $02]\n#0 o4 (!1) c4\n", "AMK0144", "a call with no event type"],
 		["#amk 4\n(!1)[$F4 $02]\n#0 o4 (!1, 1) c4\n", "AMK0146", "type 1 with no third argument"],
-		["#amk 4\n#0 o4 (!9, 1, 8) c4\n", "AMK0115", "a call to an undefined label"],
 		["#amk 4\n(!1)\n#0 o4 c4\n", "AMK0137", "a definition with no body"],
 		["#amk 4\n#0 o4 (!1, 1, 8)[$F4 $02] c4\n", "AMK0153", "defining remote code inside a channel"],
 		["#amk 4\n(!1)[c4]\n#0 o4 c4\n", "AMK0165", "note data in a remote definition"],

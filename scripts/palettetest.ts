@@ -122,9 +122,10 @@ const ARAM = 0x0800;
  * the probe supplies the partner rather than the entry pretending to be a pair.
  */
 const PARTNERS: Readonly<Record<string, { above?: string; before?: string }>> = {
-	// A remote call is inert without a body to call, and AddmusicK says so
-	// (AMK0115). Its definition has to sit above the first channel, which is the
-	// other half of the rule the palette's own `context` encodes.
+	// A remote call is inert without a body to call, which AddmusicK compiles in
+	// silence and SST0509 reports. Its definition has to sit above the first
+	// channel, which is the other half of the rule the palette's own `context`
+	// encodes.
 	"text:(!n,": { above: "(!1)[$F4 $09]" },
 	// The same rule for the same reason: a `(n)m` names a body, and
 	// `parseLabelLoop` refuses a label that is not in `loopPointers` yet. The

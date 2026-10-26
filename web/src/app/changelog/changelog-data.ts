@@ -13,6 +13,8 @@ export const CHANGELOG: readonly ChangelogEntry[] = [
     items: [
       'A pitch bend given more time with ties after it, is no longer wrongly warned as cut off',
       'A note shows how many of its ticks really sound under its quantization, and the piano roll draws notes that long',
+      'Turning remote code off with (!0, 0), no longer asks for a (!0) to be defined',
+      'Add a warning for a remote code call with no remote code to run',
     ],
   },
   {
