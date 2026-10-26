@@ -1752,6 +1752,29 @@ console.log("\ncommand hazards — bytes that compile clean and then break the s
 		check(`a slide after ${name} is ${want}`, anchorsIn(source) === want, anchorsIn(source));
 	}
 
+	// The note each answer names, which is what the bend inspector draws the slide
+	// from — the one in front of a blocker included.
+	const ridesOn = (body: string): string => {
+		const source = `#amk 4\n#0 ${body}\n`;
+		const index = tokenize(source);
+		const slide = index.commands.find((command) => command.vcmd === 0xdd);
+		const anchor = slide ? bendAnchor(slide, index) : null;
+		return anchor === null || anchor.kind === "nothing"
+			? String(anchor?.kind)
+			: `${anchor.kind}:${source.slice(anchor.note.start, anchor.note.end)}`;
+	};
+
+	for (const [name, body, want] of [
+		["the note before it", "o4 c4 d4 e4 $DD $00 $18 $B0", "rides:e4"],
+		["past what emits nothing", "o4 e4 h1 q7F @21 o5 $DD $00 $18 $B0", "rides:e4"],
+		["a tied note", "o4 e4^8 $DD $00 $18 $B0", "rides:e4^8"],
+		["a rest", "o4 e4 r4 $DD $00 $18 $B0", "rides:r4"],
+		["a note too short", "o4 e192 $DD $00 $18 $B0", "tooShort:e192"],
+		["a note behind a blocker", "o4 e4 v200 $DD $00 $18 $B0", "blocked:e4"],
+	] as const) {
+		check(`a slide names ${name}`, ridesOn(body) === want, ridesOn(body));
+	}
+
 	// The ticks a slide has before a key-on resets it. It steps only on ticks that
 	// fetch nothing, so each frame gives one fewer than it lasts, and a tie after the
 	// command keys nothing on. Every figure here is what the emulated driver gives.

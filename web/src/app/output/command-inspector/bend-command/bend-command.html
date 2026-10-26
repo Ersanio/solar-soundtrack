@@ -4,14 +4,16 @@
   </p>
 } @else {
   <!-- The dragged values, so the curve follows the pointer. Not drawn for a
-       target written as a note: the whole of the picture is the interval, and
-       the byte the note resolves to is not something the scanner can know. -->
-  @if (!noteTarget()) {
+       target written as a note, whose byte the scanner cannot know, nor where
+       the note before has no byte to measure from: the whole of the picture
+       is the interval. -->
+  @let end = to();
+  @if (!noteTarget() && end !== null) {
     <amk-bend-graph
       [delay]="shownDelay()"
       [duration]="shownDuration()"
       [from]="from()"
-      [to]="to()"
+      [to]="end"
       [tempo]="tempo()"
     />
   }

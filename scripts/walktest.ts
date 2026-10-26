@@ -45,6 +45,7 @@ import { type CompileResult, noteAddressAt } from "@amk/core/types";
 import { FIRST_VCMD, LAST_VCMD, NOTE_DURATIONS, WAIT_TIME, noteSoundingTicks } from "@amk/core/hardcoded-tables";
 import { commandStartingAt, expectedArgs, tokenize } from "@amk/tokens";
 import { commandScope, parseTimeInForce } from "@amk/tokens/commands/in-force";
+import { bendAnchor } from "@amk/tokens/command-hazards";
 import { loadDriver } from "@amk/spc/driver";
 import { buildSpc } from "@amk/spc/export";
 import {
@@ -70,6 +71,7 @@ import { secondsAtTick, songClock } from "../web/src/app/state/song-clock";
 import { measureClock, tempoShortfall } from "../web/src/app/state/measure-clock";
 import { commandsInForceOf, definedAt, noteHeardOn, notePreceding } from "../web/src/app/state/commands-in-force";
 import { commandTimeline } from "../web/src/app/state/command-timeline";
+import { slideStart } from "../web/src/app/output/command-inspector/bend-command/slide-start";
 import { driverTickSeconds } from "@amk/tokens/commands/units";
 
 import { SPC_ASSETS, check, stubFetch, summarise } from "./harness";
@@ -1127,6 +1129,69 @@ console.log("\nthe pitch slide a note reads ahead into");
 		behind.notes[0].bend?.afterTicks === 0 && behind.notes[0].bend.frameTicks === 96 && behind.notes[0].ticks === 192,
 		`${JSON.stringify(behind.notes[0].bend)} on a note of ${behind.notes[0].ticks}`,
 	);
+}
+
+// ---------------------------------------------------------------------------
+console.log("\nthe note the bend inspector draws a slide from");
+// ---------------------------------------------------------------------------
+{
+	// The byte the compiler emitted for the note `bendAnchor` names, off the note
+	// map. `typed` is the document as it stands while `source` is still the text
+	// that compiled, which is the window a slider's commit opens.
+	const startOf = (source: string, typed = source): string => {
+		const { result } = build(source);
+		const index = tokenize(typed);
+		const slide = index.commands.find((command) => command.vcmd === 0xdd);
+		if (slide === undefined) {
+			return "no $DD";
+		}
+
+		const start = slideStart(bendAnchor(slide, index), { text: source, notes: result.noteMap ?? [] }, typed);
+		return start.kind === "note" ? `note:$${start.byte.toString(16)}` : start.kind;
+	};
+
+	const plain = "#amk 4\n#0 o4 e4 $DD $00 $18 $B0 d4\n";
+	check("a slide is drawn from the note before it", startOf(plain) === "note:$a8", startOf(plain));
+
+	// Two derivations of one interval: the walk reads the note and the target off
+	// the bytes the driver runs.
+	const walked = build(plain).timeline.notes[0];
+	check(
+		"which is the interval the walk finds",
+		walked.bend !== null && walked.bend.target - walked.note === 0xb0 - 0xa8,
+		`${JSON.stringify(walked.bend)} on $${walked.note.toString(16)}`,
+	);
+
+	// `h` is in the note's byte and not in a hex target, so the byte drawn from is
+	// the emitted one rather than the one the letter names.
+	const shifted = "#amk 4\n#0 h2 o4 c4 $DD $00 $18 $B0 d4\n";
+	const shiftedNote = build(shifted).timeline.notes[0].note;
+	check(
+		"under h, the emitted byte and not the written one",
+		startOf(shifted) === `note:$${shiftedNote.toString(16)}` && shiftedNote !== 0xa4,
+		`${startOf(shifted)} against $${shiftedNote.toString(16)}`,
+	);
+
+	for (const [name, source, want] of [
+		["a tied note, by its head", "#amk 4\n#0 o4 e4^8 $DD $00 $18 $B0 d4\n", "note:$a8"],
+		["a rest", "#amk 4\n#0 o4 e4 r4 $DD $00 $18 $B0 d4\n", "rest"],
+		["a drum", "#amk 4\n#0 o4 @21 c4 $DD $00 $18 $B0 d4\n", "drum"],
+		["nothing", "#amk 4\n#0 $DD $00 $18 $B0 o4 c4\n", "nothing"],
+	] as const) {
+		check(`a slide after ${name} is ${want}`, startOf(source) === want, startOf(source));
+	}
+
+	// Nothing after a note changes its byte, so a compile that agrees up to the
+	// note's end still names it — the slide's own operands included.
+	const operand = startOf(plain, "#amk 4\n#0 o4 e4 $DD $00 $30 $B5 d4\n");
+	check("an edit after the note keeps the answer", operand === "note:$a8", operand);
+	const earlier = startOf(plain, "#amk 4\n#0 o5 e4 $DD $00 $18 $B0 d4\n");
+	check("an edit before it waits for the compile", earlier === "unknown", earlier);
+
+	const index = tokenize(plain);
+	const slide = index.commands.find((command) => command.vcmd === 0xdd);
+	const uncompiled = slide ? slideStart(bendAnchor(slide, index), null, plain).kind : "no $DD";
+	check("and no compile names nothing", uncompiled === "unknown", uncompiled);
 }
 
 // ---------------------------------------------------------------------------

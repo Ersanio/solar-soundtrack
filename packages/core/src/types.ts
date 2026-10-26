@@ -125,9 +125,10 @@ export interface NoteAddress {
 	 *
 	 * Here so that `walktest` can check `@amk/spc`'s walk of the emitted bytes
 	 * against what the compiler thought it was emitting — two independent
-	 * derivations of the same note. Nothing in the app reads it: the roll draws
-	 * from the walk, which also knows the tick each note falls on and the state
-	 * it sounds under, and this map does not.
+	 * derivations of the same note. The roll draws from the walk instead, which
+	 * also knows the tick each note falls on and the state it sounds under. The
+	 * bend inspector reads it for the note a `$DD` slides from, which a walk
+	 * names only for a slide that arms inside the pass.
 	 */
 	note: number;
 	/**

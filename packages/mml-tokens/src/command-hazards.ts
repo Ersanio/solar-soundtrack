@@ -43,17 +43,22 @@ const CODE_AM4_TRANSPOSE = "SST0508";
  */
 export const MIN_BEND_TICKS = 2;
 
-/** What stands in front of a `$DD`, and therefore whether it arms. */
+/**
+ * What stands in front of a `$DD`, and therefore whether it arms.
+ *
+ * `note` is the note the slide rides on — or would, for `blocked` — which is what
+ * the bend inspector draws the slide from.
+ */
 export type BendAnchor =
 	/**
 	 * The read-ahead arms the slide in a frame of {@link MIN_BEND_TICKS} or more, and `window` is
 	 * how many ticks it then has before a key-on resets it.
 	 */
-	| { kind: "rides"; frame: number; window: number }
+	| { kind: "rides"; note: Span; frame: number; window: number }
 	/** The note's last frame is one tick, so no read-ahead ever runs on it. `ticks` is the note's own length. */
-	| { kind: "tooShort"; ticks: number }
+	| { kind: "tooShort"; note: Span; ticks: number }
 	/** Something writing bytes stands between the note and the command. */
-	| { kind: "blocked"; by: { name: string; span: Span } }
+	| { kind: "blocked"; note: Span; by: { name: string; span: Span } }
 	/** Nothing precedes it on the channel. */
 	| { kind: "nothing" };
 
@@ -214,8 +219,9 @@ export function bendAnchor(command: Command, index: TokenIndex): BendAnchor {
 		return { kind: "nothing" };
 	}
 
+	const note = { ...anchor.span };
 	if (blocker !== null) {
-		return { kind: "blocked", by: { name: blocker.name, span: { ...blocker.span } } };
+		return { kind: "blocked", note, by: { name: blocker.name, span: { ...blocker.span } } };
 	}
 
 	// `(!` is two characters and `(` is one, which is the only thing separating a
@@ -224,6 +230,7 @@ export function bendAnchor(command: Command, index: TokenIndex): BendAnchor {
 	if (call !== null) {
 		return {
 			kind: "blocked",
+			note,
 			by: {
 				name: call.end - call.start === 2 ? "remote call" : "loop call",
 				span: { start: call.start, end: call.end, line: call.line },
@@ -236,8 +243,8 @@ export function bendAnchor(command: Command, index: TokenIndex): BendAnchor {
 	const frames = noteFrames(ticks);
 	const frame = frames[frames.length - 1] ?? 0;
 	return frame >= MIN_BEND_TICKS
-		? { kind: "rides", frame, window: slideWindow(command, index, frame) }
-		: { kind: "tooShort", ticks };
+		? { kind: "rides", note, frame, window: slideWindow(command, index, frame) }
+		: { kind: "tooShort", note, ticks };
 }
 
 /** What the slide does instead of sliding, and the way out. One line per way it fails. */

@@ -13,6 +13,7 @@ import { toSigned } from '@amk/tokens/commands/param';
 import { dragPreview } from '../commands/preview';
 import { noteName, ticksLabel } from '@amk/tokens/commands/units';
 import { NotePicker } from '../note-picker/note-picker';
+import { slideStart } from './slide-start';
 
 /**
  * `$DD` pitch bend and `$EB`/`$EC` pitch envelope — a delay, a slide and a target.
@@ -85,12 +86,11 @@ export class BendCommand {
   protected readonly semitones = computed(() => toSigned(this.target()));
 
   /**
-   * Where the slide starts and ends, in semitones from the written note.
+   * Where the slide starts and ends, in semitones from the note it starts on.
    *
-   * `$DD` starts at the note playing — which is zero on this axis — and ends at
-   * an absolute byte the graph cannot place against it, since it does not know
-   * what note is sounding. So the picture is drawn as the interval it would be
-   * from `o4 c`, which is honest about the *shape* and says as much beneath.
+   * `$DD` starts at the note it rides on — zero on this axis — and ends at an
+   * absolute byte, so the end is that byte less the note's ({@link start}).
+   * `null` where the note has no byte to measure from, and nothing is drawn.
    * `$EC` is the only one that runs the other way.
    */
   protected readonly from = computed(() => {
@@ -103,24 +103,52 @@ export class BendCommand {
 
   protected readonly to = computed(() => {
     if (this.isPitchBend()) {
-      return this.shownTarget() - 0xa4; // relative to o4 c, the graph's stand-in
+      const start = this.start();
+      return start.kind === 'note' ? this.shownTarget() - start.byte : null;
     }
 
     return this.vcmd() === 0xec ? 0 : toSigned(this.shownTarget());
   });
 
-  protected readonly note = computed(() =>
-    this.noteTarget()
-      ? 'The slide rides on the note before it and ends on the note written after it. That note plays nothing of its own — the driver reads its pitch as this command’s last byte — and which byte that is depends on the octave in force, any h, the instrument’s tuning and a drum remap, so it is not shown here. A length written on it is not read.'
-      : this.isPitchBend()
-        ? 'The slide rides on the note before it and starts on that note’s second tick, so the shape above is drawn against o4 c as a stand-in.'
-        : this.vcmd() === 0xec
-          ? 'Every later note starts this far away and arrives at its written pitch.'
-          : 'Every later note starts at its written pitch and departs by this much.',
-  );
+  protected readonly note = computed(() => {
+    if (this.noteTarget()) {
+      return 'The slide rides on the note before it and ends on the note written after it. That note plays nothing of its own — the driver reads its pitch as this command’s last byte — and which byte that is depends on the octave in force, any h, the instrument’s tuning and a drum remap, so it is not shown here. A length written on it is not read.';
+    }
+
+    if (!this.isPitchBend()) {
+      return this.vcmd() === 0xec
+        ? 'Every later note starts this far away and arrives at its written pitch.'
+        : 'Every later note starts at its written pitch and departs by this much.';
+    }
+
+    const start = this.start();
+    switch (start.kind) {
+      case 'note':
+        return `The slide rides on the note before it, ${noteName(start.byte)}, and starts on that note’s second tick.`;
+      case 'unknown':
+        return 'The slide rides on the note before it and starts on that note’s second tick. Its shape is drawn from that note once the song compiles.';
+      case 'rest':
+        return 'The slide rides on the rest before it, so it runs on a keyed-off voice and is not heard.';
+      case 'drum':
+        return 'The slide rides on a drum, which sounds at its percussion entry’s pitch rather than its note’s, so no shape is drawn.';
+      case 'nothing':
+        return 'A slide rides on the note before it, and there is none here to draw it from.';
+    }
+  });
 
   /** What the slide rides on, and so whether the driver arms it at all. */
   private readonly anchor = computed(() => bendAnchor(this.command(), this.store.tokens()));
+
+  /** The byte of the note the slide starts from, off the compile. */
+  private readonly start = computed(() => {
+    const text = this.store.compiledText();
+    const notes = this.store.result()?.noteMap;
+    return slideStart(
+      this.anchor(),
+      text === null || !notes ? null : { text, notes },
+      this.store.source(),
+    );
+  });
 
   /**
    * Whether the driver reaches this bend, and whether it fits the note it rides on.

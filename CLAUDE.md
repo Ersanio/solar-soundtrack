@@ -1510,6 +1510,15 @@ stats.loopTicks` pads **every other channel that would cut the song short** out 
   the same bytes AddmusicK writes, and `SST0509` warns for any other type, where the event runs
   that `$00` and does nothing. `(!0)` is always unrecorded, since `parseLoopStart` keeps only
   `loopLabel > 0` (`Music.cpp:1242-1251`), so even a song that defines it is told.
+- **The `$DD` bend graph drawn against `o4 c` as a stand-in** — `$DD $00 $18 $B0` after an `o4 e`
+  read "+12 semitones" for a slide of eight, and a caption owning up to it did not stop the picture
+  saying the wrong interval. It is drawn from `NoteAddress.note` of the note `bendAnchor` names
+  (`slide-start.ts`): the emitted byte, which is what the driver compares the target against. Not
+  from `WalkNote.bend` — the walk names a slide only where it arms inside the pass, and the note map
+  names every note compiled. The compile counts while it agrees with the document up to the end of
+  that note, since nothing after a note changes its byte, so a commit to the slide's own operands
+  does not blank the graph for the recompile it causes. And no stand-in where there is no byte — a
+  rest, a drum, no compile — because a curve from a made-up note is the guess that looks exact.
 
 ## Angular specifics
 
