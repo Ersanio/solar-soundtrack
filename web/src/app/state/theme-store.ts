@@ -114,7 +114,7 @@ export class ThemeStore {
   readonly presets = PRESETS;
 
   /** The stylesheet's values. Read once, and never written to. */
-  private readonly defaults: Palette = readDefaults();
+  readonly defaults: Palette = readDefaults();
 
   /** Only the tokens the porter has moved off a default. */
   readonly overrides = signal<Overrides>(readOverrides());
@@ -208,7 +208,12 @@ export class ThemeStore {
     return JSON.stringify(this.overrides(), null, 2);
   }
 
-  /** Takes a pasted theme, or answers false and changes nothing. */
+  /**
+   * Takes a pasted theme, or answers false and changes nothing.
+   *
+   * `{}` is a theme — Studio's — but an object none of whose entries is a token
+   * and a colour is not, and taking it would wipe every colour the porter has.
+   */
   importJson(json: string): boolean {
     let parsed: unknown;
     try {
@@ -217,12 +222,17 @@ export class ThemeStore {
       return false;
     }
 
-    if (!parsed || typeof parsed !== 'object') {
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      return false;
+    }
+
+    const overrides = parseOverrides(parsed);
+    if (Object.keys(overrides).length === 0 && Object.keys(parsed).length > 0) {
       return false;
     }
 
     this.previewing.set({});
-    this.overrides.set(parseOverrides(parsed));
+    this.overrides.set(overrides);
 
     return true;
   }

@@ -76,7 +76,7 @@ const LINT_SEVERITY: Record<Severity, 'error' | 'warning' | 'info'> = {
  * another tab is selected, because it holds undo history, scroll position and
  * selection that nothing else could restore. That is why it is told whether it
  * is showing rather than working it out: {@link active} is false while it is
- * still very much alive, and the three effects above still have to run — a
+ * still very much alive, and the constructor's effects still have to run — a
  * diagnostic clicked from the Samples tab must bring the source back. They ask
  * for that with {@link activate}, since the tab is the pane's business.
  */

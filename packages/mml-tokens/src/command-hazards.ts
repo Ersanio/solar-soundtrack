@@ -52,11 +52,15 @@ export const MIN_BEND_TICKS = 2;
 export type BendAnchor =
 	/**
 	 * The read-ahead arms the slide in a frame of {@link MIN_BEND_TICKS} or more, and `window` is
-	 * how many ticks it then has before a key-on resets it.
+	 * how many ticks it then has before a key-on resets it. `lead` is how many of the note's ticks
+	 * come before that frame, so the slide's first step is `lead + 1` ticks into the note.
 	 */
-	| { kind: "rides"; note: Span; frame: number; window: number }
-	/** The note's last frame is one tick, so no read-ahead ever runs on it. `ticks` is the note's own length. */
-	| { kind: "tooShort"; note: Span; ticks: number }
+	| { kind: "rides"; note: Span; frame: number; lead: number; window: number }
+	/**
+	 * The note's last frame is one tick, so no read-ahead ever runs on it. `ticks` is the length of
+	 * its last segment, which is what is cut into frames, and `tied` whether that segment is a tie.
+	 */
+	| { kind: "tooShort"; note: Span; ticks: number; tied: boolean }
 	/** Something writing bytes stands between the note and the command. */
 	| { kind: "blocked"; note: Span; by: { name: string; span: Span } }
 	/** Nothing precedes it on the channel. */
@@ -83,9 +87,25 @@ function emitsNothing(command: Command): boolean {
 	return kind === "q" || kind === "h" || isPercussionInstrument(command);
 }
 
-/** A `label` token — a `(n)m` or a `(!n)` — written strictly between two offsets. */
-function callBetween(tokens: readonly Token[], from: number, to: number): Token | null {
-	return tokens.find((token) => token.kind === "label" && token.start >= from && token.end <= to) ?? null;
+/**
+ * The first `label` token of a `(n)m`, a `(!n, …)` or a `(!!n)` written strictly between two
+ * offsets, named as the palette names it. `(!` scans as a one-character `(` with an `unknown` `!`
+ * hard against it, and `(!!` with two, so the tokens after the label are what tell them apart.
+ */
+function callBetween(tokens: readonly Token[], from: number, to: number): { token: Token; name: string } | null {
+	const at = tokens.findIndex((token) => token.kind === "label" && token.start >= from && token.end <= to);
+	if (at < 0) {
+		return null;
+	}
+
+	const bang = (n: number): boolean => {
+		const before = tokens[at + n - 1];
+		const token = tokens[at + n];
+		return token?.start === before.end && token.kind === "unknown";
+	};
+
+	const name = !bang(1) ? "loop call" : bang(2) ? "remote code reset" : "remote code call";
+	return { token: tokens[at], name };
 }
 
 /** A slide steps only on ticks that fetch no music data (`main.asm:2337-2339`), so a frame gives it one fewer than it lasts. */
@@ -224,17 +244,13 @@ export function bendAnchor(command: Command, index: TokenIndex): BendAnchor {
 		return { kind: "blocked", note, by: { name: blocker.name, span: { ...blocker.span } } };
 	}
 
-	// `(!` is two characters and `(` is one, which is the only thing separating a
-	// remote call from a loop call without the source text to read.
 	const call = callBetween(tokens, anchor.span.end, command.span.start);
 	if (call !== null) {
+		const { token, name } = call;
 		return {
 			kind: "blocked",
 			note,
-			by: {
-				name: call.end - call.start === 2 ? "remote call" : "loop call",
-				span: { start: call.start, end: call.end, line: call.line },
-			},
+			by: { name, span: { start: token.start, end: token.end, line: token.line } },
 		};
 	}
 
@@ -242,9 +258,10 @@ export function bendAnchor(command: Command, index: TokenIndex): BendAnchor {
 	const ticks = segments[segments.length - 1]?.ticks ?? 0;
 	const frames = noteFrames(ticks);
 	const frame = frames[frames.length - 1] ?? 0;
+	const total = segments.reduce((sum, segment) => sum + segment.ticks, 0);
 	return frame >= MIN_BEND_TICKS
-		? { kind: "rides", note, frame, window: slideWindow(command, index, frame) }
-		: { kind: "tooShort", note, ticks };
+		? { kind: "rides", note, frame, lead: total - frame, window: slideWindow(command, index, frame) }
+		: { kind: "tooShort", note, ticks, tied: segments.length > 1 };
 }
 
 /** What the slide does instead of sliding, and the way out. One line per way it fails. */
@@ -259,10 +276,14 @@ function describeBend(anchor: BendAnchor): string {
 				`The ${anchor.by.name} written between this $DD and the note before it is what the driver reads instead` +
 				` — the read-ahead only ever looks at the very next byte — ${dies} Move it to directly after the note.`
 			);
-		case "tooShort":
+		case "tooShort": {
+			const what = anchor.tied ? "tie" : "note";
+
 			return anchor.ticks > 1
-				? `The note before this $DD is ${anchor.ticks} ticks, which the compiler writes in pieces of 96 with one tick left over at the end, and the read-ahead cannot run on the tick a note begins, ${dies} Make that note a tick longer or shorter.`
-				: `The note before this $DD lasts one tick, and the read-ahead cannot run on the tick a note begins, ${dies} Give that note two ticks or more.`;
+				? `The ${what} before this $DD is ${anchor.ticks} ticks, which the compiler writes in pieces of 96 with one tick left over at the end, and the read-ahead cannot run on the tick a piece begins, ${dies} Make that ${what} a tick longer or shorter.`
+				: `The ${what} before this $DD lasts one tick, and the read-ahead cannot run on the tick a ${what} begins, ${dies} Give that ${what} two ticks or more.`;
+		}
+
 		case "rides":
 			return "";
 	}

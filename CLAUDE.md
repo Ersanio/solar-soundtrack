@@ -430,8 +430,9 @@ stats.loopTicks` pads **every other channel that would cut the song short** out 
   the way the roll's chips do — it is one field of the roll's persisted `Settings`, and a service
   owning it either splits that `localStorage` write in two or takes the whole roll's settings with
   it. The mixer is carried into the roll by a transition-following effect instead
-  (`followMixer`), in the mould of the `wasIdle` one beside it: a `let` holding the last mask, the
-  body `untracked`. Following the state and not the transition is what does not work — the roll is
+  (`followMixer`), through `onChange` (`util/on-change.ts`) as the page anchor's reset in
+  `roll-view.ts` is: it holds the last mask and runs the body `untracked`. Following the state and
+  not the transition is what does not work — the roll is
   rebuilt on every tab switch, so an effect reading `silenced()` alone would drag the edited channel
   back to a solo taken long ago each time the tab came round.
 - **Refusing every gesture until a channel is picked** — the roll was already pointing at the answer
@@ -571,7 +572,10 @@ stats.loopTicks` pads **every other channel that would cut the song short** out 
   there: the run is inserted at one offset and every item in the region is a note `planEdits` removes
   outright, so the guard was protecting a boundary that had gone anyway. It refused the commonest
   shape a carve leaves — a note drawn over a run of notes with a `v` or a `y` written between them —
-  and wrote nothing at all. The guard is asked only where a rest is being rewritten.
+  and wrote nothing at all. The guard is `windowCarries`, over the window the run consumes: a unit
+  being removed and a declaration deleted with its item are leaving, a `'note-state'` command is
+  written by the run on its own tick, and only what the run cannot speak for, a `t`, an `l` or a `/`,
+  refuses.
 - **Anchoring a spawned run at `strip.items[0]` where no note after the region survives** —
   `writeInto`'s head branch aims at the next _surviving_ note, and a carve that swallowed the whole
   channel leaves none: `items[0]` is then a note the same plan is deleting, `removeItem` takes the
@@ -1353,7 +1357,7 @@ stats.loopTicks` pads **every other channel that would cut the song short** out 
   utility happens to name still needs its default sitting there to fall back to.
 - **Storing the whole palette rather than only what was changed** — it reads as the simpler shape
   and it freezes a porter on the defaults of the day they first opened the picker: change one
-  colour, and the other twenty-four stop following the app for good. `ThemeStore.overrides` holds
+  colour, and the other thirty-seven stop following the app for good. `ThemeStore.overrides` holds
   only the tokens moved off a default, which is also what makes a per-token reset exact rather than
   approximate — the property is removed and whatever `styles.css` now says shows through.
 - **Re-hueing the eight channels for a preset's chrome** — the set is validated once, against the

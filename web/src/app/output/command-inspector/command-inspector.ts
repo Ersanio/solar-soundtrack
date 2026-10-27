@@ -49,8 +49,8 @@ const VIEWS: Readonly<Record<number, string>> = {
 /**
  * Letter commands with a view of their own.
  *
- * Only `@`, `p` and `q`. Every other letter's reading — tempo in BPM, pan as a
- * position, noise in hertz — lives in `@amk/tokens/commands/letter-params.ts`,
+ * Only `@`, `p`, `y` and `q`. Every other letter's reading — tempo in BPM, noise
+ * in hertz — lives in `@amk/tokens/commands/letter-params.ts`,
  * where the parameter table both states it *and* lets it be edited; a second
  * implementation of the same sentence would only drift.
  */
@@ -65,9 +65,8 @@ const LETTER_VIEWS: Readonly<Record<string, string>> = {
  * What the caret is sitting on.
  *
  * A dispatcher, not a viewer: it works out which view a command deserves and
- * renders that. FIR is the first with a view of its own because eight signed
- * bytes are the least readable thing in the language, but the shape is general
- * and `$ED`'s ADSR is meant to slot in beside it.
+ * renders that, from the two tables above. A command with no entry in either
+ * gets the parameter table.
  *
  * It reads `EditorStore.commandAtCaret`, which scans the *undebounced* source,
  * so the panel keeps up with the caret rather than with the compiler.

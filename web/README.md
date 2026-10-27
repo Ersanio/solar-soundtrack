@@ -183,8 +183,9 @@ both are Angular-free so `rolltest` can drive them against a real compile.
 The **strip** is one channel as a sequence the roll can splice. It is built from the compiler's
 `noteMap` rather than from the walk, because `noteMap` carries **rests** — the walk drops them — and a
 gap the roll can address is exactly a rest it can rewrite. A `^` is its own entry whenever anything
-but whitespace separates it from its note, so `c4 v200 ^8` is two entries and one note; `foldStrip`
-joins them, and a length change rewrites the **last** segment so the ramp keeps its place.
+but whitespace separates it from its note, so `c4 v200 ^8` is two entries and one note; the strip
+item carries both as its `segments`, and a length change rewrites the **last** segment so the ramp
+keeps its place.
 
 Its **gate** is five checks, and the third is the one no oracle could make: a `{ }` triplet scales
 every length by two thirds and a tempo ratio divides every one of them, and in both cases the strip

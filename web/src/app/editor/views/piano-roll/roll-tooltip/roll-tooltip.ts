@@ -111,7 +111,7 @@ export class RollTooltip {
     }
 
     if (note.state.quantization !== null) {
-      rows.push(`q${hex(note.state.quantization)} — sounds ${note.gateTicks} of ${note.ticks}`);
+      rows.push(`q${hex2(note.state.quantization)} — sounds ${note.gateTicks} of ${note.ticks}`);
     }
 
     if (tempo > 0) {

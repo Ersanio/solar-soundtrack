@@ -124,9 +124,9 @@ export class BendCommand {
     const start = this.start();
     switch (start.kind) {
       case 'note':
-        return `The slide rides on the note before it, ${noteName(start.byte)}, and starts on that note’s second tick.`;
+        return `The slide rides on the note before it, ${noteName(start.byte)}, and ${this.startsOn()}.`;
       case 'unknown':
-        return 'The slide rides on the note before it and starts on that note’s second tick. Its shape is drawn from that note once the song compiles.';
+        return `The slide rides on the note before it and ${this.startsOn()}. Its shape is drawn from that note once the song compiles.`;
       case 'rest':
         return 'The slide rides on the rest before it, so it runs on a keyed-off voice and is not heard.';
       case 'drum':
@@ -135,6 +135,19 @@ export class BendCommand {
         return 'A slide rides on the note before it, and there is none here to draw it from.';
     }
   });
+
+  /**
+   * Which tick of the note the slide starts on. The read-ahead arms it in the note's last piece,
+   * so a tied or long note starts it that far in rather than on its own second tick.
+   */
+  private startsOn(): string {
+    const anchor = this.anchor();
+    if (anchor.kind !== 'rides' || anchor.lead === 0) {
+      return 'starts on that note’s second tick';
+    }
+
+    return `starts ${anchor.lead + 1} ticks into it, on the second tick of its last ${anchor.frame}-tick piece`;
+  }
 
   /** What the slide rides on, and so whether the driver arms it at all. */
   private readonly anchor = computed(() => bendAnchor(this.command(), this.store.tokens()));
@@ -174,10 +187,14 @@ export class BendCommand {
         return 'No note plays before this on the channel, so the driver runs the slide as a command, jumps to address zero and the song stops.';
       case 'blocked':
         return `The ${anchor.by.name} written between this and the note before it is what the driver reads instead, so the slide runs as a command, jumps to address zero and the song stops.`;
-      case 'tooShort':
+      case 'tooShort': {
+        const what = anchor.tied ? 'tie' : 'note';
+
         return anchor.ticks > 1
-          ? `The note before this is ${anchor.ticks} ticks, which the compiler writes in pieces of 96 with one tick left over at the end, and the read-ahead cannot run on the tick a note begins, so the slide runs as a command, jumps to address zero and the song stops.`
-          : 'The note before this lasts one tick, and the read-ahead cannot run on the tick a note begins, so the slide runs as a command, jumps to address zero and the song stops.';
+          ? `The ${what} before this is ${anchor.ticks} ticks, which the compiler writes in pieces of 96 with one tick left over at the end, and the read-ahead cannot run on the tick a piece begins, so the slide runs as a command, jumps to address zero and the song stops.`
+          : `The ${what} before this lasts one tick, and the read-ahead cannot run on the tick a ${what} begins, so the slide runs as a command, jumps to address zero and the song stops.`;
+      }
+
       case 'rides':
         break;
     }

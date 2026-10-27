@@ -38,7 +38,7 @@ rather than bumping the number when one is added.
 
 ## `harness.ts`
 
-`check`, `summarise`, `failureCount`, `SPC_ASSETS` and `stubFetch`. Use them rather than writing
+`check`, `summarise`, `SPC_ASSETS` and `stubFetch`. Use them rather than writing
 another copy.
 
 `stubFetch` reproduces two dev-server behaviours deliberately, because between them a missing sample

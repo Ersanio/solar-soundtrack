@@ -514,9 +514,12 @@ export class EditorStore {
     }
   }
 
+  /** Compiles first, as {@link downloadSpc} does, so a pending edit is in the file. */
   downloadBin(): void {
+    this.compileNow();
     const result = this.result();
-    if (!result?.data) {
+    if (!result?.ok || !result.data) {
+      this.override.set({ kind: 'error', text: 'cannot export: song has errors' });
       return;
     }
 

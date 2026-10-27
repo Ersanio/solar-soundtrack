@@ -1767,6 +1767,10 @@ console.log("\ncommand hazards — bytes that compile clean and then break the s
 		["a loop bracket", "#amk 4\n#0 o4 c4 [ $DD $00 $18 $A4 ]2\n", "blocked:loop start"],
 		// `label` raises no command at all, which is why this asks the whole index.
 		["a loop call", "#amk 4\n#0 (1)[ o4 c4 ]2 c4 (1)3 $DD $00 $18 $A4\n", "blocked:loop call"],
+		// `(!` is a one-character `(` with the `!` beside it, so the label alone
+		// cannot tell a remote call from a loop call.
+		["a remote call", "#amk 4\n(!1)[ v200 ]\n#0 o4 c4 (!1, 4) $DD $00 $18 $A4\n", "blocked:remote code call"],
+		["a remote reset", "#amk 4\n#0 o4 c4 (!!0) $DD $00 $18 $A4\n", "blocked:remote code reset"],
 		// and `l` are resolved at parse time.
 		["an octave", "#amk 4\n#0 o4 c4 o5 $DD $00 $18 $A4\n", "rides:48"],
 		["a default length", "#amk 4\n#0 o4 c4 l8 $DD $00 $18 $A4\n", "rides:48"],
@@ -1828,6 +1832,39 @@ console.log("\ncommand hazards — bytes that compile clean and then break the s
 		const got = windowIn(`#amk 4\n#0 o4 ${body}\n`);
 		check(`a slide has ${want} ticks with ${name}`, got === want, got);
 	}
+
+	// How far into the note the frame the slide arms in begins, which is what the
+	// bend inspector says it starts after: `c4 $DD`, `c4^8 $DD` and `c1 $DD` arm 0,
+	// 48 and 96 ticks in, the tie having been rewound into a frame of its own.
+	const leadIn = (body: string): string => {
+		const index = tokenize(`#amk 4\n#0 o4 ${body}\n`);
+		const slide = index.commands.find((command) => command.vcmd === 0xdd);
+		const anchor = slide ? bendAnchor(slide, index) : null;
+		return anchor?.kind === "rides" ? String(anchor.lead) : String(anchor?.kind);
+	};
+
+	for (const [name, body, want] of [
+		["a note of one piece", "c4 $DD $00 $18 $A4", "0"],
+		["a tied note", "c4^8 $DD $00 $18 $A4", "48"],
+		["a whole note", "c1 $DD $00 $18 $A4", "96"],
+		["a note of 129 ticks", "c=129 $DD $00 $18 $A4", "96"],
+	] as const) {
+		check(`a slide after ${name} arms ${want} ticks in`, leadIn(body) === want, leadIn(body));
+	}
+
+	// The last segment is what is cut into frames, and for a tied note that is the tie.
+	check(
+		"and names a tie of one tick as the tie",
+		commandHazards(tokenize("#amk 4\n#0 o4 c4^192 $DD $00 $18 $A4\n"))[0].message.startsWith(
+			"The tie before this $DD lasts one tick",
+		),
+	);
+	check(
+		"and a remote call as a remote call",
+		commandHazards(tokenize("#amk 4\n(!1)[ v200 ]\n#0 o4 c4 (!1, 4) $DD $00 $18 $A4\n"))[0].message.startsWith(
+			"The remote code call written",
+		),
+	);
 
 	// Only the failures are reported, and each of them once.
 	check("a reachable slide raises nothing", codesIn("#amk 4\n#0 o4 c4 $DD $00 $18 $A4\n") === "");

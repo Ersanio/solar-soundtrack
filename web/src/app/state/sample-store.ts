@@ -311,12 +311,12 @@ export class SampleStore {
     // `editor-store.ts` does for the draft. Gated on `hydrated` so the initial
     // empty map is never written back over a populated database.
     effect(() => {
-      const overrides = this.overrides();
+      this.overrides();
       if (!this.hydrated()) {
         return;
       }
 
-      void this.persist(overrides);
+      this.saving = this.saving.then(() => this.persist());
     });
 
     // Sanctioned effect: the same, for the settings. These are small JSON and go
@@ -365,16 +365,27 @@ export class SampleStore {
   private async hydrate(): Promise<void> {
     const stored = await loadAll();
     if (stored.size > 0) {
-      this.overrides.set(stored);
+      // Merged, not replaced: a file uploaded while the read was in flight wins.
+      this.overrides.update((current) => new Map([...stored, ...current]));
     }
 
     this.hydrated.set(true);
     this.storageError.set(storageFailure());
   }
 
-  private async persist(overrides: ReadonlyMap<string, Uint8Array>): Promise<void> {
+  /** The save in flight. Each one waits for the last, so two can never interleave. */
+  private saving: Promise<void> = Promise.resolve();
+
+  /**
+   * Writes the library as it stands when this save's turn comes.
+   *
+   * A save is a clear and then a put per file, so two running at once could
+   * leave a file behind that the later one had dropped. Run in turn, and each
+   * reading the latest map, the last save to run is always the latest library.
+   */
+  private async persist(): Promise<void> {
     await clear();
-    for (const [name, bytes] of overrides) {
+    for (const [name, bytes] of this.overrides()) {
       await put(name, bytes);
     }
 
