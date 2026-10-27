@@ -20,6 +20,7 @@ app.
 | `commands/`                | What each argument _means_, in a form a panel can render and edit                |
 | `commands/availability.ts` | Which dialects will take a command, for a palette asking before the text exists  |
 | `commands/loops.ts`        | Where a song's brackets are, what each construct repeats, and what it names      |
+| `commands/remote.ts`       | Remote code calls and resets, read off the text, and the body a call runs        |
 
 ## A resumable scanner, not a second parser
 
@@ -98,6 +99,11 @@ because ending at anything the parser's loop does not name _is_ the rule. What t
 token the whole thing exists for — `hexNote`, the note that is a command's third byte and plays
 nothing — and, before it, the `hexLeft` the run would otherwise be left holding, which made the
 next `$XX` anywhere in the document scan as this command's last argument.
+
+`ScanState.remoteCall` is the same shape for a smaller question. A remote call's wait is read with
+`getHex` (Music.cpp:1090-1094), so `(!1, 1, $E0)` holds a byte of 224 ticks and not a VCMD — read as
+one, it would open a command nobody wrote and take the next real `$XX` as its argument. The flag is
+raised at `(!`, put back only by the tokens a call is made of, and cleared by everything else.
 
 ## Writing an edit back
 
@@ -234,6 +240,14 @@ is also what carries `edits.ts`'s per-part macro interlock through to anything t
 
 `palettetest` holds all of it to the compiler in notes played: every count it reads is written back
 and the result walked, so a reading one out cannot hide behind a plausible-looking number.
+
+`remote.ts` is the same move for a remote code call. `(!n, type[, wait])` and `(!!n)` raise no
+`Command` either, so `readRemote` re-reads each one from its `(` the way `parseRemoteCall` does —
+`skipSpaces` crossing lines, `getInt` skipping nothing, a wait read only for types 1 and 2 and
+through the scanner's own `getNoteLength` — and leaves out anything that would not compile or that
+a replacement reaches into. `remoteBody` is the body the `$FC` points at: the span filed under the
+call's slot, which is `LoopSpan.slot` and is `n + 1` for a `(n)` body, so a `(0)[ … ]` answers a
+`(!1, …)`. `palettetest` compares each reading with the bytes the compiler emits.
 
 One rule keeps the tables honest: **a descriptor never states how many arguments a command takes.**
 `tokens.ts` already carries that twice on purpose — as `scanHex`'s `hexLeft` mutations and as

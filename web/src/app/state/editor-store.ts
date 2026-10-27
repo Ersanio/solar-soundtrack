@@ -12,6 +12,7 @@ import {
   walkSong,
 } from '@amk/spc/song-walk';
 import { readLoops } from '@amk/tokens/commands/loops';
+import { readRemote, remoteAt } from '@amk/tokens/commands/remote';
 import { echoHazards } from '@amk/tokens/echo-hazards';
 import { commandHazards } from '@amk/tokens/command-hazards';
 import { songTarget } from '@amk/tokens/dialect';
@@ -377,6 +378,12 @@ export class EditorStore {
    * what construct the caret is in — and one pass answers all three.
    */
   readonly loops = computed(() => readLoops(this.source(), this.tokens()));
+
+  /** Every remote code call and reset, off the same scan — a call raises no `Command`. */
+  readonly remotes = computed(() => readRemote(this.source(), this.tokens()));
+
+  /** The remote call or reset whose text the caret is in, which the inspector renders. */
+  readonly remoteAtCaret = computed(() => remoteAt(this.remotes(), this.caret()));
 
   /**
    * The `#instruments` entry the caret is in, if any.

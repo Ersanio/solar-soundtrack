@@ -73,10 +73,15 @@ export function channelsBeginAt(index: TokenIndex): number | null {
  * the song has not set one yet.
  */
 export function tempoBefore(command: Command, commands: readonly Command[]): number | null {
+	return tempoAt(command.span.start, commands);
+}
+
+/** {@link tempoBefore} at an offset, for what is written there without being a command. */
+export function tempoAt(offset: number, commands: readonly Command[]): number | null {
 	let found: number | null = null;
 
 	for (const other of commands) {
-		if (other.span.start >= command.span.start) {
+		if (other.span.start >= offset) {
 			break;
 		}
 

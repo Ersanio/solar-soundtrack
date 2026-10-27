@@ -1696,6 +1696,31 @@ console.log("\n$DD takes a note as its last parameter");
 	check("but not on #6, where the remap survives its note", sfx("d") === "@21", sfx("d"));
 }
 
+// A remote call's wait is read with `getHex` (parser.ts:2443-2445, Music.cpp:1090-1094),
+// so any byte written there is an argument. One in `$DA`-`$FE` read as a VCMD
+// would open a command nobody wrote and take the next real `$XX` as its argument.
+console.log("\na remote call's $ wait is an argument");
+{
+	/** The VCMDs gathered, with how many arguments each took. */
+	const vcmds = (source: string): string =>
+		tokenize(source)
+			.commands.filter((command) => command.vcmd !== undefined)
+			.map((command) => `$${command.vcmd?.toString(16).toUpperCase()}/${command.args.length}`)
+			.join(" ");
+
+	const head = "#amk 4\n(!1)[$F4 $09]\n#0 ";
+	check("a wait of $E0 opens nothing", vcmds(`${head}(!1, 1, $E0) $ED $0F $E0 c4\n`) === "$F4/1 $ED/2");
+	check(
+		"nor across a line break, which skipSpaces crosses",
+		vcmds(`${head}(!1, 1,\n$E0) $ED $0F $E0 c4\n`) === "$F4/1 $ED/2",
+	);
+	check("a $ written after the call is a command again", vcmds(`${head}(!1, 3) $E0 $10 c4\n`) === "$F4/1 $E0/1");
+	// Cleared by default, so a call left open ends at the first token that is
+	// not part of one rather than reaching down the song.
+	check("an unclosed call ends at a note", vcmds(`${head}(!1, 3 c4 $E7 $10\n`) === "$F4/1 $E7/1");
+	check("a sample load is not a call", vcmds(`#amk 4\n#0 ("kick.brr", $02) $E7 $10\n`) === "$E7/1");
+}
+
 console.log("\ncommand hazards — bytes that compile clean and then break the song");
 {
 	const anchorsIn = (source: string): string => {
@@ -1914,6 +1939,8 @@ console.log("\nrestartability — the property CodeMirror relies on");
 		// digits below belong to nobody and the lookahead ends at them — which is
 		// only exact because `ddTargetOctave` is set on the next character.
 		"#amk 4\n#0 c4 $DD $00 $18 o\n5 g4 $E7 $10\n",
+		// A remote call split across lines, its wait a byte in the VCMD range.
+		"#amk 4\n(!1)[$F4 $09]\n#0 (!1, 1,\n$E0) $ED $0F $E0 c4\n",
 	];
 
 	for (const [index, source] of sources.entries()) {

@@ -15,16 +15,12 @@
 
         <div class="flex flex-wrap gap-1">
           @for (each of group.chips; track each.key) {
-            <button
-              type="button"
-              class="border-edge bg-inset text-ink hover:border-control flex cursor-pointer items-center gap-1.5 rounded-md border px-2 py-1 text-xs"
-              [title]="each.blurb"
-              (click)="reveal(each)"
-              (dblclick)="reveal(each, true)"
-            >
-              <svg amk-glyph width="14" height="14" [name]="each.icon"></svg>
-              {{ each.label }}
-            </button>
+            <amk-command-chip
+              [icon]="each.icon"
+              [label]="each.label"
+              [blurb]="each.blurb"
+              [span]="each.span"
+            />
           } @empty {
             <span class="text-ink-muted text-xs">{{ group.nothing }}</span>
           }

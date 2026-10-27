@@ -328,6 +328,18 @@ export interface ScanState {
 	 * line — the one piece of this that would otherwise be an approximation.
 	 */
 	ddTargetOctave: boolean;
+	/**
+	 * Inside a remote code call or reset, `(!` up to its `)`.
+	 *
+	 * `parseRemoteCall` reads its third argument with `getHex` (`parser.ts:2443-2445`,
+	 * Music.cpp:1090-1094), so a `$E0` there is a wait of 224 ticks and not a VCMD;
+	 * read as one, it would open a command that is not there and take the next real
+	 * `$xx` in the song as its argument. Cleared by default in {@link ddTarget}'s
+	 * mould: the call is a sign, digits, commas, a `$` byte or a length, and the
+	 * `skipSpaces` between them, which crosses lines — so only those arms put it
+	 * back, and a `(!1, 3` left unclosed ends at the first token that is none of them.
+	 */
+	remoteCall: boolean;
 	/** Inside a `"…"` run, which may span lines. */
 	inString: boolean;
 	/** Open `[` brackets, for future bracket matching. */
@@ -450,6 +462,7 @@ export function startState(): ScanState {
 		awaitingArpCount: false,
 		ddTarget: false,
 		ddTargetOctave: false,
+		remoteCall: false,
 		inString: false,
 		loopDepth: 0,
 		replacements: { entries: [], byFirstChar: new Map() },
@@ -575,6 +588,11 @@ function stepInner(
 	state.ddTarget = false;
 	state.ddTargetOctave = false;
 
+	// See `ScanState.remoteCall`: read and cleared here, put back by the arms below
+	// that a remote call is made of.
+	const remoteCall = state.remoteCall;
+	state.remoteCall = false;
+
 	// A string may run past the end of a line, so it is checked before anything
 	// else can claim the character.
 	if (state.inString) {
@@ -647,6 +665,7 @@ function stepInner(
 		// `skipSpaces` opens each pass of the lookahead (`parser.ts:parseHexCommand`),
 		// and it crosses newlines — which is the whole reason the flag is deferred.
 		state.ddTarget = ddTarget;
+		state.remoteCall = remoteCall;
 		return { kind: null, end };
 	}
 
@@ -714,10 +733,13 @@ function stepInner(
 			// Transparent to a `$DD` lookahead for that same reason: what the
 			// parser reads there is text a comment has already been taken out of.
 			state.ddTarget = ddTarget;
+			state.remoteCall = remoteCall;
 			return { kind: "comment", end: line.length };
 		}
 
 		case "$":
+			// `scanHex` reads the flag back to keep the byte an argument.
+			state.remoteCall = remoteCall;
 			return scanHex(line, at, state);
 
 		case '"':
@@ -763,6 +785,9 @@ function stepInner(
 				return { kind: "label", end: at + 2 };
 			}
 
+			// `parser.ts:parseLabelLoop` tests the character after the `(` for `!`
+			// with nothing skipped (Music.cpp:1007).
+			state.remoteCall = line[at + 1] === "!";
 			return { kind: "label", end: at + 1 };
 
 		// `parser.ts:parseInstrument` — a second `@` is the "direct" form, which forces the
@@ -806,10 +831,13 @@ function stepInner(
 			state.inInstruments = false;
 			return { kind: "operator", end: at + 1 };
 
+		case ",":
+			state.remoteCall = remoteCall;
+			return { kind: "operator", end: at + 1 };
+
 		case "?":
 		case "/":
 		case "&":
-		case ",":
 			return { kind: "operator", end: at + 1 };
 
 		default:
@@ -819,6 +847,7 @@ function stepInner(
 	// `=48` is an exact tick count attached to the note before it, and dots
 	// extend a duration, so both belong to the number rather than floating free.
 	if (isDigit(c) || (c === "=" && isDigit(line[at + 1]))) {
+		state.remoteCall = remoteCall;
 		return scanNumber(line, at);
 	}
 
@@ -864,6 +893,12 @@ function stepInner(
 		}
 
 		return { kind, end: at + 1 };
+	}
+
+	// The call's `!`, a type's `-` (`getIntWithNegative`), and a wait's dots with no
+	// digits in front of them (`getNoteLengthModifier` on the standing `l`).
+	if (c === "!" || c === "-" || c === ".") {
+		state.remoteCall = remoteCall;
 	}
 
 	return { kind: "unknown", end: at + 1 };
@@ -1086,6 +1121,11 @@ function scanHex(line: string, at: number, state: ScanState): StepResult {
 	// it happens to equal. `parseInstrumentDefinitions` reads them positionally
 	// (`Music.cpp:2638-2645`) and never consults the VCMD table.
 	if (state.inInstruments) {
+		return { kind: "hexArg", end };
+	}
+
+	// A remote call's wait, whatever it equals. See {@link ScanState.remoteCall}.
+	if (state.remoteCall) {
 		return { kind: "hexArg", end };
 	}
 
@@ -1734,11 +1774,12 @@ function denominatorFor(ticks: number): number | null {
  *
  * Everything here is a function of that text. Where the segment *is* in the
  * document — {@link NoteLengthSegment.digits} and its `replacement` — is the
- * caller's to add, since only the token run says it.
+ * caller's to add, since only the token run says it. Exported for the one length
+ * written outside a note, a remote call's wait (`commands/remote.ts`).
  */
-type ResolvedSegment = Omit<NoteLengthSegment, "digits" | "replacement">;
+export type ResolvedSegment = Omit<NoteLengthSegment, "digits" | "replacement">;
 
-function resolveNoteSegment(
+export function resolveNoteSegment(
 	raw: string,
 	defaultTicks: number,
 	triplet: boolean,
@@ -1810,7 +1851,7 @@ export function noteLengthTicks(segment: NoteLengthSegment, denominator: number)
  * `l=NN` and dots on `l` are both `#amk 4` and above, and every error path
  * leaves the standing length alone rather than replacing it.
  */
-function resolveDefaultLength(raw: string, current: number, target: CommandTarget): number {
+export function resolveDefaultLength(raw: string, current: number, target: CommandTarget): number {
 	const exact = raw.startsWith("=");
 	const { digits, dots } = splitLengthText(exact ? raw.slice(1) : raw);
 

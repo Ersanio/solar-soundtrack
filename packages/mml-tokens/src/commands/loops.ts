@@ -91,6 +91,13 @@ export interface LoopSpan {
 	labelAt: LoopRange | null;
 	/** A `(!n)[ … ]` definition. Its body cannot repeat at all — AMK0164. */
 	remote: boolean;
+	/**
+	 * The `loopPointers` key the body is filed under, which is what a remote call
+	 * `(!n, …)` looks up: `n + 1` for a `(n)`, `n` for a `(!n)`, `null` for a body
+	 * with no label. Filed whether or not `parseLoopStart` will record it, which it
+	 * does only above 0 (`parser.ts:2580-2586`, Music.cpp:1250-1251).
+	 */
+	slot: number | null;
 	count: LoopCount;
 }
 
@@ -168,7 +175,7 @@ export function readLoops(source: string, index: TokenIndex): LoopReading {
 	const slots = new Set<number>();
 	let sound = true;
 
-	type Named = Pick<LoopSpan, "label" | "labelAt" | "remote">;
+	type Named = Pick<LoopSpan, "label" | "labelAt" | "remote" | "slot">;
 	let call: (Named & { from: number; bodyFrom: number }) | null = null;
 	let sub: { from: number; bodyFrom: number } | null = null;
 
@@ -214,6 +221,7 @@ export function readLoops(source: string, index: TokenIndex): LoopReading {
 					label: named?.label ?? null,
 					labelAt: named?.labelAt ?? null,
 					remote: named?.remote ?? false,
+					slot: named?.slot ?? null,
 				};
 			}
 		} else if (token.kind === "loopEnd") {
@@ -232,6 +240,7 @@ export function readLoops(source: string, index: TokenIndex): LoopReading {
 						label: null,
 						labelAt: null,
 						remote: false,
+						slot: null,
 						count,
 					});
 				}
@@ -266,7 +275,13 @@ export function readLoops(source: string, index: TokenIndex): LoopReading {
 				// A `(n)` with a `[` hard against it declares the body, and that `[`
 				// raises the span; anything else is a recall and emits its own `$E9`.
 				if (source[close.end] === "[") {
-					declared = { at: token.start, label: named.remote ? null : named.written, labelAt, remote: named.remote };
+					declared = {
+						at: token.start,
+						label: named.remote ? null : named.written,
+						labelAt,
+						remote: named.remote,
+						slot: named.slot,
+					};
 				} else if (!named.remote) {
 					declared = null; // `parseLabelLoop` ends a recall with `loopLabel = 0`.
 					const count = writtenCount(source, close.end);
@@ -306,6 +321,7 @@ export function readLoops(source: string, index: TokenIndex): LoopReading {
 					label: null,
 					labelAt: null,
 					remote: false,
+					slot: null,
 					count,
 				});
 				sub = null;

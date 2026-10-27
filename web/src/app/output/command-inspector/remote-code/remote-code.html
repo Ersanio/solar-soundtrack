@@ -1,0 +1,55 @@
+@if (call(); as shown) {
+  <div class="flex flex-col gap-2.5">
+    <amk-enum-select
+      label="Type"
+      [value]="shown.type"
+      [options]="shown.types"
+      [note]="shown.typeNote"
+      [unknownLabel]="shown.unknownType"
+      (commit)="setType(shown.construct, $event)"
+    />
+
+    <!-- Only types 1 and 2 read a third argument. -->
+    @if (shown.wait; as wait) {
+      <amk-slider
+        label="Wait"
+        [value]="wait.ticks"
+        [min]="1"
+        [max]="256"
+        [note]="waitNote()"
+        (preview)="previewWait($event)"
+        (commit)="setWait(shown.construct, $event)"
+      />
+    }
+
+    <div class="flex flex-col gap-1">
+      <span class="text-ink-muted text-xs font-semibold tracking-wide uppercase">
+        What {{ shown.name }} runs
+      </span>
+      @if (shown.runsNothing; as nothing) {
+        <span class="text-ink-muted text-xs">{{ nothing }}</span>
+      } @else {
+        <div class="flex flex-wrap gap-1">
+          @for (chip of shown.chips; track chip.key) {
+            <amk-command-chip
+              [icon]="chip.icon"
+              [label]="chip.label"
+              [blurb]="chip.blurb"
+              [span]="chip.span"
+            />
+          }
+        </div>
+      }
+    </div>
+  </div>
+}
+
+@if (reset(); as shown) {
+  <amk-enum-select
+    label="Cancels"
+    [value]="shown.which"
+    [options]="shown.options"
+    [note]="shown.note"
+    (commit)="setReset(shown.construct, $event)"
+  />
+}

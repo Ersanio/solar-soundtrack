@@ -3,6 +3,7 @@ import { noiseHz } from "@amk/spc/adsr";
 import { hex2 } from "@amk/core/hex";
 import {
 	DURATION,
+	type EnumOption,
 	type ParamDescriptor,
 	type Resolver,
 	TEMPO_FADE_DURATION,
@@ -13,6 +14,7 @@ import {
 	ticks,
 	u8,
 } from "./param";
+import { REMOTE_EVENTS } from "./remote";
 import { noteName, panLabel, percentOf255, tempoLabel } from "./units";
 
 /**
@@ -114,8 +116,8 @@ const VELOCITY_TABLES_BARE = [
 ] as const;
 
 /**
- * `$FC`'s event types, named for what `cmdFC` does with each rather than for the
- * syntax reference's wording, which reserves the three the compiler itself emits.
+ * `$FC`'s event types, as the byte: `REMOTE_EVENTS` is the one list of them, and
+ * a call's `-1` is the `$FF` written here.
  *
  * 4 installs the address, runs it and puts the old one back on the spot
  * (`Commands.asm:1281-1304`); 5 is stored and handled exactly as 2
@@ -123,18 +125,10 @@ const VELOCITY_TABLES_BARE = [
  * like a 3 (`Commands.asm:1253-1254`, `main.asm:349-352`). 7, 8 and −1 are real
  * and documented only in the syntax reference (`Commands.asm:1249`, `:1323-1351`).
  */
-const REMOTE_TYPES = [
-	{ value: 0, label: "0 — cancel every remote code" },
-	{ value: 1, label: "1 — run after a set time" },
-	{ value: 2, label: "2 — run before a note ends" },
-	{ value: 3, label: "3 — run on key-off, instead of the note cut" },
-	{ value: 4, label: "4 — run once, right now" },
-	{ value: 5, label: "5 — reserved; behaves as 2" },
-	{ value: 6, label: "6 — reserved; a key-on slot that fires at key-off" },
-	{ value: 7, label: "7 — cancel all but the key-on code" },
-	{ value: 8, label: "8 — cancel the key-on code" },
-	{ value: 0xff, label: "$FF — run on key-on, alongside the rest" },
-] as const;
+const REMOTE_TYPES: readonly EnumOption[] = REMOTE_EVENTS.map((event) => ({
+	value: event.type & 0xff,
+	label: `${event.type < 0 ? `$${hex2(event.type & 0xff)}` : event.type} — ${event.name}`,
+}));
 
 // ---------------------------------------------------------------------------
 // The value-dependent forms

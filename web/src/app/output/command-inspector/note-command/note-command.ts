@@ -3,11 +3,12 @@ import { Component, computed, inject, input } from '@angular/core';
 import type { Span } from '@amk/core/types';
 import type { WalkNote } from '@amk/spc/song-walk';
 import type { Command } from '@amk/tokens';
-import { type CommandGlyph, CommandIcon } from '../../../editor/command-palette/command-icon';
+import type { CommandGlyph } from '../../../editor/command-palette/command-icon';
 import { glyphOf } from '../../../editor/command-palette/glyph-of';
 import { definedAt, notePreceding } from '../../../state/commands-in-force';
 import { EditorRequests } from '../../../state/editor-requests';
 import { EditorStore } from '../../../state/editor-store';
+import { CommandChip } from '../command-chip/command-chip';
 import { NoteLength } from '../note-length/note-length';
 import { NotePalette, type NotePaletteModel } from '../note-palette/note-palette';
 
@@ -58,7 +59,7 @@ interface Group {
  */
 @Component({
   selector: 'amk-note-command',
-  imports: [CommandIcon, NoteLength, NotePalette],
+  imports: [CommandChip, NoteLength, NotePalette],
   templateUrl: './note-command.html',
   host: { class: 'contents' },
 })
@@ -208,18 +209,4 @@ export class NoteCommand {
       hasBend: pass.bendFrom !== null,
     };
   });
-
-  /**
-   * A click asks the inspector about that command; a double click goes to it.
-   *
-   * The quiet form on a click, because this panel sits **beside** the roll: it
-   * is reached by clicking a bar, so bringing the source forward would take away
-   * the note the question was asked about — the difference `Reveal.show` exists
-   * for, and the same pair a bar's own glyphs and the lane's answer to. The
-   * selection still goes through the document either way, the caret being the
-   * one statement of what is being inspected.
-   */
-  protected reveal(acting: Acting, show = false): void {
-    this.requests.reveal.set({ span: { ...acting.span }, show });
-  }
 }

@@ -2,7 +2,7 @@
      so this section's header row (its first child) is hidden there. -->
 <amk-section heading="Inspector" class="max-lg:[&>*:first-child]:hidden">
   <!-- Muted where there is no command to name; a loop is named by the Loop panel under this. -->
-  <span sectionAside class="font-mono text-xs" [class.text-ink-muted]="!entry() && !params()">{{
+  <span sectionAside class="font-mono text-xs" [class.text-ink-muted]="!named()">{{
     summary()
   }}</span>
 
@@ -11,6 +11,13 @@
          at all, and the two forms that are mean something else in a channel. -->
     @if (entry(); as definition) {
       <amk-instrument-entry [entry]="definition" />
+    } @else if (remote(); as construct) {
+      <div class="flex items-baseline gap-2">
+        <span class="text-accent font-mono text-sm">{{ remoteLabel() }}</span>
+        <span class="text-ink text-sm">{{ remoteName() }}</span>
+      </div>
+
+      <amk-remote-code [construct]="construct" />
     } @else {
       @if (params(); as current) {
         <div class="flex items-baseline gap-2">

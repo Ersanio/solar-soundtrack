@@ -17,6 +17,7 @@ import { NoteCommand } from './note-command/note-command';
 import { PanCommand } from './pan-command/pan-command';
 import { ParamTable } from './param-table/param-table';
 import { QuantizationCommand } from './quantization-command/quantization-command';
+import { RemoteCode } from './remote-code/remote-code';
 import { VibratoCommand } from './vibrato-command/vibrato-command';
 
 /**
@@ -86,6 +87,7 @@ const LETTER_VIEWS: Readonly<Record<string, string>> = {
     ParamTable,
     QuantizationCommand,
     BendCommand,
+    RemoteCode,
     Section,
     VibratoCommand,
   ],
@@ -124,6 +126,29 @@ export class CommandInspector {
   );
 
   /**
+   * The remote code call or reset the caret is on, which wins over a loop and a
+   * command alike.
+   *
+   * A call is not a `Command`, so `commandAt` never finds it — and being
+   * end-inclusive, it finds the note written hard against the `(` instead, which
+   * is the same reason a loop stands the table down below.
+   */
+  protected readonly remote = computed(() =>
+    this.dismissed() ? null : this.store.remoteAtCaret(),
+  );
+
+  /** What the heading names a remote call or reset as, the catalogue's own words. */
+  protected readonly remoteName = computed(() =>
+    this.remote()?.kind === 'reset' ? 'remote code reset' : 'remote code call',
+  );
+
+  /** The call as written, on one line, in place of a command's byte. */
+  protected readonly remoteLabel = computed(() => {
+    const remote = this.remote();
+    return remote ? this.store.source().slice(remote.from, remote.to).replace(/\s+/g, ' ') : '';
+  });
+
+  /**
    * The loop construct the caret's own text belongs to, if any.
    *
    * The token question rather than the panel one: `amk-loop-inspector` owns what
@@ -137,7 +162,8 @@ export class CommandInspector {
   /**
    * The command the parameter table answers for.
    *
-   * `null` where a loop has the caret's own text, because the loop inspector
+   * `null` where a remote call has the caret, which {@link remote} answers, and
+   * where a loop has the caret's own text, because the loop inspector
    * draws that count and draws it better: the table would show the empty
    * `Repeats` of a `]]4`'s *first* bracket, or a `$E6`'s byte, which is one less
    * than the count it means. And it is the command rather than the header that
@@ -145,10 +171,17 @@ export class CommandInspector {
    * `c4]2` finds the note in front of it, and a heading naming that note over
    * parameters nothing draws would be worse than no heading at all.
    */
-  protected readonly params = computed(() => (this.loop() ? null : this.command()));
+  protected readonly params = computed(() =>
+    this.loop() || this.remote() ? null : this.command(),
+  );
+
+  /** Something at the caret the heading names, which is what un-mutes the aside. */
+  protected readonly named = computed(
+    () => this.entry() !== null || this.params() !== null || this.remote() !== null,
+  );
 
   /** Nothing at the caret at all, which is the one state with a sentence of its own. */
-  protected readonly empty = computed(() => !this.entry() && !this.params() && !this.loop());
+  protected readonly empty = computed(() => !this.named() && !this.loop());
 
   /** Which view to render; `null` falls through to the parameter table. */
   protected readonly view = computed(() => {
@@ -213,6 +246,10 @@ export class CommandInspector {
     const entry = this.entry();
     if (entry) {
       return `@${entry.number} instrument definition`;
+    }
+
+    if (this.remote()) {
+      return `${this.remoteLabel()} ${this.remoteName()}`;
     }
 
     const command = this.params();
