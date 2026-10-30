@@ -9,6 +9,14 @@ export interface ChangelogEntry {
 export const CHANGELOG: readonly ChangelogEntry[] = [
   // ─── newest first; add new blocks here ──────────────────────────────────
   {
+    date: '30 October 2026',
+    items: [
+      'Piano roll edits keep commands, the intro marker and the song length where they were',
+      'Deleting a note in the piano roll leaves a rest, merged with the rests beside it',
+      'Drawing over a tempo change, an intro marker, a comment or an octave change in the piano roll',
+    ],
+  },
+  {
     date: '27 October 2026',
     items: [
       'A command inspector for remote code calls and resets: the type, the wait in ticks, and the commands the call runs',

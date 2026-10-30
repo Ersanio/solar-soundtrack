@@ -1067,46 +1067,22 @@ export function plannedOrdinals(plan: Plan): ReadonlyMap<number, number> {
  * body-length change, whose every pass and every note after the loop move by
  * its difference against `frame.ticks`.
  *
- * The commit's own layout, restated over ticks: surviving and born notes stand
- * where the plan puts them, a construct's ticks are fixed, the regions between
- * anchors are preserved, and the trailing rests ride the last anchor —
- * `realiseRegion` never rewrites the tail's length, so a deleted note ahead of
- * them slides them earlier and a moved one carries them along. A rest a born
- * note wholly covers is gone, its ticks re-expressed by the note.
+ * The commit's own layout, restated over ticks: a tail keeps the frame's length
+ * (`realiseRegion`), so the frame only ever grows, and only where a note now
+ * reaches past its end. Shortening a body is the box's right-end resize.
  */
 export function plannedFrameTicks(strip: Strip, frame: StripFrame, plan: Plan): number {
-  let last = 0;
+  let last = frame.ticks;
   for (const note of plan.notes) {
     last = Math.max(last, note.startTick + note.ticks);
   }
 
-  const survivors = new Set(plan.notes.map((note) => note.from));
-  const covered = (from: number, ticks: number): boolean =>
-    plan.notes.some(
-      (note) => note.startTick <= from && note.startTick + note.ticks >= from + ticks,
-    );
-
-  let trailing = 0;
-  for (let index = frame.to - 1; index >= frame.from; index--) {
+  for (let index = frame.from; index < frame.to; index++) {
     const item = strip.items[index];
-    if (item.kind === 'rest') {
-      if (!covered(item.startTick, item.ticks)) {
-        trailing += item.ticks;
-      }
-
-      continue;
+    if (item.kind === 'construct') {
+      last = Math.max(last, item.startTick + item.ticks);
     }
-
-    if (item.kind === 'note' && !survivors.has(index)) {
-      continue; // Removed, so the rests behind it slide up to the anchor.
-    }
-
-    // The anchor the trailing rests ride: a construct's fixed end, or the
-    // surviving note's planned one.
-    const planned =
-      item.kind === 'construct' ? item : (plan.notes.find((note) => note.from === index) ?? item);
-    return Math.max(last, planned.startTick + planned.ticks + trailing);
   }
 
-  return Math.max(last, trailing);
+  return last;
 }

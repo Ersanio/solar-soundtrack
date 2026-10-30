@@ -296,24 +296,35 @@ drawing, so the spot keeps its dynamics and what changed is which note sits ther
 it was the last note on the channel, or another `v` takes over before the next note sounds — the
 command goes with the note.
 
+The question only has an answer for a command a later one replaces outright. A switch-off — `$DF`,
+`$F0`, `$FD`, `$FE` — and a `$F4` toggle are never shown in force at a note, so nothing can prove they
+reach nothing, and they always stay: taking a `$DF` away would leave the vibrato on.
+
 The gesture is no part of the question. `Backspace` on a note and drawing over the same note get the
 same answer, which is a fact about the song rather than about how you got there. It is the driver's
 own reading, too, not a scan of the MML: a command inside a `[ ]` played twice, or a `(1)n` called
 from another channel, is followed where it actually runs.
 
-A command that stays stays exactly where you wrote it. Where the roll has to lay a whole run of new
-text over the stretch that held it — drawing over two notes with a `v200` between them — it writes
-the command out again on the tick it ran at, which splits the note you drew into two tied halves
-around it: `c4 d4 v200 e4 f4` drawn over from the `d4` comes back `c4 g4 v200 ^4 f4`. A tie is one
-note, so nothing about what you drew has changed.
+A command that stays stays exactly where you wrote it, on the tick the lane shows it at. Where the
+roll has to lay a whole run of new text over the stretch that held it — drawing over two notes with a
+`v200` between them — it writes the command out again on the tick it ran at, which splits the note
+you drew into two tied halves around it: `c4 d4 v200 e4 f4` drawn over from the `d4` comes back
+`c4 g4 v200 ^4 f4`. A tie is one note, so nothing about what you drew has changed. A `t`, a `w`, an
+echo write and the intro `/` are written out again the same way, so the tempo changes and the song
+loops back where they always did; a comment and an `l` are left where they stand, every length the
+roll writes being the note's own; and an `o`, `<` or `>` is taken out, the run stating the octave it
+needs and putting back the one the song had after it. A note dragged or stretched across a `/` or a
+`t` is written again where it now plays, split around it the same way.
 
 Song settings such as `t` and `w`, an `o` or an `l`, and the intro `/` are outside all of this: no
 note gesture moves one. Dragging its icon along the command lane is how a `t` or a `w` is moved on
 purpose, and an `o`, an `l` and the `/` are not in the lane at all. So is everything written above a
-channel's first note, which is the channel's setup rather than any one note's. And a command written **inside** a note — between its head and a `^` —
-can only be kept by a run being laid over those ticks; delete or glue such a note with something
-still playing under that command and the gesture is refused instead, because there is no tick left
-to put it on. Delete it from the lane first if you meant it to go.
+channel's first note, which is the channel's setup rather than any one note's. A command written
+**inside** a note — between its head and a `^` — stays on its tick when you delete the note, which
+becomes rest around it. Glue such a note into the one before it with something still playing under
+that command and the gesture is refused instead, because the glued note now covers that tick and
+there is no saying which side of it the command belongs on. Delete it from the lane first if you
+meant it to go.
 
 ## What the roll will and will not do
 
@@ -331,9 +342,18 @@ to put it on. Delete it from the lane first if you meant it to go.
   shorter than the ticks in front of the command is refused too — there is nowhere left inside the
   note for it to fire.
 - **A gap is a rest.** The space between two notes is the rest between them, and moving a note
-  rewrites that rest rather than moving anything else. Anything you wrote inside the gap keeps its
-  distance from the note that follows it, and a rest covered completely is asked the same question a
-  note is — see above.
+  rewrites that rest rather than moving anything else: the rest beside the note that moved takes the
+  change, so anything you wrote inside the gap — a `v200`, a `t`, the `/` — stays on its tick. A
+  deleted note becomes rest where it stood, and rests left touching are written as the one rest they
+  are — `r4^16` where no single length says it. A rest covered completely is asked the same question
+  a note is — see above.
+- **Deleting keeps the song as long as it was.** The last note of a channel becomes rest too, so the
+  song does not stop early and take the other channels' notes with it; deleting a song's only note
+  leaves a rest, so it still compiles. A channel is only ever lengthened by an edit, never cut short.
+- **Octaves stay tidy.** The roll writes an `o` only where the one standing is not the one a note
+  needs, puts one back after a note only where something later reads it — not before a `#N` that
+  sets its own, nor at the end of the song — and takes out an `o`, `<` or `>` of yours that an edit
+  left with nothing to read it. One that still does stays where you wrote it.
 - **A refusal says so.** Where a gesture cannot be written, the roll turns the bars red while you
   are still holding it, and the toolbar says why in words — "there is something written where that
   note would go", and so on. A reason arrived at only when you let go stays on the toolbar until the
@@ -587,8 +607,9 @@ and the note is your own channel's music, on its own tick, in your own block.
 later pass, and everything written after the loop, slides by the change times the passes in front
 of it. The preview shows the whole of that while the pointer is down — the untouched notes of the
 body ride along as striped outlines, and the rest of the channel slides live — so nothing about the
-commit is a surprise. The body's last note is the body's tail, and a body is a channel in
-miniature: deleting it tightens the loop, where deleting a note in the middle leaves a rest.
+commit is a surprise. A body is a channel in miniature: deleting or shortening its last note leaves
+a rest and the loop keeps its length, so nothing after it moves. Making a loop shorter is the box's
+right end, below.
 
 What a loop will not do, each in its own words on the toolbar: a note cannot be dragged **onto** a
 loop from outside — the loop's ticks are a wall, not a gap — and a selection with notes on both

@@ -5,11 +5,12 @@ import {
   spellNote,
   spellOctave,
   spellQ,
+  spellRest,
 } from '@amk/core/mml-text';
 import type { Span } from '@amk/core/types';
-import type { LoopRun } from '@amk/spc/song-walk';
-import type { Command } from '@amk/tokens';
-import { commandScope } from '@amk/tokens/commands/in-force';
+import { type LoopRun, replacedByNextInSlot } from '@amk/spc/song-walk';
+import { type Command, tokenize } from '@amk/tokens';
+import { commandScope, isPercussionInstrument } from '@amk/tokens/commands/in-force';
 import { MAX_LOOP_COUNT } from '@amk/tokens/commands/loops';
 import {
   commandRewritable,
@@ -40,7 +41,15 @@ import {
   isEdits,
   plannedFrameTicks,
 } from './roll-edit';
-import type { LoopSite, Strip, StripFrame, StripItem } from './roll-strip';
+import { octaveModel } from './roll-octave';
+import {
+  COMMENT,
+  type LoopSite,
+  type Strip,
+  type StripFrame,
+  type StripItem,
+  channelMarkers,
+} from './roll-strip';
 
 /** The first interior index of a region — the frame's head where no note bounds it. */
 function interiorFrom(gap: Region, frame: StripFrame): number {
@@ -77,15 +86,6 @@ export function eol(source: string): string {
 
 /** The octave {@link channelOpening} writes, and so the one it leaves in force. */
 const OPENING_OCTAVE = 4;
-
-/**
- * Everything that can move the octave, as text — see {@link spawnInto}.
- *
- * `O` as well as `o`: the parser dispatches on the lowercased character
- * (`parser.ts:461`, `Music.cpp:445`), so `O5` sets the octave exactly as `o5`
- * does, which is why `leadsAUnit` compares `kind.toLowerCase()`.
- */
-const MOVES_OCTAVE = /[oO<>]/;
 
 /** `q[channel]` before anything sets it (`parser.ts:200`). */
 const OPENING_Q = 0x7f;
@@ -187,22 +187,6 @@ function noteText(
 }
 
 /**
- * The index of the next note at or after `from` and before `bound`, or -1 for
- * none. The bound is the asking item's own frame's end — the flat array holds
- * every frame's items, and a body's last note has no next note: the item after
- * it is another frame's text entirely.
- */
-function noteFrom(strip: Strip, from: number, bound: number): number {
-  for (let at = from; at < bound; at++) {
-    if (strip.items[at].kind === 'note') {
-      return at;
-    }
-  }
-
-  return -1;
-}
-
-/**
  * Whether a note sets its own absolute octave, so an octave put back in front of
  * it would be saying the same thing twice.
  *
@@ -223,61 +207,122 @@ function writesItsOwnOctave(
 }
 
 /**
- * The octave a run spawned in the region ending at `index` leaves standing.
- *
- * Two readers, and one answer serves both. A note bounding the region reads it:
- * {@link spawnInto} answers for that note either way — it writes the octave at
- * the note's head, or it has proved the run already leaves the right one — so a
- * number here means `planEdits` has nothing to add at that head. The block below
- * a `#N` reads it too, where the region is the tail and nothing on the channel
- * survived, since `octave` is global parser state.
- *
- * `null` where no run was spawned there, and where the one that was ends on a
- * drum: that writes no octave at all and leaves whatever stood, which is
- * `leaves` being null in {@link spawnInto} and is the one case neither reader
- * can be answered for.
+ * The drum `@` a note plays that is written somewhere other than beside it
+ * (`roll-strip.ts:drumApart`), or `null`. A rest between the two does not consume
+ * it, so it is the note's alone: it goes when the note does, and has to stand
+ * after any note written in front of it.
  */
-function spawnLeaves(regions: readonly Region[], index: number): number | null {
-  const gap = regions.find((each) => each.before === index && each.born.length > 0);
-  if (gap === undefined) {
-    return null;
-  }
+function drumApart(item: StripItem): Command | null {
+  return item.drum !== null && item.drum.span.end <= item.unitSpan.start ? item.drum : null;
+}
 
-  // The last note in tick order is the one whose octave the run leaves, which
-  // is what `spawnInto` takes for its own `born`. On the tick alone rather than
-  // through `byTick`, which breaks ties on `from`: two notes on one tick sound
-  // at once, and `committable` has already turned that plan away.
-  const last = gap.born.reduce((furthest, note) =>
-    note.startTick >= furthest.startTick ? note : furthest,
+/** Whether a run is being written into the region straight after `index`, or the one ending at it. */
+function runAfter(regions: readonly Region[], index: number): boolean {
+  return regions.some((region) => region.after === index && region.born.length > 0);
+}
+
+function runBefore(regions: readonly Region[], index: number): boolean {
+  return regions.some((region) => region.before === index && region.born.length > 0);
+}
+
+/** Whether a run is laid over the item, which takes its whole unit out. */
+function underRun(regions: readonly Region[], frame: StripFrame, index: number): boolean {
+  return regions.some(
+    (region) =>
+      region.born.length > 0 && index >= interiorFrom(region, frame) && index < region.before,
   );
-  return last.drum === null ? octaveFor(last.written) : null;
 }
 
 /**
- * The octave to put back after a note whose own has been rewritten.
+ * What the edited text does with the octave first, after `index`'s unit.
  *
- * The octave in force after the unit as it was written — unless the next note on
- * the channel sets its own. The last note of a channel always restores, because
- * `octave` is global parser state and leaks past a `#N` into whatever block comes
- * after it.
+ * `'read'` where a note, a loop or a run being written reads it before anything
+ * sets it, `'set'` where a note writes its own first, `'end'` where nothing
+ * follows. A note being removed takes its own `o`s and its read with it; what is
+ * written between its segments stays, and so does everything between units.
+ *
+ * Past the end of a body the text runs on into whatever follows the closing
+ * bracket, which another frame of the same gesture may be rewriting, so that
+ * answers `'read'`. Past the end of the channel it is the document's own next
+ * event, `octave` being one variable that a `#N` does not reset.
  */
-function exitOctaveFor(
-  strip: Strip,
+function octaveNext(
+  context: EditContext,
   index: number,
   survivors: ReadonlyMap<number, PlacedNote>,
-): number | null {
-  const item = strip.items[index];
-  const exit = item.exitOctave ?? item.octave;
-  // A `$DD` target reads the octave where it stands, and it stands before the
-  // next item — so the next item writing its own is not an answer for it. It is
-  // in no `segments`, so `noteFrom` cannot see it and only `bend` says it is
-  // there.
-  if (item.bend?.noteTarget !== undefined) {
-    return exit;
+  regions: readonly Region[],
+): 'read' | 'set' | 'end' {
+  const { strip, frame } = context;
+  const { octaves } = strip;
+  if (runAfter(regions, index)) {
+    return 'read';
   }
 
-  const next = noteFrom(strip, index + 1, strip.frames[item.frame].to);
-  return next >= 0 && writesItsOwnOctave(strip, next, survivors) ? null : exit;
+  let from = strip.items[index].unitSpan.end;
+  for (let at = index + 1; at < frame.to; at++) {
+    const item = strip.items[at];
+    const between = octaves.first(from, item.unitSpan.start);
+    if (between !== null) {
+      return between;
+    }
+
+    if (item.kind === 'construct') {
+      // A body written here reads what its text reads first; a recall parses no
+      // notes, and the octave passes it by.
+      const inner = octaves.first(item.unitSpan.start, item.unitSpan.end);
+      if (inner !== null) {
+        return inner;
+      }
+
+      from = item.unitSpan.end;
+      continue;
+    }
+
+    if (item.kind === 'note' && survivors.has(at)) {
+      return writesItsOwnOctave(strip, at, survivors) ? 'set' : 'read';
+    }
+
+    if (item.kind === 'note') {
+      // A removed note: its read goes, and so do its own `o`s but the ones kept.
+      const head = item.segments[0];
+      const last = item.segments[item.segments.length - 1];
+      const kept = underRun(regions, frame, at)
+        ? { lead: false, trail: false }
+        : keptOctaves(context, item);
+      const found =
+        (kept.lead ? octaves.first(item.unitSpan.start, head.span.start) : null) ??
+        octaves.first(head.span.end, last.span.start) ??
+        (kept.trail ? octaves.first(last.span.end, item.unitSpan.end) : null);
+      if (found !== null) {
+        return found;
+      }
+    } else {
+      const found = octaves.first(item.unitSpan.start, item.unitSpan.end);
+      if (found !== null) {
+        return found;
+      }
+    }
+
+    from = item.unitSpan.end;
+  }
+
+  return frame.body >= 0 ? 'read' : octaves.next(from);
+}
+
+/**
+ * The octave to put back after a note whose own has been rewritten: the one in
+ * force after the unit as it was written, or `null` where nothing reads it
+ * before something sets it again ({@link octaveNext}).
+ */
+function exitOctaveFor(
+  context: EditContext,
+  index: number,
+  survivors: ReadonlyMap<number, PlacedNote>,
+  regions: readonly Region[],
+): number | null {
+  const item = context.strip.items[index];
+  const exit = item.exitOctave ?? item.octave;
+  return octaveNext(context, index, survivors, regions) === 'read' ? exit : null;
 }
 
 /**
@@ -312,7 +357,10 @@ function drumOctaves(item: StripItem): { lead: string; exit: string } | null {
   // so `-1` is unreachable rather than a case with an answer — and it refuses
   // through `spellOctave`, since dropping the `o` is the whole failure here.
   const lead = item.hasLeadingOctave ? spellOctave(item.octave ?? -1) : '';
-  const exit = item.exitOctave === null ? '' : spellOctave(item.exitOctave);
+  // Only an `o` the unit holds after its last segment; one standing between its
+  // segments is not part of the splice and stays.
+  const trailing = item.unitSpan.end > item.segments[item.segments.length - 1].span.end;
+  const exit = !trailing || item.exitOctave === null ? '' : spellOctave(item.exitOctave);
   if (lead === null || exit === null) {
     return null;
   }
@@ -330,10 +378,37 @@ function afterBend(item: StripItem): number {
   return Math.max(item.unitSpan.end, item.bend?.span.end ?? 0);
 }
 
+/**
+ * `text`, with the comments the span it replaces holds put back after it.
+ *
+ * The parser never sees a comment (`roll-strip.ts:COMMENT`), so a rest it folded
+ * across a `;` line has the comment inside its span. Each goes back with its own
+ * line end, which is where it stood.
+ */
+function keepingComments(source: string, span: Span, text: string): string {
+  const comments = source.slice(span.start, span.end).match(COMMENT);
+  if (comments === null) {
+    return text;
+  }
+
+  const line = eol(source);
+  return `${text}${comments.map((comment) => ` ${comment}${line}`).join('')}`;
+}
+
+/** A unit's text replaced, keeping its comments. */
+function spliceUnit(source: string, span: Span, text: string): Edit | null {
+  return spliceRange(source, span, keepingComments(source, span, text));
+}
+
+/** A span and the whitespace in front of it taken out, keeping its comments. */
+function removeSpan(source: string, span: Span): Edit[] {
+  const edit = spliceOut(source, span);
+  return edit ? [{ ...edit, text: keepingComments(source, span, edit.text) }] : [];
+}
+
 /** The unit and the whitespace in front of it, so a deletion leaves no double space. */
 function removeItem(source: string, item: StripItem): Edit[] {
-  const edit = spliceOut(source, item.unitSpan);
-  return edit ? [edit] : [];
+  return removeSpan(source, item.unitSpan);
 }
 
 /**
@@ -412,6 +487,19 @@ function reachesSomething(
   }
 
   return born.some((note) => note.startTick >= tick && note.startTick < end);
+}
+
+/**
+ * Whether {@link reachesSomething} can speak for a command at all: a byte-less
+ * `q`, `h` or drum `@` the walk folds into a note, or one whose slot the next
+ * write takes over whole (`replacedByNextInSlot`). A switch-off, a `$F4` toggle
+ * or a one-shot write is never shown in force at a note, so a note playing
+ * without it proves nothing, and it stays.
+ */
+function droppable(command: Command): boolean {
+  return (
+    command.vcmd === undefined || replacedByNextInSlot(command.vcmd, command.args[0]?.value ?? 0)
+  );
 }
 
 /**
@@ -502,40 +590,69 @@ function coveredByBorn(order: readonly PlacedNote[], rest: StripItem): boolean {
   return false;
 }
 
+/** A survivor's splices, and the octave its text leaves standing once they land. */
+interface Rewrite {
+  edits: Edit[];
+  leaves: number | null;
+}
+
+function isRewrite(outcome: Rewrite | EditRefusal): outcome is Rewrite {
+  return (outcome as EditRefusal).refused === undefined;
+}
+
 /** What one surviving note needs written, which is usually nothing at all. */
 function rewriteNote(
   context: EditContext,
   index: number,
   note: PlacedNote,
   survivors: ReadonlyMap<number, PlacedNote>,
+  regions: readonly Region[],
   running: number | null,
-): Edit[] | EditRefusal {
+): Rewrite | EditRefusal {
   const { source, strip, targetAMKVersion } = context;
+  const { octaves } = strip;
   const item = strip.items[index];
   const samePitch =
     note.written === item.written && note.drum === (item.drum?.args[0]?.value ?? null);
   const sameLength = note.ticks === item.ticks;
   if (samePitch && sameLength) {
-    return [];
+    return { edits: [], leaves: octaves.carry(running, item.unitSpan.start, item.unitSpan.end) };
   }
 
-  const exit = exitOctaveFor(strip, index, survivors);
+  const exit = exitOctaveFor(context, index, survivors, regions);
   // Empty for a pitched note, which spells its own octaves through `noteText`.
   const around = note.drum === null ? { lead: '', exit: '' } : drumOctaves(item);
   if (around === null) {
     return refuse(REFUSE_SPELL);
   }
 
+  // An `o` the porter wrote at this note is theirs, and a note that keeps its
+  // octave keeps saying so — a channel's opening `o4` is not redundancy to tidy.
+  const stated = item.hasLeadingOctave && octaveFor(note.written) === item.octave;
+  const standing = stated ? null : running;
+
+  const last = item.segments[item.segments.length - 1];
+  /**
+   * What the rewritten unit leaves: a pitched note its own octave moved on by
+   * whatever is written between its segments, which stays; a drum the unit's own
+   * octaves, which {@link drumOctaves} restates.
+   */
+  const own =
+    note.drum === null
+      ? octaves.carry(octaveFor(note.written), item.segments[0].span.end, last.span.start)
+      : octaves.carry(running, item.unitSpan.start, item.unitSpan.end);
+  const leaves = note.drum === null && exit !== null ? exit : own;
+
   // One segment is one token, so the whole unit is rewritten together.
   if (item.segments.length === 1) {
     const length = sameLength ? writtenLength(source, item) : null;
-    const text = noteText(note, length, exit, targetAMKVersion, running);
+    const text = noteText(note, length, exit, targetAMKVersion, standing);
     if (text === null) {
       return refuse(REFUSE_SPELL);
     }
 
-    const edit = spliceRange(source, item.unitSpan, `${around.lead}${text}${around.exit}`);
-    return edit ? [edit] : [];
+    const edit = spliceUnit(source, item.unitSpan, `${around.lead}${text}${around.exit}`);
+    return { edits: edit ? [edit] : [], leaves };
   }
 
   // The command inside the note stands a number of ticks into it, and only the
@@ -559,37 +676,38 @@ function rewriteNote(
 
   const edits: Edit[] = [];
   const headSpan: Span = { ...item.unitSpan, end: item.segments[0].span.end };
-  const headText = noteText(note, writtenLength(source, item), null, targetAMKVersion, running);
+  const headText = noteText(note, writtenLength(source, item), null, targetAMKVersion, standing);
   if (headText === null) {
     return refuse(REFUSE_SPELL);
   }
 
-  const headEdit = spliceRange(source, headSpan, `${around.lead}${headText}`);
+  const headEdit = spliceUnit(source, headSpan, `${around.lead}${headText}`);
   if (headEdit) {
     edits.push(headEdit);
   }
 
-  const tail = item.segments[item.segments.length - 1];
   const length = spellDuration(remaining, targetAMKVersion);
   if (length === null) {
     return refuse(REFUSE_SPELL);
   }
 
-  const put = exitText(note, exit);
-  if (put === null) {
+  // Against what the head and the text inside the note leave, not the head alone:
+  // a `<` written before the `^` is still there.
+  const spelled = exit === null || note.drum !== null || exit === own ? '' : spellOctave(exit);
+  if (spelled === null) {
     return refuse(REFUSE_SPELL);
   }
 
-  const tailEdit = spliceRange(
+  const tailEdit = spliceUnit(
     source,
-    { start: tail.span.start, end: item.unitSpan.end, line: tail.span.line },
-    `^${length}${put}${around.exit}`,
+    { start: last.span.start, end: item.unitSpan.end, line: last.span.line },
+    `^${length}${spelled === '' ? '' : ` ${spelled}`}${around.exit}`,
   );
   if (tailEdit) {
     edits.push(tailEdit);
   }
 
-  return edits;
+  return { edits, leaves };
 }
 
 /** One stretch of text between two surviving notes, and what has to go in it. */
@@ -620,124 +738,29 @@ interface Region {
   startTick: number;
 }
 
-/** A stretch of rests that will be written as the one rest they are — see {@link restRuns}. */
-interface RestRun {
-  /** In order. The first is the one the whole run is written into. */
-  rests: StripItem[];
-  /** Whether a unit this plan removes is what joined two of them. */
-  joined: boolean;
-}
-
 /**
- * A region's rests, grouped into the stretches that will end up touching.
- *
- * Two rests are one run when everything between them is whitespace or a unit
- * this plan removes — and every non-rest item strictly inside a region is a
- * note being deleted, by construction of {@link regionsOf}, so a deleted note
- * between two rests joins them. Two rests written touching already are one run
- * too, since the text says so.
- *
- * A `v200`, a `y`, a `$ED` or the intro `/` between them is not whitespace, and
- * the run stops there: those carry a position, and a run is written over as one
- * piece. Spans are {@link StripItem.unitSpan} rather than `prefixSpan` because a
- * deleted note's unit swallows the `o` written beside it (`roll-strip.ts`,
- * `growUnits`) and {@link removeItem} takes the whole unit with it.
+ * Rests in the order they are written, taken out but the first, which is written
+ * as all of them — or every one taken out where they come to nothing. What
+ * `resizeLoop` rewrites a body's trailing or leading rests with.
  */
-function restRuns(context: EditContext, gap: Region): RestRun[] {
-  const { source, strip } = context;
-  const runs: RestRun[] = [];
-  let open: RestRun | null = null;
-  /** Whether nothing but whitespace and removed units has been passed since the last rest. */
-  let clean = false;
-  /** And whether one of those removed units is what stands between them. */
-  let removed = false;
-
-  const head = interiorFrom(gap, context.frame);
-  for (let index = head; index < gap.before; index++) {
-    const item = strip.items[index];
-    const touches =
-      index > head &&
-      source.slice(strip.items[index - 1].unitSpan.end, item.unitSpan.start).trim() === '';
-
-    if (item.kind !== 'rest') {
-      clean = clean && touches;
-      removed = true;
-      continue;
-    }
-
-    if (open !== null && clean && touches) {
-      open.rests.push(item);
-      open.joined ||= removed;
-    } else {
-      open = { rests: [item], joined: false };
-      runs.push(open);
-    }
-
-    clean = true;
-    removed = false;
-  }
-
-  return runs;
-}
-
-/**
- * Trailing rests a deletion left touching, written as the one rest they are.
- *
- * Nothing rewrites the tail's length — the channel ends where its music ends —
- * so the only runs collapsed here are the ones this gesture is what joined. A
- * run the porter wrote touching has had nothing done to it and is left as
- * written, which is the same line {@link realiseRegion} takes when a gap's ticks
- * do not change.
- *
- * The total is preserved, so the channel is exactly as long afterwards.
- */
-function joinTail(context: EditContext, gap: Region): Edit[] | null {
-  const edits: Edit[] = [];
-  for (const run of restRuns(context, gap)) {
-    if (!run.joined) {
-      continue;
-    }
-
-    const written = collapse(context, run, rested(run.rests, 0));
-    if (written === null) {
-      return null;
-    }
-
-    edits.push(...written);
-  }
-
-  return edits;
-}
-
-/**
- * A run written as one rest of `want` ticks, or removed outright where it is
- * asked for none.
- *
- * The rests it leaves behind go one edit each rather than the whole run going as
- * a single splice, and that is load-bearing: `planEdits` puts a deleted note's
- * octave restore back at that note's own `unitSpan.end`, which a splice over the
- * run would enclose — and CodeMirror merges overlapping ranges rather than
- * refusing them, so `planEdits` refuses the gesture instead. Abutting edits are
- * what {@link coalesce} joins, in the order they are read.
- */
-function collapse(context: EditContext, run: RestRun, want: number): Edit[] | null {
+function collapse(context: EditContext, rests: readonly StripItem[], want: number): Edit[] | null {
   const { source, targetAMKVersion } = context;
   const edits: Edit[] = [];
-  for (const gone of run.rests.slice(1)) {
+  for (const gone of rests.slice(1)) {
     edits.push(...removeItem(source, gone));
   }
 
   if (want <= 0) {
-    edits.push(...removeItem(source, run.rests[0]));
+    edits.push(...removeItem(source, rests[0]));
     return edits;
   }
 
-  const text = spellDuration(want, targetAMKVersion);
+  const text = spellRest(want, targetAMKVersion);
   if (text === null) {
     return null;
   }
 
-  const edit = spliceRange(source, run.rests[0].unitSpan, `r${text}`);
+  const edit = spliceUnit(source, rests[0].unitSpan, `r${text}`);
   if (edit) {
     edits.push(edit);
   }
@@ -745,25 +768,137 @@ function collapse(context: EditContext, run: RestRun, want: number): Edit[] | nu
   return edits;
 }
 
-/** What a stretch of runs holds now, from `from` on. */
-function heldBy(runs: readonly RestRun[], from: number): number {
-  return runs.slice(from).reduce((sum, run) => sum + rested(run.rests, 0), 0);
+/** One stretch of a region's rest time: a segment of a rest, or of a note the plan removes. */
+interface Piece {
+  /** The text that goes with it — a removed note's first and last pieces take its own `o`s. */
+  span: Span;
+  startTick: number;
+  ticks: number;
+  item: StripItem;
+  /** A note the plan removes, as against a rest already written. */
+  removed: boolean;
 }
 
 /**
- * The rests between the notes, made to come to the ticks the plan asks for.
+ * Which of a removed note's own `o`s stay in the text: one something still reads,
+ * so the notes after it keep the octave they were written under with nothing put
+ * back. One that only ever fed this note is dropped with it. Not where the unit
+ * also holds the drum `@` this note consumed, which goes with it.
+ */
+function keptOctaves(context: EditContext, item: StripItem): { lead: boolean; trail: boolean } {
+  const { octaves } = context.strip;
+  const head = item.segments[0];
+  const last = item.segments[item.segments.length - 1];
+  const fedDrum =
+    item.drum !== null &&
+    item.drum.span.start >= item.unitSpan.start &&
+    item.drum.span.start < head.span.start;
+  return {
+    lead: item.hasLeadingOctave && !fedDrum && octaves.next(head.span.end) === 'read',
+    trail: item.unitSpan.end > last.span.end && octaves.next(item.unitSpan.end) === 'read',
+  };
+}
+
+/** The region's interior as pieces, in text order: one per segment of each rest and removed note. */
+function piecesOf(context: EditContext, gap: Region): Piece[] {
+  const { strip, frame } = context;
+  const pieces: Piece[] = [];
+  for (let index = interiorFrom(gap, frame); index < gap.before; index++) {
+    const item = strip.items[index];
+    const kept = item.kind === 'note' ? keptOctaves(context, item) : { lead: false, trail: false };
+    let tick = item.startTick;
+    item.segments.forEach((segment, at) => {
+      const first = at === 0;
+      const last = at === item.segments.length - 1;
+      pieces.push({
+        span: {
+          start: first && !kept.lead ? item.unitSpan.start : segment.span.start,
+          end: last && !kept.trail ? item.unitSpan.end : segment.span.end,
+          line: segment.span.line,
+        },
+        startTick: tick,
+        ticks: segment.ticks,
+        item,
+        removed: item.kind === 'note',
+      });
+      tick += segment.ticks;
+    });
+  }
+
+  return pieces;
+}
+
+/**
+ * Whether a command has to stay on its tick when rests are rewritten around it.
  *
- * Every change is taken from the rest **nearest the note before it**, so
- * anything written later in the gap keeps its distance from the note it was
- * written for: a `v200` two beats ahead of a note stays two beats ahead of it. A
- * shrink that exhausts one rest deletes it and carries on into the next; a gap
- * with no rest at all has one written in straight after the note before it.
+ * A command that emits a byte is read at a tick. An `o`, an `l`, a `<` or a `>`
+ * is parse state, and `q`, `h` and a drum `@` fold into the next note, so none of
+ * them says anything about time and each may stand anywhere among rests.
+ */
+function emitsAByte(command: Command): boolean {
+  const kind = command.kind.toLowerCase();
+  return (
+    commandScope(command) !== 'position' &&
+    kind !== 'q' &&
+    kind !== 'h' &&
+    !isPercussionInstrument(command)
+  );
+}
+
+/**
+ * Whether the text in `[from, to)` has to keep its tick: a command that emits a
+ * byte, or the intro `/`. A command this plan deletes is gone already.
+ */
+function pinned(context: EditContext, from: number, to: number, deleted: readonly Span[]): boolean {
+  const { strip } = context;
+  if (strip.intros.some((span) => span.start >= from && span.start < to)) {
+    return true;
+  }
+
+  return strip.commands.some(
+    (command) =>
+      command.span.start >= from &&
+      command.span.start < to &&
+      command.noteLength === undefined &&
+      !deleted.some((span) => span.start === command.span.start) &&
+      emitsAByte(command),
+  );
+}
+
+/** The text between two of a region's pieces, and the tick it stands at. */
+interface Bound {
+  tick: number;
+  /** Whether it holds anything that has to stay on that tick — see {@link pinned}. */
+  hard: boolean;
+  /** Whether it stands between two segments of one item, rather than between items. */
+  inside: boolean;
+}
+
+/** A stretch of rest between two hard bounds, and the pieces written in it now. */
+interface RestRun {
+  pieces: Piece[];
+  from: number;
+  to: number;
+}
+
+/**
+ * The rests between two notes, made to come to the ticks the plan asks for.
  *
- * What the change is taken from is a **run** of rests rather than one rest
- * (`restRuns`): a note deleted from between two of them leaves them touching,
- * and two touching rests are one rest. A run whose ticks are what they already
- * were is left exactly as written, so rests the porter wrote touching are only
- * ever joined by a gesture that had to move them anyway.
+ * Everything in the gap that is read at a tick keeps it: a `v200`, a `t60` and
+ * the intro `/` stand where the command lane shows them. So the change goes to
+ * the rest beside whichever note moved — after the note in front when its end
+ * moved, before the note behind when its start did — and a note the plan removes
+ * becomes rest where it stood. Between two such commands, rests and removed notes
+ * are one stretch of rest, written as the one rest they are; a stretch that comes
+ * to what it already held and lost no note is left exactly as written.
+ *
+ * A tail keeps the channel's length — or the body's, inside a loop — unless the
+ * music now reaches past it. Shortening a loop is the box's right-end resize.
+ *
+ * A command a note has come to cover cannot keep its tick and is moved to the
+ * note's edge; one written between two segments of an item moved that way is
+ * refused instead, since which side of the item it belongs on is not something
+ * the gesture says.
  */
 function realiseRegion(
   context: EditContext,
@@ -771,21 +906,12 @@ function realiseRegion(
   survivors: ReadonlyMap<number, PlacedNote>,
   deleted: readonly Span[],
 ): Edit[] | EditRefusal {
-  const { targetAMKVersion } = context;
-  const edits: Edit[] = [];
-
-  // The tail is free: a channel may end wherever the music ends. What it is not
-  // free to leave is two rests where a deleted note stood between them.
-  if (gap.tail && gap.born.length === 0) {
-    const joined = joinTail(context, gap);
-    return joined ?? refuse(REFUSE_SPELL);
-  }
+  const { source, strip, frame, targetAMKVersion } = context;
 
   // A gap between two notes that has to come to less than nothing is a plan
   // asking for them in an order the text does not have them in, which
   // `crossings` takes out before the regions are built. Refused rather than
-  // written: there is no run of rests that realises it, and the answer that
-  // looks plausible — leave the text alone — is a channel slid along.
+  // written: there is no run of rests that realises it.
   if (!gap.tail && gap.ticks < 0) {
     return refuse(REFUSE_CROWDED);
   }
@@ -794,44 +920,127 @@ function realiseRegion(
     return spawnInto(context, gap, survivors, deleted);
   }
 
-  const runs = restRuns(context, gap);
-  let left = gap.ticks;
+  const before = gap.after >= 0 ? strip.items[gap.after] : null;
+  const after = gap.before < frame.to ? strip.items[gap.before] : null;
+  const oldStart = before ? before.startTick + before.ticks : 0;
+  const oldEnd = after ? after.startTick : frame.ticks;
+  const newStart = gap.startTick;
+  const newEnd = gap.tail ? Math.max(newStart, oldEnd) : newStart + gap.ticks;
+  const pieces = piecesOf(context, gap);
+
+  // Past a slide the note in front carries, which rides it and not the gap.
+  const leadFrom = before ? afterBend(before) : -1;
+  const trailTo = after ? after.unitSpan.start : frame.body >= 0 ? frame.span.end : strip.home.at;
+
+  const bound = (from: number, to: number, tick: number, inside: boolean): Bound => ({
+    tick,
+    inside,
+    hard: from >= 0 && pinned(context, from, to, deleted),
+  });
+
+  /** Bound `k` stands in front of piece `k`; the last one closes the region. */
+  const bounds: Bound[] = [];
+  if (pieces.length === 0) {
+    bounds.push(bound(leadFrom, trailTo, oldStart, false));
+  } else {
+    bounds.push(bound(leadFrom, pieces[0].span.start, oldStart, false));
+    for (let at = 1; at < pieces.length; at++) {
+      const inside = pieces[at - 1].item === pieces[at].item;
+      bounds.push(
+        bound(pieces[at - 1].span.end, pieces[at].span.start, pieces[at].startTick, inside),
+      );
+    }
+
+    bounds.push(bound(pieces[pieces.length - 1].span.end, trailTo, oldEnd, false));
+  }
+
+  const runs: RestRun[] = [];
+  let from = newStart;
+  let open: Piece[] = [];
+  for (let at = 0; at < bounds.length; at++) {
+    const here = bounds[at];
+    if (here.hard) {
+      const pin = Math.min(newEnd, Math.max(newStart, here.tick));
+      if (here.inside && pin !== here.tick) {
+        return refuse(pieces[at].item.kind === 'note' ? REFUSE_INSIDE : REFUSE_CROWDED);
+      }
+
+      runs.push({ pieces: open, from, to: pin });
+      from = pin;
+      open = [];
+    }
+
+    if (at < pieces.length) {
+      open.push(pieces[at]);
+    }
+  }
+
+  runs.push({ pieces: open, from, to: newEnd });
+
+  const edits: Edit[] = [];
   for (let at = 0; at < runs.length; at++) {
     const run = runs[at];
-    const held = rested(run.rests, 0);
-    const last = at === runs.length - 1;
-    const want = last ? left : at === 0 ? Math.max(0, left - heldBy(runs, 1)) : held;
-    if (want !== held) {
-      const written = collapse(context, run, want);
-      if (written === null) {
+    const want = run.to - run.from;
+    if (run.pieces.length === 0) {
+      if (want <= 0) {
+        continue;
+      }
+
+      const text = spellRest(want, targetAMKVersion);
+      if (text === null) {
         return refuse(REFUSE_SPELL);
       }
 
-      edits.push(...written);
-    }
+      // The side that moved: the last stretch belongs to the note behind, unless
+      // it is the only one and it was the note in front that moved.
+      const trailing = at === runs.length - 1 && (runs.length > 1 || newStart === oldStart);
+      const edit =
+        trailing && after
+          ? insertAt(after.unitSpan.start, `r${text} `, after.unitSpan.line)
+          : before
+            ? insertAt(afterBend(before), ` r${text}`, before.unitSpan.line)
+            : writeInto(context, gap, `r${text}`);
+      if (edit === null) {
+        return refuse(REFUSE_CROWDED);
+      }
 
-    if (want <= 0) {
+      edits.push(edit);
       continue;
     }
 
-    left -= want;
+    const held = run.pieces.reduce((sum, piece) => sum + piece.ticks, 0);
+    if (want === held && run.pieces.every((piece) => !piece.removed)) {
+      continue;
+    }
+
+    // A rest a `$DD` rides has to stay in front of it (`main.asm:L_10E4`), and the
+    // command is a hard bound, so it is the last piece of its stretch.
+    const last = run.pieces[run.pieces.length - 1];
+    const ridden = last.item.bend !== null && last.item.bend.span.start >= last.span.end;
+    const keeper = ridden ? last : run.pieces[0];
+    if (ridden && want <= 0) {
+      return refuse(REFUSE_CROWDED);
+    }
+
+    for (const piece of run.pieces) {
+      if (piece !== keeper || want <= 0) {
+        edits.push(...removeSpan(source, piece.span));
+        continue;
+      }
+
+      const text = spellRest(want, targetAMKVersion);
+      if (text === null) {
+        return refuse(REFUSE_SPELL);
+      }
+
+      const edit = spliceUnit(source, piece.span, `r${text}`);
+      if (edit) {
+        edits.push(edit);
+      }
+    }
   }
 
-  if (left === 0) {
-    return edits;
-  }
-
-  if (left < 0) {
-    return refuse(REFUSE_CROWDED); // The rests could not give up enough; a command would have to move.
-  }
-
-  const text = spellDuration(left, targetAMKVersion);
-  if (text === null) {
-    return refuse(REFUSE_SPELL);
-  }
-
-  const edit = writeInto(context, gap, `r${text}`);
-  return edit ? [...edits, edit] : refuse(REFUSE_CROWDED);
+  return edits;
 }
 
 /**
@@ -937,12 +1146,16 @@ function padChannels(
       continue;
     }
 
-    const text = spellDuration(to - ticks, targetAMKVersion);
+    // A channel already ending on a rest has that rest lengthened, so padding the
+    // same channel twice does not leave two rests side by side.
+    const text = spellRest(to - ticks + (tail.rest?.ticks ?? 0), targetAMKVersion);
     if (text === null) {
       return null;
     }
 
-    const edit = insertAt(tail.at, `${line}r${text}`, 1);
+    const edit = tail.rest
+      ? spliceUnit(source, tail.rest.span, `r${text}`)
+      : insertAt(tail.at, `${line}r${text}`, 1);
     if (edit) {
       edits.push(edit);
     }
@@ -1242,7 +1455,7 @@ function joinInto(context: EditContext, site: LoopSite, sibling: LoopSite, count
  * it, and never abutting the text in front of it without a space.
  */
 function openBefore(context: EditContext, site: LoopSite, ticks: number): Edit[] | EditRefusal {
-  const text = spellDuration(ticks, context.targetAMKVersion);
+  const text = spellRest(ticks, context.targetAMKVersion);
   if (text === null) {
     return refuse(REFUSE_SPELL);
   }
@@ -1283,12 +1496,12 @@ function closeBefore(context: EditContext, at: number, need: number): Edit[] | E
       continue;
     }
 
-    const text = spellDuration(rest.ticks - left, targetAMKVersion);
+    const text = spellRest(rest.ticks - left, targetAMKVersion);
     if (text === null) {
       return refuse(REFUSE_SPELL);
     }
 
-    const shortened = spliceRange(source, rest.unitSpan, `r${text}`);
+    const shortened = spliceUnit(source, rest.unitSpan, `r${text}`);
     if (shortened) {
       edits.push(shortened);
     }
@@ -1363,7 +1576,7 @@ export function openGap(
       return [];
     }
 
-    const text = spellDuration(delta, targetAMKVersion);
+    const text = spellRest(delta, targetAMKVersion);
     if (text === null) {
       return refuse(REFUSE_SPELL);
     }
@@ -1484,7 +1697,7 @@ export function resizeLoop(
   }
 
   if (run.rests.length > 0) {
-    const written = collapse(context, { rests: run.rests, joined: false }, want);
+    const written = collapse(context, run.rests, want);
     if (written === null) {
       return refuse(REFUSE_SPELL);
     }
@@ -1495,7 +1708,7 @@ export function resizeLoop(
     // the body's interior, which for the head is what keeps a command written
     // there on its tick: it runs at body-local `delta`, and the pass begins
     // `delta` earlier.
-    const text = spellDuration(delta, targetAMKVersion);
+    const text = spellRest(delta, targetAMKVersion);
     if (text === null) {
       return refuse(REFUSE_SPELL);
     }
@@ -1629,7 +1842,7 @@ function spawnRun(
 
     const end = at + ticks;
     while (splits(end)) {
-      const piece = spellDuration(marks[next].tick - at, targetAMKVersion);
+      const piece = spellRest(marks[next].tick - at, targetAMKVersion);
       if (piece === null) {
         return false;
       }
@@ -1639,7 +1852,7 @@ function spawnRun(
       mark();
     }
 
-    const last = spellDuration(end - at, targetAMKVersion);
+    const last = spellRest(end - at, targetAMKVersion);
     if (last === null) {
       return false;
     }
@@ -1765,9 +1978,12 @@ function restFor(gap: Region, born: PlacedNote): StripItem | null {
  * Every interior note is in it by construction: a surviving note would bound
  * the region instead, so each one here is being removed and its ticks have to
  * be re-expressed by the run. Only a rest can stand aside, and only one no
- * born note reaches into.
+ * born note reaches into — unless it touches the window at an end where the run
+ * leaves a rest of its own, and then it joins, or the two rests would be written
+ * side by side.
  */
 function windowOf(
+  source: string,
   strip: Strip,
   frame: StripFrame,
   gap: Region,
@@ -1807,12 +2023,44 @@ function windowOf(
     }
   }
 
-  return interior.filter((item) => item.startTick < to && item.startTick + item.ticks > from);
+  const chosen = interior.filter(
+    (item) => item.startTick < to && item.startTick + item.ticks > from,
+  );
+  if (chosen.length === 0 || order.length === 0) {
+    return chosen;
+  }
+
+  const touching = (left: StripItem, right: StripItem): boolean =>
+    source.slice(left.unitSpan.end, right.unitSpan.start).trim() === '';
+  let first = interior.indexOf(chosen[0]);
+  let last = interior.indexOf(chosen[chosen.length - 1]);
+  const lastBorn = order[order.length - 1];
+  if (order[0].startTick > from) {
+    while (
+      first > 0 &&
+      interior[first - 1].kind === 'rest' &&
+      touching(interior[first - 1], interior[first])
+    ) {
+      first--;
+    }
+  }
+
+  if (lastBorn.startTick + lastBorn.ticks < to) {
+    while (
+      last < interior.length - 1 &&
+      interior[last + 1].kind === 'rest' &&
+      touching(interior[last], interior[last + 1])
+    ) {
+      last++;
+    }
+  }
+
+  return interior.slice(first, last + 1);
 }
 
-/** A command a run has to write for itself, and the tick it stands on. */
-interface CarriedCommand {
-  command: Command;
+/** Text a run takes over from the window it is laid over, and the tick it stood on. */
+interface Carried {
+  span: Span;
   tick: number;
   /**
    * Whether it stands inside a unit the plan is splicing, and so is already
@@ -1820,16 +2068,18 @@ interface CarriedCommand {
    * `unitSpan`, where one between two units is left behind by both.
    */
   inside: boolean;
+  /** Written out again on its tick, or only taken out: an octave the run states for itself. */
+  mark: boolean;
 }
 
 /**
  * What a run laid over the window has to take over from the text it replaces,
  * or `null` where something in there cannot be taken over at all.
  *
- * A `v`, a `y`, a `$ED` or the intro `/` carries no ticks of its own but does
- * carry a **position**: the tick of the boundary it stands at. A run rewrites
- * every boundary strictly inside the window, so anything written on one has to
- * be re-emitted by the run itself, at that same tick — which is what a
+ * A `v`, a `t`, an echo write or the intro `/` carries no ticks of its own but
+ * does carry a **position**: the tick of the boundary it stands at. A run
+ * rewrites every boundary strictly inside the window, so anything written on one
+ * has to be re-emitted by the run itself, at that same tick — which is what a
  * {@link RunMark} is. One written before the window's first item or after its
  * last stands on a boundary the run starts or ends at, and stays exactly where
  * it is, which is why only the interior is read.
@@ -1838,12 +2088,16 @@ interface CarriedCommand {
  * and inside one of them, between the head and a `^` continuation the porter
  * put a command between (`roll-strip.ts:segments`).
  *
- * Only a `'note-state'` command is carried. A `t` or a `w` acts on the song and
- * not on this channel's next note, an `l` or a naked `o` is parse state the run
- * spells for itself and two writers on one variable is worse than a refusal, a
- * `;` comment and the intro `/` are not commands at all, and a command written
- * through a `"name=value"` has a span collapsed onto its call site
- * (`edits.ts:commandRewritable`). Each of those refuses.
+ * What says nothing about time is not carried. A `;` comment and an `l` between
+ * two items are left where they were written — every length the run writes is
+ * its own — and an `o`, `<` or `>` is taken out, the run stating the octave it
+ * needs and putting back the one the original had after it (`spawnInto`). An
+ * `l` inside a unit going is carried, so it is not lost with the unit.
+ *
+ * Refused: a `$DD`, which needs a *byte* in front of it rather than a tick
+ * (`main.asm:L_10E4`) and whose note target would read the run's octave; a
+ * bracket; and a command written through a `"name=value"`, whose span is
+ * collapsed onto its call site (`edits.ts:commandRewritable`).
  *
  * A command this plan deletes along with the item it defined stands on no
  * boundary at all, so the spans in `deleted` read as blank.
@@ -1852,15 +2106,48 @@ function windowCarries(
   context: EditContext,
   window: readonly StripItem[],
   deleted: readonly Span[],
-): CarriedCommand[] | null {
+  lead?: { from: number; to: number; tick: number },
+): Carried[] | null {
   const { source, strip } = context;
-  const carried: CarriedCommand[] = [];
+  const carried: Carried[] = [];
 
-  /** Everything written between two offsets, all of it standing on one tick. */
-  const between = (from: number, to: number, tick: number, inside: boolean): boolean => {
+  /**
+   * Everything written between two offsets, all of it standing on one tick. In
+   * front of the window an octave is left where it is: the run is written after
+   * it and enters under it.
+   */
+  const between = (
+    from: number,
+    to: number,
+    tick: number,
+    inside: boolean,
+    front = false,
+  ): boolean => {
     let at = from;
     while (at < to) {
       if (/\s/.test(source[at]) || deleted.some((span) => at >= span.start && at < span.end)) {
+        at++;
+        continue;
+      }
+
+      if (source[at] === ';') {
+        const end = source.indexOf('\n', at);
+        at = end < 0 || end > to ? to : end;
+        continue;
+      }
+
+      const intro = strip.intros.find((span) => span.start === at);
+      if (intro !== undefined) {
+        carried.push({ span: intro, tick, inside, mark: true });
+        at = intro.end;
+        continue;
+      }
+
+      if (source[at] === '<' || source[at] === '>') {
+        if (!front) {
+          carried.push({ span: { start: at, end: at + 1, line: 1 }, tick, inside, mark: false });
+        }
+
         at++;
         continue;
       }
@@ -1870,23 +2157,35 @@ function windowCarries(
         command === undefined ||
         command.inRemoteDefinition ||
         !commandRewritable(command) ||
-        // A `RunMark` re-emits its command at a tick, and `$DD` needs a *byte*
-        // in front of it rather than a tick (`main.asm:L_10E4`) — and where it
-        // names its target as a note, that target would read the run's octave
-        // rather than the one it was written under. `StripItem.bend` is what
-        // keeps it where it is; the run being refused here is the same answer.
         command.vcmd === 0xdd ||
-        commandScope(command) !== 'note-state'
+        commandScope(command) === 'structure'
       ) {
         return false;
       }
 
-      carried.push({ command, tick, inside });
+      const kind = command.kind.toLowerCase();
+      if (isPercussionInstrument(command)) {
+        // A drum `@` belongs to the note it feeds, wherever the run puts notes:
+        // `planEdits` takes it out with that note or moves it to its head.
+      } else if (kind === 'o') {
+        if (!front) {
+          carried.push({ span: command.span, tick, inside, mark: false });
+        }
+      } else if (kind !== 'l' || inside) {
+        carried.push({ span: command.span, tick, inside, mark: true });
+      }
+
       at = command.span.end;
     }
 
     return true;
   };
+
+  // The text in front of the window, where the run begins before the window's
+  // first item: taken over where it can be, and left where it stands otherwise.
+  if (lead !== undefined && !between(lead.from, lead.to, lead.tick, false, true)) {
+    carried.length = 0;
+  }
 
   for (let index = 0; index < window.length; index++) {
     const item = window[index];
@@ -2023,20 +2322,8 @@ function spawnInto(
 
     window = [over];
   } else {
-    window = windowOf(strip, context.frame, gap, order);
+    window = windowOf(source, strip, context.frame, gap, order);
     over = window.find((item) => item.kind === 'rest') ?? null;
-  }
-
-  // Everything in the window but the whitespace is either leaving — a unit
-  // `planEdits` removes, or a declaration deleted with the item that owned it,
-  // which arrives here as a span so the run can tell text that is going from
-  // text that would have to move — or is a `'note-state'` command the run writes
-  // for itself on the tick it stands on. A `t`, an `l` or a `/` in there still
-  // refuses, for the reason deleting the notes around it would move it: what it
-  // stood against has gone, and the run has nothing to say on its behalf.
-  const carried = windowCarries(context, window, deleted);
-  if (carried === null) {
-    return refuse(REFUSE_CROWDED);
   }
 
   const wide = window.length === gap.between;
@@ -2078,6 +2365,23 @@ function spawnInto(
         : gap.startTick + gap.ticks
       : over.startTick + over.ticks;
 
+  // Everything in the window but the whitespace is either leaving — a unit
+  // `planEdits` removes, or a declaration deleted with the item that owned it,
+  // which arrives here as a span so the run can tell text that is going from
+  // text that would have to move — or is written out again by the run on the
+  // tick it stands on (`windowCarries`). So is what stands in front of the
+  // window's first item where the run begins before that item did: written there,
+  // a `/` or a `t` would run where the run starts.
+  const leadFrom = gap.after >= 0 ? afterBend(strip.items[gap.after]) : -1;
+  const lead =
+    laidOut && window.length > 0 && leadFrom >= 0 && runFrom < window[0].startTick
+      ? { from: leadFrom, to: window[0].unitSpan.start, tick: window[0].startTick }
+      : undefined;
+  const carried = windowCarries(context, window, deleted, lead);
+  if (carried === null) {
+    return refuse(REFUSE_CROWDED);
+  }
+
   /** One rest before each note, and one more after the last — `order.length + 1`. */
   const gaps: number[] = [];
   let at = runFrom;
@@ -2111,118 +2415,121 @@ function spawnInto(
   }
 
   for (const each of carried) {
-    marks.push({
-      tick: each.tick,
-      text: source.slice(each.command.span.start, each.command.span.end),
-    });
+    if (each.mark) {
+      marks.push({ tick: each.tick, text: source.slice(each.span.start, each.span.end) });
+    }
   }
 
   marks.sort((a, b) => a.tick - b.tick);
 
-  /**
-   * The octave the run leaves standing, which is the note's own: a spawn writes
-   * an absolute `o` in front of itself wherever one is in doubt, and a drum
-   * writes none at all and so leaves whatever stood.
-   */
-  const leaves = born.drum === null ? octaveFor(born.written) : null;
-  // The next *surviving* note, which is what bounds the region — `noteFrom`
-  // would find the first note item, and that may be one this plan is removing:
-  // an octave inserted at its head is an edit inside a range being deleted, and
-  // two edits over one run of text is what `planEdits` refuses. Bounded to the
-  // frame: past its end is another frame's text.
-  const reader = gap.before < context.frame.to ? gap.before : -1;
-
-  /**
-   * The note that reads the octave the run leaves, and so has to be given the
-   * one it was written under.
-   *
-   * Its own head, rather than the end of the run: `<` and `>` are not commands
-   * to the scanner at all, so nothing here can say which side of the run one
-   * written in this gap sits on, and a note's head is past every one of them. It
-   * is also where the text settles — an `o` written there is that note's leading
-   * octave on the next pass (`roll-strip.ts:growUnits`), where one left between
-   * two rests is claimed by no unit and is what makes a later edit unreadable.
-   */
-  const owed =
-    leaves !== null && reader >= 0 && !writesItsOwnOctave(strip, reader, survivors)
-      ? strip.items[reader].octave
-      : null;
-
-  // Nothing left on the channel to hand it to, so the run carries it: `octave`
-  // is global parser state and leaks past a `#N` into the block below.
+  const { octaves } = strip;
   const previous = gap.after >= 0 ? strip.items[gap.after] : null;
-  const standing = previous ? (previous.exitOctave ?? previous.octave) : null;
-  const trailing = reader < 0 ? standing : null;
 
   /**
-   * The octave in force where the run goes, or `null` for not known — a note
-   * drawn at the octave already standing writes no `o` in front of itself.
-   *
-   * The note before the gap gives it, out of its own byte, so a `<` or a `>`
-   * written above that note is already in it. What is left is the text between
-   * that note and where the run lands, which has to move the octave nowhere:
-   * only an `o` of either case, a `<` and a `>` can, and a channel the strip
-   * built holds no `[ ]`, `(n)` or `"x=y"` to hide one inside
-   * (`roll-strip.ts:forbiddenConstruct`), so reading those characters off the
-   * text is exact. It over-matches one
-   * written in a comment, which costs the note an `o` it did not need and
-   * nothing else.
+   * Where the run's text begins in the original, which is what it enters under:
+   * everything in the window is leaving, so the octave there is the one standing
+   * in front of the window's first item. With no window it is where
+   * {@link writeInto} puts the run.
    */
-  const runAt = over
-    ? over.unitSpan.start
-    : (windowLast?.unitSpan.end ?? previous?.unitSpan.end ?? 0);
-  const inForce =
-    previous !== null && !MOVES_OCTAVE.test(source.slice(previous.unitSpan.end, runAt))
-      ? standing
-      : null;
-
-  /** The head the octave would be put back at, which is where the reader begins. */
-  const readAt = reader >= 0 ? strip.items[reader].unitSpan.start : 0;
-  /**
-   * Where the run's text ends, which is where the splice over `over` and the
-   * insertions below put it: the rest it was written over, the window's last
-   * item, or the reader's own head for a region at the top of the channel.
-   */
-  const runEnd = over
-    ? over.unitSpan.end
-    : (windowLast?.unitSpan.end ??
-      (gap.after >= 0 ? strip.items[gap.before - 1].unitSpan.end : readAt));
+  const enterAt =
+    window[0]?.unitSpan.start ??
+    (gap.after >= 0
+      ? afterBend(strip.items[gap.before - 1])
+      : gap.before < context.frame.to
+        ? strip.items[gap.before].unitSpan.start
+        : strip.home.declared && empty
+          ? strip.home.at
+          : null);
+  /** And where the original text takes up again after it. */
+  const afterRun = windowLast?.unitSpan.end ?? enterAt;
+  // Stated outright where the run takes over a note that stated its own, and on a
+  // channel's first note, so the channel does not depend on the block above it.
+  const states = empty || (window[0]?.kind === 'note' && window[0].hasLeadingOctave);
+  const inForce = opening
+    ? OPENING_OCTAVE
+    : states || enterAt === null
+      ? null
+      : octaves.at(enterAt);
 
   /**
-   * Whether the note after the gap can be left as it is.
-   *
-   * The run leaves {@link leaves} standing, so that note reads what it was
-   * written under exactly when the two are the same octave and nothing between
-   * the run and its head moves the octave again. What can is the characters the
-   * scan above reads, on the other side of the run, and for the same reason: an
-   * `o` of either case, a `<` and a `>` are all that move it, and a channel the
-   * strip built holds no `[ ]`, `(n)` or `"x=y"` to hide one inside. It over-matches
-   * one written in a comment and one inside a unit this plan is deleting, which
-   * costs the note an `o` it did not need and nothing else.
+   * The octave the run leaves standing: its last pitched note's, since a spawn
+   * writes an absolute `o` wherever one is in doubt, and a drum writes none and
+   * leaves whatever stood.
    */
-  const untouched = owed === leaves && !MOVES_OCTAVE.test(source.slice(runEnd, readAt));
+  const pitched = order.filter((each) => each.drum === null);
+  const lastPitched = pitched[pitched.length - 1];
+  const leaves = lastPitched === undefined ? inForce : octaveFor(lastPitched.written);
 
-  const run = spawnRun(
-    context,
-    order,
-    gaps,
-    runFrom,
-    opening ? OPENING_OCTAVE : inForce,
-    marks,
-    trailing,
-  );
+  // The next *surviving* item, which is what bounds the region — the first note
+  // item may be one this plan is removing, and an octave inserted at its head is
+  // an edit inside a range being deleted. Bounded to the frame: past its end is
+  // another frame's text.
+  const reader = gap.before < context.frame.to ? strip.items[gap.before] : null;
+
+  /**
+   * What the reader has to be handed: a loop the octave its body was written
+   * under, a note the one its byte says — unless it writes its own.
+   */
+  const wanted =
+    reader === null
+      ? null
+      : reader.kind === 'construct'
+        ? octaves.first(reader.unitSpan.start, reader.unitSpan.end) === 'read'
+          ? octaves.at(reader.unitSpan.start)
+          : null
+        : writesItsOwnOctave(strip, gap.before, survivors)
+          ? null
+          : reader.octave;
+
+  /**
+   * At the reader's head where nothing between the run and it moves the octave,
+   * which is where the text settles — an `o` written there is that note's leading
+   * octave on the next pass. Otherwise straight after the run, with the octave the
+   * original had there, so a `<` or `>` standing between still does its job.
+   */
+  let restoreAtReader = false;
+  let trailing: number | null = null;
+  if (reader !== null && afterRun !== null) {
+    const arriving = octaves.carry(leaves, afterRun, reader.unitSpan.start);
+    if (wanted !== null && arriving !== wanted) {
+      const there = octaves.moves(afterRun, reader.unitSpan.start) ? octaves.at(afterRun) : null;
+      trailing = there;
+      restoreAtReader = there === null;
+    }
+  } else if (reader === null) {
+    // Nothing left in the frame to hand it to, so the run carries it: `octave`
+    // is one variable, and leaks past a `#N` into the block below — unless what
+    // comes next sets its own, or nothing does.
+    const standing = previous ? (previous.exitOctave ?? previous.octave) : null;
+    const left = afterRun === null ? standing : (octaves.at(afterRun) ?? standing);
+    const reads = context.frame.body >= 0 || afterRun === null || octaves.next(afterRun) === 'read';
+    trailing = reads && left !== null && left !== leaves ? left : null;
+  }
+
+  // A pitched last note carries the octave after itself; a drum writes none, so
+  // the run does at its end instead.
+  const lastBorn = order[order.length - 1];
+  const exitOnNote = lastBorn.drum === null ? trailing : null;
+  const run = spawnRun(context, order, gaps, runFrom, inForce, marks, exitOnNote);
   if (run === null) {
     return refuse(REFUSE_SPELL);
   }
 
+  const putBack = trailing === null || exitOnNote !== null ? '' : spellOctave(trailing);
+  if (putBack === null) {
+    return refuse(REFUSE_SPELL);
+  }
+
+  const text = putBack === '' ? run : `${run} ${putBack}`;
+
   let restore: Edit | null = null;
-  if (owed !== null && !untouched) {
-    const spelled = spellOctave(owed);
+  if (restoreAtReader && reader !== null && wanted !== null) {
+    const spelled = spellOctave(wanted);
     if (spelled === null) {
       return refuse(REFUSE_SPELL);
     }
 
-    restore = insertAt(strip.items[reader].unitSpan.start, `${spelled} `, 1);
+    restore = insertAt(reader.unitSpan.start, `${spelled} `, 1);
   }
 
   // No rest to write over — the window holds nothing but notes this plan is
@@ -2231,23 +2538,20 @@ function spawnInto(
   // A window with no items at all is a run written beside the region's anchors,
   // which is {@link writeInto}'s to place.
   const edit = over
-    ? spliceRange(source, over.unitSpan, run)
+    ? spliceUnit(source, over.unitSpan, text)
     : windowLast !== undefined
-      ? insertAt(windowLast.unitSpan.end, ` ${run}`, 1)
-      : writeInto(context, gap, run);
+      ? insertAt(windowLast.unitSpan.end, ` ${text}`, 1)
+      : writeInto(context, gap, text);
   if (edit === null) {
     return refuse(REFUSE_CROWDED);
   }
 
-  // A run laid out afresh is the whole window's ticks, so the rests in it that
-  // it did not go over are gone: what they held is in the run now. Each goes as
-  // its own edit rather than the whole stretch going as one splice, since
-  // anything between them is a unit `planEdits` is removing and two edits over
-  // one run of text is what it refuses.
+  // A run laid out afresh is the whole window's ticks, so everything in it the
+  // run did not go over is gone: the rests, and the notes this plan removes. Each
+  // goes as its own edit rather than the whole stretch going as one splice, since
+  // two edits over one run of text is what `planEdits` refuses.
   const gone = laidOut
-    ? window
-        .filter((item) => item.kind === 'rest' && item !== over)
-        .flatMap((item) => removeItem(source, item))
+    ? window.filter((item) => item !== over).flatMap((item) => removeItem(source, item))
     : [];
 
   // A carried command the run has re-emitted has to come out of where it was
@@ -2255,7 +2559,7 @@ function spawnInto(
   // takes it along, and taking it twice is two edits over one run of text.
   const taken = carried
     .filter((each) => !each.inside)
-    .flatMap((each) => removeCommand(source, each.command));
+    .flatMap((each) => removeSpan(source, each.span));
 
   // The run first where the two land on the same offset — a run inserted at the
   // head of the note it is being written in front of — so `coalesce` joins them
@@ -2325,8 +2629,8 @@ function planReach(
  *
  * A gesture that moves no tick may reach into a loop written inside the one it
  * started in (`spansFrames`), and each frame is planned and spelled on its
- * own: the frames are disjoint text, so the pieces cannot overlap and sorting by
- * offset is the whole of the ordering they need. One frame refusing refuses the
+ * own: the frames are disjoint text, so the pieces should not overlap, and two
+ * that do are refused rather than handed on. One frame refusing refuses the
  * lot, because a group half written is a song of neither shape.
  *
  * The frame reaching furthest is the one that pads the other channels out, and
@@ -2360,7 +2664,7 @@ export function planGroupEdits(
     edits.push(...written);
   }
 
-  return edits.sort((a, b) => a.span.start - b.span.start);
+  return ordered(edits) ?? refuse(REFUSE_CROWDED);
 }
 
 export function planEdits(context: EditContext, plan: Plan): Edit[] | EditRefusal {
@@ -2409,6 +2713,24 @@ export function planEdits(context: EditContext, plan: Plan): Edit[] | EditRefusa
     born.push({ ...note, from: -1 });
   }
 
+  // A note that has come to stand across the intro `/` or a song-wide command is
+  // written again where it now plays too, so the run can split it around that
+  // tick and the song loops back, or changes tempo, where it always did. Not one
+  // with a command inside it or a slide riding it, which cannot be lifted; those
+  // push the marker to their edge.
+  for (const [index, note] of [...survivors]) {
+    const item = strip.items[index];
+    if (
+      item.segments.length === 1 &&
+      item.bend === null &&
+      coversMarker(strip, frame, index, note)
+    ) {
+      survivors.delete(index);
+      lifted.add(index);
+      born.push({ ...note, from: -1 });
+    }
+  }
+
   // Built here rather than at the pass below that realises them: an octave put
   // back at a note's head has to agree with what the run in front of it leaves,
   // and `survivors` and `born` are both settled once the crossings are out.
@@ -2440,7 +2762,10 @@ export function planEdits(context: EditContext, plan: Plan): Edit[] | EditRefusa
 
     if (index > frame.from) {
       for (const command of prefixCommandsOf(strip, item)) {
-        if (!reachesSomething(context, command, item.startTick, index, survivors, born)) {
+        if (
+          droppable(command) &&
+          !reachesSomething(context, command, item.startTick, index, survivors, born)
+        ) {
           unheard.add(command);
         }
       }
@@ -2454,17 +2779,21 @@ export function planEdits(context: EditContext, plan: Plan): Edit[] | EditRefusa
       if (
         commandScope(command) === 'note-state' &&
         !command.inRemoteDefinition &&
+        droppable(command) &&
         !reachesSomething(context, command, tick, index, survivors, born)
       ) {
         unheard.add(command);
-        swallowed.add(command);
+        if (underRun(regions, frame, index)) {
+          swallowed.add(command);
+        }
       }
     }
   }
 
   // Every drop is written out here rather than beside the item that owned it:
-  // a rest's prefix would otherwise have nowhere to go, since the item loop
-  // below passes over rests and the run that covers one only rewrites its unit.
+  // a rest's prefix would otherwise have nowhere to go. One written inside a unit
+  // a run is laid over goes with that unit's own removal; anywhere else the
+  // unit's segments become rest around it and it needs an edit of its own.
   for (const command of unheard) {
     if (!swallowed.has(command)) {
       edits.push(...removeCommand(source, command));
@@ -2473,82 +2802,97 @@ export function planEdits(context: EditContext, plan: Plan): Edit[] | EditRefusa
 
   const deleted: Span[] = [...unheard].map((command) => command.span);
 
-  // The octave the edited text leaves in force, carried down the channel so a
-  // note only writes one where the one already standing is not the one it needs.
-  // `null` is "not known": before the first note, and after anything between two
-  // notes that moved the octave itself — which is what the comparison against the
-  // previous note's own exit detects, since the compiler gave both of them.
-  let running: number | null = null;
-  let previous: StripItem | null = null;
-  /** Whether a unit has been removed since the last surviving note. */
-  let dropped = false;
+  const { octaves } = strip;
   /**
-   * The octaves put back in front of the notes that read them, held apart so
-   * they are written after the regions.
-   *
-   * A rest realised into the gap a deleted first note left goes in at the next
-   * surviving note's head as well (`writeInto`), and `coalesce` joins two empty
-   * ranges at one offset in the order this array holds them. The rest has to be
-   * read first: an `o` behind it is claimed by no unit on the next strip build.
+   * The octave the edited text has in force where the walk has got to, or `null`
+   * where it cannot be said — carried down the channel so a note only writes one
+   * where the one standing is not the one it needs. Text the plan does not touch
+   * moves it as it always did, read off the original ({@link OctaveModel.carry}).
+   */
+  let running: number | null =
+    frame.from < frame.to ? octaves.at(strip.items[frame.from].unitSpan.start) : null;
+  let at = frame.from < frame.to ? strip.items[frame.from].unitSpan.start : 0;
+  /**
+   * The end of the last edit after which the edited text stopped agreeing with
+   * the original about the octave, while it still disagrees — the place an octave
+   * put back restores the original from, so a `<` or `>` standing after it still
+   * does its job. `null` once the two agree again.
+   */
+  let diverged: number | null = null;
+  /**
+   * The octaves put back, held apart so they are written after the regions: a
+   * rest realised at a reader's head lands at the same offset, `coalesce` joins
+   * two empty ranges there in this array's order, and the rest has to be read
+   * first.
    */
   const restores: Edit[] = [];
 
+  /** Hands `reader` the octave the original gave it, from where the two parted. */
+  const restoreFor = (reader: StripItem, wanted: number): EditRefusal | null => {
+    const back = diverged === null ? null : octaves.at(diverged);
+    const inPlace =
+      diverged !== null && back !== null && octaves.moves(diverged, reader.unitSpan.start);
+    const spelled = spellOctave(inPlace && back !== null ? back : wanted);
+    if (spelled === null) {
+      return refuse(REFUSE_SPELL);
+    }
+
+    const restore =
+      inPlace && diverged !== null
+        ? insertAt(diverged, ` ${spelled}`, reader.unitSpan.line)
+        : insertAt(reader.unitSpan.start, `${spelled} `, reader.unitSpan.line);
+    if (restore) {
+      restores.push(restore);
+    }
+
+    running = wanted;
+    diverged = null;
+    return null;
+  };
+
+  /** Records where an edit ended, and whether the octave still agrees there. */
+  const settle = (end: number): void => {
+    diverged = running === octaves.at(end) ? null : end;
+    at = end;
+  };
+
   for (let index = frame.from; index < frame.to; index++) {
     const item = strip.items[index];
+    /** The octave standing before the text in front of this item, and where that text starts. */
+    const entering = running;
+    const gapFrom = at;
+    running = octaves.carry(running, at, item.unitSpan.start);
+    // A run written in front of this item answers for its head (`spawnInto`).
+    const answered = runBefore(regions, index);
+
     if (item.kind === 'construct') {
-      // The body may leave any octave standing, so what was carried in does not
-      // come out the other side — the next note spells its own.
-      running = null;
-      previous = item;
+      // A body written here reads the octave its text was written under, unless
+      // that text sets its own first; a recall parses no notes and reads nothing.
+      const reads = octaves.first(item.unitSpan.start, item.unitSpan.end) === 'read';
+      const wanted = octaves.at(item.unitSpan.start);
+      if (answered) {
+        running = reads ? wanted : null;
+        diverged = null;
+      } else if (reads && wanted !== null && running !== wanted) {
+        const refused = restoreFor(item, wanted);
+        if (refused) {
+          return refused;
+        }
+      }
+
+      running = octaves.carry(running, item.unitSpan.start, item.unitSpan.end);
+      settle(item.unitSpan.end);
       continue;
     }
 
-    if (item.kind !== 'note') {
+    if (item.kind === 'rest') {
+      running = octaves.carry(running, item.unitSpan.start, item.unitSpan.end);
+      at = item.unitSpan.end;
       continue;
-    }
-
-    if (
-      item.hasLeadingOctave ||
-      (previous !== null && (previous.exitOctave ?? previous.octave) !== item.octave)
-    ) {
-      // Something between the two notes moved the octave — a `<`, a `>`, or an
-      // `o` no unit claimed. What we were carrying is not what enters this one.
-      //
-      // The comparison cannot answer that for a unit carrying its own leading
-      // `o`: `item.octave` is what that `o` put in force rather than what
-      // entered the unit, so in `> c+32 r64 < o3 c32` the two agree at 3 while
-      // a `<` sits between them, and the `o3` the rewrite is about to splice
-      // away is the only thing holding the note up. The octave a spliced `o`
-      // leaves behind is unknown by construction, whatever stands in front.
-      running = null;
-    }
-
-    // Nothing has diverged from the original here yet, so the octave in force is
-    // the one the note was written under — which the compiler gave us. Without
-    // this seed the first note edited in a channel always gains an `o` saying
-    // what was already true. A unit carrying its own leading `o` stays unknown,
-    // since that `o` is about to be rewritten along with the note. So does a
-    // note standing after a unit that has gone: what the compiler gave us is
-    // what the text said before the `o` inside that unit was deleted.
-    if (running === null && !item.hasLeadingOctave && !dropped) {
-      running = item.octave;
     }
 
     const note = survivors.get(index);
     if (!note) {
-      // A command written inside the unit is inside the span `removeItem`
-      // splices, so it would go with the note and say nothing about it. Where a
-      // run is being laid over these ticks it is taken over on its own tick
-      // (`windowCarries`); where nothing is, there is no tick left to put it on
-      // and no gesture can say which side of the deletion the porter meant it to
-      // follow, so it is refused instead of quietly eaten.
-      if (
-        !coveredByBorn(order, item) &&
-        insideCommands(strip, item).some(({ command }) => !unheard.has(command))
-      ) {
-        return refuse(REFUSE_INSIDE);
-      }
-
       // A `$DD` reads the note in front of it rather than being dispatched
       // (`main.asm:L_10E4`), so taking that note away does not leave a slide
       // that does nothing — it leaves one the command loop reaches, whose
@@ -2558,84 +2902,121 @@ export function planEdits(context: EditContext, plan: Plan): Edit[] | EditRefusa
         return refuse(REFUSE_BEND_RIDER);
       }
 
-      // The unit takes the `o` written beside it with it (`roll-strip.ts`,
-      // `growUnits`), and what stood in force for the notes after it goes too.
-      // `running` is left alone: what stands after a removed unit is what stood
-      // before it, which is what it already holds.
-      edits.push(...removeItem(source, item));
+      // The drum it played goes with it, or the next note would play it instead.
+      const apart = drumApart(item);
+      if (apart !== null && !unheard.has(apart)) {
+        edits.push(...removeCommand(source, apart));
+      }
 
-      dropped = true;
-      previous = item;
+      // Its text is the region's to rewrite. Under a run the whole unit goes and the
+      // run states what it needs (`spawnInto`); elsewhere its segments become rest
+      // and its own `o`s stay where something still reads them (`keptOctaves`).
+      // What is written between its segments stays either way.
+      const head = item.segments[0];
+      const last = item.segments[item.segments.length - 1];
+      const kept = underRun(regions, frame, index)
+        ? { lead: false, trail: false }
+        : keptOctaves(context, item);
+      if (kept.lead) {
+        running = octaves.carry(running, item.unitSpan.start, head.span.start);
+      }
+
+      running = octaves.carry(running, head.span.end, last.span.start);
+      if (kept.trail) {
+        running = octaves.carry(running, last.span.end, item.unitSpan.end);
+      }
+
+      settle(item.unitSpan.end);
       continue;
     }
 
-    // A unit removed since the last surviving note took the octave this one was
-    // written under with it, so it is given one of its own — at its head, where
-    // the text settles: an `o` written there is this note's leading octave on
-    // the next pass, where one left between two rests is claimed by no unit and
-    // is what makes a later edit there unreadable. Once, however many notes
-    // went, because it is the note that reads the octave that asks for it rather
-    // than each note that dropped one — and not at all where a run spawned into
-    // the region in front of it has already answered for the same head.
-    if (
-      dropped &&
-      !writesItsOwnOctave(strip, index, survivors) &&
-      spawnLeaves(regions, index) === null &&
-      item.octave !== running
-    ) {
-      const spelled = item.octave === null ? null : spellOctave(item.octave);
-      if (spelled === null) {
-        return refuse(REFUSE_SPELL);
+    // A note moved to the octave standing before the `<` and `>` in front of it
+    // has those taken out rather than an `o` written after them: they are read by
+    // this note alone, and `o4 c4 > d4` with `d4` dropped an octave is `o4 c4 d4`.
+    // What the note leaves is put back by its exit, as for any rewrite.
+    const shifts =
+      answered ||
+      note.drum !== null ||
+      item.hasLeadingOctave ||
+      entering === null ||
+      octaveFor(note.written) !== entering ||
+      octaveFor(note.written) === item.octave
+        ? null
+        : octaves.shiftsIn(gapFrom, item.unitSpan.start);
+    if (shifts !== null && shifts.length > 0) {
+      for (const shift of shifts) {
+        edits.push(
+          ...removeSpan(source, { start: shift, end: shift + 1, line: item.unitSpan.line }),
+        );
       }
 
-      const restore = insertAt(item.unitSpan.start, `${spelled} `, item.unitSpan.line);
-      if (restore) {
-        restores.push(restore);
-      }
-
-      running = item.octave;
+      running = entering;
     }
 
-    dropped = false;
+    if (answered) {
+      // What the run leaves is the original's here, or this note spells its own.
+      running = writesItsOwnOctave(strip, index, survivors) ? null : item.octave;
+      diverged = null;
+    } else if (!writesItsOwnOctave(strip, index, survivors) && running !== item.octave) {
+      const refused = item.octave === null ? null : restoreFor(item, item.octave);
+      if (refused) {
+        return refused;
+      }
+    }
 
-    const written = rewriteNote(context, index, note, survivors, running);
-    if (!isEdits(written)) {
+    const written = rewriteNote(context, index, note, survivors, regions, running);
+    if (!isRewrite(written)) {
       return written;
     }
 
-    edits.push(...written);
-    const exit = exitOctaveFor(strip, index, survivors);
-    // A drum writes no octave, so it leaves whatever was standing.
-    const own: number | null = note.drum === null ? octaveFor(note.written) : running;
-    // `exit` is null where the next note sets its own octave, which says the
-    // rewrite need not put this unit's trailing `o` back — and a unit nothing
-    // rewrote still has that `o` in it, since `rewriteNote` answers no edits at
-    // all for a note whose pitch and length are both unchanged. The text is the
-    // authority there, and reading `own` instead makes the next note's new
-    // octave look like the one already standing, so nothing is spelled and the
-    // gesture commits nothing.
-    running = written.length === 0 ? (item.exitOctave ?? own) : (exit ?? own);
-    previous = item;
+    edits.push(...written.edits);
+
+    // A drum written apart from its note: a rewrite puts the `@` beside the note,
+    // and a run written in front of the note would take the drum, so it goes to
+    // the note's head — after the run, which is why it is held with the restores.
+    const apart = drumApart(item);
+    if (apart !== null && (written.edits.length > 0 || answered)) {
+      edits.push(...removeCommand(source, apart));
+      if (written.edits.length === 0) {
+        const moved = insertAt(
+          item.unitSpan.start,
+          `${source.slice(apart.span.start, apart.span.end)} `,
+          item.unitSpan.line,
+        );
+        if (moved) {
+          restores.push(moved);
+        }
+      }
+    }
+
+    running = written.leaves;
+    settle(item.unitSpan.end);
   }
 
-  // Nothing left on the channel to hand it to, so the octave the last unit put
-  // in force stays where that unit was: `octave` is global parser state and
-  // leaks past a `#N` into the block below. `coalesce` joins it to the unit's
-  // own removal, and the note before it claims it as a trailing `o` on the next
-  // pass. Only the last note deleted off the tail leaves `dropped` set, so a run
-  // of them writes one.
-  if (dropped && previous !== null) {
-    const standing = previous.exitOctave ?? previous.octave;
-    // A run spawned into the tail spells its own last note's octave, so that is
-    // what the block below reads and there is nothing here to say.
-    const left = spawnLeaves(regions, frame.to) ?? running;
-    if (standing !== null && standing !== left) {
-      const spelled = spellOctave(standing);
+  // Past the frame's last item the original goes on as it was written: the rest of
+  // the channel, and then the blocks below, `octave` being one variable that a
+  // `#N` does not reset. Put back only where something there reads it, and not
+  // where a run in the tail has already answered.
+  const tailRun = regions.some((region) => region.tail && region.born.length > 0);
+  const lastItem = frame.from < frame.to ? strip.items[frame.to - 1] : null;
+  if (!tailRun && lastItem !== null) {
+    const wanted =
+      octaves.at(at) ??
+      (lastItem.kind === 'note' ? (lastItem.exitOctave ?? lastItem.octave) : null);
+    const reads = frame.body >= 0 || octaves.next(at) === 'read';
+    if (reads && wanted !== null && running !== wanted) {
+      const back = diverged === null ? null : octaves.at(diverged);
+      const inPlace = diverged !== null && back !== null && octaves.moves(diverged, at);
+      const spelled = spellOctave(inPlace && back !== null ? back : wanted);
       if (spelled === null) {
         return refuse(REFUSE_SPELL);
       }
 
-      const restore = insertAt(previous.unitSpan.end, ` ${spelled}`, previous.unitSpan.line);
+      const restore = insertAt(
+        inPlace && diverged !== null ? diverged : at,
+        ` ${spelled}`,
+        lastItem.unitSpan.line,
+      );
       if (restore) {
         restores.push(restore);
       }
@@ -2673,20 +3054,152 @@ export function planEdits(context: EditContext, plan: Plan): Edit[] | EditRefusa
   // there.
   edits.push(...restores);
 
-  // Shortest first at a shared offset, so an insertion sits ahead of the
-  // replacement it abuts and `coalesce` can join the two into one.
+  const sorted = ordered(edits);
+  if (sorted === null) {
+    return refuse(REFUSE_CROWDED);
+  }
+
+  const dead = deadOctaves(context, sorted);
+  return dead.length === 0 ? sorted : (ordered([...sorted, ...dead]) ?? refuse(REFUSE_CROWDED));
+}
+
+/**
+ * The edits in offset order, joined where they touch, or `null` where two overlap.
+ *
+ * Shortest first at a shared offset, so an insertion sits ahead of the
+ * replacement it abuts and `coalesce` can join the two into one. CodeMirror
+ * merges overlapping ranges instead of refusing them, so refusing them is the
+ * roll's own invariant to hold rather than something it can be told.
+ */
+function ordered(edits: readonly Edit[]): Edit[] | null {
   const sorted = coalesce(
-    edits.sort((a, b) => a.span.start - b.span.start || a.span.end - b.span.end),
+    [...edits].sort((a, b) => a.span.start - b.span.start || a.span.end - b.span.end),
   );
   for (let at = 1; at < sorted.length; at++) {
-    // CodeMirror merges overlapping ranges instead of refusing them, so this is
-    // the roll's own invariant to hold rather than something it can be told.
     if (sorted[at].span.start < sorted[at - 1].span.end) {
-      return refuse(REFUSE_CROWDED);
+      return null;
     }
   }
 
   return sorted;
+}
+
+/**
+ * The porter's own `o`, `<` and `>` an edit has left with nothing to read them —
+ * read by something before it and by nothing after — taken out, so an edit leaves
+ * no octave standing in front of another that undoes it.
+ *
+ * Only the edited channel's, and only text no edit touches. Taking out an octave
+ * nothing reads changes no note, so this is spelling and never music.
+ */
+function deadOctaves(context: EditContext, sorted: readonly Edit[]): Edit[] {
+  const { source, strip, frame } = context;
+  if (sorted.length === 0) {
+    return [];
+  }
+
+  const index = tokenize(source);
+  const markers = channelMarkers(index, source);
+  /** The channel a root offset is written on; `-1` above the first marker. */
+  const owner = (offset: number): number => {
+    let channel = -1;
+    for (const marker of markers) {
+      if (marker.start > offset) {
+        break;
+      }
+
+      channel = marker.channel;
+    }
+
+    return channel;
+  };
+
+  // A body's text is its own frame's, which the same gesture may be rewriting.
+  const inBody = (offset: number): boolean =>
+    strip.frames.some(
+      (each) =>
+        each !== frame &&
+        each.body >= 0 &&
+        offset >= each.span.start &&
+        offset < each.span.end &&
+        (frame.body < 0 || each.span.start >= frame.span.start),
+    );
+  const ours = (offset: number): boolean =>
+    !inBody(offset) &&
+    (frame.body >= 0
+      ? offset >= frame.span.start && offset < frame.span.end
+      : owner(offset) === strip.channel);
+
+  const candidates: Span[] = [
+    ...index.tokens
+      .filter((token) => token.kind === 'octaveShift')
+      .map((token) => ({ start: token.start, end: token.end, line: token.line })),
+    ...index.commands
+      .filter(
+        (command) =>
+          command.kind.toLowerCase() === 'o' &&
+          command.replacement === undefined &&
+          !command.inRemoteDefinition,
+      )
+      .map((command) => command.span),
+  ];
+
+  let text = '';
+  let cursor = 0;
+  /** Where each edit's own text lands in the edited text. */
+  const written: { start: number; end: number }[] = [];
+  for (const edit of sorted) {
+    text += source.slice(cursor, edit.span.start);
+    written.push({ start: text.length, end: text.length + edit.text.length });
+    text += edit.text;
+    cursor = edit.span.end;
+  }
+
+  text += source.slice(cursor);
+  const after = octaveModel(text, tokenize(text));
+  /** Where an offset no edit covers lands in the edited text. */
+  const moved = (offset: number): number =>
+    sorted.reduce(
+      (at, edit) =>
+        edit.span.end <= offset ? at + edit.text.length - (edit.span.end - edit.span.start) : at,
+      offset,
+    );
+
+  const out: Edit[] = [];
+  for (const span of candidates) {
+    if (!ours(span.start)) {
+      continue;
+    }
+
+    const gone = removeSpan(source, span);
+    const from = gone[0]?.span.start ?? span.start;
+    const touched = sorted.some(
+      (edit) =>
+        (edit.span.start < span.end && edit.span.end > from) ||
+        (edit.span.start === edit.span.end && edit.span.start > from && edit.span.start < span.end),
+    );
+    const end = moved(span.start) + span.end - span.start;
+    if (touched || after.next(end) === 'read') {
+      continue;
+    }
+
+    // Read before the edit, or unread already and now standing straight in front
+    // of an octave the edit wrote, which is the stacking `o4 o3` this is for — but
+    // not where that octave is the one that overrode it before, rewritten in place.
+    const next = after.nextAt(end);
+    const was = strip.octaves.nextAt(span.end);
+    const restated =
+      was !== null && sorted.some((edit) => was >= edit.span.start && was < edit.span.end);
+    const behindOurs =
+      !restated &&
+      next !== null &&
+      written.some((range) => next >= range.start && next < range.end);
+    if (strip.octaves.next(span.end) === 'read' || behindOurs) {
+      out.push(...gone);
+    }
+  }
+
+  return out;
 }
 
 /**
@@ -2774,6 +3287,56 @@ function crossings(
   }
 
   return crossed;
+}
+
+/**
+ * Whether a note moved or resized now plays across, or on the far side of, an
+ * intro `/` or a song-wide command written in its frame — which keeps its tick
+ * only if the note is written again where it now plays.
+ *
+ * A marker's tick is that of the first item written after it. Only markers
+ * between the frame's own items count, and not one inside a loop's body, which
+ * is another frame's text.
+ */
+function coversMarker(strip: Strip, frame: StripFrame, at: number, note: PlacedNote): boolean {
+  const item = strip.items[at];
+  if ((note.startTick === item.startTick && note.ticks === item.ticks) || frame.from >= frame.to) {
+    return false;
+  }
+
+  const first = strip.items[frame.from].unitSpan.start;
+  const last = strip.items[frame.to - 1].unitSpan.end;
+  const markers = [
+    ...strip.intros,
+    ...strip.commands
+      .filter((command) => command.noteLength === undefined && commandScope(command) === 'song')
+      .map((command) => command.span),
+  ].filter(
+    (span) =>
+      span.start >= first &&
+      span.start < last &&
+      !strip.items
+        .slice(frame.from, frame.to)
+        .some((each) => span.start >= each.unitSpan.start && span.start < each.unitSpan.end),
+  );
+
+  const end = note.startTick + note.ticks;
+  for (const span of markers) {
+    let tick = frame.ticks;
+    for (let index = frame.from; index < frame.to; index++) {
+      if (strip.items[index].unitSpan.start >= span.end) {
+        tick = strip.items[index].startTick;
+        break;
+      }
+    }
+
+    const written = item.unitSpan.end <= span.start;
+    if (written ? end > tick : note.startTick < tick) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 /**

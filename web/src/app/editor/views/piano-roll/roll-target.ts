@@ -165,7 +165,13 @@ export function rollTarget(sources: TargetSources): RollTarget {
    * which {@link playableTicks} is the smallest non-zero member of.
    */
   const tails = computed(() =>
-    channelTails(editor.source(), editor.tokens(), editor.result()?.stats?.channelTicks ?? []),
+    channelTails(
+      editor.source(),
+      editor.tokens(),
+      editor.result()?.stats?.channelTicks ?? [],
+      // Spans into the compiled text, so only while that is the text in the editor.
+      editor.compiledText() === editor.source() ? (editor.result()?.noteMap ?? []) : [],
+    ),
   );
 
   /** The walk's notes by address, which is how a strip item names the one it is. */

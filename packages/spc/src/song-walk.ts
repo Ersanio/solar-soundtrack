@@ -262,6 +262,21 @@ function slotsOf(vcmd: number, sub: number): { writes: StateSlot | null; clears:
 }
 
 /**
+ * Whether the next command into this one's slot undoes everything it did, so
+ * that a note playing without it in {@link WalkNote.origins} is proof it reaches
+ * nothing more.
+ *
+ * Not a command that only clears a slot — after `$DF` there is no vibrato to be
+ * in force, so no note ever names it — nor `$F4`'s switches or `$FA`'s settings,
+ * which share a slot without replacing one another (two `$F4 $01`s cancel, and
+ * `$F4 $03` leaves `$F4 $01` standing), nor one that fills no slot at all.
+ */
+export function replacedByNextInSlot(vcmd: number, sub: number): boolean {
+	const { writes } = slotsOf(vcmd, sub);
+	return writes !== null && writes !== "toggles" && writes !== "settings";
+}
+
+/**
  * The song-wide and per-channel settings a note sounds under.
  *
  * Deliberately the whole of it, not the subset anything reads today. A view

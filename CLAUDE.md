@@ -303,8 +303,27 @@ One entry each: what it was, what it is, why.
   than refuses. Leading wins (`growUnits`), which is also what makes the restore stable: a repitch
   writes `o3 c4 o4 d4`, and on the next pass that `o4` is `d4`'s own leading octave.
 - **Re-serializing the whole run of text between two notes** to realise a gap — it moves every `v`,
-  `y` and `$ED` written in that run. Each item carries a `prefixSpan` instead, the rest nearest the
-  note _before_ the gap absorbs the change, and a gap whose run holds a fade command is refused.
+  `y` and `$ED` written in that run. The gap is pieces of rest between **hard** bounds — text read at
+  a tick: a byte-emitting command or the intro `/` (`realiseRegion`, `pinned`) — and each bound keeps
+  its tick, clamped into the gap's new extent.
+- **Taking a gap's change from the rest nearest the note _before_ it** — so a `v200`, a `t60` or the
+  intro `/` written in the gap rode along with the note after it, the lane's glyph moved under a
+  gesture that never named it, and dragging a note beside the `/` moved the song's loop point. The
+  rest beside **whichever note moved** takes the change: the stretch before the first hard bound when
+  the note in front's end moved, the one after the last when the note behind's start did.
+- **Removing a deleted note's unit and writing the gap's rest somewhere else** — after the note in
+  front, or at the next note's head where there was none, which put a channel's `t60` or fade at
+  tick 0 when its first note went and slid every command between two deleted notes onto the first.
+  A deleted note's segments are **pieces of rest where it stood**, merged with the rests they touch
+  (soft text between — whitespace, comments, `o`, `l`, a deleted command — joins them), so nothing
+  written around it moves.
+- **A tail ending wherever its music ends** — in a channel, deleting the shortest one's last note cut
+  the song short and silenced the others past the new end, and deleting a song's only note left
+  `#0 o4`, which does not compile; in a body, deleting the last note tightened the loop and an
+  emptied one was `[]2`, which the strip cannot frame. A tail keeps its length (`realiseRegion`,
+  `plannedFrameTicks`): a channel is only ever lengthened by a note gesture, and shortening a loop is
+  the box's right-end resize. Not trimmed back to the song's end where a channel runs long either:
+  that would move any command written in its trailing rests.
 - **Refusing `<` and `>` in an edited channel** — they are not commands to the scanner at all, and
   they are harmless: a note's octave comes from its own `written` byte rather than from a running
   sum, so `o4 c4 > d4` repitches either note without disturbing the other. `rolltest` pins it. That
@@ -392,20 +411,19 @@ One entry each: what it was, what it is, why.
   rewrite restores the octave standing after the note it rewrote, which that note's own byte gives
   it exactly; a run written into a gap has no such anchor, and `<` and `>` are not commands to the
   scanner, so nothing can say which side of the run one written in the gap sits on. The octave goes
-  at the **head of the note that reads it** (`spawnInto`), where the byte is the answer and any
-  shift has already been applied — and where the text settles anyway, since an `o` left between two
-  rests is claimed by no unit on the next strip build and is what makes a later edit there
-  unreadable. Only a channel with no note left to hand it to has the run carry it, for the leak past
-  a `#N`.
+  at the **head of the note that reads it** (`spawnInto`) where nothing between the run and that head
+  moves the octave — where the text settles, an `o` there being that note's leading octave on the
+  next pass — and **straight after the run**, as the original had it there, where a `<` or `>` stands
+  between, so that shift still does its job. Only a channel with no note left to hand it to has the
+  run carry it, for the leak past a `#N`, and only where something after the channel reads it.
 - **Answering a deleted note's octave with `running = null`**, and leaving the note after it to
   notice — a note whose pitch and length are unchanged returns from `rewriteNote` before an octave
   is spelled at all, and the seed above it re-reads `item.octave` off the text the deletion had just
-  taken away, so `o2 a8 d8` losing `a8` moved `d8` an octave up. The note that _reads_ the octave
-  asks for it, once per run of deletions (`dropped`) however many notes went, and it goes in at that
-  note's head rather than through a rewrite of its unit: `noteText` re-spells what it writes, so an
-  untouched `d-8` would come back `c+8` and a `b+4` as `o5 c4`. With no note left to hand it to it
-  stays where the last unit was, for the leak past a `#N`; `rolltest` pins both, and the whole
-  channel deleted.
+  taken away, so `o2 a8 d8` losing `a8` moved `d8` an octave up. A deleted note's own `o`s **stay in
+  the text where something still reads them** (`keptOctaves`), so the notes after it keep the octave
+  they were written under with nothing put back — `o2 a8 d8` becomes `o2 r8 d8` — and one only that
+  note read goes with it. Not handed to the next note's head through a rewrite of its unit either:
+  `noteText` re-spells what it writes, so an untouched `d-8` would come back `c+8`.
 - **Letting a note drawn past the end of the song extend only its own channel** — the driver reloads
   all eight track pointers the moment one voice reads its `$00` (`main.asm:L_0C01`,
   `Music.cpp:3209`), so the note was written, compiled, reported by `SST0502` and never heard, and
@@ -413,10 +431,14 @@ One entry each: what it was, what it is, why.
 stats.loopTicks` pads **every other channel that would cut the song short** out to meet it
   (`padChannels`), in the same commit and so the same undo step. It counts the notes the gesture
   moved — placed and pushed both — rather than every note in the plan, or a deletion in a channel
-  already running long would lengthen the song. A rest on the end needs no note map, no walk
-  agreement and no `Strip`, so a channel `channelStrip` refuses outright is padded like any other;
-  a channel at 0 ticks is left alone, since it holds nothing back. `rolltest`'s `playsFor` is what
-  pins it — a rest one note short reads exactly like a rest of the right length.
+  already running long would lengthen the song. A rest on the end needs no walk agreement and no
+  `Strip`, so a channel `channelStrip` refuses outright is padded like any other; a channel at 0
+  ticks is left alone, since it holds nothing back. `rolltest`'s `playsFor` is what pins it — a rest
+  one note short reads exactly like a rest of the right length.
+- **Padding a channel with a rest of its own every time** — a second draw past the end wrote a second
+  `rN` line under the first. A channel whose text ends on a rest has that rest lengthened
+  (`ChannelTail.rest`, off the note map, and only while the compile is of the text in the editor),
+  and one ending on anything else — a note, a bracket, a comment — is appended to as before.
 - **`cursor-pointer` on the roll's note bars**, to say a bar is clickable — an element's own
   `cursor` beats the one it inherits, so the class silenced the roll's own cursor over every painted
   part of a bar. The `ew-resize` showed in exactly one place: the `NOTE_GAP` sliver past a bar's
@@ -557,9 +579,9 @@ stats.loopTicks` pads **every other channel that would cut the song short** out 
   wrote in front of it. Both build the same insert at the same offset, `coalesce` concatenates
   rather than dedupes, and a note carried past another came out `o4 o4 d8`. The regions are built
   before the item loop, so the loop can ask whether a run is about to answer for that note
-  (`spawnLeaves`) and stand down — the pass that can see what the run leaves is the one that
-  speaks. Not a dedupe of identical edits at one offset: two writers agreeing by accident is not the
-  same as one of them knowing it has nothing to say.
+  (`runBefore`) and stand down — the pass that can see what the run leaves is the one that speaks.
+  Not a dedupe of identical edits at one offset: two writers agreeing by accident is not the same as
+  one of them knowing it has nothing to say.
 - **`planEdits` answering a refusal with a bare `null`** — the gesture was undone and nothing on
   screen said why, while `REFUSE_SPELL`, `REFUSE_CROWDED` and `REFUSE_RAMP` sat exported and unread.
   It answers `Edit[] | EditRefusal`, which is the shape `channelStrip` already has, and the roll puts
@@ -573,9 +595,20 @@ stats.loopTicks` pads **every other channel that would cut the song short** out 
   outright, so the guard was protecting a boundary that had gone anyway. It refused the commonest
   shape a carve leaves — a note drawn over a run of notes with a `v` or a `y` written between them —
   and wrote nothing at all. The guard is `windowCarries`, over the window the run consumes: a unit
-  being removed and a declaration deleted with its item are leaving, a `'note-state'` command is
-  written by the run on its own tick, and only what the run cannot speak for, a `t`, an `l` or a `/`,
-  refuses.
+  being removed and a declaration deleted with its item are leaving, and everything read at a tick
+  is written by the run on that tick.
+- **A run refusing a `t`, a `w`, an echo write, a `/`, an `l`, a comment or an octave shift in its
+  window** — none of them is anything the run cannot speak for. Song-wide commands and the `/` are
+  read at a tick like a `v` is, so they are carried as `RunMark`s; a comment and an `l` say nothing
+  about time and are left where they stand; an `o`, `<` or `>` is taken out, the run entering at the
+  octave standing in front of the window and putting back the one the original had after it. Only a
+  `$DD`, a bracket and a command written through a `"name=value"` still refuse. The text in front of
+  the window's first item is carried as well where the run begins before that item did, its octave
+  tokens left in place there, since the run is written after them and enters under them.
+- **Moving a note across the intro `/` or a song-wide command in place** — it pushed the marker to
+  the note's edge, moving the loop point or the tempo change. A note that comes to stand across or
+  beyond one is lifted like a crossing (`coversMarker`) and written by the run, which splits it
+  around the marker. Not one with a command inside it or a slide riding it, which cannot be lifted.
 - **Anchoring a spawned run at `strip.items[0]` where no note after the region survives** —
   `writeInto`'s head branch aims at the next _surviving_ note, and a carve that swallowed the whole
   channel leaves none: `items[0]` is then a note the same plan is deleting, `removeItem` takes the
@@ -585,11 +618,10 @@ stats.loopTicks` pads **every other channel that would cut the song short** out 
 - **Asking whether the note after a spawn can be left as it is by what stood _before_ the gap** —
   `untouched` compared the previous note's exit octave against the reader's and against the run's,
   so a region at the head of a channel, which has no note before it to compare with, always wrote an
-  `o` saying what the run had just said. What that note reads is what the **run** leaves: `noteText`
-  spells an absolute `o` wherever the octave in force is not the one the note needs, so after the run
-  the octave standing is the last born note's own. `untouched` is that against the reader's octave,
-  plus the `MOVES_OCTAVE` scan over the text between the run and the reader's head — the same scan
-  as `inForce`, on the other side of the run.
+  `o` saying what the run had just said. What that note reads is what the **run** leaves: its last
+  pitched note's octave, or the one it entered under where it holds only drums — carried over the
+  text between the run and the reader's head by the octave model, and compared with the octave the
+  reader was written under.
 - **The overview bar's minimap in one grey, deduped by pixel and row alone** — it was the one picture
   of the song that would not say whose note a bar was, and the key made that structural rather than
   incidental: two notes colliding on it are by definition two channels', so the wider won and the
@@ -697,10 +729,11 @@ stats.loopTicks` pads **every other channel that would cut the song short** out 
   segment (`roll-strip.ts`), so a `v200` written inside a note went out with the note in silence, and
   a `t` or an intro `/` would have gone the same way. A command inside a removed unit is asked the
   reach question on its own tick (`insideCommands`) and dropped where nothing sounds under it; where
-  a run is being laid over those ticks the run takes it over; and with neither, the gesture is
-  refused (`REFUSE_INSIDE`), because there is no tick left to put it on and no gesture can say which
-  side of the deletion the porter meant it to follow. `REFUSE_RAMP` keeps the one site whose reason
-  really is the length, a note cut shorter than the ticks in front of the command.
+  a run is being laid over those ticks the run takes it over; and a plain deletion leaves the note's
+  segments as rest around it, so it keeps its tick. Only where a surviving note now covers that tick
+  — a glue — is the gesture refused (`REFUSE_INSIDE`): there is no tick left to put it on and no
+  gesture can say which side of the note the porter meant it to follow. `REFUSE_RAMP` keeps the one
+  site whose reason really is the length, a note cut shorter than the ticks in front of the command.
 - **Handing a command a deletion left behind to the next surviving note** — deleting `b3` from
   `o4 a=27 p12,147 b3 c3` leaves the `p` in front of the rest that takes those ticks, and putting it
   on `c3` instead loses the tick: the `p` runs at 27, where the driver read it and where the rest
@@ -999,17 +1032,36 @@ stats.loopTicks` pads **every other channel that would cut the song short** out 
   `rewriteNote` splices whole; so in `> c+32 r64 < o3 c32` the guard compared the previous note's
   exit against the octave the doomed `o3` had just set, agreed with itself at 3, and let the note be
   rewritten with no octave at all — the `<` then took it to o2, and only the byte oracle could see
-  it. A unit carrying its own leading `o` leaves the octave **unknown** (`running = null`), which
-  costs a redundant absolute `o` exactly where that leading `o` was redundant anyway and is never
-  wrong in the other direction, since `null` only ever adds one. Not the `MOVES_OCTAVE` text scan
-  `spawnInto` runs on the same question: it is exact where this is conservative, and it buys the
-  tidying with a scan per note and a match that over-reads a comment. The mirror of it is on the far
-  side of the unit — `exitOctaveFor` answers `null` where the next note sets its own, which says the
-  trailing `o` may go with the rewrite, and there **is** no rewrite for a note whose pitch and length
-  are both unchanged (`rewriteNote` returns before spelling anything, and `spliceRange` answers
-  `null` for text already there). Reading the note's own octave there made a drag's destination look
-  like the octave already standing, so nothing was spelled and the gesture committed nothing at all.
-  An untouched unit leaves what its text says.
+  it. What enters a unit is read off the text in front of it by the octave model (`roll-octave.ts`),
+  and a unit whose note keeps its octave **restates** the `o` the porter wrote there, a channel's
+  opening `o4` not being redundancy to tidy. The mirror of it is on the far side of the unit —
+  `exitOctaveFor` answers `null` where what follows sets its own, which says the trailing `o` may go
+  with the rewrite, and there **is** no rewrite for a note whose pitch and length are both unchanged
+  (`rewriteNote` returns before spelling anything, and `spliceRange` answers `null` for text already
+  there). Reading the note's own octave there made a drag's destination look like the octave already
+  standing, so nothing was spelled and the gesture committed nothing at all. An untouched unit
+  leaves what its text says.
+- **Guessing the octave in force from the notes either side** — `running = null` wherever a unit
+  carried an `o`, a `MOVES_OCTAVE` character scan over the gap, `item.octave` for a construct (always
+  `null`) and the last born note's octave for a run ending on a drum. Each was conservative one way
+  and wrong the other: a note drawn in front of a `[` handed the loop the run's octave, a pitched note
+  drawn among drums leaked its own, a `<` written inside a tie went uncounted, and every unknown
+  wrote an `o` saying what was already true. `octaveModel` reads the whole document in source order —
+  an `o` sets, `<` and `>` shift, a note reads — and `checkedOctaves` holds it to the compiler's own
+  octave for every note of the channel, falling back to `BLIND_OCTAVES` (all unknown, the old
+  conservative answers) on any disagreement, a `"name=value"` or an `#if`. It agreed on all 260,244
+  notes of the fuzz corpus.
+- **Putting an octave back after every rewrite at the end of a channel**, `octave` leaking past a
+  `#N` — before a block that sets its own first, or at the end of the song, nothing reads it, and the
+  result was `o4 o3` stacks and a round trip that grew an `o4` each way. A restore is written only
+  where the next thing the text does with the octave is read it (`octaveNext`, `OctaveModel.next`).
+- **Leaving a porter's octave an edit made unread** — `o4 l8 e1` dragged down an octave came out
+  `o4 l8 o3 e1`, the `o4` standing in front of an `o` that undoes it. `deadOctaves` takes out an `o`,
+  `<` or `>` of the edited channel's that something read before the edit and nothing reads after it,
+  or that nothing read already and now stands straight in front of an octave the edit wrote; one the
+  edit merely restated is left. Taking out an octave nothing reads changes no note. A note moved to
+  the octave standing before the `<` or `>` only it read has those taken out instead of an `o`
+  written after them, so `o4 c4 > d4` dropped an octave is `o4 c4 d4`.
 - **Letting a drum's unit carry an octave `noteText` cannot write back** — `leadsAUnit` takes an `o`
   as well as a percussion `@`, so the unit reaches over the `@` to the octave beside it, and a drum
   is written `@21 c<length>`, the letter having no say in the byte. The splice took the `o` away and
@@ -1523,6 +1575,24 @@ stats.loopTicks` pads **every other channel that would cut the song short** out 
   that note, since nothing after a note changes its byte, so a commit to the slide's own operands
   does not blank the graph for the recompile it causes. And no stand-in where there is no byte — a
   rest, a drum, no compile — because a curve from a made-up note is the guess that looks exact.
+- **Asking the reach question of every `'note-state'` command a removed item carried** — the walk
+  only ever names a command that _fills_ a slot, so a switch-off (`$DF`, `$F0`, `$FD`, `$FE`) is in
+  force at no note and a `$F4` toggle shares one slot with eight others it does not replace; all of
+  them answered "reaches nothing" and went with the note, leaving the vibrato on. The question is put
+  only to a byte-less `q`, `h` or drum `@` and to a command whose slot the next write takes over whole
+  (`replacedByNextInSlot` in `song-walk.ts`, beside `slotsOf`); anything else stays.
+- **Reading a note's drum off the `@` written beside it alone** — the remap is consumed by the next
+  note and by no rest, so `@21 r4 d4` plays `d4` as the drum, and the strip drew and hit-tested it on
+  the keyboard, a note drawn between the two took the drum, and deleting `d4` handed it to the note
+  after. Whether a note is a drum is the byte the compiler emitted (`NoteAddress.note`, `$D0` up),
+  which is exact past the end of the pass too where the walk has nothing; the `@` is the last one
+  since the previous note's head (`drumApart`), a `^` being no note. It goes with its note, moves to
+  the note's head when a note is drawn between them, and is rewritten beside the note on a lane
+  change.
+- **Spelling every rest that has no single length as `=ticks`** — `r=60` for `r16` and `r4` merged.
+  `spellRest` ties up to three common lengths (`r4^16`), a whole note down to a 64th plain and
+  dotted, and falls back to `=ticks` only where they cannot reach it. Rests only: a note's `c=60` is
+  what the roll's length bubble promises.
 
 ## Angular specifics
 

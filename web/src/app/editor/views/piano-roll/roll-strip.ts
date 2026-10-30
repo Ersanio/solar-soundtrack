@@ -1,9 +1,10 @@
-import { NOTE_REST, NOTE_TIE } from '@amk/core/hardcoded-tables';
+import { FIRST_PERCUSSION_INSTRUMENT, NOTE_REST, NOTE_TIE } from '@amk/core/hardcoded-tables';
 import { octaveOfNote } from '@amk/core/mml-text';
 import type { CommandAddress, NoteAddress, Span } from '@amk/core/types';
 import type { LoopRun, PitchSlide, SongTimeline, WalkNote } from '@amk/spc/song-walk';
 import type { Command, TokenIndex } from '@amk/tokens';
 import { isPercussionInstrument } from '@amk/tokens/commands/in-force';
+import { BLIND_OCTAVES, type OctaveModel, octaveModel } from './roll-octave';
 
 /**
  * One channel of a song as a sequence the roll can splice: what is written, what
@@ -148,8 +149,9 @@ export interface StripItem {
    */
   octave: number | null;
   /**
-   * The octave in force after the unit, where a trailing `o` moved it on. Null
-   * when nothing does, which is when {@link octave} is also the exit.
+   * The octave in force after the unit, where something in it moved it on — a
+   * trailing `o`, or an `o`, `<` or `>` written between its segments. Null when
+   * nothing does, which is when {@link octave} is also the exit.
    */
   exitOctave: number | null;
   /** Whether the unit already carries an absolute `o`, and so must keep carrying one. */
@@ -240,6 +242,12 @@ export interface ChannelTail {
   ticks: number;
   /** The end of its own block, as {@link channelHome} — a run written here lands on this channel. */
   at: number;
+  /**
+   * The rest its text ends on, where nothing but whitespace follows it: what a
+   * pad lengthens rather than writing a rest of its own beside it. `null` where
+   * the channel ends on anything else, a loop's bracket included.
+   */
+  rest: { span: Span; ticks: number } | null;
 }
 
 export interface Strip {
@@ -254,6 +262,13 @@ export interface Strip {
   home: ChannelHome;
   /** The channel's own commands, for the prefix a wholly overwritten item takes with it. */
   commands: readonly Command[];
+  /** The octave anywhere in the document, checked against this channel's own notes. */
+  octaves: OctaveModel;
+  /**
+   * Every intro `/` in the document. `gather` raises no command for an operator,
+   * so these are read off the tokens; the channel's own are the ones inside its text.
+   */
+  intros: readonly Span[];
 }
 
 /** Why a channel cannot be spliced, in the words the toolbar shows. */
@@ -335,6 +350,17 @@ const LENGTH = String.raw`(?:\d*|=\d+)\.*`;
 const NOTE_TEXT = new RegExp(String.raw`^[a-gA-G][+-]?${LENGTH}(?:\s*\^\s*${LENGTH})*$`);
 const REST_TEXT = new RegExp(String.raw`^[rR]${LENGTH}(?:\s*[\^rR]\s*${LENGTH})*$`);
 const TIE_TEXT = new RegExp(String.raw`^\^${LENGTH}(?:\s*\^\s*${LENGTH})*$`);
+
+/**
+ * A `;` comment. The preprocessor takes comments out before the parser sees the
+ * text, so `r4 ; x` and an `r4` on the next line fold into one rest; a unit's
+ * splice puts them back (`roll-write.ts:keepingComments`).
+ */
+export const COMMENT = /;[^\r\n]*/g;
+
+/** The first drum's note byte, `@21`'s (`NoteAddress.note`), and how many drums follow it. */
+const PERCUSSION_NOTE = 0xd0;
+const DRUMS = 9;
 
 /** Only spaces and tabs, so a unit never grows across a line break. */
 const INLINE_GAP = /^[ \t]*$/;
@@ -609,12 +635,31 @@ export function channelTails(
   source: string,
   index: TokenIndex,
   channelTicks: readonly number[],
+  noteMap: readonly NoteAddress[],
 ): readonly ChannelTail[] {
   const markers = channelMarkers(index, source);
-  return channelTicks.map((ticks, channel) => ({
-    ticks,
-    at: channelHome(source, channel, markers).at,
-  }));
+  return channelTicks.map((ticks, channel) => {
+    const at = channelHome(source, channel, markers).at;
+    let last: NoteAddress | null = null;
+    for (const entry of noteMap) {
+      if (
+        entry.channel === channel &&
+        entry.span.end <= at &&
+        (last === null || entry.span.start > last.span.start)
+      ) {
+        last = entry;
+      }
+    }
+
+    const rest =
+      last !== null &&
+      last.note === NOTE_REST &&
+      REST_TEXT.test(source.slice(last.span.start, last.span.end).replace(COMMENT, '')) &&
+      source.slice(last.span.end, at).trim() === ''
+        ? { span: last.span, ticks: last.ticks }
+        : null;
+    return { ticks, at, rest };
+  });
 }
 
 /**
@@ -1067,6 +1112,8 @@ export function channelStrip(request: StripRequest): Strip | StripRefusal {
 
   const items: StripItem[] = [];
   const frames: StripFrame[] = [];
+  /** The drum each note was emitted as — `NoteAddress.note`, `$D0` up — or `null` for a pitched one. */
+  const percussion = new Map<StripItem, number | null>();
   /** The construct each item index stands as, for the expansion below. */
   const constructAt = new Map<number, ConstructSeed>();
 
@@ -1125,7 +1172,7 @@ export function channelStrip(request: StripRequest): Strip | StripRefusal {
       const tie = entry.note === NOTE_TIE;
       const rest = entry.note === NOTE_REST;
       const pattern = tie ? TIE_TEXT : rest ? REST_TEXT : NOTE_TEXT;
-      if (!pattern.test(text)) {
+      if (!pattern.test(text.replace(COMMENT, ''))) {
         return { refused: `\`${text}\` is not a note the roll can rewrite` };
       }
 
@@ -1179,6 +1226,8 @@ export function channelStrip(request: StripRequest): Strip | StripRefusal {
         remapFed: false,
       });
 
+      const drum = entry.note - PERCUSSION_NOTE;
+      percussion.set(items[items.length - 1], drum >= 0 && drum < DRUMS ? drum : null);
       tick += entry.ticks;
       previousEnd = entry.span.end;
     }
@@ -1194,6 +1243,7 @@ export function channelStrip(request: StripRequest): Strip | StripRefusal {
   }
 
   growUnits(source, commands, items);
+  const octaves = checkedOctaves(source, index, items);
 
   for (let at = 0; at < items.length; at++) {
     const item = items[at];
@@ -1205,6 +1255,13 @@ export function channelStrip(request: StripRequest): Strip | StripRefusal {
 
     if (item.kind === 'construct') {
       continue;
+    }
+
+    // Off the text rather than the trailing `o` alone, so a `<` written between
+    // the head and a `^` is counted too.
+    const exit = octaves.at(item.unitSpan.end);
+    if (item.kind === 'note' && exit !== null) {
+      item.exitOctave = exit === item.octave ? null : exit;
     }
 
     // Read off the unit boundaries rather than the prefix: a `$DD` written after
@@ -1242,6 +1299,7 @@ export function channelStrip(request: StripRequest): Strip | StripRefusal {
         ? item.instances[0]?.note != null
         : (item.instances[0]?.tick ?? 0) < timeline.ticks);
     if (item.kind === 'note') {
+      item.drum ??= drumApart(items, frames, commands, item, percussion.get(item) ?? null);
       item.slide = item.instances[0]?.note?.bend ?? null;
       item.remapFed =
         frames[item.frame].body >= 0 &&
@@ -1250,7 +1308,81 @@ export function channelStrip(request: StripRequest): Strip | StripRefusal {
     }
   }
 
-  return { channel, items, frames, ticks: frames[0].ticks, home, commands };
+  const intros = index.tokens
+    .filter((token) => token.kind === 'operator' && source[token.start] === '/')
+    .map((token) => ({ start: token.start, end: token.end, line: token.line }));
+
+  return { channel, items, frames, ticks: frames[0].ticks, home, commands, octaves, intros };
+}
+
+/**
+ * The drum `@` a note plays that is not written beside it — `@21 r4 c4`, where a
+ * rest stands between the two. The remap is consumed by the next note and by no
+ * rest (`parser.ts:2911-2916`), so it is the last percussion `@` since the note
+ * or loop before this one in its frame.
+ *
+ * Whether the note is a drum, and which, is the byte the compiler emitted for it
+ * (`NoteAddress.note`, `$D0`-`$D8`), past the end of the pass as much as inside
+ * it. `null` where the note is pitched, and where no `@` for that drum stands in
+ * the frame — a body head the remap fed from before the `[` (`remapFed`).
+ */
+function drumApart(
+  items: readonly StripItem[],
+  frames: readonly StripFrame[],
+  commands: readonly Command[],
+  item: StripItem,
+  played: number | null,
+): Command | null {
+  if (played === null) {
+    return null;
+  }
+
+  // From the note before's head, not its unit's end: a `^` is no note, so an `@`
+  // written between that head and its tie is this note's.
+  const frame = frames[item.frame];
+  const at = items.indexOf(item);
+  let from = frame.body >= 0 ? frame.span.start : 0;
+  for (let back = at - 1; back >= frame.from; back--) {
+    const before = items[back];
+    if (before.kind !== 'rest') {
+      from = before.kind === 'note' ? before.segments[0].span.end : before.unitSpan.end;
+      break;
+    }
+  }
+
+  let drum: Command | null = null;
+  for (const command of commands) {
+    if (
+      command.span.start >= from &&
+      command.span.end <= item.unitSpan.start &&
+      isPercussionInstrument(command)
+    ) {
+      drum = command;
+    }
+  }
+
+  return drum?.args[0]?.value === FIRST_PERCUSSION_INSTRUMENT + played ? drum : null;
+}
+
+/**
+ * The document's octave model, or a blind one where it disagrees with the
+ * compiler about any note on this channel — the octave a note's byte says it was
+ * written under is the authority, and a model that misreads one cannot be
+ * trusted for the text around it.
+ */
+function checkedOctaves(
+  source: string,
+  index: TokenIndex,
+  items: readonly StripItem[],
+): OctaveModel {
+  const model = octaveModel(source, index);
+  for (const item of items) {
+    if (item.kind === 'note' && model.at(item.segments[0].span.start) !== item.octave) {
+      return BLIND_OCTAVES;
+    }
+  }
+
+  return model;
 }
 
 function isDiscovered(

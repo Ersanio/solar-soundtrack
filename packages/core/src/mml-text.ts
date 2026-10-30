@@ -199,3 +199,49 @@ export function spellDuration(ticks: number, targetAMKVersion: number): string |
 	parts.push(last);
 	return parts.join("^");
 }
+
+/** The lengths a rest is tied from: a whole note down to a 64th, plain and dotted. */
+const TIED_PIECES = [192, 144, 96, 72, 48, 36, 24, 18, 12, 9, 6, 3];
+
+/**
+ * {@link spellDuration} for a rest, which reads better as the lengths it adds up
+ * to than as a tick count: 60 ticks is `4^16` rather than `=60`. Tied from up to
+ * three common lengths, largest first, and `=ticks` only where they cannot reach
+ * it. Rests only — a note's `=ticks` is what the roll's length bubble promises.
+ */
+export function spellRest(ticks: number, targetAMKVersion: number): string | null {
+	const plain = spellDuration(ticks, targetAMKVersion);
+	if (!plain?.includes("=")) {
+		return plain;
+	}
+
+	const parts: string[] = [];
+	let left = ticks;
+	while (left > TICKS_PER_WHOLE) {
+		parts.push("1");
+		left -= TICKS_PER_WHOLE;
+	}
+
+	const tied: number[] = [];
+	for (const piece of TIED_PIECES) {
+		while (left >= piece && tied.length < 3) {
+			tied.push(piece);
+			left -= piece;
+		}
+	}
+
+	if (left !== 0) {
+		return plain;
+	}
+
+	for (const piece of tied) {
+		const text = spellLength(piece, "note", targetAMKVersion);
+		if (text === null) {
+			return plain;
+		}
+
+		parts.push(text);
+	}
+
+	return parts.join("^");
+}
