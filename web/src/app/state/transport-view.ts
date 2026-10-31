@@ -137,12 +137,12 @@ export interface PassEstimate {
 /**
  * Seconds at a tick, interpolated from `stats` alone.
  *
- * The fallback for a song the walk could not read, and the shape `CLAUDE.md`'s
- * ledger records as having been replaced *for the readout*: two straight lines,
- * exact at the intro/loop boundary and drifting between them. It stands only
- * where there is no clock at all, which is why it survives — and it is here
- * rather than inline so the drift is something a harness can state rather than
- * something a reader has to take on trust.
+ * The fallback for a song the walk could not read, and the shape the ledger in
+ * `docs/claude/transport-and-clock.md` records as having been replaced *for the
+ * readout*: two straight lines, exact at the intro/loop boundary and drifting
+ * between them. It stands only where there is no clock at all, which is why it
+ * survives — and it is here rather than inline so the drift is something a
+ * harness can state rather than something a reader has to take on trust.
  */
 export function estimatedSecondsAt(pass: PassEstimate, tick: number): number {
   if (pass.introTicks > 0 && tick < pass.introTicks) {
