@@ -218,3 +218,8 @@ handling, selection or toolbar.
   so a song the driver cannot keep up with says `231.9 of 498.0 ticks/s` from any view. What stays
   on the toolbar is what only the roll can say: how many notes are selected, and why a channel or a
   gesture was refused.
+- **The toolbar's messages at `ml-auto` in the wrapping strip** — a message that did not fit beside
+  the controls wrapped onto a row of its own and took the row away again when it went, so the roll
+  moved under the pointer on every refusal and every change of selection. The messages have a fixed
+  line of their own (`basis-full`, `h-4`), drawn when empty, and each one is truncated to that line
+  with its full text in a `title`.

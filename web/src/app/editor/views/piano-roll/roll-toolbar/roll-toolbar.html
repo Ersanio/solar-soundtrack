@@ -142,22 +142,28 @@
     Percussion
   </button>
 
-  <span class="ml-auto flex items-center gap-3 font-mono text-xs">
+  <!-- A line of its own, drawn even when empty and kept to one line, so a
+       message coming or going never changes the strip's height under the roll. -->
+  <div
+    class="flex h-4 basis-full items-center justify-end gap-3 overflow-hidden font-mono text-xs whitespace-nowrap"
+  >
     @if (selectedLabel(); as label) {
-      <span class="text-ink-muted">{{ label }}</span>
+      <span class="text-ink-muted shrink-0">{{ label }}</span>
     }
     <!-- Why a channel cannot be edited is said here rather than in a dialog: it
          is a property of the song, or of the mixer for a muted channel, and not
          the answer to a click. -->
     @if (editRefusal(); as reason) {
-      <span class="text-warn">cannot edit: {{ reason }}</span>
+      <span class="text-warn truncate" [title]="`cannot edit: ${reason}`"
+        >cannot edit: {{ reason }}</span
+      >
     }
     <!-- And why the last gesture was not written out. A refusal the plan
          carries is on show while the pointer is down, beside the red bars saying
          the same thing; one the splice makes arrives at the pointer-up that
          undoes the gesture, so it stands until the document moves under it. -->
     @if (gestureRefusal(); as reason) {
-      <span class="text-warn">refused: {{ reason }}</span>
+      <span class="text-warn truncate" [title]="`refused: ${reason}`">refused: {{ reason }}</span>
     }
-  </span>
+  </div>
 </amk-toolbar>
