@@ -22,7 +22,10 @@
           <span
             i18n="@@inspector.note-length.row-ticks"
             class="text-ink font-mono text-[11px] tabular-nums"
-            >{{ row.ticks }} ticks</span
+            >{{
+              row.ticks // i18n(ph='ticks')
+            }}
+            ticks</span
           >
         </div>
       }

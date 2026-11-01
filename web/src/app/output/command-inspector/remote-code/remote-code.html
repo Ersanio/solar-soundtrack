@@ -29,7 +29,11 @@
         i18n="@@inspector.remote-code.what-runs"
         class="text-ink-muted text-xs font-semibold tracking-wide uppercase"
       >
-        What {{ shown.name }} runs
+        What
+        {{
+          shown.name // i18n(ph='name')
+        }}
+        runs
       </span>
       @if (shown.runsNothing; as nothing) {
         <span class="text-ink-muted text-xs">{{ nothing }}</span>

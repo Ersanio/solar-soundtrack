@@ -14,5 +14,5 @@
 >@for (row of rows(); track row.address) {<span
     class="text-ink-muted"
   >{{ row.address }}  </span><span class="text-accent">{{ row.header }}</span>{{ row.rest }}
-}@if (truncated(); as more) {<span i18n="@@output.hex.more-bytes" class="text-ink-muted">… {{ more }} more bytes</span>
+}@if (truncated(); as more) {<span i18n="@@output.hex.more-bytes" class="text-ink-muted">… {{ more // i18n(ph='count') }} more bytes</span>
 }</pre>

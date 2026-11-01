@@ -9,7 +9,10 @@
         (click)="reveal(diagnostic)"
       >
         <span i18n="@@output.problems.line" class="text-ink-muted shrink-0 font-mono text-xs"
-          >line {{ diagnostic.span.line }}</span
+          >line
+          {{
+            diagnostic.span.line // i18n(ph='line')
+          }}</span
         >
         <span class="shrink-0 font-mono text-xs" [class]="severityClass[diagnostic.severity]">
           {{ diagnostic.severity }} {{ diagnostic.code }}

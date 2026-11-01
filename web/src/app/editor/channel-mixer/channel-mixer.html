@@ -8,7 +8,9 @@
 
     <button
       type="button"
-      title="Mute channel {{ channel.index }}"
+      title="Mute channel {{
+        channel.index // i18n(ph='channel')
+      }}"
       [class]="channel.mute"
       [disabled]="mixer.isSoloing()"
       i18n-title="@@mixer.mute.title"
@@ -19,7 +21,9 @@
 
     <button
       type="button"
-      title="Solo channel {{ channel.index }}"
+      title="Solo channel {{
+        channel.index // i18n(ph='channel')
+      }}"
       [class]="channel.solo"
       i18n-title="@@mixer.solo.title"
       (click)="mixer.toggleSolo(channel.index)"

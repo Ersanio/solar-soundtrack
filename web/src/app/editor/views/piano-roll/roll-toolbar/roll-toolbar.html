@@ -195,9 +195,14 @@
       <span
         i18n="@@roll.cannot-edit"
         class="text-warn truncate"
-        title="cannot edit: {{ reason }}"
+        title="cannot edit: {{
+          reason // i18n(ph='reason')
+        }}"
         i18n-title="@@roll.cannot-edit.title"
-        >cannot edit: {{ reason }}</span
+        >cannot edit:
+        {{
+          reason // i18n(ph='reason')
+        }}</span
       >
     }
     <!-- And why the last gesture was not written out. A refusal the plan
@@ -208,9 +213,14 @@
       <span
         i18n="@@roll.refused"
         class="text-warn truncate"
-        title="refused: {{ reason }}"
+        title="refused: {{
+          reason // i18n(ph='reason')
+        }}"
         i18n-title="@@roll.refused.title"
-        >refused: {{ reason }}</span
+        >refused:
+        {{
+          reason // i18n(ph='reason')
+        }}</span
       >
     }
   </div>

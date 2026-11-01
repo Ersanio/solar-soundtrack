@@ -56,7 +56,9 @@
               class="self-start"
               (click)="setName(loop, naming.label)"
             >
-              Name it ({{ naming.label }})
+              Name it ({{
+                naming.label  // i18n(ph='label')
+              }})
             </button>
             <p class="text-ink-muted text-[11px] leading-snug">{{ naming.note }}</p>
           }

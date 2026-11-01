@@ -20,7 +20,9 @@
       size="sm"
       (click)="library.resetAll()"
     >
-      Reset all ({{ library.overrideCount() }})
+      Reset all ({{
+        library.overrideCount()  // i18n(ph='count')
+      }})
     </button>
   }
 

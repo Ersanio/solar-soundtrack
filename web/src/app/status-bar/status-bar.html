@@ -11,7 +11,7 @@
   <ng-container i18n="@@status.problems">{problemCount(), plural,
     =0 {No problems}
     =1 {1 problem}
-    other {{{ problemCount() }} problems}
+    other {{{ problemCount() // i18n(ph='count') }} problems}
   }</ng-container>
 </button>
 
@@ -24,7 +24,10 @@
   [class]="aramClass()"
   (click)="requests.revealSection.set('build')"
 >
-  ARAM {{ store.freeLabel() }}
+  ARAM
+  {{
+    store.freeLabel() // i18n(ph='free')
+  }}
 </button>
 
 @if (notesLabel(); as label) {

@@ -55,7 +55,10 @@
       <p class="text-ink-muted mt-0.5 font-mono text-xs">{{ row().bank }}</p>
     } @else if (!row().requested) {
       <p i18n="@@samples.not-in-this-song" class="text-ink-muted mt-0.5 font-mono text-xs">
-        {{ row().detail }} · not in this song
+        {{
+          row().detail // i18n(ph='detail')
+        }}
+        · not in this song
       </p>
     } @else {
       <amk-sample-wave class="mt-1 h-8" [d]="row().waveform" />

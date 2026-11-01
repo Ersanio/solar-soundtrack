@@ -34,8 +34,13 @@
         i18n="@@inspector.instrument-entry.add-samples-to-the"
         class="text-ink-muted text-xs leading-relaxed"
       >
-        <code class="text-ink">"{{ sampleName() }}"</code> — add samples to the song's
-        <code class="text-ink">#samples</code> block to pick from a list here.
+        <code class="text-ink"
+          >"{{
+            sampleName()  // i18n(ph='sample')
+          }}"</code
+        >
+        — add samples to the song's <code class="text-ink">#samples</code> block to pick from a list
+        here.
       </p>
     }
   }

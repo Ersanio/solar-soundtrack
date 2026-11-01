@@ -78,7 +78,7 @@
         <p class="text-ink-muted text-[11px] leading-snug">
           <ng-container i18n="@@inspector.arpeggio.and-further-note-not">{omitted(), plural,
             =1 {… and 1 further note not shown.}
-            other {… and {{ omitted() }} further notes not shown.}
+            other {… and {{ omitted() // i18n(ph='count') }} further notes not shown.}
           }</ng-container>
         </p>
       }

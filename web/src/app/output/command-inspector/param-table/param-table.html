@@ -98,15 +98,18 @@
     <p class="text-ink-muted pt-2 text-[11px] leading-snug">
       @if (shape.tail; as what) {
         <ng-container i18n="@@inspector.param-table.carries-shown-in-the">{shape.omitted, plural,
-          =1 {Carries 1 {{ what }}, shown in the hex dump below.}
-          other {Carries {{ shape.omitted }} {{ what }}s, shown in the hex dump below.}
+          =1 {Carries 1 {{ what // i18n(ph='noun') }}, shown in the hex dump below.}
+          other {
+            Carries {{ shape.omitted // i18n(ph='count') }} {{ what // i18n(ph='noun') }}s, shown in
+            the hex dump below.
+          }
         }</ng-container>
       } @else {
         <ng-container
           i18n="@@inspector.param-table.and-further-argument-not"
           >{shape.omitted, plural,
             =1 {… and 1 further argument not shown.}
-            other {… and {{ shape.omitted }} further arguments not shown.}
+            other {… and {{ shape.omitted // i18n(ph='count') }} further arguments not shown.}
           }</ng-container
         >
       }

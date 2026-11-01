@@ -68,7 +68,9 @@
       class="text-warn text-xs leading-relaxed"
     >
       This replaces the coefficients set by the <code class="text-ink">$F5</code> on line
-      {{ earlier.line }}. AddmusicK does this silently.
+      {{
+        earlier.line  // i18n(ph='line')
+      }}. AddmusicK does this silently.
     </p>
   }
 }

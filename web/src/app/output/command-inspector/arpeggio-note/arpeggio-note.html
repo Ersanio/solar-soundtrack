@@ -19,7 +19,9 @@
   <amk-slider
     class="flex-1"
     origin="centre"
-    label="Note {{ row.index + 1 }}"
+    label="Note {{
+      row.index + 1 // i18n(ph='number')
+    }}"
     i18n-label="@@inspector.arpeggio-note.note.label"
     [signed]="true"
     [value]="row.value"
