@@ -80,7 +80,7 @@ function needsVersion(target: CommandTarget, least: number, what: string): Avail
 
 	const advise = LEGAL_VERSIONS.find((version) => version >= least) ?? least;
 	return blocked(
-		$localize`:@@palette.availability.needs-amk-this-song-is:${what}:what: needs #amk ${advise}:advise:; this song is ${dialectName(target)}:target:.`,
+		$localize`:@@palette.availability.needs-amk-this-song-is:palette.availability.needs-amk-this-song-is ${what}:what: ${advise}:advise: ${dialectName(target)}:target:`,
 	);
 }
 
@@ -95,7 +95,11 @@ export function formAvailability(form: PaletteForm, target: CommandTarget): Avai
 			// even though the palette writes `$E3` rather than showing the reason.
 			case "fade":
 				return (
-					needsVersion(target, 3, $localize`:@@palette.availability.the-comma-fade-form:The comma fade form`) ?? OK
+					needsVersion(
+						target,
+						3,
+						$localize`:@@palette.availability.the-comma-fade-form:palette.availability.the-comma-fade-form`,
+					) ?? OK
 				);
 			// `parseDefaultLength` (`parser.ts:1453`).
 			case "exactLength":
@@ -103,19 +107,21 @@ export function formAvailability(form: PaletteForm, target: CommandTarget): Avai
 					needsVersion(
 						target,
 						4,
-						$localize`:@@palette.availability.an-exact-tick-length-l:An exact tick length (l=NN)`,
+						$localize`:@@palette.availability.an-exact-tick-length-l:palette.availability.an-exact-tick-length-l`,
 					) ?? OK
 				);
 			// `parseOpenParen` (`parser.ts:2097`) — AMK0117, "Unrecognized character '!'".
 			case "remoteLoop":
-				return needsVersion(target, 2, $localize`:@@palette.availability.remote-code:Remote code`) ?? OK;
+				return (
+					needsVersion(target, 2, $localize`:@@palette.availability.remote-code:palette.availability.remote-code`) ?? OK
+				);
 			// `parseRemoteCall` (`parser.ts:2222`).
 			case "remoteReset":
 				return (
 					needsVersion(
 						target,
 						3,
-						$localize`:@@palette.availability.the-remote-code-reset-form:The remote code reset form (!!n)`,
+						$localize`:@@palette.availability.the-remote-code-reset-form:palette.availability.the-remote-code-reset-form`,
 					) ?? OK
 				);
 		}
@@ -125,9 +131,7 @@ export function formAvailability(form: PaletteForm, target: CommandTarget): Avai
 		// `parser.ts:parseTranspose` — AMK0205, the one letter with a dialect rule
 		// of its own.
 		if (form.letter === "h" && target.program === 1) {
-			return caution(
-				$localize`:@@palette.availability.the-h-command-is-not:The "h" command is not native to Addmusic 4.05; AddmusicK warns (AMK0205).`,
-			);
+			return caution($localize`:@@palette.availability.the-h-command-is-not:palette.availability.the-h-command-is-not`);
 		}
 
 		// Every other letter in `LETTER_NAMES` parses in every dialect; only their
@@ -139,7 +143,7 @@ export function formAvailability(form: PaletteForm, target: CommandTarget): Avai
 	// not the AMK0207 warning the neighbouring bytes get, so it goes first.
 	if (form.vcmd === 0xfa && target.program === 2) {
 		return blocked(
-			$localize`:@@palette.availability.addmusicms-fa-is-not-implemented:AddmusicM's $FA is not implemented in AddmusicK (AMK0156).`,
+			$localize`:@@palette.availability.addmusicms-fa-is-not-implemented:palette.availability.addmusicms-fa-is-not-implemented`,
 		);
 	}
 
@@ -147,13 +151,13 @@ export function formAvailability(form: PaletteForm, target: CommandTarget): Avai
 	// the legacy program never had. It is a warning either way, not an error.
 	if (target.program === 1 && form.vcmd > 0xf2) {
 		return caution(
-			$localize`:@@palette.availability.is-not-native-to-addmusic:$${hex2(form.vcmd)}:vcmd: is not native to Addmusic 4.05; AddmusicK warns (AMK0207).`,
+			$localize`:@@palette.availability.is-not-native-to-addmusic:palette.availability.is-not-native-to-addmusic ${hex2(form.vcmd)}:vcmd:`,
 		);
 	}
 
 	if (target.program === 2 && form.vcmd > 0xfa) {
 		return caution(
-			$localize`:@@palette.availability.is-not-native-to-addmusicm:$${hex2(form.vcmd)}:vcmd: is not native to AddmusicM; AddmusicK warns (AMK0207).`,
+			$localize`:@@palette.availability.is-not-native-to-addmusicm:palette.availability.is-not-native-to-addmusicm ${hex2(form.vcmd)}:vcmd:`,
 		);
 	}
 
@@ -161,7 +165,7 @@ export function formAvailability(form: PaletteForm, target: CommandTarget): Avai
 	// passes on the readme's own "do not use manually".
 	if (form.vcmd === 0xe9) {
 		return caution(
-			$localize`:@@palette.availability.written-by-the-compiler-from:Written by the compiler from a [ ] loop. The readme says outright: do not use manually.`,
+			$localize`:@@palette.availability.written-by-the-compiler-from:palette.availability.written-by-the-compiler-from`,
 		);
 	}
 
@@ -171,10 +175,10 @@ export function formAvailability(form: PaletteForm, target: CommandTarget): Avai
 		// there is no `(!n)` to prefer over it (`parser.ts:2910`).
 		return target.amkVersion < 4
 			? caution(
-					$localize`:@@palette.availability.fc-errors-on-addmusick-1:$FC errors on AddmusicK 1.0.8 and lower, which replaced it with remote code in #amk 2 (AMK0211).`,
+					$localize`:@@palette.availability.fc-errors-on-addmusick-1:palette.availability.fc-errors-on-addmusick-1`,
 				)
 			: caution(
-					$localize`:@@palette.availability.written-by-the-compiler-from-2:Written by the compiler from a (!n) remote call. Prefer (!n) unless you mean the raw bytes.`,
+					$localize`:@@palette.availability.written-by-the-compiler-from-2:palette.availability.written-by-the-compiler-from-2`,
 				);
 	}
 

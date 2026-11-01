@@ -97,7 +97,7 @@ export class StatusBar {
   protected readonly notesLabel = computed(() => {
     const song = this.store.timeline();
     return song
-      ? $localize`:@@status.notes:${song.notes.length.toLocaleString()}:count: notes`
+      ? $localize`:@@status.notes:status.notes ${song.notes.length.toLocaleString()}:count:`
       : null;
   });
 
@@ -137,8 +137,8 @@ export class StatusBar {
     const got = shortfall ? asked / shortfall : asked;
     const rate =
       got > 0 && got < asked * 0.95
-        ? $localize`:@@status.of-ticks-s:${got.toFixed(1)}:got: of ${asked.toFixed(1)}:asked: ticks/s`
-        : $localize`:@@status.ticks-s:${asked.toFixed(1)}:asked: ticks/s`;
+        ? $localize`:@@status.of-ticks-s:status.of-ticks-s ${got.toFixed(1)}:got: ${asked.toFixed(1)}:asked:`
+        : $localize`:@@status.ticks-s:status.ticks-s ${asked.toFixed(1)}:asked:`;
     return `t${tempo} · ${rate}`;
   });
 

@@ -1,13 +1,13 @@
 <amk-popover
   i18n-heading="@@theme.heading"
-  heading="Theme"
+  heading="theme.heading"
   i18n-title="@@theme.title"
-  title="Theme"
+  title="theme.title"
 >
   <amk-icon-palette popoverIcon />
 
   <h3 i18n="@@theme.presets" class="text-ink-muted text-xs font-semibold tracking-wide uppercase">
-    Presets
+    theme.presets
   </h3>
   <div class="mt-1.5 grid grid-cols-2 gap-1.5">
     @for (item of presetButtons(); track item.preset.id) {
@@ -54,10 +54,10 @@
     i18n="@@theme.save-or-paste-a"
     class="text-ink-muted mt-4 text-xs font-semibold tracking-wide uppercase"
   >
-    Save or paste a theme
+    theme.save-or-paste-a
   </h3>
   <p i18n="@@theme.only-the-colours-you" class="text-ink-muted mt-1 text-[11px] leading-snug">
-    Only the colours you have changed. Paste one here to take it on.
+    theme.only-the-colours-you
   </p>
   <textarea
     rows="4"
@@ -68,7 +68,7 @@
   ></textarea>
   @if (importFailed()) {
     <p i18n="@@theme.that-is-not-a" class="text-danger mt-1 text-[11px] leading-snug">
-      That is not a theme — nothing was changed.
+      theme.that-is-not-a
     </p>
   }
 
@@ -80,6 +80,6 @@
     [disabled]="!theme.customised()"
     (click)="resetAll()"
   >
-    Reset all
+    theme.reset-all
   </button>
 </amk-popover>

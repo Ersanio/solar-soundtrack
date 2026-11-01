@@ -23,7 +23,7 @@ let failure: string | null = null;
 function open(): Promise<IDBDatabase | null> {
   opening ??= new Promise<IDBDatabase | null>((resolve) => {
     if (typeof indexedDB === 'undefined') {
-      failure = $localize`:@@error.storage.this-browser-has-no-indexeddb:This browser has no IndexedDB, so samples will be lost when the tab closes.`;
+      failure = $localize`:@@error.storage.this-browser-has-no-indexeddb:error.storage.this-browser-has-no-indexeddb`;
       resolve(null);
       return;
     }
@@ -32,7 +32,7 @@ function open(): Promise<IDBDatabase | null> {
     try {
       request = indexedDB.open(DB_NAME, DB_VERSION);
     } catch (error) {
-      failure = $localize`:@@error.storage.indexeddb-could-not-be-opened:IndexedDB could not be opened (${String(error)}:error:); samples will not persist.`;
+      failure = $localize`:@@error.storage.indexeddb-could-not-be-opened:error.storage.indexeddb-could-not-be-opened ${String(error)}:error:`;
       resolve(null);
       return;
     }
@@ -45,13 +45,13 @@ function open(): Promise<IDBDatabase | null> {
 
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => {
-      failure = $localize`:@@error.storage.indexeddb-is-unavailable-private-browsing:IndexedDB is unavailable (private browsing blocks it); samples will not persist.`;
+      failure = $localize`:@@error.storage.indexeddb-is-unavailable-private-browsing:error.storage.indexeddb-is-unavailable-private-browsing`;
       resolve(null);
     };
 
     // Another tab holding an old version open. Don't hang the app waiting.
     request.onblocked = () => {
-      failure = $localize`:@@error.storage.another-tab-is-holding-the:Another tab is holding the sample database open; samples will not persist here.`;
+      failure = $localize`:@@error.storage.another-tab-is-holding-the:error.storage.another-tab-is-holding-the`;
       resolve(null);
     };
   });
@@ -79,12 +79,13 @@ function run<T>(
           const request = body(db.transaction(STORE, mode).objectStore(STORE));
           request.onsuccess = () => resolve(request.result);
           request.onerror = () => {
-            const reason = request.error?.name ?? $localize`:@@error.storage.unknown:unknown`;
-            failure = $localize`:@@error.storage.write-failed:Writing to the sample database failed (${reason}:error:).`;
+            const reason =
+              request.error?.name ?? $localize`:@@error.storage.unknown:error.storage.unknown`;
+            failure = $localize`:@@error.storage.write-failed:error.storage.write-failed ${reason}:error:`;
             resolve(null);
           };
         } catch (error) {
-          failure = $localize`:@@error.storage.the-sample-database-rejected-an:The sample database rejected an operation (${String(error)}:error:).`;
+          failure = $localize`:@@error.storage.the-sample-database-rejected-an:error.storage.the-sample-database-rejected-an ${String(error)}:error:`;
           resolve(null);
         }
       }),

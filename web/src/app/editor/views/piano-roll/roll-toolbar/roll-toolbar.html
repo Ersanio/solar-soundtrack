@@ -8,13 +8,13 @@
   <span class="bg-edge h-5 w-px shrink-0"></span>
 
   <div class="flex items-center gap-1">
-    <span i18n="@@roll.zoom-x" class="text-ink-muted text-xs">Zoom X</span>
+    <span i18n="@@roll.zoom-x" class="text-ink-muted text-xs">roll.zoom-x</span>
     <button
       amk-button
       size="sm"
       icon
       i18n-title="@@roll.zoom-out.title"
-      title="Zoom out"
+      title="roll.zoom-out.title"
       (click)="zoomBy.emit(-1)"
     >
       <amk-icon-minus />
@@ -24,7 +24,7 @@
       size="sm"
       icon
       i18n-title="@@roll.zoom-in.title"
-      title="Zoom in"
+      title="roll.zoom-in.title"
       (click)="zoomBy.emit(1)"
     >
       <amk-icon-plus />
@@ -32,13 +32,13 @@
   </div>
 
   <div class="flex items-center gap-1">
-    <span i18n="@@roll.zoom-y" class="text-ink-muted text-xs">Zoom Y</span>
+    <span i18n="@@roll.zoom-y" class="text-ink-muted text-xs">roll.zoom-y</span>
     <button
       amk-button
       size="sm"
       icon
       i18n-title="@@roll.shorter-rows.title"
-      title="Shorter rows"
+      title="roll.shorter-rows.title"
       (click)="rowHeightBy.emit(-1)"
     >
       <amk-icon-minus />
@@ -48,7 +48,7 @@
       size="sm"
       icon
       i18n-title="@@roll.taller-rows.title"
-      title="Taller rows"
+      title="roll.taller-rows.title"
       (click)="rowHeightBy.emit(1)"
     >
       <amk-icon-plus />
@@ -62,21 +62,21 @@
     i18n="@@roll.follow-playback"
     amk-toggle
     i18n-title="@@roll.keep-the-roll-on.title"
-    title="Keep the roll on the playing song, including after a scroll seeks it"
+    title="roll.keep-the-roll-on.title"
     [pressed]="follow()"
     (click)="followChange.emit(!follow())"
   >
-    Follow playback
+    roll.follow-playback
   </button>
   <button
     i18n="@@roll.scroll-the-notes"
     amk-toggle
     i18n-title="@@roll.slide-the-music-under.title"
-    title="Slide the music under a fixed playhead, rather than turning a page when the playhead reaches the edge"
+    title="roll.slide-the-music-under.title"
     [pressed]="scrollNotes()"
     (click)="scrollNotesChange.emit(!scrollNotes())"
   >
-    Scroll the notes
+    roll.scroll-the-notes
   </button>
   <button
     i18n="@@roll.all-octaves"
@@ -84,7 +84,7 @@
     [pressed]="allOctaves()"
     (click)="allOctavesChange.emit(!allOctaves())"
   >
-    All octaves
+    roll.all-octaves
   </button>
 
   <span class="bg-edge h-5 w-px shrink-0"></span>
@@ -95,9 +95,9 @@
   <div
     class="flex items-center gap-1"
     i18n-title="@@roll.the-grids-time-signature.title"
-    title="The grid's time signature: beats in a bar, over the note that gets the beat. Zero beats draws no grid."
+    title="roll.the-grids-time-signature.title"
   >
-    <span i18n="@@roll.grid" class="text-ink-muted text-xs">Grid</span>
+    <span i18n="@@roll.grid" class="text-ink-muted text-xs">roll.grid</span>
     <input
       type="number"
       class="bg-inset border-edge text-ink h-7 w-12 rounded-md border px-1.5 font-mono text-xs tabular-nums"
@@ -125,9 +125,9 @@
   <div
     class="flex items-center gap-1"
     i18n-title="@@roll.what-a-note-snaps.title"
-    title="What a note snaps to when you draw or drag it. Hold Alt for single ticks."
+    title="roll.what-a-note-snaps.title"
   >
-    <span i18n="@@roll.snap" class="text-ink-muted text-xs">Snap</span>
+    <span i18n="@@roll.snap" class="text-ink-muted text-xs">roll.snap</span>
     <select
       class="bg-inset border-edge text-ink h-7 cursor-pointer rounded-md border px-1.5 text-xs"
       [value]="snap()"
@@ -145,9 +145,9 @@
   <div
     class="flex items-center gap-1"
     i18n-title="@@roll.what-happens-when-notes.title"
-    title="What happens when notes overlap: Overwrite takes the ticks off the notes already there, Insert shifts them out of the way, Strict refuses the edit."
+    title="roll.what-happens-when-notes.title"
   >
-    <span i18n="@@roll.edits" class="text-ink-muted text-xs">Edits</span>
+    <span i18n="@@roll.edits" class="text-ink-muted text-xs">roll.edits</span>
     <select
       class="bg-inset border-edge text-ink h-7 cursor-pointer rounded-md border px-1.5 text-xs"
       [value]="editMode()"
@@ -177,7 +177,7 @@
     } @else {
       <amk-icon-chevron-right />
     }
-    <ng-container i18n="@@roll.percussion">Percussion</ng-container>
+    <ng-container i18n="@@roll.percussion">roll.percussion</ng-container>
   </button>
 
   <!-- A line of its own, drawn even when empty and kept to one line, so a
@@ -195,11 +195,11 @@
       <span
         i18n="@@roll.cannot-edit"
         class="text-warn truncate"
-        title="cannot edit: {{
+        title="roll.cannot-edit.title {{
           reason // i18n(ph='reason')
         }}"
         i18n-title="@@roll.cannot-edit.title"
-        >cannot edit:
+        >roll.cannot-edit
         {{
           reason // i18n(ph='reason')
         }}</span
@@ -213,11 +213,11 @@
       <span
         i18n="@@roll.refused"
         class="text-warn truncate"
-        title="refused: {{
+        title="roll.refused.title {{
           reason // i18n(ph='reason')
         }}"
         i18n-title="@@roll.refused.title"
-        >refused:
+        >roll.refused
         {{
           reason // i18n(ph='reason')
         }}</span

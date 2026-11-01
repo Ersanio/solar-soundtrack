@@ -126,7 +126,8 @@ export function resolveCommand(command: Command, context: ParamContext): Resolve
 
 	const rows: ParamRow[] = [];
 	for (let index = 0; index < shown; index++) {
-		const descriptor = shape.params[index] ?? raw($localize`:@@inspector.param.argument:Argument ${index + 1}:index:`);
+		const descriptor =
+			shape.params[index] ?? raw($localize`:@@inspector.param.argument:inspector.param.argument ${index + 1}:index:`);
 		const arg = command.args[index] as Command["args"][number] | undefined;
 		const byte = arg?.value ?? null;
 		const { min, max } = rangeFor(descriptor);
@@ -152,9 +153,9 @@ export function resolveCommand(command: Command, context: ParamContext): Resolve
 			note: byte === null ? null : (descriptor.describe?.(byte, command, context) ?? null),
 			editable: !missing && argEditable(command, index),
 			lockedBecause: missing
-				? $localize`:@@inspector.param.not-written-yet:not written yet`
+				? $localize`:@@inspector.param.not-written-yet:inspector.param.not-written-yet`
 				: macro !== undefined
-					? $localize`:@@inspector.param.comes-from-the-replacement:comes from the "${macro}:macro:" replacement`
+					? $localize`:@@inspector.param.comes-from-the-replacement:inspector.param.comes-from-the-replacement ${macro}:macro:`
 					: null,
 		});
 	}

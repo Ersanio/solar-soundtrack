@@ -9,7 +9,7 @@
         (click)="reveal(diagnostic)"
       >
         <span i18n="@@output.problems.line" class="text-ink-muted shrink-0 font-mono text-xs"
-          >line
+          >output.problems.line
           {{
             diagnostic.span.line // i18n(ph='line')
           }}</span
@@ -21,6 +21,8 @@
       </button>
     </li>
   } @empty {
-    <li i18n="@@output.problems.no-problems" class="text-ink-muted px-3 py-2">No problems.</li>
+    <li i18n="@@output.problems.no-problems" class="text-ink-muted px-3 py-2">
+      output.problems.no-problems
+    </li>
   }
 </ul>

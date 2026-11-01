@@ -1,5 +1,5 @@
 <h3 i18n="@@mixer.channels" class="text-ink-muted text-xs font-semibold tracking-wide uppercase">
-  Channels
+  mixer.channels
 </h3>
 
 @for (channel of rows(); track channel.index) {
@@ -8,7 +8,7 @@
 
     <button
       type="button"
-      title="Mute channel {{
+      title="mixer.mute.title {{
         channel.index // i18n(ph='channel')
       }}"
       [class]="channel.mute"
@@ -16,19 +16,19 @@
       i18n-title="@@mixer.mute.title"
       (click)="mixer.toggleMute(channel.index)"
     >
-      <ng-container i18n="@@mixer.mute">M</ng-container>
+      <ng-container i18n="@@mixer.mute">mixer.mute</ng-container>
     </button>
 
     <button
       type="button"
-      title="Solo channel {{
+      title="mixer.solo.title {{
         channel.index // i18n(ph='channel')
       }}"
       [class]="channel.solo"
       i18n-title="@@mixer.solo.title"
       (click)="mixer.toggleSolo(channel.index)"
     >
-      <ng-container i18n="@@mixer.solo">S</ng-container>
+      <ng-container i18n="@@mixer.solo">mixer.solo</ng-container>
     </button>
   </div>
 }
@@ -41,5 +41,5 @@
   [disabled]="!mixer.hasChannelOverrides()"
   (click)="mixer.clearChannels()"
 >
-  Reset
+  mixer.reset
 </button>

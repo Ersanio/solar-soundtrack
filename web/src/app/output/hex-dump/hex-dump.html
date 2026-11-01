@@ -4,7 +4,7 @@
     i18n="@@output.hex.hex-dump"
     class="text-ink-muted text-xs font-semibold tracking-wide uppercase"
   >
-    Hex dump
+    output.hex.hex-dump
   </h3>
   <span class="text-ink-muted font-mono text-xs">{{ range() }}</span>
 </div>
@@ -14,5 +14,5 @@
 >@for (row of rows(); track row.address) {<span
     class="text-ink-muted"
   >{{ row.address }}  </span><span class="text-accent">{{ row.header }}</span>{{ row.rest }}
-}@if (truncated(); as more) {<span i18n="@@output.hex.more-bytes" class="text-ink-muted">… {{ more // i18n(ph='count') }} more bytes</span>
+}@if (truncated(); as more) {<span i18n="@@output.hex.more-bytes" class="text-ink-muted">output.hex.more-bytes {{ more // i18n(ph='count') }}</span>
 }</pre>

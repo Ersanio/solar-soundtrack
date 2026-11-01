@@ -9,14 +9,14 @@
   <span
     i18n="@@output.inspector"
     class="text-ink-muted text-xs font-semibold tracking-wide uppercase"
-    >Inspector</span
+    >output.inspector</span
   >
   <span class="text-ink-muted flex items-center gap-2 text-xs">
     @if (collapsed()) {
-      <ng-container i18n="@@output.show">Show</ng-container>
+      <ng-container i18n="@@output.show">output.show</ng-container>
       <amk-icon-chevron-right />
     } @else {
-      <ng-container i18n="@@output.hide">Hide</ng-container>
+      <ng-container i18n="@@output.hide">output.hide</ng-container>
       <amk-icon-chevron-down />
     }
   </span>
@@ -25,12 +25,10 @@
 <div [class]="bodyClass()">
   @if (blocked()) {
     <p i18n="@@output.cannot-compile-without-a" class="text-danger m-3 text-xs leading-relaxed">
-      Cannot compile without a driver —
+      output.cannot-compile-without-a
       {{
         driverProblem() // i18n(ph='problem')
       }}
-      The song's load address comes from the driver's song pointer table, so there is nothing to
-      compile against.
     </p>
   } @else {
     <div class="min-h-0 flex-1 overflow-auto">
@@ -39,7 +37,7 @@
       <amk-section
         #build
         i18n-heading="@@output.build.heading"
-        heading="Build"
+        heading="output.build.heading"
         collapsible
         [(open)]="buildOpen"
       >
@@ -55,7 +53,7 @@
     <!-- Pinned under the scroll column, so it stays in view whatever the inspector's height. -->
     <amk-section
       i18n-heading="@@output.problems.heading"
-      heading="Problems"
+      heading="output.problems.heading"
       collapsible
       class="max-h-[30%] shrink-0"
       [(open)]="problemsOpen"

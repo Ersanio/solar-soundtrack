@@ -52,15 +52,15 @@ export function isWrap(verdict: WrapVerdict): verdict is WrapOffer {
 }
 
 /** Said by both verdicts: with the brackets unpaired there is nothing to reason from. */
-export const BRACKETS_UNPAIRED = $localize`:@@palette.this-songs-loop-brackets-do:This song’s loop brackets do not pair up.`;
+export const BRACKETS_UNPAIRED = $localize`:@@palette.this-songs-loop-brackets-do:palette.this-songs-loop-brackets-do`;
 
-export const WRAP_NOTHING = $localize`:@@palette.select-the-notes-the-loop:Select the notes the loop should play.`;
-export const WRAP_NO_NOTES = $localize`:@@palette.that-selection-holds-no-notes:That selection holds no notes to loop.`;
-export const WRAP_SPLIT = $localize`:@@palette.those-notes-are-on-both:Those notes are on both sides of a loop bracket.`;
-export const WRAP_CHANNELS = $localize`:@@palette.those-notes-are-on-more:Those notes are on more than one channel.`;
-export const WRAP_INTRO = $localize`:@@palette.the-intro-marker-cannot-be:The intro marker cannot be written inside a loop (AMK0080).`;
-export const WRAP_REPLACEMENT = $localize`:@@palette.that-music-is-written-through:That music is written through a replacement.`;
-export const WRAP_DEEP = $localize`:@@palette.a-loop-and-a-subloop:A loop and a subloop is as deep as AddmusicK goes.`;
+export const WRAP_NOTHING = $localize`:@@palette.select-the-notes-the-loop:palette.select-the-notes-the-loop`;
+export const WRAP_NO_NOTES = $localize`:@@palette.that-selection-holds-no-notes:palette.that-selection-holds-no-notes`;
+export const WRAP_SPLIT = $localize`:@@palette.those-notes-are-on-both:palette.those-notes-are-on-both`;
+export const WRAP_CHANNELS = $localize`:@@palette.those-notes-are-on-more:palette.those-notes-are-on-more`;
+export const WRAP_INTRO = $localize`:@@palette.the-intro-marker-cannot-be:palette.the-intro-marker-cannot-be`;
+export const WRAP_REPLACEMENT = $localize`:@@palette.that-music-is-written-through:palette.that-music-is-written-through`;
+export const WRAP_DEEP = $localize`:@@palette.a-loop-and-a-subloop:palette.a-loop-and-a-subloop`;
 
 /**
  * Calling a loop the song has already written.
@@ -84,8 +84,8 @@ export function isCall(verdict: CallVerdict): verdict is CallOffer {
   return 'label' in verdict;
 }
 
-export const CALL_NONE = $localize`:@@palette.no-named-loop-is-written:No named loop is written above the cursor. Loops made here name themselves.`;
-export const CALL_NESTED = $localize`:@@palette.a-loop-cannot-be-called:A loop cannot be called from inside another loop (AMK0112).`;
+export const CALL_NONE = $localize`:@@palette.no-named-loop-is-written:palette.no-named-loop-is-written`;
+export const CALL_NESTED = $localize`:@@palette.a-loop-cannot-be-called:palette.a-loop-cannot-be-called`;
 
 /**
  * What a fresh loop opens on.

@@ -1,4 +1,6 @@
-<span i18n="@@roll.on-percussion-lanes" class="text-ink-muted text-xs">On percussion lanes</span>
+<span i18n="@@roll.on-percussion-lanes" class="text-ink-muted text-xs"
+  >roll.on-percussion-lanes</span
+>
 @for (chip of chips(); track chip.instrument) {
   <button
     amk-toggle
@@ -12,7 +14,7 @@
   </button>
 } @empty {
   <span i18n="@@roll.this-song-plays-no" class="text-ink-muted text-xs"
-    >This song plays no instruments.</span
+    >roll.this-song-plays-no</span
   >
 }
 <button
@@ -24,5 +26,5 @@
   [disabled]="!hasOverrides()"
   (click)="resetAll.emit()"
 >
-  Reset
+  roll.reset
 </button>

@@ -10,6 +10,7 @@
   ],
   "scripts": {
     "start": "npm start -w web",
+    "start:ids": "npm run start:ids -w web",
     "build": "npm run build -w web",
     "watch": "npm run watch -w web",
     "build:worklet": "npm run build -w @amk/spc",

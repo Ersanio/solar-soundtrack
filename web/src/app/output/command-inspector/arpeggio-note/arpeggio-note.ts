@@ -35,8 +35,8 @@ export interface ArpeggioNote {
 })
 export class ArpeggioNoteRow {
   protected readonly text = {
-    clearLoop: $localize`:@@inspector.arpeggio-note.clear-loop.title:Clear the loop point`,
-    restartHere: $localize`:@@inspector.arpeggio-note.restart-here.title:Restart the sequence here`,
+    clearLoop: $localize`:@@inspector.arpeggio-note.clear-loop.title:inspector.arpeggio-note.clear-loop.title`,
+    restartHere: $localize`:@@inspector.arpeggio-note.restart-here.title:inspector.arpeggio-note.restart-here.title`,
   };
 
   readonly note = input.required<ArpeggioNote>();

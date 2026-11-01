@@ -616,39 +616,39 @@ export interface FirPreset {
 export const FIR_PRESETS: readonly FirPreset[] = [
 	{
 		id: "flat",
-		name: $localize`:@@inspector.fir.preset.flat.name:Flat`,
-		note: $localize`:@@inspector.fir.preset.flat.note:Echo comes back unchanged. AddmusicK's filter 1.`,
+		name: $localize`:@@inspector.fir.preset.flat.name:inspector.fir.preset.flat.name`,
+		note: $localize`:@@inspector.fir.preset.flat.note:inspector.fir.preset.flat.note`,
 		taps: [...FLAT_TAPS],
 	},
 	{
 		id: "classic",
-		name: $localize`:@@inspector.fir.preset.classic.name:Classic`,
-		note: $localize`:@@inspector.fir.preset.classic.note:Super Mario World's echo. AddmusicK's filter 0.`,
+		name: $localize`:@@inspector.fir.preset.classic.name:inspector.fir.preset.classic.name`,
+		note: $localize`:@@inspector.fir.preset.classic.note:inspector.fir.preset.classic.note`,
 		// EchoFilter0, main.asm:3507 — $FF and $08 read as −1 and 8.
 		taps: [-1, 0x08, 0x17, 0x24, 0x24, 0x17, 0x08, -1],
 	},
 	{
 		id: "warm",
-		name: $localize`:@@inspector.fir.preset.warm.name:Warm`,
-		note: $localize`:@@inspector.fir.preset.warm.note:Takes the edge off without muffling anything.`,
+		name: $localize`:@@inspector.fir.preset.warm.name:inspector.fir.preset.warm.name`,
+		note: $localize`:@@inspector.fir.preset.warm.note:inspector.fir.preset.warm.note`,
 		taps: designTone({ tone: -0.45 }),
 	},
 	{
 		id: "dark",
-		name: $localize`:@@inspector.fir.preset.dark.name:Dark`,
-		note: $localize`:@@inspector.fir.preset.dark.note:Echo sits well behind the music. Good for big spaces.`,
+		name: $localize`:@@inspector.fir.preset.dark.name:inspector.fir.preset.dark.name`,
+		note: $localize`:@@inspector.fir.preset.dark.note:inspector.fir.preset.dark.note`,
 		taps: designTone({ tone: -1 }),
 	},
 	{
 		id: "bright",
-		name: $localize`:@@inspector.fir.preset.bright.name:Bright`,
-		note: $localize`:@@inspector.fir.preset.bright.note:Echo keeps its top end and stays present.`,
+		name: $localize`:@@inspector.fir.preset.bright.name:inspector.fir.preset.bright.name`,
+		note: $localize`:@@inspector.fir.preset.bright.note:inspector.fir.preset.bright.note`,
 		taps: designTone({ tone: 0.6 }),
 	},
 	{
 		id: "telephone",
-		name: $localize`:@@inspector.fir.preset.telephone.name:Telephone`,
-		note: $localize`:@@inspector.fir.preset.telephone.note:Midrange only — thin and distant.`,
+		name: $localize`:@@inspector.fir.preset.telephone.name:inspector.fir.preset.telephone.name`,
+		note: $localize`:@@inspector.fir.preset.telephone.note:inspector.fir.preset.telephone.note`,
 		taps: fitToTarget([
 			{ hz: 100, gain: 0.15 },
 			{ hz: 900, gain: 0.95 },
@@ -659,8 +659,8 @@ export const FIR_PRESETS: readonly FirPreset[] = [
 	},
 	{
 		id: "boomy",
-		name: $localize`:@@inspector.fir.preset.boomy.name:Boomy`,
-		note: $localize`:@@inspector.fir.preset.boomy.note:Keeps the low end, drops everything above it.`,
+		name: $localize`:@@inspector.fir.preset.boomy.name:inspector.fir.preset.boomy.name`,
+		note: $localize`:@@inspector.fir.preset.boomy.note:inspector.fir.preset.boomy.note`,
 		taps: fitToTarget([
 			{ hz: 100, gain: 1 },
 			{ hz: 1500, gain: 0.9 },

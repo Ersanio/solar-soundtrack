@@ -68,9 +68,7 @@ export function stopWhenRunaway(
       }
 
       playback.stop();
-      store.fail(
-        $localize`:@@inspector.runaway.stopped:playback automatically stopped to protect your ears and speakers due to a runaway ${what}:what:`,
-      );
+      store.fail($localize`:@@inspector.runaway.stopped:inspector.runaway.stopped ${what}:what:`);
     });
   });
 }

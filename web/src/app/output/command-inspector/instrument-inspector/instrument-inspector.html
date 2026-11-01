@@ -7,7 +7,7 @@
     <div class="flex flex-col gap-0.5">
       <amk-enum-select
         i18n-label="@@inspector.instrument.instrument.label"
-        label="Instrument"
+        label="inspector.instrument.instrument.label"
         [value]="picker().selected"
         [options]="picker().options"
         [disabled]="!picker().editable"
@@ -25,58 +25,43 @@
         i18n="@@inspector.instrument.no-number-given-so"
         class="text-ink-muted text-xs leading-relaxed"
       >
-        No number given, so this changes nothing.
+        inspector.instrument.no-number-given-so
       </p>
     } @else {
       @switch (band()) {
         @case ('unsupported') {
           <div class="text-warn space-y-2 text-xs leading-relaxed">
             <p i18n="@@inspector.instrument.emits-nothing-addmusick-writes">
-              <code class="text-ink"
-                >&#64;{{
-                  written() // i18n(ph='written')
-                }}</code
-              >
-              emits nothing. AddmusicK writes a <code class="text-ink">$DA</code> only for
-              <code class="text-ink">&#64;0</code>–<code class="text-ink">&#64;18</code> and
-              <code class="text-ink">&#64;30</code> upward, so the sound does not change — the
-              channel keeps whatever instrument it already had, or instrument 0 if none was ever
-              set. That is why it appears to be the same as <code class="text-ink">&#64;0</code>.
+              inspector.instrument.emits-nothing-addmusick-writes
+              <code class="text-ink">{{
+                written() // i18n(ph='written')
+              }}</code>
+              <code class="text-ink"></code> <code class="text-ink"></code>
+              <code class="text-ink"></code> <code class="text-ink"></code>
+              <code class="text-ink"></code>
             </p>
             <p i18n="@@inspector.instrument.it-is-not-inert">
-              It is not inert, though. It still records itself as the channel's instrument, which
-              cancels a pending <code class="text-ink">&#64;21</code>–<code class="text-ink"
-                >&#64;29</code
-              >
-              drum and clears the current instrument's built-in transposition. So
-              <code class="text-ink">&#64;2 c4 &#64;19 c4</code> plays one timbre at two different
-              pitches.
+              inspector.instrument.it-is-not-inert <code class="text-ink"></code>
+              <code class="text-ink"></code> <code class="text-ink"></code>
             </p>
             <p i18n="@@inspector.instrument.valid-instruments-are">
-              Valid instruments are
+              inspector.instrument.valid-instruments-are
               {{
-                validRanges  // i18n(ph='ranges')
-              }}.
+                validRanges // i18n(ph='ranges')
+              }}
             </p>
             @if (!direct()) {
               <p i18n="@@inspector.instrument.does-not-help-the">
-                <code class="text-ink"
-                  >&#64;&#64;{{
-                    written() // i18n(ph='written')
-                  }}</code
-                >
-                does not help: the direct form is remapped to
-                <code class="text-ink"
-                  >&#64;{{
-                    written() + 11 // i18n(ph='remapped')
-                  }}</code
-                >, a custom instrument. Only a raw
-                <code class="text-ink"
-                  >$DA ${{
-                    written() | hex // i18n(ph='written_hex')
-                  }}</code
-                >
-                reaches the driver's own entry.
+                inspector.instrument.does-not-help-the
+                <code class="text-ink">{{
+                  written() // i18n(ph='written')
+                }}</code>
+                <code class="text-ink">{{
+                  written() + 11 // i18n(ph='remapped')
+                }}</code>
+                <code class="text-ink">{{
+                  written() | hex // i18n(ph='written_hex')
+                }}</code>
               </p>
             }
           </div>
@@ -87,16 +72,11 @@
             i18n="@@inspector.instrument.da-reads-past-the"
             class="text-warn text-xs leading-relaxed"
           >
-            <code class="text-ink"
-              >$DA ${{
-                written() | hex // i18n(ph='written_hex')
-              }}</code
-            >
-            reads past the driver's 20-entry instrument table. Where it lands depends on how that
-            driver indexes the table, which is not something this editor can read, so the bytes it
-            picks up are not shown. Percussion is not reached this way — that is
-            <code class="text-ink">&#64;21</code>–<code class="text-ink">&#64;29</code>, which
-            rewrite the note instead.
+            inspector.instrument.da-reads-past-the
+            <code class="text-ink">{{
+              written() | hex // i18n(ph='written_hex')
+            }}</code>
+            <code class="text-ink"></code> <code class="text-ink"></code>
           </p>
         }
 
@@ -105,113 +85,80 @@
             @if (customCount() === 0) {
               @if (direct()) {
                 <ng-container i18n="@@inspector.instrument.undefined.direct-none"
-                  >The direct form
-                  <code class="text-ink"
-                    >&#64;&#64;{{
-                      written() // i18n(ph='written')
-                    }}</code
-                  >
-                  is remapped to
-                  <code class="text-ink"
-                    >&#64;{{
-                      emitted() // i18n(ph='remapped')
-                    }}</code
-                  >, a custom instrument — this song defines none. Add an
-                  <code class="text-ink">#instruments</code> block; its first entry is
-                  <code class="text-ink">&#64;30</code>.</ng-container
-                >
+                  >inspector.instrument.undefined.direct-none
+                  <code class="text-ink">{{
+                    written() // i18n(ph='written')
+                  }}</code>
+                  <code class="text-ink">{{
+                    emitted() // i18n(ph='remapped')
+                  }}</code>
+                  <code class="text-ink"></code> <code class="text-ink"></code
+                ></ng-container>
               } @else if (rawRemapped()) {
                 <ng-container i18n="@@inspector.instrument.undefined.am4-none"
-                  >Under <code class="text-ink">#am4</code>,
-                  <code class="text-ink"
-                    >$DA ${{
-                      written() | hex // i18n(ph='written_hex')
-                    }}</code
-                  >
-                  means
-                  <code class="text-ink"
-                    >&#64;{{
-                      emitted() // i18n(ph='remapped')
-                    }}</code
-                  >, a custom instrument — this song defines none. Add an
-                  <code class="text-ink">#instruments</code> block; its first entry is
-                  <code class="text-ink">&#64;30</code>.</ng-container
-                >
+                  >inspector.instrument.undefined.am4-none <code class="text-ink"></code>
+                  <code class="text-ink">{{
+                    written() | hex // i18n(ph='written_hex')
+                  }}</code>
+                  <code class="text-ink">{{
+                    emitted() // i18n(ph='remapped')
+                  }}</code>
+                  <code class="text-ink"></code> <code class="text-ink"></code
+                ></ng-container>
               } @else {
                 <ng-container i18n="@@inspector.instrument.undefined.plain-none"
-                  ><code class="text-ink"
-                    >&#64;{{
-                      written() // i18n(ph='written')
-                    }}</code
-                  >
-                  is a custom instrument, but this song defines none. Add an
-                  <code class="text-ink">#instruments</code> block; its first entry is
-                  <code class="text-ink">&#64;30</code>.</ng-container
-                >
+                  >inspector.instrument.undefined.plain-none
+                  <code class="text-ink">{{
+                    written() // i18n(ph='written')
+                  }}</code>
+                  <code class="text-ink"></code> <code class="text-ink"></code
+                ></ng-container>
               }
             } @else {
               @if (direct()) {
                 <ng-container i18n="@@inspector.instrument.undefined.direct-some"
-                  >The direct form
-                  <code class="text-ink"
-                    >&#64;&#64;{{
-                      written() // i18n(ph='written')
-                    }}</code
-                  >
-                  is remapped to
-                  <code class="text-ink"
-                    >&#64;{{
-                      emitted() // i18n(ph='remapped')
-                    }}</code
-                  >, a custom instrument — this song defines
+                  >inspector.instrument.undefined.direct-some
+                  <code class="text-ink">{{
+                    written() // i18n(ph='written')
+                  }}</code>
+                  <code class="text-ink">{{
+                    emitted() // i18n(ph='remapped')
+                  }}</code>
                   {{
-                    customCount()  // i18n(ph='defined')
-                  }}, so the highest is
-                  <code class="text-ink"
-                    >&#64;{{
-                      29 + customCount() // i18n(ph='highest')
-                    }}</code
-                  >.</ng-container
+                    customCount() // i18n(ph='defined')
+                  }}
+                  <code class="text-ink">{{
+                    29 + customCount() // i18n(ph='highest')
+                  }}</code></ng-container
                 >
               } @else if (rawRemapped()) {
                 <ng-container i18n="@@inspector.instrument.undefined.am4-some"
-                  >Under <code class="text-ink">#am4</code>,
-                  <code class="text-ink"
-                    >$DA ${{
-                      written() | hex // i18n(ph='written_hex')
-                    }}</code
-                  >
-                  means
-                  <code class="text-ink"
-                    >&#64;{{
-                      emitted() // i18n(ph='remapped')
-                    }}</code
-                  >, a custom instrument — this song defines
+                  >inspector.instrument.undefined.am4-some <code class="text-ink"></code>
+                  <code class="text-ink">{{
+                    written() | hex // i18n(ph='written_hex')
+                  }}</code>
+                  <code class="text-ink">{{
+                    emitted() // i18n(ph='remapped')
+                  }}</code>
                   {{
-                    customCount()  // i18n(ph='defined')
-                  }}, so the highest is
-                  <code class="text-ink"
-                    >&#64;{{
-                      29 + customCount() // i18n(ph='highest')
-                    }}</code
-                  >.</ng-container
+                    customCount() // i18n(ph='defined')
+                  }}
+                  <code class="text-ink">{{
+                    29 + customCount() // i18n(ph='highest')
+                  }}</code></ng-container
                 >
               } @else {
                 <ng-container i18n="@@inspector.instrument.undefined.plain-some"
-                  ><code class="text-ink"
-                    >&#64;{{
-                      written() // i18n(ph='written')
-                    }}</code
-                  >
-                  is a custom instrument, but this song defines
+                  >inspector.instrument.undefined.plain-some
+                  <code class="text-ink">{{
+                    written() // i18n(ph='written')
+                  }}</code>
                   {{
-                    customCount()  // i18n(ph='defined')
-                  }}, so the highest is
-                  <code class="text-ink"
-                    >&#64;{{
-                      29 + customCount() // i18n(ph='highest')
-                    }}</code
-                  >.</ng-container
+                    customCount() // i18n(ph='defined')
+                  }}
+                  <code class="text-ink">{{
+                    29 + customCount() // i18n(ph='highest')
+                  }}</code></ng-container
                 >
               }
             }
@@ -228,7 +175,7 @@
                   i18n="@@inspector.instrument.written-as"
                   class="text-ink-muted py-1 pr-3 whitespace-nowrap"
                 >
-                  Written as
+                  inspector.instrument.written-as
                 </td>
                 <td class="py-1 font-mono tabular-nums">
                   {{ writtenLabel() }}
@@ -236,20 +183,19 @@
                     @switch (band()) {
                       @case ('percussion') {
                         <ng-container i18n="@@inspector.instrument.drum-of-9-no"
-                          >drum
+                          >inspector.instrument.drum-of-9-no
                           {{
                             drumIndex() // i18n(ph='drum')
                           }}
-                          of 9 — no <code>$DA</code> is emitted</ng-container
-                        >
+                          <code></code
+                        ></ng-container>
                       }
                       @case ('custom') {
                         <ng-container i18n="@@inspector.instrument.custom-instrument-entry-of"
-                          >custom instrument, entry
+                          >inspector.instrument.custom-instrument-entry-of
                           {{
                             customEntry() // i18n(ph='entry')
                           }}
-                          of
                           {{
                             customCount() // i18n(ph='total')
                           }}</ng-container
@@ -258,14 +204,14 @@
                       @default {
                         @if (raw()) {
                           <ng-container i18n="@@inspector.instrument.driver-instrument-table-entry"
-                            >driver instrument table entry
+                            >inspector.instrument.driver-instrument-table-entry
                             {{
                               emitted() // i18n(ph='entry')
                             }}</ng-container
                           >
                         } @else {
                           <ng-container i18n="@@inspector.instrument.stock-instrument"
-                            >stock instrument</ng-container
+                            >inspector.instrument.stock-instrument</ng-container
                           >
                         }
                       }
@@ -280,7 +226,7 @@
                     i18n="@@inspector.instrument.bytes"
                     class="text-ink-muted py-1 pr-3 whitespace-nowrap"
                   >
-                    Bytes
+                    inspector.instrument.bytes
                   </td>
                   <td class="py-1 font-mono tabular-nums">{{ bytes }}</td>
                 </tr>
@@ -292,7 +238,7 @@
                     i18n="@@inspector.instrument.defined-as"
                     class="text-ink-muted py-1 pr-3 whitespace-nowrap"
                   >
-                    Defined as
+                    inspector.instrument.defined-as
                   </td>
                   <td class="py-1 font-mono tabular-nums">{{ sample }}</td>
                 </tr>
@@ -317,8 +263,7 @@
               i18n="@@inspector.instrument.this-entry-is-unfinished"
               class="text-warn text-xs leading-relaxed"
             >
-              This entry is unfinished. Each one needs a sample and five
-              <code class="text-ink">$xx</code> bytes.
+              inspector.instrument.this-entry-is-unfinished <code class="text-ink"></code>
             </p>
           }
 
@@ -328,7 +273,7 @@
                 i18n="@@inspector.instrument.envelope-heading"
                 class="text-ink-muted mb-1 text-[11px] tracking-wide uppercase"
               >
-                Envelope
+                inspector.instrument.envelope-heading
               </div>
               <amk-adsr-graph [adsr1]="adsr1()" [adsr2]="adsr2()" [gain]="gain()" />
             </div>
@@ -339,22 +284,13 @@
               i18n="@@inspector.instrument.the-pitch-you-write"
               class="text-ink-muted text-xs leading-relaxed"
             >
-              The pitch you write is discarded —
-              <code class="text-ink"
-                >&#64;{{
-                  written() // i18n(ph='written')
-                }}
-                c4</code
-              >
-              and
-              <code class="text-ink"
-                >&#64;{{
-                  written() // i18n(ph='written')
-                }}
-                g4</code
-              >
-              are the same drum at the same pitch, and only the length differs. It applies to the
-              next note only, then the channel reverts.
+              inspector.instrument.the-pitch-you-write
+              <code class="text-ink">{{
+                written() // i18n(ph='written')
+              }}</code>
+              <code class="text-ink">{{
+                written() // i18n(ph='written')
+              }}</code>
             </p>
           }
 
@@ -363,10 +299,8 @@
               i18n="@@inspector.instrument.the-direct-form-for"
               class="text-ink-muted text-xs leading-relaxed"
             >
-              The direct form. For <code class="text-ink">&#64;0</code>–<code class="text-ink"
-                >&#64;18</code
-              >
-              it does exactly what the plain form does.
+              inspector.instrument.the-direct-form-for <code class="text-ink"></code>
+              <code class="text-ink"></code>
             </p>
           }
         }

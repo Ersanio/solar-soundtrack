@@ -509,8 +509,9 @@ snapping back to where the song _was_.
 
 Neither thread of the worklet, nor the app's two workers, has a `$localize`, so the modules they
 load — `worklet.ts`, `protocol.ts`, `driver-state.ts`, `wasm-host.ts`, `note-audition.ts` — hold no
-message and their errors stay English. Everything else here that a porter reads (the FIR presets,
-the ARAM segment labels, the GAIN mode names, the BRR and driver errors) is a `$localize` message;
+message and their errors are written in English in the code. Everything else here that a porter
+reads (the FIR presets, the ARAM segment labels, the GAIN mode names, the BRR and driver errors) is
+a `$localize` message written by its ID, with its English in `web/src/locale/messages.en.json`;
 the presets carry an `id` because their names are display text.
 
 ## The `.spc` file

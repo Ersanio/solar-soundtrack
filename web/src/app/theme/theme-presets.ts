@@ -22,14 +22,14 @@ export interface ThemePreset {
 export const PRESETS: readonly ThemePreset[] = [
   {
     id: 'studio',
-    name: $localize`:@@theme.studio:Studio`,
-    note: $localize`:@@theme.blue-grey-chrome-with-an:Blue-grey chrome with an orange playhead, and what the app ships as`,
+    name: $localize`:@@theme.studio:theme.studio`,
+    note: $localize`:@@theme.blue-grey-chrome-with-an:theme.blue-grey-chrome-with-an`,
     overrides: {},
   },
   {
     id: 'graphite',
-    name: $localize`:@@theme.graphite:Graphite`,
-    note: $localize`:@@theme.neutral-grey:Neutral grey`,
+    name: $localize`:@@theme.graphite:theme.graphite`,
+    note: $localize`:@@theme.neutral-grey:theme.neutral-grey`,
     overrides: {
       surface: '#191919',
       raised: '#212121',
@@ -49,8 +49,8 @@ export const PRESETS: readonly ThemePreset[] = [
   },
   {
     id: 'midnight',
-    name: $localize`:@@theme.midnight:Midnight`,
-    note: $localize`:@@theme.the-cooler-blue-tinted-grey:The cooler, blue-tinted grey the editor used to open in`,
+    name: $localize`:@@theme.midnight:theme.midnight`,
+    note: $localize`:@@theme.the-cooler-blue-tinted-grey:theme.the-cooler-blue-tinted-grey`,
     overrides: {
       surface: '#16181d',
       raised: '#1d2027',
@@ -72,8 +72,8 @@ export const PRESETS: readonly ThemePreset[] = [
   },
   {
     id: 'contrast',
-    name: $localize`:@@theme.contrast:Contrast`,
-    note: $localize`:@@theme.near-black-with-brighter-text:Near-black, with brighter text`,
+    name: $localize`:@@theme.contrast:theme.contrast`,
+    note: $localize`:@@theme.near-black-with-brighter-text:theme.near-black-with-brighter-text`,
     overrides: {
       surface: '#0a0a0a',
       raised: '#161616',
@@ -96,8 +96,8 @@ export const PRESETS: readonly ThemePreset[] = [
   },
   {
     id: 'warm',
-    name: $localize`:@@theme.warm-grey:Warm grey`,
-    note: $localize`:@@theme.the-same-greys-turned-a:The same greys, turned a little towards brown`,
+    name: $localize`:@@theme.warm-grey:theme.warm-grey`,
+    note: $localize`:@@theme.the-same-greys-turned-a:theme.the-same-greys-turned-a`,
     overrides: {
       surface: '#1a1918',
       raised: '#232120',

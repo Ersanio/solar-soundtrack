@@ -71,58 +71,58 @@ export interface RemoteEvent {
 export const REMOTE_EVENTS: readonly RemoteEvent[] = [
 	{
 		type: 0,
-		name: $localize`:@@inspector.remote.cancel-every-remote-code:cancel every remote code`,
-		note: $localize`:@@inspector.remote.cancels-this-channels-remote-code:Cancels this channel's remote code, the key-on kind included. Nothing is run.`,
+		name: $localize`:@@inspector.remote.cancel-every-remote-code:inspector.remote.cancel-every-remote-code`,
+		note: $localize`:@@inspector.remote.cancels-this-channels-remote-code:inspector.remote.cancels-this-channels-remote-code`,
 	},
 	{
 		type: 1,
-		name: $localize`:@@inspector.remote.run-after-a-set-time:run after a set time`,
-		note: $localize`:@@inspector.remote.runs-the-code-this-long:Runs the code this long after each note keys on. Ties and rests do not count, and a wait longer than the note never fires.`,
+		name: $localize`:@@inspector.remote.run-after-a-set-time:inspector.remote.run-after-a-set-time`,
+		note: $localize`:@@inspector.remote.runs-the-code-this-long:inspector.remote.runs-the-code-this-long`,
 	},
 	{
 		type: 2,
-		name: $localize`:@@inspector.remote.run-before-a-note-ends:run before a note ends`,
-		note: $localize`:@@inspector.remote.runs-the-code-this-long-2:Runs the code this long before each note is cut, which its q decides.`,
+		name: $localize`:@@inspector.remote.run-before-a-note-ends:inspector.remote.run-before-a-note-ends`,
+		note: $localize`:@@inspector.remote.runs-the-code-this-long-2:inspector.remote.runs-the-code-this-long-2`,
 	},
 	{
 		type: 3,
-		name: $localize`:@@inspector.remote.run-on-key-off-instead:run on key-off, instead of the note cut`,
-		note: $localize`:@@inspector.remote.runs-the-code-where-each:Runs the code where each note would be cut, and the note keeps sounding until the next one.`,
+		name: $localize`:@@inspector.remote.run-on-key-off-instead:inspector.remote.run-on-key-off-instead`,
+		note: $localize`:@@inspector.remote.runs-the-code-where-each:inspector.remote.runs-the-code-where-each`,
 	},
 	{
 		type: 4,
-		name: $localize`:@@inspector.remote.run-once-right-now:run once, right now`,
-		note: $localize`:@@inspector.remote.runs-the-code-once-here:Runs the code once, here, alongside whatever else is set.`,
+		name: $localize`:@@inspector.remote.run-once-right-now:inspector.remote.run-once-right-now`,
+		note: $localize`:@@inspector.remote.runs-the-code-once-here:inspector.remote.runs-the-code-once-here`,
 	},
 	{
 		type: 5,
-		name: $localize`:@@inspector.remote.reserved-behaves-as-2:reserved; behaves as 2`,
-		note: $localize`:@@inspector.remote.reserved-the-driver-handles-it:Reserved. The driver handles it exactly as type 2.`,
+		name: $localize`:@@inspector.remote.reserved-behaves-as-2:inspector.remote.reserved-behaves-as-2`,
+		note: $localize`:@@inspector.remote.reserved-the-driver-handles-it:inspector.remote.reserved-the-driver-handles-it`,
 	},
 	{
 		type: 6,
-		name: $localize`:@@inspector.remote.reserved-a-key-on-slot:reserved; a key-on slot that fires at key-off`,
-		note: $localize`:@@inspector.remote.reserved-stored-as-key-on:Reserved. Stored as key-on code, and run at key-off like type 3.`,
+		name: $localize`:@@inspector.remote.reserved-a-key-on-slot:inspector.remote.reserved-a-key-on-slot`,
+		note: $localize`:@@inspector.remote.reserved-stored-as-key-on:inspector.remote.reserved-stored-as-key-on`,
 	},
 	{
 		type: 7,
-		name: $localize`:@@inspector.remote.cancel-all-but-the-key:cancel all but the key-on code`,
-		note: $localize`:@@inspector.remote.cancels-this-channels-remote-code-2:Cancels this channel's remote code except the key-on kind. Nothing is run.`,
+		name: $localize`:@@inspector.remote.cancel-all-but-the-key:inspector.remote.cancel-all-but-the-key`,
+		note: $localize`:@@inspector.remote.cancels-this-channels-remote-code-2:inspector.remote.cancels-this-channels-remote-code-2`,
 	},
 	{
 		type: 8,
-		name: $localize`:@@inspector.remote.cancel-the-key-on-code:cancel the key-on code`,
-		note: $localize`:@@inspector.remote.cancels-this-channels-key-on:Cancels this channel's key-on code. Nothing is run.`,
+		name: $localize`:@@inspector.remote.cancel-the-key-on-code:inspector.remote.cancel-the-key-on-code`,
+		note: $localize`:@@inspector.remote.cancels-this-channels-key-on:inspector.remote.cancels-this-channels-key-on`,
 	},
 	{
 		type: -1,
-		name: $localize`:@@inspector.remote.run-on-key-on-alongside:run on key-on, alongside the rest`,
-		note: $localize`:@@inspector.remote.runs-the-code-as-each:Runs the code as each note keys on, before it sounds. It can run alongside any other type.`,
+		name: $localize`:@@inspector.remote.run-on-key-on-alongside:inspector.remote.run-on-key-on-alongside`,
+		note: $localize`:@@inspector.remote.runs-the-code-as-each:inspector.remote.runs-the-code-as-each`,
 	},
 ];
 
 /** A type the driver never tests for is stored in the normal slot and never run (Commands.asm:1260-1269). */
-export const UNKNOWN_EVENT_NOTE = $localize`:@@inspector.remote.no-such-type-the-code:No such type: the code is stored and never run, but it replaces a running type 1, 2, 3 or 5.`;
+export const UNKNOWN_EVENT_NOTE = $localize`:@@inspector.remote.no-such-type-the-code:inspector.remote.no-such-type-the-code`;
 
 /** The two types that count from a note, and so the two a wait is read for (Music.cpp:1085). */
 export function takesWait(type: number): boolean {

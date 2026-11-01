@@ -11,9 +11,9 @@
     variant="primary"
     size="sm"
     icon
-    title="Undo ({{
+    title="topbar.history.undo.title {{
       historyKeys.undo // i18n(ph='shortcut')
-    }})"
+    }}"
     i18n-title="@@topbar.history.undo.title"
     [disabled]="!canUndo()"
     (click)="undo()"
@@ -25,9 +25,9 @@
     variant="primary"
     size="sm"
     icon
-    title="Redo ({{
+    title="topbar.history.redo.title {{
       historyKeys.redo // i18n(ph='shortcut')
-    }})"
+    }}"
     i18n-title="@@topbar.history.redo.title"
     [disabled]="!canRedo()"
     (click)="redo()"

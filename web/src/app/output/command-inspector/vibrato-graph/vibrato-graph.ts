@@ -102,12 +102,12 @@ export class VibratoGraph {
   protected readonly cycleLabel = computed(() => {
     const rate = this.rate();
     if (rate <= 0) {
-      return $localize`:@@inspector.vibrato-graph.no-wobble-a-rate-of:no wobble — a rate of 0 never advances`;
+      return $localize`:@@inspector.vibrato-graph.no-wobble-a-rate-of:inspector.vibrato-graph.no-wobble-a-rate-of`;
     }
 
     const ticks = Math.round(256 / rate);
-    return $localize`:@@inspector.vibrato-graph.a-cycle-every:a cycle every ${ticksLabel(ticks, this.tempo())}:ticksLabel:`;
+    return $localize`:@@inspector.vibrato-graph.a-cycle-every:inspector.vibrato-graph.a-cycle-every ${ticksLabel(ticks, this.tempo())}:ticksLabel:`;
   });
 
-  protected readonly spanLabel = $localize`:@@inspector.vibrato-graph.ticks:${SPAN_TICKS}:ticks: ticks`;
+  protected readonly spanLabel = $localize`:@@inspector.vibrato-graph.ticks:inspector.vibrato-graph.ticks ${SPAN_TICKS}:ticks:`;
 }

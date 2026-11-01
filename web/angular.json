@@ -15,7 +15,10 @@
       "sourceRoot": "src",
       "prefix": "amk",
       "i18n": {
-        "sourceLocale": "en-US"
+        "sourceLocale": { "code": "en-x-ids", "subPath": "ids" },
+        "locales": {
+          "en": { "translation": "src/locale/messages.en.json", "subPath": "" }
+        }
       },
       "architect": {
         "build": {
@@ -25,7 +28,8 @@
             "tsConfig": "tsconfig.app.json",
             "assets": [{ "glob": "**/*", "input": "public" }],
             "styles": ["src/styles.css"],
-            "polyfills": ["@angular/localize/init"]
+            "polyfills": ["@angular/localize/init"],
+            "localize": ["en"]
           },
           "configurations": {
             "production": {
@@ -48,6 +52,9 @@
               "optimization": false,
               "extractLicenses": false,
               "sourceMap": true
+            },
+            "ids": {
+              "localize": false
             }
           },
           "defaultConfiguration": "production"
@@ -60,6 +67,9 @@
             },
             "development": {
               "buildTarget": "solar-soundtrack:build:development"
+            },
+            "ids": {
+              "buildTarget": "solar-soundtrack:build:development,ids"
             }
           },
           "defaultConfiguration": "development"

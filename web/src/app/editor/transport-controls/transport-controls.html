@@ -19,7 +19,7 @@
   size="md"
   icon
   i18n-title="@@transport.stop-the-song-or.title"
-  title="Stop the song, or a note being previewed"
+  title="transport.stop-the-song-or.title"
   [disabled]="!canStop()"
   (click)="stop()"
 >
@@ -30,12 +30,12 @@
   amk-toggle
   size="md"
   i18n-title="@@transport.keep-playing-past-the.title"
-  title="Keep playing past the end, round the song's loop"
+  title="transport.keep-playing-past-the.title"
   [pressed]="playback.loop()"
   (click)="playback.loop.set(!playback.loop())"
 >
   <amk-icon-loop />
-  <ng-container i18n="@@transport.loop">Loop</ng-container>
+  <ng-container i18n="@@transport.loop">transport.loop</ng-container>
 </button>
 
 <button
@@ -43,11 +43,11 @@
   amk-toggle
   size="md"
   i18n-title="@@transport.while-playing-reload-the.title"
-  title="While playing, reload the song at the same position whenever it recompiles"
+  title="transport.while-playing-reload-the.title"
   [pressed]="playback.hotReload()"
   (click)="playback.hotReload.set(!playback.hotReload())"
 >
-  Hot Reload
+  transport.hot-reload
 </button>
 
 <!-- One well with two faces: the m:ss the clock gives a tick, or the tick itself. -->
@@ -66,7 +66,7 @@
   step="1"
   class="accent-control max-w-80 min-w-24 flex-1 cursor-pointer disabled:cursor-not-allowed disabled:opacity-40"
   i18n-title="@@transport.seek-the-song-replays.title"
-  title="Seek — the song replays silently to reach the new position"
+  title="transport.seek-the-song-replays.title"
   [max]="playback.durationTicks()"
   [value]="playback.position()"
   [disabled]="!playback.canSeek()"
@@ -84,7 +84,7 @@
     min="0"
     class="accent-control w-20 cursor-pointer"
     i18n-title="@@transport.volume.title"
-    title="Volume"
+    title="transport.volume.title"
     [max]="VOLUME_MAX"
     [value]="mixer.volume()"
     (input)="onVolume($event)"

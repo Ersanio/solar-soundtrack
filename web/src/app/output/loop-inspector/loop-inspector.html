@@ -3,7 +3,7 @@
   <div class="border-edge border-t">
     <div class="flex items-center justify-between gap-3 px-3 py-1.5">
       <h3 i18n="@@loops.loop" class="text-ink-muted text-xs font-semibold tracking-wide uppercase">
-        Loop
+        loops.loop
       </h3>
       <span class="text-ink truncate font-mono text-xs">{{ summary() }}</span>
     </div>
@@ -21,7 +21,7 @@
           @if (loop.count; as count) {
             <amk-number-field
               i18n-label="@@loops.repeats.label"
-              label="Repeats"
+              label="loops.repeats.label"
               [value]="count.plays"
               [min]="count.min"
               [max]="count.max"
@@ -38,7 +38,7 @@
           @if (loop.recalls; as recalls) {
             <amk-enum-select
               i18n-label="@@loops.recalls.label"
-              label="Recalls"
+              label="loops.recalls.label"
               [value]="recalls.label"
               [options]="recalls.options"
               [note]="recalls.note"
@@ -56,9 +56,10 @@
               class="self-start"
               (click)="setName(loop, naming.label)"
             >
-              Name it ({{
-                naming.label  // i18n(ph='label')
-              }})
+              loops.name-it
+              {{
+                naming.label // i18n(ph='label')
+              }}
             </button>
             <p class="text-ink-muted text-[11px] leading-snug">{{ naming.note }}</p>
           }

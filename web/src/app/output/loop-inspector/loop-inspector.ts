@@ -78,7 +78,7 @@ export class LoopInspector {
     }
 
     return loops.length > 1
-      ? $localize`:@@loops.in-more:${first.written}:written: · in ${loops.length - 1}:count: more`
+      ? $localize`:@@loops.in-more:loops.in-more ${first.written}:written: ${loops.length - 1}:count:`
       : first.written;
   });
 

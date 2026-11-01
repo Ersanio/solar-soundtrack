@@ -47,8 +47,8 @@ export class TransportControls {
   private readonly audition = inject(Audition);
 
   protected readonly text = {
-    pause: $localize`:@@transport.pause.title:Pause`,
-    play: $localize`:@@transport.play.title:Play`,
+    pause: $localize`:@@transport.pause.title:transport.pause.title`,
+    play: $localize`:@@transport.play.title:transport.play.title`,
   };
   protected readonly VOLUME_MAX = VOLUME_MAX;
 
@@ -96,13 +96,13 @@ export class TransportControls {
     }
 
     const tick = this.counting() ? this.displayClock.tick() : this.playback.position();
-    return $localize`:@@transport.tick:tick ${Math.round(tick).toLocaleString()}:count: / ${this.playback.durationTicks().toLocaleString()}:total:`;
+    return $localize`:@@transport.tick:transport.tick ${Math.round(tick).toLocaleString()}:count: ${this.playback.durationTicks().toLocaleString()}:total:`;
   });
 
   protected readonly clockTitle = computed(() =>
     this.clockFace() === 'time'
-      ? $localize`:@@transport.time-in-the-song-click:Time in the song — click for ticks`
-      : $localize`:@@transport.driver-ticks-click-for-time:Driver ticks — click for time`,
+      ? $localize`:@@transport.time-in-the-song-click:transport.time-in-the-song-click`
+      : $localize`:@@transport.driver-ticks-click-for-time:transport.driver-ticks-click-for-time`,
   );
 
   /** True while a pointer is down on the volume slider, or after a keyboard change until it blurs. */

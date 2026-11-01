@@ -102,63 +102,63 @@ export const TOKEN_TAGS: Readonly<Record<TokenKind, string>> = {
 
 /** Human-readable names for the VCMDs, used in hover text and the command inspector. */
 export const VCMD_NAMES: Readonly<Record<number, string>> = {
-	0xda: $localize`:@@command.name.set-instrument:set instrument`,
-	0xdb: $localize`:@@command.name.pan:pan`,
-	0xdc: $localize`:@@command.name.pan-fade:pan fade`,
-	0xdd: $localize`:@@command.name.pitch-bend:pitch bend`,
-	0xde: $localize`:@@command.name.vibrato:vibrato`,
-	0xdf: $localize`:@@command.name.vibrato-off:vibrato off`,
-	0xe0: $localize`:@@command.name.global-volume:global volume`,
-	0xe1: $localize`:@@command.name.global-volume-fade:global volume fade`,
-	0xe2: $localize`:@@command.name.tempo:tempo`,
-	0xe3: $localize`:@@command.name.tempo-fade:tempo fade`,
-	0xe4: $localize`:@@command.name.global-transpose:global transpose`,
-	0xe5: $localize`:@@command.name.tremolo:tremolo`,
-	0xe6: $localize`:@@command.name.subloop:subloop`,
-	0xe7: $localize`:@@command.name.volume:volume`,
-	0xe8: $localize`:@@command.name.volume-fade:volume fade`,
-	0xe9: $localize`:@@command.name.call-loop:call loop`,
-	0xea: $localize`:@@command.name.vibrato-fade:vibrato fade`,
-	0xeb: $localize`:@@command.name.pitch-envelope-release:pitch envelope (release)`,
-	0xec: $localize`:@@command.name.pitch-envelope-attack:pitch envelope (attack)`,
-	0xed: $localize`:@@command.name.adsr-gain:ADSR / GAIN`,
-	0xee: $localize`:@@command.name.fine-tune:fine tune`,
-	0xef: $localize`:@@command.name.echo-parameters:echo parameters`,
-	0xf0: $localize`:@@command.name.echo-off:echo off`,
-	0xf1: $localize`:@@command.name.echo-parameters:echo parameters`,
-	0xf2: $localize`:@@command.name.echo-fade:echo fade`,
-	0xf3: $localize`:@@command.name.sample-load:sample load`,
-	0xf4: $localize`:@@command.name.misc:misc`,
-	0xf5: $localize`:@@command.name.fir-filter:FIR filter`,
-	0xf6: $localize`:@@command.name.dsp-write:DSP write`,
-	0xf7: $localize`:@@command.name.write-byte:write byte`,
-	0xf8: $localize`:@@command.name.noise:noise`,
-	0xf9: $localize`:@@command.name.data-send:data send`,
-	0xfa: $localize`:@@command.name.misc:misc`,
-	0xfb: $localize`:@@command.name.arpeggio:arpeggio`,
-	0xfc: $localize`:@@command.name.remote-code:remote code`,
-	0xfd: $localize`:@@command.name.tremolo-off:tremolo off`,
-	0xfe: $localize`:@@command.name.pitch-envelope-off:pitch envelope off`,
+	0xda: $localize`:@@command.name.set-instrument:command.name.set-instrument`,
+	0xdb: $localize`:@@command.name.pan:command.name.pan`,
+	0xdc: $localize`:@@command.name.pan-fade:command.name.pan-fade`,
+	0xdd: $localize`:@@command.name.pitch-bend:command.name.pitch-bend`,
+	0xde: $localize`:@@command.name.vibrato:command.name.vibrato`,
+	0xdf: $localize`:@@command.name.vibrato-off:command.name.vibrato-off`,
+	0xe0: $localize`:@@command.name.global-volume:command.name.global-volume`,
+	0xe1: $localize`:@@command.name.global-volume-fade:command.name.global-volume-fade`,
+	0xe2: $localize`:@@command.name.tempo:command.name.tempo`,
+	0xe3: $localize`:@@command.name.tempo-fade:command.name.tempo-fade`,
+	0xe4: $localize`:@@command.name.global-transpose:command.name.global-transpose`,
+	0xe5: $localize`:@@command.name.tremolo:command.name.tremolo`,
+	0xe6: $localize`:@@command.name.subloop:command.name.subloop`,
+	0xe7: $localize`:@@command.name.volume:command.name.volume`,
+	0xe8: $localize`:@@command.name.volume-fade:command.name.volume-fade`,
+	0xe9: $localize`:@@command.name.call-loop:command.name.call-loop`,
+	0xea: $localize`:@@command.name.vibrato-fade:command.name.vibrato-fade`,
+	0xeb: $localize`:@@command.name.pitch-envelope-release:command.name.pitch-envelope-release`,
+	0xec: $localize`:@@command.name.pitch-envelope-attack:command.name.pitch-envelope-attack`,
+	0xed: $localize`:@@command.name.adsr-gain:command.name.adsr-gain`,
+	0xee: $localize`:@@command.name.fine-tune:command.name.fine-tune`,
+	0xef: $localize`:@@command.name.echo-parameters:command.name.echo-parameters`,
+	0xf0: $localize`:@@command.name.echo-off:command.name.echo-off`,
+	0xf1: $localize`:@@command.name.echo-parameters:command.name.echo-parameters`,
+	0xf2: $localize`:@@command.name.echo-fade:command.name.echo-fade`,
+	0xf3: $localize`:@@command.name.sample-load:command.name.sample-load`,
+	0xf4: $localize`:@@command.name.misc:command.name.misc`,
+	0xf5: $localize`:@@command.name.fir-filter:command.name.fir-filter`,
+	0xf6: $localize`:@@command.name.dsp-write:command.name.dsp-write`,
+	0xf7: $localize`:@@command.name.write-byte:command.name.write-byte`,
+	0xf8: $localize`:@@command.name.noise:command.name.noise`,
+	0xf9: $localize`:@@command.name.data-send:command.name.data-send`,
+	0xfa: $localize`:@@command.name.misc:command.name.misc`,
+	0xfb: $localize`:@@command.name.arpeggio:command.name.arpeggio`,
+	0xfc: $localize`:@@command.name.remote-code:command.name.remote-code`,
+	0xfd: $localize`:@@command.name.tremolo-off:command.name.tremolo-off`,
+	0xfe: $localize`:@@command.name.pitch-envelope-off:command.name.pitch-envelope-off`,
 };
 
 /** Human names for the single-letter commands, to match {@link VCMD_NAMES}. */
 export const LETTER_NAMES: Readonly<Record<string, string>> = {
-	t: $localize`:@@command.name.tempo:tempo`,
-	v: $localize`:@@command.name.volume:volume`,
-	w: $localize`:@@command.name.global-volume:global volume`,
-	y: $localize`:@@command.name.pan:pan`,
-	q: $localize`:@@command.name.quantization:quantization`,
-	l: $localize`:@@command.name.default-length:default length`,
-	o: $localize`:@@command.name.octave:octave`,
-	"@": $localize`:@@command.name.instrument:instrument`,
-	h: $localize`:@@command.name.transpose:transpose`,
-	n: $localize`:@@command.name.noise:noise`,
-	p: $localize`:@@command.name.vibrato:vibrato`,
-	"<": $localize`:@@command.name.octave-down:octave down`,
-	">": $localize`:@@command.name.octave-up:octave up`,
-	"[": $localize`:@@command.name.loop-start:loop start`,
-	"]": $localize`:@@command.name.loop-end:loop end`,
-	"*": $localize`:@@command.name.loop-call:loop call`,
+	t: $localize`:@@command.name.tempo:command.name.tempo`,
+	v: $localize`:@@command.name.volume:command.name.volume`,
+	w: $localize`:@@command.name.global-volume:command.name.global-volume`,
+	y: $localize`:@@command.name.pan:command.name.pan`,
+	q: $localize`:@@command.name.quantization:command.name.quantization`,
+	l: $localize`:@@command.name.default-length:command.name.default-length`,
+	o: $localize`:@@command.name.octave:command.name.octave`,
+	"@": $localize`:@@command.name.instrument:command.name.instrument`,
+	h: $localize`:@@command.name.transpose:command.name.transpose`,
+	n: $localize`:@@command.name.noise:command.name.noise`,
+	p: $localize`:@@command.name.vibrato:command.name.vibrato`,
+	"<": $localize`:@@command.name.octave-down:command.name.octave-down`,
+	">": $localize`:@@command.name.octave-up:command.name.octave-up`,
+	"[": $localize`:@@command.name.loop-start:command.name.loop-start`,
+	"]": $localize`:@@command.name.loop-end:command.name.loop-end`,
+	"*": $localize`:@@command.name.loop-call:command.name.loop-call`,
 };
 
 /**
@@ -170,9 +170,9 @@ export const LETTER_NAMES: Readonly<Record<string, string>> = {
  * commands in the inspector and the hover.
  */
 const LETTER_FADE_NAMES: Readonly<Record<string, string>> = {
-	t: $localize`:@@command.name.tempo-fade:tempo fade`,
-	v: $localize`:@@command.name.volume-fade:volume fade`,
-	w: $localize`:@@command.name.global-volume-fade:global volume fade`,
+	t: $localize`:@@command.name.tempo-fade:command.name.tempo-fade`,
+	v: $localize`:@@command.name.volume-fade:command.name.volume-fade`,
+	w: $localize`:@@command.name.global-volume-fade:command.name.global-volume-fade`,
 };
 
 /**
@@ -2328,14 +2328,14 @@ function gather(
 
 function nameForNote(kind: TokenKind): string {
 	if (kind === "rest") {
-		return $localize`:@@command.name.rest:rest`;
+		return $localize`:@@command.name.rest:command.name.rest`;
 	}
 
 	if (kind === "tie") {
-		return $localize`:@@command.name.tie:tie`;
+		return $localize`:@@command.name.tie:command.name.tie`;
 	}
 
-	return $localize`:@@command.name.note:note`;
+	return $localize`:@@command.name.note:command.name.note`;
 }
 
 /** The radix comes from the kind, which keeps {@link gather} a pure function of the stream. */
@@ -2365,15 +2365,15 @@ export function vcmdName(vcmd: number, args: { value: number }[], target: Comman
 		}
 
 		if (sub === 0x81) {
-			return $localize`:@@command.name.tune:tune`; // parser.ts:parseHFDHex
+			return $localize`:@@command.name.tune:command.name.tune`; // parser.ts:parseHFDHex
 		}
 
 		if (sub === 0x82) {
-			return $localize`:@@command.name.aram-upload:ARAM upload`; // parser.ts:parseHFDHex
+			return $localize`:@@command.name.aram-upload:command.name.aram-upload`; // parser.ts:parseHFDHex
 		}
 
 		if (sub === 0x83) {
-			return $localize`:@@command.name.unknown-command:unknown command`; // AMK0163 (parser.ts:parseHFDHex)
+			return $localize`:@@command.name.unknown-command:command.name.unknown-command`; // AMK0163 (parser.ts:parseHFDHex)
 		}
 
 		return VCMD_NAMES[0xed]; // the plain form, a bare `$ED` included
@@ -2384,10 +2384,10 @@ export function vcmdName(vcmd: number, args: { value: number }[], target: Comman
 	}
 
 	if (vcmd === 0xfc && target.amkVersion === 1) {
-		return $localize`:@@command.name.remote-gain:remote gain`; // parser.ts:parseHexCommand, which rebuilds it as a type 5 remote code event
+		return $localize`:@@command.name.remote-gain:command.name.remote-gain`; // parser.ts:parseHexCommand, which rebuilds it as a type 5 remote code event
 	}
 
-	return VCMD_NAMES[vcmd] ?? $localize`:@@command.name.unknown-command:unknown command`;
+	return VCMD_NAMES[vcmd] ?? $localize`:@@command.name.unknown-command:command.name.unknown-command`;
 }
 
 /**

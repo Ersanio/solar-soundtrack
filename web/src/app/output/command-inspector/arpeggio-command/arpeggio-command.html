@@ -1,6 +1,6 @@
 <amk-enum-select
   i18n-label="@@inspector.arpeggio.arpeggio.label"
-  label="Arpeggio"
+  label="inspector.arpeggio.arpeggio.label"
   [value]="mode()"
   [options]="MODES"
   [disabled]="!canResize()"
@@ -17,12 +17,12 @@
     i18n="@@inspector.arpeggio.turns-arpeggio-off-notes"
     class="text-ink-muted text-xs leading-relaxed"
   >
-    Turns arpeggio off. Notes after this play at their written pitch again.
+    inspector.arpeggio.turns-arpeggio-off-notes
   </p>
 } @else {
   <amk-slider
     i18n-label="@@inspector.arpeggio.note-duration.label"
-    label="Note duration"
+    label="inspector.arpeggio.note-duration.label"
     [value]="duration()"
     [max]="255"
     [valueLabel]="durationLabel()"
@@ -37,9 +37,8 @@
         <span
           i18n="@@inspector.arpeggio.notes-semitones-from-the"
           class="text-ink-muted text-[11px]"
+          >inspector.arpeggio.notes-semitones-from-the</span
         >
-          Notes — semitones from the note being played
-        </span>
         <span class="text-ink font-mono text-[11px] tabular-nums">{{ notes().length }}</span>
       </div>
 
@@ -67,18 +66,18 @@
           [disabled]="!canResize()"
           (click)="addNote()"
         >
-          Add note
+          inspector.arpeggio.add-note
         </button>
-        <span i18n="@@inspector.arpeggio.the-count-byte-follows" class="text-ink-muted text-[11px]">
-          the count byte follows the number of notes
-        </span>
+        <span i18n="@@inspector.arpeggio.the-count-byte-follows" class="text-ink-muted text-[11px]"
+          >inspector.arpeggio.the-count-byte-follows</span
+        >
       </div>
 
       @if (omitted() > 0) {
         <p class="text-ink-muted text-[11px] leading-snug">
           <ng-container i18n="@@inspector.arpeggio.and-further-note-not">{omitted(), plural,
-            =1 {… and 1 further note not shown.}
-            other {… and {{ omitted() // i18n(ph='count') }} further notes not shown.}
+            =1 {inspector.arpeggio.and-further-note-not}
+            other {inspector.arpeggio.and-further-note-not {{ omitted() // i18n(ph='count') }}}
           }</ng-container>
         </p>
       }

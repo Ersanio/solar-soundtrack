@@ -10,7 +10,9 @@
     } @else {
       <amk-icon-chevron-right />
     }
-    <ng-container i18n="@@inspector.note-palette.add-a-command">Add a command</ng-container>
+    <ng-container i18n="@@inspector.note-palette.add-a-command"
+      >inspector.note-palette.add-a-command</ng-container
+    >
   </button>
 
   @if (open()) {
@@ -43,7 +45,7 @@
         <span
           i18n="@@inspector.note-palette.everything-here-is-already"
           class="text-ink-muted text-xs"
-          >Everything here is already on this note.</span
+          >inspector.note-palette.everything-here-is-already</span
         >
       }
     </div>
@@ -54,7 +56,7 @@
         <span [class]="readout.muted ? 'text-ink-muted' : 'text-warn'"> - {{ readout.text }}</span>
       } @else {
         <span i18n="@@inspector.note-palette.hover-over-a-command" class="text-ink-muted"
-          >Hover over a command to see what it does.</span
+          >inspector.note-palette.hover-over-a-command</span
         >
       }
     </p>

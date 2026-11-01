@@ -108,21 +108,21 @@ export class NoteLength {
 
     const under =
       note.state.waitTime === WAIT_TIME
-        ? $localize`:@@inspector.note-length.under-q:under q${hex2(q)}:q:`
-        : $localize`:@@inspector.note-length.under-q-staccato:under q${hex2(q)}:q: with light staccato`;
+        ? $localize`:@@inspector.note-length.under-q:inspector.note-length.under-q ${hex2(q)}:q:`
+        : $localize`:@@inspector.note-length.under-q-staccato:inspector.note-length.under-q-staccato ${hex2(q)}:q:`;
     const span =
       ratio === 1
-        ? $localize`:@@inspector.note-length.ticks:${ticks}:ticks: ticks`
-        : $localize`:@@inspector.note-length.the-ticks-the-tempo-ratio:the ${ticks}:ticks: ticks the tempo ratio leaves it`;
+        ? $localize`:@@inspector.note-length.ticks:inspector.note-length.ticks ${ticks}:ticks:`
+        : $localize`:@@inspector.note-length.the-ticks-the-tempo-ratio:inspector.note-length.the-ticks-the-tempo-ratio ${ticks}:ticks:`;
     if (sounds >= ticks) {
       // A last piece of one tick has no tick left to key off on, so the note plays whole.
       return ticks === 1
-        ? $localize`:@@inspector.note-length.sounds-one-tick:Sounds for its one tick ${under}:under:`
-        : $localize`:@@inspector.note-length.sounds-all:Sounds for all ${span}:span: ${under}:under:`;
+        ? $localize`:@@inspector.note-length.sounds-one-tick:inspector.note-length.sounds-one-tick ${under}:under:`
+        : $localize`:@@inspector.note-length.sounds-all:inspector.note-length.sounds-all ${span}:span: ${under}:under:`;
     }
 
     const percent = Math.round((sounds / ticks) * 100);
-    return $localize`:@@inspector.note-length.sounds-for-of-then-of:Sounds for ${sounds}:sounds: of ${span}:span: ${under}:under: (${percent}:percent:%), then ${ticks - sounds}:silence: of silence`;
+    return $localize`:@@inspector.note-length.sounds-for-of-then-of:inspector.note-length.sounds-for-of-then-of ${sounds}:sounds: ${span}:span: ${under}:under: ${percent}:percent: ${ticks - sounds}:silence:`;
   });
 
   protected preview(row: NoteLengthRow, value: number): void {

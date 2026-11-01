@@ -44,14 +44,14 @@ function chipTitle(
   song: boolean,
 ): string {
   const edit = on
-    ? $localize`:@@roll.stop-editing-channel:Stop editing channel ${channel}:channel:`
-    : $localize`:@@roll.edit-channel:Edit channel ${channel}:channel:`;
-  const heard = quiet ? $localize`:@@roll.not-being-heard:not being heard` : '';
+    ? $localize`:@@roll.stop-editing-channel:roll.stop-editing-channel ${channel}:channel:`
+    : $localize`:@@roll.edit-channel:roll.edit-channel ${channel}:channel:`;
+  const heard = quiet ? $localize`:@@roll.not-being-heard:roll.not-being-heard` : '';
   const solo = !song
     ? ''
     : soloed
-      ? $localize`:@@roll.ctrl-click-to-stop-soloing:Ctrl+click to stop soloing`
-      : $localize`:@@roll.ctrl-click-to-solo:Ctrl+click to solo`;
+      ? $localize`:@@roll.ctrl-click-to-stop-soloing:roll.ctrl-click-to-stop-soloing`
+      : $localize`:@@roll.ctrl-click-to-solo:roll.ctrl-click-to-solo`;
   return [edit, heard, solo].filter((part) => part !== '').join(' — ');
 }
 

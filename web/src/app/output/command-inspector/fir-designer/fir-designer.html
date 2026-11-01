@@ -13,13 +13,13 @@
     {{ activePreset()?.name ?? description().shape }}
   </span>
   <span i18n="@@inspector.fir-designer.corner" class="text-ink-muted font-mono"
-    >corner
+    >inspector.fir-designer.corner
     {{
       cornerLabel() // i18n(ph='corner')
     }}</span
   >
   <span i18n="@@inspector.fir-designer.tilt" class="text-ink-muted font-mono"
-    >tilt
+    >inspector.fir-designer.tilt
     {{
       tiltLabel() // i18n(ph='tilt')
     }}</span
@@ -31,32 +31,25 @@
     i18n="@@inspector.fir-designer.with-the-echo-feedback"
     class="text-danger text-xs leading-relaxed"
   >
-    With the echo feedback at
-    <span class="font-mono"
-      >${{
-        feedback() | hex2 // i18n(ph='feedback')
-      }}</span
-    >
-    this filter has a loop gain of
+    inspector.fir-designer.with-the-echo-feedback
+    <span class="font-mono">{{
+      feedback() | hex2 // i18n(ph='feedback')
+    }}</span>
     {{
       stability().loopGain.toFixed(2) // i18n(ph='loop_gain')
     }}
-    — the echo will build up on itself instead of dying away, and clip. Lower the feedback, or pull
-    the marked band down.
   </p>
 }
 
 @if (overriddenBy(); as later) {
   <p i18n="@@inspector.fir-designer.a-f1-on-line" class="text-warn text-xs leading-relaxed">
-    A <code class="text-ink">$F1</code> on line
+    inspector.fir-designer.a-f1-on-line <code class="text-ink"></code>
     {{
       later.line // i18n(ph='line')
     }}
-    replaces these coefficients with
     {{
       later.filter // i18n(ph='filter')
     }}
-    — so they only apply until it runs. AddmusicK does this silently.
   </p>
 }
 
@@ -65,11 +58,10 @@
     i18n="@@inspector.fir-designer.the-first-seven-coefficients"
     class="text-warn text-xs leading-relaxed"
   >
-    The first seven coefficients sum to
+    inspector.fir-designer.the-first-seven-coefficients
     {{
-      headroom().sum  // i18n(ph='sum')
-    }}, over the 128 the DSP can add up without wrapping. A loud echo may crackle. (Super Mario
-    World's own filter does this too, so it is only worth worrying about well past the limit.)
+      headroom().sum // i18n(ph='sum')
+    }}
   </p>
 }
 
@@ -78,28 +70,20 @@
     i18n="@@inspector.fir-designer.these-coefficients-come-from"
     class="text-ink-muted text-xs leading-relaxed"
   >
-    These coefficients come from the
-    <code class="text-ink"
-      >"{{
-        command().replacement  // i18n(ph='replacement')
-      }}"</code
-    >
-    replacement, so the text under the cursor is the macro's name rather than the bytes. Editing
-    here would write the expansion out in its place, so it is turned off — change the definition
-    instead.
+    inspector.fir-designer.these-coefficients-come-from
+    <code class="text-ink">{{
+      command().replacement // i18n(ph='replacement')
+    }}</code>
   </p>
 } @else if (command().headReplacement) {
   <p
     i18n="@@inspector.fir-designer.the-f5-itself-comes"
     class="text-ink-muted text-xs leading-relaxed"
   >
-    The <code class="text-ink">$F5</code> itself comes from the
-    <code class="text-ink"
-      >"{{
-        command().headReplacement  // i18n(ph='replacement')
-      }}"</code
-    >
-    replacement, but these eight bytes are written here, so they can still be tuned.
+    inspector.fir-designer.the-f5-itself-comes <code class="text-ink"></code>
+    <code class="text-ink">{{
+      command().headReplacement // i18n(ph='replacement')
+    }}</code>
   </p>
 }
 
@@ -114,7 +98,7 @@
       [class.text-accent]="mode() === 'presets'"
       (click)="mode.set('presets')"
     >
-      Presets
+      inspector.fir-designer.presets
     </button>
     <button
       i18n="@@inspector.fir-designer.draw"
@@ -123,7 +107,7 @@
       [class.text-accent]="mode() === 'draw'"
       (click)="mode.set('draw')"
     >
-      Draw
+      inspector.fir-designer.draw
     </button>
   </div>
 
@@ -155,8 +139,7 @@
           i18n="@@inspector.fir-designer.click-the-plot-to"
           class="text-ink-muted text-xs leading-relaxed"
         >
-          Click the plot to place points, then fit. Eight taps cannot follow a shape below about 2
-          kHz — the shaded part of the plot — so nothing drawn there will come back.
+          inspector.fir-designer.click-the-plot-to
         </p>
         <div class="flex gap-1.5">
           <button
@@ -166,7 +149,7 @@
             [disabled]="target().length < 2"
             (click)="fit()"
           >
-            Fit to curve
+            inspector.fir-designer.fit-to-curve
           </button>
           <button
             i18n="@@inspector.fir-designer.clear"
@@ -174,12 +157,12 @@
             [disabled]="target().length === 0"
             (click)="clearTarget()"
           >
-            Clear
+            inspector.fir-designer.clear
           </button>
           <span class="text-ink-muted self-center font-mono text-xs"
             ><ng-container i18n="@@inspector.fir-designer.point">{target().length, plural,
-              =1 {1 point}
-              other {{{ target().length // i18n(ph='count') }} points}
+              =1 {inspector.fir-designer.point}
+              other {inspector.fir-designer.point {{ target().length // i18n(ph='count') }}}
             }</ng-container></span
           >
         </div>
@@ -194,7 +177,7 @@
       i18n="@@inspector.fir-designer.coefficients"
       class="text-ink-muted mb-1 text-[11px] tracking-wide uppercase"
     >
-      Coefficients
+      inspector.fir-designer.coefficients
     </div>
     <div class="grid grid-cols-2 gap-x-3">
       @for (row of rows(); track row.index) {

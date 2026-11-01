@@ -28,10 +28,10 @@ export class EchoInspector {
   private readonly store = inject(EditorStore);
 
   protected readonly text = {
-    volumeL: $localize`:@@inspector.echo.volume-l.label:Volume L`,
-    toVolumeL: $localize`:@@inspector.echo.to-volume-l.label:To volume L`,
-    volumeR: $localize`:@@inspector.echo.volume-r.label:Volume R`,
-    toVolumeR: $localize`:@@inspector.echo.to-volume-r.label:To volume R`,
+    volumeL: $localize`:@@inspector.echo.volume-l.label:inspector.echo.volume-l.label`,
+    toVolumeL: $localize`:@@inspector.echo.to-volume-l.label:inspector.echo.to-volume-l.label`,
+    volumeR: $localize`:@@inspector.echo.volume-r.label:inspector.echo.volume-r.label`,
+    toVolumeR: $localize`:@@inspector.echo.to-volume-r.label:inspector.echo.to-volume-r.label`,
   };
 
   readonly command = input.required<Command>();

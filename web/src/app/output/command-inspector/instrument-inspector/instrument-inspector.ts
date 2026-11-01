@@ -234,13 +234,13 @@ export class InstrumentInspector {
     if (list) {
       return (
         list[srcn] ??
-        $localize`:@@inspector.instrument.past-the-end-of-this:past the end of this song’s sample list`
+        $localize`:@@inspector.instrument.past-the-end-of-this:inspector.instrument.past-the-end-of-this`
       );
     }
 
     return (
       this.drivers.driver()?.samples[srcn]?.sampleName ??
-      $localize`:@@inspector.instrument.not-in-the-drivers-default:not in the driver’s default set`
+      $localize`:@@inspector.instrument.not-in-the-drivers-default:inspector.instrument.not-in-the-drivers-default`
     );
   });
 
@@ -257,10 +257,10 @@ export class InstrumentInspector {
     }
 
     if (sample.form === 'copy') {
-      return $localize`:@@inspector.instrument.whose-sample-is:@${sample.instrument}:instrument:, whose sample is $${hex2(sample.srcn)}:srcn:`;
+      return $localize`:@@inspector.instrument.whose-sample-is:inspector.instrument.whose-sample-is ${sample.instrument}:instrument: ${hex2(sample.srcn)}:srcn:`;
     }
 
-    return $localize`:@@inspector.instrument.noise-at-clock:noise at clock $${hex2(sample.clock)}:clock:`;
+    return $localize`:@@inspector.instrument.noise-at-clock:inspector.instrument.noise-at-clock ${hex2(sample.clock)}:clock:`;
   });
 
   protected readonly incompleteCustom = computed(() => {
@@ -274,7 +274,7 @@ export class InstrumentInspector {
   );
 
   /** `@0`-`@18`, `@21`-`@29`, `@30`+ — stated once so the prose cannot drift. */
-  protected readonly validRanges = $localize`:@@inspector.instrument.0-18-21-29-and:@0–@18, @21–@29 and @30 upward`;
+  protected readonly validRanges = $localize`:@@inspector.instrument.0-18-21-29-and:inspector.instrument.0-18-21-29-and`;
 
   protected readonly drumIndex = computed(() => this.written() - FIRST_PERCUSSION_INSTRUMENT);
 }

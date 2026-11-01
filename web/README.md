@@ -797,8 +797,8 @@ codebase where every read is a call; the structure is what keeps the bug out ins
 
 ## Text
 
-Every string a porter reads is marked for Angular's i18n with a grouped `@@id` — `i18n` attributes in
-the templates, `$localize` in TypeScript — and `src/locale/messages.json` lists all of it, sorted by
-ID. Only English ships, so the text is still written where it is used; the catalog is where to find
-it, and `npm run i18n` regenerates it. A ternary between two strings in a binding becomes a
+Every string a porter reads is written by a grouped ID for Angular's i18n — `i18n="@@id"` in the
+templates with the ID as the text, `$localize` in TypeScript — and `src/locale/messages.en.json`
+holds the English, which the build swaps in. Wording is changed there; `npm run start:ids` shows
+each message's ID where its English would be. A ternary between two strings in a binding becomes a
 `text` object of messages on the component. The rules: `docs/claude/i18n.md`.

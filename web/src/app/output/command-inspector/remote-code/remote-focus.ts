@@ -92,8 +92,8 @@ function callView(request: RemoteViewRequest, call: RemoteCall): RemoteCallView 
     types: TYPES,
     typeNote: event?.note ?? UNKNOWN_EVENT_NOTE,
     unknownType: event
-      ? $localize`:@@inspector.remote-code.the-same-byte-as:${call.type}:type: — the same byte as ${event.type}:type2:, ${event.name}:name:`
-      : $localize`:@@inspector.remote-code.no-such-type:${call.type}:type: — no such type`,
+      ? $localize`:@@inspector.remote-code.the-same-byte-as:inspector.remote-code.the-same-byte-as ${call.type}:type: ${event.type}:type2: ${event.name}:name:`
+      : $localize`:@@inspector.remote-code.no-such-type:inspector.remote-code.no-such-type ${call.type}:type:`,
     wait: call.wait ? { ticks: call.wait.ticks, tempo: tempoAt(call.from, index.commands) } : null,
     chips,
     runsNothing: runsNothing(call, body !== null, chips.length),
@@ -103,18 +103,18 @@ function callView(request: RemoteViewRequest, call: RemoteCall): RemoteCallView 
 
 function runsNothing(call: RemoteCall, found: boolean, chips: number): string | null {
   if (!runsCode(call.type)) {
-    return $localize`:@@inspector.remote-code.type-runs-no-code-so:Type ${call.type}:type: runs no code, so the (!${call.label}:label:) it names is not used.`;
+    return $localize`:@@inspector.remote-code.type-runs-no-code-so:inspector.remote-code.type-runs-no-code-so ${call.type}:type: ${call.label}:label:`;
   }
 
   // SST0509's own two sentences (`parser.ts:2509-2518`).
   if (!found) {
     return call.label === 0
-      ? $localize`:@@inspector.remote-code.remote-code-0-can-never:Remote code (!0) can never be called: AddmusicK only records a remote body numbered from 1, so this runs nothing. Number the body from 1.`
-      : $localize`:@@inspector.remote-code.no-remote-code-is-defined:No remote code (!${call.label}:label:) is defined above the first channel, so this runs nothing.`;
+      ? $localize`:@@inspector.remote-code.remote-code-0-can-never:inspector.remote-code.remote-code-0-can-never`
+      : $localize`:@@inspector.remote-code.no-remote-code-is-defined:inspector.remote-code.no-remote-code-is-defined ${call.label}:label:`;
   }
 
   return chips === 0
-    ? $localize`:@@inspector.remote-code.has-no-commands-in-it:(!${call.label}:label:) has no commands in it.`
+    ? $localize`:@@inspector.remote-code.has-no-commands-in-it:inspector.remote-code.has-no-commands-in-it ${call.label}:label:`
     : null;
 }
 

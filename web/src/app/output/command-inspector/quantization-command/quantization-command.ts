@@ -97,14 +97,14 @@ export class QuantizationCommand {
     const ratio = this.store.tempoRatio();
     const piece = Math.floor(0x60 / ratio);
     const long = Math.floor(0x80 / ratio);
-    return $localize`:@@inspector.quantization.of-a-note-sounds-of:of a note sounds — of its last ${piece}:piece: ticks, once it is ${long}:long: or longer — and never closer than ${WAIT_TIME}:wait: ticks to its end`;
+    return $localize`:@@inspector.quantization.of-a-note-sounds-of:inspector.quantization.of-a-note-sounds-of ${piece}:piece: ${long}:long: ${WAIT_TIME}:wait:`;
   });
 
   protected readonly velocityLabel = computed(() => `$${hex2(this.velocityByte())}`);
 
   protected readonly velocityNote = computed(
     () =>
-      $localize`:@@inspector.quantization.of-full-from-the-table:${Math.round((this.velocityByte() / 0xff) * 100)}:amount:% of full, from the ${this.tableName()}:tableName: table`,
+      $localize`:@@inspector.quantization.of-full-from-the-table:inspector.quantization.of-full-from-the-table ${Math.round((this.velocityByte() / 0xff) * 100)}:amount: ${this.tableName()}:tableName:`,
   );
 
   /**
@@ -117,7 +117,7 @@ export class QuantizationCommand {
   protected readonly outOfRange = computed(() => {
     const value = (this.shownGate() << 4) | this.shownVelocity();
     return value < 1 || value > 0x7f
-      ? $localize`:@@inspector.quantization.q-must-be-between-01:q must be between $01 and $7F; $${hex2(value)}:byte: is an error at compile time`
+      ? $localize`:@@inspector.quantization.q-must-be-between-01:inspector.quantization.q-must-be-between-01 ${hex2(value)}:byte:`
       : null;
   });
 

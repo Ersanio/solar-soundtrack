@@ -4,9 +4,9 @@ Read before changing the pre-hooks, `eslint.config.js`, `.prettierrc`, CI or dep
 
 ## Automatic pre-hooks
 
-Never invoke these by hand. `prestart` / `prebuild` / `prewatch` in `web/package.json` run the first
-two and the third; `pretypecheck` and `preextract-i18n` there and `prelint` at the root run
-`generate-git-info` alone, which is all those need:
+Never invoke these by hand. `prestart` / `prestart:ids` / `prebuild` / `prewatch` in
+`web/package.json` run the first two and the third; `pretypecheck` and `preextract-i18n` there and
+`prelint` at the root run `generate-git-info` alone, which is all those need:
 
 - **`build:worklet`** — `@amk/spc`'s own build; esbuild bundles `worklet.ts` into
   `assets/player/spc-worklet.js` (generated, gitignored). An AudioWorklet is loaded by URL from the
@@ -18,18 +18,26 @@ two and the third; `pretypecheck` and `preextract-i18n` there and `prelint` at t
   (generated, gitignored). Captured once at startup, so it goes stale if you commit while
   `npm start` is running; restart to refresh.
 
-## The i18n catalog
+## The English
 
-`npm run i18n` runs `ng extract-i18n` (an AOT build of the app, JSON format, raw output in the
-gitignored `.selftest/i18n/`) and then `scripts/i18n-catalog.mjs write`, which checks every ID,
-sorts the messages by ID so each group sits together, puts each on one line and formats the result
-through Prettier into `web/src/locale/messages.json`. `npm run i18n:check`, the last step of
-`npm run check`, does the same and fails instead of writing when the committed file differs, listing
-the IDs. Extraction itself fails on one ID carrying two different texts
+`npm run i18n` runs `ng extract-i18n` (an AOT build of the app in the source locale, JSON format,
+raw output in the gitignored `.selftest/i18n/`) and then `scripts/i18n-catalog.mjs write`, which
+checks every ID and that every message's source is its ID and placeholders, adds a stub for a new ID
+to `web/src/locale/messages.en.json`, drops a removed one, and sorts and formats the file through
+Prettier, one message to a line. `npm run i18n:check`, the last step of `npm run check`, fails
+instead on any of those, on a stub left in place, and on English whose placeholders differ from the
+code's, listing the IDs. Extraction itself fails on one ID with two different sources
 (`i18nDuplicateTranslation: "error"` in `angular.json`).
 
+The build reads the English through `i18n.locales.en` and inlines it (`localize: ["en"]` in the
+build options). Its `subPath` is empty, so the output stays at the root of `browser/`, where CI
+deploys it from. The `ids` configuration, build and serve, sets `localize: false` and is what
+`npm run start:ids` serves. A missing English is a build warning, not an error, so a new message
+can be seen in place before its English is written.
+
 JSON rather than XLIFF or ARB because those record each message's file and line, so every edit
-anywhere would churn the catalog.
+anywhere would churn the file, and because it is the one of the three that is pleasant to edit by
+hand.
 
 ## Formatting
 

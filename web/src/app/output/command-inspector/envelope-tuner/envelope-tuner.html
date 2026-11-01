@@ -14,7 +14,7 @@
     [disabled]="disabled()"
     (click)="setMode(true)"
   >
-    ADSR
+    inspector.envelope-tuner.adsr
   </button>
   <button
     i18n="@@inspector.envelope-tuner.gain"
@@ -23,7 +23,7 @@
     [disabled]="disabled()"
     (click)="setMode(false)"
   >
-    GAIN
+    inspector.envelope-tuner.gain
   </button>
 </div>
 
@@ -52,7 +52,7 @@
 
     <amk-slider
       i18n-label="@@inspector.envelope-tuner.attack.label"
-      label="Attack"
+      label="inspector.envelope-tuner.attack.label"
       [value]="envelope().attack"
       [max]="15"
       [valueLabel]="attackLabel()"
@@ -62,7 +62,7 @@
     />
     <amk-slider
       i18n-label="@@inspector.envelope-tuner.decay.label"
-      label="Decay"
+      label="inspector.envelope-tuner.decay.label"
       [value]="envelope().decay"
       [max]="7"
       [valueLabel]="decayLabel()"
@@ -72,9 +72,9 @@
     />
     <amk-slider
       i18n-label="@@inspector.envelope-tuner.sustain.label"
-      label="Sustain"
+      label="inspector.envelope-tuner.sustain.label"
       i18n-note="@@inspector.envelope-tuner.the-level-decay-falls.note"
-      note="the level decay falls to, and holds at"
+      note="inspector.envelope-tuner.the-level-decay-falls.note"
       [value]="envelope().sustain"
       [max]="7"
       [valueLabel]="sustainLabel()"
@@ -84,7 +84,7 @@
     />
     <amk-slider
       i18n-label="@@inspector.envelope-tuner.release.label"
-      label="Release"
+      label="inspector.envelope-tuner.release.label"
       [value]="envelope().release"
       [max]="31"
       [valueLabel]="releaseLabel()"
@@ -96,7 +96,7 @@
   } @else {
     <amk-enum-select
       i18n-label="@@inspector.envelope-tuner.gain-mode.label"
-      label="GAIN mode"
+      label="inspector.envelope-tuner.gain-mode.label"
       [value]="gainModeIndex()"
       [options]="GAIN_MODES"
       [disabled]="disabled()"
@@ -107,9 +107,9 @@
     @if (gainIsDirect()) {
       <amk-slider
         i18n-label="@@inspector.envelope-tuner.level.label"
-        label="Level"
+        label="inspector.envelope-tuner.level.label"
         i18n-note="@@inspector.envelope-tuner.a-fixed-level-with.note"
-        note="a fixed level, with no envelope at all"
+        note="inspector.envelope-tuner.a-fixed-level-with.note"
         [value]="gainLevel()"
         [max]="127"
         [valueLabel]="gainLevelLabel()"
@@ -120,7 +120,7 @@
     } @else {
       <amk-slider
         i18n-label="@@inspector.envelope-tuner.rate.label"
-        label="Rate"
+        label="inspector.envelope-tuner.rate.label"
         [value]="gain().rate ?? 0"
         [max]="31"
         [valueLabel]="gainRateLabel()"

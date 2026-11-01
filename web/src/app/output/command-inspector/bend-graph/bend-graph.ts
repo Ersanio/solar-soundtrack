@@ -88,26 +88,26 @@ export class BendGraph {
 
   protected readonly durationLabel = computed(() =>
     this.duration() === 0
-      ? $localize`:@@inspector.bend-graph.instant:instant`
-      : $localize`:@@inspector.bend-graph.over:over ${ticksLabel(this.duration(), this.tempo())}:ticksLabel:`,
+      ? $localize`:@@inspector.bend-graph.instant:inspector.bend-graph.instant`
+      : $localize`:@@inspector.bend-graph.over:inspector.bend-graph.over ${ticksLabel(this.duration(), this.tempo())}:ticksLabel:`,
   );
 
   protected readonly axisLabel = computed(() => {
     const reach = this.reach();
     return reach === SEMITONES_PER_OCTAVE
-      ? $localize`:@@inspector.bend-graph.an-octave:an octave`
-      : $localize`:@@inspector.bend-graph.octaves:${reach / SEMITONES_PER_OCTAVE}:octaves: octaves`;
+      ? $localize`:@@inspector.bend-graph.an-octave:inspector.bend-graph.an-octave`
+      : $localize`:@@inspector.bend-graph.octaves:inspector.bend-graph.octaves ${reach / SEMITONES_PER_OCTAVE}:octaves:`;
   });
 
   protected readonly reachLabel = computed(() => {
     const semitones = this.to() - this.from();
     if (semitones === 0) {
-      return $localize`:@@inspector.bend-graph.no-change:no change`;
+      return $localize`:@@inspector.bend-graph.no-change:inspector.bend-graph.no-change`;
     }
 
     const signed = `${semitones > 0 ? '+' : ''}${semitones}`;
     return Math.abs(semitones) === 1
-      ? $localize`:@@inspector.bend-graph.semitones.one:${signed}:semitones: semitone`
-      : $localize`:@@inspector.bend-graph.semitones.other:${signed}:semitones: semitones`;
+      ? $localize`:@@inspector.bend-graph.semitones.one:inspector.bend-graph.semitones.one ${signed}:semitones:`
+      : $localize`:@@inspector.bend-graph.semitones.other:inspector.bend-graph.semitones.other ${signed}:semitones:`;
   });
 }

@@ -19,11 +19,11 @@ function dotsLabel(dots: number): string {
     case 0:
       return '';
     case 1:
-      return $localize`:@@source.hover.dotted:, dotted`;
+      return $localize`:@@source.hover.dotted:source.hover.dotted`;
     case 2:
-      return $localize`:@@source.hover.double-dotted:, double-dotted`;
+      return $localize`:@@source.hover.double-dotted:source.hover.double-dotted`;
     default:
-      return $localize`:@@source.hover.dotted-2:, ${dots}:dots:× dotted`;
+      return $localize`:@@source.hover.dotted-2:source.hover.dotted-2 ${dots}:dots:`;
   }
 }
 
@@ -45,17 +45,17 @@ function segmentLabel(segment: NoteLengthSegment): string {
     // `l8 c.` dots the standing length, so the fraction stops describing it.
     const fraction = modifiers === '' ? wholeNoteFraction(segment.ticks) : null;
     return fraction
-      ? $localize`:@@source.hover.default-length-fraction:default length (${fraction}:fraction:)${modifiers}:modifiers: — ${segment.ticks}:ticks: ticks`
-      : $localize`:@@source.hover.default-length:default length${modifiers}:modifiers: — ${segment.ticks}:ticks: ticks`;
+      ? $localize`:@@source.hover.default-length-fraction:source.hover.default-length-fraction ${fraction}:fraction: ${modifiers}:modifiers: ${segment.ticks}:ticks:`
+      : $localize`:@@source.hover.default-length:source.hover.default-length ${modifiers}:modifiers: ${segment.ticks}:ticks:`;
   }
 
   if (segment.exact) {
     return modifiers === ''
-      ? $localize`:@@source.hover.ticks-exactly:${segment.written}:written: ticks exactly`
-      : $localize`:@@source.hover.ticks-exactly-ticks:${segment.written}:written: ticks exactly${modifiers}:modifiers: (${segment.ticks}:ticks: ticks)`;
+      ? $localize`:@@source.hover.ticks-exactly:source.hover.ticks-exactly ${segment.written}:written:`
+      : $localize`:@@source.hover.ticks-exactly-ticks:source.hover.ticks-exactly-ticks ${segment.written}:written: ${modifiers}:modifiers: ${segment.ticks}:ticks:`;
   }
 
-  return $localize`:@@source.hover.1-ticks:1/${segment.written}:written:${modifiers}:modifiers: (${segment.ticks}:ticks: ticks)`;
+  return $localize`:@@source.hover.1-ticks:source.hover.1-ticks ${segment.written}:written: ${modifiers}:modifiers: ${segment.ticks}:ticks:`;
 }
 
 /**
@@ -69,8 +69,10 @@ function noteLengthLine(segments: readonly NoteLengthSegment[]): string {
   }
 
   const total = segments.reduce((sum, segment) => sum + segment.ticks, 0);
-  const joined = segments.map(segmentLabel).join(` ${$localize`:@@source.hover.tied-to:tied to`} `);
-  return $localize`:@@source.hover.ticks-total:${joined}:segments: — ${total}:total: ticks total`;
+  const joined = segments
+    .map(segmentLabel)
+    .join(` ${$localize`:@@source.hover.tied-to:source.hover.tied-to`} `);
+  return $localize`:@@source.hover.ticks-total:source.hover.ticks-total ${joined}:segments: ${total}:total:`;
 }
 
 function renderCommand(command: Command): HTMLElement {
@@ -80,7 +82,7 @@ function renderCommand(command: Command): HTMLElement {
   const label = command.vcmd !== undefined ? `$${hex2(command.vcmd)}` : command.kind;
   const via =
     command.replacement !== undefined
-      ? $localize`:@@source.hover.via:via ${command.replacement}:replacement:`
+      ? $localize`:@@source.hover.via:source.hover.via ${command.replacement}:replacement:`
       : '';
   dom.appendChild(
     line('cm-amk-hover-name', [label, command.name, via].filter((part) => part !== '').join(' ')),
@@ -103,7 +105,9 @@ function renderCommand(command: Command): HTMLElement {
     dom.appendChild(
       line(
         'cm-amk-hover-args',
-        more > 0 ? $localize`:@@source.hover.more:${args}:args: … ${more}:more: more` : args,
+        more > 0
+          ? $localize`:@@source.hover.more:source.hover.more ${args}:args: ${more}:more:`
+          : args,
       ),
     );
   }
@@ -112,7 +116,7 @@ function renderCommand(command: Command): HTMLElement {
     dom.appendChild(
       line(
         'cm-amk-hover-incomplete',
-        $localize`:@@source.hover.incomplete-expects-more-arguments:incomplete — expects more arguments`,
+        $localize`:@@source.hover.incomplete-expects-more-arguments:source.hover.incomplete-expects-more-arguments`,
       ),
     );
   }

@@ -64,9 +64,7 @@ export class AramBudget {
   protected readonly notes = computed(() => {
     const notes: string[] = [];
     if (this.overflowing()) {
-      notes.push(
-        $localize`:@@output.aram.this-will-not-fit-in:This will not fit in ARAM. Reduce samples, shorten the song, or lower the echo buffer.`,
-      );
+      notes.push($localize`:@@output.aram.this-will-not-fit-in:output.aram.this-will-not-fit-in`);
     }
 
     return notes;

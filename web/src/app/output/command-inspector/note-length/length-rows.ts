@@ -42,7 +42,7 @@ export interface NoteLengthRow {
 }
 
 /** Said under a row whose digits are not in the document. */
-export const READS_THE_DEFAULT = $localize`:@@inspector.note-length.this-note-takes-its-length:This note takes its length from the standing \`l\`. Moving the slider writes the length onto the note itself.`;
+export const READS_THE_DEFAULT = $localize`:@@inspector.note-length.this-note-takes-its-length:inspector.note-length.this-note-takes-its-length`;
 
 /** The reading beside the track — `1/4 · a quarter note · 48 ticks`. */
 export function noteLengthLabel(segment: NoteLengthSegment, denominator: number): string {
@@ -68,8 +68,8 @@ function lockedBecause(segment: NoteLengthSegment): string | null {
 
   if (segment.denominator === null) {
     return segment.exact
-      ? $localize`:@@inspector.note-length.written-as-an-exact-tick:written as an exact tick count, which is not a note value`
-      : $localize`:@@inspector.note-length.the-standing-l-is-not:the standing \`l\` is not a length that can be written as \`1/n\``;
+      ? $localize`:@@inspector.note-length.written-as-an-exact-tick:inspector.note-length.written-as-an-exact-tick`
+      : $localize`:@@inspector.note-length.the-standing-l-is-not:inspector.note-length.the-standing-l-is-not`;
   }
 
   return null;
@@ -83,8 +83,8 @@ export function noteLengthRows(command: Command): readonly NoteLengthRow[] {
       key: index,
       label:
         index === 0
-          ? $localize`:@@inspector.note-length.length:Length`
-          : $localize`:@@inspector.note-length.tied-to:Tied to`,
+          ? $localize`:@@inspector.note-length.length:inspector.note-length.length`
+          : $localize`:@@inspector.note-length.tied-to:inspector.note-length.tied-to`,
       value: segment.denominator ?? segment.ticks,
       ticks: segment.ticks,
       written: !segment.implicit,

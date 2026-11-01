@@ -93,14 +93,14 @@ export class VibratoCommand {
 
   protected readonly rateNote = computed(() =>
     this.shownRate() === 0
-      ? $localize`:@@inspector.vibrato.a-rate-of-0-never:a rate of 0 never advances, so nothing wobbles`
-      : $localize`:@@inspector.vibrato.higher-is-faster-one-cycle:higher is faster — one cycle every ${Math.round(256 / this.shownRate())}:amount: ticks`,
+      ? $localize`:@@inspector.vibrato.a-rate-of-0-never:inspector.vibrato.a-rate-of-0-never`
+      : $localize`:@@inspector.vibrato.higher-is-faster-one-cycle:inspector.vibrato.higher-is-faster-one-cycle ${Math.round(256 / this.shownRate())}:amount:`,
   );
 
   protected readonly formNote = computed(() =>
     this.hasDelay()
       ? null
-      : $localize`:@@inspector.vibrato.written-with-two-arguments-so:Written with two arguments, so there is no delay. Add a third and the first becomes one.`,
+      : $localize`:@@inspector.vibrato.written-with-two-arguments-so:inspector.vibrato.written-with-two-arguments-so`,
   );
 
   protected editable(index: number): boolean {

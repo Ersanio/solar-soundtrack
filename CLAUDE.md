@@ -42,16 +42,17 @@ AddmusicK release if they are missing.
 
 Node 24 is what CI uses. CI runs `npm run lint` then `npm run check`.
 
-| Command             | What it does                                                                       |
-| ------------------- | ---------------------------------------------------------------------------------- |
-| `npm start`         | Dev server on `http://localhost:4200/`.                                            |
-| `npm run build`     | Production build into `web/dist/`.                                                 |
-| `npm run watch`     | Dev-configuration build with `--watch`, no server.                                 |
-| `npm run lint`      | ESLint over every workspace.                                                       |
-| `npm run format`    | Prettier over the workspace.                                                       |
-| `npm run typecheck` | The app. `:packages` and `:scripts` cover the rest.                                |
-| `npm run i18n`      | Regenerates `web/src/locale/messages.json`, the catalog of every user-facing text. |
-| `npm run check`     | The merge gate: formatting, three typechecks, all fourteen harnesses, the catalog. |
+| Command             | What it does                                                                            |
+| ------------------- | --------------------------------------------------------------------------------------- |
+| `npm start`         | Dev server on `http://localhost:4200/`.                                                 |
+| `npm run build`     | Production build into `web/dist/`.                                                      |
+| `npm run watch`     | Dev-configuration build with `--watch`, no server.                                      |
+| `npm run lint`      | ESLint over every workspace.                                                            |
+| `npm run format`    | Prettier over the workspace.                                                            |
+| `npm run typecheck` | The app. `:packages` and `:scripts` cover the rest.                                     |
+| `npm run start:ids` | The dev server with every message showing its i18n ID instead of its English.           |
+| `npm run i18n`      | Adds new IDs to `web/src/locale/messages.en.json`, the English, and drops removed ones. |
+| `npm run check`     | The merge gate: formatting, three typechecks, all fourteen harnesses, the English.      |
 
 `npm run typecheck` does **not** compile Angular templates — `tsc` does not run the template
 compiler, so a bad binding (`viewBox=` instead of `[attr.viewBox]=`) passes it. `npm run check`
@@ -141,14 +142,16 @@ line cited; `SST####` is one `Music.cpp` does not produce at all. A new diagnost
 of the tool that found it. Spans are mapped back to the source the author wrote — `spanAt` is the
 single choke point, and anything that bypasses it will be wrong. Constructs this compiler does not
 implement are reported as errors, never silently mis-compiled. Their text is not at the call site:
-it is in `@amk/core/messages/amk.ts` and `sst.ts`, one entry per code and variant, and a new
-diagnostic adds its entry there. What each `SST05xx` covers: `docs/claude/compiler.md`.
+each code and variant has an entry in `@amk/core/messages/amk.ts` or `sst.ts` and its English under
+the same ID in `web/src/locale/messages.en.json`, and a new diagnostic adds both. What each
+`SST05xx` covers: `docs/claude/compiler.md`.
 
-**Text a porter reads carries an i18n ID.** Templates take `i18n="@@group.name"`, TypeScript and
-the packages `` $localize`:@@group.name:…` ``, and `web/src/locale/messages.json` lists all of it,
-grouped by where it is read. The lint rule and `npm run check` hold both halves. A string that is
-compared or stored is a key, never text. How to mark, which group, and what stays unmarked:
-`docs/claude/i18n.md`.
+**Text a porter reads is written by its i18n ID.** Templates take `i18n="@@group.name"` with the
+ID as their text, TypeScript and the packages `` $localize`:@@group.name:group.name` ``, and the
+words are in `web/src/locale/messages.en.json`, grouped by where they are read; the build swaps
+them in. Change wording there, not in the code. The lint rule and `npm run check` hold both
+halves. A string that is compared or stored is a key, never text. How to write a message, which
+group, and what stays unmarked: `docs/claude/i18n.md`.
 
 **Accessibility is not supported.** The app ships no ARIA attributes and no `role` or `tabindex`,
 and none are planned. `angular.configs.templateAccessibility` is therefore absent from the
@@ -189,7 +192,7 @@ of the area it belongs to, in the same change; if no file fits, add one and list
 | `commands-in-the-roll.md`  | command glyphs on bars, the command lane, `commands-in-force.ts`, `command-timeline.ts`, `song-walk.ts`'s slots                                      |
 | `inspector-and-palette.md` | the command inspector, a note's Length row, the instrument picker, the command palette, the `$DD` and `q` readouts, the bend graph, the FIR designer |
 | `compiler.md`              | `packages/mml-compiler`, the `@amk/tokens` scanner, diagnostics                                                                                      |
-| `i18n.md`                  | any text a porter reads: templates, `$localize`, the AMK/SST catalogs, command names and descriptions, `web/src/locale/messages.json`                |
+| `i18n.md`                  | any text a porter reads: templates, `$localize`, the AMK/SST catalogs, command names and descriptions, `web/src/locale/messages.en.json`             |
 | `ui-and-theme.md`          | `styles.css` colours, `ThemeStore` and presets, the panes, sidebar, tabs and shared controls                                                         |
 | `tooling.md`               | the pre-hooks, `eslint.config.js`, `.prettierrc`, CI and deployment                                                                                  |
 

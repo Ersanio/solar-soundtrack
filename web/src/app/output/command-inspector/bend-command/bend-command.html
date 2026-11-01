@@ -1,6 +1,6 @@
 @if (!hasTarget()) {
   <p i18n="@@inspector.bend.needs-three-arguments-a" class="text-ink-muted text-xs leading-relaxed">
-    Needs three arguments: a delay, a duration and a target.
+    inspector.bend.needs-three-arguments-a
   </p>
 } @else {
   <!-- The dragged values, so the curve follows the pointer. Not drawn for a
@@ -20,7 +20,7 @@
 
   <amk-slider
     i18n-label="@@inspector.bend.delay.label"
-    label="Delay"
+    label="inspector.bend.delay.label"
     [value]="delay()"
     [max]="255"
     [valueLabel]="delayLabel()"
@@ -32,7 +32,7 @@
 
   <amk-slider
     i18n-label="@@inspector.bend.over.label"
-    label="Over"
+    label="inspector.bend.over.label"
     [value]="duration()"
     [max]="255"
     [valueLabel]="durationLabel()"
@@ -48,7 +48,7 @@
     <span class="flex flex-col gap-0.5">
       <span class="flex items-baseline justify-between gap-2">
         <span i18n="@@inspector.bend.target-note" class="text-ink-muted text-[11px]"
-          >Target note</span
+          >inspector.bend.target-note</span
         >
         <span class="text-ink font-mono text-[11px]">{{ written.text }}</span>
       </span>
@@ -58,7 +58,7 @@
     <!-- A dropdown, so there is no drag to preview: it commits on choosing. -->
     <amk-note-picker
       i18n-label="@@inspector.bend.target-note.label"
-      label="Target note"
+      label="inspector.bend.target-note.label"
       [value]="target()"
       [disabled]="!editable(2)"
       (commit)="setArg(2, $event)"
@@ -67,7 +67,7 @@
   } @else {
     <amk-slider
       i18n-label="@@inspector.bend.semitones.label"
-      label="Semitones"
+      label="inspector.bend.semitones.label"
       [signed]="true"
       [value]="semitones()"
       [min]="-128"

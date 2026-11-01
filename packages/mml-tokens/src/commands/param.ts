@@ -117,7 +117,7 @@ export function ticks(name: string, extra: Partial<ParamDescriptor> = {}): Param
  * `$DC`, `:3302` for `$EA` — and each branches straight past its own block on a
  * zero.
  */
-const NO_FADE = $localize`:@@inspector.param.no-fade-the-driver-skips:no fade — the driver skips a duration of 0, so the value stays put; 1 is what applies it at once`;
+const NO_FADE = $localize`:@@inspector.param.no-fade-the-driver-skips:inspector.param.no-fade-the-driver-skips`;
 
 /**
  * The fade duration `$E1` and `$E8` share with `w` and `v`'s comma forms, which
@@ -127,7 +127,7 @@ const NO_FADE = $localize`:@@inspector.param.no-fade-the-driver-skips:no fade �
  * Not folded into {@link ticks}: a `$DD` or `$DE` delay of 0 means no delay,
  * where a fade over 0 ticks is dropped outright.
  */
-export const DURATION = ticks($localize`:@@inspector.param.over:Over`, {
+export const DURATION = ticks($localize`:@@inspector.param.over:inspector.param.over`, {
 	describe: (value, _command, context) => (value === 0 ? NO_FADE : fadeTicksLabel(value, context.tempo)),
 });
 
@@ -138,7 +138,7 @@ export const DURATION = ticks($localize`:@@inspector.param.over:Over`, {
  * clock alone, so pricing its ticks at the tempo in force is right. A tempo fade
  * *is* the tempo in force, and `units.ts:tempoFadeSeconds` accounts for that.
  */
-export const TEMPO_FADE_DURATION = ticks($localize`:@@inspector.param.over:Over`, {
+export const TEMPO_FADE_DURATION = ticks($localize`:@@inspector.param.over:inspector.param.over`, {
 	min: 1,
 	describe: (value, command, context) =>
 		value === 0 ? NO_FADE : tempoFadeLabel(value, context.tempo, command.args[1]?.value ?? null),

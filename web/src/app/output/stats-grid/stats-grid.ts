@@ -34,45 +34,45 @@ export class StatsGrid {
 
     const cells: Cell[] = [
       {
-        label: $localize`:@@output.stats.total-size:Total size`,
+        label: $localize`:@@output.stats.total-size:output.stats.total-size`,
         value: stats.totalSize ? `0x${hex4(stats.totalSize)}` : '—',
         dim: !stats.totalSize,
       },
       {
-        label: $localize`:@@output.stats.aram-range:ARAM range`,
+        label: $localize`:@@output.stats.aram-range:output.stats.aram-range`,
         value: stats.totalSize ? `${hex4(base)}–${hex4(end - 1)}` : '—',
         dim: !stats.totalSize,
       },
       {
-        label: $localize`:@@output.stats.header:Header`,
+        label: $localize`:@@output.stats.header:output.stats.header`,
         value: stats.headerSize ? `0x${hex4(stats.headerSize)}` : '—',
         dim: !stats.headerSize,
       },
       {
-        label: $localize`:@@output.stats.loop-block:Loop block`,
+        label: $localize`:@@output.stats.loop-block:output.stats.loop-block`,
         value: stats.loopDataSize ? `0x${hex4(stats.loopDataSize)}` : '—',
         dim: !stats.loopDataSize,
       },
       {
-        label: $localize`:@@output.stats.echo-buffer:Echo buffer`,
+        label: $localize`:@@output.stats.echo-buffer:output.stats.echo-buffer`,
         value: echoBytes ? `0x${hex4(echoBytes)}` : '0',
         dim: echoBytes === 0,
       },
       // One pass through the song, as AddmusicK itself reports it. Not the ID666
       // header field, which doubles the loop and is not shown here.
       {
-        label: $localize`:@@output.stats.length:Length`,
+        label: $localize`:@@output.stats.length:output.stats.length`,
         value:
           playSeconds === null
-            ? $localize`:@@output.stats.unknown:unknown`
+            ? $localize`:@@output.stats.unknown:output.stats.unknown`
             : formatTime(playSeconds),
         dim: playSeconds === null,
       },
       {
-        label: $localize`:@@output.stats.intro:Intro`,
+        label: $localize`:@@output.stats.intro:output.stats.intro`,
         value: stats.hasIntro
-          ? $localize`:@@output.stats.yes:yes`
-          : $localize`:@@output.stats.no:no`,
+          ? $localize`:@@output.stats.yes:output.stats.yes`
+          : $localize`:@@output.stats.no:output.stats.no`,
         dim: !stats.hasIntro,
       },
     ];
@@ -86,7 +86,7 @@ export class StatsGrid {
 
       const ticks = stats.channelTicks[channel] ?? 0;
       cells.push({
-        label: $localize`:@@output.stats.channel:Channel ${channel}:channel:`,
+        label: $localize`:@@output.stats.channel:output.stats.channel ${channel}:channel:`,
         value: `0x${hex4(size)} · ${ticks}t`,
         dim: false,
       });

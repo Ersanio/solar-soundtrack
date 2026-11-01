@@ -3,12 +3,12 @@
     i18n="@@inspector.quantization.needs-a-two-digit"
     class="text-ink-muted text-xs leading-relaxed"
   >
-    Needs a two-digit hex value, as in <code class="text-ink">q7F</code>.
+    inspector.quantization.needs-a-two-digit <code class="text-ink"></code>
   </p>
 } @else {
   <amk-slider
     i18n-label="@@inspector.quantization.note-length.label"
-    label="Note length"
+    label="inspector.quantization.note-length.label"
     [value]="gateIndex()"
     [max]="7"
     [valueLabel]="gateLabel()"
@@ -20,7 +20,7 @@
 
   <amk-slider
     i18n-label="@@inspector.quantization.velocity.label"
-    label="Velocity"
+    label="inspector.quantization.velocity.label"
     [value]="velocityIndex()"
     [max]="15"
     [valueLabel]="velocityLabel()"

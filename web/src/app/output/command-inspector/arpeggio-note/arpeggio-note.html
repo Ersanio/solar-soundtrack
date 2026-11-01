@@ -7,11 +7,11 @@
     —
     @if (row.isLive) {
       <ng-container i18n="@@inspector.arpeggio-note.restarts-here"
-        >the sequence restarts here</ng-container
+        >inspector.arpeggio-note.restarts-here</ng-container
       >
     } @else {
       <ng-container i18n="@@inspector.arpeggio-note.overridden"
-        >a loop point a later one overrides</ng-container
+        >inspector.arpeggio-note.overridden</ng-container
       >
     }
   </span>
@@ -19,7 +19,7 @@
   <amk-slider
     class="flex-1"
     origin="centre"
-    label="Note {{
+    label="inspector.arpeggio-note.note.label {{
       row.index + 1 // i18n(ph='number')
     }}"
     i18n-label="@@inspector.arpeggio-note.note.label"
@@ -42,9 +42,11 @@
   (click)="looped.emit(row.index)"
 >
   @if (row.isMarker) {
-    <ng-container i18n="@@inspector.arpeggio-note.unloop">Unloop</ng-container>
+    <ng-container i18n="@@inspector.arpeggio-note.unloop"
+      >inspector.arpeggio-note.unloop</ng-container
+    >
   } @else {
-    <ng-container i18n="@@inspector.arpeggio-note.loop">Loop</ng-container>
+    <ng-container i18n="@@inspector.arpeggio-note.loop">inspector.arpeggio-note.loop</ng-container>
   }
 </button>
 <button
@@ -52,9 +54,9 @@
   amk-button
   variant="ghost"
   i18n-title="@@inspector.arpeggio-note.remove-this-entry.title"
-  title="Remove this entry"
+  title="inspector.arpeggio-note.remove-this-entry.title"
   [disabled]="!resizable()"
   (click)="removed.emit(row.index)"
 >
-  Remove
+  inspector.arpeggio-note.remove
 </button>

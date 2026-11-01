@@ -32,7 +32,7 @@ export class EnumSelect {
   readonly disabled = input(false);
   readonly note = input<string | null>(null);
   readonly unknownLabel = input(
-    $localize`:@@common.not-a-documented-value:(not a documented value)`,
+    $localize`:@@common.not-a-documented-value:common.not-a-documented-value`,
   );
 
   readonly commit = output<number>();

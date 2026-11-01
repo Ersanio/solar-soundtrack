@@ -1,6 +1,6 @@
 @if (args().length < 2) {
   <p i18n="@@inspector.vibrato.needs-a-rate-and" class="text-ink-muted text-xs leading-relaxed">
-    Needs a rate and a depth, and optionally a delay before them.
+    inspector.vibrato.needs-a-rate-and
   </p>
 } @else {
   <!-- The dragged values, so the shape follows the pointer. -->
@@ -19,7 +19,7 @@
   @if (delayIndex() >= 0) {
     <amk-slider
       i18n-label="@@inspector.vibrato.delay.label"
-      label="Delay"
+      label="inspector.vibrato.delay.label"
       [value]="delay()"
       [max]="255"
       [valueLabel]="delayLabel()"
@@ -32,7 +32,7 @@
 
   <amk-slider
     i18n-label="@@inspector.vibrato.rate.label"
-    label="Rate"
+    label="inspector.vibrato.rate.label"
     [value]="rate()"
     [max]="255"
     [note]="lockedBecause(rateIndex()) ?? rateNote()"
@@ -43,7 +43,7 @@
 
   <amk-slider
     i18n-label="@@inspector.vibrato.depth.label"
-    label="Depth"
+    label="inspector.vibrato.depth.label"
     [value]="depth()"
     [max]="255"
     [note]="lockedBecause(depthIndex())"

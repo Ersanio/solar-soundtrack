@@ -21,8 +21,8 @@
  *   npm run brrtest
  */
 
-// First, so every module after it finds the global.
-import "@angular/localize/init";
+// First, so every module after it finds $localize and the English.
+import "./localize";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 

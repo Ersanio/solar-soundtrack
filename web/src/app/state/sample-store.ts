@@ -589,7 +589,7 @@ function extensionProblem(name: string): string | null {
     return null;
   }
 
-  return $localize`:@@status.is-neither-a-brr-sample:"${name}:name:" is neither a .brr sample nor a .bnk sample bank.`;
+  return $localize`:@@status.is-neither-a-brr-sample:status.is-neither-a-brr-sample ${name}:name:`;
 }
 
 /**

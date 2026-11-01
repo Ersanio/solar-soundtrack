@@ -47,8 +47,8 @@ import {
 })
 export class RollToolbar {
   protected readonly text = {
-    hidePercussion: $localize`:@@roll.percussion.hide.title:Hide the percussion set`,
-    choosePercussion: $localize`:@@roll.percussion.choose.title:Choose which instruments are percussion`,
+    hidePercussion: $localize`:@@roll.percussion.hide.title:roll.percussion.hide.title`,
+    choosePercussion: $localize`:@@roll.percussion.choose.title:roll.percussion.choose.title`,
   };
 
   readonly follow = input.required<boolean>();
@@ -84,22 +84,22 @@ export class RollToolbar {
   /** For the Snap control. The names are the porter's, not the tick counts. */
   protected readonly snaps = SNAPS;
   protected readonly snapLabels: Record<SnapName, string> = {
-    bar: $localize`:@@roll.snap.bar:Bar`,
-    beat: $localize`:@@roll.snap.beat:Beat`,
-    half: $localize`:@@roll.snap.half:½ beat`,
-    quarter: $localize`:@@roll.snap.quarter:¼ beat`,
-    eighth: $localize`:@@roll.snap.eighth:⅛ beat`,
+    bar: $localize`:@@roll.snap.bar:roll.snap.bar`,
+    beat: $localize`:@@roll.snap.beat:roll.snap.beat`,
+    half: $localize`:@@roll.snap.half:roll.snap.half`,
+    quarter: $localize`:@@roll.snap.quarter:roll.snap.quarter`,
+    eighth: $localize`:@@roll.snap.eighth:roll.snap.eighth`,
     // Built from `⅟` and subscript digits, the vulgar fractions running out at ⅛.
-    sixteenth: $localize`:@@roll.snap.sixteenth:⅟₁₆ beat`,
-    off: $localize`:@@roll.snap.off:Off`,
+    sixteenth: $localize`:@@roll.snap.sixteenth:roll.snap.sixteenth`,
+    off: $localize`:@@roll.snap.off:roll.snap.off`,
   };
 
   /** For the Edits control. Both modes are named, so neither has to be inferred. */
   protected readonly editModes = EDIT_MODES;
   protected readonly editModeLabels: Record<EditMode, string> = {
-    overwrite: $localize`:@@roll.mode.overwrite:Overwrite`,
-    insert: $localize`:@@roll.mode.insert:Insert`,
-    strict: $localize`:@@roll.mode.strict:Strict`,
+    overwrite: $localize`:@@roll.mode.overwrite:roll.mode.overwrite`,
+    insert: $localize`:@@roll.mode.insert:roll.mode.insert`,
+    strict: $localize`:@@roll.mode.strict:roll.mode.strict`,
   };
 
   /**
@@ -109,7 +109,7 @@ export class RollToolbar {
   protected readonly selectedLabel = computed(() => {
     const selected = this.selected();
     return selected > 0
-      ? $localize`:@@roll.selected:${selected.toLocaleString()}:selected: selected`
+      ? $localize`:@@roll.selected:roll.selected ${selected.toLocaleString()}:selected:`
       : null;
   });
 

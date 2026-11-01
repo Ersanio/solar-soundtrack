@@ -139,7 +139,7 @@ export function computeBudget(
 	const sampleDetail =
 		loaded === samples.length
 			? `${samples.length} ${samples.length === 1 ? "sample" : "samples"}`
-			: $localize`:@@output.aram.segment.loaded:${loaded}:loaded: of ${samples.length}:length: loaded`;
+			: $localize`:@@output.aram.segment.loaded:output.aram.segment.loaded ${loaded}:loaded: ${samples.length}:length:`;
 
 	const rows: BudgetRow[] = [
 		{
@@ -153,13 +153,13 @@ export function computeBudget(
 			// would double-count the difference. Everything from `localPos` up
 			// belongs to the song, whatever is currently in it.
 			key: "driver",
-			label: $localize`:@@output.aram.segment.spc-700-engine:SPC-700 engine`,
+			label: $localize`:@@output.aram.segment.spc-700-engine:output.aram.segment.spc-700-engine`,
 			start: 0,
 			bytes: layout.songPos,
 		},
 		{
 			key: "song",
-			label: $localize`:@@output.aram.segment.your-song:your song`,
+			label: $localize`:@@output.aram.segment.your-song:output.aram.segment.your-song`,
 			start: layout.songPos,
 			bytes: songBytes,
 		},
@@ -169,14 +169,14 @@ export function computeBudget(
 			// the directory itself is four bytes per entry. Both exist only to carry
 			// samples, so both are counted as sample data.
 			key: "samples",
-			label: $localize`:@@output.aram.segment.sample-data:sample data`,
+			label: $localize`:@@output.aram.segment.sample-data:output.aram.segment.sample-data`,
 			detail: sampleDetail,
 			start: layout.songEnd,
 			bytes: layout.sampleDataEnd - layout.songEnd,
 		},
 		{
 			key: "free",
-			label: $localize`:@@output.aram.segment.free:free`,
+			label: $localize`:@@output.aram.segment.free:output.aram.segment.free`,
 			start: layout.sampleDataEnd,
 			bytes: Math.max(0, layout.freeBytes),
 		},
@@ -186,8 +186,8 @@ export function computeBudget(
 			key: "echo",
 			label:
 				echoBufferSize > 0
-					? $localize`:@@output.aram.segment.echo-buffer:echo buffer`
-					: $localize`:@@output.aram.segment.echo-buffer-reserved:echo buffer (reserved)`,
+					? $localize`:@@output.aram.segment.echo-buffer:output.aram.segment.echo-buffer`
+					: $localize`:@@output.aram.segment.echo-buffer-reserved:output.aram.segment.echo-buffer-reserved`,
 			start: layout.echoStart,
 			bytes: ARAM_SIZE - layout.echoStart,
 		},

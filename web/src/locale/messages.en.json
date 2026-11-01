@@ -1,5 +1,5 @@
 {
-  "locale": "en-US",
+  "locale": "en",
   "translations": {
     "amk.0002": "Song did not specify a target program with \"#amk\", \"#am4\" or \"#amm\".",
     "amk.0003": "This song was made for a newer version of AddmusicK (#amk {$version}); only up to {$supported} is supported.",
@@ -609,7 +609,7 @@
     "inspector.pan.surround-left.label": "Surround, left",
     "inspector.pan.surround-right.label": "Surround, right",
     "inspector.param-table.and-further-argument-not": "{VAR_PLURAL, plural, =1 {… and 1 further argument not shown.} other {… and {COUNT} further arguments not shown.}}",
-    "inspector.param-table.carries-shown-in-the": "{VAR_PLURAL, plural, =1 {Carries 1 {NOUN}, shown in the hex dump below.} other {Carries {COUNT} {NOUN}s, shown in the hex dump below. }}",
+    "inspector.param-table.carries-shown-in-the": "{VAR_PLURAL, plural, =1 {Carries 1 {NOUN}, shown in the hex dump below.} other {Carries {COUNT} {NOUN}s, shown in the hex dump below.}}",
     "inspector.param-table.this-command-takes-no": "This command takes no arguments.",
     "inspector.param.0-smw-low-pass": "0 — SMW low-pass",
     "inspector.param.00-is-treated-as-0100": "$00 is treated as $0100",

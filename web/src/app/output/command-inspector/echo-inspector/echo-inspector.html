@@ -1,7 +1,6 @@
 @if (isEchoOff()) {
   <p i18n="@@inspector.echo.silences-the-echo-and" class="text-ink-muted text-xs leading-relaxed">
-    Silences the echo and clears every channel's echo bit. The buffer stays reserved — only
-    <code class="text-ink">$FA $04</code> changes that, and the compiler writes it for you.
+    inspector.echo.silences-the-echo-and <code class="text-ink"></code>
   </p>
 } @else if (isF1()) {
   <amk-echo-config [command]="command()" />
@@ -9,7 +8,7 @@
   @if (isEf()) {
     <amk-bit-toggles
       i18n-legend="@@inspector.echo.channels.legend"
-      legend="Channels"
+      legend="inspector.echo.channels.legend"
       [value]="bytes.at(0)"
       [labels]="VOICE_LABELS"
       [valueLabel]="maskLabel()"
@@ -22,7 +21,7 @@
   @if (isFade()) {
     <amk-slider
       i18n-label="@@inspector.echo.over.label"
-      label="Over"
+      label="inspector.echo.over.label"
       [value]="bytes.at(0)"
       [max]="255"
       [note]="bytes.lockedBecause(0) ?? fadeLabel()"

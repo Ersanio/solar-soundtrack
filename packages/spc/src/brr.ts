@@ -32,25 +32,25 @@ export interface BrrSample {
  */
 export function validateBrr(bytes: Uint8Array): string | null {
 	if (bytes.length === 0) {
-		return $localize`:@@error.brr.the-file-is-empty:The file is empty.`;
+		return $localize`:@@error.brr.the-file-is-empty:error.brr.the-file-is-empty`;
 	}
 
 	if (bytes.length < 2 + BRR_BLOCK_BYTES) {
-		return $localize`:@@error.brr.only-bytes-too-short-to:Only ${bytes.length}:length: bytes — too short to hold the 2-byte loop header and a single 9-byte block.`;
+		return $localize`:@@error.brr.only-bytes-too-short-to:error.brr.only-bytes-too-short-to ${bytes.length}:length:`;
 	}
 
 	if ((bytes.length - 2) % BRR_BLOCK_BYTES !== 0) {
-		return $localize`:@@error.brr.bytes-size-2-must-be:${bytes.length}:length: bytes: (size - 2) must be a multiple of 9. Either the 2-byte loop header is missing or the file is truncated.`;
+		return $localize`:@@error.brr.bytes-size-2-must-be:error.brr.bytes-size-2-must-be ${bytes.length}:length:`;
 	}
 
 	const loopOffset = bytes[0] | (bytes[1] << 8);
 	const dataLength = bytes.length - 2;
 	if (loopOffset >= dataLength) {
-		return $localize`:@@error.brr.the-loop-point-0x-is:The loop point (0x${hex(loopOffset)}:loopOffset:) is past the end of the ${dataLength}:dataLength:-byte sample.`;
+		return $localize`:@@error.brr.the-loop-point-0x-is:error.brr.the-loop-point-0x-is ${hex(loopOffset)}:loopOffset: ${dataLength}:dataLength:`;
 	}
 
 	if (loopOffset % BRR_BLOCK_BYTES !== 0) {
-		return $localize`:@@error.brr.the-loop-point-is-not:The loop point (${loopOffset}:loopOffset:) is not on a 9-byte block boundary.`;
+		return $localize`:@@error.brr.the-loop-point-is-not:error.brr.the-loop-point-is-not ${loopOffset}:loopOffset:`;
 	}
 
 	return null;
@@ -67,19 +67,19 @@ export function validateBrr(bytes: Uint8Array): string | null {
  */
 export function validateName(name: string): string | null {
 	if (name.trim().length === 0) {
-		return $localize`:@@error.brr.the-name-is-empty:The name is empty.`;
+		return $localize`:@@error.brr.the-name-is-empty:error.brr.the-name-is-empty`;
 	}
 
 	if (name.includes("#")) {
-		return $localize`:@@error.brr.contains-a-which-mml-reads:"${name}:name:" contains a '#', which MML reads as the start of a directive.`;
+		return $localize`:@@error.brr.contains-a-which-mml-reads:error.brr.contains-a-which-mml-reads ${name}:name:`;
 	}
 
 	if (name.includes(";")) {
-		return $localize`:@@error.brr.contains-a-which-mml-reads-2:"${name}:name:" contains a ';', which MML reads as the start of a comment.`;
+		return $localize`:@@error.brr.contains-a-which-mml-reads-2:error.brr.contains-a-which-mml-reads-2 ${name}:name:`;
 	}
 
 	if (name.includes('"')) {
-		return $localize`:@@error.brr.contains-a-quote-which-would:"${name}:name:" contains a quote, which would terminate the name inside #samples.`;
+		return $localize`:@@error.brr.contains-a-quote-which-would:error.brr.contains-a-quote-which-would ${name}:name:`;
 	}
 
 	return null;
@@ -98,7 +98,7 @@ export function parseBrr(name: string, raw: Uint8Array): BrrSample {
 	const problem = validateBrr(raw);
 	if (problem) {
 		throw new BrrError(
-			$localize`:@@error.brr.sample-is-not-valid:Sample "${name}:name:" is not valid: ${problem}:problem:`,
+			$localize`:@@error.brr.sample-is-not-valid:error.brr.sample-is-not-valid ${name}:name: ${problem}:problem:`,
 		);
 	}
 
@@ -133,7 +133,7 @@ const SAMPLE_BANK_ORIGIN = 0x8000;
 /** Why a byte run is not a usable `.bnk`, or `null` if it is. */
 export function validateSampleBank(bytes: Uint8Array): string | null {
 	if (bytes.length !== SAMPLE_BANK_BYTES) {
-		return $localize`:@@error.brr.bytes-a-sample-bank-must:${bytes.length.toLocaleString()}:bytes: bytes: a sample bank must be exactly ${SAMPLE_BANK_BYTES.toLocaleString()}:expected:, being a dump of ARAM $8000-$FFFF.`;
+		return $localize`:@@error.brr.bytes-a-sample-bank-must:error.brr.bytes-a-sample-bank-must ${bytes.length.toLocaleString()}:bytes: ${SAMPLE_BANK_BYTES.toLocaleString()}:expected:`;
 	}
 
 	return null;
@@ -143,7 +143,9 @@ export function validateSampleBank(bytes: Uint8Array): string | null {
 export function parseSampleBank(bytes: Uint8Array, names: (slot: number) => string): BrrSample[] {
 	const problem = validateSampleBank(bytes);
 	if (problem) {
-		throw new BrrError($localize`:@@error.brr.not-a-valid-sample-bank:Not a valid sample bank: ${problem}:problem:`);
+		throw new BrrError(
+			$localize`:@@error.brr.not-a-valid-sample-bank:error.brr.not-a-valid-sample-bank ${problem}:problem:`,
+		);
 	}
 
 	// Every offset below — the directory *and* the addresses in it — is relative

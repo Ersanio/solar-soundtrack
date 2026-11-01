@@ -8,8 +8,8 @@
     i18n="@@samples.used"
     class="bg-good/20 text-good shrink-0 rounded-md px-1 py-px text-[11px] font-semibold tracking-wide uppercase"
     i18n-title="@@samples.this-song-plays-this.title-2"
-    title="This song plays this slot, so it is always loaded."
-    >used</span
+    title="samples.this-song-plays-this.title-2"
+    >samples.used</span
   >
 }
 
@@ -17,7 +17,7 @@
 
 <div class="min-w-0 flex-1">
   @if (slot.empty) {
-    <p i18n="@@samples.empty-slot" class="text-ink-muted font-mono text-xs">empty slot</p>
+    <p i18n="@@samples.empty-slot" class="text-ink-muted font-mono text-xs">samples.empty-slot</p>
   } @else {
     <amk-sample-wave class="h-6" [d]="row().waveform" />
     <p class="text-ink-muted mt-0.5 font-mono text-xs">{{ row().detail }}</p>
@@ -32,14 +32,14 @@
     class="shrink-0 text-xs"
     [checked]="slot.important"
     (checkedChange)="onImportant(slot.name, $event)"
-    >keep</amk-checkbox
+    >samples.keep</amk-checkbox
   >
 } @else {
   <span
     i18n="@@samples.not-in-song"
     class="text-ink-muted shrink-0 text-xs"
     i18n-title="@@samples.this-song-does-not.title-2"
-    title="This song does not load this bank, so the slot uses no ARAM. Name the bank in #samples."
-    >not in song</span
+    title="samples.this-song-does-not.title-2"
+    >samples.not-in-song</span
   >
 }

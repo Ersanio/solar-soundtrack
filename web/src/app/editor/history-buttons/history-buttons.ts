@@ -9,8 +9,8 @@ import { EditorRequests } from '../../state/editor-requests';
 const HISTORY_KEYS = /Mac|iP/.test(navigator.platform)
   ? { undo: '⌘Z', redo: '⇧⌘Z' }
   : {
-      undo: $localize`:@@topbar.history.undo-keys:Ctrl+Z`,
-      redo: $localize`:@@topbar.history.redo-keys:Ctrl+Y`,
+      undo: $localize`:@@topbar.history.undo-keys:topbar.history.undo-keys`,
+      redo: $localize`:@@topbar.history.redo-keys:topbar.history.redo-keys`,
     };
 
 /**

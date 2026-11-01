@@ -73,7 +73,7 @@ export class OutputPane {
   protected readonly blocked = computed(() => !this.drivers.ready());
 
   protected readonly driverProblem = computed(
-    () => this.drivers.loadError() ?? $localize`:@@output.still-loading:still loading…`,
+    () => this.drivers.loadError() ?? $localize`:@@output.still-loading:output.still-loading`,
   );
 
   protected readonly bodyClass = computed(() =>

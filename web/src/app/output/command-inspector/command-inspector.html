@@ -2,7 +2,7 @@
      so this section's header row (its first child) is hidden there. -->
 <amk-section
   i18n-heading="@@inspector.heading"
-  heading="Inspector"
+  heading="inspector.heading"
   class="max-lg:[&>*:first-child]:hidden"
 >
   <!-- Muted where there is no command to name; a loop is named by the Loop panel under this. -->
@@ -29,9 +29,10 @@
           <span class="text-ink text-sm">{{ current.name }}</span>
           @if (replacement(); as via) {
             <span i18n="@@inspector.via" class="text-ink-muted font-mono text-xs"
-              >via "{{
-                via  // i18n(ph='replacement')
-              }}"</span
+              >inspector.via
+              {{
+                via // i18n(ph='replacement')
+              }}</span
             >
           }
         </div>
@@ -41,19 +42,16 @@
             i18n="@@inspector.written-as-the-replacement"
             class="text-ink-muted text-xs leading-relaxed"
           >
-            Written as the
-            <code class="text-ink"
-              >"{{
-                via  // i18n(ph='replacement')
-              }}"</code
-            >
-            replacement, so the cursor is on the macro's name rather than on the command itself.
+            inspector.written-as-the-replacement
+            <code class="text-ink">{{
+              via // i18n(ph='replacement')
+            }}</code>
           </p>
         }
 
         @if (incomplete()) {
           <p i18n="@@inspector.this-command-is-missing" class="text-warn text-xs leading-relaxed">
-            This command is missing arguments, so what it does cannot be read off yet.
+            inspector.this-command-is-missing
           </p>
         }
 
@@ -99,15 +97,13 @@
            because the cursor really is on something. -->
       @if (loop()) {
         <p i18n="@@inspector.the-cursor-is-on" class="text-ink-muted text-xs leading-relaxed">
-          The cursor is on a loop, which is not a command. The
-          <span class="text-ink">Loop</span> panel under this has what it repeats.
+          inspector.the-cursor-is-on <span class="text-ink"></span>
         </p>
       }
 
       @if (empty()) {
         <p i18n="@@inspector.put-the-cursor-on" class="text-ink-muted text-xs leading-relaxed">
-          Put the cursor on a note or command (e.g. <code class="text-ink">$F5</code>,
-          <code class="text-ink">t</code>) to see what it does.
+          inspector.put-the-cursor-on <code class="text-ink"></code> <code class="text-ink"></code>
         </p>
       }
     }

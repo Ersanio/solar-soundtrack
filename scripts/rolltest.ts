@@ -18,8 +18,8 @@
  *   npm run rolltest
  */
 
-// First, so every module after it finds the global.
-import "@angular/localize/init";
+// First, so every module after it finds $localize and the English.
+import "./localize";
 import { compiler } from "@amk/compiler";
 import { NOTE_MAX, NOTE_MIN } from "@amk/core/hardcoded-tables";
 import { octaveFor, octaveOfNote, spellDuration, spellNote } from "@amk/core/mml-text";

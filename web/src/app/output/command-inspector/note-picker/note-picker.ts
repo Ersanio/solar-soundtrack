@@ -36,7 +36,7 @@ const OCTAVES: readonly EnumOption[] = [1, 2, 3, 4, 5, 6].map((n) => ({
 })
 export class NotePicker {
   readonly value = input.required<number>();
-  readonly label = input($localize`:@@inspector.note-picker.note:Note`);
+  readonly label = input($localize`:@@inspector.note-picker.note:inspector.note-picker.note`);
   readonly disabled = input(false);
 
   readonly commit = output<number>();

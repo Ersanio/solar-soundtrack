@@ -141,7 +141,7 @@ export function laneStack(request: LaneRequest = {}): LaneStack {
       row: noiseRow,
       kind: 'noise',
       index: -1,
-      label: $localize`:@@roll.lane.noise:noise`,
+      label: $localize`:@@roll.lane.noise:roll.lane.noise`,
       black: false,
       octaveStart: false,
     });

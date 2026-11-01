@@ -134,7 +134,11 @@ export class FirDesigner {
   private readonly runaway = computed(() => this.stability().runaway);
 
   constructor() {
-    stopWhenRunaway(this.command, this.runaway, $localize`:@@inspector.runaway.fir:FIR filter`);
+    stopWhenRunaway(
+      this.command,
+      this.runaway,
+      $localize`:@@inspector.runaway.fir:inspector.runaway.fir`,
+    );
   }
 
   /**
@@ -171,7 +175,7 @@ export class FirDesigner {
     }
 
     return corner >= 1000
-      ? $localize`:@@inspector.fir-designer.khz:${(corner / 1000).toFixed(1)}:amount: kHz`
+      ? $localize`:@@inspector.fir-designer.khz:inspector.fir-designer.khz ${(corner / 1000).toFixed(1)}:amount:`
       : `${Math.round(corner)} Hz`;
   });
 

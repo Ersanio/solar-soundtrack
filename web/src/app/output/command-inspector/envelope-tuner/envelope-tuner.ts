@@ -27,14 +27,26 @@ export interface EnvelopeValue {
 }
 
 const GAIN_MODES: readonly EnumOption[] = [
-  { value: 0, label: $localize`:@@inspector.envelope-tuner.fixed-level:fixed level` },
-  { value: 1, label: $localize`:@@inspector.envelope-tuner.linear-decrease:linear decrease` },
+  {
+    value: 0,
+    label: $localize`:@@inspector.envelope-tuner.fixed-level:inspector.envelope-tuner.fixed-level`,
+  },
+  {
+    value: 1,
+    label: $localize`:@@inspector.envelope-tuner.linear-decrease:inspector.envelope-tuner.linear-decrease`,
+  },
   {
     value: 2,
-    label: $localize`:@@inspector.envelope-tuner.exponential-decrease:exponential decrease`,
+    label: $localize`:@@inspector.envelope-tuner.exponential-decrease:inspector.envelope-tuner.exponential-decrease`,
   },
-  { value: 3, label: $localize`:@@inspector.envelope-tuner.linear-increase:linear increase` },
-  { value: 4, label: $localize`:@@inspector.envelope-tuner.bent-increase:bent increase` },
+  {
+    value: 3,
+    label: $localize`:@@inspector.envelope-tuner.linear-increase:inspector.envelope-tuner.linear-increase`,
+  },
+  {
+    value: 4,
+    label: $localize`:@@inspector.envelope-tuner.bent-increase:inspector.envelope-tuner.bent-increase`,
+  },
 ];
 
 /** `decodeGain`'s modes in the order the two high bits of a ramping GAIN byte pick them. */
@@ -77,40 +89,40 @@ export interface AdsrPreset {
  */
 const PRESETS: readonly AdsrPreset[] = [
   {
-    name: $localize`:@@inspector.envelope-tuner.pluck:Pluck`,
+    name: $localize`:@@inspector.envelope-tuner.pluck:inspector.envelope-tuner.pluck`,
     adsr1: 0xdf,
     adsr2: 0x31,
-    note: $localize`:@@inspector.envelope-tuner.instant-attack-59-ms-to:instant attack, 59 ms to a quarter level`,
+    note: $localize`:@@inspector.envelope-tuner.instant-attack-59-ms-to:inspector.envelope-tuner.instant-attack-59-ms-to`,
   },
   {
-    name: $localize`:@@inspector.envelope-tuner.piano:Piano`,
+    name: $localize`:@@inspector.envelope-tuner.piano:inspector.envelope-tuner.piano`,
     adsr1: 0xbf,
     adsr2: 0x4d,
-    note: $localize`:@@inspector.envelope-tuner.instant-attack-114-ms-decay:instant attack, 114 ms decay, long tail`,
+    note: $localize`:@@inspector.envelope-tuner.instant-attack-114-ms-decay:inspector.envelope-tuner.instant-attack-114-ms-decay`,
   },
   {
-    name: $localize`:@@inspector.envelope-tuner.pad:Pad`,
+    name: $localize`:@@inspector.envelope-tuner.pad:inspector.envelope-tuner.pad`,
     adsr1: 0x86,
     adsr2: 0xe9,
-    note: $localize`:@@inspector.envelope-tuner.256-ms-swell-holds-7:256 ms swell, holds, ~7 s release`,
+    note: $localize`:@@inspector.envelope-tuner.256-ms-swell-holds-7:inspector.envelope-tuner.256-ms-swell-holds-7`,
   },
   {
-    name: $localize`:@@inspector.envelope-tuner.organ:Organ`,
+    name: $localize`:@@inspector.envelope-tuner.organ:inspector.envelope-tuner.organ`,
     adsr1: 0x8f,
     adsr2: 0xf3,
-    note: $localize`:@@inspector.envelope-tuner.instant-on-holds-0-7:instant on, holds, ~0.7 s release`,
+    note: $localize`:@@inspector.envelope-tuner.instant-on-holds-0-7:inspector.envelope-tuner.instant-on-holds-0-7`,
   },
   {
-    name: $localize`:@@inspector.envelope-tuner.strings:Strings`,
+    name: $localize`:@@inspector.envelope-tuner.strings:inspector.envelope-tuner.strings`,
     adsr1: 0x99,
     adsr2: 0xcc,
-    note: $localize`:@@inspector.envelope-tuner.64-ms-swell-sustains-near:64 ms swell, sustains near full`,
+    note: $localize`:@@inspector.envelope-tuner.64-ms-swell-sustains-near:inspector.envelope-tuner.64-ms-swell-sustains-near`,
   },
   {
-    name: $localize`:@@inspector.envelope-tuner.percussive:Percussive`,
+    name: $localize`:@@inspector.envelope-tuner.percussive:inspector.envelope-tuner.percussive`,
     adsr1: 0xff,
     adsr2: 0x14,
-    note: $localize`:@@inspector.envelope-tuner.instant-attack-gone-in-200:instant attack, gone in ~200 ms`,
+    note: $localize`:@@inspector.envelope-tuner.instant-attack-gone-in-200:inspector.envelope-tuner.instant-attack-gone-in-200`,
   },
 ];
 
@@ -205,13 +217,13 @@ export class EnvelopeTuner {
   protected readonly decayLabel = computed(() => {
     const { decay, sustain } = this.shown();
     return sustain >= 7
-      ? $localize`:@@inspector.envelope-tuner.instant-sustain-is-already-at:instant — sustain is already at full level`
+      ? $localize`:@@inspector.envelope-tuner.instant-sustain-is-already-at:inspector.envelope-tuner.instant-sustain-is-already-at`
       : duration(decaySeconds(decay, sustain));
   });
 
   protected readonly sustainLabel = computed(
     () =>
-      $localize`:@@inspector.envelope-tuner.of-full:${Math.round(sustainLevel(this.shown().sustain) * 100)}:amount:% of full`,
+      $localize`:@@inspector.envelope-tuner.of-full:inspector.envelope-tuner.of-full ${Math.round(sustainLevel(this.shown().sustain) * 100)}:amount:`,
   );
 
   protected readonly releaseLabel = computed(() => {
@@ -219,13 +231,13 @@ export class EnvelopeTuner {
     const seconds = releaseSeconds(release, sustain);
     return Number.isFinite(seconds)
       ? duration(seconds)
-      : $localize`:@@inspector.envelope-tuner.held-indefinitely:held indefinitely`;
+      : $localize`:@@inspector.envelope-tuner.held-indefinitely:inspector.envelope-tuner.held-indefinitely`;
   });
 
   /** AddmusicK calls this release; on the DSP it is the sustain-phase fall. */
   protected readonly releaseNote = computed(() =>
     this.shown().release === 0
-      ? $localize`:@@inspector.envelope-tuner.a-rate-of-0-never:a rate of 0 never decays, so the note holds`
+      ? $localize`:@@inspector.envelope-tuner.a-rate-of-0-never:inspector.envelope-tuner.a-rate-of-0-never`
       : null,
   );
 
@@ -243,14 +255,14 @@ export class EnvelopeTuner {
 
   protected readonly gainLevelLabel = computed(
     () =>
-      $localize`:@@inspector.envelope-tuner.of-full:${Math.round((this.shownGain().level ?? 0) * 100)}:amount:% of full`,
+      $localize`:@@inspector.envelope-tuner.of-full:inspector.envelope-tuner.of-full ${Math.round((this.shownGain().level ?? 0) * 100)}:amount:`,
   );
 
   protected readonly gainRateLabel = computed(() => {
     const rate = this.shownGain().rate ?? 0;
     return rate === 0
-      ? $localize`:@@inspector.envelope-tuner.a-rate-of-0-never-2:a rate of 0 never advances, so the level holds`
-      : $localize`:@@inspector.envelope-tuner.rate-2:rate $${hex2(rate)}:rate:`;
+      ? $localize`:@@inspector.envelope-tuner.a-rate-of-0-never-2:inspector.envelope-tuner.a-rate-of-0-never-2`
+      : $localize`:@@inspector.envelope-tuner.rate-2:inspector.envelope-tuner.rate-2 ${hex2(rate)}:rate:`;
   });
 
   protected readonly gainByteLabel = computed(() => `$${hex2(this.value().gain)}`);

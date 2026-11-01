@@ -77,9 +77,10 @@ deliberately ignores, `SST0505` for a replacement that expands into itself, and 
 Constructs this compiler does not implement are reported as errors, never silently mis-compiled.
 
 The words of a diagnostic are not at its call site: `this.error("AMK0058", AMK["0058"](name))`
-names the code here and takes the text from `@amk/core/messages/amk.ts`, where each entry cites the
-AddmusicK line it ports. Comparing a message with `Music.cpp` means reading that entry; comparing
-when it is raised means reading the call site, which is cited as before.
+names the code here and takes the message from `@amk/core/messages/amk.ts`, where each entry cites
+the AddmusicK line it ports, and its words are under the entry's ID (`amk.0058`) in
+`web/src/locale/messages.en.json`. Comparing a message's wording with `Music.cpp` means reading
+that; comparing when it is raised means reading the call site, which carries its own citation.
 
 `SST0505` is the one place a code covers a song AddmusicK cannot finish rather than one it rejects.
 `Music.cpp:135` counts nested expansion at a single position — that is `AMK0023` here — and so sees

@@ -5,7 +5,8 @@
   "extends": "../tsconfig.base.json",
   "compilerOptions": {
     "noEmit": true,
-    "types": ["node", "@angular/localize"]
+    "types": ["node", "@angular/localize"],
+    "resolveJsonModule": true
   },
   "include": ["**/*.ts"]
 }

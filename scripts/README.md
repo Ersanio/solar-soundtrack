@@ -51,11 +51,12 @@ file surfaces as "invalid BRR length 2205" rather than a 404:
 
 A harness that threw on a missing file instead would pass while the browser failed.
 
-Every harness imports `@angular/localize/init` before anything else. The packages and the app code
-they reach write their text as `$localize` messages (`docs/claude/i18n.md`), and that global is
-what the page loads as a polyfill; imported first, it is defined before any module-level message
-is built. With no translation loaded it returns the source text, so an assertion on a message's
-words still reads the English.
+Every harness imports `./localize` before anything else. The packages and the app code they reach
+write their messages by ID (`docs/claude/i18n.md`), and the page's build swaps the English in; a
+harness runs that code unbuilt, so `localize.ts` defines `$localize` and loads
+`web/src/locale/messages.en.json` into it. Imported first, both are in place before any
+module-level message is built, and an assertion on a message's words reads the English a porter
+sees.
 
 ## What none of them cover
 

@@ -16,12 +16,18 @@ import { type EnvelopeValue, EnvelopeTuner } from '../envelope-tuner/envelope-tu
 
 /** The three things an entry's sample byte can be (`parser.ts`'s `readInstrumentSample`). */
 const SAMPLE_FORMS: readonly EnumOption[] = [
-  { value: 0, label: $localize`:@@inspector.instrument-entry.a-brr-file:a .brr file` },
+  {
+    value: 0,
+    label: $localize`:@@inspector.instrument-entry.a-brr-file:inspector.instrument-entry.a-brr-file`,
+  },
   {
     value: 1,
-    label: $localize`:@@inspector.instrument-entry.a-stock-instruments-sample-n:a stock instrument's sample (@n)`,
+    label: $localize`:@@inspector.instrument-entry.a-stock-instruments-sample-n:inspector.instrument-entry.a-stock-instruments-sample-n`,
   },
-  { value: 2, label: $localize`:@@inspector.instrument-entry.noise-nxx:noise (nXX)` },
+  {
+    value: 2,
+    label: $localize`:@@inspector.instrument-entry.noise-nxx:inspector.instrument-entry.noise-nxx`,
+  },
 ];
 
 /**
@@ -48,7 +54,7 @@ export class InstrumentEntryEditor {
   private readonly library = inject(SampleStore);
 
   protected readonly text = {
-    envelopeLocked: $localize`:@@inspector.instrument-entry.envelope-locked:These bytes come through a replacement, so they cannot be set here.`,
+    envelopeLocked: $localize`:@@inspector.instrument-entry.envelope-locked:inspector.instrument-entry.envelope-locked`,
   };
 
   readonly entry = input.required<InstrumentDefinition>();
@@ -96,7 +102,7 @@ export class InstrumentEntryEditor {
    */
   protected readonly unknownSampleLabel = computed(
     () =>
-      $localize`:@@inspector.instrument-entry.not-in-this-songs-samples:"${this.sampleName()}:sampleName:" — not in this song’s #samples`,
+      $localize`:@@inspector.instrument-entry.not-in-this-songs-samples:inspector.instrument-entry.not-in-this-songs-samples ${this.sampleName()}:sampleName:`,
   );
 
   /**
@@ -131,7 +137,7 @@ export class InstrumentEntryEditor {
   protected readonly noiseLabel = computed(() => {
     const clock = this.shownNoiseClock();
     return clock === 0
-      ? $localize`:@@inspector.instrument-entry.silent:silent`
+      ? $localize`:@@inspector.instrument-entry.silent:inspector.instrument-entry.silent`
       : `${Math.round(noiseHz(clock)).toLocaleString()} Hz`;
   });
 
@@ -148,7 +154,7 @@ export class InstrumentEntryEditor {
     // AddmusicK's own table. The scanner's own `srcn` is that same lookup,
     // redone here because the dragged number has not been scanned yet.
     const srcn = INSTRUMENT_TO_SAMPLE[this.shownCopyFrom()] ?? -1;
-    return $localize`:@@inspector.instrument-entry.takes-s-sample:takes @${this.shownCopyFrom()}:shownCopyFrom:'s sample, $${hex2(srcn)}:srcn:`;
+    return $localize`:@@inspector.instrument-entry.takes-s-sample:inspector.instrument-entry.takes-s-sample ${this.shownCopyFrom()}:shownCopyFrom: ${hex2(srcn)}:srcn:`;
   });
 
   // --- envelope --------------------------------------------------------------
@@ -200,8 +206,8 @@ export class InstrumentEntryEditor {
     const { multiplier, tuning, subTuning } = this.shownTuning();
     const semitones = tuningSemitones(multiplier);
     const said = Number.isFinite(semitones)
-      ? $localize`:@@inspector.instrument-entry.semitones:${semitones > 0 ? '+' : ''}:sign:${semitones.toFixed(1)}:semitones: semitones`
-      : $localize`:@@inspector.instrument-entry.silent:silent`;
+      ? $localize`:@@inspector.instrument-entry.semitones:inspector.instrument-entry.semitones ${semitones > 0 ? '+' : ''}:sign: ${semitones.toFixed(1)}:semitones:`
+      : $localize`:@@inspector.instrument-entry.silent:inspector.instrument-entry.silent`;
     return `$${hex2(tuning)}.$${hex2(subTuning)} — ${said}`;
   });
 

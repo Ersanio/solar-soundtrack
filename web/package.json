@@ -6,11 +6,13 @@
   "scripts": {
     "ng": "ng",
     "start": "ng serve",
+    "start:ids": "ng serve --configuration ids",
     "build": "ng build",
     "extract-i18n": "ng extract-i18n",
     "watch": "ng build --watch --configuration development",
     "typecheck": "tsc -p tsconfig.app.json --noEmit",
     "prestart": "npm run prepare:assets --prefix .. && npm run generate-git-info --prefix ..",
+    "prestart:ids": "npm run prepare:assets --prefix .. && npm run generate-git-info --prefix ..",
     "prebuild": "npm run prepare:assets --prefix .. && npm run generate-git-info --prefix ..",
     "prewatch": "npm run prepare:assets --prefix .. && npm run generate-git-info --prefix ..",
     "pretypecheck": "npm run generate-git-info --prefix ..",

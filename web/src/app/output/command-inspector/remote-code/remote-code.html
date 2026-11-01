@@ -2,7 +2,7 @@
   <div class="flex flex-col gap-2.5">
     <amk-enum-select
       i18n-label="@@inspector.remote-code.type.label"
-      label="Type"
+      label="inspector.remote-code.type.label"
       [value]="shown.type"
       [options]="shown.types"
       [note]="shown.typeNote"
@@ -14,7 +14,7 @@
     @if (shown.wait; as wait) {
       <amk-slider
         i18n-label="@@inspector.remote-code.wait.label"
-        label="Wait"
+        label="inspector.remote-code.wait.label"
         [value]="wait.ticks"
         [min]="1"
         [max]="256"
@@ -28,13 +28,11 @@
       <span
         i18n="@@inspector.remote-code.what-runs"
         class="text-ink-muted text-xs font-semibold tracking-wide uppercase"
-      >
-        What
+        >inspector.remote-code.what-runs
         {{
           shown.name // i18n(ph='name')
-        }}
-        runs
-      </span>
+        }}</span
+      >
       @if (shown.runsNothing; as nothing) {
         <span class="text-ink-muted text-xs">{{ nothing }}</span>
       } @else {
@@ -56,7 +54,7 @@
 @if (reset(); as shown) {
   <amk-enum-select
     i18n-label="@@inspector.remote-code.cancels.label"
-    label="Cancels"
+    label="inspector.remote-code.cancels.label"
     [value]="shown.which"
     [options]="shown.options"
     [note]="shown.note"

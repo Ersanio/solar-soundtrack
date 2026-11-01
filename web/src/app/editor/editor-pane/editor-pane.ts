@@ -15,15 +15,15 @@ type ViewId = 'source' | 'samples' | 'roll';
 const VIEW_KEY = 'solar-soundtrack.view';
 
 const VIEWS: readonly TabDef<ViewId>[] = [
-  { id: 'source', label: $localize`:@@editor.tab.source:Source`, icon: IconSource },
+  { id: 'source', label: $localize`:@@editor.tab.source:editor.tab.source`, icon: IconSource },
   {
     id: 'roll',
-    label: $localize`:@@editor.tab.roll:Piano roll (work in progress)`,
+    label: $localize`:@@editor.tab.roll:editor.tab.roll`,
     icon: IconRoll,
   },
   {
     id: 'samples',
-    label: $localize`:@@editor.tab.samples:Samples`,
+    label: $localize`:@@editor.tab.samples:editor.tab.samples`,
     icon: IconSamples,
     aside: true,
   },

@@ -91,7 +91,7 @@ async function fetchBytes(url: string): Promise<Uint8Array> {
 	const response = await fetch(url);
 	if (!response.ok) {
 		throw new DriverError(
-			$localize`:@@error.driver.could-not-load-http:Could not load ${url}:url: (HTTP ${response.status}:status:).`,
+			$localize`:@@error.driver.could-not-load-http:error.driver.could-not-load-http ${url}:url: ${response.status}:status:`,
 		);
 	}
 
@@ -109,7 +109,7 @@ function assertNotHtmlFallback(response: Response, url: string): void {
 	const contentType = response.headers.get("content-type") ?? "";
 	if (/^\s*text\/html/i.test(contentType)) {
 		throw new DriverError(
-			$localize`:@@error.driver.returned-an-html-page-instead:${url}:url: returned an HTML page instead of a file, which means it does not exist (the dev server's SPA fallback answers 200 for unknown paths). Check that it is present in the driver bundle.`,
+			$localize`:@@error.driver.returned-an-html-page-instead:error.driver.returned-an-html-page-instead ${url}:url:`,
 		);
 	}
 }
@@ -135,7 +135,7 @@ async function load(baseUrl: string, sampleGroup: string): Promise<DriverBundle>
 	const manifestResponse = await fetch(manifestUrl);
 	if (!manifestResponse.ok) {
 		throw new DriverError(
-			$localize`:@@error.driver.could-not-load-http-the:Could not load ${manifestUrl}:manifestUrl: (HTTP ${manifestResponse.status}:status:). The driver bundle lives in packages/spc/assets/driver/.`,
+			$localize`:@@error.driver.could-not-load-http-the:error.driver.could-not-load-http-the ${manifestUrl}:manifestUrl: ${manifestResponse.status}:status:`,
 		);
 	}
 
@@ -145,7 +145,7 @@ async function load(baseUrl: string, sampleGroup: string): Promise<DriverBundle>
 	const names = manifest.sampleGroups[sampleGroup];
 	if (!names) {
 		throw new DriverError(
-			$localize`:@@error.driver.sample-group-is-not-defined:Sample group "${sampleGroup}:sampleGroup:" is not defined in the manifest.`,
+			$localize`:@@error.driver.sample-group-is-not-defined:error.driver.sample-group-is-not-defined ${sampleGroup}:sampleGroup:`,
 		);
 	}
 
@@ -158,7 +158,7 @@ async function load(baseUrl: string, sampleGroup: string): Promise<DriverBundle>
 
 	if (spcBase.length < 0x100) {
 		throw new DriverError(
-			$localize`:@@error.driver.is-only-bytes-expected-at:${manifest.spcBase}:spcBase: is only ${spcBase.length}:length: bytes; expected at least 256.`,
+			$localize`:@@error.driver.is-only-bytes-expected-at:error.driver.is-only-bytes-expected-at ${manifest.spcBase}:spcBase: ${spcBase.length}:length:`,
 		);
 	}
 
@@ -169,7 +169,7 @@ async function load(baseUrl: string, sampleGroup: string): Promise<DriverBundle>
 	// back. `spctest` checks the addresses themselves against these bytes.
 	if (word(rawProgram, 0) !== rawProgram.length - UPLOAD_HEADER_BYTES) {
 		throw new DriverError(
-			$localize`:@@error.driver.does-not-begin-with-addmusicks:${manifest.driver}:driver: does not begin with AddmusicK's upload header, so it is not the final-pass build the manifest describes.`,
+			$localize`:@@error.driver.does-not-begin-with-addmusicks:error.driver.does-not-begin-with-addmusicks ${manifest.driver}:driver:`,
 		);
 	}
 

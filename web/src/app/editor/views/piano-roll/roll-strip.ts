@@ -460,7 +460,7 @@ function forbiddenConstruct(
   // (`parser.ts:3027`).
   for (const token of index.tokens) {
     if (token.kind === 'operator' && source.slice(token.start, token.end) === '&') {
-      return $localize`:@@roll.this-song-uses-whose-length:this song uses \`&\`, whose length comes from the note before it`;
+      return $localize`:@@roll.this-song-uses-whose-length:roll.this-song-uses-whose-length`;
     }
   }
 
@@ -476,15 +476,15 @@ function forbiddenConstruct(
     }
 
     if (command.replacement !== undefined || command.headReplacement !== undefined) {
-      return $localize`:@@roll.this-channel-is-written-through:this channel is written through a "name=value" replacement`;
+      return $localize`:@@roll.this-channel-is-written-through:roll.this-channel-is-written-through`;
     }
 
     if (FORBIDDEN_KINDS.has(command.kind)) {
-      return $localize`:@@roll.this-channel-uses-so-one:this channel uses \`${command.kind}:kind:\`, so one written note plays more than once`;
+      return $localize`:@@roll.this-channel-uses-so-one:roll.this-channel-uses-so-one ${command.kind}:kind:`;
     }
 
     if (command.noteLength?.some((segment) => segment.triplet)) {
-      return $localize`:@@roll.this-channel-has-notes-inside:this channel has notes inside \`{ }\`, whose lengths are two thirds of what they say`;
+      return $localize`:@@roll.this-channel-has-notes-inside:roll.this-channel-has-notes-inside`;
     }
   }
 
@@ -703,7 +703,7 @@ function movesTheStartingChannel(
 }
 
 /** The sentence every expansion mismatch refuses with — one reading, one voice. */
-const OUT_OF_ORDER = $localize`:@@roll.this-channel-does-not-play:this channel does not play in the order it is written`;
+const OUT_OF_ORDER = $localize`:@@roll.this-channel-does-not-play:roll.this-channel-does-not-play`;
 
 const runTotal = (run: LoopRun): number => run.passes.reduce((sum, pass) => sum + pass.ticks, 0);
 
@@ -758,7 +758,7 @@ function discoverLoops(
   // end stands before its start is the same shape seen from the subloop's side —
   // its mark inside a `[ ]` body lives in the loop block and its close out in
   // the channel, which the layout puts at a lower address.
-  const CROSSED = $localize`:@@roll.a-loop-and-a-subloop:a loop and a subloop cross on this channel, so it does not play in the order it is written`;
+  const CROSSED = $localize`:@@roll.a-loop-and-a-subloop:roll.a-loop-and-a-subloop`;
   for (const run of runs) {
     if (run.body.end < run.body.start) {
       return { refused: CROSSED };
@@ -825,7 +825,7 @@ function discoverLoops(
     );
     if (remote) {
       return {
-        refused: $localize`:@@roll.this-channel-replays-a-remote:this channel replays a remote code body, which the roll leaves alone`,
+        refused: $localize`:@@roll.this-channel-replays-a-remote:roll.this-channel-replays-a-remote`,
       };
     }
   }
@@ -906,7 +906,7 @@ function discoverLoops(
       const opening = mapped.get(seed.body.start - 2);
       if (!call || !opening) {
         return {
-          refused: $localize`:@@roll.the-roll-cannot-line-this:the roll cannot line this channel's brackets up with what plays`,
+          refused: $localize`:@@roll.the-roll-cannot-line-this:roll.the-roll-cannot-line-this`,
         };
       }
 
@@ -933,13 +933,13 @@ function discoverLoops(
     );
     if (!pair) {
       return {
-        refused: $localize`:@@roll.the-roll-cannot-line-this:the roll cannot line this channel's brackets up with what plays`,
+        refused: $localize`:@@roll.the-roll-cannot-line-this:roll.the-roll-cannot-line-this`,
       };
     }
 
     if (pair.open.inRemoteDefinition || pair.close.inRemoteDefinition) {
       return {
-        refused: $localize`:@@roll.this-channel-replays-a-remote:this channel replays a remote code body, which the roll leaves alone`,
+        refused: $localize`:@@roll.this-channel-replays-a-remote:roll.this-channel-replays-a-remote`,
       };
     }
 
@@ -974,7 +974,7 @@ function discoverLoops(
     );
     if (!pair) {
       return {
-        refused: $localize`:@@roll.the-roll-cannot-line-this:the roll cannot line this channel's brackets up with what plays`,
+        refused: $localize`:@@roll.the-roll-cannot-line-this:roll.the-roll-cannot-line-this`,
       };
     }
 
@@ -1002,8 +1002,8 @@ function discoverLoops(
       return {
         refused:
           command.args[0]?.value === 0
-            ? $localize`:@@roll.this-channel-opens-a-subloop:this channel opens a subloop ($E6 $00) that nothing closes`
-            : $localize`:@@roll.the-roll-cannot-line-this:the roll cannot line this channel's brackets up with what plays`,
+            ? $localize`:@@roll.this-channel-opens-a-subloop:roll.this-channel-opens-a-subloop`
+            : $localize`:@@roll.the-roll-cannot-line-this:roll.the-roll-cannot-line-this`,
       };
     }
 
@@ -1012,7 +1012,7 @@ function discoverLoops(
       !covered(command)
     ) {
       return {
-        refused: $localize`:@@roll.the-roll-cannot-line-this:the roll cannot line this channel's brackets up with what plays`,
+        refused: $localize`:@@roll.the-roll-cannot-line-this:roll.the-roll-cannot-line-this`,
       };
     }
   }
@@ -1033,13 +1033,13 @@ export function channelStrip(request: StripRequest): Strip | StripRefusal {
 
   if (timeline.truncated || timeline.problems.length > 0) {
     return {
-      refused: $localize`:@@roll.the-song-is-longer-than:the song is longer than the roll can read`,
+      refused: $localize`:@@roll.the-song-is-longer-than:roll.the-song-is-longer-than`,
     };
   }
 
   if (tempoRatio !== 1) {
     return {
-      refused: $localize`:@@roll.this-song-divides-its-tempo:this song divides its tempo, so a written length is not a tick count`,
+      refused: $localize`:@@roll.this-song-divides-its-tempo:roll.this-song-divides-its-tempo`,
     };
   }
 
@@ -1047,7 +1047,7 @@ export function channelStrip(request: StripRequest): Strip | StripRefusal {
   const home = channelHome(source, channel, markers);
   if (!home.declared && movesTheStartingChannel(source, channel, markers, noteMap)) {
     return {
-      refused: $localize`:@@roll.writing-this-channel-would-move:writing this channel would move the music written above the first \`#N\``,
+      refused: $localize`:@@roll.writing-this-channel-would-move:roll.writing-this-channel-would-move`,
     };
   }
 
@@ -1191,7 +1191,7 @@ export function channelStrip(request: StripRequest): Strip | StripRefusal {
       const pattern = tie ? TIE_TEXT : rest ? REST_TEXT : NOTE_TEXT;
       if (!pattern.test(text.replace(COMMENT, ''))) {
         return {
-          refused: $localize`:@@roll.is-not-a-note-the:\`${text}:text:\` is not a note the roll can rewrite`,
+          refused: $localize`:@@roll.is-not-a-note-the:roll.is-not-a-note-the ${text}:text:`,
         };
       }
 
@@ -1200,8 +1200,8 @@ export function channelStrip(request: StripRequest): Strip | StripRefusal {
         if (!held || held.kind === 'construct') {
           return {
             refused: held
-              ? $localize`:@@roll.this-channel-ties-a-note:this channel ties a note across a loop bracket`
-              : $localize`:@@roll.this-channel-opens-with-a:this channel opens with a tie`,
+              ? $localize`:@@roll.this-channel-ties-a-note:roll.this-channel-ties-a-note`
+              : $localize`:@@roll.this-channel-opens-with-a:roll.this-channel-opens-with-a`,
           };
         }
 
@@ -1218,7 +1218,7 @@ export function channelStrip(request: StripRequest): Strip | StripRefusal {
       const octave = rest ? null : octaveOfNote(entry.written, text);
       if (!rest && octave === null) {
         return {
-          refused: $localize`:@@roll.the-roll-cannot-read-the:the roll cannot read the octave \`${text}:text:\` was written at`,
+          refused: $localize`:@@roll.the-roll-cannot-read-the:roll.the-roll-cannot-read-the ${text}:text:`,
         };
       }
 
@@ -1512,7 +1512,7 @@ function expandAndJoin(
 
   const played = timeline.notes.filter((note) => note.channel === channel);
   if (played.length > predicted.length) {
-    return $localize`:@@roll.this-channel-plays-more-notes:this channel plays more notes than it has written`;
+    return $localize`:@@roll.this-channel-plays-more-notes:roll.this-channel-plays-more-notes`;
   }
 
   for (let at = 0; at < played.length; at++) {

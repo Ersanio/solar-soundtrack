@@ -9,9 +9,9 @@
   (click)="requests.revealSection.set('problems')"
 >
   <ng-container i18n="@@status.problems">{problemCount(), plural,
-    =0 {No problems}
-    =1 {1 problem}
-    other {{{ problemCount() // i18n(ph='count') }} problems}
+    =0 {status.problems}
+    =1 {status.problems}
+    other {status.problems {{ problemCount() // i18n(ph='count') }}}
   }</ng-container>
 </button>
 
@@ -20,11 +20,11 @@
   type="button"
   class="cursor-pointer font-mono tabular-nums hover:underline"
   i18n-title="@@status.free-aram-opens-the.title"
-  title="Free ARAM — opens the build details"
+  title="status.free-aram-opens-the.title"
   [class]="aramClass()"
   (click)="requests.revealSection.set('build')"
 >
-  ARAM
+  status.aram
   {{
     store.freeLabel() // i18n(ph='free')
   }}
@@ -38,14 +38,14 @@
   <span
     class="text-ink-muted font-mono tabular-nums"
     i18n-title="@@status.the-tempo-at-the.title"
-    title="The tempo at the playhead, and the ticks per second the driver manages there — 'x of y' when it cannot keep up with what the tempo asks"
+    title="status.the-tempo-at-the.title"
     >{{ label }}</span
   >
 }
 
 <div class="ml-auto flex items-center gap-3">
   <span i18n="@@status.in-active-development-back" class="text-ink-muted"
-    >In active development. Back up your work regularly.</span
+    >status.in-active-development-back</span
   >
 
   <a
@@ -54,7 +54,6 @@
     target="_blank"
     rel="noopener noreferrer"
     class="text-ink-muted hover:text-ink hover:underline"
+    >status.made-by</a
   >
-    Made by Ersanio
-  </a>
 </div>

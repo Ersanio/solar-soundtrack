@@ -3,14 +3,13 @@
   <span
     i18n="@@inspector.instrument-entry.inside-instruments-so-this"
     class="text-ink-muted text-[11px]"
-  >
-    inside <code>#instruments</code>, so this defines a sample rather than selecting an instrument
-  </span>
+    >inspector.instrument-entry.inside-instruments-so-this <code></code
+  ></span>
 </div>
 
 <amk-enum-select
   i18n-label="@@inspector.instrument-entry.sample.label"
-  label="Sample"
+  label="inspector.instrument-entry.sample.label"
   [value]="form()"
   [options]="SAMPLE_FORMS"
   (commit)="setForm($event)"
@@ -21,9 +20,9 @@
     @if (sampleOptions().length > 0) {
       <amk-enum-select
         i18n-label="@@inspector.instrument-entry.file.label"
-        label="File"
+        label="inspector.instrument-entry.file.label"
         i18n-note="@@inspector.instrument-entry.its-srcn-is-decided.note"
-        note="its SRCN is decided by the resolved #samples list"
+        note="inspector.instrument-entry.its-srcn-is-decided.note"
         [value]="currentSampleIndex()"
         [options]="sampleOptions()"
         [unknownLabel]="unknownSampleLabel()"
@@ -34,13 +33,11 @@
         i18n="@@inspector.instrument-entry.add-samples-to-the"
         class="text-ink-muted text-xs leading-relaxed"
       >
-        <code class="text-ink"
-          >"{{
-            sampleName()  // i18n(ph='sample')
-          }}"</code
-        >
-        — add samples to the song's <code class="text-ink">#samples</code> block to pick from a list
-        here.
+        inspector.instrument-entry.add-samples-to-the
+        <code class="text-ink">{{
+          sampleName() // i18n(ph='sample')
+        }}</code>
+        <code class="text-ink"></code>
       </p>
     }
   }
@@ -48,7 +45,7 @@
   @case (1) {
     <amk-slider
       i18n-label="@@inspector.instrument-entry.copies-the-sample-of.label"
-      label="Copies the sample of"
+      label="inspector.instrument-entry.copies-the-sample-of.label"
       [value]="copyFrom()"
       [max]="29"
       [valueLabel]="copyLabel()"
@@ -61,9 +58,9 @@
   @default {
     <amk-slider
       i18n-label="@@inspector.instrument-entry.noise-clock.label"
-      label="Noise clock"
+      label="inspector.instrument-entry.noise-clock.label"
       i18n-note="@@inspector.instrument-entry.the-high-bit-of.note"
-      note="the high bit of the sample byte is what marks it noise"
+      note="inspector.instrument-entry.the-high-bit-of.note"
       [value]="noiseClock()"
       [max]="31"
       [valueLabel]="noiseLabel()"
@@ -79,7 +76,7 @@
       i18n="@@inspector.instrument-entry.envelope"
       class="text-ink-muted mb-1 text-[11px] tracking-wide uppercase"
     >
-      Envelope
+      inspector.instrument-entry.envelope
     </div>
     <amk-envelope-tuner
       [value]="envelope()"
@@ -93,7 +90,7 @@
 @if (hasTuning()) {
   <amk-slider
     i18n-label="@@inspector.instrument-entry.tuning.label"
-    label="Tuning"
+    label="inspector.instrument-entry.tuning.label"
     [value]="tuningRaw()"
     [min]="0"
     [max]="65535"
@@ -110,7 +107,6 @@
     i18n="@@inspector.instrument-entry.this-entry-is-unfinished"
     class="text-warn text-xs leading-relaxed"
   >
-    This entry is unfinished. Each one needs a sample and five
-    <code class="text-ink">$xx</code> bytes.
+    inspector.instrument-entry.this-entry-is-unfinished <code class="text-ink"></code>
   </p>
 }

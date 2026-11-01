@@ -10,8 +10,8 @@
  *   npm run firtest
  */
 
-// First, so every module after it finds the global.
-import "@angular/localize/init";
+// First, so every module after it finds $localize and the English.
+import "./localize";
 import {
 	DSP_RATE,
 	FIR_AUTHORITY_HZ,

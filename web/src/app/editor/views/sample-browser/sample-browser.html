@@ -4,12 +4,12 @@
   <label
     class="border-edge bg-inset text-ink hover:border-control inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-md border px-3 text-sm transition-colors"
   >
-    <ng-container i18n="@@samples.add-samples">Add samples…</ng-container>
+    <ng-container i18n="@@samples.add-samples">samples.add-samples</ng-container>
     <input type="file" class="hidden" accept=".brr,.bnk" multiple (change)="onFiles($event)" />
   </label>
 
   <amk-checkbox i18n="@@samples.optimize-samples" class="text-xs" [(checked)]="library.optimize"
-    >Optimize samples</amk-checkbox
+    >samples.optimize-samples</amk-checkbox
   >
 
   @if (library.overrideCount() > 0) {
@@ -20,9 +20,10 @@
       size="sm"
       (click)="library.resetAll()"
     >
-      Reset all ({{
-        library.overrideCount()  // i18n(ph='count')
-      }})
+      samples.reset-all
+      {{
+        library.overrideCount() // i18n(ph='count')
+      }}
     </button>
   }
 
@@ -53,13 +54,8 @@
   i18n="@@samples.used-means-the-song"
   class="border-edge text-ink-muted shrink-0 border-t px-3 py-2 text-xs leading-relaxed"
 >
-  <strong class="text-good font-semibold">used</strong> means the song plays it, so it is loaded
-  whatever else is true. <strong class="text-ink font-semibold">keep</strong> holds a sample the
-  song includes but never plays, which
-  <strong class="text-ink font-semibold">Optimize samples</strong> would otherwise replace with an
-  empty one to free its ARAM — the bundled set arrives kept where AddmusicK marks it important.
-  <strong class="text-ink font-semibold">not in song</strong> costs nothing either way: name it in
-  <code class="text-ink font-mono">#samples</code> to load it. Bank slots are addressed by position,
-  with <code class="text-ink font-mono">$F3</code> or
-  <code class="text-ink font-mono">&#64;n</code>.
+  samples.used-means-the-song <strong class="text-good font-semibold"></strong>
+  <strong class="text-ink font-semibold"></strong> <strong class="text-ink font-semibold"></strong>
+  <strong class="text-ink font-semibold"></strong> <code class="text-ink font-mono"></code>
+  <code class="text-ink font-mono"></code> <code class="text-ink font-mono"></code>
 </p>

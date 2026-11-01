@@ -45,30 +45,30 @@ export function ticksPerSecond(tempo: number): number {
 
 /** The caveat is the driver's, not one spelling's: `t` compiles to `$E2` and `t,` to `$E3`. */
 export function tempoLabel(tempo: number): string {
-	return $localize`:@@command.unit.tempo:about ${bpm(tempo).toFixed(1)}:bpm: BPM · ${ticksPerSecond(tempo).toFixed(1)}:rate: ticks per second — estimated; the driver drops ticks when it is busy`;
+	return $localize`:@@command.unit.tempo:command.unit.tempo ${bpm(tempo).toFixed(1)}:bpm: ${ticksPerSecond(tempo).toFixed(1)}:rate:`;
 }
 
 /** * Every tick count the readme's "Length" table names, and the five dotted ones. */
 const NOTE_LENGTHS: Readonly<Record<number, string>> = {
-	192: $localize`:@@command.unit.a-whole-note:a whole note`,
-	144: $localize`:@@command.unit.a-dotted-half-note:a dotted half note`,
-	128: $localize`:@@command.unit.a-whole-triplet:a whole triplet`,
-	96: $localize`:@@command.unit.a-half-note:a half note`,
-	72: $localize`:@@command.unit.a-dotted-quarter-note:a dotted quarter note`,
-	64: $localize`:@@command.unit.a-half-triplet:a half triplet`,
-	48: $localize`:@@command.unit.a-quarter-note:a quarter note`,
-	36: $localize`:@@command.unit.a-dotted-eighth-note:a dotted eighth note`,
-	32: $localize`:@@command.unit.a-quarter-triplet:a quarter triplet`,
-	24: $localize`:@@command.unit.an-eighth-note:an eighth note`,
-	18: $localize`:@@command.unit.a-dotted-16th-note:a dotted 16th note`,
-	16: $localize`:@@command.unit.an-eighth-triplet:an eighth triplet`,
-	12: $localize`:@@command.unit.a-16th-note:a 16th note`,
-	9: $localize`:@@command.unit.a-dotted-32nd-note:a dotted 32nd note`,
-	8: $localize`:@@command.unit.a-16th-triplet:a 16th triplet`,
-	6: $localize`:@@command.unit.a-32nd-note:a 32nd note`,
-	4: $localize`:@@command.unit.a-32nd-triplet:a 32nd triplet`,
-	3: $localize`:@@command.unit.a-64th-note:a 64th note`,
-	2: $localize`:@@command.unit.a-64th-triplet:a 64th triplet`,
+	192: $localize`:@@command.unit.a-whole-note:command.unit.a-whole-note`,
+	144: $localize`:@@command.unit.a-dotted-half-note:command.unit.a-dotted-half-note`,
+	128: $localize`:@@command.unit.a-whole-triplet:command.unit.a-whole-triplet`,
+	96: $localize`:@@command.unit.a-half-note:command.unit.a-half-note`,
+	72: $localize`:@@command.unit.a-dotted-quarter-note:command.unit.a-dotted-quarter-note`,
+	64: $localize`:@@command.unit.a-half-triplet:command.unit.a-half-triplet`,
+	48: $localize`:@@command.unit.a-quarter-note:command.unit.a-quarter-note`,
+	36: $localize`:@@command.unit.a-dotted-eighth-note:command.unit.a-dotted-eighth-note`,
+	32: $localize`:@@command.unit.a-quarter-triplet:command.unit.a-quarter-triplet`,
+	24: $localize`:@@command.unit.an-eighth-note:command.unit.an-eighth-note`,
+	18: $localize`:@@command.unit.a-dotted-16th-note:command.unit.a-dotted-16th-note`,
+	16: $localize`:@@command.unit.an-eighth-triplet:command.unit.an-eighth-triplet`,
+	12: $localize`:@@command.unit.a-16th-note:command.unit.a-16th-note`,
+	9: $localize`:@@command.unit.a-dotted-32nd-note:command.unit.a-dotted-32nd-note`,
+	8: $localize`:@@command.unit.a-16th-triplet:command.unit.a-16th-triplet`,
+	6: $localize`:@@command.unit.a-32nd-note:command.unit.a-32nd-note`,
+	4: $localize`:@@command.unit.a-32nd-triplet:command.unit.a-32nd-triplet`,
+	3: $localize`:@@command.unit.a-64th-note:command.unit.a-64th-note`,
+	2: $localize`:@@command.unit.a-64th-triplet:command.unit.a-64th-triplet`,
 };
 
 /** The note length a tick count is exactly, or `null` for one that falls between. */
@@ -87,19 +87,21 @@ export const DEFAULT_TEMPO = 0x36 - 1;
 
 /** A tempo in a readout, marked where it is {@link DEFAULT_TEMPO} and not the song's. */
 function tempoName(tempo: number | null): string {
-	return tempo === null ? $localize`:@@command.unit.default-tempo:the default t${DEFAULT_TEMPO}:tempo:` : `t${tempo}`;
+	return tempo === null
+		? $localize`:@@command.unit.default-tempo:command.unit.default-tempo ${DEFAULT_TEMPO}:tempo:`
+		: `t${tempo}`;
 }
 
 /** "1 tick" or "N ticks". */
 export function tickCount(ticks: number): string {
 	return ticks === 1
-		? $localize`:@@command.unit.ticks.one:1 tick`
-		: $localize`:@@command.unit.ticks.other:${ticks}:ticks: ticks`;
+		? $localize`:@@command.unit.ticks.one:command.unit.ticks.one`
+		: $localize`:@@command.unit.ticks.other:command.unit.ticks.other ${ticks}:ticks:`;
 }
 
 /** A duration in seconds at a tempo, e.g. "0.50 s at t120". */
 function secondsAt(seconds: number, tempo: string): string {
-	return $localize`:@@command.unit.seconds-at:${seconds.toFixed(2)}:seconds: s at ${tempo}:tempo:`;
+	return $localize`:@@command.unit.seconds-at:command.unit.seconds-at ${seconds.toFixed(2)}:seconds: ${tempo}:tempo:`;
 }
 
 /** The tick count and the note length it comes to — true whatever the tempo is. */
@@ -197,7 +199,7 @@ export function tempoFadeLabel(ticks: number, from: number | null, to: number | 
 	const seconds = to === null ? null : tempoFadeSeconds(ticks, from ?? DEFAULT_TEMPO, to);
 	if (seconds !== null) {
 		parts.push(
-			$localize`:@@command.unit.seconds-fade:${seconds.toFixed(2)}:seconds: s, ${tempoName(from)}:from: → t${to}:to:`,
+			$localize`:@@command.unit.seconds-fade:command.unit.seconds-fade ${seconds.toFixed(2)}:seconds: ${tempoName(from)}:from: ${to}:to:`,
 		);
 	}
 
@@ -219,23 +221,23 @@ export function noteName(byte: number): string {
 /** The eleven intervals inside an octave, by semitone. */
 const INTERVALS = [
 	"", // Unused; Unison
-	$localize`:@@command.unit.minor-2nd:minor 2nd`,
-	$localize`:@@command.unit.major-2nd:major 2nd`,
-	$localize`:@@command.unit.minor-3rd:minor 3rd`,
-	$localize`:@@command.unit.major-3rd:major 3rd`,
-	$localize`:@@command.unit.perfect-4th:perfect 4th`,
-	$localize`:@@command.unit.tritone:tritone`,
-	$localize`:@@command.unit.perfect-5th:perfect 5th`,
-	$localize`:@@command.unit.minor-6th:minor 6th`,
-	$localize`:@@command.unit.major-6th:major 6th`,
-	$localize`:@@command.unit.minor-7th:minor 7th`,
-	$localize`:@@command.unit.major-7th:major 7th`,
+	$localize`:@@command.unit.minor-2nd:command.unit.minor-2nd`,
+	$localize`:@@command.unit.major-2nd:command.unit.major-2nd`,
+	$localize`:@@command.unit.minor-3rd:command.unit.minor-3rd`,
+	$localize`:@@command.unit.major-3rd:command.unit.major-3rd`,
+	$localize`:@@command.unit.perfect-4th:command.unit.perfect-4th`,
+	$localize`:@@command.unit.tritone:command.unit.tritone`,
+	$localize`:@@command.unit.perfect-5th:command.unit.perfect-5th`,
+	$localize`:@@command.unit.minor-6th:command.unit.minor-6th`,
+	$localize`:@@command.unit.major-6th:command.unit.major-6th`,
+	$localize`:@@command.unit.minor-7th:command.unit.minor-7th`,
+	$localize`:@@command.unit.major-7th:command.unit.major-7th`,
 ];
 
 /** A signed semitone count as the interval it is. */
 export function intervalName(semitones: number): string {
 	if (semitones === 0) {
-		return $localize`:@@command.unit.interval.unison:unison`;
+		return $localize`:@@command.unit.interval.unison:command.unit.interval.unison`;
 	}
 
 	const up = semitones > 0;
@@ -245,31 +247,31 @@ export function intervalName(semitones: number): string {
 
 	if (octaves === 0) {
 		return up
-			? $localize`:@@command.unit.interval.higher:a ${interval}:interval: higher`
-			: $localize`:@@command.unit.interval.lower:a ${interval}:interval: lower`;
+			? $localize`:@@command.unit.interval.higher:command.unit.interval.higher ${interval}:interval:`
+			: $localize`:@@command.unit.interval.lower:command.unit.interval.lower ${interval}:interval:`;
 	}
 
 	if (interval === "") {
 		if (octaves === 1) {
 			return up
-				? $localize`:@@command.unit.interval.octave-higher:an octave higher`
-				: $localize`:@@command.unit.interval.octave-lower:an octave lower`;
+				? $localize`:@@command.unit.interval.octave-higher:command.unit.interval.octave-higher`
+				: $localize`:@@command.unit.interval.octave-lower:command.unit.interval.octave-lower`;
 		}
 
 		return up
-			? $localize`:@@command.unit.interval.octaves-higher:${octaves}:octaves: octaves higher`
-			: $localize`:@@command.unit.interval.octaves-lower:${octaves}:octaves: octaves lower`;
+			? $localize`:@@command.unit.interval.octaves-higher:command.unit.interval.octaves-higher ${octaves}:octaves:`
+			: $localize`:@@command.unit.interval.octaves-lower:command.unit.interval.octaves-lower ${octaves}:octaves:`;
 	}
 
 	if (octaves === 1) {
 		return up
-			? $localize`:@@command.unit.interval.octave-and-higher:an octave and a ${interval}:interval: higher`
-			: $localize`:@@command.unit.interval.octave-and-lower:an octave and a ${interval}:interval: lower`;
+			? $localize`:@@command.unit.interval.octave-and-higher:command.unit.interval.octave-and-higher ${interval}:interval:`
+			: $localize`:@@command.unit.interval.octave-and-lower:command.unit.interval.octave-and-lower ${interval}:interval:`;
 	}
 
 	return up
-		? $localize`:@@command.unit.interval.octaves-and-higher:${octaves}:octaves: octaves and a ${interval}:interval: higher`
-		: $localize`:@@command.unit.interval.octaves-and-lower:${octaves}:octaves: octaves and a ${interval}:interval: lower`;
+		? $localize`:@@command.unit.interval.octaves-and-higher:command.unit.interval.octaves-and-higher ${octaves}:octaves: ${interval}:interval:`
+		: $localize`:@@command.unit.interval.octaves-and-lower:command.unit.interval.octaves-and-lower ${octaves}:octaves: ${interval}:interval:`;
 }
 
 /** The same, with the number in front e.g. `+4 — a major 3rd higher`. */
@@ -284,15 +286,15 @@ export function intervalLabel(semitones: number): string {
 /** AddmusicK's pan, which runs 0 (hard right) to 20 (hard left) with 10 centre. */
 export function panLabel(value: number): string {
 	if (value === 10) {
-		return $localize`:@@command.unit.pan.centre:centre`;
+		return $localize`:@@command.unit.pan.centre:command.unit.pan.centre`;
 	}
 
 	return value < 10
-		? $localize`:@@command.unit.pan.right:right ${10 - value}:amount:/10`
-		: $localize`:@@command.unit.pan.left:left ${value - 10}:amount:/10`;
+		? $localize`:@@command.unit.pan.right:command.unit.pan.right ${10 - value}:amount:`
+		: $localize`:@@command.unit.pan.left:command.unit.pan.left ${value - 10}:amount:`;
 }
 
 /** % of the byte range of 0-255. */
 export function percentOf255(value: number): string {
-	return $localize`:@@command.unit.percent-of-full:${Math.round((value / 255) * 100)}:percent:% of full`;
+	return $localize`:@@command.unit.percent-of-full:command.unit.percent-of-full ${Math.round((value / 255) * 100)}:percent:`;
 }
