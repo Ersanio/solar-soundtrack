@@ -83,10 +83,10 @@
   @switch (current) {
     @case ('presets') {
       <div class="flex flex-wrap gap-1.5">
-        @for (preset of FIR_PRESETS; track preset.name) {
+        @for (preset of FIR_PRESETS; track preset.id) {
           <button
             amk-button
-            [variant]="activePreset()?.name === preset.name ? 'primary' : 'default'"
+            [variant]="activePreset()?.id === preset.id ? 'primary' : 'default'"
             [title]="preset.note"
             (click)="applyPreset(preset.taps)"
           >

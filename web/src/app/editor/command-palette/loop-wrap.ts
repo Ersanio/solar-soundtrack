@@ -118,7 +118,7 @@ export function wrapVerdict(request: WrapRequest): WrapVerdict {
   // and sounds nothing, so it is no part of what a porter picked out.
   const bends = index.commands.filter((command) => command.vcmd === 0xdd);
   const sounds = (command: Command): boolean =>
-    (command.name === 'note' || command.name === 'rest') &&
+    command.noteLength !== undefined &&
     !bends.some(
       (bend) => command.span.start >= bend.span.start && command.span.end <= bend.span.end,
     );

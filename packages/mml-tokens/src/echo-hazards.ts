@@ -25,7 +25,7 @@ export function builtInTaps(which: number): FirTaps | null {
 		return null;
 	}
 
-	return FIR_PRESETS.find((preset) => preset.name === (which === 0 ? "Classic" : "Flat"))?.taps ?? null;
+	return FIR_PRESETS.find((preset) => preset.id === (which === 0 ? "classic" : "flat"))?.taps ?? null;
 }
 
 /**

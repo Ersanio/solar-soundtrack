@@ -1400,7 +1400,7 @@ export interface Command {
 	 */
 	target: CommandTarget;
 	/**
-	 * For a note or rest (`name` is `"note"`/`"rest"`): every length segment in
+	 * For a note or rest, and nothing else: every length segment in
 	 * source order. `undefined` for every other command.
 	 *
 	 * Repeated bare `r`s are not folded together the way `accumulateTiedLength`

@@ -596,6 +596,8 @@ export function designTone({ tone, strength = 1 }: ToneOptions): number[] {
 const FLAT_TAPS: readonly number[] = [0x7f, 0, 0, 0, 0, 0, 0, 0];
 
 export interface FirPreset {
+	/** Stable across wording changes; match on this, never on {@link name}. */
+	id: string;
 	name: string;
 	/** What it does, in the terms a music porter would use. */
 	note: string;
@@ -613,32 +615,38 @@ export interface FirPreset {
  */
 export const FIR_PRESETS: readonly FirPreset[] = [
 	{
+		id: "flat",
 		name: "Flat",
 		note: "Echo comes back unchanged. AddmusicK's filter 1.",
 		taps: [...FLAT_TAPS],
 	},
 	{
+		id: "classic",
 		name: "Classic",
 		note: "Super Mario World's echo. AddmusicK's filter 0.",
 		// EchoFilter0, main.asm:3507 — $FF and $08 read as −1 and 8.
 		taps: [-1, 0x08, 0x17, 0x24, 0x24, 0x17, 0x08, -1],
 	},
 	{
+		id: "warm",
 		name: "Warm",
 		note: "Takes the edge off without muffling anything.",
 		taps: designTone({ tone: -0.45 }),
 	},
 	{
+		id: "dark",
 		name: "Dark",
 		note: "Echo sits well behind the music. Good for big spaces.",
 		taps: designTone({ tone: -1 }),
 	},
 	{
+		id: "bright",
 		name: "Bright",
 		note: "Echo keeps its top end and stays present.",
 		taps: designTone({ tone: 0.6 }),
 	},
 	{
+		id: "telephone",
 		name: "Telephone",
 		note: "Midrange only — thin and distant.",
 		taps: fitToTarget([
@@ -650,6 +658,7 @@ export const FIR_PRESETS: readonly FirPreset[] = [
 		]),
 	},
 	{
+		id: "boomy",
 		name: "Boomy",
 		note: "Keeps the low end, drops everything above it.",
 		taps: fitToTarget([

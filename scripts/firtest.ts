@@ -170,7 +170,7 @@ console.log("\nintermediate overflow — bsnes SPC_DSP.cpp:668-678");
 
 	// Nothing designed here should be anywhere near the bound.
 	for (const preset of FIR_PRESETS) {
-		if (preset.name === "Classic") {
+		if (preset.id === "classic") {
 			continue;
 		}
 
@@ -317,16 +317,16 @@ console.log("\npresets");
 	}
 
 	// The two that must be exact, because they are AddmusicK's own.
-	const flat = FIR_PRESETS.find((p) => p.name === "Flat");
+	const flat = FIR_PRESETS.find((p) => p.id === "flat");
 	check("Flat is EchoFilter1 verbatim", JSON.stringify(flat?.taps) === JSON.stringify(FLAT), flat?.taps.join(", "));
-	const classic = FIR_PRESETS.find((p) => p.name === "Classic");
+	const classic = FIR_PRESETS.find((p) => p.id === "classic");
 	check(
 		"Classic is EchoFilter0 verbatim",
 		JSON.stringify(classic?.taps) === JSON.stringify(CLASSIC),
 		classic?.taps.join(", "),
 	);
 
-	check("a preset recognises itself", matchPreset(CLASSIC)?.name === "Classic");
+	check("a preset recognises itself", matchPreset(CLASSIC)?.id === "classic");
 	check("an unrelated filter matches nothing", matchPreset([1, 2, 3, 4, 5, 6, 7, 8]) === null);
 
 	// No preset should quietly ship an echo that blows up at ordinary feedback.
