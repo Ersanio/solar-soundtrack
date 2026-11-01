@@ -69,7 +69,7 @@ function noteLengthLine(segments: readonly NoteLengthSegment[]): string {
   }
 
   const total = segments.reduce((sum, segment) => sum + segment.ticks, 0);
-  const joined = segments.map(segmentLabel).join($localize`:@@source.hover.tied-to: tied to `);
+  const joined = segments.map(segmentLabel).join(` ${$localize`:@@source.hover.tied-to:tied to`} `);
   return $localize`:@@source.hover.ticks-total:${joined}:segments: — ${total}:total: ticks total`;
 }
 
@@ -80,9 +80,11 @@ function renderCommand(command: Command): HTMLElement {
   const label = command.vcmd !== undefined ? `$${hex2(command.vcmd)}` : command.kind;
   const via =
     command.replacement !== undefined
-      ? $localize`:@@source.hover.via: via ${command.replacement}:replacement:`
+      ? $localize`:@@source.hover.via:via ${command.replacement}:replacement:`
       : '';
-  dom.appendChild(line('cm-amk-hover-name', `${label} ${command.name}${via}`));
+  dom.appendChild(
+    line('cm-amk-hover-name', [label, command.name, via].filter((part) => part !== '').join(' ')),
+  );
 
   if (command.noteLength) {
     dom.appendChild(line('cm-amk-hover-args', noteLengthLine(command.noteLength)));

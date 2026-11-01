@@ -46,13 +46,13 @@ function chipTitle(
   const edit = on
     ? $localize`:@@roll.stop-editing-channel:Stop editing channel ${channel}:channel:`
     : $localize`:@@roll.edit-channel:Edit channel ${channel}:channel:`;
-  const heard = quiet ? $localize`:@@roll.not-being-heard: — not being heard` : '';
+  const heard = quiet ? $localize`:@@roll.not-being-heard:not being heard` : '';
   const solo = !song
     ? ''
     : soloed
-      ? $localize`:@@roll.ctrl-click-to-stop-soloing: — Ctrl+click to stop soloing`
-      : $localize`:@@roll.ctrl-click-to-solo: — Ctrl+click to solo`;
-  return `${edit}${heard}${solo}`;
+      ? $localize`:@@roll.ctrl-click-to-stop-soloing:Ctrl+click to stop soloing`
+      : $localize`:@@roll.ctrl-click-to-solo:Ctrl+click to solo`;
+  return [edit, heard, solo].filter((part) => part !== '').join(' — ');
 }
 
 /**
