@@ -13,6 +13,8 @@
  *   npm run charttest
  */
 
+// First, so every module after it finds the global.
+import "@angular/localize/init";
 import { KEY_COUNT, type LoopRun, type SongTimeline, type TempoChange, type WalkNote } from "@amk/spc/song-walk";
 import { type Command, tokenize } from "@amk/tokens";
 import type { TimelineCommand } from "../web/src/app/state/command-timeline";

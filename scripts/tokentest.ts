@@ -12,6 +12,8 @@
  *   npm run tokentest
  */
 
+// First, so every module after it finds the global.
+import "@angular/localize/init";
 import { Tag, tags } from "@lezer/highlight";
 
 import {

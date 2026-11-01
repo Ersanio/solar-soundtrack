@@ -30,6 +30,8 @@
  *      ticks, not the 72 of `c4.`.
  */
 
+// First, so every module after it finds the global.
+import "@angular/localize/init";
 import {
 	argEditable,
 	argsRewritable,

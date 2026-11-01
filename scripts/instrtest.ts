@@ -16,6 +16,8 @@
  *   npm run instrtest
  */
 
+// First, so every module after it finds the global.
+import "@angular/localize/init";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 

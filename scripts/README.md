@@ -51,11 +51,17 @@ file surfaces as "invalid BRR length 2205" rather than a 404:
 
 A harness that threw on a missing file instead would pass while the browser failed.
 
+Every harness imports `@angular/localize/init` before anything else. The packages and the app code
+they reach write their text as `$localize` messages (`docs/claude/i18n.md`), and that global is
+what the page loads as a polyfill; imported first, it is defined before any module-level message
+is built. With no translation loaded it returns the source text, so an assertion on a message's
+words still reads the English.
+
 ## What none of them cover
 
-**Angular templates.** Neither these nor `npm run typecheck` run the template compiler, so a bad
-binding (`viewBox=` instead of `[attr.viewBox]=`) passes `npm run check` and fails only at
-`npm run build` / `npm start`. Run one of those before believing a UI change.
+**Angular templates.** Neither these nor `npm run typecheck` run the template compiler. The last
+step of `npm run check` does — `i18n:check` builds the app to extract its messages, so a bad
+binding (`viewBox=` instead of `[attr.viewBox]=`) fails there — but nothing here renders one.
 
 ## Establishing fidelity
 

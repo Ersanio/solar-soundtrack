@@ -8,6 +8,8 @@
  *   npm run selftest
  */
 
+// First, so every module after it finds the global.
+import "@angular/localize/init";
 import { compiler } from "@amk/compiler";
 import type { CompileResult } from "@amk/core/types";
 

@@ -5,8 +5,8 @@ Read before changing the pre-hooks, `eslint.config.js`, `.prettierrc`, CI or dep
 ## Automatic pre-hooks
 
 Never invoke these by hand. `prestart` / `prebuild` / `prewatch` in `web/package.json` run the first
-two and the third; `pretypecheck` there and `prelint` at the root run `generate-git-info` alone,
-which is all either needs:
+two and the third; `pretypecheck` and `preextract-i18n` there and `prelint` at the root run
+`generate-git-info` alone, which is all those need:
 
 - **`build:worklet`** — `@amk/spc`'s own build; esbuild bundles `worklet.ts` into
   `assets/player/spc-worklet.js` (generated, gitignored). An AudioWorklet is loaded by URL from the
@@ -17,6 +17,19 @@ which is all either needs:
 - **`generate-git-info`** — writes `web/src/app/git-info.generated.ts` for the top bar's commit link
   (generated, gitignored). Captured once at startup, so it goes stale if you commit while
   `npm start` is running; restart to refresh.
+
+## The i18n catalog
+
+`npm run i18n` runs `ng extract-i18n` (an AOT build of the app, JSON format, raw output in the
+gitignored `.selftest/i18n/`) and then `scripts/i18n-catalog.mjs write`, which checks every ID,
+sorts the messages by ID so each group sits together, puts each on one line and formats the result
+through Prettier into `web/src/locale/messages.json`. `npm run i18n:check`, the last step of
+`npm run check`, does the same and fails instead of writing when the committed file differs, listing
+the IDs. Extraction itself fails on one ID carrying two different texts
+(`i18nDuplicateTranslation: "error"` in `angular.json`).
+
+JSON rather than XLIFF or ARB because those record each message's file and line, so every edit
+anywhere would churn the catalog.
 
 ## Formatting
 

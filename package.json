@@ -16,6 +16,8 @@
     "sync-spc-assets": "node scripts/sync-spc-assets.mjs",
     "prepare:assets": "npm run build:worklet && npm run sync-spc-assets",
     "generate-git-info": "node scripts/generate-git-info.mjs",
+    "i18n": "npm run extract-i18n -w web && node scripts/i18n-catalog.mjs write",
+    "i18n:check": "npm run extract-i18n -w web && node scripts/i18n-catalog.mjs check",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "prelint": "npm run generate-git-info",
@@ -44,7 +46,7 @@
     "check:integration": "npm run spctest && npm run audiotest && npm run worklettest && npm run walktest",
     "rolltest": "esbuild scripts/rolltest.ts --bundle --platform=node --format=esm --outfile=.selftest/rolltest.mjs --log-level=warning && node .selftest/rolltest.mjs",
     "check:app": "npm run charttest && npm run rolltest",
-    "check": "npm run format:check && npm run typecheck && npm run typecheck:packages && npm run typecheck:scripts && npm run check:compiler && npm run check:tokens && npm run check:spc && npm run check:integration && npm run check:app"
+    "check": "npm run format:check && npm run typecheck && npm run typecheck:packages && npm run typecheck:scripts && npm run check:compiler && npm run check:tokens && npm run check:spc && npm run check:integration && npm run check:app && npm run i18n:check"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

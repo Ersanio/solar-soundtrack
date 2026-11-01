@@ -42,20 +42,21 @@ AddmusicK release if they are missing.
 
 Node 24 is what CI uses. CI runs `npm run lint` then `npm run check`.
 
-| Command             | What it does                                                          |
-| ------------------- | --------------------------------------------------------------------- |
-| `npm start`         | Dev server on `http://localhost:4200/`.                               |
-| `npm run build`     | Production build into `web/dist/`.                                    |
-| `npm run watch`     | Dev-configuration build with `--watch`, no server.                    |
-| `npm run lint`      | ESLint over every workspace.                                          |
-| `npm run format`    | Prettier over the workspace.                                          |
-| `npm run typecheck` | The app. `:packages` and `:scripts` cover the rest.                   |
-| `npm run check`     | The merge gate: formatting, three typechecks, all fourteen harnesses. |
+| Command             | What it does                                                                       |
+| ------------------- | ---------------------------------------------------------------------------------- |
+| `npm start`         | Dev server on `http://localhost:4200/`.                                            |
+| `npm run build`     | Production build into `web/dist/`.                                                 |
+| `npm run watch`     | Dev-configuration build with `--watch`, no server.                                 |
+| `npm run lint`      | ESLint over every workspace.                                                       |
+| `npm run format`    | Prettier over the workspace.                                                       |
+| `npm run typecheck` | The app. `:packages` and `:scripts` cover the rest.                                |
+| `npm run i18n`      | Regenerates `web/src/locale/messages.json`, the catalog of every user-facing text. |
+| `npm run check`     | The merge gate: formatting, three typechecks, all fourteen harnesses, the catalog. |
 
-`npm run check` does **not** compile Angular templates, and neither does `npm run typecheck` — `tsc`
-does not run the template compiler, so a bad binding (`viewBox=` instead of `[attr.viewBox]=`)
-passes `check` and fails only at `npm run build` / `npm start`. Run one of those before believing a
-UI change.
+`npm run typecheck` does **not** compile Angular templates — `tsc` does not run the template
+compiler, so a bad binding (`viewBox=` instead of `[attr.viewBox]=`) passes it. `npm run check`
+does, last: `i18n:check` builds the app to extract its messages. Run `check`, `npm run build` or
+`npm start` before believing a UI change.
 
 ### Automatic pre-hooks
 
@@ -181,6 +182,7 @@ of the area it belongs to, in the same change; if no file fits, add one and list
 | `commands-in-the-roll.md`  | command glyphs on bars, the command lane, `commands-in-force.ts`, `command-timeline.ts`, `song-walk.ts`'s slots                                      |
 | `inspector-and-palette.md` | the command inspector, a note's Length row, the instrument picker, the command palette, the `$DD` and `q` readouts, the bend graph, the FIR designer |
 | `compiler.md`              | `packages/mml-compiler`, the `@amk/tokens` scanner, diagnostics                                                                                      |
+| `i18n.md`                  | any text a porter reads: templates, `$localize`, the AMK/SST catalogs, command names and descriptions, `web/src/locale/messages.json`                |
 | `ui-and-theme.md`          | `styles.css` colours, `ThemeStore` and presets, the panes, sidebar, tabs and shared controls                                                         |
 | `tooling.md`               | the pre-hooks, `eslint.config.js`, `.prettierrc`, CI and deployment                                                                                  |
 

@@ -117,6 +117,9 @@ module.exports = defineConfig([
   //   compiler → core
   //   spc      → core
   //   tokens   → core, and two modules of spc
+  //
+  // `$localize` is no exception: it is a global the host provides, not an
+  // import, so a package's messages need nothing from Angular.
   {
     files: ['packages/core/**/*.ts'],
     rules: forbid(

@@ -14,6 +14,9 @@
       "root": "",
       "sourceRoot": "src",
       "prefix": "amk",
+      "i18n": {
+        "sourceLocale": "en-US"
+      },
       "architect": {
         "build": {
           "builder": "@angular/build:application",
@@ -21,7 +24,8 @@
             "browser": "src/main.ts",
             "tsConfig": "tsconfig.app.json",
             "assets": [{ "glob": "**/*", "input": "public" }],
-            "styles": ["src/styles.css"]
+            "styles": ["src/styles.css"],
+            "polyfills": ["@angular/localize/init"]
           },
           "configurations": {
             "production": {
@@ -59,6 +63,15 @@
             }
           },
           "defaultConfiguration": "development"
+        },
+        "extract-i18n": {
+          "builder": "@angular/build:extract-i18n",
+          "options": {
+            "buildTarget": "solar-soundtrack:build",
+            "format": "json",
+            "outputPath": "../.selftest/i18n",
+            "i18nDuplicateTranslation": "error"
+          }
         }
       }
     }
