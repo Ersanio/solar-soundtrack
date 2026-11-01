@@ -9,7 +9,8 @@ partial UI stays populated. **The prefix says whose finding it is, not which fil
 `AMK####` is a condition AddmusicK itself reports, ported from `AddmusicKsrc/` with the `Music.cpp`
 line cited; `SST####` is one `Music.cpp` does not produce at all, so a porter is never told
 AddmusicK objects to something it has no opinion about. The echo hazards, the unreachable-channel
-warning, the tempo shortfall, the `#path` notice, the runaway-replacement guard, the three
+warning, the tempo shortfall, a tempo that carries over into the song's repeat (`SST0510`), a fine
+tune or a tremolo that carries over into a channel's repeat (`SST0511`, `SST0512`), the `#path` notice, the runaway-replacement guard, the three
 command hazards — `$F7`'s dead dispatch slot, a `$DD` no note's read-ahead can reach, and `#am4`'s
 silent `$E4` offset — and a remote call that points at no body (`SST0509`) are `SST05xx`, which is
 also where a finding goes when the reference does not

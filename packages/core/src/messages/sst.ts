@@ -28,4 +28,13 @@ export const SST = {
 	"0508": () => $localize`:@@sst.0508:sst.0508`,
 	"0509": (label: number) => $localize`:@@sst.0509:sst.0509 ${label}:label:`,
 	"0509.zero": () => $localize`:@@sst.0509.zero:sst.0509.zero`,
+	"0510": (first: string, repeat: string) => $localize`:@@sst.0510:sst.0510 ${first}:first: ${repeat}:repeat:`,
+	"0511": (channel: number, first: string, repeat: string) =>
+		$localize`:@@sst.0511:sst.0511 ${channel}:channel: ${first}:first: ${repeat}:repeat:`,
+	"0512": (channel: number, first: string, repeat: string) =>
+		$localize`:@@sst.0512:sst.0512 ${channel}:channel: ${first}:first: ${repeat}:repeat:`,
+	"0512.on": (channel: number, repeat: string) =>
+		$localize`:@@sst.0512.on:sst.0512.on ${channel}:channel: ${repeat}:repeat:`,
+	"0512.off": (channel: number, first: string) =>
+		$localize`:@@sst.0512.off:sst.0512.off ${channel}:channel: ${first}:first:`,
 };

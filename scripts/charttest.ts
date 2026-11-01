@@ -1660,6 +1660,8 @@ console.log("\nthe transport's clock, over songs the compiler will not time");
 		ticks,
 		loopTick: null,
 		tempoChanges,
+		tempoAtEnd: null,
+		loopSettings: [],
 		commands: [],
 		loops: [],
 		channelTicks: [ticks, 0, 0, 0, 0, 0, 0, 0],
@@ -1671,8 +1673,14 @@ console.log("\nthe transport's clock, over songs the compiler will not time");
 		problems: [],
 	});
 
-	const at = (tempo: number, tick = 0): TempoChange => ({ tick, tempo, fadeTicks: 0 });
-	const fade = (tick: number, tempo: number, fadeTicks: number): TempoChange => ({ tick, tempo, fadeTicks });
+	const at = (tempo: number, tick = 0): TempoChange => ({ tick, tempo, fadeTicks: 0, address: 0, repeats: false });
+	const fade = (tick: number, tempo: number, fadeTicks: number): TempoChange => ({
+		tick,
+		tempo,
+		fadeTicks,
+		address: 0,
+		repeats: false,
+	});
 	const near = (got: number, want: number) => Math.abs(got - want) < 1e-9;
 
 	// A song with no `t` is not a song with no tempo — main.asm:177 has already

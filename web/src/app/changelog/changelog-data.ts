@@ -9,6 +9,12 @@ export interface ChangelogEntry {
 export const CHANGELOG: readonly ChangelogEntry[] = [
   // ─── newest first; add new blocks here ──────────────────────────────────
   {
+    date: '2 November 2026',
+    items: [
+      "Warnings when a tempo, fine tune or tremolo change carries over into the song's repeat",
+    ],
+  },
+  {
     date: '30 October 2026',
     items: [
       'Piano roll edits keep commands, the intro marker and the song length where they were',

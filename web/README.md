@@ -394,7 +394,7 @@ which is why it is still worth having.
 
 `SST0503` is the same finding pointed at the porter: past 10% the song is not playing at the tempo
 it was written at, and a SNES drops the same ticks, so it is a fact about the song rather than about
-this editor. `severe`, beside the echo hazards, `SST0502` and the two command hazards — it compiles
+this editor. `severe`, beside the echo hazards, `SST0502`, `SST0510`-`SST0512` and the two command hazards — it compiles
 cleanly and then misbehaves on playback. What the `SST05xx` band shares is not that, but that
 `Music.cpp` produces none of them: `SST0504`, for a `#path` this editor deliberately ignores, is
 `info` and is about the editor rather than the song. The comparison starts at the first tick: the

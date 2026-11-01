@@ -253,6 +253,20 @@ is what the driver does with it. Turning the list into seconds is not this packa
 ramps once per tick and the model of that lives in `@amk/tokens`, which nothing here may import — so
 the editor joins the two in `web/src/app/state/song-clock.ts`.
 
+`tempoAtEnd` is the tempo the repeat starts at. The driver sets `$51` only when a song starts
+(`main.asm:2187`) and a phrase change leaves it alone, so whatever a pass ends on carries over. It is
+not always the last of `tempoChanges`: on the tick the pass ends the voices run in order and the
+first `$00` ends the phrase, so a `t` at the very end of a channel numbered no higher than that one
+has run, though `tempoChanges` cuts everything on that tick. Each `TempoChange` also says whether it
+`repeats` — read after its channel reached the point the song loops back to. `loopSettings` is the
+same pair of facts for each channel's fine tune (`$EE`) and tremolo (`$E5`/`$FD`), which only the
+start of a song resets (`main.asm:2142-2146`): the command in force at the channel's first note or
+rest after its loop point, and the one in force when the pass ends, taken at the same moment as
+`tempoAtEnd`. The app compares the two passes at the loop's first note or rest and raises `SST0510`
+to `SST0512`
+(`web/src/app/state/repeat-carry.ts`), since the tempo a song starts at is `@amk/tokens`'
+`DEFAULT_TEMPO`.
+
 `WalkNote.origins` is the same idea pointed at the commands rather than their values: the ARAM
 address of whatever last wrote each of `SLOTS`, so a reader can name the `$ED` a note sounds under
 and not merely read its bytes. It has to come from here for the reason the rest of the state does —

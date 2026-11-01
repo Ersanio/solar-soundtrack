@@ -3529,9 +3529,9 @@
         <h3 id="codes-sst">Solar Soundtrack's own</h3>
 
         <p>
-          Ten findings AddmusicK does not make. Nine are about what a song <em>does</em> rather than
-          about whether it builds, so real AddmusicK will compile every one of these without
-          comment.
+          Thirteen findings AddmusicK does not make. Twelve are about what a song
+          <em>does</em> rather than about whether it builds, so real AddmusicK will compile every
+          one of these without comment.
         </p>
 
         <div class="wrap">
@@ -3647,6 +3647,46 @@
                   AddmusicK only keeps bodies numbered from 1. Event types 0, 7 and 8 are exempt:
                   they switch remote code off and never look at the body, so <code>(!0, 0)</code> is
                   fine.
+                </td>
+              </tr>
+              <tr>
+                <td><code>SST0510</code></td>
+                <td>Severe</td>
+                <td>
+                  A tempo change carries over into the song's repeat. The driver sets the tempo only
+                  when a song starts, so the repeat plays the loop at whatever tempo the song ended
+                  on, which differs from the one its first pass played it at — the default
+                  <code>t53</code> if the song set none. Set the tempo again before the first note
+                  or rest after the <code>/</code>, or before the first note or rest if there is no
+                  <code>/</code>.
+                </td>
+              </tr>
+              <tr>
+                <td><code>SST0511</code></td>
+                <td>Severe</td>
+                <td>
+                  A fine tune (<code>$EE</code>) carries over into a channel's repeat. The driver
+                  clears it only when a song starts, so the channel's loop repeats under whatever
+                  fine tune it ended on, which differs from the one its first pass started the loop
+                  under — <code>$EE $00</code> if the channel set none. Each channel is judged on
+                  its own. Set the fine tune again on that channel before the first note or rest
+                  after the <code>/</code>, or before its first note or rest if there is no
+                  <code>/</code>.
+                </td>
+              </tr>
+              <tr>
+                <td><code>SST0512</code></td>
+                <td>Severe</td>
+                <td>
+                  A tremolo (<code>$E5</code>, or <code>$FD</code> turning it off) carries over into
+                  a channel's repeat. The driver clears it only when a song starts, so the channel's
+                  loop repeats under whatever tremolo it ended on, which differs from the one its
+                  first pass started the loop under — none, if the channel set none. An
+                  <code>$E5</code> with a depth of <code>$00</code> is no tremolo, the same as
+                  <code>$FD</code>. Each channel is judged on its own. Set the tremolo again on that
+                  channel, or turn it off with <code>$FD</code>, before the first note or rest after
+                  the <code>/</code>, or before its first note or rest if there is no
+                  <code>/</code>.
                 </td>
               </tr>
             </tbody>

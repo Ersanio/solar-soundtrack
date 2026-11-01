@@ -504,6 +504,46 @@ export interface TempoChange {
 	tempo: number;
 	/** `$E3`'s duration byte. 0 for `$E2`, which takes effect at once. */
 	fadeTicks: number;
+	/** ARAM address of the `$E2`/`$E3` byte — a key into `CompileResult.commandMap`. */
+	address: number;
+	/**
+	 * Read after its channel reached the point the song loops back to, so every
+	 * repetition runs it again. Always false in a song that does not loop.
+	 */
+	repeats: boolean;
+}
+
+/**
+ * A channel setting that only the start of a song resets, so the one a pass
+ * ends on is what the channel's repeat starts under:
+ *   - `fineTune`, `$EE`'s `$02D1+x` (`Commands.asm:460`, zeroed at `main.asm:2142`).
+ *   - `tremolo`, `$E5`'s delay, rate and depth and `$FD`'s zero depth
+ *     (`Commands.asm:346-355`). A depth of 0 is no tremolo (`main.asm:3366`),
+ *     and the depth is what `main.asm:2146` zeroes.
+ */
+export type CarriedSetting = "fineTune" | "tremolo";
+
+/** The command a {@link CarriedSetting} last came from. */
+export interface SettingCommand {
+	/** ARAM address of the command byte — a key into `CompileResult.commandMap`. */
+	address: number;
+	/** `$EE`, or `$E5`/`$FD`. */
+	vcmd: number;
+	/** The bytes after it, as written. */
+	operands: readonly number[];
+	/** Read after its channel reached the point the song loops back to. */
+	repeats: boolean;
+}
+
+/**
+ * One channel setting where the channel's loop starts, at its first note or
+ * rest after the loop point. `null` is the value a song starts with.
+ */
+export interface LoopSetting {
+	/** The command in force there on the first pass. */
+	first: SettingCommand | null;
+	/** The command in force when the pass ends, which the repeat starts under. */
+	carried: SettingCommand | null;
 }
 
 /**
@@ -560,6 +600,27 @@ export interface SongTimeline {
 	 * shortest channel never runs, which is what `AMK0217` warns about.
 	 */
 	tempoChanges: readonly TempoChange[];
+	/**
+	 * The tempo command still in force when the pass ends, which is the tempo the
+	 * repetition starts at: `L_0C01` loads new track pointers and leaves `$51`
+	 * alone (`main.asm:2283-2326`), and only the start of a song resets it
+	 * (`main.asm:2187`). `null` when no tempo command has run.
+	 *
+	 * Not always the last of {@link tempoChanges}. On the tick the pass ends the
+	 * voices run in order and the first `$00` ends the phrase there
+	 * (`main.asm:2337-2346`), so a `t` at the very end of a channel numbered no
+	 * higher than the one that ends it has run and carries over, though that list
+	 * cuts it with everything else on that tick.
+	 */
+	tempoAtEnd: TempoChange | null;
+	/**
+	 * Per channel, the settings its loop starts under on each pass. Taken when
+	 * {@link tempoAtEnd} is, so a trailing `$EE` or `$E5` counts on the same terms.
+	 *
+	 * `null` for a channel that plays no note or rest after its loop point before
+	 * the pass ends, and for every channel of a song that does not loop.
+	 */
+	loopSettings: readonly (Readonly<Record<CarriedSetting, LoopSetting>> | null)[];
 	/**
 	 * Every command the pass runs that changes something, ascending by tick and
 	 * in driver order.
@@ -691,6 +752,15 @@ interface Track {
 	 */
 	loopCount: number;
 	loopStart: number;
+	/**
+	 * Whether the read pointer has reached the point the song loops back to, so
+	 * everything read from here on runs again on every repetition.
+	 */
+	repeating: boolean;
+	/** The command each {@link CarriedSetting} last came from. */
+	settings: Record<CarriedSetting, SettingCommand | null>;
+	/** {@link settings} at the first note or rest after the loop point, once one has played. */
+	loopSettings: Readonly<Record<CarriedSetting, SettingCommand | null>> | null;
 	/** The `$E9` run being played, or null. One per track, as the frame is. */
 	pendingCall: PendingRun | null;
 	/** The `$E6` run being played, or null. */
@@ -843,6 +913,9 @@ export function walkSong(song: Uint8Array, aramAddress: number): SongTimeline {
 			callRestart: -1,
 			loopCount: 0,
 			loopStart: -1,
+			repeating: false,
+			settings: { fineTune: null, tremolo: null },
+			loopSettings: null,
 			pendingCall: null,
 			pendingSub: null,
 			origins: new Array<number | null>(CHANNEL_SLOTS).fill(null),
@@ -886,6 +959,10 @@ export function walkSong(song: Uint8Array, aramAddress: number): SongTimeline {
 	};
 	let loopTick = loopPhrase >= 0 ? Number.POSITIVE_INFINITY : Number.NaN;
 	let truncated = false;
+	let lastTempo: TempoChange | null = null;
+	let tempoAtEnd: TempoChange | null = null;
+	let settingsAtEnd: Record<CarriedSetting, SettingCommand | null>[] | null = null;
+	let phraseEnded = false;
 
 	// --- loop runs -----------------------------------------------------------
 	const finishedRuns: PendingRun[] = [];
@@ -1066,8 +1143,11 @@ export function walkSong(song: Uint8Array, aramAddress: number): SongTimeline {
 
 			// The loop re-entry point, noted the moment the read pointer reaches it
 			// at a frame boundary.
-			if (track.at === loopAt[channel] && track.ticks < loopTick) {
-				loopTick = track.ticks;
+			if (track.at === loopAt[channel]) {
+				track.repeating = true;
+				if (track.ticks < loopTick) {
+					loopTick = track.ticks;
+				}
 			}
 
 			if (track.at >= song.length) {
@@ -1084,6 +1164,14 @@ export function walkSong(song: Uint8Array, aramAddress: number): SongTimeline {
 			// otherwise it decrements and either returns or restarts the body.
 			if (byte === 0) {
 				if (track.callCount === 0) {
+					// The first channel to end is the one that ends the phrase, and the
+					// tempo and channel settings standing now are what the repetition starts at.
+					if (!phraseEnded) {
+						phraseEnded = true;
+						tempoAtEnd = lastTempo;
+						settingsAtEnd = tracks.map((each) => ({ ...each.settings }));
+					}
+
 					track.at = -1;
 					return;
 				}
@@ -1151,6 +1239,12 @@ export function walkSong(song: Uint8Array, aramAddress: number): SongTimeline {
 		const address = aramAddress + (track.frameAt >= 0 ? track.frameAt : track.at);
 		track.frameAt = -1;
 		track.at += 1;
+
+		// A tie or a rest counts as much as a note: what the loop starts under is
+		// whatever was set before the first thing in it that takes time.
+		if (track.repeating && track.loopSettings === null && !phraseEnded) {
+			track.loopSettings = { ...track.settings };
+		}
 
 		const ticks = track.duration;
 
@@ -1232,6 +1326,12 @@ export function walkSong(song: Uint8Array, aramAddress: number): SongTimeline {
 		const length = vcmdLength(song, track.at);
 		const argAt = track.at + 1;
 		const arg = (n: number): number => song[argAt + n] ?? 0;
+		const setting = (): SettingCommand => ({
+			address: aramAddress + track.at,
+			vcmd,
+			operands: [...song.subarray(argAt, track.at + length)],
+			repeats: track.repeating,
+		});
 		const state = track.state;
 		let dirty = true;
 
@@ -1316,11 +1416,14 @@ export function walkSong(song: Uint8Array, aramAddress: number): SongTimeline {
 				// (the loop below), and `step` moves the clock at most once, in
 				// `emitNote` — so the eight channels' commands are recorded in the
 				// order the driver would run them, already ascending by tick.
-				tempoChanges.push({
+				lastTempo = {
 					tick: track.ticks,
 					tempo: vcmd === 0xe2 ? arg(0) : arg(1),
 					fadeTicks: vcmd === 0xe2 ? 0 : arg(0),
-				});
+					address: aramAddress + track.at,
+					repeats: track.repeating,
+				};
+				tempoChanges.push(lastTempo);
 				// The target, not what a fade is passing through — see
 				// {@link NoteState.tempo}. Pricing a fade tick by tick is the
 				// clock's job, and it reads `tempoChanges` to do it.
@@ -1332,7 +1435,16 @@ export function walkSong(song: Uint8Array, aramAddress: number): SongTimeline {
 				invalidateAll();
 				break;
 			case 0xe5:
-				state.tremolo = true;
+			case 0xfd:
+				// `$FD` is `$E5`'s tail with a zero depth (`Commands.asm:353`).
+				state.tremolo = vcmd === 0xe5 && arg(2) !== 0;
+				track.settings.tremolo = setting();
+				break;
+			case 0xee:
+				// Kept for what carries into the repeat. The pitch it moves stays
+				// unmodelled, so no note's state changes.
+				track.settings.fineTune = setting();
+				dirty = false;
 				break;
 			case 0xe7:
 			case 0xe8:
@@ -1553,6 +1665,17 @@ export function walkSong(song: Uint8Array, aramAddress: number): SongTimeline {
 		// The same cut `played` takes: a command past the shortest channel is
 		// never reached, on this pass or any later one.
 		tempoChanges: tempoChanges.filter((change) => ticks === 0 || change.tick < ticks),
+		tempoAtEnd,
+		loopSettings: tracks.map((track, channel) => {
+			const atLoop = track.loopSettings;
+			const atEnd = settingsAtEnd?.[channel];
+			return atLoop === null || atEnd === undefined
+				? null
+				: {
+						fineTune: { first: atLoop.fineTune, carried: atEnd.fineTune },
+						tremolo: { first: atLoop.tremolo, carried: atEnd.tremolo },
+					};
+		}),
 		// Sorted rather than pushed in order: a `$DD` is raised on the tick of the
 		// note that read it, which is behind the tick the byte was reached at, so
 		// `c4 v200 $DD …` records the two the other way round. Stable, so within one
@@ -1574,6 +1697,8 @@ export function walkSong(song: Uint8Array, aramAddress: number): SongTimeline {
 			ticks: 0,
 			loopTick: null,
 			tempoChanges: [],
+			tempoAtEnd: null,
+			loopSettings: new Array<null>(CHANNELS).fill(null),
 			commands: [],
 			loops: [],
 			channelTicks: new Array<number>(CHANNELS).fill(0),

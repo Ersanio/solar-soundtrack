@@ -86,7 +86,7 @@ export function noteLengthName(ticks: number): string | null {
 export const DEFAULT_TEMPO = 0x36 - 1;
 
 /** A tempo in a readout, marked where it is {@link DEFAULT_TEMPO} and not the song's. */
-function tempoName(tempo: number | null): string {
+export function tempoName(tempo: number | null): string {
 	return tempo === null
 		? $localize`:@@command.unit.default-tempo:command.unit.default-tempo ${DEFAULT_TEMPO}:tempo:`
 		: `t${tempo}`;
