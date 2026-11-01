@@ -48,6 +48,7 @@ import {
 	WAIT_TIME,
 	frameSoundingTicks,
 } from "@amk/core/hardcoded-tables";
+import { SST } from "@amk/core/messages/sst";
 import type { Diagnostic, NoteAddress } from "@amk/core/types";
 
 /** N-SPC songs have eight music channels. */
@@ -1648,16 +1649,16 @@ export function unreachableChannels(timeline: SongTimeline, noteMap: readonly No
 	const surviving = timeline.notes.filter((note) => note.channel === longest.channel);
 	const last = byAddress.get(surviving[surviving.length - 1]?.address ?? -1);
 
-	const names = over.map((c) => `#${c.channel}`);
-	const plural = over.length === 1 ? "is" : "are";
+	const names = listOf(over.map((c) => `#${c.channel}`));
 
 	return [
 		{
 			severity: "severe",
 			code: CODE_UNREACHABLE,
 			message:
-				`${listOf(names)} ${plural} longer than the song. It lasts as long as its shortest channel, ` +
-				`#${shortest.channel} at ${shortest.ticks} ticks, and everything past that is never played.`,
+				over.length === 1
+					? SST["0502.one"](names, shortest.channel, shortest.ticks)
+					: SST["0502.other"](names, shortest.channel, shortest.ticks),
 			span: first?.span ?? last?.span ?? { start: 0, end: 0, line: 1 },
 		},
 	];

@@ -2,6 +2,7 @@ import type { Command } from "./tokens";
 import type { Diagnostic } from "@amk/core/types";
 import { FIR_PRESETS, FIR_TAPS, type FirTaps, echoStability, toSigned } from "@amk/spc/fir";
 import { hex2 } from "@amk/core/hex";
+import { SST } from "@amk/core/messages/sst";
 
 /**
  * Diagnostics for an echo that compounds instead of decaying.
@@ -104,17 +105,12 @@ export function echoHazards(commands: readonly Command[]): Diagnostic[] {
 
 /** Cause, effect, and the way out, in one line. Says what the song will do and nothing more. */
 function describe(command: Command, feedback: number): string {
-	const effect = `make the echo grow instead of fade, so the song will get loud and distorted.`;
-
 	if (command.vcmd === 0xf1) {
 		const which = command.args[2].value;
 		// Filter 1 is flat and peaks below unity, so it cannot be the one at fault; only filter 0 ever
 		// reaches here, and swapping to the other one is a fix on its own.
-		const fix = which === 0 ? " Lower the feedback, or select filter 1." : " Lower the feedback.";
-		return `The echo feedback at $${hex2(feedback)} and filter ${which} ${effect}${fix}`;
+		return which === 0 ? SST["0501.filter-zero"](hex2(feedback)) : SST["0501"](hex2(feedback), which);
 	}
 
-	return (
-		`The echo feedback at $${hex2(feedback)} and this filter ${effect}` + ` Lower the feedback, or this filter's gain.`
-	);
+	return SST["0500"](hex2(feedback));
 }

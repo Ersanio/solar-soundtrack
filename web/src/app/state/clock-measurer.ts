@@ -1,5 +1,6 @@
 import { DestroyRef, Service, inject, signal } from '@angular/core';
 
+import { SST } from '@amk/core/messages/sst';
 import type { Diagnostic, Span } from '@amk/core/types';
 import type { MeasureReply, MeasureRequest } from './clock.worker';
 import { type Measurement, tempoShortfall } from './measure-clock';
@@ -58,9 +59,7 @@ export function tempoDiagnostic(measured: Measurement | null, span: Span): Diagn
     {
       severity: 'severe',
       code: 'SST0503',
-      message:
-        `The driver cannot keep up with this song's tempo: it plays about ${percent}% slower than written. ` +
-        `Lower the tempo, or give the busiest channels less to do.`,
+      message: SST['0503'](percent),
       span,
     },
   ];

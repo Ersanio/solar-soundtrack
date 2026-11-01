@@ -7,10 +7,17 @@ The vocabulary every other package shares. Depends on nothing.
 | `types.ts`            | What goes into the compiler and what comes out of it         |
 | `hardcoded-tables.ts` | Constant tables lifted from AddmusicK's `Music.cpp`          |
 | `hex.ts`              | Upper-case hex, the notation everything here writes bytes in |
+| `messages/amk.ts`     | The text of every `AMK` diagnostic                           |
+| `messages/sst.ts`     | The text of every `SST` diagnostic                           |
 
 `types.ts` is the compiler's contract, but the UI reads it too — diagnostics, stats and the sample
 list are all rendered — and `@amk/spc` needs `SongTags` for the ID666 header, so it lives at the
 bottom rather than inside `@amk/compiler`.
+
+The two message catalogs are here for the same reason: `SST` codes are raised by the compiler, the
+scanner, the song walk and the app, and this is the one package all four can reach. Each entry is a
+`$localize` message with an `@@amk.…` / `@@sst.…` ID — a global the host provides, so "depends on
+nothing" still holds. `docs/claude/i18n.md` has the scheme.
 
 `hardcoded-tables.ts` is here rather than in `@amk/compiler` because `@amk/tokens` needs eight of its
 constants, and that is what keeps the scanner off the compiler entirely. Its line references are to

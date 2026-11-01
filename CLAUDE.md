@@ -140,8 +140,9 @@ partial UI stays populated. **The prefix says whose finding it is, not which fil
 line cited; `SST####` is one `Music.cpp` does not produce at all. A new diagnostic takes the prefix
 of the tool that found it. Spans are mapped back to the source the author wrote — `spanAt` is the
 single choke point, and anything that bypasses it will be wrong. Constructs this compiler does not
-implement are reported as errors, never silently mis-compiled. What each `SST05xx` covers:
-`docs/claude/compiler.md`.
+implement are reported as errors, never silently mis-compiled. Their text is not at the call site:
+it is in `@amk/core/messages/amk.ts` and `sst.ts`, one entry per code and variant, and a new
+diagnostic adds its entry there. What each `SST05xx` covers: `docs/claude/compiler.md`.
 
 **Accessibility is not supported.** The app ships no ARIA attributes and no `role` or `tabindex`,
 and none are planned. `angular.configs.templateAccessibility` is therefore absent from the

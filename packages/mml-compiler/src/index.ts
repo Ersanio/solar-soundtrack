@@ -1,5 +1,7 @@
 import { PARSER_VERSION } from "@amk/core/hardcoded-tables";
 import { hex } from "@amk/core/hex";
+import { AMK } from "@amk/core/messages/amk";
+import { SST } from "@amk/core/messages/sst";
 import type { CompileRequest, CompileResult, CompileStats, Diagnostic } from "@amk/core/types";
 import { link } from "./link";
 import { type AddmusicKOptions, AddmusicKParser } from "./parser";
@@ -26,7 +28,7 @@ export class AddmusicKCompiler {
 				{
 					severity: "error",
 					code: "SST0301",
-					message: `ARAM address 0x${hex(aramAddress)} is outside the 64 KiB address space.`,
+					message: SST["0301"](hex(aramAddress)),
 					span: { start: 0, end: 0, line: 1 },
 				},
 			]);
@@ -68,7 +70,7 @@ export class AddmusicKCompiler {
 					{
 						severity: "error",
 						code: "AMK0302",
-						message: "This song contained no musical data.",
+						message: AMK["0302"](),
 						span: { start: 0, end: 0, line: 1 },
 					},
 				],
@@ -87,7 +89,7 @@ export class AddmusicKCompiler {
 					{
 						severity: "error",
 						code: "AMK0303",
-						message: "This song doesn't seem to have any data.",
+						message: AMK["0303"](),
 						span: { start: 0, end: 0, line: 1 },
 					},
 				],
@@ -109,9 +111,7 @@ export class AddmusicKCompiler {
 			diagnostics.push({
 				severity: "warning",
 				code: "AMK0213",
-				message:
-					`This song is 0x${hex(stats.totalSize - parsed.minSize)} bytes larger ` +
-					`than the 0x${hex(parsed.minSize)} it asked #pad to reserve.`,
+				message: AMK["0213"](hex(stats.totalSize - parsed.minSize), hex(parsed.minSize)),
 				span: { start: 0, end: 0, line: 1 },
 			});
 		}

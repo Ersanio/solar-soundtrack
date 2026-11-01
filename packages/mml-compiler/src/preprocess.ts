@@ -15,6 +15,7 @@
  * definition is preserved.
  */
 
+import { AMK } from "@amk/core/messages/amk";
 import type { Diagnostic } from "@amk/core/types";
 
 /** Version marker found in the source. */
@@ -80,7 +81,7 @@ export function preprocess(source: string): PreprocessResult {
 		let value = "";
 		for (;;) {
 			if (pos >= source.length) {
-				fail("Unexpected end of file found.");
+				fail(AMK["0400.eof"]());
 				return value;
 			}
 
@@ -127,10 +128,10 @@ export function preprocess(source: string): PreprocessResult {
 	 * part of the check, not an implementation detail. `Number.parseInt` would
 	 * carry a `#define FOO 99999999999` straight through into an `#if`.
 	 */
-	const parseNumber = (text: string, what: string): number => {
+	const parseNumber = (text: string, failure: () => string): number => {
 		const value = Number.parseInt(text, 10);
 		if (!Number.isFinite(value) || value < -0x80000000 || value > 0x7fffffff) {
-			fail(`Could not parse integer for ${what}.`);
+			fail(failure());
 			return 0;
 		}
 
@@ -194,13 +195,13 @@ export function preprocess(source: string): PreprocessResult {
 				skipSpaces();
 				const name = getArgument(" ", true);
 				if (name.length === 0) {
-					fail("#define was missing its argument.");
+					fail(AMK["0400.define-argument"]());
 					break;
 				}
 
 				skipSpaces();
 				const value = getArgument(" ", true);
-				defines.set(name, value.length === 0 ? 1 : parseNumber(value, "#define"));
+				defines.set(name, value.length === 0 ? 1 : parseNumber(value, AMK["0400.define-integer"]));
 				break;
 			}
 
@@ -213,7 +214,7 @@ export function preprocess(source: string): PreprocessResult {
 				skipSpaces();
 				const name = getArgument(" ", true);
 				if (name.length === 0) {
-					fail("#undef was missing its argument.");
+					fail(AMK["0400.undef-argument"]());
 					break;
 				}
 
@@ -230,7 +231,7 @@ export function preprocess(source: string): PreprocessResult {
 				skipSpaces();
 				const name = getArgument(" ", true);
 				if (name.length === 0) {
-					fail("#ifdef was missing its argument.");
+					fail(AMK["0400.ifdef-argument"]());
 					break;
 				}
 
@@ -250,7 +251,7 @@ export function preprocess(source: string): PreprocessResult {
 				const name = getArgument(" ", true);
 				okayStatus.push(okayToAdd);
 				if (name.length === 0) {
-					fail("#ifndef was missing its argument.");
+					fail(AMK["0400.ifndef-argument"]());
 					break;
 				}
 
@@ -268,32 +269,32 @@ export function preprocess(source: string): PreprocessResult {
 				skipSpaces();
 				const name = getArgument(" ", true);
 				if (name.length === 0) {
-					fail("#if was missing its first argument.");
+					fail(AMK["0400.if-first-argument"]());
 					break;
 				}
 
 				if (!defines.has(name)) {
-					fail("First argument for #if was never defined.");
+					fail(AMK["0400.if-undefined"]());
 					break;
 				}
 
 				skipSpaces();
 				const operator = getArgument(" ", true);
 				if (operator.length === 0) {
-					fail("#if was missing its comparison operator.");
+					fail(AMK["0400.if-operator"]());
 					break;
 				}
 
 				skipSpaces();
 				const rhsText = getArgument(" ", true);
 				if (rhsText.length === 0) {
-					fail("#if was missing its second argument.");
+					fail(AMK["0400.if-second-argument"]());
 					break;
 				}
 
 				okayStatus.push(okayToAdd);
 				const lhs = defines.get(name) ?? 0;
-				const rhs = parseNumber(rhsText, "#if");
+				const rhs = parseNumber(rhsText, AMK["0400.if-integer"]);
 				switch (operator) {
 					case "==":
 						okayToAdd = lhs === rhs;
@@ -314,7 +315,7 @@ export function preprocess(source: string): PreprocessResult {
 						okayToAdd = lhs <= rhs;
 						break;
 					default:
-						fail("Unknown operator for #if.");
+						fail(AMK["0400.if-unknown-operator"]());
 				}
 
 				level++;
@@ -326,7 +327,7 @@ export function preprocess(source: string): PreprocessResult {
 					level--;
 					okayToAdd = okayStatus.pop() ?? true;
 				} else {
-					fail("There was an #endif without a matching #ifdef, #ifndef, or #if.");
+					fail(AMK["0400.endif-unmatched"]());
 				}
 
 				break;
@@ -337,11 +338,11 @@ export function preprocess(source: string): PreprocessResult {
 					skipSpaces();
 					const value = getArgument(" ", true);
 					if (value.length === 0) {
-						fail("#amk must have an integer argument specifying the version.", "AMK0401");
+						fail(AMK["0401"](), "AMK0401");
 					} else {
-						version = parseNumber(value, "#amk");
+						version = parseNumber(value, AMK["0400.amk-integer"]);
 						if (version === 3) {
-							fail("Codec's AddmusicK Beta (#amk 3) has not been implemented.", "AMK0402");
+							fail(AMK["0402"](), "AMK0402");
 						}
 					}
 				}
@@ -367,7 +368,7 @@ export function preprocess(source: string): PreprocessResult {
 		diagnostics.push({
 			severity: "error",
 			code: "AMK0403",
-			message: "There was an #ifdef, #ifndef, or #if without a matching #endif.",
+			message: AMK["0403"](),
 			span: { start: source.length, end: source.length, line },
 		});
 	}

@@ -20,6 +20,13 @@ takes the prefix of the tool that found it. Spans are mapped back to the source 
 `spanAt` is the single choke point, and anything that bypasses it will be wrong. Constructs this
 compiler does not implement are reported as errors, never silently mis-compiled.
 
+A diagnostic's text lives in `@amk/core/messages/amk.ts` or `sst.ts`, keyed by code and variant
+(`AMK["0096.rate"]`), and the call site states the code and calls the entry. Where one code says
+several things each gets an entry of its own, and a text that used to be assembled — `"a dot"` or
+`"N dots"`, `is` or `are`, the five leftover-directive articles — is one whole message per form.
+`report` keys its de-duplication on the text, which a catalog leaves unchanged. The ID scheme and
+how to add one: `docs/claude/i18n.md`.
+
 ## Decisions already made
 
 - **Mirroring the parser's `$DD` lookahead in `step` as a lookahead** — `$DD`'s last parameter may be

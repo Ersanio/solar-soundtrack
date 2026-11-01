@@ -1,6 +1,7 @@
 import type { Command, NoteLengthSegment, Token, TokenIndex } from "./tokens";
 import type { Diagnostic, Span } from "@amk/core/types";
 import { noteFrames } from "@amk/core/hardcoded-tables";
+import { SST } from "@amk/core/messages/sst";
 import { commandScope, isPercussionInstrument } from "./commands/in-force";
 
 /**
@@ -266,23 +267,17 @@ export function bendAnchor(command: Command, index: TokenIndex): BendAnchor {
 
 /** What the slide does instead of sliding, and the way out. One line per way it fails. */
 function describeBend(anchor: BendAnchor): string {
-	const dies = "so the $DD runs as a command, jumps to address zero and the song stops.";
-
 	switch (anchor.kind) {
 		case "nothing":
-			return `No note plays before this $DD on the channel, ${dies} Write it directly after a note of two ticks or more.`;
+			return SST["0507.nothing"]();
 		case "blocked":
-			return (
-				`The ${anchor.by.name} written between this $DD and the note before it is what the driver reads instead` +
-				` — the read-ahead only ever looks at the very next byte — ${dies} Move it to directly after the note.`
-			);
-		case "tooShort": {
-			const what = anchor.tied ? "tie" : "note";
+			return SST["0507.blocked"](anchor.by.name);
+		case "tooShort":
+			if (anchor.ticks > 1) {
+				return anchor.tied ? SST["0507.tie-pieces"](anchor.ticks) : SST["0507.note-pieces"](anchor.ticks);
+			}
 
-			return anchor.ticks > 1
-				? `The ${what} before this $DD is ${anchor.ticks} ticks, which the compiler writes in pieces of 96 with one tick left over at the end, and the read-ahead cannot run on the tick a piece begins, ${dies} Make that ${what} a tick longer or shorter.`
-				: `The ${what} before this $DD lasts one tick, and the read-ahead cannot run on the tick a ${what} begins, ${dies} Give that ${what} two ticks or more.`;
-		}
+			return anchor.tied ? SST["0507.tie-one-tick"]() : SST["0507.note-one-tick"]();
 
 		case "rides":
 			return "";
@@ -305,8 +300,7 @@ export function commandHazards(index: TokenIndex): Diagnostic[] {
 			diagnostics.push({
 				severity: "severe",
 				code: CODE_DEAD_VCMD,
-				message:
-					"$F7 was never implemented in this driver: its dispatch slot is $0000, so the SPC jumps to address zero and the song stops. Remove the command.",
+				message: SST["0506"](),
 				span: { ...command.span },
 			});
 			continue;
@@ -331,8 +325,7 @@ export function commandHazards(index: TokenIndex): Diagnostic[] {
 			diagnostics.push({
 				severity: "warning",
 				code: CODE_AM4_TRANSPOSE,
-				message:
-					"Under #am4, the compiler adds one to this transpose, so it lands a semitone above what is written. Double check to write one less than you want.",
+				message: SST["0508"](),
 				span: { ...command.span },
 			});
 		}

@@ -10,6 +10,7 @@
  */
 
 import { hex, hex4 } from "@amk/core/hex";
+import { AMK } from "@amk/core/messages/amk";
 import type { CommandAddress, Diagnostic, NoteAddress } from "@amk/core/types";
 import type { ParseOutput } from "./parser";
 
@@ -107,7 +108,7 @@ export function link(parsed: ParseOutput, aramAddress: number): LinkResult {
 		diagnostics.push({
 			severity: "error",
 			code: "AMK0300",
-			message: `Song data runs past the end of ARAM (0x${hex4(aramAddress)} + 0x${hex4(blob.length)} = 0x${hex(end)}).`,
+			message: AMK["0300"](hex4(aramAddress), hex4(blob.length), hex(end)),
 			span: { start: 0, end: 0, line: 1 },
 		});
 	}

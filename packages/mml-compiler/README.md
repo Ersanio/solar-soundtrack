@@ -76,6 +76,11 @@ deliberately ignores, `SST0505` for a replacement that expands into itself, and 
 `compile()`'s ARAM argument rather than on anything in the MML.
 Constructs this compiler does not implement are reported as errors, never silently mis-compiled.
 
+The words of a diagnostic are not at its call site: `this.error("AMK0058", AMK["0058"](name))`
+names the code here and takes the text from `@amk/core/messages/amk.ts`, where each entry cites the
+AddmusicK line it ports. Comparing a message with `Music.cpp` means reading that entry; comparing
+when it is raised means reading the call site, which is cited as before.
+
 `SST0505` is the one place a code covers a song AddmusicK cannot finish rather than one it rejects.
 `Music.cpp:135` counts nested expansion at a single position — that is `AMK0023` here — and so sees
 `"1=1 1"` and not `"1=[q7F @0 a1]"`, whose value starts with `[`: the recursion there runs between
