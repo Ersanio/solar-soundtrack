@@ -1,5 +1,8 @@
 @if (args().length < 2) {
-  <p class="text-ink-muted pb-2 text-xs leading-relaxed">
+  <p
+    i18n="@@inspector.adsr.needs-two-arguments-either"
+    class="text-ink-muted pb-2 text-xs leading-relaxed"
+  >
     Needs two arguments: either <code class="text-ink">$80</code> and a GAIN value, or an ADSR pair.
     Setting one below writes both.
   </p>
@@ -12,7 +15,10 @@
   (commit)="apply($event)"
 />
 
-<p class="text-ink-muted pt-2 text-xs leading-relaxed">
+<p
+  i18n="@@inspector.adsr.this-overrides-the-current"
+  class="text-ink-muted pt-2 text-xs leading-relaxed"
+>
   This overrides the current instrument's own envelope until the next
   <code class="text-ink">&#64;</code> resets it.
 </p>

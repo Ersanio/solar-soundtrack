@@ -196,9 +196,9 @@ export function packCommandLane(request: LaneRequest): CommandLane {
       cursor: removable ? 'grab' : 'pointer',
       tint: CHANNEL_TEXT[event.channel],
       opacity: muted ? LANE_MUTED_OPACITY : 1,
-      title:
-        `${entry.label} · ${written} · #${event.channel} · tick ${event.tick}` +
-        (removable ? ' · drag to move · right-click to delete' : ''),
+      title: removable
+        ? $localize`:@@roll.command.title-removable:${entry.label}:label: · ${written}:written: · #${event.channel}:channel: · tick ${event.tick}:tick: · drag to move · right-click to delete`
+        : $localize`:@@roll.command.title:${entry.label}:label: · ${written}:written: · #${event.channel}:channel: · tick ${event.tick}:tick:`,
     });
   };
 

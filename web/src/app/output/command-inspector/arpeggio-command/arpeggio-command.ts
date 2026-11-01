@@ -15,10 +15,10 @@ import { dragPreview, shownArgs } from '../commands/preview';
 import { intervalLabel } from '@amk/tokens/commands/units';
 
 const MODES: readonly EnumOption[] = [
-  { value: 0x00, label: 'off' },
-  { value: 0x01, label: 'a sequence of notes' },
-  { value: 0x80, label: 'trill — two notes' },
-  { value: 0x81, label: 'glissando' },
+  { value: 0x00, label: $localize`:@@inspector.arpeggio.off:off` },
+  { value: 0x01, label: $localize`:@@inspector.arpeggio.a-sequence-of-notes:a sequence of notes` },
+  { value: 0x80, label: $localize`:@@inspector.arpeggio.trill-two-notes:trill — two notes` },
+  { value: 0x81, label: $localize`:@@inspector.arpeggio.glissando:glissando` },
 ];
 
 /** The most notes worth drawing a row each for. `$FB $7F` carries 127. */
@@ -94,7 +94,9 @@ export class ArpeggioCommand {
     this.drag.set(index, fromSigned(value));
   }
 
-  protected readonly durationLabel = computed(() => `${this.shown()[1] ?? 0} ticks`);
+  protected readonly durationLabel = computed(
+    () => $localize`:@@inspector.arpeggio.ticks:${this.shown()[1] ?? 0}:ticks: ticks`,
+  );
 
   /**
    * Where the sequence restarts, or `-1` for "at the beginning".
@@ -157,15 +159,15 @@ export class ArpeggioCommand {
     }
 
     if (notes.every((value) => value === LOOP_MARKER)) {
-      return 'Every entry is a loop point, so the driver never reaches a note and hangs.';
+      return $localize`:@@inspector.arpeggio.every-entry-is-a-loop:Every entry is a loop point, so the driver never reaches a note and hangs.`;
     }
 
     if (notes[notes.length - 1] === LOOP_MARKER) {
-      return 'A loop point in the last slot points past the end of the sequence, and the driver reads the song after this command as notes.';
+      return $localize`:@@inspector.arpeggio.a-loop-point-in-the:A loop point in the last slot points past the end of the sequence, and the driver reads the song after this command as notes.`;
     }
 
     if (this.markers().length > 1) {
-      return `${this.markers().length} loop points are written; only the last takes effect, and the notes before it play once and never again.`;
+      return $localize`:@@inspector.arpeggio.loop-points-are-written-only:${this.markers().length}:length: loop points are written; only the last takes effect, and the notes before it play once and never again.`;
     }
 
     return null;
@@ -177,7 +179,7 @@ export class ArpeggioCommand {
     const written = this.count();
     const actual = this.args().length - 2;
     if (this.isSequence() && written !== actual) {
-      return `the count says ${written} but ${actual} follow — the driver will read past this command`;
+      return $localize`:@@inspector.arpeggio.the-count-says-but-follow:the count says ${written}:written: but ${actual}:actual: follow — the driver will read past this command`;
     }
 
     return null;
@@ -187,7 +189,9 @@ export class ArpeggioCommand {
   protected readonly extra = computed(() => toSigned(this.args()[2] ?? 0));
 
   protected readonly extraLabel = computed(() =>
-    this.mode() === 0x80 ? 'Pitch change' : 'Semitones per step',
+    this.mode() === 0x80
+      ? $localize`:@@inspector.arpeggio.pitch-change:Pitch change`
+      : $localize`:@@inspector.arpeggio.semitones-per-step:Semitones per step`,
   );
 
   /** The interval, said the same way the note rows say theirs. */

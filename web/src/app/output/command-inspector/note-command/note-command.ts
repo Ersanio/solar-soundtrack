@@ -144,7 +144,7 @@ export class NoteCommand {
       return null;
     }
 
-    return `plays ${passes.length} times — showing pass ${passes.indexOf(note) + 1}, at tick ${note.tick}`;
+    return $localize`:@@inspector.note.plays-times-showing-pass-at:plays ${passes.length}:length: times — showing pass ${passes.indexOf(note) + 1}:pass:, at tick ${note.tick}:tick:`;
   });
 
   /**
@@ -163,8 +163,8 @@ export class NoteCommand {
       return [
         {
           key: 'acting',
-          title: 'Commands acting on this note',
-          nothing: 'Nothing but the note itself.',
+          title: $localize`:@@inspector.note.commands-acting-on-this-note:Commands acting on this note`,
+          nothing: $localize`:@@inspector.note.nothing-but-the-note-itself:Nothing but the note itself.`,
           pass,
           chips: [],
         },
@@ -174,15 +174,15 @@ export class NoteCommand {
     return [
       {
         key: 'defined',
-        title: 'Commands defined by this note',
-        nothing: 'Nothing starts here.',
+        title: $localize`:@@inspector.note.commands-defined-by-this-note:Commands defined by this note`,
+        nothing: $localize`:@@inspector.note.nothing-starts-here:Nothing starts here.`,
         pass,
         chips: acting.filter((each) => each.defining),
       },
       {
         key: 'acting',
-        title: 'Commands acting on this note',
-        nothing: 'Nothing carries in from an earlier note.',
+        title: $localize`:@@inspector.note.commands-acting-on-this-note:Commands acting on this note`,
+        nothing: $localize`:@@inspector.note.nothing-carries-in-from-an:Nothing carries in from an earlier note.`,
         pass: null,
         chips: acting.filter((each) => !each.defining),
       },
@@ -192,7 +192,7 @@ export class NoteCommand {
   /** Why the list is empty, when it is empty for a reason worth stating. */
   protected readonly unavailable = computed(() =>
     this.pass() === null
-      ? 'The commands acting on a note are read off the compiled song, so they appear once it compiles.'
+      ? $localize`:@@inspector.note.the-commands-acting-on-a:The commands acting on a note are read off the compiled song, so they appear once it compiles.`
       : null,
   );
 

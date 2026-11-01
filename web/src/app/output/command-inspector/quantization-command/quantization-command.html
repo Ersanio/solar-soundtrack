@@ -1,9 +1,13 @@
 @if (!written()) {
-  <p class="text-ink-muted text-xs leading-relaxed">
+  <p
+    i18n="@@inspector.quantization.needs-a-two-digit"
+    class="text-ink-muted text-xs leading-relaxed"
+  >
     Needs a two-digit hex value, as in <code class="text-ink">q7F</code>.
   </p>
 } @else {
   <amk-slider
+    i18n-label="@@inspector.quantization.note-length.label"
     label="Note length"
     [value]="gateIndex()"
     [max]="7"
@@ -15,6 +19,7 @@
   />
 
   <amk-slider
+    i18n-label="@@inspector.quantization.velocity.label"
     label="Velocity"
     [value]="velocityIndex()"
     [max]="15"

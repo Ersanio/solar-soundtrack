@@ -125,11 +125,13 @@ export class SpcPlayer {
 		}
 
 		if (typeof WebAssembly === "undefined") {
-			throw new PlayerError("This browser has no WebAssembly support.");
+			throw new PlayerError(
+				$localize`:@@error.player.this-browser-has-no-webassembly:This browser has no WebAssembly support.`,
+			);
 		}
 
 		if (typeof AudioContext === "undefined") {
-			throw new PlayerError("This browser has no Web Audio support.");
+			throw new PlayerError($localize`:@@error.player.this-browser-has-no-web:This browser has no Web Audio support.`);
 		}
 
 		const context = new AudioContext();
@@ -145,7 +147,11 @@ export class SpcPlayer {
 			node.port.onmessage = (event: MessageEvent<FromWorklet>) => this.receive(event.data);
 			node.onprocessorerror = () => {
 				this.state = "idle";
-				this.onError?.(new PlayerError("The SPC renderer stopped unexpectedly."));
+				this.onError?.(
+					new PlayerError(
+						$localize`:@@error.player.the-spc-renderer-stopped-unexpectedly:The SPC renderer stopped unexpectedly.`,
+					),
+				);
 			};
 
 			const gain = context.createGain();
@@ -171,7 +177,7 @@ export class SpcPlayer {
 		const response = await fetch(url);
 		if (!response.ok) {
 			throw new PlayerError(
-				`Could not load ${url} (HTTP ${response.status}). The emulator lives in packages/spc/assets/player/.`,
+				$localize`:@@error.player.could-not-load-http-the:Could not load ${url}:url: (HTTP ${response.status}:status:). The emulator lives in packages/spc/assets/player/.`,
 			);
 		}
 
@@ -183,7 +189,9 @@ export class SpcPlayer {
 		try {
 			await context.audioWorklet.addModule(url);
 		} catch {
-			throw new PlayerError(`Could not load ${url}. Run \`npm run build:worklet\` to generate it.`);
+			throw new PlayerError(
+				$localize`:@@error.player.could-not-load-run-npm:Could not load ${url}:url:. Run \`npm run build:worklet\` to generate it.`,
+			);
 		}
 	}
 
@@ -338,7 +346,9 @@ export class SpcPlayer {
 
 	private require(): AudioWorkletNode {
 		if (!this.node) {
-			throw new PlayerError("The player has not been initialised yet.");
+			throw new PlayerError(
+				$localize`:@@error.player.the-player-has-not-been:The player has not been initialised yet.`,
+			);
 		}
 
 		return this.node;

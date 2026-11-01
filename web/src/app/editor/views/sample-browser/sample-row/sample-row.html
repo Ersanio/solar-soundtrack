@@ -23,6 +23,7 @@
       <span class="text-ink truncate font-mono text-xs">{{ file.name }}</span>
       @if (file.kind === 'bank') {
         <span
+          i18n="@@samples.bank"
           class="bg-good/20 text-good shrink-0 rounded-md px-1 py-px text-[11px] font-semibold tracking-wide uppercase"
           >bank</span
         >
@@ -30,12 +31,15 @@
       @if (file.source !== 'stock') {
         <span
           class="bg-accent/20 text-accent shrink-0 rounded-md px-1 py-px text-[11px] font-semibold tracking-wide uppercase"
-          >{{ file.source === 'override' ? 'replaced' : 'added' }}</span
+          i18n="@@samples.source"
+          >{file.source, select, override {replaced} other {added}}</span
         >
       }
       @if (file.kind === 'sample' && row().used) {
         <span
+          i18n="@@samples.used"
           class="bg-good/20 text-good shrink-0 rounded-md px-1 py-px text-[11px] font-semibold tracking-wide uppercase"
+          i18n-title="@@samples.this-song-plays-this.title"
           title="This song plays this sample, so it is always loaded."
           >used</span
         >
@@ -50,7 +54,9 @@
     } @else if (file.kind === 'bank') {
       <p class="text-ink-muted mt-0.5 font-mono text-xs">{{ row().bank }}</p>
     } @else if (!row().requested) {
-      <p class="text-ink-muted mt-0.5 font-mono text-xs">{{ row().detail }} · not in this song</p>
+      <p i18n="@@samples.not-in-this-song" class="text-ink-muted mt-0.5 font-mono text-xs">
+        {{ row().detail }} · not in this song
+      </p>
     } @else {
       <amk-sample-wave class="mt-1 h-8" [d]="row().waveform" />
       <p class="text-ink-muted mt-0.5 font-mono text-xs">{{ row().detail }}</p>
@@ -62,6 +68,7 @@
       <!-- Offered even when the sample is used, so the control does not appear
            and vanish as the MML is edited. -->
       <amk-checkbox
+        i18n="@@samples.keep"
         class="shrink-0 text-xs"
         [checked]="file.important"
         (checkedChange)="onImportant(file.name, $event)"
@@ -69,7 +76,9 @@
       >
     } @else {
       <span
+        i18n="@@samples.not-in-song"
         class="text-ink-muted shrink-0 text-xs"
+        i18n-title="@@samples.this-song-does-not.title"
         title="This song does not reference this sample, so it uses no ARAM whether or not it is kept. Name it in #samples to load it."
         >not in song</span
       >
@@ -77,9 +86,13 @@
   }
 
   @if (file.source === 'override') {
-    <button amk-button variant="ghost" (click)="revert(file.name)">Revert</button>
+    <button i18n="@@samples.revert" amk-button variant="ghost" (click)="revert(file.name)">
+      Revert
+    </button>
   } @else if (file.source === 'user') {
-    <button amk-button variant="ghost" (click)="remove(file.name)">Delete</button>
+    <button i18n="@@samples.delete" amk-button variant="ghost" (click)="remove(file.name)">
+      Delete
+    </button>
   }
 </div>
 

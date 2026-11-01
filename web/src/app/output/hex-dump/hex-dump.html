@@ -1,6 +1,11 @@
 <!-- `border-t` alone: the budget above ends without a rule, and the section holds the bottom. -->
 <div class="border-edge flex items-center justify-between gap-3 border-t px-3 py-1.5">
-  <h3 class="text-ink-muted text-xs font-semibold tracking-wide uppercase">Hex dump</h3>
+  <h3
+    i18n="@@output.hex.hex-dump"
+    class="text-ink-muted text-xs font-semibold tracking-wide uppercase"
+  >
+    Hex dump
+  </h3>
   <span class="text-ink-muted font-mono text-xs">{{ range() }}</span>
 </div>
 
@@ -9,5 +14,5 @@
 >@for (row of rows(); track row.address) {<span
     class="text-ink-muted"
   >{{ row.address }}  </span><span class="text-accent">{{ row.header }}</span>{{ row.rest }}
-}@if (truncated(); as more) {<span class="text-ink-muted">… {{ more }} more bytes</span>
+}@if (truncated(); as more) {<span i18n="@@output.hex.more-bytes" class="text-ink-muted">… {{ more }} more bytes</span>
 }</pre>

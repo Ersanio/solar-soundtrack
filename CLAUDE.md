@@ -144,6 +144,12 @@ implement are reported as errors, never silently mis-compiled. Their text is not
 it is in `@amk/core/messages/amk.ts` and `sst.ts`, one entry per code and variant, and a new
 diagnostic adds its entry there. What each `SST05xx` covers: `docs/claude/compiler.md`.
 
+**Text a porter reads carries an i18n ID.** Templates take `i18n="@@group.name"`, TypeScript and
+the packages `` $localize`:@@group.name:…` ``, and `web/src/locale/messages.json` lists all of it,
+grouped by where it is read. The lint rule and `npm run check` hold both halves. A string that is
+compared or stored is a key, never text. How to mark, which group, and what stays unmarked:
+`docs/claude/i18n.md`.
+
 **Accessibility is not supported.** The app ships no ARIA attributes and no `role` or `tabindex`,
 and none are planned. `angular.configs.templateAccessibility` is therefore absent from the
 template lint block, and the "Accessibility Requirements" section of `web/.claude/CLAUDE.md` does

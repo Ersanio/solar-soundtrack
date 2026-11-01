@@ -3,7 +3,7 @@
     amk-toggle
     icon
     [pressed]="wordWrap()"
-    [title]="wordWrap() ? 'Word wrap: on' : 'Word wrap: off'"
+    [title]="wordWrap() ? text.wrapOn : text.wrapOff"
     (click)="toggleWordWrap()"
   >
     <amk-icon-wrap />
@@ -20,7 +20,7 @@
   <button
     amk-toggle
     [pressed]="paletteOpen()"
-    [title]="paletteOpen() ? 'Hide the command palette' : 'Show the command palette'"
+    [title]="paletteOpen() ? text.hidePalette : text.showPalette"
     (click)="paletteOpen.set(!paletteOpen())"
   >
     @if (paletteOpen()) {
@@ -28,7 +28,7 @@
     } @else {
       <amk-icon-chevron-right />
     }
-    Commands
+    <ng-container i18n="@@source.commands">Commands</ng-container>
   </button>
 
   <span class="text-ink-muted ml-auto font-mono text-xs">{{ store.caretLabel() }}</span>

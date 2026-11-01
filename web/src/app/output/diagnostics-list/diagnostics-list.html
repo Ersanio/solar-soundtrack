@@ -8,7 +8,7 @@
         class="hover:bg-raised flex w-full cursor-pointer items-baseline gap-2 px-3 py-2 text-left"
         (click)="reveal(diagnostic)"
       >
-        <span class="text-ink-muted shrink-0 font-mono text-xs"
+        <span i18n="@@output.problems.line" class="text-ink-muted shrink-0 font-mono text-xs"
           >line {{ diagnostic.span.line }}</span
         >
         <span class="shrink-0 font-mono text-xs" [class]="severityClass[diagnostic.severity]">
@@ -18,6 +18,6 @@
       </button>
     </li>
   } @empty {
-    <li class="text-ink-muted px-3 py-2">No problems.</li>
+    <li i18n="@@output.problems.no-problems" class="text-ink-muted px-3 py-2">No problems.</li>
   }
 </ul>

@@ -70,7 +70,9 @@ export class RollTooltip {
         instrument >= FIRST_PERCUSSION_INSTRUMENT && instrument < FIRST_CUSTOM_INSTRUMENT
           ? this.drivers.instruments()?.percussion[instrument - FIRST_PERCUSSION_INSTRUMENT]
           : undefined;
-      const sample = entry ? `, sample $${hex2(entry.srcn ?? 0)}` : '';
+      const sample = entry
+        ? $localize`:@@roll.sample:, sample $${hex2(entry.srcn ?? 0)}:byte:`
+        : '';
 
       // A drum written at a pitch of its own is the interesting case, and the
       // one its lane cannot show: `@29 c` and `@29 g` are one drum at two rates.
@@ -88,7 +90,7 @@ export class RollTooltip {
     if (note.key !== null) {
       const written = context.written.get(note.address);
       const transposition: [number, string][] = [
-        [written === undefined ? 0 : note.note - written, 'transposed'],
+        [written === undefined ? 0 : note.note - written, $localize`:@@roll.transposed:transposed`],
         [note.state.transpose, '$E4'],
         [note.state.tune, '$FA $02'],
       ];
@@ -96,13 +98,13 @@ export class RollTooltip {
       if (applied.length > 0) {
         const plays = keyName(note.key + note.state.transpose + note.state.tune);
         const by = applied.map(([n, what]) => `${what} ${n > 0 ? '+' : ''}${n}`).join(', ');
-        rows.push(`plays as ${plays} — ${by}`);
+        rows.push($localize`:@@roll.plays-as:plays as ${plays}:plays: — ${by}:by:`);
       }
     }
 
     if (note.state.noise !== null) {
       rows.push(
-        `noise — clock $${hex(note.state.noise)}, ${Math.round(noiseHz(note.state.noise))} Hz`,
+        $localize`:@@roll.noise-clock-hz:noise — clock $${hex(note.state.noise)}:noise:, ${Math.round(noiseHz(note.state.noise))}:amount: Hz`,
       );
     }
 
@@ -111,11 +113,15 @@ export class RollTooltip {
     }
 
     if (note.state.quantization !== null) {
-      rows.push(`q${hex2(note.state.quantization)} — sounds ${note.gateTicks} of ${note.ticks}`);
+      rows.push(
+        $localize`:@@roll.q-sounds-of:q${hex2(note.state.quantization)}:quantization: — sounds ${note.gateTicks}:gateTicks: of ${note.ticks}:ticks:`,
+      );
     }
 
     if (tempo > 0) {
-      rows.push(`t${tempo} — ${ticksPerSecond(tempo).toFixed(1)} ticks per second`);
+      rows.push(
+        $localize`:@@roll.t-ticks-per-second:t${tempo}:tempo: — ${ticksPerSecond(tempo).toFixed(1)}:amount: ticks per second`,
+      );
     }
 
     const heading = headingOf(note, context, false);
@@ -136,11 +142,11 @@ export class RollTooltip {
     }
 
     if (sets.length > 0) {
-      rows.push(`sets ${sets.join(', ').toLowerCase()}`);
+      rows.push($localize`:@@roll.sets:sets ${sets.join(', ').toLowerCase()}:what:`);
     }
 
     if (under.length > 0) {
-      rows.push(`under ${under.join(', ').toLowerCase()}`);
+      rows.push($localize`:@@roll.under:under ${under.join(', ').toLowerCase()}:what:`);
     }
 
     const at = this.anchor();
@@ -148,8 +154,8 @@ export class RollTooltip {
     const upward = at.y > at.height / 2;
 
     return {
-      heading: `${heading} · channel ${note.channel}`,
-      length: `tick ${note.tick} · ${note.ticks} ticks`,
+      heading: $localize`:@@roll.channel:${heading}:heading: · channel ${note.channel}:channel:`,
+      length: $localize`:@@roll.tick-ticks:tick ${note.tick}:tick: · ${note.ticks}:ticks: ticks`,
       rows,
       source: this.sourceOf(note),
       left: leftward ? null : at.x + TOOLTIP_GAP,

@@ -1,6 +1,6 @@
 import { TICKS_PER_WHOLE } from '@amk/core/hardcoded-tables';
 import { NOTE_DENOMINATORS } from '@amk/tokens/commands/letter-params';
-import { noteLengthName } from '@amk/tokens/commands/units';
+import { noteLengthName, tickCount } from '@amk/tokens/commands/units';
 import { type Edit, insertAt, spliceRange } from '@amk/tokens/edits';
 import { type Command, type NoteLengthSegment, noteLengthTicks } from '@amk/tokens';
 import { replacementLockedBecause } from '../commands/context';
@@ -42,13 +42,12 @@ export interface NoteLengthRow {
 }
 
 /** Said under a row whose digits are not in the document. */
-export const READS_THE_DEFAULT =
-  'This note takes its length from the standing `l`. Moving the slider writes the length onto the note itself.';
+export const READS_THE_DEFAULT = $localize`:@@inspector.note-length.this-note-takes-its-length:This note takes its length from the standing \`l\`. Moving the slider writes the length onto the note itself.`;
 
 /** The reading beside the track — `1/4 · a quarter note · 48 ticks`. */
 export function noteLengthLabel(segment: NoteLengthSegment, denominator: number): string {
   const ticks = noteLengthTicks(segment, denominator);
-  return [`1/${denominator}`, noteLengthName(ticks), `${ticks} tick${ticks === 1 ? '' : 's'}`]
+  return [`1/${denominator}`, noteLengthName(ticks), tickCount(ticks)]
     .filter((part) => part !== null)
     .join(' · ');
 }
@@ -69,8 +68,8 @@ function lockedBecause(segment: NoteLengthSegment): string | null {
 
   if (segment.denominator === null) {
     return segment.exact
-      ? 'written as an exact tick count, which is not a note value'
-      : 'the standing `l` is not a length that can be written as `1/n`';
+      ? $localize`:@@inspector.note-length.written-as-an-exact-tick:written as an exact tick count, which is not a note value`
+      : $localize`:@@inspector.note-length.the-standing-l-is-not:the standing \`l\` is not a length that can be written as \`1/n\``;
   }
 
   return null;
@@ -82,7 +81,10 @@ export function noteLengthRows(command: Command): readonly NoteLengthRow[] {
     const locked = lockedBecause(segment);
     return {
       key: index,
-      label: index === 0 ? 'Length' : 'Tied to',
+      label:
+        index === 0
+          ? $localize`:@@inspector.note-length.length:Length`
+          : $localize`:@@inspector.note-length.tied-to:Tied to`,
       value: segment.denominator ?? segment.ticks,
       ticks: segment.ticks,
       written: !segment.implicit,

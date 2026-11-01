@@ -102,63 +102,63 @@ export const TOKEN_TAGS: Readonly<Record<TokenKind, string>> = {
 
 /** Human-readable names for the VCMDs, used in hover text and the command inspector. */
 export const VCMD_NAMES: Readonly<Record<number, string>> = {
-	0xda: "set instrument",
-	0xdb: "pan",
-	0xdc: "pan fade",
-	0xdd: "pitch bend",
-	0xde: "vibrato",
-	0xdf: "vibrato off",
-	0xe0: "global volume",
-	0xe1: "global volume fade",
-	0xe2: "tempo",
-	0xe3: "tempo fade",
-	0xe4: "global transpose",
-	0xe5: "tremolo",
-	0xe6: "subloop",
-	0xe7: "volume",
-	0xe8: "volume fade",
-	0xe9: "call loop",
-	0xea: "vibrato fade",
-	0xeb: "pitch envelope (release)",
-	0xec: "pitch envelope (attack)",
-	0xed: "ADSR / GAIN",
-	0xee: "fine tune",
-	0xef: "echo parameters",
-	0xf0: "echo off",
-	0xf1: "echo parameters",
-	0xf2: "echo fade",
-	0xf3: "sample load",
-	0xf4: "misc",
-	0xf5: "FIR filter",
-	0xf6: "DSP write",
-	0xf7: "write byte",
-	0xf8: "noise",
-	0xf9: "data send",
-	0xfa: "misc",
-	0xfb: "arpeggio",
-	0xfc: "remote code",
-	0xfd: "tremolo off",
-	0xfe: "pitch envelope off",
+	0xda: $localize`:@@command.name.set-instrument:set instrument`,
+	0xdb: $localize`:@@command.name.pan:pan`,
+	0xdc: $localize`:@@command.name.pan-fade:pan fade`,
+	0xdd: $localize`:@@command.name.pitch-bend:pitch bend`,
+	0xde: $localize`:@@command.name.vibrato:vibrato`,
+	0xdf: $localize`:@@command.name.vibrato-off:vibrato off`,
+	0xe0: $localize`:@@command.name.global-volume:global volume`,
+	0xe1: $localize`:@@command.name.global-volume-fade:global volume fade`,
+	0xe2: $localize`:@@command.name.tempo:tempo`,
+	0xe3: $localize`:@@command.name.tempo-fade:tempo fade`,
+	0xe4: $localize`:@@command.name.global-transpose:global transpose`,
+	0xe5: $localize`:@@command.name.tremolo:tremolo`,
+	0xe6: $localize`:@@command.name.subloop:subloop`,
+	0xe7: $localize`:@@command.name.volume:volume`,
+	0xe8: $localize`:@@command.name.volume-fade:volume fade`,
+	0xe9: $localize`:@@command.name.call-loop:call loop`,
+	0xea: $localize`:@@command.name.vibrato-fade:vibrato fade`,
+	0xeb: $localize`:@@command.name.pitch-envelope-release:pitch envelope (release)`,
+	0xec: $localize`:@@command.name.pitch-envelope-attack:pitch envelope (attack)`,
+	0xed: $localize`:@@command.name.adsr-gain:ADSR / GAIN`,
+	0xee: $localize`:@@command.name.fine-tune:fine tune`,
+	0xef: $localize`:@@command.name.echo-parameters:echo parameters`,
+	0xf0: $localize`:@@command.name.echo-off:echo off`,
+	0xf1: $localize`:@@command.name.echo-parameters:echo parameters`,
+	0xf2: $localize`:@@command.name.echo-fade:echo fade`,
+	0xf3: $localize`:@@command.name.sample-load:sample load`,
+	0xf4: $localize`:@@command.name.misc:misc`,
+	0xf5: $localize`:@@command.name.fir-filter:FIR filter`,
+	0xf6: $localize`:@@command.name.dsp-write:DSP write`,
+	0xf7: $localize`:@@command.name.write-byte:write byte`,
+	0xf8: $localize`:@@command.name.noise:noise`,
+	0xf9: $localize`:@@command.name.data-send:data send`,
+	0xfa: $localize`:@@command.name.misc:misc`,
+	0xfb: $localize`:@@command.name.arpeggio:arpeggio`,
+	0xfc: $localize`:@@command.name.remote-code:remote code`,
+	0xfd: $localize`:@@command.name.tremolo-off:tremolo off`,
+	0xfe: $localize`:@@command.name.pitch-envelope-off:pitch envelope off`,
 };
 
 /** Human names for the single-letter commands, to match {@link VCMD_NAMES}. */
 export const LETTER_NAMES: Readonly<Record<string, string>> = {
-	t: "tempo",
-	v: "volume",
-	w: "global volume",
-	y: "pan",
-	q: "quantization",
-	l: "default length",
-	o: "octave",
-	"@": "instrument",
-	h: "transpose",
-	n: "noise",
-	p: "vibrato",
-	"<": "octave down",
-	">": "octave up",
-	"[": "loop start",
-	"]": "loop end",
-	"*": "loop call",
+	t: $localize`:@@command.name.tempo:tempo`,
+	v: $localize`:@@command.name.volume:volume`,
+	w: $localize`:@@command.name.global-volume:global volume`,
+	y: $localize`:@@command.name.pan:pan`,
+	q: $localize`:@@command.name.quantization:quantization`,
+	l: $localize`:@@command.name.default-length:default length`,
+	o: $localize`:@@command.name.octave:octave`,
+	"@": $localize`:@@command.name.instrument:instrument`,
+	h: $localize`:@@command.name.transpose:transpose`,
+	n: $localize`:@@command.name.noise:noise`,
+	p: $localize`:@@command.name.vibrato:vibrato`,
+	"<": $localize`:@@command.name.octave-down:octave down`,
+	">": $localize`:@@command.name.octave-up:octave up`,
+	"[": $localize`:@@command.name.loop-start:loop start`,
+	"]": $localize`:@@command.name.loop-end:loop end`,
+	"*": $localize`:@@command.name.loop-call:loop call`,
 };
 
 /**
@@ -170,9 +170,9 @@ export const LETTER_NAMES: Readonly<Record<string, string>> = {
  * commands in the inspector and the hover.
  */
 const LETTER_FADE_NAMES: Readonly<Record<string, string>> = {
-	t: "tempo fade",
-	v: "volume fade",
-	w: "global volume fade",
+	t: $localize`:@@command.name.tempo-fade:tempo fade`,
+	v: $localize`:@@command.name.volume-fade:volume fade`,
+	w: $localize`:@@command.name.global-volume-fade:global volume fade`,
 };
 
 /**
@@ -2328,14 +2328,14 @@ function gather(
 
 function nameForNote(kind: TokenKind): string {
 	if (kind === "rest") {
-		return "rest";
+		return $localize`:@@command.name.rest:rest`;
 	}
 
 	if (kind === "tie") {
-		return "tie";
+		return $localize`:@@command.name.tie:tie`;
 	}
 
-	return "note";
+	return $localize`:@@command.name.note:note`;
 }
 
 /** The radix comes from the kind, which keeps {@link gather} a pure function of the stream. */
@@ -2365,15 +2365,15 @@ export function vcmdName(vcmd: number, args: { value: number }[], target: Comman
 		}
 
 		if (sub === 0x81) {
-			return "tune"; // parser.ts:parseHFDHex
+			return $localize`:@@command.name.tune:tune`; // parser.ts:parseHFDHex
 		}
 
 		if (sub === 0x82) {
-			return "ARAM upload"; // parser.ts:parseHFDHex
+			return $localize`:@@command.name.aram-upload:ARAM upload`; // parser.ts:parseHFDHex
 		}
 
 		if (sub === 0x83) {
-			return "unknown command"; // AMK0163 (parser.ts:parseHFDHex)
+			return $localize`:@@command.name.unknown-command:unknown command`; // AMK0163 (parser.ts:parseHFDHex)
 		}
 
 		return VCMD_NAMES[0xed]; // the plain form, a bare `$ED` included
@@ -2384,10 +2384,10 @@ export function vcmdName(vcmd: number, args: { value: number }[], target: Comman
 	}
 
 	if (vcmd === 0xfc && target.amkVersion === 1) {
-		return "remote gain"; // parser.ts:parseHexCommand, which rebuilds it as a type 5 remote code event
+		return $localize`:@@command.name.remote-gain:remote gain`; // parser.ts:parseHexCommand, which rebuilds it as a type 5 remote code event
 	}
 
-	return VCMD_NAMES[vcmd] ?? "unknown command";
+	return VCMD_NAMES[vcmd] ?? $localize`:@@command.name.unknown-command:unknown command`;
 }
 
 /**

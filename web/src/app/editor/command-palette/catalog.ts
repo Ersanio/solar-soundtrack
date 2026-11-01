@@ -47,13 +47,13 @@ export interface CategoryDef {
 }
 
 export const CATEGORIES: readonly CategoryDef[] = [
-  { id: 'notes', label: 'Notes' },
-  { id: 'volume', label: 'Volume' },
-  { id: 'pitch', label: 'Pitch' },
-  { id: 'instrument', label: 'Instrument' },
-  { id: 'echo', label: 'Echo' },
-  { id: 'loops', label: 'Loops' },
-  { id: 'misc', label: 'Misc' },
+  { id: 'notes', label: $localize`:@@palette.category.notes:Notes` },
+  { id: 'volume', label: $localize`:@@palette.category.volume:Volume` },
+  { id: 'pitch', label: $localize`:@@palette.category.pitch:Pitch` },
+  { id: 'instrument', label: $localize`:@@palette.category.instrument:Instrument` },
+  { id: 'echo', label: $localize`:@@palette.category.echo:Echo` },
+  { id: 'loops', label: $localize`:@@palette.category.loops:Loops` },
+  { id: 'misc', label: $localize`:@@palette.category.misc:Misc` },
 ];
 
 /** What every entry says regardless of how it is spelled. */
@@ -237,44 +237,43 @@ export const ENTRIES: readonly Entry[] = [
   letter('l', 'l8', {
     category: 'notes',
     icon: 'note',
-    blurb:
-      'The default length notes take, when you do not write one on them. Compile-time command.',
+    blurb: $localize`:@@palette.the-default-length-notes-take:The default length notes take, when you do not write one on them. Compile-time command.`,
   }),
   {
     kind: 'syntax',
     category: 'notes',
     id: 'l=',
     icon: 'noteTicks',
-    label: 'default length, in ticks',
-    blurb: 'Sets the default note length as an exact number of ticks. Compile-time command.',
+    label: $localize`:@@palette.default-length-in-ticks:default length, in ticks`,
+    blurb: $localize`:@@palette.sets-the-default-note-length:Sets the default note length as an exact number of ticks. Compile-time command.`,
     snippet: 'l=48',
     syntax: 'exactLength',
   },
   letter('o', 'o4', {
     category: 'notes',
     icon: 'octave',
-    blurb: 'Which octave the notes after it are played in. Compile-time command.',
+    blurb: $localize`:@@palette.which-octave-the-notes-after:Which octave the notes after it are played in. Compile-time command.`,
   }),
   letter('<', '<', {
     category: 'notes',
     icon: 'octaveDown',
-    blurb: 'Drops everything after it by one octave. Compile-time command.',
+    blurb: $localize`:@@palette.drops-everything-after-it-by:Drops everything after it by one octave. Compile-time command.`,
   }),
   letter('>', '>', {
     category: 'notes',
     icon: 'octaveUp',
-    blurb: 'Lifts everything after it by one octave. Compile-time command.',
+    blurb: $localize`:@@palette.lifts-everything-after-it-by:Lifts everything after it by one octave. Compile-time command.`,
   }),
   letter('q', 'q7f', {
     category: 'notes',
     icon: 'staccato',
-    blurb: 'How much of each note actually sounds before it is cut short.',
+    blurb: $localize`:@@palette.how-much-of-each-note:How much of each note actually sounds before it is cut short.`,
   }),
   letter('t', 't48', {
     category: 'notes',
     writes: 0xe2,
     icon: 'metronome',
-    blurb: 'How fast the song plays.',
+    blurb: $localize`:@@palette.how-fast-the-song-plays:How fast the song plays.`,
   }),
   {
     kind: 'syntax',
@@ -282,8 +281,8 @@ export const ENTRIES: readonly Entry[] = [
     id: 't,',
     writes: 0xe3,
     icon: 'metronomeFade',
-    label: 'tempo fade',
-    blurb: 'Slides the tempo to a new speed over time (accelerando/ritardando).',
+    label: $localize`:@@palette.tempo-fade:tempo fade`,
+    blurb: $localize`:@@palette.slides-the-tempo-to-a:Slides the tempo to a new speed over time (accelerando/ritardando).`,
     snippet: 't18,144',
     syntax: 'fade',
     fallback: [0x12, 0x90],
@@ -294,7 +293,7 @@ export const ENTRIES: readonly Entry[] = [
     category: 'volume',
     writes: 0xe7,
     icon: 'speaker',
-    blurb: 'How loud this channel plays.',
+    blurb: $localize`:@@palette.how-loud-this-channel-plays:How loud this channel plays.`,
   }),
   {
     kind: 'syntax',
@@ -302,8 +301,8 @@ export const ENTRIES: readonly Entry[] = [
     id: 'v,',
     writes: 0xe8,
     icon: 'hairpin',
-    label: 'volume fade',
-    blurb: "Slides this channel's volume over time (crescendo/diminuendo).",
+    label: $localize`:@@palette.volume-fade:volume fade`,
+    blurb: $localize`:@@palette.slides-this-channels-volume-over:Slides this channel's volume over time (crescendo/diminuendo).`,
     snippet: 'v18,200',
     syntax: 'fade',
     fallback: [0x12, 0xc8],
@@ -312,7 +311,7 @@ export const ENTRIES: readonly Entry[] = [
     category: 'volume',
     writes: 0xe0,
     icon: 'speakerMaster',
-    blurb: 'How loud the whole song plays, affects every channel.',
+    blurb: $localize`:@@palette.how-loud-the-whole-song:How loud the whole song plays, affects every channel.`,
   }),
   {
     kind: 'syntax',
@@ -320,8 +319,8 @@ export const ENTRIES: readonly Entry[] = [
     id: 'w,',
     writes: 0xe1,
     icon: 'hairpinMaster',
-    label: 'global volume fade',
-    blurb: 'Slides the whole song louder or quieter over time (fade-in/fade-out).',
+    label: $localize`:@@palette.global-volume-fade:global volume fade`,
+    blurb: $localize`:@@palette.slides-the-whole-song-louder:Slides the whole song louder or quieter over time (fade-in/fade-out).`,
     snippet: 'w18,200',
     syntax: 'fade',
     fallback: [0x12, 0xc8],
@@ -330,96 +329,92 @@ export const ENTRIES: readonly Entry[] = [
     category: 'volume',
     writes: 0xdb,
     icon: 'pan',
-    blurb: "Set the channel's sound position between the left and right speaker.",
+    blurb: $localize`:@@palette.set-the-channels-sound-position:Set the channel's sound position between the left and right speaker.`,
   }),
   hex(0xdc, [0x18, 0x0a], {
     category: 'volume',
     icon: 'panFade',
-    blurb: "Slides this channel's sound position between the left and right speaker over time.",
+    blurb: $localize`:@@palette.slides-this-channels-sound-position:Slides this channel's sound position between the left and right speaker over time.`,
   }),
   hex(0xe5, [0x00, 0x12, 0x08], {
     category: 'volume',
     icon: 'tremolo',
-    blurb: "A steady wobble in volume. The channel's volume pulses.",
+    blurb: $localize`:@@palette.a-steady-wobble-in-volume:A steady wobble in volume. The channel's volume pulses.`,
   }),
   hex(0xfd, [], {
     category: 'volume',
     icon: 'tremoloOff',
-    blurb: 'Stops the volume wobble.',
+    blurb: $localize`:@@palette.stops-the-volume-wobble:Stops the volume wobble.`,
   }),
 
   // ─── Pitch ──────────────────────────────────────────────────────────────
   letter('h', 'h0', {
     category: 'pitch',
     icon: 'sharp',
-    blurb:
-      'Shifts every note written after it up or down by a number of semitones. Compile-time command.',
+    blurb: $localize`:@@palette.shifts-every-note-written-after:Shifts every note written after it up or down by a number of semitones. Compile-time command.`,
   }),
   letter('p', 'p12,8', {
     category: 'pitch',
     writes: 0xde,
     icon: 'wave',
-    blurb: 'A steady wobble in pitch.',
+    blurb: $localize`:@@palette.a-steady-wobble-in-pitch:A steady wobble in pitch.`,
   }),
   hex(0xdf, [], {
     category: 'pitch',
     icon: 'waveOff',
-    blurb: 'Stops the pitch wobble.',
+    blurb: $localize`:@@palette.stops-the-pitch-wobble:Stops the pitch wobble.`,
   }),
   hex(0xea, [0x18], {
     category: 'pitch',
     icon: 'waveFade',
-    blurb:
-      'Eases the vibrato in or out instead of switching it on at full depth. Must be used after a vibrato (`p`) command.',
+    blurb: $localize`:@@palette.eases-the-vibrato-in-or:Eases the vibrato in or out instead of switching it on at full depth. Must be used after a vibrato (\`p\`) command.`,
   }),
   hex(0xdd, [0x00, 0x18, 0xa4], {
     category: 'pitch',
     icon: 'slide',
-    blurb: 'Slides smoothly from the note playing now to another one.',
+    blurb: $localize`:@@palette.slides-smoothly-from-the-note:Slides smoothly from the note playing now to another one.`,
     // main.asm:3256-3287 — the per-tick read-ahead peeks for $DD and swallows
     // all four bytes, and its dispatch slot is $0000 for anything the command
     // loop reaches first. SST0507 is the same fact about a written one.
     caveat: () =>
-      'Write it directly after a note of two ticks or more, otherwise it crashes the SPC.',
+      $localize`:@@palette.write-it-directly-after-a:Write it directly after a note of two ticks or more, otherwise it crashes the SPC.`,
   }),
   hex(0xec, [0x00, 0x18, 0x02], {
     category: 'pitch',
     icon: 'envelopeUp',
-    blurb:
-      'Starts with the specified semitones difference applied, and bends it into the note that follows.',
+    blurb: $localize`:@@palette.starts-with-the-specified-semitones:Starts with the specified semitones difference applied, and bends it into the note that follows.`,
   }),
   hex(0xeb, [0x00, 0x18, 0x02], {
     category: 'pitch',
     icon: 'envelopeDown',
-    blurb:
-      'Starts with the note that follows, and bends it into the specified semitones difference.',
+    blurb: $localize`:@@palette.starts-with-the-note-that:Starts with the note that follows, and bends it into the specified semitones difference.`,
   }),
   hex(0xfe, [], {
     category: 'pitch',
     icon: 'envelopeOff',
-    blurb: 'Stops the pitch bends through the envelope commands.',
+    blurb: $localize`:@@palette.stops-the-pitch-bends-through:Stops the pitch bends through the envelope commands.`,
   }),
   hex(0xe4, [0x00], {
     category: 'pitch',
     icon: 'sharpMaster',
-    blurb: 'Shifts the pitch up or down by a number of semitones. Applies to the entire song.',
+    blurb: $localize`:@@palette.shifts-the-pitch-up-or:Shifts the pitch up or down by a number of semitones. Applies to the entire song.`,
     // `parser.ts:parseHexCommand` (Music.cpp:1863) — Addmusic 4.05 stored one
     // more than was written, and AddmusicK reproduces it in silence. Below
     // `$F2`, so the non-native warning never covers it either; SST0508 does.
     caveat: (target) =>
       target.program === 1
-        ? 'Under #am4 the compiler adds one, so the transpose lands a semitone above what is written.'
+        ? $localize`:@@palette.under-am4-the-compiler-adds:Under #am4 the compiler adds one, so the transpose lands a semitone above what is written.`
         : undefined,
   }),
   hex(0xee, [0x00], {
     category: 'pitch',
     icon: 'tuningFork',
-    blurb: 'Nudges the pitch by a fraction of a semitone, applies to the current channel only.',
+    blurb: $localize`:@@palette.nudges-the-pitch-by-a:Nudges the pitch by a fraction of a semitone, applies to the current channel only.`,
   }),
   hex(0xfb, [0x02, 0x06, 0xa4, 0xa7], {
     category: 'pitch',
     icon: 'arpeggio',
-    blurb: 'Cycles quickly through a set of notes.',
+    blurb: $localize`:@@palette.cycles-quickly-through-a-set:Cycles quickly through a set of notes.`,
   }),
 
   // ─── Instrument ─────────────────────────────────────────────────────────
@@ -427,62 +422,61 @@ export const ENTRIES: readonly Entry[] = [
     category: 'instrument',
     writes: 0xda,
     icon: 'keys',
-    blurb: 'Which instrument this channel plays.',
+    blurb: $localize`:@@palette.which-instrument-this-channel-plays:Which instrument this channel plays.`,
   }),
   letter('n', 'n10', {
     category: 'instrument',
     writes: 0xf8,
     icon: 'noise',
-    blurb: 'Swaps the instrument for white noise.',
+    blurb: $localize`:@@palette.swaps-the-instrument-for-white:Swaps the instrument for white noise.`,
   }),
   hex(0xed, [0x3f, 0x4d], {
     id: 'adsr',
     category: 'instrument',
     icon: 'adsr',
     label: 'ADSR',
-    blurb: 'How a note swells and dies away: attack, decay, sustain, release.',
+    blurb: $localize`:@@palette.how-a-note-swells-and:How a note swells and dies away: attack, decay, sustain, release.`,
   }),
   hex(0xed, [0x8e, 0x7f], {
     id: 'gain',
     category: 'instrument',
     icon: 'gain',
     label: 'GAIN',
-    blurb: "Drives the note's loudness directly instead, holding or sliding it to a level.",
+    blurb: $localize`:@@palette.drives-the-notes-loudness-directly:Drives the note's loudness directly instead, holding or sliding it to a level.`,
   }),
   hex(0xf3, [0x00, 0x04], {
     category: 'instrument',
     icon: 'sample',
-    blurb: 'Swaps the sample and coarse tuning without touching how the note swells.',
+    blurb: $localize`:@@palette.swaps-the-sample-and-coarse:Swaps the sample and coarse tuning without touching how the note swells.`,
   }),
 
   // ─── Echo ───────────────────────────────────────────────────────────────
   hex(0xef, [0xff, 0x28, 0x28], {
     category: 'echo',
     icon: 'echo',
-    label: 'echo channels & volume',
-    blurb: 'Adds a reverb effect for the specified channels, and how loud it is.',
+    label: $localize`:@@palette.echo-channels-volume:echo channels & volume`,
+    blurb: $localize`:@@palette.adds-a-reverb-effect-for:Adds a reverb effect for the specified channels, and how loud it is.`,
   }),
   hex(0xf1, [0x02, 0x00, 0x00], {
     category: 'echo',
     icon: 'echoDelay',
-    label: 'echo delay & feedback',
-    blurb: 'How far behind the echo sits, how much of it feeds back, and which filter shapes it.',
+    label: $localize`:@@palette.echo-delay-feedback:echo delay & feedback`,
+    blurb: $localize`:@@palette.how-far-behind-the-echo:How far behind the echo sits, how much of it feeds back, and which filter shapes it.`,
   }),
   hex(0xf2, [0x18, 0x28, 0x28], {
     category: 'echo',
     icon: 'echoFade',
-    blurb: 'Fades the echo to the specified volume over time.',
+    blurb: $localize`:@@palette.fades-the-echo-to-the:Fades the echo to the specified volume over time.`,
   }),
   hex(0xf0, [], {
     category: 'echo',
     icon: 'echoOff',
-    blurb: 'Turns the echo off.',
+    blurb: $localize`:@@palette.turns-the-echo-off:Turns the echo off.`,
   }),
   hex(0xf5, [0xff, 0x08, 0x17, 0x24, 0x24, 0x17, 0x08, 0xff], {
     category: 'echo',
     icon: 'filter',
-    blurb:
-      'Shapes the tone of the echo by selectively reducing or emphasizing frequencies. It affects how bright or muffled the repeats sound.',
+    blurb: $localize`:@@palette.shapes-the-tone-of-the:Shapes the tone of the echo by selectively reducing or emphasizing frequencies. It affects how bright or muffled the repeats sound.`,
   }),
 
   // ─── Loops ──────────────────────────────────────────────────────────────
@@ -495,9 +489,9 @@ export const ENTRIES: readonly Entry[] = [
     category: 'loops',
     writes: 0xe9,
     wraps: 'loop',
-    label: 'loop',
+    label: $localize`:@@palette.label.loop:loop`,
     icon: 'repeatStart',
-    blurb: 'Repeats the notes you have selected.',
+    blurb: $localize`:@@palette.repeats-the-notes-you-have:Repeats the notes you have selected.`,
   }),
   {
     kind: 'syntax',
@@ -506,8 +500,8 @@ export const ENTRIES: readonly Entry[] = [
     writes: 0xe6,
     wraps: 'subloop',
     icon: 'repeatNested',
-    label: 'subloop',
-    blurb: 'Repeats the selected notes inside a repeat that is already running.',
+    label: $localize`:@@palette.label.subloop:subloop`,
+    blurb: $localize`:@@palette.repeats-the-selected-notes-inside:Repeats the selected notes inside a repeat that is already running.`,
     snippet: '[[ ]]2',
     syntax: null,
   },
@@ -526,8 +520,8 @@ export const ENTRIES: readonly Entry[] = [
     id: '(n)',
     calls: true,
     icon: 'replay',
-    label: 'loop call',
-    blurb: 'Plays a loop you have already written, again from here.',
+    label: $localize`:@@palette.loop-call:loop call`,
+    blurb: $localize`:@@palette.plays-a-loop-you-have:Plays a loop you have already written, again from here.`,
     snippet: '(0)2',
     syntax: null,
   },
@@ -536,9 +530,8 @@ export const ENTRIES: readonly Entry[] = [
     category: 'loops',
     id: '(!n)',
     icon: 'triggerDefine',
-    label: 'remote code',
-    blurb:
-      'Writes a command snippet the song can run by itself later. Goes above the first channel.',
+    label: $localize`:@@palette.remote-code:remote code`,
+    blurb: $localize`:@@palette.writes-a-command-snippet-the:Writes a command snippet the song can run by itself later. Goes above the first channel.`,
     snippet: '(!1)[$F4 $09]',
     syntax: 'remoteLoop',
     context: 'before-channels',
@@ -549,8 +542,8 @@ export const ENTRIES: readonly Entry[] = [
     id: '(!n,',
     writes: 0xfc,
     icon: 'trigger',
-    label: 'remote code call',
-    blurb: 'Arms a remote snippet from here on, and says what should set it off.',
+    label: $localize`:@@palette.remote-code-call:remote code call`,
+    blurb: $localize`:@@palette.arms-a-remote-snippet-from:Arms a remote snippet from here on, and says what should set it off.`,
     snippet: '(!1,1,24)',
     syntax: 'remoteLoop',
     context: 'channel',
@@ -560,8 +553,8 @@ export const ENTRIES: readonly Entry[] = [
     category: 'loops',
     id: '(!!n)',
     icon: 'triggerOff',
-    label: 'remote code reset',
-    blurb: 'Cancels a remote snippet so it stops firing.',
+    label: $localize`:@@palette.remote-code-reset:remote code reset`,
+    blurb: $localize`:@@palette.cancels-a-remote-snippet-so:Cancels a remote snippet so it stops firing.`,
     snippet: '(!!1)',
     syntax: 'remoteReset',
     // Event type `$07`, the non-key-on slot, which is what `(!!1)` above emits —
@@ -575,26 +568,24 @@ export const ENTRIES: readonly Entry[] = [
   hex(0xf4, [0x01], {
     category: 'misc',
     icon: 'toggle',
-    label: 'toggles',
-    blurb:
-      'Nine on/off switches: legato, light staccato, echo for this channel, Yoshi drums and more.',
+    label: $localize`:@@palette.label.toggles:toggles`,
+    blurb: $localize`:@@palette.nine-on-off-switches-legato:Nine on/off switches: legato, light staccato, echo for this channel, Yoshi drums and more.`,
   }),
   hex(0xfa, [0x00, 0x00], {
     category: 'misc',
     icon: 'sliders',
-    label: 'driver settings',
-    blurb:
-      'Eight settings that each take a value: pitch modulation, GAIN, tuning, amplify, echo buffer size.',
+    label: $localize`:@@palette.driver-settings:driver settings`,
+    blurb: $localize`:@@palette.eight-settings-that-each-take:Eight settings that each take a value: pitch modulation, GAIN, tuning, amplify, echo buffer size.`,
   }),
   hex(0xf6, [0x0c, 0x7f], {
     category: 'misc',
     icon: 'chip',
-    blurb: "Writes a value straight into one of the sound chip's registers.",
+    blurb: $localize`:@@palette.writes-a-value-straight-into:Writes a value straight into one of the sound chip's registers.`,
   }),
   hex(0xf7, [0x00, 0x00, 0x00], {
     category: 'misc',
     icon: 'chipWrite',
-    blurb: "AddmusicM's command for writing a byte anywhere in the driver's memory.",
+    blurb: $localize`:@@palette.addmusicms-command-for-writing-a:AddmusicM's command for writing a byte anywhere in the driver's memory.`,
     // Commands.asm:633 — the body is commented out, so the label collapses onto
     // cmdF9 and the dispatch slot is $0000 (main.bin @ $13A6). AddmusicK
     // compiles it without a word, and SST0506 is what says so. Offering the
@@ -605,7 +596,7 @@ export const ENTRIES: readonly Entry[] = [
   hex(0xf9, [0x00, 0x00], {
     category: 'misc',
     icon: 'chipSend',
-    blurb: 'Sends two bytes to the SNES for the ROM to read. Changes nothing you can hear.',
+    blurb: $localize`:@@palette.sends-two-bytes-to-the:Sends two bytes to the SNES for the ROM to read. Changes nothing you can hear.`,
   }),
 ];
 
@@ -692,15 +683,14 @@ function placeAvailability(entry: SyntaxEntry, place: CaretPlace): Availability 
   if (entry.context === 'before-channels' && !place.beforeChannels) {
     return {
       state: 'blocked',
-      reason:
-        'Remote code has to be defined above the first channel; written inside one it is read as a call instead.',
+      reason: $localize`:@@palette.remote-code-has-to-be:Remote code has to be defined above the first channel; written inside one it is read as a call instead.`,
     };
   }
 
   if (entry.context === 'channel' && place.beforeChannels) {
     return {
       state: 'blocked',
-      reason: 'The reset form is a call, so it belongs inside a channel, below the first #0-#7.',
+      reason: $localize`:@@palette.the-reset-form-is-a:The reset form is a call, so it belongs inside a channel, below the first #0-#7.`,
     };
   }
 
@@ -836,8 +826,8 @@ export function resolveEntry(
 
 /** What the readout says where a wrap lands on the other construct. */
 const INSTEAD: Readonly<Record<WrapKind, string>> = {
-  loop: 'Inside a subloop this makes an ordinary loop, which is what fits there.',
-  subloop: 'Inside a loop this makes a subloop - a repeat within the repeat.',
+  loop: $localize`:@@palette.inside-a-subloop-this-makes:Inside a subloop this makes an ordinary loop, which is what fits there.`,
+  subloop: $localize`:@@palette.inside-a-loop-this-makes:Inside a loop this makes a subloop - a repeat within the repeat.`,
 };
 
 /** The two digits of a hex snippet's first argument: `$XX ` then its own `$`. */

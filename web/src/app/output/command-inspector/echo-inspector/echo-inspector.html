@@ -1,5 +1,5 @@
 @if (isEchoOff()) {
-  <p class="text-ink-muted text-xs leading-relaxed">
+  <p i18n="@@inspector.echo.silences-the-echo-and" class="text-ink-muted text-xs leading-relaxed">
     Silences the echo and clears every channel's echo bit. The buffer stays reserved — only
     <code class="text-ink">$FA $04</code> changes that, and the compiler writes it for you.
   </p>
@@ -8,6 +8,7 @@
 } @else {
   @if (isEf()) {
     <amk-bit-toggles
+      i18n-legend="@@inspector.echo.channels.legend"
       legend="Channels"
       [value]="bytes.at(0)"
       [labels]="VOICE_LABELS"
@@ -20,6 +21,7 @@
 
   @if (isFade()) {
     <amk-slider
+      i18n-label="@@inspector.echo.over.label"
       label="Over"
       [value]="bytes.at(0)"
       [max]="255"
@@ -34,7 +36,7 @@
        reading, so only the labels tell them apart. -->
   <amk-slider
     origin="centre"
-    [label]="isFade() ? 'To volume L' : 'Volume L'"
+    [label]="isFade() ? text.toVolumeL : text.volumeL"
     [signed]="true"
     [value]="bytes.signedAt(1)"
     [min]="-128"
@@ -46,7 +48,7 @@
   />
   <amk-slider
     origin="centre"
-    [label]="isFade() ? 'To volume R' : 'Volume R'"
+    [label]="isFade() ? text.toVolumeR : text.volumeR"
     [signed]="true"
     [value]="bytes.signedAt(2)"
     [min]="-128"

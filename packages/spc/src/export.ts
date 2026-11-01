@@ -127,8 +127,7 @@ export function buildSpc(request: SpcExportRequest): SpcExportResult {
 		const end = samplePos + sample.data.length;
 		if (end > ARAM_SIZE) {
 			throw new SpcExportError(
-				`Sample data overflows ARAM by ${end - ARAM_SIZE} bytes. ` +
-					`Song is 0x${hex(songData.length)} bytes; samples need 0x${hex(totalSampleBytes(samples))}.`,
+				$localize`:@@error.export.sample-data-overflows-aram-by:Sample data overflows ARAM by ${end - ARAM_SIZE}:excess: bytes. Song is 0x${hex(songData.length)}:song: bytes; samples need 0x${hex(totalSampleBytes(samples))}:samples:.`,
 			);
 		}
 
@@ -156,7 +155,7 @@ export function buildSpc(request: SpcExportRequest): SpcExportResult {
 
 	if (samplePos > layout.echoStart) {
 		throw new SpcExportError(
-			`Sample data runs into the echo buffer (ends at $${hex(samplePos)}, buffer starts at $${hex(layout.echoStart)}).`,
+			$localize`:@@error.export.sample-data-runs-into-the:Sample data runs into the echo buffer (ends at $${hex(samplePos)}:samplePos:, buffer starts at $${hex(layout.echoStart)}:echoStart:).`,
 		);
 	}
 

@@ -20,8 +20,8 @@ import { dragPreview } from '../commands/preview';
 
 /** `y`'s second and third arguments, and the two bits they set. */
 const SURROUND = [
-  { value: 0, label: 'off' },
-  { value: 1, label: 'on' },
+  { value: 0, label: $localize`:@@inspector.pan.off:off` },
+  { value: 1, label: $localize`:@@inspector.pan.on:on` },
 ] as const;
 
 /**
@@ -86,7 +86,7 @@ export class PanCommand {
     // main.asm:3486 — `PanValues` holds 21 entries, and the driver indexes it
     // with all five bits it kept, so anything past $14 reads off the end.
     this.shownPan() > 0x14
-      ? `past the driver's 21-entry pan table, which ends at $14`
+      ? $localize`:@@inspector.pan.past-the-drivers-21-entry:past the driver's 21-entry pan table, which ends at $14`
       : `$${hex2(this.shownPan())} of $14`,
   );
 
@@ -102,21 +102,21 @@ export class PanCommand {
 
     const spilled = [this.left(), this.right()].some((value) => value >= 2);
     return spilled
-      ? 'AddmusicK accepts 2 here, but the bit it would set is shifted off the byte, so it reads as off.'
+      ? $localize`:@@inspector.pan.addmusick-accepts-2-here-but:AddmusicK accepts 2 here, but the bit it would set is shifted off the byte, so it reads as off.`
       : null;
   });
 
   /** Bit 5 is in neither of the driver's masks, so nothing reads it. */
   protected readonly unusedBit = computed(() =>
     this.packed() && (this.byte() & 0x20) !== 0
-      ? 'Bit 5 is set, which the driver reads as neither pan nor surround.'
+      ? $localize`:@@inspector.pan.bit-5-is-set-which:Bit 5 is set, which the driver reads as neither pan nor surround.`
       : null,
   );
 
   protected readonly note = computed(() =>
     this.packed()
-      ? 'One byte: the low five bits are the pan, bit 7 mirrors the left speaker and bit 6 the right. Written as y, that is y<pan>,<left>,<right>.'
-      : 'Both extra arguments are written or neither. They compile to bits 7 and 6 of a $DB byte.',
+      ? $localize`:@@inspector.pan.one-byte-the-low-five:One byte: the low five bits are the pan, bit 7 mirrors the left speaker and bit 6 the right. Written as y, that is y<pan>,<left>,<right>.`
+      : $localize`:@@inspector.pan.both-extra-arguments-are-written:Both extra arguments are written or neither. They compile to bits 7 and 6 of a $DB byte.`,
   );
 
   // --- editing ---------------------------------------------------------------

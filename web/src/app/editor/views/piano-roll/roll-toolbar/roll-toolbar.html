@@ -8,21 +8,49 @@
   <span class="bg-edge h-5 w-px shrink-0"></span>
 
   <div class="flex items-center gap-1">
-    <span class="text-ink-muted text-xs">Zoom X</span>
-    <button amk-button size="sm" icon title="Zoom out" (click)="zoomBy.emit(-1)">
+    <span i18n="@@roll.zoom-x" class="text-ink-muted text-xs">Zoom X</span>
+    <button
+      amk-button
+      size="sm"
+      icon
+      i18n-title="@@roll.zoom-out.title"
+      title="Zoom out"
+      (click)="zoomBy.emit(-1)"
+    >
       <amk-icon-minus />
     </button>
-    <button amk-button size="sm" icon title="Zoom in" (click)="zoomBy.emit(1)">
+    <button
+      amk-button
+      size="sm"
+      icon
+      i18n-title="@@roll.zoom-in.title"
+      title="Zoom in"
+      (click)="zoomBy.emit(1)"
+    >
       <amk-icon-plus />
     </button>
   </div>
 
   <div class="flex items-center gap-1">
-    <span class="text-ink-muted text-xs">Zoom Y</span>
-    <button amk-button size="sm" icon title="Shorter rows" (click)="rowHeightBy.emit(-1)">
+    <span i18n="@@roll.zoom-y" class="text-ink-muted text-xs">Zoom Y</span>
+    <button
+      amk-button
+      size="sm"
+      icon
+      i18n-title="@@roll.shorter-rows.title"
+      title="Shorter rows"
+      (click)="rowHeightBy.emit(-1)"
+    >
       <amk-icon-minus />
     </button>
-    <button amk-button size="sm" icon title="Taller rows" (click)="rowHeightBy.emit(1)">
+    <button
+      amk-button
+      size="sm"
+      icon
+      i18n-title="@@roll.taller-rows.title"
+      title="Taller rows"
+      (click)="rowHeightBy.emit(1)"
+    >
       <amk-icon-plus />
     </button>
   </div>
@@ -31,7 +59,9 @@
 
   <!-- Three ways of looking at the roll, each a lit plate while it is on. -->
   <button
+    i18n="@@roll.follow-playback"
     amk-toggle
+    i18n-title="@@roll.keep-the-roll-on.title"
     title="Keep the roll on the playing song, including after a scroll seeks it"
     [pressed]="follow()"
     (click)="followChange.emit(!follow())"
@@ -39,14 +69,21 @@
     Follow playback
   </button>
   <button
+    i18n="@@roll.scroll-the-notes"
     amk-toggle
+    i18n-title="@@roll.slide-the-music-under.title"
     title="Slide the music under a fixed playhead, rather than turning a page when the playhead reaches the edge"
     [pressed]="scrollNotes()"
     (click)="scrollNotesChange.emit(!scrollNotes())"
   >
     Scroll the notes
   </button>
-  <button amk-toggle [pressed]="allOctaves()" (click)="allOctavesChange.emit(!allOctaves())">
+  <button
+    i18n="@@roll.all-octaves"
+    amk-toggle
+    [pressed]="allOctaves()"
+    (click)="allOctavesChange.emit(!allOctaves())"
+  >
     All octaves
   </button>
 
@@ -57,9 +94,10 @@
        porter's. -->
   <div
     class="flex items-center gap-1"
+    i18n-title="@@roll.the-grids-time-signature.title"
     title="The grid's time signature: beats in a bar, over the note that gets the beat. Zero beats draws no grid."
   >
-    <span class="text-ink-muted text-xs">Grid</span>
+    <span i18n="@@roll.grid" class="text-ink-muted text-xs">Grid</span>
     <input
       type="number"
       class="bg-inset border-edge text-ink h-7 w-12 rounded-md border px-1.5 font-mono text-xs tabular-nums"
@@ -86,9 +124,10 @@
        that is a whole quarter note. Alt gives ticks without changing it. -->
   <div
     class="flex items-center gap-1"
+    i18n-title="@@roll.what-a-note-snaps.title"
     title="What a note snaps to when you draw or drag it. Hold Alt for single ticks."
   >
-    <span class="text-ink-muted text-xs">Snap</span>
+    <span i18n="@@roll.snap" class="text-ink-muted text-xs">Snap</span>
     <select
       class="bg-inset border-edge text-ink h-7 cursor-pointer rounded-md border px-1.5 text-xs"
       [value]="snap()"
@@ -105,9 +144,10 @@
        length slider is not the roll and does not read this. -->
   <div
     class="flex items-center gap-1"
+    i18n-title="@@roll.what-happens-when-notes.title"
     title="What happens when notes overlap: Overwrite takes the ticks off the notes already there, Insert shifts them out of the way, Strict refuses the edit."
   >
-    <span class="text-ink-muted text-xs">Edits</span>
+    <span i18n="@@roll.edits" class="text-ink-muted text-xs">Edits</span>
     <select
       class="bg-inset border-edge text-ink h-7 cursor-pointer rounded-md border px-1.5 text-xs"
       [value]="editMode()"
@@ -129,9 +169,7 @@
   <button
     amk-toggle
     [pressed]="percussionOpen()"
-    [title]="
-      percussionOpen() ? 'Hide the percussion set' : 'Choose which instruments are percussion'
-    "
+    [title]="percussionOpen() ? text.hidePercussion : text.choosePercussion"
     (click)="percussionOpenChange.emit(!percussionOpen())"
   >
     @if (percussionOpen()) {
@@ -139,7 +177,7 @@
     } @else {
       <amk-icon-chevron-right />
     }
-    Percussion
+    <ng-container i18n="@@roll.percussion">Percussion</ng-container>
   </button>
 
   <!-- A line of its own, drawn even when empty and kept to one line, so a
@@ -154,7 +192,11 @@
          is a property of the song, or of the mixer for a muted channel, and not
          the answer to a click. -->
     @if (editRefusal(); as reason) {
-      <span class="text-warn truncate" [title]="`cannot edit: ${reason}`"
+      <span
+        i18n="@@roll.cannot-edit"
+        class="text-warn truncate"
+        title="cannot edit: {{ reason }}"
+        i18n-title="@@roll.cannot-edit.title"
         >cannot edit: {{ reason }}</span
       >
     }
@@ -163,7 +205,13 @@
          the same thing; one the splice makes arrives at the pointer-up that
          undoes the gesture, so it stands until the document moves under it. -->
     @if (gestureRefusal(); as reason) {
-      <span class="text-warn truncate" [title]="`refused: ${reason}`">refused: {{ reason }}</span>
+      <span
+        i18n="@@roll.refused"
+        class="text-warn truncate"
+        title="refused: {{ reason }}"
+        i18n-title="@@roll.refused.title"
+        >refused: {{ reason }}</span
+      >
     }
   </div>
 </amk-toolbar>

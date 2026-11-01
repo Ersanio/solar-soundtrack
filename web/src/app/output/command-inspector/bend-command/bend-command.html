@@ -1,5 +1,5 @@
 @if (!hasTarget()) {
-  <p class="text-ink-muted text-xs leading-relaxed">
+  <p i18n="@@inspector.bend.needs-three-arguments-a" class="text-ink-muted text-xs leading-relaxed">
     Needs three arguments: a delay, a duration and a target.
   </p>
 } @else {
@@ -19,6 +19,7 @@
   }
 
   <amk-slider
+    i18n-label="@@inspector.bend.delay.label"
     label="Delay"
     [value]="delay()"
     [max]="255"
@@ -30,6 +31,7 @@
   />
 
   <amk-slider
+    i18n-label="@@inspector.bend.over.label"
     label="Over"
     [value]="duration()"
     [max]="255"
@@ -45,7 +47,9 @@
          there is none, so it is not rendered disabled at a made-up one. -->
     <span class="flex flex-col gap-0.5">
       <span class="flex items-baseline justify-between gap-2">
-        <span class="text-ink-muted text-[11px]">Target note</span>
+        <span i18n="@@inspector.bend.target-note" class="text-ink-muted text-[11px]"
+          >Target note</span
+        >
         <span class="text-ink font-mono text-[11px]">{{ written.text }}</span>
       </span>
       <span class="text-ink-muted text-[11px] leading-snug">{{ lockedBecause(2) }}</span>
@@ -53,6 +57,7 @@
   } @else if (isPitchBend()) {
     <!-- A dropdown, so there is no drag to preview: it commits on choosing. -->
     <amk-note-picker
+      i18n-label="@@inspector.bend.target-note.label"
       label="Target note"
       [value]="target()"
       [disabled]="!editable(2)"
@@ -61,6 +66,7 @@
     <span class="text-ink-muted font-mono text-[11px]">{{ noteLabel() }}</span>
   } @else {
     <amk-slider
+      i18n-label="@@inspector.bend.semitones.label"
       label="Semitones"
       [signed]="true"
       [value]="semitones()"

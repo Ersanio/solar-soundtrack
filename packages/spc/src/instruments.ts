@@ -131,9 +131,7 @@ export function readInstrumentTables(program: Uint8Array, programPos: number): I
 	const hits = findInstrumentTables(program);
 	if (hits.length !== 1) {
 		throw new InstrumentTableError(
-			`The driver's instrument tables were not found in main.bin (${hits.length} candidates). ` +
-				`They are located by matching the SRCN column against instrToSample, so anything but exactly ` +
-				`one match means this is not the image this build ships.`,
+			$localize`:@@error.instruments.the-drivers-instrument-tables-were:The driver's instrument tables were not found in main.bin (${hits.length}:length: candidates). They are located by matching the SRCN column against instrToSample, so anything but exactly one match means this is not the image this build ships.`,
 		);
 	}
 

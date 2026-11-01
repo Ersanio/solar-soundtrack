@@ -193,15 +193,15 @@ export function decodeGain(gain: number): Gain {
 export function gainModeName(mode: GainMode): string {
 	switch (mode) {
 		case "direct":
-			return "fixed level";
+			return $localize`:@@inspector.gain-mode.fixed-level:fixed level`;
 		case "linearDecrease":
-			return "linear decrease";
+			return $localize`:@@inspector.gain-mode.linear-decrease:linear decrease`;
 		case "expDecrease":
-			return "exponential decrease";
+			return $localize`:@@inspector.gain-mode.exponential-decrease:exponential decrease`;
 		case "linearIncrease":
-			return "linear increase";
+			return $localize`:@@inspector.gain-mode.linear-increase:linear increase`;
 		case "bentIncrease":
-			return "bent increase";
+			return $localize`:@@inspector.gain-mode.bent-increase:bent increase`;
 	}
 }
 

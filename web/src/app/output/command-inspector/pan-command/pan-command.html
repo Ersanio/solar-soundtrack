@@ -1,5 +1,5 @@
 @if (!written()) {
-  <p class="text-ink-muted text-xs leading-relaxed">
+  <p i18n="@@inspector.pan.needs-a-pan-value" class="text-ink-muted text-xs leading-relaxed">
     Needs a pan value, as in <code class="text-ink">y10</code> or
     <code class="text-ink">$DB $0A</code>.
   </p>
@@ -7,6 +7,7 @@
   <p class="text-ink-muted text-xs leading-relaxed">{{ note() }}</p>
 
   <amk-slider
+    i18n-label="@@inspector.pan.pan.label"
     label="Pan"
     origin="centre"
     [value]="pan()"
@@ -21,6 +22,7 @@
   />
 
   <amk-enum-select
+    i18n-label="@@inspector.pan.surround-left.label"
     label="Surround, left"
     [value]="left()"
     [options]="SURROUND"
@@ -29,6 +31,7 @@
   />
 
   <amk-enum-select
+    i18n-label="@@inspector.pan.surround-right.label"
     label="Surround, right"
     [value]="right()"
     [options]="SURROUND"

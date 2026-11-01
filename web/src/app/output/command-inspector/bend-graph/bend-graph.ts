@@ -87,20 +87,27 @@ export class BendGraph {
   });
 
   protected readonly durationLabel = computed(() =>
-    this.duration() === 0 ? 'instant' : `over ${ticksLabel(this.duration(), this.tempo())}`,
+    this.duration() === 0
+      ? $localize`:@@inspector.bend-graph.instant:instant`
+      : $localize`:@@inspector.bend-graph.over:over ${ticksLabel(this.duration(), this.tempo())}:ticksLabel:`,
   );
 
   protected readonly axisLabel = computed(() => {
     const reach = this.reach();
-    return reach === SEMITONES_PER_OCTAVE ? 'an octave' : `${reach / SEMITONES_PER_OCTAVE} octaves`;
+    return reach === SEMITONES_PER_OCTAVE
+      ? $localize`:@@inspector.bend-graph.an-octave:an octave`
+      : $localize`:@@inspector.bend-graph.octaves:${reach / SEMITONES_PER_OCTAVE}:octaves: octaves`;
   });
 
   protected readonly reachLabel = computed(() => {
     const semitones = this.to() - this.from();
     if (semitones === 0) {
-      return 'no change';
+      return $localize`:@@inspector.bend-graph.no-change:no change`;
     }
 
-    return `${semitones > 0 ? '+' : ''}${semitones} semitone${Math.abs(semitones) === 1 ? '' : 's'}`;
+    const signed = `${semitones > 0 ? '+' : ''}${semitones}`;
+    return Math.abs(semitones) === 1
+      ? $localize`:@@inspector.bend-graph.semitones.one:${signed}:semitones: semitone`
+      : $localize`:@@inspector.bend-graph.semitones.other:${signed}:semitones: semitones`;
   });
 }

@@ -83,7 +83,9 @@ export function soleAudible(states: readonly ChannelState[]): number | null {
  * set is a solo to a listener and seven separate mutes to the buttons.
  */
 export function silencedReason(channel: number, soloed: number | null): string {
-  return soloed === null ? `channel ${channel} is muted` : `only channel ${soloed} is soloed`;
+  return soloed === null
+    ? $localize`:@@status.channel-is-muted:channel ${channel}:channel: is muted`
+    : $localize`:@@status.only-channel-is-soloed:only channel ${soloed}:soloed: is soloed`;
 }
 
 /**

@@ -19,7 +19,11 @@
         <!-- No denominator to drag: the reading is all there is to give. -->
         <div class="flex items-baseline justify-between gap-2">
           <span class="text-ink-muted text-[11px]">{{ row.label }}</span>
-          <span class="text-ink font-mono text-[11px] tabular-nums">{{ row.ticks }} ticks</span>
+          <span
+            i18n="@@inspector.note-length.row-ticks"
+            class="text-ink font-mono text-[11px] tabular-nums"
+            >{{ row.ticks }} ticks</span
+          >
         </div>
       }
 

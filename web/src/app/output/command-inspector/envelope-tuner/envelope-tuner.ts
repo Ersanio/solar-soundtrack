@@ -27,11 +27,14 @@ export interface EnvelopeValue {
 }
 
 const GAIN_MODES: readonly EnumOption[] = [
-  { value: 0, label: 'fixed level' },
-  { value: 1, label: 'linear decrease' },
-  { value: 2, label: 'exponential decrease' },
-  { value: 3, label: 'linear increase' },
-  { value: 4, label: 'bent increase' },
+  { value: 0, label: $localize`:@@inspector.envelope-tuner.fixed-level:fixed level` },
+  { value: 1, label: $localize`:@@inspector.envelope-tuner.linear-decrease:linear decrease` },
+  {
+    value: 2,
+    label: $localize`:@@inspector.envelope-tuner.exponential-decrease:exponential decrease`,
+  },
+  { value: 3, label: $localize`:@@inspector.envelope-tuner.linear-increase:linear increase` },
+  { value: 4, label: $localize`:@@inspector.envelope-tuner.bent-increase:bent increase` },
 ];
 
 /** `decodeGain`'s modes in the order the two high bits of a ramping GAIN byte pick them. */
@@ -73,12 +76,42 @@ export interface AdsrPreset {
  * relabelling the buttons.
  */
 const PRESETS: readonly AdsrPreset[] = [
-  { name: 'Pluck', adsr1: 0xdf, adsr2: 0x31, note: 'instant attack, 59 ms to a quarter level' },
-  { name: 'Piano', adsr1: 0xbf, adsr2: 0x4d, note: 'instant attack, 114 ms decay, long tail' },
-  { name: 'Pad', adsr1: 0x86, adsr2: 0xe9, note: '256 ms swell, holds, ~7 s release' },
-  { name: 'Organ', adsr1: 0x8f, adsr2: 0xf3, note: 'instant on, holds, ~0.7 s release' },
-  { name: 'Strings', adsr1: 0x99, adsr2: 0xcc, note: '64 ms swell, sustains near full' },
-  { name: 'Percussive', adsr1: 0xff, adsr2: 0x14, note: 'instant attack, gone in ~200 ms' },
+  {
+    name: $localize`:@@inspector.envelope-tuner.pluck:Pluck`,
+    adsr1: 0xdf,
+    adsr2: 0x31,
+    note: $localize`:@@inspector.envelope-tuner.instant-attack-59-ms-to:instant attack, 59 ms to a quarter level`,
+  },
+  {
+    name: $localize`:@@inspector.envelope-tuner.piano:Piano`,
+    adsr1: 0xbf,
+    adsr2: 0x4d,
+    note: $localize`:@@inspector.envelope-tuner.instant-attack-114-ms-decay:instant attack, 114 ms decay, long tail`,
+  },
+  {
+    name: $localize`:@@inspector.envelope-tuner.pad:Pad`,
+    adsr1: 0x86,
+    adsr2: 0xe9,
+    note: $localize`:@@inspector.envelope-tuner.256-ms-swell-holds-7:256 ms swell, holds, ~7 s release`,
+  },
+  {
+    name: $localize`:@@inspector.envelope-tuner.organ:Organ`,
+    adsr1: 0x8f,
+    adsr2: 0xf3,
+    note: $localize`:@@inspector.envelope-tuner.instant-on-holds-0-7:instant on, holds, ~0.7 s release`,
+  },
+  {
+    name: $localize`:@@inspector.envelope-tuner.strings:Strings`,
+    adsr1: 0x99,
+    adsr2: 0xcc,
+    note: $localize`:@@inspector.envelope-tuner.64-ms-swell-sustains-near:64 ms swell, sustains near full`,
+  },
+  {
+    name: $localize`:@@inspector.envelope-tuner.percussive:Percussive`,
+    adsr1: 0xff,
+    adsr2: 0x14,
+    note: $localize`:@@inspector.envelope-tuner.instant-attack-gone-in-200:instant attack, gone in ~200 ms`,
+  },
 ];
 
 /**
@@ -172,23 +205,28 @@ export class EnvelopeTuner {
   protected readonly decayLabel = computed(() => {
     const { decay, sustain } = this.shown();
     return sustain >= 7
-      ? 'instant — sustain is already at full level'
+      ? $localize`:@@inspector.envelope-tuner.instant-sustain-is-already-at:instant — sustain is already at full level`
       : duration(decaySeconds(decay, sustain));
   });
 
   protected readonly sustainLabel = computed(
-    () => `${Math.round(sustainLevel(this.shown().sustain) * 100)}% of full`,
+    () =>
+      $localize`:@@inspector.envelope-tuner.of-full:${Math.round(sustainLevel(this.shown().sustain) * 100)}:amount:% of full`,
   );
 
   protected readonly releaseLabel = computed(() => {
     const { release, sustain } = this.shown();
     const seconds = releaseSeconds(release, sustain);
-    return Number.isFinite(seconds) ? duration(seconds) : 'held indefinitely';
+    return Number.isFinite(seconds)
+      ? duration(seconds)
+      : $localize`:@@inspector.envelope-tuner.held-indefinitely:held indefinitely`;
   });
 
   /** AddmusicK calls this release; on the DSP it is the sustain-phase fall. */
   protected readonly releaseNote = computed(() =>
-    this.shown().release === 0 ? 'a rate of 0 never decays, so the note holds' : null,
+    this.shown().release === 0
+      ? $localize`:@@inspector.envelope-tuner.a-rate-of-0-never:a rate of 0 never decays, so the note holds`
+      : null,
   );
 
   // --- GAIN readouts ---------------------------------------------------------
@@ -204,12 +242,15 @@ export class EnvelopeTuner {
   protected readonly gainLevel = computed(() => Math.round((this.gain().level ?? 0) * 0x7f));
 
   protected readonly gainLevelLabel = computed(
-    () => `${Math.round((this.shownGain().level ?? 0) * 100)}% of full`,
+    () =>
+      $localize`:@@inspector.envelope-tuner.of-full:${Math.round((this.shownGain().level ?? 0) * 100)}:amount:% of full`,
   );
 
   protected readonly gainRateLabel = computed(() => {
     const rate = this.shownGain().rate ?? 0;
-    return rate === 0 ? 'a rate of 0 never advances, so the level holds' : `rate $${hex2(rate)}`;
+    return rate === 0
+      ? $localize`:@@inspector.envelope-tuner.a-rate-of-0-never-2:a rate of 0 never advances, so the level holds`
+      : $localize`:@@inspector.envelope-tuner.rate-2:rate $${hex2(rate)}:rate:`;
   });
 
   protected readonly gainByteLabel = computed(() => `$${hex2(this.value().gain)}`);

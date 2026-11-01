@@ -2,9 +2,11 @@
   <div
     class="border-accent/40 bg-accent/10 text-ink flex items-center justify-between gap-3 border-b px-4 py-2 text-sm"
   >
-    <span>A new version is available. Reload to get the latest features and bugfixes.</span>
+    <span i18n="@@update.a-new-version-is"
+      >A new version is available. Reload to get the latest features and bugfixes.</span
+    >
     <div class="flex items-center gap-2">
-      <button amk-button variant="primary" (click)="reload()">Reload</button>
+      <button i18n="@@update.reload" amk-button variant="primary" (click)="reload()">Reload</button>
       <button amk-button variant="ghost" (click)="dismiss()">
         <amk-icon-close />
       </button>

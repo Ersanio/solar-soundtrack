@@ -106,15 +106,23 @@ export class NoteLength {
         ? note.gateTicks
         : noteSoundingTicks(ticks, note.state.gate, note.state.waitTime, ratio);
 
-    const under = `under q${hex2(q)}${note.state.waitTime === WAIT_TIME ? '' : ' with light staccato'}`;
-    const span = ratio === 1 ? `${ticks} ticks` : `the ${ticks} ticks the tempo ratio leaves it`;
+    const under =
+      note.state.waitTime === WAIT_TIME
+        ? $localize`:@@inspector.note-length.under-q:under q${hex2(q)}:q:`
+        : $localize`:@@inspector.note-length.under-q-staccato:under q${hex2(q)}:q: with light staccato`;
+    const span =
+      ratio === 1
+        ? $localize`:@@inspector.note-length.ticks:${ticks}:ticks: ticks`
+        : $localize`:@@inspector.note-length.the-ticks-the-tempo-ratio:the ${ticks}:ticks: ticks the tempo ratio leaves it`;
     if (sounds >= ticks) {
       // A last piece of one tick has no tick left to key off on, so the note plays whole.
-      return `Sounds for ${ticks === 1 ? 'its one tick' : `all ${span}`} ${under}`;
+      return ticks === 1
+        ? $localize`:@@inspector.note-length.sounds-one-tick:Sounds for its one tick ${under}:under:`
+        : $localize`:@@inspector.note-length.sounds-all:Sounds for all ${span}:span: ${under}:under:`;
     }
 
     const percent = Math.round((sounds / ticks) * 100);
-    return `Sounds for ${sounds} of ${span} ${under} (${percent}%), then ${ticks - sounds} of silence`;
+    return $localize`:@@inspector.note-length.sounds-for-of-then-of:Sounds for ${sounds}:sounds: of ${span}:span: ${under}:under: (${percent}:percent:%), then ${ticks - sounds}:silence: of silence`;
   });
 
   protected preview(row: NoteLengthRow, value: number): void {

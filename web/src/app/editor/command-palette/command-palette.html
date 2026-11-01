@@ -11,11 +11,7 @@
 
   <span
     class="bg-accent/20 text-accent ml-auto shrink-0 rounded px-1.5 py-px font-mono text-[11px] font-semibold"
-    [title]="
-      assumed()
-        ? 'No #amk, #am4 or #amm marker anywhere in the song, so the palette assumes what the parser assumes. AddmusicK itself rejects a song with no marker (AMK0002).'
-        : 'The dialect this song compiles as. A marker anywhere in the file sets it, and the palette follows it.'
-    "
+    [title]="assumed() ? text.dialectAssumed : text.dialectMarked"
     >{{ dialect() }}{{ assumed() ? ' ?' : '' }}</span
   >
 </div>
@@ -43,6 +39,8 @@
     <span class="text-ink font-semibold">{{ readout.label }}</span>
     <span [class]="readout.muted ? 'text-ink-muted' : 'text-warn'"> - {{ readout.text }}</span>
   } @else {
-    <span class="text-ink-muted">Hover over a command to see what it does.</span>
+    <span i18n="@@palette.hover-over-a-command" class="text-ink-muted"
+      >Hover over a command to see what it does.</span
+    >
   }
 </p>

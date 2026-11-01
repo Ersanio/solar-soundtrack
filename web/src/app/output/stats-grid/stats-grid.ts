@@ -34,38 +34,47 @@ export class StatsGrid {
 
     const cells: Cell[] = [
       {
-        label: 'Total size',
+        label: $localize`:@@output.stats.total-size:Total size`,
         value: stats.totalSize ? `0x${hex4(stats.totalSize)}` : '—',
         dim: !stats.totalSize,
       },
       {
-        label: 'ARAM range',
+        label: $localize`:@@output.stats.aram-range:ARAM range`,
         value: stats.totalSize ? `${hex4(base)}–${hex4(end - 1)}` : '—',
         dim: !stats.totalSize,
       },
       {
-        label: 'Header',
+        label: $localize`:@@output.stats.header:Header`,
         value: stats.headerSize ? `0x${hex4(stats.headerSize)}` : '—',
         dim: !stats.headerSize,
       },
       {
-        label: 'Loop block',
+        label: $localize`:@@output.stats.loop-block:Loop block`,
         value: stats.loopDataSize ? `0x${hex4(stats.loopDataSize)}` : '—',
         dim: !stats.loopDataSize,
       },
       {
-        label: 'Echo buffer',
+        label: $localize`:@@output.stats.echo-buffer:Echo buffer`,
         value: echoBytes ? `0x${hex4(echoBytes)}` : '0',
         dim: echoBytes === 0,
       },
       // One pass through the song, as AddmusicK itself reports it. Not the ID666
       // header field, which doubles the loop and is not shown here.
       {
-        label: 'Length',
-        value: playSeconds === null ? 'unknown' : formatTime(playSeconds),
+        label: $localize`:@@output.stats.length:Length`,
+        value:
+          playSeconds === null
+            ? $localize`:@@output.stats.unknown:unknown`
+            : formatTime(playSeconds),
         dim: playSeconds === null,
       },
-      { label: 'Intro', value: stats.hasIntro ? 'yes' : 'no', dim: !stats.hasIntro },
+      {
+        label: $localize`:@@output.stats.intro:Intro`,
+        value: stats.hasIntro
+          ? $localize`:@@output.stats.yes:yes`
+          : $localize`:@@output.stats.no:no`,
+        dim: !stats.hasIntro,
+      },
     ];
 
     // Only show the channels practically in use
@@ -77,7 +86,7 @@ export class StatsGrid {
 
       const ticks = stats.channelTicks[channel] ?? 0;
       cells.push({
-        label: `Channel ${channel}`,
+        label: $localize`:@@output.stats.channel:Channel ${channel}:channel:`,
         value: `0x${hex4(size)} · ${ticks}t`,
         dim: false,
       });

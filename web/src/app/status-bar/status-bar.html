@@ -8,12 +8,18 @@
   [class]="problemsClass()"
   (click)="requests.revealSection.set('problems')"
 >
-  {{ problemsLabel() }}
+  <ng-container i18n="@@status.problems">{problemCount(), plural,
+    =0 {No problems}
+    =1 {1 problem}
+    other {{{ problemCount() }} problems}
+  }</ng-container>
 </button>
 
 <button
+  i18n="@@status.aram"
   type="button"
   class="cursor-pointer font-mono tabular-nums hover:underline"
+  i18n-title="@@status.free-aram-opens-the.title"
   title="Free ARAM — opens the build details"
   [class]="aramClass()"
   (click)="requests.revealSection.set('build')"
@@ -28,15 +34,19 @@
 @if (rateLabel(); as label) {
   <span
     class="text-ink-muted font-mono tabular-nums"
+    i18n-title="@@status.the-tempo-at-the.title"
     title="The tempo at the playhead, and the ticks per second the driver manages there — 'x of y' when it cannot keep up with what the tempo asks"
     >{{ label }}</span
   >
 }
 
 <div class="ml-auto flex items-center gap-3">
-  <span class="text-ink-muted">In active development. Back up your work regularly.</span>
+  <span i18n="@@status.in-active-development-back" class="text-ink-muted"
+    >In active development. Back up your work regularly.</span
+  >
 
   <a
+    i18n="@@status.made-by"
     href="https://ersan.io/"
     target="_blank"
     rel="noopener noreferrer"

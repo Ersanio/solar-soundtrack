@@ -1,4 +1,4 @@
-<h1 class="text-sm font-semibold whitespace-nowrap">Solar Soundtrack</h1>
+<h1 i18n="@@topbar.app-name" class="text-sm font-semibold whitespace-nowrap">Solar Soundtrack</h1>
 
 <amk-transport-controls class="min-w-0" />
 
@@ -9,23 +9,25 @@
 <button
   amk-button
   size="md"
+  i18n-title="@@topbar.download-the-compiled-song.title"
   title="Download the compiled song data — the same bytes the SPC carries"
   [disabled]="!store.canDownload()"
   (click)="store.downloadBin()"
 >
   <amk-icon-download />
-  <span class="max-2xl:hidden">Download .bin</span>
+  <span i18n="@@topbar.download-bin" class="max-2xl:hidden">Download .bin</span>
 </button>
 
 <button
   amk-button
   size="md"
+  i18n-title="@@topbar.compile-at-the-drivers.title"
   title="Compile at the driver's load address and assemble a playable SPC"
   [disabled]="!store.canDownload()"
   (click)="store.downloadSpc()"
 >
   <amk-icon-download />
-  <span class="max-2xl:hidden">Export .spc</span>
+  <span i18n="@@topbar.export-spc" class="max-2xl:hidden">Export .spc</span>
 </button>
 
 <div class="ml-auto flex items-center gap-1">
@@ -37,8 +39,9 @@
     target="_blank"
     rel="noopener noreferrer"
     class="text-ink-muted hover:text-ink inline-flex h-8 items-center gap-1.5 rounded-md px-2"
+    title="Commit {{ commitShort }}"
     [href]="commitUrl"
-    [title]="`Commit ${commitShort}`"
+    i18n-title="@@topbar.commit.title"
   >
     <amk-icon-github />
     <span class="font-mono text-xs max-xl:hidden">{{ commitShort }}</span>

@@ -8,6 +8,7 @@
        overriding. The selected one is the primary button, which is the plate
        Play wears. -->
   <button
+    i18n="@@inspector.envelope-tuner.adsr"
     amk-button
     [variant]="usingAdsr() ? 'primary' : 'ghost'"
     [disabled]="disabled()"
@@ -16,6 +17,7 @@
     ADSR
   </button>
   <button
+    i18n="@@inspector.envelope-tuner.gain"
     amk-button
     [variant]="usingAdsr() ? 'ghost' : 'primary'"
     [disabled]="disabled()"
@@ -49,6 +51,7 @@
     </div>
 
     <amk-slider
+      i18n-label="@@inspector.envelope-tuner.attack.label"
       label="Attack"
       [value]="envelope().attack"
       [max]="15"
@@ -58,6 +61,7 @@
       (commit)="setField('attack', $event)"
     />
     <amk-slider
+      i18n-label="@@inspector.envelope-tuner.decay.label"
       label="Decay"
       [value]="envelope().decay"
       [max]="7"
@@ -67,7 +71,9 @@
       (commit)="setField('decay', $event)"
     />
     <amk-slider
+      i18n-label="@@inspector.envelope-tuner.sustain.label"
       label="Sustain"
+      i18n-note="@@inspector.envelope-tuner.the-level-decay-falls.note"
       note="the level decay falls to, and holds at"
       [value]="envelope().sustain"
       [max]="7"
@@ -77,6 +83,7 @@
       (commit)="setField('sustain', $event)"
     />
     <amk-slider
+      i18n-label="@@inspector.envelope-tuner.release.label"
       label="Release"
       [value]="envelope().release"
       [max]="31"
@@ -88,6 +95,7 @@
     />
   } @else {
     <amk-enum-select
+      i18n-label="@@inspector.envelope-tuner.gain-mode.label"
       label="GAIN mode"
       [value]="gainModeIndex()"
       [options]="GAIN_MODES"
@@ -98,7 +106,9 @@
 
     @if (gainIsDirect()) {
       <amk-slider
+        i18n-label="@@inspector.envelope-tuner.level.label"
         label="Level"
+        i18n-note="@@inspector.envelope-tuner.a-fixed-level-with.note"
         note="a fixed level, with no envelope at all"
         [value]="gainLevel()"
         [max]="127"
@@ -109,6 +119,7 @@
       />
     } @else {
       <amk-slider
+        i18n-label="@@inspector.envelope-tuner.rate.label"
         label="Rate"
         [value]="gain().rate ?? 0"
         [max]="31"

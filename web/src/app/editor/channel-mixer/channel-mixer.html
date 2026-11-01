@@ -1,4 +1,6 @@
-<h3 class="text-ink-muted text-xs font-semibold tracking-wide uppercase">Channels</h3>
+<h3 i18n="@@mixer.channels" class="text-ink-muted text-xs font-semibold tracking-wide uppercase">
+  Channels
+</h3>
 
 @for (channel of rows(); track channel.index) {
   <div [class]="channel.strip">
@@ -6,26 +8,29 @@
 
     <button
       type="button"
+      title="Mute channel {{ channel.index }}"
       [class]="channel.mute"
       [disabled]="mixer.isSoloing()"
-      [title]="`Mute channel ${channel.index}`"
+      i18n-title="@@mixer.mute.title"
       (click)="mixer.toggleMute(channel.index)"
     >
-      M
+      <ng-container i18n="@@mixer.mute">M</ng-container>
     </button>
 
     <button
       type="button"
+      title="Solo channel {{ channel.index }}"
       [class]="channel.solo"
-      [title]="`Solo channel ${channel.index}`"
+      i18n-title="@@mixer.solo.title"
       (click)="mixer.toggleSolo(channel.index)"
     >
-      S
+      <ng-container i18n="@@mixer.solo">S</ng-container>
     </button>
   </div>
 }
 
 <button
+  i18n="@@mixer.reset"
   amk-button
   variant="ghost"
   size="sm"

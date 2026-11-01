@@ -202,6 +202,12 @@ one.
 edits), a role (what the number _is_), and optionally a control, a range, a set of named choices and
 a sentence about the consequence the number does not state.
 
+Every name and sentence in them, and the command names in `tokens.ts`, is a `$localize` message —
+`command.*` for the vocabulary the hover, palette and inspector share, `inspector.*` for the
+parameter table's own words. `Command.name` is therefore display text: nothing may compare it, and
+code that needs to know what a command is reads `kind`, `vcmd` or `noteLength`. The text of the
+hazards' diagnostics is in `@amk/core/messages/sst.ts`, with every other `SST` finding's.
+
 `availability.ts` is the same tables' answer to a different question. The descriptors say what a
 command's bytes mean once they are written; this says whether the dialect the song declares will
 take that command at all — which is what a palette needs, because it has to grey a button out

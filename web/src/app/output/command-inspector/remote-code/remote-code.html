@@ -1,6 +1,7 @@
 @if (call(); as shown) {
   <div class="flex flex-col gap-2.5">
     <amk-enum-select
+      i18n-label="@@inspector.remote-code.type.label"
       label="Type"
       [value]="shown.type"
       [options]="shown.types"
@@ -12,6 +13,7 @@
     <!-- Only types 1 and 2 read a third argument. -->
     @if (shown.wait; as wait) {
       <amk-slider
+        i18n-label="@@inspector.remote-code.wait.label"
         label="Wait"
         [value]="wait.ticks"
         [min]="1"
@@ -23,7 +25,10 @@
     }
 
     <div class="flex flex-col gap-1">
-      <span class="text-ink-muted text-xs font-semibold tracking-wide uppercase">
+      <span
+        i18n="@@inspector.remote-code.what-runs"
+        class="text-ink-muted text-xs font-semibold tracking-wide uppercase"
+      >
         What {{ shown.name }} runs
       </span>
       @if (shown.runsNothing; as nothing) {
@@ -46,6 +51,7 @@
 
 @if (reset(); as shown) {
   <amk-enum-select
+    i18n-label="@@inspector.remote-code.cancels.label"
     label="Cancels"
     [value]="shown.which"
     [options]="shown.options"

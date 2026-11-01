@@ -15,9 +15,18 @@ type ViewId = 'source' | 'samples' | 'roll';
 const VIEW_KEY = 'solar-soundtrack.view';
 
 const VIEWS: readonly TabDef<ViewId>[] = [
-  { id: 'source', label: 'Source', icon: IconSource },
-  { id: 'roll', label: 'Piano roll (work in progress)', icon: IconRoll },
-  { id: 'samples', label: 'Samples', icon: IconSamples, aside: true },
+  { id: 'source', label: $localize`:@@editor.tab.source:Source`, icon: IconSource },
+  {
+    id: 'roll',
+    label: $localize`:@@editor.tab.roll:Piano roll (work in progress)`,
+    icon: IconRoll,
+  },
+  {
+    id: 'samples',
+    label: $localize`:@@editor.tab.samples:Samples`,
+    icon: IconSamples,
+    aside: true,
+  },
 ];
 
 /** The stored view, or the one the pane opens on when there is none. */

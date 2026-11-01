@@ -1,4 +1,5 @@
 <amk-slider
+  i18n-label="@@inspector.echo-config.delay.label"
   label="Delay"
   [value]="bytes.at(0)"
   [max]="15"
@@ -8,6 +9,7 @@
   (commit)="bytes.commit(0, $event)"
 />
 <amk-slider
+  i18n-label="@@inspector.echo-config.feedback.label"
   label="Feedback"
   origin="centre"
   [signed]="true"
@@ -27,7 +29,7 @@
 
 <!-- Two presets, because the driver ships exactly two filter tables. -->
 <div class="flex flex-col gap-1">
-  <span class="text-ink-muted text-[11px]">Filter</span>
+  <span i18n="@@inspector.echo-config.filter" class="text-ink-muted text-[11px]">Filter</span>
   <div class="flex flex-wrap gap-1.5">
     @for (choice of FILTERS; track choice.value) {
       <button
@@ -51,12 +53,20 @@
 
 @if (taps(); as filterTaps) {
   <div>
-    <div class="text-ink-muted mb-1 text-[11px] tracking-wide uppercase">Filter this selects</div>
+    <div
+      i18n="@@inspector.echo-config.filter-this-selects"
+      class="text-ink-muted mb-1 text-[11px] tracking-wide uppercase"
+    >
+      Filter this selects
+    </div>
     <amk-fir-graph [taps]="filterTaps" [feedback]="feedback()" />
   </div>
 
   @if (overrides(); as earlier) {
-    <p class="text-warn text-xs leading-relaxed">
+    <p
+      i18n="@@inspector.echo-config.this-replaces-the-coefficients"
+      class="text-warn text-xs leading-relaxed"
+    >
       This replaces the coefficients set by the <code class="text-ink">$F5</code> on line
       {{ earlier.line }}. AddmusicK does this silently.
     </p>

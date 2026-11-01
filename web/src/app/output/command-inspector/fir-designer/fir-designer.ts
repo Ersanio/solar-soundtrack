@@ -134,7 +134,7 @@ export class FirDesigner {
   private readonly runaway = computed(() => this.stability().runaway);
 
   constructor() {
-    stopWhenRunaway(this.command, this.runaway, 'FIR filter');
+    stopWhenRunaway(this.command, this.runaway, $localize`:@@inspector.runaway.fir:FIR filter`);
   }
 
   /**
@@ -170,7 +170,9 @@ export class FirDesigner {
       return '—';
     }
 
-    return corner >= 1000 ? `${(corner / 1000).toFixed(1)} kHz` : `${Math.round(corner)} Hz`;
+    return corner >= 1000
+      ? $localize`:@@inspector.fir-designer.khz:${(corner / 1000).toFixed(1)}:amount: kHz`
+      : `${Math.round(corner)} Hz`;
   });
 
   protected readonly tiltLabel = computed(() => {

@@ -4,14 +4,22 @@
   <label
     class="border-edge bg-inset text-ink hover:border-control inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-md border px-3 text-sm transition-colors"
   >
-    Add samples…
+    <ng-container i18n="@@samples.add-samples">Add samples…</ng-container>
     <input type="file" class="hidden" accept=".brr,.bnk" multiple (change)="onFiles($event)" />
   </label>
 
-  <amk-checkbox class="text-xs" [(checked)]="library.optimize">Optimize samples</amk-checkbox>
+  <amk-checkbox i18n="@@samples.optimize-samples" class="text-xs" [(checked)]="library.optimize"
+    >Optimize samples</amk-checkbox
+  >
 
   @if (library.overrideCount() > 0) {
-    <button amk-button variant="ghost" size="sm" (click)="library.resetAll()">
+    <button
+      i18n="@@samples.reset-all"
+      amk-button
+      variant="ghost"
+      size="sm"
+      (click)="library.resetAll()"
+    >
       Reset all ({{ library.overrideCount() }})
     </button>
   }
@@ -39,7 +47,10 @@
   }
 </ul>
 
-<p class="border-edge text-ink-muted shrink-0 border-t px-3 py-2 text-xs leading-relaxed">
+<p
+  i18n="@@samples.used-means-the-song"
+  class="border-edge text-ink-muted shrink-0 border-t px-3 py-2 text-xs leading-relaxed"
+>
   <strong class="text-good font-semibold">used</strong> means the song plays it, so it is loaded
   whatever else is true. <strong class="text-ink font-semibold">keep</strong> holds a sample the
   song includes but never plays, which

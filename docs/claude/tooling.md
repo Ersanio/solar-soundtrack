@@ -66,6 +66,13 @@ never inserts blank lines, only collapses them — so this is the one place wher
 rule. `eslint-config-prettier` switches `curly` off, so setting it in any earlier block would be
 silently undone. `npm run lint:fix` fixes both; run `npm run format` after it.
 
+`template/i18n` has a block of its own, scoped to `web/src/app/**/*.html` because `index.html` is
+not a template Angular's i18n reads. It wants an `@@id` on every text and every text-bearing
+attribute; its `ignoreAttributes` adds SVG geometry and the components' keyword inputs (`variant`,
+`size`, `origin`) to the rule's own list. A new keyword input goes there, not an `i18n-` marker on a
+value nobody reads. `attributes-order` wants an `i18n-*` marker after every binding on the element;
+`lint:fix` sorts them.
+
 To prove the scoping is what you think it is, diff `npx eslint --print-config` over
 `packages/mml-compiler/src/parser.ts`, `packages/spc/src/fir.ts` and `web/src/app/app.ts`. Those
 resolve 1, 121 and 146 rules respectively.

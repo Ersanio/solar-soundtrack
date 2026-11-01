@@ -299,7 +299,9 @@ export class Playback {
     this.editor.compileNow();
     const spc = this.editor.assembleSpc();
     if (!spc) {
-      this.editor.fail('cannot play: song has errors');
+      this.editor.fail(
+        $localize`:@@status.cannot-play-song-has-errors:cannot play: song has errors`,
+      );
       return;
     }
 

@@ -794,3 +794,11 @@ A `computed` of rows with everything resolved, rather than a method called per r
 see `sample-browser.ts`, `aram-budget.ts` and `stats-grid.ts`. `@angular-eslint`'s
 `template/no-call-expression` is the rule that would enforce this, and it cannot be used in a signals
 codebase where every read is a call; the structure is what keeps the bug out instead.
+
+## Text
+
+Every string a porter reads is marked for Angular's i18n with a grouped `@@id` — `i18n` attributes in
+the templates, `$localize` in TypeScript — and `src/locale/messages.json` lists all of it, sorted by
+ID. Only English ships, so the text is still written where it is used; the catalog is where to find
+it, and `npm run i18n` regenerates it. A ternary between two strings in a binding becomes a
+`text` object of messages on the component. The rules: `docs/claude/i18n.md`.

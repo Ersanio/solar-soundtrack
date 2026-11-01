@@ -5,13 +5,22 @@
   <span class="flex-1 py-1 text-xs" [class.text-accent]="row.isLive">
     <span class="font-mono">$80</span>
     —
-    {{ row.isLive ? 'the sequence restarts here' : 'a loop point a later one overrides' }}
+    @if (row.isLive) {
+      <ng-container i18n="@@inspector.arpeggio-note.restarts-here"
+        >the sequence restarts here</ng-container
+      >
+    } @else {
+      <ng-container i18n="@@inspector.arpeggio-note.overridden"
+        >a loop point a later one overrides</ng-container
+      >
+    }
   </span>
 } @else {
   <amk-slider
     class="flex-1"
     origin="centre"
-    [label]="`Note ${row.index + 1}`"
+    label="Note {{ row.index + 1 }}"
+    i18n-label="@@inspector.arpeggio-note.note.label"
     [signed]="true"
     [value]="row.value"
     [min]="-127"
@@ -26,15 +35,21 @@
 <button
   amk-button
   variant="ghost"
-  [title]="row.isMarker ? 'Clear the loop point' : 'Restart the sequence here'"
+  [title]="row.isMarker ? text.clearLoop : text.restartHere"
   [disabled]="!row.canMark && !row.isMarker"
   (click)="looped.emit(row.index)"
 >
-  {{ row.isMarker ? 'Unloop' : 'Loop' }}
+  @if (row.isMarker) {
+    <ng-container i18n="@@inspector.arpeggio-note.unloop">Unloop</ng-container>
+  } @else {
+    <ng-container i18n="@@inspector.arpeggio-note.loop">Loop</ng-container>
+  }
 </button>
 <button
+  i18n="@@inspector.arpeggio-note.remove"
   amk-button
   variant="ghost"
+  i18n-title="@@inspector.arpeggio-note.remove-this-entry.title"
   title="Remove this entry"
   [disabled]="!resizable()"
   (click)="removed.emit(row.index)"

@@ -95,9 +95,9 @@ export class SampleBrowser {
   protected readonly freeLabel = computed(() => {
     const free = this.freeBytes();
     if (free < 0) {
-      return `over ARAM by ${(-free).toLocaleString()} B`;
+      return $localize`:@@samples.over-aram-by-b:over ARAM by ${(-free).toLocaleString()}:count: B`;
     }
 
-    return `${free.toLocaleString()} B free of ${ARAM_SIZE.toLocaleString()}`;
+    return $localize`:@@samples.b-free-of:${free.toLocaleString()}:free: B free of ${ARAM_SIZE.toLocaleString()}:size:`;
   });
 }

@@ -31,7 +31,9 @@ export class EnumSelect {
   readonly options = input.required<readonly EnumOption[]>();
   readonly disabled = input(false);
   readonly note = input<string | null>(null);
-  readonly unknownLabel = input('(not a documented value)');
+  readonly unknownLabel = input(
+    $localize`:@@common.not-a-documented-value:(not a documented value)`,
+  );
 
   readonly commit = output<number>();
 

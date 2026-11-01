@@ -232,10 +232,16 @@ export class InstrumentInspector {
 
     const list = this.store.result()?.sampleList;
     if (list) {
-      return list[srcn] ?? 'past the end of this song’s sample list';
+      return (
+        list[srcn] ??
+        $localize`:@@inspector.instrument.past-the-end-of-this:past the end of this song’s sample list`
+      );
     }
 
-    return this.drivers.driver()?.samples[srcn]?.sampleName ?? 'not in the driver’s default set';
+    return (
+      this.drivers.driver()?.samples[srcn]?.sampleName ??
+      $localize`:@@inspector.instrument.not-in-the-drivers-default:not in the driver’s default set`
+    );
   });
 
   /** For `@30+`: the sample form as written in the block. */
@@ -251,10 +257,10 @@ export class InstrumentInspector {
     }
 
     if (sample.form === 'copy') {
-      return `@${sample.instrument}, whose sample is $${hex2(sample.srcn)}`;
+      return $localize`:@@inspector.instrument.whose-sample-is:@${sample.instrument}:instrument:, whose sample is $${hex2(sample.srcn)}:srcn:`;
     }
 
-    return `noise at clock $${hex2(sample.clock)}`;
+    return $localize`:@@inspector.instrument.noise-at-clock:noise at clock $${hex2(sample.clock)}:clock:`;
   });
 
   protected readonly incompleteCustom = computed(() => {
@@ -268,7 +274,7 @@ export class InstrumentInspector {
   );
 
   /** `@0`-`@18`, `@21`-`@29`, `@30`+ — stated once so the prose cannot drift. */
-  protected readonly validRanges = '@0–@18, @21–@29 and @30 upward';
+  protected readonly validRanges = $localize`:@@inspector.instrument.0-18-21-29-and:@0–@18, @21–@29 and @30 upward`;
 
   protected readonly drumIndex = computed(() => this.written() - FIRST_PERCUSSION_INSTRUMENT);
 }

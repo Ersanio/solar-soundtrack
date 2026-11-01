@@ -105,11 +105,11 @@ export interface LoopFocusRequest {
 const WRITTEN_MAX = 44;
 
 const TITLES: Readonly<Record<LoopKind, string>> = {
-  loop: 'Loop',
-  subloop: 'Subloop',
-  call: 'Loop call',
-  star: 'Loop call',
-  remote: 'Remote code',
+  loop: $localize`:@@loops.title.loop:Loop`,
+  subloop: $localize`:@@loops.title.subloop:Subloop`,
+  call: $localize`:@@loops.title.call:Loop call`,
+  star: $localize`:@@loops.title.call:Loop call`,
+  remote: $localize`:@@loops.title.remote:Remote code`,
 };
 
 /**
@@ -223,17 +223,22 @@ function countView(
 
 function countNote(construct: LoopConstruct, plays: number | null, written: boolean): string {
   if (plays === null) {
-    return 'nothing is written, and a subloop must be given a count';
+    return $localize`:@@loops.nothing-is-written-and-a:nothing is written, and a subloop must be given a count`;
   }
 
-  const times = `plays ${plays} time${plays === 1 ? '' : 's'}`;
+  const times =
+    plays === 1
+      ? $localize`:@@loops.plays.one:plays 1 time`
+      : $localize`:@@loops.plays.other:plays ${plays}:plays: times`;
   if (!written) {
-    return `${times} — nothing is written, and a missing count reads as 1`;
+    return $localize`:@@loops.nothing-is-written-and-a-2:${times}:times: — nothing is written, and a missing count reads as 1`;
   }
 
   // The byte and the number disagree for exactly one spelling, and a porter
   // reading the hex dump beside this needs to know which way round it is.
-  return construct.count.lessOne ? `${times} — the byte is one less than the count` : times;
+  return construct.count.lessOne
+    ? $localize`:@@loops.the-byte-is-one-less:${times}:times: — the byte is one less than the count`
+    : times;
 }
 
 function countWarning(
@@ -245,19 +250,19 @@ function countWarning(
   if (plays === null) {
     // Only a subloop reads as none: every other spelling defaults a missing
     // count to 1.
-    return 'A subloop must be given a count (AMK0128).';
+    return $localize`:@@loops.a-subloop-must-be-given:A subloop must be given a count (AMK0128).`;
   }
 
   if (plays < min) {
     return kind === 'subloop'
-      ? 'A subloop cannot repeat only once (AMK0126).'
-      : 'A loop count must be between 1 and 255 (AMK0116).';
+      ? $localize`:@@loops.a-subloop-cannot-repeat-only:A subloop cannot repeat only once (AMK0126).`
+      : $localize`:@@loops.a-loop-count-must-be:A loop count must be between 1 and 255 (AMK0116).`;
   }
 
   if (plays > max) {
     return kind === 'subloop'
-      ? 'Past 256 the count wraps: the driver is given one less than it, through a byte.'
-      : 'A loop count must be between 1 and 255 (AMK0116).';
+      ? $localize`:@@loops.past-256-the-count-wraps:Past 256 the count wraps: the driver is given one less than it, through a byte.`
+      : $localize`:@@loops.a-loop-count-must-be:A loop count must be between 1 and 255 (AMK0116).`;
   }
 
   return null;
@@ -274,16 +279,19 @@ function recallView(reading: LoopReading, construct: LoopConstruct): LoopRecallV
     // `*` takes `prevLoop`, the last `[` opened, so what it plays is decided by
     // where it is written rather than by a number in it. Choosing a label writes
     // the labelled call that says the same thing out loud.
-    options.unshift({ value: -1, label: 'the loop written above it' });
+    options.unshift({
+      value: -1,
+      label: $localize`:@@loops.the-loop-written-above-it:the loop written above it`,
+    });
   }
 
   return {
     label: isSpan(construct) ? -1 : (construct.label ?? -1),
     options,
     note: star
-      ? 'A * replays whichever loop was opened above it. Naming one writes a (n) call in its place.'
-      : 'Only loops declared above this call — AddmusicK reads a song in order (AMK0115).',
-    unknownLabel: 'no loop with this number is declared above here',
+      ? $localize`:@@loops.a-replays-whichever-loop-was:A * replays whichever loop was opened above it. Naming one writes a (n) call in its place.`
+      : $localize`:@@loops.only-loops-declared-above-this:Only loops declared above this call — AddmusicK reads a song in order (AMK0115).`,
+    unknownLabel: $localize`:@@loops.no-loop-with-this-number:no loop with this number is declared above here`,
   };
 }
 
@@ -303,19 +311,19 @@ function nameView(
         label,
         // A `(!n)` takes slot n and a `(n)` takes slot n + 1 (`parser.ts:2460`,
         // `:2517`), so the allocator counts both kinds or walks into AMK0124.
-        note: 'A body with no name can only be replayed by a *, which names nothing a piano roll can point at.',
+        note: $localize`:@@loops.a-body-with-no-name:A body with no name can only be replayed by a *, which names nothing a piano roll can point at.`,
       };
 }
 
 function noteFor(kind: LoopKind, construct: LoopConstruct): string | null {
   if (kind === 'remote') {
-    return 'A remote code definition cannot repeat (AMK0164). Its body runs where a (!n, …) call fires it.';
+    return $localize`:@@loops.a-remote-code-definition-cannot:A remote code definition cannot repeat (AMK0164). Its body runs where a (!n, …) call fires it.`;
   }
 
   const label = kind === 'loop' && isSpan(construct) ? construct.label : null;
   return label === null
     ? null
-    : `Named (${label}), so a (${label})n call replays this body from anywhere below it.`;
+    : $localize`:@@loops.named-so-a-n-call:Named (${label}:label:), so a (${label}:label:)n call replays this body from anywhere below it.`;
 }
 
 /** One line, and not more of it than a panel column can hold. */

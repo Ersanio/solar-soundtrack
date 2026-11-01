@@ -138,7 +138,9 @@ export class CommandInspector {
 
   /** What the heading names a remote call or reset as, the catalogue's own words. */
   protected readonly remoteName = computed(() =>
-    this.remote()?.kind === 'reset' ? 'remote code reset' : 'remote code call',
+    this.remote()?.kind === 'reset'
+      ? $localize`:@@inspector.remote-code-reset:remote code reset`
+      : $localize`:@@inspector.remote-code-call:remote code call`,
   );
 
   /** The call as written, on one line, in place of a command's byte. */
@@ -244,7 +246,7 @@ export class CommandInspector {
   protected readonly summary = computed(() => {
     const entry = this.entry();
     if (entry) {
-      return `@${entry.number} instrument definition`;
+      return $localize`:@@inspector.instrument-definition:@${entry.number}:number: instrument definition`;
     }
 
     if (this.remote()) {
@@ -253,7 +255,9 @@ export class CommandInspector {
 
     const command = this.params();
     if (!command) {
-      return this.loop() ? 'a loop' : 'nothing at the caret';
+      return this.loop()
+        ? $localize`:@@inspector.a-loop:a loop`
+        : $localize`:@@inspector.nothing-at-the-caret:nothing at the caret`;
     }
 
     const via = this.replacement();

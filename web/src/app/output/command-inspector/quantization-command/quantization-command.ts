@@ -97,14 +97,14 @@ export class QuantizationCommand {
     const ratio = this.store.tempoRatio();
     const piece = Math.floor(0x60 / ratio);
     const long = Math.floor(0x80 / ratio);
-    return `of a note sounds — of its last ${piece} ticks, once it is ${long} or longer — and never closer than ${WAIT_TIME} ticks to its end`;
+    return $localize`:@@inspector.quantization.of-a-note-sounds-of:of a note sounds — of its last ${piece}:piece: ticks, once it is ${long}:long: or longer — and never closer than ${WAIT_TIME}:wait: ticks to its end`;
   });
 
   protected readonly velocityLabel = computed(() => `$${hex2(this.velocityByte())}`);
 
   protected readonly velocityNote = computed(
     () =>
-      `${Math.round((this.velocityByte() / 0xff) * 100)}% of full, from the ${this.tableName()} table`,
+      $localize`:@@inspector.quantization.of-full-from-the-table:${Math.round((this.velocityByte() / 0xff) * 100)}:amount:% of full, from the ${this.tableName()}:tableName: table`,
   );
 
   /**
@@ -117,7 +117,7 @@ export class QuantizationCommand {
   protected readonly outOfRange = computed(() => {
     const value = (this.shownGate() << 4) | this.shownVelocity();
     return value < 1 || value > 0x7f
-      ? `q must be between $01 and $7F; $${hex2(value)} is an error at compile time`
+      ? $localize`:@@inspector.quantization.q-must-be-between-01:q must be between $01 and $7F; $${hex2(value)}:byte: is an error at compile time`
       : null;
   });
 

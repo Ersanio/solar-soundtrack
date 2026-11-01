@@ -78,8 +78,11 @@ function detailLabel(file: SampleFile | SampleSlot): string {
   }
 
   const seconds = (file.frames / 32000).toFixed(2);
-  const loop = file.loopOffset > 0 ? `loop @ ${file.loopOffset.toLocaleString()}` : 'no loop point';
-  return `${file.blocks.toLocaleString()} blocks · ${seconds}s · ${loop}`;
+  const loop =
+    file.loopOffset > 0
+      ? $localize`:@@samples.loop:loop @ ${file.loopOffset.toLocaleString()}:count:`
+      : $localize`:@@samples.no-loop-point:no loop point`;
+  return $localize`:@@samples.blocks-s:${file.blocks.toLocaleString()}:count: blocks · ${seconds}:seconds:s · ${loop}:loop:`;
 }
 
 /**
@@ -103,7 +106,7 @@ export function fileRow(file: SampleFile, context: RowContext): FileRow {
     waveform: file.kind === 'sample' && file.error === null && requested ? waveform(file) : '',
     detail: detailLabel(file),
     size: `${file.bytes.length.toLocaleString()} B`,
-    bank: `${file.slotCount} slots · ${file.usedSlots} non-empty`,
+    bank: $localize`:@@samples.slots-non-empty:${file.slotCount}:slotCount: slots · ${file.usedSlots}:usedSlots: non-empty`,
     // A real bank is mostly empty — showing all 64 buries the handful that
     // matter. Each row still displays its own slot index, so the SRCNs stay
     // readable.

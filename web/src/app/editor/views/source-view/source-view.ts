@@ -100,6 +100,13 @@ export class SourceView {
   private readonly playback = inject(Playback);
   private readonly injector = inject(Injector);
 
+  protected readonly text = {
+    wrapOn: $localize`:@@source.wrap.on.title:Word wrap: on`,
+    wrapOff: $localize`:@@source.wrap.off.title:Word wrap: off`,
+    hidePalette: $localize`:@@source.palette.hide.title:Hide the command palette`,
+    showPalette: $localize`:@@source.palette.show.title:Show the command palette`,
+  };
+
   /** Whether the pane is showing this view. A hidden view cannot be measured. */
   readonly active = input(false);
 

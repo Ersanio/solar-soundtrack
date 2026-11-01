@@ -37,19 +37,19 @@ const MAX_TEMPO = 254;
 // ---------------------------------------------------------------------------
 
 /** The vibrato and tremolo rate — `$DE`'s and `$E5`'s second byte. */
-const RATE = (what: string): ParamDescriptor =>
-	u8("Rate", "rate", {
+const RATE = (stillAtZero: string): ParamDescriptor =>
+	u8($localize`:@@inspector.param.rate:Rate`, "rate", {
 		min: 1,
-		describe: (value) => (value === 0 ? `a rate of 0 never advances, so the ${what} stays still` : "higher is faster"),
+		describe: (value) => (value === 0 ? stillAtZero : $localize`:@@inspector.param.higher-is-faster:higher is faster`),
 	});
 
-const PAN = u8("Pan", "pan", {
+const PAN = u8($localize`:@@inspector.param.pan:Pan`, "pan", {
 	max: 20,
 	describe: (value) => {
 		if (value > 0x14) {
 			// main.asm:3486 — `PanValues` has 21 entries, and the readme's own $13
 			// ceiling is one short of the table it describes.
-			return `past the driver's 21-entry pan table, which ends at $14`;
+			return $localize`:@@inspector.param.past-the-drivers-21-entry:past the driver's 21-entry pan table, which ends at $14`;
 		}
 
 		return panLabel(value);
@@ -57,62 +57,71 @@ const PAN = u8("Pan", "pan", {
 });
 
 const ECHO_VOLUME = (side: string): ParamDescriptor =>
-	s8(`Volume ${side}`, "level", {
-		describe: (value) => (value >= 0x80 ? "negative, so this side is phase-inverted" : null),
+	s8($localize`:@@inspector.param.echo-volume:Volume ${side}:side:`, "level", {
+		describe: (value) =>
+			value >= 0x80
+				? $localize`:@@inspector.param.negative-so-this-side-is:negative, so this side is phase-inverted`
+				: null,
 	});
 
-const SEMITONES = s8("Semitones", "semitones", {
-	describe: (value) => (value >= 0x80 ? "bends downward" : "bends upward"),
+const SEMITONES = s8($localize`:@@inspector.param.semitones:Semitones`, "semitones", {
+	describe: (value) =>
+		value >= 0x80
+			? $localize`:@@inspector.param.bends-downward:bends downward`
+			: $localize`:@@inspector.param.bends-upward:bends upward`,
 });
 
 /** `$F4`'s sub-commands, every one the readme documents. */
 const F4_SUBCOMMANDS = [
-	{ value: 0x00, label: "$00 — Yoshi drums on channel 5" },
-	{ value: 0x01, label: "$01 — legato toggle" },
-	{ value: 0x02, label: "$02 — light staccato toggle" },
-	{ value: 0x03, label: "$03 — echo toggle for this channel" },
-	{ value: 0x05, label: "$05 — SNES sync" },
-	{ value: 0x06, label: "$06 — Yoshi drums on this channel" },
-	{ value: 0x07, label: "$07 — tempo hike off" },
-	{ value: 0x08, label: "$08 — switch velocity table" },
-	{ value: 0x09, label: "$09 — restore instrument" },
+	{ value: 0x00, label: $localize`:@@inspector.param.f4.00-yoshi-drums-on-channel:$00 — Yoshi drums on channel 5` },
+	{ value: 0x01, label: $localize`:@@inspector.param.f4.01-legato-toggle:$01 — legato toggle` },
+	{ value: 0x02, label: $localize`:@@inspector.param.f4.02-light-staccato-toggle:$02 — light staccato toggle` },
+	{ value: 0x03, label: $localize`:@@inspector.param.f4.03-echo-toggle-for-this:$03 — echo toggle for this channel` },
+	{ value: 0x05, label: $localize`:@@inspector.param.f4.05-snes-sync:$05 — SNES sync` },
+	{ value: 0x06, label: $localize`:@@inspector.param.f4.06-yoshi-drums-on-this:$06 — Yoshi drums on this channel` },
+	{ value: 0x07, label: $localize`:@@inspector.param.f4.07-tempo-hike-off:$07 — tempo hike off` },
+	{ value: 0x08, label: $localize`:@@inspector.param.f4.08-switch-velocity-table:$08 — switch velocity table` },
+	{ value: 0x09, label: $localize`:@@inspector.param.f4.09-restore-instrument:$09 — restore instrument` },
 ] as const;
 
 /**
  * `$FA`'s sub-commands. `$05` is an error at `#amk 2`+ (`parser.ts:parseHexCommand`).
  */
 const FA_SUBCOMMANDS = [
-	{ value: 0x00, label: "$00 — pitch modulation" },
-	{ value: 0x01, label: "$01 — GAIN" },
-	{ value: 0x02, label: "$02 — semitone tune" },
-	{ value: 0x03, label: "$03 — amplify" },
-	{ value: 0x04, label: "$04 — echo buffer reserve" },
-	{ value: 0x06, label: "$06 — velocity table" },
-	{ value: 0x7f, label: "$7F — hot patch preset" },
-	{ value: 0xfe, label: "$FE — hot patch toggle bits" },
+	{ value: 0x00, label: $localize`:@@inspector.param.fa.00-pitch-modulation:$00 — pitch modulation` },
+	{ value: 0x01, label: $localize`:@@inspector.param.fa.01-gain:$01 — GAIN` },
+	{ value: 0x02, label: $localize`:@@inspector.param.fa.02-semitone-tune:$02 — semitone tune` },
+	{ value: 0x03, label: $localize`:@@inspector.param.fa.03-amplify:$03 — amplify` },
+	{ value: 0x04, label: $localize`:@@inspector.param.fa.04-echo-buffer-reserve:$04 — echo buffer reserve` },
+	{ value: 0x06, label: $localize`:@@inspector.param.fa.06-velocity-table:$06 — velocity table` },
+	{ value: 0x7f, label: $localize`:@@inspector.param.fa.7f-hot-patch-preset:$7F — hot patch preset` },
+	{ value: 0xfe, label: $localize`:@@inspector.param.fa.fe-hot-patch-toggle-bits:$FE — hot patch toggle bits` },
 ] as const;
 
 const HOT_PATCH_PRESETS = [
-	{ value: 0x00, label: "$00 — AddmusicK 1.0.8 and earlier" },
-	{ value: 0x01, label: "$01 — AddmusicK 1.0.9" },
-	{ value: 0x02, label: "$02 — AddmusicK Beta" },
-	{ value: 0x03, label: "$03 — Romi's Addmusic404" },
-	{ value: 0x04, label: "$04 — Addmusic405" },
-	{ value: 0x05, label: "$05 — AddmusicM" },
-	{ value: 0x06, label: "$06 — carol's MORE.bin" },
-	{ value: 0x07, label: "$07 — Vanilla SMW" },
+	{ value: 0x00, label: $localize`:@@inspector.param.hot-patch.00-addmusick-1-0-8:$00 — AddmusicK 1.0.8 and earlier` },
+	{ value: 0x01, label: $localize`:@@inspector.param.hot-patch.01-addmusick-1-0-9:$01 — AddmusicK 1.0.9` },
+	{ value: 0x02, label: $localize`:@@inspector.param.hot-patch.02-addmusick-beta:$02 — AddmusicK Beta` },
+	{ value: 0x03, label: $localize`:@@inspector.param.hot-patch.03-romis-addmusic404:$03 — Romi's Addmusic404` },
+	{ value: 0x04, label: $localize`:@@inspector.param.hot-patch.04-addmusic405:$04 — Addmusic405` },
+	{ value: 0x05, label: $localize`:@@inspector.param.hot-patch.05-addmusicm:$05 — AddmusicM` },
+	{ value: 0x06, label: $localize`:@@inspector.param.hot-patch.06-carols-more-bin:$06 — carol's MORE.bin` },
+	{ value: 0x07, label: $localize`:@@inspector.param.hot-patch.07-vanilla-smw:$07 — Vanilla SMW` },
 ] as const;
 
 /** What `#option smwvtable` and `#option nspcvtable` compile to (`Music.cpp:2343-2367`). */
 const VELOCITY_TABLES = [
-	{ value: 0x00, label: "$00 — SMW (#option smwvtable)" },
-	{ value: 0x01, label: "$01 — N-SPC (#option nspcvtable)" },
+	{ value: 0x00, label: $localize`:@@inspector.param.velocity.00-smw-option-smwvtable:$00 — SMW (#option smwvtable)` },
+	{
+		value: 0x01,
+		label: $localize`:@@inspector.param.velocity.01-n-spc-option-nspcvtable:$01 — N-SPC (#option nspcvtable)`,
+	},
 ] as const;
 
 /** The same two, at `#amk 1`, where `#option` is not available (AMK0045). */
 const VELOCITY_TABLES_BARE = [
-	{ value: 0x00, label: "$00 — SMW" },
-	{ value: 0x01, label: "$01 — N-SPC" },
+	{ value: 0x00, label: $localize`:@@inspector.param.velocity.00-smw:$00 — SMW` },
+	{ value: 0x01, label: $localize`:@@inspector.param.velocity.01-n-spc:$01 — N-SPC` },
 ] as const;
 
 /**
@@ -142,20 +151,27 @@ const subloop: Resolver = (command) => {
 	const value = command.args[0]?.value;
 	if (value === 0) {
 		return {
-			params: [choice("Subloop", [{ value: 0x00, label: "$00 — start" }], { structural: true })],
-			note: "Opens a subloop. The matching $E6 with a non-zero count closes it.",
+			params: [
+				choice(
+					$localize`:@@inspector.param.subloop:Subloop`,
+					[{ value: 0x00, label: $localize`:@@inspector.param.00-start:$00 — start` }],
+					{ structural: true },
+				),
+			],
+			note: $localize`:@@inspector.param.opens-a-subloop-the-matching:Opens a subloop. The matching $E6 with a non-zero count closes it.`,
 		};
 	}
 
 	return {
 		params: [
-			u8("Repeat count", "index", {
+			u8($localize`:@@inspector.param.repeat-count:Repeat count`, "index", {
 				min: 1,
 				structural: true,
-				describe: (n) => `plays the subloop ${n + 1} times — the byte is one less than the count`,
+				describe: (n) =>
+					$localize`:@@inspector.param.plays-the-subloop-times-the:plays the subloop ${n + 1}:count: times — the byte is one less than the count`,
 			}),
 		],
-		note: "Closes the subloop opened by the nearest earlier $E6 $00.",
+		note: $localize`:@@inspector.param.closes-the-subloop-opened-by:Closes the subloop opened by the nearest earlier $E6 $00.`,
 	};
 };
 
@@ -168,27 +184,31 @@ const envelope: Resolver = (command) => {
 
 	if (command.target.program === 1 && sub !== undefined && sub >= 0x80 && sub <= 0x83) {
 		const form = choice(
-			"HFD form",
+			$localize`:@@inspector.param.hfd-form:HFD form`,
 			[
-				{ value: 0x80, label: "$80 — DSP write" },
-				{ value: 0x81, label: "$81 — semitone tune" },
-				{ value: 0x82, label: "$82 — ARAM upload" },
-				{ value: 0x83, label: "$83 — not implemented" },
+				{ value: 0x80, label: $localize`:@@inspector.param.hfd.80-dsp-write:$80 — DSP write` },
+				{ value: 0x81, label: $localize`:@@inspector.param.hfd.81-semitone-tune:$81 — semitone tune` },
+				{ value: 0x82, label: $localize`:@@inspector.param.hfd.82-aram-upload:$82 — ARAM upload` },
+				{ value: 0x83, label: $localize`:@@inspector.param.hfd.83-not-implemented:$83 — not implemented` },
 			],
 			{ structural: true },
 		);
 
 		if (sub === 0x80) {
 			return {
-				params: [form, u8("DSP register", "address"), u8("Value", "opaque")],
-				note: "Addmusic 4.05 wrote DSP registers through $ED. AddmusicK compiles this to $F6.",
+				params: [
+					form,
+					u8($localize`:@@inspector.param.dsp-register:DSP register`, "address"),
+					u8($localize`:@@inspector.param.value:Value`, "opaque"),
+				],
+				note: $localize`:@@inspector.param.addmusic-4-05-wrote-dsp:Addmusic 4.05 wrote DSP registers through $ED. AddmusicK compiles this to $F6.`,
 			};
 		}
 
 		if (sub === 0x81) {
 			return {
-				params: [form, s8("Semitones", "semitones")],
-				note: "Addmusic 4.05’s tune command. AddmusicK compiles this to $FA $02.",
+				params: [form, s8($localize`:@@inspector.param.semitones:Semitones`, "semitones")],
+				note: $localize`:@@inspector.param.addmusic-4-05s-tune-command:Addmusic 4.05’s tune command. AddmusicK compiles this to $FA $02.`,
 			};
 		}
 
@@ -196,22 +216,32 @@ const envelope: Resolver = (command) => {
 			return {
 				params: [
 					form,
-					u8("Address, high", "address"),
-					u8("Address, low", "address"),
-					u8("Count, high", "index", { structural: true }),
-					u8("Count, low", "index", { structural: true }),
+					u8($localize`:@@inspector.param.address-high:Address, high`, "address"),
+					u8($localize`:@@inspector.param.address-low:Address, low`, "address"),
+					u8($localize`:@@inspector.param.count-high:Count, high`, "index", { structural: true }),
+					u8($localize`:@@inspector.param.count-low:Count, low`, "index", { structural: true }),
 				],
-				note: "An ARAM upload: the two count bytes decide how many of the bytes after it belong to this command.",
-				tail: "data byte",
+				note: $localize`:@@inspector.param.an-aram-upload-the-two:An ARAM upload: the two count bytes decide how many of the bytes after it belong to this command.`,
+				tail: $localize`:@@inspector.param.data-byte:data byte`,
 			};
 		}
 
-		return { params: [form], note: "AMK0163 — this form was never implemented." };
+		return {
+			params: [form],
+			note: $localize`:@@inspector.param.amk0163-this-form-was-never:AMK0163 — this form was never implemented.`,
+		};
 	}
 
 	if (sub !== undefined && (sub & 0x80) !== 0) {
 		return {
-			params: [choice("Mode", [{ value: 0x80, label: "$80 — GAIN" }], { structural: true }), u8("GAIN", "rate")],
+			params: [
+				choice(
+					$localize`:@@inspector.param.mode:Mode`,
+					[{ value: 0x80, label: $localize`:@@inspector.param.80-gain:$80 — GAIN` }],
+					{ structural: true },
+				),
+				u8("GAIN", "rate"),
+			],
 		};
 	}
 
@@ -219,10 +249,12 @@ const envelope: Resolver = (command) => {
 		params: [
 			u8("ADSR1", "rate", {
 				max: 0x7f,
-				describe: (value) => `decay ${(value >> 4) & 0x07}, attack ${value & 0x0f}`,
+				describe: (value) =>
+					$localize`:@@inspector.param.decay-attack:decay ${(value >> 4) & 0x07}:decay:, attack ${value & 0x0f}:attack:`,
 			}),
 			u8("ADSR2", "rate", {
-				describe: (value) => `sustain ${(value >> 5) & 0x07}, release ${value & 0x1f}`,
+				describe: (value) =>
+					$localize`:@@inspector.param.sustain-release:sustain ${(value >> 5) & 0x07}:sustain:, release ${value & 0x1f}:release:`,
 			}),
 		],
 	};
@@ -234,36 +266,41 @@ const tremolo: Resolver = (command) => {
 	if (command.target.program === 1 && first >= 0x80) {
 		return {
 			params: [
-				u8("Sample", "srcn", {
+				u8($localize`:@@inspector.param.sample:Sample`, "srcn", {
 					min: 0x80,
 					structural: true,
-					describe: (value) => `sample $${hex2(value - 0x80)} — the high bit is what selects this form`,
+					describe: (value) =>
+						$localize`:@@inspector.param.sample-the-high-bit-is:sample $${hex2(value - 0x80)}:sample: — the high bit is what selects this form`,
 				}),
-				u8("Multiplication pitch", "opaque"),
+				u8($localize`:@@inspector.param.multiplication-pitch:Multiplication pitch`, "opaque"),
 			],
-			note: "Addmusic 4.05 overloaded $E5: a high first byte is a sample load, and AddmusicK compiles it to $F3.",
+			note: $localize`:@@inspector.param.addmusic-4-05-overloaded-e5:Addmusic 4.05 overloaded $E5: a high first byte is a sample load, and AddmusicK compiles it to $F3.`,
 		};
 	}
 
 	return {
-		params: [ticks("Delay"), RATE("tremolo"), u8("Depth", "level")],
+		params: [
+			ticks($localize`:@@inspector.param.delay:Delay`),
+			RATE($localize`:@@inspector.param.rate-zero.tremolo:a rate of 0 never advances, so the tremolo stays still`),
+			u8($localize`:@@inspector.param.depth:Depth`, "level"),
+		],
 	};
 };
 
 /** `$FA` picks a different command per sub-byte. */
 const misc: Resolver = (command) => {
 	const sub = command.args[0]?.value;
-	const selector = choice("Sub-command", FA_SUBCOMMANDS, {
+	const selector = choice($localize`:@@inspector.param.sub-command:Sub-command`, FA_SUBCOMMANDS, {
 		structural: true,
 		// Commands.asm:667-679 — a 16-bit index into a seven-entry table with no
 		// bounds check. $05's slot was emptied when remote code replaced it.
 		describe: (value) => {
 			if (value === 0x05) {
-				return "replaced by remote code type 3; the slot is empty and the SPC jumps to address zero";
+				return $localize`:@@inspector.param.replaced-by-remote-code-type:replaced by remote code type 3; the slot is empty and the SPC jumps to address zero`;
 			}
 
 			return value > 0x06 && value !== 0x7f && value !== 0xfe
-				? "past the table: the SPC jumps into whatever follows it"
+				? $localize`:@@inspector.param.past-the-table-the-spc:past the table: the SPC jumps into whatever follows it`
 				: null;
 		},
 	});
@@ -273,36 +310,38 @@ const misc: Resolver = (command) => {
 			return {
 				params: [
 					selector,
-					u8("Channels", "channelMask", {
+					u8($localize`:@@inspector.param.channels:Channels`, "channelMask", {
 						control: "toggles",
-						describe: () => "channel 0 cannot have pitch modulation",
+						describe: () =>
+							$localize`:@@inspector.param.channel-0-cannot-have-pitch:channel 0 cannot have pitch modulation`,
 					}),
 				],
 			};
 		case 0x01:
 			return { params: [selector, u8("GAIN", "rate")] };
 		case 0x02:
-			return { params: [selector, s8("Semitones", "semitones")] };
+			return { params: [selector, s8($localize`:@@inspector.param.semitones:Semitones`, "semitones")] };
 		case 0x03:
 			return {
 				params: [
 					selector,
-					u8("Multiplier", "level", {
-						describe: (value) => `volume × ${((value + 1) / 256).toFixed(3)} + 1 — $FF is just shy of double`,
+					u8($localize`:@@inspector.param.multiplier:Multiplier`, "level", {
+						describe: (value) =>
+							$localize`:@@inspector.param.volume-1-ff-is-just:volume × ${((value + 1) / 256).toFixed(3)}:factor: + 1 — $FF is just shy of double`,
 					}),
 				],
 			};
 		case 0x04:
 			return {
-				params: [selector, u8("Largest delay", "index", { max: 0x0f })],
-				note: "Inserted by the compiler at the start of every song; there is rarely a reason to write it by hand.",
+				params: [selector, u8($localize`:@@inspector.param.largest-delay:Largest delay`, "index", { max: 0x0f })],
+				note: $localize`:@@inspector.param.inserted-by-the-compiler-at:Inserted by the compiler at the start of every song; there is rarely a reason to write it by hand.`,
 			};
 		case 0x06:
 			return {
 				params: [
 					selector,
 					choice(
-						"Table",
+						$localize`:@@inspector.param.table:Table`,
 						// AMK0045: parseOptionDirective refuses #option at #amk 1 and
 						// nowhere else, so #am4 and #amm songs — version 0 — may use it
 						// and are named the directives too.
@@ -310,21 +349,26 @@ const misc: Resolver = (command) => {
 						{
 							// main.asm:2373 tests the byte against zero rather than against 1.
 							describe: (value) =>
-								value > 1 ? "anything but $00 selects the N-SPC table; the driver only tests for zero" : null,
+								value > 1
+									? $localize`:@@inspector.param.anything-but-00-selects-the:anything but $00 selects the N-SPC table; the driver only tests for zero`
+									: null,
 						},
 					),
 				],
-				note: "The compiler already writes $FA $06 $01 at the start of every #amk 2 and up song.",
+				note: $localize`:@@inspector.param.the-compiler-already-writes-fa:The compiler already writes $FA $06 $01 at the start of every #amk 2 and up song.`,
 			};
 		case 0x7f:
-			return { params: [selector, choice("Preset", HOT_PATCH_PRESETS)] };
+			return { params: [selector, choice($localize`:@@inspector.param.preset:Preset`, HOT_PATCH_PRESETS)] };
 		case 0xfe: {
 			const bits = [
 				selector,
-				u8("Bits", "opaque", {
+				u8($localize`:@@inspector.param.bits:Bits`, "opaque", {
 					control: "toggles",
 					structural: true,
-					describe: (value) => ((value & 0x80) !== 0 ? "the high bit defines a further byte of bits" : null),
+					describe: (value) =>
+						(value & 0x80) !== 0
+							? $localize`:@@inspector.param.the-high-bit-defines-a:the high bit defines a further byte of bits`
+							: null,
 				}),
 			];
 
@@ -333,7 +377,7 @@ const misc: Resolver = (command) => {
 			// row, so an unconditional third would draw an empty "not written yet"
 			// line under every ordinary `$FA $FE`.
 			if (((command.args[1]?.value ?? 0) & 0x80) !== 0) {
-				bits.push(u8("More bits", "opaque", { control: "toggles" }));
+				bits.push(u8($localize`:@@inspector.param.more-bits:More bits`, "opaque", { control: "toggles" }));
 			}
 
 			return { params: bits };
@@ -345,7 +389,7 @@ const misc: Resolver = (command) => {
 			// second byte is really there even when nothing here knows what it means,
 			// and saying "Value" is more honest than letting it fall through to
 			// "Argument 2".
-			return { params: [selector, raw("Value")] };
+			return { params: [selector, raw($localize`:@@inspector.param.value:Value`)] };
 	}
 };
 
@@ -353,24 +397,29 @@ const misc: Resolver = (command) => {
 const remote: Resolver = (command) => {
 	if (command.target.amkVersion === 1) {
 		return {
-			params: [u8("GAIN", "rate"), ticks("Delay")],
-			note: "Under #amk 1 this is remote gain, which the compiler rebuilds into a five-byte remote-code event.",
+			params: [u8("GAIN", "rate"), ticks($localize`:@@inspector.param.delay:Delay`)],
+			note: $localize`:@@inspector.param.under-amk-1-this-is:Under #amk 1 this is remote gain, which the compiler rebuilds into a five-byte remote-code event.`,
 		};
 	}
 
 	return {
 		params: [
-			u8("Address, low", "address", { control: "readonly" }),
-			u8("Address, high", "address", { control: "readonly" }),
-			choice("Event type", REMOTE_TYPES, {
+			u8($localize`:@@inspector.param.address-low:Address, low`, "address", { control: "readonly" }),
+			u8($localize`:@@inspector.param.address-high:Address, high`, "address", { control: "readonly" }),
+			choice($localize`:@@inspector.param.event-type:Event type`, REMOTE_TYPES, {
 				// Commands.asm:1260-1269 stores any other value in the normal slot
 				// with that type, and nothing ever tests for it.
 				describe: (value) =>
-					value >= 0x09 && value <= 0xfe ? "no such event: the code is stored and never run" : null,
+					value >= 0x09 && value <= 0xfe
+						? $localize`:@@inspector.param.no-such-event-the-code:no such event: the code is stored and never run`
+						: null,
 			}),
-			ticks("Wait", { describe: (value) => (value === 0 ? "$00 is treated as $0100" : null) }),
+			ticks($localize`:@@inspector.param.wait:Wait`, {
+				describe: (value) =>
+					value === 0 ? $localize`:@@inspector.param.00-is-treated-as-0100:$00 is treated as $0100` : null,
+			}),
 		],
-		note: "The address is written by the compiler from a (!n) label; editing it by hand points the driver at nothing.",
+		note: $localize`:@@inspector.param.the-address-is-written-by:The address is written by the compiler from a (!n) label; editing it by hand points the driver at nothing.`,
 	};
 };
 
@@ -380,14 +429,14 @@ const remote: Resolver = (command) => {
 
 export const HEX_PARAMS: Readonly<Record<number, Resolver>> = {
 	0xda: fixed([
-		u8("Instrument", "index", {
+		u8($localize`:@@inspector.param.instrument:Instrument`, "index", {
 			describe: (value) =>
 				value === 0x13
 					? // `@amk/spc`'s README.md — the driver has a real 20th slot, SRCN $0F,
 						// that AddmusicK's own instrToSample marks as "Nothing". Nothing ever
 						// marks $0F used, so optimizeSampleUsage (Music.cpp:3074) swaps it for
 						// the zero-byte EMPTY.brr.
-						"the driver’s 20th slot, reachable only this way — but its sample is dropped as unused, so it plays silence unless the song also uses @21 or @26–@29"
+						$localize`:@@inspector.param.the-drivers-20th-slot-reachable:the driver’s 20th slot, reachable only this way — but its sample is dropped as unused, so it plays silence unless the song also uses @21 or @26–@29`
 					: null,
 		}),
 	]),
@@ -402,73 +451,101 @@ export const HEX_PARAMS: Readonly<Record<number, Resolver>> = {
 		// `CalcPortamentoDelta` (ARAM `$131B`) divides the pitch distance by, not a
 		// rate like `$DE`'s second byte. The delay is counted from the *second* tick
 		// of the note this rides on, which is what `bend-command` warns about.
-		ticks("Delay"),
+		ticks($localize`:@@inspector.param.delay:Delay`),
 		DURATION,
-		u8("Target note", "note", { min: 0x80, max: 0xc5, describe: (value) => noteName(value) }),
+		u8($localize`:@@inspector.param.target-note:Target note`, "note", {
+			min: 0x80,
+			max: 0xc5,
+			describe: (value) => noteName(value),
+		}),
 	]),
-	0xde: fixed([ticks("Delay"), RATE("vibrato"), u8("Depth", "level")]),
+	0xde: fixed([
+		ticks($localize`:@@inspector.param.delay:Delay`),
+		RATE($localize`:@@inspector.param.rate-zero.vibrato:a rate of 0 never advances, so the vibrato stays still`),
+		u8($localize`:@@inspector.param.depth:Depth`, "level"),
+	]),
 	0xdf: fixed([]),
-	0xe0: fixed([u8("Global volume", "level", { describe: percentOf255 })]),
-	0xe1: fixed([DURATION, u8("Global volume", "level", { describe: percentOf255 })]),
+	0xe0: fixed([u8($localize`:@@inspector.param.global-volume:Global volume`, "level", { describe: percentOf255 })]),
+	0xe1: fixed([
+		DURATION,
+		u8($localize`:@@inspector.param.global-volume:Global volume`, "level", { describe: percentOf255 }),
+	]),
 	0xe2: fixed(
 		[
-			u8("Tempo", "rate", {
+			u8($localize`:@@inspector.param.tempo:Tempo`, "rate", {
 				max: MAX_TEMPO,
 				describe: tempoLabel,
 			}),
 		],
-		"The driver stores one more than you write, so $FF would be tempo 0 and the song would stop advancing.",
+		$localize`:@@inspector.param.the-driver-stores-one-more:The driver stores one more than you write, so $FF would be tempo 0 and the song would stop advancing.`,
 	),
 	0xe3: fixed(
 		[
 			TEMPO_FADE_DURATION,
-			u8("Tempo", "rate", {
+			u8($localize`:@@inspector.param.tempo:Tempo`, "rate", {
 				max: MAX_TEMPO,
 				describe: tempoLabel,
 			}),
 		],
-		"Its handler has the same carry-less add as $E2, so a target of $FF fades the song to a stop.",
+		$localize`:@@inspector.param.its-handler-has-the-same:Its handler has the same carry-less add as $E2, so a target of $FF fades the song to a stop.`,
 	),
 	0xe4: fixed([SEMITONES]),
 	0xe5: tremolo,
 	0xe6: subloop,
-	0xe7: fixed([u8("Volume", "level", { describe: percentOf255 })]),
-	0xe8: fixed([DURATION, u8("Volume", "level", { describe: percentOf255 })]),
+	0xe7: fixed([u8($localize`:@@inspector.param.volume:Volume`, "level", { describe: percentOf255 })]),
+	0xe8: fixed([DURATION, u8($localize`:@@inspector.param.volume:Volume`, "level", { describe: percentOf255 })]),
 	0xe9: fixed(
 		[
-			u8("Loop point, low", "address", { control: "readonly" }),
-			u8("Loop point, high", "address", { control: "readonly" }),
-			u8("Loop count", "index"),
+			u8($localize`:@@inspector.param.loop-point-low:Loop point, low`, "address", { control: "readonly" }),
+			u8($localize`:@@inspector.param.loop-point-high:Loop point, high`, "address", { control: "readonly" }),
+			u8($localize`:@@inspector.param.loop-count:Loop count`, "index"),
 		],
-		"Written by the compiler from a [ ] loop. The readme says outright: do not use manually.",
+		$localize`:@@inspector.param.written-by-the-compiler-from:Written by the compiler from a [ ] loop. The readme says outright: do not use manually.`,
 	),
-	0xea: fixed([DURATION], "Fades to the amplitude the last $DE set."),
-	0xeb: fixed([ticks("Delay"), ticks("Duration"), SEMITONES]),
-	0xec: fixed([ticks("Delay"), ticks("Duration"), SEMITONES]),
+	0xea: fixed(
+		[DURATION],
+		$localize`:@@inspector.param.fades-to-the-amplitude-the:Fades to the amplitude the last $DE set.`,
+	),
+	0xeb: fixed([
+		ticks($localize`:@@inspector.param.delay:Delay`),
+		ticks($localize`:@@inspector.param.duration:Duration`),
+		SEMITONES,
+	]),
+	0xec: fixed([
+		ticks($localize`:@@inspector.param.delay:Delay`),
+		ticks($localize`:@@inspector.param.duration:Duration`),
+		SEMITONES,
+	]),
 	0xed: envelope,
-	0xee: fixed([s8("Tuning", "semitones")]),
-	0xef: fixed([u8("Channels", "channelMask", { control: "toggles" }), ECHO_VOLUME("L"), ECHO_VOLUME("R")]),
+	0xee: fixed([s8($localize`:@@inspector.param.tuning:Tuning`, "semitones")]),
+	0xef: fixed([
+		u8($localize`:@@inspector.param.channels:Channels`, "channelMask", { control: "toggles" }),
+		ECHO_VOLUME("L"),
+		ECHO_VOLUME("R"),
+	]),
 	0xf0: fixed([]),
 	0xf1: fixed([
-		u8("Delay", "index", {
+		u8($localize`:@@inspector.param.delay:Delay`, "index", {
 			max: 0x0f,
 			describe: (value) => {
 				const masked = value & 0x0f;
 				if (value > 0x0f) {
 					// main.asm:2606 masks it, so an out-of-range value wraps in silence.
-					return `$${hex2(value)} is out of range; the driver masks it to $${hex2(masked)}`;
+					return $localize`:@@inspector.param.is-out-of-range-the:$${hex2(value)}:byte: is out of range; the driver masks it to $${hex2(masked)}:masked:`;
 				}
 
-				return `${masked * 16} ms — ${masked * 2} KiB of ARAM reserved for the buffer`;
+				return $localize`:@@inspector.param.ms-kib-of-aram-reserved:${masked * 16}:ms: ms — ${masked * 2}:kib: KiB of ARAM reserved for the buffer`;
 			},
 		}),
-		s8("Feedback", "level", {
+		s8($localize`:@@inspector.param.feedback:Feedback`, "level", {
 			describe: (value) =>
-				value === 0 ? "no feedback — the echo plays once" : "each repeat is this fraction of the last",
+				value === 0
+					? $localize`:@@inspector.param.no-feedback-the-echo-plays:no feedback — the echo plays once`
+					: $localize`:@@inspector.param.each-repeat-is-this-fraction:each repeat is this fraction of the last`,
 		}),
-		choice("Filter", [
-			{ value: 0, label: "0 — SMW low-pass" },
-			{ value: 1, label: "1 — flat" },
+		choice($localize`:@@inspector.param.filter:Filter`, [
+			{ value: 0, label: $localize`:@@inspector.param.0-smw-low-pass:0 — SMW low-pass` },
+			{ value: 1, label: $localize`:@@inspector.param.1-flat:1 — flat` },
 		]),
 	]),
 	0xf2: fixed([DURATION, ECHO_VOLUME("L"), ECHO_VOLUME("R")]),
@@ -478,54 +555,74 @@ export const HEX_PARAMS: Readonly<Record<number, Resolver>> = {
 	// over from whatever played last.
 	0xf3: (_command, context) => ({
 		params: [
-			u8("Sample", "srcn", {
+			u8($localize`:@@inspector.param.sample:Sample`, "srcn", {
 				control: "select",
 				choices: context.samples.filter((option) => option.label !== EMPTY_SAMPLE_NAME),
 				max: Math.max(0, context.samples.length - 1),
 			}),
-			u8("Tuning multiplier", "rate", {
+			u8($localize`:@@inspector.param.tuning-multiplier:Tuning multiplier`, "rate", {
 				describe: (value) =>
 					value === 0
-						? "a multiplier of 0 is silence"
-						: `×${value} — the whole part only; the fraction carries over from the last instrument`,
+						? $localize`:@@inspector.param.a-multiplier-of-0-is:a multiplier of 0 is silence`
+						: $localize`:@@inspector.param.the-whole-part-only-the:×${value}:multiplier: — the whole part only; the fraction carries over from the last instrument`,
 			}),
 		],
-		note: "Changes the sample and coarse pitch only: the envelope and the fractional tuning are left as the previous instrument set them. $FA $FE’s third bit makes $F3 zero the fraction instead.",
+		note: $localize`:@@inspector.param.changes-the-sample-and-coarse:Changes the sample and coarse pitch only: the envelope and the fractional tuning are left as the previous instrument set them. $FA $FE’s third bit makes $F3 zero the fraction instead.`,
 	}),
 	0xf4: fixed([
-		choice("Sub-command", F4_SUBCOMMANDS, {
+		choice($localize`:@@inspector.param.sub-command:Sub-command`, F4_SUBCOMMANDS, {
 			structural: true,
 			// Commands.asm:556-565 — ten entries, no bounds check, and $04's is
 			// `dw $0000`. Neither value is offered above; both are reachable by hand.
 			describe: (value) => {
 				if (value === 0x04) {
-					return "this driver has no such command: the SPC jumps to address zero";
+					return $localize`:@@inspector.param.this-driver-has-no-such:this driver has no such command: the SPC jumps to address zero`;
 				}
 
-				return value >= 0x0a ? "past the table: the SPC jumps into whatever follows it" : null;
+				return value >= 0x0a
+					? $localize`:@@inspector.param.past-the-table-the-spc:past the table: the SPC jumps into whatever follows it`
+					: null;
 			},
 		}),
 	]),
 	0xf5: fixed(
-		Array.from({ length: 8 }, (_, i) => s8(`Coefficient ${i + 1}`, "level")),
-		"C7 multiplies the newest sample and C0 the oldest.",
+		Array.from({ length: 8 }, (_, i) =>
+			s8($localize`:@@inspector.param.coefficient:Coefficient ${i + 1}:index:`, "level"),
+		),
+		$localize`:@@inspector.param.c7-multiplies-the-newest-sample:C7 multiplies the newest sample and C0 the oldest.`,
 	),
-	0xf6: fixed([u8("DSP register", "address"), u8("Value", "opaque")]),
-	0xf7: fixed([raw("Address, low"), raw("Address, high"), raw("Value")], "AddmusicM’s write-byte command."),
+	0xf6: fixed([
+		u8($localize`:@@inspector.param.dsp-register:DSP register`, "address"),
+		u8($localize`:@@inspector.param.value:Value`, "opaque"),
+	]),
+	0xf7: fixed(
+		[
+			raw($localize`:@@inspector.param.address-low:Address, low`),
+			raw($localize`:@@inspector.param.address-high:Address, high`),
+			raw($localize`:@@inspector.param.value:Value`),
+		],
+		$localize`:@@inspector.param.addmusicms-write-byte-command:AddmusicM’s write-byte command.`,
+	),
 	// The same clock the `n` command sets, so it reads out the same way: the
 	// driver writes both to the DSP's `FLG` register and the ladder is the DSP's.
 	0xf8: fixed([
-		u8("Noise clock", "rate", {
+		u8($localize`:@@inspector.param.noise-clock:Noise clock`, "rate", {
 			max: 0x1f,
-			describe: (value) => (value === 0 ? "silent" : `${Math.round(noiseHz(value)).toLocaleString()} Hz`),
+			describe: (value) =>
+				value === 0
+					? $localize`:@@inspector.param.silent:silent`
+					: $localize`:@@inspector.param.hz:${Math.round(noiseHz(value)).toLocaleString()}:hz: Hz`,
 		}),
 	]),
 	// The handler at $1083 writes the first argument to $0167 and the second to
 	// $0166 — inverted — and the main loop pushes both to the ports every tick
 	// (main.asm:248-256).
 	0xf9: fixed(
-		[u8("To $2141", "opaque"), u8("To $2140", "opaque")],
-		"The two bytes land on the SNES’s APU ports the other way round from how they are written, and stay there until another $F9 changes them. What the ROM does with them is its own business. $F4 $05 reuses the same two bytes as a tick counter, so the two commands cannot both be used.",
+		[
+			u8($localize`:@@inspector.param.to-2141:To $2141`, "opaque"),
+			u8($localize`:@@inspector.param.to-2140:To $2140`, "opaque"),
+		],
+		$localize`:@@inspector.param.the-two-bytes-land-on:The two bytes land on the SNES’s APU ports the other way round from how they are written, and stay there until another $F9 changes them. What the ROM does with them is its own business. $F4 $05 reuses the same two bytes as a tick counter, so the two commands cannot both be used.`,
 	),
 	0xfa: misc,
 	// `$FB` has a view of its own: its length is one of its arguments, so the

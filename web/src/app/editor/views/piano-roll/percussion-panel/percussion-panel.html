@@ -1,4 +1,4 @@
-<span class="text-ink-muted text-xs">On percussion lanes</span>
+<span i18n="@@roll.on-percussion-lanes" class="text-ink-muted text-xs">On percussion lanes</span>
 @for (chip of chips(); track chip.instrument) {
   <button
     amk-toggle
@@ -11,9 +11,12 @@
     {{ chip.label }}
   </button>
 } @empty {
-  <span class="text-ink-muted text-xs">This song plays no instruments.</span>
+  <span i18n="@@roll.this-song-plays-no" class="text-ink-muted text-xs"
+    >This song plays no instruments.</span
+  >
 }
 <button
+  i18n="@@roll.reset"
   amk-button
   variant="ghost"
   size="sm"

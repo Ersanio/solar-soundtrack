@@ -72,15 +72,7 @@ export class StatusBar {
   protected readonly dotClass = computed(() => DOT[this.store.status().kind]);
   protected readonly textClass = computed(() => TEXT[this.store.status().kind]);
 
-  protected readonly problemsLabel = computed(() => {
-    const count = this.store.diagnostics().length;
-
-    if (count === 0) {
-      return 'No problems';
-    }
-
-    return count === 1 ? '1 problem' : `${count} problems`;
-  });
+  protected readonly problemCount = computed(() => this.store.diagnostics().length);
 
   /** The worst severity in the list decides the colour; `info` alone earns none. */
   protected readonly problemsClass = computed(() => {
@@ -104,7 +96,9 @@ export class StatusBar {
   /** The walk's note count: a fact about the song, so it is here whatever view is showing. */
   protected readonly notesLabel = computed(() => {
     const song = this.store.timeline();
-    return song ? `${song.notes.length.toLocaleString()} notes` : null;
+    return song
+      ? $localize`:@@status.notes:${song.notes.length.toLocaleString()}:count: notes`
+      : null;
   });
 
   /**
@@ -143,8 +137,8 @@ export class StatusBar {
     const got = shortfall ? asked / shortfall : asked;
     const rate =
       got > 0 && got < asked * 0.95
-        ? `${got.toFixed(1)} of ${asked.toFixed(1)} ticks/s`
-        : `${asked.toFixed(1)} ticks/s`;
+        ? $localize`:@@status.of-ticks-s:${got.toFixed(1)}:got: of ${asked.toFixed(1)}:asked: ticks/s`
+        : $localize`:@@status.ticks-s:${asked.toFixed(1)}:asked: ticks/s`;
     return `t${tempo} · ${rate}`;
   });
 

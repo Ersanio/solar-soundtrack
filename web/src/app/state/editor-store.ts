@@ -343,16 +343,16 @@ export class EditorStore {
     }
 
     if (budget.overflowBytes > 0) {
-      return `over by ${budget.overflowBytes.toLocaleString()} B`;
+      return $localize`:@@status.over-by-b:over by ${budget.overflowBytes.toLocaleString()}:count: B`;
     }
 
     const percent = ((budget.freeBytes / ARAM_SIZE) * 100).toFixed(0);
-    return `${budget.freeBytes.toLocaleString()} B free (${percent}%)`;
+    return $localize`:@@status.b-free:${budget.freeBytes.toLocaleString()}:count: B free (${percent}:percent:%)`;
   });
 
   readonly caretLabel = computed(() => {
     const { line, column } = caretPosition(this.source(), this.caret());
-    return `Ln ${line}, Col ${column}`;
+    return $localize`:@@status.ln-col:Ln ${line}:line:, Col ${column}:column:`;
   });
 
   /**
@@ -420,24 +420,30 @@ export class EditorStore {
     }
 
     if (!this.drivers.ready()) {
-      return { kind: 'busy', text: 'loading driver…' };
+      return { kind: 'busy', text: $localize`:@@status.loading-driver:loading driver…` };
     }
 
     const compilation = this.compilation();
     if (!compilation) {
-      return { kind: 'busy', text: 'waiting for a driver' };
+      return { kind: 'busy', text: $localize`:@@status.waiting-for-a-driver:waiting for a driver` };
     }
 
     const { result, elapsedMs } = compilation;
     if (result.ok && result.data) {
       return {
         kind: 'ok',
-        text: `${result.data.length} bytes · ${elapsedMs.toFixed(1)} ms`,
+        text: $localize`:@@status.bytes-ms:${result.data.length}:length: bytes · ${elapsedMs.toFixed(1)}:elapsedMs: ms`,
       };
     }
 
     const errors = this.errorCount();
-    return { kind: 'error', text: `${errors} error${errors === 1 ? '' : 's'}` };
+    return {
+      kind: 'error',
+      text:
+        errors === 1
+          ? $localize`:@@status.errors.one:1 error`
+          : $localize`:@@status.errors.other:${errors}:errors: errors`,
+    };
   });
 
   /** Compilation is gated on a driver, so every producing action is too. */
@@ -519,7 +525,10 @@ export class EditorStore {
     this.compileNow();
     const result = this.result();
     if (!result?.ok || !result.data) {
-      this.override.set({ kind: 'error', text: 'cannot export: song has errors' });
+      this.override.set({
+        kind: 'error',
+        text: $localize`:@@status.cannot-export-song-has-errors:cannot export: song has errors`,
+      });
       return;
     }
 
@@ -535,12 +544,18 @@ export class EditorStore {
     this.compileNow();
     const spc = this.assembleSpc();
     if (!spc) {
-      this.override.set({ kind: 'error', text: 'cannot export: song has errors' });
+      this.override.set({
+        kind: 'error',
+        text: $localize`:@@status.cannot-export-song-has-errors:cannot export: song has errors`,
+      });
       return;
     }
 
     downloadBlob(spcFilename(this.result()?.stats?.tags ?? {}), spc);
-    this.override.set({ kind: 'ok', text: `SPC written · ${spc.length.toLocaleString()} bytes` });
+    this.override.set({
+      kind: 'ok',
+      text: $localize`:@@status.spc-written-bytes:SPC written · ${spc.length.toLocaleString()}:count: bytes`,
+    });
   }
 
   fail(text: string): void {

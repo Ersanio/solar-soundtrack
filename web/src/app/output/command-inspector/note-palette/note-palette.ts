@@ -98,6 +98,11 @@ export class NotePalette {
 
   private readonly requests = inject(EditorRequests);
 
+  protected readonly text = {
+    hidePalette: $localize`:@@source.palette.hide.title:Hide the command palette`,
+    addCommand: $localize`:@@inspector.note-palette.add-command.title:Add a command in front of this note`,
+  };
+
   readonly note = input.required<Command>();
 
   readonly model = input.required<NotePaletteModel>();

@@ -14,8 +14,16 @@ import { stopWhenRunaway } from '../runaway-guard';
 
 /** AddmusicK ships exactly two, at `main.asm:3506-3510`. There is no third. */
 const FILTERS = [
-  { value: 0, name: '0 — SMW low-pass', note: 'the filter Super Mario World itself uses' },
-  { value: 1, name: '1 — flat', note: 'passes the echo through unchanged' },
+  {
+    value: 0,
+    name: $localize`:@@inspector.echo-config.0-smw-low-pass:0 — SMW low-pass`,
+    note: $localize`:@@inspector.echo-config.the-filter-super-mario-world:the filter Super Mario World itself uses`,
+  },
+  {
+    value: 1,
+    name: $localize`:@@inspector.echo-config.1-flat:1 — flat`,
+    note: $localize`:@@inspector.echo-config.passes-the-echo-through-unchanged:passes the echo through unchanged`,
+  },
 ] as const;
 
 /**
@@ -65,14 +73,16 @@ export class EchoConfig {
     const written = this.bytes.shownAt(0);
     const masked = written & 0x0f;
     if (written > 0x0f) {
-      return `$${hex2(written)} is out of range; the driver masks it to $${hex2(masked)}`;
+      return $localize`:@@inspector.echo-config.is-out-of-range-the:$${hex2(written)}:written: is out of range; the driver masks it to $${hex2(masked)}:masked:`;
     }
 
-    return `${masked * 16} ms — ${masked * 2} KiB of ARAM reserved for the buffer`;
+    return $localize`:@@inspector.echo-config.ms-kib-of-aram-reserved:${masked * 16}:ms: ms — ${masked * 2}:kib: KiB of ARAM reserved for the buffer`;
   });
 
   protected readonly filterNote = computed(() =>
-    this.filter() > 1 ? 'Only $00 and $01 exist; anything else reads past the table.' : null,
+    this.filter() > 1
+      ? $localize`:@@inspector.echo-config.only-00-and-01-exist:Only $00 and $01 exist; anything else reads past the table.`
+      : null,
   );
 
   /**
@@ -111,18 +121,17 @@ export class EchoConfig {
       return null;
     }
 
-    return (
-      `This feedback and filter ${this.filter()} give a loop gain of ` +
-      `${stability.loopGain.toFixed(2)} — the echo will grow instead of fade. Lower the feedback` +
-      `${this.filter() === 0 ? ', or select filter 1' : ''}.`
-    );
+    const gain = stability.loopGain.toFixed(2);
+    return this.filter() === 0
+      ? $localize`:@@inspector.echo-config.runaway-filter-zero:This feedback and filter 0 give a loop gain of ${gain}:gain: — the echo will grow instead of fade. Lower the feedback, or select filter 1.`
+      : $localize`:@@inspector.echo-config.runaway:This feedback and filter ${this.filter()}:filter: give a loop gain of ${gain}:gain: — the echo will grow instead of fade. Lower the feedback.`;
   });
 
   constructor() {
     // The feedback is a slider and the player keeps running through a drag, so
     // the runaway arrives while the pointer is still moving — several seconds
     // before a commit could produce the SST0501 that describes it.
-    stopWhenRunaway(this.command, this.runaway, 'echo');
+    stopWhenRunaway(this.command, this.runaway, $localize`:@@inspector.runaway.echo:echo`);
   }
 
   /**

@@ -49,7 +49,7 @@ export function argLockedBecause(command: Command, index: number): string | null
   // (`parser.ts:parseNote`), none of which the scanner sees, so there is no
   // value to put a control on.
   if (index === 2 && command.noteTarget !== undefined) {
-    return 'is the note written after the command, whose byte the octave in force decides';
+    return $localize`:@@inspector.commands.is-the-note-written-after:is the note written after the command, whose byte the octave in force decides`;
   }
 
   const macro = index >= 0 ? command.args[index]?.replacement : undefined;
@@ -62,7 +62,7 @@ export function argLockedBecause(command: Command, index: number): string | null
  * that are.
  */
 export function replacementLockedBecause(macro: string): string {
-  return `comes from the "${macro}" replacement`;
+  return $localize`:@@inspector.commands.comes-from-the-replacement:comes from the "${macro}:macro:" replacement`;
 }
 
 /**
@@ -77,8 +77,5 @@ export function commandLockedBecause(command: Command): string | null {
     return null;
   }
 
-  return (
-    `These bytes come from the "${command.replacement}" replacement, so the cursor is on ` +
-    `the macro's name rather than on them. Change the definition instead.`
-  );
+  return $localize`:@@inspector.commands.these-bytes-come-from-the:These bytes come from the "${command.replacement}:replacement:" replacement, so the cursor is on the macro's name rather than on them. Change the definition instead.`;
 }

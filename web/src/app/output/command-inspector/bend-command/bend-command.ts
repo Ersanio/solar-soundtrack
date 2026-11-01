@@ -112,27 +112,27 @@ export class BendCommand {
 
   protected readonly note = computed(() => {
     if (this.noteTarget()) {
-      return 'The slide rides on the note before it and ends on the note written after it. That note plays nothing of its own — the driver reads its pitch as this command’s last byte — and which byte that is depends on the octave in force, any h, the instrument’s tuning and a drum remap, so it is not shown here. A length written on it is not read.';
+      return $localize`:@@inspector.bend.the-slide-rides-on-the:The slide rides on the note before it and ends on the note written after it. That note plays nothing of its own — the driver reads its pitch as this command’s last byte — and which byte that is depends on the octave in force, any h, the instrument’s tuning and a drum remap, so it is not shown here. A length written on it is not read.`;
     }
 
     if (!this.isPitchBend()) {
       return this.vcmd() === 0xec
-        ? 'Every later note starts this far away and arrives at its written pitch.'
-        : 'Every later note starts at its written pitch and departs by this much.';
+        ? $localize`:@@inspector.bend.every-later-note-starts-this:Every later note starts this far away and arrives at its written pitch.`
+        : $localize`:@@inspector.bend.every-later-note-starts-at:Every later note starts at its written pitch and departs by this much.`;
     }
 
     const start = this.start();
     switch (start.kind) {
       case 'note':
-        return `The slide rides on the note before it, ${noteName(start.byte)}, and ${this.startsOn()}.`;
+        return $localize`:@@inspector.bend.the-slide-rides-on-the-2:The slide rides on the note before it, ${noteName(start.byte)}:byte:, and ${this.startsOn()}:startsOn:.`;
       case 'unknown':
-        return `The slide rides on the note before it and ${this.startsOn()}. Its shape is drawn from that note once the song compiles.`;
+        return $localize`:@@inspector.bend.the-slide-rides-on-the-3:The slide rides on the note before it and ${this.startsOn()}:startsOn:. Its shape is drawn from that note once the song compiles.`;
       case 'rest':
-        return 'The slide rides on the rest before it, so it runs on a keyed-off voice and is not heard.';
+        return $localize`:@@inspector.bend.the-slide-rides-on-the-4:The slide rides on the rest before it, so it runs on a keyed-off voice and is not heard.`;
       case 'drum':
-        return 'The slide rides on a drum, which sounds at its percussion entry’s pitch rather than its note’s, so no shape is drawn.';
+        return $localize`:@@inspector.bend.the-slide-rides-on-a:The slide rides on a drum, which sounds at its percussion entry’s pitch rather than its note’s, so no shape is drawn.`;
       case 'nothing':
-        return 'A slide rides on the note before it, and there is none here to draw it from.';
+        return $localize`:@@inspector.bend.a-slide-rides-on-the:A slide rides on the note before it, and there is none here to draw it from.`;
     }
   });
 
@@ -143,10 +143,10 @@ export class BendCommand {
   private startsOn(): string {
     const anchor = this.anchor();
     if (anchor.kind !== 'rides' || anchor.lead === 0) {
-      return 'starts on that note’s second tick';
+      return $localize`:@@inspector.bend.starts-on-that-notes-second:starts on that note’s second tick`;
     }
 
-    return `starts ${anchor.lead + 1} ticks into it, on the second tick of its last ${anchor.frame}-tick piece`;
+    return $localize`:@@inspector.bend.starts-ticks-into-it-on:starts ${anchor.lead + 1}:ticks: ticks into it, on the second tick of its last ${anchor.frame}:frame:-tick piece`;
   }
 
   /** What the slide rides on, and so whether the driver arms it at all. */
@@ -184,16 +184,19 @@ export class BendCommand {
     const anchor = this.anchor();
     switch (anchor.kind) {
       case 'nothing':
-        return 'No note plays before this on the channel, so the driver runs the slide as a command, jumps to address zero and the song stops.';
+        return $localize`:@@inspector.bend.no-note-plays-before-this:No note plays before this on the channel, so the driver runs the slide as a command, jumps to address zero and the song stops.`;
       case 'blocked':
-        return `The ${anchor.by.name} written between this and the note before it is what the driver reads instead, so the slide runs as a command, jumps to address zero and the song stops.`;
-      case 'tooShort': {
-        const what = anchor.tied ? 'tie' : 'note';
+        return $localize`:@@inspector.bend.the-written-between-this-and:The ${anchor.by.name}:name: written between this and the note before it is what the driver reads instead, so the slide runs as a command, jumps to address zero and the song stops.`;
+      case 'tooShort':
+        if (anchor.ticks > 1) {
+          return anchor.tied
+            ? $localize`:@@inspector.bend.tie-pieces:The tie before this is ${anchor.ticks}:ticks: ticks, which the compiler writes in pieces of 96 with one tick left over at the end, and the read-ahead cannot run on the tick a piece begins, so the slide runs as a command, jumps to address zero and the song stops.`
+            : $localize`:@@inspector.bend.note-pieces:The note before this is ${anchor.ticks}:ticks: ticks, which the compiler writes in pieces of 96 with one tick left over at the end, and the read-ahead cannot run on the tick a piece begins, so the slide runs as a command, jumps to address zero and the song stops.`;
+        }
 
-        return anchor.ticks > 1
-          ? `The ${what} before this is ${anchor.ticks} ticks, which the compiler writes in pieces of 96 with one tick left over at the end, and the read-ahead cannot run on the tick a piece begins, so the slide runs as a command, jumps to address zero and the song stops.`
-          : `The ${what} before this lasts one tick, and the read-ahead cannot run on the tick a ${what} begins, so the slide runs as a command, jumps to address zero and the song stops.`;
-      }
+        return anchor.tied
+          ? $localize`:@@inspector.bend.tie-one-tick:The tie before this lasts one tick, and the read-ahead cannot run on the tick a tie begins, so the slide runs as a command, jumps to address zero and the song stops.`
+          : $localize`:@@inspector.bend.note-one-tick:The note before this lasts one tick, and the read-ahead cannot run on the tick a note begins, so the slide runs as a command, jumps to address zero and the song stops.`;
 
       case 'rides':
         break;
@@ -203,11 +206,11 @@ export class BendCommand {
     const delay = this.shownDelay();
     const span = delay + this.shownDuration();
     if (delay >= window) {
-      return `The slide has ${window} ticks before the next note, and the delay alone uses them all, so none of the bend is heard. A tie written after this command gives it more.`;
+      return $localize`:@@inspector.bend.the-slide-has-ticks-before:The slide has ${window}:window: ticks before the next note, and the delay alone uses them all, so none of the bend is heard. A tie written after this command gives it more.`;
     }
 
     if (span > window) {
-      return `The slide has ${window} ticks before the next note and this asks for ${span}, so it is cut off partway and never reaches the target. A tie written after this command gives it more.`;
+      return $localize`:@@inspector.bend.the-slide-has-ticks-before-2:The slide has ${window}:window: ticks before the next note and this asks for ${span}:span:, so it is cut off partway and never reaches the target. A tie written after this command gives it more.`;
     }
 
     return null;

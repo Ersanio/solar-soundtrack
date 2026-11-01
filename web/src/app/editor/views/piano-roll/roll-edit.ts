@@ -150,25 +150,22 @@ export interface EditContext {
   inForce: (address: number) => readonly Command[] | null;
 }
 
-export const REFUSE_RANGE = 'the driver cannot play a note that high or low';
-export const REFUSE_ROOM = 'there is no room to push the notes out of the way';
-export const REFUSE_SPELL = 'that length cannot be written on this AddmusicK target';
-export const REFUSE_CROWDED = 'there is something written where that note would go';
-export const REFUSE_RAMP = 'that note is too short to keep the command written inside it';
-export const REFUSE_INSIDE = 'there is a command written inside that note';
-export const REFUSE_CLASH = 'two notes would sound at once, which MML cannot say';
-export const REFUSE_BEND_RIDER =
-  'a `$DD` pitch slide is written after that note, and it reads the note in front of it';
-export const REFUSE_LOOP_WALL = 'a loop plays where that note would go';
-export const REFUSE_SPLIT = 'those notes are on both sides of a loop bracket';
-export const REFUSE_REMAP_FED = 'that note plays a drum loaded before the loop';
-export const REFUSE_SUB_SPLIT = 'a subloop has no name to call it back by';
-export const REFUSE_NESTED_LOOP = 'that loop plays inside another loop';
-export const REFUSE_LOOP_LEFT_PASS = "only a loop's first pass can be resized from its left end";
-export const REFUSE_LOOP_LEAD_ROOM =
-  'there is nothing but music in front of that loop to grow it into';
-export const REFUSE_LOOP_BODY_ROOM =
-  'there is no rest at that end of the loop to take those ticks from';
+export const REFUSE_RANGE = $localize`:@@roll.the-driver-cannot-play-a:the driver cannot play a note that high or low`;
+export const REFUSE_ROOM = $localize`:@@roll.there-is-no-room-to:there is no room to push the notes out of the way`;
+export const REFUSE_SPELL = $localize`:@@roll.that-length-cannot-be-written:that length cannot be written on this AddmusicK target`;
+export const REFUSE_CROWDED = $localize`:@@roll.there-is-something-written-where:there is something written where that note would go`;
+export const REFUSE_RAMP = $localize`:@@roll.that-note-is-too-short:that note is too short to keep the command written inside it`;
+export const REFUSE_INSIDE = $localize`:@@roll.there-is-a-command-written:there is a command written inside that note`;
+export const REFUSE_CLASH = $localize`:@@roll.two-notes-would-sound-at:two notes would sound at once, which MML cannot say`;
+export const REFUSE_BEND_RIDER = $localize`:@@roll.a-dd-pitch-slide-is:a \`$DD\` pitch slide is written after that note, and it reads the note in front of it`;
+export const REFUSE_LOOP_WALL = $localize`:@@roll.a-loop-plays-where-that:a loop plays where that note would go`;
+export const REFUSE_SPLIT = $localize`:@@roll.those-notes-are-on-both:those notes are on both sides of a loop bracket`;
+export const REFUSE_REMAP_FED = $localize`:@@roll.that-note-plays-a-drum:that note plays a drum loaded before the loop`;
+export const REFUSE_SUB_SPLIT = $localize`:@@roll.a-subloop-has-no-name:a subloop has no name to call it back by`;
+export const REFUSE_NESTED_LOOP = $localize`:@@roll.that-loop-plays-inside-another:that loop plays inside another loop`;
+export const REFUSE_LOOP_LEFT_PASS = $localize`:@@roll.only-a-loops-first-pass:only a loop's first pass can be resized from its left end`;
+export const REFUSE_LOOP_LEAD_ROOM = $localize`:@@roll.there-is-nothing-but-music:there is nothing but music in front of that loop to grow it into`;
+export const REFUSE_LOOP_BODY_ROOM = $localize`:@@roll.there-is-no-rest-at:there is no rest at that end of the loop to take those ticks from`;
 
 /**
  * Why a plan cannot be written out, in the words the roll shows.

@@ -11,7 +11,8 @@
     variant="primary"
     size="sm"
     icon
-    [title]="`Undo (${historyKeys.undo})`"
+    title="Undo ({{ historyKeys.undo }})"
+    i18n-title="@@topbar.history.undo.title"
     [disabled]="!canUndo()"
     (click)="undo()"
   >
@@ -22,7 +23,8 @@
     variant="primary"
     size="sm"
     icon
-    [title]="`Redo (${historyKeys.redo})`"
+    title="Redo ({{ historyKeys.redo }})"
+    i18n-title="@@topbar.history.redo.title"
     [disabled]="!canRedo()"
     (click)="redo()"
   >

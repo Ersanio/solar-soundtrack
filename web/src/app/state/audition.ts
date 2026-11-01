@@ -187,7 +187,9 @@ export class Audition {
       // caller that expects to is allowed to ask quietly rather than filling
       // the status line with a message about a note it never committed.
       if (!request.quiet) {
-        this.editor.fail('that note is out of range under the instrument in force there');
+        this.editor.fail(
+          $localize`:@@status.that-note-is-out-of:that note is out of range under the instrument in force there`,
+        );
       }
 
       return;

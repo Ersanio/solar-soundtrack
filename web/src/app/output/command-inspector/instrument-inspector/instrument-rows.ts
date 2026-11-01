@@ -56,73 +56,89 @@ export function detailRows(input: DetailInputs): DetailRow[] {
   if (srcn >= 0 && (srcn & NOISE_FLAG) !== 0) {
     const clock = srcn & 0x1f;
     rows.push({
-      label: 'Sample',
+      label: $localize`:@@inspector.instrument.sample:Sample`,
       value: `noise, clock $${hex2(clock)}`,
       note: `${Math.round(noiseHz(clock)).toLocaleString()} Hz`,
     });
   } else if (srcn >= 0) {
-    rows.push({ label: 'Sample', value: `$${hex2(srcn)}`, note: sampleName });
+    rows.push({
+      label: $localize`:@@inspector.instrument.sample:Sample`,
+      value: `$${hex2(srcn)}`,
+      note: sampleName,
+    });
   } else {
     // The name is already on the "Defined as" row; what is missing is the
     // number, and it is missing because the compiler assigns it.
     rows.push({
-      label: 'Sample',
+      label: $localize`:@@inspector.instrument.sample:Sample`,
       value: 'decided by #samples',
-      note: 'its SRCN is fixed once the song compiles',
+      note: $localize`:@@inspector.instrument.its-srcn-is-fixed-once:its SRCN is fixed once the song compiles`,
     });
   }
 
   const envelope = decodeAdsr(bytes[1], bytes[2]);
   if (envelope.adsrEnabled) {
     const release = releaseSeconds(envelope.release, envelope.sustain);
-    rows.push({ label: 'Envelope', value: 'ADSR', note: `GAIN $${hex2(bytes[3])} is not used` });
-    rows.push({ label: 'Attack', value: duration(attackSeconds(envelope.attack)) });
     rows.push({
-      label: 'Decay',
-      value: duration(decaySeconds(envelope.decay, envelope.sustain)),
-      note: `to ${Math.round(sustainLevel(envelope.sustain) * 100)}% of full`,
+      label: $localize`:@@inspector.instrument.envelope:Envelope`,
+      value: 'ADSR',
+      note: $localize`:@@inspector.instrument.gain-is-not-used:GAIN $${hex2(bytes[3])}:byte: is not used`,
     });
     rows.push({
-      label: 'Release',
-      value: Number.isFinite(release) ? duration(release) : 'held indefinitely',
+      label: $localize`:@@inspector.instrument.attack:Attack`,
+      value: duration(attackSeconds(envelope.attack)),
+    });
+    rows.push({
+      label: $localize`:@@inspector.instrument.decay:Decay`,
+      value: duration(decaySeconds(envelope.decay, envelope.sustain)),
+      note: $localize`:@@inspector.instrument.to-of-full:to ${Math.round(sustainLevel(envelope.sustain) * 100)}:amount:% of full`,
+    });
+    rows.push({
+      label: $localize`:@@inspector.instrument.release:Release`,
+      value: Number.isFinite(release)
+        ? duration(release)
+        : $localize`:@@inspector.instrument.held-indefinitely:held indefinitely`,
       // AddmusicK calls this release; on the DSP it is the sustain-phase fall.
-      note: envelope.release === 0 ? 'a rate of 0 never decays' : undefined,
+      note:
+        envelope.release === 0
+          ? $localize`:@@inspector.instrument.a-rate-of-0-never:a rate of 0 never decays`
+          : undefined,
     });
   } else {
     const gain = decodeGain(bytes[3]);
     rows.push({
-      label: 'Envelope',
+      label: $localize`:@@inspector.instrument.envelope:Envelope`,
       value: `GAIN $${hex2(bytes[3])}`,
-      note: 'ADSR is off, so bytes 1 and 2 are unused',
+      note: $localize`:@@inspector.instrument.adsr-is-off-so-bytes:ADSR is off, so bytes 1 and 2 are unused`,
     });
     rows.push(
       gain.mode === 'direct'
         ? {
-            label: 'Level',
+            label: $localize`:@@inspector.instrument.level:Level`,
             value: `${Math.round((gain.level ?? 0) * 100)}% of full`,
-            note: 'fixed',
+            note: $localize`:@@inspector.instrument.fixed:fixed`,
           }
         : {
-            label: 'Mode',
+            label: $localize`:@@inspector.instrument.mode:Mode`,
             value: gainModeName(gain.mode),
             note:
               gain.rate === 0
-                ? 'a rate of 0 never advances, so the level holds'
-                : `rate $${hex2(gain.rate ?? 0)}`,
+                ? $localize`:@@inspector.instrument.a-rate-of-0-never-2:a rate of 0 never advances, so the level holds`
+                : $localize`:@@inspector.instrument.rate:rate $${hex2(gain.rate ?? 0)}:byte:`,
           },
     );
   }
 
   const multiplier = tuningMultiplier(bytes[4], bytes[5]);
   rows.push({
-    label: 'Tuning',
+    label: $localize`:@@inspector.instrument.tuning:Tuning`,
     value: `×${multiplier.toFixed(3)}`,
     note: `$${hex2(bytes[4])}.$${hex2(bytes[5])} — ${semitones(tuningSemitones(multiplier))}`,
   });
 
   if (bytes.length > 6) {
     rows.push({
-      label: 'Drum note',
+      label: $localize`:@@inspector.instrument.drum-note:Drum note`,
       value: `$${hex2(bytes[6])}`,
       note: noteName(bytes[6]),
     });
@@ -131,10 +147,10 @@ export function detailRows(input: DetailInputs): DetailRow[] {
   if (emitted !== null && emitted < DEFAULT_TRANSPOSE.length && DEFAULT_TRANSPOSE[emitted] !== 0) {
     const t = DEFAULT_TRANSPOSE[emitted];
     rows.push({
-      label: 'Transposes',
+      label: $localize`:@@inspector.instrument.transposes:Transposes`,
       // `parser.ts`'s `parseNote` subtracts, so a positive entry moves notes *down*.
       value: `${t > 0 ? '−' : '+'}${Math.abs(t)} semitones`,
-      note: 'applied to every note written under it',
+      note: $localize`:@@inspector.instrument.applied-to-every-note-written:applied to every note written under it`,
     });
   }
 
@@ -158,9 +174,9 @@ export function sampleByte(sample: { form: string; srcn?: number; byte?: number 
 
 function semitones(value: number): string {
   if (!Number.isFinite(value)) {
-    return 'silent';
+    return $localize`:@@inspector.instrument.silent:silent`;
   }
 
   const rounded = value.toFixed(1);
-  return `${value > 0 ? '+' : ''}${rounded} semitones`;
+  return $localize`:@@inspector.instrument.semitones:${value > 0 ? '+' : ''}:sign:${rounded}:rounded: semitones`;
 }

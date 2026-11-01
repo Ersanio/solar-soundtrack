@@ -127,8 +127,8 @@ export class AdsrGraph {
     const attack = attackSeconds(envelope.attack);
     const decay = attack + decaySeconds(envelope.decay, envelope.sustain);
     return [
-      { label: 'attack', x: this.xOf(attack) },
-      { label: 'decay', x: this.xOf(decay) },
+      { label: $localize`:@@inspector.adsr-graph.attack:attack`, x: this.xOf(attack) },
+      { label: $localize`:@@inspector.adsr-graph.decay:decay`, x: this.xOf(decay) },
     ].filter((mark) => mark.x > 1 && mark.x < PLOT.w - 1);
   });
 

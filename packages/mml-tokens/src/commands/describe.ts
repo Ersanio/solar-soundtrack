@@ -126,7 +126,7 @@ export function resolveCommand(command: Command, context: ParamContext): Resolve
 
 	const rows: ParamRow[] = [];
 	for (let index = 0; index < shown; index++) {
-		const descriptor = shape.params[index] ?? raw(`Argument ${index + 1}`);
+		const descriptor = shape.params[index] ?? raw($localize`:@@inspector.param.argument:Argument ${index + 1}:index:`);
 		const arg = command.args[index] as Command["args"][number] | undefined;
 		const byte = arg?.value ?? null;
 		const { min, max } = rangeFor(descriptor);
@@ -151,7 +151,11 @@ export function resolveCommand(command: Command, context: ParamContext): Resolve
 			raw: byte === null ? "—" : command.vcmd !== undefined ? `$${hex2(byte)}` : String(byte),
 			note: byte === null ? null : (descriptor.describe?.(byte, command, context) ?? null),
 			editable: !missing && argEditable(command, index),
-			lockedBecause: missing ? "not written yet" : macro !== undefined ? `comes from the "${macro}" replacement` : null,
+			lockedBecause: missing
+				? $localize`:@@inspector.param.not-written-yet:not written yet`
+				: macro !== undefined
+					? $localize`:@@inspector.param.comes-from-the-replacement:comes from the "${macro}:macro:" replacement`
+					: null,
 		});
 	}
 

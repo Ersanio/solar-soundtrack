@@ -36,8 +36,10 @@
   <span class="flex w-10 shrink-0 justify-end">
     @if (overridden()) {
       <button
+        i18n="@@common.reset"
         type="button"
         class="text-ink-muted hover:text-ink cursor-pointer text-[11px] hover:underline"
+        i18n-title="@@common.back-to-the-default.title"
         title="Back to the default colour"
         (click)="cleared.emit()"
       >

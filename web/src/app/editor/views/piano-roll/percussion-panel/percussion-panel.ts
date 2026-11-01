@@ -29,8 +29,8 @@ export function percussionChips(
       on: chosen.has(instrument),
       title:
         sounds === undefined
-          ? `Draw @${instrument} on a percussion lane instead of the keyboard`
-          : `@${instrument} is one of the driver's own drums, and plays ${noteName(sounds)}`,
+          ? $localize`:@@roll.draw-on-a-percussion-lane:Draw @${instrument}:instrument: on a percussion lane instead of the keyboard`
+          : $localize`:@@roll.is-one-of-the-drivers:@${instrument}:instrument: is one of the driver's own drums, and plays ${noteName(sounds)}:sounds:`,
     };
   });
 }

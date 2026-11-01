@@ -507,6 +507,12 @@ across pause and seek. Each carries an `epoch` — messages cross asynchronously
 just before a seek arrives just after it, and a transport that trusted it would show the thumb
 snapping back to where the song _was_.
 
+Neither thread of the worklet, nor the app's two workers, has a `$localize`, so the modules they
+load — `worklet.ts`, `protocol.ts`, `driver-state.ts`, `wasm-host.ts`, `note-audition.ts` — hold no
+message and their errors stay English. Everything else here that a porter reads (the FIR presets,
+the ARAM segment labels, the GAIN mode names, the BRR and driver errors) is a `$localize` message;
+the presets carry an `id` because their names are display text.
+
 ## The `.spc` file
 
 `export.ts` is a direct port of `generateSPCs` (`AddmusicK.cpp:1445`). The file is a fixed 0x10200

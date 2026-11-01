@@ -139,7 +139,7 @@ export function computeBudget(
 	const sampleDetail =
 		loaded === samples.length
 			? `${samples.length} ${samples.length === 1 ? "sample" : "samples"}`
-			: `${loaded} of ${samples.length} loaded`;
+			: $localize`:@@output.aram.segment.loaded:${loaded}:loaded: of ${samples.length}:length: loaded`;
 
 	const rows: BudgetRow[] = [
 		{
@@ -153,28 +153,41 @@ export function computeBudget(
 			// would double-count the difference. Everything from `localPos` up
 			// belongs to the song, whatever is currently in it.
 			key: "driver",
-			label: "SPC-700 engine",
+			label: $localize`:@@output.aram.segment.spc-700-engine:SPC-700 engine`,
 			start: 0,
 			bytes: layout.songPos,
 		},
-		{ key: "song", label: "your song", start: layout.songPos, bytes: songBytes },
+		{
+			key: "song",
+			label: $localize`:@@output.aram.segment.your-song:your song`,
+			start: layout.songPos,
+			bytes: songBytes,
+		},
 		{
 			// Song end rather than sampleDataPos: the directory must start on a page
 			// boundary, so up to 255 bytes of the song's last page are unusable, and
 			// the directory itself is four bytes per entry. Both exist only to carry
 			// samples, so both are counted as sample data.
 			key: "samples",
-			label: "sample data",
+			label: $localize`:@@output.aram.segment.sample-data:sample data`,
 			detail: sampleDetail,
 			start: layout.songEnd,
 			bytes: layout.sampleDataEnd - layout.songEnd,
 		},
-		{ key: "free", label: "free", start: layout.sampleDataEnd, bytes: Math.max(0, layout.freeBytes) },
+		{
+			key: "free",
+			label: $localize`:@@output.aram.segment.free:free`,
+			start: layout.sampleDataEnd,
+			bytes: Math.max(0, layout.freeBytes),
+		},
 		{
 			// Everything from echoStart up is off limits — a whole page even with no
 			// echo, for the reason computeSpcLayout gives.
 			key: "echo",
-			label: echoBufferSize > 0 ? "echo buffer" : "echo buffer (reserved)",
+			label:
+				echoBufferSize > 0
+					? $localize`:@@output.aram.segment.echo-buffer:echo buffer`
+					: $localize`:@@output.aram.segment.echo-buffer-reserved:echo buffer (reserved)`,
 			start: layout.echoStart,
 			bytes: ARAM_SIZE - layout.echoStart,
 		},

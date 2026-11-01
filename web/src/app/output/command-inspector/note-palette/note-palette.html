@@ -2,7 +2,7 @@
   <button
     type="button"
     class="text-ink-muted hover:text-ink flex cursor-pointer items-center gap-1 self-start text-xs font-semibold tracking-wide uppercase"
-    [title]="open() ? 'Hide the command palette' : 'Add a command in front of this note'"
+    [title]="open() ? text.hidePalette : text.addCommand"
     (click)="open.set(!open())"
   >
     @if (open()) {
@@ -10,7 +10,7 @@
     } @else {
       <amk-icon-chevron-right />
     }
-    Add a command
+    <ng-container i18n="@@inspector.note-palette.add-a-command">Add a command</ng-container>
   </button>
 
   @if (open()) {
@@ -40,7 +40,11 @@
           {{ entry.label }}
         </button>
       } @empty {
-        <span class="text-ink-muted text-xs">Everything here is already on this note.</span>
+        <span
+          i18n="@@inspector.note-palette.everything-here-is-already"
+          class="text-ink-muted text-xs"
+          >Everything here is already on this note.</span
+        >
       }
     </div>
 
@@ -49,7 +53,9 @@
         <span class="text-ink font-semibold">{{ readout.label }}</span>
         <span [class]="readout.muted ? 'text-ink-muted' : 'text-warn'"> - {{ readout.text }}</span>
       } @else {
-        <span class="text-ink-muted">Hover over a command to see what it does.</span>
+        <span i18n="@@inspector.note-palette.hover-over-a-command" class="text-ink-muted"
+          >Hover over a command to see what it does.</span
+        >
       }
     </p>
   }

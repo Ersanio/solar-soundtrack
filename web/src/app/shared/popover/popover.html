@@ -20,7 +20,15 @@
       class="border-edge bg-raised flex shrink-0 items-center justify-between gap-3 rounded-t-md border-b px-3 py-2"
     >
       <h2 class="text-ink-muted text-xs font-semibold tracking-wide uppercase">{{ heading() }}</h2>
-      <button amk-button variant="ghost" size="sm" icon title="Close" (click)="dismiss()">
+      <button
+        amk-button
+        variant="ghost"
+        size="sm"
+        icon
+        i18n-title="@@common.close.title"
+        title="Close"
+        (click)="dismiss()"
+      >
         <amk-icon-close />
       </button>
     </div>

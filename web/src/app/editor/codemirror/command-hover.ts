@@ -19,11 +19,11 @@ function dotsLabel(dots: number): string {
     case 0:
       return '';
     case 1:
-      return ', dotted';
+      return $localize`:@@source.hover.dotted:, dotted`;
     case 2:
-      return ', double-dotted';
+      return $localize`:@@source.hover.double-dotted:, double-dotted`;
     default:
-      return `, ${dots}× dotted`;
+      return $localize`:@@source.hover.dotted-2:, ${dots}:dots:× dotted`;
   }
 }
 
@@ -44,16 +44,18 @@ function segmentLabel(segment: NoteLengthSegment): string {
   if (segment.implicit) {
     // `l8 c.` dots the standing length, so the fraction stops describing it.
     const fraction = modifiers === '' ? wholeNoteFraction(segment.ticks) : null;
-    return `default length${fraction ? ` (${fraction})` : ''}${modifiers} — ${segment.ticks} ticks`;
+    return fraction
+      ? $localize`:@@source.hover.default-length-fraction:default length (${fraction}:fraction:)${modifiers}:modifiers: — ${segment.ticks}:ticks: ticks`
+      : $localize`:@@source.hover.default-length:default length${modifiers}:modifiers: — ${segment.ticks}:ticks: ticks`;
   }
 
   if (segment.exact) {
     return modifiers === ''
-      ? `${segment.written} ticks exactly`
-      : `${segment.written} ticks exactly${modifiers} (${segment.ticks} ticks)`;
+      ? $localize`:@@source.hover.ticks-exactly:${segment.written}:written: ticks exactly`
+      : $localize`:@@source.hover.ticks-exactly-ticks:${segment.written}:written: ticks exactly${modifiers}:modifiers: (${segment.ticks}:ticks: ticks)`;
   }
 
-  return `1/${segment.written}${modifiers} (${segment.ticks} ticks)`;
+  return $localize`:@@source.hover.1-ticks:1/${segment.written}:written:${modifiers}:modifiers: (${segment.ticks}:ticks: ticks)`;
 }
 
 /**
@@ -67,7 +69,8 @@ function noteLengthLine(segments: readonly NoteLengthSegment[]): string {
   }
 
   const total = segments.reduce((sum, segment) => sum + segment.ticks, 0);
-  return `${segments.map(segmentLabel).join(' tied to ')} — ${total} ticks total`;
+  const joined = segments.map(segmentLabel).join($localize`:@@source.hover.tied-to: tied to `);
+  return $localize`:@@source.hover.ticks-total:${joined}:segments: — ${total}:total: ticks total`;
 }
 
 function renderCommand(command: Command): HTMLElement {
@@ -75,7 +78,10 @@ function renderCommand(command: Command): HTMLElement {
   dom.className = 'cm-amk-hover';
 
   const label = command.vcmd !== undefined ? `$${hex2(command.vcmd)}` : command.kind;
-  const via = command.replacement !== undefined ? ` via ${command.replacement}` : '';
+  const via =
+    command.replacement !== undefined
+      ? $localize`:@@source.hover.via: via ${command.replacement}:replacement:`
+      : '';
   dom.appendChild(line('cm-amk-hover-name', `${label} ${command.name}${via}`));
 
   if (command.noteLength) {
@@ -92,11 +98,21 @@ function renderCommand(command: Command): HTMLElement {
         ? shown.map((arg) => `$${hex2(arg.value & 0xff)}`).join(' ')
         : shown.map((arg) => arg.value).join(', ');
     const more = command.args.length - shown.length;
-    dom.appendChild(line('cm-amk-hover-args', more > 0 ? `${args} … ${more} more` : args));
+    dom.appendChild(
+      line(
+        'cm-amk-hover-args',
+        more > 0 ? $localize`:@@source.hover.more:${args}:args: … ${more}:more: more` : args,
+      ),
+    );
   }
 
   if (!command.complete) {
-    dom.appendChild(line('cm-amk-hover-incomplete', 'incomplete — expects more arguments'));
+    dom.appendChild(
+      line(
+        'cm-amk-hover-incomplete',
+        $localize`:@@source.hover.incomplete-expects-more-arguments:incomplete — expects more arguments`,
+      ),
+    );
   }
 
   return dom;

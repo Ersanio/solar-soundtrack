@@ -150,6 +150,11 @@ export class CommandPalette {
 
   private readonly requests = inject(EditorRequests);
 
+  protected readonly text = {
+    dialectAssumed: $localize`:@@palette.dialect.assumed.title:No #amk, #am4 or #amm marker anywhere in the song, so the palette assumes what the parser assumes. AddmusicK itself rejects a song with no marker (AMK0002).`,
+    dialectMarked: $localize`:@@palette.dialect.marked.title:The dialect this song compiles as. A marker anywhere in the file sets it, and the palette follows it.`,
+  };
+
   protected readonly CATEGORIES = CATEGORIES;
 
   /**
@@ -270,7 +275,7 @@ export class CommandPalette {
   protected readonly chips = computed<{ id: Filter; label: string; selected: boolean }[]>(() => {
     const filter = this.filter();
     return [
-      { id: 'all', label: 'All', selected: filter === 'all' },
+      { id: 'all', label: $localize`:@@palette.all:All`, selected: filter === 'all' },
       ...CATEGORIES.map((category) => ({
         id: category.id,
         label: category.label,

@@ -12,12 +12,19 @@
   <span class="text-ink">
     {{ activePreset()?.name ?? description().shape }}
   </span>
-  <span class="text-ink-muted font-mono">corner {{ cornerLabel() }}</span>
-  <span class="text-ink-muted font-mono">tilt {{ tiltLabel() }}</span>
+  <span i18n="@@inspector.fir-designer.corner" class="text-ink-muted font-mono"
+    >corner {{ cornerLabel() }}</span
+  >
+  <span i18n="@@inspector.fir-designer.tilt" class="text-ink-muted font-mono"
+    >tilt {{ tiltLabel() }}</span
+  >
 </div>
 
 @if (stability().runaway) {
-  <p class="text-danger text-xs leading-relaxed">
+  <p
+    i18n="@@inspector.fir-designer.with-the-echo-feedback"
+    class="text-danger text-xs leading-relaxed"
+  >
     With the echo feedback at
     <span class="font-mono">${{ feedback() | hex2 }}</span>
     this filter has a loop gain of {{ stability().loopGain.toFixed(2) }} — the echo will build up on
@@ -26,14 +33,17 @@
 }
 
 @if (overriddenBy(); as later) {
-  <p class="text-warn text-xs leading-relaxed">
+  <p i18n="@@inspector.fir-designer.a-f1-on-line" class="text-warn text-xs leading-relaxed">
     A <code class="text-ink">$F1</code> on line {{ later.line }} replaces these coefficients with
     {{ later.filter }} — so they only apply until it runs. AddmusicK does this silently.
   </p>
 }
 
 @if (headroom().mayWrap) {
-  <p class="text-warn text-xs leading-relaxed">
+  <p
+    i18n="@@inspector.fir-designer.the-first-seven-coefficients"
+    class="text-warn text-xs leading-relaxed"
+  >
     The first seven coefficients sum to {{ headroom().sum }}, over the 128 the DSP can add up
     without wrapping. A loud echo may crackle. (Super Mario World's own filter does this too, so it
     is only worth worrying about well past the limit.)
@@ -41,14 +51,20 @@
 }
 
 @if (readOnly()) {
-  <p class="text-ink-muted text-xs leading-relaxed">
+  <p
+    i18n="@@inspector.fir-designer.these-coefficients-come-from"
+    class="text-ink-muted text-xs leading-relaxed"
+  >
     These coefficients come from the
     <code class="text-ink">"{{ command().replacement }}"</code> replacement, so the text under the
     cursor is the macro's name rather than the bytes. Editing here would write the expansion out in
     its place, so it is turned off — change the definition instead.
   </p>
 } @else if (command().headReplacement) {
-  <p class="text-ink-muted text-xs leading-relaxed">
+  <p
+    i18n="@@inspector.fir-designer.the-f5-itself-comes"
+    class="text-ink-muted text-xs leading-relaxed"
+  >
     The <code class="text-ink">$F5</code> itself comes from the
     <code class="text-ink">"{{ command().headReplacement }}"</code> replacement, but these eight
     bytes are written here, so they can still be tuned.
@@ -60,6 +76,7 @@
 <fieldset class="contents" [disabled]="readOnly()">
   <div class="border-edge flex gap-1 border-b pb-2">
     <button
+      i18n="@@inspector.fir-designer.presets"
       amk-button
       variant="ghost"
       [class.text-accent]="mode() === 'presets'"
@@ -68,6 +85,7 @@
       Presets
     </button>
     <button
+      i18n="@@inspector.fir-designer.draw"
       amk-button
       variant="ghost"
       [class.text-accent]="mode() === 'draw'"
@@ -101,20 +119,37 @@
 
     @case ('draw') {
       <div class="flex flex-col gap-2">
-        <p class="text-ink-muted text-xs leading-relaxed">
+        <p
+          i18n="@@inspector.fir-designer.click-the-plot-to"
+          class="text-ink-muted text-xs leading-relaxed"
+        >
           Click the plot to place points, then fit. Eight taps cannot follow a shape below about 2
           kHz — the shaded part of the plot — so nothing drawn there will come back.
         </p>
         <div class="flex gap-1.5">
-          <button amk-button variant="primary" [disabled]="target().length < 2" (click)="fit()">
+          <button
+            i18n="@@inspector.fir-designer.fit-to-curve"
+            amk-button
+            variant="primary"
+            [disabled]="target().length < 2"
+            (click)="fit()"
+          >
             Fit to curve
           </button>
-          <button amk-button [disabled]="target().length === 0" (click)="clearTarget()">
+          <button
+            i18n="@@inspector.fir-designer.clear"
+            amk-button
+            [disabled]="target().length === 0"
+            (click)="clearTarget()"
+          >
             Clear
           </button>
-          <span class="text-ink-muted self-center font-mono text-xs">
-            {{ target().length }} point{{ target().length === 1 ? '' : 's' }}
-          </span>
+          <span class="text-ink-muted self-center font-mono text-xs"
+            ><ng-container i18n="@@inspector.fir-designer.point">{target().length, plural,
+              =1 {1 point}
+              other {{{ target().length }} points}
+            }</ng-container></span
+          >
         </div>
       </div>
     }
@@ -123,7 +158,12 @@
 
   <!-- The raw truth, always. -->
   <div class="border-edge border-t pt-2">
-    <div class="text-ink-muted mb-1 text-[11px] tracking-wide uppercase">Coefficients</div>
+    <div
+      i18n="@@inspector.fir-designer.coefficients"
+      class="text-ink-muted mb-1 text-[11px] tracking-wide uppercase"
+    >
+      Coefficients
+    </div>
     <div class="grid grid-cols-2 gap-x-3">
       @for (row of rows(); track row.index) {
         <amk-slider

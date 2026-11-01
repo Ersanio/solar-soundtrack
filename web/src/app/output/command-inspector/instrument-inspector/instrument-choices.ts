@@ -90,20 +90,22 @@ export function instrumentEdit(source: string, command: Command, instrument: num
  * `@19` to call it by.
  */
 function labelOf(instrument: number): string {
-  return instrument === LAST_DRIVER_INSTRUMENT ? `entry ${instrument}` : `@${instrument}`;
+  return instrument === LAST_DRIVER_INSTRUMENT
+    ? $localize`:@@inspector.instrument.entry:entry ${instrument}:instrument:`
+    : `@${instrument}`;
 }
 
 /** What this spelling leaves out, said once under the control. */
 function noteFor(command: Command): string | null {
   if (command.vcmd === 0xda) {
-    const drums = 'A drum is not a $DA at all — @21–@29 rewrite the next note instead.';
+    const drums = $localize`:@@inspector.instrument.a-drum-is-not-a:A drum is not a $DA at all — @21–@29 rewrite the next note instead.`;
     return command.target.program === 1
-      ? `${drums} Under #am4 a custom instrument is written from $13.`
+      ? $localize`:@@inspector.instrument.under-am4-a-custom-instrument:${drums}:drums: Under #am4 a custom instrument is written from $13.`
       : drums;
   }
 
   if (command.direct === true) {
-    return 'The direct form remaps 19–29 to custom instruments, so it cannot write a drum.';
+    return $localize`:@@inspector.instrument.the-direct-form-remaps-19:The direct form remaps 19–29 to custom instruments, so it cannot write a drum.`;
   }
 
   return null;
@@ -119,16 +121,16 @@ function noteFor(command: Command): string | null {
  */
 function unknownLabelFor(written: number, selected: number | null): string {
   if (written < 0) {
-    return 'no number written yet';
+    return $localize`:@@inspector.instrument.no-number-written-yet:no number written yet`;
   }
 
   if (selected === null) {
-    return `@${written}, which emits nothing`;
+    return $localize`:@@inspector.instrument.which-emits-nothing:@${written}:written:, which emits nothing`;
   }
 
   if (selected >= FIRST_CUSTOM_INSTRUMENT) {
-    return `@${selected}, which this song does not define`;
+    return $localize`:@@inspector.instrument.which-this-song-does-not:@${selected}:selected:, which this song does not define`;
   }
 
-  return `$DA $${hex2(written)}, which reads past the driver’s table`;
+  return $localize`:@@inspector.instrument.da-which-reads-past-the:$DA $${hex2(written)}:written:, which reads past the driver’s table`;
 }

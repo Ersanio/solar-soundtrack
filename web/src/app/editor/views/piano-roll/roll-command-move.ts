@@ -18,17 +18,13 @@ import { coalesce } from './roll-write';
  * and walking the song rather than by looking at the text.
  */
 
-export const REFUSE_MOVE_REMOTE =
-  'that command is inside remote code, which runs wherever it is called';
-export const REFUSE_MOVE_ELSEWHERE = 'that command is not written in the channel that runs it';
-export const REFUSE_MOVE_MACRO = 'that command is written through a "name=value" replacement';
-export const REFUSE_MOVE_KIND =
-  'that command says where a note sits rather than when something happens';
-export const REFUSE_MOVE_EMPTY = 'this channel has no note or rest to put a command in front of';
-export const REFUSE_MOVE_BEND =
-  'that command is read as part of the note in front of it, so it cannot be moved on its own';
-export const REFUSE_MOVE_LOOPED =
-  'that command is inside a loop, and every pass replays it where it stands';
+export const REFUSE_MOVE_REMOTE = $localize`:@@roll.that-command-is-inside-remote:that command is inside remote code, which runs wherever it is called`;
+export const REFUSE_MOVE_ELSEWHERE = $localize`:@@roll.that-command-is-not-written:that command is not written in the channel that runs it`;
+export const REFUSE_MOVE_MACRO = $localize`:@@roll.that-command-is-written-through:that command is written through a "name=value" replacement`;
+export const REFUSE_MOVE_KIND = $localize`:@@roll.that-command-says-where-a:that command says where a note sits rather than when something happens`;
+export const REFUSE_MOVE_EMPTY = $localize`:@@roll.this-channel-has-no-note:this channel has no note or rest to put a command in front of`;
+export const REFUSE_MOVE_BEND = $localize`:@@roll.that-command-is-read-as:that command is read as part of the note in front of it, so it cannot be moved on its own`;
+export const REFUSE_MOVE_LOOPED = $localize`:@@roll.that-command-is-inside-a:that command is inside a loop, and every pass replays it where it stands`;
 
 /** A tick a command may be dropped on, and where its text goes to run there. */
 export interface MoveTarget {

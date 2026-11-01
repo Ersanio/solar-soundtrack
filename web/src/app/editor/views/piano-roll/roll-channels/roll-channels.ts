@@ -43,9 +43,15 @@ function chipTitle(
   quiet: boolean,
   song: boolean,
 ): string {
-  const edit = on ? `Stop editing channel ${channel}` : `Edit channel ${channel}`;
-  const heard = quiet ? ' — not being heard' : '';
-  const solo = !song ? '' : soloed ? ' — Ctrl+click to stop soloing' : ' — Ctrl+click to solo';
+  const edit = on
+    ? $localize`:@@roll.stop-editing-channel:Stop editing channel ${channel}:channel:`
+    : $localize`:@@roll.edit-channel:Edit channel ${channel}:channel:`;
+  const heard = quiet ? $localize`:@@roll.not-being-heard: — not being heard` : '';
+  const solo = !song
+    ? ''
+    : soloed
+      ? $localize`:@@roll.ctrl-click-to-stop-soloing: — Ctrl+click to stop soloing`
+      : $localize`:@@roll.ctrl-click-to-solo: — Ctrl+click to solo`;
   return `${edit}${heard}${solo}`;
 }
 

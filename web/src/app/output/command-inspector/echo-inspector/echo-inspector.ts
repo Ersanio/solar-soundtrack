@@ -27,6 +27,13 @@ import { EchoConfig } from '../echo-config/echo-config';
 export class EchoInspector {
   private readonly store = inject(EditorStore);
 
+  protected readonly text = {
+    volumeL: $localize`:@@inspector.echo.volume-l.label:Volume L`,
+    toVolumeL: $localize`:@@inspector.echo.to-volume-l.label:To volume L`,
+    volumeR: $localize`:@@inspector.echo.volume-r.label:Volume R`,
+    toVolumeR: $localize`:@@inspector.echo.to-volume-r.label:To volume R`,
+  };
+
   readonly command = input.required<Command>();
 
   protected readonly VOICE_LABELS = VOICE_LABELS;

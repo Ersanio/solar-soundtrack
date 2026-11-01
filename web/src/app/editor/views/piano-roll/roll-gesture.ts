@@ -1069,7 +1069,9 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
       const going = held.loop.splitTick + delta;
       const joins = held.loop.joins !== null && delta === -held.loop.slack;
       return {
-        text: joins ? `tick ${going} · one call of ${held.loop.joins}` : `tick ${going}`,
+        text: joins
+          ? $localize`:@@roll.tick-one-call-of:tick ${going}:going: · one call of ${held.loop.joins}:joins:`
+          : $localize`:@@roll.tick-2:tick ${going}:going:`,
         x: going * sources.zoom(),
         y: held.row * sources.rowHeight(),
       };
@@ -1109,7 +1111,10 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
           ? held.loop.splitTick + held.loop.ahead * delta + ticks
           : held.loop.splitTick - delta;
       return {
-        text: `${spelled === null ? '' : `${spelled} · `}${ticks} ticks`,
+        text:
+          spelled === null
+            ? $localize`:@@roll.drag.ticks:${ticks}:ticks: ticks`
+            : $localize`:@@roll.drag.spelled-ticks:${spelled}:spelled: · ${ticks}:ticks: ticks`,
         x: going * sources.zoom(),
         y: held.row * sources.rowHeight(),
       };
@@ -1127,8 +1132,8 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
     // the grabbed pass's origin.
     const label =
       held.kind === 'move'
-        ? `tick ${held.origin + note.startTick}`
-        : `${lengthLabel(note, version, now.touched.length === 1)} · ${note.ticks} ticks`;
+        ? $localize`:@@roll.tick-3:tick ${held.origin + note.startTick}:tick:`
+        : $localize`:@@roll.ticks-2:${lengthLabel(note, version, now.touched.length === 1)}:lengthLabel: · ${note.ticks}:ticks: ticks`;
     return {
       text: label,
       x: (held.origin + note.startTick + note.ticks / 2) * sources.zoom(),
@@ -2137,7 +2142,7 @@ function hoverCursor(
 function lengthLabel(note: PlacedNote, version: number, alone: boolean): string {
   const spelled = spellDuration(note.ticks, version);
   if (spelled === null) {
-    return `${note.ticks} ticks`;
+    return $localize`:@@roll.ticks-3:${note.ticks}:ticks: ticks`;
   }
 
   if (!alone) {

@@ -268,6 +268,41 @@ module.exports = defineConfig([
       // calling a method per row.
     },
   },
+  {
+    // Every string a porter reads carries a grouped `@@id` (docs/claude/i18n.md).
+    // Not index.html, which Angular's i18n never reads. The ignored attributes
+    // are SVG geometry and component inputs that take a keyword, never text.
+    files: ['web/src/app/**/*.html'],
+    rules: {
+      '@angular-eslint/template/i18n': [
+        'error',
+        {
+          checkId: true,
+          checkText: true,
+          checkAttributes: true,
+          checkDuplicateId: true,
+          ignoreAttributes: [
+            'accept',
+            'clip-path',
+            'd',
+            'dominant-baseline',
+            'origin',
+            'patternTransform',
+            'patternUnits',
+            'pointer-events',
+            'preserveAspectRatio',
+            'rel',
+            'size',
+            'stroke-linecap',
+            'stroke-linejoin',
+            'text-anchor',
+            'transform',
+            'variant',
+          ],
+        },
+      ],
+    },
+  },
 
   eslintConfigPrettier,
   {

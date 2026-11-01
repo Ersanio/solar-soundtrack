@@ -8,7 +8,10 @@ import { EditorRequests } from '../../state/editor-requests';
 /** The keys `historyKeymap` binds on this platform, for the buttons' titles. */
 const HISTORY_KEYS = /Mac|iP/.test(navigator.platform)
   ? { undo: '⌘Z', redo: '⇧⌘Z' }
-  : { undo: 'Ctrl+Z', redo: 'Ctrl+Y' };
+  : {
+      undo: $localize`:@@topbar.history.undo-keys:Ctrl+Z`,
+      redo: $localize`:@@topbar.history.redo-keys:Ctrl+Y`,
+    };
 
 /**
  * Undo and redo, for the two toolbars that need them.
