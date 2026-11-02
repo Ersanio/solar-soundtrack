@@ -1271,6 +1271,8 @@
     "topbar.aram.aram": "ARAM",
     "topbar.commit.title": "Commit {$COMMIT}",
     "topbar.compile-at-the-drivers.title": "Compile at the driver's load address and assemble a playable SPC",
+    "topbar.docs": "Docs",
+    "topbar.docs.title": "Open the docs in a new tab",
     "topbar.download-bin": "Download .bin",
     "topbar.download-the-compiled-song.title": "Download the compiled song data — the same bytes the SPC carries",
     "topbar.export-spc": "Export .spc",

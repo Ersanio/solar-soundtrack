@@ -31,6 +31,19 @@
 </button>
 
 <div class="ml-auto flex items-center gap-1">
+  <!-- Relative to the base href, so it finds the guide that CI deploys beside the app. -->
+  <a
+    i18n="@@topbar.docs"
+    href="docs/"
+    target="_blank"
+    rel="noopener"
+    class="text-ink-muted hover:text-ink inline-flex h-8 items-center rounded-md px-2 text-sm"
+    title="topbar.docs.title"
+    i18n-title="@@topbar.docs.title"
+  >
+    topbar.docs
+  </a>
+
   <amk-theme-picker />
 
   <amk-changelog />

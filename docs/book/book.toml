@@ -1,0 +1,13 @@
+[book]
+title = "Solar Soundtrack"
+language = "en"
+
+[build]
+# A chapter in SUMMARY.md with no file behind it fails the build instead of being created empty.
+create-missing = false
+
+[output.html]
+# Dark, like the editor. CI sets `site-url`, where the repository name is known.
+default-theme = "navy"
+preferred-dark-theme = "navy"
+git-repository-url = "https://github.com/Ersanio/solar-soundtrack"

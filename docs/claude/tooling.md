@@ -91,3 +91,17 @@ resolve 1, 121 and 146 rules respectively.
 with `--base-href=/<repo-name>/` and deploy `web/dist/solar-soundtrack/browser` to GitHub Pages. The
 build must go through `npm run build` rather than `ng build` so the prebuild hooks still run. The app
 is a PWA (`web/ngsw-config.json`); the service worker is enabled in production builds only.
+
+The same Pages artifact carries the guide, an mdBook in `docs/book/` (chapters in `docs/book/src/`,
+listed in `SUMMARY.md`). The deploy job builds it after the app, because `ng build` empties its
+output folder, into `docs/` inside it: the app is at `/<repo-name>/`, the guide at
+`/<repo-name>/docs/`. mdBook is not an npm dependency; CI downloads the release pinned in
+`MDBOOK_VERSION`, and sets `site-url` through `MDBOOK_OUTPUT__HTML__SITE_URL` for the same reason
+the base href comes from the repository name. Preview it locally with `mdbook serve docs/book`.
+
+`navigationUrls` in `ngsw-config.json` is Angular's default list plus `!/docs` and `!/docs/**`.
+Without them the service worker answers every extensionless navigation in its scope with the app's
+`index.html`, so after one visit to the editor `/<repo-name>/docs/` opens the editor. Both are
+absolute on purpose: the worker matches the URL with its scope already stripped, so `/docs/` is
+what it tests, while the generator prefixes a relative pattern with the base href and
+`/<repo-name>/docs/**` then never matches. `/docs/**` does not match `/docs` itself, hence the pair.

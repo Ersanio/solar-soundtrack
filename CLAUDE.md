@@ -19,6 +19,7 @@ packages/mml-tokens/    @amk/tokens    scanner, splices, command model
 packages/spc/           @amk/spc       BRR, echo FIR, ARAM, emulator, worklet
 web/                    the Angular editor
 scripts/                fourteen byte-level harnesses
+docs/book/              the mdBook guide, deployed beside the app under docs/
 ```
 
 ```
@@ -250,4 +251,5 @@ the config is scoped and why: `docs/claude/tooling.md`.
 ## Deployment
 
 CI lints and checks every push and PR, and deploys `main` to GitHub Pages through `npm run build` —
-never `ng build`, which skips the prebuild hooks. Details: `docs/claude/tooling.md`.
+never `ng build`, which skips the prebuild hooks. The guide in `docs/book/` goes out in the same
+artifact, under `docs/`. Details: `docs/claude/tooling.md`.
