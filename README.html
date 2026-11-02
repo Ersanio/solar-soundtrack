@@ -3677,11 +3677,13 @@
                   >), pitch envelope (<code>$EB</code>, <code>$EC</code>, <code>$FE</code>), volume
                   multiplier (<code>$FA $03</code>), <code>q</code>, noise (<code>n</code>),
                   arpeggio (<code>$FB</code>), legato (<code>$F4 $01</code>) and remote code. Each
-                  channel is judged on its own, at the loop's first note or rest. Write the setting
-                  again on that channel before the first note or rest after the <code>/</code>, or
-                  before its first note or rest if there is no <code>/</code>. A toggle such as
-                  <code>$F4 $01</code> is fixed differently: switch it back before the end of the
-                  channel.
+                  channel is judged on its own, at the loop's first note or rest. Remote code a rest
+                  cannot run is judged at the loop's first note instead: a key-on code, and a type 3
+                  unless a note is still sounding into that rest. Its warning names the reset that
+                  cancels it, such as <code>(!!3)</code>. Write the setting again on that channel
+                  before the first note or rest after the <code>/</code>, or before its first note
+                  or rest if there is no <code>/</code>. A toggle such as <code>$F4 $01</code> is
+                  fixed differently: switch it back before the end of the channel.
                 </td>
               </tr>
               <tr>

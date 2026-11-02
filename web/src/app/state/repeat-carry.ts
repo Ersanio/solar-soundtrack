@@ -77,9 +77,50 @@ export interface CompiledSong {
 const hexSpelling = (bytes: readonly number[]): string =>
   bytes.map((byte) => `$${hex2(byte)}`).join(' ');
 
+/** Remote code's types 1, 2 and 5, which count down through rests. */
+const COUNTING_TYPES: ReadonlySet<number> = new Set([1, 2, 5]);
+
+/**
+ * The remote code wording for a call the first pass does not have at the loop
+ * start, or `null` where the generic one stands: another call in the first
+ * pass, or a song below `#amk 2`, which has no remote code syntax.
+ */
+function remoteMessage(
+  carry: SettingCarry,
+  command: string,
+  channel: number,
+  amkVersion: number,
+): string | null {
+  const [lead, , , type] = carry.repeat.bytes;
+  if (carry.first !== null || amkVersion < 2 || lead !== 0xfc || type === undefined) {
+    return null;
+  }
+
+  // `(!!n)` from `#amk 3` (`parser.ts:2302-2323`): -1 cancels the key-on slot and
+  // any other non-zero number the other one.
+  const keyOn = carry.setting === 'remoteKeyOn';
+  const reset =
+    amkVersion >= 3 ? (keyOn ? '(!!-1)' : `(!!${type})`) : keyOn ? '(!0, 8)' : '(!0, 7)';
+  const keyOff = carry.onRest ? SST['0511.remote.key-off-rest'] : SST['0511.remote.key-off'];
+  if (keyOn) {
+    return type === 0xff
+      ? SST['0511.remote.key-on'](command, channel, reset)
+      : type === 6
+        ? keyOff(command, channel, reset)
+        : null;
+  }
+
+  return COUNTING_TYPES.has(type)
+    ? SST['0511.remote.timed'](command, channel, reset)
+    : type === 3
+      ? keyOff(command, channel, reset)
+      : null;
+}
+
 /**
  * `SST0511` and `SST0512`: each setting in {@link SongTimeline.carries}, named as
- * it was written and underlined where it was.
+ * it was written and underlined where it was. Remote code names the reset that
+ * cancels it.
  */
 export function repeatSettings(timeline: SongTimeline, compiled: CompiledSong): Diagnostic[] {
   if (timeline.carries.length === 0) {
@@ -142,9 +183,10 @@ export function repeatSettings(timeline: SongTimeline, compiled: CompiledSong): 
       code = 'SST0511';
       message = carry.repeat.toggle
         ? SST['0511.toggle'](repeat.text, channel)
-        : first === null
-          ? SST['0511.default'](repeat.text, channel)
-          : SST['0511'](repeat.text, channel, first);
+        : (remoteMessage(carry, repeat.text, channel, result.stats?.targetAMKVersion ?? 0) ??
+          (first === null
+            ? SST['0511.default'](repeat.text, channel)
+            : SST['0511'](repeat.text, channel, first)));
     } else {
       code = 'SST0512';
       message = carry.repeat.toggle

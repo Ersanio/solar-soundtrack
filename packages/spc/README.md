@@ -264,13 +264,15 @@ two passes with these and raises `SST0510` (`web/src/app/state/repeat-carry.ts`)
 song starts at is `@amk/tokens`' `DEFAULT_TEMPO`.
 
 `carries` does the same for every other setting `PlaySong` resets and the phrase change does not:
-fourteen kept per channel (the instrument record, volume, pan, vibrato, tremolo, fine tune, `q` and
-the rest) and nine kept for the song (master volume, echo, the velocity table and so on).
+fifteen kept per channel (the instrument record, volume, pan, vibrato, tremolo, fine tune, `q`,
+remote code's two slots and the rest) and nine kept for the song (master volume, echo, the velocity table and so on).
 `repeat-settings.ts` models each — its value at the start of a song, and what each command, `q`
 byte or note does to it — and lists what was decided not to model. The walk feeds it everything it
-reads, takes each channel's settings at its first note or rest after the loop point, and the
-commands between the loop point and there, and replays those onto what the pass ended on, taken
-when `tempoAtEnd` is. Replaying rather than comparing commands is what makes a toggle right: an
+reads, takes each channel's settings at its first note or rest after the loop point and again at
+its first note, and the commands between the loop point and each, and replays those onto what the
+pass ended on, taken when `tempoAtEnd` is. Remote code a rest cannot run is judged at the first
+note: a key-on code, and a type 3 or 6 unless legato, or a phrase change that cuts the channel
+short, leaves a note sounding into the rest. Replaying rather than comparing commands is what makes a toggle right: an
 `$F4 $01` at the loop start flips both passes and fixes nothing. Song settings are judged at
 `loopTick` on the rule `tempoAtEnd` is. The app names each entry as it was written (`SST0511` for a
 channel's, `SST0512` for the song's).

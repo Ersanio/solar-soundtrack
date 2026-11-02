@@ -10,6 +10,17 @@
  *
  * The tempo is the one such setting kept apart, as `SongTimeline.tempoAtEnd`.
  *
+ * A setting is judged at the loop's first note or rest, except remote code a
+ * rest cannot read, which is judged at the loop's first note:
+ *   - A key-on code runs only as a note keys on (`NormalNote`, `main.asm:388-429`).
+ *   - Types 3 and 6 stop a rest keying off (`if_rest`, `main.asm:365-374`), which
+ *     matters only to a note still sounding into it. The read-ahead keys a
+ *     channel's last note off at its `$00` (`main.asm:3125-3149`), so on the
+ *     repeat that takes legato, or a channel the phrase change cuts short: it
+ *     sets every `$70+x` to 1 (`main.asm:2318`), past the `!WaitTime` key-off.
+ *   - Types 1, 2 and 5 count down every tick (`L_10A1`, `main.asm:3199-3230`), so
+ *     a rest is as much theirs as a note.
+ *
  * Deliberately not here:
  *   - `$DD`, which runs once on the note that reads it, and `$E6`/`$E9`, which
  *     are the shape of the music rather than a setting.
@@ -39,6 +50,7 @@ export const CHANNEL_SETTINGS = [
 	"arpeggio",
 	"legato",
 	"remote",
+	"remoteKeyOn",
 ] as const;
 
 /** Settings the driver keeps once for the whole song. */
@@ -93,6 +105,26 @@ export interface SettingCarry {
 	first: SettingCommand | null;
 	/** The command the pass ended on, which carries over. */
 	repeat: SettingCommand;
+	/** Found at a rest the loop starts with, before its first note. Always false for a song setting. */
+	onRest: boolean;
+}
+
+/** Where a channel's loop starts, as the first pass plays it. */
+export interface LoopStart {
+	/** The settings at the loop's first note or rest. */
+	atFirst: Readonly<Record<ChannelSetting, SettingState>>;
+	/** The settings at the loop's first note, or `null` when the pass plays none. */
+	atNote: Readonly<Record<ChannelSetting, SettingState>> | null;
+	/** What ran from the loop point up to that note. */
+	head: readonly SettingChange[];
+	/** How much of {@link head} ran before the first note or rest. */
+	headToFirst: number;
+	/** The first note or rest is a rest or a tie. */
+	startsOnRest: boolean;
+	/** The channel's last event before the loop point was a note, so it may still be sounding. */
+	soundingFirst: boolean;
+	/** The phrase change cuts this channel short of its end, so its last note may still be sounding. */
+	cutAtSeam: boolean;
 }
 
 /** A value the driver does not reset, or a slot nothing has written. */
@@ -137,7 +169,8 @@ const START: Readonly<Record<CarriedSetting, readonly number[]>> = {
 	noise: [0, 0], // on (main.asm:2172), clock
 	arpeggio: [0], // count (main.asm:2149-2151, 2196-2199), type, length, notes
 	legato: [0], // $0161 (main.asm:2201)
-	remote: [UNSET, UNSET, UNSET, UNSET, UNSET, UNSET, UNSET], // both slots (main.asm:2136)
+	remote: [UNSET, UNSET, UNSET, UNSET], // type, code address, time (main.asm:2136)
+	remoteKeyOn: [UNSET, UNSET, UNSET], // type, code address
 	masterVolume: [0xc0], // main.asm:2186
 	transpose: [0], // main.asm:2178
 	echo: [0, UNSET, UNSET, UNSET, UNSET, UNSET], // channels (main.asm:2171), volumes, writes, delay, feedback
@@ -183,6 +216,12 @@ const OFF_WHEN_ZERO: Partial<Record<CarriedSetting, number>> = {
 	arpeggio: 0,
 };
 
+/** The normal slot's types the driver runs (`Commands.asm:1260-1269`); any other is stored and never read. */
+const RUN_TYPES: ReadonlySet<number> = new Set([1, 2, 3, 5]);
+
+/** The normal slot's types that count down through a rest (`main.asm:3199-3230`). */
+const COUNTING_TYPES: ReadonlySet<number> = new Set([1, 2, 5]);
+
 /** Two states that sound alike compare alike: off is off whatever the rate. */
 function keyOf(setting: CarriedSetting, values: readonly number[]): string {
 	if (setting === "instrument") {
@@ -190,8 +229,28 @@ function keyOf(setting: CarriedSetting, values: readonly number[]): string {
 		return [Math.max(values[0], 0), ...values.slice(1)].join(",");
 	}
 
+	if (setting === "remote" && !RUN_TYPES.has(values[0])) {
+		return "off";
+	}
+
 	const off = OFF_WHEN_ZERO[setting];
 	return off !== undefined && values[off] === 0 ? "off" : values.join(",");
+}
+
+/**
+ * Whether a rest the loop starts with reads the setting, given whether a note
+ * may still be sounding into it. Remote code alone depends on it.
+ */
+function readAtRest(setting: ChannelSetting, values: readonly number[], sounding: boolean): boolean {
+	if (setting === "remote") {
+		return COUNTING_TYPES.has(values[0]) || (values[0] === 3 && sounding);
+	}
+
+	if (setting === "remoteKeyOn") {
+		return values[0] === 6 && sounding;
+	}
+
+	return true;
 }
 
 const change = (
@@ -385,48 +444,71 @@ function remote(operands: readonly number[]): SettingChange[] {
 	const [low = 0, high = 0, type = 0, time = 0] = operands;
 	switch (type) {
 		case 0x00:
-			return [to("remote", START.remote)];
+			return [to("remote", START.remote), to("remoteKeyOn", START.remoteKeyOn)];
 		case 0x04:
 			return []; // runs once and keeps nothing
 		case 0x07:
-			return [change("remote", (v) => [UNSET, UNSET, UNSET, UNSET, v[4], v[5], v[6]])];
+			return [to("remote", START.remote)];
 		case 0x08:
-			return [change("remote", (v) => [v[0], v[1], v[2], v[3], UNSET, UNSET, UNSET])];
+			return [to("remoteKeyOn", START.remoteKeyOn)];
 		case 0x06:
 		case 0xff:
-			return [change("remote", (v) => [v[0], v[1], v[2], v[3], type, low, high])];
+			return [to("remoteKeyOn", [type, low, high])];
 		default:
-			return [change("remote", (v) => [type, low, high, time, v[4], v[5], v[6]])];
+			return [to("remote", [type, low, high, time])];
 	}
 }
 
 /**
  * The channel settings that differ where the loop starts.
  *
- * `atLoop` is the channel at its first note or rest after the loop point, and
- * `loopHead` what ran between the loop point and there. The repeat replays that
- * onto what the pass ended on, which is what makes a toggle right: one written
- * at the loop start flips both passes and fixes nothing.
+ * The repeat replays what ran from the loop point onto what the pass ended on,
+ * which is what makes a toggle right: one written at the loop start flips both
+ * passes and fixes nothing. Each setting is compared at the loop's first note or
+ * rest, or at its first note where {@link readAtRest} says a rest cannot read it.
  */
 export function channelCarries(
 	channel: number,
-	atLoop: Readonly<Record<ChannelSetting, SettingState>>,
-	loopHead: readonly SettingChange[],
+	start: LoopStart,
 	atEnd: Readonly<Record<ChannelSetting, SettingState>>,
 ): SettingCarry[] {
-	return CHANNEL_SETTINGS.flatMap((setting): SettingCarry[] => {
-		const first = atLoop[setting];
-		const carried = atEnd[setting];
-		let again = carried.values;
-		for (const each of loopHead) {
+	const again = (setting: ChannelSetting, upTo: number): readonly number[] => {
+		let values = atEnd[setting].values;
+		for (const each of start.head.slice(0, upTo)) {
 			if (each.setting === setting) {
-				again = each.apply(again);
+				values = each.apply(values);
 			}
 		}
 
-		return carried.by === null || keyOf(setting, first.values) === keyOf(setting, again)
+		return values;
+	};
+
+	const legatoAgain = again("legato", start.headToFirst)[0] !== 0;
+	return CHANNEL_SETTINGS.flatMap((setting): SettingCarry[] => {
+		const carried = atEnd[setting].by;
+		if (carried === null) {
+			return [];
+		}
+
+		const first = start.atFirst[setting];
+		const repeat = again(setting, start.headToFirst);
+		if (
+			readAtRest(setting, first.values, start.soundingFirst) ||
+			readAtRest(setting, repeat, start.cutAtSeam || legatoAgain)
+		) {
+			return keyOf(setting, first.values) === keyOf(setting, repeat)
+				? []
+				: [{ setting, channel, first: first.by, repeat: carried, onRest: start.startsOnRest }];
+		}
+
+		if (start.atNote === null) {
+			return [];
+		}
+
+		const atNote = start.atNote[setting];
+		return keyOf(setting, atNote.values) === keyOf(setting, again(setting, start.head.length))
 			? []
-			: [{ setting, channel, first: first.by, repeat: carried.by }];
+			: [{ setting, channel, first: atNote.by, repeat: carried, onRest: false }];
 	});
 }
 
@@ -474,6 +556,6 @@ export function songCarries(
 		const carried = atEnd[setting].by;
 		return carried === null || keyOf(setting, first.values) === keyOf(setting, again)
 			? []
-			: [{ setting, channel: null, first: first.by, repeat: carried }];
+			: [{ setting, channel: null, first: first.by, repeat: carried, onRest: false }];
 	});
 }

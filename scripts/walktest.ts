@@ -1514,6 +1514,16 @@ console.log("\na setting that carries over into the repeat is reported");
 		["legato switched at the loop start, which flips both passes", "#0 / $F4 $01 o4 c4 c4", true],
 		["remote code set inside the loop", "(!1)[$E7 $FF]\n#0 / o4 c4 (!1, -1) c4", true],
 		["remote code cleared again", "(!1)[$E7 $FF]\n#0 / o4 c4 (!1, -1) c4 (!0, 0) c4", false],
+		// Remote code a rest cannot read is judged at the loop's first note.
+		["a key-on code set after the loop's first rest", "(!1)[$E7 $FF]\n#0 r4 (!1, -1) o4 c4", false],
+		["a key-on code set after the loop's first note", "(!1)[$E7 $FF]\n#0 o4 c4 (!1, -1) c4", true],
+		["a key-off code set after the loop's first rest", "(!1)[$E7 $FF]\n#0 r4 (!1, 3) o4 c4", false],
+		["a key-off code with legato on into that rest", "(!1)[$E7 $FF]\n#0 $F4 $01 o4 c4 / r4 (!1, 3) c4", true],
+		["a key-off code on a channel the pass cuts short", "(!1)[$E7 $FF]\n#0 o4 r4 c4\n#1 o4 r4 (!1, 3) c2", true],
+		["a timer, which counts through that rest", "(!1)[$E7 $FF]\n#0 r4 (!1, 1, 8) o4 c4", true],
+		["a timer cancelled at the loop start", "(!1)[$E7 $FF]\n#0 (!!1) r4 (!1, 1, 8) o4 c4", false],
+		["a key-on code cancelled at the loop start", "(!1)[$E7 $FF]\n#0 (!!-1) o4 c4 (!1, -1) c4", false],
+		["a type the driver never runs", "(!1)[$E7 $FF]\n#0 o4 c4 (!1, 9) c4", false],
 		["a w the pass ends back on", "#0 w200 / o4 c4 w150 c4 w200 c4", false],
 		["an $E4 inside the loop", "#0 / o4 c4 $E4 $01 c4", true],
 		["echo turned on inside the loop", "#0 / o4 c4 $EF $FF $30 $30 c4", true],
@@ -1554,6 +1564,32 @@ console.log("\na setting that carries over into the repeat is reported");
 		"an @ that both changes the instrument and silences an n is reported once",
 		warn(song("#0 n1F / o4 c4 @2 c4")).length === 1,
 	);
+
+	// Remote code is told by its type, and named with the reset that cancels it.
+	for (const [name, source, words] of [
+		["a key-on code", song("(!1)[$E7 $FF]\n#0 o4 c4 (!1, -1) c4"), ["(!!-1)", "key-on code"]],
+		["a timer", song("(!1)[$E7 $FF]\n#0 r4 (!1, 1, 8) o4 c4"), ["(!!1)", "counts through rests"]],
+		["a key-off code at a note", song("(!1)[$E7 $FF]\n#0 o4 c4 (!1, 3) c4"), ["(!!3)", "keeps sounding"]],
+		[
+			"a key-off code at a rest",
+			song("(!1)[$E7 $FF]\n#0 $F4 $01 o4 c4 / r4 (!1, 3) c4"),
+			["(!!3)", "rings on through it"],
+		],
+		["a timer under #amk 2", "#amk 2\n(!1)[$E7 $FF]\n#0 o4 c4 (!1, 1, 8) c4\n", ["(!0, 7)"]],
+		["a key-on code under #amk 2", "#amk 2\n(!1)[$E7 $FF]\n#0 o4 c4 (!1, -1) c4\n", ["(!0, 8)"]],
+		[
+			"a call where the first pass had another",
+			song("(!1)[$E7 $FF]\n(!2)[$E7 $80]\n#0 (!1, 3) / o4 c4 (!2, 3) c4"),
+			["instead of (!1, 3)"],
+		],
+	] as const) {
+		const [found] = warn(source);
+		check(
+			`${name} is worded for it`,
+			words.every((each) => found?.message.includes(each) === true),
+			found?.message,
+		);
+	}
 
 	// The running driver is the oracle, a few ticks into the repeat and before
 	// the loop's own commands on its 48th tick. On the tick the pass ends the
@@ -1608,6 +1644,51 @@ console.log("\na setting that carries over into the repeat is reported");
 			(aram: Uint8Array) => aram[0xb3],
 			0,
 			true,
+		],
+		// A rest runs no key-on code, so the loop's `v255` stands through it.
+		[
+			"a key-on code set after the loop's first rest",
+			"(!1)[$E7 $30]\n#0 v255 r4 (!1, -1) o4 c4",
+			(aram: Uint8Array) => aram[0x0241],
+			255,
+			false,
+		],
+		// `!PlayingVoices` ($0382): a key-off code keeps the voice on through the
+		// loop's first rest only where a note is still sounding into it.
+		[
+			"a key-off code on a channel the pass cuts short",
+			"(!1)[$E7 $FF]\n#0 o4 r4 c4\n#1 o4 r4 (!1, 3) c2",
+			(aram: Uint8Array) => aram[0x0382] & 0x02,
+			0x02,
+			true,
+		],
+		[
+			"that channel with no remote code",
+			"#0 o4 r4 c4\n#1 o4 r4 c2",
+			(aram: Uint8Array) => aram[0x0382] & 0x02,
+			0,
+			false,
+		],
+		[
+			"a key-off code with legato on into the loop",
+			"(!1)[$E7 $FF]\n#0 $F4 $01 o4 c4 / r4 (!1, 3) c4",
+			(aram: Uint8Array) => aram[0x0382] & 0x01,
+			0x01,
+			true,
+		],
+		[
+			"that legato with no remote code",
+			"#0 $F4 $01 o4 c4 / r4 c4",
+			(aram: Uint8Array) => aram[0x0382] & 0x01,
+			0,
+			false,
+		],
+		[
+			"a key-off code with neither",
+			"(!1)[$E7 $FF]\n#0 r4 (!1, 3) o4 c4",
+			(aram: Uint8Array) => aram[0x0382] & 0x01,
+			0,
+			false,
 		],
 	] as const) {
 		const source = song(body);

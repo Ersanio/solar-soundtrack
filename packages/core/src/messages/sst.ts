@@ -35,6 +35,14 @@ export const SST = {
 		$localize`:@@sst.0511.default:sst.0511.default ${command}:command: ${channel}:channel:`,
 	"0511.toggle": (command: string, channel: number) =>
 		$localize`:@@sst.0511.toggle:sst.0511.toggle ${command}:command: ${channel}:channel:`,
+	"0511.remote.key-on": (command: string, channel: number, reset: string) =>
+		$localize`:@@sst.0511.remote.key-on:sst.0511.remote.key-on ${command}:command: ${channel}:channel: ${reset}:reset:`,
+	"0511.remote.timed": (command: string, channel: number, reset: string) =>
+		$localize`:@@sst.0511.remote.timed:sst.0511.remote.timed ${command}:command: ${channel}:channel: ${reset}:reset:`,
+	"0511.remote.key-off": (command: string, channel: number, reset: string) =>
+		$localize`:@@sst.0511.remote.key-off:sst.0511.remote.key-off ${command}:command: ${channel}:channel: ${reset}:reset:`,
+	"0511.remote.key-off-rest": (command: string, channel: number, reset: string) =>
+		$localize`:@@sst.0511.remote.key-off-rest:sst.0511.remote.key-off-rest ${command}:command: ${channel}:channel: ${reset}:reset:`,
 	"0512": (command: string, first: string) => $localize`:@@sst.0512:sst.0512 ${command}:command: ${first}:first:`,
 	"0512.default": (command: string) => $localize`:@@sst.0512.default:sst.0512.default ${command}:command:`,
 	"0512.toggle": (command: string) => $localize`:@@sst.0512.toggle:sst.0512.toggle ${command}:command:`,

@@ -597,7 +597,8 @@ export interface SongTimeline {
 	tempoAtEnd: TempoChange | null;
 	/**
 	 * Every setting the repeat starts its loop under differently from the first
-	 * pass, judged at the loop's first note or rest — see `repeat-settings.ts`.
+	 * pass, judged at the loop's first note or rest, or at its first note for
+	 * remote code a rest cannot read — see `repeat-settings.ts`.
 	 * What a pass ends on is taken when {@link tempoAtEnd} is, so a command at the
 	 * end of a channel counts on the same terms.
 	 *
@@ -742,10 +743,18 @@ interface Track {
 	repeating: boolean;
 	/** The channel's own carried settings, as they stand. */
 	settings: Record<ChannelSetting, SettingState>;
-	/** What ran between the loop point and the first note or rest after it; `null` before the loop point. */
+	/** What ran between the loop point and the first note after it; `null` before the loop point. */
 	loopHead: SettingChange[] | null;
-	/** {@link settings} at that first note or rest, once one has played. */
+	/** {@link settings} at the first note or rest after the loop point, once one has played. */
 	atLoop: Readonly<Record<ChannelSetting, SettingState>> | null;
+	/** {@link settings} at the first note after it, which a tie or rest is not. */
+	atLoopNote: Readonly<Record<ChannelSetting, SettingState>> | null;
+	/** How much of {@link loopHead} ran before {@link atLoop}. */
+	headToFirst: number;
+	/** {@link atLoop} was taken at a rest or a tie. */
+	startsOnRest: boolean;
+	/** A note was the channel's last event when it reached the loop point. */
+	soundingAtLoop: boolean;
 	/** The `$E9` run being played, or null. One per track, as the frame is. */
 	pendingCall: PendingRun | null;
 	/** The `$E6` run being played, or null. */
@@ -902,6 +911,10 @@ export function walkSong(song: Uint8Array, aramAddress: number): SongTimeline {
 			settings: channelStart(),
 			loopHead: null,
 			atLoop: null,
+			atLoopNote: null,
+			headToFirst: 0,
+			startsOnRest: false,
+			soundingAtLoop: false,
 			pendingCall: null,
 			pendingSub: null,
 			origins: new Array<number | null>(CHANNEL_SLOTS).fill(null),
@@ -975,7 +988,7 @@ export function walkSong(song: Uint8Array, aramAddress: number): SongTimeline {
 					track.settings[change.setting] = { values, by };
 				}
 
-				if (track.loopHead !== null && track.atLoop === null) {
+				if (track.loopHead !== null && track.atLoopNote === null && !phraseEnded) {
 					track.loopHead.push(change);
 				}
 			} else {
@@ -1171,7 +1184,11 @@ export function walkSong(song: Uint8Array, aramAddress: number): SongTimeline {
 			// at a frame boundary.
 			if (track.at === loopAt[channel]) {
 				track.repeating = true;
-				track.loopHead ??= [];
+				if (track.loopHead === null) {
+					track.loopHead = [];
+					track.soundingAtLoop = track.held >= 0;
+				}
+
 				if (track.ticks < loopTick) {
 					loopTick = track.ticks;
 				}
@@ -1275,9 +1292,19 @@ export function walkSong(song: Uint8Array, aramAddress: number): SongTimeline {
 		recordSettings(channel, track, address, [byte], true);
 
 		// A tie or a rest counts as much as a note: what the loop starts under is
-		// whatever was set before the first thing in it that takes time.
-		if (track.loopHead !== null && track.atLoop === null && !phraseEnded) {
-			track.atLoop = { ...track.settings };
+		// whatever was set before the first thing in it that takes time. Remote
+		// code a rest cannot read is judged at the first note instead.
+		if (track.loopHead !== null && track.atLoopNote === null && !phraseEnded) {
+			const keysOn = byte !== NOTE_TIE_BYTE && !(byte >= REST_FIRST && byte < PERCUSSION_FIRST);
+			if (track.atLoop === null) {
+				track.atLoop = { ...track.settings };
+				track.headToFirst = track.loopHead.length;
+				track.startsOnRest = !keysOn;
+			}
+
+			if (keysOn) {
+				track.atLoopNote = track.startsOnRest ? { ...track.settings } : track.atLoop;
+			}
 		}
 
 		const ticks = track.duration;
@@ -1691,7 +1718,7 @@ export function walkSong(song: Uint8Array, aramAddress: number): SongTimeline {
 		carries:
 			resolvedLoopTick === null || truncated || resolvedLoopTick >= ticks
 				? []
-				: carriesAt(resolvedLoopTick, channelsAtEnd, songAtEnd),
+				: carriesAt(resolvedLoopTick, ticks, channelsAtEnd, songAtEnd),
 		// Sorted rather than pushed in order: a `$DD` is raised on the tick of the
 		// note that read it, which is behind the tick the byte was reached at, so
 		// `c4 v200 $DD …` records the two the other way round. Stable, so within one
@@ -1734,6 +1761,7 @@ export function walkSong(song: Uint8Array, aramAddress: number): SongTimeline {
 	 */
 	function carriesAt(
 		at: number,
+		passTicks: number,
 		channels: readonly Readonly<Record<ChannelSetting, SettingState>>[] | null,
 		wide: Readonly<Record<SongSetting, SettingState>> | null,
 	): SettingCarry[] {
@@ -1745,7 +1773,21 @@ export function walkSong(song: Uint8Array, aramAddress: number): SongTimeline {
 			...tracks.flatMap((track, channel) =>
 				track.atLoop === null || track.loopHead === null
 					? []
-					: channelCarries(channel, track.atLoop, track.loopHead, channels[channel]),
+					: channelCarries(
+							channel,
+							{
+								atFirst: track.atLoop,
+								atNote: track.atLoopNote,
+								head: track.loopHead,
+								headToFirst: track.headToFirst,
+								startsOnRest: track.startsOnRest,
+								soundingFirst: track.soundingAtLoop,
+								// The walk runs each channel to its own end, so one longer
+								// than the pass is the one the phrase change cuts.
+								cutAtSeam: track.ticks > passTicks,
+							},
+							channels[channel],
+						),
 			),
 			...songCarries(songChanges, at, wide),
 		];

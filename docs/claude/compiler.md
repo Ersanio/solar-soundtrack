@@ -74,7 +74,16 @@ add one: `docs/claude/i18n.md`.
   `loopLabel > 0` (`Music.cpp:1242-1251`), so even a song that defines it is told.
 - **One code per setting that carries into the repeat, worded for that setting** — `SST0511` was the
   fine tune ("starts at $EE $20 instead of $EE $10") and `SST0512` the tremolo, with an on and an off
-  variant. Carrying is a property of 23 settings (`repeat-settings.ts`), and that shape needed a code,
+  variant. Carrying is a property of 24 settings (`repeat-settings.ts`), and that shape needed a code,
   a table row and its own grammar for each. `SST0511` is now any channel setting and `SST0512` any
   song setting, each naming the command as it was written, and only the tempo (`SST0510`) keeps its
-  own wording, for the default `t53` a song that sets none plays at.
+  own wording, for the default `t53` a song that sets none plays at. Remote code is the one
+  exception, worded by type and naming the reset that cancels it, since "set it back" does not
+  tell a porter to write `(!!3)`.
+- **Judging remote code at the loop's first rest, as every other setting is** — `r1 (!n, -1) a1`
+  and `r1 (!n, 3) a1` with no `/` both warned, and the driver plays their two passes alike: a rest
+  runs no key-on code (`main.asm:388-429`), and type 3 has nothing to hold through the rest once the
+  read-ahead keys the last note off at the channel's `$00` (`main.asm:3125-3149`). Remote code is
+  two settings, one per `$FC` slot, judged at a rest only for the types that count through one (1,
+  2, 5), or for 3 and 6 where legato or a channel the phrase change cuts short leaves a note
+  sounding into it, and otherwise at the loop's first note.
