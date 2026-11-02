@@ -158,8 +158,8 @@ upstream has an opinion to report. That is why the echo diagnostics are `SST05xx
 anything: the prefix is the claim that AddmusicK would say nothing here.
 
 That is the whole band, and what puts it under `SST` is that **`Music.cpp` produces none of them**:
-`SST0500`/`SST0501` and `SST0506`-`SST0508` here, `SST0502` in `@amk/spc`, `SST0503`, `SST0510` and
-`SST0511` in the app, and `SST0504` for a `#path` this editor deliberately ignores. Eight of the ten are `severe` because what
+`SST0500`/`SST0501` and `SST0506`-`SST0508` here, `SST0502` in `@amk/spc`, `SST0503` and
+`SST0510`-`SST0512` in the app, and `SST0504` for a `#path` this editor deliberately ignores. Nine of the eleven are `severe` because what
 they report compiles cleanly and then misbehaves on playback, but the severity is a property of each
 rather than of the range — `SST0504` is `info`, since nothing about that song misbehaves anywhere,
 and `SST0508` is a plain `warning`, since a song a semitone out plays perfectly well.

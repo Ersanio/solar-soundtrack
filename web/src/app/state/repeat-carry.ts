@@ -1,6 +1,6 @@
 /**
- * `SST0510` and `SST0511` — a looping song whose repeat starts its loop under a
- * different tempo, or a channel's under a different setting, from its first pass.
+ * `SST0510`-`SST0512` — a looping song whose repeat starts its loop under a
+ * different tempo, channel setting or song setting from its first pass.
  *
  * The driver sets these only when a song starts (`PlaySong`, `main.asm:2082-2206`),
  * so whatever a pass ends on carries into the repetition. Each is judged where
@@ -78,8 +78,8 @@ const hexSpelling = (bytes: readonly number[]): string =>
   bytes.map((byte) => `$${hex2(byte)}`).join(' ');
 
 /**
- * `SST0511`: each setting in {@link SongTimeline.carries}, named as it was
- * written and underlined where it was.
+ * `SST0511` and `SST0512`: each setting in {@link SongTimeline.carries}, named as
+ * it was written and underlined where it was.
  */
 export function repeatSettings(timeline: SongTimeline, compiled: CompiledSong): Diagnostic[] {
   if (timeline.carries.length === 0) {
@@ -136,12 +136,24 @@ export function repeatSettings(timeline: SongTimeline, compiled: CompiledSong): 
     const repeat = written(carry.repeat);
     const first = carry.first === null ? null : written(carry.first).text;
     const { channel } = carry;
-    const message = carry.repeat.toggle
-      ? SST['0511.toggle'](repeat.text, channel)
-      : first === null
-        ? SST['0511.default'](repeat.text, channel)
-        : SST['0511'](repeat.text, channel, first);
+    let code: string;
+    let message: string;
+    if (channel !== null) {
+      code = 'SST0511';
+      message = carry.repeat.toggle
+        ? SST['0511.toggle'](repeat.text, channel)
+        : first === null
+          ? SST['0511.default'](repeat.text, channel)
+          : SST['0511'](repeat.text, channel, first);
+    } else {
+      code = 'SST0512';
+      message = carry.repeat.toggle
+        ? SST['0512.toggle'](repeat.text)
+        : first === null
+          ? SST['0512.default'](repeat.text)
+          : SST['0512'](repeat.text, first);
+    }
 
-    return { severity: 'severe', code: 'SST0511', message, span: repeat.span ?? NOWHERE };
+    return { severity: 'severe', code, message, span: repeat.span ?? NOWHERE };
   });
 }

@@ -3529,7 +3529,7 @@
         <h3 id="codes-sst">Solar Soundtrack's own</h3>
 
         <p>
-          Twelve findings AddmusicK does not make. Eleven are about what a song
+          Thirteen findings AddmusicK does not make. Twelve are about what a song
           <em>does</em> rather than about whether it builds, so real AddmusicK will compile every
           one of these without comment.
         </p>
@@ -3682,6 +3682,21 @@
                   before its first note or rest if there is no <code>/</code>. A toggle such as
                   <code>$F4 $01</code> is fixed differently: switch it back before the end of the
                   channel.
+                </td>
+              </tr>
+              <tr>
+                <td><code>SST0512</code></td>
+                <td>Severe</td>
+                <td>
+                  A song setting carries over into the song's repeat, the same way: master volume
+                  (<code>w</code>, <code>$E1</code>), global transpose (<code>$E4</code>), echo
+                  (<code>$EF</code>, <code>$F0</code>, <code>$F1</code>, <code>$F2</code>,
+                  <code>$F4 $03</code>), the echo filter (<code>$F5</code>), pitch modulation (<code
+                    >$FA $00</code
+                  >), the velocity table (<code>$F4 $08</code>, <code>$FA $06</code>), light
+                  staccato (<code>$F4 $02</code>), Yoshi drums (<code>$F4 $00</code>,
+                  <code>$F4 $06</code>) and hot patches. Set from any channel, and judged at the
+                  loop's first note or rest.
                 </td>
               </tr>
             </tbody>

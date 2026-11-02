@@ -34,7 +34,7 @@
  * a diagnostic that underlined them would be telling an author a note is dead
  * while they can hear it playing.
  *
- * A fifth, for `SST0510` and `SST0511`: what a pass carries into the repeat is
+ * A fifth, for `SST0510`-`SST0512`: what a pass carries into the repeat is
  * what the running driver holds a few ticks into it. The tempo is `tempoAtEnd`,
  * not the last of `tempoChanges`, and a command at the very end of a channel
  * runs only when the driver reaches it before the `$00` that ends the phrase.
@@ -1463,6 +1463,14 @@ console.log("\na setting that carries over into the repeat is reported");
 		flipped?.message,
 	);
 
+	const master = song("#0 w200 / o4 c4 w150 c4");
+	const [wide] = warn(master);
+	check(
+		"a song setting is SST0512, and names no channel",
+		wide?.code === "SST0512" && textOf(master, wide) === "w150" && !wide.message.includes("#"),
+		wide?.message,
+	);
+
 	const quantized = song("#0 q7F o4 c4 / c4 q3F c4");
 	const [q] = warn(quantized);
 	check(
@@ -1506,6 +1514,17 @@ console.log("\na setting that carries over into the repeat is reported");
 		["legato switched at the loop start, which flips both passes", "#0 / $F4 $01 o4 c4 c4", true],
 		["remote code set inside the loop", "(!1)[$E7 $FF]\n#0 / o4 c4 (!1, -1) c4", true],
 		["remote code cleared again", "(!1)[$E7 $FF]\n#0 / o4 c4 (!1, -1) c4 (!0, 0) c4", false],
+		["a w the pass ends back on", "#0 w200 / o4 c4 w150 c4 w200 c4", false],
+		["an $E4 inside the loop", "#0 / o4 c4 $E4 $01 c4", true],
+		["echo turned on inside the loop", "#0 / o4 c4 $EF $FF $30 $30 c4", true],
+		["echo set before the loop", "#0 $EF $FF $30 $30 / o4 c4 c4", false],
+		["one channel's echo switched inside the loop", "#0 $EF $00 $30 $30 / o4 c4 $F4 $03 c4", true],
+		["an echo filter inside the loop", "#0 / o4 c4 $F5 $7F $00 $00 $00 $00 $00 $00 $00 c4", true],
+		["pitch modulation inside the loop", "#0 / o4 c4 $FA $00 $02 c4", true],
+		["the velocity table changed inside the loop", "#0 / o4 c4 $FA $06 $00 c4", true],
+		["light staccato switched once", "#0 / o4 c4 $F4 $02 c4", true],
+		["Yoshi drums switched once", "#0 / o4 c4 $F4 $06 c4", true],
+		["a hot patch inside the loop", "#0 / o4 c4 $FA $FE $01 c4", true],
 		["a song that does not loop", "#option noloop\n#0 v200 o4 c4 v150 c4", false],
 	] as const) {
 		const found = warn(song(body));
@@ -1522,6 +1541,14 @@ console.log("\na setting that carries over into the repeat is reported");
 		"another channel's v at its loop start does not cover this one",
 		others.length === 1 && others[0].message.includes("#0") && others[0].span.start < bounded.indexOf("#1"),
 		others.map((each) => each.message).join(" | "),
+	);
+	check(
+		"a song setting at the loop start on another channel covers the song",
+		warn(song("#0 / o4 c4 c4\n#1 / w150 o4 c4 c4")).length === 0,
+	);
+	check(
+		"and one partway through another channel is reported",
+		warn(song("#0 / o4 c4 c4\n#1 / o4 c4 w150 c4")).length === 1,
 	);
 	check(
 		"an @ that both changes the instrument and silences an n is reported once",
@@ -1551,6 +1578,9 @@ console.log("\na setting that carries over into the repeat is reported");
 		// `$C1+x` holds the instrument plus one (`Commands.asm:107-109`).
 		["an @ inside the loop", "#0 @1 / o4 c4 @2 c4", (aram: Uint8Array) => aram[0xc1], 3, true],
 		["legato switched once", "#0 / o4 c4 $F4 $01 c4", (aram: Uint8Array) => aram[0x0161] & 1, 1, true],
+		["echo channels set inside the loop", "#0 / o4 c4 $EF $03 $30 $30 c4", (aram: Uint8Array) => aram[0x4c], 3, true],
+		["a w inside the loop", "#0 w200 / o4 c4 w150 c4", (aram: Uint8Array) => aram[0x57], 150, true],
+		["an $E4 inside the loop", "#0 / o4 c4 $E4 $01 c4", (aram: Uint8Array) => aram[0x43], 1, true],
 		[
 			"an $EE at the end of #0",
 			"#0 $EE $10 / o4 c4 $EE $20 c4 $EE $10\n#1 / o4 c4 c4",

@@ -35,4 +35,7 @@ export const SST = {
 		$localize`:@@sst.0511.default:sst.0511.default ${command}:command: ${channel}:channel:`,
 	"0511.toggle": (command: string, channel: number) =>
 		$localize`:@@sst.0511.toggle:sst.0511.toggle ${command}:command: ${channel}:channel:`,
+	"0512": (command: string, first: string) => $localize`:@@sst.0512:sst.0512 ${command}:command: ${first}:first:`,
+	"0512.default": (command: string) => $localize`:@@sst.0512.default:sst.0512.default ${command}:command:`,
+	"0512.toggle": (command: string) => $localize`:@@sst.0512.toggle:sst.0512.toggle ${command}:command:`,
 };
