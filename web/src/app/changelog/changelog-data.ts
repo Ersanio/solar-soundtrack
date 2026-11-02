@@ -12,20 +12,9 @@ export const CHANGELOG: readonly ChangelogEntry[] = [
     date: '2 November 2026',
     items: [
       "Warnings when the tempo or any other setting carries over into the song's repeat",
-      'Docs link in the top bar',
-    ],
-  },
-  {
-    date: '30 October 2026',
-    items: [
+      'Docs link in the top bar. It is still being written',
       'Piano roll edits keep commands, the intro marker and the song length where they were',
-      'Deleting a note in the piano roll leaves a rest, merged with the rests beside it',
-      'Drawing over a tempo change, an intro marker, a comment or an octave change in the piano roll',
-    ],
-  },
-  {
-    date: '27 October 2026',
-    items: [
+      'Deleting a note in the piano roll leaves a rest',
       'A command inspector for remote code calls and resets: the type, the wait in ticks, and the commands the call runs',
     ],
   },
