@@ -6,21 +6,22 @@ Depends on `@amk/core` and nothing else. No DOM outside `driver.ts` and `player.
 no framework anywhere. That is what lets the same modules run in Node under the harnesses, on the
 main thread, and inside an `AudioWorkletGlobalScope`.
 
-| Module            | What it is                                                        |
-| ----------------- | ----------------------------------------------------------------- |
-| `adsr.ts`         | Envelope and tuning maths for an instrument's six bytes           |
-| `brr.ts`          | The SNES's ADPCM container and decoder                            |
-| `driver.ts`       | Loads `assets/driver/` — program, base images, `#default` samples |
-| `driver-state.ts` | Reads the running driver out of APU RAM; takes a voice's volume   |
-| `export.ts`       | Assembles the 0x10200-byte `.spc`                                 |
-| `fir.ts`          | The echo filter: response, stability, headroom, design            |
-| `instruments.ts`  | Finds the driver's own instrument and percussion tables           |
-| `layout.ts`       | Where things sit in ARAM, and what is left                        |
-| `player.ts`       | AudioContext, worklet node, transport                             |
-| `protocol.ts`     | The one message contract between page and audio thread            |
-| `song-walk.ts`    | Reads a compiled song the way the driver does: what sounds when   |
-| `wasm-host.ts`    | Blargg's snes_spc, called directly                                |
-| `worklet.ts`      | The renderer on the audio thread                                  |
+| Module               | What it is                                                        |
+| -------------------- | ----------------------------------------------------------------- |
+| `adsr.ts`            | Envelope and tuning maths for an instrument's six bytes           |
+| `brr.ts`             | The SNES's ADPCM container and decoder                            |
+| `driver.ts`          | Loads `assets/driver/` — program, base images, `#default` samples |
+| `driver-state.ts`    | Reads the running driver out of APU RAM; takes a voice's volume   |
+| `export.ts`          | Assembles the 0x10200-byte `.spc`                                 |
+| `fir.ts`             | The echo filter: response, stability, headroom, design            |
+| `instruments.ts`     | Finds the driver's own instrument and percussion tables           |
+| `layout.ts`          | Where things sit in ARAM, and what is left                        |
+| `player.ts`          | AudioContext, worklet node, transport                             |
+| `protocol.ts`        | The one message contract between page and audio thread            |
+| `repeat-settings.ts` | The settings a pass carries into the song's repeat                |
+| `song-walk.ts`       | Reads a compiled song the way the driver does: what sounds when   |
+| `wasm-host.ts`       | Blargg's snes_spc, called directly                                |
+| `worklet.ts`         | The renderer on the audio thread                                  |
 
 ## Assets
 
@@ -258,14 +259,19 @@ the editor joins the two in `web/src/app/state/song-clock.ts`.
 not always the last of `tempoChanges`: on the tick the pass ends the voices run in order and the
 first `$00` ends the phrase, so a `t` at the very end of a channel numbered no higher than that one
 has run, though `tempoChanges` cuts everything on that tick. Each `TempoChange` also says whether it
-`repeats` — read after its channel reached the point the song loops back to. `loopSettings` is the
-same pair of facts for each channel's fine tune (`$EE`) and tremolo (`$E5`/`$FD`), which only the
-start of a song resets (`main.asm:2142-2146`): the command in force at the channel's first note or
-rest after its loop point, and the one in force when the pass ends, taken at the same moment as
-`tempoAtEnd`. The app compares the two passes at the loop's first note or rest and raises `SST0510`
-to `SST0512`
-(`web/src/app/state/repeat-carry.ts`), since the tempo a song starts at is `@amk/tokens`'
-`DEFAULT_TEMPO`.
+`repeats` — read after its channel reached the point the song loops back to. The app compares the
+two passes with these and raises `SST0510` (`web/src/app/state/repeat-carry.ts`), since the tempo a
+song starts at is `@amk/tokens`' `DEFAULT_TEMPO`.
+
+`carries` does the same for the fourteen settings `PlaySong` resets per channel and the phrase
+change does not: the instrument record, volume, pan, vibrato, tremolo, fine tune, `q` and the rest.
+`repeat-settings.ts` models each — its value at the start of a song, and what each command, `q`
+byte or note does to it — and lists what was decided not to model. The walk feeds it everything it
+reads, takes each channel's settings at its first note or rest after the loop point, and the
+commands between the loop point and there, and replays those onto what the pass ended on, taken
+when `tempoAtEnd` is. Replaying rather than comparing commands is what makes a toggle right: an
+`$F4 $01` at the loop start flips both passes and fixes nothing. The app names each entry as it was
+written (`SST0511`).
 
 `WalkNote.origins` is the same idea pointed at the commands rather than their values: the ARAM
 address of whatever last wrote each of `SLOTS`, so a reader can name the `$ED` a note sounds under

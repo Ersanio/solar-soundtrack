@@ -10,9 +10,7 @@ export const CHANGELOG: readonly ChangelogEntry[] = [
   // ─── newest first; add new blocks here ──────────────────────────────────
   {
     date: '2 November 2026',
-    items: [
-      "Warnings when a tempo, fine tune or tremolo change carries over into the song's repeat",
-    ],
+    items: ["Warnings when the tempo or a channel setting carries over into the song's repeat"],
   },
   {
     date: '30 October 2026',

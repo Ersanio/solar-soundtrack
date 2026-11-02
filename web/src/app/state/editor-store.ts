@@ -20,7 +20,7 @@ import { commandsInForceOf } from './commands-in-force';
 import { type TimelineCommand, commandTimeline } from './command-timeline';
 import { type SongClock, songClock } from './song-clock';
 import { ClockMeasurer, tempoDiagnostic } from './clock-measurer';
-import { repeatFineTune, repeatTempo, repeatTremolo } from './repeat-carry';
+import { repeatSettings, repeatTempo } from './repeat-carry';
 import { caretPosition, downloadBlob, errorMessage } from '../util/format';
 import { readStored, writeStored } from '../util/storage';
 import { DriverStore } from './driver-store';
@@ -191,14 +191,14 @@ export class EditorStore {
   readonly diagnostics = computed<Diagnostic[]>(() => {
     const order = { error: 0, severe: 1, warning: 2, info: 3 } as const;
     const timeline = this.timeline();
+    const compiled = this.compilation();
     const all = [
       ...(this.result()?.diagnostics ?? []), // Compiler diagnostics
       ...echoHazards(this.tokens().commands), // Echo hazard diagnostics
       ...commandHazards(this.tokens()), // Bytes that compile clean and then break the song
       ...(timeline ? unreachableChannels(timeline, this.result()?.noteMap ?? []) : []), // Unreachable notes in channels
       ...(timeline ? repeatTempo(timeline, this.result()?.commandMap ?? []) : []), // A tempo that carries into the repeat
-      ...(timeline ? repeatFineTune(timeline, this.result()?.commandMap ?? []) : []), // A fine tune that carries into the repeat
-      ...(timeline ? repeatTremolo(timeline, this.result()?.commandMap ?? []) : []), // A tremolo that carries into the repeat
+      ...(timeline && compiled ? repeatSettings(timeline, compiled) : []), // Settings that carry into the repeat
       // The driver cannot keep up with the tempo. It stands on the last
       // measurement rather than only on one taken from the current bytes, which
       // is what stops it blinking out on every keystroke; the span comes from

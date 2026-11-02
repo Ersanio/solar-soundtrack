@@ -1661,7 +1661,7 @@ console.log("\nthe transport's clock, over songs the compiler will not time");
 		loopTick: null,
 		tempoChanges,
 		tempoAtEnd: null,
-		loopSettings: [],
+		carries: [],
 		commands: [],
 		loops: [],
 		channelTicks: [ticks, 0, 0, 0, 0, 0, 0, 0],

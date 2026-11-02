@@ -9,8 +9,8 @@ partial UI stays populated. **The prefix says whose finding it is, not which fil
 `AMK####` is a condition AddmusicK itself reports, ported from `AddmusicKsrc/` with the `Music.cpp`
 line cited; `SST####` is one `Music.cpp` does not produce at all, so a porter is never told
 AddmusicK objects to something it has no opinion about. The echo hazards, the unreachable-channel
-warning, the tempo shortfall, a tempo that carries over into the song's repeat (`SST0510`), a fine
-tune or a tremolo that carries over into a channel's repeat (`SST0511`, `SST0512`), the `#path` notice, the runaway-replacement guard, the three
+warning, the tempo shortfall, a tempo or channel setting that carries over into the song's repeat
+(`SST0510`, `SST0511`), the `#path` notice, the runaway-replacement guard, the three
 command hazards — `$F7`'s dead dispatch slot, a `$DD` no note's read-ahead can reach, and `#am4`'s
 silent `$E4` offset — and a remote call that points at no body (`SST0509`) are `SST05xx`, which is
 also where a finding goes when the reference does not
@@ -72,3 +72,9 @@ add one: `docs/claude/i18n.md`.
   the same bytes AddmusicK writes, and `SST0509` warns for any other type, where the event runs
   that `$00` and does nothing. `(!0)` is always unrecorded, since `parseLoopStart` keeps only
   `loopLabel > 0` (`Music.cpp:1242-1251`), so even a song that defines it is told.
+- **One code per setting that carries into the repeat, worded for that setting** — `SST0511` was the
+  fine tune ("starts at $EE $20 instead of $EE $10") and `SST0512` the tremolo, with an on and an off
+  variant. Carrying is a property of fourteen channel settings (`repeat-settings.ts`), and that shape
+  needed a code, a table row and its own grammar for each. `SST0511` is now any channel setting,
+  naming the command as it was written, and only the tempo (`SST0510`) keeps its own wording, for
+  the default `t53` a song that sets none plays at.

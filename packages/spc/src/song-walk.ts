@@ -50,6 +50,15 @@ import {
 } from "@amk/core/hardcoded-tables";
 import { SST } from "@amk/core/messages/sst";
 import type { Diagnostic, NoteAddress } from "@amk/core/types";
+import {
+	type ChannelSetting,
+	type SettingCarry,
+	type SettingChange,
+	type SettingState,
+	channelCarries,
+	channelStart,
+	settingChanges,
+} from "./repeat-settings";
 
 /** N-SPC songs have eight music channels. */
 const CHANNELS = 8;
@@ -514,39 +523,6 @@ export interface TempoChange {
 }
 
 /**
- * A channel setting that only the start of a song resets, so the one a pass
- * ends on is what the channel's repeat starts under:
- *   - `fineTune`, `$EE`'s `$02D1+x` (`Commands.asm:460`, zeroed at `main.asm:2142`).
- *   - `tremolo`, `$E5`'s delay, rate and depth and `$FD`'s zero depth
- *     (`Commands.asm:346-355`). A depth of 0 is no tremolo (`main.asm:3366`),
- *     and the depth is what `main.asm:2146` zeroes.
- */
-export type CarriedSetting = "fineTune" | "tremolo";
-
-/** The command a {@link CarriedSetting} last came from. */
-export interface SettingCommand {
-	/** ARAM address of the command byte — a key into `CompileResult.commandMap`. */
-	address: number;
-	/** `$EE`, or `$E5`/`$FD`. */
-	vcmd: number;
-	/** The bytes after it, as written. */
-	operands: readonly number[];
-	/** Read after its channel reached the point the song loops back to. */
-	repeats: boolean;
-}
-
-/**
- * One channel setting where the channel's loop starts, at its first note or
- * rest after the loop point. `null` is the value a song starts with.
- */
-export interface LoopSetting {
-	/** The command in force there on the first pass. */
-	first: SettingCommand | null;
-	/** The command in force when the pass ends, which the repeat starts under. */
-	carried: SettingCommand | null;
-}
-
-/**
  * One execution of a loop on one voice: the call, its body, and every pass.
  *
  * The driver's own reading, off the same `$E9` and `$E6` frames the walk keeps
@@ -614,13 +590,14 @@ export interface SongTimeline {
 	 */
 	tempoAtEnd: TempoChange | null;
 	/**
-	 * Per channel, the settings its loop starts under on each pass. Taken when
-	 * {@link tempoAtEnd} is, so a trailing `$EE` or `$E5` counts on the same terms.
+	 * Every channel setting the repeat starts its loop under differently from the
+	 * first pass, judged at the loop's first note or rest — see `repeat-settings.ts`.
+	 * What a pass ends on is taken when {@link tempoAtEnd} is, so a command at the
+	 * end of a channel counts on the same terms.
 	 *
-	 * `null` for a channel that plays no note or rest after its loop point before
-	 * the pass ends, and for every channel of a song that does not loop.
+	 * Empty for a song that does not loop, and for one the walk cut short.
 	 */
-	loopSettings: readonly (Readonly<Record<CarriedSetting, LoopSetting>> | null)[];
+	carries: readonly SettingCarry[];
 	/**
 	 * Every command the pass runs that changes something, ascending by tick and
 	 * in driver order.
@@ -757,10 +734,12 @@ interface Track {
 	 * everything read from here on runs again on every repetition.
 	 */
 	repeating: boolean;
-	/** The command each {@link CarriedSetting} last came from. */
-	settings: Record<CarriedSetting, SettingCommand | null>;
-	/** {@link settings} at the first note or rest after the loop point, once one has played. */
-	loopSettings: Readonly<Record<CarriedSetting, SettingCommand | null>> | null;
+	/** The channel's own carried settings, as they stand. */
+	settings: Record<ChannelSetting, SettingState>;
+	/** What ran between the loop point and the first note or rest after it; `null` before the loop point. */
+	loopHead: SettingChange[] | null;
+	/** {@link settings} at that first note or rest, once one has played. */
+	atLoop: Readonly<Record<ChannelSetting, SettingState>> | null;
 	/** The `$E9` run being played, or null. One per track, as the frame is. */
 	pendingCall: PendingRun | null;
 	/** The `$E6` run being played, or null. */
@@ -914,8 +893,9 @@ export function walkSong(song: Uint8Array, aramAddress: number): SongTimeline {
 			loopCount: 0,
 			loopStart: -1,
 			repeating: false,
-			settings: { fineTune: null, tremolo: null },
-			loopSettings: null,
+			settings: channelStart(),
+			loopHead: null,
+			atLoop: null,
 			pendingCall: null,
 			pendingSub: null,
 			origins: new Array<number | null>(CHANNEL_SLOTS).fill(null),
@@ -961,8 +941,26 @@ export function walkSong(song: Uint8Array, aramAddress: number): SongTimeline {
 	let truncated = false;
 	let lastTempo: TempoChange | null = null;
 	let tempoAtEnd: TempoChange | null = null;
-	let settingsAtEnd: Record<CarriedSetting, SettingCommand | null>[] | null = null;
+	let channelsAtEnd: Readonly<Record<ChannelSetting, SettingState>>[] | null = null;
 	let phraseEnded = false;
+
+	/**
+	 * What the bytes the driver just read do to the carried settings, kept the
+	 * same way for a command, a frame's `q` byte and a note.
+	 */
+	const recordSettings = (track: Track, address: number, bytes: readonly number[], onNote: boolean): void => {
+		for (const change of settingChanges(bytes)) {
+			const state = track.settings[change.setting];
+			const values = change.apply(state.values);
+			if (values !== state.values) {
+				track.settings[change.setting] = { values, by: { address, bytes, onNote, toggle: change.toggle } };
+			}
+
+			if (track.loopHead !== null && track.atLoop === null) {
+				track.loopHead.push(change);
+			}
+		}
+	};
 
 	// --- loop runs -----------------------------------------------------------
 	const finishedRuns: PendingRun[] = [];
@@ -1145,6 +1143,7 @@ export function walkSong(song: Uint8Array, aramAddress: number): SongTimeline {
 			// at a frame boundary.
 			if (track.at === loopAt[channel]) {
 				track.repeating = true;
+				track.loopHead ??= [];
 				if (track.ticks < loopTick) {
 					loopTick = track.ticks;
 				}
@@ -1165,11 +1164,11 @@ export function walkSong(song: Uint8Array, aramAddress: number): SongTimeline {
 			if (byte === 0) {
 				if (track.callCount === 0) {
 					// The first channel to end is the one that ends the phrase, and the
-					// tempo and channel settings standing now are what the repetition starts at.
+					// tempo and settings standing now are what the repetition starts at.
 					if (!phraseEnded) {
 						phraseEnded = true;
 						tempoAtEnd = lastTempo;
-						settingsAtEnd = tracks.map((each) => ({ ...each.settings }));
+						channelsAtEnd = tracks.map((each) => ({ ...each.settings }));
 					}
 
 					track.at = -1;
@@ -1212,6 +1211,8 @@ export function walkSong(song: Uint8Array, aramAddress: number): SongTimeline {
 					track.state.velocity =
 						VELOCITY_VALUES[(next & 0x0f) + (shared.secondVelocityTable ? NSPC_VELOCITY_OFFSET : 0)];
 					track.snapshot = null;
+					// The frame's own address, which is how `noteMap` knows the note.
+					recordSettings(track, aramAddress + track.frameAt, [next], true);
 					track.at += 1;
 				}
 
@@ -1240,10 +1241,14 @@ export function walkSong(song: Uint8Array, aramAddress: number): SongTimeline {
 		track.frameAt = -1;
 		track.at += 1;
 
+		// A drum byte loads its instrument as it keys on, so it is in force for
+		// its own note.
+		recordSettings(track, address, [byte], true);
+
 		// A tie or a rest counts as much as a note: what the loop starts under is
 		// whatever was set before the first thing in it that takes time.
-		if (track.repeating && track.loopSettings === null && !phraseEnded) {
-			track.loopSettings = { ...track.settings };
+		if (track.loopHead !== null && track.atLoop === null && !phraseEnded) {
+			track.atLoop = { ...track.settings };
 		}
 
 		const ticks = track.duration;
@@ -1326,18 +1331,13 @@ export function walkSong(song: Uint8Array, aramAddress: number): SongTimeline {
 		const length = vcmdLength(song, track.at);
 		const argAt = track.at + 1;
 		const arg = (n: number): number => song[argAt + n] ?? 0;
-		const setting = (): SettingCommand => ({
-			address: aramAddress + track.at,
-			vcmd,
-			operands: [...song.subarray(argAt, track.at + length)],
-			repeats: track.repeating,
-		});
 		const state = track.state;
 		let dirty = true;
 
 		// Taken before the switch: `$E6` and `$E9` move the pointer, and the
 		// address wanted is the one the driver read this command from.
 		recordOrigin(channel, track, vcmd, arg(0), aramAddress + track.at);
+		recordSettings(track, aramAddress + track.at, [...song.subarray(track.at, track.at + length)], false);
 
 		switch (vcmd) {
 			case 0xda: // instrument
@@ -1438,13 +1438,6 @@ export function walkSong(song: Uint8Array, aramAddress: number): SongTimeline {
 			case 0xfd:
 				// `$FD` is `$E5`'s tail with a zero depth (`Commands.asm:353`).
 				state.tremolo = vcmd === 0xe5 && arg(2) !== 0;
-				track.settings.tremolo = setting();
-				break;
-			case 0xee:
-				// Kept for what carries into the repeat. The pitch it moves stays
-				// unmodelled, so no note's state changes.
-				track.settings.fineTune = setting();
-				dirty = false;
 				break;
 			case 0xe7:
 			case 0xe8:
@@ -1666,16 +1659,7 @@ export function walkSong(song: Uint8Array, aramAddress: number): SongTimeline {
 		// never reached, on this pass or any later one.
 		tempoChanges: tempoChanges.filter((change) => ticks === 0 || change.tick < ticks),
 		tempoAtEnd,
-		loopSettings: tracks.map((track, channel) => {
-			const atLoop = track.loopSettings;
-			const atEnd = settingsAtEnd?.[channel];
-			return atLoop === null || atEnd === undefined
-				? null
-				: {
-						fineTune: { first: atLoop.fineTune, carried: atEnd.fineTune },
-						tremolo: { first: atLoop.tremolo, carried: atEnd.tremolo },
-					};
-		}),
+		carries: resolvedLoopTick === null || truncated || resolvedLoopTick >= ticks ? [] : carriesAt(channelsAtEnd),
 		// Sorted rather than pushed in order: a `$DD` is raised on the tick of the
 		// note that read it, which is behind the tick the byte was reached at, so
 		// `c4 v200 $DD …` records the two the other way round. Stable, so within one
@@ -1698,7 +1682,7 @@ export function walkSong(song: Uint8Array, aramAddress: number): SongTimeline {
 			loopTick: null,
 			tempoChanges: [],
 			tempoAtEnd: null,
-			loopSettings: new Array<null>(CHANNELS).fill(null),
+			carries: [],
 			commands: [],
 			loops: [],
 			channelTicks: new Array<number>(CHANNELS).fill(0),
@@ -1709,6 +1693,36 @@ export function walkSong(song: Uint8Array, aramAddress: number): SongTimeline {
 			truncated: false,
 			problems: [...problems, ...reason],
 		};
+	}
+
+	/**
+	 * Every channel setting the repeat starts its loop under differently. A function of
+	 * its arguments rather than of the variables `step` assigns, which the
+	 * compiler would otherwise read as never having left `null`.
+	 */
+	function carriesAt(channels: readonly Readonly<Record<ChannelSetting, SettingState>>[] | null): SettingCarry[] {
+		if (channels === null) {
+			return [];
+		}
+
+		const found = tracks.flatMap((track, channel) =>
+			track.atLoop === null || track.loopHead === null
+				? []
+				: channelCarries(channel, track.atLoop, track.loopHead, channels[channel]),
+		);
+
+		// One `@` both sets the instrument and silences `n`; the setting named
+		// first is the one reported.
+		const seen = new Set<string>();
+		return found.filter((carry) => {
+			const key = `${carry.channel}:${carry.repeat.address}`;
+			if (seen.has(key)) {
+				return false;
+			}
+
+			seen.add(key);
+			return true;
+		});
 	}
 }
 

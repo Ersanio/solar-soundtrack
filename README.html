@@ -3529,7 +3529,7 @@
         <h3 id="codes-sst">Solar Soundtrack's own</h3>
 
         <p>
-          Thirteen findings AddmusicK does not make. Twelve are about what a song
+          Twelve findings AddmusicK does not make. Eleven are about what a song
           <em>does</em> rather than about whether it builds, so real AddmusicK will compile every
           one of these without comment.
         </p>
@@ -3665,28 +3665,23 @@
                 <td><code>SST0511</code></td>
                 <td>Severe</td>
                 <td>
-                  A fine tune (<code>$EE</code>) carries over into a channel's repeat. The driver
-                  clears it only when a song starts, so the channel's loop repeats under whatever
-                  fine tune it ended on, which differs from the one its first pass started the loop
-                  under — <code>$EE $00</code> if the channel set none. Each channel is judged on
-                  its own. Set the fine tune again on that channel before the first note or rest
-                  after the <code>/</code>, or before its first note or rest if there is no
-                  <code>/</code>.
-                </td>
-              </tr>
-              <tr>
-                <td><code>SST0512</code></td>
-                <td>Severe</td>
-                <td>
-                  A tremolo (<code>$E5</code>, or <code>$FD</code> turning it off) carries over into
-                  a channel's repeat. The driver clears it only when a song starts, so the channel's
-                  loop repeats under whatever tremolo it ended on, which differs from the one its
-                  first pass started the loop under — none, if the channel set none. An
-                  <code>$E5</code> with a depth of <code>$00</code> is no tremolo, the same as
-                  <code>$FD</code>. Each channel is judged on its own. Set the tremolo again on that
-                  channel, or turn it off with <code>$FD</code>, before the first note or rest after
-                  the <code>/</code>, or before its first note or rest if there is no
-                  <code>/</code>.
+                  A channel setting carries over into that channel's repeat. The driver sets these
+                  only when a song starts, so the channel's loop repeats under whatever it ended on,
+                  which differs from what its first pass started the loop under. They are the
+                  instrument (<code>@</code>, drums, <code>$ED</code>, <code>$F3</code>,
+                  <code>$FA $01</code>, <code>$F4 $09</code>), volume (<code>v</code>,
+                  <code>$E8</code>), pan (<code>y</code>, <code>$DC</code>), vibrato
+                  (<code>p</code>, <code>$DF</code>, <code>$EA</code>), tremolo (<code>$E5</code>,
+                  <code>$FD</code>), fine tune (<code>$EE</code>), semitone tune (<code
+                    >$FA $02</code
+                  >), pitch envelope (<code>$EB</code>, <code>$EC</code>, <code>$FE</code>), volume
+                  multiplier (<code>$FA $03</code>), <code>q</code>, noise (<code>n</code>),
+                  arpeggio (<code>$FB</code>), legato (<code>$F4 $01</code>) and remote code. Each
+                  channel is judged on its own, at the loop's first note or rest. Write the setting
+                  again on that channel before the first note or rest after the <code>/</code>, or
+                  before its first note or rest if there is no <code>/</code>. A toggle such as
+                  <code>$F4 $01</code> is fixed differently: switch it back before the end of the
+                  channel.
                 </td>
               </tr>
             </tbody>

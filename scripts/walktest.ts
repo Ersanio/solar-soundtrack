@@ -34,11 +34,10 @@
  * a diagnostic that underlined them would be telling an author a note is dead
  * while they can hear it playing.
  *
- * A fifth, for `SST0510`-`SST0512`: the tempo the repeat starts at is
- * `tempoAtEnd`, not the last of `tempoChanges`. A `t`, `$EE` or `$E5` at the very
- * end of a channel runs only when the driver reaches it before the `$00` that
- * ends the phrase, and the running driver's `$51`, `$02D1+x` and `$B1+x` are
- * what say which.
+ * A fifth, for `SST0510` and `SST0511`: what a pass carries into the repeat is
+ * what the running driver holds a few ticks into it. The tempo is `tempoAtEnd`,
+ * not the last of `tempoChanges`, and a command at the very end of a channel
+ * runs only when the driver reaches it before the `$00` that ends the phrase.
  *
  *   npm run walktest
  */
@@ -80,7 +79,7 @@ import { measureClock, tempoShortfall } from "../web/src/app/state/measure-clock
 import { commandsInForceOf, definedAt, noteHeardOn, notePreceding } from "../web/src/app/state/commands-in-force";
 import { commandTimeline } from "../web/src/app/state/command-timeline";
 import { slideStart } from "../web/src/app/output/command-inspector/bend-command/slide-start";
-import { repeatFineTune, repeatTempo, repeatTremolo } from "../web/src/app/state/repeat-carry";
+import { repeatSettings, repeatTempo } from "../web/src/app/state/repeat-carry";
 import { driverTempo, driverTickSeconds } from "@amk/tokens/commands/units";
 
 import { SPC_ASSETS, check, stubFetch, summarise } from "./harness";
@@ -1419,189 +1418,176 @@ console.log("\na tempo that carries over into the repeat is reported");
 }
 
 // ---------------------------------------------------------------------------
-console.log("\na fine tune that carries over into a channel's repeat is reported");
+console.log("\na setting that carries over into the repeat is reported");
 // ---------------------------------------------------------------------------
 {
-	// `$02D1+x` is zeroed only when a song starts (`main.asm:2142`), so the fine
-	// tune a channel ends on is the one its repeat starts under.
+	// `PlaySong` sets every one of these only when a song starts
+	// (`main.asm:2082-2206`), so what a pass ends on is what its repeat starts
+	// under. Each is judged at the loop's first note or rest, and a channel's own
+	// setting on that channel alone.
 	const warn = (source: string) => {
 		const { result, timeline } = build(source);
-		return repeatFineTune(timeline, result.commandMap ?? []);
+		return repeatSettings(timeline, { result, text: source });
 	};
 
 	const textOf = (source: string, warning: Diagnostic | undefined) =>
 		warning ? source.slice(warning.span.start, warning.span.end) : "(none)";
 
-	const midSong = "#amk 4\n#0 $EE $10 / o4 c4 $EE $20 c4\n";
-	const [warning] = warn(midSong);
-	check("a mid-song $EE with none where the loop starts is reported", warning !== undefined);
-	check("it is SST0511 and severe", warning?.code === "SST0511" && warning?.severity === "severe", warning?.code);
+	const song = (body: string) => `#amk 4\n${body}\n`;
+
+	const changed = song("#0 v200 / o4 c4 v150 c4");
+	const [warning] = warn(changed);
 	check(
-		"it points at the fine tune that carries over",
-		textOf(midSong, warning) === "$EE $20",
-		textOf(midSong, warning),
+		"a channel setting changed inside the loop is SST0511 and severe",
+		warning?.code === "SST0511" && warning.severity === "severe",
+		warning?.code,
 	);
+	check("it points at the command that carries over", textOf(changed, warning) === "v150", textOf(changed, warning));
 	check(
-		"and names the channel and both values",
-		["#0", "$EE $10", "$EE $20"].every((text) => warning?.message.includes(text) === true),
+		"and names it, the channel and what the first pass had",
+		["v150", "#0", "v200"].every((text) => warning?.message.includes(text) === true),
 		warning?.message,
 	);
 
-	const [unset] = warn("#amk 4\n#0 / o4 c4 $EE $20 c4\n");
+	const [unset] = warn(song("#0 / o4 c4 v150 c4"));
 	check(
-		"a channel that sets none first is measured against 0",
-		unset?.message.includes("$EE $00") === true,
+		"one the first pass never set is measured against how a song starts",
+		unset?.message.includes("as the song starts") === true,
 		unset?.message,
 	);
 
-	for (const [name, source, reported] of [
-		["with no /, the start of the channel", "#amk 4\n#0 o4 c4 $EE $20 c4\n", true],
-		["with no /, an $EE the restart runs again", "#amk 4\n#0 $EE $10 o4 c4 $EE $20 c4\n", false],
-		["an $EE after other commands but before the first note", "#amk 4\n#0 / @0 v200 $EE $10 o4 c4 $EE $20 c4\n", false],
-		["an $EE after a rest", "#amk 4\n#0 / r4 $EE $10 o4 c4 $EE $20 c4\n", true],
-		["a pass that ends on the value it began the loop at", "#amk 4\n#0 $EE $10 / o4 c4 $EE $20 c4 $EE $10 c4\n", false],
-		["an $EE just before the /", "#amk 4\n#0 $EE $10 o4 c4 $EE $20 / c4\n", false],
-		["an $EE at the head of a loop body after the /", "#amk 4\n#0 / o4 [$EE $10 c4 $EE $20 c4]2\n", false],
-		["a song that does not loop", "#amk 4\n#option noloop\n#0 $EE $10 o4 c4 $EE $20 c4\n", false],
-	] as const) {
-		const found = warn(source);
-		check(`${name}: ${reported ? "reported" : "quiet"}`, found.length === (reported ? 1 : 0), `${found.length}`);
-	}
-
-	// Unlike a tempo, one channel's `$EE` reaches no other.
-	const bounded = "#amk 4\n#0 / o4 c4 $EE $20 c4\n#1 / $EE $20 o4 c4 c4\n";
-	const others = warn(bounded);
+	const [flipped] = warn(song("#0 / o4 c4 $F4 $01 c4"));
 	check(
-		"another channel's $EE at its loop start does not cover this one",
-		others.length === 1 && others[0].message.includes("#0") && (others[0].span.start ?? 0) < bounded.indexOf("#1"),
-		others.map((each) => each.message).join(" | "),
-	);
-	check(
-		"each channel that carries one is reported",
-		warn("#amk 4\n#0 / o4 c4 $EE $20 c4\n#1 / o4 c4 $EE $30 c4\n").length === 2,
+		"a toggle switched an odd number of times says so",
+		flipped?.message.includes("switched the other way") === true,
+		flipped?.message,
 	);
 
-	// The driver order that decides `tempoAtEnd` decides this too.
-	const first = "#amk 4\n#0 $EE $10 / o4 c4 $EE $20 c4 $EE $10\n#1 / o4 c4 c4\n";
-	const second = "#amk 4\n#0 / o4 c4 c4\n#1 $EE $10 / o4 c4 $EE $20 c4 $EE $10\n";
-	check("an $EE that runs before the phrase ends restores the value", warn(first).length === 0);
-	check("one that runs after it does not", warn(second).length === 1);
+	const quantized = song("#0 q7F o4 c4 / c4 q3F c4");
+	const [q] = warn(quantized);
+	check(
+		"a q, which no command byte holds, is pointed at where it was written",
+		textOf(quantized, q) === "q3F" && q?.message.includes("q7F") === true,
+		`${textOf(quantized, q)} ${q?.message}`,
+	);
 
-	// The oracle: `$02D1+x` a few ticks into the repeat, before the loop's own
-	// `$EE $20` on its 48th tick.
-	for (const [name, source, channel] of [
-		["the end of #0", first, 0],
-		["the end of #1", second, 1],
+	for (const [name, body, reported] of [
+		["an @ inside the loop", "#0 @1 / o4 c4 @2 c4", true],
+		["an @ at the loop start", "#0 @1 / @1 o4 c4 @2 c4", false],
+		["an $ED inside the loop", "#0 @1 / o4 c4 $ED $8F $E0 c4", true],
+		["an $F4 $09 that undoes it", "#0 @1 / o4 c4 $ED $8F $E0 c4 $F4 $09 c4", false],
+		["an $ED on a channel that never writes an @", "#0 o4 c4 $ED $8F $E0 c4", true],
+		["a drum at the loop start, which loads its own", "#0 @1 / @21 c4 @2 o4 c4", false],
+		["a v the pass ends back on", "#0 v200 / o4 c4 v150 c4 v200 c4", false],
+		["a volume fade, by its target", "#0 v200 / o4 c4 $E8 $10 $96 c4", true],
+		["a y inside the loop", "#0 y10 / o4 c4 y5 c4", true],
+		["a vibrato inside the loop", "#0 / o4 c4 p10,20,30 c4", true],
+		["a vibrato the pass ends without", "#0 p10,20,30 / o4 c4 $DF c4", true],
+		["a vibrato of no extent, which is none", "#0 / o4 c4 $DE $00 $10 $00 c4", false],
+		["an $EE inside the loop", "#0 $EE $10 / o4 c4 $EE $20 c4", true],
+		["an $EE after other commands, before the first note", "#0 / @0 v200 $EE $10 o4 c4 $EE $20 c4", false],
+		["an $EE after a rest", "#0 / r4 $EE $10 o4 c4 $EE $20 c4", true],
+		["with no /, an $EE the restart runs again", "#0 $EE $10 o4 c4 $EE $20 c4", false],
+		["with no /, an $EE only partway", "#0 o4 c4 $EE $20 c4", true],
+		["an $E5 inside the loop", "#0 / o4 c4 $E5 $00 $10 $40 c4", true],
+		["a $FD where there was no tremolo", "#0 / o4 c4 $FD c4", false],
+		["an $E5 of no depth, which is none", "#0 / o4 c4 $E5 $00 $10 $00 c4", false],
+		["a pitch envelope inside the loop", "#0 / o4 c4 $EB $00 $10 $02 c4", true],
+		["a $FE that ends it again", "#0 / o4 c4 $EB $00 $10 $02 c4 $FE c4", false],
+		["a semitone tune inside the loop", "#0 / o4 c4 $FA $02 $01 c4", true],
+		["an arpeggio inside the loop", "#0 / o4 c4 $FB $02 $04 $04 $07 c4", true],
+		["an arpeggio switched off again", "#0 / o4 c4 $FB $02 $04 $04 $07 c4 $FB $00 $00 c4", false],
+		["a glissando, which ends itself after two notes", "#0 / o4 c4 $FB $81 $04 $02 c4 c4 c4", false],
+		["a volume multiplier inside the loop", "#0 / o4 c4 $FA $03 $40 c4", true],
+		["a q inside the loop, with no intro to set it", "#0 q7F / o4 c4 q3F c4", false],
+		["an n inside the loop", "#0 / o4 c4 n1F c4", true],
+		["an n an @ silences again", "#0 / o4 c4 n1F c4 @0 c4", false],
+		["legato switched twice", "#0 / o4 c4 $F4 $01 c4 $F4 $01 c4", false],
+		["legato switched at the loop start, which flips both passes", "#0 / $F4 $01 o4 c4 c4", true],
+		["remote code set inside the loop", "(!1)[$E7 $FF]\n#0 / o4 c4 (!1, -1) c4", true],
+		["remote code cleared again", "(!1)[$E7 $FF]\n#0 / o4 c4 (!1, -1) c4 (!0, 0) c4", false],
+		["a song that does not loop", "#option noloop\n#0 v200 o4 c4 v150 c4", false],
 	] as const) {
-		const { aram, timeline } = aramInRepeat(source);
-		const heard = aram === null ? null : aram[0x02d1 + 2 * channel];
-		const walked = timeline.loopSettings[channel]?.fineTune.carried?.operands[0] ?? 0;
+		const found = warn(song(body));
 		check(
-			`with an $EE at ${name}, the repeat starts under the fine tune the walk carried`,
-			heard === walked,
-			`$02D1+x ${heard}, walk ${walked}`,
+			`${name}: ${reported ? "reported" : "quiet"}`,
+			found.length === (reported ? 1 : 0),
+			found.map((each) => each.message).join(" | "),
 		);
 	}
-}
 
-// ---------------------------------------------------------------------------
-console.log("\na tremolo that carries over into a channel's repeat is reported");
-// ---------------------------------------------------------------------------
-{
-	// `$B1+x`, the depth, is zeroed only when a song starts (`main.asm:2146`), and
-	// a zero depth is no tremolo (`main.asm:3366`), so `$FD` is the same as never.
-	const warn = (source: string) => {
-		const { result, timeline } = build(source);
-		return repeatTremolo(timeline, result.commandMap ?? []);
-	};
-
-	const textOf = (source: string, warning: Diagnostic | undefined) =>
-		warning ? source.slice(warning.span.start, warning.span.end) : "(none)";
-
-	const changed = "#amk 4\n#0 $E5 $00 $10 $40 / o4 c4 $E5 $00 $20 $40 c4\n";
-	const [warning] = warn(changed);
-	check("a mid-song $E5 with none where the loop starts is reported", warning !== undefined);
-	check("it is SST0512 and severe", warning?.code === "SST0512" && warning?.severity === "severe", warning?.code);
-	check(
-		"it points at the tremolo that carries over",
-		textOf(changed, warning) === "$E5 $00 $20 $40",
-		textOf(changed, warning),
-	);
-	check(
-		"and names the channel and both settings",
-		["#0", "$E5 $00 $10 $40", "$E5 $00 $20 $40"].every((text) => warning?.message.includes(text) === true),
-		warning?.message,
-	);
-
-	const on = "#amk 4\n#0 / o4 c4 $E5 $00 $10 $40 c4\n";
-	const [started] = warn(on);
-	check(
-		"one the first pass did not have says to turn it off",
-		textOf(on, started) === "$E5 $00 $10 $40" && started?.message.includes("$FD") === true,
-		started?.message,
-	);
-
-	const off = "#amk 4\n#0 $E5 $00 $10 $40 / o4 c4 $FD c4\n";
-	const [stopped] = warn(off);
-	check(
-		"a $FD that carries over is pointed at, naming the tremolo it ends",
-		textOf(off, stopped) === "$FD" && stopped?.message.includes("$E5 $00 $10 $40") === true,
-		`${textOf(off, stopped)} ${stopped?.message}`,
-	);
-
-	for (const [name, source, reported] of [
-		["a zero depth carried over is the same as $FD", "#amk 4\n#0 $E5 $00 $10 $40 / o4 c4 $E5 $00 $10 $00 c4\n", true],
-		["a zero depth where there was none is quiet", "#amk 4\n#0 / o4 c4 $E5 $00 $10 $00 c4\n", false],
-		["a $FD where there was none is quiet", "#amk 4\n#0 / o4 c4 $FD c4\n", false],
-		["with no /, the start of the channel", "#amk 4\n#0 o4 c4 $E5 $00 $10 $40 c4\n", true],
-		["with no /, an $E5 the restart runs again", "#amk 4\n#0 $E5 $00 $10 $40 o4 c4 $FD c4\n", false],
-		[
-			"an $E5 after other commands but before the first note",
-			"#amk 4\n#0 / @0 v200 $E5 $00 $10 $40 o4 c4 $FD c4\n",
-			false,
-		],
-		["a $FD after a rest", "#amk 4\n#0 / r4 $FD o4 c4 $E5 $00 $10 $40 c4\n", true],
-		[
-			"a pass that ends on the tremolo it began the loop with",
-			"#amk 4\n#0 $E5 $00 $10 $40 / o4 c4 $FD c4 $E5 $00 $10 $40 c4\n",
-			false,
-		],
-		["an $E5 just before the /", "#amk 4\n#0 o4 c4 $E5 $00 $10 $40 / c4\n", false],
-		["an $E5 at the head of a loop body after the /", "#amk 4\n#0 / o4 [$E5 $00 $10 $40 c4 $FD c4]2\n", false],
-		["a song that does not loop", "#amk 4\n#option noloop\n#0 o4 c4 $E5 $00 $10 $40 c4\n", false],
-	] as const) {
-		const found = warn(source);
-		check(`${name}: ${reported ? "reported" : "quiet"}`, found.length === (reported ? 1 : 0), `${found.length}`);
-	}
-
-	const bounded = "#amk 4\n#0 / o4 c4 $E5 $00 $10 $40 c4\n#1 / $E5 $00 $10 $40 o4 c4 c4\n";
+	const bounded = song("#0 / o4 c4 v150 c4\n#1 / v150 o4 c4 c4");
 	const others = warn(bounded);
 	check(
-		"another channel's $E5 at its loop start does not cover this one",
+		"another channel's v at its loop start does not cover this one",
 		others.length === 1 && others[0].message.includes("#0") && others[0].span.start < bounded.indexOf("#1"),
 		others.map((each) => each.message).join(" | "),
 	);
+	check(
+		"an @ that both changes the instrument and silences an n is reported once",
+		warn(song("#0 n1F / o4 c4 @2 c4")).length === 1,
+	);
 
-	const first = "#amk 4\n#0 $E5 $00 $10 $40 / o4 c4 $FD c4 $E5 $00 $10 $40\n#1 / o4 c4 c4\n";
-	const second = "#amk 4\n#0 / o4 c4 c4\n#1 $E5 $00 $10 $40 / o4 c4 $FD c4 $E5 $00 $10 $40\n";
-	check("an $E5 that runs before the phrase ends restores the tremolo", warn(first).length === 0);
-	check("one that runs after it does not", warn(second).length === 1);
-
-	// The oracle: `$B1+x`, and `$0370+x`/`$0361+x` under it, a few ticks into the
-	// repeat, before the loop's own `$FD` on its 48th tick.
-	for (const [name, source, channel] of [
-		["the end of #0", first, 0],
-		["the end of #1", second, 1],
+	// The running driver is the oracle, a few ticks into the repeat and before
+	// the loop's own commands on its 48th tick. On the tick the pass ends the
+	// voices run in order and the first `$00` ends the phrase
+	// (`main.asm:2337-2346`), so a command at the very end of `#0` runs and the
+	// same one at the end of `#1` does not.
+	for (const [name, body, read, expected, reported] of [
+		[
+			"a v at the end of #0",
+			"#0 v200 / o4 c4 v150 c4 v200\n#1 / o4 c4 c4",
+			(aram: Uint8Array) => aram[0x0241],
+			200,
+			false,
+		],
+		[
+			"a v at the end of #1",
+			"#0 / o4 c4 c4\n#1 v200 / o4 c4 v150 c4 v200",
+			(aram: Uint8Array) => aram[0x0243],
+			150,
+			true,
+		],
+		// `$C1+x` holds the instrument plus one (`Commands.asm:107-109`).
+		["an @ inside the loop", "#0 @1 / o4 c4 @2 c4", (aram: Uint8Array) => aram[0xc1], 3, true],
+		["legato switched once", "#0 / o4 c4 $F4 $01 c4", (aram: Uint8Array) => aram[0x0161] & 1, 1, true],
+		[
+			"an $EE at the end of #0",
+			"#0 $EE $10 / o4 c4 $EE $20 c4 $EE $10\n#1 / o4 c4 c4",
+			(aram: Uint8Array) => aram[0x02d1],
+			0x10,
+			false,
+		],
+		[
+			"an $EE at the end of #1",
+			"#0 / o4 c4 c4\n#1 $EE $10 / o4 c4 $EE $20 c4 $EE $10",
+			(aram: Uint8Array) => aram[0x02d3],
+			0x20,
+			true,
+		],
+		[
+			"an $E5 at the end of #0",
+			"#0 $E5 $00 $10 $40 / o4 c4 $FD c4 $E5 $00 $10 $40\n#1 / o4 c4 c4",
+			(aram: Uint8Array) => aram[0xb1],
+			0x40,
+			false,
+		],
+		[
+			"an $E5 at the end of #1",
+			"#0 / o4 c4 c4\n#1 $E5 $00 $10 $40 / o4 c4 $FD c4 $E5 $00 $10 $40",
+			(aram: Uint8Array) => aram[0xb3],
+			0,
+			true,
+		],
 	] as const) {
-		const { aram, timeline } = aramInRepeat(source);
-		const carried = timeline.loopSettings[channel]?.tremolo.carried ?? null;
-		const walked = carried?.vcmd === 0xe5 ? carried.operands : [null, null, 0];
-		const heard =
-			aram === null ? [] : [aram[0x0370 + 2 * channel], aram[0x0361 + 2 * channel], aram[0xb1 + 2 * channel]];
+		const source = song(body);
+		const { aram } = aramInRepeat(source);
+		const heard = aram === null ? null : read(aram);
+		const found = warn(source).length;
 		check(
-			`with an $E5 at ${name}, the repeat starts under the tremolo the walk carried`,
-			heard[2] === walked[2] && (walked[0] === null || (heard[0] === walked[0] && heard[1] === walked[1])),
-			`driver ${heard.join(",")}, walk ${walked.join(",")}`,
+			`with ${name}, the driver carries what the walk says`,
+			heard === expected && found === (reported ? 1 : 0),
+			`driver ${heard}, ${found} reported`,
 		);
 	}
 }
