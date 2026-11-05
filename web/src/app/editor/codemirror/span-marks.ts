@@ -1,3 +1,5 @@
+/** The decoration field `playhead.ts` and `unreachable.ts` share: one effect carries the whole set of spans. */
+
 import { type StateEffectType, StateField } from '@codemirror/state';
 import { Decoration, type DecorationSet, EditorView } from '@codemirror/view';
 

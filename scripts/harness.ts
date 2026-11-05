@@ -1,6 +1,6 @@
 /**
  * What the fourteen byte-level harnesses share. Nothing here knows what is being
- * tested, so it stays out of the way of the assertions. See README.md.
+ * tested, so it stays out of the way of the assertions. See CLAUDE.md.
  */
 
 import { readFileSync } from "node:fs";
@@ -15,10 +15,15 @@ export const SPC_ASSETS = join(import.meta.dirname, "..", "packages", "spc", "as
 
 let failures = 0;
 
-/** One assertion. Prints either way; the count is what decides the exit code. */
+/** `HARNESS_QUIET` drops the `ok` lines, so a failure is not lost in hundreds of passes. */
+const QUIET = Boolean(process.env["HARNESS_QUIET"]);
+
+/** One assertion. Prints a failure always and a pass unless quiet; the count decides the exit code. */
 export function check(name: string, condition: boolean, detail = ""): void {
 	if (condition) {
-		console.log(`  ok    ${name}`);
+		if (!QUIET) {
+			console.log(`  ok    ${name}`);
+		}
 	} else {
 		failures++;
 		console.log(`  FAIL  ${name}${detail ? `\n        ${detail}` : ""}`);
@@ -58,7 +63,7 @@ function response(body: Buffer | string, contentType: string) {
  *
  * Two behaviours here are deliberate and between them produced a real bug: paths
  * are decoded with `decodeURI`, and an unresolved path is answered 200 with
- * index.html rather than 404. README.md has why both matter.
+ * index.html rather than 404. CLAUDE.md has why both matter.
  */
 export function stubFetch(): void {
 	globalThis.fetch = ((input: string) => {

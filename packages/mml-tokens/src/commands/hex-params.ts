@@ -1,3 +1,5 @@
+/** `HEX_PARAMS`: every hex command's arguments, named as AddmusicK's hex command reference names them. */
+
 import { EMPTY_SAMPLE_NAME } from "@amk/core/hardcoded-tables";
 import { noiseHz } from "@amk/spc/adsr";
 import { hex2 } from "@amk/core/hex";
@@ -493,7 +495,7 @@ export const HEX_PARAMS: Readonly<Record<number, Resolver>> = {
 		u8($localize`:@@inspector.param.instrument:inspector.param.instrument`, "index", {
 			describe: (value) =>
 				value === 0x13
-					? // `@amk/spc`'s README.md — the driver has a real 20th slot, SRCN $0F,
+					? // `@amk/spc`'s CLAUDE.md — the driver has a real 20th slot, SRCN $0F,
 						// that AddmusicK's own instrToSample marks as "Nothing". Nothing ever
 						// marks $0F used, so optimizeSampleUsage (Music.cpp:3074) swaps it for
 						// the zero-byte EMPTY.brr.

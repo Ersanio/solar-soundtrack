@@ -1,3 +1,5 @@
+/** The Build section's ARAM budget: the bar, and a table row per region. */
+
 import { Component, computed, inject } from '@angular/core';
 
 import { EditorStore } from '../../state/editor-store';

@@ -1,3 +1,5 @@
+/** The source view's playhead: the spans of the notes that are sounding, marked. */
+
 import { StateEffect } from '@codemirror/state';
 
 import type { Span } from '@amk/core/types';

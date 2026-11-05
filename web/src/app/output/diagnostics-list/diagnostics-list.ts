@@ -1,3 +1,5 @@
+/** The Problems list: each diagnostic, and a click that reveals its span in the source. */
+
 import { Component, inject } from '@angular/core';
 
 import type { Diagnostic, Severity } from '@amk/core/types';

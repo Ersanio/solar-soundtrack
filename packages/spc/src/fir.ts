@@ -8,7 +8,7 @@
  *
  * The one fact to carry into every function below: **the filter sits inside the
  * feedback loop**, so repeat *k* of the echo has gain `|H|^k` and a filter above
- * unity compounds instead of decaying. README.md has the three things the SNES
+ * unity compounds instead of decaying. CLAUDE.md has the three things the SNES
  * Development Manual leaves to inference, and where a filter clips.
  */
 

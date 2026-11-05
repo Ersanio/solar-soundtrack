@@ -8,7 +8,7 @@
  * another line, and {@link copyState} is a real copy.
  *
  * Deliberately not routed through the compiler — its spans are offsets into
- * preprocessed text, and the editor needs offsets into what was typed. README.md
+ * preprocessed text, and the editor needs offsets into what was typed. CLAUDE.md
  * has where this mirrors `parser.ts`, and the three places it cannot.
  */
 

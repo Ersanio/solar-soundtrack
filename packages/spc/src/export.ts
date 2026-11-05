@@ -3,7 +3,7 @@
  * bundle.
  *
  * Direct port of `generateSPCs` (AddmusicK.cpp:1445). The file is a fixed 0x10200
- * bytes; README.md has the map.
+ * bytes; CLAUDE.md has the map.
  */
 
 import { hex4 as hex } from "@amk/core/hex";

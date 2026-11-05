@@ -58,7 +58,7 @@ const SONG_VCMDS = new Set([
 	0xe3, // tempo fade
 	0xe4, // global transpose
 	// One DSP holds one echo unit, so all five reach every channel however they
-	// are written — the reasoning `README.md` already gives for `$F5` and `$F1`.
+	// are written — the reasoning `CLAUDE.md` already gives for `$F5` and `$F1`.
 	0xef,
 	0xf0,
 	0xf1,

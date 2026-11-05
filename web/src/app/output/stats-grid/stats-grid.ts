@@ -1,3 +1,5 @@
+/** The Build section's grid of stat tiles: sizes, addresses and lengths from the compile. */
+
 import { Component, computed, inject } from '@angular/core';
 
 import { StatTile } from '../../shared/stat-tile/stat-tile';

@@ -1,3 +1,5 @@
+/** The command palette: a button per catalogue entry, which types that command in at the caret. */
+
 import { Component, computed, effect, inject, signal } from '@angular/core';
 
 import { channelsBeginAt, hasDialectMarker, songTarget } from '@amk/tokens/dialect';

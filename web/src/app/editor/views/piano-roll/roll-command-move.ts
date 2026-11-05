@@ -1,9 +1,11 @@
+/** Dragging a command glyph along its channel: where it may land, why it may not, and the edit that moves it. */
+
 import type { Command } from '@amk/tokens';
 import { commandScope } from '@amk/tokens/commands/in-force';
 import { type Edit, commandRewritable, insertAt, spliceOut } from '@amk/tokens/edits';
 import { type EditRefusal, REFUSE_CROWDED } from './roll-edit';
 import type { Strip } from './roll-strip';
-import { coalesce } from './roll-write';
+import { coalesce } from './roll-write/plan-edits';
 
 /**
  * Moving one command along its channel: the only edit here that changes where a

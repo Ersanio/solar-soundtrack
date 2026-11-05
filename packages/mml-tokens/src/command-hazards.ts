@@ -1,3 +1,5 @@
+/** The command hazards: commands that compile clean and misbehave — `$F7`'s dead slot, an unreachable `$DD`, `#am4`'s `$E4`. */
+
 import type { Command, NoteLengthSegment, Token, TokenIndex } from "./tokens";
 import type { Diagnostic, Span } from "@amk/core/types";
 import { noteFrames } from "@amk/core/hardcoded-tables";

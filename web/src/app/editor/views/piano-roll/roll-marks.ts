@@ -1,3 +1,5 @@
+/** What the roll draws for the song: a mark per note, the overview's minimap, the loop boxes and their labels. */
+
 import type { LoopRun, WalkNote } from '@amk/spc/song-walk';
 import type { Command } from '@amk/tokens';
 import { type CommandGlyph } from '../../command-palette/command-icon';

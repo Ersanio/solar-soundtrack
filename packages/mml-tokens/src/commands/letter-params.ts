@@ -1,3 +1,5 @@
+/** `LETTER_PARAMS`: the arguments of every letter command (`t`, `v`, `l`, `o`, `@`, `p` and the rest), as the inspector edits them. */
+
 import { TICKS_PER_WHOLE } from "@amk/core/hardcoded-tables";
 import { noiseHz } from "@amk/spc/adsr";
 import { isFade } from "../tokens";

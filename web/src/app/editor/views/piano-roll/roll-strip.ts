@@ -1,3 +1,5 @@
+/** A channel as a strip the roll can splice — its notes and rests in text order, with their spans — or why it cannot be one. */
+
 import { FIRST_PERCUSSION_INSTRUMENT, NOTE_REST, NOTE_TIE } from '@amk/core/hardcoded-tables';
 import { octaveOfNote } from '@amk/core/mml-text';
 import type { CommandAddress, NoteAddress, Span } from '@amk/core/types';
@@ -354,7 +356,7 @@ const TIE_TEXT = new RegExp(String.raw`^\^${LENGTH}(?:\s*\^\s*${LENGTH})*$`);
 /**
  * A `;` comment. The preprocessor takes comments out before the parser sees the
  * text, so `r4 ; x` and an `r4` on the next line fold into one rest; a unit's
- * splice puts them back (`roll-write.ts:keepingComments`).
+ * splice puts them back (`roll-write/splice.ts:keepingComments`).
  */
 export const COMMENT = /;[^\r\n]*/g;
 
@@ -378,7 +380,7 @@ const WHITESPACE = /\s/;
  * `$DD $00 $18 o5 e g4` the `o5` belongs to the target and no unit reaches back
  * over the construct to claim it — which is what stops a repitch of `g4`
  * carrying it off — and no `unitSpan` boundary, which is where every insertion
- * in `roll-write.ts` is anchored, ever falls between the command and its target.
+ * in `roll-write/` is anchored, ever falls between the command and its target.
  */
 function leadsAUnit(command: Command): boolean {
   return command.kind.toLowerCase() === 'o' || isPercussionInstrument(command);

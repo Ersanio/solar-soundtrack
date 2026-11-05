@@ -1,3 +1,5 @@
+/** The vocabulary the inspector describes an argument in: codecs, roles, controls, and builders for a command's parameters. */
+
 import type { Command } from "../tokens";
 import { fadeTicksLabel, tempoFadeLabel, ticksLabel } from "./units";
 

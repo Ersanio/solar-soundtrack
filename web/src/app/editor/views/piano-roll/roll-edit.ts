@@ -10,7 +10,7 @@ import type { ChannelTail, Strip, StripFrame } from './roll-strip';
  * Arithmetic over ticks, and what the roll draws while the pointer is still
  * down. It decides everything about the **music** — which notes there are, on
  * which tick, at which pitch. Turning an accepted plan into splices is
- * `roll-write.ts`, which decides none of that and everything about the
+ * `roll-write/`, which decides none of that and everything about the
  * spelling; the two are apart because that is what makes either testable.
  *
  * Nothing here knows about Angular, the DOM or pixels, so `rolltest` drives it

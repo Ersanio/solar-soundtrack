@@ -1,3 +1,5 @@
+/** The wavy underline on notes past the end of the song, which never sound (`SST0502`). */
+
 import { StateEffect } from '@codemirror/state';
 
 import type { Span } from '@amk/core/types';

@@ -1,3 +1,5 @@
+/** The transport's readings of the mixer and the walk: silenced channels and why, sounding spans, estimated seconds. */
+
 import { type NoteAddress, type Span, noteAddressAt } from '@amk/core/types';
 
 /**
@@ -140,7 +142,7 @@ export interface PassEstimate {
  * Seconds at a tick, interpolated from `stats` alone.
  *
  * The fallback for a song the walk could not read, and the shape the ledger in
- * `docs/claude/transport-and-clock.md` records as having been replaced *for the
+ * `.claude/rules/transport-and-clock.md` records as having been replaced *for the
  * readout*: two straight lines, exact at the intro/loop boundary and drifting
  * between them. It stands only where there is no clock at all, which is why it
  * survives — and it is here rather than inline so the drift is something a

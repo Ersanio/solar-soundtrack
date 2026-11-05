@@ -1,3 +1,5 @@
+/** The root component: top bar, the editor pane and sidebar side by side with a splitter, and the status bar. */
+
 import { Component, type ElementRef, computed, effect, signal, viewChild } from '@angular/core';
 
 import { EditorPane } from './editor/editor-pane/editor-pane';

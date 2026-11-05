@@ -1675,7 +1675,7 @@ console.log("\n$DD takes a note as its last parameter");
 	check("the first slide rides on the note before it", said(bendAnchor(slides[0], chain)) === "rides:48");
 	check("and the second rides on nothing", said(bendAnchor(slides[1], chain)) === "nothing");
 
-	// A fourth departure, and the README lists it. `Music.cpp:2029` reads
+	// A fourth departure, and `packages/mml-tokens/CLAUDE.md` lists it. `Music.cpp:2029` reads
 	// `text[pos]` raw, with no `doReplacement` in front of it, so AMK decides the
 	// lookahead on the macro's *name* and then expands it — and where the
 	// expansion holds no note, `nextNoteIsForDD` leaks onto the next real note in

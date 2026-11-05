@@ -1,0 +1,192 @@
+// Keeps CODEMAP.md, an index of every source file and what it is for, in step with the code.
+// Usage: codemap.mjs write|check
+//
+// A file's entry is the first sentence of its opening comment, or of its first `/** */` block where
+// it opens with code. `write` rewrites the map; `check` fails on a stale map instead. Both fail on a
+// source file with no doc comment, since a file the map cannot describe is one nobody can find.
+import { execFileSync } from 'node:child_process';
+import console from 'node:console';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import process from 'node:process';
+import { fileURLToPath } from 'node:url';
+import prettier from 'prettier';
+
+const root = join(dirname(fileURLToPath(import.meta.url)), '..');
+const target = join(root, 'CODEMAP.md');
+
+const mode = process.argv[2];
+if (mode !== 'write' && mode !== 'check') {
+  console.error('usage: codemap.mjs write|check');
+  process.exit(2);
+}
+
+/** Where source lives. Templates are left out: each sits beside the `.ts` that describes it. */
+const SOURCE = /^(packages\/[^/]+\/src|web\/src|scripts)\/.+\.(ts|mjs)$/;
+
+/** Lines that open a file without describing it: tool pragmas and triple-slash directives. */
+const PRAGMA = /^\s*\/\/(\/|\s*(@ts-|eslint-|prettier-))/;
+
+/** Every `/** *\/` block. */
+const DOC = /\/\*\*([\s\S]*?)\*\//g;
+
+/** A comment block's text with its `*` gutters taken off. */
+const ungutter = (body) =>
+  body
+    .split(/\r?\n/)
+    .map((line) => line.replace(/^\s*\*\s?/, ''))
+    .join('\n')
+    .trim();
+
+function sourceFiles() {
+  const listed = execFileSync(
+    'git',
+    [
+      'ls-files',
+      '-z',
+      '--cached',
+      '--others',
+      '--exclude-standard',
+      '--',
+      'packages',
+      'web/src',
+      'scripts',
+    ],
+    { cwd: root, encoding: 'utf8' },
+  );
+  const files = new Set(listed.split('\0').filter((f) => SOURCE.test(f)));
+  return [...files].filter((f) => existsSync(join(root, f))).sort();
+}
+
+/**
+ * What describes the file: the comment it opens with; else the doc comment on its first exported
+ * class or function, decorators allowed in between; else its first top-level doc comment. Null if
+ * none of the three exists.
+ */
+function describingComment(text) {
+  const lines = text.split(/\r?\n/);
+  let at = 0;
+  while (at < lines.length && (lines[at].trim() === '' || PRAGMA.test(lines[at]))) {
+    at++;
+  }
+
+  if (/^\s*\/\//.test(lines[at] ?? '')) {
+    const head = [];
+    while (at < lines.length && /^\s*\/\//.test(lines[at])) {
+      head.push(lines[at].replace(/^\s*\/\/\s?/, ''));
+      at++;
+    }
+
+    return head.join('\n');
+  }
+
+  if (/^\s*\/\*/.test(lines[at] ?? '')) {
+    const block = /\/\*\*?([\s\S]*?)\*\//.exec(lines.slice(at).join('\n'));
+    if (block) {
+      return ungutter(block[1]);
+    }
+  }
+
+  const main = /^export (default )?(abstract )?(async )?(class|function) /m.exec(text);
+  if (main) {
+    const before = text.slice(0, main.index);
+    const last = [...before.matchAll(DOC)].at(-1);
+    if (last && /^\s*(@[\s\S]*)?$/.test(before.slice(last.index + last[0].length))) {
+      return ungutter(last[1]);
+    }
+  }
+
+  for (const block of text.matchAll(/^\/\*\*([\s\S]*?)\*\//gm)) {
+    const body = ungutter(block[1]);
+    if (body !== '' && !body.startsWith('@')) {
+      return body;
+    }
+  }
+
+  return null;
+}
+
+/** The first sentence of the comment's first paragraph, up to the first `.` outside a code span. */
+function firstSentence(comment) {
+  const lines = [];
+  for (const line of comment.split('\n')) {
+    if (line.trim() === '' || /^\s*([-*+]|\d+[.)])\s/.test(line)) {
+      break;
+    }
+
+    lines.push(line.trim());
+  }
+
+  const paragraph = lines.join(' ').replace(/\s+/g, ' ').trim();
+  let inCode = false;
+  for (let i = 0; i < paragraph.length; i++) {
+    const c = paragraph[i];
+    if (c === '`') {
+      inCode = !inCode;
+    }
+
+    const ends = i + 1 === paragraph.length || paragraph[i + 1] === ' ';
+    const abbreviation = /\b(e\.g|i\.e|vs|etc)$/.test(paragraph.slice(0, i));
+    if (!inCode && (c === '.' || c === '?' || c === '!') && ends && !abbreviation) {
+      return paragraph.slice(0, i + 1);
+    }
+  }
+
+  return paragraph;
+}
+
+const missing = [];
+const groups = new Map();
+for (const file of sourceFiles()) {
+  const comment = describingComment(readFileSync(join(root, file), 'utf8'));
+  const summary = comment === null ? '' : firstSentence(comment);
+  if (summary === '') {
+    missing.push(file);
+    continue;
+  }
+
+  const slash = file.lastIndexOf('/');
+  const dir = file.slice(0, slash);
+  if (!groups.has(dir)) {
+    groups.set(dir, []);
+  }
+
+  groups.get(dir).push(`- \`${file.slice(slash + 1)}\` — ${summary}`);
+}
+
+const lines = [
+  '# Code map',
+  '',
+  'Every source file under `packages/*/src`, `web/src` and `scripts`, with the first sentence of its',
+  'doc comment. Generated by `npm run codemap`; `npm run check` fails when it is stale. Do not edit by',
+  'hand — change the comment and regenerate.',
+];
+for (const [dir, entries] of groups) {
+  lines.push('', `## ${dir}`, '', ...entries);
+}
+
+const generated = await prettier.format(lines.join('\n') + '\n', {
+  ...(await prettier.resolveConfig(target)),
+  filepath: target,
+});
+
+if (missing.length > 0) {
+  console.error(
+    `${missing.length} source file(s) have no doc comment for the code map:\n${missing.map((f) => `  ${f}`).join('\n')}`,
+  );
+}
+
+const current = existsSync(target) ? readFileSync(target, 'utf8') : null;
+if (mode === 'check') {
+  if (current === null || current.replace(/\r\n/g, '\n') !== generated) {
+    console.error('CODEMAP.md is stale. Run `npm run codemap`.');
+    process.exit(1);
+  }
+
+  process.exit(missing.length > 0 ? 1 : 0);
+}
+
+const crlf = current === null ? process.platform === 'win32' : current.includes('\r\n');
+writeFileSync(target, crlf ? generated.replace(/\n/g, '\r\n') : generated);
+console.log(`CODEMAP.md: ${[...groups.values()].reduce((n, g) => n + g.length, 0)} files`);
+process.exit(missing.length > 0 ? 1 : 0);

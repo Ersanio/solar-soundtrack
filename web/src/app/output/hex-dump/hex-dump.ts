@@ -1,3 +1,5 @@
+/** The Build section's hex dump of the compiled song data. */
+
 import { Component, computed, inject } from '@angular/core';
 
 import { EditorStore } from '../../state/editor-store';

@@ -269,7 +269,7 @@ module.exports = defineConfig([
     },
   },
   {
-    // Every string a porter reads carries a grouped `@@id` (docs/claude/i18n.md).
+    // Every string a porter reads carries a grouped `@@id` (.claude/rules/i18n.md).
     // Not index.html, which Angular's i18n never reads. The ignored attributes
     // are SVG geometry and component inputs that take a keyword, never text.
     files: ['web/src/app/**/*.html'],

@@ -1,3 +1,5 @@
+// Writes web/src/app/git-info.generated.ts, the commit the top bar links to. The pre-hooks run it.
+
 import { execSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';

@@ -1,3 +1,5 @@
+/** The top bar: the transport, the ARAM meter, the exports, the theme picker, the changelog and the commit link. */
+
 import { Component, inject } from '@angular/core';
 
 import { Changelog } from '../../changelog/changelog';

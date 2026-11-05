@@ -1,3 +1,5 @@
+/** The compiler's entry point: `compiler.compile` parses and links one request and gathers its stats and diagnostics. */
+
 import { PARSER_VERSION } from "@amk/core/hardcoded-tables";
 import { hex } from "@amk/core/hex";
 import { AMK } from "@amk/core/messages/amk";

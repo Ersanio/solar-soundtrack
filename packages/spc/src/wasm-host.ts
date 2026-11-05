@@ -6,7 +6,7 @@
  * touches nothing outside that surface — so the same host runs unchanged in Node,
  * on the main thread and inside an AudioWorkletGlobalScope.
  *
- * Both mappings are pinned to the vendored binary and written out in README.md.
+ * Both mappings are pinned to the vendored binary and written out in CLAUDE.md.
  * Swapping in a different build means re-reading them; {@link instantiate} fails
  * loudly rather than silently mis-calling if an export is missing.
  */

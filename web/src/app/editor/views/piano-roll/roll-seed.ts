@@ -3,7 +3,7 @@ import type { TokenIndex } from '@amk/tokens';
 import { DEFAULT_TEMPO } from '@amk/tokens/commands/units';
 import { type Edit, insertAt, spliceRange } from '@amk/tokens/edits';
 import { channelHome, channelMarkers } from './roll-strip';
-import { eol, openingCommands } from './roll-write';
+import { eol, openingCommands } from './roll-write/spelling';
 
 /**
  * The first rest a song with no playable music needs, so the roll can edit it.

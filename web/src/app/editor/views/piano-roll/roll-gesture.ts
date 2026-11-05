@@ -57,9 +57,9 @@ import {
   loopJoin,
   openGap,
   passesAt,
-  planGroupEdits,
   resizeLoop,
-} from './roll-write';
+} from './roll-write/loop-edits';
+import { planGroupEdits } from './roll-write/plan-edits';
 
 /**
  * The roll's pointer: what a press means, what a drag is doing, and what

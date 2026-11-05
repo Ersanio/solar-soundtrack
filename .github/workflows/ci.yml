@@ -26,7 +26,7 @@ jobs:
       - run: npm run lint
 
       # Formatting, three typechecks (packages, harnesses, app) and the fourteen
-      # byte-level harnesses; `scripts/README.md` says what each one proves.
+      # byte-level harnesses; `scripts/CLAUDE.md` says what each one proves.
       - run: npm run check
 
   deploy:

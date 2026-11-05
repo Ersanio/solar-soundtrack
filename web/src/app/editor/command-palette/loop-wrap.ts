@@ -332,7 +332,7 @@ function offerOf(
  * `$DD` is not dispatched — the note before it reads it by peeking at the byte
  * standing at the track pointer (`main.asm:L_10E4`) — so a bracket written
  * between the two puts the body's own `$00` where the slide was, and the note
- * stops bending. `afterBend` in `roll-write.ts` moves an anchor for the same
+ * stops bending. `afterBend` in `roll-write/spelling.ts` moves an anchor for the same
  * reason.
  */
 function tailAfter(index: TokenIndex, channel: number, last: Command): number {

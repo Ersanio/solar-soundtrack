@@ -14,7 +14,7 @@ export interface PercussionChip {
 
 /**
  * One chip per instrument the song plays, as a view model rather than methods
- * called per row — `web/README.md` on why.
+ * called per row — `web/CLAUDE.md` on why.
  */
 export function percussionChips(
   used: readonly number[],

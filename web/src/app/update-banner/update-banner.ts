@@ -1,3 +1,5 @@
+/** The banner offering a reload once the service worker has a new version of the app ready. */
+
 import { Component, computed, inject, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { SwUpdate, type VersionReadyEvent } from '@angular/service-worker';

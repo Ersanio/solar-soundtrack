@@ -1,3 +1,5 @@
+/** The echo FIR's frequency response as a graph, with the echo's repeats ghosted behind it. */
+
 import { Component, computed, input, output } from '@angular/core';
 
 import {
@@ -15,7 +17,7 @@ import { clamp } from '../../../util/math';
 const TOP_DB = 12;
 const FLOOR_DB = -48;
 /**
- * The frequency axis is **linear**, DC to Nyquist — deliberate, and README.md
+ * The frequency axis is **linear**, DC to Nyquist — deliberate, and `inspector-and-palette.md`
  * says why. It also makes DC drawable, which matters because `firDcGain` is a
  * real quantity: the manual's low-pass sums to 132 and lifts steady tones by 3%.
  */

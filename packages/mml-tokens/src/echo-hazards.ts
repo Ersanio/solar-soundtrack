@@ -1,3 +1,5 @@
+/** The echo hazards: every runaway echo in the document, one diagnostic per command that causes one. */
+
 import type { Command } from "./tokens";
 import type { Diagnostic } from "@amk/core/types";
 import { FIR_PRESETS, FIR_TAPS, type FirTaps, echoStability, toSigned } from "@amk/spc/fir";

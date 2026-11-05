@@ -1,12 +1,31 @@
 # CLAUDE.md
 
-Guidance for Claude Code (claude.ai/code) working in this repository.
-
-## What this is
-
 Solar Soundtrack — a browser-based AddmusicK 1.0.11 MML editor. It compiles MML to N-SPC song data,
 assembles a playable `.spc`, and plays it through an emulated SPC700, entirely client-side. No ROM,
 no AddmusicK install, no server.
+
+## Finding your way
+
+The repository is organised for Claude Code to read. `docs/` belongs to the project's author (the
+mdBook guide and their own README) and is not guidance for you.
+
+- **`CODEMAP.md`** lists every source file with the first sentence of its doc comment, by
+  directory. Read it first when looking for where something lives. It is generated
+  (`npm run codemap`), and `npm run check` fails when it is stale or a source file has no doc
+  comment — so every new file opens with one.
+- **Nested `CLAUDE.md` files load by themselves** once you touch a file under them:
+  `packages/<pkg>/CLAUDE.md` (each package's long explanations), `web/CLAUDE.md` (the app's
+  structure and Angular conventions), `scripts/CLAUDE.md` (the harnesses).
+- **`.claude/rules/*.md` load by themselves** once you read or edit a file their `paths:` cover.
+  Each holds one area's rules and its **Decisions already made** ledger; the index is at the end of
+  this file. If unsure which applies, grep `.claude/rules/` for the identifier you are about to
+  touch — the entries name their identifiers.
+- **Skills** in `.claude/skills/`: `verify-change` (what to run before calling a change done),
+  `drive-the-app` (driving the running editor in a headless browser), `add-diagnostic`.
+- **A hook** runs after every Edit and Write (`.claude/hooks/after-edit.mjs`): it puts back the
+  working tree's CRLF endings, runs Prettier on the file, and reports a parse error back to you.
+- **`COMMANDS.html`** is the per-target truth table for every MML and hex command. Consult and cite
+  it before changing a command's availability, name or argument count.
 
 ## Layout
 
@@ -18,8 +37,9 @@ packages/mml-compiler/  @amk/compiler  preprocess -> parser -> link
 packages/mml-tokens/    @amk/tokens    scanner, splices, command model
 packages/spc/           @amk/spc       BRR, echo FIR, ARAM, emulator, worklet
 web/                    the Angular editor
-scripts/                fourteen byte-level harnesses
-docs/book/              the mdBook guide, deployed beside the app under docs/
+scripts/                fourteen byte-level harnesses, the code map, the i18n catalog
+.claude/                rules, skills, the after-edit hook
+docs/                   the author's guide and README; deployed beside the app under docs/
 ```
 
 ```
@@ -29,10 +49,6 @@ docs/book/              the mdBook guide, deployed beside the app under docs/
 @amk/tokens    → core, and @amk/spc/{adsr,fir}
 web            → all four
 ```
-
-Each package has a `README.md` and that is where the long explanations live — the port's citation
-convention, why the driver is observed rather than predicted, what the scanner can and cannot mirror
-from the parser, what the harnesses actually prove. Read the one for the package you are changing.
 
 `AddmusicKsrc/` and `AddmusicKreadme/` hold a local copy of AddmusicK 1.0.11's C++ sources and its
 readme. They are **gitignored and not part of the repository**, but they are the reference
@@ -53,29 +69,28 @@ Node 24 is what CI uses. CI runs `npm run lint` then `npm run check`.
 | `npm run typecheck` | The app. `:packages` and `:scripts` cover the rest.                                     |
 | `npm run start:ids` | The dev server with every message showing its i18n ID instead of its English.           |
 | `npm run i18n`      | Adds new IDs to `web/src/locale/messages.en.json`, the English, and drops removed ones. |
-| `npm run check`     | The merge gate: formatting, three typechecks, all fourteen harnesses, the English.      |
+| `npm run codemap`   | Rewrites `CODEMAP.md` from the source files' doc comments.                              |
+| `npm run check`     | The merge gate: formatting, code map, three typechecks, the harnesses, the English.     |
+
+Set `HARNESS_QUIET=1` to drop the `ok` lines from harness output (a full `check` otherwise prints
+over 300 KB, more than a tool result shows): `$env:HARNESS_QUIET=1; npm run check` in PowerShell.
 
 `npm run typecheck` does **not** compile Angular templates — `tsc` does not run the template
 compiler, so a bad binding (`viewBox=` instead of `[attr.viewBox]=`) passes it. `npm run check`
 does, last: `i18n:check` builds the app to extract its messages. Run `check`, `npm run build` or
 `npm start` before believing a UI change.
 
-### Automatic pre-hooks
+**Automatic pre-hooks.** Never invoke these by hand — the `pre*` scripts run them, and all three
+write generated, gitignored output: `build:worklet` bundles the AudioWorklet, `sync-spc-assets`
+mirrors `packages/spc/assets/` (the only source of truth) into `web/public/`, and
+`generate-git-info` writes the top bar's commit link, captured once at startup, so restart
+`npm start` after committing. Which hook runs which: `.claude/rules/tooling.md`.
 
-Never invoke these by hand — the `pre*` scripts run them, and all three write generated, gitignored
-output: **`build:worklet`** bundles the AudioWorklet, **`sync-spc-assets`** mirrors
-`packages/spc/assets/` (the only source of truth) into `web/public/`, and **`generate-git-info`**
-writes the top bar's commit link, captured once at startup, so restart `npm start` after
-committing. Which hook runs which, and why each exists: `docs/claude/tooling.md`.
-
-### Tests
-
-There are no `.spec.ts` files, and no `npm run test` — the suite is the fourteen harnesses under
-`scripts/`; **`scripts/README.md` says what each one proves**,
-and several of those assertions are load-bearing in ways that are not obvious from the name.
-
-`scripts/Compare-Spc.ps1` and `scripts/Compare-SongBin.ps1` diff output against a real AddmusicK
-build. Those are what establish fidelity; the harnesses only catch gross breakage.
+**Tests.** There are no `.spec.ts` files and no `npm run test` — the suite is the fourteen harnesses
+under `scripts/`, and `scripts/CLAUDE.md` says what each one proves; several of those assertions are
+load-bearing in ways the name does not suggest. `scripts/Compare-Spc.ps1` and
+`scripts/Compare-SongBin.ps1` diff output against a real AddmusicK build. Those establish fidelity;
+the harnesses only catch gross breakage.
 
 ## Rules
 
@@ -91,30 +106,24 @@ AddmusicK is case-sensitive, so is this — `#Title`, `"kick.BRR"` and `#DEFINE`
 `#SAMPLES` is not, because `strnicmp` is what the reference uses there. Convenience is never a
 reason to widen what is accepted, and neither is helpfulness a reason to narrow it: an unknown
 `#directive` is read as music and `*` with no previous loop emits a call to nowhere, because that is
-what the reference does. `packages/mml-compiler/AUDIT.md` is the record of the last line-by-line
+what the reference does. `#path` is the one deliberate divergence, and why it alone qualifies is in
+`.claude/rules/compiler.md`. `packages/mml-compiler/AUDIT.md` is the record of the last line-by-line
 comparison.
-
-**`#path` is the one deliberate divergence, and the bar it had to clear is high.** It is read,
-validated and applied to nothing (`parsePath`, `SST0504`), because the reference behaviour has
-nothing to mean here: `basepath` is a directory prefix resolved against a filesystem, and the host's
-library is one flat list of filenames matched verbatim, so a prefixed name resolves to nothing and
-every sample under a `#path` fails with AMK0058. That is not the same as finding the reference
-unhelpful — the two constructs above are unhelpful and were kept. Nothing else earns this: a second
-divergence needs the reference behaviour to be undefined here, not merely inconvenient.
 
 **`packages/mml-compiler` is not linted, and its comments are not thinned.** It is a port, and style
 rules would make it harder to diff against the C++ that is the only check on its faithfulness. It
-gets one ESLint rule, an import boundary. Prettier still runs.
+gets one ESLint rule, an import boundary. Prettier still runs. Outside the compiler, keep added
+comments short.
 
 **Comments describe the code as it is, not as it was.** No "it used to", "this replaced", "which is
 where it was", "the bug this exists to fix", "before this existed". A comment that says "it was once
 X, and X was wrong because Y" has one useful sentence — the present-tense reason for the shape it has
 now — and the rest is history: state the reason and stop, or state Y as a plain counterfactual ("a
 spread would take whatever is in storage on trust"). Harness comments say what is pinned, not what
-once broke. This applies to the READMEs too. The git log holds what changed; a shape that was moved
-away from and is worth not proposing again goes in the **Decisions already made** ledger of the
-matching topic file (see Topic files below), in the same change, and nowhere in the source.
-(`AUDIT.md`, the changelog and `.git-blame-ignore-revs` are records by genre and are outside this.)
+once broke. This applies to the `CLAUDE.md` files and rules too. The git log holds what changed; a
+shape that was moved away from and is worth not proposing again goes in the **Decisions already
+made** ledger of the matching rule, in the same change, and nowhere in the source. (`AUDIT.md`, the
+changelog and `.git-blame-ignore-revs` are records by genre and are outside this.)
 
 **Package boundaries are a lint rule.** npm links every workspace into `node_modules/@amk`, so
 TypeScript resolves a sibling package however the tsconfigs are written; `no-restricted-imports` in
@@ -122,134 +131,67 @@ TypeScript resolves a sibling package however the tsconfigs are written; `no-res
 deliberately.
 
 **Ticks, not seconds.** Anything that follows the music uses driver ticks, and stores and accepts
-nothing else: the driver drops ticks on a busy song, so no formula over tempo can be exact and a
-playhead built on one drifts further every pass round the loop. Seconds appear at exactly two
-edges — the m:ss label derived from a tick, and the fade past the end of the song — and the
-conversion has no inverse on purpose. The tick rate itself is measured, not assumed: anything that
-turns ticks into seconds goes through `EditorStore.clock`. AddmusicK's own seconds
-(`stats.tagSeconds` / `introSeconds` / `mainSeconds`, the ID666 header, the "Length" tile) are
-outside this. The full rule is in `docs/claude/transport-and-clock.md`; read it before touching the
-transport, the playhead or the clock.
+nothing else: the driver drops ticks on a busy song, so a playhead built on a formula over tempo
+drifts further every pass round the loop. Anything that turns ticks into seconds goes through
+`EditorStore.clock`. The full rule is in `.claude/rules/transport-and-clock.md`.
 
 **`sampleList: null` is not `[]`.** `null` means the compiler had no opinion and the driver's default
 set stands; `[]` means the song genuinely asks for no samples. The list's _order is the SRCN
 assignment_, so building an SPC against a different set produces a valid-looking file that plays the
 wrong sounds. It is a correctness-critical output, not a statistic.
 
-**Diagnostics carry source spans and stable codes**, and are carried on failure paths too, so
-partial UI stays populated. **The prefix says whose finding it is, not which file raises it**:
-`AMK####` is a condition AddmusicK itself reports, ported from `AddmusicKsrc/` with the `Music.cpp`
-line cited; `SST####` is one `Music.cpp` does not produce at all. A new diagnostic takes the prefix
-of the tool that found it. Spans are mapped back to the source the author wrote — `spanAt` is the
-single choke point, and anything that bypasses it will be wrong. Constructs this compiler does not
-implement are reported as errors, never silently mis-compiled. Their text is not at the call site:
-each code and variant has an entry in `@amk/core/messages/amk.ts` or `sst.ts` and its English under
-the same ID in `web/src/locale/messages.en.json`, and a new diagnostic adds both. What each
-`SST05xx` covers: `docs/claude/compiler.md`.
+**Diagnostics carry source spans and stable codes.** `AMK####` is a condition AddmusicK itself
+reports, `SST####` one it does not produce; spans go through `spanAt`; constructs this compiler does
+not implement are errors, never silent mis-compiles. The detail is in `.claude/rules/compiler.md`,
+and the `add-diagnostic` skill walks through adding one.
 
 **Text a porter reads is written by its i18n ID.** Templates take `i18n="@@group.name"` with the
 ID as their text, TypeScript and the packages `` $localize`:@@group.name:group.name` ``, and the
-words are in `web/src/locale/messages.en.json`, grouped by where they are read; the build swaps
-them in. Change wording there, not in the code. The lint rule and `npm run check` hold both
-halves. A string that is compared or stored is a key, never text. How to write a message, which
-group, and what stays unmarked: `docs/claude/i18n.md`.
+words are in `web/src/locale/messages.en.json`, grouped by where they are read. Change wording
+there, not in the code. A string that is compared or stored is a key, never text. The scheme:
+`.claude/rules/i18n.md`.
 
 **Accessibility is not supported.** The app ships no ARIA attributes and no `role` or `tabindex`,
 and none are planned. `angular.configs.templateAccessibility` is therefore absent from the
 template lint block, and the "Accessibility Requirements" section of `web/.claude/CLAUDE.md` does
-not apply here — that file is generated by the Angular CLI and is kept byte-identical to what the
-CLI emits, so the override is stated here instead. The global `:focus-visible` outline is a
-different concern and must not be removed by components.
+not apply here — that file is generated by the Angular CLI and kept byte-identical to what the CLI
+emits, so the override is stated here instead. The global `:focus-visible` outline is a different
+concern and must not be removed by components.
 
 **The changelog is part of the feature.** `web/src/app/changelog/changelog-data.ts` backs the top
 bar's changelog popup. A commit that adds or materially changes a user-facing feature adds its entry
 **in the same commit** — a new block at the top of `CHANGELOG` if the date is new, otherwise one more
-string in the existing block for that date.
+string in the existing block for that date. Write for **music porters, not developers**, as a short
+phrase naming the feature: "Sample browser & importer", not a sentence about how it works.
+Refactors, internal work and small fixes get no entry. It is hand-written and never generated from
+commit subjects.
 
-Write for **music porters, not developers**, and keep it to a short phrase naming the feature:
-"Sample browser & importer", not a sentence about how it works. How something is implemented never
-belongs here, however interesting. Refactors, internal work and small fixes get no entry at all. It
-is hand-written and must never be generated from commit subjects, which are not written for users.
+**Formatting, linting and deployment.** Prettier owns formatting in two profiles — `web/src/app/`
+at 2 spaces, single quotes, width 100; `packages/` and `scripts/` at tabs, double quotes, width 120 —
+and the hook runs it on each file you edit; never hand-format. `eslint.config.js` at the root is the
+one config for every workspace, and several rules are deliberately **off** with the reasoning
+inline. CI deploys `main` to GitHub Pages through `npm run build`, never `ng build`, which skips the
+prebuild hooks. All three in detail: `.claude/rules/tooling.md`.
 
-## Topic files
+## Rules index
 
-`docs/claude/` holds the guidance that matters for one area of the code only. Nothing there loads
-on its own: **read an area's file before changing code in it**. If unsure which applies, grep
-`docs/claude/` for the identifier you are about to touch — the entries name their identifiers.
+Each loads by itself once you read or edit a file it covers (its `paths:` frontmatter). A new
+ledger entry goes in the rule of the area it belongs to, in the same change; if none fits, add a
+rule with a `paths:` list and a row here.
 
-Each file ends in a **Decisions already made** ledger: shapes this code has had and moved away
-from, on record there rather than in comments — the code says what it is; the ledger says what it
-is not going back to. One entry each: what it was, what it is, why. A new entry goes in the ledger
-of the area it belongs to, in the same change; if no file fits, add one and list it here.
-
-| File                       | Read before changing                                                                                                                                 |
+| Rule                       | Covers                                                                                                                                               |
 | -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `transport-and-clock.md`   | the transport, the seek bar, the playhead, `Playback`, `Mixer`, the worklet, the clock measurement, anything that turns ticks into seconds           |
-| `audition.md`              | the note and region preview: `Audition`, `note.worker.ts`, the fast-forward and voice parking                                                        |
+| `audition.md`              | the note and region preview: `Audition`, `note.worker.ts`, the fast-forward and voice parking, the two AudioContexts                                 |
+| `roll-architecture.md`     | how the piano roll is put together: what it draws from, layout, lanes, percussion, which module owns what                                            |
 | `roll-view.md`             | the roll's camera, scrub and overview bars, grid, cursor, hover, pointer handling, selection and toolbar                                             |
-| `roll-editing.md`          | how a roll gesture becomes text: `roll-edit.ts`, `roll-write.ts`, `roll-strip.ts`, `roll-gesture.ts`, rests, padding, drums, opening a channel       |
+| `roll-editing.md`          | how a roll gesture becomes text: `roll-edit.ts`, `roll-write/`, `roll-strip.ts`, `roll-gesture.ts`, rests, padding, drums, opening a channel         |
 | `roll-octaves.md`          | `roll-octave.ts`, or anything that writes or removes an `o`, `<` or `>`                                                                              |
 | `loops.md`                 | loop boxes, wrap, join and split, `roll-loops/`, the loop inspector and `loop-focus.ts`, `(n)m` and `*`                                              |
 | `commands-in-the-roll.md`  | command glyphs on bars, the command lane, `commands-in-force.ts`, `command-timeline.ts`, `song-walk.ts`'s slots                                      |
 | `inspector-and-palette.md` | the command inspector, a note's Length row, the instrument picker, the command palette, the `$DD` and `q` readouts, the bend graph, the FIR designer |
-| `compiler.md`              | `packages/mml-compiler`, the `@amk/tokens` scanner, diagnostics                                                                                      |
+| `compiler.md`              | `packages/mml-compiler`, the `@amk/tokens` scanner, diagnostics, `#path`                                                                             |
 | `i18n.md`                  | any text a porter reads: templates, `$localize`, the AMK/SST catalogs, command names and descriptions, `web/src/locale/messages.en.json`             |
 | `ui-and-theme.md`          | `styles.css` colours, `ThemeStore` and presets, the panes, sidebar, tabs and shared controls                                                         |
-| `tooling.md`               | the pre-hooks, `eslint.config.js`, `.prettierrc`, CI and deployment                                                                                  |
-
-## Angular specifics
-
-Angular 22, zoneless (scaffolded `--zoneless`, so zone.js is not a dependency and there is nothing
-to opt into), no router, no NgModules. Signals throughout: `signal`/`computed` for state, `effect`
-reserved for mirroring into imperative sinks (localStorage, the player, the DSP). State lives in
-ten `@Service()` singletons in `web/src/app/state/`. The spine runs one way, `DriverStore` →
-`SampleStore` → `EditorStore` → `Playback`; `ClockMeasurer` feeds `EditorStore`, `Audition` hangs
-off it beside `Playback`, `Mixer` hangs off it and is read by both of those and by the roll, and
-`CommitAudition` is the command inspector's write path over `EditorRequests` and `Audition` — a
-panel's commit replays the selected note once its compile lands. `EditorRequests` and `ThemeStore`
-depend on nothing at all, and nothing depends on the second either: it puts the porter's colours on
-`<html>` as inline custom properties, and everything downstream reads those as CSS rather than
-asking the service. `web/README.md` has the rest.
-
-Selector prefix is `amk` — `amk-root`, `amk-editor-pane` for components, camelCase `amk*` for
-directives. ESLint enforces both.
-
-Styling is Tailwind v4, with the entire theme as CSS variables in `web/src/styles.css` (v4 has no
-`tailwind.config.js`). Dark-only on purpose. `--color-seg-*` and `--color-ch-*` there are
-**validated categorical sets**: never reorder or re-hue their defaults, and never make the default
-`--color-surface` lighter than `#1f282f`, without re-validating — and never leave channel identity
-to colour alone. What is validated, and why a porter's own overrides may break it:
-`docs/claude/ui-and-theme.md`.
-
-Framework-generic Angular 22 conventions (signal APIs, `@Service()`, host bindings, control flow)
-live in `web/.claude/CLAUDE.md`, which the Angular CLI generated via `--ai-config=claude` and can
-regenerate. Keep project-specific guidance here instead, so that file stays safe to overwrite.
-
-## Formatting
-
-Prettier owns the whole workspace, in two profiles split by layer — `web/src/app/` at 2 spaces,
-single quotes, width 100; `packages/` and `scripts/` at tabs, double quotes, width 120, carried over
-from the pre-Angular prototype so the port can still be diffed against AddmusicK's C++. Both are in
-`.prettierrc`, with matching `.editorconfig` sections so editors agree; **change both or neither**.
-Never hand-format — run `npm run format`, and `npm run check` fails on anything Prettier would
-rewrite.
-
-`endOfLine` is `"auto"` because the working tree is CRLF. Prettier's `"lf"` default makes every file
-fail `--check` for reasons that have nothing to do with formatting.
-
-Two regions carry `// prettier-ignore`, each because reflow would destroy information; read
-`docs/claude/tooling.md` before adding a third. A reformat commit is listed in
-`.git-blame-ignore-revs`.
-
-## Linting
-
-`eslint.config.js` at the root is the one config for every workspace, run as plain `eslint`.
-Several rules are deliberately **off**, each with its reasoning inline — read it before switching
-one on. `npm run lint:fix` fixes `curly` and blank-line padding; run `npm run format` after it. How
-the config is scoped and why: `docs/claude/tooling.md`.
-
-## Deployment
-
-CI lints and checks every push and PR, and deploys `main` to GitHub Pages through `npm run build` —
-never `ng build`, which skips the prebuild hooks. The guide in `docs/book/` goes out in the same
-artifact, under `docs/`. Details: `docs/claude/tooling.md`.
+| `tooling.md`               | the pre-hooks, `eslint.config.js`, `.prettierrc`, CI and deployment, the after-edit hook                                                             |
+| `harnesses/<name>.md`      | what each harness proves, loaded with that harness                                                                                                   |

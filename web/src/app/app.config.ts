@@ -1,3 +1,5 @@
+/** The app's providers: global error listeners, and the service worker in production builds. */
+
 import {
   type ApplicationConfig,
   provideBrowserGlobalErrorListeners,

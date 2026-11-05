@@ -112,7 +112,7 @@ export class EditorRequests {
    * A fresh object each time, so writing the same edit twice still takes.
    *
    * Every edit carries `expect`, the text the splice believes occupies the
-   * span, and the editor compares before it dispatches — see `web/README.md`
+   * span, and the editor compares before it dispatches — see `web/CLAUDE.md`
    * for the race that guards against.
    */
   readonly replace = signal<EditBatch | null>(null);

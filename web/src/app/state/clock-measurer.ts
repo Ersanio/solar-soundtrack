@@ -1,3 +1,5 @@
+/** Measures how fast the song really runs on the emulator, and raises `SST0503` when the driver falls behind. */
+
 import { DestroyRef, Service, inject, signal } from '@angular/core';
 
 import { SST } from '@amk/core/messages/sst';

@@ -1,3 +1,5 @@
+/** The document and everything compiled from it: the debounced compile, diagnostics, stats, the budget, the walk, the SPC. */
+
 import { Service, computed, effect, inject, linkedSignal, signal, untracked } from '@angular/core';
 
 import { compiler } from '@amk/compiler';

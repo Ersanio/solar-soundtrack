@@ -12,7 +12,7 @@ export interface DragPreview {
 
 /**
  * Values a slider is showing mid-drag, before anything has been written. The
- * receiving end of the preview/commit split — see README.md.
+ * receiving end of the preview/commit split — see `web/CLAUDE.md`.
  *
  * `source` is what makes it self-clearing: pass the command (or entry) the view
  * is rendering, and the moment a commit lands and the scan produces a new one,

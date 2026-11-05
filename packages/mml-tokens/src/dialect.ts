@@ -6,7 +6,7 @@
  *
  * A walk over the scanner's commands, not compiler output, so it answers while
  * the song is mid-edit. Positional, and same-channel only, where that matters —
- * see README.md. The dialect is the exception: the markers are resolved over the
+ * see CLAUDE.md. The dialect is the exception: the markers are resolved over the
  * whole file, because that is what `preprocess.ts` does with them.
  */
 
@@ -108,7 +108,7 @@ export function tempoAt(offset: number, commands: readonly Command[]): number | 
  * by hand, and which is the one place the two disagree.
  *
  * Not filtered by channel: `$6F` is a single global byte, so a switch in `#1`
- * is heard in `#0`. That takes the across-channel caveat README.md states, for
+ * is heard in `#0`. That takes the across-channel caveat CLAUDE.md states, for
  * the same reason {@link tempoBefore} takes it.
  */
 export function velocityTableAt(command: Command, index: TokenIndex, text: string): "smw" | "nspc" {

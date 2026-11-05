@@ -15,7 +15,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const extracted = join(root, '.selftest', 'i18n', 'messages.json');
 const english = join(root, 'web', 'src', 'locale', 'messages.en.json');
 
-/** Every ID's first segment. docs/claude/i18n.md says what each group holds. */
+/** Every ID's first segment. .claude/rules/i18n.md says what each group holds. */
 const GROUPS = new Set([
   'amk',
   'sst',

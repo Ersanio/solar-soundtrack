@@ -13,7 +13,7 @@ import {
 /**
  * A labelled range input that reports a drag and a commit separately.
  *
- * The separation is the whole component, and README.md has why: `preview` fires
+ * The separation is the whole component, and `web/CLAUDE.md` has why: `preview` fires
  * continuously and is for anything cheap and local, `commit` fires once when the
  * gesture ends, and `pending` holds the dragged value in front of the bound one
  * until it does.

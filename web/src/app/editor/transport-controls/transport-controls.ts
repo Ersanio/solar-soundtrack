@@ -1,3 +1,5 @@
+/** The transport: play, pause and stop, Loop, Hot Reload, the seek bar with its clock, and the volume. */
+
 import { Component, computed, effect, inject, signal } from '@angular/core';
 
 import { Audition } from '../../state/audition';

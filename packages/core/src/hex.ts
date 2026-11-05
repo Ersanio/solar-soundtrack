@@ -1,3 +1,5 @@
+/** Uppercase hex with no prefix: bare, padded to a byte (`hex2`) or to a word (`hex4`). */
+
 export function hex(value: number): string {
 	return value.toString(16).toUpperCase();
 }

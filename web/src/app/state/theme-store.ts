@@ -1,3 +1,5 @@
+/** What the app is painted in, and the porter's changes to it, written onto `<html>` as custom properties. */
+
 import { Service, computed, effect, signal } from '@angular/core';
 
 import { PRESETS, type ThemePreset } from '../theme/theme-presets';

@@ -64,7 +64,7 @@ export interface CompileStats {
 	mainSeconds: number | null;
 	/**
 	 * Songlength synced against the driver's real tick rate rather than AddmusicK's
-	 * rounded one, and the transport's **fallback**. See README.md.
+	 * rounded one, and the transport's **fallback**. See the package's CLAUDE.md.
 	 *
 	 * It is still an estimate over the tempo the song asked for, so it is wrong by
 	 * whatever the driver drops, and `null` for a song AddmusicK will not time at

@@ -3,10 +3,16 @@
 AddmusicKsrc/
 AddmusicKreadme/
 
-# Claude Code. Machine-local permissions and installed skills stay out; the
-# CLAUDE.md guidance files are checked in so a fresh clone gets them.
+# Claude Code. The guidance, rules, hooks, shared settings and project skills are
+# checked in so a fresh clone gets them; machine-local permissions and the skills
+# the Angular CLI installs stay out.
 **/.claude/*
 !**/.claude/CLAUDE.md
+!/.claude/rules/
+!/.claude/hooks/
+!/.claude/settings.json
+!/.claude/skills/
+/.claude/skills/angular-*/
 
 # Node. One install at the root serves every workspace.
 node_modules/

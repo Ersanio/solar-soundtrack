@@ -1,3 +1,5 @@
+/** The transport: plays the compiled song through the worklet player and holds the one playhead, in driver ticks. */
+
 import { DestroyRef, Service, computed, effect, inject, signal, untracked } from '@angular/core';
 
 import type { CompileResult, NoteAddress, Span } from '@amk/core/types';
