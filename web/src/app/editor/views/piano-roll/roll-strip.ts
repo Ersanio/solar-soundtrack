@@ -121,7 +121,7 @@ export interface StripItem {
    * More than one only when something other than whitespace separates them —
    * `c4 v200 ^8` is an ordinary mid-note volume ramp and is two `noteMap`
    * entries, because `accumulateTiedLength` folds across whitespace and nothing
-   * else (`parser.ts:2963-3004`). Which is why a length change rewrites the
+   * else (`parser.ts:2793-2834`). Which is why a length change rewrites the
    * *last* segment: the ramp has to stay where the porter put it.
    */
   segments: readonly StripSegment[];
@@ -189,7 +189,7 @@ export interface StripItem {
   /**
    * False past the end of the pass, where the walk has no note to check the
    * item against — `walkSong` cuts at the shortest channel and sets the rest
-   * aside as `unreachable` (`song-walk.ts:1069-1080`). Still editable; just not
+   * aside as `unreachable` (`song-walk.ts:1670-1681`). Still editable; just not
    * corroborated. For a looped note, whether its **first** instance is inside
    * the pass.
    */
@@ -338,7 +338,7 @@ export function framesInside(strip: Strip, frame: StripFrame): readonly StripFra
  * Text a note, rest or tie is allowed to be for the roll to rewrite it.
  *
  * `spanAt` collapses a span that came through a `"find=value"` replacement to a
- * single character (`parser.ts:3861-3873`), so a note written as `x` with
+ * single character (`parser.ts:3651-3663`), so a note written as `x` with
  * `"x=c4"` has a one-character span reading `x` — and an `expect` guard cannot
  * see it, because the roll would slice the same text. Reading the span back and
  * insisting it is a note is what catches that, and the scanner's refusal to
@@ -444,8 +444,8 @@ const FORBIDDEN_KINDS = new Set(['{', '}', '"']);
  * Why this channel cannot be spliced, or `null`.
  *
  * The checks the walk cannot make. A `{ }` triplet scales every length by two
- * thirds (`parser.ts:804-810`) and a tempo ratio divides every one of them
- * (`parser.ts:813`), and in both cases the strip and the walk agree perfectly
+ * thirds (`parser.ts:680-686`) and a tempo ratio divides every one of them
+ * (`parser.ts:691`), and in both cases the strip and the walk agree perfectly
  * while the text the roll would write is wrong — so neither is catchable by
  * comparing ticks, and both are refused here.
  */
@@ -455,11 +455,11 @@ function forbiddenConstruct(
   reachable: readonly Command[],
 ): string | null {
   // `&` is an operator rather than a command, and the note after it emits
-  // `$DD $00 <prevNoteLength> <note>` (`parser.ts:2963-2969`), so a length change
+  // `$DD $00 <prevNoteLength> <note>` (`parser.ts:2758-2764`), so a length change
   // to the note *before* it silently changes the slide. The scanner cannot say
   // which channel an operator is on, so one anywhere refuses every channel. It
   // is native on every target — only the tie rewind is legacy-only
-  // (`parser.ts:3027`).
+  // (`parser.ts:2934`).
   for (const token of index.tokens) {
     if (token.kind === 'operator' && source.slice(token.start, token.end) === '&') {
       return $localize`:@@roll.this-song-uses-whose-length:roll.this-song-uses-whose-length`;
@@ -627,7 +627,7 @@ export function channelHome(
  *
  * `channelTicks` is `CompileStats.channelTicks` — the compiler's own count, and
  * the array `stats.introTicks + stats.loopTicks` is the minimum of
- * (`index.ts:41-45`), so a caller comparing one against the other is comparing
+ * (`index.ts:42-46`), so a caller comparing one against the other is comparing
  * two readings of the same thing rather than two different ones.
  *
  * No view is taken of whether a channel could be spliced. That is
@@ -669,7 +669,7 @@ export function channelTails(
  * marker away from the channel it plays on.
  *
  * `detectStartingChannel` probes the whole text for `#0`, then `#1`, up to `#7`,
- * and starts writing to the first it finds (`parser.ts:379-390`,
+ * and starts writing to the first it finds (`parser.ts:386-397`,
  * Music.cpp:383-406) — so everything above the first marker belongs to the
  * lowest channel declared anywhere, and a `#N` written for a lower one moves all
  * of it, along with the `$FA` prologue `link.ts:prependBlobPrefix` puts on that
@@ -680,7 +680,7 @@ export function channelTails(
  * gather as commands standing above the first marker, and neither is music.
  * Two consequences, both deliberate: a
  * prelude of commands with no notes in it is not caught, and AddmusicK refuses
- * notes outside a channel outright (AMK0140, `parser.ts:2880`), so a song that
+ * notes outside a channel outright (AMK0140, `parser.ts:2714`), so a song that
  * can earn this at all is an `#am4` or `#amm` one.
  *
  * The lowest channel is read off the markers where the parser reads a raw
@@ -739,7 +739,7 @@ interface FrameSeed {
  * refusing it.
  *
  * The join runs on two facts. A `]n`'s own `$E9` is the one dispatch
- * `recordCommand` drops (`parser.ts:649`), so a run whose `from` the command
+ * `recordCommand` drops (`parser.ts:508`), so a run whose `from` the command
  * map cannot name is the textual body playing at its own position, and its
  * brackets are found by pairing the scanner's `[` and `]` commands; a `(n)m`,
  * `*n` or either `$E6` arm is named directly. Everything the frames cannot
@@ -1341,7 +1341,7 @@ export function channelStrip(request: StripRequest): Strip | StripRefusal {
 /**
  * The drum `@` a note plays that is not written beside it — `@21 r4 c4`, where a
  * rest stands between the two. The remap is consumed by the next note and by no
- * rest (`parser.ts:2911-2916`), so it is the last percussion `@` since the note
+ * rest (`parser.ts:2743-2748`), so it is the last percussion `@` since the note
  * or loop before this one in its frame.
  *
  * Whether the note is a drum, and which, is the byte the compiler emitted for it

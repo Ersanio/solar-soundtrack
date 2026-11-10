@@ -215,28 +215,28 @@ interface Supersession {
 }
 
 const SUPERSEDED: Supersession[] = [
-	{ vcmd: 0xda, letter: "c4 @0", hex: "c4 $DA $00", cite: "parser.ts:1846" },
-	{ vcmd: 0xdb, letter: "c4 y10", hex: "c4 $DB $0A", cite: "parser.ts:1614" },
-	{ vcmd: 0xde, letter: "c4 p12,8", hex: "c4 $DE $00 $0C $08", cite: "parser.ts:1945" },
-	{ vcmd: 0xe0, letter: "c4 w200", hex: "c4 $E0 $C8", cite: "parser.ts:1489" },
-	{ vcmd: 0xe1, letter: "c4 w18,200", hex: "c4 $E1 $12 $C8", cite: "parser.ts:1492" },
-	{ vcmd: 0xe2, letter: "c4 t144", hex: "c4 $E2 $90", cite: "parser.ts:1698" },
+	{ vcmd: 0xda, letter: "c4 @0", hex: "c4 $DA $00", cite: "parser.ts:1954" },
+	{ vcmd: 0xdb, letter: "c4 y10", hex: "c4 $DB $0A", cite: "parser.ts:1728" },
+	{ vcmd: 0xde, letter: "c4 p12,8", hex: "c4 $DE $00 $0C $08", cite: "parser.ts:2047" },
+	{ vcmd: 0xe0, letter: "c4 w200", hex: "c4 $E0 $C8", cite: "parser.ts:1596" },
+	{ vcmd: 0xe1, letter: "c4 w18,200", hex: "c4 $E1 $12 $C8", cite: "parser.ts:1599" },
+	{ vcmd: 0xe2, letter: "c4 t144", hex: "c4 $E2 $90", cite: "parser.ts:1812" },
 	{ vcmd: 0xe3, letter: "c4 t18,144", hex: "c4 $E3 $12 $90", cite: "parseTempo's fade fork" },
-	{ vcmd: 0xe7, letter: "c4 v200", hex: "c4 $E7 $C8", cite: "parser.ts:1506" },
-	{ vcmd: 0xe8, letter: "c4 v18,200", hex: "c4 $E8 $12 $C8", cite: "parser.ts:1509" },
+	{ vcmd: 0xe7, letter: "c4 v200", hex: "c4 $E7 $C8", cite: "parser.ts:1617" },
+	{ vcmd: 0xe8, letter: "c4 v18,200", hex: "c4 $E8 $12 $C8", cite: "parser.ts:1620" },
 	// `n` reads its argument as hex (`HEX_ARG_LETTERS`), so `n10` is sixteen.
-	{ vcmd: 0xf8, letter: "c4 n10", hex: "c4 $F8 $10", cite: "parser.ts:1900" },
-	{ vcmd: 0xe6, letter: "c4 [[ c4 ]]2", hex: null, cite: "parser.ts:2381" },
-	{ vcmd: 0xe9, letter: "c4 [ c4 ]4", hex: null, cite: "parser.ts:2512" },
+	{ vcmd: 0xf8, letter: "c4 n10", hex: "c4 $F8 $10", cite: "parser.ts:2002" },
+	{ vcmd: 0xe6, letter: "c4 [[ c4 ]]2", hex: null, cite: "parser.ts:2460" },
+	{ vcmd: 0xe9, letter: "c4 [ c4 ]4", hex: null, cite: "parser.ts:2553" },
 	{
 		vcmd: 0xfc,
 		// The definition alone emits only its body; `$FC` is written where the
-		// remote code is *called* (`parser.ts:2334`), which is why the palette
+		// remote code is *called* (`parser.ts:2400`), which is why the palette
 		// carries both spellings and why the probe needs both here.
 		above: "(!1)[$F4 $09]",
 		letter: "c4 (!1,1,24)",
 		hex: null,
-		cite: "parser.ts:2334",
+		cite: "parser.ts:2400",
 	},
 ];
 
@@ -877,7 +877,7 @@ console.log("\nputting brackets round a selection");
 
 	// The label, which is the one piece of state a wrap has to read off the whole
 	// song. `parseLabelLoop` stores `n + 1` and `parseRemoteDefinition` stores `n`
-	// (`parser.ts:2460`, `:2517-2518`), so `(0)` and `(!1)` are one slot and
+	// (`parser.ts:2210`, `:2287-2288`), so `(0)` and `(!1)` are one slot and
 	// writing both is AMK0124 — which is exactly what an allocator that counted
 	// only its own kind would walk into.
 	{
@@ -915,7 +915,7 @@ console.log("\nputting brackets round a selection");
 	}
 
 	// A drum's `@21`-`@29` comes inside with its note: `[` copies the remap into
-	// slot 8 and the note there clears slot 8 alone (`parser.ts:2725`, `:3013`),
+	// slot 8 and the note there clears slot 8 alone (`parser.ts:2473`, `:2753`),
 	// so one left outside would still be standing when the loop ends.
 	{
 		const out = offers("a drum takes its own @ in with it", "#amk 4\n#0 @21 c4 d4\n", "c4", "loop", "loop");
@@ -1097,7 +1097,7 @@ console.log("\nreading a loop's count, and writing it back");
 		);
 
 		// A label the parser carries: `(n)[` sets `loopLabel`, a `[[` met next leaves
-		// it standing and the next `[` files it (`parser.ts:2731-2736`), so the
+		// it standing and the next `[` files it (`parser.ts:2479-2485`), so the
 		// second loop here is `(5)` and the call below plays `e4`. The reading has to
 		// say so too, or the panel calls a compiling song's call undeclared and
 		// offers the body a second name that would orphan the first.

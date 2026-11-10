@@ -71,7 +71,7 @@ export function spellQ(q: number): string {
 	return `q${hex2(q)}`;
 }
 
-/** A written pitch broken back into the pieces `getPitch` read (`parser.ts:734-745`). */
+/** A written pitch broken back into the pieces `getPitch` read (`parser.ts:618-629`). */
 export interface WrittenPitch {
 	/** `a`-`g`, lower case. */
 	letter: string;
@@ -84,7 +84,7 @@ export interface WrittenPitch {
 /**
  * The head of a note token, or `null` where it is not one.
  *
- * `getPitch` takes **one** accidental and stops (`parser.ts:736-742`), so `c++`
+ * `getPitch` takes **one** accidental and stops (`parser.ts:620-626`), so `c++`
  * is a `c+` followed by a stray `+`, and the strictness here is what keeps an
  * edit from re-spelling a note the parser reads differently. `r` and `^` are
  * not pitches and answer `null`.
@@ -110,7 +110,7 @@ export function parseWrittenPitch(text: string): WrittenPitch | null {
  *
  * `written` is `PITCH_TABLE[letter] + (octave - 1) * 12 + 0x80` and nothing else
  * — `h`, the instrument's tuning and the drum remap all land on `note` instead
- * (`parser.ts:2884-2892`) — so the octave falls straight out of the two, exactly
+ * (`parser.ts:2718-2726`) — so the octave falls straight out of the two, exactly
  * rather than by inference. `null` when the text is not a plain note head or the
  * arithmetic does not come out whole, which is what a macro-expanded note gives.
  */
@@ -172,8 +172,8 @@ export function octaveFor(written: number): number | null {
  *
  * {@link spellLength} is a single token and so stops at a whole note, but a note
  * may be held for as long as the porter likes: `accumulateTiedLength` sums a run
- * of `^` segments (`parser.ts:2963-3004`) and `emitNote` splits whatever comes
- * out into `$60`-tick frames of its own (`parser.ts:3007-3036`), so there is no
+ * of `^` segments (`parser.ts:2793-2834`) and `emitNote` splits whatever comes
+ * out into `$60`-tick frames of its own (`parser.ts:2837-2866`), so there is no
  * ceiling in the driver to reach for. Whole notes first, then the remainder, so
  * the run reads as music rather than as arithmetic.
  */

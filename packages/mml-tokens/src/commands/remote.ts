@@ -161,7 +161,7 @@ export function readRemote(source: string, index: TokenIndex): RemoteConstruct[]
 			continue;
 		}
 
-		// `getInt` and `getHex` expand a replacement first (`parser.ts:558-620`),
+		// `getInt` and `getHex` expand a replacement first (`parser.ts:555-617`),
 		// which a reading of the literal text cannot follow.
 		let replaced = false;
 		let j = i + 1;
@@ -186,7 +186,7 @@ export function remoteAt(constructs: readonly RemoteConstruct[], offset: number)
 
 /**
  * The body a call runs: what `loopPointers[n]` holds when the call is parsed
- * (`parser.ts:2489`). Slot 0 is never recorded, and a body declared below the
+ * (`parser.ts:2397`). Slot 0 is never recorded, and a body declared below the
  * call is not recorded yet, so both answer `null` — the SST0509 case.
  */
 export function remoteBody(loops: LoopReading, call: RemoteCall): LoopSpan | null {
@@ -279,7 +279,7 @@ function readOne(source: string, from: number, target: CommandTarget, standing: 
 	};
 }
 
-/** `getHex`: at most two digits (`parser.ts:594-620`). */
+/** `getHex`: at most two digits (`parser.ts:591-617`). */
 function hexWait(source: string, dollar: number): RemoteWait | null {
 	let pos = dollar + 1;
 	while (pos < source.length && pos - dollar <= 2 && isHexDigit(source[pos])) {
@@ -295,7 +295,7 @@ function hexWait(source: string, dollar: number): RemoteWait | null {
 }
 
 /**
- * `getNoteLength(getInt())` (`parser.ts:637-666`), through the scanner's own
+ * `getNoteLength(getInt())` (`parser.ts:634-659`), through the scanner's own
  * reading of it. A wait inside `{ }` would take the triplet as well, which this
  * leaves out.
  */
@@ -317,7 +317,7 @@ function lengthWait(source: string, at: number, target: CommandTarget, standing:
 			return null; // AMK0010
 		}
 
-		// Exact counts take no dots below `#amk 4` (`parser.ts:647-650`).
+		// Exact counts take no dots below `#amk 4` (`parser.ts:644-647`).
 		dotted = target.amkVersion >= 4;
 	}
 
@@ -333,7 +333,7 @@ function lengthWait(source: string, at: number, target: CommandTarget, standing:
 	return { at: { start: at, end: pos }, ticks: ticks === 0 ? 0x100 : ticks, hex: false };
 }
 
-/** The `l` standing at `before`, which a wait with no digits falls back to (`parser.ts:651-652`). */
+/** The `l` standing at `before`, which a wait with no digits falls back to (`parser.ts:648-649`). */
 function standingLength(source: string, commands: readonly Command[], before: number): number {
 	let ticks = TICKS_PER_WHOLE / 8; // parser.ts:defaultNoteLength
 	for (const command of commands) {
@@ -371,7 +371,7 @@ function signedAt(source: string, at: number): { value: number; at: LoopRange } 
 	return { value: source[at] === "-" ? -digits.value : digits.value, at: { start: at, end: digits.at.end } };
 }
 
-/** `skipSpaces`, which crosses lines (`parser.ts:548-556`). */
+/** `skipSpaces`, which crosses lines (`parser.ts:545-553`). */
 function skipSpaces(source: string, at: number): number {
 	let pos = at;
 	while (pos < source.length && isSpace(source[pos])) {

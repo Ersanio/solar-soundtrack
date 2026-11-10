@@ -133,7 +133,7 @@ refresh rate and not the song's.
   the lead-in because it is heard.
 - **Re-deriving the roll's playhead from the newest anchor each frame** — every anchor arrives with
   the same small lag, so one frame in ten lurched. It carries its position across frames and eases
-  the gap shut (`roll-layout.ts`).
+  the gap shut (`roll-clock-step.ts`).
 - **Muting by writing the driver's `$5E`** — a disabled channel does less work per tick, so a busy
   song sped up. The mixer takes track volume and leaves `$5E` alone (`applyChannelMutes`).
 - **A 1024-frame render block in the worklet** — a tick counter that only looks every 1024 frames

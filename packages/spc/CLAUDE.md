@@ -95,7 +95,7 @@ which draws the walk's notes on the map's written pitch.
 
 It walks bytes rather than source because the bytes are the only place the answer is unambiguous.
 `@29 o2a1b2c3` is one drum and two pitched notes on `#0` but three drums on `#6`
-(`parser.ts:2676-2682`), and `@21`-`@29` emit no `$DA` at all, so the instrument a note plays on is
+(`parser.ts:2748-2754`), and `@21`-`@29` emit no `$DA` at all, so the instrument a note plays on is
 knowable only by following what the driver does with a `$D0` byte. A pass over the text would have to
 re-derive both rules; this gets them for free.
 
@@ -113,7 +113,7 @@ of `SongTimeline`: which instruments the song loads, not what sort of thing they
 
 `tempoChanges` is there for the same reason and answers to nobody else. The compiler's own length
 estimate is segment-wise over source text, so a `t` that executes more than once has no place in it
-(`parser.ts:1692`) and a `$E3` has no segment at all (`parser.ts:1705`) — AddmusicK abandons the
+(`parser.ts:1806`) and a `$E3` has no segment at all (`parser.ts:1819`) — AddmusicK abandons the
 song's whole length in either case, and this port reproduces that. Walking bytes has neither problem:
 a `t` in a loop body is recorded once per iteration, at the tick that iteration reaches, because that
 is what the driver does with it. Turning the list into seconds is not this package's job — a `$E3`
@@ -375,6 +375,9 @@ Export mapping, read out of its `wasmExports[...]` bindings:
   l _loadSPC(ptr,len)     m _playSPC(ptr,count) n _skipSPC(seconds)
   p _malloc(size)         q _free(ptr)          r stack_alloc
 ```
+
+The tenth is `o`, the indirect function table. The host calls eight of the ten (`REQUIRED` in
+`wasm-host.ts`) and leaves `o` and `r` alone.
 
 Both are pinned to the vendored binary. Swapping in a different build means re-reading them;
 `instantiate` fails loudly rather than silently mis-calling if an expected export is missing.

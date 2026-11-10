@@ -123,8 +123,8 @@ click on a short note is a short answer however long the notes under it were goi
 
 What the mask reaches is therefore a whole channel and not a corner of one. `audiotest` pins it as a
 level: the chord under a note is heard, silencing one of its channels sits between silencing none and
-silencing all, and silencing all of them gives back the note on its own, which is what an audition
-used to be. The echo it lands on is still the transport's, the mask being held through the
+silencing all, and silencing all of them gives back the note on its own.
+The echo it lands on is still the transport's, the mask being held through the
 fast-forward, and the buffer still holds the song as the mixer leaves it — the last delay's worth
 decays under the note at the song's own feedback rate, which is what a note written there would
 really land on top of.

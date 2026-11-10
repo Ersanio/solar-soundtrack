@@ -377,12 +377,12 @@ function closeBefore(context: EditContext, at: number, need: number): Edit[] | E
  * split around it — `(1)5` grabbed at its third pass becomes `(1)2 r… (1)3`,
  * a declaration's `]3` becomes `] r… *2` (or its own label where it has one) —
  * and both halves replay the same body bytes, a recall's whole parse output
- * being its `$E9` (`parser.ts:2427-2507`, `Music.cpp:1003-1199`). The `*` a
+ * being its `$E9` (`parser.ts:2177-2257`, `Music.cpp:1003-1199`). The `*` a
  * declaration split writes directly follows its own `]` with only rests
  * between, and `prevLoop` is set by nothing but a normal `[`
- * (`parser.ts:2721`), so it recalls that declaration on every target. Counts
+ * (`parser.ts:2469`), so it recalls that declaration on every target. Counts
  * are written only above 1, and never with a space in front — `getInt` skips
- * none (`parser.ts:731`), so `(1) 2` would be `(1)1` and a stray character.
+ * none (`parser.ts:555`), so `(1) 2` would be `(1)1` and a stray character.
  *
  * Time out is only ever free space: the rests {@link gapSlack} prices, spliced
  * from the construct backward. The gesture and this clamp through the one

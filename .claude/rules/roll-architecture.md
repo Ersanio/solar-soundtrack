@@ -227,7 +227,7 @@ the transport's 10 Hz anchor, snapped outward to a whole note, so the DOM rebuil
 screen; the scroll is a `computed` over `shared/chart/frame-clock.ts` and is one `transform` that
 nothing beneath reads. That is why the roll can run at 240 Hz without the note list knowing.
 
-**The folder is a parent and thirteen children**, as `output/command-inspector/` is. `piano-roll.ts`
+**The folder is a parent and thirteen child folders**, as `output/command-inspector/` is. `piano-roll.ts`
 holds the song's shape and the porter's settings and hands each child what it draws:
 `roll-toolbar/`, `percussion-panel/`, `roll-overview/`, `roll-scrub/`, `roll-channels/`,
 `roll-command-lane/` and `roll-tooltip/` in the ordinary namespace, `roll-lanes/`, `roll-grid/`,
@@ -303,7 +303,7 @@ inside that — `charttest` pins the coupling, because a roll drawing the wrong 
 smoothly over blank music.
 
 The playhead **carries its position across frames** rather than deriving it from the newest anchor,
-and `advanceTick` in `roll-layout.ts` is where that lives. It matters: every anchor arrives with
+and `advanceTick` in `roll-clock-step.ts` is where that lives. It matters: every anchor arrives with
 about the same small lag — mostly the time the message spent getting here — so a clock that
 re-derived its position each frame would reproduce that lag ten times a second and jerk to close
 it. Running at the driver's rate and easing the gap shut turns a periodic jolt into a constant
@@ -348,7 +348,7 @@ because two octaves stranded at the top of an empty box is the worse picture.
 
 **A row is chosen by the instrument, not by the note byte.** Everything played while a drum is
 loaded is that drum being hit, so `@29 c d e` is three marks on one lane rather than one drum and
-two notes scattered up the keyboard — the pitched ones only look melodic because `parser.ts:2681`
+two notes scattered up the keyboard — the pitched ones only look melodic because `parser.ts:2753`
 stops remapping after the first. The pitch they were written at is still true and still in the
 tooltip; it just does not decide where the mark goes.
 

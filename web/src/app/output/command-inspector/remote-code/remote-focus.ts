@@ -106,7 +106,7 @@ function runsNothing(call: RemoteCall, found: boolean, chips: number): string | 
     return $localize`:@@inspector.remote-code.type-runs-no-code-so:inspector.remote-code.type-runs-no-code-so ${call.type}:type: ${call.label}:label:`;
   }
 
-  // SST0509's own two sentences (`parser.ts:2509-2518`).
+  // SST0509's own two sentences (`parser.ts:2417`).
   if (!found) {
     return call.label === 0
       ? $localize`:@@inspector.remote-code.remote-code-0-can-never:inspector.remote-code.remote-code-0-can-never`
@@ -138,7 +138,7 @@ function bodyChips(index: TokenIndex, body: LoopSpan): RemoteChip[] {
 
 /**
  * `(!!n)` writes type 0 for 0, 8 for -1 and 7 for anything else
- * (`parser.ts:2393-2398`), so its three choices are those three events.
+ * (`parser.ts:2316-2321`), so its three choices are those three events.
  */
 function resetView(reset: RemoteReset): RemoteResetView {
   const other = reset.which === 0 || reset.which === -1 ? 1 : reset.which;

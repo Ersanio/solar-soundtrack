@@ -48,7 +48,7 @@ export type CommandScope =
 	/** Notes themselves, and the shape around them: `[`, `]`, `*`, `$E9`, `(!n,`. */
 	| "structure";
 
-/** `@21`-`@29`, the nine drums, which emit no `$DA` (`parser.ts:1816-1847`). */
+/** `@21`-`@29`, the nine drums, which emit no `$DA` (`parser.ts:1930-1956`). */
 export const LAST_PERCUSSION_INSTRUMENT = FIRST_PERCUSSION_INSTRUMENT + 8;
 
 const SONG_VCMDS = new Set([

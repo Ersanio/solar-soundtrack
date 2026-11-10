@@ -180,7 +180,7 @@ expectGap(
 }
 
 // A total past 255 is not a count any of the three spellings can carry
-// (`parser.ts:2492`, `:2792`, `:2836`, AMK0116), so the gap closes and the two
+// (`parser.ts:2247`, `:2541`, `:2587`, AMK0116), so the gap closes and the two
 // calls stand. Driven bare: a 300-pass walk is not a readable expectation.
 {
 	const source = "#amk 2\n#0 o4 (1)[c4] (1)200 r4 (1)100";

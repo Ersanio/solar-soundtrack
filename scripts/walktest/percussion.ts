@@ -8,7 +8,7 @@ import { build } from "./support";
 console.log("\npercussion follows the channel it is written on");
 // ---------------------------------------------------------------------------
 {
-	// `parser.ts:2676-2682` clears the instrument after the first remapped note,
+	// `parser.ts:2748-2754` clears the instrument after the first remapped note,
 	// except on the SFX channels. So the same three notes are one drum and two
 	// pitched notes on #0, and three drums on #6 — which is the behaviour a
 	// source-level pass would have to re-derive and this one gets for free.
@@ -45,7 +45,7 @@ console.log("\npercussion follows the channel it is written on");
 	);
 
 	// A drum reached only through a `$D0` byte emits no `$DA` at all
-	// (`parser.ts:1816-1847`), so a list built from instrument commands alone
+	// (`parser.ts:1930-1956`), so a list built from instrument commands alone
 	// would miss it entirely.
 	check("including one no $DA ever named", melodic.usedInstruments.includes(29));
 

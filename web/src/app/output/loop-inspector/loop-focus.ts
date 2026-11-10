@@ -309,8 +309,8 @@ function nameView(
     ? null
     : {
         label,
-        // A `(!n)` takes slot n and a `(n)` takes slot n + 1 (`parser.ts:2460`,
-        // `:2517`), so the allocator counts both kinds or walks into AMK0124.
+        // A `(!n)` takes slot n and a `(n)` takes slot n + 1 (`parser.ts:2210`,
+        // `:2287`), so the allocator counts both kinds or walks into AMK0124.
         note: $localize`:@@loops.a-body-with-no-name:loops.a-body-with-no-name`,
       };
 }
@@ -367,7 +367,7 @@ export function loopCountEdit(source: string, focus: LoopFocus, plays: number): 
  *
  * `parseLabelLoop` reads the number, sees the `[` hard against it and returns
  * with `loopLabel` set, which `parseLoopStart` then files in `loopPointers`
- * (`parser.ts:2736`) — so the label goes immediately in front of the bracket and
+ * (`parser.ts:2484`) — so the label goes immediately in front of the bracket and
  * nowhere else. Nothing between them: `labelBefore` and the parser's own
  * lookbehind both test adjacency.
  */

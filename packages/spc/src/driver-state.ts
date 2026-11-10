@@ -302,7 +302,7 @@ export function voiceHasInstrument(aram: Uint8Array, voice: number): boolean {
  * off after a single tick (`main.asm:2444-2449` floors the counter at 1) and a
  * zero velocity scales `VxVOL` to nothing, so a note played on such a voice is
  * inaudible. The compiler never leaves one that way: it emits `q` with the first
- * note of every channel (`parser.ts:2863`).
+ * note of every channel (`parser.ts:2849`).
  */
 export function voiceHasQuantization(aram: Uint8Array, voice: number): boolean {
 	return aram[Addr.NoteGates + voice * 2] !== 0 && aram[Addr.NoteVelocities + voice * 2] !== 0;

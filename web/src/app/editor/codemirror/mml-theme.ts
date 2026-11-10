@@ -82,11 +82,10 @@ const structure = EditorView.theme(
  * `--color-syn-*` token of its own.
  *
  * Shared with nothing, deliberately: the source's colouring is the one thing a
- * porter looks at for hours, and while these were the app's own palette a
- * change to the notes moved the body text with them and a change to the loop
- * brackets moved every severe warning. `styles.css` carries the defaults, which
- * are what the shared tokens used to give here, so the source reads as it did
- * until somebody sets one.
+ * porter looks at for hours, and on the app's own palette a change to the
+ * notes would move the body text with them and a change to the loop brackets
+ * every severe warning. `styles.css` carries the defaults, which start out as
+ * the shared tokens' own values.
  *
  * The structure above is not part of this. A gutter, a tooltip and a
  * diagnostic's underline are the editor's chrome and the app's own findings,

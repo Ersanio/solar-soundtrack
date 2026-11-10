@@ -60,7 +60,7 @@ export interface SpcExportRequest {
 	 * Emit the Yoshi drums variant ($F5 = 2).
 	 *
 	 * No caller passes it yet. The compiler does the detecting — `$F4 $00` and
-	 * `$F4 $06` set `ParseOutput.hasYoshiDrums` (`parser.ts:3428`) — and nothing
+	 * `$F4 $06` set `ParseOutput.hasYoshiDrums` (`parser.ts:3189`) — and nothing
 	 * carries that as far as here, so the two halves of the feature exist and
 	 * are not joined. Kept because deleting this one leaves the other saying
 	 * something nothing can act on.

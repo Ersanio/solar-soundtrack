@@ -179,7 +179,7 @@ const LETTER_FADE_NAMES: Readonly<Record<string, string>> = {
  * Whether a second argument makes this letter a fade under the dialect it was
  * written for.
  *
- * `parseFadeableValue` (`parser.ts:1520`) and `parseTempo` (`:1664`) look for
+ * `parseFadeableValue` (`parser.ts:1638`) and `parseTempo` (`:1782`) look for
  * the comma only at `#amk 3` and above; below it `t18,144` is `t18`, and the
  * rest is reported character by character (AMK0100). Naming it a fade anywhere
  * else would put the word on the roll, the hover and the inspector for a song
@@ -331,7 +331,7 @@ export interface ScanState {
 	/**
 	 * Inside a remote code call or reset, `(!` up to its `)`.
 	 *
-	 * `parseRemoteCall` reads its third argument with `getHex` (`parser.ts:2443-2445`,
+	 * `parseRemoteCall` reads its third argument with `getHex` (`parser.ts:2356-2358`,
 	 * Music.cpp:1090-1094), so a `$E0` there is a wait of 224 ticks and not a VCMD;
 	 * read as one, it would open a command that is not there and take the next real
 	 * `$xx` in the song as its argument. Cleared by default in {@link ddTarget}'s

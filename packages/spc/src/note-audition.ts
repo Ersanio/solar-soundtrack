@@ -101,7 +101,7 @@ const VCMD_PITCH_SLIDE = 0xdd;
 /**
  * The `q` a channel's first note carries when the song has not set one — `q7f`,
  * a full-length note at full velocity, which is what the compiler starts every
- * channel at (`parser.ts:187`).
+ * channel at (`parser.ts:215`).
  */
 const DEFAULT_Q = 0x7f;
 
@@ -153,7 +153,7 @@ export interface NoteAuditionRequest {
 	/**
 	 * The note byte as the compiler would emit it — `$80`-`$C5` pitched, or
 	 * `$D0`-`$D8` for a drum. Transposition is already in it: `h` and the
-	 * instrument's tuning are applied at compile time (`parser.ts:2737-2741`), so
+	 * instrument's tuning are applied at compile time (`parser.ts:2727-2731`), so
 	 * a written pitch is not the byte that plays and this end cannot work out the
 	 * difference.
 	 */
@@ -214,7 +214,7 @@ export interface AuditionedNote {
 }
 
 /**
- * One run of note frames, mirroring `Parser.emitNote` (`parser.ts:2853`,
+ * One run of note frames, mirroring `Parser.emitNote` (`parser.ts:2839`,
  * Music.cpp:2254). Returns the last frame's own length, which is what the next
  * duration byte has to be compared against — the compiler drops one that repeats.
  */
@@ -249,7 +249,7 @@ function appendNote(bytes: number[], note: number, ticks: number, q: readonly nu
 
 /**
  * The frames the driver is handed for one note, mirroring `Parser.emitNote`
- * (`parser.ts:2853`, Music.cpp:2254) so a note auditioned here is the same bytes
+ * (`parser.ts:2839`, Music.cpp:2254) so a note auditioned here is the same bytes
  * the compiler would write for a note of that length.
  *
  * **`quantization` is normally `null`.** The driver only reads a `q` byte when

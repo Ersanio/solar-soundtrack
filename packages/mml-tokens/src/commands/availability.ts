@@ -87,7 +87,7 @@ function needsVersion(target: CommandTarget, least: number, what: string): Avail
 export function formAvailability(form: PaletteForm, target: CommandTarget): Availability {
 	if (form.kind === "syntax") {
 		switch (form.id) {
-			// `parseFadeableValue` (`parser.ts:1520`) and `parseTempo` (`:1664`) both
+			// `parseFadeableValue` (`parser.ts:1638`) and `parseTempo` (`:1782`) both
 			// only look for the comma at `#amk 3` and above; below it the comma is
 			// not looked for at all, so `t18,144` is `t18` and the rest is warned
 			// over character by character (AMK0100). A form that quietly means
@@ -101,7 +101,7 @@ export function formAvailability(form: PaletteForm, target: CommandTarget): Avai
 						$localize`:@@palette.availability.the-comma-fade-form:palette.availability.the-comma-fade-form`,
 					) ?? OK
 				);
-			// `parseDefaultLength` (`parser.ts:1453`).
+			// `parseDefaultLength` (`parser.ts:1556`).
 			case "exactLength":
 				return (
 					needsVersion(
@@ -110,12 +110,12 @@ export function formAvailability(form: PaletteForm, target: CommandTarget): Avai
 						$localize`:@@palette.availability.an-exact-tick-length-l:palette.availability.an-exact-tick-length-l`,
 					) ?? OK
 				);
-			// `parseOpenParen` (`parser.ts:2097`) — AMK0117, "Unrecognized character '!'".
+			// `parseOpenParen` (`parser.ts:2182`) — AMK0117, "Unrecognized character '!'".
 			case "remoteLoop":
 				return (
 					needsVersion(target, 2, $localize`:@@palette.availability.remote-code:palette.availability.remote-code`) ?? OK
 				);
-			// `parseRemoteCall` (`parser.ts:2222`).
+			// `parseRemoteCall` (`parser.ts:2302`).
 			case "remoteReset":
 				return (
 					needsVersion(
@@ -139,7 +139,7 @@ export function formAvailability(form: PaletteForm, target: CommandTarget): Avai
 		return OK;
 	}
 
-	// `parser.ts:2933` — AMK0156, raised on `$FA`'s *second* byte. A hard error,
+	// `parser.ts:2988` — AMK0156, raised on `$FA`'s *second* byte. A hard error,
 	// not the AMK0207 warning the neighbouring bytes get, so it goes first.
 	if (form.vcmd === 0xfa && target.program === 2) {
 		return blocked(
@@ -147,7 +147,7 @@ export function formAvailability(form: PaletteForm, target: CommandTarget): Avai
 		);
 	}
 
-	// `parseHexCommand` (`parser.ts:2836`, `:2844`) warns once per song for a byte
+	// `parseHexCommand` (`parser.ts:2915`, `:2919`) warns once per song for a byte
 	// the legacy program never had. It is a warning either way, not an error.
 	if (target.program === 1 && form.vcmd > 0xf2) {
 		return caution(
@@ -170,9 +170,9 @@ export function formAvailability(form: PaletteForm, target: CommandTarget): Avai
 	}
 
 	if (form.vcmd === 0xfc && target.amkVersion > 1) {
-		// `parser.ts:2923` — AMK0211, for the two versions between the spellings.
+		// `parser.ts:2982` — AMK0211, for the two versions between the spellings.
 		// Not raised at `#amk 1`, where writing `$FC` by hand *is* remote gain and
-		// there is no `(!n)` to prefer over it (`parser.ts:2910`).
+		// there is no `(!n)` to prefer over it (`parser.ts:2969`).
 		return target.amkVersion < 4
 			? caution(
 					$localize`:@@palette.availability.fc-errors-on-addmusick-1:palette.availability.fc-errors-on-addmusick-1`,

@@ -20,7 +20,7 @@ export function eol(source: string): string {
 /** The octave {@link channelOpening} writes, and so the one it leaves in force. */
 export const OPENING_OCTAVE = 4;
 
-/** `q[channel]` before anything sets it (`parser.ts:200`). */
+/** `q[channel]` before anything sets it (`parser.ts:215`). */
 const OPENING_Q = 0x7f;
 
 /**
@@ -29,8 +29,8 @@ const OPENING_Q = 0x7f;
  *
  * `octave` is one variable and leaks past a `#N`, which does not reset it
  * (`parser.ts:parseHash`), so `o4` is what a channel runs at only while nothing
- * has moved it (`parser.ts:193`). `q` and `@` are per channel and start at `$7F`
- * and 0 (`parser.ts:200`, `:199`). `v` and `y` are not parse-time state at all:
+ * has moved it (`parser.ts:208`). `q` and `@` are per channel and start at `$7F`
+ * and 0 (`parser.ts:215`, `:214`). `v` and `y` are not parse-time state at all:
  * the driver boots every voice at `$FF` volume and `$0A` pan, dead centre of
  * `y`'s 0 to 20 (`main.asm:2134-2138`). The octave is literal, having one
  * spelling on every target, and `q` goes through {@link spellQ}, whose two
@@ -94,7 +94,7 @@ export function noteText(
   }
 
   // A drum's lane is its instrument. The letter it is written at has no say in
-  // the byte (`parser.ts:2911-2916`), so the `@` is the whole edit and no octave
+  // the byte (`parser.ts:2743-2748`), so the `@` is the whole edit and no octave
   // is needed either way.
   if (note.drum !== null) {
     return `@${note.drum} c${length}`;

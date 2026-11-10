@@ -256,7 +256,7 @@ console.log("\nthe stock table decodes");
 //
 // Turning a duration back into a rate index is not something the app does. The
 // envelope tuner's sliders are over the rate index itself, labelled with the
-// time that rate produces (`envelope-tuner.ts:93-96`), because the ladder is
+// time that rate produces (`envelope-tuner.ts:137-140`), because the ladder is
 // geometric and a slider in seconds would spend most of its travel inside the
 // last few milliseconds.
 //

@@ -117,7 +117,7 @@ export interface MinimapBar {
  * By instrument, not by note byte: every note played while a drum is loaded is
  * that drum being hit, so `@29 c d e` is three hits on one lane rather than
  * one drum and two notes scattered across the keyboard. The pitched ones only
- * look melodic because `parser.ts:2681` stops remapping after the first.
+ * look melodic because `parser.ts:2753` stops remapping after the first.
  */
 export function rowOf(note: WalkNote, stack: LaneStack, context: PlaceContext): number {
   switch (placeOf(note, context)) {
@@ -432,7 +432,7 @@ export interface LoopRegionRequest {
 /**
  * Which runs play at the place their body is written — the declaration sites.
  *
- * A `]n`'s own `$E9` is dropped from the command map (`parser.ts:649`), so a
+ * A `]n`'s own `$E9` is dropped from the command map (`parser.ts:508`), so a
  * call run whose `from` maps to a command is a `(n)m` or `*n` and never a
  * declaration. The rest is enclosure: a run opened inside another run's body is
  * a declaration only where the pass holding it is itself the declared one, so

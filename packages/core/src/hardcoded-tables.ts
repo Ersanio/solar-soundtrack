@@ -71,7 +71,7 @@ export const NOTE_DURATIONS: readonly number[] = [0x33, 0x66, 0x80, 0x99, 0xb3, 
 export const WAIT_TIME = 2;
 
 /**
- * The frames `emitNote` writes a note of `ticks` as (`parser.ts:2921`, Music.cpp:2254): one below
+ * The frames `emitNote` writes a note of `ticks` as (`parser.ts:2839`, Music.cpp:2254): one below
  * `$80`, otherwise `$60`-tick pieces joined by ties with the remainder last — both bounds divided by
  * the tempo ratio, and `ticks` already the emitted count.
  */

@@ -16,8 +16,8 @@
  *
  * Walking the bytes rather than the source is what makes it faithful. Two
  * behaviours make the point: `@29 o2a1b2c3` compiles to `$D8 $97 $98` on `#0`
- * but `$D8 $D8 $D8` on `#6` (`parser.ts:2676-2682`), and `@21`-`@29` emit no
- * `$DA` at all (`parser.ts:1816-1847`), so the instrument is only knowable by
+ * but `$D8 $D8 $D8` on `#6` (`parser.ts:2748-2754`), and `@21`-`@29` emit no
+ * `$DA` at all (`parser.ts:1930-1956`), so the instrument is only knowable by
  * following what the driver does with a `$D0` byte. A pass over the text would
  * have to re-derive both.
  *
@@ -547,7 +547,7 @@ export interface LoopRun {
 	 *
 	 * A key into `CompileResult.commandMap` for a call site or either `$E6`
 	 * spelling. A `]n`'s `$E9` is the one `recordCommand` drops — the `]` moved
-	 * the channel out from under the offset (`parser.ts:649`) — so a run whose
+	 * the channel out from under the offset (`parser.ts:508`) — so a run whose
 	 * `from` maps to no command is the textual body playing at its own position,
 	 * and that absence is how a reader tells a declaration from a recall.
 	 */
@@ -572,8 +572,8 @@ export interface SongTimeline {
 	 *
 	 * The compiler cannot produce this list, which is why it is here.
 	 * `estimateSeconds` is segment-wise over source text, so a `t` that executes
-	 * more than once has no place in it (`parser.ts:1692`) and a fade has no
-	 * segment at all (`parser.ts:1705`, porting `Music.cpp:809`) — either one
+	 * more than once has no place in it (`parser.ts:1806`) and a fade has no
+	 * segment at all (`parser.ts:1819`, porting `Music.cpp:809`) — either one
 	 * makes it abandon the whole song's length. Walking bytes has neither
 	 * problem: a `t` in a loop body appears once per iteration, at the tick that
 	 * iteration reaches, because that is what the driver does with it.
@@ -713,7 +713,7 @@ interface Track {
 	drumFrom: number;
 	/**
 	 * Where the current note's frame began, or -1 when it begins at the note
-	 * byte itself. `emitNote` (`parser.ts:2766`) writes `[duration][q][note]`
+	 * byte itself. `emitNote` (`parser.ts:2839`) writes `[duration][q][note]`
 	 * and the note map records the offset *before* any of it, so a note that
 	 * carries a duration is addressed by that byte and not by its own.
 	 */
@@ -831,7 +831,7 @@ export function walkSong(song: Uint8Array, aramAddress: number): SongTimeline {
 	//
 	// `L_0C01` (`main.asm:2283`) reads a word at a time: a non-zero high byte is
 	// a pointer to eight channel starts, `$0000` ends the song, and `$00nn` is
-	// "repeat nn times, target in the next word". `link.ts:268-277` writes the
+	// "repeat nn times, target in the next word". `link.ts:287-296` writes the
 	// marker as `$00FF` and the target as the phrase the loop re-enters.
 	const phrases: number[] = [];
 	let loopTarget: number | null = null;
@@ -860,14 +860,14 @@ export function walkSong(song: Uint8Array, aramAddress: number): SongTimeline {
 
 	// One pass is the *first* phrase alone. It covers the whole of every channel,
 	// intro included; a second phrase, when the song has one, starts at the `/`
-	// and is only the repeat unit. That is the same range `worklet.ts:279-294`
+	// and is only the repeat unit. That is the same range `worklet.ts:309-324`
 	// folds the playhead into, so the drawing and the playhead agree.
 	const loopEntry = loopTarget === null ? -1 : indexOf(loopTarget);
 	const loopPhrase = loopEntry >= 0 ? indexOf(word(song, loopEntry)) : -1;
 
 	// --- the instrument block ----------------------------------------------
 	//
-	// `buildHeader` (`link.ts:187-226`) writes the first phrase pointer at word
+	// `buildHeader` (`link.ts:208-247`) writes the first phrase pointer at word
 	// 0 as `add + instrLen`, and lays the `#instruments` entries at `add`, so
 	// the block's length falls out of the two.
 	const customInstruments: number[][] = [];
@@ -1279,7 +1279,7 @@ export function walkSong(song: Uint8Array, aramAddress: number): SongTimeline {
 
 	/** A note, a tie or a rest. All three move the clock; only a note sounds. */
 	const emitNote = (channel: number, track: Track, byte: number): void => {
-		// The frame, not the note byte: `link.ts:78-84` addresses a note by where
+		// The frame, not the note byte: `link.ts:91-98` addresses a note by where
 		// its emission *began*, which is the duration byte whenever one was
 		// written. Addressing the note byte instead misses the map on every note
 		// that changes length, which is most of them.
@@ -1581,7 +1581,7 @@ export function walkSong(song: Uint8Array, aramAddress: number): SongTimeline {
 				const count = arg(2);
 				if (target < 0) {
 					// `*` before any `[ ]` emits `$E9 FF FF n` on purpose
-					// (`parser.ts:2485-2494`, porting `Music.cpp:1321`), because
+					// (`parser.ts:2564-2573`, porting `Music.cpp:1321`), because
 					// AddmusicK builds it. A call to nowhere ends the channel here
 					// rather than throwing, so the other seven still draw.
 					problems.push(`Channel ${channel} calls a loop that was never defined.`);

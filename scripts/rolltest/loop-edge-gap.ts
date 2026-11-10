@@ -214,7 +214,7 @@ expectGap(
 
 // A declaration split writes its own recall for the moved passes: `*` where it
 // has no label — which recalls the loop it directly follows, `prevLoop` being
-// set by nothing but a `[` (parser.ts:2721) — and the label where it has one.
+// set by nothing but a `[` (parser.ts:2469) — and the label where it has one.
 expectGap(
 	"a declaration split with *",
 	"#amk 2\n#0 o4 [c4 d4]3",

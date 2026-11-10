@@ -149,7 +149,7 @@ Read before changing loop boxes, wrap, join and split, `roll-loops/`, the loop i
   is.
 - **Starting a wrap's brackets at the first selected note** — honest about the selection and wrong
   about the music. `[` copies the drum remap into slot 8 and the note there clears slot 8 alone
-  (`parser.ts:2725`, `:3013`), so a `@21` left outside the brackets is still standing when the loop
+  (`parser.ts:2473`, `:2753`), so a `@21` left outside the brackets is still standing when the loop
   ends and hands the drum to the next note. The run reaches back over the note's own leading `o` and
   `@` through `unitStartBefore`, which is the anchor every insertion in the roll already uses. It
   reaches **forward** over a `$DD` for the mirror reason: the slide is read by the note in front of
@@ -244,7 +244,7 @@ Read before changing loop boxes, wrap, join and split, `roll-loops/`, the loop i
   holding a subloop and refuses as `WRAP_DEEP`.
 - **The loop join guarded by `holdsCommands` over the text between the two calls** — it reads
   `strip.commands`, and the intro `/` is not one of them: `gather` raises no `Command` for an
-  operator (`tokens.ts:810`), which `prefixCommandsOf` already says out loud. So `[c4]2 / r4 *2`
+  operator (`tokens.ts:839`), which `prefixCommandsOf` already says out loud. So `[c4]2 / r4 *2`
   closed and joined wrote `[c4]4 /` and moved the song's loop point by the grabbed occupation's
   whole length, with every note still on its tick and nothing in the walk to say so — only
   `loopTick` catches it, which is why `rolltest`'s case asks `loopsWhereItDid`. What may stand
@@ -254,7 +254,7 @@ Read before changing loop boxes, wrap, join and split, `roll-loops/`, the loop i
   writes exactly `head first  r… head second`, so the round trip never meets the refusal.
 - **A `REFUSE_*` where the joined count passes 255** — every refusal in `roll-edit.ts` names music
   the gesture cannot make, and this names a count that cannot be _written_: `(1)200 (1)100` is the
-  same music as the `(1)300` that has no spelling (`parser.ts:2492`, `:2792`, `:2836`, AMK0116),
+  same music as the `(1)300` that has no spelling (`parser.ts:2247`, `:2541`, `:2587`, AMK0116),
   and the pass has already moved exactly as far as the drag asked. It falls back to the plain
   close. Not `closeBefore`'s reasoning either — `REFUSE_LOOP_LEAD_ROOM` refuses a **partial**
   close, where this is a spelling laid on top of a complete one. A join is offered on no zero gap

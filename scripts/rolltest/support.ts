@@ -121,7 +121,7 @@ export function apply(source: string, edits: readonly Edit[]): string {
  * What a channel plays, read back out of the compiler's own note map.
  *
  * Not off the walk: `walkSong` ends the pass at the shortest channel and drops
- * everything after it (`song-walk.ts:1069-1080`), so a channel longer than the
+ * everything after it (`song-walk.ts:1670-1681`), so a channel longer than the
  * shortest would report only its first few notes and every edit out in the tail
  * would look like it had done nothing. The map has the whole channel. Ties are
  * folded here rather than borrowed from `roll-strip.ts`, so the reading this is
@@ -205,7 +205,7 @@ function others(built: Built, channel: number): string {
 /**
  * How long the song plays: its shortest channel that has any.
  *
- * `Music.cpp:3209`, kept by the port as `introTicks + loopTicks` (`index.ts:41-45`)
+ * `Music.cpp:3209`, kept by the port as `introTicks + loopTicks` (`index.ts:42-46`)
  * and read by `Playback.durationTicks`. It is what a channel being opened is
  * filled out to, and what {@link Expectation.playsAsLong} pins.
  */

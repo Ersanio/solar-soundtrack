@@ -39,7 +39,7 @@ console.log("\nthe clock and the compiler agree about the songs the compiler can
 		}
 
 		// A song with no `t` differs by exactly 55/54, and the ratio is the
-		// assertion. `estimateSeconds` unshifts `[0, 0x36]` (`parser.ts:3477`) and
+		// assertion. `estimateSeconds` unshifts `[0, 0x36]` (`parser.ts:3508`) and
 		// reads `0x36` as an MML byte, adding one to get driver 55; `main.asm:177`
 		// puts `#$36` into `$51` itself, which is driver 54, and that is what
 		// `DEFAULT_TEMPO` says. The clock reads ~1.85% longer and is right —

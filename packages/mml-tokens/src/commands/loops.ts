@@ -80,7 +80,7 @@ export interface LoopSpan {
 	 *
 	 * Filed as the parser files it: `(n)[` sets `loopLabel`, a `[[` met next
 	 * leaves it standing, and the next `[` that opens a `[ ]` takes it
-	 * (`parser.ts:2476`, `:2731-2736`) — so `(5)[[d]]4 [e]2` names the second
+	 * (`parser.ts:2462`, `:2479-2485`) — so `(5)[[d]]4 [e]2` names the second
 	 * loop, and a `(5)3` below plays `e`. A `]` or a `(n)m` in between clears it
 	 * (`:2506`, `:2813`). {@link from} reaches back over the label only where it
 	 * is hard against the bracket; a carried label's digits are still
@@ -95,7 +95,7 @@ export interface LoopSpan {
 	 * The `loopPointers` key the body is filed under, which is what a remote call
 	 * `(!n, …)` looks up: `n + 1` for a `(n)`, `n` for a `(!n)`, `null` for a body
 	 * with no label. Filed whether or not `parseLoopStart` will record it, which it
-	 * does only above 0 (`parser.ts:2580-2586`, Music.cpp:1250-1251).
+	 * does only above 0 (`parser.ts:2479-2485`, Music.cpp:1250-1251).
 	 */
 	slot: number | null;
 	count: LoopCount;
@@ -126,7 +126,7 @@ export interface LoopReading {
 	 *
 	 * A `(n)` takes slot `n + 1` and a `(!n)` takes slot `n`, because
 	 * `parseLabelLoop` offsets by one so that label 0 is usable and
-	 * `parseRemoteDefinition` does not (`parser.ts:2460`, `:2517-2518`). So `(0)`
+	 * `parseRemoteDefinition` does not (`parser.ts:2210`, `:2287-2288`). So `(0)`
 	 * and `(!1)` are the same slot, and writing both is AMK0124.
 	 */
 	slots: ReadonlySet<number>;
@@ -148,7 +148,7 @@ export const MAX_LOOP_LABEL = 0xfffe;
  * The most passes one construct may ask for.
  *
  * `parseLabelLoop`, `parseLoopEnd` and `parseStarLoop` each range-check 1 to 255
- * and emit nothing outside it (`parser.ts:2492`, `:2792`, `:2836`, AMK0116;
+ * and emit nothing outside it (`parser.ts:2247`, `:2541`, `:2587`, AMK0116;
  * Music.cpp:1181 and :1329). A `]]n` is the exception and is not this: its count
  * is never range-checked and the byte written is `n - 1` — {@link MAX_SUBLOOP_COUNT}.
  */
@@ -158,7 +158,7 @@ export const MAX_LOOP_COUNT = 255;
  * The most passes a subloop may ask for, which is not {@link MAX_LOOP_COUNT}.
  *
  * `parseLoopEnd` range-checks a `[ ]` count and does **not** check a `[[ ]]` one;
- * it writes `count - 1` through `append`, which masks (`parser.ts:718`). So 256
+ * it writes `count - 1` through `append`, which masks (`parser.ts:542`). So 256
  * is the last count that means itself — `$E6 $FF`, played 256 times — and 257
  * becomes a byte of 0 and plays once, in silence.
  */
@@ -398,7 +398,7 @@ export function loopsAt(reading: LoopReading, offset: number): readonly LoopCons
  * contents at that point in the parse.
  *
  * Opened above the offset, because that is where `parseLoopStart` writes the
- * pointer (`parser.ts:2736`) and `parseLabelLoop` refuses a label it cannot
+ * pointer (`parser.ts:2484`) and `parseLabelLoop` refuses a label it cannot
  * find there (AMK0115). Never a `(!n)`: it takes a slot, so the allocator counts
  * it, but a `$E9` into a remote body is not a call any reader here should offer.
  */

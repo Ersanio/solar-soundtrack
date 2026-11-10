@@ -93,7 +93,7 @@ logarithmic and this is not.
   stood between the note and the command, so the inspector priced a slide that never arms at “95
   ticks to run in” while the song jumped to `$0000`; and it summed a tied note's segments where the
   driver reloads its counter per frame (`main.asm:2440-2441`) and `accumulateTiedLength` rewinds the
-  tie out of a `$DD`'s way (`parser.ts:2895-2909`), so `c4^8 $DD` read 72 where the read-ahead gets 24. `bendAnchor` answers with the three ways it fails and the one way it works, which is
+  tie out of a `$DD`'s way (`parser.ts:2813-2827`), so `c4^8 $DD` read 72 where the read-ahead gets 24. `bendAnchor` answers with the three ways it fails and the one way it works, which is
   `COMMANDS.html`'s own enumeration, and one pass serves the panel and the diagnostic so the two
   cannot disagree. A rest is an anchor like any note, `$C7` being a note byte to the driver — the
   reading that excluded it would have called a song that plays fine a dead SPC. And “nothing before

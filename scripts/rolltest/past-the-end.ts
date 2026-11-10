@@ -72,7 +72,7 @@ expectEdit(
 	{ mode: "overwrite", lacks: "r8 r16", playsAsLong: true },
 );
 
-// A channel with no ticks is holding nothing back — `index.ts:43` passes over it
+// A channel with no ticks is holding nothing back — `index.ts:44` passes over it
 // — so giving it ticks it never had is not what drawing a note asked for.
 expectEdit(
 	"a channel with no ticks of its own is not padded",

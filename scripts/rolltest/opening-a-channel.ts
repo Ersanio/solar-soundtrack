@@ -319,7 +319,7 @@ expectEdit(
 // `detectStartingChannel` probes the text for `#0` first, so writing one would
 // take `c4 d4` off channel 1 and put it on the channel being drawn on. The songs
 // here are `#am4` because AddmusicK refuses notes outside a channel altogether
-// (AMK0140, `parser.ts:2880`), which is what makes this shape a legacy one.
+// (AMK0140, `parser.ts:2714`), which is what makes this shape a legacy one.
 expectNoStrip(
 	"a channel below the lowest the song declares, with music above the first `#N`",
 	"#am4\no4 c4 d4\n#1 o4 e4 f4",

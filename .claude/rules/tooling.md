@@ -67,10 +67,11 @@ from the pre-Angular prototype so the port can still be diffed against AddmusicK
 fail `--check` for reasons that have nothing to do with formatting. `"auto"` also means a file
 flipped wholesale to LF passes `--check`, which is why the after-edit hook (below) puts CRLF back.
 
-Two regions carry `// prettier-ignore`, both because reflow destroys information rather than because
+Four regions carry `// prettier-ignore`, all because reflow destroys information rather than because
 someone preferred the old layout: the MML command dispatch in `parser.ts`, which is a lookup table
-one line per case, and the one hand-annotated byte table in `selftest.ts`, where each line is a
-little-endian word with its own comment. Add a marker only for that kind of reason, and say what it
+one line per case; the one hand-annotated byte table in `selftest.ts`, where each line is a
+little-endian word with its own comment; and `INSTRUMENT_TO_SAMPLE` and `VELOCITY_VALUES` in
+`hardcoded-tables.ts`, whose rows are `Music.cpp`'s own, a comment to each. Add a marker only for that kind of reason, and say what it
 is.
 
 Reformats are listed in `.git-blame-ignore-revs`. Enable it with

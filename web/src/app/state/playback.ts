@@ -82,7 +82,7 @@ export class Playback {
    * From `stats` rather than from a clock, and this is the figure the transport
    * is built on: ticks are known for every song that compiles, where seconds are
    * not — a tempo fade costs the compiler its seconds and none of its ticks
-   * (`parser.ts:1705`).
+   * (`parser.ts:1819`).
    */
   readonly durationTicks = computed(() => {
     const stats = this.editor.result()?.stats;

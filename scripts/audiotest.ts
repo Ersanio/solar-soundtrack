@@ -1196,7 +1196,7 @@ console.log("\none note, auditioned where the song is playing");
 	const NOTE = 0xa4; // o4 c, and what `@0` leaves alone
 
 	// The frames the driver is handed, against what `emitNote` writes for a note
-	// of the same length (`parser.ts:2853`, Music.cpp:2254).
+	// of the same length (`parser.ts:2839`, Music.cpp:2254).
 	const long = noteFrames(NOTE, 192);
 	check(
 		"192 ticks is a $60 note and a tie",
@@ -1377,7 +1377,7 @@ console.log("\none note, auditioned where the song is playing");
 	check("and it holds the note for the ticks asked for", atZero.heldTicks === 96, `${atZero.heldTicks} ticks`);
 
 	// `$F1 $02` reserves 4 KiB, and the `$FA $04` the linker puts at the top of the
-	// lowest channel (link.ts:170) clears it byte by byte inside the driver's first
+	// lowest channel (link.ts:171) clears it byte by byte inside the driver's first
 	// pass — tens of milliseconds, far longer than the four settle blocks. So the
 	// tick the fast-forward counts has to be a tick of music: stopping on the fetch
 	// that reads that command hands the note to a driver still in the clear, and
@@ -1575,8 +1575,8 @@ console.log("\nthat note with the rest of the song under it");
 		`${rms(noChord).toFixed(5)} < ${oneOff.toFixed(5)} < ${rms(everything).toFixed(5)}`,
 	);
 
-	// Silencing every one of them leaves the note by itself, which is what the
-	// audition used to be: the same note, at the same level, with nothing under it.
+	// Silencing every one of them leaves the note by itself, which is the
+	// note auditioned alone: the same note, at the same level, with nothing under it.
 	const solo = auditionNote(emu, compileToSpc(`#amk 4\n#0 t40 o5 v200 q7F @0 l8 c c c c @8 c c c c\n`), asked);
 	check(
 		"silencing all of them leaves the note by itself",

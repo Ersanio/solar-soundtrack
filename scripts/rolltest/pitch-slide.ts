@@ -49,8 +49,8 @@ function bendTarget(built: Built, source: string, written: string): number | nul
 }
 
 {
-	// The all-hex form involves no note at all, and used to be refused with a
-	// sentence about a target note that was not there.
+	// The all-hex form involves no note at all, so no refusal about a
+	// target note applies to it.
 	const hex = "#amk 2\n#0 o4 c4 $DD $00 $18 $A4 d4 e4";
 	expectEdit(
 		"a slide to a byte",

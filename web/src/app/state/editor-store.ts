@@ -138,7 +138,7 @@ export class EditorStore {
 
   /**
    * What the compiler divided every note length by (`#halvetempo`, `#option dividetempo`).
-   * `divideByTempoRatio` (`parser.ts:702`) does nothing below `#amk 4`, whatever the directives say.
+   * `divideByTempoRatio` (`parser.ts:691`) does nothing below `#amk 4`, whatever the directives say.
    */
   readonly tempoRatio = computed(() =>
     songTarget(this.tokens()).amkVersion >= 4 ? (this.result()?.stats?.tempoRatio ?? 1) : 1,

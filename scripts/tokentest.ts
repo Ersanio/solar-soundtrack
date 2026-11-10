@@ -1579,7 +1579,7 @@ console.log("\n$DD takes a note as its last parameter");
 	);
 
 	// The issue's other half: neither the scanner nor the parser resets `hexLeft`
-	// at a marker, so a leak used to reach the next channel.
+	// at a marker, so a `hexLeft` left standing would reach the next channel.
 	const across = "#amk 4\n#0 c4 $DD $00 $18 g\n#1 $E7 $10 c4\n";
 	check("a run closed by a note does not leak past a #N", read(across).after === "hex");
 
@@ -1698,7 +1698,7 @@ console.log("\n$DD takes a note as its last parameter");
 	check("but not on #6, where the remap survives its note", sfx("d") === "@21", sfx("d"));
 }
 
-// A remote call's wait is read with `getHex` (parser.ts:2443-2445, Music.cpp:1090-1094),
+// A remote call's wait is read with `getHex` (parser.ts:2356-2358, Music.cpp:1090-1094),
 // so any byte written there is an argument. One in `$DA`-`$FE` read as a VCMD
 // would open a command nobody wrote and take the next real `$XX` as its argument.
 console.log("\na remote call's $ wait is an argument");
@@ -1749,7 +1749,7 @@ console.log("\ncommand hazards — bytes that compile clean and then break the s
 		// keyed-off voice and is inaudible rather than fatal.
 		["a rest", "#amk 4\n#0 o4 r4 $DD $00 $18 $A4\n", "rides:48"],
 		// The tie is a frame of its own: `accumulateTiedLength` rewinds it out of the
-		// `$DD`'s way (`parser.ts:2895-2909`, Music.cpp:2224), so the peek gets 24
+		// `$DD`'s way (`parser.ts:2813-2827`, Music.cpp:2224), so the peek gets 24
 		// ticks and not the 72 the note is written as.
 		["a tied note", "#amk 4\n#0 o4 c4^8 $DD $00 $18 $A4\n", "rides:24"],
 		["a tie of one tick", "#amk 4\n#0 o4 c4^192 $DD $00 $18 $A4\n", "tooShort:1"],

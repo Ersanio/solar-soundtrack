@@ -3,7 +3,7 @@
  *
  * The compiler bakes transposition into the note byte: `h` is added and the
  * instrument's own tuning is subtracted, both at compile time
- * (`parser.ts:2737-2741`). So `@2 o5 g` emits `o5 d`, and the five semitones are
+ * (`parser.ts:2727-2731`). So `@2 o5 g` emits `o5 d`, and the five semitones are
  * cancelled by the sample's tuning to sound as the `g` that was written. The
  * piano roll's rows are the written pitch, which means a row is not the byte that
  * sounds it, and auditioning the row's own byte would put the note somewhere the

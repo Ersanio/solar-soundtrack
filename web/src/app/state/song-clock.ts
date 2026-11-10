@@ -1,10 +1,10 @@
 /**
  * Ticks to seconds, for a song the compiler could not put a clock on.
  *
- * `estimateSeconds` (`parser.ts:3459`) is segment-wise over source text, so two
+ * `estimateSeconds` (`parser.ts:3490`) is segment-wise over source text, so two
  * ordinary things defeat it: a `t` that runs more than once has no place in the
- * list (`parser.ts:1692`), and a tempo fade has no segment at all
- * (`parser.ts:1705`, porting `Music.cpp:809`). Either one makes it abandon the
+ * list (`parser.ts:1806`), and a tempo fade has no segment at all
+ * (`parser.ts:1819`, porting `Music.cpp:809`). Either one makes it abandon the
  * song's length outright.
  *
  * `@amk/spc`'s walk records every tempo command on the tick the driver runs it,

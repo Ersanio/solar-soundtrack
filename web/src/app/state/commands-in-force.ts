@@ -137,7 +137,7 @@ export function commandsInForceOf(sources: InForceSources): (note: WalkNote) => 
  *
  * By the identity of the commands and never of the arrays holding them.
  * `recordOrigin` calls `invalidateAll` on every song-wide write
- * (`song-walk.ts:713`), so a `t`, a `$E4` or an echo byte hands all eight
+ * (`song-walk.ts:1140`), so a `t`, a `$E4` or an echo byte hands all eight
  * channels a fresh `origins` array with the same addresses in it, and an array
  * compared against the one before would report every channel's next note as
  * setting everything it plays under. `index.commands` holds one object per

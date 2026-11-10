@@ -3,13 +3,13 @@
  * given spelling has to carry to select a different one.
  *
  * The three spellings do not reach the same set, and none of them reaches all of
- * it. `parseInstrument` (`parser.ts:2148`, Music.cpp:parseInstrumentCommand)
+ * it. `parseInstrument` (`parser.ts:1930`, Music.cpp:parseInstrumentCommand)
  * emits a `$DA` only for `@0`-`@18`, the direct `@@n` and `@30` upward, remapping
  * 19-29 to a custom instrument on the way — so `@21`-`@29` arm a drum and emit
  * nothing at all, while `@@21` is custom instrument 32 rather than a drum, and
  * `@19` is neither. A hand-written `$DA` goes through none of that: the byte is
  * the byte, which is what makes it the only way to reach the driver's own table
- * entry 19 — except under `#am4`, where `parseHexCommand` (`parser.ts:3448`,
+ * entry 19 — except under `#am4`, where `parseHexCommand` (`parser.ts:3155`,
  * Music.cpp:1976) remaps a byte from `$13` up to a custom instrument and takes
  * that entry away again.
  *
@@ -55,12 +55,12 @@ export function emittedInstrument(command: Command): number | null {
 	}
 
 	if (command.vcmd === 0xda) {
-		// parser.ts:3448 — Addmusic 4.05 numbered custom instruments from $13, so a
+		// parser.ts:3155 — Addmusic 4.05 numbered custom instruments from $13, so a
 		// raw $DA is remapped before any of the rules below could apply to it.
 		return command.target.program === 1 && written >= 0x13 ? written - 0x13 + FIRST_CUSTOM_INSTRUMENT : written;
 	}
 
-	// parser.ts:2148 — the one line that splits the bands. The inner remap runs
+	// parser.ts:1930 — the one line that splits the bands. The inner remap runs
 	// unconditionally where AddmusicK guards it with `convert`, which is on unless
 	// its CLI is given `-c`.
 	if (written <= 18 || command.direct === true || written >= FIRST_CUSTOM_INSTRUMENT) {

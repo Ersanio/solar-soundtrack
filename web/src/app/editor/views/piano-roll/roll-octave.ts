@@ -4,7 +4,7 @@ import type { TokenIndex } from '@amk/tokens';
 /**
  * The octave in force anywhere in the text, read the way the parser reads it.
  *
- * `octave` is one variable, starts at 4 (`parser.ts:193`) and is never reset by
+ * `octave` is one variable, starts at 4 (`parser.ts:208`) and is never reset by
  * a `#N`, so it runs through the whole document in source order: an `o` sets
  * it, `<` and `>` move it, and a note reads it. A loop's body is parsed once
  * where it is written, so text order is the whole of it.
@@ -47,7 +47,7 @@ interface OctaveEvent {
   value: number;
 }
 
-/** `parser.ts:193`. */
+/** `parser.ts:208`. */
 const START_OCTAVE = 4;
 
 const CONDITIONAL = /^#(?:if|ifdef|ifndef|elseif|else|endif)\b/;

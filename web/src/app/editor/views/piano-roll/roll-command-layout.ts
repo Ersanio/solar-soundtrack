@@ -40,7 +40,7 @@ export interface LaneGlyph {
    * moved.
    *
    * A command written through a `"name=value"` has its span collapsed onto the
-   * call site (`parser.ts:3861-3873`), so taking that range out would eat
+   * call site (`parser.ts:3651-3663`), so taking that range out would eat
    * whatever else the expansion produced along with it.
    */
   removable: boolean;

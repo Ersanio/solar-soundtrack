@@ -949,7 +949,7 @@ expectEdit(
 );
 
 // And `O` moves it too: the parser dispatches on the lowercased character
-// (`parser.ts:461`, `Music.cpp:445`), so `O5` is an octave command like any
+// (`parser.ts:407`, `Music.cpp:445`), so `O5` is an octave command like any
 // other and the scan over the gap has to see one. Drawn at the octave the note
 // before the gap left standing, which is where missing it spells nothing at all
 // and hands the note to the `O5`.

@@ -18,7 +18,7 @@ import { unitStartBefore } from '../views/piano-roll/roll-strip';
  * music and wrap it, so what a click writes depends on where the run is as well
  * as on the dialect. AddmusicK holds one `[ ]` and one `[[ ]]` open at a time,
  * in either order — that is what the four `baseLoopIs*`/`extraLoopIs*` flags
- * account for (`parser.ts:2852-2881`, Music.cpp:3552-3589) — so **which** of the
+ * account for (`parser.ts:2600-2629`, Music.cpp:3552-3589) — so **which** of the
  * two a wrap writes is decided here rather than by the button pressed: asked for
  * a loop inside a loop, this offers the subloop, in the mould of `substitute()`
  * in `catalog.ts`, which hands back the bytes where the dialect refuses the
@@ -92,7 +92,7 @@ export const CALL_NESTED = $localize`:@@palette.a-loop-cannot-be-called:palette.
  *
  * The least a repeat can be, so the music the porter picked out plays once more
  * than it did and no further; it is also the only count a subloop may open on,
- * `]]1` being AMK0126 (`parser.ts:2759`). It is left selected, so the command
+ * `]]1` being AMK0126 (`parser.ts:2507`). It is left selected, so the command
  * inspector's own **Repeats** field is where it changes.
  */
 const COUNT = 2;
@@ -141,8 +141,8 @@ export function wrapVerdict(request: WrapRequest): WrapVerdict {
 
   // The head reaches back over the note's own leading `o` and drum `@`, as every
   // insertion in the roll does. For a drum that is not tidiness: `[` copies the
-  // remap into slot 8 and the note there clears slot 8 alone (`parser.ts:2725`,
-  // `:3013`), so a `@21` left outside the brackets would still be standing when
+  // remap into slot 8 and the note there clears slot 8 alone (`parser.ts:2473`,
+  // `:2753`), so a `@21` left outside the brackets would still be standing when
   // the loop ends and would hand the drum to the note after it.
   const head = unitStartBefore(source, index.commands, picked[0]);
   let start = head.start;

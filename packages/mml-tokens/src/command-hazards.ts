@@ -33,7 +33,7 @@ const CODE_DEAD_VCMD = "SST0506";
 /** A `$DD` no note's read-ahead picks up, so the command loop reaches it. */
 const CODE_STRANDED_BEND = "SST0507";
 
-/** `#am4`'s silent `$E4` offset (`parser.ts:3203`, Music.cpp:1863). */
+/** `#am4`'s silent `$E4` offset (`parser.ts:3086`, Music.cpp:1863). */
 const CODE_AM4_TRANSPOSE = "SST0508";
 
 /**
@@ -139,7 +139,7 @@ function slideWindow(command: Command, index: TokenIndex, frame: number): number
 	const end = Math.min(stop?.span.start ?? Infinity, call?.start ?? Infinity);
 
 	// `accumulateTiedLength` folds a run into one note, but gives its last segment up as a note of
-	// its own to a `$DD` straight after it (`parser.ts:2895-2909`). Comments are gone by then.
+	// its own to a `$DD` straight after it (`parser.ts:2813-2827`). Comments are gone by then.
 	const framesOfRun = (segments: readonly NoteLengthSegment[], runEnd: number): number[] => {
 		const next = tokens.find((token) => token.start >= runEnd && token.kind !== "comment");
 		const total = segments.reduce((sum, segment) => sum + segment.ticks, 0);
@@ -151,7 +151,7 @@ function slideWindow(command: Command, index: TokenIndex, frame: number): number
 
 	let window = frame - 1;
 
-	// A target written as a note returns before its length is read (`parser.ts:2848-2852`), so the
+	// A target written as a note returns before its length is read (`parser.ts:2766-2770`), so the
 	// ties `gather` gave it are a tie of their own.
 	const target = command.noteTarget;
 	const targetNote = target && commands.find((other) => other.head.start === target.span.start && other.noteLength);
@@ -178,7 +178,7 @@ function slideWindow(command: Command, index: TokenIndex, frame: number): number
  * too short for the peek to run in.
  *
  * The anchor is the note's **last frame** rather than the sum of its segments.
- * `accumulateTiedLength` rewinds a tie out of a `$DD`'s way (`parser.ts:2895-2909`,
+ * `accumulateTiedLength` rewinds a tie out of a `$DD`'s way (`parser.ts:2813-2827`,
  * Music.cpp:2224), so `c4^8 $DD` emits the tie as its own `[24][$C6]` frame and
  * `$70+x` is reloaded from it (`main.asm:2440-2441`) — 24 ticks is what the peek
  * gets, not 72. A segment of `$80` ticks or more is `emitNote`'s `$60`-tick pieces,
@@ -194,7 +194,7 @@ function slideWindow(command: Command, index: TokenIndex, frame: number): number
  * really does have no note in front of it.
  *
  * One limit, stated rather than modelled: `#halvetempo` halves every note and
- * every piece in the compiler (`parser.ts:2855`) and this package has no tempo
+ * every piece in the compiler (`parser.ts:2773`) and this package has no tempo
  * ratio, so a written two-tick note can be a one-tick emitted one.
  * `WalkNote.bend.frameTicks` is the authority there.
  */

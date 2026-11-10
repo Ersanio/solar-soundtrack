@@ -15,7 +15,7 @@ console.log("\nthe loops the walk plays through");
 // body's `noteMap` entries are the loop block's — and a run that mis-prices one
 // pass draws a group where nothing repeats, with no visual tell. The spelling
 // here also pins the declaration/recall distinction on the one fact that
-// carries it: a `]n`'s `$E9` is dropped from the command map (`parser.ts:649`)
+// carries it: a `]n`'s `$E9` is dropped from the command map (`parser.ts:508`)
 // where a `(n)m`, `*n` or `$E6` is not.
 {
 	const shown = (source: string) => {
