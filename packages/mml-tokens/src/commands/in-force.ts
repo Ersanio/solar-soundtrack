@@ -34,7 +34,7 @@
  * twice would draw two glyphs for one setting.
  */
 
-import { FIRST_PERCUSSION_INSTRUMENT } from "@amk/core/hardcoded-tables";
+import { FIRST_PERCUSSION_INSTRUMENT, VCMD } from "@amk/core/hardcoded-tables";
 import type { Command, TokenIndex } from "../tokens";
 
 /** How far a command reaches, and therefore whether a note is the thing it acts on. */
@@ -51,28 +51,28 @@ export type CommandScope =
 /** `@21`-`@29`, the nine drums, which emit no `$DA` (`parser.ts:1930-1956`). */
 export const LAST_PERCUSSION_INSTRUMENT = FIRST_PERCUSSION_INSTRUMENT + 8;
 
-const SONG_VCMDS = new Set([
-	0xe0, // global volume
-	0xe1, // global volume fade
-	0xe2, // tempo
-	0xe3, // tempo fade
-	0xe4, // global transpose
+const SONG_VCMDS = new Set<number>([
+	VCMD.GlobalVolume, // global volume
+	VCMD.GlobalVolumeFade, // global volume fade
+	VCMD.Tempo, // tempo
+	VCMD.TempoFade, // tempo fade
+	VCMD.GlobalTranspose, // global transpose
 	// One DSP holds one echo unit, so all five reach every channel however they
 	// are written — the reasoning `CLAUDE.md` already gives for `$F5` and `$F1`.
-	0xef,
-	0xf0,
-	0xf1,
-	0xf2,
-	0xf5,
+	VCMD.EchoVolume,
+	VCMD.EchoOff,
+	VCMD.EchoDelay,
+	VCMD.EchoFade,
+	VCMD.Fir,
 	// A register, a byte and two output ports: each is written once and nothing
 	// later reads it back as this channel's state.
-	0xf6,
-	0xf7,
-	0xf9,
+	VCMD.DspWrite,
+	VCMD.WriteByte,
+	VCMD.DataSend,
 ]);
 
 /** `$E6` and `$E9` are what `[[ ]]` and `[ ]` compile to; `$FC` is a remote call. */
-const STRUCTURE_VCMDS = new Set([0xe6, 0xe9, 0xfc]);
+const STRUCTURE_VCMDS = new Set<number>([VCMD.Subloop, VCMD.CallLoop, VCMD.RemoteCode]);
 
 const SONG_LETTERS = new Set(["t", "w"]);
 const POSITION_LETTERS = new Set(["o", "l", "<", ">"]);

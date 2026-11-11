@@ -12,6 +12,7 @@
  * and `scanHex`, and a third statement would be invisible to every harness.
  */
 
+import { VCMD } from "@amk/core/hardcoded-tables";
 import { hex2 } from "@amk/core/hex";
 import type { CommandTarget } from "../tokens";
 
@@ -141,7 +142,7 @@ export function formAvailability(form: PaletteForm, target: CommandTarget): Avai
 
 	// `parser.ts:2988` — AMK0156, raised on `$FA`'s *second* byte. A hard error,
 	// not the AMK0207 warning the neighbouring bytes get, so it goes first.
-	if (form.vcmd === 0xfa && target.program === 2) {
+	if (form.vcmd === VCMD.Settings && target.program === 2) {
 		return blocked(
 			$localize`:@@palette.availability.addmusicms-fa-is-not-implemented:palette.availability.addmusicms-fa-is-not-implemented`,
 		);
@@ -149,13 +150,13 @@ export function formAvailability(form: PaletteForm, target: CommandTarget): Avai
 
 	// `parseHexCommand` (`parser.ts:2915`, `:2919`) warns once per song for a byte
 	// the legacy program never had. It is a warning either way, not an error.
-	if (target.program === 1 && form.vcmd > 0xf2) {
+	if (target.program === 1 && form.vcmd > VCMD.EchoFade) {
 		return caution(
 			$localize`:@@palette.availability.is-not-native-to-addmusic:palette.availability.is-not-native-to-addmusic ${hex2(form.vcmd)}:vcmd:`,
 		);
 	}
 
-	if (target.program === 2 && form.vcmd > 0xfa) {
+	if (target.program === 2 && form.vcmd > VCMD.Settings) {
 		return caution(
 			$localize`:@@palette.availability.is-not-native-to-addmusicm:palette.availability.is-not-native-to-addmusicm ${hex2(form.vcmd)}:vcmd:`,
 		);
@@ -163,13 +164,13 @@ export function formAvailability(form: PaletteForm, target: CommandTarget): Avai
 
 	// Written by the compiler from a `[ ]` loop, and `hex-params.ts:$E9` already
 	// passes on the readme's own "do not use manually".
-	if (form.vcmd === 0xe9) {
+	if (form.vcmd === VCMD.CallLoop) {
 		return caution(
 			$localize`:@@palette.availability.written-by-the-compiler-from:palette.availability.written-by-the-compiler-from`,
 		);
 	}
 
-	if (form.vcmd === 0xfc && target.amkVersion > 1) {
+	if (form.vcmd === VCMD.RemoteCode && target.amkVersion > 1) {
 		// `parser.ts:2982` — AMK0211, for the two versions between the spellings.
 		// Not raised at `#amk 1`, where writing `$FC` by hand *is* remote gain and
 		// there is no `(!n)` to prefer over it (`parser.ts:2969`).

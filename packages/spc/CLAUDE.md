@@ -19,7 +19,9 @@ main thread, and inside an `AudioWorkletGlobalScope`.
 | `player.ts`          | AudioContext, worklet node, transport                             |
 | `protocol.ts`        | The one message contract between page and audio thread            |
 | `repeat-settings.ts` | The settings a pass carries into the song's repeat                |
+| `slots.ts`           | The slots of driver state a VCMD writes or clears                 |
 | `song-walk.ts`       | Reads a compiled song the way the driver does: what sounds when   |
+| `song-walk-types.ts` | The walk's public model, re-exported from `song-walk.ts`          |
 | `wasm-host.ts`       | Blargg's snes_spc, called directly                                |
 | `worklet.ts`         | The renderer on the audio thread                                  |
 
@@ -147,7 +149,7 @@ channel's, `SST0512` for the song's).
 address of whatever last wrote each of `SLOTS`, so a reader can name the `$ED` a note sounds under
 and not merely read its bytes. It has to come from here for the reason the rest of the state does —
 `v255 (1)[ c ]2 v200 (1)5` plays one written note under two volumes, and which one is a fact about
-the pass rather than about the text. `slotsOf` is where a command claims a slot or takes one away;
+the pass rather than about the text. `slotsOf` (`slots.ts`) is where a command claims a slot or takes one away;
 the four `off` commands take one away rather than occupying it, since after `$DF` there is no
 vibrato to report. A `$D0`-`$D8` clears the instrument slot instead of filling it: the byte that
 loaded that drum is a note, and the `@21`-`@29` that did it emitted nothing to point at. What it

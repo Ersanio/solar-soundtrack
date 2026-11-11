@@ -1,10 +1,11 @@
 /** The `$F1`/`$F5` override, looked at from either end. */
 
+import { VCMD } from "@amk/core/hardcoded-tables";
 import type { Command } from "./tokens";
 export function firOverriddenBy(fir: Command, commands: Command[]): Command | null {
 	return (
 		commands.find(
-			(other) => other.vcmd === 0xf1 && other.channel === fir.channel && other.span.start > fir.span.start,
+			(other) => other.vcmd === VCMD.EchoDelay && other.channel === fir.channel && other.span.start > fir.span.start,
 		) ?? null
 	);
 }
@@ -17,7 +18,7 @@ export function firOverriddenBefore(echo: Command, commands: Command[]): Command
 			break;
 		}
 
-		if (other.vcmd === 0xf5 && other.channel === echo.channel) {
+		if (other.vcmd === VCMD.Fir && other.channel === echo.channel) {
 			found = other;
 		}
 	}

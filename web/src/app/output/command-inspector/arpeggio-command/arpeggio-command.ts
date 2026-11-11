@@ -1,6 +1,12 @@
 import { Component, computed, inject, input } from '@angular/core';
 
-import { argsRewritable, commandRewritable, spliceArg, spliceCommand } from '@amk/tokens/edits';
+import {
+  argsRewritable,
+  argumentText,
+  commandRewritable,
+  spliceArg,
+  spliceCommand,
+} from '@amk/tokens/edits';
 import type { Command } from '@amk/tokens';
 import { commandLockedBecause } from '../commands/context';
 import { ArpeggioNoteRow } from '../arpeggio-note/arpeggio-note';
@@ -9,8 +15,8 @@ import { type EnumOption, EnumSelect } from '../../../shared/enum-select/enum-se
 import { Slider } from '../../../shared/slider/slider';
 import { CommitAudition } from '../../../state/commit-audition';
 import { EditorStore } from '../../../state/editor-store';
-import { hex2 } from '../../../util/format';
-import { fromSigned, toSigned } from '@amk/tokens/commands/param';
+import { dollarHex } from '../../../util/format';
+import { fromSigned, toSigned } from '@amk/core/bytes';
 import { dragPreview, shownArgs } from '../commands/preview';
 import { intervalLabel } from '@amk/tokens/commands/units';
 
@@ -141,7 +147,7 @@ export class ArpeggioCommand {
         index,
         value: toSigned(value),
         /** These two follow a drag; the rest do not — see {@link shown} for why. */
-        hex: `$${hex2(showing)}`,
+        hex: dollarHex(showing),
         meaning: intervalLabel(toSigned(showing)),
         isMarker: value === LOOP_MARKER,
         /** Only the last marker is live; an earlier one is dead weight. */
@@ -216,20 +222,23 @@ export class ArpeggioCommand {
   // --- editing ---------------------------------------------------------------
 
   protected setDuration(value: number): void {
-    this.commitAudition.apply(spliceArg(this.store.source(), this.command(), 1, `$${hex2(value)}`));
+    const command = this.command();
+    this.commitAudition.apply(
+      spliceArg(this.store.source(), command, 1, argumentText(command, value)),
+    );
   }
 
   protected setNote(index: number, value: number): void {
-    const byte = value < 0 ? value + 0x100 : value;
+    const command = this.command();
     this.commitAudition.apply(
-      spliceArg(this.store.source(), this.command(), index + 2, `$${hex2(byte & 0xff)}`),
+      spliceArg(this.store.source(), command, index + 2, argumentText(command, fromSigned(value))),
     );
   }
 
   protected setExtra(value: number): void {
-    const byte = value < 0 ? value + 0x100 : value;
+    const command = this.command();
     this.commitAudition.apply(
-      spliceArg(this.store.source(), this.command(), 2, `$${hex2(byte & 0xff)}`),
+      spliceArg(this.store.source(), command, 2, argumentText(command, fromSigned(value))),
     );
   }
 
@@ -294,7 +303,7 @@ export class ArpeggioCommand {
    * inside a command cannot be preserved, and it is a shape change, not a value.
    */
   private rewrite(values: number[]): void {
-    const text = `$FB ${values.map((value) => `$${hex2(value & 0xff)}`).join(' ')}`;
+    const text = `$FB ${values.map((value) => dollarHex(value & 0xff)).join(' ')}`;
     this.commitAudition.apply(spliceCommand(this.store.source(), this.command(), text));
   }
 }

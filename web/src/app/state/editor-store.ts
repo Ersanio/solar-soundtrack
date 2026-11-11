@@ -1,5 +1,6 @@
 /** The document and everything compiled from it: the debounced compile, diagnostics, stats, the budget, the walk, the SPC. */
 
+import { VCMD } from '@amk/core/hardcoded-tables';
 import { Service, computed, effect, inject, linkedSignal, signal, untracked } from '@angular/core';
 
 import { compiler } from '@amk/compiler';
@@ -213,7 +214,10 @@ export class EditorStore {
   /** The `t` or `$E2`/`$E3` that set the rate, or the top of the document. */
   private tempoSpan(): Span {
     const command = this.tokens().commands.find(
-      (c) => c.vcmd === 0xe2 || c.vcmd === 0xe3 || (c.vcmd === undefined && c.kind === 't'),
+      (c) =>
+        c.vcmd === VCMD.Tempo ||
+        c.vcmd === VCMD.TempoFade ||
+        (c.vcmd === undefined && c.kind === 't'),
     );
     return command?.span ?? { start: 0, end: 0, line: 1 };
   }

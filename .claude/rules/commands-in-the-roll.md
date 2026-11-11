@@ -1,7 +1,7 @@
 ---
 paths:
   - 'web/src/app/state/{commands-in-force,command-timeline}.ts'
-  - 'packages/spc/src/song-walk.ts'
+  - 'packages/spc/src/{song-walk,song-walk-types,slots}.ts'
   - 'packages/mml-tokens/src/commands/in-force.ts'
   - 'web/src/app/editor/views/piano-roll/roll-command-*.ts'
   - 'web/src/app/editor/views/piano-roll/roll-command-lane/**'
@@ -10,7 +10,7 @@ paths:
 # Commands in the roll
 
 Read before changing command glyphs on bars, the command lane, `commands-in-force.ts`,
-`command-timeline.ts`, or `song-walk.ts`'s slots.
+`command-timeline.ts`, or the walk's slots (`packages/spc/src/slots.ts`).
 
 ## How it works now
 
@@ -18,7 +18,8 @@ A command is drawn in two places that answer different questions: a **glyph on a
 commands that note plays under, and the **command lane** says the tick the driver reads each
 command on. Neither is derived from the other, and neither reads the text around a note to decide.
 
-**The walk is the authority for anything that emits a VCMD** (`packages/spc/src/song-walk.ts`):
+**The walk is the authority for anything that emits a VCMD** (`packages/spc/src/song-walk.ts`, with
+its slots in `slots.ts` and its public model in `song-walk-types.ts`, both re-exported from it):
 
 - `StateSlot` / `SLOTS` is what `main.asm` keeps where; two commands sharing a slot supersede each
   other. `slotsOf(vcmd, sub)` says which slot a command writes or clears, and is the one table to

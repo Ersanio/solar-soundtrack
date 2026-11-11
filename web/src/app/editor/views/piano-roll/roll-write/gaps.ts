@@ -5,9 +5,10 @@ import type { Span } from '@amk/core/types';
 import type { Command } from '@amk/tokens';
 import { commandScope, isPercussionInstrument } from '@amk/tokens/commands/in-force';
 import { type Edit, insertAt } from '@amk/tokens/edits';
+import { clamp } from '../../../../util/math';
 import {
   type EditContext,
-  type EditRefusal,
+  type Refusal,
   type PlacedNote,
   REFUSE_CROWDED,
   REFUSE_INSIDE,
@@ -171,7 +172,7 @@ export function realiseRegion(
   gap: Region,
   survivors: ReadonlyMap<number, PlacedNote>,
   deleted: readonly Span[],
-): Edit[] | EditRefusal {
+): Edit[] | Refusal {
   const { source, strip, frame, targetAMKVersion } = context;
 
   // A gap between two notes that has to come to less than nothing is a plan
@@ -226,7 +227,7 @@ export function realiseRegion(
   for (let at = 0; at < bounds.length; at++) {
     const here = bounds[at];
     if (here.hard) {
-      const pin = Math.min(newEnd, Math.max(newStart, here.tick));
+      const pin = clamp(here.tick, newStart, newEnd);
       if (here.inside && pin !== here.tick) {
         return refuse(pieces[at].item.kind === 'note' ? REFUSE_INSIDE : REFUSE_CROWDED);
       }

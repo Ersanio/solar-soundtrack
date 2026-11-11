@@ -34,6 +34,8 @@
  *   - Anything inside a `$FC` body, which the walk does not follow.
  */
 
+import { FIRST_PERCUSSION_NOTE, FIRST_VCMD, VCMD } from "@amk/core/hardcoded-tables";
+
 /** Settings the driver keeps per channel. */
 export const CHANNEL_SETTINGS = [
 	"instrument",
@@ -294,82 +296,82 @@ export function settingChanges(bytes: readonly number[], channel: number): Setti
 		return [glissandoNote];
 	}
 
-	if (lead < 0xd0) {
+	if (lead < FIRST_PERCUSSION_NOTE) {
 		return []; // a tie or a rest
 	}
 
-	if (lead < 0xda) {
+	if (lead < FIRST_VCMD) {
 		// `PercNote` loads the drum's whole record (`main.asm:382-387`).
 		return [to("instrument", [DRUM + lead, ...NO_RECORD]), glissandoNote];
 	}
 
 	switch (lead) {
-		case 0xda:
+		case VCMD.Instrument:
 			// `cmdDA` clears the channel's noise bit before `SetInstrument` (`Commands.asm:94-98`).
 			return [to("instrument", [arg(0), ...NO_RECORD]), change("noise", (v) => [0, v[1]])];
-		case 0xdb:
+		case VCMD.Pan:
 			return [to("pan", [arg(0) & 0x1f, arg(0) & 0xc0])];
-		case 0xdc:
+		case VCMD.PanFade:
 			return [change("pan", (v) => [arg(1), v[1]])];
-		case 0xde:
+		case VCMD.Vibrato:
 			// `$0341+x`, the fade, is zeroed with it (`Commands.asm:274-288`).
 			return [to("vibrato", [arg(0), arg(1), arg(2), 0])];
-		case 0xdf:
+		case VCMD.VibratoOff:
 			return [change("vibrato", (v) => withAt(v, 2, 0))];
-		case 0xea:
+		case VCMD.VibratoFade:
 			return [change("vibrato", (v) => withAt(v, 3, arg(0)))];
-		case 0xe0:
+		case VCMD.GlobalVolume:
 			return [to("masterVolume", [arg(0)])];
-		case 0xe1:
+		case VCMD.GlobalVolumeFade:
 			return [to("masterVolume", [arg(1)])];
-		case 0xe4:
+		case VCMD.GlobalTranspose:
 			return [to("transpose", [arg(0)])];
-		case 0xe5:
+		case VCMD.Tremolo:
 			return [to("tremolo", [arg(0), arg(1), arg(2)])];
-		case 0xfd:
+		case VCMD.TremoloOff:
 			// `$E5`'s tail, entered with a zero depth (`Commands.asm:353`).
 			return [change("tremolo", (v) => withAt(v, 2, 0))];
-		case 0xe7:
+		case VCMD.Volume:
 			return [to("volume", [arg(0)])];
-		case 0xe8:
+		case VCMD.VolumeFade:
 			return [to("volume", [arg(1)])];
-		case 0xeb:
-		case 0xec:
+		case VCMD.PitchEnvelopeRelease:
+		case VCMD.PitchEnvelopeAttack:
 			// `$0320+x` is 1 for `$EB` (`Commands.asm:434-452`).
-			return [to("pitchEnvelope", [lead === 0xeb ? 1 : 0, arg(0), arg(1), arg(2)])];
-		case 0xfe:
+			return [to("pitchEnvelope", [lead === VCMD.PitchEnvelopeRelease ? 1 : 0, arg(0), arg(1), arg(2)])];
+		case VCMD.PitchEnvelopeOff:
 			return [change("pitchEnvelope", (v) => withAt(v, 2, 0))];
-		case 0xed:
+		case VCMD.Adsr:
 			// `backup[1] = XX ^ $80`, and YY is ADSR2 or GAIN by the result's bit 7
 			// (`Commands.asm:40-55`).
 			return [
 				change("instrument", (v) => withAt(withAt(v, ADSR1, arg(0) ^ 0x80), arg(0) < 0x80 ? ADSR2 : GAIN, arg(1))),
 			];
-		case 0xee:
+		case VCMD.FineTune:
 			return [to("fineTune", [arg(0)])];
-		case 0xef:
+		case VCMD.EchoVolume:
 			return [change("echo", (v) => [arg(0), arg(1), arg(2), v[3], v[4], v[5]])];
-		case 0xf0:
+		case VCMD.EchoOff:
 			// Channels and volumes zeroed, buffer writes off (`main.asm:2541-2560`).
 			return [change("echo", (v) => [0, 0, 0, 0, v[4], v[5]])];
-		case 0xf1:
+		case VCMD.EchoDelay:
 			// Writes back on, delay and feedback, and a filter preset (`Commands.asm:491-531`).
 			return [change("echo", (v) => [v[0], v[1], v[2], 1, arg(0), arg(1)]), to("echoFilter", [FIR_PRESET, arg(2)])];
-		case 0xf2:
+		case VCMD.EchoFade:
 			return [change("echo", (v) => [v[0], arg(1), arg(2), v[3], v[4], v[5]])];
-		case 0xf3:
+		case VCMD.SampleLoad:
 			return [change("instrument", (v) => withAt(withAt(v, SRCN, arg(0)), MULTIPLIER, arg(1)))];
-		case 0xf4:
+		case VCMD.Toggles:
 			return toggles(arg(0), channel);
-		case 0xf5:
+		case VCMD.Fir:
 			return [to("echoFilter", operands)];
-		case 0xf8:
+		case VCMD.Noise:
 			return [to("noise", [1, arg(0) & 0x1f])];
-		case 0xfa:
+		case VCMD.Settings:
 			return settings(arg(0), arg(1), operands);
-		case 0xfb:
+		case VCMD.Arpeggio:
 			return [to("arpeggio", arpeggio(operands))];
-		case 0xfc:
+		case VCMD.RemoteCode:
 			return remote(operands);
 		default:
 			return [];

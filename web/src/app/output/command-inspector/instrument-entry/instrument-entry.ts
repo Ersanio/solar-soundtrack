@@ -9,7 +9,7 @@ import { Slider } from '../../../shared/slider/slider';
 import { CommitAudition } from '../../../state/commit-audition';
 import { EditorStore } from '../../../state/editor-store';
 import { SampleStore } from '../../../state/sample-store';
-import { hex2 } from '../../../util/format';
+import { dollarHex, hex2 } from '../../../util/format';
 import { sampleOptions } from '../commands/context';
 import { dragPreview } from '../commands/preview';
 import { type EnvelopeValue, EnvelopeTuner } from '../envelope-tuner/envelope-tuner';
@@ -208,7 +208,7 @@ export class InstrumentEntryEditor {
     const said = Number.isFinite(semitones)
       ? $localize`:@@inspector.instrument-entry.semitones:inspector.instrument-entry.semitones ${semitones > 0 ? '+' : ''}:sign: ${semitones.toFixed(1)}:semitones:`
       : $localize`:@@inspector.instrument-entry.silent:inspector.instrument-entry.silent`;
-    return `$${hex2(tuning)}.$${hex2(subTuning)} — ${said}`;
+    return `${dollarHex(tuning)}.${dollarHex(subTuning)} — ${said}`;
   });
 
   protected readonly tuningLocked = computed(() =>
@@ -253,9 +253,9 @@ export class InstrumentEntryEditor {
   protected applyEnvelope(next: EnvelopeValue): void {
     this.write(
       spliceInstrumentBytes(this.store.source(), this.entry(), [
-        `$${hex2(next.adsr1)}`,
-        `$${hex2(next.adsr2)}`,
-        `$${hex2(next.gain)}`,
+        dollarHex(next.adsr1),
+        dollarHex(next.adsr2),
+        dollarHex(next.gain),
       ]),
     );
   }
@@ -267,8 +267,8 @@ export class InstrumentEntryEditor {
         null,
         null,
         null,
-        `$${hex2(tuning)}`,
-        `$${hex2(subTuning)}`,
+        dollarHex(tuning),
+        dollarHex(subTuning),
       ]),
     );
   }

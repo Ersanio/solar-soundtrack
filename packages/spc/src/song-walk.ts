@@ -37,8 +37,10 @@
  * Feed the compiled song binary into {@link walkSong} to get its timeline.
  */
 
+import { word } from "@amk/core/bytes";
 import {
 	FIRST_PERCUSSION_INSTRUMENT,
+	FIRST_PERCUSSION_NOTE,
 	FIRST_VCMD,
 	HEX_LENGTHS,
 	LAST_VCMD,
@@ -47,8 +49,24 @@ import {
 	VELOCITY_VALUES,
 	WAIT_TIME,
 	frameSoundingTicks,
+	VCMD,
 } from "@amk/core/hardcoded-tables";
 import { SST } from "@amk/core/messages/sst";
+import { VOICES } from "./driver-state";
+import { CHANNEL_SLOTS, INSTRUMENT_SLOT, SLOTS, slotAt, slotsOf } from "./slots";
+import type { LoopRun, NoteState, SongTimeline, TempoChange, WalkCommand, WalkNote } from "./song-walk-types";
+
+export { SLOTS, type StateSlot, replacedByNextInSlot } from "./slots";
+export type {
+	LoopRun,
+	NoteState,
+	PitchSlide,
+	SongTimeline,
+	TempoChange,
+	WalkCommand,
+	WalkNote,
+} from "./song-walk-types";
+import { PERCUSSION_SLOTS } from "./instruments";
 import type { Diagnostic, NoteAddress } from "@amk/core/types";
 import {
 	type ChannelSetting,
@@ -66,9 +84,6 @@ import {
 	songStart,
 } from "./repeat-settings";
 
-/** N-SPC songs have eight music channels. */
-const CHANNELS = 8;
-
 /** Bytes per `#instruments` entry — a sample byte and five more. `Music.cpp:2572`. */
 const CUSTOM_INSTRUMENT_ENTRY_BYTES = 6;
 
@@ -82,9 +97,7 @@ const CUSTOM_INSTRUMENT_ENTRY_BYTES = 6;
 const NOTE_LOWEST = 0x80;
 const NOTE_TIE_BYTE = 0xc6;
 const REST_FIRST = 0xc7;
-const PERCUSSION_FIRST = 0xd0;
-/** `$D0`-`$D8`, the driver's nine drums, reached as `@21`-`@29`. */
-const PERCUSSION_COUNT = 9;
+const PERCUSSION_FIRST = FIRST_PERCUSSION_NOTE;
 
 /** `$80` is o1 c and `$C5` is o6 a: 70 keys, since `$C6` is already the tie. */
 export const KEY_COUNT = 70;
@@ -104,569 +117,6 @@ const COMMAND_BUDGET = 200_000;
 const STEP_BUDGET = 2_000_000;
 
 /**
- * The channel or song state a VCMD writes. Two commands sharing a slot
- * supersede each other, so a slot holds at most one command at a time.
- *
- * A driver fact and not a presentation one: it says what `main.asm` keeps where,
- * which is the same question {@link NoteState} answers with values. A reader that
- * wants only some of these filters them itself, the way the percussion set is the
- * roll's business and not this module's.
- *
- * Only VCMDs are here, because only a VCMD has an address for {@link WalkNote.origins}
- * to name it by. `q` folds into each note's duration byte, `h` and `@21`-`@29`
- * into the note byte, and `o`/`l` into neither — those have no slot and no origin,
- * and the source is where they are answered.
- *
- * `$DD` is a VCMD and is still not here: a slide runs once on the note that read
- * it and leaves nothing standing for a later note to sound under, so it occupies
- * no slot at all. {@link WalkNote.bendFrom} is where it is named.
- */
-export type StateSlot =
-	/** `$DA`. `@21`-`@29` reach {@link NoteState.instrument} without one. */
-	| "instrument"
-	/** `$F3`. */
-	| "sample"
-	/** `$ED`, ADSR or GAIN. */
-	| "envelope"
-	/** `$E7`/`$E8`. */
-	| "volume"
-	/** `$DB`/`$DC`. */
-	| "pan"
-	/** `$EE`, the pitch modifier. */
-	| "tune"
-	/** `$FA $02`, `!HTuneValues` — a different register from `$EE`. */
-	| "htune"
-	/** `$F8`, cleared by `$DA` as the driver clears it. */
-	| "noise"
-	/** `$DE`/`$EA`, cleared by `$DF`. */
-	| "vibrato"
-	/** `$E5`, cleared by `$FD`. */
-	| "tremolo"
-	/** `$EB`/`$EC`, cleared by `$FE`. */
-	| "pitchEnvelope"
-	/** `$FB`. */
-	| "arpeggio"
-	/** `$F4`'s nine switches, as one slot: they draw the same and read the same. */
-	| "toggles"
-	/** `$FA`'s other sub-commands, likewise. */
-	| "settings"
-	/** `$FC`. */
-	| "remote"
-	/** `$E2`/`$E3`. Song-wide. */
-	| "tempo"
-	/** `$E0`/`$E1`. Song-wide. */
-	| "globalVolume"
-	/** `$E4`. Song-wide. */
-	| "transpose"
-	/** `$EF`/`$F1`/`$F2`, cleared by `$F0`. One DSP, so song-wide. */
-	| "echo"
-	/** `$F5`. Song-wide, for the same reason. */
-	| "fir";
-
-/** Every slot, in the order {@link WalkNote.origins} is indexed by. */
-export const SLOTS: readonly StateSlot[] = [
-	"instrument",
-	"sample",
-	"envelope",
-	"volume",
-	"pan",
-	"tune",
-	"htune",
-	"noise",
-	"vibrato",
-	"tremolo",
-	"pitchEnvelope",
-	"arpeggio",
-	"toggles",
-	"settings",
-	"remote",
-	"tempo",
-	"globalVolume",
-	"transpose",
-	"echo",
-	"fir",
-];
-
-/**
- * How many of {@link SLOTS} a channel owns. The song-wide ones are the tail, so
- * one number splits them and a channel's array need only be this long.
- *
- * Taken from where `"tempo"` sits rather than written as a count, so adding a
- * slot to either half moves the boundary with it. `walktest` checks the tail is
- * what this claims, since a per-channel slot filed as song-wide would have one
- * channel's command reported by all eight.
- */
-const CHANNEL_SLOTS = SLOTS.indexOf("tempo");
-
-const slotAt = (slot: StateSlot): number => SLOTS.indexOf(slot);
-
-const INSTRUMENT_SLOT = slotAt("instrument");
-
-/**
- * The slot a command writes, and the one it clears instead.
- *
- * A function rather than a table because `$FA` is eight commands under one byte
- * and only `$02` writes a slot of its own, and because the four `off` commands
- * take a slot away rather than occupying one: after `$DF` there is no vibrato,
- * so reporting the `$DF` as the vibrato in force would be a plain lie.
- */
-function slotsOf(vcmd: number, sub: number): { writes: StateSlot | null; clears: StateSlot | null } {
-	switch (vcmd) {
-		case 0xda:
-			// `SetInstrument` writes `$C1+x` and clears the noise bit with it
-			// (`main.asm:2554` ModifyNoise), which is why this takes noise away.
-			return { writes: "instrument", clears: "noise" };
-		case 0xdb:
-		case 0xdc:
-			return { writes: "pan", clears: null };
-		case 0xde:
-		case 0xea:
-			return { writes: "vibrato", clears: null };
-		case 0xdf:
-			return { writes: null, clears: "vibrato" };
-		case 0xe0:
-		case 0xe1:
-			return { writes: "globalVolume", clears: null };
-		case 0xe2:
-		case 0xe3:
-			return { writes: "tempo", clears: null };
-		case 0xe4:
-			return { writes: "transpose", clears: null };
-		case 0xe5:
-			return { writes: "tremolo", clears: null };
-		case 0xe7:
-		case 0xe8:
-			return { writes: "volume", clears: null };
-		case 0xeb:
-		case 0xec:
-			return { writes: "pitchEnvelope", clears: null };
-		case 0xed:
-			return { writes: "envelope", clears: null };
-		case 0xee:
-			return { writes: "tune", clears: null };
-		case 0xef:
-		case 0xf1:
-		case 0xf2:
-			return { writes: "echo", clears: null };
-		case 0xf0:
-			return { writes: null, clears: "echo" };
-		case 0xf3:
-			return { writes: "sample", clears: null };
-		case 0xf4:
-			return { writes: "toggles", clears: null };
-		case 0xf5:
-			return { writes: "fir", clears: null };
-		case 0xf8:
-			return { writes: "noise", clears: null };
-		case 0xfa:
-			return { writes: sub === 0x02 ? "htune" : "settings", clears: null };
-		case 0xfb:
-			return { writes: "arpeggio", clears: null };
-		case 0xfc:
-			return { writes: "remote", clears: null };
-		case 0xfd:
-			return { writes: null, clears: "tremolo" };
-		case 0xfe:
-			return { writes: null, clears: "pitchEnvelope" };
-		default:
-			// `$E6`/`$E9` are structure, and `$F6`/`$F7`/`$F9` write a register or a
-			// byte once rather than setting anything a later note reads. So does
-			// `$DD`, which runs on the note that read it and is gone: the arm in
-			// `runCommand` raises its entry and names it on that note instead.
-			return { writes: null, clears: null };
-	}
-}
-
-/**
- * Whether the next command into this one's slot undoes everything it did, so
- * that a note playing without it in {@link WalkNote.origins} is proof it reaches
- * nothing more.
- *
- * Not a command that only clears a slot — after `$DF` there is no vibrato to be
- * in force, so no note ever names it — nor `$F4`'s switches or `$FA`'s settings,
- * which share a slot without replacing one another (two `$F4 $01`s cancel, and
- * `$F4 $03` leaves `$F4 $01` standing), nor one that fills no slot at all.
- */
-export function replacedByNextInSlot(vcmd: number, sub: number): boolean {
-	const { writes } = slotsOf(vcmd, sub);
-	return writes !== null && writes !== "toggles" && writes !== "settings";
-}
-
-/**
- * The song-wide and per-channel settings a note sounds under.
- *
- * Deliberately the whole of it, not the subset anything reads today. A view
- * takes what it shows — the roll's tooltip uses `instrument`, `volume`,
- * `quantization`, `noise`, `transpose`, `tune` and `tempo`, and leaves the
- * rest — but the walk is the only place any of it can be known, since the
- * command that set it may be thousands of ticks back on another channel.
- * Working it out here once is what makes a second reader of it free; deleting
- * the unread ones would make the next tooltip row a change to the walker.
- */
-export interface NoteState {
-	/** `$DA`'s operand, or the drum a `$D0`-`$D8` byte selected. `null` if unset. */
-	instrument: number | null;
-	/** `$E7`/`$E8` channel volume. */
-	volume: number | null;
-	/** `$DB`/`$DC` pan, as written — bits 6-7 are the surround flags. */
-	pan: number | null;
-	/** The raw `q` byte, or `null` while the channel has not set one. */
-	quantization: number | null;
-	/** `NoteDurations[(q >> 4) & 7]`, the multiplier on a note's last frame — see {@link WalkNote.gateTicks}. */
-	gate: number;
-	/** `!WaitTime` at the note's key-on: 2, or 1 while `$F4 $02` has it flipped. */
-	waitTime: number;
-	/** `VelocityValues[...]`, through whichever table is selected. */
-	velocity: number;
-	vibrato: boolean;
-	tremolo: boolean;
-	/** `$F8`'s clock, or `null` when the channel is not making noise. */
-	noise: number | null;
-	/** `$E4` song-wide transposition, in semitones. */
-	transpose: number;
-	/**
-	 * `$FA $02`, the channel's own semitone tune — `!HTuneValues+x`, which the
-	 * driver adds to every note number beside `$43` (`main.asm:439-442`).
-	 */
-	tune: number;
-	/**
-	 * The `t` value the song has last been *told* to reach — not `$51`, which is
-	 * one higher.
-	 *
-	 * Through a `$E3` fade this is the target, which the driver has not got to
-	 * yet: the fade steps once per tick and only a per-tick walk knows where it
-	 * is partway. {@link SongTimeline.tempoChanges} is the authority on what a
-	 * given tick really runs at; this is what the song asked for.
-	 */
-	tempo: number;
-	/** `$E0`/`$E1` master volume. */
-	globalVolume: number | null;
-}
-
-/**
- * A `$DD` as the driver will run it, on the note that read it.
- *
- * Named rather than left inline because `note-audition.ts` takes one: a note
- * auditioned on its own is handed these four bytes so the driver finds them
- * where it finds them in the song.
- */
-export interface PitchSlide {
-	/** `$91+x` — ticks the pitch stands still before it starts moving. */
-	delay: number;
-	/** `$90+x` — ticks it takes to arrive. */
-	duration: number;
-	/**
-	 * The note byte the slide arrives at, as the **compiler emitted** it.
-	 *
-	 * Not a written pitch: `h` and the instrument's tuning are resolved at
-	 * compile time into `NoteAddress.note`, which is the byte here. The driver
-	 * adds `$43` and `!HTuneValues+x` itself when it arms the slide
-	 * (`main.asm:3277-3285`), so nothing above it may transpose this again.
-	 */
-	target: number;
-	/**
-	 * How far into the note the frame the read-ahead found the `$DD` in **begins**.
-	 *
-	 * What tells `[len, note, $DD]` from `[len, note, $C6, $DD]`: the second
-	 * starts the same slide a tie later. The peek runs only on a tick that does
-	 * *not* fetch music data (`main.asm:2337-2339` jumps past `L_0CC6`'s
-	 * read-ahead on one that does), so the pointer has to be standing on the
-	 * `$DD` already. That distinction is the whole reason `Music.cpp:2224`
-	 * rewinds a tie out of the way of a `$DD`.
-	 */
-	afterTicks: number;
-	/**
-	 * That frame's own length — `$0200+x` as it stood when the peek read the byte.
-	 *
-	 * Usually the note's last frame, and not always: a tie written *after* the
-	 * command, `f+2 $DD $00 $D6 a+^2`, puts the `$DD` between two of the note's
-	 * frames, with 96 ticks of it still to come. So {@link afterTicks} says where
-	 * the arm sits and this says how long the frame holding it runs, which is the
-	 * one thing that decides whether it arms at all: every tick of a one-tick
-	 * frame fetches, so the read-ahead never runs on one and the command loop
-	 * reaches the `$DD` and its `$0000` slot instead.
-	 */
-	frameTicks: number;
-}
-
-/** One sounding note, expanded onto the song's own tick timeline. */
-export interface WalkNote {
-	/** 0-7. The voice it sounds on, even when its bytes live in the loop block. */
-	channel: number;
-	/** Ticks from the start of the pass. */
-	tick: number;
-	/** Ticks the slot occupies. `$C6` ties are folded in. */
-	ticks: number;
-	/**
-	 * Ticks it actually sounds before the key-off: `frameSoundingTicks` of the last frame, under the
-	 * `!WaitTime` in force at its key-on, with every frame tied in front of it whole.
-	 */
-	gateTicks: number;
-	/** The emitted byte. `$80`-`$C5` pitched, `$D0`-`$D8` a drum. */
-	note: number;
-	/** 0-69 for a pitched note, `null` for a drum. */
-	key: number | null;
-	/** 0-8 for `$D0`-`$D8`, `null` for a pitched note. */
-	percussion: number | null;
-	/**
-	 * ARAM address of the note byte's own frame — the duration byte where the
-	 * note carries one, the note byte where it reuses the standing duration.
-	 * This is where `emitNote` began writing, so it is a key into `noteMap`.
-	 */
-	address: number;
-	state: NoteState;
-	/**
-	 * ARAM address of the command in force in each of {@link SLOTS}, or `null`
-	 * where nothing has written that slot yet.
-	 *
-	 * Addresses rather than values, because the point is to name the command: a
-	 * `[ ]` body, a `[[ ]]` subloop and a `(1)n` call all replay one run of bytes
-	 * under whatever state reached them, so which `$ED` a note sounds under is a
-	 * fact about execution and not about the text. `CompileResult.commandMap`
-	 * turns an address back into the source it was written as.
-	 *
-	 * Shared between consecutive notes for as long as nothing changes, exactly as
-	 * {@link state} is.
-	 */
-	origins: readonly (number | null)[];
-	/**
-	 * The note whose `$D0`-`$D8` byte loaded the drum this note sounds on, by
-	 * its {@link address} — its own for a drum note — or `null` when the
-	 * instrument in force came from a `$DA` (or is the boot default).
-	 *
-	 * The instrument slot of {@link origins} cannot say this: `@21`-`@29` emit
-	 * no command, the drum byte itself does the loading (`main.asm:381-388`),
-	 * and it goes on being the sample under every note until the next `$DA` —
-	 * through the `]` of the loop it was written in, a `*` or `(1)n` that replays
-	 * it, and a call from another channel alike. So the walk names the note that
-	 * did it, and the source, which knows which `@` was folded into *that* note,
-	 * names the command from there. `CompileResult.noteMap` turns the address
-	 * back into text.
-	 */
-	drumFrom: number | null;
-	/**
-	 * The `$DD` pitch slide this note's read-ahead picked up, or `null`.
-	 *
-	 * `$DD` is not dispatched — its slot in the command table holds `$0000` — and
-	 * is instead consumed by a peek at the track pointer during the note before
-	 * it (`main.asm:3256-3287`). So it is a property of *this* note rather than a
-	 * command in its own right, in the way {@link drumFrom} is.
-	 *
-	 * {@link PitchSlide.afterTicks} carries where in the note it was found, which
-	 * a walk that reported only the operands could not say — and two songs that
-	 * differ only there are two different songs.
-	 */
-	bend: PitchSlide | null;
-	/**
-	 * ARAM address of that `$DD`, or `null` — a key into `CompileResult.commandMap`,
-	 * which is how a reader names the command rather than only its operands.
-	 *
-	 * Its own field and not a member of {@link bend}: `bend` is the operands the
-	 * driver runs, and this is where they were read from.
-	 */
-	bendFrom: number | null;
-}
-
-/**
- * One command the pass runs, on the tick it changes something.
- *
- * A *transition* and not an execution, for everything that takes a slot: it is
- * raised where {@link SLOTS} changes hands, which is the test `recordOrigin`
- * already makes. So a `[ v200 c8 ]2` raises one, its second pass writing the
- * address already in the slot, and `[ v100 c8 v200 d8 ]2` raises four. That is
- * the same answer `definedAt` gives from the note end, arrived at from the byte
- * end.
- *
- * `$DD` takes no slot and so has no transition to be raised on. It is an
- * execution, and is raised as one — see {@link SongTimeline.commands}.
- */
-export interface WalkCommand {
-	/** Ticks from the start of the pass. */
-	tick: number;
-	/**
-	 * 0-7. Its own, because `CommandAddress.channel` is 8 for every byte that
-	 * lives in the loop block, and a reader colouring by voice needs the voice.
-	 */
-	channel: number;
-	/** ARAM address of the command byte — a key into `CompileResult.commandMap`. */
-	address: number;
-	/** The `$DA`-`$FE` byte itself. */
-	vcmd: number;
-	/**
-	 * Whether a note *begins* on this very tick and sounds with it in force.
-	 *
-	 * Which is to say whether anything anchored on a note stands where this
-	 * command runs. It is false in five shapes, and no scope tells them apart:
-	 * a command the driver reads while its channel is resting, one it reads
-	 * inside a `$C6` tie, where the sounding note began earlier, one replaced
-	 * before the next note keys on, one with no note left after it at all, and
-	 * `$DF`, `$F0`, `$FD` and `$FE`, which clear a slot rather than take one and
-	 * so are in no {@link WalkNote.origins} at any tick.
-	 *
-	 * `origins` cannot answer this from the note end: it is anchored on a note
-	 * that sounds, and the question is about the tick. Nor can
-	 * {@link WalkCommand.vcmd}, which would restate the table `slotsOf` already
-	 * is and would still reach only the last of the five.
-	 */
-	onANote: boolean;
-}
-
-/** A song-wide tempo command, on the tick the driver runs it. */
-export interface TempoChange {
-	/** Ticks from the start of the pass. */
-	tick: number;
-	/** The `t` byte: `$E2`'s only operand, `$E3`'s *second*. */
-	tempo: number;
-	/** `$E3`'s duration byte. 0 for `$E2`, which takes effect at once. */
-	fadeTicks: number;
-	/** ARAM address of the `$E2`/`$E3` byte — a key into `CompileResult.commandMap`. */
-	address: number;
-	/**
-	 * Read after its channel reached the point the song loops back to, so every
-	 * repetition runs it again. Always false in a song that does not loop.
-	 */
-	repeats: boolean;
-}
-
-/**
- * One execution of a loop on one voice: the call, its body, and every pass.
- *
- * The driver's own reading, off the same `$E9` and `$E6` frames the walk keeps
- * per {@link Track} — nothing here is derived from source, which cannot say
- * which voice replays a body or when. A body played from two places is two
- * runs; a `[[ ]]` inside a `[ ]` is one run per outer pass, since each outer
- * pass opens and closes it afresh.
- */
-export interface LoopRun {
-	/** 0-7 — the voice the passes sound on. */
-	channel: number;
-	/** `"call"` for `$E9` (`[ ]n`, `(n)m` and `*n`); `"sub"` for `$E6` (`[[ ]]n` and hex pairs). */
-	kind: "call" | "sub";
-	/**
-	 * ARAM address of the `$E9`'s own byte, or of the closing `$E6`'s.
-	 *
-	 * A key into `CompileResult.commandMap` for a call site or either `$E6`
-	 * spelling. A `]n`'s `$E9` is the one `recordCommand` drops — the `]` moved
-	 * the channel out from under the offset (`parser.ts:508`) — so a run whose
-	 * `from` maps to no command is the textual body playing at its own position,
-	 * and that absence is how a reader tells a declaration from a recall.
-	 */
-	from: number;
-	/** ARAM range of the body's bytes, `[start, end)`. For `"sub"`, `start` is past the `$E6 $00` pair. */
-	body: { start: number; end: number };
-	/** Times the body plays here — the `]]n` / `$E6 n+1` arithmetic already resolved. */
-	count: number;
-	/** One entry per pass, in order: the tick it enters the body at, and the ticks it runs. */
-	passes: readonly { tick: number; ticks: number }[];
-}
-
-export interface SongTimeline {
-	/** Sorted by tick, then by channel. */
-	notes: readonly WalkNote[];
-	/** Ticks in one pass: the intro plus a single trip round the loop. */
-	ticks: number;
-	/** Where the loop comes back to, or `null` for a song that does not loop. */
-	loopTick: number | null;
-	/**
-	 * Every `$E2`/`$E3` the pass runs, ascending by tick and in driver order.
-	 *
-	 * The compiler cannot produce this list, which is why it is here.
-	 * `estimateSeconds` is segment-wise over source text, so a `t` that executes
-	 * more than once has no place in it (`parser.ts:1806`) and a fade has no
-	 * segment at all (`parser.ts:1819`, porting `Music.cpp:809`) — either one
-	 * makes it abandon the whole song's length. Walking bytes has neither
-	 * problem: a `t` in a loop body appears once per iteration, at the tick that
-	 * iteration reaches, because that is what the driver does with it.
-	 *
-	 * Cut at the end of the pass the same way {@link notes} is — a `t` past the
-	 * shortest channel never runs, which is what `AMK0217` warns about.
-	 */
-	tempoChanges: readonly TempoChange[];
-	/**
-	 * The tempo command still in force when the pass ends, which is the tempo the
-	 * repetition starts at: `L_0C01` loads new track pointers and leaves `$51`
-	 * alone (`main.asm:2283-2326`), and only the start of a song resets it
-	 * (`main.asm:2187`). `null` when no tempo command has run.
-	 *
-	 * Not always the last of {@link tempoChanges}. On the tick the pass ends the
-	 * voices run in order and the first `$00` ends the phrase there
-	 * (`main.asm:2337-2346`), so a `t` at the very end of a channel numbered no
-	 * higher than the one that ends it has run and carries over, though that list
-	 * cuts it with everything else on that tick.
-	 */
-	tempoAtEnd: TempoChange | null;
-	/**
-	 * Every setting the repeat starts its loop under differently from the first
-	 * pass, judged at the loop's first note or rest, or at its first note for
-	 * remote code a rest cannot read — see `repeat-settings.ts`.
-	 * What a pass ends on is taken when {@link tempoAtEnd} is, so a command at the
-	 * end of a channel counts on the same terms.
-	 *
-	 * Empty for a song that does not loop, and for one the walk cut short.
-	 */
-	carries: readonly SettingCarry[];
-	/**
-	 * Every command the pass runs that changes something, ascending by tick and
-	 * in driver order.
-	 *
-	 * Neither the compiler nor {@link WalkNote.origins} can produce this list.
-	 * `origins` names the command in force *at a note*, so it dates a command to
-	 * the next note that sounds rather than to the tick the driver read it — a
-	 * `v` written before a rest is a whole rest out — and it can never name the
-	 * four commands that take a slot away instead of filling one (`$DF`, `$F0`,
-	 * `$FD`, `$FE`), since after a `$DF` there is no vibrato and reporting the
-	 * `$DF` as the vibrato in force would be a plain lie. Nor can it see a
-	 * command with no note after it at all.
-	 *
-	 * A command that writes no slot is not here: `$F6`, `$F7` and `$F9` write a
-	 * register or a byte once and nothing later reads it back as state, and
-	 * `$E6`/`$E9` are the shape of the music rather than a setting. Neither is
-	 * anything inside a `$FC` body, which the walk does not follow.
-	 *
-	 * `$DD` writes no slot either and is here all the same, raised by its own arm
-	 * in `runCommand` rather than by `recordOrigin`. It is the one entry that is
-	 * an execution and not a transition, so a `[ ]` body carrying one raises it
-	 * once per pass: a slide really does run on every note that reads it, where a
-	 * `v200` rewritten to the value already in the slot moves nothing. Its tick is
-	 * the frame the read-ahead found it in, which is inside the note before it
-	 * rather than at the tick the pointer reached the byte.
-	 *
-	 * Not everything here was written by anybody: AddmusicK prepends
-	 * `$FA $04 <echo size>` and `$FA $06 $01` to the lowest channel itself
-	 * (Music.cpp:2989-3050), and the driver runs them like any other. They are in
-	 * no command map, so a reader joining back to source drops them there.
-	 *
-	 * It does not replace {@link tempoChanges}, which carries the tempo value and
-	 * the fade length a clock needs; a `$E2` is in both, answering two questions.
-	 *
-	 * Cut at the end of the pass the same way {@link notes} is.
-	 */
-	commands: readonly WalkCommand[];
-	/**
-	 * Every loop the walk played through, in the order the runs opened.
-	 *
-	 * **Not** cut at the end of the pass, unlike {@link notes} — the piano roll
-	 * needs the tail's runs for items past the cut, exactly as {@link channelTicks}
-	 * is a full-walk figure. A reader that draws clips at {@link ticks} itself.
-	 */
-	loops: readonly LoopRun[];
-	/** Ticks walked per channel, to cross-check against `stats.channelTicks`. */
-	channelTicks: readonly number[];
-	/** Channels the song writes to. */
-	used: readonly boolean[];
-	/** Every `@n` the song sounds a note on, ascending and distinct. */
-	usedInstruments: readonly number[];
-	/** ARAM addresses of notes that never sound at all. Used for diagnostics. */
-	unreachable: readonly number[];
-	/** `#instruments` entries, six bytes each, `@30` first. */
-	customInstruments: readonly (readonly number[])[];
-	/** A budget ran out and the walk stopped early. */
-	truncated: boolean;
-	/** Anything malformed, named. Empty on a well-formed song. */
-	problems: readonly string[];
-}
-
-/**
  * Total byte length of the VCMD at `index`, including the command byte.
  * Returns 0 for a byte that is not a VCMD, and clamps at the end of the blob.
  */
@@ -680,7 +130,7 @@ export function vcmdLength(song: Uint8Array, index: number): number {
 	// notes. `main.asm:2988-2997`: a count below $80 is followed by a step
 	// length and that many note bytes; $80 and up is trill or glissando, which
 	// carry two fixed arguments instead.
-	if (vcmd === 0xfb) {
+	if (vcmd === VCMD.Arpeggio) {
 		const count = song[index + 1] ?? 0;
 		return count >= 0x80 ? 4 : count + 3;
 	}
@@ -688,7 +138,7 @@ export function vcmdLength(song: Uint8Array, index: number): number {
 	// `$FA $FE`'s hot patch takes one further byte for *every* trailing byte
 	// whose high bit is set: `.FACommand_readUntilPositive` (`main.asm:3006`)
 	// loops while `bmi`, then steps once more past the byte that ended it.
-	if (vcmd === 0xfa && song[index + 1] === 0xfe) {
+	if (vcmd === VCMD.Settings && song[index + 1] === 0xfe) {
 		let at = index + 2;
 		while (at < song.length && song[at] >= 0x80) {
 			at++;
@@ -807,8 +257,6 @@ interface ChannelState {
 	tune: number;
 }
 
-const word = (song: Uint8Array, at: number): number => song[at] | (song[at + 1] << 8);
-
 /**
  * Reads a compiled song into a timeline of one pass.
  *
@@ -886,7 +334,7 @@ export function walkSong(song: Uint8Array, aramAddress: number): SongTimeline {
 	/** Where each channel re-enters on the loop, for `loopTick`. */
 	const loopAt: number[] = [];
 
-	for (let channel = 0; channel < CHANNELS; channel++) {
+	for (let channel = 0; channel < VOICES; channel++) {
 		const start = word(song, firstPhrase + channel * 2);
 		const at = start === 0 ? -1 : indexOf(start);
 		if (start !== 0 && at < 0) {
@@ -1396,17 +844,17 @@ export function walkSong(song: Uint8Array, aramAddress: number): SongTimeline {
 		recordSettings(channel, track, aramAddress + track.at, [...song.subarray(track.at, track.at + length)], false);
 
 		switch (vcmd) {
-			case 0xda: // instrument
+			case VCMD.Instrument: // instrument
 				state.instrument = arg(0);
 				state.noise = null;
 				// `SetInstrument` reloads the sample, so no drum byte is in force now.
 				track.drumFrom = -1;
 				break;
-			case 0xdb: // pan
-			case 0xdc: // pan fade — the second byte is the target
-				state.pan = vcmd === 0xdb ? arg(0) : arg(1);
+			case VCMD.Pan: // pan
+			case VCMD.PanFade: // pan fade — the second byte is the target
+				state.pan = vcmd === VCMD.Pan ? arg(0) : arg(1);
 				break;
-			case 0xdd: {
+			case VCMD.PitchBend: {
 				// Not dispatched by the driver at all — the note sounding now picks
 				// it up by peeking at the track pointer (`main.asm:3256-3287`), on
 				// any tick of that note where no slide is already running. A `$C6`
@@ -1454,19 +902,19 @@ export function walkSong(song: Uint8Array, aramAddress: number): SongTimeline {
 				break;
 			}
 
-			case 0xde:
+			case VCMD.Vibrato:
 				state.vibrato = true;
 				break;
-			case 0xdf:
+			case VCMD.VibratoOff:
 				state.vibrato = false;
 				break;
-			case 0xe0:
-			case 0xe1:
-				shared.globalVolume = vcmd === 0xe0 ? arg(0) : arg(1);
+			case VCMD.GlobalVolume:
+			case VCMD.GlobalVolumeFade:
+				shared.globalVolume = vcmd === VCMD.GlobalVolume ? arg(0) : arg(1);
 				invalidateAll();
 				break;
-			case 0xe2:
-			case 0xe3:
+			case VCMD.Tempo:
+			case VCMD.TempoFade:
 				// `track.ticks` is the driver's own position for this command: a
 				// channel is only ever advanced while it is the furthest behind
 				// (the loop below), and `step` moves the clock at most once, in
@@ -1474,8 +922,8 @@ export function walkSong(song: Uint8Array, aramAddress: number): SongTimeline {
 				// order the driver would run them, already ascending by tick.
 				lastTempo = {
 					tick: track.ticks,
-					tempo: vcmd === 0xe2 ? arg(0) : arg(1),
-					fadeTicks: vcmd === 0xe2 ? 0 : arg(0),
+					tempo: vcmd === VCMD.Tempo ? arg(0) : arg(1),
+					fadeTicks: vcmd === VCMD.Tempo ? 0 : arg(0),
 					address: aramAddress + track.at,
 					repeats: track.repeating,
 				};
@@ -1483,26 +931,26 @@ export function walkSong(song: Uint8Array, aramAddress: number): SongTimeline {
 				// The target, not what a fade is passing through — see
 				// {@link NoteState.tempo}. Pricing a fade tick by tick is the
 				// clock's job, and it reads `tempoChanges` to do it.
-				shared.tempo = vcmd === 0xe2 ? arg(0) : arg(1);
+				shared.tempo = vcmd === VCMD.Tempo ? arg(0) : arg(1);
 				invalidateAll();
 				break;
-			case 0xe4:
+			case VCMD.GlobalTranspose:
 				shared.transpose = (arg(0) << 24) >> 24;
 				invalidateAll();
 				break;
-			case 0xe5:
-			case 0xfd:
+			case VCMD.Tremolo:
+			case VCMD.TremoloOff:
 				// `$FD` is `$E5`'s tail with a zero depth (`Commands.asm:353`).
-				state.tremolo = vcmd === 0xe5 && arg(2) !== 0;
+				state.tremolo = vcmd === VCMD.Tremolo && arg(2) !== 0;
 				break;
-			case 0xe7:
-			case 0xe8:
-				state.volume = vcmd === 0xe7 ? arg(0) : arg(1);
+			case VCMD.Volume:
+			case VCMD.VolumeFade:
+				state.volume = vcmd === VCMD.Volume ? arg(0) : arg(1);
 				break;
-			case 0xf8:
+			case VCMD.Noise:
 				state.noise = arg(0);
 				break;
-			case 0xf4:
+			case VCMD.Toggles:
 				// `eor !WaitTime, #$03` (`Commands.asm:595-597`). Read at a note
 				// key-on, where the driver reads it at the key-off check, so a toggle
 				// on another channel in between is not seen until the next note.
@@ -1515,7 +963,7 @@ export function walkSong(song: Uint8Array, aramAddress: number): SongTimeline {
 
 				dirty = false;
 				break;
-			case 0xfa:
+			case VCMD.Settings:
 				// `$FA $06` picks the velocity table. `main.asm:2379` tests it
 				// against zero, so anything non-zero is the N-SPC half.
 				if (arg(0) === 0x06) {
@@ -1532,7 +980,7 @@ export function walkSong(song: Uint8Array, aramAddress: number): SongTimeline {
 
 				break;
 
-			case 0xe6: {
+			case VCMD.Subloop: {
 				// `cmdE6` (`Commands.asm:31`). `$E6 $00` marks; a non-zero argument
 				// closes, and the count is loaded on the first close only, so the
 				// body plays one more time than the byte says.
@@ -1573,7 +1021,7 @@ export function walkSong(song: Uint8Array, aramAddress: number): SongTimeline {
 				break;
 			}
 
-			case 0xe9: {
+			case VCMD.CallLoop: {
 				// `cmdE9` (`Commands.asm:161`) — what a `[ ]` loop compiles to. The
 				// count is stored as written and the `$00` handler decrements before
 				// testing, so the body runs exactly that many times.
@@ -1630,7 +1078,7 @@ export function walkSong(song: Uint8Array, aramAddress: number): SongTimeline {
 	// the pass is worth.
 	for (;;) {
 		let next = -1;
-		for (let channel = 0; channel < CHANNELS; channel++) {
+		for (let channel = 0; channel < VOICES; channel++) {
 			if (tracks[channel].at >= 0 && (next < 0 || tracks[channel].ticks < tracks[next].ticks)) {
 				next = channel;
 			}
@@ -1687,7 +1135,7 @@ export function walkSong(song: Uint8Array, aramAddress: number): SongTimeline {
 		// emits `$D0`-`$D8`, so a tenth "drum" reads a percussion entry that is not
 		// there. The byte sets its own instrument, so this is the one percussion
 		// byte that can go wrong, and only from a malformed blob.
-		if (note.percussion !== null && note.percussion >= PERCUSSION_COUNT) {
+		if (note.percussion !== null && note.percussion >= PERCUSSION_SLOTS) {
 			problems.push(`A percussion byte outside the driver's nine drums sounded (0x${note.note.toString(16)}).`);
 		}
 	}
@@ -1744,8 +1192,8 @@ export function walkSong(song: Uint8Array, aramAddress: number): SongTimeline {
 			carries: [],
 			commands: [],
 			loops: [],
-			channelTicks: new Array<number>(CHANNELS).fill(0),
-			used: new Array<boolean>(CHANNELS).fill(false),
+			channelTicks: new Array<number>(VOICES).fill(0),
+			used: new Array<boolean>(VOICES).fill(false),
 			unreachable: [],
 			usedInstruments: [],
 			customInstruments: [],

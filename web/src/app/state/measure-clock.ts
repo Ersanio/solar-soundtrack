@@ -28,7 +28,8 @@
 
 import { SPC_SAMPLE_RATE, type SpcCore } from '@amk/spc/wasm-host';
 import {
-  TICK_POLL_HZ,
+  Addr,
+  POLL_BLOCK_FRAMES,
   createTickPhase,
   sawTick,
   seedTickPhase,
@@ -36,16 +37,12 @@ import {
 } from '@amk/spc/driver-state';
 import type { ClockSegment, SongClock } from './song-clock';
 
-/** Emulated frames per poll, matching what `worklet.ts` counts ticks at. */
-const BLOCK = SPC_SAMPLE_RATE / TICK_POLL_HZ;
-
 /**
- * `$51` holds the driver tempo, and `driverTickSeconds` in `@amk/tokens` says
- * what one of its ticks is worth. Restated rather than imported only to keep
- * this module's imports to `@amk/spc`, which the worker already pulls in;
+ * What one tick is worth at a driver tempo, which `driverTickSeconds` in
+ * `@amk/tokens` also says. Restated rather than imported only to keep this
+ * module's imports to `@amk/spc`, which the worker already pulls in;
  * `walktest` asserts the two agree.
  */
-const TEMPO = 0x51;
 const nominalTickSeconds = (driverTempo: number): number => 256 / (500 * driverTempo);
 
 /**
@@ -122,8 +119,8 @@ export function measureClock(core: SpcCore, spc: Uint8Array, passTicks: number):
   const cap = MAX_SECONDS * SPC_SAMPLE_RATE;
 
   while (ticks < passTicks && rendered < cap) {
-    core.renderView(BLOCK);
-    rendered += BLOCK;
+    core.renderView(POLL_BLOCK_FRAMES);
+    rendered += POLL_BLOCK_FRAMES;
 
     const aram = core.aram();
     if (voice < 0) {
@@ -151,7 +148,7 @@ export function measureClock(core: SpcCore, spc: Uint8Array, passTicks: number):
       // Priced at the tempo standing when the tick was seen, so a song that
       // changes tempo — or fades one — is compared against what it asked for at
       // each point rather than against an average it never plays at.
-      nominalSeconds += nominalTickSeconds(aram[TEMPO] || 1) * stepped;
+      nominalSeconds += nominalTickSeconds(aram[Addr.Tempo] || 1) * stepped;
     }
 
     if (ticks - marked >= step) {

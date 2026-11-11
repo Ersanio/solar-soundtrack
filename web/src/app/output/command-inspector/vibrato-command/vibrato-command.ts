@@ -1,3 +1,4 @@
+import { VCMD } from '@amk/core/hardcoded-tables';
 import { Component, computed, inject, input } from '@angular/core';
 
 import { argEditable, argumentText, spliceArg } from '@amk/tokens/edits';
@@ -40,7 +41,7 @@ export class VibratoCommand {
   protected readonly args = computed(() => this.command().args.map((a) => a.value));
 
   /** `$E5` is the same shape over volume rather than pitch. */
-  protected readonly isTremolo = computed(() => this.command().vcmd === 0xe5);
+  protected readonly isTremolo = computed(() => this.command().vcmd === VCMD.Tremolo);
   protected readonly axis = computed(() => (this.isTremolo() ? 'volume' : 'pitch'));
 
   /**

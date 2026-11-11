@@ -1,3 +1,4 @@
+import { VCMD } from '@amk/core/hardcoded-tables';
 import { Component, computed, inject, input } from '@angular/core';
 
 import {
@@ -12,7 +13,7 @@ import { CommitAudition } from '../../../state/commit-audition';
 import { DriverStore } from '../../../state/driver-store';
 import { EditorStore } from '../../../state/editor-store';
 import { EnumSelect } from '../../../shared/enum-select/enum-select';
-import { hex2 } from '../../../util/format';
+import { dollarHex, hex2 } from '../../../util/format';
 import { AdsrGraph } from '../adsr-graph/adsr-graph';
 import { InstrumentEntryEditor } from '../instrument-entry/instrument-entry';
 import { HexPipe } from '../../../util/hex.pipe';
@@ -53,7 +54,7 @@ export class InstrumentInspector {
   protected readonly direct = computed(() => this.command().direct === true);
 
   /** Written as `$DA $xx` rather than `@n`, which skips every rule below. */
-  protected readonly raw = computed(() => this.command().vcmd === 0xda);
+  protected readonly raw = computed(() => this.command().vcmd === VCMD.Instrument);
 
   /** A raw `$DA` whose byte meant something else — #am4's `$13`-up numbering. */
   protected readonly rawRemapped = computed(() => this.raw() && this.emitted() !== this.written());
@@ -270,7 +271,9 @@ export class InstrumentInspector {
 
   /** How the command was written, for the heading row. */
   protected readonly writtenLabel = computed(() =>
-    this.raw() ? `$DA $${hex2(this.written())}` : `${this.direct() ? '@@' : '@'}${this.written()}`,
+    this.raw()
+      ? `$DA ${dollarHex(this.written())}`
+      : `${this.direct() ? '@@' : '@'}${this.written()}`,
   );
 
   /** `@0`-`@18`, `@21`-`@29`, `@30`+ — stated once so the prose cannot drift. */

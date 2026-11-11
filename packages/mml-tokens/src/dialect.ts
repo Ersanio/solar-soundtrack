@@ -10,6 +10,7 @@
  * whole file, because that is what `preprocess.ts` does with them.
  */
 
+import { VCMD } from "@amk/core/hardcoded-tables";
 import { type Command, type CommandTarget, DEFAULT_TARGET, type TokenIndex } from "./tokens";
 
 /**
@@ -85,9 +86,9 @@ export function tempoAt(offset: number, commands: readonly Command[]): number | 
 			break;
 		}
 
-		if (other.vcmd === 0xe2) {
+		if (other.vcmd === VCMD.Tempo) {
 			found = other.args[0]?.value ?? found;
-		} else if (other.vcmd === 0xe3) {
+		} else if (other.vcmd === VCMD.TempoFade) {
 			// `$E3 <duration> <tempo>` — the target is what stands afterwards.
 			found = other.args[1]?.value ?? found;
 		} else if (other.kind.toLowerCase() === "t" && other.args.length > 0) {
@@ -148,11 +149,11 @@ export function velocityTableAt(command: Command, index: TokenIndex, text: strin
 			break;
 		}
 
-		if (other.vcmd === 0xfa && other.args[0]?.value === 0x06) {
+		if (other.vcmd === VCMD.Settings && other.args[0]?.value === 0x06) {
 			// Commands.asm:1087 stores the argument as written, and main.asm:2373
 			// compares it against zero — so every other value is the N-SPC table.
 			switches.push({ at: other.span.start, smw: (other.args[1]?.value ?? 0) === 0 });
-		} else if (other.vcmd === 0xf4 && other.args[0]?.value === 0x08) {
+		} else if (other.vcmd === VCMD.Toggles && other.args[0]?.value === 0x08) {
 			// Commands.asm:610 stores #$01 outright, so this one cannot switch back.
 			switches.push({ at: other.span.start, smw: false });
 		}

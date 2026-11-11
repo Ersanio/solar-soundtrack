@@ -1,8 +1,9 @@
 /** The echo hazards: every runaway echo in the document, one diagnostic per command that causes one. */
 
+import { VCMD } from "@amk/core/hardcoded-tables";
 import type { Command } from "./tokens";
 import type { Diagnostic } from "@amk/core/types";
-import { FIR_PRESETS, FIR_TAPS, type FirTaps, echoStability, toSigned } from "@amk/spc/fir";
+import { FIR_PRESETS, FIR_TAPS, type FirTaps, echoStability, signedByte } from "@amk/spc/fir";
 import { hex2 } from "@amk/core/hex";
 import { SST } from "@amk/core/messages/sst";
 
@@ -49,7 +50,7 @@ export function feedbackBefore(command: Command, commands: readonly Command[]): 
 			continue;
 		}
 
-		if (other.vcmd === 0xf1 && other.args.length >= 2) {
+		if (other.vcmd === VCMD.EchoDelay && other.args.length >= 2) {
 			found = other.args[1].value;
 		}
 	}
@@ -75,7 +76,7 @@ export function echoHazards(commands: readonly Command[]): Diagnostic[] {
 			continue;
 		}
 
-		if (command.vcmd !== 0xf1 && command.vcmd !== 0xf5) {
+		if (command.vcmd !== VCMD.EchoDelay && command.vcmd !== VCMD.Fir) {
 			continue;
 		}
 
@@ -83,11 +84,11 @@ export function echoHazards(commands: readonly Command[]): Diagnostic[] {
 		const state = states.get(key) ?? { taps: null, feedback: 0 };
 		states.set(key, state);
 
-		if (command.vcmd === 0xf1) {
+		if (command.vcmd === VCMD.EchoDelay) {
 			state.feedback = command.args[1].value;
 			state.taps = builtInTaps(command.args[2].value);
 		} else {
-			state.taps = Array.from({ length: FIR_TAPS }, (_, i) => toSigned(command.args[i].value));
+			state.taps = Array.from({ length: FIR_TAPS }, (_, i) => signedByte(command.args[i].value));
 		}
 
 		if (!state.taps || !echoStability(state.taps, state.feedback).runaway) {
@@ -96,7 +97,7 @@ export function echoHazards(commands: readonly Command[]): Diagnostic[] {
 
 		diagnostics.push({
 			severity: "severe",
-			code: command.vcmd === 0xf1 ? CODE_BUILT_IN : CODE_FIR,
+			code: command.vcmd === VCMD.EchoDelay ? CODE_BUILT_IN : CODE_FIR,
 			message: describe(command, state.feedback),
 			span: { ...command.span },
 		});
@@ -107,7 +108,7 @@ export function echoHazards(commands: readonly Command[]): Diagnostic[] {
 
 /** Cause, effect, and the way out, in one line. Says what the song will do and nothing more. */
 function describe(command: Command, feedback: number): string {
-	if (command.vcmd === 0xf1) {
+	if (command.vcmd === VCMD.EchoDelay) {
 		const which = command.args[2].value;
 		// Filter 1 is flat and peaks below unity, so it cannot be the one at fault; only filter 0 ever
 		// reaches here, and swapping to the other one is a fix on its own.

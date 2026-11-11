@@ -1,12 +1,13 @@
 /** A note being created, written into the gap it lands in: alone, or as a run laid over a window that carries the commands written there. */
 
+import { VCMD } from '@amk/core/hardcoded-tables';
 import { octaveFor, spellDuration, spellOctave, spellRest } from '@amk/core/mml-text';
 import type { Span } from '@amk/core/types';
 import { commandScope, isPercussionInstrument } from '@amk/tokens/commands/in-force';
 import { commandRewritable, type Edit, insertAt } from '@amk/tokens/edits';
 import {
   type EditContext,
-  type EditRefusal,
+  type Refusal,
   type PlacedNote,
   REFUSE_CROWDED,
   REFUSE_SPELL,
@@ -408,7 +409,7 @@ function windowCarries(
         command === undefined ||
         command.inRemoteDefinition ||
         !commandRewritable(command) ||
-        command.vcmd === 0xdd ||
+        command.vcmd === VCMD.PitchBend ||
         commandScope(command) === 'structure'
       ) {
         return false;
@@ -497,7 +498,7 @@ export function spawnInto(
   gap: Region,
   survivors: ReadonlyMap<number, PlacedNote>,
   deleted: readonly Span[],
-): Edit[] | EditRefusal {
+): Edit[] | Refusal {
   const { source, strip } = context;
   if (gap.born.length === 0) {
     return refuse(REFUSE_CROWDED);

@@ -1,11 +1,12 @@
 import { type Signal, computed, inject } from '@angular/core';
 
-import { toSigned } from '@amk/spc/fir';
+import { fromSigned } from '@amk/core/bytes';
+import { signedByte } from '@amk/spc/fir';
 import type { Command } from '@amk/tokens';
-import { argEditable, spliceArg } from '@amk/tokens/edits';
+import { argEditable, argumentText, spliceArg } from '@amk/tokens/edits';
 import { CommitAudition } from '../../../state/commit-audition';
 import { EditorStore } from '../../../state/editor-store';
-import { hex2 } from '../../../util/format';
+import { dollarHex } from '../../../util/format';
 import { argLockedBecause } from './context';
 import { dragPreview, shownArgs } from './preview';
 
@@ -44,11 +45,6 @@ export interface ByteArgs {
   signedNote(index: number): string;
 }
 
-/** A byte as it is written back: negatives fold into the high half. */
-function asByte(value: number): number {
-  return value < 0 ? value + 0x100 : value;
-}
-
 export function byteArgs(command: Signal<Command>): ByteArgs {
   const store = inject(EditorStore);
   const commitAudition = inject(CommitAudition);
@@ -59,20 +55,20 @@ export function byteArgs(command: Signal<Command>): ByteArgs {
 
   return {
     at: (index) => args()[index] ?? 0,
-    signedAt: (index) => toSigned(args()[index] ?? 0),
+    signedAt: (index) => signedByte(args()[index] ?? 0),
     shownAt: (index) => shown()[index] ?? 0,
     shown: () => shown(),
-    preview: (index, value) => drag.set(index, asByte(value)),
+    preview: (index, value) => drag.set(index, fromSigned(value)),
     commit: (index, value) => {
       commitAudition.apply(
-        spliceArg(store.source(), command(), index, `$${hex2(asByte(value) & 0xff)}`),
+        spliceArg(store.source(), command(), index, argumentText(command(), fromSigned(value))),
       );
     },
     editable: (index) => argEditable(command(), index),
     lockedBecause: (index) => argLockedBecause(command(), index),
     signedNote: (index) => {
       const byte = shown()[index] ?? 0;
-      return `$${hex2(byte)}${byte >= 0x80 ? ' — negative, so phase-inverted' : ''}`;
+      return `${dollarHex(byte)}${byte >= 0x80 ? ' — negative, so phase-inverted' : ''}`;
     },
   };
 }

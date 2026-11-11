@@ -24,7 +24,7 @@
  * that already has one.
  */
 
-import { FIRST_CUSTOM_INSTRUMENT, FIRST_PERCUSSION_INSTRUMENT } from "@amk/core/hardcoded-tables";
+import { FIRST_CUSTOM_INSTRUMENT, FIRST_PERCUSSION_INSTRUMENT, VCMD } from "@amk/core/hardcoded-tables";
 import type { Command } from "../tokens";
 import { LAST_PERCUSSION_INSTRUMENT, isPercussionInstrument } from "./in-force";
 
@@ -54,7 +54,7 @@ export function emittedInstrument(command: Command): number | null {
 		return null;
 	}
 
-	if (command.vcmd === 0xda) {
+	if (command.vcmd === VCMD.Instrument) {
 		// parser.ts:3155 — Addmusic 4.05 numbered custom instruments from $13, so a
 		// raw $DA is remapped before any of the rules below could apply to it.
 		return command.target.program === 1 && written >= 0x13 ? written - 0x13 + FIRST_CUSTOM_INSTRUMENT : written;
@@ -100,7 +100,7 @@ export function instrumentByte(command: Command, instrument: number): number | n
 }
 
 function spelling(command: Command, instrument: number): number | null {
-	if (command.vcmd === 0xda) {
+	if (command.vcmd === VCMD.Instrument) {
 		if (command.target.program === 1) {
 			// Below `$13` the byte is the table entry and at or above it the byte is
 			// a custom instrument, so entry 19 has no spelling left here.

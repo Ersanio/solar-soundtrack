@@ -1,6 +1,7 @@
 import { NOTE_MAX, NOTE_MIN } from '@amk/core/hardcoded-tables';
 import type { Command } from '@amk/tokens';
 import type { Edit } from '@amk/tokens/edits';
+import { type Refusal, isRefusal } from './refusal';
 import type { ChannelTail, Strip, StripFrame } from './roll-strip';
 
 /**
@@ -173,15 +174,13 @@ export const REFUSE_LOOP_BODY_ROOM = $localize`:@@roll.there-is-no-rest-at:roll.
  * {@link planGesture} refuses in the plan itself, where the roll can draw the
  * refusal as it happens; `planEdits` has no plan to put one in, and a
  * gesture that fails there is undone with nothing on screen to say why. So it
- * answers this instead — the shape `Strip | StripRefusal` already has, for the
+ * answers this instead — the shape `Strip | Refusal` already has, for the
  * same reason.
  */
-export interface EditRefusal {
-  refused: string;
-}
+export type { Refusal } from './refusal';
 
-export function isEdits(outcome: Edit[] | EditRefusal): outcome is Edit[] {
-  return (outcome as EditRefusal).refused === undefined;
+export function isEdits(outcome: Edit[] | Refusal): outcome is Edit[] {
+  return !isRefusal(outcome);
 }
 
 // --- planning ---------------------------------------------------------------

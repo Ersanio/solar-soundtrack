@@ -1,7 +1,7 @@
 /** Formatting helpers shared by the editor's panels. */
 
 /** Hex lives in `@amk/core`, where the compiler and the scanner also read it from. */
-export { hex, hex2, hex4 } from '@amk/core/hex';
+export { dollarHex, hex, hex2, hex4, hexBytes } from '@amk/core/hex';
 
 /**
  * A short duration, in whichever unit reads better. `∞` for a rate of 0, which

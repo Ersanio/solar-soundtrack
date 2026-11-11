@@ -12,7 +12,9 @@
  * Development Manual leaves to inference, and where a filter clips.
  */
 
+import { toSigned } from "@amk/core/bytes";
 import { hex2 } from "@amk/core/hex";
+import { clamp } from "@amk/core/math";
 
 /** Coefficients per filter, and DSP registers `$0F, $1F, … $7F`. */
 export const FIR_TAPS = 8;
@@ -37,13 +39,12 @@ export type FirTaps = readonly number[];
 
 /** Clamps to the signed byte range the DSP registers actually hold. */
 export function clampTap(value: number): number {
-	return Math.max(-128, Math.min(127, Math.round(value)));
+	return clamp(Math.round(value), -128, 127);
 }
 
-/** Reads a coefficient as the DSP does, so `$FF` is −1 rather than 255. */
-export function toSigned(byte: number): number {
-	const masked = byte & 0xff;
-	return masked >= 0x80 ? masked - 0x100 : masked;
+/** Reads a coefficient as the DSP does, so `$FF` is −1 rather than 255. Masks first, which `toSigned` does not. */
+export function signedByte(byte: number): number {
+	return toSigned(byte & 0xff);
 }
 
 /** Renders a coefficient the way `$F5` wants it written. */
@@ -260,7 +261,7 @@ export interface EchoStability {
  * community's FIRcon warns about it.
  */
 export function echoStability(taps: FirTaps, feedbackByte: number): EchoStability {
-	const feedback = Math.abs(toSigned(feedbackByte)) / TAP_UNIT;
+	const feedback = Math.abs(signedByte(feedbackByte)) / TAP_UNIT;
 	const loopGain = feedback * firPeakGain(taps);
 
 	let fromHz: number | null = null;
@@ -557,7 +558,7 @@ export interface ToneOptions {
  * the driver can be given.
  */
 export function designTone({ tone, strength = 1 }: ToneOptions): number[] {
-	const amount = Math.max(-1, Math.min(1, tone)) * Math.max(0, Math.min(1, strength));
+	const amount = clamp(tone, -1, 1) * clamp(strength, 0, 1);
 	if (amount === 0) {
 		return [...FLAT_TAPS];
 	}
@@ -579,7 +580,7 @@ export function designTone({ tone, strength = 1 }: ToneOptions): number[] {
 		// {@link fitToTarget} this one is not tracing a line the user drew, so it
 		// is free to follow hearing rather than the plot's linear axis — it comes
 		// out as a curve there, which is correct and not worth straightening.
-		const t = Math.min(1, Math.max(0, (Math.log(Math.max(hz, FIR_AUTHORITY_HZ)) - lowLog) / spanLog));
+		const t = clamp((Math.log(Math.max(hz, FIR_AUTHORITY_HZ)) - lowLog) / spanLog, 0, 1);
 		// Dark cuts the top, bright cuts the bottom; either way the peak is 1.
 		const cut = amount < 0 ? t : 1 - t;
 		return 10 ** ((-depthDb * cut) / 20);

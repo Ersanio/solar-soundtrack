@@ -1,7 +1,7 @@
 import { DestroyRef, Service, computed, inject, signal } from '@angular/core';
 
 import type { CompileResult } from '@amk/core/types';
-import { NOTE_MAX, NOTE_MIN } from '@amk/core/hardcoded-tables';
+import { NOTE_MAX, NOTE_MIN, TICKS_PER_WHOLE } from '@amk/core/hardcoded-tables';
 import type { PitchSlide } from '@amk/spc/song-walk';
 import { SPC_CHANNELS, SPC_SAMPLE_RATE } from '@amk/spc/wasm-host';
 import { EditorStore } from './editor-store';
@@ -12,7 +12,7 @@ import { silencedReason } from './transport-view';
 import { errorMessage } from '../util/format';
 
 /** How long an auditioned note is held when the caller does not say — a whole note. */
-export const AUDITION_TICKS = 192;
+export const AUDITION_TICKS = TICKS_PER_WHOLE;
 
 /** What {@link Audition.playNote} is asked for. */
 export interface NotePlay {

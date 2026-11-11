@@ -11,8 +11,10 @@
 
 import { SPC_CHANNELS, SPC_SAMPLE_RATE, type SpcCore, instantiate } from "./wasm-host";
 import {
+	MAX_SEEK_SECONDS,
 	type MuteBackup,
-	TICK_POLL_HZ,
+	POLL_BLOCK_FRAMES,
+	SEEK_STALL_BLOCKS,
 	applyChannelMutes,
 	createMuteBackup,
 	createTickPhase,
@@ -35,38 +37,8 @@ declare function registerProcessor(
 	constructor: new (options: AudioWorkletNodeOptions) => AudioWorkletProcessor,
 ): void;
 
-/**
- * Emulator frames per refill, which is also how often the driver's tempo
- * accumulator gets read.
- *
- * 1 ms, so `$44` is sampled at {@link TICK_POLL_HZ} — twice the driver's main
- * loop rate, which is what makes the tick count exact. Measured against the
- * vendored core, 32 frames rather than 1024 costs about 4% more emulator time
- * and still runs 355x faster than realtime on an eight-channel song — a cheap
- * price for a playhead that cannot drift.
- */
-const SOURCE_BLOCK = SPC_SAMPLE_RATE / TICK_POLL_HZ;
-
 /** How often to tell the page where playback has got to. */
 const POSITION_INTERVAL = 0.1;
-
-/**
- * How long a seek will emulate without the tick count moving before it gives up.
- *
- * A target the song never reaches — one past the end of a song that does not
- * loop, or any target at all in a song with no note data to tick on — would
- * otherwise render until a wall-clock ceiling, which on the audio thread is a
- * freeze rather than a slow seek. Two seconds is four times the 0.512 s a tick
- * takes at the slowest tempo the driver can hold, so no real song can look
- * stalled while it is merely slow.
- */
-const SEEK_STALL_BLOCKS = 2 * TICK_POLL_HZ;
-
-/**
- * And an outright ceiling, for a song that ticks forever without reaching the
- * target. `999` seconds is what the SPC format allows.
- */
-const MAX_SEEK_SECONDS = 999;
 
 const FULL_SCALE = 32768;
 
@@ -121,8 +93,8 @@ class SpcProcessor extends AudioWorkletProcessor {
 	private nextL = 0;
 	private nextR = 0;
 
-	private readonly block = new Int16Array(SOURCE_BLOCK * SPC_CHANNELS);
-	private blockPos = SOURCE_BLOCK;
+	private readonly block = new Int16Array(POLL_BLOCK_FRAMES * SPC_CHANNELS);
+	private blockPos = POLL_BLOCK_FRAMES;
 	private pullL = 0;
 	private pullR = 0;
 
@@ -206,7 +178,7 @@ class SpcProcessor extends AudioWorkletProcessor {
 	 * seek land where it was asked to. A host can only guess how many seconds of
 	 * audio a tick is worth — the driver drops ticks when it is busy, so the
 	 * guess runs progressively early the further in you seek — whereas the ticks
-	 * counted here are the driver's own. `SOURCE_BLOCK` is a millisecond, which
+	 * counted here are the driver's own. `POLL_BLOCK_FRAMES` is a millisecond, which
 	 * is under a tick at any tempo, so the overshoot is smaller than the unit.
 	 */
 	private seek(songTicks: number): void {
@@ -230,8 +202,8 @@ class SpcProcessor extends AudioWorkletProcessor {
 		const cap = MAX_SEEK_SECONDS * SPC_SAMPLE_RATE;
 		while (this.ticks < target && rendered < cap && stalledFor < SEEK_STALL_BLOCKS) {
 			const before = this.ticks;
-			core.renderView(SOURCE_BLOCK);
-			rendered += SOURCE_BLOCK;
+			core.renderView(POLL_BLOCK_FRAMES);
+			rendered += POLL_BLOCK_FRAMES;
 			this.afterBlock();
 			stalledFor = this.ticks > before ? 0 : stalledFor + 1;
 		}
@@ -244,7 +216,7 @@ class SpcProcessor extends AudioWorkletProcessor {
 		this.fadeFrom = -1;
 		this.postedAt = -1;
 		this.primed = false;
-		this.blockPos = SOURCE_BLOCK;
+		this.blockPos = POLL_BLOCK_FRAMES;
 		this.phase = 0;
 	}
 
@@ -325,8 +297,8 @@ class SpcProcessor extends AudioWorkletProcessor {
 
 	/** Reads one emulator frame, rendering another block when the last runs out. */
 	private pull(): void {
-		if (this.blockPos >= SOURCE_BLOCK) {
-			this.block.set(this.core!.renderView(SOURCE_BLOCK));
+		if (this.blockPos >= POLL_BLOCK_FRAMES) {
+			this.block.set(this.core!.renderView(POLL_BLOCK_FRAMES));
 			this.blockPos = 0;
 			this.afterBlock();
 		}

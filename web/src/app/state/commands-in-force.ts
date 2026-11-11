@@ -1,3 +1,4 @@
+import { VCMD } from '@amk/core/hardcoded-tables';
 import type { CommandAddress, NoteAddress } from '@amk/core/types';
 import type { WalkNote } from '@amk/spc/song-walk';
 import { type Command, type TokenIndex, commandStartingAt } from '@amk/tokens';
@@ -137,7 +138,7 @@ export function commandsInForceOf(sources: InForceSources): (note: WalkNote) => 
  *
  * By the identity of the commands and never of the arrays holding them.
  * `recordOrigin` calls `invalidateAll` on every song-wide write
- * (`song-walk.ts:1140`), so a `t`, a `$E4` or an echo byte hands all eight
+ * (`song-walk.ts:588`), so a `t`, a `$E4` or an echo byte hands all eight
  * channels a fresh `origins` array with the same addresses in it, and an array
  * compared against the one before would report every channel's next note as
  * setting everything it plays under. `index.commands` holds one object per
@@ -166,7 +167,7 @@ export function definedAt(
   // slide reaches two notes is by being read twice — a `[ ]` body played through
   // — and both notes ran it. Identity is what says "the same command" everywhere
   // else here and cannot tell those two apart.
-  const held = new Set(before.filter((command) => command.vcmd !== 0xdd));
+  const held = new Set(before.filter((command) => command.vcmd !== VCMD.PitchBend));
   return new Set(acting.filter((command) => !held.has(command)));
 }
 

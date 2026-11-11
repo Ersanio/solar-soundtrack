@@ -24,7 +24,8 @@ keeps its literals, which are `Music.cpp`'s.
 ## 1. Compiler (`packages/mml-compiler`, `.claude/rules/compiler.md`)
 
 - `packages/core/src/hardcoded-tables.ts` `HEX_LENGTHS`: the byte's argument count, indexed from
-  `FIRST_VCMD`. It is `Music.cpp`'s table; change it only with the cited line.
+  `FIRST_VCMD`. It is `Music.cpp`'s table; change it only with the cited line. `VCMD` in the same
+  file names every byte `$DA`-`$FE`; a renamed command is renamed there.
 - `parser.ts` `parseHexCommand` for a `$XX` (the `currentHex` / `hexLeft` / `currentHexSub`
   conditions carry every per-target rule and sub-command, e.g. `$FA`), or the letter's own
   `parse*` method reached from the `// prettier-ignore` dispatch table. Cite the `Music.cpp` lines.
@@ -54,8 +55,8 @@ keeps its literals, which are `Music.cpp`'s.
 
 - `src/song-walk.ts` `vcmdLength`: variable-length forms (`$FA $FE`, `$FB`, `$FC`). A wrong length
   mis-frames everything after it.
-- `slotsOf(vcmd, sub)`: which `StateSlot` the command writes or clears; a new slot is added to
-  `StateSlot` and `SLOTS`. `replacedByNextInSlot` if it supersedes.
+- `src/slots.ts` `slotsOf(vcmd, sub)`: which `StateSlot` the command writes or clears; a new slot
+  is added to `StateSlot` and `SLOTS`. `replacedByNextInSlot` if it supersedes.
 - `runCommand`: what it does to `NoteState`, the tempo, the loop stack.
 - `src/repeat-settings.ts` `settingChanges`, with `CHANNEL_SETTINGS` / `SONG_SETTINGS`, if the
   setting carries into the song's repeat (`SST0510`-`SST0512`).

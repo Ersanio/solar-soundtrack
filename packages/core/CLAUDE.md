@@ -7,6 +7,8 @@ The vocabulary every other package shares. Depends on nothing.
 | `types.ts`            | What goes into the compiler and what comes out of it         |
 | `hardcoded-tables.ts` | Constant tables lifted from AddmusicK's `Music.cpp`          |
 | `hex.ts`              | Upper-case hex, the notation everything here writes bytes in |
+| `bytes.ts`            | A byte's signed reading and back, and a little-endian word   |
+| `math.ts`             | `clamp`                                                      |
 | `mml-text.ts`         | How a note length, an octave or a `q` is spelled back as MML |
 | `messages/amk.ts`     | Every `AMK` diagnostic's message                             |
 | `messages/sst.ts`     | Every `SST` diagnostic's message                             |
@@ -23,6 +25,8 @@ provides, so "depends on nothing" still holds. `.claude/rules/i18n.md` has the s
 
 `hardcoded-tables.ts` is here rather than in `@amk/compiler` because `@amk/tokens` needs its constants too, and that is what keeps the scanner off the compiler entirely. Its line references are to
 AddmusicK 1.0.11's `Music.cpp` so they can be re-verified when the reference implementation moves.
+Its `VCMD` names every hex command byte, `$DA`-`$FE`, as `COMMANDS.html` lists them; everything
+outside `@amk/compiler` writes a command byte by that name.
 
 ## Constants that are stated twice on purpose
 

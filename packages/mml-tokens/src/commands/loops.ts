@@ -23,6 +23,7 @@
  * is a nested standard loop and an error rather than a subloop.
  */
 
+import { VCMD } from "@amk/core/hardcoded-tables";
 import type { Command, Token, TokenIndex } from "../tokens";
 
 /** A range of the source, as this module deals in them: offsets, no line. */
@@ -297,7 +298,7 @@ export function readLoops(source: string, index: TokenIndex): LoopReading {
 			}
 		} else if (token.kind === "hex") {
 			const command = byStart.get(token.start);
-			if (command?.vcmd !== 0xe6) {
+			if (command?.vcmd !== VCMD.Subloop) {
 				continue;
 			}
 

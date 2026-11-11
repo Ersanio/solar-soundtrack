@@ -13,7 +13,7 @@ import {
   viewChild,
 } from '@angular/core';
 
-import { NOTE_MIN } from '@amk/core/hardcoded-tables';
+import { FIRST_PERCUSSION_NOTE, NOTE_MIN } from '@amk/core/hardcoded-tables';
 import {
   FIRST_CUSTOM_INSTRUMENT,
   FIRST_PERCUSSION_INSTRUMENT,
@@ -499,7 +499,8 @@ export class PianoRoll {
           this.audition.playNote({
             channel,
             tick,
-            note: drum === null ? note : 0xd0 + (drum - FIRST_PERCUSSION_INSTRUMENT),
+            note:
+              drum === null ? note : FIRST_PERCUSSION_NOTE + (drum - FIRST_PERCUSSION_INSTRUMENT),
             ticks,
             slide,
             quiet: true,
@@ -1152,7 +1153,7 @@ export class PianoRoll {
       lane.kind === 'key'
         ? NOTE_MIN + lane.index
         : lane.kind === 'drum'
-          ? 0xd0 + (lane.index - FIRST_PERCUSSION_INSTRUMENT)
+          ? FIRST_PERCUSSION_NOTE + (lane.index - FIRST_PERCUSSION_INSTRUMENT)
           : null;
     if (note !== null) {
       // Not `quiet`: one press is one deliberate question, so a press that

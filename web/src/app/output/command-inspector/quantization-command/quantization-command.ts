@@ -13,7 +13,7 @@ import { Slider } from '../../../shared/slider/slider';
 import { CommitAudition } from '../../../state/commit-audition';
 import { EditorStore } from '../../../state/editor-store';
 import { velocityTableAt } from '@amk/tokens/dialect';
-import { hex2 } from '../../../util/format';
+import { dollarHex, hex2 } from '../../../util/format';
 import { dragPreview } from '../commands/preview';
 
 /**
@@ -90,7 +90,7 @@ export class QuantizationCommand {
       VELOCITY_VALUES[this.shownVelocity() + (this.table() === 'nspc' ? NSPC_VELOCITY_OFFSET : 0)],
   );
 
-  protected readonly gateLabel = computed(() => `$${hex2(this.gateByte())}/256`);
+  protected readonly gateLabel = computed(() => `${dollarHex(this.gateByte())}/256`);
 
   /** `parser.ts:emitNote` cuts a note of `$80` ticks or more into `$60`-tick pieces. */
   protected readonly gateNote = computed(() => {
@@ -100,7 +100,7 @@ export class QuantizationCommand {
     return $localize`:@@inspector.quantization.of-a-note-sounds-of:inspector.quantization.of-a-note-sounds-of ${piece}:piece: ${long}:long: ${WAIT_TIME}:wait:`;
   });
 
-  protected readonly velocityLabel = computed(() => `$${hex2(this.velocityByte())}`);
+  protected readonly velocityLabel = computed(() => dollarHex(this.velocityByte()));
 
   protected readonly velocityNote = computed(
     () =>

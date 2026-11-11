@@ -2,11 +2,11 @@
 
 import type { Span } from '@amk/core/types';
 import { type Edit, spliceOut, spliceRange } from '@amk/tokens/edits';
-import type { EditRefusal } from '../roll-edit';
+import type { Refusal } from '../roll-edit';
 import { COMMENT, type StripItem } from '../roll-strip';
 import { eol } from './spelling';
 
-export function refuse(reason: string): EditRefusal {
+export function refuse(reason: string): Refusal {
   return { refused: reason };
 }
 

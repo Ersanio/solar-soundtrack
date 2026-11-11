@@ -14,7 +14,7 @@ import {
 import { Button } from '../../../shared/button/button';
 import { type EnumOption, EnumSelect } from '../../../shared/enum-select/enum-select';
 import { Slider } from '../../../shared/slider/slider';
-import { duration, hex2 } from '../../../util/format';
+import { duration, dollarHex, hex2 } from '../../../util/format';
 import { AdsrGraph } from '../adsr-graph/adsr-graph';
 import { dragPreview } from '../commands/preview';
 
@@ -265,7 +265,7 @@ export class EnvelopeTuner {
       : $localize`:@@inspector.envelope-tuner.rate-2:inspector.envelope-tuner.rate-2 ${hex2(rate)}:rate:`;
   });
 
-  protected readonly gainByteLabel = computed(() => `$${hex2(this.value().gain)}`);
+  protected readonly gainByteLabel = computed(() => dollarHex(this.value().gain));
 
   /**
    * What the graph should draw: the GAIN path takes over when ADSR1's top bit is

@@ -1,3 +1,4 @@
+import { VCMD } from '@amk/core/hardcoded-tables';
 import { Component, computed, inject, input } from '@angular/core';
 
 import type { Command } from '@amk/tokens';
@@ -6,7 +7,7 @@ import { tempoBefore } from '@amk/tokens/dialect';
 import { BitToggles, VOICE_LABELS } from '../../../shared/bit-toggles/bit-toggles';
 import { Slider } from '../../../shared/slider/slider';
 import { EditorStore } from '../../../state/editor-store';
-import { hex2 } from '../../../util/format';
+import { dollarHex } from '../../../util/format';
 import { byteArgs } from '../commands/byte-args';
 import { EchoConfig } from '../echo-config/echo-config';
 
@@ -43,15 +44,15 @@ export class EchoInspector {
   protected readonly bytes = byteArgs(this.command);
 
   /** `$F0` has nothing to say beyond its own name. */
-  protected readonly isEchoOff = computed(() => this.vcmd() === 0xf0);
+  protected readonly isEchoOff = computed(() => this.vcmd() === VCMD.EchoOff);
 
-  protected readonly isEf = computed(() => this.vcmd() === 0xef);
-  protected readonly isF1 = computed(() => this.vcmd() === 0xf1);
-  protected readonly isFade = computed(() => this.vcmd() === 0xf2);
+  protected readonly isEf = computed(() => this.vcmd() === VCMD.EchoVolume);
+  protected readonly isF1 = computed(() => this.vcmd() === VCMD.EchoDelay);
+  protected readonly isFade = computed(() => this.vcmd() === VCMD.EchoFade);
 
   // --- $EF ------------------------------------------------------------------
 
-  protected readonly maskLabel = computed(() => `$${hex2(this.bytes.at(0))}`);
+  protected readonly maskLabel = computed(() => dollarHex(this.bytes.at(0)));
 
   // --- $F2 ------------------------------------------------------------------
 

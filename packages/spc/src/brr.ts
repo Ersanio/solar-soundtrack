@@ -6,6 +6,7 @@
  * drawn in the sample browser is the one the player will produce.
  */
 
+import { word } from "@amk/core/bytes";
 import { hex } from "@amk/core/hex";
 
 /** Frames per BRR block. */
@@ -152,16 +153,15 @@ export function parseSampleBank(bytes: Uint8Array, names: (slot: number) => stri
 	// to the image with its header removed, because AMK erases those 12 bytes
 	// before reading anything.
 	const image = bytes.subarray(SAMPLE_BANK_HEADER);
-	const word = (at: number): number => image[at] | (image[at + 1] << 8);
 
 	const out: BrrSample[] = [];
 	for (let slot = 0; slot < SAMPLE_BANK_SLOTS; slot++) {
 		const name = names(slot);
-		const start = word(slot * 4);
+		const start = word(image, slot * 4);
 		// Deliberately computed before the rebase, exactly as `globals.cpp:584`
 		// does, which makes it an offset from the sample's own start rather than
 		// an address — the same thing `BrrSample.loopOffset` means.
-		const loopOffset = (word(slot * 4 + 2) - start) & 0xffff;
+		const loopOffset = (word(image, slot * 4 + 2) - start) & 0xffff;
 
 		// A blank directory entry (`globals.cpp:587`). Real banks are rarely full.
 		if (start === 0 && loopOffset === 0) {

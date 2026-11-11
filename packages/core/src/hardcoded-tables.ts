@@ -136,6 +136,63 @@ export const NSPC_VELOCITY_OFFSET = 0x10;
 export const FIRST_VCMD = 0xda;
 export const LAST_VCMD = 0xfe;
 
+/**
+ * Every hex command byte by name, `$DA`-`$FE`, as `COMMANDS.html` lists them.
+ *
+ * A byte's meaning can depend on the target (`$ED` and `$E5` under `#am4`,
+ * `$FC` under `#amk 1`); the name is the AddmusicK 1.0.11 one, and
+ * `COMMANDS.html` is the per-target truth table.
+ */
+export const VCMD = {
+	Instrument: 0xda,
+	Pan: 0xdb,
+	PanFade: 0xdc,
+	PitchBend: 0xdd,
+	Vibrato: 0xde,
+	VibratoOff: 0xdf,
+	GlobalVolume: 0xe0,
+	GlobalVolumeFade: 0xe1,
+	Tempo: 0xe2,
+	TempoFade: 0xe3,
+	GlobalTranspose: 0xe4,
+	Tremolo: 0xe5,
+	Subloop: 0xe6,
+	Volume: 0xe7,
+	VolumeFade: 0xe8,
+	CallLoop: 0xe9,
+	VibratoFade: 0xea,
+	PitchEnvelopeRelease: 0xeb,
+	PitchEnvelopeAttack: 0xec,
+	/** ADSR / GAIN. */
+	Adsr: 0xed,
+	FineTune: 0xee,
+	/** Echo channels and volume. */
+	EchoVolume: 0xef,
+	EchoOff: 0xf0,
+	/** Echo delay, feedback and FIR preset. */
+	EchoDelay: 0xf1,
+	/** Echo volume fade. */
+	EchoFade: 0xf2,
+	SampleLoad: 0xf3,
+	/** Toggles, chosen by a sub-byte. */
+	Toggles: 0xf4,
+	/** The eight FIR coefficients. */
+	Fir: 0xf5,
+	DspWrite: 0xf6,
+	/** Write a byte to ARAM. */
+	WriteByte: 0xf7,
+	Noise: 0xf8,
+	/** Send two bytes to the SNES. */
+	DataSend: 0xf9,
+	/** Settings: a sub-byte and a value. */
+	Settings: 0xfa,
+	/** Arpeggio, trill and glissando. */
+	Arpeggio: 0xfb,
+	RemoteCode: 0xfc,
+	TremoloOff: 0xfd,
+	PitchEnvelopeOff: 0xfe,
+} as const;
+
 /** Semitone offsets for `a b c d e f g`. Music.cpp:getPitch */
 export const PITCH_TABLE: readonly number[] = [9, 11, 0, 2, 4, 5, 7];
 
@@ -143,6 +200,8 @@ export const PITCH_TABLE: readonly number[] = [9, 11, 0, 2, 4, 5, 7];
 export const NOTE_TIE = 0xc6;
 /** Note byte for a rest (`r`). */
 export const NOTE_REST = 0xc7;
+/** The first of the driver's nine drum note bytes, `$D0`-`$D8`, reached as `@21`-`@29`. */
+export const FIRST_PERCUSSION_NOTE = 0xd0;
 /** Notes abcdefg must be $0x80 <= $nn < $C6. */
 export const NOTE_MIN = 0x80;
 export const NOTE_MAX = 0xc6; // exclusive, as $C6 is a tie

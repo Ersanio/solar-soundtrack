@@ -6,6 +6,7 @@ import type { Span } from '@amk/core/types';
 import type { LoopRun, PitchSlide } from '@amk/spc/song-walk';
 import type { Command } from '@amk/tokens';
 import type { Edit } from '@amk/tokens/edits';
+import { clamp } from '../../../util/math';
 import type { LaneStack } from './roll-layout';
 import { rowAtY, tickAtX } from './roll-layout';
 import { snapDuration, snapTick, stepDrawLength } from './roll-lengths';
@@ -103,7 +104,7 @@ function edgesAt(
   return {
     left: (tick - from) * zoom,
     right: (from + ticks - tick) * zoom - inset,
-    zone: Math.min(EDGE_PX, Math.max(2, width / 3)),
+    zone: clamp(width / 3, 2, EDGE_PX),
   };
 }
 

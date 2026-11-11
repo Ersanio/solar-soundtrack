@@ -11,8 +11,10 @@ something in the directory, which load by themselves when such a file is opened.
 
 ## packages/core/src
 
+- `bytes.ts` — Reading bytes as numbers: a byte's signed value and back, and a little-endian word.
 - `hardcoded-tables.ts` — Constant tables lifted from AddmusicK's `Music.cpp` and `main.asm`.
-- `hex.ts` — Uppercase hex with no prefix: bare, padded to a byte (`hex2`) or to a word (`hex4`).
+- `hex.ts` — Uppercase hex: bare, padded to a byte (`hex2`) or to a word (`hex4`), and the `$XX` spelling MML writes a byte in.
+- `math.ts` — Arithmetic every package shares.
 - `mml-text.ts` — How a parse-time value is spelled as MML.
 - `types.ts` — What goes into the compiler and what comes out of it.
 
@@ -66,14 +68,14 @@ something in the directory, which load by themselves when such a file is opened.
 - `fir-override.ts` — The `$F1`/`$F5` override, looked at from either end.
 - `index.ts` — The scanner.
 - `tokens.ts` (2000+ lines) — A resumable scanner over MML source.
-  - `TOKEN_TAGS`:66 `VCMD_NAMES`:104 `LETTER_NAMES`:145 `isFade`:188 `LETTER_KINDS`:198 `HEX_ARG_LETTERS`:213
-  - `withReplacement`:228 `matchReplacement`:254 `DEFAULT_TARGET`:283 `startState`:457 `copyState`:484 `step`:556
-  - `stepInner`:567 `scanNoteBody`:908 `scanNumber`:912 `scanHash`:931 `scanString`:987 `define`:1023
-  - `scanExpansion`:1050 `scanHex`:1093 `tokenize`:1533 `gatherInstruments`:1617 `splitLengthText`:1706
-  - `dotsApplied`:1716 `applyDots`:1724 `applyTriplet`:1740 `denominatorFor`:1754 `resolveNoteSegment`:1782
-  - `noteLengthTicks`:1841 `resolveDefaultLength`:1854 `digitSpan`:1891 `gatherNoteLength`:1919
-  - `startingChannel`:2016 `gather`:2033 `nameForNote`:2329 `numberValue`:2342 `vcmdName`:2359 `expectedArgs`:2410
-  - `commandStartingAt`:2499 `commandAt`:2538
+  - `TOKEN_TAGS`:67 `VCMD_NAMES`:105 `LETTER_NAMES`:146 `isFade`:189 `LETTER_KINDS`:199 `HEX_ARG_LETTERS`:214
+  - `withReplacement`:229 `matchReplacement`:255 `DEFAULT_TARGET`:284 `startState`:458 `copyState`:485 `step`:557
+  - `stepInner`:568 `scanNoteBody`:909 `scanNumber`:913 `scanHash`:932 `scanString`:988 `define`:1024
+  - `scanExpansion`:1051 `scanHex`:1094 `tokenize`:1534 `gatherInstruments`:1618 `splitLengthText`:1707
+  - `dotsApplied`:1717 `applyDots`:1725 `applyTriplet`:1741 `denominatorFor`:1755 `resolveNoteSegment`:1783
+  - `noteLengthTicks`:1842 `resolveDefaultLength`:1855 `digitSpan`:1892 `gatherNoteLength`:1920
+  - `startingChannel`:2017 `gather`:2034 `nameForNote`:2332 `numberValue`:2345 `vcmdName`:2362 `expectedArgs`:2413
+  - `commandStartingAt`:2502 `commandAt`:2541
 
 ## packages/mml-tokens/src/commands
 
@@ -102,13 +104,14 @@ something in the directory, which load by themselves when such a file is opened.
 - `fir.ts` (500+ lines) — The DSP's echo FIR filter: what eight signed bytes actually do to a sound.
 - `instruments.ts` — The driver's own instrument and percussion tables: what `@n` actually selects.
 - `layout.ts` — ARAM layout and budgeting.
-- `note-audition.ts` (750+ lines) — Playing one note as it would sound at a point in the song, or one stretch of the song as it stands.
+- `note-audition.ts` (500+ lines) — Playing one note as it would sound at a point in the song, or one stretch of the song as it stands.
 - `player.ts` (300+ lines) — SPC700 playback.
 - `protocol.ts` — The message contract between `player.ts` on the page and `worklet.ts` on the audio thread.
 - `repeat-settings.ts` (500+ lines) — The driver settings a looping song can carry from the end of one pass into the next.
-- `song-walk.ts` (1500+ lines) — Reads a compiled song the way the driver reads it, and says what sounds when.
-  - `KEY_COUNT`:90 `SLOTS`:167 `slotsOf`:213 `replacedByNextInSlot`:290 `vcmdLength`:673 `walkSong`:818
-  - `listOf`:1822 `unreachableChannels`:1839
+- `slots.ts` — The slots of driver state a VCMD writes or clears, which is how the song walk names the command a note sounds under.
+- `song-walk-types.ts` (300+ lines) — The song walk's public model: the timeline `walkSong` returns, and the notes, commands, loops and state in it.
+- `song-walk.ts` (1000+ lines) — Reads a compiled song the way the driver reads it, and says what sounds when.
+  - `KEY_COUNT`:103 `vcmdLength`:123 `walkSong`:266 `listOf`:1270 `unreachableChannels`:1287
 - `wasm-host.ts` (300+ lines) — Host for `assets/player/spc.wasm` — Blargg's snes_spc, Emscripten-built.
 - `worklet.ts` (300+ lines) — The SPC700 renderer, running on the audio thread.
 
@@ -371,12 +374,13 @@ something in the directory, which load by themselves when such a file is opened.
 - `percussion.ts` — Which instruments the roll draws as percussion, and where a note goes as a result.
 - `piano-roll.ts` (1000+ lines) — The song as music: a keyboard down the left, time running right, and all eight channels in one roll.
   - `PianoRoll`:100 `onLaneGrab`:331 `onLaneResize`:338 `onLaneRelease`:348 `resetLaneHeight`:354
-  - `addressesOf`:573 `askAboutSelection`:658 `setZoom`:826 `setRowHeight`:830 `setScrollNotes`:837
-  - `setAllOctaves`:841 `setBeatsPerBar`:845 `setBeatUnit`:849 `setSnap`:853 `setEditMode`:857
-  - `setPercussionOpen`:861 `setEditChannel`:866 `clearEditChannel`:876 `selectEditChannel`:893 `followMixer`:913
-  - `isolateChannel`:934 `togglePercussion`:940 `resetPercussion`:944 `svgBox`:951 `onEditDown`:975
-  - `onEditMove`:996 `onEditUp`:1011 `onEditLeave`:1030 `onContextMenu`:1035 `onWheel`:1047 `onKey`:1112
-  - `onKeyPress`:1144 `onMove`:1172 `enter`:1186 `leave`:1190 `onViewportScroll`:1195
+  - `addressesOf`:574 `askAboutSelection`:659 `setZoom`:827 `setRowHeight`:831 `setScrollNotes`:838
+  - `setAllOctaves`:842 `setBeatsPerBar`:846 `setBeatUnit`:850 `setSnap`:854 `setEditMode`:858
+  - `setPercussionOpen`:862 `setEditChannel`:867 `clearEditChannel`:877 `selectEditChannel`:894 `followMixer`:914
+  - `isolateChannel`:935 `togglePercussion`:941 `resetPercussion`:945 `svgBox`:952 `onEditDown`:976
+  - `onEditMove`:997 `onEditUp`:1012 `onEditLeave`:1031 `onContextMenu`:1036 `onWheel`:1048 `onKey`:1113
+  - `onKeyPress`:1145 `onMove`:1173 `enter`:1187 `leave`:1191 `onViewportScroll`:1196
+- `refusal.ts` — A refusal: why the roll will not splice a channel or write a gesture out, in the words it shows.
 - `roll-bar-text.ts` — How wide a plate of `text` at `size` comes to, padding included.
 - `roll-camera.ts` — The camera's own fractions, and where it is left between visits.
 - `roll-clock-step.ts` — One frame of the playhead's own clock.
@@ -384,16 +388,16 @@ something in the directory, which load by themselves when such a file is opened.
 - `roll-command-layout.ts` — Where a glyph's box starts, in the roll's own coordinates.
 - `roll-command-move.ts` — Dragging a command glyph along its channel: where it may land, why it may not, and the edit that moves it.
 - `roll-edit.ts` (1000+ lines) — What a gesture on the roll does to a channel: where every note ends up, which ones a push moved, and where two would sound at once.
-  - `EDIT_MODES`:91 `REFUSE_RANGE`:153 `REFUSE_ROOM`:154 `REFUSE_SPELL`:155 `REFUSE_CROWDED`:156 `REFUSE_RAMP`:157
-  - `REFUSE_INSIDE`:158 `REFUSE_CLASH`:159 `REFUSE_BEND_RIDER`:160 `REFUSE_LOOP_WALL`:161 `REFUSE_SPLIT`:162
-  - `REFUSE_REMAP_FED`:163 `REFUSE_SUB_SPLIT`:164 `REFUSE_NESTED_LOOP`:165 `REFUSE_LOOP_LEFT_PASS`:166
-  - `REFUSE_LOOP_LEAD_ROOM`:167 `REFUSE_LOOP_BODY_ROOM`:168 `isEdits`:183 `placedNotes`:190 `byTick`:208
-  - `clashesIn`:213 `inRange`:228 `push`:252 `pushFrom`:309 `carve`:358 `resolved`:447 `planGesture`:520
-  - `spansFrames`:558 `planFrames`:572 `guarded`:607 `resolvedGesture`:632 `shiftBoundariesFor`:864
-  - `framePasses`:911 `frameAt`:940 `passShiftsFor`:1023 `plannedOrdinals`:1051 `plannedFrameTicks`:1071
+  - `EDIT_MODES`:92 `REFUSE_RANGE`:154 `REFUSE_ROOM`:155 `REFUSE_SPELL`:156 `REFUSE_CROWDED`:157 `REFUSE_RAMP`:158
+  - `REFUSE_INSIDE`:159 `REFUSE_CLASH`:160 `REFUSE_BEND_RIDER`:161 `REFUSE_LOOP_WALL`:162 `REFUSE_SPLIT`:163
+  - `REFUSE_REMAP_FED`:164 `REFUSE_SUB_SPLIT`:165 `REFUSE_NESTED_LOOP`:166 `REFUSE_LOOP_LEFT_PASS`:167
+  - `REFUSE_LOOP_LEAD_ROOM`:168 `REFUSE_LOOP_BODY_ROOM`:169 `isEdits`:182 `placedNotes`:189 `byTick`:207
+  - `clashesIn`:212 `inRange`:227 `push`:251 `pushFrom`:308 `carve`:357 `resolved`:446 `planGesture`:519
+  - `spansFrames`:557 `planFrames`:571 `guarded`:606 `resolvedGesture`:631 `shiftBoundariesFor`:863
+  - `framePasses`:910 `frameAt`:939 `passShiftsFor`:1022 `plannedOrdinals`:1050 `plannedFrameTicks`:1070
 - `roll-gesture.ts` (2000+ lines) — The roll's pointer: what a press means, what a drag is doing, and what pointer-up commits.
-  - `SLOP_PX`:86 `edgesAt`:95 `edgesOf`:110 `loopEnd`:128 `spawnTick`:346 `draggedTick`:366 `keysBetween`:378
-  - `pitchOfRow`:483 `itemAt`:508 `rowOfItem`:531 `rollGestures`:535 `hoverCursor`:2096 `lengthLabel`:2142
+  - `SLOP_PX`:87 `edgesAt`:96 `edgesOf`:111 `loopEnd`:129 `spawnTick`:347 `draggedTick`:367 `keysBetween`:379
+  - `pitchOfRow`:484 `itemAt`:509 `rowOfItem`:532 `rollGestures`:536 `hoverCursor`:2097 `lengthLabel`:2143
 - `roll-layout.ts` (300+ lines) — The roll's lanes and its camera: which row a key is on, what slice of the song is on screen, where the grid lines fall, and the arithmetic between a tick and an x.
 - `roll-lengths.ts` — The nearest length a note can be written as, at or above one tick.
 - `roll-marks.ts` (750+ lines) — What the roll draws for the song: a mark per note, the overview's minimap, the loop boxes and their labels.
@@ -406,10 +410,10 @@ something in the directory, which load by themselves when such a file is opened.
 - `roll-settings.ts` (300+ lines) — The Snap setting in ticks, from the grid the porter chose.
 - `roll-shortcuts.ts` — The roll's shortcuts, while a channel is being edited.
 - `roll-strip.ts` (1500+ lines) — A channel as a strip the roll can splice — its notes and rests in text order, with their spans — or why it cannot be one.
-  - `labelOf`:89 `isStrip`:293 `constructFor`:305 `framesInside`:328 `COMMENT`:361 `leadsAUnit`:385
-  - `trailsAUnit`:390 `unitStartBefore`:403 `forbiddenConstruct`:452 `growUnits`:509 `channelMarkers`:580
-  - `channelHome`:605 `channelTails`:636 `movesTheStartingChannel`:691 `discoverLoops`:749 `channelStrip`:1033
-  - `drumApart`:1352 `checkedOctaves`:1396 `isDiscovered`:1411 `expandAndJoin`:1430
+  - `labelOf`:96 `isStrip`:298 `constructFor`:310 `framesInside`:333 `COMMENT`:366 `leadsAUnit`:390
+  - `trailsAUnit`:395 `unitStartBefore`:408 `forbiddenConstruct`:457 `growUnits`:514 `channelMarkers`:585
+  - `channelHome`:610 `channelTails`:641 `movesTheStartingChannel`:696 `discoverLoops`:754 `channelStrip`:1038
+  - `drumApart`:1357 `checkedOctaves`:1401 `isDiscovered`:1416 `expandAndJoin`:1435
 - `roll-target.ts` — What a gesture acts on, and whether it may.
 - `roll-view.ts` (500+ lines) — Where the roll is looking, and the two drags that move it.
 
@@ -886,7 +890,7 @@ something in the directory, which load by themselves when such a file is opened.
 - `format.ts` — Formatting helpers shared by the editor's panels.
 - `hex.pipe.ts` — Hex formatting for templates.
 - `idb.ts` — A minimal key/value store over IndexedDB, for the sample library.
-- `math.ts` — `value`, held inside `[min, max]`.
+- `math.ts` — Arithmetic the app shares: `clamp` is `@amk/core`'s, under the path the app imports it by.
 - `on-change.ts` — Runs `handler` when `source` changes value, and never on the value it starts at.
 - `storage.ts` — `localStorage`, for code that would rather carry on without it.
 

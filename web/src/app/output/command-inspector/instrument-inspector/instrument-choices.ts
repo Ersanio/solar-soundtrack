@@ -5,7 +5,7 @@ import {
   instrumentReach,
   selectedInstrument,
 } from '@amk/tokens/commands/instruments';
-import { FIRST_CUSTOM_INSTRUMENT } from '@amk/core/hardcoded-tables';
+import { FIRST_CUSTOM_INSTRUMENT, VCMD } from '@amk/core/hardcoded-tables';
 import type { Command } from '@amk/tokens';
 import type { EnumOption } from '../../../shared/enum-select/enum-select';
 import { hex2 } from '../../../util/format';
@@ -97,7 +97,7 @@ function labelOf(instrument: number): string {
 
 /** What this spelling leaves out, said once under the control. */
 function noteFor(command: Command): string | null {
-  if (command.vcmd === 0xda) {
+  if (command.vcmd === VCMD.Instrument) {
     const drums = $localize`:@@inspector.instrument.a-drum-is-not-a:inspector.instrument.a-drum-is-not-a`;
     return command.target.program === 1
       ? $localize`:@@inspector.instrument.under-am4-a-custom-instrument:inspector.instrument.under-am4-a-custom-instrument ${drums}:drums:`

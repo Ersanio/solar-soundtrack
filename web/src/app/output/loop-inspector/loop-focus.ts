@@ -19,6 +19,7 @@ import {
   spliceArg,
   spliceRange,
 } from '@amk/tokens/edits';
+import { dollarHex } from '../../util/format';
 import { argLockedBecause } from '../command-inspector/commands/context';
 
 /**
@@ -356,9 +357,7 @@ export function loopCountEdit(source: string, focus: LoopFocus, plays: number): 
       : spliceRange(source, { start: at.start, end: at.end, line: 1 }, String(written));
   }
 
-  const text = lessOne
-    ? ` $${written.toString(16).toUpperCase().padStart(2, '0')}`
-    : String(written);
+  const text = lessOne ? ` ${dollarHex(written)}` : String(written);
   return insertAt(at.start, text, 1);
 }
 

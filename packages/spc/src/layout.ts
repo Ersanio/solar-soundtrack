@@ -8,8 +8,9 @@
 
 import type { BrrSample } from "./brr";
 import type { DriverBundle } from "./driver";
+import { ARAM_SIZE } from "./wasm-host";
 
-export const ARAM_SIZE = 0x10000;
+export { ARAM_SIZE };
 
 // ---------------------------------------------------------------------------
 // Address layout

@@ -2,7 +2,7 @@
 
 import type { Command, NoteLengthSegment, Token, TokenIndex } from "./tokens";
 import type { Diagnostic, Span } from "@amk/core/types";
-import { noteFrames } from "@amk/core/hardcoded-tables";
+import { noteFrames, VCMD } from "@amk/core/hardcoded-tables";
 import { SST } from "@amk/core/messages/sst";
 import { commandScope, isPercussionInstrument } from "./commands/in-force";
 
@@ -133,7 +133,7 @@ function slideWindow(command: Command, index: TokenIndex, frame: number): number
 			(other) =>
 				other.span.start >= command.span.end &&
 				ours(other) &&
-				(other.vcmd === 0xdd || commandScope(other) === "structure"),
+				(other.vcmd === VCMD.PitchBend || commandScope(other) === "structure"),
 		) ?? null;
 	const call = tokens.find((token) => token.kind === "label" && token.start >= command.span.end) ?? null;
 	const end = Math.min(stop?.span.start ?? Infinity, call?.start ?? Infinity);
@@ -144,7 +144,7 @@ function slideWindow(command: Command, index: TokenIndex, frame: number): number
 		const next = tokens.find((token) => token.start >= runEnd && token.kind !== "comment");
 		const total = segments.reduce((sum, segment) => sum + segment.ticks, 0);
 		const last = segments[segments.length - 1]?.ticks ?? 0;
-		return stop?.vcmd === 0xdd && next?.start === stop.span.start && segments.length > 1
+		return stop?.vcmd === VCMD.PitchBend && next?.start === stop.span.start && segments.length > 1
 			? [...noteFrames(total - last), ...noteFrames(last)]
 			: noteFrames(total);
 	};
@@ -223,7 +223,7 @@ export function bendAnchor(command: Command, index: TokenIndex): BendAnchor {
 			continue;
 		}
 
-		if (other.vcmd === 0xdd) {
+		if (other.vcmd === VCMD.PitchBend) {
 			anchor = null;
 			blocker = null;
 		} else if (other.noteLength !== undefined) {
@@ -298,7 +298,7 @@ export function commandHazards(index: TokenIndex): Diagnostic[] {
 	const diagnostics: Diagnostic[] = [];
 
 	for (const command of index.commands) {
-		if (command.vcmd === 0xf7) {
+		if (command.vcmd === VCMD.WriteByte) {
 			diagnostics.push({
 				severity: "severe",
 				code: CODE_DEAD_VCMD,
@@ -308,7 +308,7 @@ export function commandHazards(index: TokenIndex): Diagnostic[] {
 			continue;
 		}
 
-		if (command.vcmd === 0xdd) {
+		if (command.vcmd === VCMD.PitchBend) {
 			const anchor = bendAnchor(command, index);
 			if (anchor.kind !== "rides") {
 				diagnostics.push({
@@ -323,7 +323,7 @@ export function commandHazards(index: TokenIndex): Diagnostic[] {
 		}
 
 		// Below `$F2`, so the non-native warning never covers it either.
-		if (command.vcmd === 0xe4 && command.target.program === 1) {
+		if (command.vcmd === VCMD.GlobalTranspose && command.target.program === 1) {
 			diagnostics.push({
 				severity: "warning",
 				code: CODE_AM4_TRANSPOSE,

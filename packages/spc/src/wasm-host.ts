@@ -19,7 +19,7 @@ export const SPC_CHANNELS = 2;
 
 /** An `.spc` file carries the APU RAM image at this offset, 64 KiB of it. */
 const SPC_RAM_AT = 0x100;
-const SPC_RAM_SIZE = 0x10000;
+export const ARAM_SIZE = 0x10000;
 
 /**
  * `EM_ASM` blocks compiled into the binary, keyed by the code address the wasm
@@ -191,7 +191,7 @@ export function instantiate(module: WebAssembly.Module): SpcCore {
 			// so this always fails there. Kept honest for a core that can grow.
 			f: (requested: number): number => {
 				// 65536 is the WebAssembly page size, not ARAM — it only happens to
-				// be the same number as SPC_RAM_SIZE.
+				// be the same number as ARAM_SIZE.
 				const pages = Math.ceil((requested - memory.buffer.byteLength) / 65536);
 				try {
 					memory.grow(Math.max(pages, 1));
@@ -288,19 +288,19 @@ export function instantiate(module: WebAssembly.Module): SpcCore {
 	 * lifetime of the instance — the struct does not move.
 	 */
 	const findAram = (spc: Uint8Array): number => {
-		const image = spc.subarray(SPC_RAM_AT, SPC_RAM_AT + SPC_RAM_SIZE);
+		const image = spc.subarray(SPC_RAM_AT, SPC_RAM_AT + ARAM_SIZE);
 
 		// The driver's code, which is neither zeroes nor a repeating pattern.
 		const anchorAt = 0x400;
 		const candidates: number[] = [];
-		outer: for (let at = 0; at + SPC_RAM_SIZE <= u8.length && candidates.length < 8; at++) {
+		outer: for (let at = 0; at + ARAM_SIZE <= u8.length && candidates.length < 8; at++) {
 			for (let k = 0; k < 16; k++) {
 				if (u8[at + anchorAt + k] !== image[anchorAt + k]) {
 					continue outer;
 				}
 			}
 
-			for (let k = 0; k < SPC_RAM_SIZE; k += 89) {
+			for (let k = 0; k < ARAM_SIZE; k += 89) {
 				if (u8[at + k] !== image[k]) {
 					continue outer;
 				}
@@ -388,7 +388,7 @@ export function instantiate(module: WebAssembly.Module): SpcCore {
 				throw new SpcCoreError("APU RAM is only available once an SPC has been loaded");
 			}
 
-			aramView ??= u8.subarray(aramAt, aramAt + SPC_RAM_SIZE);
+			aramView ??= u8.subarray(aramAt, aramAt + ARAM_SIZE);
 			return aramView;
 		},
 

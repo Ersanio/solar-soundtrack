@@ -9,15 +9,15 @@ import { Slider } from '../../../shared/slider/slider';
 import { CommitAudition } from '../../../state/commit-audition';
 import { EditorStore } from '../../../state/editor-store';
 import { SampleStore } from '../../../state/sample-store';
-import { hex2 } from '../../../util/format';
+import { dollarHex } from '../../../util/format';
 import { paramContext } from '../commands/context';
 import { type ParamRow, resolveCommand } from '@amk/tokens/commands/describe';
-import { fromSigned } from '@amk/tokens/commands/param';
+import { fromSigned } from '@amk/core/bytes';
 import { dragPreview } from '../commands/preview';
 
 /** `$00`, so a mask's readout says what is in the source as well as which bits are on. */
 function hexLabel(row: ParamRow): string {
-  return row.byte === null ? '—' : `$${hex2(row.byte)}`;
+  return row.byte === null ? '—' : dollarHex(row.byte);
 }
 
 /**
@@ -88,7 +88,7 @@ export class ParamTable {
       const byte = row.descriptor.codec === 's8' ? fromSigned(shown) : shown;
       const next = {
         ...row,
-        raw: command.vcmd !== undefined ? `$${hex2(byte)}` : String(byte),
+        raw: command.vcmd !== undefined ? dollarHex(byte) : String(byte),
         note: row.descriptor.describe?.(byte, command, context) ?? null,
       };
 

@@ -5,6 +5,7 @@ import { CommandIcon } from '../../../command-palette/command-icon';
 import { noteHeardOn } from '../../../../state/commands-in-force';
 import { EditorRequests } from '../../../../state/editor-requests';
 import { EditorStore } from '../../../../state/editor-store';
+import { clamp } from '../../../../util/math';
 import { type CommandLane, type LaneGlyph, laneGlyphX } from '../roll-command-layout';
 import {
   type MoveTarget,
@@ -18,7 +19,7 @@ import { isEdits } from '../roll-edit';
 import { SLOP_PX } from '../roll-gesture';
 import { type GridLine, RollGrid } from '../roll-grid/roll-grid';
 import { KEY_WIDTH, LANE_ROW } from '../roll-metrics';
-import { type Strip, type StripRefusal, channelStrip, isStrip } from '../roll-strip';
+import { type Strip, type Refusal, channelStrip, isStrip } from '../roll-strip';
 
 /** A press on a glyph, held until it becomes a drag or turns out to be a click. */
 interface LaneDrag {
@@ -170,7 +171,7 @@ export class RollCommandLane {
 
     event.preventDefault();
     const delta = event.deltaY !== 0 ? event.deltaY : event.deltaX;
-    this.lifted.set(Math.max(0, Math.min(this.offset() + delta, this.reach())));
+    this.lifted.set(clamp(this.offset() + delta, 0, this.reach()));
   }
 
   /**
@@ -245,7 +246,7 @@ export class RollCommandLane {
   private readonly moved = signal(false);
 
   /** The held glyph's channel as something splices can be planned against. */
-  private readonly dragStrip = computed<Strip | StripRefusal | null>(() => {
+  private readonly dragStrip = computed<Strip | Refusal | null>(() => {
     const drag = this.held();
     const result = this.editor.result();
     const timeline = this.editor.timeline();

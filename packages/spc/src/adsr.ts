@@ -1,5 +1,6 @@
 /** The DSP's volume envelope: what an instrument's ADSR, GAIN and tuning bytes do. */
 
+import { clamp } from "@amk/core/math";
 import { DSP_RATE } from "./fir";
 
 /** The DSP's envelope rate table, in samples per step. 0 means "never" */
@@ -257,7 +258,7 @@ export function encodeGain(gain: Gain): number {
  * {@link tuningMultiplier}, and exact for anything the pair can express.
  */
 export function encodeTuning(multiplier: number): { tuning: number; subTuning: number } {
-	const clamped = Math.min(255 + 255 / 256, Math.max(0, multiplier));
+	const clamped = clamp(multiplier, 0, 255 + 255 / 256);
 	const whole = Math.floor(clamped);
 	const fraction = Math.round((clamped - whole) * 256);
 	// A fraction that rounds up to a whole 256 carries, exactly as 0.999 → 1.0

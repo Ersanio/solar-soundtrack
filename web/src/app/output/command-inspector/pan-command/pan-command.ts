@@ -1,3 +1,4 @@
+import { VCMD } from '@amk/core/hardcoded-tables';
 import { Component, computed, inject, input } from '@angular/core';
 
 import {
@@ -15,7 +16,7 @@ import { EnumSelect } from '../../../shared/enum-select/enum-select';
 import { Slider } from '../../../shared/slider/slider';
 import { CommitAudition } from '../../../state/commit-audition';
 import { EditorStore } from '../../../state/editor-store';
-import { hex2 } from '../../../util/format';
+import { dollarHex } from '../../../util/format';
 import { dragPreview } from '../commands/preview';
 
 /** `y`'s second and third arguments, and the two bits they set. */
@@ -55,7 +56,7 @@ export class PanCommand {
   protected readonly SURROUND = SURROUND;
 
   /** `$DB` carries all three fields in one byte; `y` spells them as arguments. */
-  private readonly packed = computed(() => this.command().vcmd === 0xdb);
+  private readonly packed = computed(() => this.command().vcmd === VCMD.Pan);
 
   protected readonly written = computed(() => this.command().args.length > 0);
 
@@ -87,7 +88,7 @@ export class PanCommand {
     // with all five bits it kept, so anything past $14 reads off the end.
     this.shownPan() > 0x14
       ? $localize`:@@inspector.pan.past-the-drivers-21-entry:inspector.pan.past-the-drivers-21-entry`
-      : `$${hex2(this.shownPan())} of $14`,
+      : `${dollarHex(this.shownPan())} of $14`,
   );
 
   /**

@@ -16,6 +16,7 @@
  * bracket writes them, which `LetterEntry.writes` states and `palettetest` proves.
  */
 
+import { VCMD } from '@amk/core/hardcoded-tables';
 import { type Command, isFade, vcmdName } from '@amk/tokens';
 import { ENTRIES, type ResolvedEntry, resolveEntry } from './catalog';
 
@@ -65,11 +66,11 @@ function envelopeEntry(command: Command): (typeof ENTRIES)[number] | undefined {
  */
 function forkEntry(command: Command): (typeof ENTRIES)[number] | undefined {
   if (
-    command.vcmd === 0xe5 &&
+    command.vcmd === VCMD.Tremolo &&
     command.target.program === 1 &&
     (command.args[0]?.value ?? 0) >= 0x80
   ) {
-    return byVcmd.get(0xf3);
+    return byVcmd.get(VCMD.SampleLoad);
   }
 
   return undefined;
@@ -95,7 +96,7 @@ export function glyphOf(command: Command): ResolvedEntry | null {
     // a `v`, whichever way it was typed.
     entry =
       forkEntry(command) ??
-      (command.vcmd === 0xed
+      (command.vcmd === VCMD.Adsr
         ? envelopeEntry(command)
         : (byVcmd.get(command.vcmd) ?? byWrites.get(command.vcmd)));
   } else {

@@ -1,3 +1,4 @@
+import { VCMD } from '@amk/core/hardcoded-tables';
 import { Component, computed, inject, input } from '@angular/core';
 
 import { argEditable, argumentText, spliceArg } from '@amk/tokens/edits';
@@ -9,7 +10,7 @@ import { EditorStore } from '../../../state/editor-store';
 import { tempoBefore } from '@amk/tokens/dialect';
 import { bendAnchor } from '@amk/tokens/command-hazards';
 import { BendGraph } from '../bend-graph/bend-graph';
-import { toSigned } from '@amk/tokens/commands/param';
+import { toSigned } from '@amk/core/bytes';
 import { dragPreview } from '../commands/preview';
 import { noteName, ticksLabel } from '@amk/tokens/commands/units';
 import { NotePicker } from '../note-picker/note-picker';
@@ -43,7 +44,7 @@ export class BendCommand {
   protected readonly vcmd = computed(() => this.command().vcmd ?? 0);
 
   /** `$DD` names a note; `$EB`/`$EC` name a distance from one. */
-  protected readonly isPitchBend = computed(() => this.vcmd() === 0xdd);
+  protected readonly isPitchBend = computed(() => this.vcmd() === VCMD.PitchBend);
 
   /** `$DD`'s target written as a note rather than a byte, the form AMK also takes. */
   protected readonly noteTarget = computed(() => this.command().noteTarget);
@@ -98,7 +99,7 @@ export class BendCommand {
       return 0;
     }
 
-    return this.vcmd() === 0xec ? toSigned(this.shownTarget()) : 0;
+    return this.vcmd() === VCMD.PitchEnvelopeAttack ? toSigned(this.shownTarget()) : 0;
   });
 
   protected readonly to = computed(() => {
@@ -107,7 +108,7 @@ export class BendCommand {
       return start.kind === 'note' ? this.shownTarget() - start.byte : null;
     }
 
-    return this.vcmd() === 0xec ? 0 : toSigned(this.shownTarget());
+    return this.vcmd() === VCMD.PitchEnvelopeAttack ? 0 : toSigned(this.shownTarget());
   });
 
   protected readonly note = computed(() => {
@@ -116,7 +117,7 @@ export class BendCommand {
     }
 
     if (!this.isPitchBend()) {
-      return this.vcmd() === 0xec
+      return this.vcmd() === VCMD.PitchEnvelopeAttack
         ? $localize`:@@inspector.bend.every-later-note-starts-this:inspector.bend.every-later-note-starts-this`
         : $localize`:@@inspector.bend.every-later-note-starts-at:inspector.bend.every-later-note-starts-at`;
     }

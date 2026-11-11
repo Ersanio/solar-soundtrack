@@ -11,8 +11,12 @@
  * `DEFAULT_TEMPO`, which that package may not reach.
  */
 
-import { FIRST_PERCUSSION_INSTRUMENT } from '@amk/core/hardcoded-tables';
-import { hex2 } from '@amk/core/hex';
+import {
+  FIRST_PERCUSSION_INSTRUMENT,
+  FIRST_PERCUSSION_NOTE,
+  VCMD,
+} from '@amk/core/hardcoded-tables';
+import { hex2, hexBytes } from '@amk/core/hex';
 import { SST } from '@amk/core/messages/sst';
 import type { CommandAddress, CompileResult, Diagnostic, Span } from '@amk/core/types';
 import type { SettingCarry, SettingCommand } from '@amk/spc/repeat-settings';
@@ -73,10 +77,6 @@ export interface CompiledSong {
   text: string;
 }
 
-/** `$E5 $00 $10 $40`, for a command no map names. */
-const hexSpelling = (bytes: readonly number[]): string =>
-  bytes.map((byte) => `$${hex2(byte)}`).join(' ');
-
 /** Remote code's types 1, 2 and 5, which count down through rests. */
 const COUNTING_TYPES: ReadonlySet<number> = new Set([1, 2, 5]);
 
@@ -92,7 +92,7 @@ function remoteMessage(
   amkVersion: number,
 ): string | null {
   const [lead, , , type] = carry.repeat.bytes;
-  if (carry.first !== null || amkVersion < 2 || lead !== 0xfc || type === undefined) {
+  if (carry.first !== null || amkVersion < 2 || lead !== VCMD.RemoteCode || type === undefined) {
     return null;
   }
 
@@ -149,7 +149,7 @@ export function repeatSettings(timeline: SongTimeline, compiled: CompiledSong): 
       const span = commands.get(command.address) ?? null;
       return {
         span,
-        text: span === null ? hexSpelling(command.bytes) : text.slice(span.start, span.end),
+        text: span === null ? hexBytes(command.bytes) : text.slice(span.start, span.end),
       };
     }
 
@@ -157,7 +157,9 @@ export function repeatSettings(timeline: SongTimeline, compiled: CompiledSong): 
     // `@21`-`@29` in force at that note is what was written.
     const [byte] = command.bytes;
     const isQ = byte < 0x80;
-    const fallback = isQ ? `q${hex2(byte)}` : `@${FIRST_PERCUSSION_INSTRUMENT + byte - 0xd0}`;
+    const fallback = isQ
+      ? `q${hex2(byte)}`
+      : `@${FIRST_PERCUSSION_INSTRUMENT + byte - FIRST_PERCUSSION_NOTE}`;
     const note = notes.get(command.address) ?? null;
     if (note === null) {
       return { span: null, text: fallback };

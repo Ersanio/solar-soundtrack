@@ -1,3 +1,4 @@
+import { VCMD } from '@amk/core/hardcoded-tables';
 import { Component, computed, effect, inject, input, signal } from '@angular/core';
 
 import type { Command } from '@amk/tokens';
@@ -65,7 +66,7 @@ export interface NotePaletteModel {
  * nine switches through one byte, so a second one is a different effect rather
  * than a duplicate — the walk files them all in one slot for the same reason.
  */
-const MANY_EFFECTS = new Set([0xf4, 0xfa]);
+const MANY_EFFECTS = new Set<number>([VCMD.Toggles, VCMD.Settings]);
 
 type Button = ResolvedEntry & { class: string; disabled: boolean; after: boolean };
 
@@ -197,7 +198,7 @@ export class NotePalette {
     return OFFERED.filter((entry) => entry.category === filter).flatMap((entry) => {
       const resolved = resolveEntry(entry, target, place);
       const hidden =
-        resolved.vcmd === 0xdd
+        resolved.vcmd === VCMD.PitchBend
           ? model.hasBend
           : !(resolved.vcmd !== undefined && MANY_EFFECTS.has(resolved.vcmd)) &&
             model.definedKeys.has(resolved.key);
@@ -209,7 +210,7 @@ export class NotePalette {
               ...resolved,
               class: entryClass(resolved),
               disabled: entryBlocked(resolved),
-              after: resolved.vcmd === 0xdd,
+              after: resolved.vcmd === VCMD.PitchBend,
             },
           ];
     });

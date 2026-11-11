@@ -1,3 +1,4 @@
+import { VCMD } from '@amk/core/hardcoded-tables';
 import type { Span } from '@amk/core/types';
 import type { Command, TokenIndex } from '@amk/tokens';
 import {
@@ -115,7 +116,7 @@ export function wrapVerdict(request: WrapRequest): WrapVerdict {
   // A `$DD`'s last parameter may be written as a note, and `gather` raises a note
   // command for it as well as filing it under `noteTarget` — but it emits nothing
   // and sounds nothing, so it is no part of what a porter picked out.
-  const bends = index.commands.filter((command) => command.vcmd === 0xdd);
+  const bends = index.commands.filter((command) => command.vcmd === VCMD.PitchBend);
   const sounds = (command: Command): boolean =>
     command.noteLength !== undefined &&
     !bends.some(
@@ -342,7 +343,7 @@ function tailAfter(index: TokenIndex, channel: number, last: Command): number {
       continue;
     }
 
-    if (command.vcmd !== 0xdd) {
+    if (command.vcmd !== VCMD.PitchBend) {
       break;
     }
 

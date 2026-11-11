@@ -5,12 +5,13 @@ import type { Span } from '@amk/core/types';
 import type { Edit } from '@amk/tokens/edits';
 import {
   type EditContext,
-  type EditRefusal,
+  type Refusal,
   type PlacedNote,
   REFUSE_INSIDE,
   REFUSE_RAMP,
   REFUSE_SPELL,
 } from '../roll-edit';
+import { isRefusal } from '../refusal';
 import { noteText, writtenLength } from './spelling';
 import { refuse, spliceUnit } from './splice';
 import type { Region } from './regions';
@@ -22,8 +23,8 @@ interface Rewrite {
   leaves: number | null;
 }
 
-export function isRewrite(outcome: Rewrite | EditRefusal): outcome is Rewrite {
-  return (outcome as EditRefusal).refused === undefined;
+export function isRewrite(outcome: Rewrite | Refusal): outcome is Rewrite {
+  return !isRefusal(outcome);
 }
 
 /** What one surviving note needs written, which is usually nothing at all. */
@@ -34,7 +35,7 @@ export function rewriteNote(
   survivors: ReadonlyMap<number, PlacedNote>,
   regions: readonly Region[],
   running: number | null,
-): Rewrite | EditRefusal {
+): Rewrite | Refusal {
   const { source, strip, targetAMKVersion } = context;
   const { octaves } = strip;
   const item = strip.items[index];

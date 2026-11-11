@@ -20,6 +20,7 @@ import {
 	INSTRUMENT_TO_SAMPLE,
 	LAST_VCMD,
 	TICKS_PER_WHOLE,
+	VCMD,
 } from "@amk/core/hardcoded-tables";
 
 export type TokenKind =
@@ -102,43 +103,43 @@ export const TOKEN_TAGS: Readonly<Record<TokenKind, string>> = {
 
 /** Human-readable names for the VCMDs, used in hover text and the command inspector. */
 export const VCMD_NAMES: Readonly<Record<number, string>> = {
-	0xda: $localize`:@@command.name.set-instrument:command.name.set-instrument`,
-	0xdb: $localize`:@@command.name.pan:command.name.pan`,
-	0xdc: $localize`:@@command.name.pan-fade:command.name.pan-fade`,
-	0xdd: $localize`:@@command.name.pitch-bend:command.name.pitch-bend`,
-	0xde: $localize`:@@command.name.vibrato:command.name.vibrato`,
-	0xdf: $localize`:@@command.name.vibrato-off:command.name.vibrato-off`,
-	0xe0: $localize`:@@command.name.global-volume:command.name.global-volume`,
-	0xe1: $localize`:@@command.name.global-volume-fade:command.name.global-volume-fade`,
-	0xe2: $localize`:@@command.name.tempo:command.name.tempo`,
-	0xe3: $localize`:@@command.name.tempo-fade:command.name.tempo-fade`,
-	0xe4: $localize`:@@command.name.global-transpose:command.name.global-transpose`,
-	0xe5: $localize`:@@command.name.tremolo:command.name.tremolo`,
-	0xe6: $localize`:@@command.name.subloop:command.name.subloop`,
-	0xe7: $localize`:@@command.name.volume:command.name.volume`,
-	0xe8: $localize`:@@command.name.volume-fade:command.name.volume-fade`,
-	0xe9: $localize`:@@command.name.call-loop:command.name.call-loop`,
-	0xea: $localize`:@@command.name.vibrato-fade:command.name.vibrato-fade`,
-	0xeb: $localize`:@@command.name.pitch-envelope-release:command.name.pitch-envelope-release`,
-	0xec: $localize`:@@command.name.pitch-envelope-attack:command.name.pitch-envelope-attack`,
-	0xed: $localize`:@@command.name.adsr-gain:command.name.adsr-gain`,
-	0xee: $localize`:@@command.name.fine-tune:command.name.fine-tune`,
-	0xef: $localize`:@@command.name.echo-parameters:command.name.echo-parameters`,
-	0xf0: $localize`:@@command.name.echo-off:command.name.echo-off`,
-	0xf1: $localize`:@@command.name.echo-parameters:command.name.echo-parameters`,
-	0xf2: $localize`:@@command.name.echo-fade:command.name.echo-fade`,
-	0xf3: $localize`:@@command.name.sample-load:command.name.sample-load`,
-	0xf4: $localize`:@@command.name.misc:command.name.misc`,
-	0xf5: $localize`:@@command.name.fir-filter:command.name.fir-filter`,
-	0xf6: $localize`:@@command.name.dsp-write:command.name.dsp-write`,
-	0xf7: $localize`:@@command.name.write-byte:command.name.write-byte`,
-	0xf8: $localize`:@@command.name.noise:command.name.noise`,
-	0xf9: $localize`:@@command.name.data-send:command.name.data-send`,
-	0xfa: $localize`:@@command.name.misc:command.name.misc`,
-	0xfb: $localize`:@@command.name.arpeggio:command.name.arpeggio`,
-	0xfc: $localize`:@@command.name.remote-code:command.name.remote-code`,
-	0xfd: $localize`:@@command.name.tremolo-off:command.name.tremolo-off`,
-	0xfe: $localize`:@@command.name.pitch-envelope-off:command.name.pitch-envelope-off`,
+	[VCMD.Instrument]: $localize`:@@command.name.set-instrument:command.name.set-instrument`,
+	[VCMD.Pan]: $localize`:@@command.name.pan:command.name.pan`,
+	[VCMD.PanFade]: $localize`:@@command.name.pan-fade:command.name.pan-fade`,
+	[VCMD.PitchBend]: $localize`:@@command.name.pitch-bend:command.name.pitch-bend`,
+	[VCMD.Vibrato]: $localize`:@@command.name.vibrato:command.name.vibrato`,
+	[VCMD.VibratoOff]: $localize`:@@command.name.vibrato-off:command.name.vibrato-off`,
+	[VCMD.GlobalVolume]: $localize`:@@command.name.global-volume:command.name.global-volume`,
+	[VCMD.GlobalVolumeFade]: $localize`:@@command.name.global-volume-fade:command.name.global-volume-fade`,
+	[VCMD.Tempo]: $localize`:@@command.name.tempo:command.name.tempo`,
+	[VCMD.TempoFade]: $localize`:@@command.name.tempo-fade:command.name.tempo-fade`,
+	[VCMD.GlobalTranspose]: $localize`:@@command.name.global-transpose:command.name.global-transpose`,
+	[VCMD.Tremolo]: $localize`:@@command.name.tremolo:command.name.tremolo`,
+	[VCMD.Subloop]: $localize`:@@command.name.subloop:command.name.subloop`,
+	[VCMD.Volume]: $localize`:@@command.name.volume:command.name.volume`,
+	[VCMD.VolumeFade]: $localize`:@@command.name.volume-fade:command.name.volume-fade`,
+	[VCMD.CallLoop]: $localize`:@@command.name.call-loop:command.name.call-loop`,
+	[VCMD.VibratoFade]: $localize`:@@command.name.vibrato-fade:command.name.vibrato-fade`,
+	[VCMD.PitchEnvelopeRelease]: $localize`:@@command.name.pitch-envelope-release:command.name.pitch-envelope-release`,
+	[VCMD.PitchEnvelopeAttack]: $localize`:@@command.name.pitch-envelope-attack:command.name.pitch-envelope-attack`,
+	[VCMD.Adsr]: $localize`:@@command.name.adsr-gain:command.name.adsr-gain`,
+	[VCMD.FineTune]: $localize`:@@command.name.fine-tune:command.name.fine-tune`,
+	[VCMD.EchoVolume]: $localize`:@@command.name.echo-parameters:command.name.echo-parameters`,
+	[VCMD.EchoOff]: $localize`:@@command.name.echo-off:command.name.echo-off`,
+	[VCMD.EchoDelay]: $localize`:@@command.name.echo-parameters:command.name.echo-parameters`,
+	[VCMD.EchoFade]: $localize`:@@command.name.echo-fade:command.name.echo-fade`,
+	[VCMD.SampleLoad]: $localize`:@@command.name.sample-load:command.name.sample-load`,
+	[VCMD.Toggles]: $localize`:@@command.name.misc:command.name.misc`,
+	[VCMD.Fir]: $localize`:@@command.name.fir-filter:command.name.fir-filter`,
+	[VCMD.DspWrite]: $localize`:@@command.name.dsp-write:command.name.dsp-write`,
+	[VCMD.WriteByte]: $localize`:@@command.name.write-byte:command.name.write-byte`,
+	[VCMD.Noise]: $localize`:@@command.name.noise:command.name.noise`,
+	[VCMD.DataSend]: $localize`:@@command.name.data-send:command.name.data-send`,
+	[VCMD.Settings]: $localize`:@@command.name.misc:command.name.misc`,
+	[VCMD.Arpeggio]: $localize`:@@command.name.arpeggio:command.name.arpeggio`,
+	[VCMD.RemoteCode]: $localize`:@@command.name.remote-code:command.name.remote-code`,
+	[VCMD.TremoloOff]: $localize`:@@command.name.tremolo-off:command.name.tremolo-off`,
+	[VCMD.PitchEnvelopeOff]: $localize`:@@command.name.pitch-envelope-off:command.name.pitch-envelope-off`,
 };
 
 /** Human names for the single-letter commands, to match {@link VCMD_NAMES}. */
@@ -712,7 +713,7 @@ function stepInner(
 	// AddmusicK rewrites the emitted byte to `$FD` and clears `hexLeft`. Left
 	// standing, the count makes the next real command scan as `$E6`'s argument
 	// and vanish from the gathered list.
-	if (state.hexLeft !== 0 && state.currentHex === 0xe6 && state.songTargetProgram === 1 && c !== "$") {
+	if (state.hexLeft !== 0 && state.currentHex === VCMD.Subloop && state.songTargetProgram === 1 && c !== "$") {
 		state.hexLeft = 0;
 		state.currentHex = 0;
 	}
@@ -1166,15 +1167,15 @@ function scanHex(line: string, at: number, state: ScanState): StepResult {
 
 		state.currentHex = value;
 		state.currentHexSub = 0;
-		if (value === 0xed && state.songTargetProgram === 1) {
+		if (value === VCMD.Adsr && state.songTargetProgram === 1) {
 			// `parser.ts:parseHexCommand` — #am4 sends $ED to the HFD translator; the next
 			// byte picks the form, exactly as `$FB`'s count picks its length.
 			state.awaitingHfdSub = true;
 			state.hexLeft = 0;
-		} else if (value === 0xfb) {
+		} else if (value === VCMD.Arpeggio) {
 			state.awaitingArpCount = true;
 			state.hexLeft = 0;
-		} else if (value === 0xfc && state.targetAMKVersion === 1) {
+		} else if (value === VCMD.RemoteCode && state.targetAMKVersion === 1) {
 			// `parser.ts:parseHexCommand` — #amk 1's $FC is remote gain: two arguments.
 			state.hexLeft = 2;
 		} else {
@@ -1188,18 +1189,18 @@ function scanHex(line: string, at: number, state: ScanState): StepResult {
 	}
 
 	state.hexLeft -= 1;
-	if (state.hexLeft === 1 && state.currentHex === 0xfa) {
+	if (state.hexLeft === 1 && state.currentHex === VCMD.Settings) {
 		state.currentHexSub = value;
 	}
 
 	// `parser.ts:parseHexCommand` — `$FA $FE` takes a further byte when the high bit is set.
-	if (state.hexLeft === 0 && state.currentHex === 0xfa && state.currentHexSub === 0xfe && value >= 0x80) {
+	if (state.hexLeft === 0 && state.currentHex === VCMD.Settings && state.currentHexSub === 0xfe && value >= 0x80) {
 		state.hexLeft++;
 	}
 
 	// `parser.ts:parseHexCommand` (Music.cpp:1820) — under #am4 a high bit on $E5's
 	// first argument means "load sample": one fewer argument follows.
-	if (state.hexLeft === 2 && state.currentHex === 0xe5 && state.songTargetProgram === 1 && value >= 0x80) {
+	if (state.hexLeft === 2 && state.currentHex === VCMD.Tremolo && state.songTargetProgram === 1 && value >= 0x80) {
 		state.hexLeft -= 1;
 	}
 
@@ -1207,7 +1208,7 @@ function scanHex(line: string, at: number, state: ScanState): StepResult {
 	// big-endian data count, and count+1 data bytes follow the four header
 	// arguments (the do-while at parser.ts:parseHFDHex runs count+1 times). The sub is
 	// cleared once the count is folded in, so data bytes cannot re-trigger it.
-	if (state.currentHex === 0xed && state.currentHexSub === 0x82) {
+	if (state.currentHex === VCMD.Adsr && state.currentHexSub === 0x82) {
 		if (state.hexLeft === 1) {
 			state.hfdCountHi = value;
 		} else if (state.hexLeft === 0) {
@@ -1219,7 +1220,7 @@ function scanHex(line: string, at: number, state: ScanState): StepResult {
 	// `parser.ts:parseHexCommand` (Music.cpp:2012-2042) — with one argument still
 	// outstanding, `$DD`'s may be a note. The parser reads ahead from here, across
 	// newlines; `step` may not, so the answer is left to the tokens that follow.
-	if (state.hexLeft === 1 && state.currentHex === 0xdd) {
+	if (state.hexLeft === 1 && state.currentHex === VCMD.PitchBend) {
 		state.ddTarget = true;
 	}
 
@@ -2193,7 +2194,9 @@ function gather(
 			// Off `expected` rather than a literal 3, so `expectedArgs` stays the
 			// one place a command's argument count is written down.
 			openDD =
-				vcmd === 0xdd && expected !== null && args.length === expected - 1 ? commands[commands.length - 1] : null;
+				vcmd === VCMD.PitchBend && expected !== null && args.length === expected - 1
+					? commands[commands.length - 1]
+					: null;
 			i = j - 1;
 			continue;
 		}
@@ -2357,11 +2360,11 @@ function numberValue(raw: string, kind: TokenKind): number {
  * command's — a `$E5` sample load really emits `$F3` (`parser.ts:parseHexCommand`).
  */
 export function vcmdName(vcmd: number, args: { value: number }[], target: CommandTarget): string {
-	if (vcmd === 0xed && target.program === 1) {
+	if (vcmd === VCMD.Adsr && target.program === 1) {
 		// `parseHFDHex` (`parser.ts`) — the sub-byte picks the form.
 		const sub = args[0]?.value;
 		if (sub === 0x80) {
-			return VCMD_NAMES[0xf6]; // what it compiles to (parser.ts:parseHFDHex)
+			return VCMD_NAMES[VCMD.DspWrite]; // what it compiles to (parser.ts:parseHFDHex)
 		}
 
 		if (sub === 0x81) {
@@ -2376,14 +2379,14 @@ export function vcmdName(vcmd: number, args: { value: number }[], target: Comman
 			return $localize`:@@command.name.unknown-command:command.name.unknown-command`; // AMK0163 (parser.ts:parseHFDHex)
 		}
 
-		return VCMD_NAMES[0xed]; // the plain form, a bare `$ED` included
+		return VCMD_NAMES[VCMD.Adsr]; // the plain form, a bare `$ED` included
 	}
 
-	if (vcmd === 0xe5 && target.program === 1 && (args[0]?.value ?? 0) >= 0x80) {
-		return VCMD_NAMES[0xf3]; // sample load in disguise (parser.ts:parseHexCommand)
+	if (vcmd === VCMD.Tremolo && target.program === 1 && (args[0]?.value ?? 0) >= 0x80) {
+		return VCMD_NAMES[VCMD.SampleLoad]; // sample load in disguise (parser.ts:parseHexCommand)
 	}
 
-	if (vcmd === 0xfc && target.amkVersion === 1) {
+	if (vcmd === VCMD.RemoteCode && target.amkVersion === 1) {
 		return $localize`:@@command.name.remote-gain:command.name.remote-gain`; // parser.ts:parseHexCommand, which rebuilds it as a type 5 remote code event
 	}
 
@@ -2412,7 +2415,7 @@ export function expectedArgs(vcmd: number, args: { value: number }[], target: Co
 		return null;
 	}
 
-	if (vcmd === 0xed && target.program === 1) {
+	if (vcmd === VCMD.Adsr && target.program === 1) {
 		// `parseHFDHex` (`parser.ts`) — the same forks as `awaitingHfdSub`.
 		if (args.length === 0) {
 			return null;
@@ -2443,15 +2446,15 @@ export function expectedArgs(vcmd: number, args: { value: number }[], target: Co
 		return 2; // plain ADSR
 	}
 
-	if (vcmd === 0xe5 && target.program === 1 && args.length > 0 && args[0].value >= 0x80) {
+	if (vcmd === VCMD.Tremolo && target.program === 1 && args.length > 0 && args[0].value >= 0x80) {
 		return 2; // sample load (parser.ts:parseHexCommand)
 	}
 
-	if (vcmd === 0xfc && target.amkVersion === 1) {
+	if (vcmd === VCMD.RemoteCode && target.amkVersion === 1) {
 		return 2; // remote gain (parser.ts:parseHexCommand)
 	}
 
-	if (vcmd === 0xfb) {
+	if (vcmd === VCMD.Arpeggio) {
 		if (args.length === 0) {
 			return null;
 		}
@@ -2468,7 +2471,7 @@ export function expectedArgs(vcmd: number, args: { value: number }[], target: Co
 	// `scanHex` mirrors. A flat 3 here would make the two statements this module
 	// deliberately keeps disagree past the second link: a longer chain loses its
 	// last byte and goes `complete` early.
-	if (vcmd === 0xfa && args.length > 0 && args[0].value === 0xfe) {
+	if (vcmd === VCMD.Settings && args.length > 0 && args[0].value === 0xfe) {
 		let expected = base;
 		while (args.length >= expected && args[expected - 1].value >= 0x80) {
 			expected++;

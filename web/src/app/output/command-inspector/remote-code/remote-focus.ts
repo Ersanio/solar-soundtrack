@@ -19,7 +19,8 @@ import { tempoAt } from '@amk/tokens/dialect';
 import { type Edit, spliceRange } from '@amk/tokens/edits';
 import type { CommandGlyph } from '../../../editor/command-palette/command-icon';
 import { glyphOf } from '../../../editor/command-palette/glyph-of';
-import { hex2 } from '../../../util/format';
+import { dollarHex } from '../../../util/format';
+import { clamp } from '../../../util/math';
 
 /** One command the body runs, drawn as the note inspector draws one. */
 export interface RemoteChip {
@@ -179,7 +180,7 @@ export function remoteTypeEdit(source: string, call: RemoteCall, type: number): 
 
   const span = { start: call.typeAt.start, end: call.typeAt.end, line: 1 };
   if (takesWait(type) && call.wait === null) {
-    return spliceRange(source, span, `${type},${call.separator}$${hex2(DEFAULT_WAIT)}`);
+    return spliceRange(source, span, `${type},${call.separator}${dollarHex(DEFAULT_WAIT)}`);
   }
 
   if (!takesWait(type) && call.wait !== null) {
@@ -196,13 +197,13 @@ export function remoteTypeEdit(source: string, call: RemoteCall, type: number): 
  */
 export function remoteWaitEdit(source: string, call: RemoteCall, ticks: number): Edit | null {
   const wait = call.wait;
-  const clamped = Math.min(0x100, Math.max(1, Math.round(ticks)));
+  const clamped = clamp(Math.round(ticks), 1, 0x100);
   if (wait === null || clamped === wait.ticks) {
     return null;
   }
 
   const text = wait.hex
-    ? `$${hex2(clamped & 0xff)}`
+    ? dollarHex(clamped & 0xff)
     : TICKS_PER_WHOLE % clamped === 0
       ? String(TICKS_PER_WHOLE / clamped)
       : `=${clamped}`;

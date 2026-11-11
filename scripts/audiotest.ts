@@ -23,7 +23,7 @@ import { EMPTY_SAMPLE_NAME, bankSlotName } from "@amk/core/hardcoded-tables";
 import { SAMPLE_BANK_BYTES, SAMPLE_BANK_SLOTS, type BrrSample, emptySample, parseSampleBank } from "@amk/spc/brr";
 import { loadDriver } from "@amk/spc/driver";
 import { buildSpc } from "@amk/spc/export";
-import { AUDITION_TAIL_SECONDS, auditionNote, noteFrames } from "@amk/spc/note-audition";
+import { AUDITION_TAIL_SECONDS, auditionNote, auditionFrames } from "@amk/spc/note-audition";
 import type { PitchSlide } from "@amk/spc/song-walk";
 import { SPC_CHANNELS, SPC_SAMPLE_RATE, instantiate } from "@amk/spc/wasm-host";
 import {
@@ -1197,14 +1197,14 @@ section("one note, auditioned where the song is playing");
 
 	// The frames the driver is handed, against what `emitNote` writes for a note
 	// of the same length (`parser.ts:2839`, Music.cpp:2254).
-	const long = noteFrames(NOTE, 192);
+	const long = auditionFrames(NOTE, 192);
 	check(
 		"192 ticks is a $60 note and a tie",
 		long[0] === 0x60 && long[1] === NOTE && long[2] === 0xc6,
 		[...long.subarray(0, 3)].map((b) => b.toString(16)).join(" "),
 	);
 
-	const short = noteFrames(NOTE, 48);
+	const short = auditionFrames(NOTE, 48);
 	check("under 128 ticks is one frame", short[0] === 0x30 && short[1] === NOTE);
 	check("a rest follows, so the note keys off and releases", short[2] === 0x7f && short[3] === 0xc7);
 	check("the block is terminated", short[short.length - 1] === 0x00);
@@ -1215,7 +1215,7 @@ section("one note, auditioned where the song is playing");
 	// pointer has to be standing on the byte already. `frameTicks` is that frame,
 	// and it is the whole note's here.
 	const SLIDE = { delay: 0x00, duration: 0x30, target: 0xb0, afterTicks: 0, frameTicks: 96 };
-	const head = noteFrames(NOTE, 96, null, SLIDE);
+	const head = auditionFrames(NOTE, 96, null, SLIDE);
 	check(
 		"a slide arming at the head goes straight after the note byte",
 		head[0] === 96 && head[1] === NOTE && head[2] === 0xdd && head[3] === 0x00 && head[4] === 0x30 && head[5] === 0xb0,
@@ -1226,14 +1226,14 @@ section("one note, auditioned where the song is playing");
 
 	// `Music.cpp:2224` rewinds a tie out of a `$DD`'s way so the arm lands on it,
 	// and the duration byte carries over, so `c4^4 $DD` is four bytes not five.
-	const tied = noteFrames(NOTE, 96, null, { ...SLIDE, afterTicks: 48, frameTicks: 48 });
+	const tied = auditionFrames(NOTE, 96, null, { ...SLIDE, afterTicks: 48, frameTicks: 48 });
 	check(
 		"an arm halfway in is a tie of the ticks left",
 		tied[0] === 48 && tied[1] === NOTE && tied[2] === 0xc6 && tied[3] === 0xdd,
 		[...tied.subarray(0, 4)].map((b) => b.toString(16)).join(" "),
 	);
 
-	const uneven = noteFrames(NOTE, 96, null, { ...SLIDE, afterTicks: 24, frameTicks: 72 });
+	const uneven = auditionFrames(NOTE, 96, null, { ...SLIDE, afterTicks: 24, frameTicks: 72 });
 	check(
 		"an uneven arm respells the tail's own duration",
 		uneven[0] === 24 && uneven[1] === NOTE && uneven[2] === 72 && uneven[3] === 0xc6 && uneven[4] === 0xdd,
@@ -1241,7 +1241,7 @@ section("one note, auditioned where the song is playing");
 	);
 
 	// The head run *is* `emitNote`, so a chunked note needs no case of its own.
-	const chunked = noteFrames(NOTE, 200, null, { ...SLIDE, afterTicks: 192, frameTicks: 8 });
+	const chunked = auditionFrames(NOTE, 200, null, { ...SLIDE, afterTicks: 192, frameTicks: 8 });
 	check(
 		"a chunked note keeps its $60 head and arms on its own last frame",
 		chunked[0] === 0x60 &&
@@ -1253,7 +1253,7 @@ section("one note, auditioned where the song is playing");
 		[...chunked.subarray(0, 6)].map((b) => b.toString(16)).join(" "),
 	);
 
-	const quantized = noteFrames(NOTE, 96, 0x7f, SLIDE);
+	const quantized = auditionFrames(NOTE, 96, 0x7f, SLIDE);
 	check(
 		"the q byte still sits between the duration and the note, once",
 		quantized[0] === 96 && quantized[1] === 0x7f && quantized[2] === NOTE && quantized[3] === 0xdd,
@@ -1264,7 +1264,7 @@ section("one note, auditioned where the song is playing");
 	// running behind the four bytes, so the `$DD` sits between two of its frames
 	// and the rest of it follows as ties. The one shape where the arm is not the
 	// note's last frame, and the reason `frameTicks` is carried at all.
-	const inside = noteFrames(NOTE, 192, null, SLIDE);
+	const inside = auditionFrames(NOTE, 192, null, SLIDE);
 	check(
 		"a note that goes on after the arm keeps its ties behind the slide",
 		inside[0] === 96 &&
@@ -1283,19 +1283,19 @@ section("one note, auditioned where the song is playing");
 	// and one the note has not the ticks for is no frame of this note at all.
 	check(
 		"a slide arming past the note's end is not written",
-		identical(noteFrames(NOTE, 48, null, { ...SLIDE, afterTicks: 48, frameTicks: 48 }), noteFrames(NOTE, 48)),
+		identical(auditionFrames(NOTE, 48, null, { ...SLIDE, afterTicks: 48, frameTicks: 48 }), auditionFrames(NOTE, 48)),
 	);
 	check(
 		"nor one arming before the note starts",
-		identical(noteFrames(NOTE, 96, null, { ...SLIDE, afterTicks: -1 }), noteFrames(NOTE, 96)),
+		identical(auditionFrames(NOTE, 96, null, { ...SLIDE, afterTicks: -1 }), auditionFrames(NOTE, 96)),
 	);
 	check(
 		"nor one on a frame no duration byte can say",
-		identical(noteFrames(NOTE, 200, null, { ...SLIDE, frameTicks: 200 }), noteFrames(NOTE, 200)),
+		identical(auditionFrames(NOTE, 200, null, { ...SLIDE, frameTicks: 200 }), auditionFrames(NOTE, 200)),
 	);
 	check(
 		"nor one on a frame the note is not long enough to hold",
-		identical(noteFrames(NOTE, 96, null, { ...SLIDE, afterTicks: 48 }), noteFrames(NOTE, 96)),
+		identical(auditionFrames(NOTE, 96, null, { ...SLIDE, afterTicks: 48 }), auditionFrames(NOTE, 96)),
 	);
 
 	// A frame of one tick is written all the same, and the driver then never arms
@@ -1304,7 +1304,7 @@ section("one note, auditioned where the song is playing");
 	// loop reaches the `$DD` and dispatches it into its empty slot. AddmusicK does
 	// exactly this, and reproducing it is the point — a guard here would have the
 	// preview say a song is fine where the transport plays the same wreckage.
-	const oneTick = noteFrames(NOTE, 48, null, { ...SLIDE, afterTicks: 47, frameTicks: 1 });
+	const oneTick = auditionFrames(NOTE, 48, null, { ...SLIDE, afterTicks: 47, frameTicks: 1 });
 	check(
 		"a frame of one tick is written all the same",
 		oneTick[0] === 47 && oneTick[1] === NOTE && oneTick[2] === 1 && oneTick[3] === 0xc6 && oneTick[4] === 0xdd,

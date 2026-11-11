@@ -1,8 +1,8 @@
 /** `HEX_PARAMS`: every hex command's arguments, named as AddmusicK's hex command reference names them. */
 
-import { EMPTY_SAMPLE_NAME } from "@amk/core/hardcoded-tables";
+import { EMPTY_SAMPLE_NAME, VCMD } from "@amk/core/hardcoded-tables";
 import { noiseHz } from "@amk/spc/adsr";
-import { hex2 } from "@amk/core/hex";
+import { dollarHex, hex2 } from "@amk/core/hex";
 import {
 	DURATION,
 	type EnumOption,
@@ -187,7 +187,7 @@ const VELOCITY_TABLES_BARE = [
  */
 const REMOTE_TYPES: readonly EnumOption[] = REMOTE_EVENTS.map((event) => ({
 	value: event.type & 0xff,
-	label: `${event.type < 0 ? `$${hex2(event.type & 0xff)}` : event.type} — ${event.name}`,
+	label: `${event.type < 0 ? dollarHex(event.type & 0xff) : event.type} — ${event.name}`,
 }));
 
 // ---------------------------------------------------------------------------
@@ -491,7 +491,7 @@ const remote: Resolver = (command) => {
 // ---------------------------------------------------------------------------
 
 export const HEX_PARAMS: Readonly<Record<number, Resolver>> = {
-	0xda: fixed([
+	[VCMD.Instrument]: fixed([
 		u8($localize`:@@inspector.param.instrument:inspector.param.instrument`, "index", {
 			describe: (value) =>
 				value === 0x13
@@ -507,8 +507,8 @@ export const HEX_PARAMS: Readonly<Record<number, Resolver>> = {
 	// surround bits, which no single descriptor row can be. See `pan-command/`.
 	// `$DC` keeps this one — its target is a plain pan value that the driver
 	// slides towards, with no surround bits in it (`Commands.asm:264`).
-	0xdc: fixed([DURATION, PAN]),
-	0xdd: fixed([
+	[VCMD.PanFade]: fixed([DURATION, PAN]),
+	[VCMD.PitchBend]: fixed([
 		// Both really are tick counts — `aram_map.html:444` calls the first "pitch
 		// slide delay in music tempo ticks", and the second is the divisor
 		// `CalcPortamentoDelta` (ARAM `$131B`) divides the pitch distance by, not a
@@ -522,20 +522,20 @@ export const HEX_PARAMS: Readonly<Record<number, Resolver>> = {
 			describe: (value) => noteName(value),
 		}),
 	]),
-	0xde: fixed([
+	[VCMD.Vibrato]: fixed([
 		ticks($localize`:@@inspector.param.delay:inspector.param.delay`),
 		RATE($localize`:@@inspector.param.rate-zero.vibrato:inspector.param.rate-zero.vibrato`),
 		u8($localize`:@@inspector.param.depth:inspector.param.depth`, "level"),
 	]),
-	0xdf: fixed([]),
-	0xe0: fixed([
+	[VCMD.VibratoOff]: fixed([]),
+	[VCMD.GlobalVolume]: fixed([
 		u8($localize`:@@inspector.param.global-volume:inspector.param.global-volume`, "level", { describe: percentOf255 }),
 	]),
-	0xe1: fixed([
+	[VCMD.GlobalVolumeFade]: fixed([
 		DURATION,
 		u8($localize`:@@inspector.param.global-volume:inspector.param.global-volume`, "level", { describe: percentOf255 }),
 	]),
-	0xe2: fixed(
+	[VCMD.Tempo]: fixed(
 		[
 			u8($localize`:@@inspector.param.tempo:inspector.param.tempo`, "rate", {
 				max: MAX_TEMPO,
@@ -544,7 +544,7 @@ export const HEX_PARAMS: Readonly<Record<number, Resolver>> = {
 		],
 		$localize`:@@inspector.param.the-driver-stores-one-more:inspector.param.the-driver-stores-one-more`,
 	),
-	0xe3: fixed(
+	[VCMD.TempoFade]: fixed(
 		[
 			TEMPO_FADE_DURATION,
 			u8($localize`:@@inspector.param.tempo:inspector.param.tempo`, "rate", {
@@ -554,15 +554,17 @@ export const HEX_PARAMS: Readonly<Record<number, Resolver>> = {
 		],
 		$localize`:@@inspector.param.its-handler-has-the-same:inspector.param.its-handler-has-the-same`,
 	),
-	0xe4: fixed([SEMITONES]),
-	0xe5: tremolo,
-	0xe6: subloop,
-	0xe7: fixed([u8($localize`:@@inspector.param.volume:inspector.param.volume`, "level", { describe: percentOf255 })]),
-	0xe8: fixed([
+	[VCMD.GlobalTranspose]: fixed([SEMITONES]),
+	[VCMD.Tremolo]: tremolo,
+	[VCMD.Subloop]: subloop,
+	[VCMD.Volume]: fixed([
+		u8($localize`:@@inspector.param.volume:inspector.param.volume`, "level", { describe: percentOf255 }),
+	]),
+	[VCMD.VolumeFade]: fixed([
 		DURATION,
 		u8($localize`:@@inspector.param.volume:inspector.param.volume`, "level", { describe: percentOf255 }),
 	]),
-	0xe9: fixed(
+	[VCMD.CallLoop]: fixed(
 		[
 			u8($localize`:@@inspector.param.loop-point-low:inspector.param.loop-point-low`, "address", {
 				control: "readonly",
@@ -574,29 +576,29 @@ export const HEX_PARAMS: Readonly<Record<number, Resolver>> = {
 		],
 		$localize`:@@inspector.param.written-by-the-compiler-from:inspector.param.written-by-the-compiler-from`,
 	),
-	0xea: fixed(
+	[VCMD.VibratoFade]: fixed(
 		[DURATION],
 		$localize`:@@inspector.param.fades-to-the-amplitude-the:inspector.param.fades-to-the-amplitude-the`,
 	),
-	0xeb: fixed([
+	[VCMD.PitchEnvelopeRelease]: fixed([
 		ticks($localize`:@@inspector.param.delay:inspector.param.delay`),
 		ticks($localize`:@@inspector.param.duration:inspector.param.duration`),
 		SEMITONES,
 	]),
-	0xec: fixed([
+	[VCMD.PitchEnvelopeAttack]: fixed([
 		ticks($localize`:@@inspector.param.delay:inspector.param.delay`),
 		ticks($localize`:@@inspector.param.duration:inspector.param.duration`),
 		SEMITONES,
 	]),
-	0xed: envelope,
-	0xee: fixed([s8($localize`:@@inspector.param.tuning:inspector.param.tuning`, "semitones")]),
-	0xef: fixed([
+	[VCMD.Adsr]: envelope,
+	[VCMD.FineTune]: fixed([s8($localize`:@@inspector.param.tuning:inspector.param.tuning`, "semitones")]),
+	[VCMD.EchoVolume]: fixed([
 		u8($localize`:@@inspector.param.channels:inspector.param.channels`, "channelMask", { control: "toggles" }),
 		ECHO_VOLUME("L"),
 		ECHO_VOLUME("R"),
 	]),
-	0xf0: fixed([]),
-	0xf1: fixed([
+	[VCMD.EchoOff]: fixed([]),
+	[VCMD.EchoDelay]: fixed([
 		u8($localize`:@@inspector.param.delay:inspector.param.delay`, "index", {
 			max: 0x0f,
 			describe: (value) => {
@@ -620,12 +622,12 @@ export const HEX_PARAMS: Readonly<Record<number, Resolver>> = {
 			{ value: 1, label: $localize`:@@inspector.param.1-flat:inspector.param.1-flat` },
 		]),
 	]),
-	0xf2: fixed([DURATION, ECHO_VOLUME("L"), ECHO_VOLUME("R")]),
+	[VCMD.EchoFade]: fixed([DURATION, ECHO_VOLUME("L"), ECHO_VOLUME("R")]),
 	// The handler at $0DBE forges a six-byte instrument entry in the channel's
 	// backup table: byte 0 is the sample, byte 4 the tuning multiplier. It writes
 	// neither byte 5 (the fraction) nor bytes 1-3 (the envelope), so both carry
 	// over from whatever played last.
-	0xf3: (_command, context) => ({
+	[VCMD.SampleLoad]: (_command, context) => ({
 		params: [
 			u8($localize`:@@inspector.param.sample:inspector.param.sample`, "srcn", {
 				control: "select",
@@ -641,7 +643,7 @@ export const HEX_PARAMS: Readonly<Record<number, Resolver>> = {
 		],
 		note: $localize`:@@inspector.param.changes-the-sample-and-coarse:inspector.param.changes-the-sample-and-coarse`,
 	}),
-	0xf4: fixed([
+	[VCMD.Toggles]: fixed([
 		choice($localize`:@@inspector.param.sub-command:inspector.param.sub-command`, F4_SUBCOMMANDS, {
 			structural: true,
 			// Commands.asm:556-565 — ten entries, no bounds check, and $04's is
@@ -657,17 +659,17 @@ export const HEX_PARAMS: Readonly<Record<number, Resolver>> = {
 			},
 		}),
 	]),
-	0xf5: fixed(
+	[VCMD.Fir]: fixed(
 		Array.from({ length: 8 }, (_, i) =>
 			s8($localize`:@@inspector.param.coefficient:inspector.param.coefficient ${i + 1}:index:`, "level"),
 		),
 		$localize`:@@inspector.param.c7-multiplies-the-newest-sample:inspector.param.c7-multiplies-the-newest-sample`,
 	),
-	0xf6: fixed([
+	[VCMD.DspWrite]: fixed([
 		u8($localize`:@@inspector.param.dsp-register:inspector.param.dsp-register`, "address"),
 		u8($localize`:@@inspector.param.value:inspector.param.value`, "opaque"),
 	]),
-	0xf7: fixed(
+	[VCMD.WriteByte]: fixed(
 		[
 			raw($localize`:@@inspector.param.address-low:inspector.param.address-low`),
 			raw($localize`:@@inspector.param.address-high:inspector.param.address-high`),
@@ -677,7 +679,7 @@ export const HEX_PARAMS: Readonly<Record<number, Resolver>> = {
 	),
 	// The same clock the `n` command sets, so it reads out the same way: the
 	// driver writes both to the DSP's `FLG` register and the ladder is the DSP's.
-	0xf8: fixed([
+	[VCMD.Noise]: fixed([
 		u8($localize`:@@inspector.param.noise-clock:inspector.param.noise-clock`, "rate", {
 			max: 0x1f,
 			describe: (value) =>
@@ -689,18 +691,18 @@ export const HEX_PARAMS: Readonly<Record<number, Resolver>> = {
 	// The handler at $1083 writes the first argument to $0167 and the second to
 	// $0166 — inverted — and the main loop pushes both to the ports every tick
 	// (main.asm:248-256).
-	0xf9: fixed(
+	[VCMD.DataSend]: fixed(
 		[
 			u8($localize`:@@inspector.param.to-2141:inspector.param.to-2141`, "opaque"),
 			u8($localize`:@@inspector.param.to-2140:inspector.param.to-2140`, "opaque"),
 		],
 		$localize`:@@inspector.param.the-two-bytes-land-on:inspector.param.the-two-bytes-land-on`,
 	),
-	0xfa: misc,
+	[VCMD.Settings]: misc,
 	// `$FB` has a view of its own: its length is one of its arguments, so the
 	// notes are a list you add to rather than a count you type. See
 	// `arpeggio-command/`.
-	0xfc: remote,
-	0xfd: fixed([]),
-	0xfe: fixed([]),
+	[VCMD.RemoteCode]: remote,
+	[VCMD.TremoloOff]: fixed([]),
+	[VCMD.PitchEnvelopeOff]: fixed([]),
 };

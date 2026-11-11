@@ -1,11 +1,18 @@
 /** A channel as a strip the roll can splice — its notes and rests in text order, with their spans — or why it cannot be one. */
 
-import { FIRST_PERCUSSION_INSTRUMENT, NOTE_REST, NOTE_TIE } from '@amk/core/hardcoded-tables';
+import {
+  FIRST_PERCUSSION_INSTRUMENT,
+  FIRST_PERCUSSION_NOTE,
+  NOTE_REST,
+  NOTE_TIE,
+  VCMD,
+} from '@amk/core/hardcoded-tables';
 import { octaveOfNote } from '@amk/core/mml-text';
 import type { CommandAddress, NoteAddress, Span } from '@amk/core/types';
 import type { LoopRun, PitchSlide, SongTimeline, WalkNote } from '@amk/spc/song-walk';
 import type { Command, TokenIndex } from '@amk/tokens';
 import { isPercussionInstrument } from '@amk/tokens/commands/in-force';
+import { type Refusal, isRefusal } from './refusal';
 import { BLIND_OCTAVES, type OctaveModel, octaveModel } from './roll-octave';
 
 /**
@@ -189,7 +196,7 @@ export interface StripItem {
   /**
    * False past the end of the pass, where the walk has no note to check the
    * item against — `walkSong` cuts at the shortest channel and sets the rest
-   * aside as `unreachable` (`song-walk.ts:1670-1681`). Still editable; just not
+   * aside as `unreachable` (`song-walk.ts:1118-1129`). Still editable; just not
    * corroborated. For a looped note, whether its **first** instance is inside
    * the pass.
    */
@@ -274,9 +281,7 @@ export interface Strip {
 }
 
 /** Why a channel cannot be spliced, in the words the toolbar shows. */
-export interface StripRefusal {
-  refused: string;
-}
+export type { Refusal } from './refusal';
 
 export interface StripRequest {
   source: string;
@@ -290,7 +295,7 @@ export interface StripRequest {
   tempoRatio: number;
 }
 
-export function isStrip(strip: Strip | StripRefusal): strip is Strip {
+export function isStrip(strip: Strip | Refusal): strip is Strip {
   return (strip as Strip).items !== undefined;
 }
 
@@ -361,7 +366,7 @@ const TIE_TEXT = new RegExp(String.raw`^\^${LENGTH}(?:\s*\^\s*${LENGTH})*$`);
 export const COMMENT = /;[^\r\n]*/g;
 
 /** The first drum's note byte, `@21`'s (`NoteAddress.note`), and how many drums follow it. */
-const PERCUSSION_NOTE = 0xd0;
+const PERCUSSION_NOTE = FIRST_PERCUSSION_NOTE;
 const DRUMS = 9;
 
 /** Only spaces and tabs, so a unit never grows across a line break. */
@@ -749,7 +754,7 @@ interface FrameSeed {
 function discoverLoops(
   request: StripRequest,
   commands: readonly Command[],
-): { seeds: FrameSeed[]; constructs: ConstructSeed[] } | StripRefusal {
+): { seeds: FrameSeed[]; constructs: ConstructSeed[] } | Refusal {
   const { source, channel, noteMap, commandMap, timeline, index } = request;
   const runs = timeline.loops.filter((run) => run.channel === channel);
   const mapped = new Map(commandMap.map((entry) => [entry.address, entry]));
@@ -1000,7 +1005,7 @@ function discoverLoops(
       continue;
     }
 
-    if (command.vcmd === 0xe6 && !covered(command)) {
+    if (command.vcmd === VCMD.Subloop && !covered(command)) {
       return {
         refused:
           command.args[0]?.value === 0
@@ -1030,7 +1035,7 @@ function discoverLoops(
  * has not moved since — `EditorStore.compiledText() === source()`, the same test
  * every other span-based reader in the app takes.
  */
-export function channelStrip(request: StripRequest): Strip | StripRefusal {
+export function channelStrip(request: StripRequest): Strip | Refusal {
   const { source, channel, noteMap, timeline, index, tempoRatio } = request;
 
   if (timeline.truncated || timeline.problems.length > 0) {
@@ -1301,7 +1306,7 @@ export function channelStrip(request: StripRequest): Strip | StripRefusal {
     item.bend =
       commands.find(
         (command) =>
-          command.vcmd === 0xdd &&
+          command.vcmd === VCMD.PitchBend &&
           !command.inRemoteDefinition &&
           command.span.start >= item.segments[0].span.end &&
           command.span.start < until,
@@ -1409,9 +1414,9 @@ function checkedOctaves(
 }
 
 function isDiscovered(
-  outcome: { seeds: FrameSeed[]; constructs: ConstructSeed[] } | StripRefusal,
+  outcome: { seeds: FrameSeed[]; constructs: ConstructSeed[] } | Refusal,
 ): outcome is { seeds: FrameSeed[]; constructs: ConstructSeed[] } {
-  return (outcome as StripRefusal).refused === undefined;
+  return !isRefusal(outcome);
 }
 
 /**

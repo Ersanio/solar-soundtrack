@@ -1,11 +1,16 @@
 import { Component, computed, inject, input } from '@angular/core';
 
-import { argsRewritable, commandRewritable, spliceArgs, spliceCommand } from '@amk/tokens/edits';
+import {
+  argsRewritable,
+  argumentText,
+  commandRewritable,
+  spliceArgs,
+  spliceCommand,
+} from '@amk/tokens/edits';
 import type { Command } from '@amk/tokens';
 import { commandLockedBecause } from '../commands/context';
 import { CommitAudition } from '../../../state/commit-audition';
 import { EditorStore } from '../../../state/editor-store';
-import { hex2 } from '../../../util/format';
 import { type EnvelopeValue, EnvelopeTuner } from '../envelope-tuner/envelope-tuner';
 
 /**
@@ -73,7 +78,11 @@ export class AdsrCommand {
     // write, so there is nowhere to splice the missing one.
     if (!command.complete) {
       this.commitAudition.apply(
-        spliceCommand(source, command, `$ED $${hex2(first)} $${hex2(second)}`),
+        spliceCommand(
+          source,
+          command,
+          `$ED ${argumentText(command, first)} ${argumentText(command, second)}`,
+        ),
       );
       return;
     }
@@ -87,8 +96,8 @@ export class AdsrCommand {
 
     this.commitAudition.apply(
       spliceArgs(source, command, [
-        keepFirst || first === wasFirst ? null : `$${hex2(first)}`,
-        second === wasSecond ? null : `$${hex2(second)}`,
+        keepFirst || first === wasFirst ? null : argumentText(command, first),
+        second === wasSecond ? null : argumentText(command, second),
       ]),
     );
   }

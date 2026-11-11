@@ -13,7 +13,7 @@ import {
   fitToTarget,
   matchPreset,
   toHexByte,
-  toSigned,
+  signedByte,
 } from '@amk/spc/fir';
 import { Button } from '../../../shared/button/button';
 import { Slider } from '../../../shared/slider/slider';
@@ -75,7 +75,7 @@ export class FirDesigner {
    */
   protected readonly taps = computed<FirTaps>(() => {
     const args = this.command().args;
-    return Array.from({ length: FIR_TAPS }, (_, i) => toSigned(args[i]?.value ?? 0));
+    return Array.from({ length: FIR_TAPS }, (_, i) => signedByte(args[i]?.value ?? 0));
   });
 
   /**

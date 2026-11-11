@@ -4,6 +4,7 @@ import { Component, computed, inject } from '@angular/core';
 
 import { StatTile } from '../../shared/stat-tile/stat-tile';
 import { EditorStore } from '../../state/editor-store';
+import { CHANNELS } from '../../state/transport-view';
 import { formatTime, hex4 } from '../../util/format';
 
 interface Cell {
@@ -80,7 +81,7 @@ export class StatsGrid {
     ];
 
     // Only show the channels practically in use
-    for (let channel = 0; channel < 8; channel++) {
+    for (let channel = 0; channel < CHANNELS; channel++) {
       const size = stats.channelSizes[channel] ?? 0;
       if (size === 0) {
         continue;

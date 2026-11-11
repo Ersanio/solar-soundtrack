@@ -7,6 +7,7 @@
  */
 
 import { hex4 as hex } from "@amk/core/hex";
+import { clamp } from "@amk/core/math";
 import type { SongTags } from "@amk/core/types";
 import type { BrrSample } from "./brr";
 import type { DriverBundle } from "./driver";
@@ -192,7 +193,7 @@ function writeText(spc: Uint8Array, offset: number, length: number, value: strin
  * ("Why on Earth is the value stored as plain text...?" — AddmusicK.cpp:1614).
  */
 function writeDigits(spc: Uint8Array, offset: number, length: number, value: number): void {
-	const clamped = Math.max(0, Math.min(value, 10 ** length - 1));
+	const clamped = clamp(value, 0, 10 ** length - 1);
 	const text = String(Math.floor(clamped)).padStart(length, "0");
 	for (let index = 0; index < length; index++) {
 		spc[offset + index] = text.charCodeAt(index);

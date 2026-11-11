@@ -7,7 +7,7 @@ import { commandScope } from '@amk/tokens/commands/in-force';
 import { type Edit, insertAt } from '@amk/tokens/edits';
 import {
   type EditContext,
-  type EditRefusal,
+  type Refusal,
   framePasses,
   type FramePlan,
   isEdits,
@@ -129,7 +129,7 @@ function planReach(
 export function planGroupEdits(
   context: EditContext,
   plans: readonly FramePlan[],
-): Edit[] | EditRefusal {
+): Edit[] | Refusal {
   const reaches = plans.map(({ frame, plan }) => planReach(context.strip, frame, plan).reach);
   const furthest = reaches.indexOf(Math.max(...reaches, 0));
   const edits: Edit[] = [];
@@ -155,7 +155,7 @@ export function planGroupEdits(
   return ordered(edits) ?? refuse(REFUSE_CROWDED);
 }
 
-export function planEdits(context: EditContext, plan: Plan): Edit[] | EditRefusal {
+export function planEdits(context: EditContext, plan: Plan): Edit[] | Refusal {
   if (!committable(plan)) {
     return refuse(plan.refused ?? REFUSE_CLASH);
   }
@@ -316,7 +316,7 @@ export function planEdits(context: EditContext, plan: Plan): Edit[] | EditRefusa
   const restores: Edit[] = [];
 
   /** Hands `reader` the octave the original gave it, from where the two parted. */
-  const restoreFor = (reader: StripItem, wanted: number): EditRefusal | null => {
+  const restoreFor = (reader: StripItem, wanted: number): Refusal | null => {
     const back = diverged === null ? null : octaves.at(diverged);
     const inPlace =
       diverged !== null && back !== null && octaves.moves(diverged, reader.unitSpan.start);

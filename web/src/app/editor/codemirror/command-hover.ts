@@ -3,7 +3,7 @@ import { hoverTooltip } from '@codemirror/view';
 
 import { type Command, type NoteLengthSegment, commandAt } from '@amk/tokens';
 import { TICKS_PER_WHOLE } from '@amk/core/hardcoded-tables';
-import { hex2 } from '../../util/format';
+import { dollarHex } from '../../util/format';
 
 /** One line of the tooltip, styled by the classes the theme defines. */
 function line(className: string, text: string): HTMLElement {
@@ -79,7 +79,7 @@ function renderCommand(command: Command): HTMLElement {
   const dom = document.createElement('div');
   dom.className = 'cm-amk-hover';
 
-  const label = command.vcmd !== undefined ? `$${hex2(command.vcmd)}` : command.kind;
+  const label = command.vcmd !== undefined ? dollarHex(command.vcmd) : command.kind;
   const via =
     command.replacement !== undefined
       ? $localize`:@@source.hover.via:source.hover.via ${command.replacement}:replacement:`
@@ -99,7 +99,7 @@ function renderCommand(command: Command): HTMLElement {
     const shown = command.args.slice(0, 16);
     const args =
       command.vcmd !== undefined
-        ? shown.map((arg) => `$${hex2(arg.value & 0xff)}`).join(' ')
+        ? shown.map((arg) => dollarHex(arg.value & 0xff)).join(' ')
         : shown.map((arg) => arg.value).join(', ');
     const more = command.args.length - shown.length;
     dom.appendChild(

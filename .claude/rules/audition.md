@@ -82,7 +82,7 @@ moves the key-on by a few CPU cycles, and the DSP's free-running envelope counte
 under the attack. `audiotest` measures that at a few ten-thousandths of the signal, with the body of
 the note unmoved.
 
-`noteFrames` mirrors the compiler's `emitNote` (Music.cpp:2254), so the bytes are the ones a note of
+`auditionFrames` mirrors the compiler's `emitNote` (Music.cpp:2254), so the bytes are the ones a note of
 that length would really be written as. **It writes no `q` byte**, because the driver only reads one
 when the byte after the duration is below `$80` — leaving it out is what makes the gate and velocity
 the song left standing apply. The exception is a channel the song has never written to, which has

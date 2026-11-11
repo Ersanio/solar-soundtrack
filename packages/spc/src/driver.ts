@@ -5,6 +5,7 @@
  * These are build-time artifacts produced by running AddmusicK once.
  */
 
+import { word } from "@amk/core/bytes";
 import { type BrrSample, parseBrr } from "./brr";
 
 export interface DriverManifest {
@@ -69,8 +70,6 @@ export class DriverError extends Error {}
  * before the header existed, so it is the file's length less these four bytes.
  */
 export const UPLOAD_HEADER_BYTES = 4;
-
-const word = (bytes: Uint8Array, at: number): number => bytes[at] | (bytes[at + 1] << 8);
 
 /**
  * Percent-encode one path segment.

@@ -1,4 +1,3 @@
-/** `value`, held inside `[min, max]`. */
-export function clamp(value: number, min: number, max: number): number {
-  return Math.min(max, Math.max(min, value));
-}
+/** Arithmetic the app shares: `clamp` is `@amk/core`'s, under the path the app imports it by. */
+
+export { clamp } from '@amk/core/math';

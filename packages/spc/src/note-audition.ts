@@ -27,10 +27,13 @@
  * note-off to.
  */
 
+import { NOTE_REST, NOTE_TIE, VCMD, noteFrames } from "@amk/core/hardcoded-tables";
 import type { PitchSlide } from "./song-walk";
 import { SPC_CHANNELS, SPC_SAMPLE_RATE, type SpcCore } from "./wasm-host";
 import {
-	TICK_POLL_HZ,
+	MAX_SEEK_SECONDS,
+	POLL_BLOCK_FRAMES,
+	SEEK_STALL_BLOCKS,
 	VOICES,
 	applyChannelMutes,
 	createMuteBackup,
@@ -51,9 +54,6 @@ import {
 	voiceStarted,
 	volumesSettled,
 } from "./driver-state";
-
-/** Emulated frames per poll, matching what `worklet.ts` counts ticks at. */
-const BLOCK = SPC_SAMPLE_RATE / TICK_POLL_HZ;
 
 /**
  * How long the release and the echo are given to ring out past the note.
@@ -77,26 +77,11 @@ const FADE_SECONDS = 0.02;
  */
 const MAX_AUDITION_SECONDS = 10;
 
-/**
- * How long the fast-forward will run without the tick count moving before it
- * gives up, and an outright ceiling — the same two guards `worklet.ts` states,
- * for the same reason. Restated rather than imported: `worklet.ts` is bundled
- * standalone for the audio thread and exports nothing.
- */
-const SEEK_STALL_BLOCKS = 2 * TICK_POLL_HZ;
-const MAX_SEEK_SECONDS = 999;
-
-/** `$C6` holds the note, `$C7` releases it, `$00` ends the track. */
-const NOTE_TIE = 0xc6;
-const NOTE_REST = 0xc7;
+/** `$00` ends the track. */
 const TRACK_END = 0x00;
 
-/** `$DA` is the instrument command, and `@0` is what the driver defaults to. */
-const VCMD_INSTRUMENT = 0xda;
+/** `@0`, which is what the driver defaults to. */
 const DEFAULT_INSTRUMENT = 0x00;
-
-/** `$DD`, the pitch slide, which the note before it reads rather than the command loop. */
-const VCMD_PITCH_SLIDE = 0xdd;
 
 /**
  * The `q` a channel's first note carries when the song has not set one — `q7f`,
@@ -108,8 +93,7 @@ const DEFAULT_Q = 0x7f;
 /** The most a duration byte can say; `$80` and up is a note. */
 const MAX_DURATION = 0x7f;
 
-/** Music.cpp:2254 — a note this long is split, into chunks of this. */
-const LONG_NOTE = 0x80;
+/** Music.cpp:2254 — a note of `$80` ticks or more is split into chunks of this, which {@link noteFrames} does. */
 const LONG_CHUNK = 0x60;
 
 /**
@@ -174,7 +158,7 @@ export interface NoteAuditionRequest {
 	 *
 	 * The song's own `$DD` is never reached — the voice is pointed away from the
 	 * song data before the note is handed over — so a slide has to be written into
-	 * the frames, which {@link noteFrames} does. `target` must arrive **as the
+	 * the frames, which {@link auditionFrames} does. `target` must arrive **as the
 	 * compiler emitted it**: the driver adds `$43` and `!HTuneValues+x` itself at
 	 * arm time (`main.asm:3277-3285`), so anything that transposes a written pitch
 	 * on the way here has to leave this alone.
@@ -219,32 +203,21 @@ export interface AuditionedNote {
  * duration byte has to be compared against — the compiler drops one that repeats.
  */
 function appendNote(bytes: number[], note: number, ticks: number, q: readonly number[]): number {
-	let left = ticks;
+	const [first, ...tied] = noteFrames(ticks);
+	bytes.push(first, ...q, note);
 
-	if (left < LONG_NOTE) {
-		bytes.push(left, ...q, note);
-		return left;
-	}
+	let last = first;
+	for (const frame of tied) {
+		// The duration byte carries over, so an equal frame needs no new one.
+		if (frame !== last) {
+			bytes.push(frame);
+		}
 
-	bytes.push(LONG_CHUNK, ...q, note);
-	left -= LONG_CHUNK;
-
-	while (left > LONG_CHUNK) {
 		bytes.push(NOTE_TIE);
-		left -= LONG_CHUNK;
+		last = frame;
 	}
 
-	if (left === 0) {
-		return LONG_CHUNK;
-	}
-
-	// The duration byte carries over, so an exact chunk needs no new one.
-	if (left !== LONG_CHUNK) {
-		bytes.push(left);
-	}
-
-	bytes.push(NOTE_TIE);
-	return left;
+	return last;
 }
 
 /**
@@ -280,7 +253,7 @@ function appendNote(bytes: number[], note: number, ticks: number, q: readonly nu
  * would send the driver to the phrase table, which by then is underneath these
  * very bytes.
  */
-export function noteFrames(
+export function auditionFrames(
 	note: number,
 	ticks: number,
 	quantization: number | null = null,
@@ -315,7 +288,7 @@ export function noteFrames(
 			bytes.push(NOTE_TIE);
 		}
 
-		bytes.push(VCMD_PITCH_SLIDE, bend.delay, bend.duration, bend.target);
+		bytes.push(VCMD.PitchBend, bend.delay, bend.duration, bend.target);
 
 		// The rest of the note, as the ties it is. Once the slide has armed it runs
 		// off `$90`/`$91` rather than off frames, so what these are is inaudible and
@@ -427,7 +400,7 @@ export function auditionNote(core: SpcCore, spc: Uint8Array, request: NoteAuditi
 	const hushed = silenced | (1 << channel);
 	for (let settle = 0; settle < MAX_SETTLE_BLOCKS && (settle < SETTLE_BLOCKS || quiet < 2); settle++) {
 		applyChannelMutes(core.aram(), hushed, backup);
-		core.renderView(BLOCK);
+		core.renderView(POLL_BLOCK_FRAMES);
 		quiet = volumesSettled(core.aram()) ? quiet + 1 : 0;
 	}
 
@@ -450,8 +423,13 @@ export function auditionNote(core: SpcCore, spc: Uint8Array, request: NoteAuditi
 	// The prefix does not disturb a `$DD` in the frames: the command loop
 	// dispatches it on the fetch tick, several bytes before the duration byte, so
 	// the pointer standing after the note byte is the same either way.
-	const prefix = voiceHasInstrument(aram, channel) ? [] : [VCMD_INSTRUMENT, DEFAULT_INSTRUMENT];
-	const frames = noteFrames(note, held, voiceHasQuantization(aram, channel) ? null : DEFAULT_Q, request.slide ?? null);
+	const prefix = voiceHasInstrument(aram, channel) ? [] : [VCMD.Instrument, DEFAULT_INSTRUMENT];
+	const frames = auditionFrames(
+		note,
+		held,
+		voiceHasQuantization(aram, channel) ? null : DEFAULT_Q,
+		request.slide ?? null,
+	);
 	aram.set(prefix, scratchAt);
 	aram.set(frames, scratchAt + prefix.length);
 
@@ -524,8 +502,8 @@ function fastForward(
 		// block is about to report may run entirely inside the block, so the mark
 		// has to come from before it for the change to be visible at all.
 		const mark = channel === null ? 0 : voiceFetchMark(core.aram(), channel);
-		core.renderView(BLOCK);
-		rendered += BLOCK;
+		core.renderView(POLL_BLOCK_FRAMES);
+		rendered += POLL_BLOCK_FRAMES;
 
 		const aram = core.aram();
 		// Before the latch below returns, so a song that has not keyed on yet is
@@ -666,8 +644,8 @@ function record(
 	let tail = -1;
 
 	while (rendered < cap) {
-		pcm.set(core.renderView(BLOCK), rendered * SPC_CHANNELS);
-		rendered += BLOCK;
+		pcm.set(core.renderView(POLL_BLOCK_FRAMES), rendered * SPC_CHANNELS);
+		rendered += POLL_BLOCK_FRAMES;
 
 		const aram = core.aram();
 		if (channel !== null) {

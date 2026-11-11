@@ -1,9 +1,10 @@
 import { argEditable } from "../edits";
 import { type Command, expectedArgs } from "../tokens";
-import { hex2 } from "@amk/core/hex";
+import { dollarHex } from "@amk/core/hex";
 import { HEX_PARAMS } from "./hex-params";
 import { LETTER_PARAMS } from "./letter-params";
-import { type Control, type ParamChoice, type ParamContext, type ParamDescriptor, raw, toSigned } from "./param";
+import { toSigned } from "@amk/core/bytes";
+import { type Control, type ParamChoice, type ParamContext, type ParamDescriptor, raw } from "./param";
 
 /** One row of the parameter table: a descriptor bound to the value it describes. */
 export interface ParamRow {
@@ -149,7 +150,7 @@ export function resolveCommand(command: Command, context: ParamContext): Resolve
 			invert: invertedFor(descriptor),
 			ends: descriptor.role === "pan" ? ["L", "R"] : null,
 			choices: descriptor.choices ?? [],
-			raw: byte === null ? "—" : command.vcmd !== undefined ? `$${hex2(byte)}` : String(byte),
+			raw: byte === null ? "—" : command.vcmd !== undefined ? dollarHex(byte) : String(byte),
 			note: byte === null ? null : (descriptor.describe?.(byte, command, context) ?? null),
 			editable: !missing && argEditable(command, index),
 			lockedBecause: missing

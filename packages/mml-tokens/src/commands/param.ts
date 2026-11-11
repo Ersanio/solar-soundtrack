@@ -150,13 +150,3 @@ export const TEMPO_FADE_DURATION = ticks($localize`:@@inspector.param.over:inspe
 export function raw(name: string): ParamDescriptor {
 	return { name, codec: "u8", role: "opaque" };
 }
-
-/** The signed reading of a byte, for `s8` descriptors. */
-export function toSigned(value: number): number {
-	return value >= 0x80 ? value - 0x100 : value;
-}
-
-/** The byte a signed value writes back as. */
-export function fromSigned(value: number): number {
-	return value < 0 ? value + 0x100 : value;
-}

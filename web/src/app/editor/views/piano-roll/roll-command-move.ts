@@ -1,9 +1,10 @@
 /** Dragging a command glyph along its channel: where it may land, why it may not, and the edit that moves it. */
 
+import { VCMD } from '@amk/core/hardcoded-tables';
 import type { Command } from '@amk/tokens';
 import { commandScope } from '@amk/tokens/commands/in-force';
 import { type Edit, commandRewritable, insertAt, spliceOut } from '@amk/tokens/edits';
-import { type EditRefusal, REFUSE_CROWDED } from './roll-edit';
+import { type Refusal, REFUSE_CROWDED } from './roll-edit';
 import type { Strip } from './roll-strip';
 import { coalesce } from './roll-write/plan-edits';
 
@@ -74,7 +75,7 @@ export function commandMoveRefusal(strip: Strip, command: Command): string | nul
   // list that is right, so the refusal is the whole answer rather than a
   // narrowing of {@link commandMoveTargets}. A note target would not survive the
   // move either: its byte is the octave in force where it stands.
-  if (command.vcmd === 0xdd) {
+  if (command.vcmd === VCMD.PitchBend) {
     return REFUSE_MOVE_BEND;
   }
 
@@ -207,7 +208,7 @@ export function planCommandMove(
   command: Command,
   tick: number,
   target: MoveTarget,
-): Edit[] | EditRefusal {
+): Edit[] | Refusal {
   const reason = commandMoveRefusal(strip, command);
   if (reason !== null) {
     return { refused: reason };

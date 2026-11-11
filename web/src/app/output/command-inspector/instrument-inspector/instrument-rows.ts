@@ -13,7 +13,7 @@ import {
 } from '@amk/spc/adsr';
 import { NOISE_FLAG } from '@amk/spc/instruments';
 import { noteName } from '@amk/tokens/commands/units';
-import { duration, hex2 } from '../../../util/format';
+import { duration, dollarHex, hex2 } from '../../../util/format';
 
 /**
  * A table entry's six or seven bytes, said in the units they mean.
@@ -57,13 +57,13 @@ export function detailRows(input: DetailInputs): DetailRow[] {
     const clock = srcn & 0x1f;
     rows.push({
       label: $localize`:@@inspector.instrument.sample:inspector.instrument.sample`,
-      value: `noise, clock $${hex2(clock)}`,
+      value: `noise, clock ${dollarHex(clock)}`,
       note: `${Math.round(noiseHz(clock)).toLocaleString()} Hz`,
     });
   } else if (srcn >= 0) {
     rows.push({
       label: $localize`:@@inspector.instrument.sample:inspector.instrument.sample`,
-      value: `$${hex2(srcn)}`,
+      value: dollarHex(srcn),
       note: sampleName,
     });
   } else {
@@ -108,7 +108,7 @@ export function detailRows(input: DetailInputs): DetailRow[] {
     const gain = decodeGain(bytes[3]);
     rows.push({
       label: $localize`:@@inspector.instrument.envelope:inspector.instrument.envelope`,
-      value: `GAIN $${hex2(bytes[3])}`,
+      value: `GAIN ${dollarHex(bytes[3])}`,
       note: $localize`:@@inspector.instrument.adsr-is-off-so-bytes:inspector.instrument.adsr-is-off-so-bytes`,
     });
     rows.push(
@@ -133,13 +133,13 @@ export function detailRows(input: DetailInputs): DetailRow[] {
   rows.push({
     label: $localize`:@@inspector.instrument.tuning:inspector.instrument.tuning`,
     value: `×${multiplier.toFixed(3)}`,
-    note: `$${hex2(bytes[4])}.$${hex2(bytes[5])} — ${semitones(tuningSemitones(multiplier))}`,
+    note: `${dollarHex(bytes[4])}.${dollarHex(bytes[5])} — ${semitones(tuningSemitones(multiplier))}`,
   });
 
   if (bytes.length > 6) {
     rows.push({
       label: $localize`:@@inspector.instrument.drum-note:inspector.instrument.drum-note`,
-      value: `$${hex2(bytes[6])}`,
+      value: dollarHex(bytes[6]),
       note: noteName(bytes[6]),
     });
   }

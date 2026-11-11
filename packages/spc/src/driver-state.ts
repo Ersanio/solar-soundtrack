@@ -1,34 +1,37 @@
 /** Our SPC driver's I/O through the emulator's ARAM. */
 
+import { word } from "@amk/core/bytes";
+import { SPC_SAMPLE_RATE } from "./wasm-host";
+
 /** Zero-page addresses, from the ARAM map. */
-const enum Addr {
+export const Addr = {
 	/** `$30-$3F`: music track pointer, one 16-bit pointer per voice. */
-	TrackPointers = 0x30,
+	TrackPointers: 0x30,
 	/** `$44`: the sound effect tempo accumulator, stepped by the timer count. */
-	SfxPhase = 0x44,
+	SfxPhase: 0x44,
 	/** `$48`: the voice bit every per-voice loop shifts along, and out to zero. */
-	VoiceLoopBit = 0x48,
+	VoiceLoopBit: 0x48,
 	/** `$49`: the music tempo accumulator, whose overflow is a music tick. */
-	TickPhase = 0x49,
+	TickPhase: 0x49,
 	/** `$51`: music tempo, as the `t` command and any fade leave it. */
-	Tempo = 0x51,
+	Tempo: 0x51,
 	/** `$5C`: voice bits whose `VxVOL` the driver must rewrite this tick. */
-	VolumeDirty = 0x5c,
+	VolumeDirty: 0x5c,
 	// `$5E` is the driver's own mute mask, and nothing here writes it — see
 	// {@link applyChannelMutes} for why disabling a channel is the wrong tool.
 	/** `$70-$7F`: music note duration, one byte per voice. */
-	NoteDurations = 0x70,
+	NoteDurations: 0x70,
 	/** `$C1+2n`: the instrument the voice is playing, 0 for one never given any. */
-	Instruments = 0xc1,
+	Instruments: 0xc1,
 	/** `$0200+2n`: the duration byte a voice last read, ahead of its note. */
-	NoteDurationBytes = 0x0200,
+	NoteDurationBytes: 0x0200,
 	/** `$0201+2n`: the gate `q`'s high nybble chose, as a fraction of the duration. */
-	NoteGates = 0x0201,
+	NoteGates: 0x0201,
 	/** `$0211+2n`: the velocity `q`'s low nybble chose, which scales `VxVOL`. */
-	NoteVelocities = 0x0211,
+	NoteVelocities: 0x0211,
 	/** `$0241+2n`: per-voice track volume, as `v` and `$E8` leave it. */
-	TrackVolumes = 0x0241,
-}
+	TrackVolumes: 0x0241,
+} as const;
 
 /** N-SPC songs have eight music channels. */
 export const VOICES = 8;
@@ -46,8 +49,6 @@ export interface DriverState {
 	/** `$51` as the driver holds it, which is the `t` value **plus one**. */
 	tempo: number;
 }
-
-const word = (aram: Uint8Array, at: number): number => aram[at] | (aram[at + 1] << 8);
 
 export function readDriverState(aram: Uint8Array): DriverState {
 	return {
@@ -258,6 +259,37 @@ export function sawTick(tick: TickPhase, aram: Uint8Array): number {
  * that never happened, and {@link TIMER_COUNTS} would name it or name nothing.
  */
 export const TICK_POLL_HZ = 1000;
+
+/**
+ * Emulator frames per poll, which is how often the driver's tempo accumulator
+ * gets read by everything that counts ticks.
+ *
+ * 1 ms, so `$44` is sampled at {@link TICK_POLL_HZ} — twice the driver's main
+ * loop rate, which is what makes the tick count exact. Measured against the
+ * vendored core, 32 frames rather than 1024 costs about 4% more emulator time
+ * and still runs 355x faster than realtime on an eight-channel song — a cheap
+ * price for a playhead that cannot drift.
+ */
+export const POLL_BLOCK_FRAMES = SPC_SAMPLE_RATE / TICK_POLL_HZ;
+
+/**
+ * How long a seek will emulate without the tick count moving before it gives up,
+ * in blocks of {@link POLL_BLOCK_FRAMES}.
+ *
+ * A target the song never reaches — one past the end of a song that does not
+ * loop, or any target at all in a song with no note data to tick on — would
+ * otherwise render until a wall-clock ceiling, which on the audio thread is a
+ * freeze rather than a slow seek. Two seconds is four times the 0.512 s a tick
+ * takes at the slowest tempo the driver can hold, so no real song can look
+ * stalled while it is merely slow.
+ */
+export const SEEK_STALL_BLOCKS = 2 * TICK_POLL_HZ;
+
+/**
+ * And an outright ceiling, for a song that ticks forever without reaching the
+ * target. `999` seconds is what the SPC format allows.
+ */
+export const MAX_SEEK_SECONDS = 999;
 
 /**
  * Whether the driver is playing a voice, judged the way it judges it: the track

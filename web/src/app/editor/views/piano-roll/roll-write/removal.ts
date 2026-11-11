@@ -1,5 +1,6 @@
 /** What happens to the commands a removed note carried: which still reach something that sounds, and which go with it. */
 
+import { VCMD } from '@amk/core/hardcoded-tables';
 import { replacedByNextInSlot } from '@amk/spc/song-walk';
 import type { Command } from '@amk/tokens';
 import { commandScope } from '@amk/tokens/commands/in-force';
@@ -124,7 +125,7 @@ export function prefixCommandsOf(strip: Strip, item: StripItem): Command[] {
       // it sits in this prefix while belonging to the item behind it, and
       // `reachesSomething` — which scans forward — has no way to say so. Left
       // where it was written, which is where `StripItem.bend` keeps track of it.
-      command.vcmd !== 0xdd &&
+      command.vcmd !== VCMD.PitchBend &&
       commandScope(command) === 'note-state',
   );
 }
@@ -153,7 +154,7 @@ export function insideCommands(
       // A `$DD` between two of a note's frames is that note's rider rather than
       // a command written inside it — it has no tick of its own, arming where
       // the read-ahead finds it — and `StripItem.bend` is what answers for it.
-      if (command.vcmd === 0xdd) {
+      if (command.vcmd === VCMD.PitchBend) {
         continue;
       }
 

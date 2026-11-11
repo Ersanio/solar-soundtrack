@@ -69,7 +69,7 @@ export interface CommandLane {
 
 const EMPTY: CommandLane = { glyphs: [], depth: 0 };
 
-export interface LaneRequest {
+export interface CommandLaneRequest {
   events: readonly TimelineCommand[];
   /** The document, for spelling a command as it was written in the hover. */
   text: string;
@@ -141,7 +141,7 @@ export function laneGlyphX(tick: number, zoom: number, songTicks: number): numbe
  * an answer to "what runs here" — the stack is scrolled, and the seam above the
  * lane takes it taller.
  */
-export function packCommandLane(request: LaneRequest): CommandLane {
+export function packCommandLane(request: CommandLaneRequest): CommandLane {
   const { events, text, zoom, audible, active, songTicks } = request;
   if (zoom <= 0 || events.length === 0) {
     return EMPTY;

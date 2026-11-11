@@ -19,7 +19,8 @@
  * both of those feed `runaway-guard.ts`.
  */
 
-import { hex2 } from '@amk/core/hex';
+import { VCMD } from '@amk/core/hardcoded-tables';
+import { hexBytes } from '@amk/core/hex';
 import { type CommandTarget, expectedArgs, LETTER_NAMES, vcmdName } from '@amk/tokens';
 import {
   type Availability,
@@ -103,7 +104,7 @@ interface HexEntry extends Described {
    * checks the two both ways round: a caveat with no diagnostic behind it, or a
    * diagnostic no button warns of, fails there. This is the sentence read before
    * the byte is written and `SST0506`-`SST0508` the one read after, so it costs
-   * the button nothing - not its colour, which no entry wears any more.
+   * the button nothing: a caveat does not colour it.
    */
   caveat?: (target: CommandTarget) => string | undefined;
   /**
@@ -274,7 +275,7 @@ export const ENTRIES: readonly Entry[] = [
   }),
   letter('t', 't48', {
     category: 'notes',
-    writes: 0xe2,
+    writes: VCMD.Tempo,
     icon: 'metronome',
     blurb: $localize`:@@palette.how-fast-the-song-plays:palette.how-fast-the-song-plays`,
   }),
@@ -282,7 +283,7 @@ export const ENTRIES: readonly Entry[] = [
     kind: 'syntax',
     category: 'notes',
     id: 't,',
-    writes: 0xe3,
+    writes: VCMD.TempoFade,
     icon: 'metronomeFade',
     label: $localize`:@@palette.tempo-fade:palette.tempo-fade`,
     blurb: $localize`:@@palette.slides-the-tempo-to-a:palette.slides-the-tempo-to-a`,
@@ -294,7 +295,7 @@ export const ENTRIES: readonly Entry[] = [
   // ─── Volume and pan ─────────────────────────────────────────────────────
   letter('v', 'v200', {
     category: 'volume',
-    writes: 0xe7,
+    writes: VCMD.Volume,
     icon: 'speaker',
     blurb: $localize`:@@palette.how-loud-this-channel-plays:palette.how-loud-this-channel-plays`,
   }),
@@ -302,7 +303,7 @@ export const ENTRIES: readonly Entry[] = [
     kind: 'syntax',
     category: 'volume',
     id: 'v,',
-    writes: 0xe8,
+    writes: VCMD.VolumeFade,
     icon: 'hairpin',
     label: $localize`:@@palette.volume-fade:palette.volume-fade`,
     blurb: $localize`:@@palette.slides-this-channels-volume-over:palette.slides-this-channels-volume-over`,
@@ -312,7 +313,7 @@ export const ENTRIES: readonly Entry[] = [
   },
   letter('w', 'w200', {
     category: 'volume',
-    writes: 0xe0,
+    writes: VCMD.GlobalVolume,
     icon: 'speakerMaster',
     blurb: $localize`:@@palette.how-loud-the-whole-song:palette.how-loud-the-whole-song`,
   }),
@@ -320,7 +321,7 @@ export const ENTRIES: readonly Entry[] = [
     kind: 'syntax',
     category: 'volume',
     id: 'w,',
-    writes: 0xe1,
+    writes: VCMD.GlobalVolumeFade,
     icon: 'hairpinMaster',
     label: $localize`:@@palette.global-volume-fade:palette.global-volume-fade`,
     blurb: $localize`:@@palette.slides-the-whole-song-louder:palette.slides-the-whole-song-louder`,
@@ -330,21 +331,21 @@ export const ENTRIES: readonly Entry[] = [
   },
   letter('y', 'y10', {
     category: 'volume',
-    writes: 0xdb,
+    writes: VCMD.Pan,
     icon: 'pan',
     blurb: $localize`:@@palette.set-the-channels-sound-position:palette.set-the-channels-sound-position`,
   }),
-  hex(0xdc, [0x18, 0x0a], {
+  hex(VCMD.PanFade, [0x18, 0x0a], {
     category: 'volume',
     icon: 'panFade',
     blurb: $localize`:@@palette.slides-this-channels-sound-position:palette.slides-this-channels-sound-position`,
   }),
-  hex(0xe5, [0x00, 0x12, 0x08], {
+  hex(VCMD.Tremolo, [0x00, 0x12, 0x08], {
     category: 'volume',
     icon: 'tremolo',
     blurb: $localize`:@@palette.a-steady-wobble-in-volume:palette.a-steady-wobble-in-volume`,
   }),
-  hex(0xfd, [], {
+  hex(VCMD.TremoloOff, [], {
     category: 'volume',
     icon: 'tremoloOff',
     blurb: $localize`:@@palette.stops-the-volume-wobble:palette.stops-the-volume-wobble`,
@@ -358,21 +359,21 @@ export const ENTRIES: readonly Entry[] = [
   }),
   letter('p', 'p12,8', {
     category: 'pitch',
-    writes: 0xde,
+    writes: VCMD.Vibrato,
     icon: 'wave',
     blurb: $localize`:@@palette.a-steady-wobble-in-pitch:palette.a-steady-wobble-in-pitch`,
   }),
-  hex(0xdf, [], {
+  hex(VCMD.VibratoOff, [], {
     category: 'pitch',
     icon: 'waveOff',
     blurb: $localize`:@@palette.stops-the-pitch-wobble:palette.stops-the-pitch-wobble`,
   }),
-  hex(0xea, [0x18], {
+  hex(VCMD.VibratoFade, [0x18], {
     category: 'pitch',
     icon: 'waveFade',
     blurb: $localize`:@@palette.eases-the-vibrato-in-or:palette.eases-the-vibrato-in-or`,
   }),
-  hex(0xdd, [0x00, 0x18, 0xa4], {
+  hex(VCMD.PitchBend, [0x00, 0x18, 0xa4], {
     category: 'pitch',
     icon: 'slide',
     blurb: $localize`:@@palette.slides-smoothly-from-the-note:palette.slides-smoothly-from-the-note`,
@@ -381,22 +382,22 @@ export const ENTRIES: readonly Entry[] = [
     // loop reaches first. SST0507 is the same fact about a written one.
     caveat: () => $localize`:@@palette.write-it-directly-after-a:palette.write-it-directly-after-a`,
   }),
-  hex(0xec, [0x00, 0x18, 0x02], {
+  hex(VCMD.PitchEnvelopeAttack, [0x00, 0x18, 0x02], {
     category: 'pitch',
     icon: 'envelopeUp',
     blurb: $localize`:@@palette.starts-with-the-specified-semitones:palette.starts-with-the-specified-semitones`,
   }),
-  hex(0xeb, [0x00, 0x18, 0x02], {
+  hex(VCMD.PitchEnvelopeRelease, [0x00, 0x18, 0x02], {
     category: 'pitch',
     icon: 'envelopeDown',
     blurb: $localize`:@@palette.starts-with-the-note-that:palette.starts-with-the-note-that`,
   }),
-  hex(0xfe, [], {
+  hex(VCMD.PitchEnvelopeOff, [], {
     category: 'pitch',
     icon: 'envelopeOff',
     blurb: $localize`:@@palette.stops-the-pitch-bends-through:palette.stops-the-pitch-bends-through`,
   }),
-  hex(0xe4, [0x00], {
+  hex(VCMD.GlobalTranspose, [0x00], {
     category: 'pitch',
     icon: 'sharpMaster',
     blurb: $localize`:@@palette.shifts-the-pitch-up-or:palette.shifts-the-pitch-up-or`,
@@ -408,12 +409,12 @@ export const ENTRIES: readonly Entry[] = [
         ? $localize`:@@palette.under-am4-the-compiler-adds:palette.under-am4-the-compiler-adds`
         : undefined,
   }),
-  hex(0xee, [0x00], {
+  hex(VCMD.FineTune, [0x00], {
     category: 'pitch',
     icon: 'tuningFork',
     blurb: $localize`:@@palette.nudges-the-pitch-by-a:palette.nudges-the-pitch-by-a`,
   }),
-  hex(0xfb, [0x02, 0x06, 0xa4, 0xa7], {
+  hex(VCMD.Arpeggio, [0x02, 0x06, 0xa4, 0xa7], {
     category: 'pitch',
     icon: 'arpeggio',
     blurb: $localize`:@@palette.cycles-quickly-through-a-set:palette.cycles-quickly-through-a-set`,
@@ -422,60 +423,60 @@ export const ENTRIES: readonly Entry[] = [
   // ─── Instrument ─────────────────────────────────────────────────────────
   letter('@', '@0', {
     category: 'instrument',
-    writes: 0xda,
+    writes: VCMD.Instrument,
     icon: 'keys',
     blurb: $localize`:@@palette.which-instrument-this-channel-plays:palette.which-instrument-this-channel-plays`,
   }),
   letter('n', 'n10', {
     category: 'instrument',
-    writes: 0xf8,
+    writes: VCMD.Noise,
     icon: 'noise',
     blurb: $localize`:@@palette.swaps-the-instrument-for-white:palette.swaps-the-instrument-for-white`,
   }),
-  hex(0xed, [0x3f, 0x4d], {
+  hex(VCMD.Adsr, [0x3f, 0x4d], {
     id: 'adsr',
     category: 'instrument',
     icon: 'adsr',
     label: 'ADSR',
     blurb: $localize`:@@palette.how-a-note-swells-and:palette.how-a-note-swells-and`,
   }),
-  hex(0xed, [0x8e, 0x7f], {
+  hex(VCMD.Adsr, [0x8e, 0x7f], {
     id: 'gain',
     category: 'instrument',
     icon: 'gain',
     label: 'GAIN',
     blurb: $localize`:@@palette.drives-the-notes-loudness-directly:palette.drives-the-notes-loudness-directly`,
   }),
-  hex(0xf3, [0x00, 0x04], {
+  hex(VCMD.SampleLoad, [0x00, 0x04], {
     category: 'instrument',
     icon: 'sample',
     blurb: $localize`:@@palette.swaps-the-sample-and-coarse:palette.swaps-the-sample-and-coarse`,
   }),
 
   // ─── Echo ───────────────────────────────────────────────────────────────
-  hex(0xef, [0xff, 0x28, 0x28], {
+  hex(VCMD.EchoVolume, [0xff, 0x28, 0x28], {
     category: 'echo',
     icon: 'echo',
     label: $localize`:@@palette.echo-channels-volume:palette.echo-channels-volume`,
     blurb: $localize`:@@palette.adds-a-reverb-effect-for:palette.adds-a-reverb-effect-for`,
   }),
-  hex(0xf1, [0x02, 0x00, 0x00], {
+  hex(VCMD.EchoDelay, [0x02, 0x00, 0x00], {
     category: 'echo',
     icon: 'echoDelay',
     label: $localize`:@@palette.echo-delay-feedback:palette.echo-delay-feedback`,
     blurb: $localize`:@@palette.how-far-behind-the-echo:palette.how-far-behind-the-echo`,
   }),
-  hex(0xf2, [0x18, 0x28, 0x28], {
+  hex(VCMD.EchoFade, [0x18, 0x28, 0x28], {
     category: 'echo',
     icon: 'echoFade',
     blurb: $localize`:@@palette.fades-the-echo-to-the:palette.fades-the-echo-to-the`,
   }),
-  hex(0xf0, [], {
+  hex(VCMD.EchoOff, [], {
     category: 'echo',
     icon: 'echoOff',
     blurb: $localize`:@@palette.turns-the-echo-off:palette.turns-the-echo-off`,
   }),
-  hex(0xf5, [0xff, 0x08, 0x17, 0x24, 0x24, 0x17, 0x08, 0xff], {
+  hex(VCMD.Fir, [0xff, 0x08, 0x17, 0x24, 0x24, 0x17, 0x08, 0xff], {
     category: 'echo',
     icon: 'filter',
     blurb: $localize`:@@palette.shapes-the-tone-of-the:palette.shapes-the-tone-of-the`,
@@ -489,7 +490,7 @@ export const ENTRIES: readonly Entry[] = [
   // closing one left to write.
   letter('[', '[ ]2', {
     category: 'loops',
-    writes: 0xe9,
+    writes: VCMD.CallLoop,
     wraps: 'loop',
     label: $localize`:@@palette.label.loop:palette.label.loop`,
     icon: 'repeatStart',
@@ -499,7 +500,7 @@ export const ENTRIES: readonly Entry[] = [
     kind: 'syntax',
     category: 'loops',
     id: '[[',
-    writes: 0xe6,
+    writes: VCMD.Subloop,
     wraps: 'subloop',
     icon: 'repeatNested',
     label: $localize`:@@palette.label.subloop:palette.label.subloop`,
@@ -542,7 +543,7 @@ export const ENTRIES: readonly Entry[] = [
     kind: 'syntax',
     category: 'loops',
     id: '(!n,',
-    writes: 0xfc,
+    writes: VCMD.RemoteCode,
     icon: 'trigger',
     label: $localize`:@@palette.remote-code-call:palette.remote-code-call`,
     blurb: $localize`:@@palette.arms-a-remote-snippet-from:palette.arms-a-remote-snippet-from`,
@@ -562,29 +563,29 @@ export const ENTRIES: readonly Entry[] = [
     // Event type `$07`, the non-key-on slot, which is what `(!!1)` above emits —
     // `$00` for 0 and `$08` for -1 are the other two (`parser.ts:parseRemoteCall`).
     // The byte is the call's, so `writes` stays on `(!n,` and this names it.
-    fallbackOf: 0xfc,
+    fallbackOf: VCMD.RemoteCode,
     fallback: [0x00, 0x00, 0x07, 0x00],
     context: 'channel',
   },
 
-  hex(0xf4, [0x01], {
+  hex(VCMD.Toggles, [0x01], {
     category: 'misc',
     icon: 'toggle',
     label: $localize`:@@palette.label.toggles:palette.label.toggles`,
     blurb: $localize`:@@palette.nine-on-off-switches-legato:palette.nine-on-off-switches-legato`,
   }),
-  hex(0xfa, [0x00, 0x00], {
+  hex(VCMD.Settings, [0x00, 0x00], {
     category: 'misc',
     icon: 'sliders',
     label: $localize`:@@palette.driver-settings:palette.driver-settings`,
     blurb: $localize`:@@palette.eight-settings-that-each-take:palette.eight-settings-that-each-take`,
   }),
-  hex(0xf6, [0x0c, 0x7f], {
+  hex(VCMD.DspWrite, [0x0c, 0x7f], {
     category: 'misc',
     icon: 'chip',
     blurb: $localize`:@@palette.writes-a-value-straight-into:palette.writes-a-value-straight-into`,
   }),
-  hex(0xf7, [0x00, 0x00, 0x00], {
+  hex(VCMD.WriteByte, [0x00, 0x00, 0x00], {
     category: 'misc',
     icon: 'chipWrite',
     blurb: $localize`:@@palette.addmusicms-command-for-writing-a:palette.addmusicms-command-for-writing-a`,
@@ -595,7 +596,7 @@ export const ENTRIES: readonly Entry[] = [
     // row stays for `glyphOf`, so one already written is still named and drawn.
     withheld: true,
   }),
-  hex(0xf9, [0x00, 0x00], {
+  hex(VCMD.DataSend, [0x00, 0x00], {
     category: 'misc',
     icon: 'chipSend',
     blurb: $localize`:@@palette.sends-two-bytes-to-the:palette.sends-two-bytes-to-the`,
@@ -710,11 +711,6 @@ function formFor(entry: LetterEntry | SyntaxEntry): PaletteForm | null {
 
 const AVAILABLE: Availability = { state: 'ok', reason: null };
 
-/** `$XX $YY …` — the one place a command's bytes become the text of a snippet. */
-function hexText(vcmd: number, args: readonly number[]): string {
-  return [vcmd, ...args].map((byte) => `$${hex2(byte)}`).join(' ');
-}
-
 /**
  * The raw-hex spelling of a form the dialect will not take as written.
  *
@@ -747,7 +743,7 @@ function substitute(
 
   return {
     vcmd,
-    text: hexText(vcmd, entry.fallback),
+    text: hexBytes([vcmd, ...entry.fallback]),
     availability: formAvailability({ kind: 'hex', vcmd }, target),
   };
 }
@@ -818,7 +814,7 @@ export function resolveEntry(
     icon: entry.icon,
     label,
     blurb: entry.blurb,
-    text: hexText(entry.vcmd, entry.args),
+    text: hexBytes([entry.vcmd, ...entry.args]),
     select: entry.args.length > 0 ? FIRST_HEX_ARG : null,
     availability,
     caveat: entry.caveat?.(target),

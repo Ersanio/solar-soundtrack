@@ -7,7 +7,7 @@ import { MAX_LOOP_COUNT } from '@amk/tokens/commands/loops';
 import { type Edit, insertAt, padAround, spliceOut, spliceRange } from '@amk/tokens/edits';
 import {
   type EditContext,
-  type EditRefusal,
+  type Refusal,
   isEdits,
   REFUSE_LOOP_BODY_ROOM,
   REFUSE_LOOP_LEAD_ROOM,
@@ -310,7 +310,7 @@ function joinInto(context: EditContext, site: LoopSite, sibling: LoopSite, count
  * After the construct's prefix commands, which keep their tick by running before
  * it, and never abutting the text in front of it without a space.
  */
-function openBefore(context: EditContext, site: LoopSite, ticks: number): Edit[] | EditRefusal {
+function openBefore(context: EditContext, site: LoopSite, ticks: number): Edit[] | Refusal {
   const text = spellRest(ticks, context.targetAMKVersion);
   if (text === null) {
     return refuse(REFUSE_SPELL);
@@ -331,7 +331,7 @@ function openBefore(context: EditContext, site: LoopSite, ticks: number): Edit[]
  * backward, and it refuses rather than doing part of the job: a body already
  * grown at its head cannot be handed a partial close.
  */
-function closeBefore(context: EditContext, at: number, need: number): Edit[] | EditRefusal {
+function closeBefore(context: EditContext, at: number, need: number): Edit[] | Refusal {
   const { source, strip, targetAMKVersion } = context;
   if (need > gapSlack(strip, at)) {
     return refuse(REFUSE_LOOP_LEAD_ROOM);
@@ -397,7 +397,7 @@ export function openGap(
   run: LoopRun,
   pass: number,
   delta: number,
-): Edit[] | EditRefusal {
+): Edit[] | Refusal {
   const { source, strip, targetAMKVersion } = context;
   const item = strip.items[at];
   const site = item?.loop;
@@ -525,7 +525,7 @@ export function resizeLoop(
   grabbed: number,
   edge: 'start' | 'end',
   delta: number,
-): Edit[] | EditRefusal {
+): Edit[] | Refusal {
   const { strip, targetAMKVersion } = context;
   const item = strip.items[at];
   const site = item?.loop;

@@ -1,10 +1,11 @@
+import { VCMD } from '@amk/core/hardcoded-tables';
 import { Component, computed, inject } from '@angular/core';
 
 import { loopAt } from '@amk/tokens/commands/loops';
 import { Section } from '../../shared/section/section';
 import { EditorRequests } from '../../state/editor-requests';
 import { EditorStore } from '../../state/editor-store';
-import { hex2 } from '../../util/format';
+import { dollarHex } from '../../util/format';
 import { LoopInspector } from '../loop-inspector/loop-inspector';
 import { AdsrCommand } from './adsr-command/adsr-command';
 import { ArpeggioCommand } from './arpeggio-command/arpeggio-command';
@@ -29,21 +30,21 @@ import { VibratoCommand } from './vibrato-command/vibrato-command';
 const VIEWS: Readonly<Record<number, string>> = {
   // `$DA` is the hex form of `@`, and the only way to reach the driver's own
   // instrument table entry 19 — so it gets the same view.
-  0xda: 'instrument',
-  0xdb: 'pan',
+  [VCMD.Instrument]: 'instrument',
+  [VCMD.Pan]: 'pan',
   // A delay, a speed and a depth that only make sense together.
-  0xdd: 'bend',
-  0xde: 'vibrato',
-  0xe5: 'vibrato',
-  0xeb: 'bend',
-  0xec: 'bend',
-  0xed: 'adsr',
-  0xef: 'echo',
-  0xf0: 'echo',
-  0xf1: 'echo',
-  0xf2: 'echo',
-  0xf5: 'fir',
-  0xfb: 'arpeggio',
+  [VCMD.PitchBend]: 'bend',
+  [VCMD.Vibrato]: 'vibrato',
+  [VCMD.Tremolo]: 'vibrato',
+  [VCMD.PitchEnvelopeRelease]: 'bend',
+  [VCMD.PitchEnvelopeAttack]: 'bend',
+  [VCMD.Adsr]: 'adsr',
+  [VCMD.EchoVolume]: 'echo',
+  [VCMD.EchoOff]: 'echo',
+  [VCMD.EchoDelay]: 'echo',
+  [VCMD.EchoFade]: 'echo',
+  [VCMD.Fir]: 'fir',
+  [VCMD.Arpeggio]: 'arpeggio',
 };
 
 /**
@@ -206,14 +207,14 @@ export class CommandInspector {
       // parser.ts's parseHFDHex — under #am4, $ED is HFD's escape: only the plain-ADSR
       // shape earns the envelope view, and $80-$83 fall to the generic
       // readout. A bare $ED keeps the view, as an incomplete one always has.
-      if (command.vcmd === 0xed && command.target.program === 1) {
+      if (command.vcmd === VCMD.Adsr && command.target.program === 1) {
         const sub = command.args[0]?.value;
         return sub !== undefined && sub >= 0x80 && sub <= 0x83 ? null : 'adsr';
       }
 
       // parser.ts's parseHexCommand — the other #am4 overload: a high first byte turns $E5
       // from tremolo into a sample load, which has no shape to draw.
-      if (command.vcmd === 0xe5 && command.target.program === 1) {
+      if (command.vcmd === VCMD.Tremolo && command.target.program === 1) {
         return (command.args[0]?.value ?? 0) >= 0x80 ? null : 'vibrato';
       }
 
@@ -230,7 +231,7 @@ export class CommandInspector {
       return '';
     }
 
-    return command.vcmd === undefined ? command.kind : `$${hex2(command.vcmd)}`;
+    return command.vcmd === undefined ? command.kind : dollarHex(command.vcmd);
   });
 
   /**

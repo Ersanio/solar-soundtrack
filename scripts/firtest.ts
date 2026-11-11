@@ -31,7 +31,7 @@ import {
 	fitToTarget,
 	matchPreset,
 	toHexByte,
-	toSigned,
+	signedByte,
 } from "@amk/spc/fir";
 
 import { builtInTaps, echoHazards, feedbackBefore } from "@amk/tokens/echo-hazards";
@@ -49,10 +49,10 @@ const CLASSIC = [-1, 0x08, 0x17, 0x24, 0x24, 0x17, 0x08, -1];
 
 section("signed bytes are read the way the DSP reads them");
 {
-	check("$FF is −1", toSigned(0xff) === -1);
-	check("$7F is 127", toSigned(0x7f) === 127);
-	check("$80 is −128", toSigned(0x80) === -128);
-	check("$00 is 0", toSigned(0x00) === 0);
+	check("$FF is −1", signedByte(0xff) === -1);
+	check("$7F is 127", signedByte(0x7f) === 127);
+	check("$80 is −128", signedByte(0x80) === -128);
+	check("$00 is 0", signedByte(0x00) === 0);
 	check("−1 writes back as FF", toHexByte(-1) === "FF");
 	check("127 writes back as 7F", toHexByte(127) === "7F");
 	check("clamping holds the register range", clampTap(500) === 127 && clampTap(-500) === -128);
