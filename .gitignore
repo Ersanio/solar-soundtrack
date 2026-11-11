@@ -3,12 +3,15 @@
 AddmusicKsrc/
 AddmusicKreadme/
 
-# Claude Code. The guidance, rules, hooks, shared settings and project skills are
-# checked in so a fresh clone gets them; machine-local permissions and the skills
-# the Angular CLI installs stay out.
+# Claude Code. The guidance, rules, ledgers, hooks, shared settings and project
+# skills, agents and commands are checked in so a fresh clone gets them;
+# machine-local permissions and the skills the Angular CLI installs stay out.
 **/.claude/*
 !**/.claude/CLAUDE.md
 !/.claude/rules/
+!/.claude/ledgers/
+!/.claude/agents/
+!/.claude/commands/
 !/.claude/hooks/
 !/.claude/settings.json
 !/.claude/skills/

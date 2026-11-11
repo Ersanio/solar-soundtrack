@@ -8,6 +8,8 @@ paths:
 How the roll is put together: what it draws from, how it lays a song out, and which module owns
 which part. The editing path is in `roll-editing.md`, the view's decisions in `roll-view.md`.
 
+## What the roll draws from
+
 `editor/views/piano-roll/` draws whatever `@amk/spc/song-walk` says — the compiler's `noteMap`
 records the emitted byte and a note's own length but leaves it in source order, with no tick to draw
 it on and no instrument, volume or tempo to draw it under, so the roll is a view of a walk over the
@@ -20,6 +22,8 @@ a note plays as is the tooltip's business: `plays as o5 d — transposed -5`, an
 beside it when the driver adds them, since none of that is knowable from the source alone. A note the
 map does not know — a `$8x` typed as raw hex — keeps the byte, and a bare `$D0`-`$D8` keeps the
 driver's own pitch for its drum, since the letter it was written under had no say in it.
+
+## Bars and their glyphs
 
 **A bar says what it is and what is acting on it.** Its own pitch on the left — `C6`, `C+6`, the
 compact spelling of the key column's `o6 c` — and on the right a glyph per command in force, drawn
@@ -76,6 +80,8 @@ puts the two kinds under headings of their own, having room for words where a ba
 The song's own settings and the shape of the music get no glyph **on a bar** — `t`, `w`, `$E4` and
 the echo unit reach every note alike, and `o`, `<`, `>` and `l` are what the bar's row and width
 already are. `commandScope` is the one statement of that.
+
+## The command lane
 
 **The command lane holds every command that takes effect**, on the tick the driver reads it:
 `commandScope`'s `'song'`, which `commandsInForceOf` drops because those act on the song and not on
@@ -164,6 +170,8 @@ Let go on the tick it already runs at, it plans nothing, so the undo history is 
 gesture that changed nothing. Horizontal only, rows being packing; and the press neither captures the
 pointer nor prevents the default, for the reason `roll-gesture.ts` does not.
 
+## Keyboard range and the grid
+
 Written pitch is not held to the driver's o1 c–o6 a — `o0` is legal MML and `h12 o0 c` is a note the
 driver plays — so `roll-layout.ts` grows the keyboard to take such a note in, above or below.
 
@@ -174,6 +182,8 @@ and takes the bar from the count rather than testing a tick against a bar's leng
 snaps outward to a whole note, a 7/8 bar is 168 ticks, and the two therefore line up only by
 coincidence, so a bar line has to be a bar's own first beat by construction. Zero beats in a bar is
 the grid switched off, which is why there is no separate switch for it.
+
+## The overview and the scrub bar
 
 **Two bars sit over the roll, one job each.** The **overview** is the whole song at once and moves
 the _view_; the **scrub bar** under it is the roll's own timeline and moves the _song_. One bar
@@ -222,10 +232,14 @@ song, the lane stack, the pane's width and the mixer and never from the playhead
 recompile, a mute or a resize and not on a frame; the playhead line and the box showing what the roll
 is displaying are their own `computed`s over the frame clock.
 
+## Two clocks
+
 Two clocks drive it and keeping them apart is the whole trick. The mark list is a `computed` over
 the transport's 10 Hz anchor, snapped outward to a whole note, so the DOM rebuilds about twice per
 screen; the scroll is a `computed` over `shared/chart/frame-clock.ts` and is one `transform` that
 nothing beneath reads. That is why the roll can run at 240 Hz without the note list knowing.
+
+## Files and components
 
 **The folder is a parent and thirteen child folders**, as `output/command-inspector/` is. `piano-roll.ts`
 holds the song's shape and the porter's settings and hands each child what it draws:
@@ -273,6 +287,8 @@ own because Angular takes one from the parent in the same template. The glyph is
 proves it — `<svg amk-glyph>` needs no prefix, `svg` being one of the three names that carry a
 namespace implicitly. The `transform` binding stays in the parent, above children that take no
 frame-rate input, so the frame clock reaches it and stops there.
+
+## Following, paging and the playhead
 
 **Which of the two moves is a view option**, "Scroll the notes" on the roll's own toolbar. On, it
 pins the playhead a fifth across the pane and slides the music under it; off — the default — the
@@ -342,6 +358,8 @@ figure `SST0503` is raised on, applied at the playhead's tempo. Not the clock's 
 the measurement polls once a tick in 5 ms blocks, so one segment reads 100 or 125 ticks/s on a song
 that plays at 107.
 
+## Rows and percussion
+
 Only what the song uses gets a row: the pitched range is fitted and rounded out to whole octaves,
 and a drum or noise lane appears only when something plays it. Rows then stretch to fill the pane,
 because two octaves stranded at the top of an empty box is the worse picture.
@@ -364,6 +382,8 @@ than vanishing.
 `placeOf` is the one statement of the precedence — percussion, then noise, then the keyboard. The
 lanes and the fitted range are both built from it, so they cannot disagree. `song-walk.ts` has no
 opinion on any of this by design.
+
+## What is not the roll's business
 
 A channel longer than the song is **not** the roll's business, even though the walk is what notices
 it — that goes to the diagnostics list as `SST0502` and to the editor as a wavy underline on the

@@ -27,8 +27,10 @@ to colour alone (`.claude/rules/ui-and-theme.md`).
 
 Framework-generic Angular 22 conventions (signal APIs, `@Service()`, host bindings, control flow)
 live in `web/.claude/CLAUDE.md`, which the Angular CLI generated via `--ai-config=claude` and can
-regenerate, so it is kept byte-identical to what the CLI emits. Its "Accessibility Requirements"
-section does not apply here; the root `CLAUDE.md` says why.
+regenerate, so it is kept byte-identical to what the CLI emits. Where it disagrees with this file —
+its "Accessibility Requirements" section, lazy-loaded routes, the `async` pipe — this repository
+wins; the root `CLAUDE.md` says so. Adding a component is the `add-component` skill, and what must
+stay true of `EditorStore` and the write-back path is `.claude/rules/state-and-editor.md`.
 
 ## Layout
 

@@ -236,12 +236,16 @@ The byte meanings are AddmusicK's own, documented for `#instruments` in
 `AddmusicKreadme/readme_files/syntax_reference.html:257-263`. The 6- and 7-byte strides come from
 the vanilla driver: `AddmusicKsrc/Super Mario World.s:1029-1069` applies an instrument as "set sample
 A in bank at $14/15 width Y" with `y = #$05`— four bytes to DSP registers, then the multiplier —
-and`:103-118`takes the percussion path with`y = #$06`, then `inc y`to fetch "perc note num from
-instr tbl". AMK widens both by one byte for the sub-multiplier, giving 6 and 7.`AddmusicKsrc/main.asm:383-388` is the same code in AMK's own source.
+and`:103-118`takes the percussion path with`y = #$06`, then `inc y` to fetch "perc note num from
+instr tbl". AMK widens both by one byte for the sub-multiplier, giving 6 and 7:
+`AddmusicKsrc/Commands.asm:103-105` (`SetInstrument`) and `:32-37` (`SetupPercInstrument`) set
+`y = #$06`and`#$07`, and `AddmusicKsrc/main.asm:383-388` is the percussion call in AMK's own
+source.
 
 The tables themselves are assembled from `InstrumentData.asm`, which `main.asm:3618` `incsrc`s and
-which is **not in an AddmusicK release** — nor is `Commands.asm`, which holds the routine that
-indexes them, so there is no citable address either. What there _is_ is the assembled `main.bin`,
+which is **not in the reference sources**. `Commands.asm` names them only by label
+(`InstrumentTable`, `PercussionTable`), so there is no citable address. What there _is_ is the
+assembled `main.bin`,
 and the tables can be found in it without knowing where they live: byte 0 of each entry has to
 reproduce AddmusicK's `instrToSample`, so a stride-6 column matching it is the table. On the bundled
 driver that match is unique — `instrtest` asserts it — and lands at ARAM `$1893`, with percussion at

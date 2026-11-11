@@ -11,8 +11,8 @@ MML to N-SPC song data. A port of AddmusicK 1.0.11's `Music.cpp`, and shaped by 
 read a certain way, and the way this code should read is _like `Music.cpp`_. A rule that pushes a
 method to be shorter, a condition to be inverted, or a loop to become a `map` makes the two
 implementations harder to diff, which is the only tool there is for establishing that the port is
-faithful. The same argument covers the comments: roughly 100 of them cite a `Music.cpp` line, and
-they are the port's audit trail rather than explanations of TypeScript.
+faithful. The same argument covers the comments: the ones citing a `Music.cpp` line are the port's
+audit trail rather than explanations of TypeScript.
 
 Prettier still runs. Formatting does not change what the code says, and the tabs/double-quotes/120
 profile exists so the port can be diffed against the C++.
@@ -26,9 +26,9 @@ so the two implementations can be stepped through side by side.
 
 ## Not permissive, in either direction
 
-A song written in this editor is going into AddmusicK, so matching it is the whole job. Accepting
-what AddmusicK rejects is the dangerous failure — it compiles here, plays here, and the real tool
-refuses it. Rejecting what AddmusicK accepts is merely annoying, and still wrong.
+A song written in this editor is going into AddmusicK, so matching it is the whole job, and a
+divergence in either direction is a bug. Accepting what AddmusicK rejects compiles here, plays here,
+and is then refused by the real tool. Rejecting what AddmusicK accepts turns a working song away.
 
 **Where AddmusicK is case-sensitive, so is this.** `#Title` is not a title, `"kick.BRR"` is not a
 sample, and `#DEFINE` is not a define. Where it is case-*in*sensitive — `strnicmp` on a directive

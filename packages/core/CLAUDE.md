@@ -7,6 +7,7 @@ The vocabulary every other package shares. Depends on nothing.
 | `types.ts`            | What goes into the compiler and what comes out of it         |
 | `hardcoded-tables.ts` | Constant tables lifted from AddmusicK's `Music.cpp`          |
 | `hex.ts`              | Upper-case hex, the notation everything here writes bytes in |
+| `mml-text.ts`         | How a note length, an octave or a `q` is spelled back as MML |
 | `messages/amk.ts`     | Every `AMK` diagnostic's message                             |
 | `messages/sst.ts`     | Every `SST` diagnostic's message                             |
 
@@ -20,8 +21,7 @@ takes a diagnostic's values and returns a `$localize` message written by its ID,
 `@@sst.…`, whose English is in `web/src/locale/messages.en.json`. `$localize` is a global the host
 provides, so "depends on nothing" still holds. `.claude/rules/i18n.md` has the scheme.
 
-`hardcoded-tables.ts` is here rather than in `@amk/compiler` because `@amk/tokens` needs eight of its
-constants, and that is what keeps the scanner off the compiler entirely. Its line references are to
+`hardcoded-tables.ts` is here rather than in `@amk/compiler` because `@amk/tokens` needs its constants too, and that is what keeps the scanner off the compiler entirely. Its line references are to
 AddmusicK 1.0.11's `Music.cpp` so they can be re-verified when the reference implementation moves.
 
 ## Constants that are stated twice on purpose

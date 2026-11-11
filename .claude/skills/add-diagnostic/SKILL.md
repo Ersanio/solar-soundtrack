@@ -31,7 +31,7 @@ code, message)` covers `severe`. A span must map back to the text the author wro
 5. **Pin it** in `scripts/selftest.ts` for compiler diagnostics (the `[source, code, description]`
    tables), or the harness that owns the module that raises it. Assert the span lands on the
    offending character, not only that the code appears.
-6. **Verify**: `$env:HARNESS_QUIET=1; npm run selftest`, then `npm run i18n:check`, then the
+6. **Verify**: `npm run selftest`, then `npm run i18n:check`, then the
    `verify-change` skill for the rest.
 
 If the new code is an `SST05xx`, add it to the list of what that band covers in
