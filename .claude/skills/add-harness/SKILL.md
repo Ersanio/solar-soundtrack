@@ -5,8 +5,9 @@ description: Use when adding a new test harness under scripts/, splitting one in
 
 # Adding a harness
 
-First ask whether an existing harness owns the module: a new section file in `scripts/rolltest/` or
-`scripts/walktest/`, or a new block in a single-file harness, needs none of the registration below.
+First ask whether an existing harness owns the module: a new section file in a split harness
+(`scripts/<name>/`, listed in its `main.ts` and in the table of its rule), or a new block in a
+single-file harness, needs none of the registration below.
 A new harness is for a seam nothing covers. `scripts/CLAUDE.md` says what each one proves and how
 they are run; read it first.
 

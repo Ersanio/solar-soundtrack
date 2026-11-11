@@ -1,6 +1,6 @@
 ---
 paths:
-  - 'scripts/tokentest.ts'
+  - 'scripts/tokentest/**'
 ---
 
 # `tokentest`: what it proves
@@ -64,3 +64,24 @@ walk-free answer says is stranded, and `SST0508` a `$E4` under `#am4` and nowher
 call's `$` wait is an argument whatever it equals: `(!1, 1, $E0)` opens no `$E0`, so the `$ED` after
 it keeps both its arguments, across a line break too, and a call left unclosed ends at the first
 token that is not part of one.
+
+## Section files
+
+`scripts/tokentest/main.ts` runs one section file per subject, in the order below, and `support.ts`
+holds what they share: `at`, `said`, `tokenAt`, `lengthOf` and `inForceAt`. `HARNESS_ONLY=<file
+name>` runs one section alone.
+
+| File                             | What it pins                                                                                                                                                |
+| -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `hex-arguments.ts`               | A hex command gathers exactly its arguments: counted, incomplete, outside `$DA`-`$FE`, `$FB`'s variable length, and abandoned at a bar line.                |
+| `letters-and-fades.ts`           | Letter commands and their arguments, the comma forms of `t`, `v` and `w` as fades, and the fade arithmetic the inspector label and the clock share.         |
+| `note-lengths.ts`                | Note and rest lengths: ties, `l`, each segment's denominator and digits, dots by dialect, and triplets.                                                     |
+| `channels-and-tags.ts`           | Comments and strings, directives and channel markers, the channel a command is written under, remote definitions, lookup by offset, and the highlight tags. |
+| `replacements.ts`                | Replacements expanded at the use site: scope, longest match, arguments, transitivity, recursion and the edge cases.                                         |
+| `instruments-and-divergences.ts` | `q` and `n` read as hex, the `@` forms, the `#instruments` block, the divergences from AddmusicK pinned on purpose, and a directive's bare-word argument.   |
+| `dialect.ts`                     | The dialect a command is read under: the velocity table, the target markers, `#am4`'s `$ED` and `$E5`, and a command stopping at its argument count.        |
+| `pitch-slide-note.ts`            | `$DD`'s note target and `bendAnchor`, and a remote call's `$` wait read as an argument.                                                                     |
+| `hazards.ts`                     | Command hazards, the bytes that compile clean and then break the song.                                                                                      |
+| `restartability.ts`              | Restartability, that `copyState` copies, that the scanner always makes progress, and the empty document.                                                    |
+| `driver-lengths.ts`              | The scanner agrees with the driver about command lengths.                                                                                                   |
+| `command-reach.ts`               | What a command reaches (`commandScope`), and the parse-time half of what is in force on a note.                                                             |

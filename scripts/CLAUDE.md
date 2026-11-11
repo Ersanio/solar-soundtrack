@@ -20,6 +20,11 @@ Ten of the fourteen import a value from two or more `@amk/*` packages — every 
 and why they share `harness.ts` rather than each carrying a copy: copies drift. Recount that rule
 rather than bumping the number when one is added.
 
+Seven are split into section files — `selftest`, `tokentest`, `palettetest`, `audiotest`,
+`walktest`, `charttest` and `rolltest` — each a `scripts/<name>/` holding `main.ts`, which lists the
+sections in order, `support.ts`, which holds what they share, and one file per section. The other
+seven are one file each, `scripts/<name>.ts`.
+
 ## What each one proves
 
 Each harness's full account is a rule in `.claude/rules/harnesses/`, and it loads when you open that
@@ -58,14 +63,15 @@ A passing run prints one line, `<name>: N passed, 0 failed`. A failing check pri
 and every failed name is listed again above the tally. The location is where `check` was called,
 innermost first, so a failure inside a shared helper names the helper's line and then the line in the
 section that called it. A JS throw is a FAIL line too — `FAIL  <section>: threw <message>` with the
-stack as its detail — and the tally still prints: in `rolltest` and `walktest` the sections after
-the one that threw still run, and in a single-file harness the checks before the throw are counted.
+stack as its detail — and the tally still prints: in a harness split into sections the sections
+after the one that threw still run, and in a single-file harness the checks before the throw are
+counted.
 N is the number of `check` calls that ran, so a harness whose N dropped has lost assertions.
 
-| Variable            | Effect                                                                                                                                                             |
-| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `HARNESS_VERBOSE=1` | Every `ok` line, every section header and the `info` lines.                                                                                                        |
-| `HARNESS_ONLY=a,b`  | `rolltest` and `walktest` only: run just those sections, named as their files are (`loop-resize`, `driver-plays`). An unknown name lists the sections and exits 2. |
+| Variable            | Effect                                                                                                                                                                 |
+| ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `HARNESS_VERBOSE=1` | Every `ok` line, every section header and the `info` lines.                                                                                                            |
+| `HARNESS_ONLY=a,b`  | A harness split into sections only: run just those sections, named as their files are (`loop-resize`, `driver-plays`). An unknown name lists the sections and exits 2. |
 
 PowerShell: `$env:HARNESS_ONLY='loops'; npm run rolltest; Remove-Item Env:HARNESS_ONLY`. Bash:
 `HARNESS_ONLY=loops npm run rolltest`. `HARNESS_QUIET` is accepted and does nothing; quiet is the

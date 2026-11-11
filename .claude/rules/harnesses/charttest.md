@@ -1,6 +1,6 @@
 ---
 paths:
-  - 'scripts/charttest.ts'
+  - 'scripts/charttest/**'
 ---
 
 # `charttest`: what it proves
@@ -106,3 +106,26 @@ its `(1)2` both name the body where a `*2` recalling the very same body names no
 channel being edited has a selection to show one for, a box too narrow or too short shows nothing
 rather than something cut, and the plate is the same size at every zoom and every row height,
 sitting in the box's top-left corner.
+
+## Section files
+
+`scripts/charttest/main.ts` runs one section file per subject, in the order below, and `support.ts`
+holds what they share: `EPSILON` alone. `HARNESS_ONLY=<file name>` runs one section alone.
+
+| File                       | What it pins                                                                                                                                                   |
+| -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `stack-plot-clamp.ts`      | The stacked bar's geometry, the plot space, and `clamp`.                                                                                                       |
+| `lanes.ts`                 | The piano roll's lanes.                                                                                                                                        |
+| `window-and-grid.ts`       | The roll's mark window and grid, and the ladder the wheel walks while a note is being drawn.                                                                   |
+| `pages.ts`                 | The roll's pages.                                                                                                                                              |
+| `playhead-and-overview.ts` | The roll's playhead marking the song rather than the camera, and the overview bar's time axis and minimap.                                                     |
+| `loop-regions.ts`          | The loop regions behind the bars.                                                                                                                              |
+| `loop-labels.ts`           | The label on a selected loop.                                                                                                                                  |
+| `loop-follow.ts`           | The loop boxes following a gesture.                                                                                                                            |
+| `playhead-clock.ts`        | The pull at the end of the scrub bar, and the playhead's own clock.                                                                                            |
+| `percussion.ts`            | The percussion set, which is a preference and not a rule.                                                                                                      |
+| `transport-clock.ts`       | The transport's tick-to-seconds clock over songs the compiler will not time, and the roll's playhead following the music rather than the written tempo.        |
+| `bar-text.ts`              | What fits inside one bar.                                                                                                                                      |
+| `command-lane.ts`          | How the command lane stacks what lands together.                                                                                                               |
+| `slider-track.ts`          | The slider's track.                                                                                                                                            |
+| `transport-view.ts`        | The transport's mixer and playhead, the playhead dropping what a mid-update read of ARAM invents, and the seconds estimate for a song the walk could not read. |

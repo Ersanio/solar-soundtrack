@@ -70,7 +70,7 @@ flipped wholesale to LF passes `--check`, which is why the after-edit hook (belo
 
 Four regions carry `// prettier-ignore`, all because reflow destroys information rather than because
 someone preferred the old layout: the MML command dispatch in `parser.ts`, which is a lookup table
-one line per case; the one hand-annotated byte table in `selftest.ts`, where each line is a
+one line per case; the one hand-annotated byte table in `selftest/notes-and-header.ts`, where each line is a
 little-endian word with its own comment; and `INSTRUMENT_TO_SAMPLE` and `VELOCITY_VALUES` in
 `hardcoded-tables.ts`, whose rows are `Music.cpp`'s own, a comment to each. Add a marker only for that kind of reason, and say what it
 is.

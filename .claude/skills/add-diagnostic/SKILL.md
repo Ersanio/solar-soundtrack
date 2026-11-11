@@ -28,8 +28,9 @@ open the compiler or the message catalogs anyway.
 code, message)` covers `severe`. A span must map back to the text the author wrote — go through
    `spanAt`, never compute offsets into preprocessed text yourself. Raise it on failure paths too,
    so partial UI stays populated.
-5. **Pin it** in `scripts/selftest.ts` for compiler diagnostics (the `[source, code, description]`
-   tables), or the harness that owns the module that raises it. Assert the span lands on the
+5. **Pin it** in the `scripts/selftest/` section that owns the construct for compiler diagnostics
+   (the `[source, code, description]` tables; `.claude/rules/harnesses/selftest.md` lists the
+   sections), or the harness that owns the module that raises it. Assert the span lands on the
    offending character, not only that the code appears.
 6. **Verify**: `npm run selftest`, then `npm run i18n:check`, then the
    `verify-change` skill for the rest.

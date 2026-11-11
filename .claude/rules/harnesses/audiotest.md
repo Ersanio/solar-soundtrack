@@ -1,6 +1,6 @@
 ---
 paths:
-  - 'scripts/audiotest.ts'
+  - 'scripts/audiotest/**'
 ---
 
 # `audiotest`: what it proves
@@ -53,3 +53,21 @@ where the same three bytes at the head have already moved it; while the ticks a 
 the arm move nothing at all, a slide counting off `$90`/`$91` once armed rather than off frames.
 Operands no `emitNote` could have written are dropped rather than approximated, and the note comes
 out byte for byte flat.
+
+## Section files
+
+`scripts/audiotest/main.ts` runs one section file per subject, in the order below, and `support.ts`
+holds what they share: the driver, the one emulator instance every section loads its own SPC into,
+`compileToSpc`, `renderMuted`, and the level and pitch measures. `HARNESS_ONLY=<file name>` runs one
+section alone.
+
+| File                  | What it pins                                                                                                                                        |
+| --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `sound.ts`            | The emulator boots, a compiled song makes sound, silence is silent, notes differ audibly, and fast-forward lands somewhere different.               |
+| `muting.ts`           | Muting takes a channel's volume and nothing else: the mix, the song carried on underneath, its speed, a ringing note, and unmuting.                 |
+| `samples.ts`          | Sample sets through the emulator: `#samples`, a custom instrument, `optimizeSampleUsage` and a `.bnk` bank.                                         |
+| `loop-and-ticks.ts`   | The loop lasts as long as the compiler says, the driver's ticks are counted exactly, and the voice the count is latched on is one the driver plays. |
+| `note-map.ts`         | The note map lands on what the driver is playing.                                                                                                   |
+| `audition.ts`         | One note, auditioned where the song is playing.                                                                                                     |
+| `audition-in-song.ts` | An auditioned note with the rest of the song under it, and handed over on a tick the whole song fetches on.                                         |
+| `audition-slide.ts`   | An auditioned note sliding as the `$DD` riding on it says.                                                                                          |

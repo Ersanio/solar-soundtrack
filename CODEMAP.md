@@ -117,46 +117,11 @@ something in the directory, which load by themselves when such a file is opened.
 
 ## scripts
 
-**Rules:** `compiler.md`, `harnesses/*.md`, `i18n.md`, `tooling.md`
+**Rules:** `harnesses/*.md`, `i18n.md`, `tooling.md`
 
 - `adsrtest.ts` (500+ lines) — The envelope maths behind the instrument and `$ED` views.
 - `affected.mjs` — Runs the checks that cover the files changed since the last commit, and nothing else.
-- `audiotest.ts` (1500+ lines) — End-to-end audio check: MML -> SPC -> actual PCM samples.
-  - `peak`:46 `rms`:55 `crossingRate`:73 `firstDifference`:108 `resolveSamples`:138 `compileToSpc`:142
-  - `renderMuted`:176 `emulator boots`:197 `a compiled song actually makes sound`:201
-  - `silence really is silent (control)`:224 `notes differ audibly from each other`:235
-  - `fast-forward lands somewhere different`:266 `muting takes the volume and nothing else`:290
-  - `muting a channel takes it out of the mix`:323 `a muted channel goes on carrying the song`:361
-  - `muting does not change how fast the song plays`:461 `muting cuts a note that is already ringing`:519
-  - `unmuting gives the channel its volume back`:545 `a song-declared sample set still plays`:571
-  - `a custom instrument resolves in the emulator`:584 `optimizeSampleUsage does not silence the song`:627
-  - `a .bnk sample bank plays through the emulator`:721 `the loop really lasts as long as the compiler says`:813
-  - `the driver's own ticks are counted exactly`:893
-  - `the music tick is the driver's own accumulator overflow`:1020
-  - `the voice the count is latched on is one the driver plays`:1065
-  - `the note map lands on what the driver is playing`:1109 `one note, auditioned where the song is playing`:1179
-  - `that note with the rest of the song under it`:1527
-  - `that note handed over on a tick the whole song fetches on`:1602
-  - `that note sliding, as the $DD riding on it says`:1729
 - `brrtest.ts` (500+ lines) — Checks the BRR container handling and the decoder.
-- `charttest.ts` (2000+ lines) — Everything the app draws that is arithmetic rather than markup: the stacked bar, the plot space, `clamp`, the piano roll's lanes, mark window, grid and playhead clock, its percussion set, the slider's track, and the transport's tick-to-seconds clock.
-  - `every region that exists stays visible`:119 `the floor is paid for by donors, not by the total`:136
-  - `proportions survive where no floor is needed`:155
-  - `degenerate input produces no geometry rather than bad geometry`:162
-  - `the plot space reads back as its own viewBox`:179 `clamp holds a value inside its bounds`:187
-  - `piano roll lanes`:199 `piano roll window and grid`:295
-  - `the ladder the wheel walks while a note is being drawn`:373 `the roll's pages`:413
-  - `the roll's playhead marks the song, not the camera`:596 `the overview bar's time axis`:666
-  - `the overview bar's minimap`:718 `the loop regions behind the bars`:839 `the label on a selected loop`:1057
-  - `the loop boxes following a gesture`:1132 `the pull at the end of the scrub bar`:1342
-  - `the playhead's own clock`:1378 `percussion is a preference, not a rule`:1498
-  - `the transport's clock, over songs the compiler will not time`:1655
-  - `the roll's playhead follows the music, not the tempo it was written at`:1782 `what fits inside one bar`:1840
-  - `how the command lane stacks what lands together`:1988
-  - `the slider's track, whose two rules fail invisibly`:2271
-  - `the transport's mixer and playhead, which a browser cannot be made to show`:2355
-  - `the playhead drops what a mid-update read of ARAM invents`:2406
-  - `the seconds estimate for a song the walk could not read`:2450
 - `check.mjs` — The merge gate behind `npm run check`: formatting, the code map, the citations, three typechecks, every harness, and the English, as separate steps reported in one table.
 - `citations.mjs` — Checks that every line citation into this repository's own files still points at lines that exist.
 - `codemap.mjs` (300+ lines) — Keeps CODEMAP.md, an index of every source file and what it is for, in step with the code.
@@ -167,80 +132,69 @@ something in the directory, which load by themselves when such a file is opened.
 - `i18n-catalog.mjs` — Keeps web/src/locale/messages.en.json, the English for every message, in step with the IDs in the code.
 - `instrtest.ts` — The driver's instrument and percussion tables.
 - `localize.ts` — What the page's build does to every message, done at run time instead: defines `$localize` and loads the English from web/src/locale/messages.en.json, so a message reads as a porter sees it rather than as its ID.
-- `palettetest.ts` (1000+ lines) — The command palette's catalogue, and the loop reading the two bracket buttons and the loop inspector share.
-  - `probe`:154 `resolveAll`:182 `catalogue`:243 `superseded`:390 `substituted`:430 `placement`:614
-  - `a command read back out of a song finds its glyph`:646 `putting brackets round a selection`:728
-  - `reading a loop's count, and writing it back`:927 `reading a remote call, and writing it back`:1231
 - `run-harness.mjs` — Bundles one harness into `.selftest/<name>.mjs` and runs it under `node --enable-source-maps`.
-- `selftest.ts` (1500+ lines) — Byte-level sanity checks for the AddmusicK compiler.
-  - `compile`:18 `hex`:33 `expectBytes`:37 `minimal song, no intro, loops`:57 `note encoding`:99
-  - `long notes split into ties`:108 `commands above the first channel`:122
-  - `which notes the drum remap folds into`:188 `intro changes the header shape`:325
-  - `noloop drops the loop words`:349 `loops relocate their pointers`:356 `label loops`:377
-  - `relocation follows the ARAM address`:390 `legacy targets compile`:404
-  - `target selects the compatibility prefix`:431 `y packs its surround flags into the $DB byte`:448
-  - `legacy note behaviour`:480 `legacy hex translation`:503 `preprocessor`:539 `near misses report clearly`:564
-  - `hex command validation`:581 `replacements`:599
-  - `a replacement that expands into itself is refused, not run forever`:610
-  - `diagnostic spans point into the source the author wrote`:671 `ARAM overflow is caught`:744
-  - `parity against AddmusicKsrc`:750 `#samples and #path`:941 `#instruments and @30+`:1066
-  - `the sample load command`:1183 `remote code`:1270 `#pad and the remaining warnings`:1420
-  - `optimizeSampleUsage`:1475 `#samples with a .bnk sample bank`:1529
-  - `importance comes from the host, not from the syntax`:1576 `which samples the song actually plays`:1628
-  - `tailOf`:1670 `audit: the tie lookahead is as case-sensitive as AddmusicK's`:1675
-  - `audit: #amk 1's $FA $05 becomes remote code`:1690
-  - `audit: the tempo ratio divides 0x60 only where AddmusicK does`:1709
-  - `audit: a source that ends on a directive is not truncated`:1723
-  - `audit: nothing is accepted that AddmusicK would reject`:1739
-  - `audit: nothing is rejected that AddmusicK would accept`:1784
-  - `audit: the diagnostics AddmusicK produces, produced here too`:1805 `audit: ;title= sets the ID666 title`:1857
-  - `audit: the two constructs AddmusicK lets through are let through`:1876
 - `spctest.ts` (300+ lines) — End-to-end check: compile MML -> assemble an SPC -> verify its structure.
 - `steps.mjs` — What `check.mjs` and `affected.mjs` share: running a list of steps and reporting them as one table.
 - `sync-spc-assets.mjs` — Mirrors `packages/spc/assets/` into `web/public/`.
-- `tokentest.ts` (2000+ lines) — The MML source scanner.
-  - `said`:60 `tokenAt`:88 `hex commands gather their arguments`:106
-  - `an incomplete hex command is reported as incomplete`:127 `hex arguments are counted, not guessed`:135
-  - `a byte outside $DA-$FE opens no command`:146 `$FB takes its length from its first argument`:158
-  - `a bar line abandons a half-written command`:173 `letter commands carry their arguments`:190
-  - `a comma form of t, v or w is its hex fade, and reads as one`:209
-  - `a tempo fade is priced across the tempo it changes, not the one it leaves`:262
-  - `the label and the transport's clock read one model of a fade`:308
-  - `$51 holds one more than the byte, and wraps`:357
-  - `a fade in a song with no tempo yet is read at the driver's default`:379
-  - `a fade over 0 ticks is dropped, not applied`:419 `notes and rests resolve their length`:472
-  - `a tie plays as one note`:503 `the default length follows 'l'`:536
-  - `every segment says which denominator names it, and where the digits go`:554
-  - `dots and exact lengths fork by dialect`:641 `a lone dot still lengthens the note before it`:665
-  - `a triplet scales the notes inside it`:689 `comments and strings`:758
-  - `directives and channels are told apart`:776 `commands carry the channel they were written under`:787
-  - `a remote code definition is marked, and is not the starting channel's music`:830 `lookup`:878
-  - `every kind has a highlight tag`:898 `every tag name resolves against @lezer/highlight`:918
-  - `replacements are expanded at the use site`:929 `a definition only applies below itself`:963
-  - `longest match wins, and there is no word boundary`:971 `a replacement can carry a whole run of commands`:990
-  - `a replacement can supply arguments, or take them`:1005
-  - `a command knows which of its parts came through a macro`:1026 `replacements are transitive`:1059
-  - `a recursive replacement cannot hang the editor`:1069 `a sample load is not a replacement definition`:1090
-  - `replacement edge cases`:1109 `q and n read their arguments as hex`:1140 `the @ forms`:1163
-  - `#instruments is scanned as a block, not as commands`:1180
-  - `known divergences from AddmusicK, pinned on purpose`:1255
-  - `a directive's bare-word argument is not music`:1337
-  - `the velocity table follows the hex, not just the directives`:1365 `the target markers pick the dialect`:1397
-  - `#am4's $ED is HFD's escape`:1444 `#am4's $E5 forks on its first argument`:1488
-  - `a command takes its arguments and stops`:1503 `$DD takes a note as its last parameter`:1551
-  - `a remote call's $ wait is an argument`:1704
-  - `command hazards — bytes that compile clean and then break the song`:1726
-  - `restartability — the property CodeMirror relies on`:1929 `copyState really copies`:2018
-  - `the scanner always makes progress`:2033 `an empty document is not a special case`:2049
-  - `audit: the scanner agrees with the driver about command lengths`:2058
-  - `what a command reaches, and what the source alone can answer`:2118 `inForceAt`:2186
 - `worklettest.ts` (500+ lines) — Runs the shipped worklet bundle the way the browser will.
+
+## scripts/audiotest
+
+**Rules:** `harnesses/*.md`
+
+- `audition-in-song.ts` — `audiotest`: an auditioned note with the rest of the song under it, and handed over on a tick the whole song fetches on.
+- `audition-slide.ts` — `audiotest`: an auditioned note sliding as the `$DD` riding on it says.
+- `audition.ts` (300+ lines) — `audiotest`: one note, auditioned where the song is playing.
+- `loop-and-ticks.ts` (300+ lines) — `audiotest`: the loop lasts as long as the compiler says, the driver's ticks are counted exactly, and the voice the count is latched on is one the driver plays.
+- `main.ts` — End-to-end audio check: MML -> SPC -> actual PCM samples.
+- `muting.ts` (300+ lines) — `audiotest`: muting takes a channel's volume and nothing else: the mix, the song carried on underneath, its speed, a ringing note, and unmuting.
+- `note-map.ts` — `audiotest`: the note map lands on what the driver is playing.
+- `samples.ts` — `audiotest`: sample sets through the emulator: `#samples`, a custom instrument, `optimizeSampleUsage` and a `.bnk` bank.
+- `sound.ts` — `audiotest`: the emulator boots, a compiled song makes sound, silence is silent, notes differ audibly, and fast-forward lands somewhere different.
+- `support.ts` — What the `audiotest` sections share: the driver, the one emulator instance, `compileToSpc`, `renderMuted`, and the level and pitch measures.
+
+## scripts/charttest
+
+**Rules:** `harnesses/*.md`
+
+- `bar-text.ts` — `charttest`: what fits inside one bar.
+- `command-lane.ts` (300+ lines) — `charttest`: how the command lane stacks what lands together.
+- `lanes.ts` — `charttest`: the piano roll's lanes.
+- `loop-follow.ts` — `charttest`: the loop boxes following a gesture.
+- `loop-labels.ts` — `charttest`: the label on a selected loop.
+- `loop-regions.ts` — `charttest`: the loop regions behind the bars.
+- `main.ts` — Everything the app draws that is arithmetic rather than markup: the stacked bar, the plot space, `clamp`, the piano roll's lanes, mark window, grid and playhead clock, its percussion set, the slider's track, and the transport's tick-to-seconds clock.
+- `pages.ts` — `charttest`: the roll's pages.
+- `percussion.ts` — `charttest`: the percussion set, which is a preference and not a rule.
+- `playhead-and-overview.ts` — `charttest`: the roll's playhead marking the song rather than the camera, and the overview bar's time axis and minimap.
+- `playhead-clock.ts` — `charttest`: the pull at the end of the scrub bar, and the playhead's own clock.
+- `slider-track.ts` — `charttest`: the slider's track.
+- `stack-plot-clamp.ts` — `charttest`: the stacked bar's geometry, the plot space, and `clamp`.
+- `support.ts` — What the `charttest` sections share: `EPSILON`, the tolerance a computed coordinate is compared within.
+- `transport-clock.ts` — `charttest`: the transport's tick-to-seconds clock over songs the compiler will not time, and the roll's playhead following the music rather than the written tempo.
+- `transport-view.ts` — `charttest`: the transport's mixer and playhead, the playhead dropping what a mid-update read of ARAM invents, and the seconds estimate for a song the walk could not read.
+- `window-and-grid.ts` — `charttest`: the roll's mark window and grid, and the ladder the wheel walks while a note is being drawn.
 
 ## scripts/drive
 
 - `drive.mjs` (500+ lines) — Drives the built editor in headless Edge and prints what it shows as one JSON snapshot.
 - `selectors.mjs` — Every DOM selector the app driver reads the running editor through, one comment each on what it finds.
 - `serve.mjs` — A dependency-free static server for a built copy of the app, on a free port of its own.
+
+## scripts/palettetest
+
+**Rules:** `harnesses/*.md`
+
+- `catalogue.ts` — `palettetest`: the catalogue covers every VCMD in every dialect, and every entry can be drawn and explained.
+- `dialects.ts` — `palettetest`: every entry under every dialect: arity against `expectedArgs`, availability against the compiler, and caveats against the hazard diagnostics.
+- `glyph-lookup.ts` — `palettetest`: a command read back out of a song finds its glyph.
+- `loop-count.ts` (300+ lines) — `palettetest`: reading a loop's count and writing it back, priced in notes played.
+- `loop-wrap.ts` — `palettetest`: putting brackets round a selection: an offer compiles, and a refusal written out by hand does not.
+- `main.ts` — The command palette's catalogue, and the loop reading the two bracket buttons and the loop inspector share.
+- `placement.ts` — `palettetest`: placement either side of the first channel, and `songTarget`'s marker precedence.
+- `remote-call.ts` — `palettetest`: reading a remote call and writing it back, against the `$FC` the compiler emits.
+- `supersession.ts` — `palettetest`: a superseded hex command and a substituted spelling compile to the same bytes, and a snippet is one run of MML on one line.
+- `support.ts` — What the `palettetest` sections share: the dialects, the probe song an entry is compiled in, `resolveAll`, and the `SUPERSEDED` table.
 
 ## scripts/rolltest
 
@@ -271,6 +225,47 @@ something in the directory, which load by themselves when such a file is opened.
 - `selection.ts` — `rolltest`: the selection survives an edit.
 - `spelling.ts` — `rolltest`: the spellings the roll and the compiler have to agree on.
 - `support.ts` (750+ lines) — What every `rolltest` section shares: the driver, building and stripping a song, applying edits, and the `expect*` checks.
+
+## scripts/selftest
+
+**Rules:** `compiler.md`, `harnesses/*.md`
+
+- `above-first-channel.ts` — `selftest`: where commands written above the first `#N` go.
+- `audit.ts` — `selftest`: the divergences a line-by-line reading against AddmusicK 1.0.11 found, a case each.
+- `diagnostic-spans.ts` — `selftest`: diagnostic spans point into the source the author wrote, and ARAM overflow is caught.
+- `drum-remap.ts` — `selftest`: which notes the `@21`-`@29` drum remap folds into.
+- `header-and-loops.ts` — `selftest`: the header with an intro and under `#noloop`, loop and label-loop pointers, and relocation to the ARAM address.
+- `instruments.ts` — `selftest`: `#instruments` and `@30` upwards.
+- `legacy-targets.ts` — `selftest`: the legacy targets: that they compile, the compatibility prefix, `y`'s surround flags, legacy note behaviour and legacy hex translation.
+- `main.ts` — Byte-level sanity checks for the AddmusicK compiler.
+- `notes-and-header.ts` — `selftest`: the minimal looping song byte for byte, how a note is encoded, and a long note split into ties.
+- `pad-and-warnings.ts` — `selftest`: `#pad` and the remaining warnings.
+- `parity.ts` — `selftest`: parity against AddmusicKsrc, a case per behaviour.
+- `preprocessor-and-replacements.ts` — `selftest`: the preprocessor, near-miss directives, hex command validation, and replacements, one that expands into itself included.
+- `remote-code.ts` — `selftest`: remote code.
+- `sample-load.ts` — `selftest`: the sample load command.
+- `sample-usage.ts` — `selftest`: `optimizeSampleUsage`, a `.bnk` sample bank under `#samples`, sample importance, and which samples the song plays.
+- `samples-and-path.ts` — `selftest`: `#samples` and `#path`.
+- `support.ts` — What the `selftest` sections share: `compile`, the stand-in sample library, and `hex` and `expectBytes` for comparing emitted bytes.
+
+## scripts/tokentest
+
+**Rules:** `harnesses/*.md`
+
+- `channels-and-tags.ts` — `tokentest`: comments and strings, directives and channel markers, the channel a command is written under, remote definitions, lookup by offset, and the highlight tags.
+- `command-reach.ts` — `tokentest`: what a command reaches (`commandScope`), and the parse-time half of what is in force on a note.
+- `dialect.ts` — `tokentest`: the dialect a command is read under: the velocity table, the target markers, `#am4`'s `$ED` and `$E5`, and a command stopping at its argument count.
+- `driver-lengths.ts` — `tokentest`: the scanner agrees with the driver about command lengths.
+- `hazards.ts` — `tokentest`: command hazards, the bytes that compile clean and then break the song.
+- `hex-arguments.ts` — `tokentest`: a hex command gathers exactly its arguments: counted, incomplete, outside `$DA`-`$FE`, `$FB`'s variable length, and abandoned at a bar line.
+- `instruments-and-divergences.ts` — `tokentest`: `q` and `n` read as hex, the `@` forms, the `#instruments` block, the divergences from AddmusicK pinned on purpose, and a directive's bare-word argument.
+- `letters-and-fades.ts` — `tokentest`: letter commands and their arguments, the comma forms of `t`, `v` and `w` as fades, and the fade arithmetic the inspector label and the clock share.
+- `main.ts` — The MML source scanner.
+- `note-lengths.ts` — `tokentest`: note and rest lengths: ties, `l`, each segment's denominator and digits, dots by dialect, and triplets.
+- `pitch-slide-note.ts` — `tokentest`: `$DD`'s note target and `bendAnchor`, and a remote call's `$` wait read as an argument.
+- `replacements.ts` — `tokentest`: replacements expanded at the use site: scope, longest match, arguments, transitivity, recursion and the edge cases.
+- `restartability.ts` — `tokentest`: restartability, that `copyState` copies, that the scanner always makes progress, and the empty document.
+- `support.ts` — What the `tokentest` sections share: `at`, `said`, `tokenAt`, `lengthOf` and `inForceAt`.
 
 ## scripts/walktest
 

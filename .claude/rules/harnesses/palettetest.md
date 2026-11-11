@@ -1,6 +1,6 @@
 ---
 paths:
-  - 'scripts/palettetest.ts'
+  - 'scripts/palettetest/**'
 ---
 
 # `palettetest`: what it proves
@@ -46,3 +46,20 @@ compared with what was read, the body found is the one the `$FC` address points 
 answering a `(!1)` call included — and every splice the inspector writes compiles clean to the bytes
 it claims, a wait written on a move onto type 1 or 2 and taken out on a move off (AMK0146 and
 AMK0149 otherwise), a hex wait kept hex with 256 as `$00`, and a length kept a length.
+
+## Section files
+
+`scripts/palettetest/main.ts` runs one section file per subject, in the order below, and
+`support.ts` holds what they share: the dialects, the `probe` song an entry is compiled in,
+`resolveAll` and the `SUPERSEDED` table. `HARNESS_ONLY=<file name>` runs one section alone.
+
+| File              | What it pins                                                                                                                                  |
+| ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| `catalogue.ts`    | The catalogue covers every VCMD in every dialect, and every entry can be drawn and explained.                                                 |
+| `supersession.ts` | A superseded hex command and a substituted spelling compile to the same bytes, and a snippet is one run of MML on one line.                   |
+| `dialects.ts`     | Every entry under every dialect: arity against `expectedArgs`, availability against the compiler, and caveats against the hazard diagnostics. |
+| `placement.ts`    | Placement either side of the first channel, and `songTarget`'s marker precedence.                                                             |
+| `glyph-lookup.ts` | A command read back out of a song finds its glyph.                                                                                            |
+| `loop-wrap.ts`    | Putting brackets round a selection: an offer compiles, and a refusal written out by hand does not.                                            |
+| `loop-count.ts`   | Reading a loop's count and writing it back, priced in notes played.                                                                           |
+| `remote-call.ts`  | Reading a remote call and writing it back, against the `$FC` the compiler emits.                                                              |

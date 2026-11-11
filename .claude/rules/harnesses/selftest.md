@@ -1,6 +1,6 @@
 ---
 paths:
-  - 'scripts/selftest.ts'
+  - 'scripts/selftest/**'
 ---
 
 # `selftest`: what it proves
@@ -29,3 +29,27 @@ with no body compiles, as it does there: `(!0, 0)`, `(!0, 7)` and `(!0, 8)` writ
 `$FFFF`, which relocation lands on the last channel's terminating `$00`, and raise nothing, while
 any other type raises `SST0509` at `warning` — `(!0)` included even when a body is written for it,
 since slot 0 is never recorded.
+
+## Section files
+
+`scripts/selftest/main.ts` runs one section file per subject, in the order below, and `support.ts`
+holds what they share: `compile`, the stand-in sample library `LIBRARY`, and `hex` and
+`expectBytes`. `HARNESS_ONLY=<file name>` runs one section alone.
+
+| File                               | What it pins                                                                                                                             |
+| ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `notes-and-header.ts`              | The minimal looping song byte for byte, how a note is encoded, and a long note split into ties.                                          |
+| `above-first-channel.ts`           | Where commands written above the first `#N` go.                                                                                          |
+| `drum-remap.ts`                    | Which notes the `@21`-`@29` drum remap folds into.                                                                                       |
+| `header-and-loops.ts`              | The header with an intro and under `#noloop`, loop and label-loop pointers, and relocation to the ARAM address.                          |
+| `legacy-targets.ts`                | The legacy targets: that they compile, the compatibility prefix, `y`'s surround flags, legacy note behaviour and legacy hex translation. |
+| `preprocessor-and-replacements.ts` | The preprocessor, near-miss directives, hex command validation, and replacements, one that expands into itself included.                 |
+| `diagnostic-spans.ts`              | Diagnostic spans point into the source the author wrote, and ARAM overflow is caught.                                                    |
+| `parity.ts`                        | Parity against AddmusicKsrc, a case per behaviour.                                                                                       |
+| `samples-and-path.ts`              | `#samples` and `#path`.                                                                                                                  |
+| `instruments.ts`                   | `#instruments` and `@30` upwards.                                                                                                        |
+| `sample-load.ts`                   | The sample load command.                                                                                                                 |
+| `remote-code.ts`                   | Remote code.                                                                                                                             |
+| `pad-and-warnings.ts`              | `#pad` and the remaining warnings.                                                                                                       |
+| `sample-usage.ts`                  | `optimizeSampleUsage`, a `.bnk` sample bank under `#samples`, sample importance, and which samples the song plays.                       |
+| `audit.ts`                         | The divergences a line-by-line reading against AddmusicK 1.0.11 found, a case each.                                                      |

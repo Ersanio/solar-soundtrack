@@ -4,7 +4,7 @@ paths:
   - 'packages/mml-tokens/src/{tokens,dialect,echo-hazards,fir-override}.ts'
   - 'packages/mml-tokens/src/commands/availability.ts'
   - 'packages/core/src/messages/**'
-  - 'scripts/selftest.ts'
+  - 'scripts/selftest/**'
 ---
 
 # Compiler, scanner and diagnostics
