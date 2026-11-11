@@ -1,6 +1,6 @@
-# Decisions already made: `.claude/rules/roll-view.md`
+# Decisions already made: `.claude/rules/piano-roll-view.md`
 
-The ledger of `.claude/rules/roll-view.md`: each entry is a design that was built or considered
+The ledger of `.claude/rules/piano-roll-view.md`: each entry is a design that was built or considered
 there and moved away from, with the reason. The rule carries one index line per entry.
 
 - **Parking the roll in an `effect` on the follow flag** — an effect runs after the handler and

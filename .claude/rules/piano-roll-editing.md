@@ -82,7 +82,7 @@ holding a new note has no second axis left to say a length with, so `onWheel` of
 ## Decisions already made
 
 Designs built or considered here and moved away from, one line each: the entry's title and the
-identifiers it names. The full entries are in `.claude/ledgers/roll-editing.md` — read it before
+identifiers it names. The full entries are in `.claude/ledgers/piano-roll-editing.md` — read it before
 proposing a redesign in this area, or when a title below matches what you are about to do. A new
 entry goes there, with its line here, in the same change.
 

@@ -75,7 +75,7 @@ entry goes there, with its line here, in the same change.
   `roll-edit.ts`, `plannedFrameTicks`
 - **The loop label carried on `LoopRegionBox`** — `buildLoopLabels`, `LoopSite.label`,
   `widenOverLabel`, `openGap`, `editChannel`, `editing`
-- **A handle of its own for the loop's transpose** — `Shift`, `Drag.axis`, `roll-view.md`,
+- **A handle of its own for the loop's transpose** — `Shift`, `Drag.axis`, `piano-roll-view.md`,
   `Drag.loop`
 - **`keysBetween` for that drag's semitones**
 - **Dimming the loop boxes to 30% while a body-length edit is held** — `followLoopRegions`,

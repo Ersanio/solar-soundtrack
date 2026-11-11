@@ -16,7 +16,7 @@ list disagrees with `web/.claude/CLAUDE.md` or an installed Angular skill, this 
 2. **Selector prefix `amk`**: `amk-stats-grid` for an element; an attribute selector on a native
    element where the element matters (`button[amk-toggle]`); and inside an `<svg>` always an
    attribute on a real `<g>` with the template's elements prefixed `svg:`
-   (`.claude/rules/roll-architecture.md`, Files and components). ESLint enforces the prefix.
+   (`.claude/rules/piano-roll-architecture.md`, Files and components). ESLint enforces the prefix.
 3. **`templateUrl`**, unless the template is one element or `<ng-content />`.
 4. **A doc comment**, a `/** */` block on the class or at the top of the file. Its first sentence is the
    file's line in `CODEMAP.md`; the gate fails without one. Run `npm run codemap` after adding the

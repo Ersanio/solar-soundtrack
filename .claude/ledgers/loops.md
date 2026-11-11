@@ -82,7 +82,7 @@ and moved away from, with the reason. The rule carries one index line per entry.
   thing worked. The **axis** says which of the two a press is, the way `Shift` already picks an axis
   for a note drag: sideways slides, up or down transposes. Latched where `Drag.axis` is and read
   never again — a press that re-decided on every move would swap one edit for the other under the
-  hand, which is the complaint **`Shift` as a row lock alone** (`roll-view.md`) already answers.
+  hand, which is the complaint **`Shift` as a row lock alone** (`piano-roll-view.md`) already answers.
   The refusals do not carry across: a `'transpose'` holds `Drag.loop` and reads none of it, since
   a nested body that has no song-time position to slide transposes like any other.
 - **`keysBetween` for that drag's semitones**, as a note drag uses it — it answers 0 wherever either

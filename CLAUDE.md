@@ -202,20 +202,20 @@ index entry in the rule, in the same change; if no rule fits, add one with a `pa
 ledger beside the others and a row here. A ledger file has no frontmatter, and nothing under
 `.claude/rules/` may lack `paths:`, since such a file would load in every session.
 
-| Rule                       | Covers                                                                                                                                                   |
-| -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `transport-and-clock.md`   | the transport, the seek bar, the playhead, `Playback`, `Mixer`, the worklet, the clock measurement, anything that turns ticks into seconds               |
-| `audition.md`              | the note and region preview: `Audition`, `note.worker.ts`, the fast-forward and voice parking, the two AudioContexts                                     |
-| `roll-architecture.md`     | how the piano roll is put together: what it draws from, layout, lanes, percussion, which module owns what                                                |
-| `roll-view.md`             | the roll's camera, scrub and overview bars, grid, cursor, hover, pointer handling, selection and toolbar                                                 |
-| `roll-editing.md`          | how a roll gesture becomes text: `roll-edit.ts`, `roll-write/`, `roll-strip.ts`, `roll-gesture.ts`, rests, padding, drums, opening a channel             |
-| `roll-octaves.md`          | `roll-octave.ts`, or anything that writes or removes an `o`, `<` or `>`                                                                                  |
-| `loops.md`                 | loop boxes, wrap, join and split, `roll-loops/`, the loop inspector and `loop-focus.ts`, `(n)m` and `*`                                                  |
-| `commands-in-the-roll.md`  | command glyphs on bars, the command lane, `commands-in-force.ts`, `command-timeline.ts`, `song-walk.ts`'s slots                                          |
-| `inspector-and-palette.md` | the command inspector, a note's Length row, the instrument picker, the command palette, the `$DD` and `q` readouts, the bend graph, the FIR designer     |
-| `compiler.md`              | `packages/mml-compiler`, the `@amk/tokens` scanner, diagnostics, `#path`                                                                                 |
-| `state-and-editor.md`      | `EditorStore`'s scan and compile, the write-back path through `EditorRequests`, `DriverStore`, `SampleStore`, the CodeMirror adapter, the sample browser |
-| `i18n.md`                  | any text a porter reads: templates, `$localize`, the AMK/SST catalogs, command names and descriptions, `web/src/locale/messages.en.json`                 |
-| `ui-and-theme.md`          | `styles.css` colours, `ThemeStore` and presets, the panes, sidebar, tabs and shared controls                                                             |
-| `tooling.md`               | the pre-hooks, `eslint.config.js`, `.prettierrc`, CI and deployment, the after-edit hook                                                                 |
-| `harnesses/<name>.md`      | what each harness proves, loaded with that harness                                                                                                       |
+| Rule                         | Covers                                                                                                                                                   |
+| ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `transport-and-clock.md`     | the transport, the seek bar, the playhead, `Playback`, `Mixer`, the worklet, the clock measurement, anything that turns ticks into seconds               |
+| `audition.md`                | the note and region preview: `Audition`, `note.worker.ts`, the fast-forward and voice parking, the two AudioContexts                                     |
+| `piano-roll-architecture.md` | how the piano roll is put together: what it draws from, layout, lanes, percussion, which module owns what                                                |
+| `piano-roll-view.md`         | the roll's camera, scrub and overview bars, grid, cursor, hover, pointer handling, selection and toolbar                                                 |
+| `piano-roll-editing.md`      | how a roll gesture becomes text: `roll-edit.ts`, `roll-write/`, `roll-strip.ts`, `roll-gesture.ts`, rests, padding, drums, opening a channel             |
+| `piano-roll-octaves.md`      | `roll-octave.ts`, or anything that writes or removes an `o`, `<` or `>`                                                                                  |
+| `loops.md`                   | loop boxes, wrap, join and split, `roll-loops/`, the loop inspector and `loop-focus.ts`, `(n)m` and `*`                                                  |
+| `commands-in-the-roll.md`    | command glyphs on bars, the command lane, `commands-in-force.ts`, `command-timeline.ts`, `song-walk.ts`'s slots                                          |
+| `inspector-and-palette.md`   | the command inspector, a note's Length row, the instrument picker, the command palette, the `$DD` and `q` readouts, the bend graph, the FIR designer     |
+| `compiler.md`                | `packages/mml-compiler`, the `@amk/tokens` scanner, diagnostics, `#path`                                                                                 |
+| `state-and-editor.md`        | `EditorStore`'s scan and compile, the write-back path through `EditorRequests`, `DriverStore`, `SampleStore`, the CodeMirror adapter, the sample browser |
+| `i18n.md`                    | any text a porter reads: templates, `$localize`, the AMK/SST catalogs, command names and descriptions, `web/src/locale/messages.en.json`                 |
+| `ui-and-theme.md`            | `styles.css` colours, `ThemeStore` and presets, the panes, sidebar, tabs and shared controls                                                             |
+| `tooling.md`                 | the pre-hooks, `eslint.config.js`, `.prettierrc`, CI and deployment, the after-edit hook                                                                 |
+| `harnesses/<name>.md`        | what each harness proves, loaded with that harness                                                                                                       |

@@ -71,7 +71,7 @@ considered there and moved away from, with the reason. The rule carries one inde
 - **A native `overflow-y-auto` on the command lane** — nothing here styles a scrollbar, so a ~15px
   Windows bar eats a third of a 42px lane, and its gutter narrows the content box, which puts the
   lane's right edge a scrollbar out of step with the roll it is drawn to track — the trap `w-full` on
-  the bars over the roll (`roll-view.md`) already fell into. A plain wheel lifts the glyphs by a
+  the bars over the roll (`piano-roll-view.md`) already fell into. A plain wheel lifts the glyphs by a
   transform, and the thumb saying the stack runs deeper is drawn inside the `<svg>`, where it costs
   no width.
 - **Packing the lane over the window on screen** — rows are first-fit, so a re-deal at every

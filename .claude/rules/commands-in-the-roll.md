@@ -75,7 +75,7 @@ A new entry goes there, with its line here, in the same change.
   `onANote`, `Track.owners`
 - **Reading the lane off `definedAt` alone** — `emitNote`, `WalkNote`, `origins`, `WalkCommand`,
   `recordOrigin`
-- **A native `overflow-y-auto` on the command lane** — `roll-view.md`
+- **A native `overflow-y-auto` on the command lane** — `piano-roll-view.md`
 - **Packing the lane over the window on screen** — `tickWindow`, `packCommandLane`, `laneWindow`,
   `depth`
 - **A muted channel's commands dimmed rather than dropped, the way its bars are** — `commandScope`,

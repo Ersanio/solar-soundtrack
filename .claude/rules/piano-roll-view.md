@@ -16,7 +16,7 @@ handling, selection or toolbar.
 `piano-roll.ts` holds the song's shape and the porter's settings and calls four composables from
 its field initialisers, in dependency order: `rollView`, `rollTarget`, `rollGestures`,
 `rollPictures`. The flat `roll-*.ts` files they lean on are Angular-free so `charttest` and
-`rolltest` can import them. `roll-architecture.md` has the reasoning; this is the map.
+`rolltest` can import them. `piano-roll-architecture.md` has the reasoning; this is the map.
 
 **Camera** (`roll-view.ts`, `roll-camera.ts`, `roll-layout.ts`). `rollCamera` is a module record
 of signals that outlives the component, which is rebuilt on every tab switch. `viewTick` is the
@@ -58,7 +58,7 @@ compile, so a selection crosses a commit as `NoteAnchor`s (`anchorsFor`, `notesA
 ## Decisions already made
 
 Designs built or considered here and moved away from, one line each: the entry's title and the
-identifiers it names. The full entries are in `.claude/ledgers/roll-view.md` — read it before
+identifiers it names. The full entries are in `.claude/ledgers/piano-roll-view.md` — read it before
 proposing a redesign in this area, or when a title below matches what you are about to do. A new
 entry goes there, with its line here, in the same change.
 

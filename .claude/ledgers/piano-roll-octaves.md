@@ -1,6 +1,6 @@
-# Decisions already made: `.claude/rules/roll-octaves.md`
+# Decisions already made: `.claude/rules/piano-roll-octaves.md`
 
-The ledger of `.claude/rules/roll-octaves.md`: each entry is a design that was built or considered
+The ledger of `.claude/rules/piano-roll-octaves.md`: each entry is a design that was built or considered
 there and moved away from, with the reason. The rule carries one index line per entry.
 
 - **A trailing octave run winning over a leading one** — in `c4 o5 d4` the `o5` is adjacent to both

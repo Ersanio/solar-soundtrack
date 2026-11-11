@@ -198,7 +198,7 @@ something in the directory, which load by themselves when such a file is opened.
 
 ## scripts/rolltest
 
-**Rules:** `harnesses/*.md`, `roll-editing.md`
+**Rules:** `harnesses/*.md`, `piano-roll-editing.md`
 
 - `bulk.ts` — `rolltest`: the bulk gestures — legato and quantize — over a selection.
 - `carried-past.ts` (300+ lines) — `rolltest`: a note carried past another, written again on the far side.
@@ -358,13 +358,13 @@ something in the directory, which load by themselves when such a file is opened.
 
 ## web/src/app/editor/views/piano-roll/percussion-panel
 
-**Rules:** `roll-architecture.md`, `roll-editing.md`
+**Rules:** `piano-roll-architecture.md`, `piano-roll-editing.md`
 
 - `percussion-panel.ts` — One chip per instrument the song plays, as a view model rather than methods called per row — `web/CLAUDE.md` on why.
 
 ## web/src/app/editor/views/piano-roll
 
-**Rules:** `commands-in-the-roll.md`, `roll-architecture.md`, `roll-editing.md`, `roll-octaves.md`, `roll-view.md`, `transport-and-clock.md`
+**Rules:** `commands-in-the-roll.md`, `piano-roll-architecture.md`, `piano-roll-editing.md`, `piano-roll-octaves.md`, `piano-roll-view.md`, `transport-and-clock.md`
 
 - `percussion.ts` — Which instruments the roll draws as percussion, and where a note goes as a result.
 - `piano-roll.ts` (1000+ lines) — The song as music: a keyboard down the left, time running right, and all eight channels in one roll.
@@ -414,80 +414,80 @@ something in the directory, which load by themselves when such a file is opened.
 
 ## web/src/app/editor/views/piano-roll/roll-channels
 
-**Rules:** `roll-architecture.md`, `roll-view.md`
+**Rules:** `piano-roll-architecture.md`, `piano-roll-view.md`
 
 - `roll-channels.ts` — Which channel the roll is editing, in the corner above the key column.
 
 ## web/src/app/editor/views/piano-roll/roll-command-lane
 
-**Rules:** `commands-in-the-roll.md`, `roll-architecture.md`
+**Rules:** `commands-in-the-roll.md`, `piano-roll-architecture.md`
 
 - `roll-command-lane.ts` (300+ lines) — The command lane: every command the song puts in force, on the song's own timeline and with the note data out of the way.
 
 ## web/src/app/editor/views/piano-roll/roll-edit-layer
 
-**Rules:** `roll-architecture.md`, `roll-view.md`
+**Rules:** `piano-roll-architecture.md`, `piano-roll-view.md`
 
 - `roll-edit-layer.ts` — The gesture in flight, drawn over the song.
 
 ## web/src/app/editor/views/piano-roll/roll-grid
 
-**Rules:** `roll-architecture.md`, `roll-view.md`
+**Rules:** `piano-roll-architecture.md`, `piano-roll-view.md`
 
 - `roll-grid.ts` — The grid behind the notes, and the two markers that are the song's own.
 
 ## web/src/app/editor/views/piano-roll/roll-keys
 
-**Rules:** `roll-architecture.md`, `roll-view.md`
+**Rules:** `piano-roll-architecture.md`, `piano-roll-view.md`
 
 - `roll-keys.ts` — The key column down the left, drawn last so notes never spill over it.
 
 ## web/src/app/editor/views/piano-roll/roll-lanes
 
-**Rules:** `roll-architecture.md`, `roll-view.md`
+**Rules:** `piano-roll-architecture.md`, `piano-roll-view.md`
 
 - `roll-lanes.ts` — The row stripes behind the music.
 
 ## web/src/app/editor/views/piano-roll/roll-loops
 
-**Rules:** `loops.md`, `roll-architecture.md`
+**Rules:** `loops.md`, `piano-roll-architecture.md`
 
 - `roll-loop-labels.ts` — The `(n)` a selected loop is written with, in the corner of each of its boxes.
 - `roll-loops.ts` — The loop structure behind the notes: one washed box per pass of every run, around the rows its notes span — dashed at the declaration, dotted at a recall, solid where the group is selected, in the channel's own colour.
 
 ## web/src/app/editor/views/piano-roll/roll-notes
 
-**Rules:** `roll-architecture.md`, `roll-view.md`
+**Rules:** `piano-roll-architecture.md`, `piano-roll-view.md`
 
 - `roll-notes.ts` — The notes themselves: a bar per note, its name, and a glyph per command in force on it.
 
 ## web/src/app/editor/views/piano-roll/roll-overview
 
-**Rules:** `roll-architecture.md`, `roll-view.md`
+**Rules:** `piano-roll-architecture.md`, `piano-roll-view.md`
 
 - `roll-overview.ts` — The whole song at once, and the roll's horizontal scroller.
 
 ## web/src/app/editor/views/piano-roll/roll-scrub
 
-**Rules:** `roll-architecture.md`, `roll-view.md`
+**Rules:** `piano-roll-architecture.md`, `piano-roll-view.md`
 
 - `roll-scrub.ts` — The timeline over the roll, and the only way to seek from it.
 
 ## web/src/app/editor/views/piano-roll/roll-toolbar
 
-**Rules:** `roll-architecture.md`, `roll-view.md`
+**Rules:** `piano-roll-architecture.md`, `piano-roll-view.md`
 
 - `roll-toolbar.ts` — The roll's own controls, which every view brings for itself.
 
 ## web/src/app/editor/views/piano-roll/roll-tooltip
 
-**Rules:** `roll-architecture.md`, `roll-view.md`
+**Rules:** `piano-roll-architecture.md`, `piano-roll-view.md`
 
 - `roll-tooltip.ts` — What a bar is, at length, because a bar has room for a name and a few glyphs and nothing else.
 
 ## web/src/app/editor/views/piano-roll/roll-write
 
-**Rules:** `loops.md`, `roll-architecture.md`, `roll-editing.md`, `roll-octaves.md`
+**Rules:** `loops.md`, `piano-roll-architecture.md`, `piano-roll-editing.md`, `piano-roll-octaves.md`
 
 - `gaps.ts` (300+ lines) — The rests between two notes, made to come to the ticks the plan asks for, and the other channels padded so the song still reaches them.
 - `loop-edits.ts` (500+ lines) — The loop box's gestures: its edge opening a gap or joining a split loop back up, and its ends resizing the body.
@@ -879,7 +879,7 @@ something in the directory, which load by themselves when such a file is opened.
 
 ## web/src/app/util
 
-**Rules:** `roll-view.md`, `ui-and-theme.md`
+**Rules:** `piano-roll-view.md`, `ui-and-theme.md`
 
 - `channel-palette.ts` — The eight music channels' colours, as Tailwind class names.
 - `format.ts` — Formatting helpers shared by the editor's panels.

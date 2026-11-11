@@ -6,7 +6,7 @@ paths:
 # Piano roll: architecture
 
 How the roll is put together: what it draws from, how it lays a song out, and which module owns
-which part. The editing path is in `roll-editing.md`, the view's decisions in `roll-view.md`.
+which part. The editing path is in `piano-roll-editing.md`, the view's decisions in `piano-roll-view.md`.
 
 ## What the roll draws from
 

@@ -1,6 +1,6 @@
-# Decisions already made: `.claude/rules/roll-editing.md`
+# Decisions already made: `.claude/rules/piano-roll-editing.md`
 
-The ledger of `.claude/rules/roll-editing.md`: each entry is a design that was built or considered
+The ledger of `.claude/rules/piano-roll-editing.md`: each entry is a design that was built or considered
 there and moved away from, with the reason. The rule carries one index line per entry.
 
 - **A strict one-to-one gate between the walk's notes and the roll's strip** — `walkSong` ends the
