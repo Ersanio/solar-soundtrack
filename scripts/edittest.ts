@@ -57,7 +57,7 @@ import {
 	noteLengthLabel,
 	noteLengthRows,
 } from "../web/src/app/output/command-inspector/note-length/length-rows";
-import { check, summarise } from "./harness";
+import { check, section, summarise } from "./harness";
 
 /** The command a test is about, found by VCMD so the source can stay readable. */
 function hexCommand(source: string, vcmd: number): Command {
@@ -74,7 +74,7 @@ function applied(source: string, edit: { span: { start: number; end: number }; t
 	return edit === null ? source : source.slice(0, edit.span.start) + edit.text + source.slice(edit.span.end);
 }
 
-console.log("an argument is written in the radix its own command reads");
+section("an argument is written in the radix its own command reads");
 {
 	// Pins that `q` and `n` are read with `getHex`, not `getInt`
 	// (`HEX_ARG_LETTERS`), so writing their argument as decimal is wrong
@@ -103,7 +103,7 @@ console.log("an argument is written in the radix its own command reads");
 	check("and a hex command keeps its $", argumentText(hexCommand("#0 $EF $80 $10 $10\n", 0xef), 10) === "$0A");
 }
 
-console.log("\nan edit replaces the part that changed and nothing else");
+section("an edit replaces the part that changed and nothing else");
 {
 	const source = "#0 $EF   $80 $10\t$10\n";
 	const command = hexCommand(source, 0xef);
@@ -145,7 +145,7 @@ console.log("\nan edit replaces the part that changed and nothing else");
 	check("an out-of-range index yields nothing", spliceArg(source, command, 9, "$00") === null);
 }
 
-console.log("\nthe splice carries what it expects to be replacing");
+section("the splice carries what it expects to be replacing");
 {
 	const source = "#0 $EF $80 $10 $10\n";
 	const edit = spliceArg(source, hexCommand(source, 0xef), 0, "$FF");
@@ -156,7 +156,7 @@ console.log("\nthe splice carries what it expects to be replacing");
 	);
 }
 
-console.log("\nthe macro interlock is asked per part");
+section("the macro interlock is asked per part");
 {
 	// The requirement: only the command byte came through a macro, so every
 	// argument is literal text and rewriting one touches nothing else.
@@ -204,7 +204,7 @@ console.log("\nthe macro interlock is asked per part");
 	);
 }
 
-console.log("\nan #instruments entry edits byte by byte");
+section("an #instruments entry edits byte by byte");
 {
 	const source = '#instruments\n{\n\t"kick.brr" $FE  $6A $B8 $03 $00\n}\n';
 	const entry = tokenize(source).instruments[0];
@@ -234,7 +234,7 @@ console.log("\nan #instruments entry edits byte by byte");
 	);
 }
 
-console.log("\nvariable-length commands do not lose their payload");
+section("variable-length commands do not lose their payload");
 {
 	// `#am4 $ED $82` is an ARAM upload whose 16-bit count decides how many of the
 	// bytes after it belong to the command. An edit to the count either leaves
@@ -261,7 +261,7 @@ console.log("\nvariable-length commands do not lose their payload");
 	);
 }
 
-console.log("\nan instrument the inspector offers is the instrument it then selects");
+section("an instrument the inspector offers is the instrument it then selects");
 {
 	// The list a picker draws and the number a pick writes are two halves of one
 	// map, and the three spellings do not carry it the same way: `parseInstrument`
@@ -329,7 +329,7 @@ console.log("\nan instrument the inspector offers is the instrument it then sele
 	check("nothing past a byte is offered", instrumentByte(plain, 256) === null);
 }
 
-console.log("\na note's length is written onto the note, whatever it was written as");
+section("a note's length is written onto the note, whatever it was written as");
 {
 	// The one control whose subject is a *segment* rather than an argument, and
 	// the reason it is: a note under a standing `l` has no argument at all and is
@@ -428,7 +428,7 @@ console.log("\na note's length is written onto the note, whatever it was written
 	);
 }
 
-console.log("\nan insertion is padded to stand as a token of its own");
+section("an insertion is padded to stand as a token of its own");
 {
 	// One rule for the caret palette, the note palette, a wrap's two brackets
 	// and the rest a loop drag opens: a space on whichever side has a character

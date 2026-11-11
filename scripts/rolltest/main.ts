@@ -21,27 +21,29 @@
 // First, so every module after it finds $localize and the English.
 
 import "../localize";
-import { summarise } from "../harness";
-import "./spelling";
-import "./gate";
-import "./loops";
-import "./loop-carries-loops";
-import "./loop-edge-gap";
-import "./loop-edge-join";
-import "./loop-resize";
-import "./bulk";
-import "./insert-mode";
-import "./overwrite-mode";
-import "./carried-past";
-import "./removed-commands";
-import "./drum-apart";
-import "./refusals";
-import "./drag-carries";
-import "./past-the-end";
-import "./opening-a-channel";
-import "./carrying-a-command";
-import "./pitch-slide";
-import "./selection";
-import "./seed";
+import { runSections } from "../harness";
 
-summarise();
+// In this order: each section runs as its module is evaluated.
+await runSections([
+	["spelling", () => import("./spelling")],
+	["gate", () => import("./gate")],
+	["loops", () => import("./loops")],
+	["loop-carries-loops", () => import("./loop-carries-loops")],
+	["loop-edge-gap", () => import("./loop-edge-gap")],
+	["loop-edge-join", () => import("./loop-edge-join")],
+	["loop-resize", () => import("./loop-resize")],
+	["bulk", () => import("./bulk")],
+	["insert-mode", () => import("./insert-mode")],
+	["overwrite-mode", () => import("./overwrite-mode")],
+	["carried-past", () => import("./carried-past")],
+	["removed-commands", () => import("./removed-commands")],
+	["drum-apart", () => import("./drum-apart")],
+	["refusals", () => import("./refusals")],
+	["drag-carries", () => import("./drag-carries")],
+	["past-the-end", () => import("./past-the-end")],
+	["opening-a-channel", () => import("./opening-a-channel")],
+	["carrying-a-command", () => import("./carrying-a-command")],
+	["pitch-slide", () => import("./pitch-slide")],
+	["selection", () => import("./selection")],
+	["seed", () => import("./seed")],
+]);

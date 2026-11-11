@@ -4,11 +4,11 @@ import "../localize";
 import { NOTE_MAX, NOTE_MIN } from "@amk/core/hardcoded-tables";
 import { octaveFor, octaveOfNote, spellDuration, spellNote } from "@amk/core/mml-text";
 import { NOTE_NAMES } from "@amk/tokens/commands/units";
-import { check } from "../harness";
+import { check, section } from "../harness";
 
 // --- the spellings the roll and the compiler have to agree on ---------------
 
-console.log("\nspelling");
+section("spelling");
 {
 	let agree = true;
 	let roundTrips = true;

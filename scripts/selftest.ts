@@ -13,7 +13,7 @@ import "./localize";
 import { compiler } from "@amk/compiler";
 import type { CompileResult } from "@amk/core/types";
 
-import { check, summarise } from "./harness";
+import { check, section, summarise } from "./harness";
 
 function compile(source: string, aramAddress = 0x3e00, options?: Record<string, unknown>): CompileResult {
 	return compiler.compile({ source, aramAddress, options });
@@ -37,12 +37,24 @@ function hex(data: Uint8Array): string {
 function expectBytes(name: string, actual: Uint8Array, expected: number[]): void {
 	const got = hex(actual);
 	const want = hex(Uint8Array.from(expected));
-	check(name, got === want, `expected ${want}\n        got      ${got}`);
+	const length = Math.min(actual.length, expected.length);
+	let differs = 0;
+	while (differs < length && actual[differs] === (expected[differs] ?? 0) % 256) {
+		differs++;
+	}
+
+	const lengths =
+		actual.length === expected.length ? "" : `, ${expected.length} bytes expected and ${actual.length} got`;
+	check(
+		name,
+		got === want,
+		`expected ${want}\n        got      ${got}\n        first differs at byte ${differs}${lengths}`,
+	);
 }
 
 // ---------------------------------------------------------------------------
 
-console.log("\nminimal song, no intro, loops");
+section("minimal song, no intro, loops");
 {
 	// One channel, one quarter-note C in octave 4.
 	const result = compile("#amk 4\n#0 @0 o4 c4\n");
@@ -84,7 +96,7 @@ console.log("\nminimal song, no intro, loops");
 	}
 }
 
-console.log("\nnote encoding");
+section("note encoding");
 {
 	const result = compile("#amk 4\n#0 o4 c4 c4 d8\n");
 	// Second c4 reuses the previous length, so no duration byte is emitted.
@@ -93,7 +105,7 @@ console.log("\nnote encoding");
 	expectBytes("duration is omitted when unchanged", result.data!.slice(28), [0x30, 0x7f, 0xa4, 0xa4, 0x18, 0xa6, 0x00]);
 }
 
-console.log("\nlong notes split into ties");
+section("long notes split into ties");
 {
 	const result = compile("#amk 4\n#0 o4 c1\n");
 	// 192 ticks exceeds the 0x80 note-length limit, so Music.cpp:2245 emits a
@@ -107,7 +119,7 @@ console.log("\nlong notes split into ties");
 	expectBytes("dotted-whole via tie", longer.data!.slice(28), [0x60, 0x7f, 0xa4, 0xc6, 0xc6, 0x00]);
 }
 
-console.log("\ncommands above the first channel");
+section("commands above the first channel");
 {
 	// Music.cpp:385-400 — the parser starts on the lowest `#N` found anywhere in
 	// the text, probing `#0` up through `#7`, and stays on 0 without one. So what
@@ -173,7 +185,7 @@ console.log("\ncommands above the first channel");
 	);
 }
 
-console.log("\nwhich notes the drum remap folds into");
+section("which notes the drum remap folds into");
 {
 	// `instrument[channel]` is written by `@` alone (Music.cpp:908), copied into
 	// the loop block by `[` and never copied back (Music.cpp:1239), and cleared
@@ -310,7 +322,7 @@ console.log("\nwhich notes the drum remap folds into");
 	]);
 }
 
-console.log("\nintro changes the header shape");
+section("intro changes the header shape");
 {
 	const result = compile("#amk 4\n#0 o4 c4 / d4\n");
 	check("compiles", result.ok, result.diagnostics.map((d) => d.message).join("; "));
@@ -334,14 +346,14 @@ console.log("\nintro changes the header shape");
 	}
 }
 
-console.log("\nnoloop drops the loop words");
+section("noloop drops the loop words");
 {
 	const result = compile("#amk 4\n#0 o4 c4 ?\n");
 	check("header is 20 bytes", result.stats?.headerSize === 20, `got ${result.stats?.headerSize}`);
 	check("does not loop", result.stats?.loops === false);
 }
 
-console.log("\nloops relocate their pointers");
+section("loops relocate their pointers");
 {
 	const result = compile("#amk 4\n#0 o4 [c4 d4]4\n");
 	check("compiles", result.ok, result.diagnostics.map((d) => d.message).join("; "));
@@ -362,7 +374,7 @@ console.log("\nloops relocate their pointers");
 	}
 }
 
-console.log("\nlabel loops");
+section("label loops");
 {
 	const result = compile("#amk 4\n#0 o4 (1)[c4 d4]2 (1)3\n");
 	check("compiles", result.ok, result.diagnostics.map((d) => d.message).join("; "));
@@ -375,7 +387,7 @@ console.log("\nlabel loops");
 	);
 }
 
-console.log("\nrelocation follows the ARAM address");
+section("relocation follows the ARAM address");
 {
 	const a = compile("#amk 4\n#0 o4 [c4]2\n", 0x3e00);
 	const b = compile("#amk 4\n#0 o4 [c4]2\n", 0x4000);
@@ -389,7 +401,7 @@ console.log("\nrelocation follows the ARAM address");
 	}
 }
 
-console.log("\nlegacy targets compile");
+section("legacy targets compile");
 {
 	for (const [source, label] of [
 		["#am4\n#0 o4 c4\n", "#am4"],
@@ -416,7 +428,7 @@ console.log("\nlegacy targets compile");
 	check("future version rejected", !amk9.ok);
 }
 
-console.log("\ntarget selects the compatibility prefix");
+section("target selects the compatibility prefix");
 {
 	// Music.cpp:2989 — each target gets its own 3-byte mode prefix, right after
 	// the echo buffer allocation.
@@ -433,7 +445,7 @@ console.log("\ntarget selects the compatibility prefix");
 	}
 }
 
-console.log("\ny packs its surround flags into the $DB byte");
+section("y packs its surround flags into the $DB byte");
 {
 	// Music.cpp:711-726 — `pan |= i << 7` for the second argument and
 	// `pan |= i << 6` for the third, and the readme names them "(left,right)"
@@ -465,7 +477,7 @@ console.log("\ny packs its surround flags into the $DB byte");
 	check("a lone second argument is rejected", !compile("#amk 4\n#0 y10,1 o4 c4\n").ok);
 }
 
-console.log("\nlegacy note behaviour");
+section("legacy note behaviour");
 {
 	// Addmusic 4.05 ignores instrument tuning until an instrument is declared,
 	// so @2 (transpose +5) shifts the note only after the @ command.
@@ -488,7 +500,7 @@ console.log("\nlegacy note behaviour");
 	check("amk honours three", lenOf(amkDots) === 48 + 24 + 12 + 6, `${lenOf(amkDots)}`);
 }
 
-console.log("\nlegacy hex translation");
+section("legacy hex translation");
 {
 	// Channel data starts after two 3-byte prefixes: the echo buffer allocation
 	// and the target's compatibility mode.
@@ -524,7 +536,7 @@ console.log("\nlegacy hex translation");
 	expectBytes("$ED $81 becomes $FA $02", Uint8Array.from(bodyOf(tune).slice(0, 3)), [0xfa, 0x02, 0x03]);
 }
 
-console.log("\npreprocessor");
+section("preprocessor");
 {
 	const ifdef = compile("#amk 4\n#define LOUD\n#0 o4\n#ifdef LOUD\nv200\n#endif\nc4\n");
 	check(
@@ -549,7 +561,7 @@ console.log("\npreprocessor");
 	check("amm handles ; in the scanner", ammComment.ok, ammComment.diagnostics.map((d) => d.message).join("; "));
 }
 
-console.log("\nnear misses report clearly");
+section("near misses report clearly");
 {
 	for (const [source, code] of [
 		// Every directive form is implemented now; these are the errors people
@@ -566,7 +578,7 @@ console.log("\nnear misses report clearly");
 	}
 }
 
-console.log("\nhex command validation");
+section("hex command validation");
 {
 	const good = compile("#amk 4\n#0 o4 $E7 $C8 c4\n");
 	check("valid $E7 accepted", good.ok, good.diagnostics.map((d) => d.message).join("; "));
@@ -584,7 +596,7 @@ console.log("\nhex command validation");
 	check("echo buffer size tracked from $F1", echo.stats?.echoBufferSize === 4, `got ${echo.stats?.echoBufferSize}`);
 }
 
-console.log("\nreplacements");
+section("replacements");
 {
 	const result = compile('#amk 4\n"LEAD=@0 v200"\n#0 o4 LEAD c4\n');
 	check("compiles", result.ok, result.diagnostics.map((d) => d.message).join("; "));
@@ -595,7 +607,7 @@ console.log("\nreplacements");
 	}
 }
 
-console.log("\na replacement that expands into itself is refused, not run forever");
+section("a replacement that expands into itself is refused, not run forever");
 {
 	const started = Date.now();
 
@@ -656,7 +668,7 @@ console.log("\na replacement that expands into itself is refused, not run foreve
 	check("all of it finishes promptly", elapsed < 4000, `took ${elapsed} ms`);
 }
 
-console.log("\ndiagnostic spans point into the source the author wrote");
+section("diagnostic spans point into the source the author wrote");
 {
 	// The parser works on preprocessed text — no `#amk` marker, no `#define`
 	// lines, no comments — so a raw buffer offset lands short of where the
@@ -729,13 +741,13 @@ console.log("\ndiagnostic spans point into the source the author wrote");
 	}
 }
 
-console.log("\nARAM overflow is caught");
+section("ARAM overflow is caught");
 {
 	const result = compile("#amk 4\n#0 o4 [c4 d4 e4 f4]8\n", 0xfff0);
 	check("overflow rejected", !result.ok && result.diagnostics.some((d) => d.code === "AMK0300"));
 }
 
-console.log("\nparity against AddmusicKsrc");
+section("parity against AddmusicKsrc");
 {
 	// Music.cpp:535 — `?1` and `?2` set `noMusic[][]`, which the reference never
 	// reads. Only `?` and `?0` stop the song looping. The digit is consumed, so
@@ -926,7 +938,7 @@ console.log("\nparity against AddmusicKsrc");
 	);
 }
 
-console.log("\n#samples and #path");
+section("#samples and #path");
 {
 	const names = (result: CompileResult): readonly string[] => result.sampleList ?? [];
 
@@ -1051,7 +1063,7 @@ console.log("\n#samples and #path");
 	);
 }
 
-console.log("\n#instruments and @30+");
+section("#instruments and @30+");
 {
 	const ENTRY = "$8F $E0 $00 $02 $B0"; // ADSR1, ADSR2, GAIN, tuning hi, tuning lo
 	const withDefault = (body: string) => `#amk 4\n#samples { #default }\n${body}`;
@@ -1168,7 +1180,7 @@ console.log("\n#instruments and @30+");
 	check("@@19 emits $DA $1E", doubleAt.data ? [...doubleAt.data.slice(12)].includes(0x1e) : false);
 }
 
-console.log("\nthe sample load command");
+section("the sample load command");
 {
 	const withDefault = (body: string) => `#amk 4\n#samples { #default }\n${body}`;
 
@@ -1255,7 +1267,7 @@ console.log("\nthe sample load command");
 	}
 }
 
-console.log("\nremote code");
+section("remote code");
 {
 	// A definition sits outside every channel; a call is inside one. That is the
 	// only thing distinguishing them (Music.cpp:1015).
@@ -1405,7 +1417,7 @@ console.log("\nremote code");
 	}
 }
 
-console.log("\n#pad and the remaining warnings");
+section("#pad and the remaining warnings");
 {
 	// #pad records a reservation. It does not zero-fill: AMK only pads global
 	// songs, and a song compiled here is always the local one.
@@ -1460,7 +1472,7 @@ console.log("\n#pad and the remaining warnings");
 	);
 }
 
-console.log("\noptimizeSampleUsage");
+section("optimizeSampleUsage");
 {
 	const EMPTY = "EMPTY.brr";
 	const names = (result: CompileResult): readonly string[] => result.sampleList ?? [];
@@ -1514,7 +1526,7 @@ console.log("\noptimizeSampleUsage");
 	check("a song with no instrument keeps the directory length", names(silent).length === 20);
 }
 
-console.log("\n#samples with a .bnk sample bank");
+section("#samples with a .bnk sample bank");
 {
 	const names = (result: CompileResult): readonly string[] => result.sampleList ?? [];
 	const run = (source: string, extra: Record<string, unknown> = {}) =>
@@ -1561,7 +1573,7 @@ console.log("\n#samples with a .bnk sample bank");
 	check("its unplayed neighbours do not", names(played)[6] === "EMPTY.brr", names(played)[6]);
 }
 
-console.log("\nimportance comes from the host, not from the syntax");
+section("importance comes from the host, not from the syntax");
 {
 	const names = (result: CompileResult): readonly string[] => result.sampleList ?? [];
 	const kept = (result: CompileResult): number => names(result).filter((n) => n !== "EMPTY.brr").length;
@@ -1613,7 +1625,7 @@ console.log("\nimportance comes from the host, not from the syntax");
 	check("while sampleList is the optimised one", names(asked).includes("EMPTY.brr"));
 }
 
-console.log("\nwhich samples the song actually plays");
+section("which samples the song actually plays");
 {
 	const used = (result: CompileResult): readonly string[] => result.stats?.usedSampleNames ?? [];
 	const run = (source: string) => compile(source, 0x3e00, LIBRARY);
@@ -1660,7 +1672,7 @@ function tailOf(source: string, n: number): string {
 	return data ? hex(data.subarray(Math.max(0, data.length - n))) : "(no data)";
 }
 
-console.log("\naudit: the tie lookahead is as case-sensitive as AddmusicK's");
+section("audit: the tie lookahead is as case-sensitive as AddmusicK's");
 {
 	// Music.cpp:2224 strncmps against exactly "$DD" and "$dd". A mixed-case `$Dd`
 	// matches neither, so AddmusicK does *not* rewind and the tie folds into the
@@ -1675,7 +1687,7 @@ console.log("\naudit: the tie lookahead is as case-sensitive as AddmusicK's");
 	}
 }
 
-console.log("\naudit: #amk 1's $FA $05 becomes remote code");
+section("audit: #amk 1's $FA $05 becomes remote code");
 {
 	// Music.cpp:1925-1962 pops the `$FA $05` back off and writes a type 6 remote
 	// code event in its place, or a type 8 cancel when the gain is zero.
@@ -1694,7 +1706,7 @@ console.log("\naudit: #amk 1's $FA $05 becomes remote code");
 	);
 }
 
-console.log("\naudit: the tempo ratio divides 0x60 only where AddmusicK does");
+section("audit: the tempo ratio divides 0x60 only where AddmusicK does");
 {
 	// Music.cpp:2252 divides 0x80 on every note but reaches 0x60 only inside the
 	// long-note branch. Hoisting the 0x60 out of that branch made every short
@@ -1708,7 +1720,7 @@ console.log("\naudit: the tempo ratio divides 0x60 only where AddmusicK does");
 	check("a long note still reports the fractional value", !long.ok, "");
 }
 
-console.log("\naudit: a source that ends on a directive is not truncated");
+section("audit: a source that ends on a directive is not truncated");
 {
 	// Music.cpp:286 pads the buffer with 16 spaces in init(), *before* the
 	// preprocessor runs, so getArgument (globals.cpp:706) never reaches the end
@@ -1724,7 +1736,7 @@ console.log("\naudit: a source that ends on a directive is not truncated");
 	}
 }
 
-console.log("\naudit: nothing is accepted that AddmusicK would reject");
+section("audit: nothing is accepted that AddmusicK would reject");
 {
 	// The point of the tool is that a song written here works in AddmusicK, so
 	// being more permissive than the reference is the failure that matters most:
@@ -1769,7 +1781,7 @@ console.log("\naudit: nothing is accepted that AddmusicK would reject");
 	rejects("an out-of-range #define operand is rejected", "#amk 4\n#define FOO 99999999999\n#0 c4\n", "strToInt throws");
 }
 
-console.log("\naudit: nothing is rejected that AddmusicK would accept");
+section("audit: nothing is rejected that AddmusicK would accept");
 {
 	// Music.cpp:2493 — `#halvetempo` is matched on prefix alone, with no
 	// trailing-whitespace test, so it may butt straight up against what follows.
@@ -1790,7 +1802,7 @@ console.log("\naudit: nothing is rejected that AddmusicK would accept");
 	check("#AM4 is consumed silently", marker.ok, marker.diagnostics.map((d) => `${d.code} ${d.message}`).join("; "));
 }
 
-console.log("\naudit: the diagnostics AddmusicK produces, produced here too");
+section("audit: the diagnostics AddmusicK produces, produced here too");
 {
 	// Music.cpp:1181 and 1332 — `error()` returns, so no `$E9` is written and the
 	// dead `j = 1` after it never runs. Forcing the count to 1 and carrying on put
@@ -1842,7 +1854,7 @@ console.log("\naudit: the diagnostics AddmusicK produces, produced here too");
 	);
 }
 
-console.log("\naudit: ;title= sets the ID666 title");
+section("audit: ;title= sets the ID666 title");
 {
 	// Music.cpp:297-306 — a plain substring search of the raw source, before
 	// preprocessing, taking everything to the end of the line.
@@ -1861,7 +1873,7 @@ console.log("\naudit: ;title= sets the ID666 title");
 	check("and no marker leaves it empty", none.stats?.tags.title === undefined, String(none.stats?.tags.title));
 }
 
-console.log("\naudit: the two constructs AddmusicK lets through are let through");
+section("audit: the two constructs AddmusicK lets through are let through");
 {
 	// Music.cpp:2413-2506 has no final else, so `pos` stays on the first letter
 	// and the scan loop reads it as music. `#c4` really is a quarter-note C.

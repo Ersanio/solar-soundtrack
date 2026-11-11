@@ -10,11 +10,11 @@ import { instantiate } from "@amk/spc/wasm-host";
 import { secondsAtTick, songClock } from "../../web/src/app/state/song-clock";
 import { measureClock, tempoShortfall } from "../../web/src/app/state/measure-clock";
 import { driverTickSeconds } from "@amk/tokens/commands/units";
-import { check, SPC_ASSETS } from "../harness";
+import { SPC_ASSETS, check, section } from "../harness";
 import { build, BY_NAME, driver } from "./support";
 
 // ---------------------------------------------------------------------------
-console.log("\nthe driver does not always run the song as fast as it is written");
+section("the driver does not always run the song as fast as it is written");
 // ---------------------------------------------------------------------------
 {
 	// The one thing in the app that cannot be computed: the driver's main loop

@@ -1,11 +1,11 @@
 /** `walktest`: the commands that must not be walked as notes. */
 
 import "../localize";
-import { check } from "../harness";
+import { check, section } from "../harness";
 import { build } from "./support";
 
 // ---------------------------------------------------------------------------
-console.log("\nthe commands that must not be walked as notes");
+section("the commands that must not be walked as notes");
 // ---------------------------------------------------------------------------
 {
 	// Assertion 2. The arpeggio's three note bytes are arguments, not notes.

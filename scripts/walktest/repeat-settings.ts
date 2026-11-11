@@ -3,12 +3,12 @@
 import "../localize";
 import type { Diagnostic } from "@amk/core/types";
 import { repeatSettings } from "../../web/src/app/state/repeat-carry";
-import { check } from "../harness";
+import { check, section } from "../harness";
 import { build } from "./support";
 import { aramInRepeat } from "./longer-channel";
 
 // ---------------------------------------------------------------------------
-console.log("\na setting that carries over into the repeat is reported");
+section("a setting that carries over into the repeat is reported");
 // ---------------------------------------------------------------------------
 {
 	// `PlaySong` sets every one of these only when a song starts

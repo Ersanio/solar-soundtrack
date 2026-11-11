@@ -2,11 +2,11 @@
 
 import "../localize";
 import { walkSong } from "@amk/spc/song-walk";
-import { check } from "../harness";
+import { check, section } from "../harness";
 import { ARAM, build } from "./support";
 
 // ---------------------------------------------------------------------------
-console.log("\nthe loops the walk plays through");
+section("the loops the walk plays through");
 // ---------------------------------------------------------------------------
 //
 // `SongTimeline.loops` is the roll's only ground truth for loop structure:

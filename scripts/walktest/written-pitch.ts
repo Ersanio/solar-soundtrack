@@ -1,11 +1,11 @@
 /** `walktest`: the note map keeps the pitch that was written. */
 
 import "../localize";
-import { check } from "../harness";
+import { check, section } from "../harness";
 import { build } from "./support";
 
 // ---------------------------------------------------------------------------
-console.log("\nthe note map keeps the pitch that was written");
+section("the note map keeps the pitch that was written");
 // ---------------------------------------------------------------------------
 {
 	// The byte has `h` or the instrument's transposition folded in; the map

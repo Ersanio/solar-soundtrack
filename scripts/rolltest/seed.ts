@@ -5,7 +5,7 @@ import { compiler } from "@amk/compiler";
 import { tokenize } from "@amk/tokens";
 import { SEED_SONG, seededChannel, seedEdits } from "../../web/src/app/editor/views/piano-roll/roll-seed";
 import { SAMPLE_SONG } from "../../web/src/app/state/sample-song";
-import { check } from "../harness";
+import { check, section } from "../harness";
 import { apply, ARAM, build, OPTIONS, strip } from "./support";
 
 // --- seeding a song with no playable music ----------------------------------
@@ -15,7 +15,7 @@ import { apply, ARAM, build, OPTIONS, strip } from "./support";
 // exist at all. Seeded songs are checked the way every edit here is — by
 // compiling the result — and the refusals pin that a song failing for its own
 // reasons is never written to.
-console.log("\nthe seed");
+section("the seed");
 {
 	const seeded = (source: string): string | null => {
 		const result = compiler.compile({ source, aramAddress: ARAM, options: OPTIONS });

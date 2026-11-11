@@ -11,7 +11,7 @@ import { buildPreview } from "../../web/src/app/editor/views/piano-roll/roll-pre
 import { laneStack } from "../../web/src/app/editor/views/piano-roll/roll-layout";
 import { openGap } from "../../web/src/app/editor/views/piano-roll/roll-write/loop-edits";
 import type { Strip } from "../../web/src/app/editor/views/piano-roll/roll-strip";
-import { check } from "../harness";
+import { check, section } from "../harness";
 import { apply, build, type Built, introOf, playable, strip, tailsOf } from "./support";
 import { expectGap, grabEdge } from "./loop-edge-gap";
 
@@ -22,7 +22,7 @@ import { expectGap, grabEdge } from "./loop-edge-gap";
 // construct written twice. `loopJoin` is the reading; each case here is the
 // round trip of a split above it.
 
-console.log("\nthe loop box's edge joins a split loop");
+section("the loop box's edge joins a split loop");
 
 expectGap(
 	"a split recall joined back up",

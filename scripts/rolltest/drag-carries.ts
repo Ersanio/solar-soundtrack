@@ -2,9 +2,10 @@
 
 import "../localize";
 import { REFUSE_RANGE, REFUSE_ROOM } from "../../web/src/app/editor/views/piano-roll/roll-edit";
+import { section } from "../harness";
 import { expectCarried, expectEdit, noteAt } from "./support";
 
-console.log("\nwhat a drag carries");
+section("what a drag carries");
 
 // `Plan.touched` is what the roll draws in the preview and leaves out of the
 // song's own bars, so these pin whether a dragged note is drawn once or twice.

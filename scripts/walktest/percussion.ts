@@ -1,11 +1,11 @@
 /** `walktest`: percussion follows the channel it is written on. */
 
 import "../localize";
-import { check } from "../harness";
+import { check, section } from "../harness";
 import { build } from "./support";
 
 // ---------------------------------------------------------------------------
-console.log("\npercussion follows the channel it is written on");
+section("percussion follows the channel it is written on");
 // ---------------------------------------------------------------------------
 {
 	// `parser.ts:2748-2754` clears the instrument after the first remapped note,
@@ -33,7 +33,7 @@ console.log("\npercussion follows the channel it is written on");
 		drums.length === 3 && drums.every((n) => n.percussion === 8),
 		drums.map((n) => `$${n.note.toString(16)}`).join(" "),
 	);
-	// Those three assertions are now the *entire* foundation the roll's lane rule
+	// Those three assertions are the *entire* foundation the roll's lane rule
 	// stands on: it places a note by the instrument in force, and this is what
 	// says the instrument survives a `$D0` byte. Which of them counts as
 	// percussion is a preference and lives in the app — `percussion.ts`, covered

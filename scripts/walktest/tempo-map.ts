@@ -2,11 +2,11 @@
 
 import "../localize";
 import type { TempoChange } from "@amk/spc/song-walk";
-import { check } from "../harness";
+import { check, section } from "../harness";
 import { build } from "./support";
 
 // ---------------------------------------------------------------------------
-console.log("\nthe song's tempo map");
+section("the song's tempo map");
 // ---------------------------------------------------------------------------
 {
 	const map = (source: string) => build(source).timeline.tempoChanges;

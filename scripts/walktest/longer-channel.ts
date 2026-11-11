@@ -8,11 +8,11 @@ import { createTickPhase, sawTick, seedTickPhase, TICK_POLL_HZ } from "@amk/spc/
 import { emptySample } from "@amk/spc/brr";
 import { instantiate, SPC_SAMPLE_RATE } from "@amk/spc/wasm-host";
 import { type SongTimeline, unreachableChannels } from "@amk/spc/song-walk";
-import { check, SPC_ASSETS } from "../harness";
+import { SPC_ASSETS, check, section } from "../harness";
 import { build, BY_NAME, driver } from "./support";
 
 // ---------------------------------------------------------------------------
-console.log("\na channel longer than the song is reported, not drawn");
+section("a channel longer than the song is reported, not drawn");
 // ---------------------------------------------------------------------------
 {
 	// `#1` runs twice as long as `#0`. The driver ends a phrase the moment any

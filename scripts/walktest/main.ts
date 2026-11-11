@@ -45,29 +45,31 @@
 // First, so every module after it finds $localize and the English.
 
 import "../localize";
-import { summarise } from "../harness";
-import "./command-lengths";
-import "./song-length";
-import "./tempo-map";
-import "./loops";
-import "./command-list";
-import "./command-lane";
-import "./clock-agrees";
-import "./no-loop";
-import "./notes-mapped";
-import "./written-pitch";
-import "./not-notes";
-import "./percussion";
-import "./ties-gates-range";
-import "./slide-read-ahead";
-import "./slide-start";
-import "./longer-channel";
-import "./repeat-tempo";
-import "./repeat-settings";
-import "./malformed-data";
-import "./driver-plays";
-import "./driver-key-off";
-import "./tempo-shortfall";
-import "./in-force-named";
+import { runSections } from "../harness";
 
-summarise();
+// In this order: each section runs as its module is evaluated.
+await runSections([
+	["command-lengths", () => import("./command-lengths")],
+	["song-length", () => import("./song-length")],
+	["tempo-map", () => import("./tempo-map")],
+	["loops", () => import("./loops")],
+	["command-list", () => import("./command-list")],
+	["command-lane", () => import("./command-lane")],
+	["clock-agrees", () => import("./clock-agrees")],
+	["no-loop", () => import("./no-loop")],
+	["notes-mapped", () => import("./notes-mapped")],
+	["written-pitch", () => import("./written-pitch")],
+	["not-notes", () => import("./not-notes")],
+	["percussion", () => import("./percussion")],
+	["ties-gates-range", () => import("./ties-gates-range")],
+	["slide-read-ahead", () => import("./slide-read-ahead")],
+	["slide-start", () => import("./slide-start")],
+	["longer-channel", () => import("./longer-channel")],
+	["repeat-tempo", () => import("./repeat-tempo")],
+	["repeat-settings", () => import("./repeat-settings")],
+	["malformed-data", () => import("./malformed-data")],
+	["driver-plays", () => import("./driver-plays")],
+	["driver-key-off", () => import("./driver-key-off")],
+	["tempo-shortfall", () => import("./tempo-shortfall")],
+	["in-force-named", () => import("./in-force-named")],
+]);

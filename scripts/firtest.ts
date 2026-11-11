@@ -38,7 +38,7 @@ import { builtInTaps, echoHazards, feedbackBefore } from "@amk/tokens/echo-hazar
 import { firOverriddenBefore, firOverriddenBy } from "@amk/tokens/fir-override";
 import { tokenize } from "@amk/tokens";
 
-import { check, summarise } from "./harness";
+import { check, section, summarise } from "./harness";
 
 const dB = (gain: number) => 20 * Math.log10(Math.max(gain, 1e-9));
 
@@ -47,7 +47,7 @@ const FLAT = [0x7f, 0, 0, 0, 0, 0, 0, 0];
 /** EchoFilter0, main.asm:3507 — $FF $08 $17 $24 $24 $17 $08 $FF. */
 const CLASSIC = [-1, 0x08, 0x17, 0x24, 0x24, 0x17, 0x08, -1];
 
-console.log("\nsigned bytes are read the way the DSP reads them");
+section("signed bytes are read the way the DSP reads them");
 {
 	check("$FF is −1", toSigned(0xff) === -1);
 	check("$7F is 127", toSigned(0x7f) === 127);
@@ -58,7 +58,7 @@ console.log("\nsigned bytes are read the way the DSP reads them");
 	check("clamping holds the register range", clampTap(500) === 127 && clampTap(-500) === -128);
 }
 
-console.log("\nthe manual's flat filter is flat");
+section("the manual's flat filter is flat");
 {
 	// $7F is 127/128, so it is a hair under unity rather than exactly at it.
 	const unity = 127 / 128;
@@ -71,7 +71,7 @@ console.log("\nthe manual's flat filter is flat");
 	check("its tilt is nil", Math.abs(describeFir(FLAT).tiltDb) < 0.1);
 }
 
-console.log("\nthe manual's low-pass filter rolls off");
+section("the manual's low-pass filter rolls off");
 {
 	// −1 + 8 + 23 + 36 + 36 + 23 + 8 − 1 = 132.
 	check("its coefficients sum to 132", CLASSIC.reduce((a, b) => a + b, 0) === 132);
@@ -108,14 +108,14 @@ console.log("\nthe manual's low-pass filter rolls off");
 	);
 }
 
-console.log("\ngain readings");
+section("gain readings");
 {
 	check("peak gain of the flat filter is unity", Math.abs(firPeakGain(FLAT) - 127 / 128) < 1e-6);
 	check("peak gain of the low-pass is its DC gain", Math.abs(firPeakGain(CLASSIC) - 132 / 128) < 1e-3);
 	check("an all-zero filter silences the echo", firPeakGain([0, 0, 0, 0, 0, 0, 0, 0]) === 0);
 }
 
-console.log("\nagainst bsnes's SPC_DSP.cpp, the emulator's own echo stage");
+section("against bsnes's SPC_DSP.cpp, the emulator's own echo stage");
 {
 	// bsnes SPC_DSP.cpp:621,629 — a buffer sample is halved on the way in and the
 	// product shifted down six, so a tap is worth c/128 and unity is Σc = 128.
@@ -149,7 +149,7 @@ console.log("\nagainst bsnes's SPC_DSP.cpp, the emulator's own echo stage");
 	);
 }
 
-console.log("\nintermediate overflow — bsnes SPC_DSP.cpp:668-678");
+section("intermediate overflow — bsnes SPC_DSP.cpp:668-678");
 {
 	// Taps 0-6 are summed and truncated to int16 (which wraps), and only then
 	// is tap 7 added and the total clamped. So the budget is over seven taps,
@@ -182,7 +182,7 @@ console.log("\nintermediate overflow — bsnes SPC_DSP.cpp:668-678");
 	}
 }
 
-console.log("\nthe echo loop");
+section("the echo loop");
 {
 	// The filter is inside the feedback path, so a repeat is scaled by
 	// EFB/128 × H each time round.
@@ -205,7 +205,7 @@ console.log("\nthe echo loop");
 	check("negative feedback counts by its size", echoStability(CLASSIC, 0xc0).loopGain > 0.4);
 }
 
-console.log("\nrepeat curves darken pass by pass");
+section("repeat curves darken pass by pass");
 {
 	const options = { fromHz: 100, toHz: 16000, points: 40 };
 	const repeats = firRepeatCurves(CLASSIC, 4, options);
@@ -224,7 +224,7 @@ console.log("\nrepeat curves darken pass by pass");
 	);
 }
 
-console.log("\ndesigning from a tone control");
+section("designing from a tone control");
 {
 	const flat = designTone({ tone: 0 });
 	check("tone 0 leaves the echo alone", describeFir(flat).shape === "flat", describeFir(flat).shape);
@@ -255,7 +255,7 @@ console.log("\ndesigning from a tone control");
 	}
 }
 
-console.log("\nfitting a drawn curve");
+section("fitting a drawn curve");
 {
 	// The fit cannot be exact with eight taps, but it must follow the shape.
 	const target = [
@@ -281,7 +281,7 @@ console.log("\nfitting a drawn curve");
 	check("no points at all is not a crash", fitToTarget([]).length === FIR_TAPS);
 }
 
-console.log("\nquantisation earns its keep");
+section("quantisation earns its keep");
 {
 	// The ±1 refinement pass must never make the fit worse than plain rounding.
 	const target = (hz: number) => (hz < 5000 ? 1 : 0.1);
@@ -304,7 +304,7 @@ console.log("\nquantisation earns its keep");
 	check("the fitted filter beats doing nothing", error(fitted) < error(FLAT), `${error(fitted)} vs ${error(FLAT)}`);
 }
 
-console.log("\npresets");
+section("presets");
 {
 	check("there are presets", FIR_PRESETS.length >= 6);
 	for (const preset of FIR_PRESETS) {
@@ -339,7 +339,7 @@ console.log("\npresets");
 	}
 }
 
-console.log("\nthe authority limit is honest");
+section("the authority limit is honest");
 {
 	// The claim the UI makes by shading below FIR_AUTHORITY_HZ is about
 	// resolution, not about level: eight taps at 32 kHz cannot put a *feature*
@@ -380,7 +380,7 @@ console.log("\nthe authority limit is honest");
 	check("the limit is where it is documented", FIR_AUTHORITY_HZ === 2000);
 }
 
-console.log("\ncurve sampling");
+section("curve sampling");
 {
 	const curve = firCurve(CLASSIC, { fromHz: 20, toHz: 16000, points: 100 });
 	check("a curve has the points asked for", curve.length === 100);
@@ -408,7 +408,7 @@ function hazards(source: string) {
 	return echoHazards(tokenize(source).commands);
 }
 
-console.log("\nrunaway echo diagnostics");
+section("runaway echo diagnostics");
 {
 	const custom = hazards(`#amk 2\n\n#0 $F1 $08 $7F $00 ${HOT}\nc4\n`);
 	check(
@@ -433,7 +433,7 @@ console.log("\nrunaway echo diagnostics");
 	check("a song with no echo at all says nothing", hazards("#amk 2\n\n#0 o4 c4 d4 e4\n").length === 0);
 }
 
-console.log("\nthe diagnostic points at the command that causes it");
+section("the diagnostic points at the command that causes it");
 {
 	const source = `#amk 2\n\n#0 $F1 $08 $7F $00 ${HOT}\nc4\n`;
 	const fir = hazards(source).find((d) => d.code === "SST0500");
@@ -450,7 +450,7 @@ console.log("\nthe diagnostic points at the command that causes it");
 	);
 }
 
-console.log("\nmultiple filters are judged one at a time");
+section("multiple filters are judged one at a time");
 {
 	// AddmusicK emits every $F5 verbatim (`Music.cpp:63`, `:1770`), so both of
 	// these run — the first under $7F feedback, the second under $20.
@@ -473,7 +473,7 @@ console.log("\nmultiple filters are judged one at a time");
 	check("two runaway filters give two diagnostics, not one", twice.filter((d) => d.code === "SST0500").length === 2);
 }
 
-console.log("\nchannels are read separately");
+section("channels are read separately");
 {
 	// Source order is execution order within a channel and nothing between them,
 	// so these two must not pair up — the same rule `fir-override.ts` enforces.
@@ -503,7 +503,7 @@ console.log("\nchannels are read separately");
 	);
 }
 
-console.log("\nthe two override views see across the first marker");
+section("the two override views see across the first marker");
 {
 	// The same rule from the other end: what a `$F1` above `#0` throws away, and
 	// what a `$F5` written there is later thrown away by.
@@ -518,7 +518,7 @@ console.log("\nthe two override views see across the first marker");
 	check("and that $F1 names the $F5 it discards", echo !== undefined && firOverriddenBefore(echo, commands) === fir);
 }
 
-console.log("\nhalf-written commands are left alone");
+section("half-written commands are left alone");
 {
 	// Three bytes into typing eight, the filter is not yet what it will be — and
 	// the flat table it is replacing keeps the $F1 above quiet, so a diagnostic
@@ -529,7 +529,7 @@ console.log("\nhalf-written commands are left alone");
 	check("an incomplete $F1 is not judged", hazards(`#amk 2\n\n#0 $F1 $08 $7F\nc4\n`).length === 0);
 }
 
-console.log("\nthe pieces the inspectors share");
+section("the pieces the inspectors share");
 {
 	const source = `#amk 2\n\n#0 $F1 $08 $60 $00 ${HOT}\nc4\n`;
 	const commands = tokenize(source).commands;

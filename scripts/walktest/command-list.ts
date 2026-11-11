@@ -1,11 +1,11 @@
 /** `walktest`: the song's command list. */
 
 import "../localize";
-import { check } from "../harness";
+import { check, section } from "../harness";
 import { build } from "./support";
 
 // ---------------------------------------------------------------------------
-console.log("\nthe song's command list");
+section("the song's command list");
 // ---------------------------------------------------------------------------
 //
 // The roll's command lane is drawn entirely from this, and it exists because the

@@ -5,12 +5,12 @@ import type { Diagnostic } from "@amk/core/types";
 import { readDriverState } from "@amk/spc/driver-state";
 import { repeatTempo } from "../../web/src/app/state/repeat-carry";
 import { driverTempo } from "@amk/tokens/commands/units";
-import { check } from "../harness";
+import { check, section } from "../harness";
 import { build } from "./support";
 import { aramInRepeat } from "./longer-channel";
 
 // ---------------------------------------------------------------------------
-console.log("\na tempo that carries over into the repeat is reported");
+section("a tempo that carries over into the repeat is reported");
 // ---------------------------------------------------------------------------
 {
 	// The driver sets `$51` only when a song starts (`main.asm:2187`), so the

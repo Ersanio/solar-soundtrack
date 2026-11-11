@@ -13,7 +13,7 @@ import {
 } from "../../web/src/app/editor/views/piano-roll/roll-edit";
 import { planGroupEdits } from "../../web/src/app/editor/views/piano-roll/roll-write/plan-edits";
 import type { Strip } from "../../web/src/app/editor/views/piano-roll/roll-strip";
-import { check } from "../harness";
+import { check, section } from "../harness";
 import {
 	apply,
 	build,
@@ -38,7 +38,7 @@ import {
 // strip's own expansion agreement is what re-joins the edited text to it. The
 // helper pins both, plus the other channels' walks whole, replays included.
 
-console.log("\nloops");
+section("loops");
 
 /** Every note of one voice as the walk plays it, pass by pass. */
 export function walked(built: Built, channel: number): string {

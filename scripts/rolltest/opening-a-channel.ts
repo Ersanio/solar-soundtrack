@@ -3,9 +3,10 @@
 import "../localize";
 import { NOTE_MIN } from "@amk/core/hardcoded-tables";
 import { REFUSE_CROWDED, REFUSE_INSIDE } from "../../web/src/app/editor/views/piano-roll/roll-edit";
+import { section } from "../harness";
 import { expectEdit, expectNoStrip, expectRefused, noteAt } from "./support";
 
-console.log("\nopening a channel");
+section("opening a channel");
 
 // The whole text, because everything about the block is the point: the `#N`, the
 // five defaults, the blank line above it, the rest that carries the note out to

@@ -1,11 +1,11 @@
 /** `walktest`: a song that does not loop. */
 
 import "../localize";
-import { check } from "../harness";
+import { check, section } from "../harness";
 import { build } from "./support";
 
 // ---------------------------------------------------------------------------
-console.log("\na song that does not loop");
+section("a song that does not loop");
 // ---------------------------------------------------------------------------
 {
 	const { result, timeline } = build("#amk 4\n#option noloop\n#0 o4 c4d4e4f4\n");

@@ -2,11 +2,11 @@
 
 import "../localize";
 import { walkSong } from "@amk/spc/song-walk";
-import { check } from "../harness";
+import { check, section } from "../harness";
 import { ARAM, build } from "./support";
 
 // ---------------------------------------------------------------------------
-console.log("\nmalformed data is contained, not thrown");
+section("malformed data is contained, not thrown");
 // ---------------------------------------------------------------------------
 {
 	// `*` before any `[ ]` emits `$E9 FF FF n` on purpose (`parser.ts:2564-2573`,

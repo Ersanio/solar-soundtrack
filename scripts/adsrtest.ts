@@ -43,9 +43,9 @@ import {
 import { type DriverManifest, UPLOAD_HEADER_BYTES } from "@amk/spc/driver";
 import { readInstrumentTables } from "@amk/spc/instruments";
 
-import { SPC_ASSETS, check, summarise } from "./harness";
+import { SPC_ASSETS, check, section, summarise } from "./harness";
 
-console.log("\nCLOCKS, checked against the published noise ladder");
+section("CLOCKS, checked against the published noise ladder");
 {
 	// The SNES noise frequencies for NCK $00-$1F, as documented for the DSP's FLG
 	// register. Independent of everything else here.
@@ -68,7 +68,7 @@ console.log("\nCLOCKS, checked against the published noise ladder");
 	check("the fastest clock is the sample rate", noiseHz(0x1f) === 32000);
 }
 
-console.log("\nthe readme's magic tables are bsnes's step counts");
+section("the readme's magic tables are bsnes's step counts");
 {
 	// readme:68 and :78. These are the numbers the closed forms scale by, and
 	// they are asserted here to be the number of DSP steps the fall really takes.
@@ -111,7 +111,7 @@ console.log("\nthe readme's magic tables are bsnes's step counts");
 	check("every release step count matches", release);
 }
 
-console.log("\nphase durations");
+section("phase durations");
 {
 	// The readme's own closed form, which agrees with the DSP for attack 0-14.
 	const readmeAttack = (a: number) => (CLOCKS[a * 2 + 1] * 64) / 32000;
@@ -147,7 +147,7 @@ console.log("\nphase durations");
 	check("sustain level is (s+1)/8", levels);
 }
 
-console.log("\nthe stepped envelope");
+section("the stepped envelope");
 {
 	const envelope = decodeAdsr(0xfe, 0x6a);
 	check("$FE $6A decodes to attack 14, decay 7", envelope.attack === 14 && envelope.decay === 7);
@@ -178,7 +178,7 @@ console.log("\nthe stepped envelope");
 	check("and terminates", held.length > 1 && held.length < 10000);
 }
 
-console.log("\nGAIN");
+section("GAIN");
 {
 	check("a byte under $80 is a fixed level", decodeGain(0x7f).mode === "direct");
 	check("$7F is full volume", decodeGain(0x7f).level === 1);
@@ -203,7 +203,7 @@ console.log("\nGAIN");
 	check("a rate of 0 still returns a curve", envelopeGain(0x80).length >= 2);
 }
 
-console.log("\ntuning");
+section("tuning");
 {
 	check("$03.$00 is a plain multiplier", tuningMultiplier(3, 0) === 3);
 	check("the sub-byte is /256", tuningMultiplier(1, 0x80) === 1.5);
@@ -211,7 +211,7 @@ console.log("\ntuning");
 	check("unity is no shift", tuningSemitones(1) === 0);
 }
 
-console.log("\nthe stock table decodes");
+section("the stock table decodes");
 {
 	const driverDir = join(SPC_ASSETS, "driver");
 	const manifest = JSON.parse(readFileSync(join(driverDir, "manifest.json"), "utf8")) as DriverManifest;
@@ -357,7 +357,7 @@ function nearestNoiseClock(hz: number): number {
 	return nearestBy(32, hz, noiseHz, 1);
 }
 
-console.log("\nthe inverses round-trip");
+section("the inverses round-trip");
 {
 	// A round trip is a real assertion rather than a tautology — it catches a
 	// transposed nibble shift, a swapped field and a tie broken the wrong way —
@@ -453,7 +453,7 @@ console.log("\nthe inverses round-trip");
 	);
 }
 
-console.log("\nthe envelope tuner's presets are the times they claim");
+section("the envelope tuner's presets are the times they claim");
 {
 	// The six preset buttons name a shape — "Pluck", "Pad" — and the byte pairs
 	// behind them were derived from the functions above rather than picked to

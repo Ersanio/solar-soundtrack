@@ -1,11 +1,11 @@
 /** `walktest`: the pitch slide a note reads ahead into. */
 
 import "../localize";
-import { check } from "../harness";
+import { check, section } from "../harness";
 import { build } from "./support";
 
 // ---------------------------------------------------------------------------
-console.log("\nthe pitch slide a note reads ahead into");
+section("the pitch slide a note reads ahead into");
 // ---------------------------------------------------------------------------
 {
 	// `$DD` is not dispatched — the note before it picks it up by peeking at the

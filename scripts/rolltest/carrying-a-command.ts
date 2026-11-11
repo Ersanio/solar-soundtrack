@@ -7,7 +7,7 @@ import {
 	REFUSE_MOVE_LOOPED,
 	REFUSE_MOVE_REMOTE,
 } from "../../web/src/app/editor/views/piano-roll/roll-command-move";
-import { check } from "../harness";
+import { check, section } from "../harness";
 import { build, expectMove, expectNoMove, strip } from "./support";
 
 // --- carrying a command to another tick -------------------------------------
@@ -20,7 +20,7 @@ import { build, expectMove, expectNoMove, strip } from "./support";
 // the text alone cannot say — `p12,147` written before a rest and written before
 // the note after it look equally plausible and are 64 ticks apart.
 
-console.log("\ncarrying a command");
+section("carrying a command");
 
 /** `a=27` is 27 ticks, so the `p` runs at 27 — a tick no note begins on. */
 const VIBRATO_SONG = "#amk 4\n\n#0 t53,245 o4 q7F @0\no4 a=27 p12,147 r3 c3\n";

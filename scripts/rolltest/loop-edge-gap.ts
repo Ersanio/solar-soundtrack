@@ -10,7 +10,7 @@ import {
 } from "../../web/src/app/editor/views/piano-roll/roll-edit";
 import { gapSlack, openGap } from "../../web/src/app/editor/views/piano-roll/roll-write/loop-edits";
 import type { Strip } from "../../web/src/app/editor/views/piano-roll/roll-strip";
-import { check } from "../harness";
+import { check, section } from "../harness";
 import { apply, build, type Expectation, introOf, listOf, playable, strip, tailsOf } from "./support";
 import { walked, walkedOthers } from "./loops";
 
@@ -22,7 +22,7 @@ import { walked, walkedOthers } from "./loops";
 // `openGap` is the whole write; `gapSlack` is the shared clamp a leftward drag
 // and the commit both go through.
 
-console.log("\nthe loop box's edge opens a gap");
+section("the loop box's edge opens a gap");
 
 /** The press's own resolution: the construct item and the run pass starting at `grab`. */
 export function grabEdge(bar: Strip, grab: number): { item: number; run: LoopRun; pass: number } | null {

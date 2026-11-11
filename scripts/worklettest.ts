@@ -26,7 +26,7 @@ import { loadDriver } from "@amk/spc/driver";
 import { buildSpc } from "@amk/spc/export";
 import type { FromWorklet, ToWorklet } from "@amk/spc/protocol";
 
-import { SPC_ASSETS, check, stubFetch, summarise } from "./harness";
+import { SPC_ASSETS, check, section, stubFetch, summarise } from "./harness";
 
 stubFetch();
 
@@ -178,7 +178,7 @@ const bundlePath = join(SPC_ASSETS, "player", "spc-worklet.js");
 const bundle = readFileSync(bundlePath, "utf8");
 const wasm = new Uint8Array(readFileSync(join(SPC_ASSETS, "player", "spc.wasm")));
 
-console.log("\nthe bundle survives a worklet scope");
+section("the bundle survives a worklet scope");
 const { processor, port, sent } = loadProcessor(bundle, wasm);
 check("it registers a processor and constructs", true);
 check(
@@ -190,7 +190,7 @@ check(
 		.join("; "),
 );
 
-console.log("\nit reaches for nothing the audio thread lacks");
+section("it reaches for nothing the audio thread lacks");
 {
 	// A worklet scope has none of these. Catching them here rather than in the
 	// browser is the whole point of this file.
@@ -214,13 +214,13 @@ console.log("\nit reaches for nothing the audio thread lacks");
 	}
 }
 
-console.log("\nsilence before a song is loaded");
+section("silence before a song is loaded");
 {
 	const samples = render(processor, 8);
 	check("output is silent while idle", peak(samples) === 0, `peak ${peak(samples)}`);
 }
 
-console.log("\na loaded song renders audio through the resampler");
+section("a loaded song renders audio through the resampler");
 {
 	port.onmessage!({
 		data: { type: "load", spc, atTicks: 0, introTicks: 0, loopTicks: 0, fadeSeconds: 0, songLoops: true, epoch: 1 },
@@ -246,7 +246,7 @@ console.log("\na loaded song renders audio through the resampler");
 	);
 }
 
-console.log("\npause and resume");
+section("pause and resume");
 {
 	port.onmessage!({ data: { type: "paused", paused: true } });
 	const quiet = render(processor, 20);
@@ -257,7 +257,7 @@ console.log("\npause and resume");
 	check("resuming brings it back", peak(loud) > 0.01, `peak ${peak(loud).toFixed(4)}`);
 }
 
-console.log("\nseeking lands on the tick it was asked for");
+section("seeking lands on the tick it was asked for");
 {
 	port.onmessage!({ data: { type: "seek", ticks: 0, epoch: 2 } });
 	const fromStart = render(processor, 100);
@@ -339,7 +339,7 @@ function restart(over: Partial<Extract<ToWorklet, { type: "load" }>> = {}, loop 
 	return { processor, sent };
 }
 
-console.log("\nthe end of a song is reported");
+section("the end of a song is reported");
 {
 	const { processor: fresh, sent: freshSent } = restart();
 
@@ -353,7 +353,7 @@ console.log("\nthe end of a song is reported");
 	check("nothing is rendered after the end", peak(after) === 0, `peak ${peak(after)}`);
 }
 
-console.log("\nthe playhead is counted off the driver, not predicted");
+section("the playhead is counted off the driver, not predicted");
 {
 	const { processor: fresh, sent: freshSent } = restart({ loopTicks: 0 }); // no end, so it runs freely
 	render(fresh, 900);
@@ -390,7 +390,7 @@ console.log("\nthe playhead is counted off the driver, not predicted");
 	);
 }
 
-console.log("\nand off whichever voice the song plays");
+section("and off whichever voice the song plays");
 {
 	// The same music on `#1` alone. The count starts once a voice is latched off
 	// the driver's track pointers — through the moments it holds `$30` pointing
@@ -420,7 +420,7 @@ console.log("\nand off whichever voice the song plays");
 	);
 }
 
-console.log("\nlooping leaves the song running for the emulator to repeat");
+section("looping leaves the song running for the emulator to repeat");
 {
 	const { processor: fresh, sent: freshSent } = restart({}, true);
 
@@ -440,7 +440,7 @@ console.log("\nlooping leaves the song running for the emulator to repeat");
 	);
 }
 
-console.log("\nand a song of one-tick notes stays in phase with it");
+section("and a song of one-tick notes stays in phase with it");
 {
 	// The fold is `ticks % loopTicks` against the compiler's count, so a counter
 	// that runs slow does not wobble — it walks away, further every pass. A note
@@ -471,7 +471,7 @@ console.log("\nand a song of one-tick notes stays in phase with it");
 	);
 }
 
-console.log("\nunticking loop finishes the pass rather than cutting out");
+section("unticking loop finishes the pass rather than cutting out");
 {
 	const { processor: fresh, sent: freshSent } = restart({}, true);
 
@@ -491,7 +491,7 @@ console.log("\nunticking loop finishes the pass rather than cutting out");
 	);
 }
 
-console.log("\na song with no loop point is restarted by hand");
+section("a song with no loop point is restarted by hand");
 {
 	const { processor: fresh, sent: freshSent } = restart({ songLoops: false }, true);
 
@@ -502,7 +502,7 @@ console.log("\na song with no loop point is restarted by hand");
 	check("and the count itself restarts", last.ticks < LOOP_TICKS, `${last.ticks} ticks`);
 }
 
-console.log("\nmuting a channel without breaking stride");
+section("muting a channel without breaking stride");
 {
 	// Two channels, so muting one leaves something to hear. The claim under test
 	// is that the mask reaches the driver through the port and the song carries

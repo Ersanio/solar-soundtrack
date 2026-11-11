@@ -442,7 +442,11 @@ export function expectEdit(
 	}
 
 	if (expectation.text !== undefined) {
-		check(`${name}: writes what it should`, after === expectation.text, JSON.stringify(after));
+		check(
+			`${name}: writes what it should`,
+			after === expectation.text,
+			`expected ${JSON.stringify(expectation.text)}\n        got      ${JSON.stringify(after)}`,
+		);
 	}
 
 	for (const wanted of listOf(expectation.contains)) {

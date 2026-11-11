@@ -2,11 +2,11 @@
 
 import "../localize";
 import { NOTE_DURATIONS, noteSoundingTicks, WAIT_TIME } from "@amk/core/hardcoded-tables";
-import { check } from "../harness";
+import { check, section } from "../harness";
 import { build } from "./support";
 
 // ---------------------------------------------------------------------------
-console.log("\nties, gates and the pitched range");
+section("ties, gates and the pitched range");
 // ---------------------------------------------------------------------------
 {
 	const tied = build("#amk 4\n#0 o4 c1^1^1^1 d4\n").timeline;

@@ -2,12 +2,12 @@
 
 import "../localize";
 import { songClock } from "../../web/src/app/state/song-clock";
-import { check } from "../harness";
+import { check, section } from "../harness";
 import { build } from "./support";
 import { CORPUS } from "./song-length";
 
 // ---------------------------------------------------------------------------
-console.log("\nthe clock and the compiler agree about the songs the compiler can time");
+section("the clock and the compiler agree about the songs the compiler can time");
 // ---------------------------------------------------------------------------
 {
 	// The clock is the only thing that can time a faded song, so nothing can

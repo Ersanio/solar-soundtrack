@@ -2,9 +2,10 @@
 
 import "../localize";
 import { NOTE_MIN } from "@amk/core/hardcoded-tables";
+import { section } from "../harness";
 import { expectEdit, noteAt } from "./support";
 
-console.log("\npast the end of the song");
+section("past the end of the song");
 
 // A note past the shortest channel is written, compiled and never heard — see
 // `padChannels` for why. Every channel that would cut the song short is padded

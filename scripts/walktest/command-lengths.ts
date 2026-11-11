@@ -4,11 +4,11 @@ import "../localize";
 import { FIRST_VCMD, LAST_VCMD } from "@amk/core/hardcoded-tables";
 import { expectedArgs } from "@amk/tokens";
 import { vcmdLength } from "@amk/spc/song-walk";
-import { check } from "../harness";
+import { check, section } from "../harness";
 import { DEFAULT_TARGET } from "./support";
 
 // ---------------------------------------------------------------------------
-console.log("both packages agree on how long a command is");
+section("both packages agree on how long a command is");
 // ---------------------------------------------------------------------------
 {
 	const args = (values: number[]) => values.map((value) => ({ value }));

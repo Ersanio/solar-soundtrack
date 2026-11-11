@@ -38,7 +38,7 @@ import {
 	VOICES,
 } from "@amk/spc/driver-state";
 
-import { SPC_ASSETS, check, stubFetch, summarise } from "./harness";
+import { SPC_ASSETS, check, section, stubFetch, summarise } from "./harness";
 
 stubFetch();
 
@@ -194,11 +194,11 @@ function renderMuted(spc: Uint8Array, warmup: number, frames: number, maskAt: (f
 	return out.subarray(0, written);
 }
 
-console.log("\nemulator boots");
+section("emulator boots");
 const emu = instantiate(new WebAssembly.Module(readFileSync(join(SPC_ASSETS, "player", "spc.wasm"))));
 check("wasm instantiated and main() ran", true);
 
-console.log("\na compiled song actually makes sound");
+section("a compiled song actually makes sound");
 {
 	const spc = compileToSpc(`#amk 4
 #0 t40 o4 v220 q7F @0 l8 c d e f g4 e4 c4 r4
@@ -221,7 +221,7 @@ console.log("\na compiled song actually makes sound");
 	check("right channel has signal", rms(Int16Array.from(right)) > 0.001);
 }
 
-console.log("\nsilence really is silent (control)");
+section("silence really is silent (control)");
 {
 	// Rests only: proves the non-silence check above is measuring our song and
 	// not some artefact of the driver or leftover state.
@@ -232,7 +232,7 @@ console.log("\nsilence really is silent (control)");
 	check("a song of rests produces near-silence", peak(samples) < 0.01, `peak ${peak(samples).toFixed(4)}`);
 }
 
-console.log("\nnotes differ audibly from each other");
+section("notes differ audibly from each other");
 {
 	const render = (mml: string) => {
 		emu.loadSpc(compileToSpc(mml));
@@ -263,7 +263,7 @@ console.log("\nnotes differ audibly from each other");
 	);
 }
 
-console.log("\nfast-forward lands somewhere different");
+section("fast-forward lands somewhere different");
 {
 	const spc = compileToSpc(`#amk 4
 #0 t40 o4 v220 q7F @0 l8 c d e f g a b > c < b a g f e d c r
@@ -287,7 +287,7 @@ console.log("\nfast-forward lands somewhere different");
 	check("still audible after skipping", peak(fromThree) > 0.005, `peak ${peak(fromThree).toFixed(4)}`);
 }
 
-console.log("\nmuting takes the volume and nothing else");
+section("muting takes the volume and nothing else");
 {
 	// A pure check of the bookkeeping, with no emulator involved. `$5E`, the
 	// driver's own mute register, is deliberately never written: disabling a
@@ -320,7 +320,7 @@ console.log("\nmuting takes the volume and nothing else");
 	check("a volume set during the mute survives it", aram[0x0241 + 2 * 1] === 90, `got ${aram[0x0241 + 2 * 1]}`);
 }
 
-console.log("\nmuting a channel takes it out of the mix");
+section("muting a channel takes it out of the mix");
 {
 	// Two clearly different parts, so muting either one is audible in the level
 	// rather than just in the bytes.
@@ -358,7 +358,7 @@ console.log("\nmuting a channel takes it out of the mix");
 	check("an unmuted render is unchanged", rms(render(0b00)).toFixed(6) === rms(both).toFixed(6));
 }
 
-console.log("\na muted channel goes on carrying the song");
+section("a muted channel goes on carrying the song");
 {
 	// The whole point of muting at the driver rather than by blanking the
 	// channel's pointer. Everything song-global here lives in `#0`: the tempo,
@@ -458,7 +458,7 @@ console.log("\na muted channel goes on carrying the song");
 	);
 }
 
-console.log("\nmuting does not change how fast the song plays");
+section("muting does not change how fast the song plays");
 {
 	// The reason `applyChannelMutes` leaves `$5E` alone. The driver's main loop
 	// handles at most one music tick per pass, so a song already at that ceiling
@@ -516,7 +516,7 @@ console.log("\nmuting does not change how fast the song plays");
 	}
 }
 
-console.log("\nmuting cuts a note that is already ringing");
+section("muting cuts a note that is already ringing");
 {
 	// `$5E` alone only stops the *next* note; the volume has to be taken too.
 	// One very long note, muted a third of the way in, so anything still audible
@@ -542,7 +542,7 @@ console.log("\nmuting cuts a note that is already ringing");
 	);
 }
 
-console.log("\nunmuting gives the channel its volume back");
+section("unmuting gives the channel its volume back");
 {
 	const source = "#amk 4\n#0 t60 v220 @0 o4 q7D l8 [c d e f]8\n";
 	const spc = compileToSpc(source);
@@ -568,7 +568,7 @@ console.log("\nunmuting gives the channel its volume back");
 	);
 }
 
-console.log("\na song-declared sample set still plays");
+section("a song-declared sample set still plays");
 {
 	// One sample instead of twenty. If the writer had fallen back to the driver's
 	// set, the directory would be wrong and this would still make noise — so the
@@ -581,7 +581,7 @@ console.log("\na song-declared sample set still plays");
 	check("a one-sample song is audible", peak(samples) > 0.01, `peak ${peak(samples).toFixed(4)}`);
 }
 
-console.log("\na custom instrument resolves in the emulator");
+section("a custom instrument resolves in the emulator");
 {
 	// The only end-to-end proof that `@30` works: the driver has to find the
 	// instrument table via zero-page $6C, which it only sets while loading a song.
@@ -624,7 +624,7 @@ console.log("\na custom instrument resolves in the emulator");
 	check("@31 is audible with two entries defined", peak(emu.render(32000)) > 0.01);
 }
 
-console.log("\noptimizeSampleUsage does not silence the song");
+section("optimizeSampleUsage does not silence the song");
 {
 	// The pass replaces unplayed samples with a zero-length one. If usage tracking
 	// missed anything, the SPC still looks valid and simply goes quiet — so this
@@ -718,7 +718,7 @@ console.log("\noptimizeSampleUsage does not silence the song");
 	check("a sample selected by raw $DA survives optimisation", peak(emu.render(32000)) > 0.01);
 }
 
-console.log("\na .bnk sample bank plays through the emulator");
+section("a .bnk sample bank plays through the emulator");
 {
 	// The decisive check for banks. A wrong slot walk, a wrong loop offset or a
 	// directory that disagrees with the data all produce noise or silence rather
@@ -810,7 +810,7 @@ console.log("\na .bnk sample bank plays through the emulator");
 	);
 }
 
-console.log("\nthe loop really lasts as long as the compiler says");
+section("the loop really lasts as long as the compiler says");
 {
 	/**
 	 * Times a song's loop against the emulator.
@@ -890,7 +890,7 @@ console.log("\nthe loop really lasts as long as the compiler says");
 	}
 }
 
-console.log("\nthe driver's own ticks are counted exactly");
+section("the driver's own ticks are counted exactly");
 {
 	// This is what the playhead runs on, so it has to be exact rather than close:
 	// an error of one tick a pass is a progress bar that walks away from the music.
@@ -1017,7 +1017,7 @@ console.log("\nthe driver's own ticks are counted exactly");
 	);
 }
 
-console.log("\nthe music tick is the driver's own accumulator overflow");
+section("the music tick is the driver's own accumulator overflow");
 {
 	// `main.asm:220-238`. A pass of the main loop multiplies the tempo by timer
 	// 0's count, adds it to `$49`, and plays a tick if that carried *or* if the
@@ -1062,7 +1062,7 @@ console.log("\nthe music tick is the driver's own accumulator overflow");
 	check("a stopped song never ticks", gate(0, keepingUp) === 0);
 }
 
-console.log("\nthe voice the count is latched on is one the driver plays");
+section("the voice the count is latched on is one the driver plays");
 {
 	// The playhead starts counting on the first poll that finds a voice — from
 	// the moment the SPC loads, as `worklet.ts` and `measure-clock.ts` do it. At
@@ -1106,7 +1106,7 @@ console.log("\nthe voice the count is latched on is one the driver plays");
 	check("to the same count as the same music on #0", one.ticks === zero.ticks, `${one.ticks} against ${zero.ticks}`);
 }
 
-console.log("\nthe note map lands on what the driver is playing");
+section("the note map lands on what the driver is playing");
 {
 	// A loop, so the loop block is exercised: while a voice is inside `[ ]` its
 	// track pointer walks channel 8's bytes, and the map must resolve them.
@@ -1176,7 +1176,7 @@ console.log("\nthe note map lands on what the driver is playing");
 	check("the loop body was seen playing from the loop block", inLoopBlock > 0, `${inLoopBlock} polls`);
 }
 
-console.log("\none note, auditioned where the song is playing");
+section("one note, auditioned where the song is playing");
 {
 	const identical = (a: Int16Array | Uint8Array, b: Int16Array | Uint8Array): boolean => {
 		if (a.length !== b.length) {
@@ -1488,8 +1488,8 @@ console.log("\none note, auditioned where the song is playing");
 	};
 
 	// The other channels are parked rather than halted, so they play on under the
-	// note and a mask takes a whole channel out of what is heard — where it used
-	// to reach the echo buffer and nothing else.
+	// note and a mask takes a whole channel out of what is heard, not only out of
+	// the echo buffer.
 	const dryDiff = diffRms(heard(dry, 0).pcm, heard(dry, 0b10).pcm);
 	check(
 		"which is a whole channel and not a few cycles",
@@ -1499,10 +1499,10 @@ console.log("\none note, auditioned where the song is playing");
 
 	// The mask is still held through the fast-forward, which is what keeps a
 	// silenced channel out of the echo buffer the note lands on — the reason it is
-	// passed to `fastForward` at all. There is no check isolating that any more:
-	// the same mask now takes the channel out of what is heard directly, which is
-	// far the larger of the two, and a song contrived to separate them would be
-	// measuring the instrument's release as much as the buffer.
+	// passed to `fastForward` at all. No check isolates that: the same mask takes
+	// the channel out of what is heard directly, which is far the larger of the
+	// two, and a song contrived to separate them would be measuring the
+	// instrument's release as much as the buffer.
 
 	// `$5E` is still untouched, so the driver's work per pass is unchanged and the
 	// fast-forward arrives at the same tick. Exact, because this song has slack
@@ -1524,7 +1524,7 @@ console.log("\none note, auditioned where the song is playing");
 	check("and a masked audition still leaves the image alone", identical(wetPristine, wet));
 }
 
-console.log("\nthat note with the rest of the song under it");
+section("that note with the rest of the song under it");
 {
 	const identical = (a: Int16Array | Uint8Array, b: Int16Array | Uint8Array): boolean => {
 		if (a.length !== b.length) {
@@ -1599,7 +1599,7 @@ console.log("\nthat note with the rest of the song under it");
 	check("and none of it writes to the image", identical(pristine, spc));
 }
 
-console.log("\nthat note handed over on a tick the whole song fetches on");
+section("that note handed over on a tick the whole song fetches on");
 {
 	const identical = (a: Int16Array, b: Int16Array): boolean => {
 		if (a.length !== b.length) {
@@ -1726,7 +1726,7 @@ console.log("\nthat note handed over on a tick the whole song fetches on");
 	);
 }
 
-console.log("\nthat note sliding, as the $DD riding on it says");
+section("that note sliding, as the $DD riding on it says");
 {
 	const identical = (a: Int16Array | Uint8Array, b: Int16Array | Uint8Array): boolean => {
 		if (a.length !== b.length) {

@@ -8,11 +8,11 @@ import { buildSpc } from "@amk/spc/export";
 import { readDriverState } from "@amk/spc/driver-state";
 import { emptySample } from "@amk/spc/brr";
 import { instantiate, SPC_SAMPLE_RATE } from "@amk/spc/wasm-host";
-import { check, SPC_ASSETS } from "../harness";
+import { SPC_ASSETS, check, section } from "../harness";
 import { build, BY_NAME, driver } from "./support";
 
 // ---------------------------------------------------------------------------
-console.log("\nthe driver plays what the walk says it will");
+section("the driver plays what the walk says it will");
 // ---------------------------------------------------------------------------
 {
 	const source = "#amk 4\n#0 t54 v200 @0 o4 q7F [c8 d8 e8]4 g2\n#1 v180 @1 o3 q7F c1c1\n";

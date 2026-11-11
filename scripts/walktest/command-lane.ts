@@ -4,11 +4,11 @@ import "../localize";
 import { tokenize } from "@amk/tokens";
 import { commandsInForceOf, noteHeardOn } from "../../web/src/app/state/commands-in-force";
 import { commandTimeline } from "../../web/src/app/state/command-timeline";
-import { check } from "../harness";
+import { check, section } from "../harness";
 import { build } from "./support";
 
 // ---------------------------------------------------------------------------
-console.log("\nwhat the roll's command lane holds");
+section("what the roll's command lane holds");
 // ---------------------------------------------------------------------------
 //
 // The rule itself, end to end: the walk's list, the compiler's command map, the

@@ -1,11 +1,12 @@
 /** `rolltest`: what the strip will and will not read. */
 
 import "../localize";
+import { section } from "../harness";
 import { expectEdit, expectNoStrip, noteAt } from "./support";
 
 // --- what the strip will and will not read ---------------------------------
 
-console.log("\nthe gate");
+section("the gate");
 expectNoStrip("a triplet", "#amk 2\n#0 o4 {c8 d8 e8} f4", 0, "{ }");
 expectNoStrip("a replacement", '#amk 2\n"x=c4"\n#0 o4 x d4', 0, "replacement");
 expectNoStrip("a tempo ratio", "#amk 2\n#halvetempo\n#0 o4 c4 d4", 0, "divides its tempo");

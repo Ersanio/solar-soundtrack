@@ -98,7 +98,7 @@ import {
 } from "../web/src/app/state/transport-view";
 import { clamp } from "../web/src/app/util/math";
 
-import { check, summarise } from "./harness";
+import { check, section, summarise } from "./harness";
 
 const OPTS = { width: 600, gap: 2, minWidth: 3 };
 const EPSILON = 1e-6;
@@ -116,7 +116,7 @@ const place = (values: number[], options = OPTS) =>
  */
 const REALISTIC = [10646, 700, 21000, 29094, 4096];
 
-console.log("\nevery region that exists stays visible");
+section("every region that exists stays visible");
 {
 	for (const songBytes of [1, 120, 218, 700]) {
 		const placed = place([10646, songBytes, 21000, 29794 - songBytes, 4096]);
@@ -133,7 +133,7 @@ console.log("\nevery region that exists stays visible");
 	);
 }
 
-console.log("\nthe floor is paid for by donors, not by the total");
+section("the floor is paid for by donors, not by the total");
 {
 	const placed = place(REALISTIC);
 	const last = placed[placed.length - 1];
@@ -152,14 +152,14 @@ console.log("\nthe floor is paid for by donors, not by the total");
 	);
 }
 
-console.log("\nproportions survive where no floor is needed");
+section("proportions survive where no floor is needed");
 {
 	const placed = place([1, 1, 2]);
 	check("equal values get equal widths", Math.abs(placed[0].width - placed[1].width) < EPSILON);
 	check("a doubled value gets double the width", Math.abs(placed[2].width - placed[0].width * 2) < EPSILON);
 }
 
-console.log("\ndegenerate input produces no geometry rather than bad geometry");
+section("degenerate input produces no geometry rather than bad geometry");
 {
 	check("no segments", place([]).length === 0);
 	check("all values zero", place([0, 0]).length === 0);
@@ -176,7 +176,7 @@ console.log("\ndegenerate input produces no geometry rather than bad geometry");
 	check("a cramped bar does not overflow", end.x + end.width <= 20 + EPSILON, `${(end.x + end.width).toFixed(2)}`);
 }
 
-console.log("\nthe plot space reads back as its own viewBox");
+section("the plot space reads back as its own viewBox");
 {
 	check("the shared plot is 320 by 120", PLOT.w === 320 && PLOT.h === 120, `${PLOT.w}x${PLOT.h}`);
 	check("its box states the same numbers", PLOT.box === `0 0 ${PLOT.w} ${PLOT.h}`, PLOT.box);
@@ -184,7 +184,7 @@ console.log("\nthe plot space reads back as its own viewBox");
 	check("a taller plot keeps the width", plot(320, 150).box === "0 0 320 150", plot(320, 150).box);
 }
 
-console.log("\nclamp holds a value inside its bounds");
+section("clamp holds a value inside its bounds");
 {
 	check("inside is untouched", clamp(5, 0, 10) === 5);
 	check("below floors", clamp(-1, 0, 10) === 0);
@@ -196,7 +196,7 @@ console.log("\nclamp holds a value inside its bounds");
 	check("an inverted range answers with max", clamp(5, 10, 0) === 0, String(clamp(5, 10, 0)));
 }
 
-console.log("\npiano roll lanes");
+section("piano roll lanes");
 {
 	// The whole point of fitting: a song that lives in one octave should not be
 	// drawn against seventy rows, most of them empty.
@@ -292,7 +292,7 @@ console.log("\npiano roll lanes");
 	check("a song with no notes still draws a keyboard", empty.lanes.length === KEY_COUNT);
 }
 
-console.log("\npiano roll window and grid");
+section("piano roll window and grid");
 {
 	// The window is snapped outward to a whole note so the mark list rebuilds a
 	// couple of times per screen rather than on every frame of a scroll.
@@ -370,7 +370,7 @@ console.log("\npiano roll window and grid");
 	check("and no beats in a bar is the grid switched off", gridLines(0, 384, 48, 0).length === 0);
 }
 
-console.log("\nthe ladder the wheel walks while a note is being drawn");
+section("the ladder the wheel walks while a note is being drawn");
 {
 	// Fourteen rungs, one per denominator that divides a whole note exactly, so
 	// every one of them is an `l` the roll can write without dots or `=N`. The
@@ -410,7 +410,7 @@ console.log("\nthe ladder the wheel walks while a note is being drawn");
 	);
 }
 
-console.log("\nthe roll's pages");
+section("the roll's pages");
 {
 	// The paged view holds the music still and sweeps the playhead across it,
 	// turning over once the playhead reaches PAGE_TURN_AT and moving PAGE_STEP of
@@ -593,7 +593,7 @@ console.log("\nthe roll's pages");
 	check("every page is inside the window the marks are built for", uncovered === "", uncovered);
 }
 
-console.log("\nthe roll's playhead marks the song, not the camera");
+section("the roll's playhead marks the song, not the camera");
 {
 	// `lead` is where the camera holds the playhead, and the transform is the same
 	// fraction run the other way — so while the roll is *on* the song, the line is
@@ -663,7 +663,7 @@ console.log("\nthe roll's playhead marks the song, not the camera");
 	);
 }
 
-console.log("\nthe overview bar's time axis");
+section("the overview bar's time axis");
 {
 	// The bar holds the whole song and nothing else, so a drag on it is a mapping
 	// and its inverse. The inverse has to be exact: the view goes where the box
@@ -715,7 +715,7 @@ console.log("\nthe overview bar's time axis");
 	check("and so does an unmeasured pane", overviewOffset(50, TICKS, 0) === 0 && overviewTick(50, TICKS, 0) === 0);
 }
 
-console.log("\nthe overview bar's minimap");
+section("the overview bar's minimap");
 {
 	// A bar's colour is which channel it is, so the dedupe that keeps a dense song
 	// inside the DOM has to keep the channels apart. Everything here is invisible
@@ -836,7 +836,7 @@ console.log("\nthe overview bar's minimap");
 	check("and there are never more bars than notes", bars.length <= dense.length, `${bars.length} of ${dense.length}`);
 }
 
-console.log("\nthe loop regions behind the bars");
+section("the loop regions behind the bars");
 {
 	// The declared/recalled reading is invisible in a screenshot the same way the
 	// minimap's key is: a recall classified as a declaration draws the dashed box
@@ -1054,7 +1054,7 @@ console.log("\nthe loop regions behind the bars");
 	);
 }
 
-console.log("\nthe label on a selected loop");
+section("the label on a selected loop");
 {
 	// None of this is visible in a screenshot either: a label drawn for a body
 	// nothing selected, or for a `*` that names no body, reads as the roll
@@ -1129,7 +1129,7 @@ console.log("\nthe label on a selected loop");
 	check("and it sits in the box's top-left corner", zoomed[0].x === 3 && zoomed[0].y === 3, JSON.stringify(zoomed[0]));
 }
 
-console.log("\nthe loop boxes following a gesture");
+section("the loop boxes following a gesture");
 {
 	// A box that stays where the compiled song put it while the notes it is drawn
 	// round move out from under it says the loop is somewhere it is not, and
@@ -1339,7 +1339,7 @@ console.log("\nthe loop boxes following a gesture");
 	check("a body three deep is reached by every box above it", down(deep) === "98+64 118+44 138+24", down(deep));
 }
 
-console.log("\nthe pull at the end of the scrub bar");
+section("the pull at the end of the scrub bar");
 {
 	// A scrub can only ask for a tick that is on screen, so a drag held off the
 	// end has to take the view with it. The middle must be dead still: a pull that
@@ -1375,7 +1375,7 @@ console.log("\nthe pull at the end of the scrub bar");
 	check("and an unmeasured pane answers 0 rather than NaN", edgeUrgency(50, 0) === 0);
 }
 
-console.log("\nthe playhead's own clock");
+section("the playhead's own clock");
 {
 	const RATE = 95.7; // t48
 	const FRAME = 1 / 60;
@@ -1495,7 +1495,7 @@ console.log("\nthe playhead's own clock");
 	);
 }
 
-console.log("\npercussion is a preference, not a rule");
+section("percussion is a preference, not a rule");
 {
 	/** The driver's own notes for `@21` and `@29`, decoded from `main.bin`. */
 	const DRUM_NOTES = new Map([
@@ -1652,7 +1652,7 @@ console.log("\npercussion is a preference, not a rule");
 	check("and a drag's fractional pixel is rounded off", Number.isInteger(clampLaneHeight(LANE_HEIGHT + 7.4)));
 }
 
-console.log("\nthe transport's clock, over songs the compiler will not time");
+section("the transport's clock, over songs the compiler will not time");
 {
 	/** Only the four fields `songClock` reads; the rest is padding. */
 	const song = (ticks: number, tempoChanges: TempoChange[] = [], truncated = false): SongTimeline => ({
@@ -1779,7 +1779,7 @@ console.log("\nthe transport's clock, over songs the compiler will not time");
 	check("which follows a tempo change", near(ticksPerSecondAt(rate, 300), 1 / driverTickSeconds(97)));
 }
 
-console.log("\nthe roll's playhead follows the music, not the tempo it was written at");
+section("the roll's playhead follows the music, not the tempo it was written at");
 {
 	// The driver runs at most one tick per pass of its main loop, so a song that
 	// asks for more than it can manage gets fewer — measured, about 231 of the
@@ -1837,7 +1837,7 @@ console.log("\nthe roll's playhead follows the music, not the tempo it was writt
 }
 
 // ---------------------------------------------------------------------------
-console.log("\nwhat fits inside one bar");
+section("what fits inside one bar");
 // ---------------------------------------------------------------------------
 //
 // A bar names its own note and carries a glyph per command acting on it. Both
@@ -1985,7 +1985,7 @@ console.log("\nwhat fits inside one bar");
 }
 
 // ---------------------------------------------------------------------------
-console.log("\nhow the command lane stacks what lands together");
+section("how the command lane stacks what lands together");
 // ---------------------------------------------------------------------------
 //
 // The lane draws one glyph per command going in effect, at `tick * zoom`, and
@@ -2268,7 +2268,7 @@ console.log("\nhow the command lane stacks what lands together");
 	);
 }
 
-console.log("\nthe slider's track, whose two rules fail invisibly");
+section("the slider's track, whose two rules fail invisibly");
 {
 	// A slider with `stops` is an index into that list; a plain one is its value.
 	const STOPS = [0, 1, 2, 4, 8, 16];
@@ -2352,7 +2352,7 @@ console.log("\nthe slider's track, whose two rules fail invisibly");
 	check("a caller's own label wins", readout(5, "12 ticks", true) === "12 ticks");
 }
 
-console.log("\nthe transport's mixer and playhead, which a browser cannot be made to show");
+section("the transport's mixer and playhead, which a browser cannot be made to show");
 {
 	// Solo clears the mutes outright rather than holding them: what the buttons
 	// show is always what is heard.
@@ -2403,7 +2403,7 @@ console.log("\nthe transport's mixer and playhead, which a browser cannot be mad
 	check("  and a solo names the channel that has it", silencedReason(3, 5) === "only channel 5 is soloed");
 }
 
-console.log("\nthe playhead drops what a mid-update read of ARAM invents");
+section("the playhead drops what a mid-update read of ARAM invents");
 {
 	// `noteAddressAt` finds the last note *before* the pointer, because the
 	// driver's read pointer has already stepped past the note it is sounding —
@@ -2447,7 +2447,7 @@ console.log("\nthe playhead drops what a mid-update read of ARAM invents");
 	check("spans come back in document order", sorted.join(",") === "15,40", sorted.join(","));
 }
 
-console.log("\nthe seconds estimate for a song the walk could not read");
+section("the seconds estimate for a song the walk could not read");
 {
 	const pass = { introTicks: 96, loopTicks: 192, introSeconds: 2, mainSeconds: 6 };
 

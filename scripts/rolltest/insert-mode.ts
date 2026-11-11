@@ -2,11 +2,12 @@
 
 import "../localize";
 import { NOTE_MIN } from "@amk/core/hardcoded-tables";
+import { section } from "../harness";
 import { expectEdit, noteAt } from "./support";
 
 // --- insert mode: the notes in the way move aside --------------------------
 
-console.log("\ninsert");
+section("insert");
 expectEdit("a note dragged onto the one after it, pushing it right", "#amk 2\n#0 o4 c4 d4 e4", 0, (bar) => ({
 	kind: "move",
 	items: [noteAt(bar, 0)],

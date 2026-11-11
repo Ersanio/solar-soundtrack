@@ -43,7 +43,7 @@ import {
 } from "@amk/spc/brr";
 import { BANK_SLOT_COUNT, bankSlotName } from "@amk/core/hardcoded-tables";
 
-import { SPC_ASSETS, check, summarise } from "./harness";
+import { SPC_ASSETS, check, section, summarise } from "./harness";
 
 /** Builds a one-block `.brr` file, loop header included. */
 function block(shift: number, filter: number, nibbles: number[], flags = 0): Uint8Array {
@@ -99,7 +99,7 @@ function bareBlock(shift: number, filter: number, nibbles: number[], end = false
 
 // ---------------------------------------------------------------------------
 
-console.log("\nthe container is validated before it is trusted");
+section("the container is validated before it is trusted");
 {
 	check("an empty file is rejected", validateBrr(new Uint8Array(0)) !== null);
 	check("a file too short for one block is rejected", validateBrr(new Uint8Array(8)) !== null);
@@ -119,7 +119,7 @@ console.log("\nthe container is validated before it is trusted");
 	check("parseBrr reads the loop offset", parsed.loopOffset === 0);
 }
 
-console.log("\nnames that MML could not survive are rejected");
+section("names that MML could not survive are rejected");
 {
 	check("a '#' is rejected", validateName("kick#1.brr") !== null);
 	check("a ';' is rejected", validateName("kick;1.brr") !== null);
@@ -129,7 +129,7 @@ console.log("\nnames that MML could not survive are rejected");
 	check("a path-prefixed name is fine", validateName("drums/kick.brr") === null);
 }
 
-console.log("\nfilter 0 decodes to a closed form");
+section("filter 0 decodes to a closed form");
 {
 	// Every nibble value, so sign extension is covered at both ends.
 	const nibbles = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
@@ -152,7 +152,7 @@ console.log("\nfilter 0 decodes to a closed form");
 	}
 }
 
-console.log("\nthe invalid shifts collapse the way the hardware does");
+section("the invalid shifts collapse the way the hardware does");
 {
 	for (const shift of [13, 14, 15]) {
 		const pcm = decodeBrr(parseBrr("t.brr", block(shift, 0, [0, 1, 7, 8, 9, 15, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])));
@@ -162,7 +162,7 @@ console.log("\nthe invalid shifts collapse the way the hardware does");
 	}
 }
 
-console.log("\nfilters 1-3 match their published coefficients");
+section("filters 1-3 match their published coefficients");
 {
 	// Ratios are halved because the decoder carries its history doubled.
 	const ratios: Record<number, [number, number]> = {
@@ -212,7 +212,7 @@ console.log("\nfilters 1-3 match their published coefficients");
 	check("the three filters produce different output", !a.every((v, i) => v === b[i]) && !b.every((v, i) => v === c[i]));
 }
 
-console.log("\nit matches snes_spc's decode_brr exactly");
+section("it matches snes_spc's decode_brr exactly");
 {
 	// A second, independent transcription of `SPC_DSP::decode_brr` — written in
 	// the C++'s own shape, sign-extending through a 16-bit word and keeping the
@@ -334,7 +334,7 @@ console.log("\nit matches snes_spc's decode_brr exactly");
 	check("every decoded sample is even, as the filter forms assume", allEven);
 }
 
-console.log("\nthe twenty bundled samples decode");
+section("the twenty bundled samples decode");
 {
 	const manifest = JSON.parse(readFileSync(join(SPC_ASSETS, "driver", "manifest.json"), "utf8")) as {
 		sampleGroups: Record<string, string[]>;
@@ -376,7 +376,7 @@ console.log("\nthe twenty bundled samples decode");
 	check("none of them decode to pure silence", allAudible, quiet);
 }
 
-console.log("\npeaks reduces without lying");
+section("peaks reduces without lying");
 {
 	const sample = parseBrr("t.brr", block(10, 0, [7, 8, 7, 8, 7, 8, 7, 8, 7, 8, 7, 8, 7, 8, 7, 8]));
 	const pcm = decodeBrr(sample);
@@ -419,7 +419,7 @@ console.log("\npeaks reduces without lying");
 	check("zero buckets is handled", peaks(pcm, 0).length === 0);
 }
 
-console.log("\nsample banks split into their slots");
+section("sample banks split into their slots");
 {
 	const names = (bank: string) => (slot: number) => bankSlotName(bank, slot);
 	const ramp = [7, 6, 4, 1, 15, 13, 10, 8, 9, 11, 14, 2, 5, 7, 3, 0];

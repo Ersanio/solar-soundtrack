@@ -9,9 +9,10 @@ import {
 	REFUSE_RANGE,
 	REFUSE_ROOM,
 } from "../../web/src/app/editor/views/piano-roll/roll-edit";
+import { section } from "../harness";
 import { expectRefused, noteAt } from "./support";
 
-console.log("\nrefusals");
+section("refusals");
 expectRefused(
 	"a note dragged onto its neighbour, strictly",
 	"#amk 2\n#0 o4 c4 d4",

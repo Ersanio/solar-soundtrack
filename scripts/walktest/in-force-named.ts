@@ -5,11 +5,11 @@ import { commandStartingAt, tokenize } from "@amk/tokens";
 import { commandScope, parseTimeInForce } from "@amk/tokens/commands/in-force";
 import { SLOTS, type SongTimeline, type StateSlot } from "@amk/spc/song-walk";
 import { commandsInForceOf, definedAt, notePreceding } from "../../web/src/app/state/commands-in-force";
-import { check } from "../harness";
+import { check, section } from "../harness";
 import { ARAM, build } from "./support";
 
 // ---------------------------------------------------------------------------
-console.log("\nthe command in force at a note is named exactly");
+section("the command in force at a note is named exactly");
 // ---------------------------------------------------------------------------
 //
 // The roll draws one glyph per command acting on a note, and clicking a glyph

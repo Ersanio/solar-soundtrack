@@ -1,12 +1,12 @@
 /** `walktest`: every note the walk finds is a note the compiler mapped. */
 
 import "../localize";
-import { check } from "../harness";
+import { check, section } from "../harness";
 import { build } from "./support";
 import { CORPUS } from "./song-length";
 
 // ---------------------------------------------------------------------------
-console.log("\nevery note the walk finds is a note the compiler mapped");
+section("every note the walk finds is a note the compiler mapped");
 // ---------------------------------------------------------------------------
 {
 	let checked = 0;

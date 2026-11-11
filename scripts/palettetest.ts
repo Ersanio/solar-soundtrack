@@ -112,7 +112,7 @@ import {
 	remoteWaitEdit,
 } from "../web/src/app/output/command-inspector/remote-code/remote-focus";
 
-import { check, summarise } from "./harness";
+import { check, section, summarise } from "./harness";
 
 /** The dialects a song can actually declare. `#amk 3` is AMK0402 and is not one. */
 const DIALECTS: { marker: string; target: CommandTarget }[] = [
@@ -240,7 +240,7 @@ const SUPERSEDED: Supersession[] = [
 	},
 ];
 
-console.log("\ncatalogue");
+section("catalogue");
 
 // The catalogue is complete by construction rather than by a number written
 // here: adding a VCMD to `tokens.ts` fails this until it either has a button or
@@ -387,7 +387,7 @@ console.log("\ncatalogue");
 }
 
 // The supersession claims, proven against the compiler rather than asserted.
-console.log("\nsuperseded");
+section("superseded");
 
 for (const row of SUPERSEDED) {
 	const byte = hex(row.vcmd);
@@ -427,7 +427,7 @@ for (const row of SUPERSEDED) {
 // readout has to be true. Both spellings are compiled at `#amk 4`, where the
 // dialect takes each, and compared. The pair is read off the entries themselves:
 // an entry whose text moves between dialects is one that substitutes.
-console.log("\nsubstituted");
+section("substituted");
 
 for (const entry of ENTRIES) {
 	const spelled = resolveEntry(entry, DIALECTS[2].target, { beforeChannels: false });
@@ -474,7 +474,7 @@ for (const entry of ENTRIES) {
 }
 
 for (const { marker, target } of DIALECTS) {
-	console.log(`\n${marker}`);
+	section(marker);
 
 	// What the palette reads is what the compiler reads. If these disagreed,
 	// every gating decision below would answer for the wrong dialect.
@@ -611,7 +611,7 @@ for (const { marker, target } of DIALECTS) {
 	}
 }
 
-console.log("\nplacement");
+section("placement");
 
 // The rule `channelsBeginAt` exists for: a remote definition above the first
 // channel is a definition, and below it is read as a call.
@@ -643,7 +643,7 @@ console.log("\nplacement");
 }
 
 // ---------------------------------------------------------------------------
-console.log("\na command read back out of a song finds its glyph");
+section("a command read back out of a song finds its glyph");
 // ---------------------------------------------------------------------------
 //
 // The catalogue answers "what can I add"; the piano roll asks it backwards, for
@@ -725,7 +725,7 @@ console.log("\na command read back out of a song finds its glyph");
 }
 
 // ---------------------------------------------------------------------------
-console.log("\nputting brackets round a selection");
+section("putting brackets round a selection");
 // ---------------------------------------------------------------------------
 //
 // The same standard as `formAvailability` above, applied to a rule about
@@ -924,7 +924,7 @@ console.log("\nputting brackets round a selection");
 }
 
 // ---------------------------------------------------------------------------
-console.log("\nreading a loop's count, and writing it back");
+section("reading a loop's count, and writing it back");
 // ---------------------------------------------------------------------------
 //
 // The same standard once more, on the other half of the brackets: `loop-focus.ts`
@@ -1228,7 +1228,7 @@ console.log("\nreading a loop's count, and writing it back");
 }
 
 // ---------------------------------------------------------------------------
-console.log("\nreading a remote call, and writing it back");
+section("reading a remote call, and writing it back");
 // ---------------------------------------------------------------------------
 //
 // A call raises no `Command`, so `commands/remote.ts` reads it off the text, and

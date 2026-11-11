@@ -4,7 +4,7 @@ import "../localize";
 import type { PitchSlide } from "@amk/spc/song-walk";
 import { REFUSE_MOVE_BEND } from "../../web/src/app/editor/views/piano-roll/roll-command-move";
 import { REFUSE_BEND_RIDER } from "../../web/src/app/editor/views/piano-roll/roll-edit";
-import { check } from "../harness";
+import { check, section } from "../harness";
 import { ARAM, build, type Built, expectEdit, expectNoMove, expectRefused, noteAt, strip } from "./support";
 
 // ===========================================================================
@@ -19,7 +19,7 @@ import { ARAM, build, type Built, expectEdit, expectNoMove, expectRefused, noteA
 //
 // Its last parameter may also be a written note (Music.cpp:2012-2042), which
 // emits nothing of its own and reads the octave in force where it stands.
-console.log("\na pitch slide");
+section("a pitch slide");
 
 /**
  * The byte `$DD` really slides to, read out of the song data.

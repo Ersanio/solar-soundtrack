@@ -1,6 +1,7 @@
 /** `rolltest`: overwrite mode — the notes already there give up the ticks. */
 
 import "../localize";
+import { section } from "../harness";
 import { expectEdit, noteAt } from "./support";
 
 // --- overwrite mode: the notes already there give up the ticks -------------
@@ -10,7 +11,7 @@ import { expectEdit, noteAt } from "./support";
 // channel's, so the song has to be exactly as long afterwards. A carve that
 // lengthened the song would mean `reach` had counted a note nothing moved.
 
-console.log("\noverwrite");
+section("overwrite");
 expectEdit(
 	"a note dragged onto the one after it, which gives up its head",
 	"#amk 2\n#0 o4 c4 d4 e4",

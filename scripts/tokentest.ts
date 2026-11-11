@@ -46,7 +46,7 @@ import {
 	tickSeconds,
 } from "@amk/tokens/commands/units";
 
-import { check, summarise } from "./harness";
+import { check, section, summarise } from "./harness";
 
 const at = (text: string, offset: number) => commandAt(tokenize(text).commands, offset);
 
@@ -103,7 +103,7 @@ function tokenAt(tokens: Token[], offset: number): Token | null {
 	return null;
 }
 
-console.log("\nhex commands gather their arguments");
+section("hex commands gather their arguments");
 {
 	const source = "#amk 4\n#0 $F5 $7F $00 $00 $00 $00 $00 $00 $00 c4\n";
 	const { commands } = tokenize(source);
@@ -124,7 +124,7 @@ console.log("\nhex commands gather their arguments");
 	);
 }
 
-console.log("\nan incomplete hex command is reported as incomplete");
+section("an incomplete hex command is reported as incomplete");
 {
 	const { commands } = tokenize("#0 $F5 $7F $00\n");
 	const fir = commands.find((c) => c.vcmd === 0xf5);
@@ -132,7 +132,7 @@ console.log("\nan incomplete hex command is reported as incomplete");
 	check("not complete", fir?.complete === false);
 }
 
-console.log("\nhex arguments are counted, not guessed");
+section("hex arguments are counted, not guessed");
 {
 	const { commands } = tokenize("#0 $E7 $10 $E7 $20\n");
 	const volumes = commands.filter((c) => c.vcmd === 0xe7);
@@ -143,7 +143,7 @@ console.log("\nhex arguments are counted, not guessed");
 	);
 }
 
-console.log("\na byte outside $DA-$FE opens no command");
+section("a byte outside $DA-$FE opens no command");
 {
 	// The tuning byte of a sample load is not a VCMD, and treating it as one
 	// would eat the tokens after it as arguments.
@@ -155,7 +155,7 @@ console.log("\na byte outside $DA-$FE opens no command");
 	);
 }
 
-console.log("\n$FB takes its length from its first argument");
+section("$FB takes its length from its first argument");
 {
 	// `parseHexCommand`'s `$FB` branch — the count byte is itself an argument, and `count + 1`
 	// more follow it, so `$FB $02` wants four arguments in total.
@@ -170,7 +170,7 @@ console.log("\n$FB takes its length from its first argument");
 	check("a high count means the three-argument form", long?.complete === true);
 }
 
-console.log("\na bar line abandons a half-written command");
+section("a bar line abandons a half-written command");
 {
 	// parser.ts's dispatch loop resets hexLeft on `|`, so the bytes after one are fresh.
 	const { commands } = tokenize("#0 $F5 $7F | $E7 $10\n");
@@ -187,7 +187,7 @@ console.log("\na bar line abandons a half-written command");
 	);
 }
 
-console.log("\nletter commands carry their arguments");
+section("letter commands carry their arguments");
 {
 	const tempo = at("#0 t144 c4\n", 4);
 	check("t144 is the tempo command", tempo?.kind === "t", tempo?.kind);
@@ -206,7 +206,7 @@ console.log("\nletter commands carry their arguments");
 	check("an exact tick count is the note's argument", exact?.args[0].value === 48);
 }
 
-console.log("\na comma form of t, v or w is its hex fade, and reads as one");
+section("a comma form of t, v or w is its hex fade, and reads as one");
 {
 	// parser.ts:parseFadeableValue and parseTempo compile `w30,200` to exactly
 	// `$E1 $1E $C8`, so the panel and the hover have to say the same thing about
@@ -259,7 +259,7 @@ console.log("\na comma form of t, v or w is its hex fade, and reads as one");
 	}
 }
 
-console.log("\na tempo fade is priced across the tempo it changes, not the one it leaves");
+section("a tempo fade is priced across the tempo it changes, not the one it leaves");
 {
 	// $E3 steps the tempo once per tick (main.asm:2461) and a tick's length is
 	// what the tempo *is*, so the elapsed time is the sum of every step's own
@@ -305,7 +305,7 @@ console.log("\na tempo fade is priced across the tempo it changes, not the one i
 	check("nor does a fade over no ticks at all", tempoFadeSeconds(0, 144, 254) === null);
 }
 
-console.log("\nthe label and the transport's clock read one model of a fade");
+section("the label and the transport's clock read one model of a fade");
 {
 	// `tempoFadeSeconds` is a sum over `tempoFadeSteps`, and the editor's clock
 	// walks the same list a tick at a time to say where in a fade a given tick
@@ -354,7 +354,7 @@ console.log("\nthe label and the transport's clock read one model of a fade");
 	}
 }
 
-console.log("\n$51 holds one more than the byte, and wraps");
+section("$51 holds one more than the byte, and wraps");
 {
 	// Commands.asm:320/:330 enter with the carry set, and it is an 8-bit adc.
 	// The plausible-but-wrong reading is 256 — "as fast as it goes" — where the
@@ -376,7 +376,7 @@ console.log("\n$51 holds one more than the byte, and wraps");
 	check("where the label still gives a length", Number.isFinite(tickSeconds(255)));
 }
 
-console.log("\na fade in a song with no tempo yet is read at the driver's default");
+section("a fade in a song with no tempo yet is read at the driver's default");
 {
 	// main.asm:177 puts #$36 into $51 before a song touches it, so "no tempo set"
 	// is not "no tempo" — the fade is audible and has a length. Only the rows
@@ -416,7 +416,7 @@ console.log("\na fade in a song with no tempo yet is read at the driver's defaul
 	check("nor does a $DE one", overNote("$DE $18 $02 $10", "$DE") === "24 ticks · an eighth note");
 }
 
-console.log("\na fade over 0 ticks is dropped, not applied");
+section("a fade over 0 ticks is dropped, not applied");
 {
 	// Every fade counter is tested before it is decremented and branches past its
 	// own block on a zero — main.asm:2461 for $E3, :2472 for $F2, :2490 for $E1,
@@ -469,7 +469,7 @@ console.log("\na fade over 0 ticks is dropped, not applied");
 /** The length of the note or rest written at `needle` — `undefined` for anything else. */
 const lengthOf = (source: string, needle: string) => at(source, source.indexOf(needle))?.noteLength;
 
-console.log("\nnotes and rests resolve their length");
+section("notes and rests resolve their length");
 {
 	// getNoteLength (parser.ts), over the 192 ticks of a whole note. The
 	// tooltip states the tick count outright, so a wrong fork here is a wrong
@@ -500,7 +500,7 @@ console.log("\nnotes and rests resolve their length");
 	check("a command that is not a note carries none", at("#0 t144\n", 4)?.noteLength === undefined);
 }
 
-console.log("\na tie plays as one note");
+section("a tie plays as one note");
 {
 	// accumulateTiedLength (parser.ts) — every segment after a `^` belongs
 	// to the note that opened the run, which is why the tooltip totals them
@@ -533,7 +533,7 @@ console.log("\na tie plays as one note");
 	check("and the tie's segment is implied, not the d's length", next[0].noteLength?.[1].implicit === true);
 }
 
-console.log("\nthe default length follows `l`");
+section("the default length follows `l`");
 {
 	// parseDefaultLength (parser.ts). One field on the parser, never
 	// reset — so it is one running value here, not one per channel.
@@ -551,7 +551,7 @@ console.log("\nthe default length follows `l`");
 	check("the l command itself carries no note length", at("#0 l16\n", 3)?.noteLength === undefined);
 }
 
-console.log("\nevery segment says which denominator names it, and where the digits go");
+section("every segment says which denominator names it, and where the digits go");
 {
 	// The inspector's Length slider is a `1/n` over these two fields, and both
 	// halves are load-bearing in a way a tick count cannot see. `denominator` has
@@ -638,7 +638,7 @@ console.log("\nevery segment says which denominator names it, and where the digi
 	check("and none of them is unreachable", unreachable === 0, String(unreachable));
 }
 
-console.log("\ndots and exact lengths fork by dialect");
+section("dots and exact lengths fork by dialect");
 {
 	// Music.cpp:2960 — Addmusic 4.05 stops after the second dot.
 	const am4 = lengthOf("#am4\n#0 c8...\n", "c8");
@@ -662,7 +662,7 @@ console.log("\ndots and exact lengths fork by dialect");
 	check("and a note's own = still works", lengthOf("#am4\n#0 c=48\n", "c=48")?.[0].ticks === 48);
 }
 
-console.log("\na lone dot still lengthens the note before it");
+section("a lone dot still lengthens the note before it");
 {
 	// `l8 c.` is ordinary MML: getInt finds no digits and getNoteLengthModifier
 	// dots the standing default anyway (getNoteLength). A lone `.` scans as
@@ -686,7 +686,7 @@ console.log("\na lone dot still lengthens the note before it");
 	);
 }
 
-console.log("\na triplet scales the notes inside it");
+section("a triplet scales the notes inside it");
 {
 	// getNoteLengthModifier's second half (parser.ts): two thirds,
 	// rounded half up, applied after the dots. A reader hovering a note wants
@@ -755,7 +755,7 @@ console.log("\na triplet scales the notes inside it");
 	check("and a real triplet after one still works", lengthOf(`${block}#0 {c4}\n`, "c4}")?.[0].ticks === 32);
 }
 
-console.log("\ncomments and strings");
+section("comments and strings");
 {
 	const { tokens } = tokenize("; a comment with $F5 in it\n#0 c4\n");
 	check("the comment is one token", tokens[0].kind === "comment");
@@ -773,7 +773,7 @@ console.log("\ncomments and strings");
 	);
 }
 
-console.log("\ndirectives and channels are told apart");
+section("directives and channels are told apart");
 {
 	const { tokens } = tokenize("#amk 4\n#samples\n#0 c4\n");
 	check("#amk is a directive", tokens[0].kind === "directive");
@@ -784,7 +784,7 @@ console.log("\ndirectives and channels are told apart");
 	);
 }
 
-console.log("\ncommands carry the channel they were written under");
+section("commands carry the channel they were written under");
 {
 	// Source order is execution order within one channel and meaningless across
 	// them, so anything reasoning about "runs after" needs this.
@@ -827,7 +827,7 @@ console.log("\ncommands carry the channel they were written under");
 	);
 }
 
-console.log("\na remote code definition is marked, and is not the starting channel's music");
+section("a remote code definition is marked, and is not the starting channel's music");
 {
 	// Music.cpp:1015 tells a definition from a call by position alone, so one can
 	// only sit above the first `#N` and its brackets gather on the starting
@@ -875,7 +875,7 @@ console.log("\na remote code definition is marked, and is not the starting chann
 	);
 }
 
-console.log("\nlookup");
+section("lookup");
 {
 	const source = "#amk 4\n#0 $F5 $7F $00 $00 $00 $00 $00 $00 $00\n";
 	const { commands } = tokenize(source);
@@ -895,7 +895,7 @@ console.log("\nlookup");
 	check("tokenAt at the note's end is the next token", tokenAt(note.tokens, noteAt + 1)?.kind === "number");
 }
 
-console.log("\nevery kind has a highlight tag");
+section("every kind has a highlight tag");
 {
 	const { tokens } = tokenize(
 		'#amk 4\n"a=b"\n#0 t144 o4 l8 v200 w150 y10 q7F h2 @1 p1 n5 [c+4 ^ r8]3 *2 (1) < > | & / ? {c} $F5 $7F $00 $00 $00 $00 $00 $00 $00 ; end\n',
@@ -915,7 +915,7 @@ console.log("\nevery kind has a highlight tag");
 	);
 }
 
-console.log("\nevery tag name resolves against @lezer/highlight");
+section("every tag name resolves against @lezer/highlight");
 {
 	// The editor builds its tokenTable by looking TOKEN_TAGS values up on
 	// `tags`. A name that misses — or that lands on one of the helper
@@ -926,7 +926,7 @@ console.log("\nevery tag name resolves against @lezer/highlight");
 	check("every TOKEN_TAGS value is a real Tag", unresolved.length === 0, unresolved.join(", "));
 }
 
-console.log("\nreplacements are expanded at the use site");
+section("replacements are expanded at the use site");
 {
 	// The report this came from, verbatim.
 	const source = '"echo1=$EF"\n"echo2=$F1"\n\n#0 echo1 $2b $2d $2d\necho2 $05 $3c $00\n';
@@ -960,7 +960,7 @@ console.log("\nreplacements are expanded at the use site");
 	);
 }
 
-console.log("\na definition only applies below itself");
+section("a definition only applies below itself");
 {
 	// `doReplacement` runs at the cursor and never behind it (parser.ts), so
 	// there is no hoisting. A whole-document pre-pass would fail this.
@@ -968,7 +968,7 @@ console.log("\na definition only applies below itself");
 	check("exactly one $EF", commands.filter((c) => c.vcmd === 0xef).length === 1);
 }
 
-console.log("\nlongest match wins, and there is no word boundary");
+section("longest match wins, and there is no word boundary");
 {
 	const { commands } = tokenize('"e=$E7 $10"\n"ee=$EF $2b $2d $2d"\n#0 ee\n');
 	check(
@@ -987,7 +987,7 @@ console.log("\nlongest match wins, and there is no word boundary");
 	check("leaving no note behind", !shadowed.tokens.some((t) => t.kind === "note"));
 }
 
-console.log("\na replacement can carry a whole run of commands");
+section("a replacement can carry a whole run of commands");
 {
 	const source = '"x=$EF $2b $2d $2d c4"\n#0 x\n';
 	const { commands } = tokenize(source);
@@ -1002,7 +1002,7 @@ console.log("\na replacement can carry a whole run of commands");
 	check("the caret resolves to the first, not whichever the search landed on", commandAt(commands, use)?.vcmd === 0xef);
 }
 
-console.log("\na replacement can supply arguments, or take them");
+section("a replacement can supply arguments, or take them");
 {
 	const supplies = tokenize('"lo=$2b"\n#0 $EF lo $2d $2d\n').commands.find((c) => c.vcmd === 0xef);
 	check(
@@ -1023,7 +1023,7 @@ console.log("\na replacement can supply arguments, or take them");
 	);
 }
 
-console.log("\na command knows which of its parts came through a macro");
+section("a command knows which of its parts came through a macro");
 {
 	// The whole point of carrying provenance per part rather than per command:
 	// `replacement` alone cannot tell "the bytes are not in the document" from
@@ -1056,7 +1056,7 @@ console.log("\na command knows which of its parts came through a macro");
 	check("and the whole of the direct form's @@", source.slice(direct!.head.start, direct!.head.end) === "@@");
 }
 
-console.log("\nreplacements are transitive");
+section("replacements are transitive");
 {
 	// doReplacement re-runs the match on the text it just spliced in.
 	const { commands } = tokenize('"a1=a2 $2d"\n"a2=$EF $2b"\n#0 a1 $2d\n');
@@ -1066,7 +1066,7 @@ console.log("\nreplacements are transitive");
 	check("and is complete", echo?.complete === true);
 }
 
-console.log("\na recursive replacement cannot hang the editor");
+section("a recursive replacement cannot hang the editor");
 {
 	// The guard here is an active set plus a character budget rather than AMK's
 	// 500 iterations, because expansion is a tree: `"g=g g"` doubles at every
@@ -1087,7 +1087,7 @@ console.log("\na recursive replacement cannot hang the editor");
 	check("all three finish promptly", elapsed < 500, `took ${elapsed} ms`);
 }
 
-console.log("\na sample load is not a replacement definition");
+section("a sample load is not a replacement definition");
 {
 	// parseOpenParen hands `("` to parseSampleLoad, which reads the name itself,
 	// so that quote never reaches the directive arm.
@@ -1106,7 +1106,7 @@ console.log("\na sample load is not a replacement definition");
 	);
 }
 
-console.log("\nreplacement edge cases");
+section("replacement edge cases");
 {
 	// An empty value expands to nothing, but `find` is non-empty so the scanner
 	// still advances over it.
@@ -1137,7 +1137,7 @@ console.log("\nreplacement edge cases");
 	check("no definition leaks into the next scan", !tokenize("#0 leak\n").commands.some((c) => c.vcmd === 0xef));
 }
 
-console.log("\nq and n read their arguments as hex");
+section("q and n read their arguments as hex");
 {
 	// parseQuantization and parseNoise both use getHex. Reading either as decimal is
 	// wrong twice over: the value, and the `F` that would become a note.
@@ -1160,7 +1160,7 @@ console.log("\nq and n read their arguments as hex");
 	check("a space stops the hex run", !tokenize("#0 n 1F\n").tokens.some((t) => t.kind === "hexNumber"));
 }
 
-console.log("\nthe @ forms");
+section("the @ forms");
 {
 	const direct = tokenize("#0 @@19\n").commands.filter((c) => c.kind === "@");
 	check("@@19 is one command, not two", direct.length === 1);
@@ -1177,7 +1177,7 @@ console.log("\nthe @ forms");
 	);
 }
 
-console.log("\n#instruments is scanned as a block, not as commands");
+section("#instruments is scanned as a block, not as commands");
 {
 	const source =
 		'#instruments\n{\n\t"kick.brr" $FE $6A $B8 $03 $00\n\t@5 $8F $E0 $7F $02 $80\n\tn1F $00 $00 $7F $01 $00\n}\n';
@@ -1252,7 +1252,7 @@ console.log("\n#instruments is scanned as a block, not as commands");
 	check("a song with no block has no entries", tokenize("#0 c4\n").instruments.length === 0);
 }
 
-console.log("\nknown divergences from AddmusicK, pinned on purpose");
+section("known divergences from AddmusicK, pinned on purpose");
 {
 	// Both come from the same root: `getInt`/`getHex` (parser.ts) expand
 	// *inside* a token, which a model whose tokens are spans cannot express.
@@ -1334,7 +1334,7 @@ console.log("\nknown divergences from AddmusicK, pinned on purpose");
 	);
 }
 
-console.log("\na directive's bare-word argument is not music");
+section("a directive's bare-word argument is not music");
 {
 	const source = "#amk 4\n#option smwvtable\n#0 w255 c4\n";
 	const { tokens } = tokenize(source);
@@ -1362,7 +1362,7 @@ console.log("\na directive's bare-word argument is not music");
 	);
 }
 
-console.log("\nthe velocity table follows the hex, not just the directives");
+section("the velocity table follows the hex, not just the directives");
 {
 	const tableAt = (source: string, needle: string) => {
 		const index = tokenize(source);
@@ -1394,7 +1394,7 @@ console.log("\nthe velocity table follows the hex, not just the directives");
 	check("a switch in #1 is heard in #0", tableAt("#amk 4\n#1 $FA $06 $00\n#0 q7F c4\n", "q7F") === "smw");
 }
 
-console.log("\nthe target markers pick the dialect");
+section("the target markers pick the dialect");
 {
 	// parseHexCommand — #amk 1's $FC is remote gain and takes two arguments.
 	const amk1 = tokenize("#amk 1\n#0 $FC $05 $7F c4\n").commands;
@@ -1441,7 +1441,7 @@ console.log("\nthe target markers pick the dialect");
 	check("no marker means the #amk 4 default", bare?.target.program === 0 && bare.target.amkVersion === 4);
 }
 
-console.log("\n#am4's $ED is HFD's escape");
+section("#am4's $ED is HFD's escape");
 {
 	// parseHFDHex (parser.ts, Music.cpp:1466) — the sub-byte picks the form.
 	const dsp = tokenize("#am4\n#0 $ED $80 $6C $20 c4\n").commands.find((c) => c.vcmd === 0xed);
@@ -1485,7 +1485,7 @@ console.log("\n#am4's $ED is HFD's escape");
 	check("under #amk 4, $ED is two-argument ADSR", amk?.args.length === 2, `got ${amk?.args.length}`);
 }
 
-console.log("\n#am4's $E5 forks on its first argument");
+section("#am4's $E5 forks on its first argument");
 {
 	// Music.cpp:1820, parseHexCommand's $E5 fork — a high bit means "load sample".
 	const load = tokenize("#am4\n#0 $E5 $85 $04 c4\n").commands.find((c) => c.vcmd === 0xe5);
@@ -1500,7 +1500,7 @@ console.log("\n#am4's $E5 forks on its first argument");
 	check("no fork outside #am4", amk?.args.length === 3, `got ${amk?.args.length}`);
 }
 
-console.log("\na command takes its arguments and stops");
+section("a command takes its arguments and stops");
 {
 	// `scanHex` emits `hexArg` for any byte below $DA even with `hexLeft` at 0
 	// (tokens.ts), because a sample load's tuning byte has to read as one.
@@ -1548,7 +1548,7 @@ console.log("\na command takes its arguments and stops");
 // follow and cleared by default. What goes wrong when the run is left open is
 // the whole of issue #28: the *next* `$XX` in the document scans as this
 // command's last argument, and the one after that is right again.
-console.log("\n$DD takes a note as its last parameter");
+section("$DD takes a note as its last parameter");
 {
 	/** The `$DD`s and the kind of the `$XX` after them, which is what the bug moved. */
 	const read = (source: string): { targets: string[]; after: TokenKind | undefined } => {
@@ -1701,7 +1701,7 @@ console.log("\n$DD takes a note as its last parameter");
 // A remote call's wait is read with `getHex` (parser.ts:2356-2358, Music.cpp:1090-1094),
 // so any byte written there is an argument. One in `$DA`-`$FE` read as a VCMD
 // would open a command nobody wrote and take the next real `$XX` as its argument.
-console.log("\na remote call's $ wait is an argument");
+section("a remote call's $ wait is an argument");
 {
 	/** The VCMDs gathered, with how many arguments each took. */
 	const vcmds = (source: string): string =>
@@ -1723,7 +1723,7 @@ console.log("\na remote call's $ wait is an argument");
 	check("a sample load is not a call", vcmds(`#amk 4\n#0 ("kick.brr", $02) $E7 $10\n`) === "$E7/1");
 }
 
-console.log("\ncommand hazards — bytes that compile clean and then break the song");
+section("command hazards — bytes that compile clean and then break the song");
 {
 	const anchorsIn = (source: string): string => {
 		const index = tokenize(source);
@@ -1926,7 +1926,7 @@ console.log("\ncommand hazards — bytes that compile clean and then break the s
 	check("and a note outside it does not", anchorsIn("#amk 4\no4 c4\n(!1)[ $DD $00 $18 $A4 ]\n#0 d4\n") === "nothing");
 }
 
-console.log("\nrestartability — the property CodeMirror relies on");
+section("restartability — the property CodeMirror relies on");
 {
 	const sources = [
 		"#amk 4\n#0 $F5 $7F $00 $00 $00 $00 $00 $00 $00 c4\n",
@@ -2015,7 +2015,7 @@ console.log("\nrestartability — the property CodeMirror relies on");
 	}
 }
 
-console.log("\ncopyState really copies");
+section("copyState really copies");
 {
 	const original = startState();
 	original.hexLeft = 3;
@@ -2030,7 +2030,7 @@ console.log("\ncopyState really copies");
 	check("the replacement table is shared, not deep-copied", copy.replacements === original.replacements);
 }
 
-console.log("\nthe scanner always makes progress");
+section("the scanner always makes progress");
 {
 	// Garbage in must not hang the editor.
 	const nasty = "\0\x1b~`%:!\\\n#0 éé $ $$ $Z c\n";
@@ -2046,7 +2046,7 @@ console.log("\nthe scanner always makes progress");
 	);
 }
 
-console.log("\nan empty document is not a special case");
+section("an empty document is not a special case");
 {
 	check("empty text yields nothing", tokenize("").tokens.length === 0);
 	check("empty text has no commands", tokenize("").commands.length === 0);
@@ -2055,7 +2055,7 @@ console.log("\nan empty document is not a special case");
 	check("tokenAt on nothing is null", tokenAt([], 0) === null);
 }
 
-console.log("\naudit: the scanner agrees with the driver about command lengths");
+section("audit: the scanner agrees with the driver about command lengths");
 {
 	// Music.cpp:1807-1813 — every trailing byte with its high bit set extends the
 	// hot patch by one, not just the first.
@@ -2115,7 +2115,7 @@ console.log("\naudit: the scanner agrees with the driver about command lengths")
 }
 
 // ---------------------------------------------------------------------------
-console.log("\nwhat a command reaches, and what the source alone can answer");
+section("what a command reaches, and what the source alone can answer");
 // ---------------------------------------------------------------------------
 //
 // The piano roll draws a glyph per command acting on a note. Two halves answer

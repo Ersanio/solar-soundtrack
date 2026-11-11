@@ -1,9 +1,10 @@
 /** `rolltest`: the bulk gestures — legato and quantize — over a selection. */
 
 import "../localize";
+import { section } from "../harness";
 import { expectEdit, noteAt } from "./support";
 
-console.log("\nbulk");
+section("bulk");
 expectEdit("legato closes the rests", "#amk 2\n#0 o4 c8 r8 d8 r8", 0, (bar) => ({
 	kind: "legato",
 	items: [noteAt(bar, 0), noteAt(bar, 1)],

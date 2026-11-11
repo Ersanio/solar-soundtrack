@@ -7,11 +7,11 @@ import { buildSpc } from "@amk/spc/export";
 import { createTickPhase, passMark, sawTick, seedTickPhase, TICK_POLL_HZ } from "@amk/spc/driver-state";
 import { emptySample } from "@amk/spc/brr";
 import { instantiate, SPC_SAMPLE_RATE } from "@amk/spc/wasm-host";
-import { check, SPC_ASSETS } from "../harness";
+import { SPC_ASSETS, check, section } from "../harness";
 import { build, BY_NAME, driver } from "./support";
 
 // ---------------------------------------------------------------------------
-console.log("\nthe driver keys a note off where the walk says it does");
+section("the driver keys a note off where the walk says it does");
 // ---------------------------------------------------------------------------
 {
 	// `!PlayingVoices` is set in `KeyOnVoices` and cleared in `KeyOffVoices` and

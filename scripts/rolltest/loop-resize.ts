@@ -20,7 +20,7 @@ import {
 	resizeLoop,
 } from "../../web/src/app/editor/views/piano-roll/roll-write/loop-edits";
 import type { Strip, StripFrame } from "../../web/src/app/editor/views/piano-roll/roll-strip";
-import { check } from "../harness";
+import { check, section } from "../harness";
 import {
 	apply,
 	build,
@@ -49,7 +49,7 @@ import { grabEdge } from "./loop-edge-gap";
 // `shiftBoundariesFor` is the same asymmetry as the boundaries the preview
 // slides on.
 
-console.log("\nthe loop box's ends resize the loop");
+section("the loop box's ends resize the loop");
 
 /** `expectResize`'s own bag: a body edit may move another channel that plays it. */
 interface ResizeExpectation extends Expectation {

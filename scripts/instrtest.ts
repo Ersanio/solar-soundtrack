@@ -44,7 +44,7 @@ import {
 	readInstrumentTables,
 } from "@amk/spc/instruments";
 
-import { SPC_ASSETS, check, summarise } from "./harness";
+import { SPC_ASSETS, check, info, section, summarise } from "./harness";
 
 const driverDir = join(SPC_ASSETS, "driver");
 const manifest = JSON.parse(readFileSync(join(driverDir, "manifest.json"), "utf8")) as DriverManifest;
@@ -57,7 +57,7 @@ const program = new Uint8Array(readFileSync(join(driverDir, "main.bin"))).subarr
 /** Where `main.bin` sits in ARAM. `spctest` checks this against the image. */
 const PROGRAM_POS = manifest.programPos;
 
-console.log("\nfinding the tables in the shipped driver");
+section("finding the tables in the shipped driver");
 {
 	const hits = findInstrumentTables(program);
 	check("exactly one candidate, so the match is not a guess", hits.length === 1, `${hits.length} hit(s)`);
@@ -85,7 +85,7 @@ console.log("\nfinding the tables in the shipped driver");
 	check("it lands where the bundled build puts it", tables.address === 0x1893, `$${tables.address.toString(16)}`);
 }
 
-console.log("\nthe SRCN column against AddmusicK's own table");
+section("the SRCN column against AddmusicK's own table");
 {
 	const tables = readInstrumentTables(program, PROGRAM_POS);
 
@@ -119,7 +119,7 @@ console.log("\nthe SRCN column against AddmusicK's own table");
 	);
 }
 
-console.log("\nan image without the tables is refused, not guessed at");
+section("an image without the tables is refused, not guessed at");
 {
 	// There is one driver, so a search that comes back with anything other than a
 	// single hit means this is not the image the build ships — and then nothing it
@@ -145,7 +145,7 @@ console.log("\nan image without the tables is refused, not guessed at");
 	check("the shipped image is neither", findInstrumentTables(program).length === 1);
 }
 
-console.log("\nentry shape");
+section("entry shape");
 {
 	const tables = readInstrumentTables(program, PROGRAM_POS);
 
@@ -200,7 +200,7 @@ console.log("\nentry shape");
 	);
 }
 
-console.log("\nthe quantization tables against the shipped driver");
+section("the quantization tables against the shipped driver");
 {
 	// `NOTE_DURATIONS` and `VELOCITY_VALUES` are hand-copied out of `main.asm`,
 	// which is not in an AddmusicK release's `AddmusicKsrc/` — so, exactly as
@@ -231,7 +231,7 @@ console.log("\nthe quantization tables against the shipped driver");
 	check("the 40 bytes appear in main.bin", hits > 0);
 	check("and appear exactly once, so this is not a coincidence", hits === 1, `${hits} matches`);
 	if (at >= 0) {
-		console.log(`        NoteDurations at $${(PROGRAM_POS + at).toString(16).toUpperCase().padStart(4, "0")}`);
+		info(`        NoteDurations at $${(PROGRAM_POS + at).toString(16).toUpperCase().padStart(4, "0")}`);
 	}
 
 	// The two halves are the whole reason the table is 32 entries: the driver

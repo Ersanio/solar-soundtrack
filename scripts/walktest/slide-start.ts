@@ -4,11 +4,11 @@ import "../localize";
 import { tokenize } from "@amk/tokens";
 import { bendAnchor } from "@amk/tokens/command-hazards";
 import { slideStart } from "../../web/src/app/output/command-inspector/bend-command/slide-start";
-import { check } from "../harness";
+import { check, section } from "../harness";
 import { build } from "./support";
 
 // ---------------------------------------------------------------------------
-console.log("\nthe note the bend inspector draws a slide from");
+section("the note the bend inspector draws a slide from");
 // ---------------------------------------------------------------------------
 {
 	// The byte the compiler emitted for the note `bendAnchor` names, off the note

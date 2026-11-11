@@ -1,11 +1,11 @@
 /** `walktest`: the walk and the compiler agree on how long the song is. */
 
 import "../localize";
-import { check } from "../harness";
+import { check, section } from "../harness";
 import { build } from "./support";
 
 // ---------------------------------------------------------------------------
-console.log("\nthe walk and the compiler agree on how long the song is");
+section("the walk and the compiler agree on how long the song is");
 // ---------------------------------------------------------------------------
 
 /** Each song isolates one hazard; the name is what it is there to catch. */

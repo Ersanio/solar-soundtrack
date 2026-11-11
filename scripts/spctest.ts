@@ -18,7 +18,7 @@ import { encodePathSegment, loadDriver } from "@amk/spc/driver";
 import { buildSpc } from "@amk/spc/export";
 import { computeBudget } from "@amk/spc/layout";
 
-import { SPC_ASSETS, check, stubFetch, summarise } from "./harness";
+import { SPC_ASSETS, check, info, section, stubFetch, summarise } from "./harness";
 
 stubFetch();
 
@@ -34,7 +34,7 @@ const SONG = `#amk 4
 #1 o2 v160 q7D @1 l8 [c c > c < c]4
 `;
 
-console.log("\nURL encoding");
+section("URL encoding");
 {
 	// encodeURIComponent escapes `@` to %40, which decodeURI does not undo, so the
 	// file never resolves and the SPA fallback returns index.html.
@@ -52,7 +52,7 @@ console.log("\nURL encoding");
 	);
 }
 
-console.log("\nmissing files are diagnosed, not misread");
+section("missing files are diagnosed, not misread");
 {
 	let message = "";
 	try {
@@ -66,7 +66,7 @@ console.log("\nmissing files are diagnosed, not misread");
 
 const driver = await loadDriver();
 
-console.log("\nmanifest.json still describes the shipped main.bin");
+section("manifest.json still describes the shipped main.bin");
 {
 	// Nothing derives these from the image, so this is the only place a stale
 	// manifest is caught. Every address it states is checked against the
@@ -107,7 +107,7 @@ console.log("\nmanifest.json still describes the shipped main.bin");
 	check("and the last of them is localPos", entries[songIndex - 1] === localPos, hex(entries[songIndex - 1]));
 }
 
-console.log("\ndriver bundle");
+section("driver bundle");
 {
 	// The five addresses this build was measured at. The section above proves the
 	// manifest agrees with the image; these say which image it is meant to be, so
@@ -161,7 +161,7 @@ console.log("\ndriver bundle");
 	);
 }
 
-console.log("\nthe song goes in the driver's own slot");
+section("the song goes in the driver's own slot");
 {
 	// The local song's slot is inside the image — AddmusicK leaves the last song
 	// it compiled sitting there — so the song data overwrites it rather than
@@ -174,7 +174,7 @@ console.log("\nthe song goes in the driver's own slot");
 	);
 }
 
-console.log("\ncompile + export");
+section("compile + export");
 const compiled = compiler.compile({ source: SONG, aramAddress: driver.manifest.localPos });
 check("song compiles", compiled.ok, compiled.diagnostics.map((d) => `${d.code} ${d.message}`).join("; "));
 
@@ -188,7 +188,7 @@ const { spc, layout } = buildSpc({
 	date: new Date(2026, 6, 28),
 });
 
-console.log("\nfile structure");
+section("file structure");
 {
 	const text = (at: number, len: number) =>
 		Buffer.from(spc.subarray(at, at + len))
@@ -208,7 +208,7 @@ console.log("\nfile structure");
 	check("fade is 10000", text(0xac, 5) === "10000", text(0xac, 5));
 }
 
-console.log("\nARAM contents");
+section("ARAM contents");
 {
 	const aram = spc.subarray(0x100, 0x10100);
 
@@ -243,7 +243,7 @@ console.log("\nARAM contents");
 	);
 }
 
-console.log("\nsample directory");
+section("sample directory");
 {
 	const aram = spc.subarray(0x100, 0x10100);
 	const dir = spc[0x10100 + 0x5d];
@@ -280,7 +280,7 @@ console.log("\nsample directory");
 	check("sample data ends where layout says", expected === layout.sampleDataEnd, hex(expected));
 }
 
-console.log("\nARAM budget");
+section("ARAM budget");
 {
 	const budget = computeBudget(driver, driver.samples, compiled.data!.length, compiled.stats!.echoBufferSize);
 
@@ -294,18 +294,18 @@ console.log("\nARAM budget");
 		budget.layout.songPos === layout.songPos && budget.layout.sampleDataEnd === layout.sampleDataEnd,
 	);
 
-	console.log(`  ..    free ${budget.freeBytes} B`);
+	info(`  ..    free ${budget.freeBytes} B`);
 }
 
-console.log("\nlayout");
-console.log(`  driver   ${hex(layout.programPos)} - ${hex(layout.programEnd)}`);
-console.log(`  song     ${hex(layout.songPos)} - ${hex(layout.songEnd)}`);
-console.log(`  smp tbl  ${hex(layout.sampleTablePos)} - ${hex(layout.sampleTableEnd)}`);
-console.log(`  samples  ${hex(layout.sampleDataPos)} - ${hex(layout.sampleDataEnd)}`);
-console.log(`  echo     ${hex(layout.echoStart)} - ${hex(layout.echoEnd)}`);
-console.log(`  free     ${layout.freeBytes} bytes`);
+section("layout");
+section(`  driver   ${hex(layout.programPos)} - ${hex(layout.programEnd)}`);
+section(`  song     ${hex(layout.songPos)} - ${hex(layout.songEnd)}`);
+section(`  smp tbl  ${hex(layout.sampleTablePos)} - ${hex(layout.sampleTableEnd)}`);
+section(`  samples  ${hex(layout.sampleDataPos)} - ${hex(layout.sampleDataEnd)}`);
+section(`  echo     ${hex(layout.echoStart)} - ${hex(layout.echoEnd)}`);
+section(`  free     ${layout.freeBytes} bytes`);
 
-console.log("\n#samples reaches the sample directory");
+section("#samples reaches the sample directory");
 {
 	// The decisive end-to-end check: a song that names its own sample set must
 	// produce an SPC built from *that* set. Every intermediate stage can look
@@ -368,7 +368,7 @@ console.log("\n#samples reaches the sample directory");
 	);
 }
 
-console.log("\nthe budget says how many samples are really loaded");
+section("the budget says how many samples are really loaded");
 {
 	// "20 samples" for every possible song reads as "the default set is loaded"
 	// no matter what optimisation actually did. The row has to distinguish the two.
@@ -398,7 +398,7 @@ console.log("\nthe budget says how many samples are really loaded");
 	check("optimised reports loaded of total", detail(true) === "17 of 20 loaded", detail(true));
 }
 
-console.log("\noptimizeSampleUsage frees real ARAM");
+section("optimizeSampleUsage frees real ARAM");
 {
 	// The point of the pass: a song using two instruments should not upload all
 	// twenty samples. Measured on the real bundle, through the real writer.

@@ -58,9 +58,10 @@ hand.
 
 ## Formatting
 
-Prettier owns the whole workspace, in two profiles split by layer — `web/src/app/` at 2 spaces,
-single quotes, width 100; `packages/` and `scripts/` at tabs, double quotes, width 120, carried over
-from the pre-Angular prototype so the port can still be diffed against AddmusicK's C++. Both are in
+Prettier owns the whole workspace, in two profiles — everything at 2 spaces, single quotes, width
+100, which is the app, the config files and `scripts/*.mjs`; and `packages/**/*.ts` and
+`scripts/**/*.ts` at tabs, double quotes, width 120, so the port can be diffed against AddmusicK's
+C++. Both are in
 `.prettierrc`, with matching `.editorconfig` sections so editors agree; **change both or neither**.
 
 `endOfLine` is `"auto"` because the working tree is CRLF. Prettier's `"lf"` default makes every file
@@ -144,11 +145,22 @@ which shows Prettier's message to Claude; every other failure exits quietly so a
 up. Claude Code reads hooks when a session starts, so a change to either file takes effect in the
 next one. Machine-local permissions stay in the gitignored `settings.local.json`.
 
-`.gitignore` tracks `.claude/rules/`, `.claude/hooks/`, `.claude/settings.json` and
-`.claude/skills/`, except the `angular-*` skills the Angular CLI installs, which stay ignored along
+`.gitignore` tracks `.claude/rules/`, `.claude/ledgers/`, `.claude/hooks/`, `.claude/agents/`,
+`.claude/commands/`, `.claude/settings.json` and `.claude/skills/`, except the `angular-*` skills the Angular CLI installs, which stay ignored along
 with everything else under `.claude/`.
 
 `CODEMAP.md` is written by `scripts/codemap.mjs` (`npm run codemap`), and `npm run codemap:check`,
 early in `npm run check`, fails on a stale map or on a source file under `packages/*/src`, `web/src`
 or `scripts` with no doc comment. A file's entry is the first sentence of its first `/** */` block,
-or of the `//` lines it opens with.
+or of the `//` lines it opens with. What else an entry carries, and why none of it goes stale on an
+ordinary edit, is in `scripts/CLAUDE.md`.
+
+## The gate's scripts
+
+`npm run check` is `scripts/check.mjs`, not an `&&` chain: each step of the gate is run on its own,
+a failure does not stop the ones after it, a Node crash is retried, and the report is a table.
+`npm run affected` runs the subset that covers the changed files, `npm run citations:check` holds
+line citations in range, and every harness goes through `scripts/run-harness.mjs`. A new gate step
+is a root `package.json` script named in `check.mjs`'s `STEPS`; a new harness is a name in
+`steps.mjs`'s `HARNESSES` and a script of the same name. `scripts/CLAUDE.md` describes all of them.
+`npm run ci` is `lint`, `check` and `build`, what CI runs spelled as one command.

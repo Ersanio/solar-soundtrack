@@ -2,6 +2,7 @@
 
 import "../localize";
 import { NOTE_MIN } from "@amk/core/hardcoded-tables";
+import { section } from "../harness";
 import { expectEdit, noteAt } from "./support";
 
 // --- a drum whose `@` is not written beside it --------------------------------
@@ -9,7 +10,7 @@ import { expectEdit, noteAt } from "./support";
 // A rest does not consume the drum remap, so `@21 r4 d4` plays `d4` as the drum. The strip reads
 // the drum off the walk rather than off the unit, so the plan names it and "plays what the plan
 // said" holds for every gesture below.
-console.log("\na drum written apart from its note");
+section("a drum written apart from its note");
 
 const APART = "#amk 2\n#0 o4 c4 @21 r4 d4 e4";
 
