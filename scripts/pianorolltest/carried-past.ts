@@ -1,4 +1,4 @@
-/** `rolltest`: a note carried past another, written again on the far side. */
+/** `pianorolltest`: a note carried past another, written again on the far side. */
 
 import "../localize";
 import { NOTE_MIN } from "@amk/core/hardcoded-tables";

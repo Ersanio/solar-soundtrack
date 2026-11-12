@@ -14,7 +14,7 @@ import type { ChannelTail, Strip, StripFrame } from './roll-strip';
  * `roll-write/`, which decides none of that and everything about the
  * spelling; the two are apart because that is what makes either testable.
  *
- * Nothing here knows about Angular, the DOM or pixels, so `rolltest` drives it
+ * Nothing here knows about Angular, the DOM or pixels, so `pianorolltest` drives it
  * against a real compile and checks the result by walking it.
  */
 

@@ -110,7 +110,7 @@ entry goes there, with its line here, in the same change.
   `framesInside`, `planFrames`, `planGroupEdits`, `run()`, `parseLabelLoop`, `coalesce`, `planReach`
 - **The loop join guarded by `holdsCommands` over the text between the two calls** —
   `strip.commands`, `gather`, `Command`, `tokens.ts:839`, `prefixCommandsOf`, `loopTick`,
-  `rolltest`, `loopsWhereItDid`
+  `pianorolltest`, `loopsWhereItDid`
 - **A `REFUSE_*` where the joined count passes 255** — `roll-edit.ts`, `parser.ts:2247`,
   `closeBefore`, `REFUSE_LOOP_LEAD_ROOM`
 - **The joined count read off `passesAt().before`, or off the digits** — `loop-focus.ts`,

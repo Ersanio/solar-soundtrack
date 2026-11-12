@@ -3,7 +3,7 @@
 // Usage: check.mjs [--bail] [--list] [step ...]
 //
 // Every step runs even after one fails, unless `--bail`. Naming steps runs only those, in the
-// gate's own order: `npm run check -- rolltest i18n:check`. Retries, logs and the report are
+// gate's own order: `npm run check -- pianorolltest i18n:check`. Retries, logs and the report are
 // `steps.mjs`.
 import console from 'node:console';
 import process from 'node:process';

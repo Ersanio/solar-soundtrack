@@ -1,4 +1,4 @@
-/** What every `rolltest` section shares: the driver, building and stripping a song, applying edits, and the `expect*` checks. */
+/** What every `pianorolltest` section shares: the driver, building and stripping a song, applying edits, and the `expect*` checks. */
 
 import "../localize";
 import { compiler } from "@amk/compiler";

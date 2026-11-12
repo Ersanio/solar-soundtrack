@@ -13,7 +13,7 @@ also runnable on their own:
 | `check:tokens`      | `tokentest`, `edittest`, `palettetest`            |
 | `check:spc`         | `adsrtest`, `instrtest`, `brrtest`, `firtest`     |
 | `check:integration` | `spctest`, `audiotest`, `worklettest`, `walktest` |
-| `check:app`         | `charttest`, `rolltest`                           |
+| `check:app`         | `charttest`, `pianorolltest`                      |
 
 Ten of the fourteen import a value from two or more `@amk/*` packages — every one but `adsrtest`,
 `edittest`, `selftest` and `tokentest` — which is why they all live here rather than one per package,
@@ -21,7 +21,7 @@ and why they share `harness.ts` rather than each carrying a copy: copies drift. 
 rather than bumping the number when one is added.
 
 Seven are split into section files — `selftest`, `tokentest`, `palettetest`, `audiotest`,
-`walktest`, `charttest` and `rolltest` — each a `scripts/<name>/` holding `main.ts`, which lists the
+`walktest`, `charttest` and `pianorolltest` — each a `scripts/<name>/` holding `main.ts`, which lists the
 sections in order, `support.ts`, which holds what they share, and one file per section. The other
 seven are one file each, `scripts/<name>.ts`.
 
@@ -43,7 +43,7 @@ harness. In one line each:
 - `adsrtest` — The envelope maths.
 - `palettetest` — The command palette's catalogue, and it is the one harness whose oracle is the compiler rather than a table of expected bytes.
 - `edittest` — The splices the command inspector writes back into the source.
-- `rolltest` — The piano roll's edits: `roll-strip.ts` and `roll-edit.ts`, driven the way the roll drives them.
+- `pianorolltest` — The piano roll's edits: `roll-strip.ts` and `roll-edit.ts`, driven the way the roll drives them.
 
 ## Running one, and reading what it prints
 
@@ -73,8 +73,8 @@ N is the number of `check` calls that ran, so a harness whose N dropped has lost
 | `HARNESS_VERBOSE=1` | Every `ok` line, every section header and the `info` lines.                                                                                                            |
 | `HARNESS_ONLY=a,b`  | A harness split into sections only: run just those sections, named as their files are (`loop-resize`, `driver-plays`). An unknown name lists the sections and exits 2. |
 
-PowerShell: `$env:HARNESS_ONLY='loops'; npm run rolltest; Remove-Item Env:HARNESS_ONLY`. Bash:
-`HARNESS_ONLY=loops npm run rolltest`. `HARNESS_QUIET` is accepted and does nothing; quiet is the
+PowerShell: `$env:HARNESS_ONLY='loops'; npm run pianorolltest; Remove-Item Env:HARNESS_ONLY`. Bash:
+`HARNESS_ONLY=loops npm run pianorolltest`. `HARNESS_QUIET` is accepted and does nothing; quiet is the
 default.
 
 ## `npm run check` and `npm run affected`
@@ -87,7 +87,7 @@ is written `-`). The exit code is non-zero when any step failed.
 - **`npm run check`** (`check.mjs`) is the gate: `format:check`, `codemap:check`,
   `citations:check`, `typecheck`, `typecheck:packages`, `typecheck:scripts`, the fourteen harnesses,
   `i18n:check`. It carries on past a failure, so one run reports everything that is broken;
-  `-- --bail` stops at the first. `npm run check -- rolltest i18n:check` runs only the steps named,
+  `-- --bail` stops at the first. `npm run check -- pianorolltest i18n:check` runs only the steps named,
   and `-- --list` prints the names.
 - **`npm run affected`** (`affected.mjs`) runs what covers the files changed since `HEAD`, untracked
   ones included (`-- --since main` for a branch): Prettier and ESLint on those files, the code map

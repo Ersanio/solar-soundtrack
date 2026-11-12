@@ -1,4 +1,4 @@
-/** `rolltest`: a note drawn, and the octave it spells. */
+/** `pianorolltest`: a note drawn, and the octave it spells. */
 
 import "../localize";
 import { NOTE_MIN } from "@amk/core/hardcoded-tables";

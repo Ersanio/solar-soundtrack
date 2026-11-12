@@ -16,7 +16,7 @@ handling, selection or toolbar.
 `piano-roll.ts` holds the song's shape and the porter's settings and calls four composables from
 its field initialisers, in dependency order: `rollView`, `rollTarget`, `rollGestures`,
 `rollPictures`. The flat `roll-*.ts` files they lean on are Angular-free so `charttest` and
-`rolltest` can import them. `piano-roll-architecture.md` has the reasoning; this is the map.
+`pianorolltest` can import them. `piano-roll-architecture.md` has the reasoning; this is the map.
 
 **Camera** (`roll-view.ts`, `roll-camera.ts`, `roll-layout.ts`). `rollCamera` is a module record
 of signals that outlives the component, which is rebuilt on every tab switch. `viewTick` is the

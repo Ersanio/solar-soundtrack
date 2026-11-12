@@ -14,7 +14,7 @@ they are run; read it first.
 ## Write it
 
 1. `scripts/<name>.ts`, or `scripts/<name>/main.ts` with section files and a `support.ts` beside
-   it where it will grow (`scripts/rolltest/` is the model). `scripts/run-harness.mjs` finds either.
+   it where it will grow (`scripts/pianorolltest/` is the model). `scripts/run-harness.mjs` finds either.
 2. It opens with a `/** */` doc comment: its first sentence is the harness's entry in `CODEMAP.md`,
    and the gate fails on a file without one.
 3. `import "./localize";` comes before every other import, so each module after it finds

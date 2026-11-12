@@ -83,7 +83,7 @@ Node 24 is what CI uses. CI runs `npm run lint` then `npm run check`.
 
 `check` runs every step even after one fails, retries a step that dies in a Node crash, keeps each
 step's output in `.selftest/logs/<step>.log` and ends with a table; `-- --bail` stops at the first
-failure and `-- rolltest i18n:check` runs named steps. Harnesses print one tally line unless a check
+failure and `-- pianorolltest i18n:check` runs named steps. Harnesses print one tally line unless a check
 fails; `HARNESS_VERBOSE=1` shows every `ok`, and `HARNESS_ONLY=<section>` runs one section of a
 sectioned harness. The detail: `scripts/CLAUDE.md` and the `verify-change` skill.
 

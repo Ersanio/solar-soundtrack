@@ -1,4 +1,4 @@
-/** `rolltest`: a removed item's commands are kept where something still plays under them. */
+/** `pianorolltest`: a removed item's commands are kept where something still plays under them. */
 
 import "../localize";
 import { NOTE_MIN } from "@amk/core/hardcoded-tables";

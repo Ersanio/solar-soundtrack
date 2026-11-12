@@ -1,4 +1,4 @@
-/** `rolltest`: a note dragged or stretched, and the octave and rests around it. */
+/** `pianorolltest`: a note dragged or stretched, and the octave and rests around it. */
 
 import "../localize";
 import { section } from "../harness";

@@ -1,4 +1,4 @@
-/** `rolltest`: what a drag carries with the notes it moves. */
+/** `pianorolltest`: what a drag carries with the notes it moves. */
 
 import "../localize";
 import { REFUSE_RANGE, REFUSE_ROOM } from "../../web/src/app/editor/views/piano-roll/roll-edit";

@@ -12,7 +12,7 @@ import { eol, openingCommands } from './roll-write/spelling';
  * does not (AMK0302/AMK0303), so nothing the roll's gestures can do is able to
  * write the first note. The seed is that first note's precondition: one rest,
  * and whatever has to stand in front of it, written as one batch so it is one
- * undo step. Everything here is arithmetic over plain data, so `rolltest`
+ * undo step. Everything here is arithmetic over plain data, so `pianorolltest`
  * drives it against a real compile.
  */
 

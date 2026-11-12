@@ -1,9 +1,9 @@
 ---
 paths:
-  - 'scripts/rolltest/**'
+  - 'scripts/pianorolltest/**'
 ---
 
-# `rolltest`: what it proves
+# `pianorolltest`: what it proves
 
 The piano roll's edits: `roll-strip.ts` and `roll-edit.ts`, driven the way the roll drives them. A
 gesture is never checked by looking at the text it produced — the text is **compiled and read
@@ -16,7 +16,7 @@ strip's fold, and it reads the **map** rather than the walk, because the walk en
 shortest channel and an edit out in a longer channel's tail would otherwise look like it had done
 nothing.
 
-`scripts/rolltest/main.ts` runs one section file per subject and `support.ts` holds what they share:
+`scripts/pianorolltest/main.ts` runs one section file per subject and `support.ts` holds what they share:
 the driver, building and stripping a song, applying edits, and the `expect*` checks. Below, each
 section file and what it pins. `bulk.ts` is the bulk gestures, legato and quantize, over a
 selection.

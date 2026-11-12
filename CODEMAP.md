@@ -196,36 +196,36 @@ something in the directory, which load by themselves when such a file is opened.
 - `supersession.ts` — `palettetest`: a superseded hex command and a substituted spelling compile to the same bytes, and a snippet is one run of MML on one line.
 - `support.ts` — What the `palettetest` sections share: the dialects, the probe song an entry is compiled in, `resolveAll`, and the `SUPERSEDED` table.
 
-## scripts/rolltest
+## scripts/pianorolltest
 
 **Rules:** `harnesses/*.md`, `piano-roll-editing.md`
 
-- `bulk.ts` — `rolltest`: the bulk gestures — legato and quantize — over a selection.
-- `carried-past.ts` (300+ lines) — `rolltest`: a note carried past another, written again on the far side.
-- `carrying-a-command.ts` — `rolltest`: carrying a command glyph to another tick.
-- `drag-carries.ts` — `rolltest`: what a drag carries with the notes it moves.
-- `drum-apart.ts` — `rolltest`: a drum whose `@` is not written beside it.
-- `gate.ts` — `rolltest`: what the strip will and will not read.
-- `insert-mode.ts` — `rolltest`: insert mode — the notes in the way move aside.
-- `loop-carries-loops.ts` (300+ lines) — `rolltest`: a loop carries the loops written inside it.
-- `loop-edge-gap.ts` (300+ lines) — `rolltest`: the loop box's edge opens a gap.
-- `loop-edge-join.ts` — `rolltest`: the loop box's edge joins a split loop back up.
-- `loop-resize.ts` (500+ lines) — `rolltest`: the loop box's ends resize the loop.
-- `loops.ts` (300+ lines) — `rolltest`: editing notes inside loops, checked against the walk of every pass.
+- `bulk.ts` — `pianorolltest`: the bulk gestures — legato and quantize — over a selection.
+- `carried-past.ts` (300+ lines) — `pianorolltest`: a note carried past another, written again on the far side.
+- `carrying-a-command.ts` — `pianorolltest`: carrying a command glyph to another tick.
+- `drag-carries.ts` — `pianorolltest`: what a drag carries with the notes it moves.
+- `drum-apart.ts` — `pianorolltest`: a drum whose `@` is not written beside it.
+- `gate.ts` — `pianorolltest`: what the strip will and will not read.
+- `insert-mode.ts` — `pianorolltest`: insert mode — the notes in the way move aside.
+- `loop-carries-loops.ts` (300+ lines) — `pianorolltest`: a loop carries the loops written inside it.
+- `loop-edge-gap.ts` (300+ lines) — `pianorolltest`: the loop box's edge opens a gap.
+- `loop-edge-join.ts` — `pianorolltest`: the loop box's edge joins a split loop back up.
+- `loop-resize.ts` (500+ lines) — `pianorolltest`: the loop box's ends resize the loop.
+- `loops.ts` (300+ lines) — `pianorolltest`: editing notes inside loops, checked against the walk of every pass.
 - `main.ts` — The piano roll's edits: `roll-strip.ts` and `roll-edit.ts`, driven the way the roll drives them and checked against the walk of what they wrote.
-- `note-deletes.ts` — `rolltest`: a note deleted, and the rest and octave it leaves.
-- `note-drags.ts` — `rolltest`: a note dragged or stretched, and the octave and rests around it.
-- `note-draws.ts` — `rolltest`: a note drawn, and the octave it spells.
-- `opening-a-channel.ts` (300+ lines) — `rolltest`: opening a channel the song does not have yet.
-- `overwrite-mode.ts` — `rolltest`: overwrite mode — the notes already there give up the ticks.
-- `past-the-end.ts` — `rolltest`: a note drawn past the end of the song, and the channels padded to meet it.
-- `pitch-slide.ts` — `rolltest`: notes carrying a `$DD` pitch slide.
-- `refusals.ts` — `rolltest`: the gestures the roll refuses outright.
-- `removed-commands.ts` — `rolltest`: a removed item's commands are kept where something still plays under them.
-- `seed.ts` — `rolltest`: seeding a song with no playable music.
-- `selection.ts` — `rolltest`: the selection survives an edit.
-- `spelling.ts` — `rolltest`: the spellings the roll and the compiler have to agree on.
-- `support.ts` (750+ lines) — What every `rolltest` section shares: the driver, building and stripping a song, applying edits, and the `expect*` checks.
+- `note-deletes.ts` — `pianorolltest`: a note deleted, and the rest and octave it leaves.
+- `note-drags.ts` — `pianorolltest`: a note dragged or stretched, and the octave and rests around it.
+- `note-draws.ts` — `pianorolltest`: a note drawn, and the octave it spells.
+- `opening-a-channel.ts` (300+ lines) — `pianorolltest`: opening a channel the song does not have yet.
+- `overwrite-mode.ts` — `pianorolltest`: overwrite mode — the notes already there give up the ticks.
+- `past-the-end.ts` — `pianorolltest`: a note drawn past the end of the song, and the channels padded to meet it.
+- `pitch-slide.ts` — `pianorolltest`: notes carrying a `$DD` pitch slide.
+- `refusals.ts` — `pianorolltest`: the gestures the roll refuses outright.
+- `removed-commands.ts` — `pianorolltest`: a removed item's commands are kept where something still plays under them.
+- `seed.ts` — `pianorolltest`: seeding a song with no playable music.
+- `selection.ts` — `pianorolltest`: the selection survives an edit.
+- `spelling.ts` — `pianorolltest`: the spellings the roll and the compiler have to agree on.
+- `support.ts` (750+ lines) — What every `pianorolltest` section shares: the driver, building and stripping a song, applying edits, and the `expect*` checks.
 
 ## scripts/selftest
 

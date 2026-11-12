@@ -39,14 +39,14 @@ there and moved away from, with the reason. The rule carries one index line per 
   (`parser.ts:parseIntro` writes `phrasePointers[channel][1]`), so a marker a note out of place moves
   the whole song's loop point, and none at all restarts the channel at its top. The tick decides, and
   the piece it lands inside is split: a rest becomes two rests, the note becomes a head and a `^`
-  continuation, which is still one note because a tie emits `$C6`. `rolltest` pins `loopTick` across
+  continuation, which is still one note because a tie emits `$C6`. `pianorolltest` pins `loopTick` across
   the edit, which is the only reading that catches a marker on the wrong tick.
 - **Filling a channel the roll opens out to the _longest_ channel**, or leaving it at the length of
   its first note — the second cuts the song off at that note, since the driver reloads every track
   pointer the moment one voice reads its `$00` (`main.asm:L_0C01`, `Music.cpp:3209`), and the first
   writes rests past a point the song never reaches. It is filled out to the **shortest playable**
   channel, `stats.introTicks + stats.loopTicks`, which leaves that minimum exactly where it was: the
-  song plays for as long after a channel is opened as before it, which `rolltest` pins per case.
+  song plays for as long after a channel is opened as before it, which `pianorolltest` pins per case.
 - **Writing a channel the roll opens into its place in `#0`-`#7` order** — `octave` and
   `defaultNoteLength` are one variable each and `parseHash` resets neither, so a block dropped
   between two others changes what the second is parsed under. A new `#N` goes at the **end of the
@@ -60,7 +60,7 @@ stats.loopTicks` pads **every other channel that would cut the song short** out 
   moved — placed and pushed both — rather than every note in the plan, or a deletion in a channel
   already running long would lengthen the song. A rest on the end needs no walk agreement and no
   `Strip`, so a channel `channelStrip` refuses outright is padded like any other; a channel at 0
-  ticks is left alone, since it holds nothing back. `rolltest`'s `playsFor` is what pins it — a rest
+  ticks is left alone, since it holds nothing back. `pianorolltest`'s `playsFor` is what pins it — a rest
   one note short reads exactly like a rest of the right length.
 - **Padding a channel with a rest of its own every time** — a second draw past the end wrote a second
   `rN` line under the first. A channel whose text ends on a rest has that rest lengthened
@@ -168,7 +168,7 @@ stats.loopTicks` pads **every other channel that would cut the song short** out 
   the pass played without the command in its list. The identity is the trap: `channelStrip` filters
   `index.commands` from its own `TokenIndex`, so a second `tokenize` makes every membership test
   false and keeps every command while looking like it works — `EditContext.inForce` and
-  `Strip.commands` must come from one scan, which is what `rolltest`'s `Built.index` is for.
+  `Strip.commands` must come from one scan, which is what `pianorolltest`'s `Built.index` is for.
 - **`removeItem` splicing a multi-segment unit whole** — `growUnits` ends `unitSpan` at the **last**
   segment (`roll-strip.ts`), so a `v200` written inside a note went out with the note in silence, and
   a `t` or an intro `/` would have gone the same way. A command inside a removed unit is asked the

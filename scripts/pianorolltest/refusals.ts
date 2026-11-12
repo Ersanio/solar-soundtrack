@@ -1,4 +1,4 @@
-/** `rolltest`: the gestures the roll refuses outright. */
+/** `pianorolltest`: the gestures the roll refuses outright. */
 
 import "../localize";
 import { NOTE_MIN } from "@amk/core/hardcoded-tables";

@@ -1,4 +1,4 @@
-/** `rolltest`: the spellings the roll and the compiler have to agree on. */
+/** `pianorolltest`: the spellings the roll and the compiler have to agree on. */
 
 import "../localize";
 import { NOTE_MAX, NOTE_MIN } from "@amk/core/hardcoded-tables";

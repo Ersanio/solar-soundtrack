@@ -1,4 +1,4 @@
-/** `rolltest`: carrying a command glyph to another tick. */
+/** `pianorolltest`: carrying a command glyph to another tick. */
 
 import "../localize";
 import {

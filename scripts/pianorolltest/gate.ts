@@ -1,4 +1,4 @@
-/** `rolltest`: what the strip will and will not read. */
+/** `pianorolltest`: what the strip will and will not read. */
 
 import "../localize";
 import { section } from "../harness";

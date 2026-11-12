@@ -15,7 +15,7 @@
  * that a note's octave falls out of its written byte — and the refusals, each
  * with a song that earns it.
  *
- *   npm run rolltest
+ *   npm run pianorolltest
  */
 
 // First, so every module after it finds $localize and the English.

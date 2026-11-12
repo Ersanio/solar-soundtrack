@@ -1,4 +1,4 @@
-/** `rolltest`: insert mode — the notes in the way move aside. */
+/** `pianorolltest`: insert mode — the notes in the way move aside. */
 
 import "../localize";
 import { NOTE_MIN } from "@amk/core/hardcoded-tables";

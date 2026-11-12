@@ -1,4 +1,4 @@
-/** `rolltest`: overwrite mode — the notes already there give up the ticks. */
+/** `pianorolltest`: overwrite mode — the notes already there give up the ticks. */
 
 import "../localize";
 import { section } from "../harness";

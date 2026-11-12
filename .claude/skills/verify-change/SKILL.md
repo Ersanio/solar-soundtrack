@@ -21,9 +21,9 @@ One harness on its own is `npm run <name>`; a passing run prints one line,
 
 - `HARNESS_ONLY=<section>[,<section>]` runs only those sections of a harness split into section
   files, named as the files under its `scripts/<name>/` are (`selftest`, `tokentest`,
-  `palettetest`, `audiotest`, `walktest`, `charttest` and `rolltest` are split). PowerShell:
-  `$env:HARNESS_ONLY='loop-resize'; npm run rolltest; Remove-Item Env:HARNESS_ONLY`. Bash:
-  `HARNESS_ONLY=loop-resize npm run rolltest`.
+  `palettetest`, `audiotest`, `walktest`, `charttest` and `pianorolltest` are split). PowerShell:
+  `$env:HARNESS_ONLY='loop-resize'; npm run pianorolltest; Remove-Item Env:HARNESS_ONLY`. Bash:
+  `HARNESS_ONLY=loop-resize npm run pianorolltest`.
 - `HARNESS_VERBOSE=1` prints every `ok` line and section header.
 - `node --enable-source-maps .selftest/<name>.mjs` runs the last bundle again without rebuilding
   it, which is the quickest way to tell a crash from a failure.

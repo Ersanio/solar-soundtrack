@@ -9,7 +9,7 @@ there and moved away from, with the reason. The rule carries one index line per 
   writes `o3 c4 o4 d4`, and on the next pass that `o4` is `d4`'s own leading octave.
 - **Refusing `<` and `>` in an edited channel** — they are not commands to the scanner at all, and
   they are harmless: a note's octave comes from its own `written` byte rather than from a running
-  sum, so `o4 c4 > d4` repitches either note without disturbing the other. `rolltest` pins it. That
+  sum, so `o4 c4 > d4` repitches either note without disturbing the other. `pianorolltest` pins it. That
   is a statement about the **row**, and what `planEdits` carries between the notes is the next
   entry, **Putting a drawn note's octave back at the end of its run**.
 - **Putting a drawn note's octave back at the end of its run**, in the mould of the rewrite path — a

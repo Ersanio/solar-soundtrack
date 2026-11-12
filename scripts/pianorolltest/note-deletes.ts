@@ -1,4 +1,4 @@
-/** `rolltest`: a note deleted, and the rest and octave it leaves. */
+/** `pianorolltest`: a note deleted, and the rest and octave it leaves. */
 
 import "../localize";
 import { section } from "../harness";

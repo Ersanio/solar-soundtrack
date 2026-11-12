@@ -1,4 +1,4 @@
-/** `rolltest`: a loop carries the loops written inside it. */
+/** `pianorolltest`: a loop carries the loops written inside it. */
 
 import "../localize";
 import {

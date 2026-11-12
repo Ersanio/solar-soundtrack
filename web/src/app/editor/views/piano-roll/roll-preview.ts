@@ -9,7 +9,7 @@ import { barRect } from './roll-metrics';
  * three are built from `WalkNote`s and say what the song *is*, where this is
  * built from a `Plan` and says what a pointer still down would make of it.
  *
- * Angular-free and pinned by `rolltest` through the plans it draws.
+ * Angular-free and pinned by `pianorolltest` through the plans it draws.
  */
 
 /** One bar of a gesture in flight: where it is, and what it means. */

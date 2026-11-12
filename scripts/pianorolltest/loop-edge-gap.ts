@@ -1,4 +1,4 @@
-/** `rolltest`: the loop box's edge opens a gap. */
+/** `pianorolltest`: the loop box's edge opens a gap. */
 
 import "../localize";
 import type { LoopRun } from "@amk/spc/song-walk";

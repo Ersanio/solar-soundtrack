@@ -25,7 +25,7 @@ import { BLIND_OCTAVES, type OctaveModel, octaveModel } from './roll-octave';
  * which the walk drops (`song-walk.ts:emitNote` returns early for `$C7`), and a
  * gap the roll can address is exactly a rest it can rewrite.
  *
- * Everything here is arithmetic over plain data, so `rolltest` can drive it
+ * Everything here is arithmetic over plain data, so `pianorolltest` can drive it
  * against a real compile the way `charttest` drives `roll-layout.ts`.
  */
 

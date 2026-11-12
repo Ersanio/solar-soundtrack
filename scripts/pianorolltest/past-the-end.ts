@@ -1,4 +1,4 @@
-/** `rolltest`: a note drawn past the end of the song, and the channels padded to meet it. */
+/** `pianorolltest`: a note drawn past the end of the song, and the channels padded to meet it. */
 
 import "../localize";
 import { NOTE_MIN } from "@amk/core/hardcoded-tables";

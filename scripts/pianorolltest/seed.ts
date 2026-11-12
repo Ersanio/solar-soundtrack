@@ -1,4 +1,4 @@
-/** `rolltest`: seeding a song with no playable music. */
+/** `pianorolltest`: seeding a song with no playable music. */
 
 import "../localize";
 import { compiler } from "@amk/compiler";

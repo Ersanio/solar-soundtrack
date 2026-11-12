@@ -132,7 +132,7 @@ export function octaveOfNote(written: number, text: string): number | null {
  * flat spellings are never needed and one canonical answer means a note dragged
  * away and back comes home spelled the same way. It agrees with `NOTE_NAMES` in
  * `@amk/tokens` by construction, both being built from {@link PITCH_TABLE};
- * `rolltest` holds them to each other, since core may not import tokens.
+ * `pianorolltest` holds them to each other, since core may not import tokens.
  */
 export function spellNote(written: number, octave: number): string | null {
 	if (written < NOTE_MIN || written >= NOTE_MAX) {

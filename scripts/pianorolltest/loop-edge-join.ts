@@ -1,4 +1,4 @@
-/** `rolltest`: the loop box's edge joins a split loop back up. */
+/** `pianorolltest`: the loop box's edge joins a split loop back up. */
 
 import "../localize";
 import {

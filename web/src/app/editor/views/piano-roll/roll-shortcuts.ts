@@ -7,7 +7,7 @@ import { eraseCommand } from './roll-command-move';
 /**
  * Everything a keypress can reach, as plain callbacks.
  *
- * A bag rather than the component, so this file needs no Angular and `rolltest`
+ * A bag rather than the component, so this file needs no Angular and `pianorolltest`
  * can drive the shortcuts the way it drives a gesture — the `Ctrl+B` bar
  * arithmetic and the precedence between a selected command and a selected note
  * are decisions with no other test.

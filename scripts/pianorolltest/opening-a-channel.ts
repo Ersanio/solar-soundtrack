@@ -1,4 +1,4 @@
-/** `rolltest`: opening a channel the song does not have yet. */
+/** `pianorolltest`: opening a channel the song does not have yet. */
 
 import "../localize";
 import { NOTE_MIN } from "@amk/core/hardcoded-tables";

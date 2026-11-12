@@ -11,7 +11,7 @@ Read before changing `roll-octave.ts`, or anything that writes or removes an `o`
 ## How it works now
 
 **The invariant: an edit changes no note it did not ask to change.** Every note the gesture leaves
-alone still sounds in the octave it was written in, and `rolltest` holds each edit to that through
+alone still sounds in the octave it was written in, and `pianorolltest` holds each edit to that through
 the walk.
 
 **The octave is one variable over the whole document** (`roll-octave.ts`). It starts at 4, no `#N`
@@ -48,7 +48,7 @@ proposing a redesign in this area, or when a title below matches what you are ab
 entry goes there, with its line here, in the same change.
 
 - **A trailing octave run winning over a leading one** — `growUnits`
-- **Refusing `<` and `>` in an edited channel** — `written`, `rolltest`, `planEdits`
+- **Refusing `<` and `>` in an edited channel** — `written`, `pianorolltest`, `planEdits`
 - **Putting a drawn note's octave back at the end of its run** — `spawnInto`
 - **Answering a deleted note's octave with `running = null`** — `rewriteNote`, `item.octave`,
   `keptOctaves`, `noteText`

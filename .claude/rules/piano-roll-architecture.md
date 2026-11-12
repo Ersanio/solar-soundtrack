@@ -158,7 +158,7 @@ unit would put every row's rule on a half pixel. A stored value outside the rang
 than rejected: it is a window that has been resized, not a value that means nothing.
 
 **A glyph is dragged sideways to move its command to another tick**, which `roll-command-move.ts`
-plans and `rolltest` drives. It is the only edit in the app that changes where a command runs without
+plans and `pianorolltest` drives. It is the only edit in the app that changes where a command runs without
 touching a note: everywhere else a command's position moves, a note gesture is carrying one it could
 not leave where it stood, and re-emits it on the tick it already had. Targets are the item heads of
 the command's own channel — every note and rest — so the insertion always lands in an item's prefix

@@ -1,4 +1,4 @@
-/** `rolltest`: notes carrying a `$DD` pitch slide. */
+/** `pianorolltest`: notes carrying a `$DD` pitch slide. */
 
 import "../localize";
 import type { PitchSlide } from "@amk/spc/song-walk";

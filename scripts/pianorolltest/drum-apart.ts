@@ -1,4 +1,4 @@
-/** `rolltest`: a drum whose `@` is not written beside it. */
+/** `pianorolltest`: a drum whose `@` is not written beside it. */
 
 import "../localize";
 import { NOTE_MIN } from "@amk/core/hardcoded-tables";

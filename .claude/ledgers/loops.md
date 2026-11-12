@@ -227,7 +227,7 @@ and moved away from, with the reason. The rule carries one index line per entry.
   the rest twice, `coalesce` running inside a plan and not across them, so it is priced once
   (`planReach`) and only the frame reaching furthest writes it. `playsFor` cannot catch that — an
   over-padded channel stops being the shortest and the song's figure does not move — so
-  `rolltest`'s `channelTicks` reads the padded voice's own count. And the costs are taken rather
+  `pianorolltest`'s `channelTicks` reads the padded voice's own count. And the costs are taken rather
   than worked around: `selectedBodies` finds the inner body whole too, so both boxes close up solid,
   and `selectedRun` is the whole group's text, which `wrapVerdict` reads as a run inside a loop
   holding a subloop and refuses as `WRAP_DEEP`.
@@ -236,7 +236,7 @@ and moved away from, with the reason. The rule carries one index line per entry.
   operator (`tokens.ts:839`), which `prefixCommandsOf` already says out loud. So `[c4]2 / r4 *2`
   closed and joined wrote `[c4]4 /` and moved the song's loop point by the grabbed occupation's
   whole length, with every note still on its tick and nothing in the walk to say so — only
-  `loopTick` catches it, which is why `rolltest`'s case asks `loopsWhereItDid`. What may stand
+  `loopTick` catches it, which is why `pianorolltest`'s case asks `loopsWhereItDid`. What may stand
   between the two is asked of the **text**, which must be blank once the rests go; that also turns
   away a `;` comment and a stray `o5` that would in fact have been harmless, and that is the trade,
   since the safe set cannot be enumerated from a list the dangerous member is not in. The split
@@ -268,7 +268,7 @@ and moved away from, with the reason. The rule carries one index line per entry.
   also puts it back in step with `StripItem.instances`: `expandAndJoin` fills those from this
   channel's runs alone, so `itemAt` and `constructFor` were already channel-correct while `frameAt`
   was not. In `roll-edit.ts` for `shiftBoundariesFor`'s reason — a harness cannot drive an Angular
-  composable, and `rolltest`'s `planFor` took a gesture's frame from its first item, which a `spawn`
+  composable, and `pianorolltest`'s `planFor` took a gesture's frame from its first item, which a `spawn`
   has not got, so every draw case ran in the root frame and `frameAt` was never executed at all.
 - **Dealing the roll's marks into shift buckets from the press** — `shiftBoundaries` answered off the
   held frame alone, so a press on a note inside a `[ ]` body raised the boundaries before anything

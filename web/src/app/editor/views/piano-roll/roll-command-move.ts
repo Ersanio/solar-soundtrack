@@ -17,7 +17,7 @@ import { coalesce } from './roll-write/plan-edits';
  * tick it already had — the gesture is about the notes, so the command's own
  * tick is preserved rather than chosen. This is the porter naming the tick.
  *
- * Angular-free and driven by `rolltest`, which reads the result by compiling it
+ * Angular-free and driven by `pianorolltest`, which reads the result by compiling it
  * and walking the song rather than by looking at the text.
  */
 

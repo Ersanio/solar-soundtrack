@@ -1,4 +1,4 @@
-/** `rolltest`: the loop box's ends resize the loop. */
+/** `pianorolltest`: the loop box's ends resize the loop. */
 
 import "../localize";
 import {

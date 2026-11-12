@@ -46,7 +46,7 @@ import { padChannels, realiseRegion } from './gaps';
  * again on the far side of one it was carried past. It can also refuse a
  * spelling it cannot produce.
  *
- * Nothing in `roll-write/` knows about Angular, the DOM or pixels, so `rolltest`
+ * Nothing in `roll-write/` knows about Angular, the DOM or pixels, so `pianorolltest`
  * drives it against a real compile and checks the result by walking it.
  */
 

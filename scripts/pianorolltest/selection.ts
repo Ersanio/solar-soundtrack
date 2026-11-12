@@ -1,4 +1,4 @@
-/** `rolltest`: the selection survives an edit. */
+/** `pianorolltest`: the selection survives an edit. */
 
 import "../localize";
 import { commandAt } from "@amk/tokens";

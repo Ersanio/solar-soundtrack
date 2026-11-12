@@ -1,4 +1,4 @@
-/** `rolltest`: editing notes inside loops, checked against the walk of every pass. */
+/** `pianorolltest`: editing notes inside loops, checked against the walk of every pass. */
 
 import "../localize";
 import { NOTE_MIN } from "@amk/core/hardcoded-tables";

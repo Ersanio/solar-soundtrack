@@ -1,4 +1,4 @@
-/** `rolltest`: the bulk gestures — legato and quantize — over a selection. */
+/** `pianorolltest`: the bulk gestures — legato and quantize — over a selection. */
 
 import "../localize";
 import { section } from "../harness";

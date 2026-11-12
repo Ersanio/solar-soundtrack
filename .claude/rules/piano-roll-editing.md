@@ -8,7 +8,7 @@ paths:
   - 'web/src/app/editor/views/piano-roll/roll-write/**'
   - 'web/src/app/editor/views/piano-roll/percussion.ts'
   - 'web/src/app/editor/views/piano-roll/percussion-panel/**'
-  - 'scripts/rolltest/**'
+  - 'scripts/pianorolltest/**'
 ---
 
 # Piano roll: editing
@@ -19,7 +19,7 @@ Read before changing how a roll gesture becomes text: `roll-edit.ts`, `roll-writ
 ## Editing from the piano roll
 
 `editor/views/piano-roll/roll-strip.ts` and `roll-edit.ts` are the two halves of a roll gesture, and
-both are Angular-free so `rolltest` can drive them against a real compile.
+both are Angular-free so `pianorolltest` can drive them against a real compile.
 
 The **strip** is one channel as a sequence the roll can splice. It is built from the compiler's
 `noteMap` rather than from the walk, because `noteMap` carries **rests** — the walk drops them — and a
@@ -94,13 +94,13 @@ entry goes there, with its line here, in the same change.
 - **Removing a deleted note's unit and writing the gap's rest somewhere else**
 - **A tail ending wherever its music ends** — `realiseRegion`, `plannedFrameTicks`
 - **Putting the intro `/` a channel the roll opens needs on the nearest note boundary** —
-  `parser.ts:parseIntro`, `rolltest`, `loopTick`
+  `parser.ts:parseIntro`, `pianorolltest`, `loopTick`
 - **Filling a channel the roll opens out to the _longest_ channel** — `main.asm:L_0C01`,
-  `Music.cpp:3209`, `rolltest`
+  `Music.cpp:3209`, `pianorolltest`
 - **Writing a channel the roll opens into its place in `#0`-`#7` order** — `octave`,
   `defaultNoteLength`, `parseHash`
 - **Letting a note drawn past the end of the song extend only its own channel** — `main.asm:L_0C01`,
-  `Music.cpp:3209`, `SST0502`, `padChannels`, `Strip`, `channelStrip`, `rolltest`, `playsFor`
+  `Music.cpp:3209`, `SST0502`, `padChannels`, `Strip`, `channelStrip`, `pianorolltest`, `playsFor`
 - **Padding a channel with a rest of its own every time** — `ChannelTail.rest`
 - **Each gesture answering an overlap for itself** — `resolved`, `touched`
 - **Counting a carve's pieces in `reach`** — `plan.erased`, `pushed`

@@ -14,7 +14,7 @@ import { basename, join } from "node:path";
  */
 export const SPC_ASSETS = join(import.meta.dirname, "..", "packages", "spc", "assets");
 
-/** The harness's own name, off the bundle it runs from: `.selftest/rolltest.mjs` is `rolltest`. */
+/** The harness's own name, off the bundle it runs from: `.selftest/pianorolltest.mjs` is `pianorolltest`. */
 const HARNESS = basename(process.argv[1] ?? "harness").replace(/\.[cm]?js$/, "");
 
 /** `HARNESS_VERBOSE` prints every `ok` line and every section header; without it only failures and the tally. */

@@ -51,7 +51,7 @@ per compile.
 **Geometry is the roll's**: `roll-command-layout.ts` (`packCommandLane`, `laneGlyphX`,
 `laneWindow`; `charttest`) packs rows over the whole song with the edited channel first and drops
 or dims what the mixer silences; `roll-command-move.ts` (`commandMoveTargets`, `planCommandMove`,
-`commandMoveRefusal`; `rolltest`) plans a glyph's sideways drag; `roll-command-lane/` draws and
+`commandMoveRefusal`; `pianorolltest`) plans a glyph's sideways drag; `roll-command-lane/` draws and
 takes the pointer. A bar's own glyphs are fitted by `fitBarContent` in `roll-bar-text.ts`.
 
 ## Decisions already made
