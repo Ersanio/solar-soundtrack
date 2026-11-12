@@ -1024,7 +1024,7 @@ export function walkSong(song: Uint8Array, aramAddress: number): SongTimeline {
 			case VCMD.CallLoop: {
 				// `cmdE9` (`Commands.asm:400-417`) — what a `[ ]` loop compiles to. The
 				// count is stored as written and the `$00` handler decrements before
-				// testing, so the body runs exactly that many times.
+				// testing, so the body runs exactly that many times, and once for a zero.
 				const target = indexOf(arg(0) | (arg(1) << 8));
 				const count = arg(2);
 				if (target < 0) {
@@ -1037,14 +1037,12 @@ export function walkSong(song: Uint8Array, aramAddress: number): SongTimeline {
 					return;
 				}
 
-				if (count === 0) {
-					break;
-				}
-
 				// A call while one is pending clobbers the driver's one frame; the
-				// old run keeps what it finished, as the `$E6` mark does.
+				// old run keeps what it finished, as the `$E6` mark does. A zero is no
+				// run: its `$00` finds `$C0+x` at zero and ends the phrase (`main.asm:2345-2346`).
 				settleRun(track.pendingCall);
-				track.pendingCall = openRun(channel, "call", aramAddress + track.at, arg(0) | (arg(1) << 8), track.ticks);
+				track.pendingCall =
+					count === 0 ? null : openRun(channel, "call", aramAddress + track.at, arg(0) | (arg(1) << 8), track.ticks);
 				track.callCount = count;
 				track.callReturn = track.at + length;
 				track.callRestart = target;

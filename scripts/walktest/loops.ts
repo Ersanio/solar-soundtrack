@@ -35,8 +35,8 @@ section("the loops the walk plays through");
 	const sub = shown("#amk 4\n#0 o4 [[c8d8]]2 e4\n");
 	check("a ]]n plays n times", sub === "sub#0x2@0+48,48+48", sub);
 
-	// The hex spelling goes through `cmdE6`'s own arithmetic: the byte is one
-	// less than the times the body plays.
+	// The hex spelling goes through `cmdE6`'s own arithmetic (`Commands.asm:376-392`):
+	// the byte is one less than the times the body plays.
 	const hex = shown("#amk 4\n#0 o4 $E6 $00 c8d8 $E6 $02 e4\n");
 	check("a hex $E6 $02 plays three times", hex === "sub#0x3@0+48,48+48,96+48", hex);
 
@@ -109,9 +109,9 @@ section("the loops the walk plays through");
 		crossed,
 	);
 
-	// A count of zero is skipped, not entered (`Commands.asm:161` via the walk's
-	// own break) — and it opens no run. Only bytes can spell it: `]0` is
-	// AMK0116 at parse, so the blob is built by hand here.
+	// `cmdE9` (`Commands.asm:400-417`) never tests its count, so a zero still enters the body, and
+	// the body's `$00` finds `$C0+x` at zero and ends the phrase (`main.asm:2345-2346`): the note
+	// after the call is never reached. Only bytes can spell it: `]0` is AMK0116 at parse.
 	{
 		const at = (offset: number) => [(ARAM + offset) & 0xff, (ARAM + offset) >> 8];
 		const blob = Uint8Array.from([
@@ -121,17 +121,23 @@ section("the loops the walk plays through");
 			...at(20), // channel 0
 			...new Array<number>(14).fill(0), // channels 1-7 unused
 			0xe9,
-			...at(24),
-			0x00, // a call of count 0, targeting the note below
+			...at(27),
+			0x00, // a call of count 0, targeting the body at 27
 			0x30,
-			0x80, // one note, so the channel is not empty
+			0x81, // the note after the call
+			0x00,
+			0x30,
+			0x80, // the body
 			0x00,
 		]);
-		const skipped = walkSong(blob, ARAM);
+		const zero = walkSong(blob, ARAM);
 		check(
-			"a $E9 of count zero is no run",
-			skipped.loops.length === 0 && skipped.notes.length === 1 && skipped.problems.length === 0,
-			`${skipped.loops.length} runs, ${skipped.notes.length} notes, ${skipped.problems.join(" | ")}`,
+			"a $E9 of count zero plays its body once, as no run, and ends there",
+			zero.loops.length === 0 &&
+				zero.notes.map((note) => note.note).join() === "128" &&
+				zero.ticks === 0x30 &&
+				zero.problems.length === 0,
+			`${zero.loops.length} runs, notes ${zero.notes.map((note) => note.note).join()}, ${zero.ticks} ticks, ${zero.problems.join(" | ")}`,
 		);
 	}
 }

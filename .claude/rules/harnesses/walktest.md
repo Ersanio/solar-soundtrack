@@ -57,7 +57,8 @@ how many times, entering at which tick:
   like `channelTicks`.
 
 What is _not_ a run is pinned beside what is: an unterminated `$E6 $00`, a remote definition and
-its call, and a count-zero `$E9`, which only a hand-built blob can spell (`]0` is AMK0116). A
+its call, and a count-zero `$E9`, which only a hand-built blob can spell (`]0` is AMK0116) and which
+plays its body once and ends the phrase on the body's `$00`, as `cmdE9` never tests its count. A
 crossed loop and subloop file what really played — one call run and a one-pass sub whose body range
 partially overlaps it — so a reader refusing that shape has a stable input.
 
@@ -206,7 +207,9 @@ Malformed data is contained, not thrown.
 ### `driver-plays.ts`
 
 The driver plays what the walk says it will: at every poll the note the walk says is sounding
-against the one the voice's track pointer is on.
+against the one the voice's track pointer is on. And a compiled `]2` patched to a count of zero:
+the running driver never reaches the notes after the call, where the unpatched song does, and the
+walk stops at the body's end with it.
 
 ### `driver-key-off.ts`
 

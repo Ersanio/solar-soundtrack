@@ -121,7 +121,7 @@ export function apply(source: string, edits: readonly Edit[]): string {
  * What a channel plays, read back out of the compiler's own note map.
  *
  * Not off the walk: `walkSong` ends the pass at the shortest channel and drops
- * everything after it (`song-walk.ts:1118-1129`), so a channel longer than the
+ * everything after it (`song-walk.ts:1116-1127`), so a channel longer than the
  * shortest would report only its first few notes and every edit out in the tail
  * would look like it had done nothing. The map has the whole channel. Ties are
  * folded here rather than borrowed from `roll-strip.ts`, so the reading this is

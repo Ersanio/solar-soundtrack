@@ -196,7 +196,7 @@ export interface StripItem {
   /**
    * False past the end of the pass, where the walk has no note to check the
    * item against — `walkSong` cuts at the shortest channel and sets the rest
-   * aside as `unreachable` (`song-walk.ts:1118-1129`). Still editable; just not
+   * aside as `unreachable` (`song-walk.ts:1116-1127`). Still editable; just not
    * corroborated. For a looped note, whether its **first** instance is inside
    * the pass.
    */
