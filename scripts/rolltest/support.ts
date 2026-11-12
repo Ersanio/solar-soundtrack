@@ -411,6 +411,17 @@ export function expectEdit(
 		`${others(before, channel)} -> ${others(rebuilt, channel)}`,
 	);
 
+	expectOutcome(name, before, rebuilt, after, expectation);
+}
+
+/** The opt-in readings of an {@link Expectation}, shared by every edit check that takes one. */
+export function expectOutcome(
+	name: string,
+	before: Built,
+	rebuilt: Built,
+	after: string,
+	expectation: Expectation,
+): void {
 	if (expectation.playsAsLong === true) {
 		check(
 			`${name}: plays for as long as it did`,

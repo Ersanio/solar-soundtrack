@@ -20,10 +20,10 @@ import {
 	type Built,
 	type Expectation,
 	expectOrdinals,
+	expectOutcome,
 	expectRefused,
 	frameFor,
 	introOf,
-	listOf,
 	noteAt,
 	playable,
 	strip,
@@ -64,7 +64,8 @@ export function walkedOthers(built: Built, channel: number): string {
  * An edit inside a loop-bearing channel: planned in the frame the expectation
  * or the gesture's items name, written, applied, recompiled — and then held to
  * `plays`, the edited voice's whole walk spelled out by hand, which is the one
- * reading that covers every pass of every body.
+ * reading that covers every pass of every body. The expectation's own readings
+ * are {@link expectOutcome}'s, as for `expectEdit`.
  *
  * Through `planFrames` and `planGroupEdits` rather than `planGesture` and
  * `planEdits`, which is the road the roll takes: a gesture moving no tick may
@@ -165,35 +166,7 @@ export function expectLoopEdit(
 		);
 	}
 
-	if (expectation.playsFor !== undefined) {
-		check(
-			`${name}: plays for ${expectation.playsFor} ticks`,
-			playable(rebuilt) === expectation.playsFor,
-			`${playable(before)} -> ${playable(rebuilt)} ticks`,
-		);
-	}
-
-	if (expectation.channelTicks !== undefined) {
-		const [voice, wanted] = expectation.channelTicks;
-		const ran = rebuilt.result.stats?.channelTicks?.[voice] ?? -1;
-		check(`${name}: #${voice} runs ${wanted} ticks`, ran === wanted, `${ran}`);
-	}
-
-	if (expectation.loopsWhereItDid === true) {
-		check(
-			`${name}: loops back where it did`,
-			before.timeline.loopTick === rebuilt.timeline.loopTick,
-			`${before.timeline.loopTick} -> ${rebuilt.timeline.loopTick}`,
-		);
-	}
-
-	for (const wanted of listOf(expectation.contains)) {
-		check(`${name}: writes ${wanted}`, after.includes(wanted), JSON.stringify(after));
-	}
-
-	for (const unwanted of listOf(expectation.lacks)) {
-		check(`${name}: does not write ${unwanted}`, !after.includes(unwanted), JSON.stringify(after));
-	}
+	expectOutcome(name, before, rebuilt, after, expectation);
 }
 
 // The strip's own shape on the headline song: one root frame holding the

@@ -131,21 +131,27 @@ the grabbed occurrence's own, and a voice with no construct moved keeps every on
 notes on the grabbed channel land in the same place under either list, and only the boundary says
 which voice's tail moves by how much.
 
-### The note gestures: `insert-mode.ts`, `drum-apart.ts`, `bulk.ts`, `refusals.ts`
+### The note gestures: `note-drags.ts`, `note-deletes.ts`, `note-draws.ts`, `insert-mode.ts`, `drum-apart.ts`, `bulk.ts`, `refusals.ts`
 
-The gestures cover a drag up a semitone, a drag into the next octave with the octave put back after
-it, a stretch that pushes its neighbour, one past a whole note written as a tie, a note drawn into a
-rest and past the end of a channel, one drawn at the octave already standing, which spells none of
-its own, and one drawn past a `>` written in the gap, and one past an upper-case `O`, both of which
-spell one because the scan over that gap saw them, a drum moved between lanes, a note deleted from
-between two rests, which leaves the one rest the two now are — with the cases that must **not**
-merge beside it, a `v200` or the intro `/` written between them, and a gap whose ticks do not
-change, so rests the porter wrote touching are only joined by a gesture that had to move them — the
-same thing in a channel's tail, which nothing else rewrites, a mid-note `v200` that has to keep its
-place inside the note being stretched, and a pitch drag on an implicit length that must **not**
-spell one in — `l4 c` stays `c`. And the refusals: a note dragged onto its neighbour, one dragged
-off the bottom of the driver's range, a stretch with nowhere to push, and a note shortened past the
-command written inside it.
+`note-drags.ts` is the drags and stretches: a drag up a semitone, a drag into the next octave with
+the octave put back after it, a repitch under an octave shift keeping the octave its unit carried, a
+note dragged earlier into the rest before it, a stretch past a whole note written as a tie, a drum
+moved between lanes, a mid-note `v200` that has to keep its place inside the note being stretched,
+and a pitch drag on an implicit length that must **not** spell one in — `l4 c` stays `c`.
+`note-deletes.ts` is the deletes: the octave a deleted note's unit carried, put back at the head of
+the note that reads it and only there, and a note deleted from between two rests, which leaves the
+one rest the two now are — with the cases that must **not** merge beside it, a `v200` or the intro
+`/` written between them, and a gap whose ticks do not change, so rests the porter wrote touching are
+only joined by a gesture that had to move them — and the same thing in a channel's tail, which
+nothing else rewrites. `note-draws.ts` is the draws: a note drawn into a rest and past the end of a
+channel, one drawn at the octave already standing, which spells none of its own, one drawn past a
+`>` written in the gap and one past an upper-case `O`, both of which spell one because the scan over
+that gap saw them, the octave put back for the note after a drawn one, and a note drawn in front of a
+loop, whose body reads the octave standing at its `[`. `insert-mode.ts` is the pushes, a drag, a
+draw and a stretch shoving a neighbour aside; `drum-apart.ts` a drum whose `@` is written apart from
+it; `bulk.ts` legato, quantize, glue and a selection moved as one. And `refusals.ts`: a note dragged
+onto its neighbour, one dragged off the bottom of the driver's range, a stretch with nowhere to push,
+and a note shortened past the command written inside it.
 
 ### `overwrite-mode.ts`
 

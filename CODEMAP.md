@@ -210,11 +210,12 @@ something in the directory, which load by themselves when such a file is opened.
 - `loop-carries-loops.ts` (300+ lines) — `rolltest`: a loop carries the loops written inside it.
 - `loop-edge-gap.ts` (300+ lines) — `rolltest`: the loop box's edge opens a gap.
 - `loop-edge-join.ts` — `rolltest`: the loop box's edge joins a split loop back up.
-- `loop-resize.ts` (1000+ lines) — `rolltest`: the loop box's ends resize the loop.
-  - `the loop box's ends resize the loop`:52 `expectResize`:65 `expectResizeRefusal`:149 `grabResize`:172
-  - `spelledShifts`:447 `spelledBounds`:455
+- `loop-resize.ts` (500+ lines) — `rolltest`: the loop box's ends resize the loop.
 - `loops.ts` (300+ lines) — `rolltest`: editing notes inside loops, checked against the walk of every pass.
 - `main.ts` — The piano roll's edits: `roll-strip.ts` and `roll-edit.ts`, driven the way the roll drives them and checked against the walk of what they wrote.
+- `note-deletes.ts` — `rolltest`: a note deleted, and the rest and octave it leaves.
+- `note-drags.ts` — `rolltest`: a note dragged or stretched, and the octave and rests around it.
+- `note-draws.ts` — `rolltest`: a note drawn, and the octave it spells.
 - `opening-a-channel.ts` (300+ lines) — `rolltest`: opening a channel the song does not have yet.
 - `overwrite-mode.ts` — `rolltest`: overwrite mode — the notes already there give up the ticks.
 - `past-the-end.ts` — `rolltest`: a note drawn past the end of the song, and the channels padded to meet it.

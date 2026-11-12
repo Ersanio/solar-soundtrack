@@ -43,3 +43,10 @@ expectEdit("a note drawn over the one after it, pushing it right", "#amk 2\n#0 o
 	written: NOTE_MIN + 36 + 4,
 	drum: null,
 }));
+
+expectEdit("a note stretched, pushing the one after it", "#amk 2\n#0 o4 c4 d4 e4", 0, (bar) => ({
+	kind: "stretch",
+	items: [noteAt(bar, 0)],
+	edge: "end",
+	deltaTicks: 48,
+}));
