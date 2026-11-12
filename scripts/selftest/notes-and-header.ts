@@ -60,7 +60,7 @@ section("note encoding");
 section("long notes split into ties");
 {
 	const result = compile("#amk 4\n#0 o4 c1\n");
-	// 192 ticks exceeds the 0x80 note-length limit, so Music.cpp:2245 emits a
+	// 192 ticks exceeds the 0x80 note-length limit, so Music.cpp:2252-2274 emits a
 	// 0x60 head and ties the rest. The remainder is exactly 0x60, so the
 	// `if (j != 0x60)` guard suppresses a redundant duration byte before the tie.
 	expectBytes("whole note", result.data!.slice(28), [0x60, 0x7f, 0xa4, 0xc6, 0x00]);

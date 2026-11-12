@@ -17,6 +17,6 @@ and rescanned, and `selectedInstrument` has to name the one that was picked. A l
 a write built another offers one instrument and selects a different one, silently. **A note's length
 is written onto the note**: a bare `c` under an `l8` has no argument to splice and is still 24 ticks
 long, so the digits are inserted where none were written, and they go in front of the dots — which
-compose rather than add (`Music.cpp:2950`) — so `l8 c.` written back at its own denominator is `c8.`
+compose rather than add (`Music.cpp:2956-2957`) — so `l8 c.` written back at its own denominator is `c8.`
 and still 36 ticks; the standing `l`, the notes around it and a tie's other segment are read back
 unmoved.

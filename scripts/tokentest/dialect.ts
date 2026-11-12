@@ -29,10 +29,10 @@ section("the velocity table follows the hex, not just the directives");
 		"and a later $FA $06 $01 switches back",
 		tableAt("#amk 4\n#option smwvtable\n#0 $FA $06 $01 q7F c4\n", "q7F") === "nspc",
 	);
-	// main.asm:2373 compares against zero, so $05 is as N-SPC as $01 is.
+	// main.asm:2374 compares against zero, so $05 is as N-SPC as $01 is.
 	check("a value the driver does not test for is N-SPC", tableAt("#amk 4\n#0 $FA $06 $05 q7F c4\n", "q7F") === "nspc");
 
-	// Commands.asm:610 stores #$01 outright, so $F4 $08 only goes the one way.
+	// Commands.asm:611 stores #$01 outright, so $F4 $08 only goes the one way.
 	check("$F4 $08 leaves SMW", tableAt("#amk 4\n#option smwvtable\n#0 $F4 $08 q7F c4\n", "q7F") === "nspc");
 	check("#louder does the same", tableAt("#amk 4\n#option smwvtable\n#louder\n#0 q7F c4\n", "q7F") === "nspc");
 

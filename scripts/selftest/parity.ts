@@ -33,7 +33,7 @@ section("parity against AddmusicKsrc");
 		labelSubloop.diagnostics.map((d) => `${d.code} ${d.message}`).join("; "),
 	);
 
-	// Music.cpp:3493 — a declared length must switch guessing off, or the
+	// Music.cpp:3501 — a declared length must switch guessing off, or the
 	// estimate wins and the declared value is recorded but never used.
 	const declared = compile('#amk 4\n#spc { #length "1:30" }\n#0 o4 c4\n');
 	check('#length "1:30" is 90 seconds', declared.stats?.tagSeconds === 90, `${declared.stats?.tagSeconds}`);
@@ -149,7 +149,7 @@ section("parity against AddmusicKsrc");
 		`${staggered.stats?.introTicks}/${staggered.stats?.loopTicks} vs ${split.introSeconds}/${split.mainSeconds}`,
 	);
 
-	// Music.cpp:3528 — ID666 gives each text field 32 bytes.
+	// Music.cpp:3543-3547 — ID666 gives each text field 32 bytes.
 	const longTitle = compile(`#amk 4\n#spc { #title "${"x".repeat(40)}" }\n#0 o4 c4\n`);
 	check(
 		"an over-long title is truncated to 32",

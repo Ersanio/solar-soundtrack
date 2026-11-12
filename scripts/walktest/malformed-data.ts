@@ -10,7 +10,7 @@ section("malformed data is contained, not thrown");
 // ---------------------------------------------------------------------------
 {
 	// `*` before any `[ ]` emits `$E9 FF FF n` on purpose (`parser.ts:2564-2573`,
-	// porting `Music.cpp:1321`), because AddmusicK builds it rather than
+	// porting `Music.cpp:240, 1337-1341`), because AddmusicK builds it rather than
 	// rejecting it. What it does *not* do is point outside the song: relocation
 	// adds the loop-block base to `$FFFF` and keeps the low sixteen bits, so the
 	// call wraps to one byte below the block and lands back inside the blob. The

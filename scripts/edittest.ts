@@ -25,7 +25,7 @@
  *
  *   4. **A note's length is written onto the note.** A bare `c` under an `l8`
  *      has no argument to splice and is still 24 ticks long, and its dots
- *      compose rather than add (`Music.cpp:2950`), so the digits go in front of
+ *      compose rather than add (`Music.cpp:2956-2957`), so the digits go in front of
  *      them — `l8 c.` written back at its own denominator is `c8.` and still 36
  *      ticks, not the 72 of `c4.`.
  */
@@ -336,7 +336,7 @@ section("a note's length is written onto the note, whatever it was written as");
 	// still a note of a definite length. Every assertion here is a round trip
 	// through `tokenize` rather than a comparison of numbers, because the failure
 	// this is guarding against — digits written in front of dots that compose
-	// rather than add (`Music.cpp:2950`) — produces text that reads perfectly and
+	// rather than add (`Music.cpp:2956-2957`) — produces text that reads perfectly and
 	// plays something else.
 	const noteIn = (source: string, needle: string): Command => {
 		const at = source.indexOf(needle);

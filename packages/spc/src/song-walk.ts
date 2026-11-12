@@ -136,7 +136,7 @@ export function vcmdLength(song: Uint8Array, index: number): number {
 	}
 
 	// `$FA $FE`'s hot patch takes one further byte for *every* trailing byte
-	// whose high bit is set: `.FACommand_readUntilPositive` (`main.asm:3006`)
+	// whose high bit is set: `.FACommand_readUntilPositive` (`main.asm:3011-3015`)
 	// loops while `bmi`, then steps once more past the byte that ended it.
 	if (vcmd === VCMD.Settings && song[index + 1] === 0xfe) {
 		let at = index + 2;
@@ -170,7 +170,7 @@ interface Track {
 	frameAt: number;
 	/**
 	 * `$E9`'s frame: `$C0+x` counts iterations, `$03E0/1` is where to return and
-	 * `$03F0/1` is where to restart. `cmdE9` (`Commands.asm:161`) stores the
+	 * `$03F0/1` is where to restart. `cmdE9` (`Commands.asm:400-417`) stores the
 	 * count as written, and the `$00` handler decrements before testing, so the
 	 * body runs exactly `count` times.
 	 */
@@ -179,7 +179,7 @@ interface Track {
 	callRestart: number;
 	/**
 	 * `$E6`'s frame, which shares nothing with `$E9`'s — it is `$01E0/1` and
-	 * `$01F0` (`Commands.asm:31`), so a subloop nests inside a call without
+	 * `$01F0` (`Commands.asm:365-392`), so a subloop nests inside a call without
 	 * either disturbing the other. `$E6 $00` stores `$FF`; the first closing
 	 * `$E6 $n` sees `$FE` after its `dec` and loads `n`, so the body plays n+1
 	 * times.
@@ -692,7 +692,7 @@ export function walkSong(song: Uint8Array, aramAddress: number): SongTimeline {
 
 			if (byte < NOTE_LOWEST) {
 				// A duration byte, and then one fetch that is *not* guarded against
-				// zero (`main.asm:2374-2377` tests `bmi`, not `beq`). So a `$00`
+				// zero (`main.asm:2364-2365` tests `bmi`, not `beq`). So a `$00`
 				// sitting here is a `q` byte of zero, not the end of the channel —
 				// reading it as an end would misframe everything after it.
 				track.frameAt = track.at;
@@ -757,7 +757,7 @@ export function walkSong(song: Uint8Array, aramAddress: number): SongTimeline {
 
 		const ticks = track.duration;
 
-		// `$C6` returns before any key-on or key-off (`main.asm:2403-2405`), so the
+		// `$C6` returns before any key-on or key-off (`main.asm:361-363`), so the
 		// note already sounding simply runs longer. Folding the tie into that note
 		// is what makes a piano roll draw one bar rather than several.
 		if (byte === NOTE_TIE_BYTE) {
@@ -863,7 +863,7 @@ export function walkSong(song: Uint8Array, aramAddress: number): SongTimeline {
 				// recorded rather than just the three bytes: the same operands found
 				// a tie later are a different slide.
 				//
-				// The "no slide already running" half is not modelled: `main.asm:3248`
+				// The "no slide already running" half is not modelled: `main.asm:3247-3249`
 				// reads it only while `$90+x` is zero, so a second `$DD` inside a
 				// slide is ignored where this records it.
 				const address = aramAddress + track.at;
@@ -964,7 +964,7 @@ export function walkSong(song: Uint8Array, aramAddress: number): SongTimeline {
 				dirty = false;
 				break;
 			case VCMD.Settings:
-				// `$FA $06` picks the velocity table. `main.asm:2379` tests it
+				// `$FA $06` picks the velocity table. `main.asm:2374-2375` tests it
 				// against zero, so anything non-zero is the N-SPC half.
 				if (arg(0) === 0x06) {
 					shared.secondVelocityTable = arg(1) !== 0;
@@ -981,7 +981,7 @@ export function walkSong(song: Uint8Array, aramAddress: number): SongTimeline {
 				break;
 
 			case VCMD.Subloop: {
-				// `cmdE6` (`Commands.asm:31`). `$E6 $00` marks; a non-zero argument
+				// `cmdE6` (`Commands.asm:365-392`). `$E6 $00` marks; a non-zero argument
 				// closes, and the count is loaded on the first close only, so the
 				// body plays one more time than the byte says.
 				if (arg(0) === 0) {
@@ -1022,14 +1022,14 @@ export function walkSong(song: Uint8Array, aramAddress: number): SongTimeline {
 			}
 
 			case VCMD.CallLoop: {
-				// `cmdE9` (`Commands.asm:161`) — what a `[ ]` loop compiles to. The
+				// `cmdE9` (`Commands.asm:400-417`) — what a `[ ]` loop compiles to. The
 				// count is stored as written and the `$00` handler decrements before
 				// testing, so the body runs exactly that many times.
 				const target = indexOf(arg(0) | (arg(1) << 8));
 				const count = arg(2);
 				if (target < 0) {
 					// `*` before any `[ ]` emits `$E9 FF FF n` on purpose
-					// (`parser.ts:2564-2573`, porting `Music.cpp:1321`), because
+					// (`parser.ts:2564-2573`, porting `Music.cpp:240, 1337-1341`), because
 					// AddmusicK builds it. A call to nowhere ends the channel here
 					// rather than throwing, so the other seven still draw.
 					problems.push(`Channel ${channel} calls a loop that was never defined.`);

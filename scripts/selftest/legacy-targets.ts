@@ -37,7 +37,7 @@ section("legacy targets compile");
 
 section("target selects the compatibility prefix");
 {
-	// Music.cpp:2989 — each target gets its own 3-byte mode prefix, right after
+	// Music.cpp:2992-3018 — each target gets its own 3-byte mode prefix, right after
 	// the echo buffer allocation.
 	for (const [source, expected, label] of [
 		["#amk 4\n#0 o4 c4\n", [0xfa, 0x06, 0x01], "#amk 4 -> N-SPC vtable"],
@@ -80,7 +80,7 @@ section("y packs its surround flags into the $DB byte");
 
 	check("y21 is out of range", !compile("#amk 4\n#0 y21 o4 c4\n").ok);
 	check("and so is a third argument of 3", !compile("#amk 4\n#0 y10,0,3 o4 c4\n").ok);
-	// Music.cpp:718 — the second argument without a third is an error, not a default.
+	// Music.cpp:717 — the second argument without a third is an error, not a default.
 	check("a lone second argument is rejected", !compile("#amk 4\n#0 y10,1 o4 c4\n").ok);
 }
 

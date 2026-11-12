@@ -70,7 +70,7 @@ section("CLOCKS, checked against the published noise ladder");
 
 section("the readme's magic tables are bsnes's step counts");
 {
-	// readme:68 and :78. These are the numbers the closed forms scale by, and
+	// `hex_command_reference.html:69` and `:79`. These are the numbers the closed forms scale by, and
 	// they are asserted here to be the number of DSP steps the fall really takes.
 	const DECAY_STEPS = [440, 312, 227, 163, 112, 69, 32, 0];
 	const RELEASE_STEPS = [255, 383, 469, 533, 584, 626, 663, 695];

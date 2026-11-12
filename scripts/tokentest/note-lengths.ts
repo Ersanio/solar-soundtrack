@@ -97,7 +97,7 @@ section("every segment says which denominator names it, and where the digits go"
 	// to be a value that, *written*, reproduces the ticks the segment already
 	// plays for — otherwise letting a slider go where it was picked up changes
 	// the music. `digits` has to cover the digits and nothing else: the dots of a
-	// segment compose rather than add (`Music.cpp:2950`), so a span reaching over
+	// segment compose rather than add (`Music.cpp:2956-2957`), so a span reaching over
 	// them writes 48 where the note was 36, and one reaching over an `=` turns a
 	// tick count into a denominator.
 	const segmentOf = (source: string, needle: string) => lengthOf(source, needle)?.[0];
