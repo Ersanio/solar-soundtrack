@@ -5,7 +5,7 @@
 
 import "../localize";
 import { check, section } from "../harness";
-import { compile } from "./support";
+import { compile, hex } from "./support";
 
 section("intro changes the header shape");
 {
@@ -16,13 +16,15 @@ section("intro changes the header shape");
 	check("hasIntro", result.stats?.hasIntro === true);
 	if (result.data) {
 		const view = new DataView(result.data.buffer, result.data.byteOffset);
+		// Word 0 points at each channel's start, the intro; word 1 at the part after
+		// `/`, which the loop returns to (Music.cpp:3159-3163, :3166, :3185).
 		check(
-			"word 0 -> main pointer block",
+			"word 0 -> intro pointer block",
 			view.getUint16(0, true) === 0x3e00 + 8,
 			`got ${view.getUint16(0, true).toString(16)}`,
 		);
 		check(
-			"word 1 -> intro pointer block",
+			"word 1 -> main pointer block",
 			view.getUint16(2, true) === 0x3e00 + 8 + 16,
 			`got ${view.getUint16(2, true).toString(16)}`,
 		);
@@ -82,6 +84,16 @@ section("relocation follows the ARAM address");
 		const wordA = a.data[0] | (a.data[1] << 8);
 		const wordB = b.data[0] | (b.data[1] << 8);
 		check("header pointer shifts", wordB - wordA === delta, `${wordA.toString(16)} vs ${wordB.toString(16)}`);
-		check("body is otherwise identical", a.data.length === b.data.length);
+
+		// The song pointer, the loop target, channel 0's pointer and the $E9 call's target.
+		const pointers = [0, 4, 6, [...a.data].lastIndexOf(0xe9) + 1];
+		const word = (data: Uint8Array, at: number) => data[at] | (data[at + 1] << 8);
+		check(
+			"every pointer shifts",
+			pointers.every((at) => word(b.data!, at) - word(a.data!, at) === delta),
+			pointers.map((at) => `${word(a.data!, at).toString(16)} vs ${word(b.data!, at).toString(16)}`).join(", "),
+		);
+		const rest = (data: Uint8Array) => data.filter((_, i) => !pointers.some((at) => i === at || i === at + 1));
+		check("body is otherwise identical", hex(rest(a.data)) === hex(rest(b.data)), `${hex(a.data)}\n${hex(b.data)}`);
 	}
 }

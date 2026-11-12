@@ -6,7 +6,7 @@
 import "../localize";
 import type { CompileResult } from "@amk/core/types";
 import { check, section } from "../harness";
-import { compile, expectBytes } from "./support";
+import { compile, expectBytes, hex } from "./support";
 
 section("legacy targets compile");
 {
@@ -98,10 +98,19 @@ section("legacy note behaviour");
 	check("am4 first note untransposed", notesOf(am4)[0] === 0xa4, `0x${notesOf(am4)[0]?.toString(16)}`);
 	check("am4 second note transposed by @2", notesOf(am4)[1] === 0xa4 - 5, `0x${notesOf(am4)[1]?.toString(16)}`);
 
-	// Addmusic 4.05 stops honouring dots after two.
+	// Addmusic 4.05 stops honouring dots after two (Music.cpp:2960), so past the
+	// prefixes only the length byte ahead of `q` $7F and the note $A4 differs.
 	const twoDots = compile("#am4\n#0 o4 c4...\n");
 	const amkDots = compile("#amk 4\n#0 o4 c4...\n");
-	check("three dots differ between targets", twoDots.data!.length !== 0 && amkDots.data!.length !== 0);
+	const noteOf = (r: typeof am4) => hex(r.data!.slice(r.stats!.headerSize + 6));
+	check(
+		"three dots differ between targets",
+		twoDots.data!.length !== 0 &&
+			amkDots.data!.length !== 0 &&
+			noteOf(twoDots) === "54 7F A4 00" &&
+			noteOf(amkDots) === "5A 7F A4 00",
+		`am4 ${noteOf(twoDots)}, amk ${noteOf(amkDots)}`,
+	);
 	const lenOf = (r: typeof am4) => [...r.data!.slice(r.stats!.headerSize)][6];
 	check("am4 honours only two dots", lenOf(twoDots) === 48 + 24 + 12, `${lenOf(twoDots)}`);
 	check("amk honours three", lenOf(amkDots) === 48 + 24 + 12 + 6, `${lenOf(amkDots)}`);
