@@ -108,7 +108,8 @@ correctness-critical output, not a statistic.
 `stats.introTicks`, `stats.loopTicks` and `stats.channelTicks` are exact — a tick is the same tick
 on both sides of the boundary. `stats.tagSeconds`, `introSeconds` and `mainSeconds` are AddmusicK's
 own arithmetic, kept for the ID666 header and for labels, and are a few percent out by design.
-`stats.playback` is the same split measured against the driver's real tick rate.
+`stats.playback` is the same split priced at the driver's real tick rate: still a prediction, which
+`EditorStore.clock` replaces with a measurement wherever there is a walk to read.
 
 Anything that follows the music uses ticks. See `@amk/spc`'s CLAUDE.md for why no formula over tempo
 can be exact.

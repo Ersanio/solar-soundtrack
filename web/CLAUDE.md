@@ -65,8 +65,8 @@ blocked rather than run against a guess.
 
 `EditorStore` debounces typing (150 ms) into a `committed` signal that a `computed` compiles.
 Diagnostics, stats, the ARAM budget and the hex dump are all `computed` off that one result.
-`buildSpc` is a method rather than a `computed` because it copies 64 KiB of ARAM plus every sample —
-wasted work on each keystroke.
+`assembleSpc()` is a method rather than a `computed` because it copies 64 KiB of ARAM plus every
+sample — wasted work on each keystroke.
 
 ## Adding a view
 
