@@ -159,6 +159,17 @@ section("intermediate overflow — bsnes SPC_DSP.cpp:668-678");
 
 	// The eighth tap is outside the budget, being added after the truncation.
 	check("tap 7 does not count against it", firHeadroom([0, 0, 0, 0, 0, 0, 0, 127]).sum === 0);
+	check("nor does it wrap at $7F", !firHeadroom([0, 0, 0, 0, 0, 0, 0, 127]).lastTapWraps);
+
+	// −16384 × −128 >> 6 is +32768, one past int16, both in the sum and in
+	// tap 7's own `(int16_t) CALC_FIR(7, 0)` (:671).
+	check("tap 7 at $80 wraps on its own", firHeadroom([0, 0, 0, 0, 0, 0, 0, -128]).lastTapWraps);
+	check("but not into the sum of the rest", !firHeadroom([0, 0, 0, 0, 0, 0, 0, -128]).mayWrap);
+	check("a lone $80 among taps 0-6 wraps at a sum of 128", firHeadroom([-128, 0, 0, 0, 0, 0, 0, 0]).mayWrap);
+	check("as does any all-negative 128", firHeadroom([0, -64, 0, -64, 0, 0, 0, 0]).mayWrap);
+	check("one positive tap in a 128 keeps it inside", !firHeadroom([1, -127, 0, 0, 0, 0, 0, 0]).mayWrap);
+	check("a positive 128 stays inside", !firHeadroom([0x40, 0x40, 0, 0, 0, 0, 0, 0]).mayWrap);
+	check("129 wraps whatever the signs", firHeadroom([0x40, 0x41, 0, 0, 0, 0, 0, 0]).mayWrap);
 
 	// AddmusicK's own EchoFilter0 exceeds the bound: 1+8+23+36+36+23+8 = 135.
 	// Recorded rather than treated as a fault — it is Super Mario World's echo,
@@ -176,7 +187,7 @@ section("intermediate overflow — bsnes SPC_DSP.cpp:668-678");
 
 		check(
 			`${preset.name} stays inside the DSP's arithmetic`,
-			!firHeadroom(preset.taps).mayWrap,
+			!firHeadroom(preset.taps).mayWrap && !firHeadroom(preset.taps).lastTapWraps,
 			`sum ${firHeadroom(preset.taps).sum}`,
 		);
 	}

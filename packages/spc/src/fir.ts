@@ -283,13 +283,22 @@ export function echoStability(taps: FirTaps, feedbackByte: number): EchoStabilit
 }
 
 export interface FirHeadroom {
-	/** `Σ|c₀…c₆|`. At or below 128 the intermediate sum cannot overflow. */
+	/** `Σ|c₀…c₆|`. Above 128 the intermediate sum can overflow; at 128 only if every tap is negative. */
 	sum: number;
 	/** How much of the safe budget is used, as a fraction. */
 	fraction: number;
-	/** The intermediate sum can wrap on a loud enough echo signal. */
+	/** The sum of taps 0–6 can wrap on a loud enough echo signal. */
 	mayWrap: boolean;
+	/** C7 is `$80`, whose product alone can wrap before the clamp. */
+	lastTapWraps: boolean;
 }
+
+/** The extremes of a history sample: the buffer's signed 16 bits, halved (`SPC_DSP.cpp:629`). */
+const HISTORY_MIN = -16384;
+const HISTORY_MAX = 16383;
+
+/** One tap's contribution, as `CALC_FIR` computes it (`SPC_DSP.cpp:621`). */
+const tapProduct = (sample: number, tap: number): number => (sample * tap) >> 6;
 
 /**
  * Whether the filter can overflow the DSP's own arithmetic.
@@ -302,9 +311,12 @@ export interface FirHeadroom {
  * sum wraps from positive to negative, rather than into the soft clipping you
  * would expect.
  *
- * A buffer sample is halved before the taps see it, so the largest magnitude
- * one tap contributes is `16384 × |c| / 64 = 256|c|`. Seven of them stay inside
- * a signed 16-bit total exactly when `Σ|c₀…c₆| ≤ 128`.
+ * Each tap reads its own history sample, so the worst case takes each one at
+ * whichever extreme drives the total furthest. A negative tap on −16384 gives
+ * exactly `256|c|` and a positive one on 16383 a little less, so `Σ|c₀…c₆| ≤ 128`
+ * is safe unless every non-zero tap is negative: a lone `$80` reaches +32768
+ * and wraps. Tap 7's product is truncated too (`(int16_t) CALC_FIR(7, 0)`,
+ * :671) and wraps the same way at `$80`, before the clamp can catch it.
  *
  * This is a warning, not an error, and the reason is instructive: AddmusicK's
  * own `EchoFilter0` — Super Mario World's echo, straight from the SNES manual —
@@ -315,12 +327,28 @@ export interface FirHeadroom {
  */
 export function firHeadroom(taps: FirTaps): FirHeadroom {
 	let sum = 0;
+	let highest = 0;
+	let lowest = 0;
 	for (let n = 0; n < Math.min(taps.length, FIR_TAPS - 1); n++) {
-		sum += Math.abs(taps[n]);
+		const tap = taps[n];
+		sum += Math.abs(tap);
+		highest += Math.max(tapProduct(HISTORY_MIN, tap), tapProduct(HISTORY_MAX, tap));
+		lowest += Math.min(tapProduct(HISTORY_MIN, tap), tapProduct(HISTORY_MAX, tap));
 	}
 
-	return { sum, fraction: sum / TAP_UNIT, mayWrap: sum > TAP_UNIT };
+	return {
+		sum,
+		fraction: sum / TAP_UNIT,
+		mayWrap: highest > 32767 || lowest < -32768,
+		lastTapWraps: taps[FIR_TAPS - 1] === -128,
+	};
 }
+
+/** Either part of {@link firHeadroom} can wrap. */
+const canWrap = (taps: FirTaps): boolean => {
+	const headroom = firHeadroom(taps);
+	return headroom.mayWrap || headroom.lastTapWraps;
+};
 
 /**
  * Gain curves for successive echo repeats — `|H|`, `|H|²`, `|H|³`, …
@@ -375,6 +403,11 @@ function quantise(ideal: number[], error: (taps: number[]) => number): number[] 
 		taps[widest] -= Math.sign(taps[widest]);
 	}
 
+	// C7 is outside that budget, but `$80` there wraps on its own.
+	if (taps[FIR_TAPS - 1] === -128) {
+		taps[FIR_TAPS - 1] = -127;
+	}
+
 	let best = error(taps);
 
 	for (let pass = 0; pass < 8; pass++) {
@@ -388,7 +421,7 @@ function quantise(ideal: number[], error: (taps: number[]) => number): number[] 
 
 				const previous = taps[i];
 				taps[i] = candidate;
-				const score = firHeadroom(taps).mayWrap ? Infinity : error(taps);
+				const score = canWrap(taps) ? Infinity : error(taps);
 				if (score < best) {
 					best = score;
 					improved = true;

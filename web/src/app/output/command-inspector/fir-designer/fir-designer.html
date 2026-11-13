@@ -53,7 +53,7 @@
   </p>
 }
 
-@if (headroom().mayWrap) {
+@if (headroom().mayWrap && headroom().sum > 128) {
   <p
     i18n="@@inspector.fir-designer.the-first-seven-coefficients"
     class="text-warn text-xs leading-relaxed"
@@ -62,6 +62,19 @@
     {{
       headroom().sum // i18n(ph='sum')
     }}
+  </p>
+} @else if (headroom().mayWrap) {
+  <p
+    i18n="@@inspector.fir-designer.the-first-seven-all-negative"
+    class="text-warn text-xs leading-relaxed"
+  >
+    inspector.fir-designer.the-first-seven-all-negative
+  </p>
+}
+
+@if (headroom().lastTapWraps) {
+  <p i18n="@@inspector.fir-designer.c7-at-80" class="text-warn text-xs leading-relaxed">
+    inspector.fir-designer.c7-at-80 <code class="text-ink"></code>
   </p>
 }
 

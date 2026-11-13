@@ -300,8 +300,10 @@ settles three things the SNES Development Manual §7.2.2.11 leaves to inference:
   `firRepeatCurves` raises to successive powers.
 
 Taps 0–6 are summed into a value that _wraps_ at 16 bits before tap 7 is added and clamped, so
-`Σ|c₀…c₆| > 128` can crackle. That is what `firHeadroom` is about, and it is not where you would
-guess.
+`Σ|c₀…c₆| > 128` can crackle — and so can exactly 128 when every one of those taps is negative,
+since −16384 × −128 `>> 6` is +32768. Tap 7's own product is truncated to 16 bits before the clamp
+(:671), so a C7 of `$80` wraps the same way. That is what `firHeadroom` is about, and it is not
+where you would guess.
 
 ## Where the envelope numbers come from
 
