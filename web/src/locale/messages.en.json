@@ -1029,6 +1029,7 @@
     "roll.record.chord.title": "The channels a chord is spread over: each key held takes the lowest free one, and a key with none left is dropped",
     "roll.record.key-sounds": "Key sounds",
     "roll.record.key-sounds.title": "Sound each key as the song would play it there, for a keyboard with no speaker of its own",
+    "roll.record.keyboard": "Keyboard",
     "roll.record.on-a-loop.one": "1 note landed on a loop and was not written",
     "roll.record.on-a-loop.other": "{$count} notes landed on a loop and were not written",
     "roll.record.pick-a-channel": "pick a channel to record on first",

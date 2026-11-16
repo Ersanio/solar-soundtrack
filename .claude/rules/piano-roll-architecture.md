@@ -395,8 +395,9 @@ the toolbar's Typing keys toggle, a field of the roll's `Settings`. `keyOfCode` 
 FL Studio's typing-keyboard layout as MIDI key numbers — `Z` is MIDI 60 — read off
 `KeyboardEvent.code`, so the piano is where the keys are on any layout. `piano-roll.ts` takes the
 bare keys ahead of the shortcuts, every one of which on a letter needs `Ctrl` or `Alt`, and hands
-them to `RollRecord.key` as a MIDI input would. The toolbar's Record group is shown while either
-source is on (`RollRecord.listening`), and the last of them going off ends a take in flight.
+them to `RollRecord.key` as a MIDI input would. The keyboard's controls are a row of their own in
+the toolbar, under the roll's settings: the toggle always, and the Record group beside it while
+either source is on (`RollRecord.listening`). The last source going off ends a take in flight.
 
 **The record pointer is its own, not the transport's.** A take can run past the end of the song and
 a song with nothing in it can be recorded into, so the pointer free-runs at the clock's slope
