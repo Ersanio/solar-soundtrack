@@ -1324,7 +1324,7 @@
     "transport.pause.title": "Pause",
     "transport.play.title": "Play",
     "transport.seek-the-song-replays.title": "Seek — the song replays silently to reach the new position",
-    "transport.stop-the-song-or.title": "Stop the song, or a note being previewed",
+    "transport.stop-the-song-or.title": "Stop the song, a note being previewed, or a recording in the piano roll",
     "transport.tick": "tick {$count} / {$total}",
     "transport.time-in-the-song-click": "Time in the song — click for ticks",
     "transport.volume.title": "Volume",

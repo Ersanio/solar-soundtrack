@@ -165,6 +165,10 @@ when the roll does; `inspecting` goes back when `Escape` lets the note go, and a
 command lane points it at the note the command is heard on, so a value committed from the panel has
 a note to replay.
 
+One pair runs between the roll and the transport: `recording`, which the roll holds true while a
+keyboard recording is armed or in flight, and `stopRecording()`, which the transport's Stop button
+calls. The roll owns the take and stopping one is writing it, so the button asks rather than acts.
+
 `reveal` carries a `show` flag, and it is the difference between a summons and a question. A
 diagnostic wants the source brought forward, scrolled to and focused. A single click on a roll bar
 wants the note inspected, and the inspector is in the pane _beside_ the roll — so switching tabs

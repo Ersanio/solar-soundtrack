@@ -10,6 +10,7 @@ import { IconPlay } from '../../shared/icons/icon-play';
 import { IconStop } from '../../shared/icons/icon-stop';
 import { IconVolume } from '../../shared/icons/icon-volume';
 import { Toggle } from '../../shared/toggle/toggle';
+import { EditorRequests } from '../../state/editor-requests';
 import { EditorStore } from '../../state/editor-store';
 import { Mixer } from '../../state/mixer';
 import { Playback } from '../../state/playback';
@@ -47,6 +48,7 @@ export class TransportControls {
   protected readonly mixer = inject(Mixer);
   protected readonly store = inject(EditorStore);
   private readonly audition = inject(Audition);
+  private readonly requests = inject(EditorRequests);
 
   protected readonly text = {
     pause: $localize`:@@transport.pause.title:transport.pause.title`,
@@ -55,14 +57,17 @@ export class TransportControls {
   protected readonly VOLUME_MAX = VOLUME_MAX;
 
   /**
-   * Anything there is to stop: the song, or a note or selection being previewed.
+   * Anything there is to stop: the song, a note or selection being previewed, or
+   * a recording in the piano roll.
    *
-   * The two are asked separately because they are separate — the previewer has
-   * its own AudioContext and neither interrupts the other of its own accord — so
-   * this button is where they meet, as the volume slider is for the level.
+   * The first two are asked separately because they are separate — the previewer
+   * has its own AudioContext and neither interrupts the other of its own accord —
+   * so this button is where they meet, as the volume slider is for the level. A
+   * recording waiting for its first key is neither playing nor sounding, which
+   * is why it is asked about by name.
    */
   protected readonly canStop = computed(
-    () => !this.playback.isIdle() || this.audition.previewing(),
+    () => !this.playback.isIdle() || this.audition.previewing() || this.requests.recording(),
   );
 
   /** Which face the clock shows; a click flips it, and the choice is kept. */
@@ -136,8 +141,16 @@ export class TransportControls {
     this.clockFace.update((face) => (face === 'time' ? 'ticks' : 'time'));
   }
 
-  /** Stops whichever of the two is going, and both where both are — the roll's `Space` too. */
+  /**
+   * Stops whichever of them is going, and all where all are — the roll's `Space`
+   * too. A recording is asked to stop rather than stopped from here: the roll
+   * owns it, and stopping one is writing it.
+   */
   protected stop(): void {
+    if (this.requests.recording()) {
+      this.requests.stopRecording();
+    }
+
     stopAll(this.playback, this.audition);
   }
 

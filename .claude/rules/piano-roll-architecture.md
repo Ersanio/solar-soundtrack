@@ -412,7 +412,9 @@ lowest free record channel — the edited channel plus the chord chips — drops
 and snaps both ends of a note to the roll's own Snap. `roll-take/` draws the bars, and the lane
 stack shows every octave while a take is in flight, since a note with no row is not drawn. Stopping
 hands the notes to `takeEdits` (`piano-roll-editing.md`), one undo step, and puts the transport back
-where the take began. Until then the roll's pointer gestures and shortcuts are held: the take is
+where the take began. Record, `Space`, `Escape` and the transport's Stop button all stop one; the
+last is outside the roll, so the roll says a take exists through `EditorRequests.recording` and the
+button asks through `stopRecording`. Until then the roll's pointer gestures and shortcuts are held: the take is
 timed against the text as it stood.
 
 **A key is sounded where its note will be written**, on its own channel, through

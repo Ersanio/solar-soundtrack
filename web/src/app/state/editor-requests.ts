@@ -263,6 +263,28 @@ export class EditorRequests {
   readonly inspectingLoop = signal<{ text: Span; body: Span } | null>(null);
 
   /**
+   * Whether the piano roll has a keyboard recording armed or in flight.
+   *
+   * Written by the roll, which owns the recording and is the only thing that can
+   * end one; read by the transport, whose Stop button is one of the ways to. It
+   * travels with the roll, so it goes back to `false` when the roll does.
+   */
+  readonly recording = signal(false);
+
+  /**
+   * How many times the roll has been asked to stop its recording.
+   *
+   * A count rather than a flag, for {@link notesKept}'s reason: what the roll
+   * wants is the press, and nothing here is in a position to put a flag back down.
+   */
+  readonly recordingStops = signal(0);
+
+  /** Asks the roll to stop the recording it has in flight, and write it. */
+  stopRecording(): void {
+    this.recordingStops.update((count) => count + 1);
+  }
+
+  /**
    * The caret the inspector's question was withdrawn at, or `null` for none.
    *
    * The roll's `Escape` lets a note or a command go, and the panel that was

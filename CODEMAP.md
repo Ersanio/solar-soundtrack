@@ -854,7 +854,7 @@ something in the directory, which load by themselves when such a file is opened.
 - `commands-in-force.ts` — The commands acting on a walked note, exactly — a lookup rather than a map.
 - `commit-audition.ts` — Replays the selected note when a command inspector panel commits a value.
 - `driver-store.ts` — The N-SPC driver and the ARAM layout that goes with it.
-- `editor-requests.ts` — What a panel asks the editor to do, and what the view and the roll report back.
+- `editor-requests.ts` (300+ lines) — What a panel asks the editor to do, and what the view and the roll report back.
 - `editor-store.ts` (500+ lines) — The document and everything compiled from it: the debounced compile, diagnostics, stats, the budget, the walk, the SPC.
 - `measure-clock.ts` — The song's clock as the driver actually keeps it, by running the emulator.
 - `midi-input.ts` — The connected MIDI keyboards, as a stream of keys.

@@ -581,6 +581,13 @@ export function rollRecord(sources: RecordSources): RollRecord {
     down.set(new Map<number, number>());
   });
 
+  // Sanctioned effect: mirroring the recording into the mailbox, where the
+  // transport's Stop button reads whether there is one to stop.
+  effect(() => requests.recording.set(phase() !== 'idle'));
+
+  // Sanctioned effect: that button's press, which ends a take as Record does.
+  onChange(requests.recordingStops, () => stop());
+
   // Sanctioned effect: the last source of keys going away, which ends the take
   // they were playing. The Record group that would stop it goes with them.
   onChange(listening, (on) => {
@@ -594,6 +601,7 @@ export function rollRecord(sources: RecordSources): RollRecord {
   inject(DestroyRef).onDestroy(() => {
     midi.listen(null);
     stop();
+    requests.recording.set(false);
     for (const key of [...sounds.keys()]) {
       hush(key);
     }
