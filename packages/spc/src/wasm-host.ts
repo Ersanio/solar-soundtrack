@@ -81,8 +81,29 @@ export interface SpcCore {
 	 * which detaches any array handed out earlier. Valid only after `loadSpc`.
 	 */
 	aram(): Uint8Array;
+	/**
+	 * The whole emulator as it stands, to be put back with {@link restore}.
+	 *
+	 * The binary keeps every byte of its state in its own linear memory, so a copy
+	 * of that memory is the emulator: the loaded song, the CPU, the DSP and the
+	 * echo buffer. Valid for this instance only, and only after `loadSpc`.
+	 */
+	snapshot(): CoreSnapshot;
+	/** Puts a {@link snapshot} of this instance back, as if nothing had run since. */
+	restore(snapshot: CoreSnapshot): void;
 	/** Anything the module wrote to stdout/stderr, which in practice means a crash message. */
 	readonly output: string;
+}
+
+/** One emulator instance, frozen. Opaque to everything but the host that took it. */
+export interface CoreSnapshot {
+	/** The wasm memory, whole. */
+	readonly memory: Uint8Array;
+	/** The host's scratch buffer as the heap in {@link memory} knows it. */
+	readonly scratch: number;
+	readonly scratchFrames: number;
+	/** Where APU RAM sits in {@link memory}. */
+	readonly aramAt: number;
 }
 
 interface Exports {
@@ -390,6 +411,29 @@ export function instantiate(module: WebAssembly.Module): SpcCore {
 
 			aramView ??= u8.subarray(aramAt, aramAt + ARAM_SIZE);
 			return aramView;
+		},
+
+		snapshot(): CoreSnapshot {
+			if (aramAt < 0) {
+				throw new SpcCoreError("a snapshot can only be taken once an SPC has been loaded");
+			}
+
+			return { memory: u8.slice(), scratch, scratchFrames, aramAt };
+		},
+
+		restore(snapshot: CoreSnapshot): void {
+			if (snapshot.memory.length !== u8.length) {
+				throw new SpcCoreError("that snapshot was not taken from this emulator instance");
+			}
+
+			u8.set(snapshot.memory);
+			// The heap's own record of the scratch buffer went back with the memory,
+			// so the host's has to go back with it.
+			scratch = snapshot.scratch;
+			scratchFrames = snapshot.scratchFrames;
+			aramAt = snapshot.aramAt;
+			audioView = null;
+			aramView = null;
 		},
 
 		get output(): string {

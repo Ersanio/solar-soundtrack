@@ -29,7 +29,7 @@
 
 import { NOTE_REST, NOTE_TIE, VCMD, noteFrames } from "@amk/core/hardcoded-tables";
 import type { PitchSlide } from "./song-walk";
-import { SPC_CHANNELS, SPC_SAMPLE_RATE, type SpcCore } from "./wasm-host";
+import { type CoreSnapshot, SPC_CHANNELS, SPC_SAMPLE_RATE, type SpcCore } from "./wasm-host";
 import {
 	MAX_SEEK_SECONDS,
 	POLL_BLOCK_FRAMES,
@@ -39,6 +39,7 @@ import {
 	createMuteBackup,
 	createTickPhase,
 	type MuteBackup,
+	type TickPhase,
 	inVoiceLoop,
 	parkVoice,
 	passMark,
@@ -354,7 +355,12 @@ export function auditionFrames(
  * 6. **Count the note's ticks off the driver's tempo**, the same `sawTick`
  *    machinery the worklet and the clock measurement use, then render the tail.
  */
-export function auditionNote(core: SpcCore, spc: Uint8Array, request: NoteAuditionRequest): AuditionedNote {
+export function auditionNote(
+	core: SpcCore,
+	spc: Uint8Array,
+	request: NoteAuditionRequest,
+	from: AuditionCheckpoint | null = null,
+): AuditionedNote {
 	const { channel, note, scratchAt } = request;
 	// At least one tick, whatever is asked for. The dump's PC is the driver's main
 	// loop with the song index still in `$F6`, and it takes four passes of the main
@@ -370,14 +376,14 @@ export function auditionNote(core: SpcCore, spc: Uint8Array, request: NoteAuditi
 	const target = Math.max(1, Math.floor(request.atTicks));
 	const held = Math.max(1, Math.floor(request.ticks));
 
-	core.loadSpc(spc);
+	const silenced = (request.silenced ?? 0) & ~(1 << channel);
 
 	// One backup across both, so a voice the mixer silenced arrives at the settle
 	// loop with 0 already in its track volume: `applyChannelMutes` keeps the value
 	// it saved earlier rather than saving that zero over it.
-	const backup = createMuteBackup();
-	const silenced = (request.silenced ?? 0) & ~(1 << channel);
-	const reachedTicks = fastForward(core, target, channel, silenced, backup);
+	const seek = resumeSeek(core, spc, from, target, silenced);
+	const backup = seek.backup;
+	const reachedTicks = fastForward(core, seek, target, channel, silenced);
 
 	// The target voice has read the tick's music, so it can be parked: 127 ticks
 	// it cannot fetch inside is what stops the settle below carrying it past the
@@ -482,35 +488,134 @@ function parkOthers(aram: Uint8Array, channel: number): void {
  * The mask is constant for the whole run, which is what keeps `MuteBackup.restoring`
  * at zero: bits enter it only when they leave the mask, and none do here.
  */
-function fastForward(
+function fastForward(core: SpcCore, seek: Seek, target: number, channel: number | null, silenced: number): number {
+	arrive(core, channel, seekTo(core, seek, target, channel, silenced));
+	return seek.ticks;
+}
+
+/**
+ * Where a fast-forward has got to: everything its loop carries from one block to
+ * the next, so a run can be stopped at a tick and taken up again from there.
+ */
+export interface Seek {
+	ticks: number;
+	/** The voice the count is latched on, or -1 while the song has not keyed on. */
+	voice: number;
+	tick: TickPhase;
+	rendered: number;
+	stalledFor: number;
+	backup: MuteBackup;
+}
+
+function createSeek(): Seek {
+	return {
+		ticks: 0,
+		voice: -1,
+		tick: createTickPhase(),
+		rendered: 0,
+		stalledFor: 0,
+		backup: createMuteBackup(),
+	};
+}
+
+function copySeek(seek: Seek): Seek {
+	return {
+		...seek,
+		tick: { ...seek.tick },
+		backup: { ...seek.backup, saved: seek.backup.saved.slice() },
+	};
+}
+
+/**
+ * A fast-forward stopped at a tick, to start later ones from.
+ *
+ * The emulator has no way back to a tick but playing the song up to it, so a note
+ * deep in a long song costs that whole run before its first sample. A checkpoint
+ * is that run already made: the emulator as it stood when the count reached
+ * `ticks`, and the count's own state. A note at a later tick restores it and runs
+ * on, through the same blocks a run from the top would have rendered, so what it
+ * returns is byte for byte what that run returns.
+ *
+ * It belongs to one SPC image and one mixer mask, and the caller keeps it with
+ * both: nothing in it says which song it was taken from.
+ */
+export interface AuditionCheckpoint {
+	/** The tick the count had reached. */
+	readonly ticks: number;
+	/** The mask the run was made under. */
+	readonly silenced: number;
+	readonly snapshot: CoreSnapshot;
+	readonly seek: Seek;
+}
+
+/**
+ * Runs the song silently to `atTicks` and freezes it there.
+ *
+ * `from` is an earlier checkpoint of the same song to run on from, which is what
+ * makes following a moving position cheap: each one costs the ticks since the
+ * last and not the song up to it.
+ */
+export function prepareCheckpoint(
 	core: SpcCore,
+	spc: Uint8Array,
+	request: { atTicks: number; silenced?: number },
+	from: AuditionCheckpoint | null = null,
+): AuditionCheckpoint {
+	const target = Math.max(1, Math.floor(request.atTicks));
+	const silenced = request.silenced ?? 0;
+	const seek = resumeSeek(core, spc, from, target + 1, silenced);
+	seekTo(core, seek, target, null, silenced);
+	return { ticks: seek.ticks, silenced, snapshot: core.snapshot(), seek: copySeek(seek) };
+}
+
+/**
+ * The emulator at the start of a run to `target`: at `from` where that is a
+ * checkpoint the run passes through, and at the top of the song otherwise.
+ *
+ * Strictly before the target, so at least one block is rendered after the
+ * restore: whether the target voice fetched in the block that reached the tick is
+ * read off that block, and a checkpoint standing on the tick itself has no block
+ * to read it off.
+ */
+function resumeSeek(
+	core: SpcCore,
+	spc: Uint8Array,
+	from: AuditionCheckpoint | null,
 	target: number,
-	channel: number | null,
 	silenced: number,
-	backup: MuteBackup,
-): number {
-	let ticks = 0;
-	let voice = -1;
-	const tick = createTickPhase();
-	let rendered = 0;
-	let stalledFor = 0;
+): Seek {
+	if (from !== null && from.ticks < target && from.silenced === silenced) {
+		core.restore(from.snapshot);
+		return copySeek(from.seek);
+	}
+
+	core.loadSpc(spc);
+	return createSeek();
+}
+
+/**
+ * The fast-forward's loop: blocks rendered and thrown away until the count
+ * reaches `target`. Answers whether the target voice fetched in the last of them.
+ */
+function seekTo(core: SpcCore, seek: Seek, target: number, channel: number | null, silenced: number): boolean {
+	const { tick, backup } = seek;
 	let fetched = false;
 	const cap = MAX_SEEK_SECONDS * SPC_SAMPLE_RATE;
 
-	while (ticks < target && rendered < cap && stalledFor < SEEK_STALL_BLOCKS) {
+	while (seek.ticks < target && seek.rendered < cap && seek.stalledFor < SEEK_STALL_BLOCKS) {
 		// Read before the block and not after it. The fetch loop for the tick this
 		// block is about to report may run entirely inside the block, so the mark
 		// has to come from before it for the change to be visible at all.
 		const mark = channel === null ? 0 : voiceFetchMark(core.aram(), channel);
 		core.renderView(POLL_BLOCK_FRAMES);
-		rendered += POLL_BLOCK_FRAMES;
+		seek.rendered += POLL_BLOCK_FRAMES;
 
 		const aram = core.aram();
 		// Before the latch below returns, so a song that has not keyed on yet is
 		// still being muted while we wait for it.
 		applyChannelMutes(aram, silenced, backup);
 
-		if (voice < 0) {
+		if (seek.voice < 0) {
 			// The song has not keyed on yet; latch the voice once it has, and once it
 			// has read a duration byte. `worklet.ts` latches on the pointer alone,
 			// which is enough for a playhead that can be a tick out and not enough
@@ -521,22 +626,21 @@ function fastForward(
 			// {@link voiceStarted}.
 			const playing = tickVoice(aram);
 			if (voiceStarted(aram, playing)) {
-				voice = playing;
+				seek.voice = playing;
 			}
 
 			seedTickPhase(tick, aram);
-			stalledFor++;
+			seek.stalledFor++;
 			continue;
 		}
 
 		const stepped = sawTick(tick, aram);
-		ticks += stepped;
-		stalledFor = stepped > 0 ? 0 : stalledFor + 1;
+		seek.ticks += stepped;
+		seek.stalledFor = stepped > 0 ? 0 : seek.stalledFor + 1;
 		fetched = channel === null || voiceFetchMark(aram, channel) !== mark;
 	}
 
-	arrive(core, channel, fetched);
-	return ticks;
+	return fetched;
 }
 
 /**
@@ -722,11 +826,11 @@ export function auditionRegion(core: SpcCore, spc: Uint8Array, request: RegionAu
 
 	core.loadSpc(spc);
 
-	const backup = createMuteBackup();
+	const seek = createSeek();
 	const silenced = request.silenced ?? 0;
-	const reachedTicks = fastForward(core, target, null, silenced, backup);
+	const reachedTicks = fastForward(core, seek, target, null, silenced);
 
-	return { ...record(core, span, null, silenced, backup), reachedTicks };
+	return { ...record(core, span, null, silenced, seek.backup), reachedTicks };
 }
 
 /** Ramps the last {@link FADE_SECONDS} to zero, and takes a copy while it is there. */

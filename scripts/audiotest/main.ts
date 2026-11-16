@@ -27,4 +27,5 @@ await runSections([
 	["audition", () => import("./audition")],
 	["audition-in-song", () => import("./audition-in-song")],
 	["audition-slide", () => import("./audition-slide")],
+	["audition-checkpoint", () => import("./audition-checkpoint")],
 ]);

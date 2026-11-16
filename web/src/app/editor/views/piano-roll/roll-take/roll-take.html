@@ -1,0 +1,29 @@
+<!-- Inert: nothing here is in the song yet, so there is nothing to grab. Red
+     where a note has landed on a loop, which is the one place it is not written. -->
+@for (bar of done(); track bar.id) {
+  <svg:rect
+    rx="2"
+    stroke-width="1.5"
+    pointer-events="none"
+    [class]="bar.blocked ? 'fill-danger stroke-danger' : `${bar.fill} stroke-ink`"
+    [attr.fill-opacity]="bar.blocked ? 0.5 : 0.9"
+    [attr.x]="bar.x"
+    [attr.y]="bar.y"
+    [attr.width]="bar.w"
+    [attr.height]="bar.h"
+  />
+}
+
+@for (bar of live(); track bar.id) {
+  <svg:rect
+    rx="2"
+    stroke-width="1.5"
+    pointer-events="none"
+    [class]="bar.blocked ? 'fill-danger stroke-danger' : `${bar.fill} stroke-ink`"
+    [attr.fill-opacity]="bar.blocked ? 0.5 : 0.9"
+    [attr.x]="bar.x"
+    [attr.y]="bar.y"
+    [attr.width]="bar.w"
+    [attr.height]="bar.h"
+  />
+}

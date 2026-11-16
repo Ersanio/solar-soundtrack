@@ -127,7 +127,7 @@ export function apply(source: string, edits: readonly Edit[]): string {
  * folded here rather than borrowed from `roll-strip.ts`, so the reading this is
  * checked against is a second one rather than the same one twice.
  */
-function played(built: Built, channel: number): string[] {
+export function played(built: Built, channel: number): string[] {
 	return notesOf(
 		built,
 		channel,

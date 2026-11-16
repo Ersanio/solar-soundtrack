@@ -43,6 +43,14 @@ export interface ViewSources {
   /** The pane's width, and the part of it the notes are drawn in. */
   width: Signal<number>;
   rollWidth: Signal<number>;
+  /**
+   * The pointer of a MIDI recording in flight, at frame rate, or `null`. It
+   * stands in for the song's own tick while there is one, since a take can run
+   * on past the end of the song.
+   */
+  recordTick: Signal<number | null>;
+  /** That pointer ten times a second, which is the cadence the mark window keeps. */
+  recordWindowTick: Signal<number | null>;
 }
 
 export interface ViewSinks {
@@ -69,6 +77,8 @@ export interface RollView {
   headTick: Signal<number>;
   /** Where the camera is, in ticks. */
   playTick: Signal<number>;
+  /** Where the transport itself is, whatever a recording's pointer is doing. */
+  transportTick: Signal<number>;
   /** The song's own tick, in the camera's coordinates. */
   playheadX: Signal<number>;
   /** The roll's `transform`, at frame rate. */
@@ -200,9 +210,12 @@ export function rollView(sources: ViewSources, sinks: ViewSinks): RollView {
    * released — the marker would move, the song would not, and nothing would say
    * why.
    */
-  const songHead = computed(() =>
+  const transportTick = computed(() =>
     playback.isIdle() ? playback.songTicks().ticks : playhead.tick(),
   );
+
+  /** The same, with a recording's own pointer in front of it while one is in flight. */
+  const songHead = computed(() => sources.recordTick() ?? transportTick());
 
   /**
    * Where the playhead is drawn: the song's own tick, or the one a scrub is
@@ -236,7 +249,9 @@ export function rollView(sources: ViewSources, sinks: ViewSinks): RollView {
    * marks are two halves of one picture, so a pause that moved one and not the
    * other would scroll to the paused position and find nothing drawn there.
    */
-  const windowTick = computed(() => (sources.follow() ? playback.songTicks().ticks : parkedTick()));
+  const windowTick = computed(() =>
+    sources.follow() ? (sources.recordWindowTick() ?? playback.songTicks().ticks) : parkedTick(),
+  );
 
   /**
    * Where the camera holds the playhead, as a fraction of the roll's width.
@@ -556,6 +571,7 @@ export function rollView(sources: ViewSources, sinks: ViewSinks): RollView {
     windowTick,
     headTick,
     playTick,
+    transportTick,
     playheadX,
     scroll,
     overviewBox,

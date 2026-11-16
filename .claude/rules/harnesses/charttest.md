@@ -129,3 +129,4 @@ holds what they share: `EPSILON` alone. `HARNESS_ONLY=<file name>` runs one sect
 | `command-lane.ts`          | How the command lane stacks what lands together.                                                                                                               |
 | `slider-track.ts`          | The slider's track.                                                                                                                                            |
 | `transport-view.ts`        | The transport's mixer and playhead, the playhead dropping what a mid-update read of ARAM invents, and the seconds estimate for a song the walk could not read. |
+| `record-pointer.ts`        | The pointer a MIDI recording is timed against: the clock's rate where it stands, the song's last rate past the end, and never backwards.                       |

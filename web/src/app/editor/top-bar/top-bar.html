@@ -30,6 +30,20 @@
   <span i18n="@@topbar.export-spc" class="max-2xl:hidden">topbar.export-spc</span>
 </button>
 
+<!-- Lit while keyboards are being listened to. The press is what the browser's
+     permission prompt answers to; the keys themselves reach the piano roll only. -->
+<button
+  amk-toggle
+  size="md"
+  [pressed]="midi.status() === 'on'"
+  [disabled]="midi.status() === 'unsupported' || midi.status() === 'asking'"
+  [title]="midiTitle()"
+  (click)="toggleMidi()"
+>
+  <amk-icon-roll />
+  <span i18n="@@topbar.use-midi-keyboard" class="max-2xl:hidden">topbar.use-midi-keyboard</span>
+</button>
+
 <div class="ml-auto flex items-center gap-1">
   <!-- Relative to the base href, so it finds the guide that CI deploys beside the app. -->
   <a

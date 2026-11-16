@@ -241,12 +241,12 @@ nothing beneath reads. That is why the roll can run at 240 Hz without the note l
 
 ## Files and components
 
-**The folder is a parent and thirteen child folders**, as `output/command-inspector/` is. `piano-roll.ts`
+**The folder is a parent and fourteen child folders**, as `output/command-inspector/` is. `piano-roll.ts`
 holds the song's shape and the porter's settings and hands each child what it draws:
 `roll-toolbar/`, `percussion-panel/`, `roll-overview/`, `roll-scrub/`, `roll-channels/`,
 `roll-command-lane/` and `roll-tooltip/` in the ordinary namespace, `roll-lanes/`, `roll-grid/`,
-`roll-loops/` — which holds two, the boxes and their labels — `roll-notes/`, `roll-edit-layer/` and
-`roll-keys/` inside the roll's own `<svg>`. `roll-channels/` is the odd one: it draws nothing of the
+`roll-loops/` — which holds two, the boxes and their labels — `roll-notes/`, `roll-edit-layer/`,
+`roll-take/` and `roll-keys/` inside the roll's own `<svg>`. `roll-channels/` is the odd one: it draws nothing of the
 song, and takes the corner the overview bar leaves empty above the key column to say which channel
 is being edited. Its eight toggles
 are not the only way in — a click on a bar or on one of its glyphs names that bar's channel, since
@@ -267,20 +267,22 @@ import it: `roll-layout.ts` and `percussion.ts` for the lanes and the camera, `r
 motion, `roll-selection.ts` for what a commit hands back, `roll-seed.ts` for the first rest a song
 with no music gets, `roll-strip.ts` and `roll-edit.ts` and `roll-write/` for a gesture's three
 stages, `roll-command-layout.ts` and `roll-command-move.ts` for the lane, `roll-shortcuts.ts` for
-the keyboard, and `roll-settings.ts` for what is remembered.
+the keyboard, `roll-take.ts` for a take played in on a MIDI keyboard, and `roll-settings.ts` for
+what is remembered.
 
-**Six files in the folder import `@angular/core`, and each says which kind it is.**
+**Seven files in the folder import `@angular/core`, and each says which kind it is.**
 `roll-camera.ts` is a module record — four signals that outlive a component rebuilt on every tab
-switch. The other five are composables, called from `piano-roll.ts`'s field initialisers in the
-order they depend on each other: `roll-view.ts` for the camera, the display clock and the two
+switch. The other six are composables, called from `piano-roll.ts`'s field initialisers in the
+order they depend on each other: `roll-record.ts` for a MIDI recording, ahead of the view because
+the view draws its pointer; `roll-view.ts` for the camera, the display clock and the two
 drags over the roll; `roll-target.ts` for the channel a gesture acts on and the strip it splices;
 `roll-gesture.ts` for the gesture itself; `roll-pictures.ts` for what is drawn, after the gestures
 because the loop boxes follow the one in flight; and `roll-clock.ts`, which `roll-view.ts` calls.
 No harness can bundle any of them, which is why the arithmetic each one leans on sits in a flat
 file of its own — `roll-clock-step.ts` under `roll-clock.ts`, `roll-edit.ts` under
-`roll-gesture.ts`, `roll-marks.ts` under `roll-pictures.ts`.
+`roll-gesture.ts`, `roll-marks.ts` under `roll-pictures.ts`, `roll-take.ts` under `roll-record.ts`.
 
-**The seven inside the `<svg>` are attribute components on a real `<g>`**, and their templates prefix
+**The eight inside the `<svg>` are attribute components on a real `<g>`**, and their templates prefix
 every element `svg:`. Both halves are required and neither fails loudly: a component _element_ in an
 `<svg>` is an unknown SVG element with no layout box, and a child template has no namespace of its
 own because Angular takes one from the parent in the same template. The glyph is the exception that
@@ -382,6 +384,32 @@ than vanishing.
 `placeOf` is the one statement of the precedence — percussion, then noise, then the keyboard. The
 lanes and the fitted range are both built from it, so they cannot disagree. `song-walk.ts` has no
 opinion on any of this by design.
+
+## Recording from a MIDI keyboard
+
+`state/midi-input.ts` holds the connection and one listener slot, which `roll-record.ts` takes for
+as long as the roll is open; with no roll, a key does nothing. The toolbar's Record group is shown
+while the top bar's switch is on.
+
+**The record pointer is its own, not the transport's.** A take can run past the end of the song and
+a song with nothing in it can be recorded into, so the pointer free-runs at the clock's slope
+(`recordTickStep` in `roll-take.ts`) and `roll-view.ts` reads it ahead of the song's own tick while
+there is one. It stands still until the first key, so a take has no silence in front of it. With
+**Play the song** on, the transport starts as Record is pressed and the pointer is the transport's
+playhead for as long as that moves forwards; where the song ends or comes round its loop the
+transport stops and the pointer carries on.
+
+**A take is drawn as it is played and written when it stops.** `roll-take.ts` gives each key the
+lowest free record channel — the edited channel plus the chord chips — drops a key with none left,
+and snaps both ends of a note to the roll's own Snap. `roll-take/` draws the bars, and the lane
+stack shows every octave while a take is in flight, since a note with no row is not drawn. Stopping
+hands the notes to `takeEdits` (`piano-roll-editing.md`), one undo step, and puts the transport back
+where the take began. Until then the roll's pointer gestures and shortcuts are held: the take is
+timed against the text as it stood.
+
+**A key is sounded where its note will be written**, on its own channel, through
+`Audition.holdNote` (`audition.md`). The composable keeps the previewer's worker a checkpoint ahead
+of the pointer, which is what makes a key sound at once.
 
 ## What is not the roll's business
 

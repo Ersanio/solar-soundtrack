@@ -49,4 +49,5 @@ await runSections([
 	["pitch-slide", () => import("./pitch-slide")],
 	["selection", () => import("./selection")],
 	["seed", () => import("./seed")],
+	["recording", () => import("./recording")],
 ]);

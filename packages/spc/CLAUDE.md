@@ -390,6 +390,12 @@ The tenth is `o`, the indirect function table. The host calls eight of the ten (
 Both are pinned to the vendored binary. Swapping in a different build means re-reading them;
 `instantiate` fails loudly rather than silently mis-calling if an expected export is missing.
 
+The binary exports no save state, and needs none: its memory is fixed at 16 MiB (min pages equal
+max) and holds every byte the emulator keeps, so `SpcCore.snapshot` is a copy of that memory with
+the three things the host knows about it — the scratch buffer, its size, and where APU RAM sits —
+and `restore` puts all four back. A snapshot belongs to the instance it was taken from.
+`note-audition.ts` builds its checkpoints on it (`.claude/rules/audition.md`).
+
 ## The page/worklet seam
 
 `protocol.ts` is the sole contract between the two threads, and it is a separate module so both

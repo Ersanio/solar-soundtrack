@@ -52,7 +52,12 @@ sample must come strictly later as it grows. And `afterTicks` — the reading th
 where the same three bytes at the head have already moved it; while the ticks a note has _behind_
 the arm move nothing at all, a slide counting off `$90`/`$91` once armed rather than off frames.
 Operands no `emitNote` could have written are dropped rather than approximated, and the note comes
-out byte for byte flat.
+out byte for byte flat. And that a **checkpoint** changes nothing: a note auditioned from a frozen
+emulator is the note auditioned from the top of the song, sample for sample, on three channels and
+under a mixer mask, again off the same checkpoint, and off one that was itself run on from an
+earlier one — with the three a checkpoint must not be resumed from (on the note's own tick, past
+it, under another mask) falling back to the run from the top. An identity rather than a level,
+because the two runs render the same blocks in the same order.
 
 ## Section files
 
@@ -61,13 +66,14 @@ holds what they share: the driver, the one emulator instance every section loads
 `compileToSpc`, `renderMuted`, and the level and pitch measures. `HARNESS_ONLY=<file name>` runs one
 section alone.
 
-| File                  | What it pins                                                                                                                                        |
-| --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `sound.ts`            | The emulator boots, a compiled song makes sound, silence is silent, notes differ audibly, and fast-forward lands somewhere different.               |
-| `muting.ts`           | Muting takes a channel's volume and nothing else: the mix, the song carried on underneath, its speed, a ringing note, and unmuting.                 |
-| `samples.ts`          | Sample sets through the emulator: `#samples`, a custom instrument, `optimizeSampleUsage` and a `.bnk` bank.                                         |
-| `loop-and-ticks.ts`   | The loop lasts as long as the compiler says, the driver's ticks are counted exactly, and the voice the count is latched on is one the driver plays. |
-| `note-map.ts`         | The note map lands on what the driver is playing.                                                                                                   |
-| `audition.ts`         | One note, auditioned where the song is playing.                                                                                                     |
-| `audition-in-song.ts` | An auditioned note with the rest of the song under it, and handed over on a tick the whole song fetches on.                                         |
-| `audition-slide.ts`   | An auditioned note sliding as the `$DD` riding on it says.                                                                                          |
+| File                     | What it pins                                                                                                                                        |
+| ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `sound.ts`               | The emulator boots, a compiled song makes sound, silence is silent, notes differ audibly, and fast-forward lands somewhere different.               |
+| `muting.ts`              | Muting takes a channel's volume and nothing else: the mix, the song carried on underneath, its speed, a ringing note, and unmuting.                 |
+| `samples.ts`             | Sample sets through the emulator: `#samples`, a custom instrument, `optimizeSampleUsage` and a `.bnk` bank.                                         |
+| `loop-and-ticks.ts`      | The loop lasts as long as the compiler says, the driver's ticks are counted exactly, and the voice the count is latched on is one the driver plays. |
+| `note-map.ts`            | The note map lands on what the driver is playing.                                                                                                   |
+| `audition.ts`            | One note, auditioned where the song is playing.                                                                                                     |
+| `audition-in-song.ts`    | An auditioned note with the rest of the song under it, and handed over on a tick the whole song fetches on.                                         |
+| `audition-slide.ts`      | An auditioned note sliding as the `$DD` riding on it says.                                                                                          |
+| `audition-checkpoint.ts` | A note auditioned from a checkpoint is the note auditioned from the top of the song, byte for byte.                                                 |

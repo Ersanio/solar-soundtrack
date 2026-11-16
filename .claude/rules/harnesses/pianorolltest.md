@@ -301,6 +301,20 @@ past the `$DD`. Past the end of the pass there is no walk note to ask, so the it
 however plainly the `$DD` follows it — the same reading the commands-in-force list takes, and the
 reason a note the walk cannot corroborate auditions flat rather than approximately right.
 
+### `recording.ts`
+
+A take played in on a MIDI keyboard, in three layers. `roll-take.ts` bare: MIDI 60 is `o4 c` and
+the driver's range is MIDI 24 to 93; a key takes the lowest free record channel, a key with none
+left is dropped, and a key coming up frees its channel for the next; both ends of a note round to
+the snap step, a tap is one step long, no grid keeps the ticks, and a note snapped onto the next is
+cut at it or dropped. The `take` gesture through `expectEdit`, so it is read back from the compile
+like any other: into a rest, over notes in overwrite and insert, refused in strict as
+`REFUSE_CLASH`, and past the end of the song with `playsFor`. And `takeEdits` over several channels
+— a chord on a channel with music, one holding a rest and one the song has never declared, the last
+note past the end — where each channel's notes are read back and the song reaches the last of
+them; a note on a loop left out and counted with the notes either side written; a take with no
+notes writing nothing; and a channel the strip refuses refusing the whole take.
+
 ### `seed.ts`
 
 The seed is here too, `roll-seed.ts` being what the roll runs when it is opened on a song with no

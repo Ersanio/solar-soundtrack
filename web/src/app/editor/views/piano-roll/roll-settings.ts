@@ -116,6 +116,15 @@ export interface Settings {
    * note resized after it was drawn, which is a gesture per note for no reason.
    */
   lastLength: number;
+  /**
+   * The channels a MIDI recording spreads a chord over, besides the one being
+   * edited, ascending. A key takes the lowest of them that is free.
+   */
+  chordChannels: readonly number[];
+  /** Sound each MIDI key as it is pressed, for a keyboard with no speaker of its own. */
+  keySounds: boolean;
+  /** Play the song under a MIDI recording, rather than running the pointer in silence. */
+  playSong: boolean;
 }
 
 /** Every field `unknown`, because none of it is ours until it is checked. */
@@ -134,6 +143,9 @@ interface StoredSettings {
   snap?: unknown;
   editMode?: unknown;
   lastLength?: unknown;
+  chordChannels?: unknown;
+  keySounds?: unknown;
+  playSong?: unknown;
 }
 
 /** A tick count a drawn note could have. */
@@ -183,6 +195,9 @@ export function readSettings(): Settings {
     // one place the default, the fallback and the `<select>`'s order are set.
     editMode: EDIT_MODES[0],
     lastLength: TICKS_PER_WHOLE / 8,
+    chordChannels: [],
+    keySounds: true,
+    playSong: false,
   };
 
   let stored: StoredSettings | null;
@@ -252,6 +267,18 @@ export function readSettings(): Settings {
     settings.lastLength = stored.lastLength;
   }
 
+  if (Array.isArray(stored.chordChannels) && stored.chordChannels.every(isChannel)) {
+    settings.chordChannels = sortedChannels(stored.chordChannels);
+  }
+
+  if (typeof stored.keySounds === 'boolean') {
+    settings.keySounds = stored.keySounds;
+  }
+
+  if (typeof stored.playSong === 'boolean') {
+    settings.playSong = stored.playSong;
+  }
+
   const percussion = parsePercussion(stored.percussion);
   if (percussion) {
     settings.percussion = percussion;
@@ -315,6 +342,21 @@ export function togglePercussion(settings: Settings, instrument: number): Settin
   }
 
   return { ...settings, percussion: [...next].sort((a, b) => a - b) };
+}
+
+/** Channels once each, ascending — the order a chord's keys take them in. */
+function sortedChannels(channels: readonly number[]): number[] {
+  return [...new Set(channels)].sort((a, b) => a - b);
+}
+
+/** Add a channel to the ones a recorded chord spreads over, or take it off. */
+export function toggleChordChannel(settings: Settings, channel: number): Settings {
+  const next = new Set(settings.chordChannels);
+  if (!next.delete(channel)) {
+    next.add(channel);
+  }
+
+  return { ...settings, chordChannels: sortedChannels([...next]) };
 }
 
 /** Back to `@21`-`@29` plus `@10`, which is what `percussion.ts` says a drum is. */

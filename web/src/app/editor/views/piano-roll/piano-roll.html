@@ -10,6 +10,18 @@
   [editRefusal]="target.editRefusal()"
   [gestureRefusal]="gestures.refusal()"
   [selected]="gestures.selection().size"
+  [midiOn]="midiOn()"
+  [recordPhase]="record.phase()"
+  [recordNotes]="record.noteCount()"
+  [recordMessage]="record.message()"
+  [keySounds]="keySounds()"
+  [playSong]="playSong()"
+  [editChannel]="editChannel()"
+  [recordChannels]="record.channels()"
+  (recordToggle)="record.toggle()"
+  (keySoundsChange)="setKeySounds($event)"
+  (playSongChange)="setPlaySong($event)"
+  (chordChannelToggle)="toggleChordChannel($event)"
   (zoomBy)="setZoom($event)"
   (snapChange)="setSnap($event)"
   (editModeChange)="setEditMode($event)"
@@ -182,6 +194,8 @@
             [stroke]="editStroke()"
             [blocked]="blocked()"
           />
+          <!-- A MIDI take in flight: the notes played so far, and the keys held. -->
+          <g amk-roll-take [done]="record.doneBars()" [live]="record.liveBars()" />
         </g>
 
         <!-- Inert: it is drawn over everything the roll is edited through, and a

@@ -180,6 +180,63 @@
     <ng-container i18n="@@roll.percussion">roll.percussion</ng-container>
   </button>
 
+  <!-- Recording from a MIDI keyboard, shown once the top bar's switch is on. The
+       channels are chosen before a take and not during one, so everything but
+       Record itself is held while one is in flight. -->
+  @if (midiOn()) {
+    <span class="bg-edge h-5 w-px shrink-0"></span>
+
+    <button
+      amk-toggle
+      [pressed]="recordPhase() !== 'idle'"
+      [title]="recordPhase() === 'idle' ? text.startRecording : text.stopRecording"
+      (click)="recordToggle.emit()"
+    >
+      <amk-icon-record [class.text-danger]="recordPhase() !== 'idle'" />
+      <ng-container i18n="@@roll.record">roll.record</ng-container>
+    </button>
+    <button
+      i18n="@@roll.record.key-sounds"
+      amk-toggle
+      i18n-title="@@roll.record.key-sounds.title"
+      title="roll.record.key-sounds.title"
+      [pressed]="keySounds()"
+      (click)="keySoundsChange.emit(!keySounds())"
+    >
+      roll.record.key-sounds
+    </button>
+    <button
+      i18n="@@roll.record.play-the-song"
+      amk-toggle
+      i18n-title="@@roll.record.play-the-song.title"
+      title="roll.record.play-the-song.title"
+      [pressed]="playSong()"
+      [disabled]="recordPhase() !== 'idle'"
+      (click)="playSongChange.emit(!playSong())"
+    >
+      roll.record.play-the-song
+    </button>
+
+    <div
+      class="flex items-center gap-1"
+      i18n-title="@@roll.record.chord.title"
+      title="roll.record.chord.title"
+    >
+      <span i18n="@@roll.record.chord" class="text-ink-muted text-xs">roll.record.chord</span>
+      @for (chip of chordChips(); track chip.channel) {
+        <button
+          type="button"
+          [class]="chip.class"
+          [title]="chip.title"
+          [disabled]="chip.fixed || recordPhase() !== 'idle'"
+          (click)="chordChannelToggle.emit(chip.channel)"
+        >
+          {{ chip.channel }}
+        </button>
+      }
+    </div>
+  }
+
   <!-- A line of its own, drawn even when empty and kept to one line, so a
        message coming or going never changes the strip's height under the roll. -->
   <div
@@ -187,6 +244,14 @@
   >
     @if (selectedLabel(); as label) {
       <span class="text-ink-muted shrink-0">{{ label }}</span>
+    }
+    <!-- What a recording is doing, and why the last one did not start or was
+         not written whole. -->
+    @if (recordStatus(); as status) {
+      <span class="text-accent shrink-0">{{ status }}</span>
+    }
+    @if (recordMessage(); as reason) {
+      <span class="text-warn truncate" [title]="reason">{{ reason }}</span>
     }
     <!-- Why a channel cannot be edited is said here rather than in a dialog: it
          is a property of the song, or of the mixer for a muted channel, and not

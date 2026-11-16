@@ -26,6 +26,7 @@ import { Audition } from '../../../state/audition';
 import { DriverStore } from '../../../state/driver-store';
 import { EditorRequests } from '../../../state/editor-requests';
 import { EditorStore } from '../../../state/editor-store';
+import { MidiInput } from '../../../state/midi-input';
 import { Mixer } from '../../../state/mixer';
 import { Playback } from '../../../state/playback';
 import { stopAll } from '../../../state/stop-all';
@@ -62,9 +63,12 @@ import {
   snapTicks,
   stepRowHeight,
   stepZoom,
+  toggleChordChannel,
   togglePercussion,
   writeSettings,
 } from './roll-settings';
+import { rollRecord } from './roll-record';
+import { RollTake } from './roll-take/roll-take';
 import { RollToolbar } from './roll-toolbar/roll-toolbar';
 import { rollPictures } from './roll-pictures';
 import { rollShortcut } from './roll-shortcuts';
@@ -112,6 +116,7 @@ import { RollTooltip } from './roll-tooltip/roll-tooltip';
     RollNotes,
     RollOverview,
     RollScrub,
+    RollTake,
     RollToolbar,
     RollTooltip,
   ],
@@ -133,6 +138,7 @@ export class PianoRoll {
   private readonly mixer = inject(Mixer);
   private readonly audition = inject(Audition);
   private readonly requests = inject(EditorRequests);
+  private readonly midi = inject(MidiInput);
 
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly destroyRef = inject(DestroyRef);
@@ -152,6 +158,10 @@ export class PianoRoll {
   protected readonly editChannel = computed(() => this.settings().editChannel);
   protected readonly snap = computed(() => this.settings().snap);
   protected readonly editMode = computed(() => this.settings().editMode);
+  protected readonly keySounds = computed(() => this.settings().keySounds);
+  protected readonly playSong = computed(() => this.settings().playSong);
+  /** Whether MIDI keyboards are being listened to, which is what shows the Record group. */
+  protected readonly midiOn = computed(() => this.midi.status() === 'on');
   protected readonly snapTicks = computed(() =>
     snapTicks(this.settings().snap, this.beatsPerBar(), this.beatUnit()),
   );
@@ -237,7 +247,9 @@ export class PianoRoll {
       highestKey: shape.highestKey,
       usedDrums: shape.usedDrums,
       usesNoise: shape.usesNoise,
-      all: this.allOctaves(),
+      // A take can land on any key, and a note with no row is not drawn, so the
+      // whole keyboard is there for as long as one is in flight.
+      all: this.allOctaves() || this.record.phase() !== 'idle',
       drumNotes: this.drumNotes(),
     });
   });
@@ -278,6 +290,25 @@ export class PianoRoll {
   protected readonly labelSize = computed(() => clamp(this.rowHeight() - 4, 7, 11));
 
   /**
+   * Recording from a MIDI keyboard — see `roll-record.ts`. Ahead of the view,
+   * which draws its pointer; the transport's own tick comes back the other way
+   * as a function, the view not having been built yet.
+   */
+  protected readonly record = rollRecord({
+    editChannel: this.editChannel,
+    chordChannels: computed(() => this.settings().chordChannels),
+    keySounds: this.keySounds,
+    playSong: this.playSong,
+    snap: this.snapTicks,
+    editMode: this.editMode,
+    stack: this.stack,
+    zoom: this.zoom,
+    rowHeight: this.rowHeight,
+    timeline: this.timeline,
+    transportTick: () => this.view.transportTick(),
+  });
+
+  /**
    * The camera, the display clock and the geometry of the two bars over the
    * roll — see `roll-view.ts`. The Follow setting is written from there so that
    * coming off the song always parks the camera first.
@@ -290,6 +321,8 @@ export class PianoRoll {
       songTicks: this.songTicks,
       width: this.width,
       rollWidth: this.rollWidth,
+      recordTick: this.record.tick,
+      recordWindowTick: this.record.windowTick,
     },
     {
       writeFollow: (follow) => {
@@ -437,12 +470,17 @@ export class PianoRoll {
   protected readonly soundingRows = computed<ReadonlySet<number>>(() => {
     const rows = this.heldRows();
     const pressed = this.pressedKey();
-    if (pressed === null) {
+    const keys = this.record.heldRows();
+    if (pressed === null && keys.size === 0) {
       return rows;
     }
 
-    const all = new Set(rows);
-    all.add(pressed);
+    // A key held on a MIDI keyboard is a row sounding too.
+    const all = new Set([...rows, ...keys]);
+    if (pressed !== null) {
+      all.add(pressed);
+    }
+
     return all;
   });
 
@@ -863,6 +901,18 @@ export class PianoRoll {
     this.settings.update((s) => ({ ...s, percussionOpen }));
   }
 
+  protected setKeySounds(keySounds: boolean): void {
+    this.settings.update((s) => ({ ...s, keySounds }));
+  }
+
+  protected setPlaySong(playSong: boolean): void {
+    this.settings.update((s) => ({ ...s, playSong }));
+  }
+
+  protected toggleChordChannel(channel: number): void {
+    this.settings.update((s) => toggleChordChannel(s, channel));
+  }
+
   /** Pressing the channel already being edited clears it, as the mixer's solo does. */
   protected setEditChannel(channel: number): void {
     if (this.editChannel() === channel) {
@@ -991,6 +1041,12 @@ export class PianoRoll {
       return;
     }
 
+    // A take in flight is timed against the text as it stood when it began, so
+    // nothing edits the song until it has been written.
+    if (this.record.phase() !== 'idle') {
+      return;
+    }
+
     this.gestures.onPointerDown(event, this.svgBox(event));
   }
 
@@ -1111,6 +1167,19 @@ export class PianoRoll {
    * decided. What is here is the bag it decides them against.
    */
   protected onKey(event: KeyboardEvent): void {
+    // A recording takes the keyboard whole: Space and Escape end it, and no
+    // shortcut edits or undoes the song it is being timed against.
+    if (this.record.phase() !== 'idle') {
+      if (event.key === ' ' || event.key === 'Escape') {
+        event.preventDefault();
+        if (!event.repeat) {
+          this.record.stop();
+        }
+      }
+
+      return;
+    }
+
     rollShortcut(event, {
       playing: () => this.playback.isPlaying(),
       previewing: () => this.audition.previewing(),

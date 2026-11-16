@@ -4,6 +4,7 @@ paths:
   - 'web/src/app/editor/views/piano-roll/roll-strip.ts'
   - 'web/src/app/editor/views/piano-roll/roll-gesture.ts'
   - 'web/src/app/editor/views/piano-roll/roll-seed.ts'
+  - 'web/src/app/editor/views/piano-roll/roll-take.ts'
   - 'web/src/app/editor/views/piano-roll/roll-command-move.ts'
   - 'web/src/app/editor/views/piano-roll/roll-write/**'
   - 'web/src/app/editor/views/piano-roll/percussion.ts'
@@ -78,6 +79,14 @@ treats a press that never moved as a click that commits nothing. Drawing is the 
 click on empty grid is the whole gesture. That is also the one gesture the wheel reaches: a press
 holding a new note has no second axis left to say a length with, so `onWheel` offers the wheel to
 `stepLength` before it reads its own modifiers, and takes it back when there is nothing being drawn.
+
+**A recorded take is a spawn of many, written a channel at a time.** The `take` gesture places every
+note of one channel in one plan, under the porter's `EditMode` like any other gesture.
+`roll-write/take-edits.ts` writes a take's channels lowest first, each against a fresh compile of
+the text the one before it left (`EditorStore.compileText`), so padding the other channels out to a
+note past the end and opening an undeclared channel are `planEdits`' own single-channel work. The
+result goes to the editor as one splice. A note on a loop's ticks is left out and counted rather
+than refusing the take as `REFUSE_LOOP_WALL` would; any other refusal refuses all of it.
 
 ## Decisions already made
 

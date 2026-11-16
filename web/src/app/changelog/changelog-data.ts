@@ -9,6 +9,10 @@ export interface ChangelogEntry {
 export const CHANGELOG: readonly ChangelogEntry[] = [
   // ─── newest first; add new blocks here ──────────────────────────────────
   {
+    date: '16 November 2026',
+    items: ['MIDI keyboard recording in the piano roll'],
+  },
+  {
     date: '2 November 2026',
     items: [
       "Warnings when the tempo or any other setting carries over into the song's repeat",

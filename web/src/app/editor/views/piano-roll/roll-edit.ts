@@ -68,8 +68,16 @@ export interface Plan {
   refused: string | null;
 }
 
+/** One note of a recorded take: where it starts, how long it is, and the byte its key names. */
+export interface TakeNote {
+  startTick: number;
+  ticks: number;
+  written: number;
+}
+
 export type Gesture =
   | { kind: 'spawn'; startTick: number; ticks: number; written: number; drum: number | null }
+  | { kind: 'take'; notes: readonly TakeNote[] }
   | { kind: 'move'; items: readonly number[]; deltaTicks: number; deltaKeys: number; copy: boolean }
   | { kind: 'stretch'; items: readonly number[]; edge: 'start' | 'end'; deltaTicks: number }
   | { kind: 'delete'; items: readonly number[] }
@@ -646,6 +654,18 @@ function resolvedGesture(strip: Strip, frame: StripFrame, gesture: Gesture, mode
       // A drawn note is put where the pointer is, so whatever was already there
       // moves later rather than earlier.
       return resolved(notes, [born], mode, 1, new Set());
+    }
+
+    case 'take': {
+      if (gesture.notes.some((note) => !inRange(note.written))) {
+        return { ...NOTHING, refused: REFUSE_RANGE };
+      }
+
+      // A spawn of many: every note is the gesture's own, so none shoves or
+      // carves another, and two of them overlapping is a clash.
+      const born: PlacedNote[] = gesture.notes.map((note) => ({ ...note, from: -1, drum: null }));
+      const notes = [...placedNotes(strip, frame), ...born].sort(byTick);
+      return resolved(notes, born, mode, 1, new Set());
     }
 
     case 'move': {

@@ -111,6 +111,13 @@ fade past the end of the song — the driver has stopped reading music data by t
 ticks left to count — and the frame timing inside the piano roll, which is about the display's
 refresh rate and not the song's.
 
+**A MIDI recording's pointer is ticks too, and runs forwards only.** It is not the transport's
+playhead — a take can outrun the song — so `recordTickStep` (`roll-take.ts`) carries it one frame
+at a time at `ticksPerSecondAt`'s rate, the way the playhead's own velocity is set between anchors.
+That is a wall clock going in and a tick coming out, once per frame, and still no `tickAtSeconds`:
+nothing looks a second up in the clock's table, and a key's tick is the pointer carried to the
+moment the key was pressed.
+
 ## Decisions already made
 
 Designs built or considered here and moved away from, one line each: the entry's title and the

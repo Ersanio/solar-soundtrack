@@ -13,22 +13,26 @@
 
 import { type SpcCore, instantiate } from '@amk/spc/wasm-host';
 
-let core: SpcCore | null = null;
-let compiled: Promise<WebAssembly.Module> | null = null;
+let core: Promise<SpcCore> | null = null;
 
-export async function coreFor(wasmUrl: string): Promise<SpcCore> {
-  if (core) {
-    return core;
-  }
+/**
+ * The promise is what is kept, not the core: two requests arriving while the
+ * module is still compiling have to be handed the same instance, and a
+ * checkpoint taken on one emulator means nothing to another.
+ */
+export function coreFor(wasmUrl: string): Promise<SpcCore> {
+  core ??= fetch(wasmUrl)
+    .then(async (response) => {
+      if (!response.ok) {
+        throw new Error(`Could not load ${wasmUrl} (HTTP ${response.status}).`);
+      }
 
-  compiled ??= fetch(wasmUrl).then(async (response) => {
-    if (!response.ok) {
-      throw new Error(`Could not load ${wasmUrl} (HTTP ${response.status}).`);
-    }
+      return instantiate(await WebAssembly.compile(await response.arrayBuffer()));
+    })
+    .catch((error: unknown) => {
+      core = null; // So the next request tries again rather than inheriting the failure.
+      throw error;
+    });
 
-    return WebAssembly.compile(await response.arrayBuffer());
-  });
-
-  core = instantiate(await compiled);
   return core;
 }

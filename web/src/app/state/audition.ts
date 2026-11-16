@@ -2,6 +2,7 @@ import { DestroyRef, Service, computed, inject, signal } from '@angular/core';
 
 import type { CompileResult } from '@amk/core/types';
 import { NOTE_MAX, NOTE_MIN, TICKS_PER_WHOLE } from '@amk/core/hardcoded-tables';
+import type { NoteAuditionRequest } from '@amk/spc/note-audition';
 import type { PitchSlide } from '@amk/spc/song-walk';
 import { SPC_CHANNELS, SPC_SAMPLE_RATE } from '@amk/spc/wasm-host';
 import { EditorStore } from './editor-store';
@@ -46,6 +47,23 @@ export interface NotePlay {
    * asked twenty times over. One deliberate press is not such a caller.
    */
   quiet?: boolean;
+}
+
+/** How long a held key's level takes to fall away once the key is let go, in seconds. */
+const RELEASE_SECONDS = 0.03;
+
+/** The least a held key is heard for, so one let go before its render lands still sounds. */
+const MIN_HELD_SECONDS = 0.12;
+
+/** Held keys take their tokens from here up, clear of the one-at-a-time previews'. */
+const FIRST_KEY_TOKEN = 0x4000_0000;
+
+/** One held key: rendering, or sounding through a gain of its own. */
+interface HeldVoice {
+  /** The key came back up before the render did. */
+  released: boolean;
+  source: AudioBufferSourceNode | null;
+  gain: GainNode | null;
 }
 
 /** What {@link Audition.playRegion} is asked for. */
@@ -105,7 +123,21 @@ export class Audition {
    * from. Building one copies the whole 64 KiB image and every sample, and a run
    * of clicks is all the same song.
    */
-  private image: { result: CompileResult; spc: Uint8Array } | null = null;
+  private image: { result: CompileResult; spc: Uint8Array; song: number } | null = null;
+  /** Counts the images built, which is how the worker tells one song from the next. */
+  private songs = 0;
+
+  /**
+   * The keys being held, by the token each was asked for with.
+   *
+   * Apart from {@link source}, which is one preview replacing the last: a chord
+   * is several notes at once, and each ends when its own key comes up.
+   */
+  private readonly voices = new Map<number, HeldVoice>();
+  private readonly holding = signal(0);
+  private keyToken = FIRST_KEY_TOKEN;
+  /** The last tick the worker was asked to be ready for, so a standing pointer asks once. */
+  private prepared = '';
 
   /** The sample currently being auditioned, for the UI to show. */
   readonly playing = signal<string | null>(null);
@@ -130,7 +162,9 @@ export class Audition {
    * Whether a preview is on its way or sounding — what there is for a stop to
    * stop, and the one question the transport's button asks here.
    */
-  readonly previewing = computed(() => this.notePending() || this.source() !== null);
+  readonly previewing = computed(
+    () => this.notePending() || this.source() !== null || this.holding() > 0,
+  );
 
   constructor() {
     inject(DestroyRef).onDestroy(() => {
@@ -164,10 +198,132 @@ export class Audition {
    * happens on a worker, so nothing that is playing is disturbed by the wait.
    */
   playNote(request: NotePlay): void {
+    const note = this.noteFor(request);
+    if (!note) {
+      return;
+    }
+
+    this.stop();
+    // This note sounds, so a hint saying why the last one did not has stopped
+    // being true — un-muting a channel and hearing it again must not leave the
+    // status line still calling it muted.
+    this.editor.clearHint();
+
+    this.render({ kind: 'note', token: this.token, ...note });
+  }
+
+  /**
+   * Sounds a note for as long as a key is held, beside whatever else is held.
+   *
+   * {@link playNote} with two differences, both a keyboard's: it replaces
+   * nothing, so a chord is every one of its notes, and it ends at
+   * {@link releaseNote} rather than at a length fixed when it was asked for. The
+   * render is still a whole one — `ticks` is the most the key can be heard for —
+   * and letting go fades what is left of it.
+   *
+   * Answers the handle to release it by, or `null` for a note that will not sound.
+   */
+  holdNote(request: NotePlay): number | null {
+    const note = this.noteFor(request);
+    if (!note) {
+      return null;
+    }
+
+    const token = this.keyToken++;
+    try {
+      this.worker ??= this.startWorker();
+      this.worker.postMessage({ kind: 'note', token, ...note } satisfies AuditionRequest);
+    } catch (error) {
+      this.worker = null;
+      this.editor.fail(errorMessage(error));
+      return null;
+    }
+
+    this.voices.set(token, { released: false, source: null, gain: null });
+    this.holding.set(this.voices.size);
+    return token;
+  }
+
+  /** Lets a held key go: what is sounding fades, and what is still rendering sounds briefly. */
+  releaseNote(handle: number): void {
+    const voice = this.voices.get(handle);
+    if (!voice) {
+      return;
+    }
+
+    if (voice.source) {
+      this.fade(handle, voice, 0);
+    } else {
+      voice.released = true;
+    }
+  }
+
+  /**
+   * Has the worker run the song to `tick` and keep it there, so a note asked for
+   * at or after it starts from that point rather than from the top of the song.
+   *
+   * Asked for ahead of the keys, by whoever knows where the next one will land:
+   * the wait a note costs is the song emulated up to its tick, and this is that
+   * wait taken before the key goes down.
+   */
+  prepare(tick: number): void {
+    const spc = this.songImage();
+    if (!spc || !this.image || typeof Worker === 'undefined') {
+      return;
+    }
+
+    const atTicks = Math.max(0, Math.round(tick));
+    const silenced = this.mixer.silenced();
+    const key = `${this.image.song}:${atTicks}:${silenced}`;
+    if (key === this.prepared) {
+      return;
+    }
+
+    try {
+      this.worker ??= this.startWorker();
+      this.worker.postMessage({
+        kind: 'prepare',
+        token: 0,
+        spc,
+        song: this.image.song,
+        wasmUrl: this.wasmUrl(),
+        atTicks,
+        silenced,
+      } satisfies AuditionRequest);
+      this.prepared = key;
+    } catch {
+      this.worker = null; // The note it was for runs from the top instead.
+    }
+  }
+
+  /**
+   * Opens the audio context and starts the worker ahead of the first note.
+   *
+   * From a press, because a context made outside one starts suspended and the
+   * first key would be spent waking it.
+   */
+  warm(): void {
+    try {
+      void this.audio().resume();
+      if (typeof Worker !== 'undefined') {
+        this.worker ??= this.startWorker();
+      }
+    } catch {
+      // No audio, or no worker: a note says so when one is asked for.
+    }
+  }
+
+  /**
+   * What the worker is asked for a note with, or `null` for one that will not
+   * sound — refused by the mixer, out of range, or with no song to play it in.
+   */
+  private noteFor(
+    request: NotePlay,
+  ): { spc: Uint8Array; song: number; wasmUrl: string; note: NoteAuditionRequest } | null {
     const scratchAt = this.editor.aramAddress();
     const spc = this.songImage();
-    if (!spc || scratchAt === null || typeof Worker === 'undefined') {
-      return;
+    if (!spc || !this.image || scratchAt === null || typeof Worker === 'undefined') {
+      return null;
     }
 
     // Before the range check, and before an emulator is asked for: hearing
@@ -178,7 +334,7 @@ export class Audition {
         this.editor.say(silencedReason(request.channel, this.mixer.soloed()));
       }
 
-      return;
+      return null;
     }
 
     const note = this.transposed(request);
@@ -190,19 +346,12 @@ export class Audition {
         this.editor.fail($localize`:@@status.that-note-is-out-of:status.that-note-is-out-of`);
       }
 
-      return;
+      return null;
     }
 
-    this.stop();
-    // This note sounds, so a hint saying why the last one did not has stopped
-    // being true — un-muting a channel and hearing it again must not leave the
-    // status line still calling it muted.
-    this.editor.clearHint();
-
-    this.render({
-      kind: 'note',
-      token: this.token,
+    return {
       spc,
+      song: this.image.song,
       wasmUrl: this.wasmUrl(),
       note: {
         atTicks: Math.max(0, Math.round(request.tick)),
@@ -216,7 +365,7 @@ export class Audition {
         // silenced channel was refused above.
         silenced: this.mixer.silenced(),
       },
-    });
+    };
   }
 
   /**
@@ -235,7 +384,7 @@ export class Audition {
   playRegion(request: RegionPlay): void {
     const spc = this.songImage();
     const ticks = Math.round(request.ticks);
-    if (!spc || ticks <= 0 || typeof Worker === 'undefined') {
+    if (!spc || !this.image || ticks <= 0 || typeof Worker === 'undefined') {
       return;
     }
 
@@ -245,6 +394,7 @@ export class Audition {
       kind: 'region',
       token: this.token,
       spc,
+      song: this.image.song,
       wasmUrl: this.wasmUrl(),
       region: {
         atTicks: Math.max(0, Math.round(request.tick)),
@@ -282,6 +432,11 @@ export class Audition {
     this.token++;
     this.notePending.set(false);
 
+    // Held keys too: a stop is everything this service is sounding.
+    for (const [handle, voice] of this.voices) {
+      this.silence(handle, voice);
+    }
+
     const source = this.source();
     this.source.set(null);
     this.playing.set(null);
@@ -302,38 +457,14 @@ export class Audition {
    * for a note, which belongs to no row.
    */
   private start(name: string | null, pcm: Int16Array, channels: number): void {
-    const frames = Math.floor(pcm.length / channels);
-    if (frames === 0) {
-      return;
-    }
-
     try {
-      this.context ??= new AudioContext();
-      const context = this.context;
-
-      const buffer = context.createBuffer(channels, frames, SPC_SAMPLE_RATE);
-      for (let channel = 0; channel < channels; channel++) {
-        const data = buffer.getChannelData(channel);
-        for (let frame = 0; frame < frames; frame++) {
-          data[frame] = pcm[frame * channels + channel] / 0x8000;
-        }
+      const source = this.sourceOf(pcm, channels);
+      if (!source) {
+        return;
       }
 
-      // The transport's slider, on this path too: the same note under the
-      // pointer and under the playhead is the same note, and one of them
-      // ignoring the slider is one of them at a level nobody asked for. Read at
-      // the source rather than mirrored by an effect — a preview lasts about a
-      // second, and the level it starts at is the level it was asked for.
-      if (!this.gain) {
-        this.gain = context.createGain();
-        this.gain.connect(context.destination);
-      }
-
-      this.gain.gain.value = this.mixer.volume() / 100;
-
-      const source = context.createBufferSource();
-      source.buffer = buffer;
-      source.connect(this.gain);
+      const context = this.audio();
+      source.connect(this.output());
       source.onended = () => {
         if (this.source() === source) {
           this.source.set(null);
@@ -348,6 +479,119 @@ export class Audition {
       void context.resume();
     } catch (error) {
       this.editor.fail(errorMessage(error));
+    }
+  }
+
+  /** The one context, built on the first thing that needs it. */
+  private audio(): AudioContext {
+    this.context ??= new AudioContext({ latencyHint: 'interactive' });
+    return this.context;
+  }
+
+  /**
+   * The slider's level, which everything here plays through.
+   *
+   * The transport's slider, on this path too: the same note under the pointer
+   * and under the playhead is the same note, and one of them ignoring the slider
+   * is one of them at a level nobody asked for. Read as each sound starts rather
+   * than mirrored by an effect — a preview lasts about a second, and the level
+   * it starts at is the level it was asked for.
+   */
+  private output(): GainNode {
+    const context = this.audio();
+    if (!this.gain) {
+      this.gain = context.createGain();
+      this.gain.connect(context.destination);
+    }
+
+    this.gain.gain.value = this.mixer.volume() / 100;
+    return this.gain;
+  }
+
+  /** PCM as a source ready to be connected and started, or `null` for none at all. */
+  private sourceOf(pcm: Int16Array, channels: number): AudioBufferSourceNode | null {
+    const frames = Math.floor(pcm.length / channels);
+    if (frames === 0) {
+      return null;
+    }
+
+    const context = this.audio();
+    const buffer = context.createBuffer(channels, frames, SPC_SAMPLE_RATE);
+    for (let channel = 0; channel < channels; channel++) {
+      const data = buffer.getChannelData(channel);
+      for (let frame = 0; frame < frames; frame++) {
+        data[frame] = pcm[frame * channels + channel] / 0x8000;
+      }
+    }
+
+    const source = context.createBufferSource();
+    source.buffer = buffer;
+    return source;
+  }
+
+  /** A held key's render has landed: sound it, through a gain its release can ramp. */
+  private sound(handle: number, voice: HeldVoice, pcm: Int16Array): void {
+    try {
+      const source = this.sourceOf(pcm, SPC_CHANNELS);
+      if (!source) {
+        this.silence(handle, voice);
+        return;
+      }
+
+      const context = this.audio();
+      const gain = context.createGain();
+      gain.connect(this.output());
+      source.connect(gain);
+      source.onended = () => this.silence(handle, voice);
+      source.start();
+      void context.resume();
+
+      voice.source = source;
+      voice.gain = gain;
+      // Let go while it was rendering: heard briefly rather than not at all.
+      if (voice.released) {
+        this.fade(handle, voice, MIN_HELD_SECONDS);
+      }
+    } catch (error) {
+      this.silence(handle, voice);
+      this.editor.fail(errorMessage(error));
+    }
+  }
+
+  /** Ramps a held key down from `after` seconds on, and stops it once it is silent. */
+  private fade(handle: number, voice: HeldVoice, after: number): void {
+    const { source, gain } = voice;
+    if (!source || !gain) {
+      return;
+    }
+
+    const from = this.audio().currentTime + after;
+    gain.gain.setValueAtTime(1, from);
+    gain.gain.linearRampToValueAtTime(0, from + RELEASE_SECONDS);
+    try {
+      source.stop(from + RELEASE_SECONDS);
+    } catch {
+      this.silence(handle, voice); // Already finished.
+    }
+  }
+
+  /** Takes a held key out at once, sounding or not. */
+  private silence(handle: number, voice: HeldVoice): void {
+    if (this.voices.get(handle) !== voice) {
+      return;
+    }
+
+    this.voices.delete(handle);
+    this.holding.set(this.voices.size);
+    if (voice.source) {
+      voice.source.onended = null;
+      try {
+        voice.source.stop();
+      } catch {
+        // Already finished; nothing to stop.
+      }
+
+      voice.gain?.disconnect();
     }
   }
 
@@ -380,7 +624,7 @@ export class Audition {
 
     if (this.image?.result !== result) {
       const spc = this.editor.assembleSpc();
-      this.image = spc ? { result, spc } : null;
+      this.image = spc ? { result, spc, song: ++this.songs } : null;
     }
 
     return this.image?.spc ?? null;
@@ -390,6 +634,19 @@ export class Audition {
     const worker = new Worker(new URL('./note.worker', import.meta.url), { type: 'module' });
     worker.onmessage = (event: MessageEvent<NoteReply>) => {
       const reply = event.data;
+      // A held key's own render, which answers to its key and to nothing else.
+      const voice = this.voices.get(reply.token);
+      if (voice) {
+        if (reply.ok) {
+          this.sound(reply.token, voice, reply.pcm);
+        } else {
+          this.silence(reply.token, voice);
+          this.editor.fail(reply.message);
+        }
+
+        return;
+      }
+
       // Superseded while it rendered: a run cannot be cancelled, so late answers
       // are dropped here rather than played over the newer one — and the flag is
       // left alone with them, since it belongs to whatever was asked for last
@@ -411,6 +668,10 @@ export class Audition {
       this.worker?.terminate();
       this.worker = null;
       this.notePending.set(false);
+      this.prepared = '';
+      for (const [handle, voice] of this.voices) {
+        this.silence(handle, voice);
+      }
     };
 
     return worker;

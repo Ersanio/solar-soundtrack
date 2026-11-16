@@ -35,4 +35,5 @@ await runSections([
 	["command-lane", () => import("./command-lane")],
 	["slider-track", () => import("./slider-track")],
 	["transport-view", () => import("./transport-view")],
+	["record-pointer", () => import("./record-pointer")],
 ]);

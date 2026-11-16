@@ -499,6 +499,23 @@ export class EditorStore {
     this.committed.set(this.source());
   }
 
+  /**
+   * Compiles a text that is not the document, exactly as the document is
+   * compiled. For a writer that has to read back text it has not committed yet.
+   */
+  compileText(text: string): { result: CompileResult; aramAddress: number } | null {
+    const driver = this.drivers.driver();
+    if (!driver) {
+      return null;
+    }
+
+    const aramAddress = driver.manifest.localPos;
+    return {
+      result: compiler.compile({ source: text, aramAddress, options: this.compileOptions() }),
+      aramAddress,
+    };
+  }
+
   // --- outputs --------------------------------------------------------------
 
   /**

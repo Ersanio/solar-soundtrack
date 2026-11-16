@@ -104,14 +104,14 @@ something in the directory, which load by themselves when such a file is opened.
 - `fir.ts` (500+ lines) — The DSP's echo FIR filter: what eight signed bytes actually do to a sound.
 - `instruments.ts` — The driver's own instrument and percussion tables: what `@n` actually selects.
 - `layout.ts` — ARAM layout and budgeting.
-- `note-audition.ts` (500+ lines) — Playing one note as it would sound at a point in the song, or one stretch of the song as it stands.
+- `note-audition.ts` (750+ lines) — Playing one note as it would sound at a point in the song, or one stretch of the song as it stands.
 - `player.ts` (300+ lines) — SPC700 playback.
 - `protocol.ts` — The message contract between `player.ts` on the page and `worklet.ts` on the audio thread.
 - `repeat-settings.ts` (500+ lines) — The driver settings a looping song can carry from the end of one pass into the next.
 - `slots.ts` — The slots of driver state a VCMD writes or clears, which is how the song walk names the command a note sounds under.
 - `song-walk-types.ts` (300+ lines) — The song walk's public model: the timeline `walkSong` returns, and the notes, commands, loops and state in it.
 - `song-walk.ts` (1000+ lines) — Reads a compiled song the way the driver reads it, and says what sounds when.
-  - `KEY_COUNT`:103 `vcmdLength`:123 `walkSong`:266 `listOf`:1270 `unreachableChannels`:1287
+  - `KEY_COUNT`:103 `vcmdLength`:123 `walkSong`:266 `listOf`:1268 `unreachableChannels`:1285
 - `wasm-host.ts` (300+ lines) — Host for `assets/player/spc.wasm` — Blargg's snes_spc, Emscripten-built.
 - `worklet.ts` (300+ lines) — The SPC700 renderer, running on the audio thread.
 
@@ -142,6 +142,7 @@ something in the directory, which load by themselves when such a file is opened.
 
 **Rules:** `harnesses/*.md`
 
+- `audition-checkpoint.ts` — `audiotest`: a note auditioned from a checkpoint is the note auditioned from the top of the song, byte for byte.
 - `audition-in-song.ts` — `audiotest`: an auditioned note with the rest of the song under it, and handed over on a tick the whole song fetches on.
 - `audition-slide.ts` — `audiotest`: an auditioned note sliding as the `$DD` riding on it says.
 - `audition.ts` (300+ lines) — `audiotest`: one note, auditioned where the song is playing.
@@ -168,6 +169,7 @@ something in the directory, which load by themselves when such a file is opened.
 - `percussion.ts` — `charttest`: the percussion set, which is a preference and not a rule.
 - `playhead-and-overview.ts` — `charttest`: the roll's playhead marking the song rather than the camera, and the overview bar's time axis and minimap.
 - `playhead-clock.ts` — `charttest`: the pull at the end of the scrub bar, and the playhead's own clock.
+- `record-pointer.ts` — `charttest`: the pointer a MIDI recording is timed against.
 - `slider-track.ts` — `charttest`: the slider's track.
 - `stack-plot-clamp.ts` — `charttest`: the stacked bar's geometry, the plot space, and `clamp`.
 - `support.ts` — What the `charttest` sections share: `EPSILON`, the tolerance a computed coordinate is compared within.
@@ -220,6 +222,7 @@ something in the directory, which load by themselves when such a file is opened.
 - `overwrite-mode.ts` — `pianorolltest`: overwrite mode — the notes already there give up the ticks.
 - `past-the-end.ts` — `pianorolltest`: a note drawn past the end of the song, and the channels padded to meet it.
 - `pitch-slide.ts` — `pianorolltest`: notes carrying a `$DD` pitch slide.
+- `recording.ts` — `pianorolltest`: a take played in on a MIDI keyboard, and the channels it is written to.
 - `refusals.ts` — `pianorolltest`: the gestures the roll refuses outright.
 - `removed-commands.ts` — `pianorolltest`: a removed item's commands are kept where something still plays under them.
 - `seed.ts` — `pianorolltest`: seeding a song with no playable music.
@@ -349,7 +352,7 @@ something in the directory, which load by themselves when such a file is opened.
 
 ## web/src/app/editor/top-bar
 
-- `top-bar.ts` — The top bar: the transport, the ARAM meter, the exports, the theme picker, the changelog and the commit link.
+- `top-bar.ts` — The top bar: the transport, the ARAM meter, the exports, the MIDI keyboard switch, the theme picker, the changelog and the commit link.
 
 ## web/src/app/editor/transport-controls
 
@@ -369,13 +372,14 @@ something in the directory, which load by themselves when such a file is opened.
 
 - `percussion.ts` — Which instruments the roll draws as percussion, and where a note goes as a result.
 - `piano-roll.ts` (1000+ lines) — The song as music: a keyboard down the left, time running right, and all eight channels in one roll.
-  - `PianoRoll`:100 `onLaneGrab`:331 `onLaneResize`:338 `onLaneRelease`:348 `resetLaneHeight`:354
-  - `addressesOf`:574 `askAboutSelection`:659 `setZoom`:827 `setRowHeight`:831 `setScrollNotes`:838
-  - `setAllOctaves`:842 `setBeatsPerBar`:846 `setBeatUnit`:850 `setSnap`:854 `setEditMode`:858
-  - `setPercussionOpen`:862 `setEditChannel`:867 `clearEditChannel`:877 `selectEditChannel`:894 `followMixer`:914
-  - `isolateChannel`:935 `togglePercussion`:941 `resetPercussion`:945 `svgBox`:952 `onEditDown`:976
-  - `onEditMove`:997 `onEditUp`:1012 `onEditLeave`:1031 `onContextMenu`:1036 `onWheel`:1048 `onKey`:1113
-  - `onKeyPress`:1145 `onMove`:1173 `enter`:1187 `leave`:1191 `onViewportScroll`:1196
+  - `PianoRoll`:104 `onLaneGrab`:364 `onLaneResize`:371 `onLaneRelease`:381 `resetLaneHeight`:387
+  - `addressesOf`:612 `askAboutSelection`:697 `setZoom`:865 `setRowHeight`:869 `setScrollNotes`:876
+  - `setAllOctaves`:880 `setBeatsPerBar`:884 `setBeatUnit`:888 `setSnap`:892 `setEditMode`:896
+  - `setPercussionOpen`:900 `setKeySounds`:904 `setPlaySong`:908 `toggleChordChannel`:912 `setEditChannel`:917
+  - `clearEditChannel`:927 `selectEditChannel`:944 `followMixer`:964 `isolateChannel`:985 `togglePercussion`:991
+  - `resetPercussion`:995 `svgBox`:1002 `onEditDown`:1026 `onEditMove`:1053 `onEditUp`:1068 `onEditLeave`:1087
+  - `onContextMenu`:1092 `onWheel`:1104 `onKey`:1169 `onKeyPress`:1214 `onMove`:1242 `enter`:1256 `leave`:1260
+  - `onViewportScroll`:1265
 - `refusal.ts` — A refusal: why the roll will not splice a channel or write a gesture out, in the words it shows.
 - `roll-bar-text.ts` — How wide a plate of `text` at `size` comes to, padding included.
 - `roll-camera.ts` — The camera's own fractions, and where it is left between visits.
@@ -384,13 +388,14 @@ something in the directory, which load by themselves when such a file is opened.
 - `roll-command-layout.ts` — Where a glyph's box starts, in the roll's own coordinates.
 - `roll-command-move.ts` — Dragging a command glyph along its channel: where it may land, why it may not, and the edit that moves it.
 - `roll-edit.ts` (1000+ lines) — What a gesture on the roll does to a channel: where every note ends up, which ones a push moved, and where two would sound at once.
-  - `EDIT_MODES`:92 `REFUSE_RANGE`:154 `REFUSE_ROOM`:155 `REFUSE_SPELL`:156 `REFUSE_CROWDED`:157 `REFUSE_RAMP`:158
-  - `REFUSE_INSIDE`:159 `REFUSE_CLASH`:160 `REFUSE_BEND_RIDER`:161 `REFUSE_LOOP_WALL`:162 `REFUSE_SPLIT`:163
-  - `REFUSE_REMAP_FED`:164 `REFUSE_SUB_SPLIT`:165 `REFUSE_NESTED_LOOP`:166 `REFUSE_LOOP_LEFT_PASS`:167
-  - `REFUSE_LOOP_LEAD_ROOM`:168 `REFUSE_LOOP_BODY_ROOM`:169 `isEdits`:182 `placedNotes`:189 `byTick`:207
-  - `clashesIn`:212 `inRange`:227 `push`:251 `pushFrom`:308 `carve`:357 `resolved`:446 `planGesture`:519
-  - `spansFrames`:557 `planFrames`:571 `guarded`:606 `resolvedGesture`:631 `shiftBoundariesFor`:863
-  - `framePasses`:910 `frameAt`:939 `passShiftsFor`:1022 `plannedOrdinals`:1050 `plannedFrameTicks`:1070
+  - `EDIT_MODES`:100 `REFUSE_RANGE`:162 `REFUSE_ROOM`:163 `REFUSE_SPELL`:164 `REFUSE_CROWDED`:165
+  - `REFUSE_RAMP`:166 `REFUSE_INSIDE`:167 `REFUSE_CLASH`:168 `REFUSE_BEND_RIDER`:169 `REFUSE_LOOP_WALL`:170
+  - `REFUSE_SPLIT`:171 `REFUSE_REMAP_FED`:172 `REFUSE_SUB_SPLIT`:173 `REFUSE_NESTED_LOOP`:174
+  - `REFUSE_LOOP_LEFT_PASS`:175 `REFUSE_LOOP_LEAD_ROOM`:176 `REFUSE_LOOP_BODY_ROOM`:177 `isEdits`:190
+  - `placedNotes`:197 `byTick`:215 `clashesIn`:220 `inRange`:235 `push`:259 `pushFrom`:316 `carve`:365
+  - `resolved`:454 `planGesture`:527 `spansFrames`:565 `planFrames`:579 `guarded`:614 `resolvedGesture`:639
+  - `shiftBoundariesFor`:883 `framePasses`:930 `frameAt`:959 `passShiftsFor`:1042 `plannedOrdinals`:1070
+  - `plannedFrameTicks`:1090
 - `roll-gesture.ts` (2000+ lines) — The roll's pointer: what a press means, what a drag is doing, and what pointer-up commits.
   - `SLOP_PX`:87 `edgesAt`:96 `edgesOf`:111 `loopEnd`:129 `spawnTick`:347 `draggedTick`:367 `keysBetween`:379
   - `pitchOfRow`:484 `itemAt`:509 `rowOfItem`:532 `rollGestures`:536 `hoverCursor`:2097 `lengthLabel`:2143
@@ -401,6 +406,7 @@ something in the directory, which load by themselves when such a file is opened.
 - `roll-octave.ts` — The octave in force anywhere in the text, read the way the parser reads it.
 - `roll-pictures.ts` — What the roll draws, as against what it is looking at.
 - `roll-preview.ts` — The row a planned note belongs on.
+- `roll-record.ts` (500+ lines) — Recording from a MIDI keyboard: the pointer a take is timed against, the take itself, the sound of each key, and the write at the end.
 - `roll-seed.ts` — The channel a song started from nothing opens with: {@link openingCommands}'s state, plus the two song-wide values a whole song needs somewhere — `channelOpening` leaves `t` out because drawing one note into an existing song is not asking for a tempo, where starting a song is.
 - `roll-selection.ts` — The selected notes as the plans leave them.
 - `roll-settings.ts` (300+ lines) — The Snap setting in ticks, from the grid the porter chose.
@@ -410,6 +416,7 @@ something in the directory, which load by themselves when such a file is opened.
   - `trailsAUnit`:395 `unitStartBefore`:408 `forbiddenConstruct`:457 `growUnits`:514 `channelMarkers`:585
   - `channelHome`:610 `channelTails`:641 `movesTheStartingChannel`:696 `discoverLoops`:754 `channelStrip`:1038
   - `drumApart`:1357 `checkedOctaves`:1401 `isDiscovered`:1416 `expandAndJoin`:1435
+- `roll-take.ts` — A take played in on a MIDI keyboard: which channel each key lands on, where its note starts and ends, and the notes that come out of it.
 - `roll-target.ts` — What a gesture acts on, and whether it may.
 - `roll-view.ts` (500+ lines) — Where the roll is looking, and the two drags that move it.
 
@@ -474,6 +481,12 @@ something in the directory, which load by themselves when such a file is opened.
 
 - `roll-scrub.ts` — The timeline over the roll, and the only way to seek from it.
 
+## web/src/app/editor/views/piano-roll/roll-take
+
+**Rules:** `piano-roll-architecture.md`
+
+- `roll-take.ts` — A MIDI take in flight, drawn over the song: a bar per note played so far, and one growing under each key still held.
+
 ## web/src/app/editor/views/piano-roll/roll-toolbar
 
 **Rules:** `piano-roll-architecture.md`, `piano-roll-view.md`
@@ -500,6 +513,7 @@ something in the directory, which load by themselves when such a file is opened.
 - `runs.ts` (750+ lines) — A note being created, written into the gap it lands in: alone, or as a run laid over a window that carries the commands written there.
 - `spelling.ts` — How the roll spells what it writes: a note and its length, a channel's opening, the document's own line ending.
 - `splice.ts` — The edit primitives every writer here shares: splicing a unit, removing a span or an item with its comments, and refusing.
+- `take-edits.ts` — A recorded take written out: each channel's notes spliced in against a reading of its own, and the whole of it handed back as one edit.
 
 ## web/src/app/editor/views/sample-browser/audition-button
 
@@ -777,7 +791,7 @@ something in the directory, which load by themselves when such a file is opened.
 
 **Rules:** `ui-and-theme.md`
 
-- 20 icon components, `icon-<name>.ts`, one glyph each: `book`, `chevron-down`, `chevron-right`, `close`, `download`, `github`, `loop`, `minus`, `palette`, `pause`, `play`, `plus`, `redo`, `roll`, `samples`, `source`, `stop`, `undo`, `volume`, `wrap`
+- 21 icon components, `icon-<name>.ts`, one glyph each: `book`, `chevron-down`, `chevron-right`, `close`, `download`, `github`, `loop`, `minus`, `palette`, `pause`, `play`, `plus`, `record`, `redo`, `roll`, `samples`, `source`, `stop`, `undo`, `volume`, `wrap`
 
 ## web/src/app/shared/number-field
 
@@ -832,7 +846,7 @@ something in the directory, which load by themselves when such a file is opened.
 
 **Rules:** `audition.md`, `commands-in-the-roll.md`, `state-and-editor.md`, `transport-and-clock.md`, `ui-and-theme.md`
 
-- `audition.ts` (300+ lines) — Playing one sample, one note of the song, or one stretch of it, on its own AudioContext.
+- `audition.ts` (500+ lines) — Playing one sample, one note of the song, or one stretch of it, on its own AudioContext.
 - `clock-measurer.ts` — Measures how fast the song really runs on the emulator, and raises `SST0503` when the driver falls behind.
 - `clock.worker.ts` — Runs {@link measureClock} off the page.
 - `command-timeline.ts` — Every command that takes effect, and the tick it runs at.
@@ -842,6 +856,7 @@ something in the directory, which load by themselves when such a file is opened.
 - `editor-requests.ts` — What a panel asks the editor to do, and what the view and the roll report back.
 - `editor-store.ts` (500+ lines) — The document and everything compiled from it: the debounced compile, diagnostics, stats, the budget, the walk, the SPC.
 - `measure-clock.ts` — The song's clock as the driver actually keeps it, by running the emulator.
+- `midi-input.ts` — The connected MIDI keyboards, as a stream of keys.
 - `mixer.ts` — Which channels are heard, how loudly, and which the porter has taken out.
 - `note-transpose.ts` — Which byte to play for a pitch the porter has not written yet.
 - `note.worker.ts` — Runs {@link auditionNote} and {@link auditionRegion} off the page.

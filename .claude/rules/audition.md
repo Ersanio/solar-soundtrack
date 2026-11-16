@@ -1,6 +1,6 @@
 ---
 paths:
-  - 'web/src/app/state/{audition,note.worker,commit-audition,note-transpose}.ts'
+  - 'web/src/app/state/{audition,note.worker,commit-audition,note-transpose,midi-input}.ts'
   - 'packages/spc/src/note-audition.ts'
   - 'web/src/app/editor/views/sample-browser/audition-button/**'
 ---
@@ -143,6 +143,29 @@ first note keyed on and take that attack off. `sawTick` reads `$44` at the top o
 that tick's music runs, so stopping at the count is stopping with the tick still ahead — which is
 what a region wants and a note cannot use. What ends the span parks **every** voice: the notes
 standing at that tick ring out and key off where they were written to, and nothing new starts.
+
+## Checkpoints, and a key held on a MIDI keyboard
+
+**A checkpoint is the fast-forward already made.** `SpcCore.snapshot` copies the emulator's whole
+wasm memory — every byte of its state is in it — and `restore` puts it back. `prepareCheckpoint`
+runs the song to a tick and freezes it there with the count's own state (`Seek`); `auditionNote`
+handed one from before its tick restores it and runs on through the same blocks a run from the top
+would render, so the PCM is byte for byte the same, which `audiotest` pins. It is used only where
+it is strictly before the note's tick and was made under the same mask: whether the target voice
+fetched in the block that reached the tick is read off that block, and a checkpoint standing on the
+tick has none.
+
+`note.worker.ts` keeps the newest three for the song it was last asked about, 16 MiB each, and
+`Audition.prepare` is how a caller asks for one ahead of the keys. The page numbers each SPC image
+it builds (`song`), since a frozen emulator says nothing about which song it holds.
+`spc-core.ts` hands every request the one core, by keeping the promise: a checkpoint taken on one
+instance means nothing to another.
+
+**`holdNote` is `playNote` for a keyboard.** It replaces nothing, so a chord is every one of its
+notes, each with a gain of its own; `releaseNote` ramps that gain down over 30 ms, and a key let go
+before its render lands is heard briefly rather than not at all. The render is still a whole one —
+the length asked for is the most a held key can sound. `stop` takes held keys out with everything
+else.
 
 ## Two AudioContexts
 
