@@ -10,7 +10,10 @@ export const CHANGELOG: readonly ChangelogEntry[] = [
   // ─── newest first; add new blocks here ──────────────────────────────────
   {
     date: '16 November 2026',
-    items: ['MIDI keyboard recording in the piano roll'],
+    items: [
+      'MIDI keyboard recording in the piano roll',
+      'The computer keyboard as a piano in the piano roll, laid out as FL Studio lays it out',
+    ],
   },
   {
     date: '2 November 2026',

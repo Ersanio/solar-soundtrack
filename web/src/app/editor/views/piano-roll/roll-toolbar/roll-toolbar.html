@@ -180,12 +180,27 @@
     <ng-container i18n="@@roll.percussion">roll.percussion</ng-container>
   </button>
 
-  <!-- Recording from a MIDI keyboard, shown once the top bar's switch is on. The
-       channels are chosen before a take and not during one, so everything but
-       Record itself is held while one is in flight. -->
-  @if (midiOn()) {
-    <span class="bg-edge h-5 w-px shrink-0"></span>
+  <span class="bg-edge h-5 w-px shrink-0"></span>
 
+  <!-- The computer's own keyboard as a piano, for a porter with no MIDI one. On
+       the roll's toolbar rather than beside the top bar's MIDI switch, because
+       the keys it takes are only taken while the roll is open. -->
+  <button
+    i18n="@@roll.record.typing-keys"
+    amk-toggle
+    i18n-title="@@roll.record.typing-keys.title"
+    title="roll.record.typing-keys.title"
+    [pressed]="typingKeys()"
+    (click)="typingKeysChange.emit(!typingKeys())"
+  >
+    roll.record.typing-keys
+  </button>
+
+  <!-- Recording, shown once keys can arrive: the top bar's MIDI switch is on, or
+       the typing keyboard is. The channels are chosen before a take and not
+       during one, so everything but Record itself is held while one is in
+       flight. -->
+  @if (listening()) {
     <button
       amk-toggle
       [pressed]="recordPhase() !== 'idle'"

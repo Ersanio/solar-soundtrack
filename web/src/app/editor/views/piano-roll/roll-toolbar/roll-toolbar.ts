@@ -68,8 +68,10 @@ export class RollToolbar {
     stopRecording: $localize`:@@roll.record.stop.title:roll.record.stop.title`,
   };
 
-  /** Whether MIDI keyboards are being listened to, which is what shows the Record group. */
-  readonly midiOn = input.required<boolean>();
+  /** Whether keys can arrive, from a MIDI keyboard or this one: what shows the Record group. */
+  readonly listening = input.required<boolean>();
+  /** Whether the computer's own keyboard is being played as a piano. */
+  readonly typingKeys = input.required<boolean>();
   readonly recordPhase = input.required<RecordPhase>();
   /** How many notes the take in flight holds. */
   readonly recordNotes = input.required<number>();
@@ -82,6 +84,7 @@ export class RollToolbar {
   /** Every channel a take is spread over, the edited one included. */
   readonly recordChannels = input.required<readonly number[]>();
 
+  readonly typingKeysChange = output<boolean>();
   readonly recordToggle = output();
   readonly keySoundsChange = output<boolean>();
   readonly playSongChange = output<boolean>();

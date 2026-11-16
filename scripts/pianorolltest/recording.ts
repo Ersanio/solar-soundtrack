@@ -7,6 +7,7 @@ import { REFUSE_CLASH } from "../../web/src/app/editor/views/piano-roll/roll-edi
 import {
 	emptyTake,
 	keyDown,
+	keyOfCode,
 	keyUp,
 	releaseAll,
 	type Take,
@@ -27,6 +28,61 @@ check("MIDI 60 is o4 c", writtenOfKey(60) === C4, String(writtenOfKey(60)));
 check("MIDI 24 is the driver's lowest key", writtenOfKey(24) === NOTE_MIN);
 check("MIDI 93 is its highest", writtenOfKey(93) === 0xc5);
 check("a key either side of the range names nothing", writtenOfKey(23) === null && writtenOfKey(94) === null);
+
+// --- the computer's keyboard as a piano, laid out as FL Studio's ------------
+
+{
+	const row = (codes: readonly string[]): string => codes.map((code) => keyOfCode(code)).join(" ");
+
+	// `Z` is FL's C5, which is MIDI 60; the sharps are on the row above, and the
+	// run carries on into the next octave through `,` `.` `/`.
+	check(
+		"Z to M are the white keys from o4 c",
+		row(["KeyZ", "KeyX", "KeyC", "KeyV", "KeyB", "KeyN", "KeyM"]) === "60 62 64 65 67 69 71",
+		row(["KeyZ", "KeyX", "KeyC", "KeyV", "KeyB", "KeyN", "KeyM"]),
+	);
+	check(
+		"S D, then G H J are their sharps",
+		row(["KeyS", "KeyD", "KeyG", "KeyH", "KeyJ"]) === "61 63 66 68 70",
+		row(["KeyS", "KeyD", "KeyG", "KeyH", "KeyJ"]),
+	);
+	check(
+		"the bottom row runs on past the octave",
+		row(["Comma", "KeyL", "Period", "Semicolon", "Slash"]) === "72 73 74 75 76",
+		row(["Comma", "KeyL", "Period", "Semicolon", "Slash"]),
+	);
+	check(
+		"Q to ] are the octave above",
+		row([
+			"KeyQ",
+			"KeyW",
+			"KeyE",
+			"KeyR",
+			"KeyT",
+			"KeyY",
+			"KeyU",
+			"KeyI",
+			"KeyO",
+			"KeyP",
+			"BracketLeft",
+			"BracketRight",
+		]) === "72 74 76 77 79 81 83 84 86 88 89 91",
+	);
+	check(
+		"with its sharps on the digits",
+		row(["Digit2", "Digit3", "Digit5", "Digit6", "Digit7", "Digit9", "Digit0", "Equal"]) === "73 75 78 80 82 85 87 90",
+	);
+	// Where a piano has no black key, the layout has no key either.
+	check(
+		"the keys between E and F, and B and C, play nothing",
+		["KeyF", "KeyK", "Digit1", "Digit4", "Digit8", "Minus", "KeyA"].every((code) => keyOfCode(code) === null),
+	);
+	check("nor does anything off the piano", keyOfCode("Space") === null && keyOfCode("ArrowUp") === null);
+	check(
+		"every key of it is one the driver can play",
+		["KeyZ", "Slash", "KeyQ", "BracketRight"].every((code) => writtenOfKey(keyOfCode(code) ?? -1) !== null),
+	);
+}
 
 // --- which channel a key takes --------------------------------------------
 

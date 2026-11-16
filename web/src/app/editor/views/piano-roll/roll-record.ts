@@ -68,6 +68,8 @@ export interface RecordSources {
   keySounds: Signal<boolean>;
   /** Play the song under the take rather than running the pointer in silence. */
   playSong: Signal<boolean>;
+  /** The computer's own keyboard is being played as a piano, MIDI or no MIDI. */
+  typing: Signal<boolean>;
   /** What a note's ends snap to, in ticks; `0` for none. */
   snap: Signal<number>;
   editMode: Signal<EditMode>;
@@ -83,6 +85,8 @@ export interface RecordSources {
 }
 
 export interface RollRecord {
+  /** Whether any keys can arrive at all: a MIDI keyboard is on, or the computer's is. */
+  listening: Signal<boolean>;
   phase: Signal<RecordPhase>;
   /** The record pointer at frame rate, or `null` when nothing is being recorded. */
   tick: Signal<number | null>;
@@ -102,6 +106,11 @@ export interface RollRecord {
   /** Arm a recording, or stop the one in flight and write it. */
   toggle(): void;
   stop(): void;
+  /**
+   * A key from somewhere other than a MIDI input, taken exactly as one from
+   * there is — the computer's keyboard played as a piano.
+   */
+  key(event: MidiKey): void;
 }
 
 /** How far apart the worker's checkpoints are kept, in ticks. */
@@ -161,6 +170,8 @@ export function rollRecord(sources: RecordSources): RollRecord {
   let walls = new Map<number, readonly Wall[]>();
   /** The audition handle of each key that is sounding, by MIDI number. */
   const sounds = new Map<number, number>();
+
+  const listening = computed(() => midi.status() === 'on' || sources.typing());
 
   const channels = computed<readonly number[]>(() => {
     const edited = sources.editChannel();
@@ -463,7 +474,7 @@ export function rollRecord(sources: RecordSources): RollRecord {
    * sounded on the tick it snaps to and that can be earlier than the press.
    */
   const cell = computed(() => {
-    if (midi.status() !== 'on' || !sources.keySounds() || sources.editChannel() === null) {
+    if (!listening() || !sources.keySounds() || sources.editChannel() === null) {
       return null;
     }
 
@@ -552,17 +563,29 @@ export function rollRecord(sources: RecordSources): RollRecord {
 
   midi.listen(onKey);
 
-  // Sanctioned effect: the keyboards going away, which ends what they were
-  // doing. No key-up will come for a key that was down, and the Record group
-  // that would stop the take goes with the switch.
+  // Sanctioned effect: the MIDI keyboards going away. No key-up will come for a
+  // key that was down on one, so every key is let go where the pointer stands.
   onChange(midi.status, (status) => {
-    if (status !== 'on') {
-      stop();
-      for (const key of [...sounds.keys()]) {
-        hush(key);
-      }
+    if (status === 'on') {
+      return;
+    }
 
-      down.set(new Map<number, number>());
+    if (phase() !== 'idle') {
+      take.set(releaseAll(take(), tickAt(performance.now())));
+    }
+
+    for (const key of [...sounds.keys()]) {
+      hush(key);
+    }
+
+    down.set(new Map<number, number>());
+  });
+
+  // Sanctioned effect: the last source of keys going away, which ends the take
+  // they were playing. The Record group that would stop it goes with them.
+  onChange(listening, (on) => {
+    if (!on) {
+      stop();
     }
   });
 
@@ -577,6 +600,7 @@ export function rollRecord(sources: RecordSources): RollRecord {
   });
 
   return {
+    listening,
     phase: phase.asReadonly(),
     tick: pointer.asReadonly(),
     windowTick: coarse.asReadonly(),
@@ -588,5 +612,6 @@ export function rollRecord(sources: RecordSources): RollRecord {
     message: message.asReadonly(),
     toggle: () => (phase() === 'idle' ? arm() : stop()),
     stop,
+    key: onKey,
   };
 }

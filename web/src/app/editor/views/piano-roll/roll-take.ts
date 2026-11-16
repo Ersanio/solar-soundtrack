@@ -22,6 +22,61 @@ export function writtenOfKey(key: number): number | null {
   return written >= NOTE_MIN && written < NOTE_MAX ? written : null;
 }
 
+/**
+ * FL Studio's "typing keyboard to piano" layout, as the MIDI key each computer
+ * key plays: `Z` to `M` are the white keys of one octave with their sharps on
+ * the row above, running on through `,` `.` `/`, and `Q` to `]` are the octave
+ * above that with its sharps on the digits. `Z` is FL's C5, which is MIDI 60.
+ *
+ * By `KeyboardEvent.code`, so the piano is where the keys are whatever the
+ * layout prints on them — `Z` and `Y` change places on a German keyboard, and
+ * the two rows would otherwise cross.
+ */
+const TYPING_KEYS: Readonly<Record<string, number>> = {
+  KeyZ: 60,
+  KeyS: 61,
+  KeyX: 62,
+  KeyD: 63,
+  KeyC: 64,
+  KeyV: 65,
+  KeyG: 66,
+  KeyB: 67,
+  KeyH: 68,
+  KeyN: 69,
+  KeyJ: 70,
+  KeyM: 71,
+  Comma: 72,
+  KeyL: 73,
+  Period: 74,
+  Semicolon: 75,
+  Slash: 76,
+  KeyQ: 72,
+  Digit2: 73,
+  KeyW: 74,
+  Digit3: 75,
+  KeyE: 76,
+  KeyR: 77,
+  Digit5: 78,
+  KeyT: 79,
+  Digit6: 80,
+  KeyY: 81,
+  Digit7: 82,
+  KeyU: 83,
+  KeyI: 84,
+  Digit9: 85,
+  KeyO: 86,
+  Digit0: 87,
+  KeyP: 88,
+  BracketLeft: 89,
+  Equal: 90,
+  BracketRight: 91,
+};
+
+/** The MIDI key a computer key plays, or `null` for one that is not on the piano. */
+export function keyOfCode(code: string): number | null {
+  return TYPING_KEYS[code] ?? null;
+}
+
 /** A key that is down, and the channel it took. */
 export interface HeldKey {
   key: number;

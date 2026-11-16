@@ -388,8 +388,15 @@ opinion on any of this by design.
 ## Recording from a MIDI keyboard
 
 `state/midi-input.ts` holds the connection and one listener slot, which `roll-record.ts` takes for
-as long as the roll is open; with no roll, a key does nothing. The toolbar's Record group is shown
-while the top bar's switch is on.
+as long as the roll is open; with no roll, a key does nothing.
+
+**The computer's own keyboard is a second source of the same keys**, for a porter with no MIDI one:
+the toolbar's Typing keys toggle, a field of the roll's `Settings`. `keyOfCode` (`roll-take.ts`) is
+FL Studio's typing-keyboard layout as MIDI key numbers — `Z` is MIDI 60 — read off
+`KeyboardEvent.code`, so the piano is where the keys are on any layout. `piano-roll.ts` takes the
+bare keys ahead of the shortcuts, every one of which on a letter needs `Ctrl` or `Alt`, and hands
+them to `RollRecord.key` as a MIDI input would. The toolbar's Record group is shown while either
+source is on (`RollRecord.listening`), and the last of them going off ends a take in flight.
 
 **The record pointer is its own, not the transport's.** A take can run past the end of the song and
 a song with nothing in it can be recorded into, so the pointer free-runs at the clock's slope

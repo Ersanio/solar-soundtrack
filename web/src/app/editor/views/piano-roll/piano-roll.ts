@@ -26,7 +26,6 @@ import { Audition } from '../../../state/audition';
 import { DriverStore } from '../../../state/driver-store';
 import { EditorRequests } from '../../../state/editor-requests';
 import { EditorStore } from '../../../state/editor-store';
-import { MidiInput } from '../../../state/midi-input';
 import { Mixer } from '../../../state/mixer';
 import { Playback } from '../../../state/playback';
 import { stopAll } from '../../../state/stop-all';
@@ -68,6 +67,7 @@ import {
   writeSettings,
 } from './roll-settings';
 import { rollRecord } from './roll-record';
+import { keyOfCode } from './roll-take';
 import { RollTake } from './roll-take/roll-take';
 import { RollToolbar } from './roll-toolbar/roll-toolbar';
 import { rollPictures } from './roll-pictures';
@@ -129,6 +129,10 @@ import { RollTooltip } from './roll-tooltip/roll-tooltip';
     // `editor-pane.html` destroys on a tab switch, so it is roll-only without a
     // check of its own.
     '(window:keydown)': 'onKey($event)',
+    // The other half of a key played on the typing keyboard, and the window
+    // losing focus with one held, which is a key-up that never arrives.
+    '(window:keyup)': 'onKeyUp($event)',
+    '(window:blur)': 'releaseTyping()',
   },
 })
 export class PianoRoll {
@@ -138,7 +142,6 @@ export class PianoRoll {
   private readonly mixer = inject(Mixer);
   private readonly audition = inject(Audition);
   private readonly requests = inject(EditorRequests);
-  private readonly midi = inject(MidiInput);
 
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly destroyRef = inject(DestroyRef);
@@ -160,8 +163,7 @@ export class PianoRoll {
   protected readonly editMode = computed(() => this.settings().editMode);
   protected readonly keySounds = computed(() => this.settings().keySounds);
   protected readonly playSong = computed(() => this.settings().playSong);
-  /** Whether MIDI keyboards are being listened to, which is what shows the Record group. */
-  protected readonly midiOn = computed(() => this.midi.status() === 'on');
+  protected readonly typingKeys = computed(() => this.settings().typingKeys);
   protected readonly snapTicks = computed(() =>
     snapTicks(this.settings().snap, this.beatsPerBar(), this.beatUnit()),
   );
@@ -299,6 +301,7 @@ export class PianoRoll {
     chordChannels: computed(() => this.settings().chordChannels),
     keySounds: this.keySounds,
     playSong: this.playSong,
+    typing: this.typingKeys,
     snap: this.snapTicks,
     editMode: this.editMode,
     stack: this.stack,
@@ -909,6 +912,17 @@ export class PianoRoll {
     this.settings.update((s) => ({ ...s, playSong }));
   }
 
+  protected setTypingKeys(typingKeys: boolean): void {
+    // Before the switch, so a key held across it is let go rather than left down.
+    this.releaseTyping();
+    if (typingKeys) {
+      // The press opens the previewer's audio, so the first key is not spent on it.
+      this.audition.warm();
+    }
+
+    this.settings.update((s) => ({ ...s, typingKeys }));
+  }
+
   protected toggleChordChannel(channel: number): void {
     this.settings.update((s) => toggleChordChannel(s, channel));
   }
@@ -1166,7 +1180,67 @@ export class PianoRoll {
    * The roll's shortcuts — see `roll-shortcuts.ts`, which is where they are
    * decided. What is here is the bag it decides them against.
    */
+  /** The typing keyboard's keys that are down, by `code`, as the MIDI key each is playing. */
+  private readonly typed = new Map<string, number>();
+
+  /**
+   * A press on the computer keyboard's piano, handed on as a MIDI key would be.
+   * Answers whether the key was one, so the shortcuts are not asked as well.
+   *
+   * Bare keys only: every shortcut the roll has on a letter takes `Ctrl` or
+   * `Alt`, so the piano and the shortcuts never want the same press. A held
+   * key's repeats are taken and dropped — a note is down until it comes up.
+   */
+  private typingDown(event: KeyboardEvent): boolean {
+    const target = event.target as HTMLElement | null;
+    if (
+      !this.typingKeys() ||
+      event.ctrlKey ||
+      event.metaKey ||
+      event.altKey ||
+      event.isComposing ||
+      (target?.closest('input, textarea, select, dialog, .cm-editor') ?? null) !== null
+    ) {
+      return false;
+    }
+
+    const key = keyOfCode(event.code);
+    if (key === null) {
+      return false;
+    }
+
+    event.preventDefault();
+    if (!event.repeat && !this.typed.has(event.code)) {
+      this.typed.set(event.code, key);
+      this.record.key({ down: true, key, at: event.timeStamp });
+    }
+
+    return true;
+  }
+
+  protected onKeyUp(event: KeyboardEvent): void {
+    const key = this.typed.get(event.code);
+    if (key !== undefined) {
+      this.typed.delete(event.code);
+      this.record.key({ down: false, key, at: event.timeStamp });
+    }
+  }
+
+  /** Every typing key let go at once, for when their own key-ups cannot be counted on. */
+  protected releaseTyping(): void {
+    for (const key of this.typed.values()) {
+      this.record.key({ down: false, key, at: performance.now() });
+    }
+
+    this.typed.clear();
+  }
+
   protected onKey(event: KeyboardEvent): void {
+    // Ahead of everything, a recording included: these are the keys it records.
+    if (this.typingDown(event)) {
+      return;
+    }
+
     // A recording takes the keyboard whole: Space and Escape end it, and no
     // shortcut edits or undoes the song it is being timed against.
     if (this.record.phase() !== 'idle') {

@@ -125,6 +125,8 @@ export interface Settings {
   keySounds: boolean;
   /** Play the song under a MIDI recording, rather than running the pointer in silence. */
   playSong: boolean;
+  /** Play and record from the computer's own keyboard, for a porter with no MIDI one. */
+  typingKeys: boolean;
 }
 
 /** Every field `unknown`, because none of it is ours until it is checked. */
@@ -146,6 +148,7 @@ interface StoredSettings {
   chordChannels?: unknown;
   keySounds?: unknown;
   playSong?: unknown;
+  typingKeys?: unknown;
 }
 
 /** A tick count a drawn note could have. */
@@ -198,6 +201,7 @@ export function readSettings(): Settings {
     chordChannels: [],
     keySounds: true,
     playSong: false,
+    typingKeys: false,
   };
 
   let stored: StoredSettings | null;
@@ -277,6 +281,10 @@ export function readSettings(): Settings {
 
   if (typeof stored.playSong === 'boolean') {
     settings.playSong = stored.playSong;
+  }
+
+  if (typeof stored.typingKeys === 'boolean') {
+    settings.typingKeys = stored.typingKeys;
   }
 
   const percussion = parsePercussion(stored.percussion);

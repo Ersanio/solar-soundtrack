@@ -304,7 +304,9 @@ reason a note the walk cannot corroborate auditions flat rather than approximate
 ### `recording.ts`
 
 A take played in on a MIDI keyboard, in three layers. `roll-take.ts` bare: MIDI 60 is `o4 c` and
-the driver's range is MIDI 24 to 93; a key takes the lowest free record channel, a key with none
+the driver's range is MIDI 24 to 93; the computer keyboard's piano is FL Studio's — `Z` to `M` the
+white keys from MIDI 60 with their sharps on the row above, `Q` to `]` the octave over it, nothing
+where a piano has no black key, and every key of it one the driver plays; a key takes the lowest free record channel, a key with none
 left is dropped, and a key coming up frees its channel for the next; both ends of a note round to
 the snap step, a tap is one step long, no grid keeps the ticks, and a note snapped onto the next is
 cut at it or dropped. The `take` gesture through `expectEdit`, so it is read back from the compile
