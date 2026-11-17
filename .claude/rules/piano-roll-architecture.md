@@ -369,25 +369,28 @@ Only what the song uses gets a row: the pitched range is fitted and rounded out 
 and a drum or noise lane appears only when something plays it. Rows then stretch to fill the pane,
 because two octaves stranded at the top of an empty box is the worse picture.
 
-**A row is chosen by the instrument, not by the note byte.** Everything played while a drum is
-loaded is that drum being hit, so `@29 c d e` is three marks on one lane rather than one drum and
-two notes scattered up the keyboard — the pitched ones only look melodic because `parser.ts:2753`
-stops remapping after the first. The pitch they were written at is still true and still in the
-tooltip; it just does not decide where the mark goes.
+**A row is chosen by the byte, not by the instrument in force.** A drum lane holds a drum byte,
+`$D0`-`$D8`, one of the driver's own `@21`-`@29` (`placeOf` and `isDrum` in `percussion.ts`); its
+pitch comes from the percussion table rather than from the letter written, so the instrument is the
+whole of where it goes. On `#0`-`#5` only the first note after a drum `@` is remapped
+(`parser.ts:2743-2754`), so in `@29 c d e` the `d` and `e` are pitched bytes: they play the drum's
+sample at the pitch written, which is not the table's, and they are on the keyboard at it. Their
+bar still carries the `@29` that loaded the sample (`WalkNote.drumFrom`), and the hover says only
+the first note after the `@` is the drum. On `#6` and `#7` every note is remapped, so the same text
+is three marks on the lane there. Every other instrument's pitch is heard as well — `@10`, and a
+kick sampled into `#instruments` — so their notes are on the keyboard too.
 
-**A drum lane is one of the driver's own `@21`-`@29`, and nothing else gets one** (`isDrum` in
-`percussion.ts`). Their byte comes from the percussion table rather than from the letter written,
-so the instrument is the whole of where such a note goes. Every other instrument's pitch is heard —
-`@10`, and a kick sampled into `#instruments` — so its notes are on the keyboard at the pitch they
-were written at. It is also the range the editing side knows a drum by: `roll-strip.ts` names a
-note's drum from an `@21`-`@29` (`isPercussionInstrument`), the press, the marquee and the cursor
-find a note on the row `rowOfPlaced` gives that drum, and drawing on a lane writes `@N c` with no
-octave, which is right only where the letter has no say. So a bar is drawn on the row a press finds
-it on, and `charttest` pins that. Nothing is guessed from the sample: no property of one says
-"drum", and asking whether the driver's own drums play it says no once one drum sample is swapped
-for another.
+**It is the editing side's answer too, which is why it is the byte.** `roll-strip.ts` names a
+note's drum from the `@21`-`@29` that fed its byte (`isPercussionInstrument`), and `rowOfItem` in
+`roll-preview.ts` finds a strip item on that drum's lane, or on the lane of its own walk byte for a
+body head the remap fed from before its `[`. The press, the marquee and the cursor all go through
+it, and drawing on a lane writes `@N c` with no octave, which is right only where the letter has no
+say. So a bar is drawn on the row a press finds it on: `charttest` pins that for each kind of note
+and `pianorolltest` (`drum-apart.ts`) for real strips. Nothing is guessed from the sample: no
+property of one says "drum", and asking whether the driver's own drums play it says no once one
+drum sample is swapped for another.
 
-`placeOf` is the one statement of the precedence — a drum, then noise, then the keyboard. The
+`placeOf` is the one statement of the precedence — a drum byte, then noise, then the keyboard. The
 lanes and the fitted range are both built from it, so they cannot disagree. `song-walk.ts` has no
 opinion on any of this by design.
 
@@ -462,3 +465,5 @@ new entry goes there, with its line here, in the same change.
 
 - **A percussion set the porter chooses** — `DEFAULT_PERCUSSION`, `parsePercussion`,
   `percussion-panel/`, `Settings.percussion`, `usedInstruments`, `rowOfPlaced`, `isDrum`
+- **A row chosen by the instrument in force, not by the byte** — `placeOf`, `rowOfItem`,
+  `drumFrom`, `remapFed`, `parser.ts:2753`

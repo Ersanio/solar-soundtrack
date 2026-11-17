@@ -8,7 +8,7 @@ import { glyphOf } from '../../../command-palette/glyph-of';
 import { DriverStore } from '../../../../state/driver-store';
 import { EditorStore } from '../../../../state/editor-store';
 import { hex, hex2 } from '../../../../util/format';
-import { type PlaceContext, keyOf, placeOf } from '../percussion';
+import { type PlaceContext, isDrum, placeOf } from '../percussion';
 import type { Mark } from '../roll-marks';
 import { headingOf } from '../roll-marks';
 import { keyName } from '../roll-layout';
@@ -73,13 +73,15 @@ export class RollTooltip {
         ? $localize`:@@roll.sample:roll.sample ${hex2(entry.srcn ?? 0)}:byte:`
         : '';
 
-      // A drum written at a pitch of its own is the interesting case, and the
-      // one its lane cannot show: `@29 c` and `@29 g` are one drum at two rates.
-      const pitched = place === 'drum' && note.percussion === null;
-      const at = pitched ? keyOf(note, context) : null;
-      rows.push(
-        `@${instrument}${at === null ? '' : ` at ${keyName(at)}`}${place === 'drum' ? ' — a drum' : ''}${sample}`,
-      );
+      rows.push(`@${instrument}${place === 'drum' ? ' — a drum' : ''}${sample}`);
+
+      // A pitched note still on a drum's sample, which is on the keyboard where a
+      // porter who meant another hit will not expect it, so the hover says why.
+      if (place === 'key' && isDrum(instrument)) {
+        rows.push(
+          $localize`:@@roll.drum-sample-at-a-pitch:roll.drum-sample-at-a-pitch ${instrument}:instrument:`,
+        );
+      }
     }
 
     // What the driver is handed, when that is not the pitch that was written.

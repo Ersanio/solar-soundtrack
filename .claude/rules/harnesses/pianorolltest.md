@@ -149,7 +149,10 @@ channel, one drawn at the octave already standing, which spells none of its own,
 that gap saw them, the octave put back for the note after a drawn one, and a note drawn in front of a
 loop, whose body reads the octave standing at its `[`. `insert-mode.ts` is the pushes, a drag, a
 draw and a stretch shoving a neighbour aside; `drum-apart.ts` a drum whose `@` is written apart from
-it; `bulk.ts` legato, quantize, glue and a selection moved as one. And `refusals.ts`: a note dragged
+it, and the row a press finds each note on — `rowOfItem` against the row `rowOf` draws it on, over
+a pitched note after a drum, a drum written apart, a body head the remap fed from before its `[`,
+every note on `#6` and a melodic slot, each also checked for the lanes its bytes say, since the two
+rules can agree with each other and both be wrong; `bulk.ts` legato, quantize, glue and a selection moved as one. And `refusals.ts`: a note dragged
 onto its neighbour, one dragged off the bottom of the driver's range, a stretch with nowhere to push,
 and a note shortened past the command written inside it.
 

@@ -15,6 +15,7 @@ import {
   type PreviewBar,
   buildPreview,
   joinPreviews,
+  rowOfItem,
   rowOfPlaced,
 } from './roll-preview';
 import { KEY_WIDTH, NOTE_GAP, barRect } from './roll-metrics';
@@ -527,10 +528,6 @@ function itemAt(
   }
 
   return { index: -1, instance: 0 };
-}
-
-function rowOfItem(item: StripItem, stack: LaneStack): number {
-  return rowOfPlaced({ written: item.written, drum: item.drum?.args[0]?.value ?? null }, stack);
 }
 
 export function rollGestures(sources: GestureSources, sinks: GestureSinks): RollGestures {

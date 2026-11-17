@@ -56,9 +56,19 @@ section("the drum lanes are the driver's own drums");
 
 	// A hi-hat must not stretch the keyboard: letting a drum widen the range adds
 	// octaves of empty rows to every song with one in it.
-	const drummed = rollShape([note(29, 0xd8), note(29, 0x97), note(0, 0xa4)], context());
+	const drummed = rollShape([note(29, 0xd8), note(0, 0xa4)], context());
 	check("a drum lane never widens the pitched range", drummed.usedDrums.join(",") === "29" && drummed.lowestKey === 36);
 	check("and the melodic note is the only thing in it", drummed.lowestKey === drummed.highestKey);
+
+	// A note after a drum is a pitched byte on `#0`-`#5` (`parser.ts:2743-2754`):
+	// it plays the drum's sample at the pitch written, so it is a key and not a
+	// second hit on the lane — and it claims its own key in the range.
+	const followed = rollShape([note(29, 0xd8), note(29, 0x97), note(0, 0xa4)], context());
+	check(
+		"a pitched note after a drum is on the keyboard",
+		followed.usedDrums.join(",") === "29" && followed.lowestKey === 23 && followed.highestKey === 36,
+		`${String(followed.lowestKey)}-${String(followed.highestKey)}`,
+	);
 
 	// `@10` and a sampled kick are heard at the pitch they were written at, so
 	// they are notes on the keyboard and get no lane, the same as any `@n`.
@@ -71,29 +81,35 @@ section("the drum lanes are the driver's own drums");
 	);
 
 	// What the lanes are for: the row a bar is drawn on is the row a press finds
-	// it on. The marks place a note by its walk instrument (`rowOf`) and the
-	// gestures place a strip item by the drum `@` it carries (`rowOfPlaced`), and
-	// the two agree only because both mean `@21`-`@29` by a drum.
-	const placed = [note(21, 0xd0, null, 1), note(10, 0x9e, null, 2), note(30, 0xa4, null, 3)];
+	// it on. The marks place a note by its walk byte (`rowOf`) and the gestures
+	// place a strip item by the drum `@` it carries (`rowOfPlaced`), and the two
+	// agree only because both call a drum byte, and nothing else, a drum. The
+	// real strips are pinned the same way in `pianorolltest`'s `drum-apart.ts`.
+	const placed: [string, WalkNote, number | null][] = [
+		["@21's drum byte", note(21, 0xd0, null, 1), 21],
+		["@21's pitched note after it", note(21, 0xa4, null, 4), null],
+		["@10", note(10, 0x9e, null, 2), null],
+		["@30", note(30, 0xa4, null, 3), null],
+	];
 	const placedContext = context(
 		[],
 		[
 			[1, 0xa4],
 			[2, 0x9e],
 			[3, 0xa4],
+			[4, 0xa4],
 		],
 	);
-	const shape = rollShape(placed, placedContext);
+	const shape = rollShape(
+		placed.map(([, each]) => each),
+		placedContext,
+	);
 	const stack = laneStack({ lowestKey: shape.lowestKey, highestKey: shape.highestKey, usedDrums: shape.usedDrums });
-	for (const each of placed) {
-		const instrument = each.state.instrument ?? 0;
+	for (const [name, each, drum] of placed) {
 		const drawn = rowOf(each, stack, placedContext);
-		const pressed = rowOfPlaced(
-			{ written: placedContext.written.get(each.address) ?? each.note, drum: isDrum(instrument) ? instrument : null },
-			stack,
-		);
+		const pressed = rowOfPlaced({ written: placedContext.written.get(each.address) ?? each.note, drum }, stack);
 		check(
-			`@${instrument}'s bar is drawn on the row a press finds it on`,
+			`${name}: its bar is drawn on the row a press finds it on`,
 			drawn >= 0 && drawn === pressed,
 			`drawn ${drawn}, pressed ${pressed}`,
 		);

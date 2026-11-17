@@ -1,15 +1,18 @@
 /**
- * Which instruments the roll draws on drum lanes, and where a note goes as a
- * result. Pure — no Angular, no storage — so `charttest` covers it.
+ * Which notes the roll draws on drum lanes, and where a note goes as a result.
+ * Pure — no Angular, no storage — so `charttest` covers it.
  *
- * A lane is one of `@21`-`@29`, the driver's own percussion table: a drum's byte
- * comes from that table and not from the letter it was written at, so its row is
- * the instrument. It is also the range `roll-strip.ts` knows a drum by, so a bar
- * is drawn on the row a press finds it on. Every other instrument's pitch is
- * heard, `@10` and a sampled kick included, so it goes on the keyboard. Nothing
- * is guessed from the sample: no property of one says "drum", and asking whether
- * the driver's own drums play it says no once one drum sample is swapped for
- * another.
+ * A lane holds a drum byte, `$D0`-`$D8`: one of the driver's own `@21`-`@29`,
+ * whose pitch comes from its percussion table and not from the letter written,
+ * so its row is the instrument. The byte decides and not the instrument in
+ * force. On `#0`-`#5` only the first note after a drum `@` is remapped
+ * (`parser.ts:2743-2754`), and the ones after it are pitched bytes that play the
+ * drum's sample at the pitch they were written at, so they are on the keyboard.
+ * That is also how `roll-strip.ts` knows a drum, so a bar is drawn on the row a
+ * press finds it on. Every other instrument's pitch is heard too, `@10` and a
+ * sampled kick included. Nothing is guessed from the sample: no property of one
+ * says "drum", and asking whether the driver's own drums play it says no once
+ * one drum sample is swapped for another.
  */
 
 import { FIRST_PERCUSSION_INSTRUMENT, PERCUSSION_SLOTS } from '@amk/spc/instruments';
@@ -43,12 +46,13 @@ export type Place = 'drum' | 'noise' | 'key' | 'none';
  * The precedence, stated once so the lanes and the fitted range cannot disagree
  * about the same note.
  *
- * A drum first: its lane is its instrument, whatever else is in force, a noise
- * command included.
+ * A drum byte first: its lane is its instrument, whatever else is in force, a
+ * noise command included. The instrument is the byte's own, since the byte
+ * loads it; a `$D9` names a tenth drum the table does not have, so it is no drum.
  */
 export function placeOf(note: WalkNote, context: PlaceContext): Place {
   const instrument = note.state.instrument;
-  if (isDrum(instrument)) {
+  if (note.percussion !== null && isDrum(instrument)) {
     return 'drum';
   }
 

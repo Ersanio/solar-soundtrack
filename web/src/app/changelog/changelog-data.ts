@@ -18,7 +18,7 @@ export const CHANGELOG: readonly ChangelogEntry[] = [
       "The piano roll in FL Studio's own blue, with a line under every row",
       'Type any theme colour as hex',
       'Notes clicked in the piano roll, and its keys, sound at once anywhere in the song',
-      'Drum lanes in the piano roll for @21–@29 only; every other instrument is on the keyboard, where it can be edited',
+      "Drum lanes in the piano roll hold only the driver's own drum hits, @21–@29; every other note, a drum's sample played at a pitch included, is on the keyboard where it can be edited",
     ],
   },
   {

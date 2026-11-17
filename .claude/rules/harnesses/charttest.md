@@ -11,11 +11,11 @@ screenshot: that the playhead's clock absorbs a steady lag instead of re-correct
 anchor, which is the difference between a smooth scroll and one that jerks ten times a second; that
 "all octaves" widens the pitch range without conjuring a drum lane the song never plays; that
 sweeping a playhead rebuilds the mark window about twice per whole note rather than once per frame,
-which is what keeps a scroll off the DOM; that a drum lane is `@21`-`@29` and nothing else, `@10`
-and a sampled kick taking their written pitch on the keyboard, and that a bar is drawn on the row a
-press finds it on — the marks place a note by its walk instrument and the gestures by the drum `@`
-it carries, so a lane those two disagree about is drawn where nothing can grab it and looks entirely
-ordinary; that a pitched note draws on the pitch it was **written** at rather than the byte `h` or
+which is what keeps a scroll off the DOM; that a drum lane holds a drum byte of `@21`-`@29` and
+nothing else — the pitched note after a drum, `@10` and a sampled kick all taking their written
+pitch on the keyboard — and that a bar is drawn on the row a press finds it on: the marks place a
+note by its walk byte and the gestures by the drum `@` it carries, so a lane those two disagree
+about is drawn where nothing can grab it and looks entirely ordinary; that a pitched note draws on the pitch it was **written** at rather than the byte `h` or
 the instrument's transposition made of it, with the keyboard growing to take in a written `o0` or
 `o7` the driver's o1 c–o6 a has no row for; and that a `$D9`, which only a malformed blob plays,
 has no row at all rather than a key that widens the keyboard down to o1 c. It also

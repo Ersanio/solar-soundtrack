@@ -1,6 +1,8 @@
+import { FIRST_PERCUSSION_INSTRUMENT, PERCUSSION_SLOTS } from '@amk/spc/instruments';
 import type { PlacedNote, Plan } from './roll-edit';
 import type { LaneStack } from './roll-layout';
 import { barRect } from './roll-metrics';
+import type { StripItem } from './roll-strip';
 
 /**
  * A gesture in flight, drawn over the song.
@@ -49,6 +51,21 @@ export function rowOfPlaced(
   return note.drum === null
     ? (stack.rowOfKey.get(note.written - 0x80) ?? -1)
     : (stack.rowOfDrum.get(note.drum) ?? -1);
+}
+
+/**
+ * The row a press finds a strip item on, which has to be the row `rowOf` draws
+ * its bar on.
+ *
+ * The drum is the `@` the strip found for the note, or else the note's own byte
+ * from the walk: a body head fed by a drum loaded before its `[` is a drum byte
+ * with no `@` in its frame, and its bar is on that drum's lane like any other.
+ */
+export function rowOfItem(item: StripItem, stack: LaneStack): number {
+  const played = item.instances[0]?.note?.percussion ?? null;
+  const fromByte =
+    played !== null && played < PERCUSSION_SLOTS ? FIRST_PERCUSSION_INSTRUMENT + played : null;
+  return rowOfPlaced({ written: item.written, drum: item.drum?.args[0]?.value ?? fromByte }, stack);
 }
 
 export interface PreviewRequest {

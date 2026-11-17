@@ -999,6 +999,7 @@
     "roll.double-click-to-show": "double-click to show it in the source",
     "roll.drag.spelled-ticks": "{$spelled} · {$ticks} ticks",
     "roll.drag.ticks": "{$ticks} ticks",
+    "roll.drum-sample-at-a-pitch": "Plays the drum's sample at the pitch written: only the first note after @{$instrument} is the drum itself",
     "roll.edit-channel": "Edit channel {$channel}",
     "roll.edits": "Edits",
     "roll.follow-playback": "Follow playback",

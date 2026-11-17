@@ -206,7 +206,7 @@ something in the directory, which load by themselves when such a file is opened.
 - `carried-past.ts` (300+ lines) — `pianorolltest`: a note carried past another, written again on the far side.
 - `carrying-a-command.ts` — `pianorolltest`: carrying a command glyph to another tick.
 - `drag-carries.ts` — `pianorolltest`: what a drag carries with the notes it moves.
-- `drum-apart.ts` — `pianorolltest`: a drum whose `@` is not written beside it.
+- `drum-apart.ts` — `pianorolltest`: a drum whose `@` is not written beside it, and the row a press finds a drum's notes on.
 - `gate.ts` — `pianorolltest`: what the strip will and will not read.
 - `insert-mode.ts` — `pianorolltest`: insert mode — the notes in the way move aside.
 - `loop-carries-loops.ts` (300+ lines) — `pianorolltest`: a loop carries the loops written inside it.
@@ -364,7 +364,7 @@ something in the directory, which load by themselves when such a file is opened.
 
 **Rules:** `commands-in-the-roll.md`, `piano-roll-architecture.md`, `piano-roll-editing.md`, `piano-roll-octaves.md`, `piano-roll-view.md`, `transport-and-clock.md`
 
-- `percussion.ts` — Which instruments the roll draws on drum lanes, and where a note goes as a result.
+- `percussion.ts` — Which notes the roll draws on drum lanes, and where a note goes as a result.
 - `piano-roll.ts` (1000+ lines) — The song as music: a keyboard down the left, time running right, and all eight channels in one roll.
   - `PianoRoll`:102 `onLaneGrab`:356 `onLaneResize`:363 `onLaneRelease`:373 `resetLaneHeight`:379
   - `addressesOf`:604 `askAboutSelection`:689 `setZoom`:864 `setRowHeight`:868 `setScrollNotes`:875
@@ -392,8 +392,8 @@ something in the directory, which load by themselves when such a file is opened.
   - `shiftBoundariesFor`:883 `framePasses`:930 `frameAt`:959 `passShiftsFor`:1042 `plannedOrdinals`:1070
   - `plannedFrameTicks`:1090
 - `roll-gesture.ts` (2000+ lines) — The roll's pointer: what a press means, what a drag is doing, and what pointer-up commits.
-  - `SLOP_PX`:87 `edgesAt`:96 `edgesOf`:111 `loopEnd`:129 `spawnTick`:347 `draggedTick`:367 `keysBetween`:379
-  - `pitchOfRow`:484 `itemAt`:509 `rowOfItem`:532 `rollGestures`:536 `hoverCursor`:2097 `lengthLabel`:2143
+  - `SLOP_PX`:88 `edgesAt`:97 `edgesOf`:112 `loopEnd`:130 `spawnTick`:348 `draggedTick`:368 `keysBetween`:380
+  - `pitchOfRow`:485 `itemAt`:510 `rollGestures`:533 `hoverCursor`:2094 `lengthLabel`:2140
 - `roll-layout.ts` (300+ lines) — The roll's lanes and its camera: which row a key is on, what slice of the song is on screen, where the grid lines fall, and the arithmetic between a tick and an x.
 - `roll-lengths.ts` — The nearest length a note can be written as, at or above one tick.
 - `roll-marks.ts` (750+ lines) — What the roll draws for the song: a mark per note, the overview's minimap, the loop boxes and their labels.

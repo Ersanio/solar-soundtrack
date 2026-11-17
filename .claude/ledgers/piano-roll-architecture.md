@@ -25,3 +25,17 @@ considered there and moved away from, with the reason. The rule carries one inde
   editing side already uses, and every other instrument is on the keyboard. Deriving the set from
   the sample instead was rejected before the set was built, and stays rejected: asking whether the
   driver's own drums play a sample says no once one drum sample is swapped for another.
+
+- **A row chosen by the instrument in force, not by the byte** — `placeOf` put a note on a drum lane
+  whenever `@21`-`@29` was the instrument in force, on the argument that everything played while a
+  drum is loaded is that drum being hit, so `@29 c d e` was three marks on one lane. But only the
+  first of them is a drum byte on `#0`-`#5` (`parser.ts:2753` clears the instrument after the
+  remap); the others are pitched bytes that play the drum's sample at the pitch written, which is
+  not the pitch the table gives the drum. The editing side reads the byte — `roll-strip.ts` names a
+  drum only from the `@` that fed one, and `rowOfItem` finds the rest on their keys — so those bars
+  were drawn on a lane where no drag, erase or box selection reached them, and grabbed on a key row
+  where nothing was drawn. A note drawn on the keyboard after a drum jumped to the drum's lane once
+  it compiled, and a body head fed by a drum loaded before its `[` (`remapFed`) was drawn on its
+  lane but found nowhere. Rows now follow the byte, and `rowOfItem` falls back to the walk's byte
+  for that body head. The sample a pitched note still plays is said by the `@` glyph on its bar
+  (`drumFrom`) and by its hover.
