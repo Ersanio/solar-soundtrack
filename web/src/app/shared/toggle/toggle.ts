@@ -18,12 +18,13 @@ const TOGGLE_BASE = `${CONTROL_BASE} transition-[color,background-color,border-c
 const OFF = 'recess text-ink-muted hover:not-disabled:text-ink';
 
 /**
- * A label drawn heavier without being set in a heavier font. A stroke round
- * each glyph adds weight and leaves its advance alone, where `font-medium`
- * widens the label and so the toggle, and pressing one would push everything
- * after it along the toolbar.
+ * A label drawn heavier without being set in a heavier font: the glyphs again,
+ * a fraction of a pixel to the right, which leaves every advance alone where
+ * `font-medium` would widen the toggle and push the toolbar along. A shadow is
+ * drawn as glyphs, with the fill's own antialiasing; a text stroke is drawn as a
+ * path, and its greyscale edge haloes a ClearType fill.
  */
-const HEAVY = '[-webkit-text-stroke:0.35px_currentcolor]';
+const HEAVY = '[text-shadow:0.35px_0_0_currentcolor]';
 
 /** The same recess glowing, as FL Studio lights a mode that is on; it sets its own label colour. */
 const ON = `recess recess-lit ${HEAVY}`;

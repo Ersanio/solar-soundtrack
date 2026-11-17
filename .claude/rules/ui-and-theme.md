@@ -138,8 +138,8 @@ tells an action from a state:
   switching is seen rather than jumping. `Toggle` lists them in its transition, which is why it
   builds on `CONTROL_BASE` rather than on a button's `transition-colors`.
 - **A toggle never changes width.** A lit label, and a selected segment's, is drawn heavier with
-  a text stroke (`HEAVY` in `toggle.ts`) rather than set in a heavier font, which would widen it
-  and push the rest of the toolbar along.
+  a hard text shadow 0.35px to the right (`HEAVY` in `toggle.ts`) rather than set in a heavier
+  font, which would widen it and push the rest of the toolbar along.
 - `well` is the recessed ground of a segment track and of the transport's clock.
 - `led` and `led-on` are the round light.
 
@@ -220,6 +220,7 @@ entry goes there, with its line here, in the same change.
 - **The piano roll's rows drawn in `fill-surface` and `fill-inset`** — `--color-lane`,
   `--color-lane-sharp`, `--color-lane-rule`, `roll-lanes`, `roll-grid`
 - **A toggle's label set in `font-medium` when on** — `HEAVY`, `SEGMENT_ON`
+- **A toggle's label made heavier with `-webkit-text-stroke`** — `HEAVY`, `text-shadow`
 - **Play and Stop as chrome-grey plates with small corners** — `dark`, `pill`, `--plate-rim`
 - **The transport in a darker box of its own inside the top bar** — `amk-transport-controls`,
   `amk-top-bar`

@@ -231,8 +231,15 @@ there and moved away from, with the reason. The rule carries one index line per 
 - **A toggle's label set in `font-medium` when on.** A heavier font is a wider one, so pressing a
   toggle widened it by a few pixels and pushed everything after it along the toolbar. Reserving
   the bold width was considered: it needs the label twice, and `<ng-content />` projects once, or
-  a measurement per toggle, which a toggle in a hidden pane gets wrong. `HEAVY` strokes the glyphs
-  in their own colour instead, which adds weight and leaves every advance where it was.
+  a measurement per toggle, which a toggle in a hidden pane gets wrong. `HEAVY` draws the glyphs a
+  second time instead, which adds weight and leaves every advance where it was.
+- **A toggle's label made heavier with `-webkit-text-stroke`.** A 0.35px stroke in `currentcolor`
+  kept the width, but Chromium draws a stroke as a path, antialiased in greyscale, over a fill
+  drawn with ClearType's subpixel antialiasing, so on Windows every lit label had a brown halo
+  round its glyphs and every selected segment a grey one, which read as a smudged shadow.
+  `HEAVY` is a hard `text-shadow` 0.35px to the right: a shadow is drawn as glyphs, with the
+  fill's own antialiasing, so the extra weight has edges as clean as the label's. Compared in
+  headed Edge at 1x, with the widths measured equal.
 - **Play and Stop as chrome-grey plates with small corners.** They were the `default` plate, the
   toolbar's own grey, joined by a group with the small radius every control has. FL Studio's
   transport is darker than the toolbar it sits on and round at both ends, which is what makes it
