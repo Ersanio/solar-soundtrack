@@ -23,11 +23,11 @@ considered there and moved away from, with the reason. The rule carries one inde
   `commands-in-force.ts` joins the two; the source alone answers only what was folded.
 - **Tinting the glyph a note puts in force, and finding it by comparing `origins` arrays** — the
   first is the reading issue #34's own words invite and there is no colour that survives it: the
-  eight channel fills are mid-tone and chromatic, so `--color-accent` goes on `--color-ch-0`,
-  `--color-warn` on `--color-ch-3` and `--color-good` on `--color-ch-2`, and each is the one that
-  vanishes on some channel. The axis the set leaves free is lightness, which is the property
-  `roll-notes.html` already leans on for the hover, so a defining glyph is a near-white plate with
-  the icon in `--color-surface` and reads against the plate rather than against the bar. The second
+  eight channel fills span the hue wheel, so any tint — the accent, a warning, a success colour —
+  is the one that vanishes on some channel. The axis that holds on all eight is lightness, which is
+  the property `roll-notes.html` already leans on for the hover, so a defining glyph is a plate in
+  the bar's own ink (`--on-ch`) with the icon in the channel's colour (`--ch`) and reads against the
+  plate rather than against the bar. The second
   is the cheap spelling of `definedAt` and it is wrong after every `t`: `recordOrigin` calls
   `invalidateAll`, so a song-wide write hands all eight channels a fresh array holding the same
   addresses and every channel's next note claims to set everything it plays under. It is the
@@ -155,13 +155,13 @@ considered there and moved away from, with the reason. The rule carries one inde
   the click falls through to the bar, which selects that note.
 - **The bar's selection ring in the lane's `stroke-ink`, the way the lane draws it** — sound in the
   lane, where nothing wears the inverted plate, and invisible on half the chips of a bar, where a
-  defining one does: a near-white ring round a near-white plate is the same value as the thing it is
-  drawn around, and reads as the plate being a pixel bigger rather than as a selection. Moving it
+  defining one does: a ring in the plate's own colour is the same value as the thing it is drawn
+  around, and reads as the plate being a pixel bigger rather than as a selection. Moving it
   clear of the plate is no answer either — the chips are packed within a few pixels of each other, so
   the ring would meet its neighbour's. It takes the **pair of colours the plate already uses**, which
-  is the axis `roll-notes.html` settled on for the icon: `stroke-surface` over a defining plate,
-  `stroke-ink` where there is none, so the ring reads against whatever is behind it on all eight
-  channels. Drawn over the plate rather than under it, for the same reason.
+  is the axis `roll-notes.html` settled on for the icon: `stroke-(--ch)` over a defining plate,
+  `stroke-(--on-ch)` where there is none, so the ring reads against whatever is behind it on all
+  eight channels. Drawn over the plate rather than under it, for the same reason.
 - **Ringing a bar's `more` dots when the selected command is one they stand for** — the plate
   already inverts on those terms and the symmetry is inviting, but `defining` is a property of the
   list where a ring is a claim about one command, and the dots stand for commands the bar has no

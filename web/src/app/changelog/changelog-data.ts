@@ -13,6 +13,9 @@ export const CHANGELOG: readonly ChangelogEntry[] = [
     items: [
       'Buttons and toggles in the style of FL Studio, with modes that light up when on',
       'Mixer channel lights, and a lock for keeping a sample',
+      'Pastel channel colours, with note names in a darker shade of each',
+      "The Studio theme in FL Studio's own greys, with toggles that glow amber when on. The old theme is the Slate preset",
+      "The piano roll in FL Studio's own blue, with a line under every row",
       'Type any theme colour as hex',
       'Notes clicked in the piano roll, and its keys, sound at once anywhere in the song',
     ],

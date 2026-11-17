@@ -8,12 +8,13 @@ function laneClass(lane: Lane): string {
     return 'fill-raised';
   }
 
-  return lane.black ? 'fill-inset' : 'fill-surface';
+  return lane.black ? 'fill-lane-sharp' : 'fill-lane';
 }
 
 /**
  * The row stripes behind the music. Black keys sit darker, so the octaves read
- * at a glance.
+ * at a glance, and a faint rule runs under every row, heavier where the octave
+ * turns over, as FL Studio's roll draws them.
  *
  * **An attribute on a real `<g>`, not an element of its own.** A component
  * element inside an `<svg>` is an unknown SVG element: no layout box, nothing
@@ -47,8 +48,9 @@ export class RollLanes {
       y: lane.row * height,
       height,
       fill: laneClass(lane),
-      /** The separator under this row, or null where the octave has not turned over. */
-      rule: lane.octaveStart || lane.kind !== 'key' ? (lane.row + 1) * height : null,
+      /** The separator under this row. */
+      rule: (lane.row + 1) * height,
+      ruleOpacity: lane.octaveStart || lane.kind !== 'key' ? 0.45 : 0.25,
     }));
   });
 }

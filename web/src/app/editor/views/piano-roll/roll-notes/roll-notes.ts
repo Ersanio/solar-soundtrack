@@ -2,6 +2,7 @@ import { Component, computed, inject, input, output } from '@angular/core';
 
 import type { Command } from '@amk/tokens';
 import { CommandIcon } from '../../../command-palette/command-icon';
+import { CHANNEL_SCOPE } from '../../../../util/channel-palette';
 import { EditorRequests } from '../../../../state/editor-requests';
 import { EditorStore } from '../../../../state/editor-store';
 import type { ShiftBoundaries } from '../roll-edit';
@@ -36,6 +37,9 @@ export class RollNotes {
   private readonly requests = inject(EditorRequests);
 
   readonly marks = input.required<readonly Mark[]>();
+
+  /** Each bar's `--ch` and `--on-ch`, which its label, glyphs and rings are drawn in. */
+  protected readonly scope = CHANNEL_SCOPE;
 
   /**
    * The addresses of the notes the porter has selected.

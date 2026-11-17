@@ -1,12 +1,12 @@
 @for (line of lines(); track line.tick) {
   <svg:line
     y1="0"
-    class="stroke-edge"
+    class="stroke-lane-rule"
     stroke-width="1"
     [attr.x1]="line.x"
     [attr.x2]="line.x"
     [attr.y2]="height()"
-    [attr.stroke-opacity]="line.strong ? 0.9 : 0.35"
+    [attr.stroke-opacity]="line.strong ? 0.9 : 0.45"
   />
 }
 

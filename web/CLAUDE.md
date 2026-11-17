@@ -20,10 +20,10 @@ Selector prefix is `amk` — `amk-root`, `amk-editor-pane` for components, camel
 directives. ESLint enforces both.
 
 Styling is Tailwind v4, with the entire theme as CSS variables in `src/styles.css` (v4 has no
-`tailwind.config.js`). Dark-only on purpose. `--color-seg-*` and `--color-ch-*` are validated
-categorical sets: never reorder or re-hue their defaults, and never make the default
-`--color-surface` lighter than `#1f282f`, without re-validating — and never leave channel identity
-to colour alone (`.claude/rules/ui-and-theme.md`).
+`tailwind.config.js`). Dark-only on purpose. `--color-seg-*` and `--color-ch-*` are categorical
+sets: never reorder or re-hue their defaults, and never change the default `--color-surface`,
+without re-validating them — and never leave channel identity to colour alone, nor draw on a
+channel's colour in anything but its `--on-ch` ink (`.claude/rules/ui-and-theme.md`).
 
 Framework-generic Angular 22 conventions (signal APIs, `@Service()`, host bindings, control flow)
 live in `web/.claude/CLAUDE.md`, which the Angular CLI generated via `--ai-config=claude` and can

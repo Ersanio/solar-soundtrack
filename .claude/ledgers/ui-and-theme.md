@@ -11,16 +11,15 @@ there and moved away from, with the reason. The rule carries one index line per 
   name a channel the two pictures that would not show its colour, and matching a note seen in the
   roll to the chip that edits it or the buttons that silence it meant reading a digit off eight
   identical grey plates. Both wear the channel's own colour now, from the literal `bg-ch-*` names
-  spelled out for the reason `CHANNEL_FILL` gives, with `text-ink` over it because that is what the
+  spelled out for the reason `CHANNEL_FILL` gives, with `--on-ch` over it because that is what the
   roll's own bars label themselves in on those same eight grounds. The rule the old shape was
   protecting is untouched: the number stays, a silenced channel is still struck through, and the
   eight still do not clear the all-pairs separation gate. What the fill can no longer say is which
-  chip is being **edited**, and that is a near-white ring rather than a dimming of the other seven:
-  dimming is what a silenced channel already means, and it would have said a channel was inaudible
-  for not being edited. The solo's own ring is not a blue either — a mid blue disappears into
-  `--color-ch-0` and `--color-ch-6` — so it is a dark ring against the
-  edited one's light, which is the lightness axis the eight leave free and the same one the roll's
-  glyph plates are told apart on. It yields to the edited chip where one is both — an element has
+  chip is being **edited**, and that is a heavy ring in the chip's ink rather than a dimming of the
+  other seven: dimming is what a silenced channel already means, and it would have said a channel
+  was inaudible for not being edited. The solo's own ring is not a hue either — a hue vanishes into
+  whichever channel sits nearest it — so it is a hairline in the same ink, told from the edited
+  one's heavy ring by weight. It yields to the edited chip where one is both — an element has
   one ring, and a solo says itself anyway, being the channel the strike-through has left alone.
 - **The palette's class names living in `piano-roll/roll-metrics.ts`** — the mixer is not part of
   the roll, so it would have had to reach into it or keep a second copy of `bg-ch-*` under the same
@@ -42,10 +41,10 @@ there and moved away from, with the reason. The rule carries one index line per 
   only the tokens moved off a default, which is also what makes a per-token reset exact rather than
   approximate — the property is removed and whatever `styles.css` now says shows through.
 - **Re-hueing the eight channels for a preset's chrome** — the set is validated once, against the
-  default `--color-surface` `#1e272e`, and every shipped preset's surface is darker than that
-  (Graphite `#191919`, Midnight `#16181d`, Contrast `#0a0a0a`, Warm grey `#1a1918`), so under each
-  of them every channel's contrast only rises and the worst pair stays above 3:1. The one direction
-  that would need re-validating is a **lighter** default, and `#1f282f` is where ch-5 crosses 3:1.
+  default `--color-surface` `#31393e`, and every shipped preset's surface is darker than that
+  (Slate `#1e272e`, Graphite `#191919`, Midnight `#16181d`, Contrast `#0a0a0a`, Warm grey
+  `#1a1918`), so under each of them every channel's contrast only rises. The one direction that
+  would need re-validating is a **lighter** default.
 - **The controls painted in `--color-accent`** — a primary button's plate, a checked box, a slider's
   fill and every toggle were the same token as the playhead, the lit keys, the caret and a syntax
   keyword, so there was no way to recolour the chrome without taking the roll's own markers with it.
@@ -99,14 +98,12 @@ there and moved away from, with the reason. The rule carries one index line per 
 - **`--color-control` a neutral grey** — a chrome with no hue at all reads as unfinished rather
   than as calm, and the reason the token is separate from `--color-accent` never needed it to be
   grey. It is FL Studio's pale blue-grey (`#bfced5`), the face of its tempo display, so a button
-  reads as the toolbar's own material; the accent is the orange (`#ffa53a`) and still means one
+  reads as the toolbar's own material; the accent is the orange (`#ffa947`) and still means one
   thing, _this is where the music is_ — the playhead, the lit keys, the caret and the focus ring.
 - **The default surface at `#191919`** — a neutral grey ground and the four greys around it. The
-  default is the Studio blue-grey, in the mould of the DAW the editor's interactions are drawn from —
-  `surface #1e272e`, `raised #2f3c45`, `inset #171f25`, `edge #42525c` — and it carries a ceiling:
-  the eight channels are validated against `#1e272e`, ch-5 crosses 3:1 above `#1f282f`, and the
-  default may not be lighter than that without re-validating the set. The grey is the Graphite
-  preset, a snapshot of the fourteen tokens it moves.
+  default is Studio, the chrome of the DAW the editor's interactions are drawn from, and the eight
+  channels are validated against its surface, so the default may not change without re-validating
+  the set. The grey is the Graphite preset, a snapshot of the fourteen tokens it moves.
 - **The mixer's solo `S` lit on `bg-control/25`** — considered and refused for the reason the
   picker's solo ring is not a blue: the control blue is a mid blue, and a mid blue vanishes on
   `--color-ch-0` and `--color-ch-6`. A lit `S` takes the channel's own colour, the one ground it is
@@ -161,6 +158,15 @@ there and moved away from, with the reason. The rule carries one index line per 
   controls passed all four by. The chip and the audition button are `amk-button`s. The label takes
   `buttonClass()`. The entries are `ENTRY_CLASS`, a toggle's off plate built from the toggle's own
   constants, because a disabled plate is not one of a toggle's states.
+- **The ARAM segments inside the dark lightness band, validated on `--color-surface` alone.** They
+  were `#3987e5`, `#199e70`, `#c98500` and `#d55181`, at OKLCH L 0.62–0.67, which passed every
+  check against the sidebar's ground. But the top bar's meter draws them on `--color-raised`,
+  where the echo pink was 2.87:1 and the rest barely cleared 3:1, and in use they sank into the
+  chrome. They are now the same hues lifted well clear of the chrome, validated on both grounds;
+  `styles.css` has the figures. That passes every gate but the band, which the validator's 0.67
+  ceiling makes impossible for anything lighter. A true pastel was tried and refused: at 70%
+  chroma the green reads grey and samples and echo fall under the normal-vision floor (ΔE 13),
+  too alike even for full colour vision.
 - **Toggles on the same raised plate as buttons.** An off toggle was `plate` with a muted label
   and an on one `plate-lit`, a raised plate filled amber, so an off toggle and a button were the
   same shape, and nothing but a pressed toggle told a state from an action. FL Studio sets its
@@ -168,6 +174,37 @@ there and moved away from, with the reason. The rule carries one index line per 
   `recess` now, a sunk ground with a shadow inside its rim, and on it is `recess-lit`, which
   lights inside the rim and fades in as it does. `plate-lit` went with it. `danger`, its only other
   wearer, is a raised plate tinted red through `--plate-face`, as `primary` is tinted blue.
+- **The eight channels as a validated mid-tone set, labelled in `text-ink`.** They were `#3987e5`,
+  `#d95926`, `#199e70`, `#c98500`, `#d55181`, `#008300`, `#9085e9` and `#e66767`, passing every
+  check against `#1e272e`. Everything drawn on them was near-white (`text-ink` names and glyphs,
+  near-white defining plates, a near-white edited ring) or dark (`--color-surface` icons on the
+  plates, a dark solo ring).
+  - **Why pastels.** Porters know FL Studio's pastel channel colours, so the eight are now those
+    hues at FL's brightness and saturation.
+  - **Each keeps its old lightness offset** around FL's 0.80. At a single lightness, the two pairs
+    of near hues collapse: 1 and 7 meet at ΔE 2.8.
+  - **The light ink had to go.** It is 1.3:1 on a pastel, so whatever sits on a channel now wears
+    `--on-ch`, which `channel-<n>` derives from the channel's lightness. That is 6.3–10.1:1 on the
+    pastels, still above 4:1 on the old set, and right for any colour a porter picks. A defining
+    glyph is a plate of that ink with the icon in `--ch`.
+  - **The picker's two rings moved from lightness to weight**, heavy for edited and a hairline for
+    solo, since only a dark ring shows on a pastel chip.
+- **FL Studio's own pastel channel colours as the default eight.** They were tried first, as FL's
+  1–8 and then as eight of its sixteen interleaved (1, 9, 5, 13, 3, 11, 7, 15) to push neighbours
+  apart. FL's colours are one step apart on its hue wheel, all at one lightness and with less
+  chroma than the editor's: in FL's own order, neighbours were ΔE 2.8 apart to normal vision and
+  0.8 under protanopia, and interleaving lifted that only to 8.3 and 2.0. The editor's own hues at
+  FL's brightness separate further, and they are the colours its porters have already learnt.
+- **The Studio theme as a dark blue-grey of its own.** Studio was `surface #1e272e`,
+  `raised #2f3c45`, `inset #171f25`, `edge #42525c`, ink `#dbe3e8` and `#9aaab5`: FL Studio's
+  manner in colours that were not its own, much darker than FL's chrome, so a porter who knows FL
+  read the editor as a different program. Studio is now FL's greys, sampled from its screen — the
+  toolbar, the window frame, a drop-down's field, the seam between panels, and the plate labels.
+  The dark blue-grey is the Slate preset. FL's greys are mid-tones, so everything read as text on
+  them was lifted to 4.5:1 on `surface`: the danger red to `#ffa49b` from `#ff7b72`, the severe
+  orange, the syntax blue and the accent with it. A red at 4.5:1 on that grey is a salmon, because
+  the sRGB gamut holds no more red chroma at that lightness, and that was accepted. The eight
+  channels were re-validated on the new ground and still clear 3:1.
 - **A lit toggle as a flat `--color-lit` floor labelled in `--color-inset`.** One flat amber
   read as a sticker beside FL Studio's lit mode, which is a lamp: an amber floor, a pale yellow
   core, a deeper orange toward an orange rim, and a burnt-orange label. `recess-lit` draws that,
@@ -176,6 +213,17 @@ there and moved away from, with the reason. The rule carries one index line per 
   `--recess-glow`, a registered property, because a gradient swapped for another cannot fade and
   one whose stop is registered fades with it. `--lit-warmth` turns the core yellower; Record sets
   it to 0 so its lamp stays red.
+- **The ARAM segments at one lightness.** Lifted to clear 3:1 on FL's mid-grey chrome, all four at
+  OKLCH L 0.80 put the echo pink and the song green within ΔE 1.3 of each other under
+  deuteranopia, over all pairs. The song green is the lightest and the echo pink the darkest, and
+  apart they are ΔE 9.5.
+- **The piano roll's rows on the chrome's `surface` and `inset`.** The roll's lanes were the page's
+  own two greys, with `--color-edge` rules only where an octave turned over, so the music sat on
+  the same ground as the controls round it. FL Studio's roll is a blue of its own, `#34444e` and
+  `#2e3e48`, with a near-black rule under every row and down every beat, heaviest at the bar.
+  `--color-lane`, `--color-lane-sharp` and `--color-lane-rule` are those, drawn at strengths in
+  `roll-lanes` and `roll-grid`; each preset but Studio sets them to its own surface, inset and
+  edge, so its roll looks as it did.
 - **A toggle's label set in `font-medium` when on.** A heavier font is a wider one, so pressing a
   toggle widened it by a few pixels and pushed everything after it along the toolbar. Reserving
   the bold width was considered: it needs the label twice, and `<ng-content />` projects once, or
@@ -191,3 +239,9 @@ there and moved away from, with the reason. The rule carries one index line per 
   the row and none round the rest. The box is gone and the whole top bar takes its colour, the
   inset mixed half into the raised grey, so the row the song is played from is one strip a step
   darker than the toolbars below it.
+- **Studio's grounds at FL Studio's sampled values.** The chrome was FL's own greys as sampled
+  (`#434c51` surface, `#596267` raised, `#333a3f` inset, `#1f282d` edge) and the roll FL's blue
+  (`#34444e`, `#2e3e48`, rule `#0a1a24`), and the author wanted Studio darker. Every
+  ground, `--color-seg-free` included, is taken 0.07 down in OKLCH lightness at its own hue and
+  chroma, so the steps between them are FL's and everything drawn on them only gains contrast.
+  Re-sampling FL's screen would undo it.

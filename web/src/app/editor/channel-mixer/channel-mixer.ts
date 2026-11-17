@@ -2,7 +2,7 @@ import { Component, computed, inject } from '@angular/core';
 
 import { Button } from '../../shared/button/button';
 import { Mixer } from '../../state/mixer';
-import { CHANNEL_BG, CHANNEL_QUIET, CHANNEL_WASH } from '../../util/channel-palette';
+import { CHANNEL_BG, CHANNEL_QUIET, CHANNEL_SCOPE, CHANNEL_WASH } from '../../util/channel-palette';
 
 /**
  * Shared by all eight strips, so a row differs from the next only in its wash.
@@ -29,12 +29,13 @@ const TOGGLE_OFF = 'text-ink-muted hover:not-disabled:text-ink';
 const LIGHT_CELL = 'hover:not-disabled:bg-ink/10 disabled:cursor-not-allowed disabled:opacity-40';
 
 /**
- * `text-ink` over a channel's own colour, which is what the roll's bars label
- * themselves in (`fill-ink` in `roll-notes.html`): a digit on a plate and a name
- * on a bar are the same colour on the same eight grounds. The plate wears it
- * always; S wears it while the channel is soloed.
+ * `--on-ch` over a channel's own colour, which is what the roll's bars label
+ * themselves in (`fill-(--on-ch)` in `roll-notes.html`): a digit on a plate and
+ * a name on a bar are the same colour on the same eight grounds. The plate wears
+ * it always; S wears it while the channel is soloed. The scope class beside it
+ * is what sets the ink.
  */
-const ON_CHANNEL = 'text-ink font-semibold';
+const ON_CHANNEL = 'text-(--on-ch) font-semibold';
 
 /**
  * Per-channel mute and solo for previewing parts in isolation.
@@ -49,8 +50,8 @@ const ON_CHANNEL = 'text-ink font-semibold';
  *
  * Each strip wears its channel's own colour, so a note seen in the roll is
  * matched to its buttons by colour rather than by reading a digit, and a solo
- * lights its S in that colour rather than in the accent, a mid blue that
- * disappears into channels 0 and 6. The digit stays, and so does the
+ * lights its S in that colour rather than in the accent, which would vanish into
+ * whichever channel came nearest its hue. The digit stays, and so does the
  * strike-through over a silenced one: the eight hues do not clear the all-pairs
  * separation gate, so neither identity nor state is ever left to the colour
  * alone.
@@ -71,13 +72,15 @@ export class ChannelMixer {
       strip: `${STRIP_CLASS} ${CHANNEL_WASH[channel.index]}`,
       // A silenced channel dims plate and digit together, which holds the
       // relation to the roll's bars where dimming the digit alone would not.
-      plate: `${PLATE_CLASS} ${CHANNEL_BG[channel.index]} ${ON_CHANNEL}${
+      plate: `${PLATE_CLASS} ${CHANNEL_BG[channel.index]} ${CHANNEL_SCOPE[channel.index]} ${ON_CHANNEL}${
         channel.audible ? '' : ` ${CHANNEL_QUIET}`
       }`,
       mute: `${TOGGLE_CLASS} ${LIGHT_CELL}`,
       light: channel.audible ? 'led led-on' : 'led',
       solo: `${TOGGLE_CLASS} ${
-        channel.soloed ? `${CHANNEL_BG[channel.index]} ${ON_CHANNEL}` : TOGGLE_OFF
+        channel.soloed
+          ? `${CHANNEL_BG[channel.index]} ${CHANNEL_SCOPE[channel.index]} ${ON_CHANNEL}`
+          : TOGGLE_OFF
       }`,
     })),
   );

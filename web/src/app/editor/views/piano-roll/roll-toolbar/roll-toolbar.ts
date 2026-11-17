@@ -11,7 +11,7 @@ import { Toolbar } from '../../../../shared/toolbar/toolbar';
 import { HistoryButtons } from '../../../history-buttons/history-buttons';
 import { IconRecord } from '../../../../shared/icons/icon-record';
 import { CHANNELS } from '../../../../state/transport-view';
-import { CHANNEL_BG } from '../../../../util/channel-palette';
+import { CHANNEL_BG, CHANNEL_SCOPE } from '../../../../util/channel-palette';
 import { EDIT_MODES, type EditMode } from '../roll-edit';
 import type { RecordPhase } from '../roll-record';
 import {
@@ -29,8 +29,8 @@ import {
  * chord may land on it.
  */
 const CHIP_CLASS =
-  'flex h-5 w-5 cursor-pointer items-center justify-center rounded-[3px] font-mono text-[10px] leading-none font-semibold text-ink transition disabled:cursor-default';
-const CHIP_ON = 'ring-ink ring-2 ring-inset';
+  'flex h-5 w-5 cursor-pointer items-center justify-center rounded-[3px] font-mono text-[10px] leading-none font-semibold text-(--on-ch) transition disabled:cursor-default';
+const CHIP_ON = 'ring-(--on-ch) ring-2 ring-inset';
 const CHIP_OFF = 'opacity-40 hover:not-disabled:opacity-70';
 
 /**
@@ -187,7 +187,7 @@ export class RollToolbar {
           : on
             ? $localize`:@@roll.record.chord.remove:roll.record.chord.remove ${channel}:channel:`
             : $localize`:@@roll.record.chord.add:roll.record.chord.add ${channel}:channel:`,
-        class: `${CHIP_CLASS} ${CHANNEL_BG[channel]} ${on ? CHIP_ON : CHIP_OFF}`,
+        class: `${CHIP_CLASS} ${CHANNEL_BG[channel]} ${CHANNEL_SCOPE[channel]} ${on ? CHIP_ON : CHIP_OFF}`,
       };
     });
   });

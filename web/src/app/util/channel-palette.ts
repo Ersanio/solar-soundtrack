@@ -69,6 +69,24 @@ export const CHANNEL_BG: readonly string[] = [
 ];
 
 /**
+ * The same eight as scopes: `--ch` and `--on-ch` set on the element, for the
+ * labels, glyphs and rings drawn over a channel's colour to read through
+ * `fill-(--on-ch)`, `text-(--ch)` and the like. `styles.css` derives the ink
+ * from the channel's lightness, so it is dark on a light channel and light on a
+ * dark one, whatever colour a porter gives it.
+ */
+export const CHANNEL_SCOPE: readonly string[] = [
+  'channel-0',
+  'channel-1',
+  'channel-2',
+  'channel-3',
+  'channel-4',
+  'channel-5',
+  'channel-6',
+  'channel-7',
+];
+
+/**
  * A channel the mask silences, on the mixer's plate and the roll's chip alike:
  * struck through and dimmed, so plate and digit lose their colour together.
  */

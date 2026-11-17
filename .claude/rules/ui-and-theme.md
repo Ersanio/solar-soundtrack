@@ -17,16 +17,38 @@ or shared controls.
 ## Colour sets
 
 Styling is Tailwind v4, with the entire theme as CSS variables in `web/src/styles.css` (v4 has no
-`tailwind.config.js`). Dark-only on purpose. Two **validated categorical sets** live there —
-`--color-seg-*` for the ARAM bar and `--color-ch-*` for the eight music channels — and neither may be
-reordered or re-hued **in that file** without re-validating, since adjacent-pair CVD separation and
-contrast against `--color-surface` are the properties being preserved. The order is the mechanism,
-not decoration: it is what the adjacent-pair check runs against. The ground is part of the
-validation too: both sets are validated against `--color-surface` at `#1e272e`, every check passing
-and the worst contrast at ch-5 (3.07:1), and the eight drop below 3:1 above `#1f282f`, so the
-default surface may not be lighter than that without re-validating. `--color-ch-*` does not clear
-the all-pairs gate and no set of eight can, so nothing may leave channel identity to colour alone;
-`styles.css` says what carries it instead.
+`tailwind.config.js`). Dark-only on purpose. Two **categorical sets** live there — `--color-seg-*`
+for the ARAM bar and `--color-ch-*` for the eight music channels — and neither may be reordered or
+re-hued **in that file** without re-validating, since adjacent-pair CVD separation and contrast
+against `--color-surface` are the properties measured. The order is the mechanism, not decoration:
+it is what the adjacent-pair check runs against.
+
+The ground is part of the validation too:
+
+- **The eight channels** are pastels in FL Studio's manner: the editor's own hues and order at
+  FL's brightness and saturation. Validated against `--color-surface` at `#31393e`, they pass
+  contrast (worst 4.69:1) and fail the lightness band, the chroma floor and both separation
+  floors, by design. `styles.css` records the figures and why each keeps its own lightness offset.
+  A change to the default surface still re-validates them.
+- **The four ARAM segments** are validated against both `--color-surface` and `--color-raised`.
+  The top bar's meter sits a step darker than `raised`, the inset mixed into it, so `raised` is
+  the harder of the two chrome grounds. Every check passes over all pairs but the
+  lightness band, which they sit above on purpose; `styles.css` says why, and why the four are
+  not at one lightness.
+
+`--color-ch-*` does not clear the adjacent-pair gates either, and no set of eight clears the
+all-pairs one, so nothing may leave channel identity to colour alone; `styles.css` says what
+carries it instead.
+
+**Anything drawn on a channel's colour is in its ink.** That covers a bar's name, glyphs and rings,
+a chip's digit and ring, and a mixer plate's digit.
+
+- **Where the ink comes from.** The `channel-<n>` utility sets `--ch` and `--on-ch` on the element,
+  through `CHANNEL_SCOPE` in `util/channel-palette.ts`.
+- **What it is.** `--on-ch` is derived from the channel's own lightness: a dark shade of it on a
+  light channel, a light one on a dark channel. So any colour a porter picks keeps its labels.
+- **The opposite.** `--ch` is the opposite of the ink by construction, which is what a glyph on a
+  plate of the ink is drawn in.
 
 Those values are **defaults**, and `ThemeStore` lets a porter override any of them — the eight
 channels included — from the top bar's picker. That is not a hole in the paragraph above, it is what
@@ -34,7 +56,7 @@ the paragraph's last sentence buys: the app never said anything with a channel's
 not also saying with a number, a tooltip or a strike-through, so a porter putting two channels on
 one hue loses a convenience and breaks no claim. What still has to be re-validated is a change to
 the defaults themselves, which is the set every porter starts from. A preset in
-`theme-presets.ts` is held to the same bar and none of the shipped five touch the eight.
+`theme-presets.ts` is held to the same bar and none of the shipped six touch the eight.
 
 ## The theme is one file, and the porter may change it
 
@@ -50,9 +72,22 @@ picker in the top bar (`theme/theme-picker/`, on the `shared/popover/` the chang
 the presets in `theme/theme-presets.ts` and a `shared/color-field/` per token;
 `theme/theme-tokens.ts` is the list, and the property name is derived from each token's name rather
 than spelled twice. **Studio** is the default and carries no overrides at all — it is the
-stylesheet's own values, a blue-grey chrome with an orange accent — and **Graphite** is the neutral
-grey; every other preset names its accent explicitly, so it renders the same whatever the
-stylesheet's accent is.
+stylesheet's own values, FL Studio's chrome greys sampled from its screen and taken two steps darker,
+with an orange accent —
+**Slate** is the darker blue-grey Studio was before, and **Graphite** is the neutral grey; every
+other preset names its accent explicitly, so it renders the same whatever the stylesheet's accent
+is.
+
+**The piano roll has a ground of its own**: `--color-lane` and `--color-lane-sharp` for a white
+and a black key's row, and `--color-lane-rule` for its bar, beat and row lines, which
+`roll-lanes` and `roll-grid` draw at strengths rather than in three colours. They are FL's roll
+blue, taken darker with the chrome, not the chrome's greys, so the music reads as a different place from the controls. Every
+preset but Studio sets them to its own surface, inset and edge.
+
+**FL's greys are mid-tones**, so every colour read as text on them sits lighter than a dark
+theme's would: the status colours, the accent and `--color-syn-*` are at 6.1:1 or better on
+`--color-surface`, and about 4.4:1 on `--color-raised`, above FL's own toolbar contrast. A
+default made more saturated, or a surface made lighter, re-checks them.
 
 Two families of token are deliberately not shared. The controls have three of their own:
 `--color-control`, FL's pale blue-grey display face, for emphasis short of being on — a primary
@@ -165,10 +200,21 @@ entry goes there, with its line here, in the same change.
 - **An armed Record shown by its dot alone** — `tone`, `--lit-tone`
 - **Hand-written copies of a button's classes** — `entryClass`, `ENTRY_CLASS`, `command-chip`,
   `audition-button`, `buttonClass`
+- **The ARAM segments inside the dark lightness band, validated on `--color-surface` alone** —
+  `--color-seg-*`, `--color-raised`, `aram-meter`
 - **Toggles on the same raised plate as buttons** — `recess`, `plate`, `plate-lit`
+- **The eight channels as a validated mid-tone set, labelled in `text-ink`** — `--color-ch-*`,
+  `--on-ch`, `channel-<n>`, `CHANNEL_SCOPE`, `text-ink`
+- **FL Studio's own pastel channel colours as the default eight** — `--color-ch-*`
+- **The Studio theme as a dark blue-grey of its own** — `--color-surface`, `--color-danger`,
+  Slate, `theme-presets.ts`
 - **A lit toggle as a flat `--color-lit` floor labelled in `--color-inset`** — `recess-lit`,
   `--recess-glow`, `--lit-warmth`, `CONTROL_BASE`
+- **The ARAM segments at one lightness** — `--color-seg-*`
+- **The piano roll's rows on the chrome's `surface` and `inset`** — `--color-lane`,
+  `--color-lane-sharp`, `--color-lane-rule`, `roll-lanes`, `roll-grid`
 - **A toggle's label set in `font-medium` when on** — `HEAVY`, `SEGMENT_ON`
 - **Play and Stop as chrome-grey plates with small corners** — `dark`, `pill`, `--plate-rim`
 - **The transport in a darker box of its own inside the top bar** — `amk-transport-controls`,
   `amk-top-bar`
+- **Studio's grounds at FL Studio's sampled values** — `--color-surface`, `--color-lane`

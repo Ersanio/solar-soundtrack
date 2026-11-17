@@ -30,12 +30,13 @@ compact spelling of the key column's `o6 c` — and on the right a glyph per com
 from the same catalogue the command palette's buttons are. A single click asks the inspector about
 that note; a double click goes to it in the source. Clicking
 a glyph targets its command instead. A glyph the note itself **puts** in force is drawn inverted —
-a near-white plate with the icon in `--color-surface` — where one it carries in from an earlier note
-is a plain light icon, so a run of notes under one `v200` says which of them the `v200` landed on. It
-is a plate and not a tint because the eight channel fills are mid-tone and chromatic, and the axis
-they leave free is lightness: `--color-control` is a blue of much the same lightness as
-`--color-ch-0`, `--color-accent` an orange beside `--color-ch-1`, `--color-warn` sits on
-`--color-ch-3`, and each would be the colour that vanished on one channel. On a plate the glyph reads against the plate, so one pair of colours does for all eight.
+a plate in the bar's own ink (`--on-ch`) with the icon in the channel's colour (`--ch`) — where one
+it carries in from an earlier note is a bare icon in that ink, so a run of notes under one `v200`
+says which of them the `v200` landed on. The bar's name is in the same ink. It is a plate and not a
+tint because the eight channel fills span the hue wheel, so any tint is the colour that vanishes on
+one of them, and lightness is the axis that holds on all eight. The ink is derived from the
+channel's own lightness (`channel-<n>` in `styles.css`), dark on the pastels and light on a darker
+colour a porter picks, and `--ch` is its opposite, so one pair does for every channel.
 The glyphs a note puts in force lead, the slot order the walk gives holding within each half, so a
 narrow bar keeps what starts at that note and drops what it carries in. What fits is measured
 (`fitBarContent`): the name has priority and the glyphs drop from the end, because a bar that says
@@ -255,11 +256,13 @@ erase, through `editing`: with no channel picked, the strip is built for the cha
 pointer, so a bar can be grabbed before it has been chosen and the press names it on the way. Empty
 grid offers nothing to name, which is why drawing, the marquee and the shortcuts still need a
 channel. Each chip wears its channel's own colour, from the same `CHANNEL_BG` the mixer's plates
-take, so the picker names the eight the notes below it are drawn in; a near-white ring is then what
-says which is being edited. The chips carry the mixer's state too — struck through and dimmed where
-the mask silences them, ringed dark where the solo is, which the edited chip's own ring takes
-precedence over — and `Ctrl` on one isolates that channel rather than editing it. Both rings are
-told apart by lightness rather than by hue, since a mid blue such as `--color-control` disappears into channels 0 and 6. Beside them sit
+take, so the picker names the eight the notes below it are drawn in; a heavy ring in the chip's
+ink is then what says which is being edited. The chips carry the mixer's state too — struck
+through and dimmed where the mask silences them, ringed with a hairline of the same ink where the
+solo is, which the edited chip's own ring takes precedence over — and `Ctrl` on one isolates that
+channel rather than editing it. Both rings are in the ink and told apart by weight, since a hue
+vanishes into whichever channel sits nearest it and the ink is the one colour certain to read on
+its chip. Beside them sit
 the flat `roll-*.ts` files, which are Angular-free so that the arithmetic stays where a harness can
 import it: `roll-layout.ts` and `percussion.ts` for the lanes and the camera, `roll-metrics.ts` and
 `roll-bar-text.ts` for what a bar is drawn as, `roll-lengths.ts` for what a gesture may land on,

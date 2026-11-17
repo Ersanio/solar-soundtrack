@@ -13,14 +13,13 @@
     [class]="lit ? 'fill-accent' : row.fill"
     [attr.fill-opacity]="lit ? 0.14 : 1"
   />
-  @if (row.rule !== null) {
-    <svg:line
-      x1="0"
-      class="stroke-edge"
-      stroke-width="1"
-      [attr.x2]="width()"
-      [attr.y1]="row.rule"
-      [attr.y2]="row.rule"
-    />
-  }
+  <svg:line
+    x1="0"
+    class="stroke-lane-rule"
+    stroke-width="1"
+    [attr.x2]="width()"
+    [attr.y1]="row.rule"
+    [attr.y2]="row.rule"
+    [attr.stroke-opacity]="row.ruleOpacity"
+  />
 }

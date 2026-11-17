@@ -14,6 +14,7 @@
        that says which gesture a press starts. -->
       <svg:g
         class="mark"
+        [class]="scope[mark.note.channel]"
         [class.pointer-events-none]="mark.muted"
         (pointerenter)="entered.emit(mark)"
         (click)="select(mark)"
@@ -71,7 +72,7 @@
           <svg:text
             pointer-events="none"
             dominant-baseline="central"
-            class="fill-ink font-mono"
+            class="fill-(--on-ch) font-mono"
             [attr.x]="label.x"
             [attr.y]="label.y"
             [attr.font-size]="label.size"
@@ -86,14 +87,13 @@
          and not in the gaps between them — a 1.3px target that reads as a dead
          icon.
 
-         A defining glyph is inverted rather than tinted: the eight channel
-         colours are mid-tone and chromatic, so the axis they leave free is
-         lightness. `--color-accent` is a blue of much the same lightness as
-         `--color-ch-0`, `--color-warn` sits on `--color-ch-3` and `--color-good`
-         on `--color-ch-2`, and each would be the colour that vanished on one
-         channel. A near-white plate lifts every one of them, and the glyph on it
-         reads against the plate rather than against the bar, so one pair of
-         colours does for all eight.
+         A defining glyph is inverted rather than tinted: a plate in the bar's own
+         ink (`--on-ch`, set by the group's `channel-<n>`) with the icon in the
+         channel's colour on it, where a glyph carried in is a bare icon in that
+         ink. Lightness is the axis that holds on every channel, since a tint would
+         be the colour that vanished on one of them, and the ink is derived from
+         the channel's own lightness, so the pair reads on FL Studio's pastels as
+         on any darker colour a porter gives a channel.
 
          The plate takes the mark's opacity for the same reason the glyph does: a
          chip at full strength over a muted bar would be the brightest thing on a
@@ -108,8 +108,8 @@
               rx="2"
               [class]="
                 glyph.defining
-                  ? 'fill-ink/70 group-hover:fill-ink'
-                  : 'fill-ink/0 group-hover:fill-ink/25'
+                  ? 'fill-(--on-ch)/70 group-hover:fill-(--on-ch)'
+                  : 'fill-(--on-ch)/0 group-hover:fill-(--on-ch)/25'
               "
               [attr.x]="glyph.x"
               [attr.y]="glyph.y"
@@ -118,19 +118,19 @@
               [attr.fill-opacity]="mark.opacity"
             />
             <!-- The lane's ring, in the pair of colours the plate already uses.
-                 The lane's own white will not do on its own: a defining chip's
-                 plate is near-white, so a white ring on one is the same value as
-                 the thing it is drawn around, and the chips sit too close
-                 together to move it clear of the plate instead. So it reads
-                 against the plate where there is one, exactly as the icon on it
-                 does, and against the bar where there is not. Over the plate,
-                 and it takes the mark's opacity for the reason the plate does. -->
+                 One colour will not do: a ring in the plate's own ink round a
+                 defining chip is the same value as the thing it is drawn
+                 around, and the chips sit too close together to move it clear
+                 of the plate instead. So it reads against the plate where there
+                 is one, exactly as the icon on it does, and against the bar
+                 where there is not. Over the plate, and it takes the mark's
+                 opacity for the reason the plate does. -->
             @if (inspected() === glyph.command) {
               <svg:rect
                 rx="3"
                 fill="none"
                 stroke-width="1.5"
-                [class]="glyph.defining ? 'stroke-surface' : 'stroke-ink'"
+                [class]="glyph.defining ? 'stroke-(--ch)' : 'stroke-(--on-ch)'"
                 [attr.x]="glyph.x - 1"
                 [attr.y]="glyph.y - 1"
                 [attr.width]="glyph.size + 2"
@@ -144,8 +144,7 @@
             <svg
               amk-glyph
               class="pointer-events-none"
-              [class.text-ink]="!glyph.defining"
-              [class.text-surface]="glyph.defining"
+              [class]="glyph.defining ? 'text-(--ch)' : 'text-(--on-ch)'"
               [name]="glyph.icon"
               [attr.x]="glyph.x"
               [attr.y]="glyph.y"
@@ -171,8 +170,8 @@
               rx="2"
               [class]="
                 more.defining
-                  ? 'fill-ink/70 group-hover:fill-ink'
-                  : 'fill-ink/0 group-hover:fill-ink/25'
+                  ? 'fill-(--on-ch)/70 group-hover:fill-(--on-ch)'
+                  : 'fill-(--on-ch)/0 group-hover:fill-(--on-ch)/25'
               "
               [attr.x]="more.x"
               [attr.y]="more.y"
@@ -182,8 +181,7 @@
             />
             <svg:g
               class="pointer-events-none"
-              [class.fill-ink]="!more.defining"
-              [class.fill-surface]="more.defining"
+              [class]="more.defining ? 'fill-(--ch)' : 'fill-(--on-ch)'"
               [attr.fill-opacity]="mark.opacity"
               [attr.transform]="`translate(${more.x} ${more.y})`"
             >

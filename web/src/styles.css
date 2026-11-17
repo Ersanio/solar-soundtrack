@@ -18,13 +18,24 @@
  * one.
  */
 @theme static {
-  --color-surface: #1e272e;
-  --color-raised: #2f3c45;
-  --color-inset: #171f25;
-  --color-edge: #42525c;
+  /*
+   * FL Studio's own chrome, sampled from its screen and each taken 0.07 down
+   * in OKLCH lightness: the toolbar is `raised`, the window frame `surface`, a
+   * drop-down's field `inset`, and the dark seam between panels `edge`. Its
+   * plate label is the ink and its secondary label the muted ink.
+   *
+   * FL's greys are mid-tones, so every colour read as text on them — the
+   * status colours, the accent and the source view's — sits lighter than a
+   * dark theme's would, at 6.1:1 or better on `surface`. On `raised` they reach
+   * about 4.4:1, above FL's own toolbar contrast.
+   */
+  --color-surface: #31393e;
+  --color-raised: #464f53;
+  --color-inset: #22282d;
+  --color-edge: #0f171c;
 
-  --color-ink: #dbe3e8;
-  --color-ink-muted: #9aaab5;
+  --color-ink: #e9ebec;
+  --color-ink-muted: #c1c7cb;
 
   /*
    * What a control is emphasised in short of being on: the tint in a primary
@@ -52,11 +63,11 @@
    */
   --color-led: #a8e44a;
 
-  --color-accent: #ffa53a;
+  --color-accent: #ffa947;
   --color-accent-soft: #ffd08a;
-  --color-danger: #ff7b72;
-  --color-severe: #f0883e;
-  --color-warn: #e3b341;
+  --color-danger: #ffa49b;
+  --color-severe: #ffa76e;
+  --color-warn: #e5b543;
   --color-good: #7ee787;
 
   /*
@@ -71,39 +82,74 @@
    * repeating the command's own colour would flatten `$E7 $02` into one
    * undifferentiated run.
    */
-  --color-syn-note: #dbe3e8;
+  --color-syn-note: #e9ebec;
   --color-syn-command: #7ee787;
-  --color-syn-hex: #6ea8fe;
-  --color-syn-hex-arg: #a7c4e8;
-  --color-syn-number: #dbe3e8;
-  --color-syn-loop: #f0883e;
-  --color-syn-operator: #9aaab5;
-  --color-syn-directive: #6ea8fe;
-  --color-syn-channel: #6ea8fe;
-  --color-syn-string: #e3b341;
-  --color-syn-comment: #9aaab5;
-  --color-syn-invalid: #ff7b72;
+  --color-syn-hex: #92beff;
+  --color-syn-hex-arg: #c1daf9;
+  --color-syn-number: #e9ebec;
+  --color-syn-loop: #ffa76e;
+  --color-syn-operator: #c1c7cb;
+  --color-syn-directive: #92beff;
+  --color-syn-channel: #92beff;
+  --color-syn-string: #e5b543;
+  --color-syn-comment: #c1c7cb;
+  --color-syn-invalid: #ffa49b;
 
   /*
    * ARAM budget bar. A categorical set — the segments are identities (driver,
    * song, samples, echo). `--color-seg-free` is the exception and is neutral:
    * it is what the bar has *not* spent, so it names no identity.
+   *
+   * Validated with the dataviz palette validator in dark mode against
+   * `--color-surface` (the sidebar) and `--color-raised`, the lightest chrome
+   * the bar could sit on — the top bar's meter is a step darker, so contrast
+   * there only rises (worst 5.51:1) — over all pairs: every check passes
+   * but the lightness band, which the four sit above on purpose, at OKLCH L
+   * 0.79–0.89 against a 0.67 ceiling, since FL's mid-grey chrome needs them
+   * that light to clear 3:1 (worst 4.08:1, echo on `raised`). The song green
+   * is the lightest and the echo pink the darkest on purpose: at one lightness
+   * the two meet under deuteranopia (ΔE 1.3), and apart they are ΔE 9.5.
    */
-  --color-seg-driver: #3987e5;
-  --color-seg-song: #199e70;
-  --color-seg-samples: #c98500;
-  --color-seg-echo: #d55181;
-  --color-seg-free: #3a4852;
+  --color-seg-driver: #8bbeff;
+  --color-seg-song: #94f2c6;
+  --color-seg-samples: #f7bb69;
+  --color-seg-echo: #ff95b6;
+  --color-seg-free: #232a2f;
+
+  /*
+   * The piano roll's ground, sampled from FL Studio's own and taken down with
+   * the chrome: a white key's row, a black key's, and the near-black its grid
+   * is drawn in. A blue of its own
+   * rather than the chrome's greys, so the music reads as a different place
+   * from the controls around it. The rule colour is drawn at strengths, as FL
+   * draws its lines: a bar heaviest, then a beat and an octave, then each row.
+   */
+  --color-lane: #22323b;
+  --color-lane-sharp: #1d2c36;
+  --color-lane-rule: #000a14;
 
   /*
    * The eight music channels, used by the piano roll's marks, by the overview
    * bar's minimap of them, by the roll's channel picker and by the channel
-   * mixer's strips, and nowhere else. All four are drawn on --color-surface —
-   * the mixer's wash mixes down to it, and the picker's plate is a shade of it.
-   * The set is validated with the dataviz palette validator in dark mode
-   * against `--color-surface` `#1e272e`, every check passing and the worst
-   * contrast at ch-5 (3.07:1); it drops below 3:1 above about `#1f282f`, so
-   * that default may not be lighter than that without re-validating.
+   * mixer's strips, and nowhere else. The roll's marks are drawn on its lanes,
+   * `--color-lane` and `--color-lane-sharp`, and the other three on
+   * --color-surface — the mixer's wash mixes down to it, and the picker's plate
+   * is a shade of it. The lanes are the darker ground, so the surface is the
+   * one the set is validated against.
+   *
+   * Pastels, as FL Studio's channel colours are: the editor's own eight hues in
+   * their own order, at FL's brightness and saturation — OKLCH chroma 0.085, and
+   * each at FL's lightness of about 0.80 plus the offset it had in the mid-tone
+   * set it was drawn from. The offsets are kept because they are what separates
+   * the two pairs of near hues: at one lightness, 1 and 7 meet at ΔE 2.8.
+   *
+   * Against the dataviz palette validator in dark mode on `--color-surface`
+   * `#31393e` they pass contrast (worst 4.69:1, ch-5, and 5.28:1 on the roll's
+   * lighter lane) and fail the rest by
+   * design: pastels are above the lightness band and under the chroma floor,
+   * and the closest neighbours are under both separation floors (2 and 1 at
+   * ΔE 4.3 under deuteranopia, 4 and 3 at 11.2 to normal vision). Telling
+   * channels apart therefore rests on what follows, as it always had to.
    *
    * Eight is past what any categorical set can keep separable for every pair of
    * viewers, so **nothing identifies a channel by colour alone**: a mark's
@@ -120,14 +166,14 @@
    * because nothing here was ever saying anything with colour that it was not
    * also saying in words.
    */
-  --color-ch-0: #3987e5;
-  --color-ch-1: #d95926;
-  --color-ch-2: #199e70;
-  --color-ch-3: #c98500;
-  --color-ch-4: #d55181;
-  --color-ch-5: #008300;
-  --color-ch-6: #9085e9;
-  --color-ch-7: #e66767;
+  --color-ch-0: #9ac1f5;
+  --color-ch-1: #efac95;
+  --color-ch-2: #8ad0af;
+  --color-ch-3: #f0c68f;
+  --color-ch-4: #eda8bb;
+  --color-ch-5: #82af7e;
+  --color-ch-6: #c9c7fe;
+  --color-ch-7: #feb9b5;
 
   --font-mono: ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace;
 }
@@ -273,6 +319,20 @@
   box-shadow:
     inset 0 1px 3px rgb(0 0 0 / 0.45),
     0 1px 0 color-mix(in oklab, var(--color-ink) 6%, transparent);
+}
+
+/*
+ * A channel's colour and the ink drawn on it, for whatever wears
+ * `channel-<n>`: a bar's group in the roll, a chip, a mixer plate. `--on-ch` is
+ * a dark shade of the channel on a light one and a light shade on a dark one,
+ * decided from the channel's own lightness, so a note's name reads on FL
+ * Studio's pastels and on any colour a porter picks for a channel. `--ch` is
+ * its opposite by construction, which is what a glyph is drawn in on a plate
+ * of that ink.
+ */
+@utility channel-* {
+  --ch: --value(--color-ch-*);
+  --on-ch: oklch(from --value(--color-ch-*) clamp(0.25, (0.58 - l) * 1000, 0.94) min(c, 0.05) h);
 }
 
 /* A round light, dark until `led-on` sets the two properties it reads. */

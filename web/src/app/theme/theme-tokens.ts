@@ -41,6 +41,9 @@ export type ThemeTokenName =
   | 'seg-samples'
   | 'seg-echo'
   | 'seg-free'
+  | 'lane'
+  | 'lane-sharp'
+  | 'lane-rule'
   | 'ch-0'
   | 'ch-1'
   | 'ch-2'
@@ -50,7 +53,7 @@ export type ThemeTokenName =
   | 'ch-6'
   | 'ch-7';
 
-export type ThemeGroup = 'chrome' | 'text' | 'status' | 'syntax' | 'aram' | 'channels';
+export type ThemeGroup = 'chrome' | 'text' | 'status' | 'syntax' | 'aram' | 'roll' | 'channels';
 
 export interface ThemeToken {
   readonly name: ThemeTokenName;
@@ -81,6 +84,10 @@ export const THEME_GROUPS: readonly ThemeGroupDef[] = [
   {
     id: 'aram',
     label: $localize`:@@theme.token.aram-budget-bar.label:theme.token.aram-budget-bar.label`,
+  },
+  {
+    id: 'roll',
+    label: $localize`:@@theme.token.piano-roll.label:theme.token.piano-roll.label`,
   },
   {
     id: 'channels',
@@ -285,6 +292,25 @@ export const THEME_TOKENS: readonly ThemeToken[] = [
     label: $localize`:@@theme.token.free.label:theme.token.free.label`,
     group: 'aram',
     hint: $localize`:@@theme.token.aram-still-unspent.hint:theme.token.aram-still-unspent.hint`,
+  },
+
+  {
+    name: 'lane',
+    label: $localize`:@@theme.token.rows.label:theme.token.rows.label`,
+    group: 'roll',
+    hint: $localize`:@@theme.token.a-white-key-s-row.hint:theme.token.a-white-key-s-row.hint`,
+  },
+  {
+    name: 'lane-sharp',
+    label: $localize`:@@theme.token.sharp-rows.label:theme.token.sharp-rows.label`,
+    group: 'roll',
+    hint: $localize`:@@theme.token.a-black-key-s-row.hint:theme.token.a-black-key-s-row.hint`,
+  },
+  {
+    name: 'lane-rule',
+    label: $localize`:@@theme.token.grid-lines.label:theme.token.grid-lines.label`,
+    group: 'roll',
+    hint: $localize`:@@theme.token.bar-beat-and-row-lines.hint:theme.token.bar-beat-and-row-lines.hint`,
   },
 
   {
