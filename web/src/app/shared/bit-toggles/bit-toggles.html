@@ -3,17 +3,20 @@
     <span class="text-ink-muted text-[11px]">{{ legend() }}</span>
     <span class="text-ink font-mono text-[11px] tabular-nums">{{ valueLabel() }}</span>
   </legend>
-  <div class="grid grid-cols-4 gap-x-2 gap-y-0.5">
-    @for (bit of bits(); track bit.index) {
-      <label class="flex cursor-pointer items-center gap-1 select-none">
-        <input
-          type="checkbox"
-          class="accent-control size-3 cursor-pointer disabled:cursor-not-allowed"
-          [checked]="bit.on"
-          (change)="toggle(bit.index)"
-        />
-        <span class="text-ink-muted font-mono text-[11px]">{{ bit.label }}</span>
-      </label>
+  <div class="flex flex-wrap gap-1.5">
+    @for (group of groups(); track $index) {
+      <div class="flex gap-0.5">
+        @for (bit of group; track bit.index) {
+          <button
+            amk-toggle
+            class="min-w-7 font-mono"
+            [pressed]="bit.on"
+            (click)="toggle(bit.index)"
+          >
+            {{ bit.label }}
+          </button>
+        }
+      </div>
     }
   </div>
   @if (note(); as text) {

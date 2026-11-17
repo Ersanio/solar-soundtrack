@@ -754,13 +754,19 @@ something in the directory, which load by themselves when such a file is opened.
 
 **Rules:** `ui-and-theme.md`
 
-- `bit-toggles.ts` — One checkbox per bit of a byte, LSB first.
+- `bit-toggles.ts` — One lit plate per bit of a byte, LSB first, in fours as FL Studio groups its steps.
+
+## web/src/app/shared/button-group
+
+**Rules:** `ui-and-theme.md`
+
+- `button-group.ts` — Buttons that belong together in one housing, as FL Studio joins Play and Stop.
 
 ## web/src/app/shared/button
 
 **Rules:** `ui-and-theme.md`
 
-- `button.ts` — Styling for a real `<button>`, applied by attribute.
+- `button.ts` — A button's whole class list, for an element that has to look like one and cannot be one — a `<label>` that opens a file input, a palette entry whose classes come from a view model.
 
 ## web/src/app/shared/chart
 
@@ -770,12 +776,6 @@ something in the directory, which load by themselves when such a file is opened.
 - `frame-clock.ts` — The animation frame timestamp, as a signal, while `active` is true.
 - `plot.ts` — The fixed drawing space the command inspector's graphs share.
 - `stack.ts` — Lays out one stacked proportion bar.
-
-## web/src/app/shared/checkbox
-
-**Rules:** `ui-and-theme.md`
-
-- `checkbox.ts` — A labelled checkbox with two-way `checked` binding.
 
 ## web/src/app/shared/color-field
 
@@ -793,7 +793,7 @@ something in the directory, which load by themselves when such a file is opened.
 
 **Rules:** `ui-and-theme.md`
 
-- 21 icon components, `icon-<name>.ts`, one glyph each: `book`, `chevron-down`, `chevron-right`, `close`, `download`, `github`, `loop`, `minus`, `palette`, `pause`, `play`, `plus`, `record`, `redo`, `roll`, `samples`, `source`, `stop`, `undo`, `volume`, `wrap`
+- 23 icon components, `icon-<name>.ts`, one glyph each: `book`, `chevron-down`, `chevron-right`, `close`, `download`, `github`, `lock`, `loop`, `minus`, `palette`, `pause`, `play`, `plus`, `record`, `redo`, `roll`, `samples`, `source`, `stop`, `undo`, `unlock`, `volume`, `wrap`
 
 ## web/src/app/shared/number-field
 
@@ -836,7 +836,7 @@ something in the directory, which load by themselves when such a file is opened.
 
 **Rules:** `ui-and-theme.md`
 
-- `toggle.ts` — A two-state button whose lit plate is the state.
+- `toggle.ts` — A two-state button whose lit recess is the state.
 
 ## web/src/app/shared/toolbar
 

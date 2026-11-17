@@ -50,8 +50,8 @@ there and moved away from, with the reason. The rule carries one index line per 
   fill and every toggle were the same token as the playhead, the lit keys, the caret and a syntax
   keyword, so there was no way to recolour the chrome without taking the roll's own markers with it.
   `--color-control` is its own token, and `primary` is told from `default` by weight and a tint of
-  it — `bg-control/15`, a `border-control/60`, a medium label — rather than by a hue of its own.
-  `danger` keeps its hue, saying something the shape of a button cannot. The focus ring stays on the
+  it in the plate's face rather than by a hue of its own; a toggle that is on lights in a third,
+  `--color-lit`. `danger` keeps its hue, saying something the shape of a button cannot. The focus ring stays on the
   accent: it is an affordance rather than a decoration, and it is the one place the music's colour
   reaches the chrome.
 - **The source view's colouring drawn from the app's palette** — twelve tags in `TOKEN_TAGS` sharing
@@ -98,9 +98,9 @@ there and moved away from, with the reason. The rule carries one index line per 
   header, so the editor keeps the screen and the sidebar is a pull away.
 - **`--color-control` a neutral grey** — a chrome with no hue at all reads as unfinished rather
   than as calm, and the reason the token is separate from `--color-accent` never needed it to be
-  grey. It is a steel blue a step lighter than the chrome (`#7ea6c4`), so a button reads as the
-  toolbar's own material; the accent is the orange (`#ffa53a`) and still means one thing, _this is
-  where the music is_ — the playhead, the lit keys, the caret and the focus ring.
+  grey. It is FL Studio's pale blue-grey (`#bfced5`), the face of its tempo display, so a button
+  reads as the toolbar's own material; the accent is the orange (`#ffa53a`) and still means one
+  thing, _this is where the music is_ — the playhead, the lit keys, the caret and the focus ring.
 - **The default surface at `#191919`** — a neutral grey ground and the four greys around it. The
   default is the Studio blue-grey, in the mould of the DAW the editor's interactions are drawn from —
   `surface #1e272e`, `raised #2f3c45`, `inset #171f25`, `edge #42525c` — and it carries a ceiling:
@@ -117,3 +117,77 @@ there and moved away from, with the reason. The rule carries one index line per 
   scrolling body and a footer row that hides itself when nothing is projected into it. The two
   components project their icon and their content and keep only what is theirs — the picker its
   rows and its import, the changelog its entries.
+- **Buttons as flat bordered rectangles told apart by a `--color-control` tint.** A `default`
+  button was an `--color-inset` well with a 1px `--color-edge` border that turned `--color-control`
+  under the pointer, and a `primary` one the same rectangle at `bg-control/15`. That is a form
+  field's look, and the porters this is for know FL Studio, whose buttons are shaded plates with a
+  dark rim and a lit top edge, which sink when pressed. `plate` in `styles.css` is that material,
+  mixed from the theme's tokens so every preset still re-tints it. `primary` is the same plate
+  tinted through `--plate-face`, and `buttonClass()` is the one statement of a button's classes.
+- **A toggle that is on tinted `bg-control/20`.** A fifth of a mid blue over the chrome, beside an
+  off toggle that differed from it in border and weight, so a mode's state took a second look to
+  read — and the plate is the whole of what says it. FL Studio lights the whole of a mode that is
+  on, in amber, and its glyph goes dark. `recess-lit` does that in `--color-lit`, a token of its
+  own, so the reason `--color-control` is not `--color-accent` still holds: a porter can move the
+  lit colour without the playhead. The cost is that by default orange is no longer the music's
+  alone, and that was accepted. A lit control is a whole recess and the accent never is, and either
+  one can be moved.
+- **The one of several that is selected drawn by swapping a button's variant.** ADSR or GAIN, the
+  envelope and FIR presets, the echo filter, and Presets or Draw were `amk-button`s whose
+  `[variant]` flipped between `primary` and `default` or `ghost`. Presets and Draw instead laid
+  `[class.text-accent]` over a ghost, whose winner depended on the order Tailwind emitted the two
+  in. Selection is exactly a toggle's `pressed`, so all of them are `amk-toggle`s and light as a
+  mode does.
+- **Checkboxes for a sample's keep, Optimize samples and the channel bits.** `amk-checkbox` was a
+  native box tinted `accent-control`, and a byte's bits were eight more of them. A checkbox is a
+  form field, a value waiting to be submitted, which is the reason Loop and Hot Reload stopped
+  being ones. Optimize samples is a mode, so it is an `amk-toggle`. A channel bit is a numbered lit
+  plate in fours, as FL Studio's steps are. A sample's keep is a bare padlock, the toggle's
+  `indicator` variant, lit `--color-led` while kept, as FL's channel-rack lock is. The component
+  had no users left and is gone.
+- **The mixer's M lit in `--color-danger` while muted.** A red tint on the cell said which channels
+  were off, and FL Studio, which porters know, says which are on: a lime LED lit while a channel is
+  heard. Each strip's mute is that light (`led`, `led-on`, `--color-led`), lit from
+  `ChannelState.audible`, so a solo puts out every light but its own as FL's does. The state is
+  not left to colour alone: lit and dark differ in lightness, and the silenced plate's
+  strike-through stays.
+- **An armed Record shown by its dot alone.** Record was an ordinary toggle whose icon turned
+  `text-danger` while armed, so it lit amber like every other mode, with a red dot inside the amber.
+  FL Studio's record button fills red. `tone="danger"` sets `--lit-tone` for the lit recess, so
+  the control itself says it.
+- **Hand-written copies of a button's classes.** The palettes' entries (`entryClass`), the
+  inspector's command chip, the sample browser's audition button and its Add samples `<label>`
+  each spelled out a button's border, ground and hover by hand, and a restyle of the shared
+  controls passed all four by. The chip and the audition button are `amk-button`s. The label takes
+  `buttonClass()`. The entries are `ENTRY_CLASS`, a toggle's off plate built from the toggle's own
+  constants, because a disabled plate is not one of a toggle's states.
+- **Toggles on the same raised plate as buttons.** An off toggle was `plate` with a muted label
+  and an on one `plate-lit`, a raised plate filled amber, so an off toggle and a button were the
+  same shape, and nothing but a pressed toggle told a state from an action. FL Studio sets its
+  toggles into the chrome, and a mode that comes on lights the floor of the recess. A toggle is
+  `recess` now, a sunk ground with a shadow inside its rim, and on it is `recess-lit`, which
+  lights inside the rim and fades in as it does. `plate-lit` went with it. `danger`, its only other
+  wearer, is a raised plate tinted red through `--plate-face`, as `primary` is tinted blue.
+- **A lit toggle as a flat `--color-lit` floor labelled in `--color-inset`.** One flat amber
+  read as a sticker beside FL Studio's lit mode, which is a lamp: an amber floor, a pale yellow
+  core, a deeper orange toward an orange rim, and a burnt-orange label. `recess-lit` draws that,
+  every part derived from the one tone through relative colour, so a porter's `--color-lit` and
+  Record's red light the same way. The core is a radial gradient whose colour stop is
+  `--recess-glow`, a registered property, because a gradient swapped for another cannot fade and
+  one whose stop is registered fades with it. `--lit-warmth` turns the core yellower; Record sets
+  it to 0 so its lamp stays red.
+- **A toggle's label set in `font-medium` when on.** A heavier font is a wider one, so pressing a
+  toggle widened it by a few pixels and pushed everything after it along the toolbar. Reserving
+  the bold width was considered: it needs the label twice, and `<ng-content />` projects once, or
+  a measurement per toggle, which a toggle in a hidden pane gets wrong. `HEAVY` strokes the glyphs
+  in their own colour instead, which adds weight and leaves every advance where it was.
+- **Play and Stop as chrome-grey plates with small corners.** They were the `default` plate, the
+  toolbar's own grey, joined by a group with the small radius every control has. FL Studio's
+  transport is darker than the toolbar it sits on and round at both ends, which is what makes it
+  read as the one place the song is started. They are `dark` plates, the inset's grey rimmed in
+  the seam colour through `--plate-rim`, in a `pill` group.
+- **The transport in a darker box of its own inside the top bar.** `amk-transport-controls` was a
+  rounded, bordered box at `bg-inset/50` on a `--color-raised` bar, which drew a frame round half
+  the row and none round the rest. The box is gone and the whole top bar takes its colour, the
+  inset mixed half into the raised grey, so the row the song is played from is one strip a step
+  darker than the toolbars below it.

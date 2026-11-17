@@ -16,7 +16,7 @@
       i18n-title="@@mixer.mute.title"
       (click)="mixer.toggleMute(channel.index)"
     >
-      <ng-container i18n="@@mixer.mute">mixer.mute</ng-container>
+      <span [class]="channel.light"></span>
     </button>
 
     <button

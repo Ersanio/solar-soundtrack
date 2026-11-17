@@ -4,8 +4,8 @@ import { type FirTaps, echoStability } from '@amk/spc/fir';
 import type { Command } from '@amk/tokens';
 import { builtInTaps } from '@amk/tokens/echo-hazards';
 import { firOverriddenBefore } from '@amk/tokens/fir-override';
-import { Button } from '../../../shared/button/button';
 import { Slider } from '../../../shared/slider/slider';
+import { Toggle } from '../../../shared/toggle/toggle';
 import { EditorStore } from '../../../state/editor-store';
 import { hex2 } from '../../../util/format';
 import { byteArgs } from '../commands/byte-args';
@@ -38,7 +38,7 @@ const FILTERS = [
  */
 @Component({
   selector: 'amk-echo-config',
-  imports: [Button, FirGraph, Slider],
+  imports: [FirGraph, Slider, Toggle],
   templateUrl: './echo-config.html',
   host: { class: 'flex flex-col gap-3' },
 })

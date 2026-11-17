@@ -27,13 +27,22 @@
 <span class="text-ink-muted shrink-0 font-mono text-xs tabular-nums">{{ row().size }}</span>
 
 @if (row().requested) {
-  <amk-checkbox
-    i18n="@@samples.keep"
-    class="shrink-0 text-xs"
-    [checked]="slot.important"
-    (checkedChange)="onImportant(slot.name, $event)"
-    >samples.keep</amk-checkbox
+  <!-- A lock, as FL Studio locks a channel: closed while the sample is kept. -->
+  <button
+    amk-toggle
+    variant="indicator"
+    icon
+    i18n-title="@@samples.keep.title"
+    title="samples.keep.title"
+    [pressed]="slot.important"
+    (click)="onImportant(slot.name, !slot.important)"
   >
+    @if (slot.important) {
+      <amk-icon-lock />
+    } @else {
+      <amk-icon-unlock />
+    }
+  </button>
 } @else {
   <span
     i18n="@@samples.not-in-song"

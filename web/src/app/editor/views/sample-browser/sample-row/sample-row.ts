@@ -1,7 +1,9 @@
 import { Component, inject, input, output } from '@angular/core';
 
 import { Button } from '../../../../shared/button/button';
-import { Checkbox } from '../../../../shared/checkbox/checkbox';
+import { IconLock } from '../../../../shared/icons/icon-lock';
+import { IconUnlock } from '../../../../shared/icons/icon-unlock';
+import { Toggle } from '../../../../shared/toggle/toggle';
 import { SampleStore } from '../../../../state/sample-store';
 import { AuditionButton } from '../audition-button/audition-button';
 import { SampleWave } from '../sample-wave/sample-wave';
@@ -22,7 +24,7 @@ import type { FileRow } from '../sample-rows';
  */
 @Component({
   selector: 'li[amk-sample-row]',
-  imports: [AuditionButton, Button, Checkbox, SampleWave, SlotRowView],
+  imports: [AuditionButton, Button, IconLock, IconUnlock, SampleWave, SlotRowView, Toggle],
   templateUrl: './sample-row.html',
   host: { class: 'hover:bg-raised block px-3 py-2' },
 })

@@ -27,19 +27,30 @@
   --color-ink-muted: #9aaab5;
 
   /*
-   * What a control is emphasised in: a primary button's plate, a checked box, a
-   * slider's filled half and its thumb, a toggle chip that is on, and the border
-   * a button takes under the pointer.
-   *
-   * A blue-grey a step lighter than the chrome, so a button reads as the same
-   * material as the toolbar it sits in and the accent stays the one warm thing
-   * on screen. Its own token rather than `--color-accent`, because the two are
-   * asked different questions. The accent means *this is where the music is* —
-   * the playhead, a lit key, the caret — and it is read against the roll and
-   * the source. This is chrome emphasis, read against a button. A porter who
-   * wants coloured buttons sets this one and leaves the roll alone.
+   * What a control is emphasised in short of being on: the tint in a primary
+   * button's plate, a slider's filled half and its thumb, and the active tab's
+   * rule. FL Studio's pale blue-grey, the face of its tempo and pattern
+   * displays, so it reads as the toolbar's own material. Its own token rather
+   * than `--color-accent`, because the accent means *this is where the music
+   * is* — the playhead, a lit key, the caret — and is read against the roll and
+   * the source.
    */
-  --color-control: #7ea6c4;
+  --color-control: #bfced5;
+
+  /*
+   * A control that is on, in FL Studio's amber: a toggle's floor glows in it,
+   * paler toward the middle and deeper toward the rim, as FL's toolbar lights
+   * a mode. Its own token, so a porter can move it without touching the
+   * playhead, though by default the two are both warm.
+   */
+  --color-lit: #ffab3d;
+
+  /*
+   * FL Studio's lime, for the small lights where `--color-lit` fills a plate:
+   * the mixer's channel lights, lit while a channel is heard, and a kept
+   * sample's lock.
+   */
+  --color-led: #a8e44a;
 
   --color-accent: #ffa53a;
   --color-accent-soft: #ffd08a;
@@ -145,6 +156,140 @@
       opacity: 0;
     }
   }
+}
+
+/*
+ * A control's material, in the mould of FL Studio's. A button is `plate`: a
+ * shaded plate with a dark rim and a lit top edge, which sinks when pressed. A
+ * toggle is `recess`: set into the chrome with a shadow inside its rim, and on,
+ * `recess-lit` makes it glow, as FL's toolbar lights a mode — pale at the
+ * middle, deeper toward a dark rim — so it still reads as set in. The two
+ * shapes are what tell an action from a state.
+ *
+ * Every colour is mixed from the theme's tokens, so a preset or a porter's own
+ * colours re-tint the controls with everything else; the shadows alone are
+ * black, being darkness rather than a colour. `plate` reads `--plate-face`
+ * (default `--color-raised`), which is how a primary or danger button tints
+ * itself, and `--plate-rim` (default `--color-inset`), which a plate as dark as
+ * the inset needs moved to stay outlined; `recess-lit` reads `--lit-tone` (default `--color-lit`), which is
+ * how an armed Record lights red. Hover and press are in here rather than in
+ * each caller's class list, so every control answers the pointer alike.
+ */
+@utility plate {
+  --plate-top: color-mix(in oklab, var(--plate-face, var(--color-raised)) 94%, var(--color-ink));
+  --plate-bottom: color-mix(
+    in oklab,
+    var(--plate-face, var(--color-raised)) 75%,
+    var(--color-inset)
+  );
+  border-color: var(--plate-rim, var(--color-inset));
+  background-color: var(--plate-bottom);
+  background-image: linear-gradient(to bottom, var(--plate-top), var(--plate-bottom));
+  box-shadow: inset 0 1px 0 color-mix(in oklab, var(--color-ink) 12%, transparent);
+
+  &:hover:not(:disabled) {
+    --plate-top: color-mix(in oklab, var(--plate-face, var(--color-raised)) 88%, var(--color-ink));
+    --plate-bottom: color-mix(
+      in oklab,
+      var(--plate-face, var(--color-raised)) 94%,
+      var(--color-ink)
+    );
+  }
+
+  &:active:not(:disabled) {
+    background-image: linear-gradient(to top, var(--plate-top), var(--plate-bottom));
+    box-shadow: inset 0 1px 3px rgb(0 0 0 / 0.45);
+  }
+}
+
+/*
+ * The glow at a lit recess's middle. Registered as a colour so a transition
+ * can fade it: a gradient swapped for another changes in a frame, but one
+ * whose colour stop is a registered property fades with the stop.
+ */
+@property --recess-glow {
+  syntax: '<color>';
+  inherits: false;
+  initial-value: transparent;
+}
+
+/*
+ * The floor is a `background-color`, the glow a gradient that is clear until
+ * `--recess-glow` says otherwise, and the shading a `box-shadow`; a
+ * toggle's transition fades all three, so lighting up is seen rather than
+ * swapped in a frame. The shade off and the deeper rim on are lists of one
+ * shape — two shadows inside the rim, then the lip outside it — which is what
+ * lets the one fade into the other. `recess-lit` only sets properties this
+ * reads, so the two never compete for a declaration.
+ */
+@utility recess {
+  --recess-ground: color-mix(in oklab, var(--color-inset) 65%, var(--color-raised));
+  border-color: var(--recess-rim, var(--color-inset));
+  background-color: var(--recess-floor, var(--recess-ground));
+  background-image: radial-gradient(farthest-corner, var(--recess-glow), transparent 75%);
+  box-shadow:
+    var(--recess-shade, inset 0 1px 3px rgb(0 0 0 / 0.55), inset 0 8px 6px -6px rgb(0 0 0 / 0.3)),
+    0 1px 0 color-mix(in oklab, var(--color-ink) 9%, transparent);
+
+  &:hover:not(:disabled) {
+    --recess-ground: color-mix(in oklab, var(--color-inset) 35%, var(--color-raised));
+  }
+
+  &:active:not(:disabled) {
+    --recess-shade: inset 0 2px 4px rgb(0 0 0 / 0.65), inset 0 8px 6px -6px rgb(0 0 0 / 0.4);
+  }
+}
+
+/*
+ * FL Studio's lit mode, all of it derived from the one tone: the floor is the
+ * tone; its middle glows paler and yellower, a lamp's hot core; it deepens
+ * toward the edges, inside a dark rim; and the label is a dark shade of the
+ * rim. `--lit-warmth` scales the turn toward yellow and back, and a tone
+ * that has to stay its own hue, Record's red, sets it to 0.
+ */
+@utility recess-lit {
+  --lit: var(--lit-tone, var(--color-lit));
+  --recess-floor: var(--lit);
+  --recess-glow: oklch(
+    from var(--lit) calc(l + 0.12) calc(c* 0.85) calc(h + 35 * var(--lit-warmth, 1))
+  );
+  --recess-rim: oklch(
+    from var(--lit) calc(l - 0.29) calc(c + 0.04) calc(h - 26 * var(--lit-warmth, 1))
+  );
+  --recess-deep: oklch(
+    from var(--lit) calc(l - 0.06) calc(c + 0.025) calc(h - 14 * var(--lit-warmth, 1))
+  );
+  --recess-shade: inset 0 0 0 1px var(--recess-deep), inset 0 0 3.6px 1.2px var(--recess-deep);
+  color: oklch(from var(--lit) 0.45 calc(c + 0.04) calc(h - 30 * var(--lit-warmth, 1)));
+
+  &:hover:not(:disabled) {
+    filter: brightness(1.06);
+  }
+}
+
+/* A recessed ground: a segment track, the transport's clock. */
+@utility well {
+  background-color: var(--color-inset);
+  box-shadow:
+    inset 0 1px 3px rgb(0 0 0 / 0.45),
+    0 1px 0 color-mix(in oklab, var(--color-ink) 6%, transparent);
+}
+
+/* A round light, dark until `led-on` sets the two properties it reads. */
+@utility led {
+  width: 0.5rem;
+  height: 0.5rem;
+  flex-shrink: 0;
+  border-radius: 9999px;
+  background-color: var(--led-face, color-mix(in oklab, var(--color-inset) 75%, var(--color-ink)));
+  box-shadow: var(--led-glow, inset 0 1px 1px rgb(0 0 0 / 0.6));
+}
+
+@utility led-on {
+  --led-face: var(--color-led);
+  --led-glow:
+    0 0 5px color-mix(in oklab, var(--color-led) 70%, transparent),
+    inset 0 -1px 1px rgb(0 0 0 / 0.25);
 }
 
 :root {

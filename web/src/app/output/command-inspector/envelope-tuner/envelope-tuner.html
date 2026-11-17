@@ -1,16 +1,12 @@
 <!-- Which of the two the DSP obeys. A pair of buttons rather than a select:
      it is one binary choice and it changes everything below it. -->
 <div class="border-edge flex gap-1 border-b pb-2">
-  <!-- The variant carries which one is on, rather than a colour laid over the
-       ghost's own: `Button` binds the whole `class` attribute, so a utility
-       added beside it wins or loses on the order Tailwind happened to emit the
-       two in, and `text-ink-muted` sorts after every colour it would be
-       overriding. The selected one is the primary button, which is the plate
-       Play wears. -->
+  <!-- Lit plates, so the one the DSP obeys is lit as a mode is. -->
   <button
     i18n="@@inspector.envelope-tuner.adsr"
-    amk-button
-    [variant]="usingAdsr() ? 'primary' : 'ghost'"
+    amk-toggle
+    size="md"
+    [pressed]="usingAdsr()"
     [disabled]="disabled()"
     (click)="setMode(true)"
   >
@@ -18,8 +14,9 @@
   </button>
   <button
     i18n="@@inspector.envelope-tuner.gain"
-    amk-button
-    [variant]="usingAdsr() ? 'ghost' : 'primary'"
+    amk-toggle
+    size="md"
+    [pressed]="!usingAdsr()"
     [disabled]="disabled()"
     (click)="setMode(false)"
   >
@@ -39,8 +36,9 @@
     <div class="flex flex-wrap gap-1.5">
       @for (preset of PRESETS; track preset.name) {
         <button
-          amk-button
-          [variant]="activePreset()?.name === preset.name ? 'primary' : 'default'"
+          amk-toggle
+          size="md"
+          [pressed]="activePreset()?.name === preset.name"
           [title]="preset.note"
           [disabled]="disabled()"
           (click)="applyPreset(preset)"

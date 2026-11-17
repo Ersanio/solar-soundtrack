@@ -3,6 +3,7 @@
 import { Component, computed, effect, inject, signal } from '@angular/core';
 
 import { channelsBeginAt, hasDialectMarker, songTarget } from '@amk/tokens/dialect';
+import { BUTTON_BASE, BUTTON_SIZES } from '../../shared/button/button';
 import { Toggle } from '../../shared/toggle/toggle';
 import { EditorRequests } from '../../state/editor-requests';
 import { EditorStore } from '../../state/editor-store';
@@ -41,12 +42,11 @@ function readFilter(): Filter {
 }
 
 /**
- * A bordered button with a glyph beside the name: the `sm` height, radius and
- * transition of an `amk-toggle` in its off state, and its colours are that
- * toggle's. Not the component itself, because a disabled bordered button is not
- * one of a toggle's states. Bordered on purpose, where the category segments above
- * it are not: each of these acts on the song, and the segments only choose which
- * of them are shown.
+ * A raised plate with a glyph beside the name: an `sm` button, its label
+ * muted until the pointer is over it, so a strip of thirty is quieter than one
+ * toolbar button. A plate on purpose, where the category segments above it are
+ * raised only when selected: each of these acts on the song, and the segments
+ * only choose which of them are shown.
  *
  * Nothing here is tinted for a hazard. What a command does to a song is the
  * editor's to report once the text exists — a `caution` is a warning AddmusicK
@@ -58,15 +58,7 @@ function readFilter(): Filter {
  * that refused what the real tool accepts would be the compiler being permissive
  * in the other direction.
  */
-export function entryClass(entry: ResolvedEntry): string {
-  const base =
-    'border-edge inline-flex h-7 cursor-pointer items-center gap-1.5 rounded-md border px-2 text-xs whitespace-nowrap transition-colors disabled:cursor-not-allowed disabled:opacity-40';
-  if (entryBlocked(entry)) {
-    return `${base} text-ink-muted`;
-  }
-
-  return `${base} text-ink-muted hover:text-ink hover:border-control`;
-}
+export const ENTRY_CLASS = `${BUTTON_BASE} ${BUTTON_SIZES.sm} plate text-ink-muted hover:not-disabled:text-ink`;
 
 /**
  * Whether the button is dead, from either of the two conditions that kill it.
@@ -255,12 +247,14 @@ export class CommandPalette {
   /** What the line under the strip says right now. */
   protected readonly readout = computed(() => entryReadout(this.hovered()));
 
+  protected readonly entryClass = ENTRY_CLASS;
+
   /**
-   * The buttons, with their class resolved.
+   * The buttons, with whether each is dead resolved.
    *
-   * A view model rather than `entryClass(entry)` in the template: that runs once
-   * per button on every change-detection pass, and the palette draws the whole
-   * catalogue when its filter is `all`.
+   * A view model rather than `entryBlocked(entry)` in the template: that runs
+   * once per button on every change-detection pass, and the palette draws the
+   * whole catalogue when its filter is `all`.
    */
   protected readonly entries = computed(() => {
     const target = this.target();
@@ -269,7 +263,7 @@ export class CommandPalette {
 
     return OFFERED.filter((entry) => filter === 'all' || entry.category === filter).map((entry) => {
       const resolved = resolveEntry(entry, target, place);
-      return { ...resolved, class: entryClass(resolved), disabled: entryBlocked(resolved) };
+      return { ...resolved, disabled: entryBlocked(resolved) };
     });
   });
 

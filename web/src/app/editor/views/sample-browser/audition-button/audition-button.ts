@@ -1,5 +1,6 @@
 import { Component, computed, inject, input } from '@angular/core';
 
+import { Button } from '../../../../shared/button/button';
 import { Audition } from '../../../../state/audition';
 import { SampleStore } from '../../../../state/sample-store';
 
@@ -15,10 +16,12 @@ import { SampleStore } from '../../../../state/sample-store';
  */
 @Component({
   selector: 'amk-audition-button',
+  imports: [Button],
   template: `
     <button
-      type="button"
-      class="border-edge bg-inset text-ink-muted hover:text-ink hover:border-control shrink-0 cursor-pointer rounded-md border px-2 py-1 font-mono text-xs disabled:cursor-not-allowed disabled:opacity-40"
+      amk-button
+      size="sm"
+      class="shrink-0 font-mono"
       [disabled]="disabled()"
       (click)="toggle()"
     >

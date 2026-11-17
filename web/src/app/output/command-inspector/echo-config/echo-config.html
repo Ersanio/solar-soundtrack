@@ -35,8 +35,9 @@
   <div class="flex flex-wrap gap-1.5">
     @for (choice of FILTERS; track choice.value) {
       <button
-        amk-button
-        [variant]="filter() === choice.value ? 'primary' : 'default'"
+        amk-toggle
+        size="md"
+        [pressed]="filter() === choice.value"
         [title]="choice.note"
         [disabled]="!bytes.editable(2)"
         (click)="bytes.commit(2, choice.value)"

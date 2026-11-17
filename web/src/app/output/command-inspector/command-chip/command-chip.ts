@@ -2,6 +2,7 @@ import { Component, inject, input } from '@angular/core';
 
 import type { Span } from '@amk/core/types';
 import { type CommandGlyph, CommandIcon } from '../../../editor/command-palette/command-icon';
+import { Button } from '../../../shared/button/button';
 import { EditorRequests } from '../../../state/editor-requests';
 
 /**
@@ -17,11 +18,11 @@ import { EditorRequests } from '../../../state/editor-requests';
  */
 @Component({
   selector: 'amk-command-chip',
-  imports: [CommandIcon],
+  imports: [Button, CommandIcon],
   template: `
     <button
-      type="button"
-      class="border-edge bg-inset text-ink hover:border-control flex cursor-pointer items-center gap-1.5 rounded-md border px-2 py-1 text-xs"
+      amk-button
+      size="sm"
       [title]="blurb()"
       (click)="reveal(false)"
       (dblclick)="reveal(true)"

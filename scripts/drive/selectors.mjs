@@ -32,18 +32,18 @@ export const SELECTORS = {
 
   // --- Transport ------------------------------------------------------------
 
-  /** Play/pause: the transport's first button, icon-only. Disabled until a driver has loaded. */
-  play: 'amk-transport-controls > button:nth-of-type(1)',
+  /** Play/pause: the first button in the transport's housing, icon-only. Disabled until a driver has loaded. */
+  play: 'amk-transport-controls > amk-button-group > button:nth-of-type(1)',
   /** Present inside `play` only while the song is playing. */
   pauseIcon: 'amk-icon-pause',
-  /** Stop: the second button. */
-  stop: 'amk-transport-controls > button:nth-of-type(2)',
-  /** The Loop toggle: the third button. Lit when it carries `togglePressedClass`. */
-  loop: 'amk-transport-controls > button:nth-of-type(3)',
-  /** The Hot reload toggle: the fourth button. */
-  hotReload: 'amk-transport-controls > button:nth-of-type(4)',
-  /** The clock well: the fifth button. Its text is `m:ss / m:ss` or the tick face; a click flips it. */
-  clock: 'amk-transport-controls > button:nth-of-type(5)',
+  /** Stop: the second button in the housing. */
+  stop: 'amk-transport-controls > amk-button-group > button:nth-of-type(2)',
+  /** The Loop toggle: the transport's first button of its own. Lit when it carries `togglePressedClass`. */
+  loop: 'amk-transport-controls > button:nth-of-type(1)',
+  /** The Hot reload toggle: the second. */
+  hotReload: 'amk-transport-controls > button:nth-of-type(2)',
+  /** The clock well: the third. Its text is `m:ss / m:ss` or the tick face; a click flips it. */
+  clock: 'amk-transport-controls > button:nth-of-type(3)',
   /** The seek bar: the one range input that is a direct child. `value` and `max` are driver ticks. */
   seek: 'amk-transport-controls > input[type="range"]',
 
@@ -101,7 +101,7 @@ export const STATUS_OK_CLASS = 'bg-good';
 export const STATUS_ERROR_CLASS = 'bg-danger';
 
 /** On an `amk-toggle` button while it is pressed. */
-export const TOGGLE_PRESSED_CLASS = 'bg-control/20';
+export const TOGGLE_PRESSED_CLASS = 'recess-lit';
 
 /** A bar's channel, from its fill class. */
 export const CHANNEL_FILL_PATTERN = /\bfill-ch-(\d)\b/;

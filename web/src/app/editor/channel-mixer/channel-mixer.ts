@@ -14,15 +14,19 @@ const STRIP_CLASS = 'border-edge flex h-8 items-stretch overflow-hidden rounded-
 /** Shared by all eight plates, the colour and the silencing coming after it. */
 const PLATE_CLASS = 'border-edge flex w-6 items-center justify-center border-r font-mono text-xs';
 
-/** Shared by M and S, the state's own colours coming after it. */
+/** Shared by the light and S, the state's own colours coming after it. */
 const TOGGLE_CLASS =
   'flex w-7 cursor-pointer items-center justify-center font-mono text-xs font-semibold transition-colors';
 
 /** A toggle that is off: quiet, and lifted only by a hover it can take. */
 const TOGGLE_OFF = 'text-ink-muted hover:not-disabled:text-ink';
 
-/** M on a muted channel. */
-const MUTE_ON = 'bg-danger/25 text-danger';
+/**
+ * The cell holding a channel's light, which is lit while the channel is heard
+ * and dark while it is silenced, as FL Studio's mute LEDs are — so a solo puts
+ * out every light but its own, as it does there.
+ */
+const LIGHT_CELL = 'hover:not-disabled:bg-ink/10 disabled:cursor-not-allowed disabled:opacity-40';
 
 /**
  * `text-ink` over a channel's own colour, which is what the roll's bars label
@@ -70,9 +74,8 @@ export class ChannelMixer {
       plate: `${PLATE_CLASS} ${CHANNEL_BG[channel.index]} ${ON_CHANNEL}${
         channel.audible ? '' : ` ${CHANNEL_QUIET}`
       }`,
-      mute: `${TOGGLE_CLASS} disabled:cursor-not-allowed disabled:opacity-40 ${
-        channel.muted ? MUTE_ON : TOGGLE_OFF
-      }`,
+      mute: `${TOGGLE_CLASS} ${LIGHT_CELL}`,
+      light: channel.audible ? 'led led-on' : 'led',
       solo: `${TOGGLE_CLASS} ${
         channel.soloed ? `${CHANNEL_BG[channel.index]} ${ON_CHANNEL}` : TOGGLE_OFF
       }`,

@@ -1,6 +1,7 @@
 import { Component, computed, input, output } from '@angular/core';
 
 import { Button } from '../../../../shared/button/button';
+import { ButtonGroup } from '../../../../shared/button-group/button-group';
 import { IconChevronDown } from '../../../../shared/icons/icon-chevron-down';
 import { IconChevronRight } from '../../../../shared/icons/icon-chevron-right';
 import { IconMinus } from '../../../../shared/icons/icon-minus';
@@ -48,6 +49,7 @@ const CHIP_OFF = 'opacity-40 hover:not-disabled:opacity-70';
   selector: 'amk-roll-toolbar',
   imports: [
     Button,
+    ButtonGroup,
     Toggle,
     IconMinus,
     IconPlus,

@@ -6,13 +6,13 @@
 >
   <span
     i18n="@@topbar.aram.aram"
-    class="text-ink-muted text-[11px] font-semibold tracking-wide uppercase"
+    class="text-ink-muted text-[11px] font-semibold tracking-wide uppercase max-xl:hidden"
     >topbar.aram.aram</span
   >
   <amk-aram-bar class="w-28" [segments]="segments()" [hoverTip]="false" />
   <!-- The figure is on the status bar at every width; here it shows only where the row has room. -->
   <span
-    class="font-mono text-xs tabular-nums whitespace-nowrap max-2xl:hidden"
+    class="font-mono text-xs tabular-nums whitespace-nowrap max-[106rem]:hidden"
     [class.text-danger]="overflowing()"
   >
     {{ store.freeLabel() }}

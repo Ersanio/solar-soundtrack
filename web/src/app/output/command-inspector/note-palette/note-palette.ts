@@ -13,8 +13,8 @@ import {
   resolveEntry,
 } from '../../../editor/command-palette/catalog';
 import {
+  ENTRY_CLASS,
   entryBlocked,
-  entryClass,
   entryReadout,
 } from '../../../editor/command-palette/command-palette';
 import { CommandIcon } from '../../../editor/command-palette/command-icon';
@@ -68,7 +68,7 @@ export interface NotePaletteModel {
  */
 const MANY_EFFECTS = new Set<number>([VCMD.Toggles, VCMD.Settings]);
 
-type Button = ResolvedEntry & { class: string; disabled: boolean; after: boolean };
+type Button = ResolvedEntry & { disabled: boolean; after: boolean };
 
 /**
  * The command palette, aimed at a note instead of the caret.
@@ -174,6 +174,8 @@ export class NotePalette {
     };
   });
 
+  protected readonly entryClass = ENTRY_CLASS;
+
   protected readonly hovered = signal<ResolvedEntry | null>(null);
 
   /** What the line under the buttons says right now — the palette's readout. */
@@ -208,7 +210,6 @@ export class NotePalette {
         : [
             {
               ...resolved,
-              class: entryClass(resolved),
               disabled: entryBlocked(resolved),
               after: resolved.vcmd === VCMD.PitchBend,
             },

@@ -54,12 +54,16 @@ stylesheet's own values, a blue-grey chrome with an orange accent — and **Grap
 grey; every other preset names its accent explicitly, so it renders the same whatever the
 stylesheet's accent is.
 
-Two families of token are deliberately not shared. `--color-control` is what a control is
-emphasised in — a primary button's plate, a checked box, a slider's fill, a toggle that is on — a
-steel blue a step lighter than the chrome, so a button reads as the same material as the toolbar it
-sits in. It is separate from `--color-accent`, which means _this is where the music is_: the
-playhead, a lit key, the caret, the focus ring. One token for both would make a neutral chrome cost
-a neutral playhead. And `--color-syn-*` is the source view's colouring, one token per tag in
+Two families of token are deliberately not shared. The controls have three of their own:
+`--color-control`, FL's pale blue-grey display face, for emphasis short of being on — a primary
+button's tint, a slider's fill, the open tab's rule; `--color-lit`, FL Studio's amber, which a
+toggle that is on glows in; and `--color-led`, FL's lime, for the small
+lights — the mixer's channel lights and a kept sample's lock. None of them is `--color-accent`,
+which means _this is where the music is_: the playhead, a lit key, the caret, the focus ring, and
+the transport's pause glyph while the song runs. One token for both would make a neutral chrome
+cost a neutral playhead. By default the accent and `--color-lit` are both warm, so orange alone no
+longer says "the music": a lit control is a whole plate and the accent never is, and a porter who
+wants them apart moves either one. And `--color-syn-*` is the source view's colouring, one token per tag in
 `TOKEN_TAGS`, shared with nothing at all — `codemirror/mml-theme.ts`'s highlight table reads only
 those, while its structure block (gutters, tooltips, diagnostic underlines) stays on the app's
 palette, being chrome rather than MML.
@@ -76,6 +80,46 @@ gives up.
 
 The one thing outside CSS is `<meta name="theme-color">` in `index.html`, which the store keeps in
 step; the manifest's copy is baked into an installed app and cannot follow.
+
+## The controls' material
+
+Every button and toggle is drawn from `@utility` blocks in `styles.css`, in the mould of FL
+Studio's, and nowhere else. **A button is raised and a toggle is sunk**, and that shape is what
+tells an action from a state:
+
+- `plate` is a button. It is a shaded face mixed from `--color-raised` toward `--color-ink`, with
+  an `--color-inset` rim and a lit top edge. Hover lightens it a step and a press sinks it. A
+  primary or danger button tints the face through `--plate-face`.
+- `recess` is a toggle. It is set into the chrome, with a shadow inside its rim and a light
+  catch on its lower lip.
+- `recess-lit` turns the recess on, as FL lights a mode: an amber floor, a pale yellow core, a
+  deeper orange toward an orange rim, and a burnt-orange label, so a toggle that is on still
+  reads as set in. Every part is derived from one tone, `--lit-tone` (default `--color-lit`),
+  which is how an armed Record lights red; `--lit-warmth: 0` keeps a tone's own hue in the core.
+  The floor, the shadows and `--recess-glow`, the core's registered colour, all fade, so
+  switching is seen rather than jumping. `Toggle` lists them in its transition, which is why it
+  builds on `CONTROL_BASE` rather than on a button's `transition-colors`.
+- **A toggle never changes width.** A lit label, and a selected segment's, is drawn heavier with
+  a text stroke (`HEAVY` in `toggle.ts`) rather than set in a heavier font, which would widen it
+  and push the rest of the toolbar along.
+- `well` is the recessed ground of a segment track and of the transport's clock.
+- `led` and `led-on` are the round light.
+
+Every colour in them is mixed from tokens, so a preset or a porter's override re-tints the controls
+with everything else. Only the shadows are black, being darkness rather than a colour.
+
+- **Who wears what.** `shared/button/` and `shared/toggle/` say which variant wears which.
+  `buttonClass()` lends a button's classes to an element that cannot be one: the Add samples
+  `<label>`, and the palettes' entries through `ENTRY_CLASS`. `amk-button-group` joins plates into
+  one housing — the transport's Play and Stop, Undo and Redo, the roll's zoom pairs. The
+  transport's is FL's: a `pill` group of `dark` plates, the inset's grey rimmed through
+  `--plate-rim` in the seam colour. The top bar's two exports are `dark` plates too.
+- **Toggles.** A toggle that is on is a lit recess, and so is the one of several that is selected:
+  ADSR or GAIN, a preset, an echo filter, the channel bits of a mask. The exception is the
+  palettes' category segments, which are raised in a well and never lit, because a filter that
+  picks which buttons are shown must not look like the buttons it shows.
+- **The small lights.** A sample's keep is a bare lock, the toggle's `indicator` variant. The
+  mixer's mute is a light, lit while the channel is heard. FL Studio draws both that way.
 
 ## Decisions already made
 
@@ -110,3 +154,21 @@ entry goes there, with its line here, in the same change.
 - **The mixer's solo `S` lit on `bg-control/25`** — `--color-ch-0`, `--color-ch-6`
 - **The theme picker and the changelog each carrying a trigger, a panel, `Escape` and the
   outside-press close of their own**
+- **Buttons as flat bordered rectangles told apart by a `--color-control` tint** — `plate`,
+  `buttonClass`, `primary`
+- **A toggle that is on tinted `bg-control/20`** — `--color-lit`, `recess-lit`, `--color-accent`
+- **The one of several that is selected drawn by swapping a button's variant** — `amk-toggle`,
+  `envelope-tuner`, `fir-designer`, `echo-config`
+- **Checkboxes for a sample's keep, Optimize samples and the channel bits** — `amk-checkbox`,
+  `indicator`, `bit-toggles`
+- **The mixer's M lit in `--color-danger` while muted** — `--color-led`, `led`
+- **An armed Record shown by its dot alone** — `tone`, `--lit-tone`
+- **Hand-written copies of a button's classes** — `entryClass`, `ENTRY_CLASS`, `command-chip`,
+  `audition-button`, `buttonClass`
+- **Toggles on the same raised plate as buttons** — `recess`, `plate`, `plate-lit`
+- **A lit toggle as a flat `--color-lit` floor labelled in `--color-inset`** — `recess-lit`,
+  `--recess-glow`, `--lit-warmth`, `CONTROL_BASE`
+- **A toggle's label set in `font-medium` when on** — `HEAVY`, `SEGMENT_ON`
+- **Play and Stop as chrome-grey plates with small corners** — `dark`, `pill`, `--plate-rim`
+- **The transport in a darker box of its own inside the top bar** — `amk-transport-controls`,
+  `amk-top-bar`

@@ -11,6 +11,8 @@ export const CHANGELOG: readonly ChangelogEntry[] = [
   {
     date: '17 November 2026',
     items: [
+      'Buttons and toggles in the style of FL Studio, with modes that light up when on',
+      'Mixer channel lights, and a lock for keeping a sample',
       'Type any theme colour as hex',
       'Notes clicked in the piano roll, and its keys, sound at once anywhere in the song',
     ],

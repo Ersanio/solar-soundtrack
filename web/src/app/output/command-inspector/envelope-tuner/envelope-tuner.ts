@@ -11,9 +11,9 @@ import {
   releaseSeconds,
   sustainLevel,
 } from '@amk/spc/adsr';
-import { Button } from '../../../shared/button/button';
 import { type EnumOption, EnumSelect } from '../../../shared/enum-select/enum-select';
 import { Slider } from '../../../shared/slider/slider';
+import { Toggle } from '../../../shared/toggle/toggle';
 import { duration, dollarHex, hex2 } from '../../../util/format';
 import { AdsrGraph } from '../adsr-graph/adsr-graph';
 import { dragPreview } from '../commands/preview';
@@ -141,7 +141,7 @@ const PRESETS: readonly AdsrPreset[] = [
  */
 @Component({
   selector: 'amk-envelope-tuner',
-  imports: [AdsrGraph, Button, EnumSelect, Slider],
+  imports: [AdsrGraph, EnumSelect, Slider, Toggle],
   templateUrl: './envelope-tuner.html',
   host: { class: 'flex flex-col gap-3' },
 })

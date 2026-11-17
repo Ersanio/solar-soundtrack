@@ -296,6 +296,7 @@ module.exports = defineConfig([
             'stroke-linecap',
             'stroke-linejoin',
             'text-anchor',
+            'tone',
             'transform',
             'variant',
           ],

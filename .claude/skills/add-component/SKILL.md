@@ -49,9 +49,12 @@ list disagrees with `web/.claude/CLAUDE.md` or an installed Angular skill, this 
 - **Tailwind utilities and theme variables only.** No hex literal, no inline `style=` (a
   `[style.width.px]` binding for geometry is fine); every colour is a `--color-*` token from
   `web/src/styles.css` (`.claude/rules/ui-and-theme.md`).
-- **Use the shared controls** in `web/src/app/shared/`: `amk-button`, `amk-toggle`, `amk-slider`,
-  `amk-number-field`, `amk-enum-select`, `amk-checkbox`, `amk-section`, `amk-toolbar`, the popover
-  and tabs. A mode is an `amk-toggle`, not a checkbox. A dragged control previews continuously and
+- **Use the shared controls** in `web/src/app/shared/`: `amk-button`, `amk-toggle`,
+  `amk-button-group`, `amk-slider`, `amk-number-field`, `amk-enum-select`, `amk-bit-toggles`,
+  `amk-section`, `amk-toolbar`, the popover and tabs. A mode, or the one of several that is
+  selected, is an `amk-toggle`, not a checkbox or a swapped button variant. Something that must
+  look like a button and cannot be one takes `buttonClass()`, and a recessed ground the `well`
+  utility, rather than a hand copy of their classes. A dragged control previews continuously and
   commits once (`web/CLAUDE.md`, Preview and commit).
 - **Every text is an i18n ID**: the `add-ui-text` skill. A new keyword input (`variant`, `size`)
   goes in `template/i18n`'s `ignoreAttributes` in `eslint.config.js`, not behind an `i18n-` marker.

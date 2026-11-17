@@ -1,6 +1,8 @@
 import { Component, inject, input } from '@angular/core';
 
-import { Checkbox } from '../../../../shared/checkbox/checkbox';
+import { IconLock } from '../../../../shared/icons/icon-lock';
+import { IconUnlock } from '../../../../shared/icons/icon-unlock';
+import { Toggle } from '../../../../shared/toggle/toggle';
 import { SampleStore } from '../../../../state/sample-store';
 import { Hex2Pipe } from '../../../../util/hex.pipe';
 import { AuditionButton } from '../audition-button/audition-button';
@@ -16,7 +18,7 @@ import type { SlotRow } from '../sample-rows';
  */
 @Component({
   selector: 'li[amk-slot-row]',
-  imports: [AuditionButton, Checkbox, Hex2Pipe, SampleWave],
+  imports: [AuditionButton, Hex2Pipe, IconLock, IconUnlock, SampleWave, Toggle],
   templateUrl: './slot-row.html',
   host: { class: 'flex items-center gap-3 py-1.5' },
 })

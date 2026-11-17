@@ -1,8 +1,8 @@
 import { Component, computed, inject, signal } from '@angular/core';
 
 import { ARAM_SIZE } from '@amk/spc/layout';
-import { Button } from '../../../shared/button/button';
-import { Checkbox } from '../../../shared/checkbox/checkbox';
+import { Button, buttonClass } from '../../../shared/button/button';
+import { Toggle } from '../../../shared/toggle/toggle';
 import { Toolbar } from '../../../shared/toolbar/toolbar';
 import { EditorStore } from '../../../state/editor-store';
 import { SampleStore } from '../../../state/sample-store';
@@ -22,13 +22,15 @@ import { type FileRow, fileRow } from './sample-rows';
  */
 @Component({
   selector: 'amk-sample-browser',
-  imports: [Button, Checkbox, Toolbar, SampleRowView],
+  imports: [Button, Toggle, Toolbar, SampleRowView],
   templateUrl: './sample-browser.html',
   host: { class: 'flex min-h-0 min-w-0 flex-col' },
 })
 export class SampleBrowser {
   protected readonly library = inject(SampleStore);
   private readonly editor = inject(EditorStore);
+
+  protected readonly addClass = buttonClass('default', 'md');
 
   /** Names rejected on the last upload, shown until the next one. */
   protected readonly rejected = signal<string[]>([]);

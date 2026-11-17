@@ -9,50 +9,54 @@
 
   <div class="flex items-center gap-1">
     <span i18n="@@roll.zoom-x" class="text-ink-muted text-xs">roll.zoom-x</span>
-    <button
-      amk-button
-      size="sm"
-      icon
-      i18n-title="@@roll.zoom-out.title"
-      title="roll.zoom-out.title"
-      (click)="zoomBy.emit(-1)"
-    >
-      <amk-icon-minus />
-    </button>
-    <button
-      amk-button
-      size="sm"
-      icon
-      i18n-title="@@roll.zoom-in.title"
-      title="roll.zoom-in.title"
-      (click)="zoomBy.emit(1)"
-    >
-      <amk-icon-plus />
-    </button>
+    <amk-button-group>
+      <button
+        amk-button
+        size="sm"
+        icon
+        i18n-title="@@roll.zoom-out.title"
+        title="roll.zoom-out.title"
+        (click)="zoomBy.emit(-1)"
+      >
+        <amk-icon-minus />
+      </button>
+      <button
+        amk-button
+        size="sm"
+        icon
+        i18n-title="@@roll.zoom-in.title"
+        title="roll.zoom-in.title"
+        (click)="zoomBy.emit(1)"
+      >
+        <amk-icon-plus />
+      </button>
+    </amk-button-group>
   </div>
 
   <div class="flex items-center gap-1">
     <span i18n="@@roll.zoom-y" class="text-ink-muted text-xs">roll.zoom-y</span>
-    <button
-      amk-button
-      size="sm"
-      icon
-      i18n-title="@@roll.shorter-rows.title"
-      title="roll.shorter-rows.title"
-      (click)="rowHeightBy.emit(-1)"
-    >
-      <amk-icon-minus />
-    </button>
-    <button
-      amk-button
-      size="sm"
-      icon
-      i18n-title="@@roll.taller-rows.title"
-      title="roll.taller-rows.title"
-      (click)="rowHeightBy.emit(1)"
-    >
-      <amk-icon-plus />
-    </button>
+    <amk-button-group>
+      <button
+        amk-button
+        size="sm"
+        icon
+        i18n-title="@@roll.shorter-rows.title"
+        title="roll.shorter-rows.title"
+        (click)="rowHeightBy.emit(-1)"
+      >
+        <amk-icon-minus />
+      </button>
+      <button
+        amk-button
+        size="sm"
+        icon
+        i18n-title="@@roll.taller-rows.title"
+        title="roll.taller-rows.title"
+        (click)="rowHeightBy.emit(1)"
+      >
+        <amk-icon-plus />
+      </button>
+    </amk-button-group>
   </div>
 
   <span class="bg-edge h-5 w-px shrink-0"></span>
@@ -207,13 +211,15 @@
     @if (listening()) {
       <span class="bg-edge h-5 w-px shrink-0"></span>
 
+      <!-- Lit red while armed, as FL Studio's record button is. -->
       <button
         amk-toggle
+        tone="danger"
         [pressed]="recordPhase() !== 'idle'"
         [title]="recordPhase() === 'idle' ? text.startRecording : text.stopRecording"
         (click)="recordToggle.emit()"
       >
-        <amk-icon-record [class.text-danger]="recordPhase() !== 'idle'" />
+        <amk-icon-record />
         <ng-container i18n="@@roll.record">roll.record</ng-container>
       </button>
       <button

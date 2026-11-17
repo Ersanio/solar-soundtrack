@@ -1,30 +1,35 @@
-<button
-  amk-button
-  variant="primary"
-  size="lg"
-  icon
-  [title]="playback.isPlaying() ? text.pause : text.play"
-  [disabled]="!store.canCompile()"
-  (click)="playback.toggle()"
->
-  @if (playback.isPlaying()) {
-    <amk-icon-pause />
-  } @else {
-    <amk-icon-play />
-  }
-</button>
+<!-- One dark, round-ended housing, as FL Studio's transport has; the pause glyph
+     lights in the accent while the song runs, the accent being where the music is. -->
+<amk-button-group pill>
+  <button
+    amk-button
+    variant="dark"
+    size="md"
+    icon
+    [title]="playback.isPlaying() ? text.pause : text.play"
+    [disabled]="!store.canCompile()"
+    (click)="playback.toggle()"
+  >
+    @if (playback.isPlaying()) {
+      <amk-icon-pause class="text-accent" />
+    } @else {
+      <amk-icon-play />
+    }
+  </button>
 
-<button
-  amk-button
-  size="md"
-  icon
-  i18n-title="@@transport.stop-the-song-or.title"
-  title="transport.stop-the-song-or.title"
-  [disabled]="!canStop()"
-  (click)="stop()"
->
-  <amk-icon-stop />
-</button>
+  <button
+    amk-button
+    variant="dark"
+    size="md"
+    icon
+    i18n-title="@@transport.stop-the-song-or.title"
+    title="transport.stop-the-song-or.title"
+    [disabled]="!canStop()"
+    (click)="stop()"
+  >
+    <amk-icon-stop />
+  </button>
+</amk-button-group>
 
 <button
   amk-toggle
@@ -35,7 +40,7 @@
   (click)="playback.loop.set(!playback.loop())"
 >
   <amk-icon-loop />
-  <ng-container i18n="@@transport.loop">transport.loop</ng-container>
+  <span i18n="@@transport.loop" class="max-xl:hidden">transport.loop</span>
 </button>
 
 <button
@@ -53,7 +58,7 @@
 <!-- One well with two faces: the m:ss the clock gives a tick, or the tick itself. -->
 <button
   type="button"
-  class="bg-inset text-ink hover:bg-inset/70 flex h-7 cursor-pointer items-center rounded-md px-2 font-mono text-sm tabular-nums whitespace-nowrap"
+  class="well text-ink hover:bg-surface flex h-7 cursor-pointer items-center rounded-sm px-2 font-mono text-sm tabular-nums whitespace-nowrap"
   [title]="clockTitle()"
   (click)="toggleClockFace()"
 >
@@ -64,7 +69,7 @@
   type="range"
   min="0"
   step="1"
-  class="accent-control max-w-80 min-w-24 flex-1 cursor-pointer disabled:cursor-not-allowed disabled:opacity-40"
+  class="accent-control max-w-80 min-w-16 flex-1 cursor-pointer xl:min-w-24 disabled:cursor-not-allowed disabled:opacity-40"
   i18n-title="@@transport.seek-the-song-replays.title"
   title="transport.seek-the-song-replays.title"
   [max]="playback.durationTicks()"
@@ -82,7 +87,7 @@
   <input
     type="range"
     min="0"
-    class="accent-control w-20 cursor-pointer"
+    class="accent-control w-16 cursor-pointer xl:w-20"
     i18n-title="@@transport.volume.title"
     title="transport.volume.title"
     [max]="VOLUME_MAX"

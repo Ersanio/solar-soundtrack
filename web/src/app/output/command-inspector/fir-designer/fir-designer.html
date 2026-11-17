@@ -106,18 +106,18 @@
   <div class="border-edge flex gap-1 border-b pb-2">
     <button
       i18n="@@inspector.fir-designer.presets"
-      amk-button
-      variant="ghost"
-      [class.text-accent]="mode() === 'presets'"
+      amk-toggle
+      size="md"
+      [pressed]="mode() === 'presets'"
       (click)="mode.set('presets')"
     >
       inspector.fir-designer.presets
     </button>
     <button
       i18n="@@inspector.fir-designer.draw"
-      amk-button
-      variant="ghost"
-      [class.text-accent]="mode() === 'draw'"
+      amk-toggle
+      size="md"
+      [pressed]="mode() === 'draw'"
       (click)="mode.set('draw')"
     >
       inspector.fir-designer.draw
@@ -132,8 +132,9 @@
       <div class="flex flex-wrap gap-1.5">
         @for (preset of FIR_PRESETS; track preset.id) {
           <button
-            amk-button
-            [variant]="activePreset()?.id === preset.id ? 'primary' : 'default'"
+            amk-toggle
+            size="md"
+            [pressed]="activePreset()?.id === preset.id"
             [title]="preset.note"
             (click)="applyPreset(preset.taps)"
           >

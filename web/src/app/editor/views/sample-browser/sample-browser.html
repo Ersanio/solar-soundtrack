@@ -1,16 +1,19 @@
 <amk-toolbar>
   <!-- A `<label>` so the hidden file input opens on the click, which
-       `button[amk-button]` cannot be; it wears the `md` button's look by hand. -->
-  <label
-    class="border-edge bg-inset text-ink hover:border-control inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-md border px-3 text-sm transition-colors"
-  >
+       `button[amk-button]` cannot be; it wears the `md` button's plate. -->
+  <label [class]="addClass">
     <ng-container i18n="@@samples.add-samples">samples.add-samples</ng-container>
     <input type="file" class="hidden" accept=".brr,.bnk" multiple (change)="onFiles($event)" />
   </label>
 
-  <amk-checkbox i18n="@@samples.optimize-samples" class="text-xs" [(checked)]="library.optimize"
-    >samples.optimize-samples</amk-checkbox
+  <button
+    i18n="@@samples.optimize-samples"
+    amk-toggle
+    [pressed]="library.optimize()"
+    (click)="library.optimize.set(!library.optimize())"
   >
+    samples.optimize-samples
+  </button>
 
   @if (library.overrideCount() > 0) {
     <button

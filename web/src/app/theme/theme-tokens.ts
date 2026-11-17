@@ -16,6 +16,8 @@ export type ThemeTokenName =
   | 'ink'
   | 'ink-muted'
   | 'control'
+  | 'lit'
+  | 'led'
   | 'accent'
   | 'accent-soft'
   | 'danger'
@@ -130,7 +132,19 @@ export const THEME_TOKENS: readonly ThemeToken[] = [
     name: 'control',
     label: $localize`:@@theme.token.controls.label:theme.token.controls.label`,
     group: 'status',
-    hint: $localize`:@@theme.token.buttons-checkboxes-and-sliders.hint:theme.token.buttons-checkboxes-and-sliders.hint`,
+    hint: $localize`:@@theme.token.sliders-and-primary-buttons.hint:theme.token.sliders-and-primary-buttons.hint`,
+  },
+  {
+    name: 'lit',
+    label: $localize`:@@theme.token.lit.label:theme.token.lit.label`,
+    group: 'status',
+    hint: $localize`:@@theme.token.toggles-that-are-on.hint:theme.token.toggles-that-are-on.hint`,
+  },
+  {
+    name: 'led',
+    label: $localize`:@@theme.token.lights.label:theme.token.lights.label`,
+    group: 'status',
+    hint: $localize`:@@theme.token.mixer-lights-and-sample-locks.hint:theme.token.mixer-lights-and-sample-locks.hint`,
   },
   {
     name: 'accent',

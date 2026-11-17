@@ -17,6 +17,7 @@ import {
 } from '@amk/spc/fir';
 import { Button } from '../../../shared/button/button';
 import { Slider } from '../../../shared/slider/slider';
+import { Toggle } from '../../../shared/toggle/toggle';
 import { CommitAudition } from '../../../state/commit-audition';
 import { EditorStore } from '../../../state/editor-store';
 import { dragPreview } from '../commands/preview';
@@ -53,7 +54,7 @@ const MERGE_HZ = 500;
  */
 @Component({
   selector: 'amk-fir-designer',
-  imports: [Button, FirGraph, Hex2Pipe, Slider],
+  imports: [Button, FirGraph, Hex2Pipe, Slider, Toggle],
   templateUrl: './fir-designer.html',
   host: { class: 'flex flex-col gap-3' },
 })

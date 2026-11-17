@@ -4,6 +4,7 @@ import { Component, computed, effect, inject, signal } from '@angular/core';
 
 import { Audition } from '../../state/audition';
 import { Button } from '../../shared/button/button';
+import { ButtonGroup } from '../../shared/button-group/button-group';
 import { IconLoop } from '../../shared/icons/icon-loop';
 import { IconPause } from '../../shared/icons/icon-pause';
 import { IconPlay } from '../../shared/icons/icon-play';
@@ -36,12 +37,9 @@ const THUMB_WIDTH = 16;
 
 @Component({
   selector: 'amk-transport-controls',
-  imports: [Button, Toggle, IconLoop, IconPause, IconPlay, IconStop, IconVolume],
+  imports: [Button, ButtonGroup, Toggle, IconLoop, IconPause, IconPlay, IconStop, IconVolume],
   templateUrl: './transport-controls.html',
-  host: {
-    class:
-      'border-edge bg-inset/50 flex h-10 min-w-0 items-center gap-1.5 rounded-md border px-1.5',
-  },
+  host: { class: 'flex h-10 min-w-0 items-center gap-1.5' },
 })
 export class TransportControls {
   protected readonly playback = inject(Playback);
