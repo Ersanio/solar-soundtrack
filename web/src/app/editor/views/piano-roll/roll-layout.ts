@@ -148,7 +148,7 @@ export function laneStack(request: LaneRequest = {}): LaneStack {
   }
 
   // Highest instrument number at the top, so the column counts down — @29 to
-  // @21, then @10, then straight on into the keyboard. Only the drums actually
+  // @21, then straight on into the keyboard. Only the drums actually
   // played get a row: `all` widens the *pitch* range and nothing else, because
   // a drum lane with no drums in it is a row of nothing and the roll is already
   // short of height.

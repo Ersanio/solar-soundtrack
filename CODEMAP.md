@@ -111,7 +111,7 @@ something in the directory, which load by themselves when such a file is opened.
 - `slots.ts` — The slots of driver state a VCMD writes or clears, which is how the song walk names the command a note sounds under.
 - `song-walk-types.ts` (300+ lines) — The song walk's public model: the timeline `walkSong` returns, and the notes, commands, loops and state in it.
 - `song-walk.ts` (1000+ lines) — Reads a compiled song the way the driver reads it, and says what sounds when.
-  - `KEY_COUNT`:103 `vcmdLength`:123 `walkSong`:266 `listOf`:1268 `unreachableChannels`:1285
+  - `KEY_COUNT`:103 `vcmdLength`:123 `walkSong`:266 `listOf`:1261 `unreachableChannels`:1278
 - `wasm-host.ts` (300+ lines) — Host for `assets/player/spc.wasm` — Blargg's snes_spc, Emscripten-built.
 - `worklet.ts` (300+ lines) — The SPC700 renderer, running on the audio thread.
 
@@ -164,9 +164,9 @@ something in the directory, which load by themselves when such a file is opened.
 - `loop-follow.ts` — `charttest`: the loop boxes following a gesture.
 - `loop-labels.ts` — `charttest`: the label on a selected loop.
 - `loop-regions.ts` — `charttest`: the loop regions behind the bars.
-- `main.ts` — Everything the app draws that is arithmetic rather than markup: the stacked bar, the plot space, `clamp`, the piano roll's lanes, mark window, grid and playhead clock, its percussion set, the slider's track, and the transport's tick-to-seconds clock.
+- `main.ts` — Everything the app draws that is arithmetic rather than markup: the stacked bar, the plot space, `clamp`, the piano roll's lanes, mark window, grid and playhead clock, its drum lanes, the slider's track, and the transport's tick-to-seconds clock.
 - `pages.ts` — `charttest`: the roll's pages.
-- `percussion.ts` — `charttest`: the percussion set, which is a preference and not a rule.
+- `percussion.ts` — `charttest`: the drum lanes, which are the driver's own `@21`-`@29` and nothing else.
 - `playhead-and-overview.ts` — `charttest`: the roll's playhead marking the song rather than the camera, and the overview bar's time axis and minimap.
 - `playhead-clock.ts` — `charttest`: the pull at the end of the scrub bar, and the playhead's own clock.
 - `record-pointer.ts` — `charttest`: the pointer a MIDI recording is timed against.
@@ -360,27 +360,20 @@ something in the directory, which load by themselves when such a file is opened.
 
 - `transport-controls.ts` — The transport: play, pause and stop, Loop, Hot Reload, the seek bar with its clock, and the volume.
 
-## web/src/app/editor/views/piano-roll/percussion-panel
-
-**Rules:** `piano-roll-architecture.md`, `piano-roll-editing.md`
-
-- `percussion-panel.ts` — One chip per instrument the song plays, as a view model rather than methods called per row — `web/CLAUDE.md` on why.
-
 ## web/src/app/editor/views/piano-roll
 
 **Rules:** `commands-in-the-roll.md`, `piano-roll-architecture.md`, `piano-roll-editing.md`, `piano-roll-octaves.md`, `piano-roll-view.md`, `transport-and-clock.md`
 
-- `percussion.ts` — Which instruments the roll draws as percussion, and where a note goes as a result.
+- `percussion.ts` — Which instruments the roll draws on drum lanes, and where a note goes as a result.
 - `piano-roll.ts` (1000+ lines) — The song as music: a keyboard down the left, time running right, and all eight channels in one roll.
-  - `PianoRoll`:105 `onLaneGrab`:369 `onLaneResize`:376 `onLaneRelease`:386 `resetLaneHeight`:392
-  - `addressesOf`:617 `askAboutSelection`:702 `setZoom`:889 `setRowHeight`:893 `setScrollNotes`:900
-  - `setAllOctaves`:904 `setBeatsPerBar`:908 `setBeatUnit`:912 `setSnap`:916 `setEditMode`:920
-  - `setPercussionOpen`:924 `setKeySounds`:928 `setPlaySong`:932 `setTypingKeys`:936 `toggleChordChannel`:947
-  - `setEditChannel`:952 `clearEditChannel`:962 `selectEditChannel`:979 `followMixer`:999 `isolateChannel`:1020
-  - `togglePercussion`:1026 `resetPercussion`:1030 `svgBox`:1037 `onEditDown`:1061 `onEditMove`:1088
-  - `onEditUp`:1103 `onEditLeave`:1122 `onContextMenu`:1127 `onWheel`:1139 `typingDown`:1215 `onKeyUp`:1242
-  - `revealRows`:1254 `releaseTyping`:1267 `onKey`:1275 `onKeyPress`:1325 `onMove`:1353 `enter`:1367 `leave`:1371
-  - `onViewportScroll`:1376
+  - `PianoRoll`:102 `onLaneGrab`:356 `onLaneResize`:363 `onLaneRelease`:373 `resetLaneHeight`:379
+  - `addressesOf`:604 `askAboutSelection`:689 `setZoom`:864 `setRowHeight`:868 `setScrollNotes`:875
+  - `setAllOctaves`:879 `setBeatsPerBar`:883 `setBeatUnit`:887 `setSnap`:891 `setEditMode`:895 `setKeySounds`:899
+  - `setPlaySong`:903 `setTypingKeys`:907 `toggleChordChannel`:918 `setEditChannel`:923 `clearEditChannel`:933
+  - `selectEditChannel`:950 `followMixer`:970 `isolateChannel`:991 `svgBox`:1000 `onEditDown`:1024
+  - `onEditMove`:1051 `onEditUp`:1066 `onEditLeave`:1085 `onContextMenu`:1090 `onWheel`:1102 `typingDown`:1178
+  - `onKeyUp`:1205 `revealRows`:1217 `releaseTyping`:1230 `onKey`:1238 `onKeyPress`:1288 `onMove`:1316
+  - `enter`:1330 `leave`:1334 `onViewportScroll`:1339
 - `refusal.ts` — A refusal: why the roll will not splice a channel or write a gesture out, in the words it shows.
 - `roll-bar-text.ts` — How wide a plate of `text` at `size` comes to, padding included.
 - `roll-camera.ts` — The camera's own fractions, and where it is left between visits.

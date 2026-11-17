@@ -101,17 +101,10 @@ It walks bytes rather than source because the bytes are the only place the answe
 knowable only by following what the driver does with a `$D0` byte. A pass over the text would have to
 re-derive both rules; this gets them for free.
 
-The walk names the instrument each note sounds on and stops there. Whether any of them counts as
-**percussion** is not a question about the driver: that `@21`-`@29` are drums is, but that a porter
-counts `@10` among them is a judgement about Super Mario World's sample set — and one a song can
-invalidate outright, since `@10`'s SRCN is fixed at `$0B` while which file `$0B` names belongs
-entirely to `#samples`. Nor can it be derived: the obvious rule, checking whether the driver's own
-drums play the same sample, says no the moment a porter swaps one drum sample for another. So the
-answer is a preference, and it lives in the editor with the view that needs it —
-`web/src/app/editor/views/piano-roll/percussion.ts`, where the reasoning is written down beside it.
-
-What this module contributes is `usedInstruments`, which is the same kind of statement as the rest
-of `SongTimeline`: which instruments the song loads, not what sort of thing they are.
+The walk names the instrument each note sounds on and stops there. Which of them the piano roll
+draws on a drum lane is the view's question, answered beside the view in
+`web/src/app/editor/views/piano-roll/percussion.ts`: the driver's own `@21`-`@29`, whose byte comes
+from the percussion table rather than from the letter written.
 
 `tempoChanges` is there for the same reason and answers to nobody else. The compiler's own length
 estimate is segment-wise over source text, so a `t` that executes more than once has no place in it

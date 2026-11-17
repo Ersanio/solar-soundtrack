@@ -81,7 +81,7 @@ a library rather than a view of the song.
 
 **A view brings its own controls.** The tab row is the tab row and only that; anything that is a
 setting on one view goes in an `<amk-toolbar>` as that view's first child, grouped with dividers,
-and a mode — Follow playback, Scroll the notes, All octaves, word wrap, Percussion — is an
+and a mode — Follow playback, Scroll the notes, All octaves, word wrap — is an
 `amk-toggle` there, a button whose lit plate is the state, rather than a checkbox. This is the point
 of the arrangement — word wrap is meaningless in the sample library, and a piano roll's zoom and snap
 will be meaningless in the source, so there is no honest way for one shared header to serve all of

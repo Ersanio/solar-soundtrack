@@ -27,10 +27,9 @@ import { type LaneStack, keyName, noteLabel, overviewOffset } from './roll-layou
  * of them.
  *
  * The roll's bars, the overview bar's minimap and the lit keys all ask
- * {@link rowOf} rather than each working a row out for itself, so an instrument
- * taken off the percussion lanes moves to the keyboard in every one of them at
- * once. Answering that question three times is how they would drift, which is
- * why the builders share a file.
+ * {@link rowOf} rather than each working a row out for itself, so a note is on
+ * the same row in every one of them. Answering that question three times is how
+ * they would drift, which is why the builders share a file.
  */
 
 /** Shared by every bar with nothing acting on it, which on a plain song is most. */
@@ -142,9 +141,8 @@ export function rowOf(note: WalkNote, stack: LaneStack, context: PlaceContext): 
  * What a note is called, which is the bar's name and the tooltip's heading.
  *
  * One helper for both, so a bar cannot say one thing and its own hover
- * another. Derived from where the mark actually sits: a bare `$D0` whose drum
- * the porter has taken off the lanes is drawn on a key, and calling it `@29`
- * would name a row it is not on.
+ * another. Derived from where the mark actually sits: a key's name on the
+ * keyboard, the instrument on a lane.
  */
 export function headingOf(note: WalkNote, context: PlaceContext, short = true): string {
   const place = placeOf(note, context);
@@ -302,8 +300,8 @@ export interface MinimapRequest {
  *
  * Built from the song, the lane stack, the pane's width and the mixer, and
  * deliberately **not** from the playhead — the bars are the song rather than a
- * view of it, so this rebuilds on a recompile, a percussion change, a mute or a
- * resize, and never on a frame. The moving parts of the bar are the component's
+ * view of it, so this rebuilds on a recompile, a mute or a resize, and never on
+ * a frame. The moving parts of the bar are the component's
  * own.
  */
 export function buildMinimap(request: MinimapRequest): MinimapBar[] {

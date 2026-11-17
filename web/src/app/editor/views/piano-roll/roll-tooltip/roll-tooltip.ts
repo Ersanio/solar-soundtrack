@@ -63,9 +63,8 @@ export class RollTooltip {
     const instrument = note.state.instrument;
 
     if (instrument !== null) {
-      // The driver's own table entry, stated whether or not the porter counts
-      // this instrument as percussion — `@21` is the driver's drum playing its
-      // sample either way, and that is a fact about the image, not a preference.
+      // The driver's own table entry for `@21`-`@29`: which sample a drum plays
+      // is a fact about the image, so the hover states it.
       const entry =
         instrument >= FIRST_PERCUSSION_INSTRUMENT && instrument < FIRST_CUSTOM_INSTRUMENT
           ? this.drivers.instruments()?.percussion[instrument - FIRST_PERCUSSION_INSTRUMENT]

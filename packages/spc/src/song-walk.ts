@@ -1111,8 +1111,6 @@ export function walkSong(song: Uint8Array, aramAddress: number): SongTimeline {
 	const playing = channelTicks.filter((_, channel) => used[channel]);
 	const ticks = playing.length > 0 ? Math.min(...playing) : 0;
 
-	const instruments = new Set<number>();
-
 	const played: WalkNote[] = [];
 	const dropped: number[] = [];
 	for (const note of notes) {
@@ -1125,9 +1123,6 @@ export function walkSong(song: Uint8Array, aramAddress: number): SongTimeline {
 		}
 
 		played.push(note);
-		if (note.state.instrument !== null) {
-			instruments.add(note.state.instrument);
-		}
 
 		// `PercNote` runs to `$D9` (`main.asm:355-360`) though AddmusicK only ever
 		// emits `$D0`-`$D8`, so a tenth "drum" reads a percussion entry that is not
@@ -1174,7 +1169,6 @@ export function walkSong(song: Uint8Array, aramAddress: number): SongTimeline {
 		channelTicks,
 		used,
 		unreachable,
-		usedInstruments: [...instruments].sort((a, b) => a - b),
 		customInstruments,
 		truncated,
 		problems,
@@ -1193,7 +1187,6 @@ export function walkSong(song: Uint8Array, aramAddress: number): SongTimeline {
 			channelTicks: new Array<number>(VOICES).fill(0),
 			used: new Array<boolean>(VOICES).fill(false),
 			unreachable: [],
-			usedInstruments: [],
 			customInstruments: [],
 			truncated: false,
 			problems: [...problems, ...reason],

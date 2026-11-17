@@ -150,9 +150,7 @@ section("the overview bar's minimap");
 	const TICKS = 12312;
 	const stack = laneStack({ lowestKey: 24, highestKey: 35 });
 	const context = {
-		percussion: new Set<number>(),
 		noisy: new Set<number>(),
-		drumNotes: new Map<number, number>(),
 		written: new Map<number, number>(),
 	};
 

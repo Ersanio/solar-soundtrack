@@ -24,9 +24,7 @@ section("the loop regions behind the bars");
 	const ROW = 14;
 	const stack = laneStack({ lowestKey: 24, highestKey: 35 });
 	const context = {
-		percussion: new Set<number>(),
 		noisy: new Set<number>(),
-		drumNotes: new Map<number, number>(),
 		written: new Map<number, number>(),
 	};
 

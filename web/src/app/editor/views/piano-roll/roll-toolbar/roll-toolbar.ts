@@ -2,8 +2,6 @@ import { Component, computed, input, output } from '@angular/core';
 
 import { Button } from '../../../../shared/button/button';
 import { ButtonGroup } from '../../../../shared/button-group/button-group';
-import { IconChevronDown } from '../../../../shared/icons/icon-chevron-down';
-import { IconChevronRight } from '../../../../shared/icons/icon-chevron-right';
 import { IconMinus } from '../../../../shared/icons/icon-minus';
 import { IconPlus } from '../../../../shared/icons/icon-plus';
 import { Toggle } from '../../../../shared/toggle/toggle';
@@ -47,25 +45,12 @@ const CHIP_OFF = 'opacity-40 hover:not-disabled:opacity-70';
  */
 @Component({
   selector: 'amk-roll-toolbar',
-  imports: [
-    Button,
-    ButtonGroup,
-    Toggle,
-    IconMinus,
-    IconPlus,
-    IconChevronDown,
-    IconChevronRight,
-    IconRecord,
-    HistoryButtons,
-    Toolbar,
-  ],
+  imports: [Button, ButtonGroup, Toggle, IconMinus, IconPlus, IconRecord, HistoryButtons, Toolbar],
   templateUrl: './roll-toolbar.html',
   host: { class: 'contents' },
 })
 export class RollToolbar {
   protected readonly text = {
-    hidePercussion: $localize`:@@roll.percussion.hide.title:roll.percussion.hide.title`,
-    choosePercussion: $localize`:@@roll.percussion.choose.title:roll.percussion.choose.title`,
     startRecording: $localize`:@@roll.record.start.title:roll.record.start.title`,
     stopRecording: $localize`:@@roll.record.stop.title:roll.record.stop.title`,
   };
@@ -97,7 +82,6 @@ export class RollToolbar {
   readonly allOctaves = input.required<boolean>();
   readonly beatsPerBar = input.required<number>();
   readonly beatUnit = input.required<number>();
-  readonly percussionOpen = input.required<boolean>();
   readonly snap = input.required<SnapName>();
   readonly editMode = input.required<EditMode>();
   /** Why the picked channel cannot be edited, or null when it can. */
@@ -114,7 +98,6 @@ export class RollToolbar {
   readonly allOctavesChange = output<boolean>();
   readonly beatsPerBarChange = output<number>();
   readonly beatUnitChange = output<number>();
-  readonly percussionOpenChange = output<boolean>();
   readonly snapChange = output<SnapName>();
   readonly editModeChange = output<EditMode>();
 

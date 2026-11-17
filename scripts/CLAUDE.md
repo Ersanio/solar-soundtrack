@@ -34,7 +34,7 @@ harness. In one line each:
 - `spctest` — MML → `.spc`, verifying the assembled file's structure.
 - `audiotest` — MML → SPC → actual PCM through the real wasm host.
 - `worklettest` — Evaluates the _built_ `spc-worklet.js` inside a `vm` context holding only what an AudioWorkletGlobalScope really exposes — no `fetch`, no `setTimeout`, no `TextDecoder`.
-- `charttest` — Stacked-bar geometry for the ARAM bar, the shared plot space, `clamp`, and the piano roll's lanes, window arithmetic and percussion set.
+- `charttest` — Stacked-bar geometry for the ARAM bar, the shared plot space, `clamp`, and the piano roll's lanes and window arithmetic.
 - `walktest` — The song-data walker, `@amk/spc/song-walk`, which is the only thing the piano roll draws from — and a walker that mis-frames one command draws a plausible roll that is quietly wrong, with no visual tell.
 - `brrtest` — BRR container handling and the decoder.
 - `tokentest` — The MML scanner, and the command model on it.

@@ -165,25 +165,6 @@
     </select>
   </div>
 
-  <span class="bg-edge h-5 w-px shrink-0"></span>
-
-  <!-- The switch on the toolbar and the panel below it, as the source view does
-       for the command palette: a closed strip would otherwise be one row of
-       chrome that still had to be drawn. The chevron says which way it is. -->
-  <button
-    amk-toggle
-    [pressed]="percussionOpen()"
-    [title]="percussionOpen() ? text.hidePercussion : text.choosePercussion"
-    (click)="percussionOpenChange.emit(!percussionOpen())"
-  >
-    @if (percussionOpen()) {
-      <amk-icon-chevron-down />
-    } @else {
-      <amk-icon-chevron-right />
-    }
-    <ng-container i18n="@@roll.percussion">roll.percussion</ng-container>
-  </button>
-
   <!-- Playing and recording from a keyboard, on a row of its own under the
        roll's settings: `basis-full` takes the whole line, so the row stands
        apart however the settings above it happen to wrap. -->

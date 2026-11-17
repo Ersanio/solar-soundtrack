@@ -60,12 +60,11 @@ section("piano roll lanes");
 
 	// Drums and noise appear only when the song plays them — nine empty drum
 	// rows on a song with no percussion is nine rows of nothing. A drum is
-	// named by its instrument number, so `@10` sits in the same list as the
-	// driver's own `@21`-`@29` and needs no separate concept.
+	// named by its instrument number.
 	const withDrums = laneStack({
 		lowestKey: 28,
 		highestKey: 33,
-		usedDrums: [10, 21, 29],
+		usedDrums: [21, 25, 29],
 		usesNoise: true,
 		drumNotes: new Map([
 			[21, 0xa8],
@@ -81,20 +80,20 @@ section("piano roll lanes");
 		withDrums.lanes.slice(0, 4).every((l) => l.kind !== "key") && withDrums.lanes[4].kind === "key",
 	);
 	check(
-		"drums count down to the keyboard, @10 last",
+		"drums count down to the keyboard",
 		withDrums.lanes
 			.slice(1, 4)
 			.map((l) => l.index)
-			.join(",") === "29,21,10",
+			.join(",") === "29,25,21",
 		withDrums.lanes
 			.slice(1, 4)
 			.map((l) => l.label)
 			.join(" | "),
 	);
-	// A table drum states the note it plays; `@10` has no percussion-table entry
-	// to state one from, so it is named and nothing more.
+	// A drum states the note the driver's table plays it at; with no entry to
+	// read, as before the driver has loaded, it is named and nothing more.
 	check("a table drum's lane names its own note", withDrums.lanes[1].label === "@29 o3 a", withDrums.lanes[1].label);
-	check("a melodic-slot drum is named alone", withDrums.lanes[3].label === "@10", withDrums.lanes[3].label);
+	check("a drum with no table entry is named alone", withDrums.lanes[2].label === "@25", withDrums.lanes[2].label);
 
 	// A song the compiler produced no notes for still has to lay out.
 	const empty = laneStack();

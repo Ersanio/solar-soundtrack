@@ -218,9 +218,8 @@ scrollbar (`elementSize` reads the content box) and the bars are drawn outside i
 stretches its `viewBox` over that gutter while the pointer maths does not — a scrub bar off by a
 scrollbar's width from the roll it is a timeline for.
 
-The overview's bars ask `rowOf` — the same function the roll's marks ask — so the percussion toggles land on
-both pictures at once, and an instrument taken off the drum lanes moves to the keyboard in the
-minimap and the roll together. Answering that question twice is how the two would drift. They take
+The overview's bars ask `rowOf` — the same function the roll's marks ask — so a note is on the
+same row in the minimap and the roll. Answering that question twice is how the two would drift. They take
 their colours from the same `CHANNEL_FILL` for the same reason, and dim a channel the mixer silences
 by the same `MUTED_OPACITY`, so the minimap is the roll seen from further off rather than a second
 picture of it. The bars are deduped by pixel, row **and channel**, keeping the wider of a pair: one
@@ -242,9 +241,9 @@ nothing beneath reads. That is why the roll can run at 240 Hz without the note l
 
 ## Files and components
 
-**The folder is a parent and fourteen child folders**, as `output/command-inspector/` is. `piano-roll.ts`
+**The folder is a parent and thirteen child folders**, as `output/command-inspector/` is. `piano-roll.ts`
 holds the song's shape and the porter's settings and hands each child what it draws:
-`roll-toolbar/`, `percussion-panel/`, `roll-overview/`, `roll-scrub/`, `roll-channels/`,
+`roll-toolbar/`, `roll-overview/`, `roll-scrub/`, `roll-channels/`,
 `roll-command-lane/` and `roll-tooltip/` in the ordinary namespace, `roll-lanes/`, `roll-grid/`,
 `roll-loops/` — which holds two, the boxes and their labels — `roll-notes/`, `roll-edit-layer/`,
 `roll-take/` and `roll-keys/` inside the roll's own `<svg>`. `roll-channels/` is the odd one: it draws nothing of the
@@ -376,16 +375,19 @@ two notes scattered up the keyboard — the pitched ones only look melodic becau
 stops remapping after the first. The pitch they were written at is still true and still in the
 tooltip; it just does not decide where the mark goes.
 
-**Which instruments are percussion is the porter's to say**, from the strip the toolbar's
-**Percussion** toggle opens. `percussion.ts` holds the default — `@21`-`@29` plus `@10` — and the whole of the reasoning,
-including why nothing is derived: the obvious rule is to look at the sample an instrument resolves
-to and ask whether the driver's drums play it, and that says no the moment a porter swaps one drum
-sample for another. Nothing in the data answers "is this a drum", so the question goes to the person
-who knows. Anything on the list can be taken off, `@21`-`@29` included; a bare `$D0`-`$D8` then
-falls back to the pitch the driver's own percussion table gives that drum, so it keeps a row rather
-than vanishing.
+**A drum lane is one of the driver's own `@21`-`@29`, and nothing else gets one** (`isDrum` in
+`percussion.ts`). Their byte comes from the percussion table rather than from the letter written,
+so the instrument is the whole of where such a note goes. Every other instrument's pitch is heard —
+`@10`, and a kick sampled into `#instruments` — so its notes are on the keyboard at the pitch they
+were written at. It is also the range the editing side knows a drum by: `roll-strip.ts` names a
+note's drum from an `@21`-`@29` (`isPercussionInstrument`), the press, the marquee and the cursor
+find a note on the row `rowOfPlaced` gives that drum, and drawing on a lane writes `@N c` with no
+octave, which is right only where the letter has no say. So a bar is drawn on the row a press finds
+it on, and `charttest` pins that. Nothing is guessed from the sample: no property of one says
+"drum", and asking whether the driver's own drums play it says no once one drum sample is swapped
+for another.
 
-`placeOf` is the one statement of the precedence — percussion, then noise, then the keyboard. The
+`placeOf` is the one statement of the precedence — a drum, then noise, then the keyboard. The
 lanes and the fitted range are both built from it, so they cannot disagree. `song-walk.ts` has no
 opinion on any of this by design.
 
@@ -450,3 +452,13 @@ notes that never sound (`codemirror/unreachable.ts`, the sibling of `playhead.ts
 warning strip is only for a walk that could not make sense of the bytes. `EditorStore.diagnostics`
 is where the three sources meet, and it is the reason `timeline` is read on every compile rather
 than only while the roll is open.
+
+## Decisions already made
+
+Designs built or considered here and moved away from, one line each: the entry's title and the
+identifiers it names. The full entries are in `.claude/ledgers/piano-roll-architecture.md` — read it
+before proposing a redesign in this area, or when a title below matches what you are about to do. A
+new entry goes there, with its line here, in the same change.
+
+- **A percussion set the porter chooses** — `DEFAULT_PERCUSSION`, `parsePercussion`,
+  `percussion-panel/`, `Settings.percussion`, `usedInstruments`, `rowOfPlaced`, `isDrum`

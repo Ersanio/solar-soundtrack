@@ -1,66 +1,33 @@
 /**
- * Which instruments the roll draws as percussion, and where a note goes as a
+ * Which instruments the roll draws on drum lanes, and where a note goes as a
  * result. Pure — no Angular, no storage — so `charttest` covers it.
  *
- * This is a *preference*, and deliberately not derived. The obvious derivation
- * is to look at the sample an instrument resolves to and ask whether the
- * driver's own drums play it; that fails in the likeliest direction, because
- * replacing a percussion sample with **another** percussion sample makes it say
- * no. Nothing in the data answers "is this sample a drum" — length, envelope and
- * loop flag all fail on pizzicato and marimba — so the porter is asked instead.
+ * A lane is one of `@21`-`@29`, the driver's own percussion table: a drum's byte
+ * comes from that table and not from the letter it was written at, so its row is
+ * the instrument. It is also the range `roll-strip.ts` knows a drum by, so a bar
+ * is drawn on the row a press finds it on. Every other instrument's pitch is
+ * heard, `@10` and a sampled kick included, so it goes on the keyboard. Nothing
+ * is guessed from the sample: no property of one says "drum", and asking whether
+ * the driver's own drums play it says no once one drum sample is swapped for
+ * another.
  */
 
 import { FIRST_PERCUSSION_INSTRUMENT, PERCUSSION_SLOTS } from '@amk/spc/instruments';
 import type { WalkNote } from '@amk/spc/song-walk';
 
-/** A `$DA` operand is one byte, so nothing outside this can name an instrument. */
-const MAX_INSTRUMENT = 0xff;
-
-/**
- * The instruments the roll treats as drums until told otherwise.
- *
- * `@21`-`@29` are the driver's own percussion table, so they are here for the
- * reason the table exists. `@10` is the one addition, and it is provable from the
- * image: its melodic entry is srcn `$0B` at tuning `$08`, byte for byte what
- * `@27` and `@28` carry in the percussion table.
- *
- * A song that repoints its `#samples` makes `@10` wrong too and nothing here can
- * detect it, which is the whole reason any of this is editable — `@21`-`@29`
- * included.
- */
-export const DEFAULT_PERCUSSION: readonly number[] = [
-  10,
-  ...Array.from({ length: PERCUSSION_SLOTS }, (_, slot) => FIRST_PERCUSSION_INSTRUMENT + slot),
-];
-
-/**
- * A stored percussion set, or `null` when there is no usable opinion in it.
- *
- * `null` and `[]` are different answers, the same way `sampleList: null` is not
- * `[]`: `null` means nothing was stored and the default stands, while `[]` means
- * the porter turned everything off. Reading an empty list as "no opinion" would
- * make that setting silently undo itself on reload.
- */
-export function parsePercussion(value: unknown): number[] | null {
-  if (!Array.isArray(value)) {
-    return null;
-  }
-
-  const instruments = value.filter(
-    (entry): entry is number => Number.isInteger(entry) && entry >= 0 && entry <= MAX_INSTRUMENT,
+/** Whether an instrument is one of the driver's nine drums, which get a lane each. */
+export function isDrum(instrument: number | null): boolean {
+  return (
+    instrument !== null &&
+    instrument >= FIRST_PERCUSSION_INSTRUMENT &&
+    instrument < FIRST_PERCUSSION_INSTRUMENT + PERCUSSION_SLOTS
   );
-
-  return [...new Set(instruments)].sort((a, b) => a - b);
 }
 
 /** What decides where a note is drawn. One object per change, never per note. */
 export interface PlaceContext {
-  /** Instrument numbers the porter calls percussion. */
-  percussion: ReadonlySet<number>;
   /** Instruments whose `#instruments` entry has `NOISE_FLAG` set. */
   noisy: ReadonlySet<number>;
-  /** The driver's own note byte for each of `@21`-`@29`. */
-  drumNotes: ReadonlyMap<number, number>;
   /**
    * The pitch each note was written at, by the ARAM address of its note map
    * entry — `NoteAddress.written`. Only the compiler knows it: the byte the walk
@@ -76,12 +43,12 @@ export type Place = 'drum' | 'noise' | 'key' | 'none';
  * The precedence, stated once so the lanes and the fitted range cannot disagree
  * about the same note.
  *
- * The porter's set comes first: if they have called a noise instrument
- * percussion, that is what they meant.
+ * A drum first: its lane is its instrument, whatever else is in force, a noise
+ * command included.
  */
 export function placeOf(note: WalkNote, context: PlaceContext): Place {
   const instrument = note.state.instrument;
-  if (instrument !== null && context.percussion.has(instrument)) {
+  if (isDrum(instrument)) {
     return 'drum';
   }
 
@@ -103,24 +70,19 @@ export function placeOf(note: WalkNote, context: PlaceContext): Place {
  * What the note plays as is the tooltip's to say. A note the map does not know
  * — a `$8x` typed as raw hex — keeps the byte, since there is nothing else.
  *
- * `null` only when the driver has not loaded and so has no table to ask, which
- * cannot happen while a song is compiled — compilation is blocked until it has.
+ * `null` for a percussion byte, which has no key: the driver's nine are on their
+ * lanes, and the `$D9` only a malformed blob plays has no row at all.
  */
 export function keyOf(note: WalkNote, context: PlaceContext): number | null {
-  if (note.key !== null) {
-    const written = context.written.get(note.address);
-    return written === undefined ? note.key : written - 0x80;
+  if (note.key === null) {
+    return null;
   }
 
-  // A bare `$D0`-`$D8` is the driver's drum at the driver's pitch: the letter
-  // it was written under had no say in the byte, so it has none in the row.
-  // `& 0x7f` rather than `- 0x80`, matching `keyName` and `units.ts`'s `noteName`.
-  const sounds =
-    note.state.instrument === null ? undefined : context.drumNotes.get(note.state.instrument);
-  return sounds === undefined ? null : sounds & 0x7f;
+  const written = context.written.get(note.address);
+  return written === undefined ? note.key : written - 0x80;
 }
 
-/** What a set of drums makes of a song: the rows it needs, and the range left over. */
+/** What a song's notes make of the roll: the rows it needs, and the range left over. */
 export interface RollShape {
   /** Ascending instrument numbers, one lane each. */
   usedDrums: readonly number[];
@@ -145,9 +107,9 @@ export function rollShape(notes: readonly WalkNote[], context: PlaceContext): Ro
         usesNoise = true;
         break;
       case 'key': {
-        // A drum on a lane must not widen the keyboard: `@10` sits at o4 f+ once
-        // its default transposition applies, and letting a hi-hat stretch the
-        // range adds octaves of empty rows. Only what lands on a key counts.
+        // Only what lands on a key widens the keyboard. A drum on its lane is
+        // left out, since letting a hi-hat stretch the range adds octaves of
+        // empty rows.
         const key = keyOf(note, context) ?? 0;
         lowestKey = lowestKey === null ? key : Math.min(lowestKey, key);
         highestKey = highestKey === null ? key : Math.max(highestKey, key);
@@ -156,9 +118,8 @@ export function rollShape(notes: readonly WalkNote[], context: PlaceContext): Ro
       }
 
       case 'none':
-        // A note with no row at all: a drum the porter removed while the driver
-        // has no table to give it a pitch from. It is not drawn, so it claims
-        // no range either.
+        // A note with no row at all — a percussion byte past the driver's nine,
+        // which the walk reports. It is not drawn, so it claims no range either.
         break;
     }
   }

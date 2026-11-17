@@ -5,18 +5,20 @@ paths:
 
 # `charttest`: what it proves
 
-Stacked-bar geometry for the ARAM bar, the shared plot space, `clamp`, and the piano roll's lanes,
-window arithmetic and percussion set. Five roll claims live here, none of them visible in a
+Stacked-bar geometry for the ARAM bar, the shared plot space, `clamp`, and the piano roll's lanes
+and window arithmetic. Five roll claims live here, none of them visible in a
 screenshot: that the playhead's clock absorbs a steady lag instead of re-correcting it on every
 anchor, which is the difference between a smooth scroll and one that jerks ten times a second; that
 "all octaves" widens the pitch range without conjuring a drum lane the song never plays; that
 sweeping a playhead rebuilds the mark window about twice per whole note rather than once per frame,
-which is what keeps a scroll off the DOM; that a drum the porter takes off the percussion lanes
-falls back to the note the driver's own table gives it rather than vanishing, having neither a lane
-nor a key; that a pitched note draws on the pitch it was **written** at rather than the byte `h` or
+which is what keeps a scroll off the DOM; that a drum lane is `@21`-`@29` and nothing else, `@10`
+and a sampled kick taking their written pitch on the keyboard, and that a bar is drawn on the row a
+press finds it on — the marks place a note by its walk instrument and the gestures by the drum `@`
+it carries, so a lane those two disagree about is drawn where nothing can grab it and looks entirely
+ordinary; that a pitched note draws on the pitch it was **written** at rather than the byte `h` or
 the instrument's transposition made of it, with the keyboard growing to take in a written `o0` or
-`o7` the driver's o1 c–o6 a has no row for; and that an empty stored percussion set is kept rather
-than read as "no opinion", which would make turning everything off undo itself on reload. It also
+`o7` the driver's o1 c–o6 a has no row for; and that a `$D9`, which only a malformed blob plays,
+has no row at all rather than a key that widens the keyboard down to o1 c. It also
 pins what a bar can hold: that the compact `C6` a bar is labelled with and the `o6 c` down the key
 column can never name different keys, that a row too short holds nothing rather than half a letter,
 and that as a bar narrows its glyphs only ever drop — never grow, which is what happens when the
@@ -123,7 +125,7 @@ holds what they share: `EPSILON` alone. `HARNESS_ONLY=<file name>` runs one sect
 | `loop-labels.ts`           | The label on a selected loop.                                                                                                                                  |
 | `loop-follow.ts`           | The loop boxes following a gesture.                                                                                                                            |
 | `playhead-clock.ts`        | The pull at the end of the scrub bar, and the playhead's own clock.                                                                                            |
-| `percussion.ts`            | The percussion set, which is a preference and not a rule.                                                                                                      |
+| `percussion.ts`            | The drum lanes, which are the driver's own `@21`-`@29` and nothing else.                                                                                       |
 | `transport-clock.ts`       | The transport's tick-to-seconds clock over songs the compiler will not time, and the roll's playhead following the music rather than the written tempo.        |
 | `bar-text.ts`              | What fits inside one bar.                                                                                                                                      |
 | `command-lane.ts`          | How the command lane stacks what lands together.                                                                                                               |

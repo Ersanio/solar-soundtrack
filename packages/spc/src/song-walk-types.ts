@@ -364,8 +364,6 @@ export interface SongTimeline {
 	channelTicks: readonly number[];
 	/** Channels the song writes to. */
 	used: readonly boolean[];
-	/** Every `@n` the song sounds a note on, ascending and distinct. */
-	usedInstruments: readonly number[];
 	/** ARAM addresses of notes that never sound at all. Used for diagnostics. */
 	unreachable: readonly number[];
 	/** `#instruments` entries, six bytes each, `@30` first. */

@@ -32,7 +32,6 @@ section("the transport's clock, over songs the compiler will not time");
 		loops: [],
 		channelTicks: [ticks, 0, 0, 0, 0, 0, 0, 0],
 		used: [true, false, false, false, false, false, false, false],
-		usedInstruments: [],
 		unreachable: [],
 		customInstruments: [],
 		truncated,

@@ -30,8 +30,7 @@ import { Mixer } from '../../../state/mixer';
 import { Playback } from '../../../state/playback';
 import { stopAll } from '../../../state/stop-all';
 import { soleAudible } from '../../../state/transport-view';
-import { PercussionPanel, percussionChips } from './percussion-panel/percussion-panel';
-import { DEFAULT_PERCUSSION, type PlaceContext, rollShape } from './percussion';
+import { type PlaceContext, rollShape } from './percussion';
 import { rollCamera } from './roll-camera';
 import { rollCheckpoints } from './roll-checkpoints';
 import { RollChannels } from './roll-channels/roll-channels';
@@ -59,12 +58,10 @@ import {
   type SnapName,
   clampLaneHeight,
   readSettings,
-  resetPercussion,
   snapTicks,
   stepRowHeight,
   stepZoom,
   toggleChordChannel,
-  togglePercussion,
   writeSettings,
 } from './roll-settings';
 import { rollRecord } from './roll-record';
@@ -105,7 +102,6 @@ import { RollTooltip } from './roll-tooltip/roll-tooltip';
 @Component({
   selector: 'amk-piano-roll',
   imports: [
-    PercussionPanel,
     RollChannels,
     RollCommandLane,
     RollEditLayer,
@@ -158,7 +154,6 @@ export class PianoRoll {
   protected readonly allOctaves = computed(() => this.settings().allOctaves);
   protected readonly beatsPerBar = computed(() => this.settings().beatsPerBar);
   protected readonly beatUnit = computed(() => this.settings().beatUnit);
-  protected readonly percussionOpen = computed(() => this.settings().percussionOpen);
   protected readonly editChannel = computed(() => this.settings().editChannel);
   protected readonly snap = computed(() => this.settings().snap);
   protected readonly editMode = computed(() => this.settings().editMode);
@@ -174,11 +169,7 @@ export class PianoRoll {
   /** The song's whole length, which the camera and both bars measure against. */
   protected readonly songTicks = computed(() => this.timeline()?.ticks ?? 0);
 
-  /**
-   * The driver's own note for each of `@21`-`@29`. Two uses, one map: it labels
-   * a drum's lane, and it is the pitch a bare `$D0`-`$D8` falls back to when the
-   * porter has taken that drum off the lanes.
-   */
+  /** The driver's own note for each of `@21`-`@29`, which a drum's lane is labelled with. */
   private readonly drumNotes = computed(() => {
     const notes = new Map<number, number>();
     (this.drivers.instruments()?.percussion ?? []).forEach((entry, index) => {
@@ -189,8 +180,6 @@ export class PianoRoll {
 
     return notes;
   });
-
-  protected readonly percussion = computed(() => new Set(this.settings().percussion));
 
   /**
    * Which channels are heard, by index.
@@ -232,13 +221,11 @@ export class PianoRoll {
 
   /** One object per change of any input, rather than one per note. */
   protected readonly placeContext = computed<PlaceContext>(() => ({
-    percussion: this.percussion(),
     noisy: this.noiseInstruments(),
-    drumNotes: this.drumNotes(),
     written: this.written(),
   }));
 
-  /** The rows the preference asks for, and the pitched range it leaves over. */
+  /** The rows the song's notes need, and the pitched range left over. */
   private readonly shape = computed(() =>
     rollShape(this.timeline()?.notes ?? [], this.placeContext()),
   );
@@ -749,18 +736,6 @@ export class PianoRoll {
   /** Anything the walk could not make sense of, said in words rather than colour. */
   protected readonly problems = computed(() => this.timeline()?.problems ?? []);
 
-  // --- the percussion set --------------------------------------------------
-
-  /** The panel's rows. Built here because the chosen set is what the lanes are built from. */
-  protected readonly chips = computed(() =>
-    percussionChips(this.timeline()?.usedInstruments ?? [], this.percussion(), this.drumNotes()),
-  );
-
-  /** Both sides are sorted, so this is a string compare. Mirrors the mixer's Reset. */
-  protected readonly hasPercussionOverrides = computed(
-    () => this.settings().percussion.join(',') !== DEFAULT_PERCUSSION.join(','),
-  );
-
   // --- interaction ---------------------------------------------------------
 
   constructor() {
@@ -921,10 +896,6 @@ export class PianoRoll {
     this.settings.update((s) => ({ ...s, editMode }));
   }
 
-  protected setPercussionOpen(percussionOpen: boolean): void {
-    this.settings.update((s) => ({ ...s, percussionOpen }));
-  }
-
   protected setKeySounds(keySounds: boolean): void {
     this.settings.update((s) => ({ ...s, keySounds }));
   }
@@ -1021,14 +992,6 @@ export class PianoRoll {
     if (this.mixer.channels().some((state) => state.index === channel)) {
       this.mixer.toggleSolo(channel);
     }
-  }
-
-  protected togglePercussion(instrument: number): void {
-    this.settings.update((s) => togglePercussion(s, instrument));
-  }
-
-  protected resetPercussion(): void {
-    this.settings.update(resetPercussion);
   }
 
   // --- the pointer, and the keys ------------------------------------------

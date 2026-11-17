@@ -4,7 +4,6 @@ import { clamp } from '../../../util/math';
 import { readStored, writeStored } from '../../../util/storage';
 import { EDIT_MODES, type EditMode } from './roll-edit';
 import { LANE_HEIGHT, LANE_HEIGHT_MAX } from './roll-metrics';
-import { DEFAULT_PERCUSSION, parsePercussion } from './percussion';
 
 /**
  * The roll's preferences, and the reading of them back out of storage.
@@ -82,9 +81,6 @@ export interface Settings {
   beatsPerBar: number;
   /** The note value that gets the beat: its lower number, one of {@link BEAT_UNITS}. */
   beatUnit: number;
-  /** Instruments drawn on percussion lanes, ascending. */
-  percussion: readonly number[];
-  percussionOpen: boolean;
   /** How tall the command lane under the roll is drawn, in CSS pixels, between its own floor and ceiling. */
   laneHeight: number;
   /** The channel the roll is editing, or null for none. One at a time. */
@@ -138,8 +134,6 @@ interface StoredSettings {
   allOctaves?: unknown;
   beatsPerBar?: unknown;
   beatUnit?: unknown;
-  percussion?: unknown;
-  percussionOpen?: unknown;
   laneHeight?: unknown;
   editChannel?: unknown;
   snap?: unknown;
@@ -173,7 +167,7 @@ function isChannel(value: unknown): value is number {
  *
  * Field by field and not a spread: a spread takes whatever is in storage on
  * trust, so a hand-edited `zoom: "big"` multiplies every mark's x into `NaN` and
- * blanks the roll, and `percussion: "yes"` would be handed to `new Set` as a
+ * blanks the roll, and `chordChannels: "yes"` would be handed to `new Set` as a
  * string of characters. The enumerated numbers are checked against their own
  * tables rather than by type, which is what makes them safe rather than merely
  * numeric.
@@ -189,8 +183,6 @@ export function readSettings(): Settings {
     // A line per sixteenth with a heavier one every quarter note, which is the
     // grid FL Studio opens on and the one a snap of `beat` then lands on.
     beatUnit: 16,
-    percussion: [...DEFAULT_PERCUSSION],
-    percussionOpen: false,
     laneHeight: LANE_HEIGHT,
     editChannel: null,
     snap: 'beat',
@@ -244,10 +236,6 @@ export function readSettings(): Settings {
     settings.beatUnit = stored.beatUnit as number;
   }
 
-  if (typeof stored.percussionOpen === 'boolean') {
-    settings.percussionOpen = stored.percussionOpen;
-  }
-
   // Clamped rather than rejected: it comes off a drag, so any height between the
   // two ends is one the porter could have set, and one outside them is a window
   // that has since been resized rather than a value that means nothing.
@@ -285,11 +273,6 @@ export function readSettings(): Settings {
 
   if (typeof stored.typingKeys === 'boolean') {
     settings.typingKeys = stored.typingKeys;
-  }
-
-  const percussion = parsePercussion(stored.percussion);
-  if (percussion) {
-    settings.percussion = percussion;
   }
 
   return settings;
@@ -339,19 +322,6 @@ export function isBeatUnit(value: number): boolean {
   return BEAT_UNITS.includes(value as (typeof BEAT_UNITS)[number]);
 }
 
-/**
- * Put an instrument on the drum lanes, or take it off. Kept sorted, so
- * comparing against the default is a string compare.
- */
-export function togglePercussion(settings: Settings, instrument: number): Settings {
-  const next = new Set(settings.percussion);
-  if (!next.delete(instrument)) {
-    next.add(instrument);
-  }
-
-  return { ...settings, percussion: [...next].sort((a, b) => a - b) };
-}
-
 /** Channels once each, ascending — the order a chord's keys take them in. */
 function sortedChannels(channels: readonly number[]): number[] {
   return [...new Set(channels)].sort((a, b) => a - b);
@@ -365,9 +335,4 @@ export function toggleChordChannel(settings: Settings, channel: number): Setting
   }
 
   return { ...settings, chordChannels: sortedChannels([...next]) };
-}
-
-/** Back to `@21`-`@29` plus `@10`, which is what `percussion.ts` says a drum is. */
-export function resetPercussion(settings: Settings): Settings {
-  return { ...settings, percussion: [...DEFAULT_PERCUSSION] };
 }

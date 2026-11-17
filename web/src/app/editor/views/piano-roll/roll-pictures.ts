@@ -86,8 +86,7 @@ export function rollPictures(sources: PictureSources): RollPictures {
 
   /**
    * The whole song, drawn small — and deliberately not from the playhead, so
-   * it rebuilds on a recompile, a percussion change, a mute or a resize and never
-   * on a frame. Its rows come from the same `rowOf` the marks ask and its colours
+   * it rebuilds on a recompile, a mute or a resize and never on a frame. Its rows come from the same `rowOf` the marks ask and its colours
    * from the same `CHANNEL_FILL`.
    */
   const minimap = computed(() =>

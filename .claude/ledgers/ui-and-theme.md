@@ -73,8 +73,8 @@ there and moved away from, with the reason. The rule carries one index line per 
   status it belongs with.
 - **Hot Reload, Loop and Follow playback as checkboxes** — a checkbox is a form field, a value
   waiting to be submitted, and each of these is a mode the transport or the roll is in. They are
-  `amk-toggle`s, a button whose lit plate is the state, as Scroll the notes, All octaves, word wrap
-  and Percussion are, and the plate is the whole of what says which state a toggle is in.
+  `amk-toggle`s, a button whose lit plate is the state, as Scroll the notes, All octaves and word
+  wrap are, and the plate is the whole of what says which state a toggle is in.
 - **The compile status in the output panel's header** — it took the one line that could name what
   the pane holds, so the sidebar could not say it was the Inspector. The status bar holds it
   (`status-bar/`), with the problems count beside it, and the sidebar's headers name their sections.

@@ -21,7 +21,6 @@ section("the record pointer");
 		loops: [],
 		channelTicks: [ticks, 0, 0, 0, 0, 0, 0, 0],
 		used: [true, false, false, false, false, false, false, false],
-		usedInstruments: [],
 		unreachable: [],
 		customInstruments: [],
 		truncated: false,

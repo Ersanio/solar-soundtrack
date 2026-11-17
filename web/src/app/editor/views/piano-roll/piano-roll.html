@@ -4,7 +4,6 @@
   [allOctaves]="allOctaves()"
   [beatsPerBar]="beatsPerBar()"
   [beatUnit]="beatUnit()"
-  [percussionOpen]="percussionOpen()"
   [snap]="snap()"
   [editMode]="editMode()"
   [editRefusal]="target.editRefusal()"
@@ -33,17 +32,7 @@
   (allOctavesChange)="setAllOctaves($event)"
   (beatsPerBarChange)="setBeatsPerBar($event)"
   (beatUnitChange)="setBeatUnit($event)"
-  (percussionOpenChange)="setPercussionOpen($event)"
 />
-
-@if (percussionOpen()) {
-  <amk-percussion-panel
-    [chips]="chips()"
-    [hasOverrides]="hasPercussionOverrides()"
-    (toggled)="togglePercussion($event)"
-    (resetAll)="resetPercussion()"
-  />
-}
 
 @if (problems().length > 0) {
   <ul class="border-edge bg-warn/10 text-warn border-b px-3 py-2 text-xs leading-relaxed">

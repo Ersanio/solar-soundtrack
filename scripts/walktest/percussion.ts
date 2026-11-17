@@ -35,36 +35,6 @@ section("percussion follows the channel it is written on");
 	);
 	// Those three assertions are the *entire* foundation the roll's lane rule
 	// stands on: it places a note by the instrument in force, and this is what
-	// says the instrument survives a `$D0` byte. Which of them counts as
-	// percussion is a preference and lives in the app — `percussion.ts`, covered
-	// by `charttest`.
-	check(
-		"the song says which instruments it sounds",
-		melodic.usedInstruments.join(",") === "29",
-		melodic.usedInstruments.join(","),
-	);
-
-	// A drum reached only through a `$D0` byte emits no `$DA` at all
-	// (`parser.ts:1930-1956`), so a list built from instrument commands alone
-	// would miss it entirely.
-	check("including one no $DA ever named", melodic.usedInstruments.includes(29));
-
-	// The walk must have no opinion about which of them is a drum. `@10` is one
-	// the roll calls percussion by default and `@11` is not, and nothing here
-	// may be able to tell them apart — the moment this list starts sorting them,
-	// a view preference has moved into a package that states driver facts.
-	const alike = build("#amk 4\n#0 @10 o4 c\n#1 @11 o4 c\n").timeline;
-	check(
-		"a drum and a melodic slot are listed alike",
-		alike.usedInstruments.join(",") === "10,11",
-		alike.usedInstruments.join(","),
-	);
-
-	// Ascending and distinct, because the control draws one chip per entry.
-	const repeated = build("#amk 4\n#0 @5 o4 c @1 d @5 e\n#1 @1 o4 c\n").timeline;
-	check(
-		"each instrument is listed once, ascending",
-		repeated.usedInstruments.join(",") === "1,5",
-		repeated.usedInstruments.join(","),
-	);
+	// says the instrument survives a `$D0` byte. Which instruments get a lane is
+	// the roll's call — `percussion.ts`, covered by `charttest`.
 }

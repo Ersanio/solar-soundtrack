@@ -1,7 +1,7 @@
 /**
  * Everything the app draws that is arithmetic rather than markup: the stacked
  * bar, the plot space, `clamp`, the piano roll's lanes, mark window, grid and
- * playhead clock, its percussion set, the slider's track, and the transport's
+ * playhead clock, its drum lanes, the slider's track, and the transport's
  * tick-to-seconds clock.
  *
  * The ARAM bar spans all 64 KiB, so real regions are routinely a fraction of a
