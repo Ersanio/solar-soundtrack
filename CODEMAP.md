@@ -781,7 +781,7 @@ something in the directory, which load by themselves when such a file is opened.
 
 **Rules:** `ui-and-theme.md`
 
-- `color-field.ts` — A colour swatch that opens the operating system's picker.
+- `color-field.ts` — A colour swatch that opens the operating system's picker, and a field beside it that takes the same colour typed as hex.
 
 ## web/src/app/shared/enum-select
 

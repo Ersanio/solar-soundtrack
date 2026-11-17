@@ -10,7 +10,10 @@ export const CHANGELOG: readonly ChangelogEntry[] = [
   // ─── newest first; add new blocks here ──────────────────────────────────
   {
     date: '17 November 2026',
-    items: ['Notes clicked in the piano roll, and its keys, sound at once anywhere in the song'],
+    items: [
+      'Type any theme colour as hex',
+      'Notes clicked in the piano roll, and its keys, sound at once anywhere in the song',
+    ],
   },
   {
     date: '16 November 2026',

@@ -294,6 +294,7 @@
     "command.unit.ticks.one": "1 tick",
     "command.unit.ticks.other": "{$ticks} ticks",
     "command.unit.tritone": "tritone",
+    "common.a-colour-as-hex.title": "The colour as hex: type #rrggbb or #rgb, then press Enter",
     "common.back-to-the-default.title": "Back to the default colour",
     "common.close.title": "Close",
     "common.not-a-documented-value": "(not a documented value)",

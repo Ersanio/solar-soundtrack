@@ -69,7 +69,10 @@ rather than copied into TypeScript, so `styles.css` stays the only place they ar
 resetting a token removes the inline property rather than writing a default back. Only the tokens
 actually changed are stored, so a porter who moved one colour still follows the app on the rest. And
 a colour input reports a drag continuously, so `preview` and `commit` are split the way
-`shared/slider/`'s are — only the second is written down.
+`shared/slider/`'s are — only the second is written down. The hex field beside each swatch keeps
+the same split: six digits preview as they are typed, Enter or leaving the field commits, three
+digits are taken on commit, and text that is not a colour is put back, as is a preview Escape
+gives up.
 
 The one thing outside CSS is `<meta name="theme-color">` in `index.html`, which the store keeps in
 step; the manifest's copy is baked into an installed app and cannot follow.

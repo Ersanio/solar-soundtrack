@@ -28,10 +28,29 @@
         <span class="text-ink-muted truncate text-[11px] leading-snug">{{ text }}</span>
       }
     </span>
-    <span class="text-ink-muted shrink-0 font-mono text-[11px] tabular-nums uppercase">
-      {{ value() }}
-    </span>
   </label>
+
+  <!-- Outside the label too: inside it, a click to type would open the picker. -->
+  <input
+    type="text"
+    maxlength="7"
+    spellcheck="false"
+    autocomplete="off"
+    class="bg-inset w-16 shrink-0 rounded-sm border px-1.5 py-0.5 font-mono text-[11px] tabular-nums uppercase disabled:cursor-not-allowed disabled:opacity-40"
+    i18n-title="@@common.a-colour-as-hex.title"
+    title="common.a-colour-as-hex.title"
+    [class.border-edge]="!invalid()"
+    [class.text-ink]="!invalid()"
+    [class.border-danger]="invalid()"
+    [class.text-danger]="invalid()"
+    [disabled]="disabled()"
+    [value]="draft() ?? value()"
+    (focus)="onHexFocus()"
+    (input)="onHexInput($event)"
+    (blur)="onHexLeave()"
+    (keydown.enter)="blur($event)"
+    (keydown.escape)="onHexEscape($event)"
+  />
 
   <span class="flex w-10 shrink-0 justify-end">
     @if (overridden()) {
