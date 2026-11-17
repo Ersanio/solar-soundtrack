@@ -407,9 +407,10 @@ on that, as a press on a bar names its channel: a keyboard has no pointer to say
 a song with nothing in it can be recorded into, so the pointer free-runs at the clock's slope
 (`recordTickStep` in `roll-take.ts`) and `roll-view.ts` reads it ahead of the song's own tick while
 there is one. It stands still until the first key, so a take has no silence in front of it. With
-**Play the song** on, the transport starts as Record is pressed and the pointer is the transport's
-playhead for as long as that moves forwards; where the song ends or comes round its loop the
-transport stops and the pointer carries on.
+**Play the song** on, the song waits for that key as well: Record loads the transport and pauses it
+where it stands (`cue`), so the key has only to let it go (`letGo`), and from then the pointer is
+the transport's playhead for as long as that moves forwards; where the song ends or comes round its
+loop the transport stops and the pointer carries on.
 
 **A take is drawn as it is played and written when it stops.** `roll-take.ts` gives each key the
 lowest free record channel — the edited channel plus the chord chips — drops a key with none left,

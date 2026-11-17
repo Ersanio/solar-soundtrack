@@ -137,7 +137,8 @@ const WINDOW_MS = 100;
  * past the end of the song and a song with nothing in it can still be recorded
  * into. It free-runs at the clock's own slope (`recordTickStep`); with the song
  * playing under the take it reads the transport's playhead instead, for as long
- * as that is still moving forwards.
+ * as that is still moving forwards. Either way it stands still until the first
+ * key, and so does the song.
  *
  * Nothing is written until the recording stops. The notes are drawn as they are
  * played and go into the text as one edit (`takeEdits`), so a take is one undo
@@ -166,8 +167,10 @@ export function rollRecord(sources: RecordSources): RollRecord {
   let coarseAt = 0;
   /** Whether the pointer is the transport's: not, waiting for it to start, or yes. */
   let follows: 'no' | 'starting' | 'yes' = 'no';
-  /** Counts recordings, so a transport that comes up after its take ended is stopped. */
-  let runs = 0;
+  /** Whether this take has the song playing under it. */
+  let withSong = false;
+  /** True while the transport is still coming up to be held for a take. */
+  let cueing = false;
   /** Each recorded channel's loops, taken once as the recording is armed. */
   let walls = new Map<number, readonly Wall[]>();
   /** The audition handle of each key that is sounding, by MIDI number. */
@@ -325,9 +328,13 @@ export function rollRecord(sources: RecordSources): RollRecord {
     }
 
     if (phase() === 'armed') {
-      // The first key is what starts the pointer, on the moment it was pressed.
+      // The first key is what starts the pointer, on the moment it was pressed,
+      // and the song under it where there is one.
       phase.set('recording');
       lastAt = event.at;
+      if (withSong) {
+        letGo();
+      }
     }
 
     const tick = tickAt(event.at);
@@ -388,7 +395,6 @@ export function rollRecord(sources: RecordSources): RollRecord {
     }
 
     const at = Math.max(0, sources.transportTick());
-    const run = ++runs;
     audition.stop();
     startTick = at;
     take.set(emptyTake(channels()));
@@ -396,43 +402,74 @@ export function rollRecord(sources: RecordSources): RollRecord {
     coarse.set(at);
     lastAt = performance.now();
     coarseAt = 0;
+    follows = 'no';
+    withSong = sources.playSong();
+    phase.set('armed');
 
-    if (!sources.playSong()) {
+    if (withSong) {
+      cue();
+    } else if (!playback.isIdle()) {
       // In silence: whatever was playing stops, and stands where it had got to.
-      if (!playback.isIdle()) {
-        playback.stop();
-        playback.seek(at);
-      }
+      playback.stop();
+      playback.seek(at);
+    }
+  };
 
-      follows = 'no';
-      phase.set('armed');
+  /**
+   * Holds the song ready under a take that is waiting for its first key: loaded
+   * and run up to where it stands, and paused there, so that key has only to
+   * let it go. Started on the key instead, the song would trail the pointer by
+   * however long the transport takes to come up.
+   */
+  const cue = (): void => {
+    if (cueing || playback.state() === 'paused') {
       return;
     }
 
-    // With the song: it is the clock from the moment it starts, so there is no
-    // first key to wait for and the notes stay where they were played.
-    phase.set('recording');
     if (playback.isPlaying()) {
-      follows = 'yes';
+      void playback.toggle();
       return;
     }
 
-    follows = 'starting';
+    cueing = true;
     void playback.toggle().then(() => {
-      if (run !== runs) {
-        // Stopped while the transport was still coming up.
-        if (playback.isPlaying()) {
-          playback.stop();
-          playback.seek(startTick);
-        }
-      } else if (playback.isPlaying()) {
-        follows = 'yes';
-      } else {
-        // The song would not play, so the take runs in silence from its first key.
+      cueing = false;
+      if (!playback.isPlaying()) {
+        // The song would not play, so the take runs in silence.
+        withSong = false;
         follows = 'no';
-        phase.set('armed');
+      } else if (phase() === 'idle' || !withSong) {
+        // The take it was coming up for has ended.
+        playback.stop();
+        playback.seek(startTick);
+      } else if (phase() === 'armed') {
+        void playback.toggle();
+      } else {
+        // A key arrived first, and the pointer has been waiting on this.
+        follows = 'yes';
       }
     });
+  };
+
+  /** Lets the held song go, under the first key of a take. */
+  const letGo = (): void => {
+    if (cueing) {
+      follows = 'starting';
+      return;
+    }
+
+    if (playback.state() === 'paused') {
+      void playback.toggle();
+    }
+
+    if (!playback.isPlaying()) {
+      withSong = false;
+      return;
+    }
+
+    follows = 'yes';
+    // A song the porter set going while the take waited has moved on from it.
+    pointer.update((tick) => Math.max(tick ?? 0, sources.transportTick()));
   };
 
   const read = (text: string) => {
@@ -445,13 +482,13 @@ export function rollRecord(sources: RecordSources): RollRecord {
       return;
     }
 
-    runs++;
     const done = releaseAll(take(), tickAt(performance.now()));
     for (const key of [...sounds.keys()]) {
       hush(key);
     }
 
-    const followed = follows !== 'no';
+    const sung = withSong;
+    withSong = false;
     follows = 'no';
     phase.set('idle');
     pointer.set(null);
@@ -459,7 +496,7 @@ export function rollRecord(sources: RecordSources): RollRecord {
     take.set(emptyTake([]));
 
     // Back to where the take began, so the next press of play is the take.
-    if (followed && !playback.isIdle()) {
+    if (sung && !playback.isIdle()) {
       playback.stop();
     }
 

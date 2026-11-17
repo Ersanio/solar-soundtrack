@@ -1034,7 +1034,7 @@
     "roll.record.on-a-loop.one": "1 note landed on a loop and was not written",
     "roll.record.on-a-loop.other": "{$count} notes landed on a loop and were not written",
     "roll.record.play-the-song": "Play the song",
-    "roll.record.play-the-song.title": "Play the song under the recording, starting as Record is pressed. Off, the pointer runs in silence from the first key",
+    "roll.record.play-the-song.title": "Play the song under the recording, starting with the first key. Off, the pointer runs in silence",
     "roll.record.recording.one": "recording: 1 note",
     "roll.record.recording.other": "recording: {$count} notes",
     "roll.record.song-has-errors": "the song has to compile before it can be recorded into",
