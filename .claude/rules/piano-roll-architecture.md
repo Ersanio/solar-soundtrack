@@ -414,7 +414,10 @@ transport stops and the pointer carries on.
 **A take is drawn as it is played and written when it stops.** `roll-take.ts` gives each key the
 lowest free record channel — the edited channel plus the chord chips — drops a key with none left,
 and snaps both ends of a note to the roll's own Snap. `roll-take/` draws the bars, and the lane
-stack shows every octave while a take is in flight, since a note with no row is not drawn. Stopping
+stack shows every octave while a take is in flight, since a note with no row is not drawn. A held
+bar throws sparks off its growing end: CSS animations (`animate-sparkle` in `styles.css`) on
+elements that live as long as the key is down, so the frame clock moves only their group. A key
+whose row is outside the pane scrolls it to the middle (`revealRows` in `piano-roll.ts`). Stopping
 hands the notes to `takeEdits` (`piano-roll-editing.md`), one undo step, and puts the transport back
 where the take began. Record, `Space`, `Escape` and the transport's Stop button all stop one; the
 last is outside the roll, so the roll says a take exists through `EditorRequests.recording` and the

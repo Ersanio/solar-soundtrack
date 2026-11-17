@@ -121,6 +121,32 @@
   --font-mono: ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace;
 }
 
+/*
+ * `animate-sparkle`: one spark off the end of a note being held on a keyboard
+ * (`piano-roll/roll-take/`). It flies from where it is drawn to the offset its
+ * element names in `--sparkle-x` and `--sparkle-y`, growing and fading out, so
+ * one keyframe set serves every direction.
+ */
+@theme {
+  --animate-sparkle: sparkle 0.6s ease-out infinite;
+
+  @keyframes sparkle {
+    0% {
+      transform: translate(0, 0) scale(0.2) rotate(0deg);
+      opacity: 0;
+    }
+
+    20% {
+      opacity: 1;
+    }
+
+    100% {
+      transform: translate(var(--sparkle-x, 0), var(--sparkle-y, 0)) scale(1) rotate(120deg);
+      opacity: 0;
+    }
+  }
+}
+
 :root {
   color-scheme: dark;
 }

@@ -27,3 +27,32 @@
     [attr.height]="bar.h"
   />
 }
+
+<!-- After every bar, so the sparks are over all of them. None for a note on a
+     loop, which is not being written. Each shape is centred on the group's
+     origin and turns about its own middle (`fill-box`), so the group's
+     translate is the only thing that places it. -->
+@for (bar of live(); track bar.id) {
+  @if (!bar.blocked) {
+    <svg:g
+      pointer-events="none"
+      [attr.transform]="`translate(${bar.x + bar.w} ${bar.y + bar.h / 2})`"
+    >
+      <svg:circle
+        class="fill-ink origin-center animate-ping [transform-box:fill-box]"
+        [attr.r]="bar.h / 2"
+      />
+      <svg:circle class="fill-ink" fill-opacity="0.9" [attr.r]="bar.h / 4" />
+      @for (spark of sparks; track $index) {
+        <svg:path
+          d="M0 -5.5 L1.3 -1.3 L5.5 0 L1.3 1.3 L0 5.5 L-1.3 1.3 L-5.5 0 L-1.3 -1.3 Z"
+          [class]="spark.shape"
+          [style.--sparkle-x]="spark.x"
+          [style.--sparkle-y]="spark.y"
+          [style.animation-delay]="spark.delay"
+          [style.animation-duration]="spark.duration"
+        />
+      }
+    </svg:g>
+  }
+}

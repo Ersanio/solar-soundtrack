@@ -835,6 +835,15 @@ export class PianoRoll {
       });
     });
 
+    // Sanctioned effect: bringing a key played off the pane into view, the
+    // scroller being an imperative sink. After the render, so the rows are
+    // measured against the stack the key was played on.
+    onChange(this.record.heldRows, (rows) => {
+      if (rows.size > 0) {
+        afterNextRender(() => this.revealRows(rows), { injector: this.injector });
+      }
+    });
+
     // Sanctioned effect: writing the first rest a song with no playable music
     // needs, when the roll is opened on one. It waits for a compile of the text
     // as it stands — the result lags the source by the typing debounce, and a
@@ -1224,6 +1233,22 @@ export class PianoRoll {
     if (key !== undefined) {
       this.typed.delete(event.code);
       this.record.key({ down: false, key, at: event.timeStamp });
+    }
+  }
+
+  /**
+   * Scrolls a held key's row to the middle of the pane where one is outside it,
+   * and leaves the pane alone while every key held can be seen.
+   */
+  private revealRows(rows: ReadonlySet<number>): void {
+    const scroller = this.viewport().nativeElement;
+    const height = this.rowHeight();
+    const top = scroller.scrollTop;
+    const hidden = [...rows].find(
+      (row) => row * height < top || (row + 1) * height > top + scroller.clientHeight,
+    );
+    if (hidden !== undefined) {
+      scroller.scrollTop = (hidden + 0.5) * height - scroller.clientHeight / 2;
     }
   }
 
