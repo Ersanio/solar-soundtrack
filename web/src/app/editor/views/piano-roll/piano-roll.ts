@@ -159,7 +159,6 @@ export class PianoRoll {
   protected readonly editMode = computed(() => this.settings().editMode);
   protected readonly keySounds = computed(() => this.settings().keySounds);
   protected readonly playSong = computed(() => this.settings().playSong);
-  protected readonly typingKeys = computed(() => this.settings().typingKeys);
   protected readonly snapTicks = computed(() =>
     snapTicks(this.settings().snap, this.beatsPerBar(), this.beatUnit()),
   );
@@ -290,7 +289,6 @@ export class PianoRoll {
     chordChannels: computed(() => this.settings().chordChannels),
     keySounds: this.keySounds,
     playSong: this.playSong,
-    typing: this.typingKeys,
     snap: this.snapTicks,
     editMode: this.editMode,
     stack: this.stack,
@@ -904,17 +902,6 @@ export class PianoRoll {
     this.settings.update((s) => ({ ...s, playSong }));
   }
 
-  protected setTypingKeys(typingKeys: boolean): void {
-    // Before the switch, so a key held across it is let go rather than left down.
-    this.releaseTyping();
-    if (typingKeys) {
-      // The press opens the previewer's audio, so the first key is not spent on it.
-      this.audition.warm();
-    }
-
-    this.settings.update((s) => ({ ...s, typingKeys }));
-  }
-
   protected toggleChordChannel(channel: number): void {
     this.settings.update((s) => toggleChordChannel(s, channel));
   }
@@ -1178,7 +1165,6 @@ export class PianoRoll {
   private typingDown(event: KeyboardEvent): boolean {
     const target = event.target as HTMLElement | null;
     if (
-      !this.typingKeys() ||
       event.ctrlKey ||
       event.metaKey ||
       event.altKey ||

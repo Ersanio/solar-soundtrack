@@ -399,14 +399,14 @@ opinion on any of this by design.
 `state/midi-input.ts` holds the connection and one listener slot, which `roll-record.ts` takes for
 as long as the roll is open; with no roll, a key does nothing.
 
-**The computer's own keyboard is a second source of the same keys**, for a porter with no MIDI one:
-the toolbar's Typing keys toggle, a field of the roll's `Settings`. `keyOfCode` (`roll-take.ts`) is
-FL Studio's typing-keyboard layout as MIDI key numbers — `Z` is MIDI 60 — read off
-`KeyboardEvent.code`, so the piano is where the keys are on any layout. `piano-roll.ts` takes the
-bare keys ahead of the shortcuts, every one of which on a letter needs `Ctrl` or `Alt`, and hands
-them to `RollRecord.key` as a MIDI input would. The keyboard's controls are a row of their own in
-the toolbar, under the roll's settings: the toggle always, and the Record group beside it while
-either source is on (`RollRecord.listening`). The last source going off ends a take in flight.
+**The computer's own keyboard is always a second source of the same keys**, with no switch.
+`keyOfCode` (`roll-take.ts`) is FL Studio's typing-keyboard layout as MIDI key numbers — `Z` is
+MIDI 60 — read off `KeyboardEvent.code`, so the piano is where the keys are on any layout.
+`piano-roll.ts` takes the bare keys ahead of the shortcuts, every one of which on a letter needs
+`Ctrl` or `Alt` while the bare ones (Space, Delete, the arrows, Escape) are off the piano, and hands
+them to `RollRecord.key` as a MIDI input would. A key whose target is a field or inside a `dialog`
+is not taken. The keyboard's controls are a row of their own in the toolbar, under the roll's
+settings, and the label heading it gives the typing layout.
 
 **A key needs no channel picked first.** With none, a key or a press of Record picks the lowest
 channel the mixer leaves audible (`keyChannel`, through the `pickChannel` sink) and plays or records
@@ -467,3 +467,5 @@ new entry goes there, with its line here, in the same change.
   `percussion-panel/`, `Settings.percussion`, `usedInstruments`, `rowOfPlaced`, `isDrum`
 - **A row chosen by the instrument in force, not by the byte** — `placeOf`, `rowOfItem`,
   `drumFrom`, `remapFed`, `parser.ts:2753`
+- **The computer keyboard as a piano behind a Typing keys toggle** — `typingKeys`,
+  `RollRecord.listening`, `keyOfCode`, `rollShortcut`

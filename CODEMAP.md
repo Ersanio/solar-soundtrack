@@ -366,14 +366,14 @@ something in the directory, which load by themselves when such a file is opened.
 
 - `percussion.ts` — Which notes the roll draws on drum lanes, and where a note goes as a result.
 - `piano-roll.ts` (1000+ lines) — The song as music: a keyboard down the left, time running right, and all eight channels in one roll.
-  - `PianoRoll`:102 `onLaneGrab`:356 `onLaneResize`:363 `onLaneRelease`:373 `resetLaneHeight`:379
-  - `addressesOf`:604 `askAboutSelection`:689 `setZoom`:864 `setRowHeight`:868 `setScrollNotes`:875
-  - `setAllOctaves`:879 `setBeatsPerBar`:883 `setBeatUnit`:887 `setSnap`:891 `setEditMode`:895 `setKeySounds`:899
-  - `setPlaySong`:903 `setTypingKeys`:907 `toggleChordChannel`:918 `setEditChannel`:923 `clearEditChannel`:933
-  - `selectEditChannel`:950 `followMixer`:970 `isolateChannel`:991 `svgBox`:1000 `onEditDown`:1024
-  - `onEditMove`:1051 `onEditUp`:1066 `onEditLeave`:1085 `onContextMenu`:1090 `onWheel`:1102 `typingDown`:1178
-  - `onKeyUp`:1205 `revealRows`:1217 `releaseTyping`:1230 `onKey`:1238 `onKeyPress`:1288 `onMove`:1316
-  - `enter`:1330 `leave`:1334 `onViewportScroll`:1339
+  - `PianoRoll`:102 `onLaneGrab`:354 `onLaneResize`:361 `onLaneRelease`:371 `resetLaneHeight`:377
+  - `addressesOf`:602 `askAboutSelection`:687 `setZoom`:862 `setRowHeight`:866 `setScrollNotes`:873
+  - `setAllOctaves`:877 `setBeatsPerBar`:881 `setBeatUnit`:885 `setSnap`:889 `setEditMode`:893 `setKeySounds`:897
+  - `setPlaySong`:901 `toggleChordChannel`:905 `setEditChannel`:910 `clearEditChannel`:920 `selectEditChannel`:937
+  - `followMixer`:957 `isolateChannel`:978 `svgBox`:987 `onEditDown`:1011 `onEditMove`:1038 `onEditUp`:1053
+  - `onEditLeave`:1072 `onContextMenu`:1077 `onWheel`:1089 `typingDown`:1165 `onKeyUp`:1191 `revealRows`:1203
+  - `releaseTyping`:1216 `onKey`:1224 `onKeyPress`:1274 `onMove`:1302 `enter`:1316 `leave`:1320
+  - `onViewportScroll`:1325
 - `refusal.ts` — A refusal: why the roll will not splice a channel or write a gesture out, in the words it shows.
 - `roll-bar-text.ts` — How wide a plate of `text` at `size` comes to, padding included.
 - `roll-camera.ts` — The camera's own fractions, and where it is left between visits.

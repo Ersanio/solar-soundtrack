@@ -70,8 +70,6 @@ export interface RecordSources {
   keySounds: Signal<boolean>;
   /** Play the song under the take rather than running the pointer in silence. */
   playSong: Signal<boolean>;
-  /** The computer's own keyboard is being played as a piano, MIDI or no MIDI. */
-  typing: Signal<boolean>;
   /** What a note's ends snap to, in ticks; `0` for none. */
   snap: Signal<number>;
   editMode: Signal<EditMode>;
@@ -87,8 +85,6 @@ export interface RecordSources {
 }
 
 export interface RollRecord {
-  /** Whether any keys can arrive at all: a MIDI keyboard is on, or the computer's is. */
-  listening: Signal<boolean>;
   phase: Signal<RecordPhase>;
   /** The record pointer at frame rate, or `null` when nothing is being recorded. */
   tick: Signal<number | null>;
@@ -174,8 +170,6 @@ export function rollRecord(sources: RecordSources): RollRecord {
   let walls = new Map<number, readonly Wall[]>();
   /** The audition handle of each key that is sounding, by MIDI number. */
   const sounds = new Map<number, number>();
-
-  const listening = computed(() => midi.status() === 'on' || sources.typing());
 
   const channels = computed<readonly number[]>(() => {
     const edited = sources.editChannel();
@@ -534,7 +528,7 @@ export function rollRecord(sources: RecordSources): RollRecord {
    * sounded on the tick it snaps to and that can be earlier than the press.
    */
   const keyTick = computed(() => {
-    if (!listening() || !sources.keySounds() || sources.editChannel() === null) {
+    if (!sources.keySounds() || sources.editChannel() === null) {
       return null;
     }
 
@@ -628,14 +622,6 @@ export function rollRecord(sources: RecordSources): RollRecord {
   // Sanctioned effect: that button's press, which ends a take as Record does.
   onChange(requests.recordingStops, () => stop());
 
-  // Sanctioned effect: the last source of keys going away, which ends the take
-  // they were playing. The Record group that would stop it goes with them.
-  onChange(listening, (on) => {
-    if (!on) {
-      stop();
-    }
-  });
-
   // The roll is rebuilt on every tab switch, and a take in flight is the
   // porter's work: it is written rather than dropped with the component.
   inject(DestroyRef).onDestroy(() => {
@@ -648,7 +634,6 @@ export function rollRecord(sources: RecordSources): RollRecord {
   });
 
   return {
-    listening,
     phase: phase.asReadonly(),
     tick: pointer.asReadonly(),
     windowTick: coarse.asReadonly(),

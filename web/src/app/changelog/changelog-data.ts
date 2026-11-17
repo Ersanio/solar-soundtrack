@@ -9,6 +9,10 @@ export interface ChangelogEntry {
 export const CHANGELOG: readonly ChangelogEntry[] = [
   // ─── newest first; add new blocks here ──────────────────────────────────
   {
+    date: '18 November 2026',
+    items: ['The computer keyboard always plays the piano roll'],
+  },
+  {
     date: '17 November 2026',
     items: [
       'Buttons and toggles in the style of FL Studio, with modes that light up when on',

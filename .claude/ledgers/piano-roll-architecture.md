@@ -39,3 +39,12 @@ considered there and moved away from, with the reason. The rule carries one inde
   lane but found nowhere. Rows now follow the byte, and `rowOfItem` falls back to the walk's byte
   for that body head. The sample a pitched note still plays is said by the `@` glyph on its bar
   (`drumFrom`) and by its hover.
+
+- **The computer keyboard as a piano behind a Typing keys toggle** — the computer's keys played
+  the roll's piano only while a toolbar toggle, `Settings.typingKeys`, was on, and the Record group
+  appeared only while it or the MIDI switch was (`RollRecord.listening`), with the last of the two
+  going off ending a take in flight. The toggle guarded against nothing: every shortcut the roll
+  has on a letter takes `Ctrl` or `Alt`, and its bare keys — Space, Delete, Backspace, the arrows,
+  Escape — are none of `keyOfCode`'s, so the piano and `rollShortcut` never want the same press.
+  What it did do was make a porter switch the keyboard on before it worked. The keys are now always
+  taken, outside fields and dialogs, and Record is always on the toolbar.

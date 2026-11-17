@@ -1040,7 +1040,6 @@
     "roll.record.song-has-errors": "the song has to compile before it can be recorded into",
     "roll.record.start.title": "Record what the keys play, starting where the playhead stands",
     "roll.record.stop.title": "Stop recording and write the notes (Space)",
-    "roll.record.typing-keys": "Typing keys",
     "roll.record.typing-keys.title": "Play and record with the computer keyboard, laid out as FL Studio's: Z to M are the white keys from o4 c with their sharps on S D G H J, and Q to ] with the digits are the octave above",
     "roll.record.waiting": "waiting for the first key",
     "roll.refused": "refused: {$REASON}",
