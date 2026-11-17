@@ -150,7 +150,12 @@ function initScript({ storage }) {
       }
 
       postMessage(...args) {
-        traffic.posted++;
+        // The note previewer's `prepare` is never answered: it asks the worker to make
+        // checkpoints ahead of the notes, and nobody waits on them.
+        if (args[0]?.kind !== 'prepare') {
+          traffic.posted++;
+        }
+
         return super.postMessage(...args);
       }
     };

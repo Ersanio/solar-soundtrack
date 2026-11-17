@@ -33,6 +33,7 @@ import { soleAudible } from '../../../state/transport-view';
 import { PercussionPanel, percussionChips } from './percussion-panel/percussion-panel';
 import { DEFAULT_PERCUSSION, type PlaceContext, rollShape } from './percussion';
 import { rollCamera } from './roll-camera';
+import { rollCheckpoints } from './roll-checkpoints';
 import { RollChannels } from './roll-channels/roll-channels';
 import { RollGrid } from './roll-grid/roll-grid';
 import { RollKeys } from './roll-keys/roll-keys';
@@ -766,6 +767,16 @@ export class PianoRoll {
     // Sanctioned effect: mirroring state into localStorage, as `editor-pane.ts`
     // does for the selected tab.
     effect(() => writeSettings(this.settings()));
+
+    // The previewer's worker kept ready where a note will next be asked for.
+    rollCheckpoints({
+      keyTick: this.record.keyTick,
+      viewTick: this.view.viewTick,
+      playTick: this.view.playTick,
+      follow: this.follow,
+      editChannel: this.editChannel,
+      phase: this.record.phase,
+    });
 
     // Sanctioned effect: carrying a press on the mixer's own buttons back to the
     // channel being edited. The mixer is a strip under the whole pane rather

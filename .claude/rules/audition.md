@@ -155,9 +155,15 @@ it is strictly before the note's tick and was made under the same mask: whether 
 fetched in the block that reached the tick is read off that block, and a checkpoint standing on the
 tick has none.
 
-`note.worker.ts` keeps the newest three for the song it was last asked about, 16 MiB each, and
-`Audition.prepare` is how a caller asks for one ahead of the keys. The page numbers each SPC image
-it builds (`song`), since a frozen emulator says nothing about which song it holds.
+`Audition.prepare` is how a caller asks for them ahead of the notes, and it names the whole set
+every time: `note.worker.ts` keeps the ones it was last asked for, of the song it was last asked
+about, at most four at 16 MiB each. The rest are let go once those are made and not before, since
+one the set has just moved off is the nearest place to run on from. A prepare only records what is
+wanted; they are made on a timer, one per task and the lowest first, so a burst of them is one run
+to wherever the last pointed, each runs on from the one below it, and a note asked for meanwhile
+waits behind at most one. `roll-checkpoints.ts` is the one caller (`piano-roll-architecture.md`).
+The page numbers each SPC image it builds (`song`), since a frozen emulator says nothing about
+which song it holds.
 `spc-core.ts` hands every request the one core, by keeping the promise: a checkpoint taken on one
 instance means nothing to another.
 

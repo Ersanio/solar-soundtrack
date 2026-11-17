@@ -136,7 +136,7 @@ export class Audition {
   private readonly voices = new Map<number, HeldVoice>();
   private readonly holding = signal(0);
   private keyToken = FIRST_KEY_TOKEN;
-  /** The last tick the worker was asked to be ready for, so a standing pointer asks once. */
+  /** The last ticks the worker was asked to be ready for, so a standing pointer asks once. */
   private prepared = '';
 
   /** The sample currently being auditioned, for the UI to show. */
@@ -259,22 +259,27 @@ export class Audition {
   }
 
   /**
-   * Has the worker run the song to `tick` and keep it there, so a note asked for
-   * at or after it starts from that point rather than from the top of the song.
+   * Has the worker run the song to each of `ticks` and keep it there, so a note
+   * asked for after one starts from that point rather than from the top of the
+   * song.
    *
-   * Asked for ahead of the keys, by whoever knows where the next one will land:
-   * the wait a note costs is the song emulated up to its tick, and this is that
-   * wait taken before the key goes down.
+   * Asked for ahead of the notes, by whoever knows where the next ones will
+   * land: the wait a note costs is the song emulated up to its tick, and this is
+   * that wait taken before the click. The whole set every time, since the worker
+   * keeps what it is asked for and lets the rest go.
    */
-  prepare(tick: number): void {
+  prepare(ticks: readonly number[]): void {
     const spc = this.songImage();
     if (!spc || !this.image || typeof Worker === 'undefined') {
       return;
     }
 
-    const atTicks = Math.max(0, Math.round(tick));
+    // A checkpoint at the top of the song is the run from the top.
+    const atTicks = [...new Set(ticks.map((tick) => Math.round(tick)))]
+      .filter((tick) => tick > 0)
+      .sort((a, b) => a - b);
     const silenced = this.mixer.silenced();
-    const key = `${this.image.song}:${atTicks}:${silenced}`;
+    const key = `${this.image.song}:${atTicks.join(',')}:${silenced}`;
     if (key === this.prepared) {
       return;
     }

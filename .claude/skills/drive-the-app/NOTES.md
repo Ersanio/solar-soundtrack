@@ -124,7 +124,8 @@ The driver polls every 100 ms, up to `--timeout`, for all of:
 
 1. the status dot (`amk-status-bar`'s first child) exists and CodeMirror's view is attached;
 2. the dot is not pulsing — `busy` covers both the driver bundle loading and the first compile;
-3. every message posted to a worker has been answered;
+3. every message posted to a worker has been answered — bar the note previewer's `prepare`, which
+   never is (the roll sends one whenever where its notes are changes, and nobody waits on it);
 4. nothing in a fingerprint of the page (status sentence, clock, diagnostic count, mark count, the
    roll's `viewBox`, the worker counts) has changed for a settle window.
 

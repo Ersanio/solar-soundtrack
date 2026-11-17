@@ -115,7 +115,9 @@ state with `javascript_tool` rather than screenshots.
   worker message to be answered (the clock measurement is a worker round trip a second after the
   compile), and for the page to hold still. After anything that recompiles, call
   `helpers.waitForReady()` before reading or pressing. The first pointer interaction can still race
-  a measurement — retry the first click once before believing a broken handler.
+  a measurement — retry the first click once before believing a broken handler. Ready does not
+  wait for the note previewer's checkpoints, which are never answered: a note clicked straight
+  after a scroll or a recompile can still be waiting behind one.
 - **Only notes near the camera are in the DOM.** `roll.markCount` is what is drawn, not the song;
   the song's count is in `status.readouts`. Off-screen bars are in the DOM too: filter on `inPane`.
 - **Names and glyphs need `rowHeight` 26** (the driver's default; the app's own default draws

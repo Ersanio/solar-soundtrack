@@ -270,14 +270,15 @@ stages, `roll-command-layout.ts` and `roll-command-move.ts` for the lane, `roll-
 the keyboard, `roll-take.ts` for a take played in on a MIDI keyboard, and `roll-settings.ts` for
 what is remembered.
 
-**Seven files in the folder import `@angular/core`, and each says which kind it is.**
+**Eight files in the folder import `@angular/core`, and each says which kind it is.**
 `roll-camera.ts` is a module record — four signals that outlive a component rebuilt on every tab
-switch. The other six are composables, called from `piano-roll.ts`'s field initialisers in the
+switch. The other seven are composables, called from `piano-roll.ts`'s field initialisers in the
 order they depend on each other: `roll-record.ts` for a MIDI recording, ahead of the view because
 the view draws its pointer; `roll-view.ts` for the camera, the display clock and the two
 drags over the roll; `roll-target.ts` for the channel a gesture acts on and the strip it splices;
 `roll-gesture.ts` for the gesture itself; `roll-pictures.ts` for what is drawn, after the gestures
-because the loop boxes follow the one in flight; and `roll-clock.ts`, which `roll-view.ts` calls.
+because the loop boxes follow the one in flight; `roll-clock.ts`, which `roll-view.ts` calls; and
+`roll-checkpoints.ts`, from the constructor, which reads both the record and the view.
 No harness can bundle any of them, which is why the arithmetic each one leans on sits in a flat
 file of its own — `roll-clock-step.ts` under `roll-clock.ts`, `roll-edit.ts` under
 `roll-gesture.ts`, `roll-marks.ts` under `roll-pictures.ts`, `roll-take.ts` under `roll-record.ts`.
@@ -426,8 +427,17 @@ button asks through `stopRecording`. Until then the roll's pointer gestures and 
 timed against the text as it stood.
 
 **A key is sounded where its note will be written**, on its own channel, through
-`Audition.holdNote` (`audition.md`). The composable keeps the previewer's worker a checkpoint ahead
-of the pointer, which is what makes a key sound at once.
+`Audition.holdNote` (`audition.md`). `roll-checkpoints.ts` keeps the previewer's worker a
+checkpoint a cell behind where the next key would sound (`RollRecord.keyTick`), which is what makes
+a key sound at once.
+
+**The rest of the roll's notes are kept as ready.** A press on the key column sounds where the
+camera is (`playTick`), so it gets a checkpoint a cell behind that; a click on a bar, a drag's
+per-row audition and a drawn note all sound at a tick on screen, so one checkpoint a bar behind the
+view's left edge serves all of them, for at most a screen of emulation rather than the song up to
+the note. A bar rather than a cell, so a note starting just off the left edge is served, and a
+scroll moves it once a bar. `roll-checkpoints.ts` is the one statement of all three, since the
+worker keeps exactly the set it was last asked for.
 
 ## What is not the roll's business
 

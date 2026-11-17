@@ -372,18 +372,19 @@ something in the directory, which load by themselves when such a file is opened.
 
 - `percussion.ts` — Which instruments the roll draws as percussion, and where a note goes as a result.
 - `piano-roll.ts` (1000+ lines) — The song as music: a keyboard down the left, time running right, and all eight channels in one roll.
-  - `PianoRoll`:104 `onLaneGrab`:368 `onLaneResize`:375 `onLaneRelease`:385 `resetLaneHeight`:391
-  - `addressesOf`:616 `askAboutSelection`:701 `setZoom`:878 `setRowHeight`:882 `setScrollNotes`:889
-  - `setAllOctaves`:893 `setBeatsPerBar`:897 `setBeatUnit`:901 `setSnap`:905 `setEditMode`:909
-  - `setPercussionOpen`:913 `setKeySounds`:917 `setPlaySong`:921 `setTypingKeys`:925 `toggleChordChannel`:936
-  - `setEditChannel`:941 `clearEditChannel`:951 `selectEditChannel`:968 `followMixer`:988 `isolateChannel`:1009
-  - `togglePercussion`:1015 `resetPercussion`:1019 `svgBox`:1026 `onEditDown`:1050 `onEditMove`:1077
-  - `onEditUp`:1092 `onEditLeave`:1111 `onContextMenu`:1116 `onWheel`:1128 `typingDown`:1204 `onKeyUp`:1231
-  - `revealRows`:1243 `releaseTyping`:1256 `onKey`:1264 `onKeyPress`:1314 `onMove`:1342 `enter`:1356 `leave`:1360
-  - `onViewportScroll`:1365
+  - `PianoRoll`:105 `onLaneGrab`:369 `onLaneResize`:376 `onLaneRelease`:386 `resetLaneHeight`:392
+  - `addressesOf`:617 `askAboutSelection`:702 `setZoom`:889 `setRowHeight`:893 `setScrollNotes`:900
+  - `setAllOctaves`:904 `setBeatsPerBar`:908 `setBeatUnit`:912 `setSnap`:916 `setEditMode`:920
+  - `setPercussionOpen`:924 `setKeySounds`:928 `setPlaySong`:932 `setTypingKeys`:936 `toggleChordChannel`:947
+  - `setEditChannel`:952 `clearEditChannel`:962 `selectEditChannel`:979 `followMixer`:999 `isolateChannel`:1020
+  - `togglePercussion`:1026 `resetPercussion`:1030 `svgBox`:1037 `onEditDown`:1061 `onEditMove`:1088
+  - `onEditUp`:1103 `onEditLeave`:1122 `onContextMenu`:1127 `onWheel`:1139 `typingDown`:1215 `onKeyUp`:1242
+  - `revealRows`:1254 `releaseTyping`:1267 `onKey`:1275 `onKeyPress`:1325 `onMove`:1353 `enter`:1367 `leave`:1371
+  - `onViewportScroll`:1376
 - `refusal.ts` — A refusal: why the roll will not splice a channel or write a gesture out, in the words it shows.
 - `roll-bar-text.ts` — How wide a plate of `text` at `size` comes to, padding included.
 - `roll-camera.ts` — The camera's own fractions, and where it is left between visits.
+- `roll-checkpoints.ts` — Keeping the note previewer's worker ready where the roll will next ask it for a note: anything on screen, the key column, and a keyboard's keys.
 - `roll-clock-step.ts` — One frame of the playhead's own clock.
 - `roll-clock.ts` — A display clock: the driver's ten anchors a second, at frame rate.
 - `roll-command-layout.ts` — Where a glyph's box starts, in the roll's own coordinates.

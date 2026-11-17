@@ -105,6 +105,8 @@ export interface RollRecord {
   noteCount: Signal<number>;
   /** Why the last recording did not start or was not written, or what it left out. */
   message: Signal<string | null>;
+  /** The earliest tick a key pressed now could sound at, or `null` while none would sound. */
+  keyTick: Signal<number | null>;
   /** Arm a recording, or stop the one in flight and write it. */
   toggle(): void;
   stop(): void;
@@ -114,9 +116,6 @@ export interface RollRecord {
    */
   key(event: MidiKey): void;
 }
-
-/** How far apart the worker's checkpoints are kept, in ticks. */
-const CELL = 24;
 
 /** A transport tick this far behind the pointer is the loop coming round, not jitter. */
 const WRAP_TICKS = 2;
@@ -528,39 +527,19 @@ export function rollRecord(sources: RecordSources): RollRecord {
   };
 
   /**
-   * The checkpoint cell a key pressed now would be sounded from, or `null`
-   * while no key would be sounded at all.
+   * The earliest tick a key pressed now could be sounded at, or `null` while no
+   * key would be sounded at all.
    *
    * Half a snap step back from the pointer while recording, since a note is
    * sounded on the tick it snaps to and that can be earlier than the press.
    */
-  const cell = computed(() => {
+  const keyTick = computed(() => {
     if (!listening() || !sources.keySounds() || sources.editChannel() === null) {
       return null;
     }
 
     const lead = phase() === 'idle' ? 0 : sources.snap() / 2;
-    const tick = (pointer() ?? sources.transportTick()) - lead;
-    return Math.max(0, Math.ceil(tick / CELL) - 1);
-  });
-
-  // Sanctioned effect: keeping the previewer's worker a checkpoint ahead of the
-  // keys, which is an imperative sink. Per cell rather than per frame, and again
-  // for a new compile or a new mixer mask, either of which is another song to
-  // have run up to that tick.
-  effect(() => {
-    const at = cell();
-    editor.result();
-    mixer.silenced();
-    const moving = phase() === 'recording' || playback.isPlaying();
-    untracked(() => {
-      if (at !== null) {
-        audition.prepare(at * CELL);
-        if (moving) {
-          audition.prepare((at + 1) * CELL);
-        }
-      }
-    });
+    return (pointer() ?? sources.transportTick()) - lead;
   });
 
   const barOf = (
@@ -679,6 +658,7 @@ export function rollRecord(sources: RecordSources): RollRecord {
     heldRows,
     noteCount: computed(() => take().played.length + take().held.length),
     message: message.asReadonly(),
+    keyTick,
     toggle: () => (phase() === 'idle' ? arm() : stop()),
     stop,
     key: onKey,
