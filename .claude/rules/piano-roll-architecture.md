@@ -399,6 +399,10 @@ them to `RollRecord.key` as a MIDI input would. The keyboard's controls are a ro
 the toolbar, under the roll's settings: the toggle always, and the Record group beside it while
 either source is on (`RollRecord.listening`). The last source going off ends a take in flight.
 
+**A key needs no channel picked first.** With none, a key or a press of Record picks the lowest
+channel the mixer leaves audible (`keyChannel`, through the `pickChannel` sink) and plays or records
+on that, as a press on a bar names its channel: a keyboard has no pointer to say which it means.
+
 **The record pointer is its own, not the transport's.** A take can run past the end of the song and
 a song with nothing in it can be recorded into, so the pointer free-runs at the clock's slope
 (`recordTickStep` in `roll-take.ts`) and `roll-view.ts` reads it ahead of the song's own tick while

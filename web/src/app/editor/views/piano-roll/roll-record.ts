@@ -63,6 +63,8 @@ export interface TakeBar {
 export interface RecordSources {
   /** The channel being edited, which every take is recorded on. */
   editChannel: Signal<number | null>;
+  /** Names a channel as the one being edited, for a key played with none picked. */
+  pickChannel: (channel: number) => void;
   /** The other channels a chord spreads over. */
   chordChannels: Signal<readonly number[]>;
   keySounds: Signal<boolean>;
@@ -180,6 +182,28 @@ export function rollRecord(sources: RecordSources): RollRecord {
       : [...new Set([edited, ...sources.chordChannels()])].sort((a, b) => a - b);
   });
 
+  /**
+   * The channel a key lands on: the one picked, or else the lowest the mixer
+   * leaves audible, which is picked there and then. A keyboard has no pointer to
+   * say which channel it means, and a key that did nothing until a chip was
+   * found would read as a keyboard that does not work.
+   */
+  const keyChannel = (): number | null => {
+    const picked = sources.editChannel();
+    if (picked !== null) {
+      return picked;
+    }
+
+    for (let channel = 0; channel < CHANNEL_FILL.length; channel++) {
+      if ((mixer.silenced() & (1 << channel)) === 0) {
+        sources.pickChannel(channel);
+        return channel;
+      }
+    }
+
+    return null;
+  };
+
   /** One pass of the song in ticks, past which there is no song to sound a key in. */
   const songEnd = computed(() => {
     const stats = editor.result()?.stats;
@@ -292,7 +316,7 @@ export function rollRecord(sources: RecordSources): RollRecord {
 
     if (phase() === 'idle') {
       // Not recording: the key is only heard, where the playhead stands.
-      const channel = sources.editChannel();
+      const channel = written === null ? null : keyChannel();
       if (channel !== null && written !== null) {
         sound(event.key, channel, written, sources.transportTick());
       }
@@ -351,8 +375,8 @@ export function rollRecord(sources: RecordSources): RollRecord {
 
   const arm = (): void => {
     message.set(null);
-    if (sources.editChannel() === null) {
-      message.set($localize`:@@roll.record.pick-a-channel:roll.record.pick-a-channel`);
+    if (keyChannel() === null) {
+      message.set($localize`:@@roll.record.every-channel-muted:roll.record.every-channel-muted`);
       return;
     }
 

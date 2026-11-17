@@ -298,6 +298,7 @@ export class PianoRoll {
    */
   protected readonly record = rollRecord({
     editChannel: this.editChannel,
+    pickChannel: (channel) => this.selectEditChannel(channel),
     chordChannels: computed(() => this.settings().chordChannels),
     keySounds: this.keySounds,
     playSong: this.playSong,
