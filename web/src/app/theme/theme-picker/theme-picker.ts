@@ -74,7 +74,7 @@ export class ThemePicker {
    * The presets, each with the surfaces it would paint, for the swatches on its button.
    *
    * A token a preset leaves alone is the stylesheet's, not whatever is on screen:
-   * taking a preset drops every other override, so Studio's swatches are the
+   * taking a preset drops every other override, so Slate's swatches are the
    * defaults even while Graphite is showing.
    */
   protected readonly presetButtons = computed(() => {

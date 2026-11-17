@@ -2,7 +2,7 @@
  * The themes the picker offers by name.
  *
  * A preset carries only what it moves off the stylesheet's own values, so the
- * default one, Studio, carries nothing at all. Every other preset names every
+ * default one, Slate, carries nothing at all. Every other preset names every
  * token it needs, the accent included, so it renders the same whatever the
  * stylesheet's own accent is. None of them touch `--color-ch-*`: the eight are
  * a set that was validated together, and repainting one channel is what the
@@ -21,33 +21,37 @@ export interface ThemePreset {
 
 export const PRESETS: readonly ThemePreset[] = [
   {
-    id: 'studio',
-    name: $localize`:@@theme.studio:theme.studio`,
-    note: $localize`:@@theme.fl-studio-s-own-greys:theme.fl-studio-s-own-greys`,
+    id: 'slate',
+    name: $localize`:@@theme.slate:theme.slate`,
+    note: $localize`:@@theme.blue-grey-chrome-with-an:theme.blue-grey-chrome-with-an`,
     overrides: {},
   },
   {
-    id: 'slate',
-    name: $localize`:@@theme.slate:theme.slate`,
-    note: $localize`:@@theme.the-darker-blue-grey-the:theme.the-darker-blue-grey-the`,
+    // FL Studio's chrome and roll, sampled from its screen and each taken 0.07
+    // down in OKLCH lightness: the toolbar is `raised`, the window frame
+    // `surface`, a drop-down's field `inset` and the seam between panels
+    // `edge`. The inks are its plate labels and the control its display face.
+    id: 'juicy-loops',
+    name: $localize`:@@theme.juicy-loops:theme.juicy-loops`,
+    note: $localize`:@@theme.fl-studio-s-own-greys:theme.fl-studio-s-own-greys`,
     overrides: {
-      surface: '#1e272e',
-      raised: '#2f3c45',
-      inset: '#171f25',
-      edge: '#42525c',
-      ink: '#dbe3e8',
-      'ink-muted': '#9aaab5',
-      control: '#7ea6c4',
-      accent: '#ffa53a',
+      surface: '#31393e',
+      raised: '#464f53',
+      inset: '#22282d',
+      edge: '#0f171c',
+      ink: '#e9ebec',
+      'ink-muted': '#c1c7cb',
+      control: '#bfced5',
+      accent: '#ffa947',
       'accent-soft': '#ffd08a',
-      'syn-note': '#dbe3e8',
-      'syn-number': '#dbe3e8',
-      'syn-comment': '#9aaab5',
-      'syn-operator': '#9aaab5',
-      'seg-free': '#3a4852',
-      lane: '#1e272e',
-      'lane-sharp': '#171f25',
-      'lane-rule': '#42525c',
+      'syn-note': '#e9ebec',
+      'syn-number': '#e9ebec',
+      'syn-comment': '#c1c7cb',
+      'syn-operator': '#c1c7cb',
+      'seg-free': '#232a2f',
+      lane: '#22323b',
+      'lane-sharp': '#1d2c36',
+      'lane-rule': '#000a14',
     },
   },
   {

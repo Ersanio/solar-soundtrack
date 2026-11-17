@@ -19,34 +19,28 @@
  */
 @theme static {
   /*
-   * FL Studio's own chrome, sampled from its screen and each taken 0.07 down
-   * in OKLCH lightness: the toolbar is `raised`, the window frame `surface`, a
-   * drop-down's field `inset`, and the dark seam between panels `edge`. Its
-   * plate label is the ink and its secondary label the muted ink.
-   *
-   * FL's greys are mid-tones, so every colour read as text on them — the
-   * status colours, the accent and the source view's — sits lighter than a
-   * dark theme's would, at 6.1:1 or better on `surface`. On `raised` they reach
-   * about 4.4:1, above FL's own toolbar contrast.
+   * Slate, a dark blue-grey. The status colours and the source view's are
+   * shared with the Juicy Loops preset, whose FL Studio greys are mid-tones, so
+   * they sit lighter than a dark theme's would: 6.1:1 or better on its
+   * `surface` and about 4.4:1 on its `raised`, and higher on these.
    */
-  --color-surface: #31393e;
-  --color-raised: #464f53;
-  --color-inset: #22282d;
-  --color-edge: #0f171c;
+  --color-surface: #1e272e;
+  --color-raised: #2f3c45;
+  --color-inset: #171f25;
+  --color-edge: #42525c;
 
-  --color-ink: #e9ebec;
-  --color-ink-muted: #c1c7cb;
+  --color-ink: #dbe3e8;
+  --color-ink-muted: #9aaab5;
 
   /*
    * What a control is emphasised in short of being on: the tint in a primary
    * button's plate, a slider's filled half and its thumb, and the active tab's
-   * rule. FL Studio's pale blue-grey, the face of its tempo and pattern
-   * displays, so it reads as the toolbar's own material. Its own token rather
-   * than `--color-accent`, because the accent means *this is where the music
-   * is* — the playhead, a lit key, the caret — and is read against the roll and
-   * the source.
+   * rule. A blue-grey a step lighter than the chrome, so it reads as the
+   * toolbar's own material. Its own token rather than `--color-accent`, because
+   * the accent means *this is where the music is* — the playhead, a lit key,
+   * the caret — and is read against the roll and the source.
    */
-  --color-control: #bfced5;
+  --color-control: #7ea6c4;
 
   /*
    * A control that is on, in FL Studio's amber: a toggle's floor glows in it,
@@ -63,7 +57,7 @@
    */
   --color-led: #a8e44a;
 
-  --color-accent: #ffa947;
+  --color-accent: #ffa53a;
   --color-accent-soft: #ffd08a;
   --color-danger: #ffa49b;
   --color-severe: #ffa76e;
@@ -82,17 +76,17 @@
    * repeating the command's own colour would flatten `$E7 $02` into one
    * undifferentiated run.
    */
-  --color-syn-note: #e9ebec;
+  --color-syn-note: #dbe3e8;
   --color-syn-command: #7ee787;
   --color-syn-hex: #92beff;
   --color-syn-hex-arg: #c1daf9;
-  --color-syn-number: #e9ebec;
+  --color-syn-number: #dbe3e8;
   --color-syn-loop: #ffa76e;
-  --color-syn-operator: #c1c7cb;
+  --color-syn-operator: #9aaab5;
   --color-syn-directive: #92beff;
   --color-syn-channel: #92beff;
   --color-syn-string: #e5b543;
-  --color-syn-comment: #c1c7cb;
+  --color-syn-comment: #9aaab5;
   --color-syn-invalid: #ffa49b;
 
   /*
@@ -100,10 +94,11 @@
    * song, samples, echo). `--color-seg-free` is the exception and is neutral:
    * it is what the bar has *not* spent, so it names no identity.
    *
-   * Validated with the dataviz palette validator in dark mode against
-   * `--color-surface` (the sidebar) and `--color-raised`, the lightest chrome
-   * the bar could sit on — the top bar's meter is a step darker, so contrast
-   * there only rises (worst 5.51:1) — over all pairs: every check passes
+   * Validated with the dataviz palette validator in dark mode against the
+   * Juicy Loops preset's `--color-surface` (the sidebar) and `--color-raised`,
+   * the lightest chrome any shipped theme puts the bar on, so on every other
+   * contrast only rises — as it does on the top bar's meter, a step darker
+   * (worst 5.51:1) — over all pairs: every check passes
    * but the lightness band, which the four sit above on purpose, at OKLCH L
    * 0.79–0.89 against a 0.67 ceiling, since FL's mid-grey chrome needs them
    * that light to clear 3:1 (worst 4.08:1, echo on `raised`). The song green
@@ -114,19 +109,18 @@
   --color-seg-song: #94f2c6;
   --color-seg-samples: #f7bb69;
   --color-seg-echo: #ff95b6;
-  --color-seg-free: #232a2f;
+  --color-seg-free: #3a4852;
 
   /*
-   * The piano roll's ground, sampled from FL Studio's own and taken down with
-   * the chrome: a white key's row, a black key's, and the near-black its grid
-   * is drawn in. A blue of its own
-   * rather than the chrome's greys, so the music reads as a different place
-   * from the controls around it. The rule colour is drawn at strengths, as FL
-   * draws its lines: a bar heaviest, then a beat and an octave, then each row.
+   * The piano roll's ground: a white key's row, a black key's, and the colour
+   * its grid is drawn in, here the chrome's own surface, inset and edge. Tokens
+   * of their own so a theme can give the music a different place from the
+   * controls, as Juicy Loops does in FL Studio's roll blue. The rule colour is
+   * drawn at strengths: a bar heaviest, then a beat and an octave, then each row.
    */
-  --color-lane: #22323b;
-  --color-lane-sharp: #1d2c36;
-  --color-lane-rule: #000a14;
+  --color-lane: #1e272e;
+  --color-lane-sharp: #171f25;
+  --color-lane-rule: #42525c;
 
   /*
    * The eight music channels, used by the piano roll's marks, by the overview
@@ -134,8 +128,8 @@
    * mixer's strips, and nowhere else. The roll's marks are drawn on its lanes,
    * `--color-lane` and `--color-lane-sharp`, and the other three on
    * --color-surface — the mixer's wash mixes down to it, and the picker's plate
-   * is a shade of it. The lanes are the darker ground, so the surface is the
-   * one the set is validated against.
+   * is a shade of it. No shipped theme's lanes are lighter than its surface,
+   * so the surface is the one the set is validated against.
    *
    * Pastels, as FL Studio's channel colours are: the editor's own eight hues in
    * their own order, at FL's brightness and saturation — OKLCH chroma 0.085, and
@@ -143,9 +137,10 @@
    * set it was drawn from. The offsets are kept because they are what separates
    * the two pairs of near hues: at one lightness, 1 and 7 meet at ΔE 2.8.
    *
-   * Against the dataviz palette validator in dark mode on `--color-surface`
-   * `#31393e` they pass contrast (worst 4.69:1, ch-5, and 5.28:1 on the roll's
-   * lighter lane) and fail the rest by
+   * Against the dataviz palette validator in dark mode on Juicy Loops'
+   * `--color-surface` `#31393e`, the lightest a shipped theme has, they pass
+   * contrast (worst 4.69:1, ch-5, and 5.28:1 on its roll's lighter lane) and
+   * fail the rest by
    * design: pastels are above the lightness band and under the chroma floor,
    * and the closest neighbours are under both separation floors (2 and 1 at
    * ΔE 4.3 under deuteranopia, 4 and 3 at 11.2 to normal vision). Telling

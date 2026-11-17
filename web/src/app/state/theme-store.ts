@@ -199,7 +199,7 @@ export class ThemeStore {
     this.overrides.set({ ...preset.overrides });
   }
 
-  /** Back to the stylesheet on every token, which is the Studio preset. */
+  /** Back to the stylesheet on every token, which is the Slate preset. */
   resetAll(): void {
     this.previewing.set({});
     this.overrides.set({});
@@ -213,7 +213,7 @@ export class ThemeStore {
   /**
    * Takes a pasted theme, or answers false and changes nothing.
    *
-   * `{}` is a theme — Studio's — but an object none of whose entries is a token
+   * `{}` is a theme — Slate's — but an object none of whose entries is a token
    * and a colour is not, and taking it would wipe every colour the porter has.
    */
   importJson(json: string): boolean {

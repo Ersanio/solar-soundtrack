@@ -26,13 +26,15 @@ it is what the adjacent-pair check runs against.
 The ground is part of the validation too:
 
 - **The eight channels** are pastels in FL Studio's manner: the editor's own hues and order at
-  FL's brightness and saturation. Validated against `--color-surface` at `#31393e`, they pass
-  contrast (worst 4.69:1) and fail the lightness band, the chroma floor and both separation
-  floors, by design. `styles.css` records the figures and why each keeps its own lightness offset.
-  A change to the default surface still re-validates them.
-- **The four ARAM segments** are validated against both `--color-surface` and `--color-raised`.
-  The top bar's meter sits a step darker than `raised`, the inset mixed into it, so `raised` is
-  the harder of the two chrome grounds. Every check passes over all pairs but the
+  FL's brightness and saturation. Validated against Juicy Loops' `--color-surface`, `#31393e`,
+  the lightest surface a shipped theme has, they pass contrast (worst 4.69:1) and fail the
+  lightness band, the chroma floor and both separation floors, by design. `styles.css` records the
+  figures and why each keeps its own lightness offset. A default or a preset with a lighter
+  surface re-validates them.
+- **The four ARAM segments** are validated against both Juicy Loops' `--color-surface` and its
+  `--color-raised`, the lightest chrome a shipped theme draws them on. The top bar's meter sits a
+  step darker than `raised`, the inset mixed into it, so `raised` is the harder of the two chrome
+  grounds. Every check passes over all pairs but the
   lightness band, which they sit above on purpose; `styles.css` says why, and why the four are
   not at one lightness.
 
@@ -71,26 +73,27 @@ porter's chosen colours on `document.documentElement` as inline custom propertie
 picker in the top bar (`theme/theme-picker/`, on the `shared/popover/` the changelog shares) offers
 the presets in `theme/theme-presets.ts` and a `shared/color-field/` per token;
 `theme/theme-tokens.ts` is the list, and the property name is derived from each token's name rather
-than spelled twice. **Studio** is the default and carries no overrides at all — it is the
-stylesheet's own values, FL Studio's chrome greys sampled from its screen and taken two steps darker,
-with an orange accent —
-**Slate** is the darker blue-grey Studio was before, and **Graphite** is the neutral grey; every
-other preset names its accent explicitly, so it renders the same whatever the stylesheet's accent
-is.
+than spelled twice. **Slate** is the default and carries no overrides at all — it is the
+stylesheet's own values, a dark blue-grey with an orange accent — **Juicy Loops** is FL Studio's
+chrome greys sampled from its screen and taken two steps darker, and **Graphite** is the neutral
+grey; every other preset names its accent explicitly, so it renders the same whatever the
+stylesheet's accent is.
 
 **The piano roll has a ground of its own**: `--color-lane` and `--color-lane-sharp` for a white
 and a black key's row, and `--color-lane-rule` for its bar, beat and row lines, which
-`roll-lanes` and `roll-grid` draw at strengths rather than in three colours. They are FL's roll
-blue, taken darker with the chrome, not the chrome's greys, so the music reads as a different place from the controls. Every
-preset but Studio sets them to its own surface, inset and edge.
+`roll-lanes` and `roll-grid` draw at strengths rather than in three colours. By default they are
+the chrome's own surface, inset and edge, as in every preset but Juicy Loops, whose roll is FL's
+blue taken darker with its chrome, so the music reads as a different place from the controls.
 
-**FL's greys are mid-tones**, so every colour read as text on them sits lighter than a dark
-theme's would: the status colours, the accent and `--color-syn-*` are at 6.1:1 or better on
-`--color-surface`, and about 4.4:1 on `--color-raised`, above FL's own toolbar contrast. A
-default made more saturated, or a surface made lighter, re-checks them.
+**Juicy Loops' greys are mid-tones**, so the colours the themes share for text — the status
+colours and the coloured `--color-syn-*` — sit lighter than a dark theme's would: 6.1:1 or better
+on its `--color-surface`, about 4.4:1 on its `--color-raised`, above FL's own toolbar contrast,
+and higher on every darker theme. A shared default made more saturated, or a preset's surface made
+lighter, re-checks them.
 
 Two families of token are deliberately not shared. The controls have three of their own:
-`--color-control`, FL's pale blue-grey display face, for emphasis short of being on — a primary
+`--color-control`, a blue-grey a step lighter than the chrome (FL's pale display face in Juicy
+Loops), for emphasis short of being on — a primary
 button's tint, a slider's fill, the open tab's rule; `--color-lit`, FL Studio's amber, which a
 toggle that is on glows in; and `--color-led`, FL's lime, for the small
 lights — the mixer's channel lights and a kept sample's lock. None of them is `--color-accent`,
@@ -206,15 +209,15 @@ entry goes there, with its line here, in the same change.
 - **The eight channels as a validated mid-tone set, labelled in `text-ink`** — `--color-ch-*`,
   `--on-ch`, `channel-<n>`, `CHANNEL_SCOPE`, `text-ink`
 - **FL Studio's own pastel channel colours as the default eight** — `--color-ch-*`
-- **The Studio theme as a dark blue-grey of its own** — `--color-surface`, `--color-danger`,
-  Slate, `theme-presets.ts`
+- **FL Studio's greys as the default theme** — `--color-surface`, `--color-danger`, Slate,
+  Juicy Loops, `theme-presets.ts`
 - **A lit toggle as a flat `--color-lit` floor labelled in `--color-inset`** — `recess-lit`,
   `--recess-glow`, `--lit-warmth`, `CONTROL_BASE`
 - **The ARAM segments at one lightness** — `--color-seg-*`
-- **The piano roll's rows on the chrome's `surface` and `inset`** — `--color-lane`,
+- **The piano roll's rows drawn in `fill-surface` and `fill-inset`** — `--color-lane`,
   `--color-lane-sharp`, `--color-lane-rule`, `roll-lanes`, `roll-grid`
 - **A toggle's label set in `font-medium` when on** — `HEAVY`, `SEGMENT_ON`
 - **Play and Stop as chrome-grey plates with small corners** — `dark`, `pill`, `--plate-rim`
 - **The transport in a darker box of its own inside the top bar** — `amk-transport-controls`,
   `amk-top-bar`
-- **Studio's grounds at FL Studio's sampled values** — `--color-surface`, `--color-lane`
+- **Juicy Loops' grounds at FL Studio's sampled values** — `--color-surface`, `--color-lane`

@@ -40,11 +40,12 @@ there and moved away from, with the reason. The rule carries one index line per 
   colour, and the other thirty-seven stop following the app for good. `ThemeStore.overrides` holds
   only the tokens moved off a default, which is also what makes a per-token reset exact rather than
   approximate — the property is removed and whatever `styles.css` now says shows through.
-- **Re-hueing the eight channels for a preset's chrome** — the set is validated once, against the
-  default `--color-surface` `#31393e`, and every shipped preset's surface is darker than that
-  (Slate `#1e272e`, Graphite `#191919`, Midnight `#16181d`, Contrast `#0a0a0a`, Warm grey
-  `#1a1918`), so under each of them every channel's contrast only rises. The one direction that
-  would need re-validating is a **lighter** default.
+- **Re-hueing the eight channels for a preset's chrome** — the set is validated once, against
+  Juicy Loops' `--color-surface` `#31393e`, the lightest a shipped theme has, and every other
+  theme's is darker than that (Slate, the default, `#1e272e`, Graphite `#191919`, Midnight
+  `#16181d`, Contrast `#0a0a0a`, Warm grey `#1a1918`), so under each of them every channel's
+  contrast only rises. The one direction that would need re-validating is a **lighter** surface,
+  in the default or in a preset.
 - **The controls painted in `--color-accent`** — a primary button's plate, a checked box, a slider's
   fill and every toggle were the same token as the playhead, the lit keys, the caret and a syntax
   keyword, so there was no way to recolour the chrome without taking the roll's own markers with it.
@@ -97,13 +98,14 @@ there and moved away from, with the reason. The rule carries one index line per 
   header, so the editor keeps the screen and the sidebar is a pull away.
 - **`--color-control` a neutral grey** — a chrome with no hue at all reads as unfinished rather
   than as calm, and the reason the token is separate from `--color-accent` never needed it to be
-  grey. It is FL Studio's pale blue-grey (`#bfced5`), the face of its tempo display, so a button
-  reads as the toolbar's own material; the accent is the orange (`#ffa947`) and still means one
-  thing, _this is where the music is_ — the playhead, the lit keys, the caret and the focus ring.
+  grey. It is a blue-grey a step lighter than the chrome (`#7ea6c4`; FL Studio's pale display face
+  `#bfced5` in Juicy Loops), so a button reads as the toolbar's own material; the accent is the
+  orange and still means one thing, _this is where the music is_ — the playhead, the lit keys, the
+  caret and the focus ring.
 - **The default surface at `#191919`** — a neutral grey ground and the four greys around it. The
-  default is Studio, the chrome of the DAW the editor's interactions are drawn from, and the eight
-  channels are validated against its surface, so the default may not change without re-validating
-  the set. The grey is the Graphite preset, a snapshot of the fourteen tokens it moves.
+  default is Slate, a dark blue-grey, and the eight channels are validated against the lightest
+  surface a shipped theme has, so no theme's surface may grow lighter than that without
+  re-validating the set. The grey is the Graphite preset, a snapshot of the tokens it moves.
 - **The mixer's solo `S` lit on `bg-control/25`** — considered and refused for the reason the
   picker's solo ring is not a blue: the control blue is a mid blue, and a mid blue vanishes on
   `--color-ch-0` and `--color-ch-6`. A lit `S` takes the channel's own colour, the one ground it is
@@ -195,16 +197,18 @@ there and moved away from, with the reason. The rule carries one index line per 
   chroma than the editor's: in FL's own order, neighbours were ΔE 2.8 apart to normal vision and
   0.8 under protanopia, and interleaving lifted that only to 8.3 and 2.0. The editor's own hues at
   FL's brightness separate further, and they are the colours its porters have already learnt.
-- **The Studio theme as a dark blue-grey of its own.** Studio was `surface #1e272e`,
-  `raised #2f3c45`, `inset #171f25`, `edge #42525c`, ink `#dbe3e8` and `#9aaab5`: FL Studio's
-  manner in colours that were not its own, much darker than FL's chrome, so a porter who knows FL
-  read the editor as a different program. Studio is now FL's greys, sampled from its screen — the
-  toolbar, the window frame, a drop-down's field, the seam between panels, and the plate labels.
-  The dark blue-grey is the Slate preset. FL's greys are mid-tones, so everything read as text on
-  them was lifted to 4.5:1 on `surface`: the danger red to `#ffa49b` from `#ff7b72`, the severe
-  orange, the syntax blue and the accent with it. A red at 4.5:1 on that grey is a salmon, because
-  the sRGB gamut holds no more red chroma at that lightness, and that was accepted. The eight
-  channels were re-validated on the new ground and still clear 3:1.
+- **FL Studio's greys as the default theme.** The default, then called Studio, was first a dark
+  blue-grey (`surface #1e272e`, `raised #2f3c45`, `inset #171f25`, `edge #42525c`, ink `#dbe3e8`
+  and `#9aaab5`), and was moved to FL's greys sampled from its screen — the toolbar, the window
+  frame, a drop-down's field, the seam between panels, and the plate labels — on the reasoning
+  that the blue-grey was FL's manner in colours not its own, so a porter who knows FL would read
+  the editor as a different program. The author chose the blue-grey to open in after all: it is
+  the default again as Slate, carrying no overrides, and FL's greys are the Juicy Loops preset.
+  What FL's mid-tone greys asked for stays shared: everything read as text on them was lifted to
+  4.5:1 on their `surface` — the danger red to `#ffa49b` from `#ff7b72`, the severe orange and the
+  syntax blue — and on Slate's darker ground those only gain. A red at 4.5:1 on that grey is a
+  salmon, because the sRGB gamut holds no more red chroma at that lightness, and that was
+  accepted.
 - **A lit toggle as a flat `--color-lit` floor labelled in `--color-inset`.** One flat amber
   read as a sticker beside FL Studio's lit mode, which is a lamp: an amber floor, a pale yellow
   core, a deeper orange toward an orange rim, and a burnt-orange label. `recess-lit` draws that,
@@ -217,13 +221,13 @@ there and moved away from, with the reason. The rule carries one index line per 
   OKLCH L 0.80 put the echo pink and the song green within ΔE 1.3 of each other under
   deuteranopia, over all pairs. The song green is the lightest and the echo pink the darkest, and
   apart they are ΔE 9.5.
-- **The piano roll's rows on the chrome's `surface` and `inset`.** The roll's lanes were the page's
-  own two greys, with `--color-edge` rules only where an octave turned over, so the music sat on
-  the same ground as the controls round it. FL Studio's roll is a blue of its own, `#34444e` and
-  `#2e3e48`, with a near-black rule under every row and down every beat, heaviest at the bar.
-  `--color-lane`, `--color-lane-sharp` and `--color-lane-rule` are those, drawn at strengths in
-  `roll-lanes` and `roll-grid`; each preset but Studio sets them to its own surface, inset and
-  edge, so its roll looks as it did.
+- **The piano roll's rows drawn in `fill-surface` and `fill-inset`.** The roll's lanes were the
+  page's own two greys, with `--color-edge` rules only where an octave turned over, so no theme
+  could give the music a ground apart from the controls round it. FL Studio's roll is a blue of
+  its own, `#34444e` and `#2e3e48`, with a near-black rule under every row and down every beat,
+  heaviest at the bar. `--color-lane`, `--color-lane-sharp` and `--color-lane-rule` are tokens of
+  their own, drawn at strengths in `roll-lanes` and `roll-grid`; Juicy Loops sets them to FL's
+  blue, and the default and every other preset to its own surface, inset and edge.
 - **A toggle's label set in `font-medium` when on.** A heavier font is a wider one, so pressing a
   toggle widened it by a few pixels and pushed everything after it along the toolbar. Reserving
   the bold width was considered: it needs the label twice, and `<ng-content />` projects once, or
@@ -239,9 +243,9 @@ there and moved away from, with the reason. The rule carries one index line per 
   the row and none round the rest. The box is gone and the whole top bar takes its colour, the
   inset mixed half into the raised grey, so the row the song is played from is one strip a step
   darker than the toolbars below it.
-- **Studio's grounds at FL Studio's sampled values.** The chrome was FL's own greys as sampled
+- **Juicy Loops' grounds at FL Studio's sampled values.** The chrome was FL's own greys as sampled
   (`#434c51` surface, `#596267` raised, `#333a3f` inset, `#1f282d` edge) and the roll FL's blue
-  (`#34444e`, `#2e3e48`, rule `#0a1a24`), and the author wanted Studio darker. Every
+  (`#34444e`, `#2e3e48`, rule `#0a1a24`), and the author wanted it darker. Every
   ground, `--color-seg-free` included, is taken 0.07 down in OKLCH lightness at its own hue and
   chroma, so the steps between them are FL's and everything drawn on them only gains contrast.
   Re-sampling FL's screen would undo it.
