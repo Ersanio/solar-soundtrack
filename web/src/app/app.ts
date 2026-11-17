@@ -3,6 +3,7 @@
 import { Component, type ElementRef, computed, effect, signal, viewChild } from '@angular/core';
 
 import { EditorPane } from './editor/editor-pane/editor-pane';
+import { HeldSongBanner } from './held-song-banner/held-song-banner';
 import { TopBar } from './editor/top-bar/top-bar';
 import { OutputPane } from './output/output-pane/output-pane';
 import { StatusBar } from './status-bar/status-bar';
@@ -68,7 +69,7 @@ function loadDrawerCollapsed(): boolean {
 
 @Component({
   selector: 'amk-root',
-  imports: [UpdateBanner, TopBar, EditorPane, OutputPane, StatusBar],
+  imports: [UpdateBanner, HeldSongBanner, TopBar, EditorPane, OutputPane, StatusBar],
   templateUrl: './app.html',
   host: { class: 'flex h-screen flex-col' },
 })

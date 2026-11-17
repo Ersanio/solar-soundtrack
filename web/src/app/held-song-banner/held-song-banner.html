@@ -1,0 +1,27 @@
+@if (held() !== null) {
+  <div
+    class="border-warn/40 bg-warn/10 text-ink flex items-center justify-between gap-3 border-b px-4 py-2 text-sm"
+  >
+    <span i18n="@@error.held-song.the-editor-stopped-responding"
+      >error.held-song.the-editor-stopped-responding</span
+    >
+    <div class="flex shrink-0 items-center gap-2">
+      <button
+        i18n="@@error.held-song.open-it-anyway"
+        i18n-title="@@error.held-song.open-it-anyway.title"
+        title="error.held-song.open-it-anyway.title"
+        amk-button
+        variant="primary"
+        (click)="open()"
+      >
+        error.held-song.open-it-anyway
+      </button>
+      <button i18n="@@error.held-song.download-it" amk-button (click)="download()">
+        error.held-song.download-it
+      </button>
+      <button i18n="@@error.held-song.discard-it" amk-button variant="ghost" (click)="discard()">
+        error.held-song.discard-it
+      </button>
+    </div>
+  </div>
+}

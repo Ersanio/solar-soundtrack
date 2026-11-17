@@ -1,6 +1,7 @@
 ---
 paths:
-  - 'web/src/app/state/{editor-store,editor-requests,driver-store,sample-store}.ts'
+  - 'web/src/app/state/{editor-store,editor-requests,driver-store,sample-store,draft-guard}.ts'
+  - 'web/src/app/held-song-banner/**'
   - 'web/src/app/editor/codemirror/**'
   - 'web/src/app/editor/views/source-view/**'
   - 'web/src/app/editor/views/sample-browser/**'
@@ -32,6 +33,22 @@ adapter or the sample browser. `web/CLAUDE.md` has the reasoning behind the writ
   `echoHazards` and `commandHazards` come off the scan and do not.
 - `compilation` is `null` until `DriverStore` has a driver; there is no fallback load address.
   `assembleSpc()` is a method, not a `computed`, because it copies 64 KiB and every sample.
+
+## A draft the page froze on is held back
+
+Every parse runs on the main thread, so a song that hangs one would hang every reload once it was
+saved. `draft-guard.ts` owns the draft's storage and a mark beside it.
+
+- `edit()` saves the draft and sets the mark itself, not by an effect, so both are on disk before
+  the next tick parses the text. Startup sets the mark too.
+- The mark is cleared `SETTLE_MS` after the compile catches up with `source` (or the driver fails
+  to load), unless an edit comes first. `pagehide` clears it as well, but only while no
+  `parsing(...)` call is open: a parse the browser stopped leaves a live page that did not finish.
+- A load that finds the mark opens `SAMPLE_SONG` and keeps the draft under the held key, which
+  nothing parses. `EditorStore.held` carries it, and `held-song-banner` opens it through
+  `EditorRequests.applyAll`, downloads it, or discards it.
+- `compiler.compile`, `tokenize` and `walkSong` in `EditorStore` go through `parsing(...)`, so a
+  new main-thread parse of the document belongs there too.
 
 ## Writing back goes through `EditorRequests`
 

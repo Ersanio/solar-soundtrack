@@ -28,3 +28,12 @@ export function writeStored(key: string, value: string): void {
     /* Private browsing, or a full quota. The setting still holds this session. */
   }
 }
+
+/** Removes a value, or does nothing at all. */
+export function removeStored(key: string): void {
+  try {
+    localStorage.removeItem(key);
+  } catch {
+    /* Storage refused; there is nothing to remove from. */
+  }
+}

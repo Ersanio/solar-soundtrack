@@ -25,12 +25,10 @@ import { type SongClock, songClock } from './song-clock';
 import { ClockMeasurer, tempoDiagnostic } from './clock-measurer';
 import { repeatSettings, repeatTempo } from './repeat-carry';
 import { caretPosition, downloadBlob, errorMessage } from '../util/format';
-import { readStored, writeStored } from '../util/storage';
+import { dropHeld, keepDraft, openDraft, parsing, settleDraft } from './draft-guard';
 import { DriverStore } from './driver-store';
 import { SAMPLE_SONG } from './sample-song';
 import { SampleStore } from './sample-store';
-
-const STORAGE_KEY = 'solar-soundtrack.draft';
 
 /** How long typing pauses before a compile fires. */
 const DEBOUNCE_MS = 150;
@@ -58,6 +56,9 @@ export class EditorStore {
   private readonly library = inject(SampleStore);
   private readonly measurer = inject(ClockMeasurer);
 
+  /** The stored draft as startup found it, read once, before anything parses it. */
+  private readonly opened = openDraft();
+
   /**
    * The source as typed. The editor's CodeMirror document is the text
    * authority: this signal is written only from the editor's update listener
@@ -65,7 +66,10 @@ export class EditorStore {
    * {@link replace} rather than by writing here — one-way sync, so there is no
    * mirror to feed back through.
    */
-  readonly source = signal(readStored(STORAGE_KEY) ?? SAMPLE_SONG);
+  readonly source = signal(this.opened.text ?? SAMPLE_SONG);
+
+  /** A draft the last page froze on, kept aside until the porter opens or discards it. */
+  readonly held = signal(this.opened.held);
   readonly caret = signal(0);
 
   /**
@@ -99,11 +103,13 @@ export class EditorStore {
     }
 
     const started = performance.now();
-    const result = compiler.compile({
-      source: this.committed(),
-      aramAddress: driver.manifest.localPos,
-      options: this.compileOptions(),
-    });
+    const result = parsing(() =>
+      compiler.compile({
+        source: this.committed(),
+        aramAddress: driver.manifest.localPos,
+        options: this.compileOptions(),
+      }),
+    );
     return {
       result,
       elapsedMs: performance.now() - started,
@@ -149,7 +155,7 @@ export class EditorStore {
   readonly timeline = computed<SongTimeline | null>(() => {
     const compiled = this.compilation();
     const data = compiled?.result.data;
-    return data ? walkSong(data, compiled.aramAddress) : null;
+    return data ? parsing(() => walkSong(data, compiled.aramAddress)) : null;
   });
 
   /**
@@ -375,7 +381,7 @@ export class EditorStore {
    * enough to redo per keystroke — unlike compiling, which is why that one is
    * debounced and this one is not.
    */
-  readonly tokens = computed(() => tokenize(this.source()));
+  readonly tokens = computed(() => parsing(() => tokenize(this.source())));
 
   /** The command the caret is in, which the command inspector renders. */
   readonly commandAtCaret = computed(() => commandAt(this.tokens().commands, this.caret()));
@@ -464,8 +470,13 @@ export class EditorStore {
   readonly canDownload = computed(() => this.result()?.ok === true && this.result()?.data !== null);
 
   constructor() {
-    // Sanctioned effect: mirroring signal state into an imperative store.
-    effect(() => writeStored(STORAGE_KEY, this.source()));
+    // Sanctioned effect: the draft guard's mark is cleared once the compile has
+    // caught up with the document, or once there is no driver to compile with.
+    effect(() => {
+      if (this.compiledText() === this.source() || this.drivers.loadError()) {
+        untracked(settleDraft);
+      }
+    });
 
     // Sanctioned effect: the compiled bytes drive an imperative sink, the
     // measuring worker. Idle-triggered rather than per-compile, because a
@@ -486,6 +497,9 @@ export class EditorStore {
 
   /** Records a keystroke, and schedules the compile it will trigger. */
   edit(text: string): void {
+    // Saved here rather than by an effect: the guard's mark has to be on disk
+    // before the next tick parses the text.
+    keepDraft(text);
     this.source.set(text);
     this.override.set(null);
     clearTimeout(this.timer);
@@ -511,9 +525,17 @@ export class EditorStore {
 
     const aramAddress = driver.manifest.localPos;
     return {
-      result: compiler.compile({ source: text, aramAddress, options: this.compileOptions() }),
+      result: parsing(() =>
+        compiler.compile({ source: text, aramAddress, options: this.compileOptions() }),
+      ),
       aramAddress,
     };
+  }
+
+  /** Forgets the held-back draft, once it is opened or discarded. */
+  dropHeld(): void {
+    this.held.set(null);
+    dropHeld();
   }
 
   // --- outputs --------------------------------------------------------------

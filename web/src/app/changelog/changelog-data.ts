@@ -20,6 +20,7 @@ export const CHANGELOG: readonly ChangelogEntry[] = [
       'Notes clicked in the piano roll, and its keys, sound at once anywhere in the song',
       "Drum lanes in the piano roll hold only the driver's own drum hits, @21–@29; every other note, a drum's sample played at a pitch included, is on the keyboard where it can be edited",
       'Drag a drum hit to another drum lane in the piano roll to change the drum',
+      'A song that makes the editor stop responding is set aside the next time it opens, to open, download or discard',
     ],
   },
   {

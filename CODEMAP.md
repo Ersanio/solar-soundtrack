@@ -547,6 +547,12 @@ something in the directory, which load by themselves when such a file is opened.
 
 - `source-view.ts` (300+ lines) — The MML source, as a CodeMirror view.
 
+## web/src/app/held-song-banner
+
+**Rules:** `state-and-editor.md`
+
+- `held-song-banner.ts` — The banner offering back a song the editor froze on, which the next load set aside instead of parsing.
+
 ## web/src/app/output/aram-bar
 
 - `aram-bar.ts` — The ARAM usage bar: a single stacked proportion bar.
@@ -847,6 +853,7 @@ something in the directory, which load by themselves when such a file is opened.
 - `command-timeline.ts` — Every command that takes effect, and the tick it runs at.
 - `commands-in-force.ts` — The commands acting on a walked note, exactly — a lookup rather than a map.
 - `commit-audition.ts` — Replays the selected note when a command inspector panel commits a value.
+- `draft-guard.ts` — The saved draft, and holding it back when the page froze on it, so a song that hangs the editor cannot lock its porter out.
 - `driver-store.ts` — The N-SPC driver and the ARAM layout that goes with it.
 - `editor-requests.ts` (300+ lines) — What a panel asks the editor to do, and what the view and the roll report back.
 - `editor-store.ts` (500+ lines) — The document and everything compiled from it: the debounced compile, diagnostics, stats, the budget, the walk, the SPC.
