@@ -794,6 +794,12 @@ something in the directory, which load by themselves when such a file is opened.
 
 - 23 icon components, `icon-<name>.ts`, one glyph each: `book`, `chevron-down`, `chevron-right`, `close`, `download`, `github`, `lock`, `loop`, `minus`, `palette`, `pause`, `play`, `plus`, `record`, `redo`, `roll`, `samples`, `source`, `stop`, `undo`, `unlock`, `volume`, `wrap`
 
+## web/src/app/shared/modal
+
+**Rules:** `ui-and-theme.md`
+
+- `modal.ts` — A window over the app, which nothing behind it answers until it closes.
+
 ## web/src/app/shared/number-field
 
 **Rules:** `ui-and-theme.md`

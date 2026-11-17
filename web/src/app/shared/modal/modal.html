@@ -1,0 +1,30 @@
+<dialog
+  #dialog
+  class="border-edge bg-raised text-ink backdrop:bg-inset/70 m-auto w-96 max-w-[calc(100vw-2rem)] rounded-md border p-0 shadow-lg"
+  (click)="onClick($event)"
+>
+  <div class="flex max-h-[80vh] flex-col">
+    <div class="border-edge flex shrink-0 items-center justify-between gap-3 border-b px-3 py-2">
+      <h2 class="text-ink-muted text-xs font-semibold tracking-wide uppercase">{{ heading() }}</h2>
+      <button
+        amk-button
+        variant="ghost"
+        size="sm"
+        icon
+        i18n-title="@@common.close.title"
+        title="common.close.title"
+        (click)="close()"
+      >
+        <amk-icon-close />
+      </button>
+    </div>
+
+    <div class="min-h-0 flex-1 overflow-auto px-3 py-3">
+      <ng-content />
+    </div>
+
+    <div class="border-edge flex shrink-0 justify-end gap-2 border-t px-3 py-2 empty:hidden">
+      <ng-content select="[modalFooter]" />
+    </div>
+  </div>
+</dialog>

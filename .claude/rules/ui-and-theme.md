@@ -158,6 +158,8 @@ with everything else. Only the shadows are black, being darkness rather than a c
   picks which buttons are shown must not look like the buttons it shows.
 - **The small lights.** A sample's keep is a bare lock, the toggle's `indicator` variant. The
   mixer's mute is a light, lit while the channel is heard. FL Studio draws both that way.
+- **Dialogs.** `shared/modal/` is the one window over the app: a native `<dialog>` opened with
+  `showModal()`, in the popover's chrome on a `bg-inset/70` backdrop.
 
 ## Decisions already made
 
