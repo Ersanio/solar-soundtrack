@@ -1069,6 +1069,7 @@
     "roll.that-note-plays-a-drum": "that note plays a drum loaded before the loop",
     "roll.that-take-could-not-be": "that recording could not be written into the song",
     "roll.the-driver-cannot-play-a": "the driver cannot play a note that high or low",
+    "roll.the-driver-has-no-drum": "the driver has no drum there: its drums are @21 to @29",
     "roll.the-grids-time-signature.title": "The grid's time signature: beats in a bar, over the note that gets the beat. Zero beats draws no grid.",
     "roll.the-roll-cannot-line-this": "the roll cannot line this channel's brackets up with what plays",
     "roll.the-roll-cannot-read-the": "the roll cannot read the octave `{$text}` was written at",

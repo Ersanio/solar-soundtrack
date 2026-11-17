@@ -86,13 +86,39 @@ expectEdit("a note shortened, which lengthens the rest after it", "#amk 2\n#0 o4
 	deltaTicks: -24,
 }));
 
-expectEdit("a drum moved to another lane", "#amk 2\n#6 @21 c8 @22 c8", 6, (bar) => ({
-	kind: "move",
-	items: [noteAt(bar, 0)],
-	deltaTicks: 0,
-	deltaKeys: 0,
-	copy: false,
-}));
+// A drum's lane is its instrument, so a drag to another lane rewrites its `@`.
+expectEdit(
+	"a drum moved to another lane",
+	"#amk 2\n#6 @21 c8 @22 c8",
+	6,
+	(bar) => ({ kind: "move", items: [noteAt(bar, 0)], deltaTicks: 0, deltaKeys: 0, deltaDrums: 2, copy: false }),
+	{ text: "#amk 2\n#6 @23 c8 @22 c8" },
+);
+
+// Two drums moved together go the same number of instruments, as two notes go the same semitones.
+expectEdit(
+	"two drums moved to other lanes together",
+	"#amk 2\n#6 @21 c8 @22 c8",
+	6,
+	(bar) => ({
+		kind: "move",
+		items: [noteAt(bar, 0), noteAt(bar, 1)],
+		deltaTicks: 0,
+		deltaKeys: 0,
+		deltaDrums: 3,
+		copy: false,
+	}),
+	{ text: "#amk 2\n#6 @24 c8 @25 c8" },
+);
+
+// The pitched note after a drum plays that drum's sample, so it plays the new one's after the move.
+expectEdit(
+	"a drum with a pitched note after it moved to another lane",
+	"#amk 2\n#0 @21 o4 c8 c8",
+	0,
+	(bar) => ({ kind: "move", items: [noteAt(bar, 0)], deltaTicks: 0, deltaKeys: 0, deltaDrums: 4, copy: false }),
+	{ text: "#amk 2\n#0 o4 @25 c8 c8" },
+);
 
 // `leadsAUnit` takes an `o` and a percussion `@` alike, so a drum's unit reaches
 // back over its `@` and on to the octave in front of it — and a drum is written

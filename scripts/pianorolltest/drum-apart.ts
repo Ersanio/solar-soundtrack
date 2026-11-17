@@ -40,14 +40,15 @@ expectEdit(
 	{ mode: "overwrite", text: "#amk 2\n#0 o4 c4 g4 @21 d4 e4" },
 );
 
-// A drum moved to another lane is written beside its new `@`, and the old one goes.
-expectEdit("a drum written apart moved to another lane", APART, 0, (bar) => ({
-	kind: "move",
-	items: [noteAt(bar, 1)],
-	deltaTicks: 0,
-	deltaKeys: 1,
-	copy: false,
-}));
+// A drum moved to another lane is written beside its new `@`, and the old one goes. A drum is
+// spelled `@N c`, its letter having no say in the byte.
+expectEdit(
+	"a drum written apart moved to another lane",
+	APART,
+	0,
+	(bar) => ({ kind: "move", items: [noteAt(bar, 1)], deltaTicks: 0, deltaKeys: 0, deltaDrums: 1, copy: false }),
+	{ text: "#amk 2\n#0 o4 c4 r4 @22 c4 e4" },
+);
 
 // --- a bar is pressed on the row it is drawn on -------------------------------
 //

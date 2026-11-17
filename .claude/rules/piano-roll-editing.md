@@ -67,6 +67,14 @@ already reached, so padding the song out to one would lengthen it for nothing. T
 length slider is not on this path at all: it writes one argument through `spliceArg` and knows
 nothing about neighbours.
 
+**A drum's lane is its instrument, so a drag up or down the lanes changes the instrument.** A move
+carries `deltaKeys` for the keyboard and `deltaDrums` for the lanes, each nothing unless the
+pointer's two rows are both of its kind (`keysBetween`, `drumsBetween` in `roll-gesture.ts`), so a
+drum never becomes a key nor a key a drum. Like semitones, it is a change of number, so a selection
+of drums moves together and one landing outside `@21`-`@29` refuses the move (`REFUSE_NO_DRUM`).
+The writer rewrites the `@` beside the note, as `spellNote` writes a drum, so a pitched note after
+the drum plays the new drum's sample.
+
 The commit is `EditorRequests.applyAll`: one transaction, one undo step for a whole selection, and
 the editor checks every `expect` before it dispatches anything, so a stale batch is a no-op rather
 than half a gesture.

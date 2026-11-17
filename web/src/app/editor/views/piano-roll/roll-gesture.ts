@@ -383,6 +383,17 @@ function keysBetween(stack: LaneStack, from: number, to: number): number {
   return a?.kind === 'key' && b?.kind === 'key' ? b.index - a.index : 0;
 }
 
+/**
+ * A drum lane is its instrument, so a drag between two of them is that change of
+ * instrument — the sibling of {@link keysBetween}, and like it nothing at all
+ * where either row is of another kind, so a drum never becomes a key or a key a drum.
+ */
+function drumsBetween(stack: LaneStack, from: number, to: number): number {
+  const a = stack.lanes[from];
+  const b = stack.lanes[to];
+  return a?.kind === 'drum' && b?.kind === 'drum' ? b.index - a.index : 0;
+}
+
 export interface RollGestures {
   /** The notes the porter has selected, by their index in the strip. */
   selection: Signal<ReadonlySet<number>>;
@@ -658,6 +669,7 @@ export function rollGestures(sources: GestureSources, sinks: GestureSinks): Roll
       deltaTicks:
         held.shift && held.axis === 'y' ? 0 : draggedTick(held, item, snap) - item.startTick,
       deltaKeys: held.shift && held.axis !== 'y' ? 0 : keysBetween(stack, held.fromRow, held.row),
+      deltaDrums: held.shift && held.axis !== 'y' ? 0 : drumsBetween(stack, held.fromRow, held.row),
       copy: held.copy,
     };
   });

@@ -5,6 +5,7 @@ import { NOTE_MIN } from "@amk/core/hardcoded-tables";
 import {
 	REFUSE_CLASH,
 	REFUSE_INSIDE,
+	REFUSE_NO_DRUM,
 	REFUSE_RAMP,
 	REFUSE_RANGE,
 	REFUSE_ROOM,
@@ -125,6 +126,23 @@ expectRefused(
 	}),
 	"insert",
 	REFUSE_RANGE,
+);
+
+// The driver's drums are `@21`-`@29`, so a drum dragged past either end has nowhere to be.
+expectRefused(
+	"a drum dragged past the driver's last drum",
+	"#amk 2\n#6 @29 c8 @21 c8",
+	6,
+	(bar) => ({
+		kind: "move",
+		items: [noteAt(bar, 0), noteAt(bar, 1)],
+		deltaTicks: 0,
+		deltaKeys: 0,
+		deltaDrums: 1,
+		copy: false,
+	}),
+	"insert",
+	REFUSE_NO_DRUM,
 );
 
 expectRefused(

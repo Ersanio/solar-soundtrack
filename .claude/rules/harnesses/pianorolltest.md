@@ -136,7 +136,8 @@ which voice's tail moves by how much.
 `note-drags.ts` is the drags and stretches: a drag up a semitone, a drag into the next octave with
 the octave put back after it, a repitch under an octave shift keeping the octave its unit carried, a
 note dragged earlier into the rest before it, a stretch past a whole note written as a tie, a drum
-moved between lanes, a mid-note `v200` that has to keep its place inside the note being stretched,
+moved between lanes — its `@` rewritten, two drums moved together by the same change of instrument,
+and a drum whose pitched note after it plays the new drum's sample — a mid-note `v200` that has to keep its place inside the note being stretched,
 and a pitch drag on an implicit length that must **not** spell one in — `l4 c` stays `c`.
 `note-deletes.ts` is the deletes: the octave a deleted note's unit carried, put back at the head of
 the note that reads it and only there, and a note deleted from between two rests, which leaves the
@@ -153,8 +154,9 @@ it, and the row a press finds each note on — `rowOfItem` against the row `rowO
 a pitched note after a drum, a drum written apart, a body head the remap fed from before its `[`,
 every note on `#6` and a melodic slot, each also checked for the lanes its bytes say, since the two
 rules can agree with each other and both be wrong; `bulk.ts` legato, quantize, glue and a selection moved as one. And `refusals.ts`: a note dragged
-onto its neighbour, one dragged off the bottom of the driver's range, a stretch with nowhere to push,
-and a note shortened past the command written inside it.
+onto its neighbour, one dragged off the bottom of the driver's range, a drum dragged past the
+driver's last drum, a stretch with nowhere to push, and a note shortened past the command written
+inside it.
 
 ### `overwrite-mode.ts`
 

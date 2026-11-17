@@ -383,17 +383,17 @@ something in the directory, which load by themselves when such a file is opened.
 - `roll-command-layout.ts` — Where a glyph's box starts, in the roll's own coordinates.
 - `roll-command-move.ts` — Dragging a command glyph along its channel: where it may land, why it may not, and the edit that moves it.
 - `roll-edit.ts` (1000+ lines) — What a gesture on the roll does to a channel: where every note ends up, which ones a push moved, and where two would sound at once.
-  - `EDIT_MODES`:100 `REFUSE_RANGE`:162 `REFUSE_ROOM`:163 `REFUSE_SPELL`:164 `REFUSE_CROWDED`:165
-  - `REFUSE_RAMP`:166 `REFUSE_INSIDE`:167 `REFUSE_CLASH`:168 `REFUSE_BEND_RIDER`:169 `REFUSE_LOOP_WALL`:170
-  - `REFUSE_SPLIT`:171 `REFUSE_REMAP_FED`:172 `REFUSE_SUB_SPLIT`:173 `REFUSE_NESTED_LOOP`:174
-  - `REFUSE_LOOP_LEFT_PASS`:175 `REFUSE_LOOP_LEAD_ROOM`:176 `REFUSE_LOOP_BODY_ROOM`:177 `isEdits`:190
-  - `placedNotes`:197 `byTick`:215 `clashesIn`:220 `inRange`:235 `push`:259 `pushFrom`:316 `carve`:365
-  - `resolved`:454 `planGesture`:527 `spansFrames`:565 `planFrames`:579 `guarded`:614 `resolvedGesture`:639
-  - `shiftBoundariesFor`:883 `framePasses`:930 `frameAt`:959 `passShiftsFor`:1042 `plannedOrdinals`:1070
-  - `plannedFrameTicks`:1090
+  - `EDIT_MODES`:109 `REFUSE_RANGE`:171 `REFUSE_NO_DRUM`:172 `REFUSE_ROOM`:173 `REFUSE_SPELL`:174
+  - `REFUSE_CROWDED`:175 `REFUSE_RAMP`:176 `REFUSE_INSIDE`:177 `REFUSE_CLASH`:178 `REFUSE_BEND_RIDER`:179
+  - `REFUSE_LOOP_WALL`:180 `REFUSE_SPLIT`:181 `REFUSE_REMAP_FED`:182 `REFUSE_SUB_SPLIT`:183
+  - `REFUSE_NESTED_LOOP`:184 `REFUSE_LOOP_LEFT_PASS`:185 `REFUSE_LOOP_LEAD_ROOM`:186 `REFUSE_LOOP_BODY_ROOM`:187
+  - `isEdits`:200 `placedNotes`:207 `byTick`:225 `clashesIn`:230 `inRange`:245 `push`:269 `pushFrom`:326
+  - `carve`:375 `resolved`:464 `planGesture`:537 `spansFrames`:575 `planFrames`:589 `guarded`:624
+  - `resolvedGesture`:649 `shiftBoundariesFor`:898 `framePasses`:945 `frameAt`:974 `passShiftsFor`:1057
+  - `plannedOrdinals`:1085 `plannedFrameTicks`:1105
 - `roll-gesture.ts` (2000+ lines) — The roll's pointer: what a press means, what a drag is doing, and what pointer-up commits.
   - `SLOP_PX`:88 `edgesAt`:97 `edgesOf`:112 `loopEnd`:130 `spawnTick`:348 `draggedTick`:368 `keysBetween`:380
-  - `pitchOfRow`:485 `itemAt`:510 `rollGestures`:533 `hoverCursor`:2094 `lengthLabel`:2140
+  - `drumsBetween`:391 `pitchOfRow`:496 `itemAt`:521 `rollGestures`:544 `hoverCursor`:2106 `lengthLabel`:2152
 - `roll-layout.ts` (300+ lines) — The roll's lanes and its camera: which row a key is on, what slice of the song is on screen, where the grid lines fall, and the arithmetic between a tick and an x.
 - `roll-lengths.ts` — The nearest length a note can be written as, at or above one tick.
 - `roll-marks.ts` (750+ lines) — What the roll draws for the song: a mark per note, the overview's minimap, the loop boxes and their labels.

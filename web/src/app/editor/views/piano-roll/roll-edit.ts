@@ -1,6 +1,7 @@
 import { NOTE_MAX, NOTE_MIN } from '@amk/core/hardcoded-tables';
 import type { Command } from '@amk/tokens';
 import type { Edit } from '@amk/tokens/edits';
+import { isDrum } from './percussion';
 import { type Refusal, isRefusal } from './refusal';
 import type { ChannelTail, Strip, StripFrame } from './roll-strip';
 
@@ -78,7 +79,15 @@ export interface TakeNote {
 export type Gesture =
   | { kind: 'spawn'; startTick: number; ticks: number; written: number; drum: number | null }
   | { kind: 'take'; notes: readonly TakeNote[] }
-  | { kind: 'move'; items: readonly number[]; deltaTicks: number; deltaKeys: number; copy: boolean }
+  | {
+      kind: 'move';
+      items: readonly number[];
+      deltaTicks: number;
+      deltaKeys: number;
+      /** The change of instrument a drum takes, `@21` to `@29`'s lanes being its rows; absent is none. */
+      deltaDrums?: number;
+      copy: boolean;
+    }
   | { kind: 'stretch'; items: readonly number[]; edge: 'start' | 'end'; deltaTicks: number }
   | { kind: 'delete'; items: readonly number[] }
   | { kind: 'quantize'; items: readonly number[]; snap: number }
@@ -160,6 +169,7 @@ export interface EditContext {
 }
 
 export const REFUSE_RANGE = $localize`:@@roll.the-driver-cannot-play-a:roll.the-driver-cannot-play-a`;
+export const REFUSE_NO_DRUM = $localize`:@@roll.the-driver-has-no-drum:roll.the-driver-has-no-drum`;
 export const REFUSE_ROOM = $localize`:@@roll.there-is-no-room-to:roll.there-is-no-room-to`;
 export const REFUSE_SPELL = $localize`:@@roll.that-length-cannot-be-written:roll.that-length-cannot-be-written`;
 export const REFUSE_CROWDED = $localize`:@@roll.there-is-something-written-where:roll.there-is-something-written-where`;
@@ -686,12 +696,17 @@ function resolvedGesture(strip: Strip, frame: StripFrame, gesture: Gesture, mode
           return { ...NOTHING, notes: placedNotes(strip, frame), refused: REFUSE_RANGE };
         }
 
+        const drum = note.drum === null ? null : note.drum + (gesture.deltaDrums ?? 0);
+        if (drum !== null && !isDrum(drum)) {
+          return { ...NOTHING, notes: placedNotes(strip, frame), refused: REFUSE_NO_DRUM };
+        }
+
         const moved: PlacedNote = {
           from: gesture.copy ? -1 : note.from,
           startTick: Math.max(0, note.startTick + gesture.deltaTicks),
           ticks: note.ticks,
           written,
-          drum: note.drum,
+          drum,
         };
 
         touched.push(moved);
