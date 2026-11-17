@@ -352,7 +352,7 @@ something in the directory, which load by themselves when such a file is opened.
 
 ## web/src/app/editor/top-bar
 
-- `top-bar.ts` — The top bar: the transport, the ARAM meter, the exports, the MIDI keyboard switch, the theme picker, the changelog and the commit link.
+- `top-bar.ts` — The top bar: the transport, the ARAM meter, the exports, the theme picker, the changelog and the commit link.
 
 ## web/src/app/editor/transport-controls
 
@@ -469,6 +469,12 @@ something in the directory, which load by themselves when such a file is opened.
 **Rules:** `piano-roll-architecture.md`, `piano-roll-view.md`
 
 - `roll-overview.ts` — The whole song at once, and the roll's horizontal scroller.
+
+## web/src/app/editor/views/piano-roll/roll-record-dialog
+
+**Rules:** `piano-roll-architecture.md`
+
+- `roll-record-dialog.ts` — What Record asks before it arms: the MIDI keyboard, the song under the take, the key sounds and the chord's channels.
 
 ## web/src/app/editor/views/piano-roll/roll-scrub
 
@@ -792,7 +798,7 @@ something in the directory, which load by themselves when such a file is opened.
 
 **Rules:** `ui-and-theme.md`
 
-- 23 icon components, `icon-<name>.ts`, one glyph each: `book`, `chevron-down`, `chevron-right`, `close`, `download`, `github`, `lock`, `loop`, `minus`, `palette`, `pause`, `play`, `plus`, `record`, `redo`, `roll`, `samples`, `source`, `stop`, `undo`, `unlock`, `volume`, `wrap`
+- 24 icon components, `icon-<name>.ts`, one glyph each: `book`, `chevron-down`, `chevron-right`, `close`, `download`, `github`, `lock`, `loop`, `minus`, `palette`, `pause`, `play`, `plus`, `record`, `recording`, `redo`, `roll`, `samples`, `source`, `stop`, `undo`, `unlock`, `volume`, `wrap`
 
 ## web/src/app/shared/modal
 

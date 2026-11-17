@@ -57,7 +57,7 @@ injects, because what it writes is CSS custom properties on `<html>` and every r
 a stylesheet; `CommitAudition`, the command inspector's write path, which
 forwards a panel's commit to `EditorRequests` and replays the selected note through `Audition`
 once the compile that includes it lands; and `MidiInput`, which injects nothing and holds the Web
-MIDI connection the top bar's switch asks for — every input the browser offers, as one stream of
+MIDI connection the piano roll's Record dialog asks for — every input the browser offers, as one stream of
 keys with one listener slot, which the piano roll takes while it is open
 (`.claude/rules/piano-roll-architecture.md`, Recording from a MIDI keyboard).
 

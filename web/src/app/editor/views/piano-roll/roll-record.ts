@@ -103,8 +103,9 @@ export interface RollRecord {
   message: Signal<string | null>;
   /** The earliest tick a key pressed now could sound at, or `null` while none would sound. */
   keyTick: Signal<number | null>;
-  /** Arm a recording, or stop the one in flight and write it. */
-  toggle(): void;
+  /** Arm a recording, to start on the first key; a refusal is left in `message`. */
+  arm(): void;
+  /** Stop the recording in flight and write it, or disarm one still waiting. */
   stop(): void;
   /**
    * A key from somewhere other than a MIDI input, taken exactly as one from
@@ -374,6 +375,10 @@ export function rollRecord(sources: RecordSources): RollRecord {
   };
 
   const arm = (): void => {
+    if (phase() !== 'idle') {
+      return;
+    }
+
     message.set(null);
     if (keyChannel() === null) {
       message.set($localize`:@@roll.record.every-channel-muted:roll.record.every-channel-muted`);
@@ -644,7 +649,7 @@ export function rollRecord(sources: RecordSources): RollRecord {
     noteCount: computed(() => take().played.length + take().held.length),
     message: message.asReadonly(),
     keyTick,
-    toggle: () => (phase() === 'idle' ? arm() : stop()),
+    arm,
     stop,
     key: onKey,
   };

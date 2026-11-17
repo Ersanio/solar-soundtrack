@@ -1,0 +1,86 @@
+<amk-modal [heading]="text.heading">
+  <div class="flex flex-col gap-3">
+    <!-- Lit while keyboards are being listened to. The keys reach the piano
+         roll only, which is why the switch is here. -->
+    <div class="flex flex-wrap items-center gap-2">
+      <button
+        i18n="@@roll.record.use-midi-keyboard"
+        amk-toggle
+        [pressed]="midi.status() === 'on'"
+        [disabled]="midi.status() === 'unsupported' || midi.status() === 'asking'"
+        [title]="midiTitle()"
+        (click)="toggleMidi()"
+      >
+        roll.record.use-midi-keyboard
+      </button>
+      <button
+        i18n="@@roll.record.play-the-song"
+        amk-toggle
+        i18n-title="@@roll.record.play-the-song.title"
+        title="roll.record.play-the-song.title"
+        [pressed]="playSong()"
+        (click)="playSongChange.emit(!playSong())"
+      >
+        roll.record.play-the-song
+      </button>
+      <button
+        i18n="@@roll.record.key-sounds"
+        amk-toggle
+        i18n-title="@@roll.record.key-sounds.title"
+        title="roll.record.key-sounds.title"
+        [pressed]="keySounds()"
+        (click)="keySoundsChange.emit(!keySounds())"
+      >
+        roll.record.key-sounds
+      </button>
+    </div>
+
+    <div
+      class="flex items-center gap-1"
+      i18n-title="@@roll.record.chord.title"
+      title="roll.record.chord.title"
+    >
+      <span i18n="@@roll.record.chord" class="text-ink-muted mr-1 text-xs">roll.record.chord</span>
+      @for (chip of chordChips(); track chip.channel) {
+        <button
+          type="button"
+          [class]="chip.class"
+          [title]="chip.title"
+          [disabled]="chip.fixed"
+          (click)="chordChannelToggle.emit(chip.channel)"
+        >
+          {{ chip.channel }}
+        </button>
+      }
+    </div>
+
+    <!-- The computer's own keyboard always plays, so its layout is said here,
+         where a porter about to record will read it. -->
+    <p i18n="@@roll.record.typing-note" class="text-ink-muted text-xs leading-relaxed">
+      roll.record.typing-note
+    </p>
+  </div>
+
+  <button
+    i18n="@@roll.record.cancel"
+    amk-button
+    size="sm"
+    variant="ghost"
+    modalFooter
+    (click)="close()"
+  >
+    roll.record.cancel
+  </button>
+  <button
+    i18n="@@roll.record.arm"
+    amk-button
+    size="sm"
+    variant="danger"
+    modalFooter
+    i18n-title="@@roll.record.arm.title"
+    title="roll.record.arm.title"
+    (click)="confirm()"
+  >
+    roll.record.arm
+  </button>
+</amk-modal>

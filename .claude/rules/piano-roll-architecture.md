@@ -241,9 +241,9 @@ nothing beneath reads. That is why the roll can run at 240 Hz without the note l
 
 ## Files and components
 
-**The folder is a parent and thirteen child folders**, as `output/command-inspector/` is. `piano-roll.ts`
+**The folder is a parent and fourteen child folders**, as `output/command-inspector/` is. `piano-roll.ts`
 holds the song's shape and the porter's settings and hands each child what it draws:
-`roll-toolbar/`, `roll-overview/`, `roll-scrub/`, `roll-channels/`,
+`roll-toolbar/` and the `roll-record-dialog/` it opens, `roll-overview/`, `roll-scrub/`, `roll-channels/`,
 `roll-command-lane/` and `roll-tooltip/` in the ordinary namespace, `roll-lanes/`, `roll-grid/`,
 `roll-loops/` — which holds two, the boxes and their labels — `roll-notes/`, `roll-edit-layer/`,
 `roll-take/` and `roll-keys/` inside the roll's own `<svg>`. `roll-channels/` is the odd one: it draws nothing of the
@@ -405,10 +405,17 @@ MIDI 60 — read off `KeyboardEvent.code`, so the piano is where the keys are on
 `piano-roll.ts` takes the bare keys ahead of the shortcuts, every one of which on a letter needs
 `Ctrl` or `Alt` while the bare ones (Space, Delete, the arrows, Escape) are off the piano, and hands
 them to `RollRecord.key` as a MIDI input would. A key whose target is a field or inside a `dialog`
-is not taken. The keyboard's controls are a row of their own in the toolbar, under the roll's
-settings, and the label heading it gives the typing layout.
+is not taken.
 
-**A key needs no channel picked first.** With none, a key or a press of Record picks the lowest
+**Record is one toggle on the toolbar's row, after Edits, and its settings are a dialog.**
+Pressed while idle it opens `roll-record-dialog/` — a `shared/modal/` holding the Use MIDI Keyboard
+switch (the press the browser's permission prompt answers to), Play the song, Key sounds, the chord
+chips and the typing layout — whose settings apply as they are pressed; its Arm arms
+(`RollRecord.arm`). Pressed while armed or recording, it stops (`RollRecord.stop`), which disarms a
+take with no notes and writes one with some. It lights red from Arm on, and its dot becomes a square
+(`icon-recording`) once the first key has started the take.
+
+**A key needs no channel picked first.** With none, a key or a press of Arm picks the lowest
 channel the mixer leaves audible (`keyChannel`, through the `pickChannel` sink) and plays or records
 on that, as a press on a bar names its channel: a keyboard has no pointer to say which it means.
 
@@ -416,7 +423,7 @@ on that, as a press on a bar names its channel: a keyboard has no pointer to say
 a song with nothing in it can be recorded into, so the pointer free-runs at the clock's slope
 (`recordTickStep` in `roll-take.ts`) and `roll-view.ts` reads it ahead of the song's own tick while
 there is one. It stands still until the first key, so a take has no silence in front of it. With
-**Play the song** on, the song waits for that key as well: Record loads the transport and pauses it
+**Play the song** on, the song waits for that key as well: Arm loads the transport and pauses it
 where it stands (`cue`), so the key has only to let it go (`letGo`), and from then the pointer is
 the transport's playhead for as long as that moves forwards; where the song ends or comes round its
 loop the transport stops and the pointer carries on.
@@ -469,3 +476,6 @@ new entry goes there, with its line here, in the same change.
   `drumFrom`, `remapFed`, `parser.ts:2753`
 - **The computer keyboard as a piano behind a Typing keys toggle** — `typingKeys`,
   `RollRecord.listening`, `keyOfCode`, `rollShortcut`
+- **The MIDI keyboard switch in the top bar** — `topbar.midi`, `MidiInput`, `roll-record-dialog/`
+- **The keyboard's controls on a row of their own under the roll's settings** — `basis-full`,
+  `roll-toolbar/`, `roll-record-dialog/`, `RollRecord.arm`

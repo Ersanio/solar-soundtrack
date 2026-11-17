@@ -1,4 +1,4 @@
-import { Component, computed, input, output } from '@angular/core';
+import { Component, computed, input, output, viewChild } from '@angular/core';
 
 import { Button } from '../../../../shared/button/button';
 import { ButtonGroup } from '../../../../shared/button-group/button-group';
@@ -8,10 +8,10 @@ import { Toggle } from '../../../../shared/toggle/toggle';
 import { Toolbar } from '../../../../shared/toolbar/toolbar';
 import { HistoryButtons } from '../../../history-buttons/history-buttons';
 import { IconRecord } from '../../../../shared/icons/icon-record';
-import { CHANNELS } from '../../../../state/transport-view';
-import { CHANNEL_BG, CHANNEL_SCOPE } from '../../../../util/channel-palette';
+import { IconRecording } from '../../../../shared/icons/icon-recording';
 import { EDIT_MODES, type EditMode } from '../roll-edit';
 import type { RecordPhase } from '../roll-record';
+import { RollRecordDialog } from '../roll-record-dialog/roll-record-dialog';
 import {
   BEAT_UNITS,
   MAX_BEATS,
@@ -20,16 +20,6 @@ import {
   clampBeats,
   isBeatUnit,
 } from '../roll-settings';
-
-/**
- * A chord channel's chip: the channel's own colour as its only background, as
- * the corner picker's chips are, with the ring and the dim saying whether a
- * chord may land on it.
- */
-const CHIP_CLASS =
-  'flex h-5 w-5 cursor-pointer items-center justify-center rounded-[3px] font-mono text-[10px] leading-none font-semibold text-(--on-ch) transition disabled:cursor-default';
-const CHIP_ON = 'ring-(--on-ch) ring-2 ring-inset';
-const CHIP_OFF = 'opacity-40 hover:not-disabled:opacity-70';
 
 /**
  * The roll's own controls, which every view brings for itself.
@@ -45,15 +35,29 @@ const CHIP_OFF = 'opacity-40 hover:not-disabled:opacity-70';
  */
 @Component({
   selector: 'amk-roll-toolbar',
-  imports: [Button, ButtonGroup, Toggle, IconMinus, IconPlus, IconRecord, HistoryButtons, Toolbar],
+  imports: [
+    Button,
+    ButtonGroup,
+    Toggle,
+    IconMinus,
+    IconPlus,
+    IconRecord,
+    IconRecording,
+    HistoryButtons,
+    RollRecordDialog,
+    Toolbar,
+  ],
   templateUrl: './roll-toolbar.html',
   host: { class: 'contents' },
 })
 export class RollToolbar {
   protected readonly text = {
     startRecording: $localize`:@@roll.record.start.title:roll.record.start.title`,
+    armed: $localize`:@@roll.record.armed.title:roll.record.armed.title`,
     stopRecording: $localize`:@@roll.record.stop.title:roll.record.stop.title`,
   };
+
+  private readonly recordDialog = viewChild.required(RollRecordDialog);
 
   readonly recordPhase = input.required<RecordPhase>();
   /** How many notes the take in flight holds. */
@@ -67,7 +71,10 @@ export class RollToolbar {
   /** Every channel a take is spread over, the edited one included. */
   readonly recordChannels = input.required<readonly number[]>();
 
-  readonly recordToggle = output();
+  /** The dialog's Arm, which arms a recording. */
+  readonly recordArm = output();
+  /** Record pressed while armed or recording, which ends the take. */
+  readonly recordStop = output();
   readonly keySoundsChange = output<boolean>();
   readonly playSongChange = output<boolean>();
   readonly chordChannelToggle = output<number>();
@@ -147,28 +154,25 @@ export class RollToolbar {
     }
   });
 
-  /**
-   * One chip per channel a chord can spread over. The edited channel's is lit
-   * and takes no press, a take always being recorded on it.
-   */
-  protected readonly chordChips = computed(() => {
-    const edited = this.editChannel();
-    const chosen = new Set(this.recordChannels());
-    return Array.from({ length: CHANNELS }, (_, channel) => {
-      const fixed = channel === edited;
-      const on = chosen.has(channel);
-      return {
-        channel,
-        fixed,
-        title: fixed
-          ? $localize`:@@roll.record.chord.edited:roll.record.chord.edited ${channel}:channel:`
-          : on
-            ? $localize`:@@roll.record.chord.remove:roll.record.chord.remove ${channel}:channel:`
-            : $localize`:@@roll.record.chord.add:roll.record.chord.add ${channel}:channel:`,
-        class: `${CHIP_CLASS} ${CHANNEL_BG[channel]} ${CHANNEL_SCOPE[channel]} ${on ? CHIP_ON : CHIP_OFF}`,
-      };
-    });
+  protected readonly recordTitle = computed(() => {
+    switch (this.recordPhase()) {
+      case 'idle':
+        return this.text.startRecording;
+      case 'armed':
+        return this.text.armed;
+      case 'recording':
+        return this.text.stopRecording;
+    }
   });
+
+  /** Idle, Record asks for the settings before it arms; otherwise it stops. */
+  protected pressRecord(): void {
+    if (this.recordPhase() === 'idle') {
+      this.recordDialog().open();
+    } else {
+      this.recordStop.emit();
+    }
+  }
 
   /**
    * The beats in a bar, off the field itself.

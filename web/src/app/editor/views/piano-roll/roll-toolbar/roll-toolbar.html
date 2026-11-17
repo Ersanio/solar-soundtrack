@@ -165,76 +165,35 @@
     </select>
   </div>
 
-  <!-- Playing and recording from a keyboard, on a row of its own under the
-       roll's settings: `basis-full` takes the whole line, so the row stands
-       apart however the settings above it happen to wrap. -->
-  <div class="flex basis-full flex-wrap items-center gap-2">
-    <!-- The computer's own keyboard always plays, so the row's label is where
-         its layout is told. -->
-    <span
-      i18n="@@roll.record.keyboard"
-      class="text-ink-muted text-xs"
-      i18n-title="@@roll.record.typing-keys.title"
-      title="roll.record.typing-keys.title"
-      >roll.record.keyboard</span
-    >
+  <span class="bg-edge h-5 w-px shrink-0"></span>
 
-    <!-- The channels are chosen before a take and not during one, so
-         everything but Record itself is held while one is in flight. Lit red
-         while armed, as FL Studio's record button is. -->
-    <button
-      amk-toggle
-      tone="danger"
-      [pressed]="recordPhase() !== 'idle'"
-      [title]="recordPhase() === 'idle' ? text.startRecording : text.stopRecording"
-      (click)="recordToggle.emit()"
-    >
+  <!-- Lit red while armed, as FL Studio's record button is, and its dot a
+       square once the first key has started the take. Idle, a press asks for
+       the settings first; armed or recording, it stops. -->
+  <button
+    amk-toggle
+    tone="danger"
+    [pressed]="recordPhase() !== 'idle'"
+    [title]="recordTitle()"
+    (click)="pressRecord()"
+  >
+    @if (recordPhase() === 'recording') {
+      <amk-icon-recording />
+    } @else {
       <amk-icon-record />
-      <ng-container i18n="@@roll.record">roll.record</ng-container>
-    </button>
-    <button
-      i18n="@@roll.record.key-sounds"
-      amk-toggle
-      i18n-title="@@roll.record.key-sounds.title"
-      title="roll.record.key-sounds.title"
-      [pressed]="keySounds()"
-      (click)="keySoundsChange.emit(!keySounds())"
-    >
-      roll.record.key-sounds
-    </button>
-    <button
-      i18n="@@roll.record.play-the-song"
-      amk-toggle
-      i18n-title="@@roll.record.play-the-song.title"
-      title="roll.record.play-the-song.title"
-      [pressed]="playSong()"
-      [disabled]="recordPhase() !== 'idle'"
-      (click)="playSongChange.emit(!playSong())"
-    >
-      roll.record.play-the-song
-    </button>
-
-    <span class="bg-edge h-5 w-px shrink-0"></span>
-
-    <div
-      class="flex items-center gap-1"
-      i18n-title="@@roll.record.chord.title"
-      title="roll.record.chord.title"
-    >
-      <span i18n="@@roll.record.chord" class="text-ink-muted text-xs">roll.record.chord</span>
-      @for (chip of chordChips(); track chip.channel) {
-        <button
-          type="button"
-          [class]="chip.class"
-          [title]="chip.title"
-          [disabled]="chip.fixed || recordPhase() !== 'idle'"
-          (click)="chordChannelToggle.emit(chip.channel)"
-        >
-          {{ chip.channel }}
-        </button>
-      }
-    </div>
-  </div>
+    }
+    <ng-container i18n="@@roll.record">roll.record</ng-container>
+  </button>
+  <amk-roll-record-dialog
+    [keySounds]="keySounds()"
+    [playSong]="playSong()"
+    [editChannel]="editChannel()"
+    [recordChannels]="recordChannels()"
+    (keySoundsChange)="keySoundsChange.emit($event)"
+    (playSongChange)="playSongChange.emit($event)"
+    (chordChannelToggle)="chordChannelToggle.emit($event)"
+    (arm)="recordArm.emit()"
+  />
 
   <!-- A line of its own, drawn even when empty and kept to one line, so a
        message coming or going never changes the strip's height under the roll. -->

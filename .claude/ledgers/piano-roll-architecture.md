@@ -48,3 +48,16 @@ considered there and moved away from, with the reason. The rule carries one inde
   Escape — are none of `keyOfCode`'s, so the piano and `rollShortcut` never want the same press.
   What it did do was make a porter switch the keyboard on before it worked. The keys are now always
   taken, outside fields and dialogs, and Record is always on the toolbar.
+
+- **The MIDI keyboard switch in the top bar** — Use MIDI Keyboard sat beside the transport, with a
+  title saying what `MidiInput` was doing (`topbar.midi.*`). The keys it turns on reach the piano
+  roll only, and nothing in the top bar reads them, so the switch was a recording setting kept
+  apart from recording. It is in `roll-record-dialog/` now, with the other settings Record asks
+  about.
+
+- **The keyboard's controls on a row of their own under the roll's settings** — a `basis-full` row
+  under the toolbar held Typing keys, Record, Key sounds, Play the song and the chord chips, all
+  visible all the time, and Record armed on its first press. Most of it is set once and left, and
+  the row cost the roll a line of height. Record is now one toggle on the main row after Edits; a
+  press while idle opens the dialog, whose Arm arms (`RollRecord.arm`), as FL Studio's record
+  button asks what to record before it arms.

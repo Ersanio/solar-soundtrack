@@ -10,7 +10,10 @@ export const CHANGELOG: readonly ChangelogEntry[] = [
   // ─── newest first; add new blocks here ──────────────────────────────────
   {
     date: '18 November 2026',
-    items: ['The computer keyboard always plays the piano roll'],
+    items: [
+      "Recording settings behind the piano roll's Record button, the MIDI keyboard switch included",
+      'The computer keyboard always plays the piano roll',
+    ],
   },
   {
     date: '17 November 2026',
