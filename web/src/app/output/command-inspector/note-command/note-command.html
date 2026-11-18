@@ -30,7 +30,13 @@
   </div>
 }
 
-<amk-note-length [command]="command()" [pass]="pass()" />
+<div class="flex flex-col gap-2.5">
+  <amk-note-length [command]="command()" [pass]="pass()" />
+
+  @if (vibrato(); as line) {
+    <span class="text-ink-muted text-[11px] leading-snug">{{ line }}</span>
+  }
+</div>
 
 @if (palette(); as palette) {
   <amk-note-palette [note]="command()" [model]="palette" />

@@ -50,3 +50,4 @@ A new entry goes there, with its line here, in the same change.
   `noteSoundingTicks`, `@amk/core`, `walktest`
 - **The `$DD` bend graph drawn against `o4 c` as a stand-in** — `NoteAddress.note`, `bendAnchor`,
   `slide-start.ts`, `WalkNote.bend`
+- **The vibrato readout measured from the emitted byte** — `vibrato-swing.ts`, `NoteAddress.written`

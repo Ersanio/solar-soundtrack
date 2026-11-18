@@ -21,6 +21,7 @@ import { runSections } from "../harness";
 await runSections([
 	["sound", () => import("./sound")],
 	["muting", () => import("./muting")],
+	["pitch", () => import("./pitch")],
 	["samples", () => import("./samples")],
 	["loop-and-ticks", () => import("./loop-and-ticks")],
 	["note-map", () => import("./note-map")],

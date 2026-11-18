@@ -23,16 +23,17 @@
  *
  * Deliberately **not** modelled, because none of it moves a note in time:
  *   - runtime transposition (`$E4`, `$EE`, `$FA $02`). {@link WalkNote.key} is
- *     the emitted byte's; `$E4` and `$FA $02` are reported as state. Which row
- *     a note draws on is the roll's decision, made from the written pitch in
+ *     the emitted byte's; all three are reported as state. Which row a note
+ *     draws on is the roll's decision, made from the written pitch in
  *     `noteMap`, and the transposition is a tooltip line rather than a moved bar.
  *   - `ShouldSkipKeyOff`'s (main.asm:2949) readahead, which is articulation.
  *   - the second trip round the loop, whose channel state carries over from the
  *     end of the first. Every {@link WalkNote.state} is the first pass's.
- *   - `$F3`, the sample load. It changes a voice's sample without changing its
- *     instrument number, so after `@10 (@1, $02)` a note still reports `@10`.
- *     Following it means tracking a per-voice SRCN override, which nothing yet
- *     needs; the lane rule is defined on `@n` and stays self-consistent.
+ *   - what `$F3`, the sample load, loads. It changes a voice's sample without
+ *     changing its instrument number, so after `@10 (@1, $02)` a note still
+ *     reports `@10`, and {@link NoteState.sampleLoaded} says only that it ran.
+ *   - remote code bodies, which run at a key-on or a key-off rather than in the
+ *     track. {@link NoteState.remotePitch} says when one could move a pitch.
  *
  * Feed the compiled song binary into {@link walkSong} to get its timeline.
  */
@@ -54,7 +55,7 @@ import {
 import { SST } from "@amk/core/messages/sst";
 import { VOICES } from "./driver-state";
 import { CHANNEL_SLOTS, INSTRUMENT_SLOT, SLOTS, slotAt, slotsOf } from "./slots";
-import type { LoopRun, NoteState, SongTimeline, TempoChange, WalkCommand, WalkNote } from "./song-walk-types";
+import type { LoopRun, NoteState, SongTimeline, TempoChange, Vibrato, WalkCommand, WalkNote } from "./song-walk-types";
 
 export { SLOTS, type StateSlot, replacedByNextInSlot } from "./slots";
 export type {
@@ -63,6 +64,7 @@ export type {
 	PitchSlide,
 	SongTimeline,
 	TempoChange,
+	Vibrato,
 	WalkCommand,
 	WalkNote,
 } from "./song-walk-types";
@@ -159,6 +161,8 @@ interface Track {
 	duration: number;
 	/** The note a `$C6` tie should extend, or -1 when a tie would be a rest. */
 	held: number;
+	/** How many frames {@link held} has had, its own and every tie's. */
+	heldFrames: number;
 	/** See {@link WalkNote.drumFrom}; -1 while no drum byte is the sample in force. */
 	drumFrom: number;
 	/**
@@ -251,11 +255,75 @@ interface ChannelState {
 	quantization: number | null;
 	gate: number;
 	velocity: number;
-	vibrato: boolean;
+	vibrato: Vibrato | null;
 	tremolo: boolean;
 	noise: number | null;
 	tune: number;
+	fineTune: number;
+	sampleLoaded: boolean;
+	arpeggio: boolean;
+	remotePitch: boolean;
 }
+
+/** Bytes of a remote code body read before it is taken to be something the walk cannot read. */
+const REMOTE_BUDGET = 256;
+
+/** What a remote body may run that moves a pitch, a tuning or a vibrato. `$FA $02` is tested apart. */
+const PITCH_COMMANDS: ReadonlySet<number> = new Set([
+	VCMD.Instrument,
+	VCMD.Vibrato,
+	VCMD.VibratoOff,
+	VCMD.VibratoFade,
+	VCMD.Subloop,
+	VCMD.CallLoop,
+	VCMD.FineTune,
+	VCMD.SampleLoad,
+	VCMD.Arpeggio,
+]);
+
+/**
+ * How far a remote code body could move a pitch: `"song"` for a `$E4`, which every channel reads,
+ * `"channel"` for anything else in {@link PITCH_COMMANDS} or a note, and `"none"`.
+ *
+ * The driver runs a body as track data up to its `$00` (`main.asm:308-335`), so it is read that
+ * way. A body that runs off the song or past {@link REMOTE_BUDGET} is not one the walk can vouch
+ * for, and counts as moving it.
+ */
+function remoteReach(song: Uint8Array, at: number): "none" | "channel" | "song" {
+	let reach: "none" | "channel" | "song" = "none";
+	const end = Math.min(song.length, at + REMOTE_BUDGET);
+	for (let i = at; i < end;) {
+		const byte = song[i];
+		if (byte === 0) {
+			return reach;
+		}
+
+		// A duration or a `q` byte.
+		if (byte < NOTE_LOWEST) {
+			i += 1;
+			continue;
+		}
+
+		const length = vcmdLength(song, i);
+		if (length === 0) {
+			return reach === "song" ? "song" : "channel";
+		}
+
+		if (byte === VCMD.GlobalTranspose) {
+			reach = "song";
+		} else if (reach === "none" && (PITCH_COMMANDS.has(byte) || (byte === VCMD.Settings && song[i + 1] === 0x02))) {
+			reach = "channel";
+		}
+
+		i += length;
+	}
+
+	return reach === "song" ? "song" : "channel";
+}
+
+/** See {@link WalkNote.vibratoTicks}. */
+const vibratoSteps = (vibrato: Vibrato | null, gateTicks: number, frames: number): number =>
+	vibrato === null ? 0 : Math.max(0, gateTicks - frames - vibrato.delay);
 
 /**
  * Reads a compiled song into a timeline of one pass.
@@ -348,6 +416,7 @@ export function walkSong(song: Uint8Array, aramAddress: number): SongTimeline {
 			ticks: 0,
 			duration: 1,
 			held: -1,
+			heldFrames: 0,
 			drumFrom: -1,
 			frameAt: -1,
 			callCount: 0,
@@ -380,10 +449,14 @@ export function walkSong(song: Uint8Array, aramAddress: number): SongTimeline {
 				// note left them; a fresh voice has the full slot and full velocity.
 				gate: 0xff,
 				velocity: 0xff,
-				vibrato: false,
+				vibrato: null,
 				tremolo: false,
 				noise: null,
 				tune: 0,
+				fineTune: 0,
+				sampleLoaded: false,
+				arpeggio: false,
+				remotePitch: false,
 			},
 			snapshot: null,
 		});
@@ -498,6 +571,10 @@ export function walkSong(song: Uint8Array, aramAddress: number): SongTimeline {
 			noise: track.state.noise,
 			transpose: shared.transpose,
 			tune: track.state.tune,
+			fineTune: track.state.fineTune,
+			sampleLoaded: track.state.sampleLoaded,
+			arpeggio: track.state.arpeggio,
+			remotePitch: track.state.remotePitch,
 			tempo: shared.tempo,
 			globalVolume: shared.globalVolume,
 		};
@@ -767,6 +844,8 @@ export function walkSong(song: Uint8Array, aramAddress: number): SongTimeline {
 				// Every segment before the last sounds in full — the tie never keys
 				// off — and only this one is cut short by the gate in force now.
 				previous.gateTicks = previous.ticks - ticks + frameSoundingTicks(ticks, track.state.gate, shared.waitTime);
+				track.heldFrames += 1;
+				previous.vibratoTicks = vibratoSteps(previous.state.vibrato, previous.gateTicks, track.heldFrames);
 			}
 
 			track.ticks += ticks;
@@ -802,21 +881,30 @@ export function walkSong(song: Uint8Array, aramAddress: number): SongTimeline {
 			}
 
 			// Every drum byte reloads, so the newest one is the one in force — the
-			// same drum twice over is still two loads.
+			// same drum twice over is still two loads. That load writes the drum's
+			// own multiplier over a `$F3`'s (`Commands.asm:211-216`).
 			track.drumFrom = address;
+			if (track.state.sampleLoaded) {
+				track.state.sampleLoaded = false;
+				track.snapshot = null;
+			}
 		}
 
 		track.held = notes.length;
+		track.heldFrames = 1;
+		const state = snapshot(track);
+		const gateTicks = frameSoundingTicks(ticks, track.state.gate, shared.waitTime);
 		notes.push({
 			channel,
 			tick: track.ticks,
 			ticks,
-			gateTicks: frameSoundingTicks(ticks, track.state.gate, shared.waitTime),
+			gateTicks,
+			vibratoTicks: vibratoSteps(state.vibrato, gateTicks, 1),
 			note: byte,
 			key: percussion === null ? byte - NOTE_LOWEST : null,
 			percussion,
 			address,
-			state: snapshot(track),
+			state,
 			origins: origins(track),
 			drumFrom: track.drumFrom >= 0 ? track.drumFrom : null,
 			bend: null,
@@ -847,9 +935,46 @@ export function walkSong(song: Uint8Array, aramAddress: number): SongTimeline {
 			case VCMD.Instrument: // instrument
 				state.instrument = arg(0);
 				state.noise = null;
-				// `SetInstrument` reloads the sample, so no drum byte is in force now.
+				// `SetInstrument` reloads the sample, so no drum byte is in force now,
+				// and nor is a `$F3`'s (`Commands.asm:94-95`).
+				state.sampleLoaded = false;
 				track.drumFrom = -1;
 				break;
+			case VCMD.SampleLoad:
+				state.sampleLoaded = true;
+				break;
+			case VCMD.FineTune:
+				state.fineTune = arg(0);
+				break;
+			case VCMD.Arpeggio:
+				// A count of 0 is no arpeggio; `$80` and up is a trill or a glissando (`main.asm:2988-2997`).
+				state.arpeggio = arg(0) !== 0;
+				break;
+			case VCMD.RemoteCode: {
+				// `cmdFC` (`Commands.asm:1242-1304`): types 0, 7 and 8 only clear, and a body address of
+				// `$01xx` is the GAIN shortcut rather than a body (`main.asm:317-323`).
+				const type = arg(2);
+				const body = indexOf(arg(0) | (arg(1) << 8));
+				const reach =
+					type === 0 || type === 7 || type === 8 || arg(1) === 0x01
+						? "none"
+						: body < 0
+							? "channel"
+							: remoteReach(song, body);
+				if (reach === "song") {
+					for (const each of tracks) {
+						each.state.remotePitch = true;
+						each.snapshot = null;
+					}
+				} else if (reach === "channel") {
+					state.remotePitch = true;
+				} else {
+					dirty = false;
+				}
+
+				break;
+			}
+
 			case VCMD.Pan: // pan
 			case VCMD.PanFade: // pan fade — the second byte is the target
 				state.pan = vcmd === VCMD.Pan ? arg(0) : arg(1);
@@ -903,10 +1028,18 @@ export function walkSong(song: Uint8Array, aramAddress: number): SongTimeline {
 			}
 
 			case VCMD.Vibrato:
-				state.vibrato = true;
+				state.vibrato = arg(2) === 0 ? null : { delay: arg(0), rate: arg(1), depth: arg(2), fade: 0 };
 				break;
 			case VCMD.VibratoOff:
-				state.vibrato = false;
+				state.vibrato = null;
+				break;
+			case VCMD.VibratoFade:
+				if (state.vibrato === null) {
+					dirty = false;
+				} else {
+					state.vibrato = { ...state.vibrato, fade: arg(0) };
+				}
+
 				break;
 			case VCMD.GlobalVolume:
 			case VCMD.GlobalVolumeFade:

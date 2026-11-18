@@ -70,6 +70,8 @@ await runSections([
 	["malformed-data", () => import("./malformed-data")],
 	["driver-plays", () => import("./driver-plays")],
 	["driver-key-off", () => import("./driver-key-off")],
+	["vibrato", () => import("./vibrato")],
+	["pitch-range", () => import("./pitch-range")],
 	["tempo-shortfall", () => import("./tempo-shortfall")],
 	["in-force-named", () => import("./in-force-named")],
 ]);

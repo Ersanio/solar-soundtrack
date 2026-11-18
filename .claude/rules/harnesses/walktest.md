@@ -220,6 +220,32 @@ the oracle — each note is timed from key-on to key-off through `!PlayingVoices
 writes, across lengths that reach every branch of the rule, 193 among them, whose last 96-tick
 piece is a single tick with no read-ahead tick to key off on.
 
+### `vibrato.ts`
+
+The vibrato a note sounds under (`NoteState.vibrato`): `$DE`'s three values, `p` with three
+arguments and with two, and none after a `$DF` or a `$DE` of depth 0. Then **how often it steps
+before the key-off** (`WalkNote.vibratoTicks`), held to the running driver: at a rate of 1 the
+phase at `$0330` counts the steps, so it is read at each key-off over the key-off section's lengths
+and four delays. The `$60`-tick pieces are what this catches, each frame's first tick fetching and
+so stepping nothing. Last, the note inspector's line (`note-command/vibrato-swing.ts`) on real
+compiles: `$F2` a cent short of two semitones at each end, a sub-semitone depth in cents, a half
+reading the same both ways, the written pitch rather than `@2`'s byte, the steady lines for a delay
+the note does not outlast and a rate of 0, and nothing for a drum or under noise.
+
+### `pitch-range.ts`
+
+What a note's pitch depends on, as the walk reports it — `$EE`'s fine tune, a `$F3` until the next
+`$DA`, an arpeggio on and off, a fade, and a remote body that moves the pitch from its call on where
+one that only sets GAIN does not — and then `state/pitch-range.ts` on real compiles. `SST0513` lands
+on the note, named in the frame it is written in: `@0` wraps from o6 f, a transposed note past
+o7 b or below o1 c plays nothing, every stock drum plays true and a transposed one is judged at its
+own entry's pitch, a note in a `[ ]3` is one finding, and `@30` and up are judged by their own
+`#instruments` entry, a noise one not at all. `SST0514` lands on each note the
+vibrato swings out, a note in a `[ ]2` once: a crest past the instrument's highest true note, one
+carried past o7 b by `$EE $10` — the margin `$FF` leaves at o6 a is 15/256 of a semitone — and a dip
+below o1 c, but not a slow rate on a short note, a delay the note does not outlast, or a fade. Under a `$F3`, an arpeggio or a pitch-moving remote
+body nothing is raised.
+
 ### `tempo-shortfall.ts`
 
 The **measured** clock, which is the only figure in the app that had to be played to be found:

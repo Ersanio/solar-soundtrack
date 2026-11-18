@@ -16,6 +16,7 @@ main thread, and inside an `AudioWorkletGlobalScope`.
 | `fir.ts`             | The echo filter: response, stability, headroom, design            |
 | `instruments.ts`     | Finds the driver's own instrument and percussion tables           |
 | `layout.ts`          | Where things sit in ARAM, and what is left                        |
+| `pitch.ts`           | `SetPitch`'s arithmetic, and where a pitch stops being the note   |
 | `player.ts`          | AudioContext, worklet node, transport                             |
 | `protocol.ts`        | The one message contract between page and audio thread            |
 | `repeat-settings.ts` | The settings a pass carries into the song's repeat                |
@@ -175,6 +176,25 @@ note long enough to be written as tied `$60`-tick pieces is cut only in its last
 2 until a `$F4 $02` flips it, for every channel at once, so the walk carries it as song-wide state.
 `frameSoundingTicks` in `@amk/core` is the arithmetic, shared with the note inspector, and `walktest`
 times each note's key-on and key-off on the running driver against it.
+
+`WalkNote.vibratoTicks` is how many of those ticks the vibrato moves the pitch on. It is the walk's
+to say because it turns on the note's frames: the delay is counted and the phase stepped only on a
+tick that fetches nothing, so each frame's first tick does neither, and a key-on starts both again
+(`main.asm:453-457, 3290-3324`). The note inspector says a note that gets none plays steady, and
+`walktest` reads the phase off the running driver at each key-off.
+
+## Where a pitch stops being the note
+
+`pitch.ts` is `SetPitch` (`main.asm:484-554`) transcribed, and it is what `SST0513` and `SST0514`
+are raised on (`web/src/app/state/pitch-range.ts`). Two limits come out of it, and neither is a
+written note's octave. The DSP reads fourteen bits of the pitch register (`SPC_DSP.cpp:436`), so
+once the instrument's multiplier carries a pitch to `$4000` it wraps round low: `@0`'s ×6 from
+o6 f, `@8`'s ×30 from o4 c+. And `SetPitch`'s octave counter counts up to 6, so a note number of
+84 or more, o8 c, sends it round through 255 and the pitch to nothing — which is also where a note
+transposed below o1 c lands. Only `$E4`, `$FA $02`, `$EE` and a vibrato get a note past o6 a, so
+the walk reports all four, and says when a `$F3`, an arpeggio or a remote body leaves the tuning
+unknown. `audiotest` holds the arithmetic to the chip on rendered audio: the pitch ratio of each
+wrapped note to an in-range one on the same sample, and silence past o7 b.
 
 The traps are all in the grammar and each carries its citation in the source: a `$00` after a
 duration byte is a quantization byte and not the end of the channel, `$C7`-`$CF` are _all_ rests,

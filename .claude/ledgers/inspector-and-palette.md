@@ -114,3 +114,9 @@ considered there and moved away from, with the reason. The rule carries one inde
   that note, since nothing after a note changes its byte, so a commit to the slide's own operands
   does not blank the graph for the recompile it causes. And no stand-in where there is no byte — a
   rest, a drum, no compile — because a curve from a made-up note is the guess that looks exact.
+- **The vibrato readout measured from the emitted byte**, as the bend graph is — `@2 o5 g` under a
+  `$F2` would read o5 e and o5 c, naming neither the note written nor the one heard, since `@2`'s
+  five semitones off the byte are there to cancel its sample's tuning. `vibrato-swing.ts` measures
+  from `NoteAddress.written`, the row the roll draws the bar on. The bend graph takes the byte only
+  because the driver compares a `$DD`'s target against it; a vibrato has no target, only a swing
+  either side of whatever is playing.

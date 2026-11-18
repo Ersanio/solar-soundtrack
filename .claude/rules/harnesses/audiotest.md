@@ -70,6 +70,7 @@ section alone.
 | ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `sound.ts`               | The emulator boots, a compiled song makes sound, silence is silent, notes differ audibly, and fast-forward lands somewhere different.               |
 | `muting.ts`              | Muting takes a channel's volume and nothing else: the mix, the song carried on underneath, its speed, a ringing note, and unmuting.                 |
+| `pitch.ts`               | The DSP plays the pitch `@amk/spc/pitch` says: true, wrapped past `$4000` on `@0`, `@8` and a custom ×3.5, and silent past o7 b and below o1 c.     |
 | `samples.ts`             | Sample sets through the emulator: `#samples`, a custom instrument, `optimizeSampleUsage` and a `.bnk` bank.                                         |
 | `loop-and-ticks.ts`      | The loop lasts as long as the compiler says, the driver's ticks are counted exactly, and the voice the count is latched on is one the driver plays. |
 | `note-map.ts`            | The note map lands on what the driver is playing.                                                                                                   |

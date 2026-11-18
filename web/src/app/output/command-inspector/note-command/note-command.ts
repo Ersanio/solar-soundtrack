@@ -11,6 +11,7 @@ import { EditorStore } from '../../../state/editor-store';
 import { CommandChip } from '../command-chip/command-chip';
 import { NoteLength } from '../note-length/note-length';
 import { NotePalette, type NotePaletteModel } from '../note-palette/note-palette';
+import { vibratoLine } from './vibrato-swing';
 
 /** One command acting on the note, drawn as the palette draws it. */
 interface Acting {
@@ -195,6 +196,14 @@ export class NoteCommand {
       ? $localize`:@@inspector.note.the-commands-acting-on-a:inspector.note.the-commands-acting-on-a`
       : null,
   );
+
+  /** The notes the vibrato swings this pass between, read under the `q`. */
+  protected readonly vibrato = computed(() => {
+    const pass = this.pass();
+    return pass === null
+      ? null
+      : vibratoLine(pass, this.store.notesByAddress().get(pass.address)?.written);
+  });
 
   /** What the palette needs to hide duplicates — nothing without a pass. */
   protected readonly palette = computed<NotePaletteModel | null>(() => {

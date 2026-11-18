@@ -28,7 +28,31 @@ export interface NoteState {
 	waitTime: number;
 	/** `VelocityValues[...]`, through whichever table is selected. */
 	velocity: number;
-	vibrato: boolean;
+	/**
+	 * The `$DE` in force, or `null` after a `$DF` or a `$DE` of depth 0, which the driver skips
+	 * outright (`main.asm:3291-3292`).
+	 *
+	 * A `$EA` is reported as {@link Vibrato.fade} and not followed further. A fade ramps `$A1+x` in
+	 * from nothing on every note and arrives at the depth here (`Commands.asm:420-432`,
+	 * `main.asm:3302-3319`), except that one longer in ticks than the depth divides to a step of 0,
+	 * which leaves no vibrato at all.
+	 */
+	vibrato: Vibrato | null;
+	/** `$EE`'s byte, `$02D1+x`: 256ths of a semitone the driver puts under every note's number (`main.asm:434-435`). */
+	fineTune: number;
+	/**
+	 * A `$F3` has replaced the instrument's sample and multiplier (`Commands.asm:58-74`), and no `$DA`
+	 * or drum byte has put an instrument back. Whether it also clears the sub-multiplier is a
+	 * hot-patch bit the walk does not track, so the tuning the note plays at is not known here.
+	 */
+	sampleLoaded: boolean;
+	/** An `$FB` with a count is in force, playing notes of its own at offsets the walk does not follow. */
+	arpeggio: boolean;
+	/**
+	 * A remote code body run on this channel moves the pitch, the tuning or the vibrato, in a way the
+	 * walk cannot see since it does not follow `$FC` bodies. True from the first such call on.
+	 */
+	remotePitch: boolean;
 	tremolo: boolean;
 	/** `$F8`'s clock, or `null` when the channel is not making noise. */
 	noise: number | null;
@@ -51,6 +75,18 @@ export interface NoteState {
 	tempo: number;
 	/** `$E0`/`$E1` master volume. */
 	globalVolume: number | null;
+}
+
+/** A `$DE` as the driver holds it (`Commands.asm:274-288`). */
+export interface Vibrato {
+	/** `$0340+x` — ticks the vibrato waits after each key-on. */
+	delay: number;
+	/** `$0331+x` — phase added per tick, 256 to a cycle. */
+	rate: number;
+	/** `$A1+x` — under `$F1` a fraction of a semitone, from `$F1` the low nybble in semitones. */
+	depth: number;
+	/** `$0341+x` — `$EA`'s ticks to fade the depth in over on every note; 0, as `$DE` leaves it, for none. */
+	fade: number;
 }
 
 /**
@@ -112,6 +148,17 @@ export interface WalkNote {
 	 * `!WaitTime` in force at its key-on, with every frame tied in front of it whole.
 	 */
 	gateTicks: number;
+	/**
+	 * Ticks on which the vibrato in force moves the pitch before {@link gateTicks}' key-off; 0 when
+	 * its delay outlasts the note or there is none.
+	 *
+	 * A key-on zeroes the delay counter and the phase (`main.asm:453-457`). The counter is counted
+	 * up, and the phase stepped once it reaches the delay, only on a tick that fetches no frame
+	 * (`main.asm:2337-2339, 3290-3324`), so of the {@link gateTicks} a note sounds, each of its
+	 * frames' first ticks does neither. The tick that keys it off clears `!PlayingVoices` before its
+	 * own step, which then does nothing (`main.asm:2577-2578, 3239-3243, 3298-3300`).
+	 */
+	vibratoTicks: number;
 	/** The emitted byte. `$80`-`$C5` pitched, `$D0`-`$D8` a drum. */
 	note: number;
 	/** 0-69 for a pitched note, `null` for a drum. */

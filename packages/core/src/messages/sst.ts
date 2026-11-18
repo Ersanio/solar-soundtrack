@@ -46,4 +46,15 @@ export const SST = {
 	"0512": (command: string, first: string) => $localize`:@@sst.0512:sst.0512 ${command}:command: ${first}:first:`,
 	"0512.default": (command: string) => $localize`:@@sst.0512.default:sst.0512.default ${command}:command:`,
 	"0512.toggle": (command: string) => $localize`:@@sst.0512.toggle:sst.0512.toggle ${command}:command:`,
+	"0513.high": (highest: string, instrument: string, heard: string) =>
+		$localize`:@@sst.0513.high:sst.0513.high ${highest}:highest: ${instrument}:instrument: ${heard}:heard:`,
+	"0513.low": (limit: string, heard: string) => $localize`:@@sst.0513.low:sst.0513.low ${limit}:limit: ${heard}:heard:`,
+	"0513.silent-high": (limit: string) => $localize`:@@sst.0513.silent-high:sst.0513.silent-high ${limit}:limit:`,
+	"0513.silent-low": (limit: string) => $localize`:@@sst.0513.silent-low:sst.0513.silent-low ${limit}:limit:`,
+	"0513.no-true-pitch": (instrument: string, heard: string) =>
+		$localize`:@@sst.0513.no-true-pitch:sst.0513.no-true-pitch ${instrument}:instrument: ${heard}:heard:`,
+	"0514.wraps": (highest: string, instrument: string) =>
+		$localize`:@@sst.0514.wraps:sst.0514.wraps ${highest}:highest: ${instrument}:instrument:`,
+	"0514.silent-high": (limit: string) => $localize`:@@sst.0514.silent-high:sst.0514.silent-high ${limit}:limit:`,
+	"0514.silent-low": (limit: string) => $localize`:@@sst.0514.silent-low:sst.0514.silent-low ${limit}:limit:`,
 };

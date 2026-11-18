@@ -23,6 +23,7 @@ import { commandsInForceOf } from './commands-in-force';
 import { type TimelineCommand, commandTimeline } from './command-timeline';
 import { type SongClock, songClock } from './song-clock';
 import { ClockMeasurer, tempoDiagnostic } from './clock-measurer';
+import { pitchRange } from './pitch-range';
 import { repeatSettings, repeatTempo } from './repeat-carry';
 import { caretPosition, downloadBlob, errorMessage } from '../util/format';
 import { dropHeld, keepDraft, openDraft, parsing, settleDraft } from './draft-guard';
@@ -201,6 +202,7 @@ export class EditorStore {
     const order = { error: 0, severe: 1, warning: 2, info: 3 } as const;
     const timeline = this.timeline();
     const compiled = this.compilation();
+    const instruments = this.drivers.instruments();
     const all = [
       ...(this.result()?.diagnostics ?? []), // Compiler diagnostics
       ...echoHazards(this.tokens().commands), // Echo hazard diagnostics
@@ -208,6 +210,9 @@ export class EditorStore {
       ...(timeline ? unreachableChannels(timeline, this.result()?.noteMap ?? []) : []), // Unreachable notes in channels
       ...(timeline ? repeatTempo(timeline, this.result()?.commandMap ?? []) : []), // A tempo that carries into the repeat
       ...(timeline && compiled ? repeatSettings(timeline, compiled) : []), // Settings that carry into the repeat
+      ...(timeline && compiled && instruments
+        ? pitchRange(timeline, compiled.result, instruments)
+        : []), // Notes and vibratos past what the instrument can play
       // The driver cannot keep up with the tempo. It stands on the last
       // measurement rather than only on one taken from the current bytes, which
       // is what stops it blinking out on every keystroke; the span comes from

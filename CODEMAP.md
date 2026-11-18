@@ -105,13 +105,14 @@ something in the directory, which load by themselves when such a file is opened.
 - `instruments.ts` — The driver's own instrument and percussion tables: what `@n` actually selects.
 - `layout.ts` — ARAM layout and budgeting.
 - `note-audition.ts` (750+ lines) — Playing one note as it would sound at a point in the song, or one stretch of the song as it stands.
+- `pitch.ts` — The driver's pitch arithmetic: how a note number becomes the DSP's pitch register, and where that stops being the note.
 - `player.ts` (300+ lines) — SPC700 playback.
 - `protocol.ts` — The message contract between `player.ts` on the page and `worklet.ts` on the audio thread.
 - `repeat-settings.ts` (500+ lines) — The driver settings a looping song can carry from the end of one pass into the next.
 - `slots.ts` — The slots of driver state a VCMD writes or clears, which is how the song walk names the command a note sounds under.
 - `song-walk-types.ts` (300+ lines) — The song walk's public model: the timeline `walkSong` returns, and the notes, commands, loops and state in it.
 - `song-walk.ts` (1000+ lines) — Reads a compiled song the way the driver reads it, and says what sounds when.
-  - `KEY_COUNT`:103 `vcmdLength`:123 `walkSong`:266 `listOf`:1261 `unreachableChannels`:1278
+  - `KEY_COUNT`:105 `vcmdLength`:125 `remoteReach`:292 `walkSong`:334 `listOf`:1393 `unreachableChannels`:1410
 - `wasm-host.ts` (300+ lines) — Host for `assets/player/spc.wasm` — Blargg's snes_spc, Emscripten-built.
 - `worklet.ts` (300+ lines) — The SPC700 renderer, running on the audio thread.
 
@@ -150,6 +151,7 @@ something in the directory, which load by themselves when such a file is opened.
 - `main.ts` — End-to-end audio check: MML -> SPC -> actual PCM samples.
 - `muting.ts` (300+ lines) — `audiotest`: muting takes a channel's volume and nothing else: the mix, the song carried on underneath, its speed, a ringing note, and unmuting.
 - `note-map.ts` — `audiotest`: the note map lands on what the driver is playing.
+- `pitch.ts` — `audiotest`: the DSP plays the pitch the driver's arithmetic says it will, the wrapped and the silent ones included.
 - `samples.ts` — `audiotest`: sample sets through the emulator: `#samples`, a custom instrument, `optimizeSampleUsage` and a `.bnk` bank.
 - `sound.ts` — `audiotest`: the emulator boots, a compiled song makes sound, silence is silent, notes differ audibly, and fast-forward lands somewhere different.
 - `support.ts` — What the `audiotest` sections share: the driver, the one emulator instance, `compileToSpc`, `renderMuted`, and the level and pitch measures.
@@ -290,6 +292,7 @@ something in the directory, which load by themselves when such a file is opened.
 - `not-notes.ts` — `walktest`: the commands that must not be walked as notes.
 - `notes-mapped.ts` — `walktest`: every note the walk finds is a note the compiler mapped.
 - `percussion.ts` — `walktest`: percussion follows the channel it is written on.
+- `pitch-range.ts` — `walktest`: what a note's pitch depends on, and the notes and vibratos past what their instrument can play (`SST0513`, `SST0514`).
 - `repeat-settings.ts` — `walktest`: a setting that carries over into the repeat is reported.
 - `repeat-tempo.ts` — `walktest`: a tempo that carries over into the repeat is reported.
 - `slide-read-ahead.ts` — `walktest`: the pitch slide a note reads ahead into.
@@ -299,6 +302,7 @@ something in the directory, which load by themselves when such a file is opened.
 - `tempo-map.ts` — `walktest`: the song's tempo map.
 - `tempo-shortfall.ts` — `walktest`: the driver does not always run the song as fast as it is written.
 - `ties-gates-range.ts` — `walktest`: ties, gates and the pitched range.
+- `vibrato.ts` — `walktest`: the vibrato a note sounds under, how long it moves before the key-off, and the note inspector's reading of it.
 - `written-pitch.ts` — `walktest`: the note map keeps the pitch that was written.
 
 ## web/src/app
@@ -675,6 +679,7 @@ something in the directory, which load by themselves when such a file is opened.
 **Rules:** `inspector-and-palette.md`
 
 - `note-command.ts` — A note, and the commands acting on it.
+- `vibrato-swing.ts` — The notes a vibrato peaks and dips at, which the note inspector reads out under the `q`.
 
 ## web/src/app/output/command-inspector/note-length
 
@@ -874,6 +879,7 @@ something in the directory, which load by themselves when such a file is opened.
 - `mixer.ts` — Which channels are heard, how loudly, and which the porter has taken out.
 - `note-transpose.ts` — Which byte to play for a pitch the porter has not written yet.
 - `note.worker.ts` — Runs {@link auditionNote} and {@link auditionRegion} off the page.
+- `pitch-range.ts` — `SST0513` and `SST0514` — a note pitched past what its instrument can play, and a vibrato that swings one there.
 - `playback.ts` (300+ lines) — The transport: plays the compiled song through the worklet player and holds the one playhead, in driver ticks.
 - `repeat-carry.ts` — `SST0510`-`SST0512` — a looping song whose repeat starts its loop under a different tempo, channel setting or song setting from its first pass.
 - `sample-song.ts` — The song a fresh editor opens on.
