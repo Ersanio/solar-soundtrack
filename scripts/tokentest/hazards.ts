@@ -44,8 +44,13 @@ section("command hazards — bytes that compile clean and then break the song");
 		["a note whose last piece is one tick", "#amk 4\n#0 o4 c=193 $DD $00 $18 $A4\n", "tooShort:193"],
 		["nothing at all", "#amk 4\n#0 $DD $00 $18 $A4\n", "nothing"],
 		["another channel's note", "#amk 4\n#0 o4 c4\n#1 $DD $00 $18 $A4\n", "nothing"],
-		// A target keys nothing on, so a chained `$DD` has no note in front of it.
-		["a chained slide", "#amk 4\n#0 o4 c4 $DD $00 $18 e $DD $00 $18 g\n", "rides:48,nothing"],
+		// The peek runs again once the slide before it has run out (`main.asm:3247-3249`).
+		["a chained slide", "#amk 4\n#0 o4 c4 $DD $00 $18 e $DD $00 $18 g\n", "rides:48,rides:48"],
+		// A `$C6` is a frame the peek runs in like any other.
+		["a tie after a slide", "#amk 4\n#0 o4 c4 $DD $00 $08 $B0 ^4^8 $DD $00 $08 $B5 d4\n", "rides:48,rides:24"],
+		["a written target's tie", "#amk 4\n#0 o4 c4 $DD $00 $08 e ^4 $DD $00 $08 g d4\n", "rides:48,rides:48"],
+		// Nothing is rewound past the `q`, so the run is one frame of 72.
+		["a tie a q apart from it", "#amk 4\n#0 o4 c4^8 q7F $DD $00 $18 $A4\n", "rides:72"],
 		// Anything writing bytes is what the peek reads instead.
 		["a volume", "#amk 4\n#0 o4 c4 v200 $DD $00 $18 $A4\n", "blocked:volume"],
 		["a hex run", "#amk 4\n#0 o4 c4 $E7 $C8 $DD $00 $18 $A4\n", "blocked:volume"],
@@ -137,6 +142,53 @@ section("command hazards — bytes that compile clean and then break the song");
 		check(`a slide after ${name} arms ${want} ticks in`, leadIn(body) === want, leadIn(body));
 	}
 
+	// Which tick of its frame the peek arms each slide on: the first that fetches
+	// nothing, or the one after the slide before it has used its delay and its
+	// steps. A duration of `$00` runs 256 steps with no delay and none behind one. A
+	// key-on clears a running slide (`main.asm:465-466`) and a tie or a rest does
+	// not, so one still running holds the peek off. Every figure is the emulated
+	// driver's.
+	const armsIn = (body: string): string => {
+		const index = tokenize(`#amk 4\n#0 o4 ${body}\n`);
+		return index.commands
+			.filter((command) => command.vcmd === 0xdd)
+			.map((command) => {
+				const anchor = bendAnchor(command, index);
+				return anchor.kind === "rides" ? `${anchor.frame}@${anchor.arms}` : said(anchor);
+			})
+			.join();
+	};
+
+	for (const [name, body, want] of [
+		["chained and then on a tie", "g+2 $dd $00 $0c a $dd $0c $12 g ^4^2 $dd $00 $60 f", "96@1,96@13,96@1"],
+		["behind one with a delay", "c4 $DD $08 $10 $B0 $DD $00 $08 $B5 d4", "48@1,48@25"],
+		["on the frame's last tick", "c8 $DD $00 $16 e $DD $00 $01 g c4", "24@1,24@23"],
+		["one tick too late", "c8 $DD $00 $17 e $DD $00 $01 g c4", "24@1,crowded"],
+		["behind a duration of $00", "c1 $DD $00 $00 $B0 $DD $00 $08 $B5 c4", "96@1,crowded"],
+		["behind a duration of $00 with a delay", "c4 $DD $08 $00 $B0 $DD $00 $08 $B5 c4", "48@1,48@2"],
+		["behind one running on through a tie", "c4 $DD $00 $FF $B0 ^4 $DD $00 $08 $B5 c4", "48@1,crowded"],
+		["behind one running on through a rest", "c4 $DD $00 $FF $B0 r4 $DD $00 $08 $B5 c4", "48@1,crowded"],
+		["behind one ending on a tie's first tick", "c4 $DD $00 $30 $B0 ^4 $DD $00 $08 $B5 c4", "48@1,48@2"],
+		["after a note keyed on in between", "c4 $DD $00 $FF $B0 d4 $DD $00 $08 $B5 c4", "48@1,48@1"],
+		// Once one cannot arm the song stops there, so the rest of the run takes its answer.
+		["past one that cannot arm", "c8 $DD $00 $18 e $DD $00 $18 g $DD $00 $01 a c4", "24@1,crowded,crowded"],
+		["after a note too short", "c192 $DD $00 $08 e $DD $00 $08 g c4", "tooShort:1,tooShort:1"],
+		["behind a blocker", "c4 v200 $DD $00 $08 e $DD $00 $08 g c4", "blocked:volume,blocked:volume"],
+		["with a blocker inside the run", "c4 $DD $00 $08 e v200 $DD $00 $08 g c4", "48@1,blocked:volume"],
+	] as const) {
+		const got = armsIn(body);
+		check(`a slide ${name} arms ${want}`, got === want, got);
+	}
+
+	// Behind another, a slide has what is left of the frame from the tick it arms on.
+	const chained = tokenize("#amk 4\n#0 o4 c4 $DD $00 $08 e $DD $00 $08 g d4\n");
+	const behind = bendAnchor(chained.commands.filter((command) => command.vcmd === 0xdd)[1], chained);
+	check(
+		"a slide behind another has 39 ticks",
+		behind.kind === "rides" && behind.window === 39 && behind.lead + behind.arms === 9,
+		JSON.stringify(behind),
+	);
+
 	// The last segment is what is cut into frames, and for a tied note that is the tie.
 	check(
 		"and names a tie of one tick as the tie",
@@ -161,6 +213,15 @@ section("command hazards — bytes that compile clean and then break the song");
 	check(
 		"and says when a long note's last piece is the one tick",
 		commandHazards(tokenize("#amk 4\n#0 o4 c=193 $DD $00 $18 $A4\n"))[0].message.includes("pieces of 96"),
+	);
+	check("a chain that fits raises nothing", codesIn("#amk 4\n#0 o4 c4 $DD $00 $18 e $DD $00 $18 g\n") === "");
+	const crowded = commandHazards(tokenize("#amk 4\n#0 o4 c8 $DD $00 $18 e $DD $00 $18 g\n"));
+	check(
+		"and one that does not says the slide before it is still running, on the second $DD",
+		crowded.length === 1 &&
+			crowded[0].message.startsWith("A slide written before this $DD is still running") &&
+			crowded[0].span.start === 30,
+		JSON.stringify(crowded),
 	);
 
 	// `Commands.asm:633` leaves the body commented out, so the label collapses onto

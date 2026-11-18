@@ -78,12 +78,22 @@ considered there and moved away from, with the reason. The rule carries one inde
   stood between the note and the command, so the inspector priced a slide that never arms at “95
   ticks to run in” while the song jumped to `$0000`; and it summed a tied note's segments where the
   driver reloads its counter per frame (`main.asm:2440-2441`) and `accumulateTiedLength` rewinds the
-  tie out of a `$DD`'s way (`parser.ts:2813-2827`), so `c4^8 $DD` read 72 where the read-ahead gets 24. `bendAnchor` answers with the three ways it fails and the one way it works, which is
+  tie out of a `$DD`'s way (`parser.ts:2813-2827`), so `c4^8 $DD` read 72 where the read-ahead gets 24. `bendAnchor` answers with the four ways it fails and the one way it works, which is
   `COMMANDS.html`'s own enumeration, and one pass serves the panel and the diagnostic so the two
   cannot disagree. A rest is an anchor like any note, `$C7` being a note byte to the driver — the
   reading that excluded it would have called a song that plays fine a dead SPC. And “nothing before
   it” is asked ahead of “something in the way”, since nothing can stand _between_ the command and a
   note that is not there: that is what the head of a `(!n)[ … ]` body answers.
+- **A `$DD` behind another read as having nothing in front of it** — the reasoning was that the
+  first one's four bytes stand between the note and the second, and that a written target keys
+  nothing on, so the second was `SST0507`'s "nothing" and a working chain of slides was called a
+  dead SPC. The peek does not look once per note: it runs on every tick that fetches nothing while
+  `$90+x` is zero (`main.asm:3247-3249`), so when one slide has used up its delay and its steps the
+  next byte at the track pointer is the next `$DD`, and it arms inside the same frame — the running
+  driver arms a `g+2 $DD $00 $0C a $DD $0C $12 g` chain on the frame's 1st and 13th ticks. The same
+  reading left ties out, a `$C6` being no `Command`, though the peek runs in a tie's frame as in a
+  note's; `bendAnchor` walks the notes, rests, `TokenIndex.ties` and slides forward instead, and
+  `crowded` is the chain that does not fit, the fetch at the frame's end reaching the `$DD` first.
 - **A slide's room read off the note in front of it alone** — that note's last segment less one, so
   a tie written after the `$DD`, which keys nothing on and is how a porter gives a slide more room,
   counted for nothing, and `c1 $DD` read 191 where the driver gives 95. The slide steps only on ticks

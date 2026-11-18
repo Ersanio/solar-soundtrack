@@ -105,7 +105,9 @@ export class BendCommand {
   protected readonly to = computed(() => {
     if (this.isPitchBend()) {
       const start = this.start();
-      return start.kind === 'note' ? this.shownTarget() - start.byte : null;
+      return (start.kind === 'note' || start.kind === 'slide') && start.byte !== null
+        ? this.shownTarget() - start.byte
+        : null;
     }
 
     return this.vcmd() === VCMD.PitchEnvelopeAttack ? 0 : toSigned(this.shownTarget());
@@ -126,6 +128,10 @@ export class BendCommand {
     switch (start.kind) {
       case 'note':
         return $localize`:@@inspector.bend.the-slide-rides-on-the-2:inspector.bend.the-slide-rides-on-the-2 ${noteName(start.byte)}:byte: ${this.startsOn()}:startsOn:`;
+      case 'slide':
+        return start.byte === null
+          ? $localize`:@@inspector.bend.picks-up-on-a-written-target:inspector.bend.picks-up-on-a-written-target ${this.startsOn()}:startsOn:`
+          : $localize`:@@inspector.bend.picks-up-where-the-slide:inspector.bend.picks-up-where-the-slide ${noteName(start.byte)}:byte: ${this.startsOn()}:startsOn:`;
       case 'unknown':
         return $localize`:@@inspector.bend.the-slide-rides-on-the-3:inspector.bend.the-slide-rides-on-the-3 ${this.startsOn()}:startsOn:`;
       case 'rest':
@@ -139,10 +145,15 @@ export class BendCommand {
 
   /**
    * Which tick of the note the slide starts on. The read-ahead arms it in the note's last piece,
-   * so a tied or long note starts it that far in rather than on its own second tick.
+   * so a tied or long note starts it that far in rather than on its own second tick, and only once
+   * a slide before it has finished.
    */
   private startsOn(): string {
     const anchor = this.anchor();
+    if (anchor.kind === 'rides' && anchor.arms > 1) {
+      return $localize`:@@inspector.bend.starts-once-the-slide-before:inspector.bend.starts-once-the-slide-before ${anchor.lead + anchor.arms}:ticks:`;
+    }
+
     if (anchor.kind !== 'rides' || anchor.lead === 0) {
       return $localize`:@@inspector.bend.starts-on-that-notes-second:inspector.bend.starts-on-that-notes-second`;
     }
@@ -167,7 +178,7 @@ export class BendCommand {
   /**
    * Whether the driver reaches this bend, and whether it fits the note it rides on.
    *
-   * Three of the four answers are fatal rather than merely lossy, and they say what
+   * Four of the five answers are fatal rather than merely lossy, and they say what
    * `SST0507` says: `$DD` is picked up by a peek at the byte standing at the track
    * pointer (`main.asm:L_10E4`) and its own dispatch slot is `$0000`, so anything
    * that breaks that adjacency stops the song rather than shortening the slide.
@@ -199,6 +210,8 @@ export class BendCommand {
           ? $localize`:@@inspector.bend.tie-one-tick:inspector.bend.tie-one-tick`
           : $localize`:@@inspector.bend.note-one-tick:inspector.bend.note-one-tick`;
 
+      case 'crowded':
+        return $localize`:@@inspector.bend.crowded:inspector.bend.crowded`;
       case 'rides':
         break;
     }

@@ -2451,7 +2451,8 @@ instrToSample[30] = { 00 01 02 03 04 07 08 09 05 0A 0B 01 10 0C 0D 12 0C 11 01  
     </div>
     <p>
       * <code>$DD</code> is “native” in the sense that the compiler accepts it unchanged everywhere
-      — but it is only <em>safe</em> directly after a note of two ticks or more, where the driver's
+      — but it is only <em>safe</em> directly after a note, rest or tie of two ticks or more, or
+      after another <code>$DD</code> whose slide ends inside that note, where the driver's
       read-ahead peek consumes it before the command loop can dispatch it to <code>$0000</code>. See
       its card.
     </p>
@@ -2778,12 +2779,20 @@ instrToSample[30] = { 00 01 02 03 04 07 08 09 05 0A 0B 01 10 0C 0D 12 0C 11 01  
           channel the four bytes are skipped (<code>:3263-3271</code>). The source's own comment: “I
           don't know why this is here instead of in its dispatch table. Maybe so that it can
           properly do the read-ahead effect?” Because the peek runs on the ticks <em>during</em> a
-          note, a <code>$DD</code> is only ever picked up when it directly follows a note whose last
-          frame lasts at least two ticks — a note of <code>$80</code> ticks or more is written in
-          <code>$60</code>-tick frames (<code>Music.cpp:2254</code>), so <code>c=193</code> ends in
-          a frame of one. Anywhere else — first thing in a channel, after another command, after a
-          one-tick note — the command loop reaches it first, dispatches it, and the SPC jumps to
-          <code>$0000</code>. Once armed, the slide steps only on ticks that fetch no music data
+          note, a <code>$DD</code> is only ever picked up when it directly follows a note, rest or
+          <code>$C6</code> tie whose last frame lasts at least two ticks — a note of
+          <code>$80</code> ticks or more is written in <code>$60</code>-tick frames
+          (<code>Music.cpp:2254</code>), so <code>c=193</code> ends in a frame of one — or directly
+          follows another <code>$DD</code> that was. The peek runs again on the first tick after a
+          slide's delay and duration have run out, so a chain arms one slide after another inside
+          the one frame, each from the pitch the last one reached; a duration of
+          <code>$00</code> holds it for 256 ticks with no delay and for one tick behind a delay
+          (<code>main.asm:558-576</code>). Only a key-on clears <code>$90+x</code>, and a tie or a
+          rest leaves it alone (<code>main.asm:361-380</code>), so a slide still running through
+          either holds the peek off there too. Anywhere else — first thing in a channel, after
+          another command, after a one-tick note, behind a slide that outlasts the frame — the
+          command loop reaches it first, dispatches it, and the SPC jumps to <code>$0000</code>.
+          Once armed, the slide steps only on ticks that fetch no music data
           (<code>main.asm:2337-2339</code>), so each frame gives it one tick fewer than it lasts. A
           <code>$C6</code> tie keys nothing on, so ties written after the command extend it frame by
           frame, until the next key-on overwrites
@@ -4771,7 +4780,8 @@ EchoFilter1:    $7F $00 $00 $00 $00 $00 $00 $00   ; flat</code></pre>
       </li>
       <li>
         <code>$DD</code>: a null dispatch slot; the compiler accepts it anywhere. Solar Soundtrack
-        does not — <code>SST0507</code> reports one no note’s read-ahead can reach.
+        does not — <code>SST0507</code> reports one no note’s read-ahead can reach, a slide still
+        running when the note ends included.
       </li>
       <li>
         <code>$FC</code>: the driver ignores the address for types 0, 7 and 8, and the compiler

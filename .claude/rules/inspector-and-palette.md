@@ -44,6 +44,8 @@ A new entry goes there, with its line here, in the same change.
   `roll-toolbar.html`
 - **Answering “is this `$DD` armed” with a tick count and a `null`** — `accumulateTiedLength`,
   `bendAnchor`, `COMMANDS.html`
+- **A `$DD` behind another read as having nothing in front of it** — `bendAnchor`,
+  `main.asm:3247-3249`, `TokenIndex.ties`, `crowded`, `SST0507`
 - **A slide's room read off the note in front of it alone** — `emitNote`, `BendAnchor.window`,
   `TokenIndex.ties`, `Command`
 - **`q`'s high nybble read as a percentage of the note** — `noteFrames`, `frameSoundingTicks`,

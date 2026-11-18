@@ -22,11 +22,19 @@ expectFix(
 	"SST0507",
 	"#amk 2\n#0 @0 o4 c4 $DD $00 $08 e y10 d4",
 );
+// Behind the slide already there, so the two still run in the order written.
+expectFix(
+	"blocked, behind another slide",
+	"#amk 2\n#0 @0 o4 c4 $DD $00 $08 $B0 v200 $DD $00 $08 $B5 d4",
+	"SST0507",
+	"#amk 2\n#0 @0 o4 c4 $DD $00 $08 $B0 $DD $00 $08 $B5 v200 d4",
+);
 
-section("a $DD with no note before it, or across an octave or a bracket, is left alone");
+section("a $DD with no note before it, across an octave or a bracket, or behind a running slide, is left alone");
 expectNoFix("nothing before", "#amk 2\n#0 @0 $DD $00 $08 $A4 o4 c4", "SST0507");
 expectNoFix("across an octave", "#amk 2\n#0 @0 o4 c4 v200 > $DD $00 $08 e d4", "SST0507");
 expectNoFix("across a loop end", "#amk 2\n#0 @0 o4 [c4 d4]2 $DD $00 $08 $A4 e4", "SST0507");
+expectNoFix("behind a slide still running", "#amk 2\n#0 @0 o4 c8 $DD $00 $18 $B0 $DD $00 $18 $B5 d4", "SST0507");
 
 /**
  * The fix lowers the governing `$F1`'s feedback to a value that fades and one step past it does

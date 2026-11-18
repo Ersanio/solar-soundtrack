@@ -175,7 +175,9 @@ them in is not the note's last one.
 The note the bend inspector draws a slide from: `slideStart` reads the byte the note map gives the
 note `bendAnchor` names, which is the walk's own `bend.target - note` interval, the emitted byte
 under `h` rather than the written one, and an answer that survives an edit after that note and not
-one before it — the window a slider's commit opens until the recompile lands.
+one before it — the window a slider's commit opens until the recompile lands. A slide on a tie is
+drawn from the note the tie extends, and one behind another from that one's target, or from nothing
+where the target is written as a note.
 
 ### `longer-channel.ts`
 

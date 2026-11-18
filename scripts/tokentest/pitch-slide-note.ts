@@ -133,14 +133,23 @@ section("$DD takes a note as its last parameter");
 		);
 	}
 
-	// A target keys nothing on, so a second `$DD` written straight after one has
-	// no note in front of it — which is what the inspector's reachability line
-	// says, and what `main.asm:L_10E4` means by reading the byte at the track
-	// pointer. Counting the target as a note put a plausible tick figure there.
+	// A target keys nothing on and is not a frame of its own, so a second `$DD`
+	// written straight after one rides the same note: `main.asm:L_10E4` reads the
+	// byte at the track pointer again once the first slide has run out, and the
+	// pitch it departs from is the first one's target.
 	const chain = tokenize("#amk 4\n#0 o4 c4 $DD $00 $18 e $DD $00 $18 g\n");
 	const slides = chain.commands.filter((command) => command.vcmd === 0xdd);
+	const second = bendAnchor(slides[1], chain);
 	check("the first slide rides on the note before it", said(bendAnchor(slides[0], chain)) === "rides:48");
-	check("and the second rides on nothing", said(bendAnchor(slides[1], chain)) === "nothing");
+	check(
+		"and the second rides on it too, from the first one's target, once that has run out",
+		said(second) === "rides:48" &&
+			second.kind === "rides" &&
+			second.arms === 25 &&
+			second.from?.kind === "slide" &&
+			second.from.span.start === slides[0].span.start,
+		JSON.stringify(second),
+	);
 
 	// A fourth departure, and `packages/mml-tokens/CLAUDE.md` lists it. `Music.cpp:2029` reads
 	// `text[pos]` raw, with no `doReplacement` in front of it, so AMK decides the

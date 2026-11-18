@@ -61,7 +61,7 @@ something in the directory, which load by themselves when such a file is opened.
 
 **Rules:** `compiler.md`, `inspector-and-palette.md`
 
-- `command-hazards.ts` (300+ lines) — The command hazards: commands that compile clean and misbehave — `$F7`'s dead slot, an unreachable `$DD`, `#am4`'s `$E4`.
+- `command-hazards.ts` (500+ lines) — The command hazards: commands that compile clean and misbehave — `$F7`'s dead slot, an unreachable `$DD`, `#am4`'s `$E4`.
 - `dialect.ts` — What was in force at a point in the song: which dialect the `#amk` / `#am4` / `#amm` markers put it in; tempo; which velocity table `q` reads against, from the hex as well as the directives.
 - `echo-hazards.ts` — The echo hazards: every runaway echo in the document, one diagnostic per command that causes one.
 - `edits.ts` — Rewriting a command in the source it was scanned from — the inverse of `gather`.
@@ -112,7 +112,7 @@ something in the directory, which load by themselves when such a file is opened.
 - `slots.ts` — The slots of driver state a VCMD writes or clears, which is how the song walk names the command a note sounds under.
 - `song-walk-types.ts` (300+ lines) — The song walk's public model: the timeline `walkSong` returns, and the notes, commands, loops and state in it.
 - `song-walk.ts` (1000+ lines) — Reads a compiled song the way the driver reads it, and says what sounds when.
-  - `KEY_COUNT`:105 `vcmdLength`:125 `remoteReach`:292 `walkSong`:334 `listOf`:1394 `unreachableChannels`:1411
+  - `KEY_COUNT`:105 `vcmdLength`:125 `remoteReach`:292 `walkSong`:334 `listOf`:1395 `unreachableChannels`:1412
 - `wasm-host.ts` (300+ lines) — Host for `assets/player/spc.wasm` — Blargg's snes_spc, Emscripten-built.
 - `worklet.ts` (300+ lines) — The SPC700 renderer, running on the audio thread.
 
@@ -622,7 +622,7 @@ something in the directory, which load by themselves when such a file is opened.
 **Rules:** `inspector-and-palette.md`
 
 - `bend-command.ts` — `$DD` pitch bend and `$EB`/`$EC` pitch envelope — a delay, a slide and a target.
-- `slide-start.ts` — The note a `$DD` slides from, by the byte the compiler emitted for the note `bendAnchor` names.
+- `slide-start.ts` — The pitch a `$DD` slides from: the byte the compiler emitted for the note `BendAnchor.from` names, or the target of the slide before it.
 
 ## web/src/app/output/command-inspector/bend-graph
 

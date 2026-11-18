@@ -42,7 +42,8 @@ ticks the segment already plays — its own digits, or the standing `l`'s where 
 one the parser threw away — and `digits` covers the digits alone, in front of the dots that compose
 rather than add and after the `=` of an exact count; every `l` from 1 to 192 is swept, and a bare
 note under a dotted or exact `l` reports no denominator rather than a wrong one. The same `$DD`
-section pins `bendAnchor` and the three hazards a byte earns where it stands. A slide is not
+section pins `bendAnchor` and the three hazards a byte earns where it stands; `pitch-slide-note.ts`
+pins that a written target is no frame of its own, so a chain rides the note in front of it. A slide is not
 dispatched — the note in front of it peeks one byte ahead — so what is checked is a byte adjacency:
 that a rest anchors one exactly as a note does, `$C7` being a note byte to the driver; that a tie is
 a frame of its own, so `c4^8 $DD` arms on 24 ticks and not the 72 it is written as, which is
@@ -50,14 +51,22 @@ a frame of its own, so `c4^8 $DD` arms on 24 ticks and not the 72 it is written 
 every tick of one fetches, and that a frame is `emitNote`'s — a note of 128 ticks or more goes out
 in 96-tick pieces, so `c1 $DD` arms in the last 96 and `c=193 $DD` in a single tick; and that a
 command writing bytes between the two is what the driver reads instead, where `q`, `h`, `o`, `l` and
-`@21`-`@29` write none and are stepped over. Every answer with a note in it names that note, the one
-in front of a blocker too, since it is what the bend inspector draws the slide from. Where it arms,
+`@21`-`@29` write none and are stepped over — and a tie past a `q` is not rewound, so `c4^8 q7F $DD`
+arms on 72. A `$C6` tie standing alone, or after a written target, is a frame the peek runs in like
+a note's. The peek runs only while no slide is running, so a `$DD` straight after another arms on
+the tick after that slide's delay and steps run out, inside the same frame, and from its target: the
+tick it arms on (`arms`) is pinned for a chain, a delay, both readings of a `$00` duration, a slide
+carried through a tie or a rest, which leaves it running where a key-on clears it, and the last tick
+of a frame against one past it, which is `crowded`. Once one `$DD` of a run cannot arm, the rest of
+the run takes its answer. Every answer with a note in it names that note, the one in front of a
+blocker too, since it is what the bend inspector draws the slide from. Where it arms,
 the **room** it has is pinned too, and every figure was read off the emulated driver: the slide
 steps only on ticks that fetch nothing, so each frame gives it one tick fewer than it lasts, from
 the frame it arms in through every tie written after the command, until a note or a rest —
 `a96 $DD $00 $FF $80^1^4^16^192` has 251 ticks and not 255, its 253 ticks of tie being three frames.
 Two ties a command apart are two frames where two adjacent ones fold into one, and a tie straight
-before the next `$DD` gives its last segment up as a frame of its own. A loop call is in that list
+before the next `$DD` gives its last segment up as a frame of its own; a slide armed behind another
+has what is left of the frame from its own tick. A loop call is in that list
 and is why the pass takes the whole `TokenIndex`: `(` raises no command at all, so the command list
 alone cannot see it. `SST0506` is then every `$F7` at every dialect, `SST0507` every slide the
 walk-free answer says is stranded, and `SST0508` a `$E4` under `#am4` and nowhere else. And a remote

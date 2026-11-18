@@ -989,8 +989,9 @@ export function walkSong(song: Uint8Array, aramAddress: number): SongTimeline {
 				// a tie later are a different slide.
 				//
 				// The "no slide already running" half is not modelled: `main.asm:3247-3249`
-				// reads it only while `$90+x` is zero, so a second `$DD` inside a
-				// slide is ignored where this records it.
+				// peeks only while `$90+x` is zero, so the driver arms a `$DD` written
+				// straight after another once that slide has run out, where this files
+				// both on the note and the second takes `bend`.
 				const address = aramAddress + track.at;
 				const held = track.held >= 0 ? notes[track.held] : null;
 

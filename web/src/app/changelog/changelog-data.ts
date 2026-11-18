@@ -11,6 +11,7 @@ export const CHANGELOG: readonly ChangelogEntry[] = [
   {
     date: '18 November 2026',
     items: [
+      'Pitch bends written one after another, or after a tie, are no longer flagged as crashing the song',
       'Fix problems from the Problems list, with a preview of the change',
       'Suppress warnings you have decided to live with, and manage the list from the top bar',
       'Colours for the fix preview in the theme editor',

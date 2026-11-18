@@ -22,6 +22,8 @@ export function said(anchor: BendAnchor): string {
 			return `tooShort:${anchor.ticks}`;
 		case "blocked":
 			return `blocked:${anchor.by.name}`;
+		case "crowded":
+			return "crowded";
 		case "nothing":
 			return "nothing";
 	}

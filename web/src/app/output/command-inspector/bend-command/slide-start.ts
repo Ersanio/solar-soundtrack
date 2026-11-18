@@ -5,6 +5,8 @@ import type { BendAnchor } from '@amk/tokens/command-hazards';
 export type SlideStart =
   /** `$80`-`$C5`, as the compiler emitted it. */
   | { kind: 'note'; byte: number }
+  /** The target the `$DD` before it reached; `null` where that target is written as a note. */
+  | { kind: 'slide'; byte: number | null }
   /** `$C7`: the slide runs on a keyed-off voice. */
   | { kind: 'rest' }
   /** `$D0`-`$D8`, which sounds at its percussion entry's pitch (`Commands.asm:219-220`), not the byte's. */
@@ -21,7 +23,10 @@ export interface CompiledNotes {
 }
 
 /**
- * The note a `$DD` slides from, by the byte the compiler emitted for the note `bendAnchor` names.
+ * The pitch a `$DD` slides from: the byte the compiler emitted for the note `BendAnchor.from` names,
+ * or the target of the slide before it.
+ *
+ * A hex target is already a byte as the driver reads one, so it needs no compile.
  *
  * Emitted rather than written, because the target is a byte the driver reads as it stands: `h`,
  * the instrument's transposition and the percussion remap are already in the note's byte, and the
@@ -40,11 +45,15 @@ export function slideStart(
   compiled: CompiledNotes | null,
   source: string,
 ): SlideStart {
-  if (anchor.kind === 'nothing') {
+  if (anchor.kind === 'nothing' || anchor.from === null) {
     return { kind: 'nothing' };
   }
 
-  const { start, end } = anchor.note;
+  if (anchor.from.kind === 'slide') {
+    return { kind: 'slide', byte: anchor.from.target };
+  }
+
+  const { start, end } = anchor.from.span;
   if (!compiled?.text.startsWith(source.slice(0, end))) {
     return { kind: 'unknown' };
   }

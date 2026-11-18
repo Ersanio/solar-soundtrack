@@ -25,6 +25,7 @@ export const SST = {
 	"0507.tie-pieces": (ticks: number) => $localize`:@@sst.0507.tie-pieces:sst.0507.tie-pieces ${ticks}:ticks:`,
 	"0507.note-one-tick": () => $localize`:@@sst.0507.note-one-tick:sst.0507.note-one-tick`,
 	"0507.tie-one-tick": () => $localize`:@@sst.0507.tie-one-tick:sst.0507.tie-one-tick`,
+	"0507.crowded": () => $localize`:@@sst.0507.crowded:sst.0507.crowded`,
 	"0508": () => $localize`:@@sst.0508:sst.0508`,
 	"0509": (label: number) => $localize`:@@sst.0509:sst.0509 ${label}:label:`,
 	"0509.zero": () => $localize`:@@sst.0509.zero:sst.0509.zero`,

@@ -66,7 +66,10 @@ function deadCommand(request: FixRequest): Fix[] {
   ];
 }
 
-/** SST0507 (blocked): the `$DD`, its note target with it, moved to directly after the note. */
+/**
+ * SST0507 (blocked): the `$DD`, its note target with it, moved to directly after the note — behind
+ * any `$DD` already standing there, so a chain keeps its order.
+ */
 function strandedBend(request: FixRequest): Fix[] {
   const song = request.context.live;
   const command = commandOf(song, request);
@@ -79,8 +82,16 @@ function strandedBend(request: FixRequest): Fix[] {
     return [];
   }
 
+  const chain = song.index.commands.filter(
+    (other) =>
+      other.vcmd === VCMD.PitchBend &&
+      other.channel === command.channel &&
+      other.span.start >= anchor.note.end &&
+      other.span.end <= anchor.by.span.start,
+  );
+  const at = chain[chain.length - 1]?.span.end ?? anchor.note.end;
   const between = song.index.tokens.filter(
-    (token) => token.start >= anchor.note.end && token.end <= command.span.start,
+    (token) => token.start >= at && token.end <= command.span.start,
   );
   if (!between.every((token) => MOVABLE_ACROSS.has(token.kind))) {
     return [];
@@ -89,7 +100,7 @@ function strandedBend(request: FixRequest): Fix[] {
   const moved = { ...command.span, end: command.noteTarget?.span.end ?? command.span.end };
   return [
     makeFix(song.text, $localize`:@@output.fix.move-bend:output.fix.move-bend`, [
-      insertAt(anchor.note.end, ` ${song.text.slice(moved.start, moved.end)}`),
+      insertAt(at, ` ${song.text.slice(moved.start, moved.end)}`),
       spliceOut(song.text, moved),
     ]),
   ];
