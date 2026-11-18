@@ -1,4 +1,4 @@
-import { Component, type ElementRef, input, viewChild } from '@angular/core';
+import { Component, type ElementRef, booleanAttribute, input, viewChild } from '@angular/core';
 
 import { Button } from '../button/button';
 import { IconClose } from '../icons/icon-close';
@@ -32,6 +32,8 @@ export class Modal {
   private readonly dialog = viewChild.required<ElementRef<HTMLDialogElement>>('dialog');
 
   readonly heading = input.required<string>();
+  /** Twice the width, for a body that is a listing rather than a form. */
+  readonly wide = input(false, { transform: booleanAttribute });
 
   open(): void {
     const dialog = this.dialog().nativeElement;

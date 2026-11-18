@@ -1,6 +1,7 @@
 <dialog
   #dialog
-  class="border-edge bg-raised text-ink backdrop:bg-inset/70 m-auto w-96 max-w-[calc(100vw-2rem)] rounded-md border p-0 shadow-lg"
+  class="border-edge bg-raised text-ink backdrop:bg-inset/70 m-auto max-w-[calc(100vw-2rem)] rounded-md border p-0 shadow-lg"
+  [class]="wide() ? 'w-[48rem]' : 'w-96'"
   (click)="onClick($event)"
 >
   <div class="flex max-h-[80vh] flex-col">
