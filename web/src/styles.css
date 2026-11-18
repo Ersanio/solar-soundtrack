@@ -65,6 +65,15 @@
   --color-good: #7ee787;
 
   /*
+   * The fix preview's diff: a line added, a line removed and a line changed inside. The same
+   * values as `good`, `danger` and `warn`, which every shipped theme already reads as text, and
+   * tokens of their own so a porter can move them apart from the status colours.
+   */
+  --color-diff-add: #7ee787;
+  --color-diff-remove: #ffa49b;
+  --color-diff-change: #e5b543;
+
+  /*
    * The source view's colouring, one token per tag in `TOKEN_TAGS`
    * (`packages/mml-tokens/src/tokens.ts`), and shared with nothing: a porter
    * reading MML all day wants the colouring under their own hand and should not

@@ -24,6 +24,9 @@ export type ThemeTokenName =
   | 'severe'
   | 'warn'
   | 'good'
+  | 'diff-add'
+  | 'diff-remove'
+  | 'diff-change'
   | 'syn-comment'
   | 'syn-directive'
   | 'syn-channel'
@@ -53,7 +56,8 @@ export type ThemeTokenName =
   | 'ch-6'
   | 'ch-7';
 
-export type ThemeGroup = 'chrome' | 'text' | 'status' | 'syntax' | 'aram' | 'roll' | 'channels';
+export type ThemeGroup =
+  'chrome' | 'text' | 'status' | 'diff' | 'syntax' | 'aram' | 'roll' | 'channels';
 
 export interface ThemeToken {
   readonly name: ThemeTokenName;
@@ -76,6 +80,10 @@ export const THEME_GROUPS: readonly ThemeGroupDef[] = [
   {
     id: 'status',
     label: $localize`:@@theme.token.controls-and-highlights.label:theme.token.controls-and-highlights.label`,
+  },
+  {
+    id: 'diff',
+    label: $localize`:@@theme.token.fix-preview.label:theme.token.fix-preview.label`,
   },
   {
     id: 'syntax',
@@ -188,6 +196,25 @@ export const THEME_TOKENS: readonly ThemeToken[] = [
     label: $localize`:@@theme.token.good.label:theme.token.good.label`,
     group: 'status',
     hint: $localize`:@@theme.token.success.hint:theme.token.success.hint`,
+  },
+
+  {
+    name: 'diff-add',
+    label: $localize`:@@theme.token.diff-add.label:theme.token.diff-add.label`,
+    group: 'diff',
+    hint: $localize`:@@theme.token.diff-add.hint:theme.token.diff-add.hint`,
+  },
+  {
+    name: 'diff-remove',
+    label: $localize`:@@theme.token.diff-remove.label:theme.token.diff-remove.label`,
+    group: 'diff',
+    hint: $localize`:@@theme.token.diff-remove.hint:theme.token.diff-remove.hint`,
+  },
+  {
+    name: 'diff-change',
+    label: $localize`:@@theme.token.diff-change.label:theme.token.diff-change.label`,
+    group: 'diff',
+    hint: $localize`:@@theme.token.diff-change.hint:theme.token.diff-change.hint`,
   },
 
   {

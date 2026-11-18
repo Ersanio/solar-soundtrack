@@ -106,6 +106,12 @@ wants them apart moves either one. And `--color-syn-*` is the source view's colo
 those, while its structure block (gutters, tooltips, diagnostic underlines) stays on the app's
 palette, being chrome rather than MML.
 
+The fix dialog's diff has three of its own, `--color-diff-add`, `--color-diff-remove` and
+`--color-diff-change`, in the picker's Fix preview group. Their defaults are `good`'s, `danger`'s
+and `warn`'s values, which every shipped preset already reads as text, so the diff needs no preset
+of its own; they are tokens apart so a porter can move them without moving the status colours. A
+row is washed in its colour at 15% behind `text-ink` and marked in it in the gutter.
+
 Three things are worth knowing before changing any of it. The defaults are read _off the document_
 rather than copied into TypeScript, so `styles.css` stays the only place they are written, and
 resetting a token removes the inline property rather than writing a default back. Only the tokens

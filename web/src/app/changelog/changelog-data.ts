@@ -11,6 +11,7 @@ export const CHANGELOG: readonly ChangelogEntry[] = [
   {
     date: '18 November 2026',
     items: [
+      'Colours for the fix preview in the theme editor',
       'Move the MIDI keyboard button to the top bar, where it shows whether a keyboard is connected',
       'Add MIDI keyboard recording function in the piano roll.',
       'Notes with vibrato acting on them, show the peak and dip octave in the note inspector',
