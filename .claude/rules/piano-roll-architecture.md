@@ -399,6 +399,12 @@ opinion on any of this by design.
 `state/midi-input.ts` holds the connection and one listener slot, which `roll-record.ts` takes for
 as long as the roll is open; with no roll, a key does nothing.
 
+**The MIDI switch is in the top bar**, left of the exports, and its press is the one the browser's
+permission prompt answers to. Its label is the connection's state — Connect MIDI Keyboard while
+off, Connected to MIDI Keyboard while an input is listened to, MIDI Keyboard not detected while on
+with none — and the last stays lit, because the connection stays open and `onstatechange` picks a
+keyboard up as it is plugged in.
+
 **The computer's own keyboard is always a second source of the same keys**, with no switch.
 `keyOfCode` (`roll-take.ts`) is FL Studio's typing-keyboard layout as MIDI key numbers — `Z` is
 MIDI 60 — read off `KeyboardEvent.code`, so the piano is where the keys are on any layout.
@@ -408,9 +414,8 @@ them to `RollRecord.key` as a MIDI input would. A key whose target is a field or
 is not taken.
 
 **Record is one toggle on the toolbar's row, after Edits, and its settings are a dialog.**
-Pressed while idle it opens `roll-record-dialog/` — a `shared/modal/` holding the Use MIDI Keyboard
-switch (the press the browser's permission prompt answers to), Play the song, Key sounds, the chord
-chips and the typing layout — whose settings apply as they are pressed; its Arm arms
+Pressed while idle it opens `roll-record-dialog/` — a `shared/modal/` holding Play the song, Key
+sounds, the chord chips and the typing layout — whose settings apply as they are pressed; its Arm arms
 (`RollRecord.arm`). Pressed while armed or recording, it stops (`RollRecord.stop`), which disarms a
 take with no notes and writes one with some. It lights red from Arm on, and its dot becomes a square
 (`icon-recording`) once the first key has started the take.
@@ -476,6 +481,7 @@ new entry goes there, with its line here, in the same change.
   `drumFrom`, `remapFed`, `parser.ts:2753`
 - **The computer keyboard as a piano behind a Typing keys toggle** — `typingKeys`,
   `RollRecord.listening`, `keyOfCode`, `rollShortcut`
-- **The MIDI keyboard switch in the top bar** — `topbar.midi`, `MidiInput`, `roll-record-dialog/`
+- **The MIDI keyboard switch as a recording setting, with a fixed label** —
+  `roll.record.use-midi-keyboard`, `topbar.midi`, `MidiInput`, `roll-record-dialog/`
 - **The keyboard's controls on a row of their own under the roll's settings** — `basis-full`,
   `roll-toolbar/`, `roll-record-dialog/`, `RollRecord.arm`

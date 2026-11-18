@@ -49,11 +49,13 @@ considered there and moved away from, with the reason. The rule carries one inde
   What it did do was make a porter switch the keyboard on before it worked. The keys are now always
   taken, outside fields and dialogs, and Record is always on the toolbar.
 
-- **The MIDI keyboard switch in the top bar** — Use MIDI Keyboard sat beside the transport, with a
-  title saying what `MidiInput` was doing (`topbar.midi.*`). The keys it turns on reach the piano
-  roll only, and nothing in the top bar reads them, so the switch was a recording setting kept
-  apart from recording. It is in `roll-record-dialog/` now, with the other settings Record asks
-  about.
+- **The MIDI keyboard switch as a recording setting, with a fixed label** — Use MIDI Keyboard sat
+  in `roll-record-dialog/` beside Play the song and Key sounds (`roll.record.use-midi-keyboard`),
+  and before that beside the transport; in both, only its title said whether a keyboard was
+  connected. A MIDI keyboard plays the roll whenever the roll is open, not only into a take, and
+  whether one is connected is a standing state that a dialog opened before recording kept out of
+  sight. The switch is in the top bar left of the exports, and its label is the state: Connect,
+  Connected, or not detected while MIDI is on with no keyboard found.
 
 - **The keyboard's controls on a row of their own under the roll's settings** — a `basis-full` row
   under the toolbar held Typing keys, Record, Key sounds, Play the song and the chord chips, all

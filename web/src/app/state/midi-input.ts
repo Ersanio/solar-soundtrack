@@ -97,10 +97,18 @@ export class MidiInput {
     }
   }
 
-  /** Listens to every input there is now; an input that has gone is simply not in the list. */
+  /**
+   * Listens to every input plugged in now. One unplugged is left out even where
+   * the browser keeps it in the map, since a handler would open it again.
+   */
   private attach(): void {
     const names: string[] = [];
     this.access?.inputs.forEach((input) => {
+      if (input.state === 'disconnected') {
+        input.onmidimessage = null;
+        return;
+      }
+
       input.onmidimessage = (event) => this.read(event);
       names.push(input.name ?? input.id);
     });

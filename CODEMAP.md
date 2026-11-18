@@ -112,7 +112,7 @@ something in the directory, which load by themselves when such a file is opened.
 - `slots.ts` — The slots of driver state a VCMD writes or clears, which is how the song walk names the command a note sounds under.
 - `song-walk-types.ts` (300+ lines) — The song walk's public model: the timeline `walkSong` returns, and the notes, commands, loops and state in it.
 - `song-walk.ts` (1000+ lines) — Reads a compiled song the way the driver reads it, and says what sounds when.
-  - `KEY_COUNT`:105 `vcmdLength`:125 `remoteReach`:292 `walkSong`:334 `listOf`:1393 `unreachableChannels`:1410
+  - `KEY_COUNT`:105 `vcmdLength`:125 `remoteReach`:292 `walkSong`:334 `listOf`:1394 `unreachableChannels`:1411
 - `wasm-host.ts` (300+ lines) — Host for `assets/player/spc.wasm` — Blargg's snes_spc, Emscripten-built.
 - `worklet.ts` (300+ lines) — The SPC700 renderer, running on the audio thread.
 
@@ -356,7 +356,7 @@ something in the directory, which load by themselves when such a file is opened.
 
 ## web/src/app/editor/top-bar
 
-- `top-bar.ts` — The top bar: the transport, the ARAM meter, the exports, the theme picker, the changelog and the commit link.
+- `top-bar.ts` — The top bar: the transport, the ARAM meter, the MIDI keyboard switch, the exports, the theme picker, the changelog and the commit link.
 
 ## web/src/app/editor/transport-controls
 
@@ -478,7 +478,7 @@ something in the directory, which load by themselves when such a file is opened.
 
 **Rules:** `piano-roll-architecture.md`
 
-- `roll-record-dialog.ts` — What Record asks before it arms: the MIDI keyboard, the song under the take, the key sounds and the chord's channels.
+- `roll-record-dialog.ts` — What Record asks before it arms: the song under the take, the key sounds and the chord's channels.
 
 ## web/src/app/editor/views/piano-roll/roll-scrub
 

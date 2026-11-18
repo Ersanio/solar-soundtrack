@@ -1,18 +1,6 @@
 <amk-modal [heading]="text.heading">
   <div class="flex flex-col gap-3">
-    <!-- Lit while keyboards are being listened to. The keys reach the piano
-         roll only, which is why the switch is here. -->
     <div class="flex flex-wrap items-center gap-2">
-      <button
-        i18n="@@roll.record.use-midi-keyboard"
-        amk-toggle
-        [pressed]="midi.status() === 'on'"
-        [disabled]="midi.status() === 'unsupported' || midi.status() === 'asking'"
-        [title]="midiTitle()"
-        (click)="toggleMidi()"
-      >
-        roll.record.use-midi-keyboard
-      </button>
       <button
         i18n="@@roll.record.play-the-song"
         amk-toggle

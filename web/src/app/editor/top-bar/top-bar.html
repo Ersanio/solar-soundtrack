@@ -7,8 +7,23 @@
 <!-- The exports on the right, dark as the transport is, and ruled off from
      the app's own buttons. -->
 <div class="ml-auto flex items-center gap-2">
-  <!-- The two labels show only where the row has room for them beside the
+  <!-- The labels show only where the row has room for them beside the
        transport; below that the glyph and the title carry each button. -->
+
+  <!-- Lit while keyboards are being listened to, found or not; the keys reach
+       the piano roll only. -->
+  <button
+    amk-toggle
+    size="md"
+    [pressed]="midi.status() === 'on'"
+    [disabled]="midi.status() === 'unsupported' || midi.status() === 'asking'"
+    [title]="midiTitle()"
+    (click)="toggleMidi()"
+  >
+    <amk-icon-roll />
+    <span class="max-[98rem]:hidden">{{ midiLabel() }}</span>
+  </button>
+
   <button
     amk-button
     variant="dark"
