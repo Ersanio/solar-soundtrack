@@ -407,6 +407,19 @@ export class EditorStore {
    */
   readonly tokens = computed(() => parsing(() => tokenize(this.source())));
 
+  /**
+   * The scan of {@link compiledText}, which the compiler's spans index: {@link tokens} itself
+   * while the compile has caught up, and a scan of its own only while typing is ahead of it.
+   */
+  readonly compiledTokens = computed(() => {
+    const text = this.compiledText();
+    if (text === null) {
+      return null;
+    }
+
+    return text === this.source() ? this.tokens() : parsing(() => tokenize(text));
+  });
+
   /** The command the caret is in, which the command inspector renders. */
   readonly commandAtCaret = computed(() => commandAt(this.tokens().commands, this.caret()));
 

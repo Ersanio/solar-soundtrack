@@ -30,6 +30,7 @@ export const HARNESSES = [
   'walktest',
   'charttest',
   'pianorolltest',
+  'fixtest',
 ];
 
 /** A step that is one of the root `package.json` scripts. */

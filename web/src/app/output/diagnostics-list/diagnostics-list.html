@@ -20,22 +20,35 @@
         <span class="text-ink">{{ row.diagnostic.message }}</span>
       </button>
 
-      <!-- On the right of the message: Suppress, on anything but an error. -->
-      @if (row.suppressible) {
+      <!-- On the right of the message: one button per fix, then Suppress on anything but an error. -->
+      @if (row.fixes.length > 0 || row.suppressible) {
         <div class="flex shrink-0 items-center gap-1">
-          <button
-            i18n="@@output.problems.suppress"
-            amk-button
-            variant="ghost"
-            size="sm"
-            title="output.problems.suppress.title {{
-              row.diagnostic.code // i18n(ph='code')
-            }}"
-            i18n-title="@@output.problems.suppress.title"
-            (click)="suppress(row.diagnostic)"
-          >
-            output.problems.suppress
-          </button>
+          @for (fix of row.fixes; track fix.id) {
+            <button
+              amk-button
+              size="sm"
+              i18n-title="@@output.problems.fix.title"
+              title="output.problems.fix.title"
+              (click)="openFix(row.diagnostic, fix)"
+            >
+              {{ fix.label }}
+            </button>
+          }
+          @if (row.suppressible) {
+            <button
+              i18n="@@output.problems.suppress"
+              amk-button
+              variant="ghost"
+              size="sm"
+              title="output.problems.suppress.title {{
+                row.diagnostic.code // i18n(ph='code')
+              }}"
+              i18n-title="@@output.problems.suppress.title"
+              (click)="suppress(row.diagnostic)"
+            >
+              output.problems.suppress
+            </button>
+          }
         </div>
       }
     </li>
@@ -61,3 +74,39 @@
     }</ng-container>
   </button>
 }
+
+<amk-modal #fixDialog wide [heading]="heading()">
+  @if (pending(); as shown) {
+    <p class="text-ink text-sm leading-relaxed">{{ shown.diagnostic.message }}</p>
+    <p class="text-ink-muted mt-2 mb-3 text-xs leading-relaxed">{{ shown.fix.summary }}</p>
+    <amk-fix-diff [source]="shown.fix.against" [edits]="shown.fix.edits" />
+    @if (shown.breaks.length > 0) {
+      <p i18n="@@output.fix.breaks" class="text-danger mt-3 text-xs leading-relaxed">
+        output.fix.breaks
+      </p>
+      <ul class="text-danger mt-1 list-disc pl-5 text-xs leading-relaxed">
+        @for (error of shown.breaks; track $index) {
+          <li>
+            <span class="font-mono">{{ error.code }}</span> {{ error.message }}
+          </li>
+        }
+      </ul>
+    } @else {
+      <p i18n="@@output.fix.undo" class="text-ink-muted mt-3 text-xs">output.fix.undo</p>
+    }
+  }
+
+  <button i18n="@@output.fix.cancel" amk-button modalFooter (click)="fixDialog.close()">
+    output.fix.cancel
+  </button>
+  <button
+    i18n="@@output.fix.apply"
+    amk-button
+    variant="primary"
+    modalFooter
+    [disabled]="blocked()"
+    (click)="apply()"
+  >
+    output.fix.apply
+  </button>
+</amk-modal>

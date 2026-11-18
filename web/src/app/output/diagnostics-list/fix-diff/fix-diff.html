@@ -1,0 +1,31 @@
+<div
+  class="border-edge bg-inset overflow-x-auto rounded-sm border font-mono text-xs leading-relaxed"
+>
+  @for (row of rows(); track $index) {
+    @if (row.kind === 'skipped') {
+      <div class="text-ink-muted border-edge border-y px-3 py-0.5 italic">
+        <ng-container i18n="@@output.fix.unchanged">{row.count, plural,
+          =1 {output.fix.unchanged}
+          other {output.fix.unchanged {{ row.count // i18n(ph='count') }}}
+        }</ng-container>
+      </div>
+    } @else {
+      <div class="flex min-w-max" [class]="rowClass[row.kind]">
+        <span class="text-ink-muted w-9 shrink-0 pr-1 text-right tabular-nums select-none">{{
+          row.old
+        }}</span>
+        <span class="text-ink-muted w-9 shrink-0 pr-1 text-right tabular-nums select-none">{{
+          row.new
+        }}</span>
+        <span class="w-4 shrink-0 text-center select-none" [class]="markClass[row.kind]">{{
+          row.mark
+        }}</span>
+        <span class="pr-3">
+          @for (part of row.parts; track $index) {
+            <span class="whitespace-pre" [class]="part.class">{{ part.text }}</span>
+          }
+        </span>
+      </div>
+    }
+  }
+</div>

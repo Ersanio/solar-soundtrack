@@ -40,7 +40,12 @@ export function builtInTaps(which: number): FirTaps | null {
  * {@link echoHazards}.
  */
 export function feedbackBefore(command: Command, commands: readonly Command[]): number {
-	let found = 0;
+	return echoDelayBefore(command, commands)?.args[1].value ?? 0;
+}
+
+/** The `$F1` whose feedback {@link feedbackBefore} reads, or `null` where there is none. */
+export function echoDelayBefore(command: Command, commands: readonly Command[]): Command | null {
+	let found: Command | null = null;
 	for (const other of commands) {
 		if (other.span.start >= command.span.start) {
 			break;
@@ -51,7 +56,7 @@ export function feedbackBefore(command: Command, commands: readonly Command[]): 
 		}
 
 		if (other.vcmd === VCMD.EchoDelay && other.args.length >= 2) {
-			found = other.args[1].value;
+			found = other;
 		}
 	}
 

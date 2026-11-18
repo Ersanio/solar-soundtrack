@@ -185,6 +185,21 @@ something in the directory, which load by themselves when such a file is opened.
 - `selectors.mjs` — Every DOM selector the app driver reads the running editor through, one comment each on what it finds.
 - `serve.mjs` — A dependency-free static server for a built copy of the app, on a free port of its own.
 
+## scripts/fixtest
+
+**Rules:** `harnesses/*.md`, `problems.md`
+
+- `diff.ts` — `fixtest`: the diff the fix dialog draws — kinds, line numbers, context and what is folded away.
+- `directives.ts` — `fixtest`: directives deleted, moved, written and switched, `#pad` grown and `#spc` text cut.
+- `hazards.ts` — `fixtest`: a dead `$F7` deleted, a stranded `$DD` moved back to its note, and a runaway echo's feedback lowered as far as it must go and no further.
+- `lengths.ts` — `fixtest`: SST0502's Pad, which makes every channel reach the longest, and Trim, which cuts what the song never reaches.
+- `main.ts` — The Problems list's fixes: each one offered where it should be and nowhere else, writing what it says it writes, and leaving a song that no longer raises what it fixed and raises no new error.
+- `names.ts` — `fixtest`: a sample, group or `#spc` field name put right where exactly one name fits.
+- `repeat.ts` — `fixtest`: a setting that carries into the repeat, written again where the loop starts, reset, or switched back.
+- `samples.ts` — `fixtest`: a used sample added to `#samples`, `#default` put first, and a list written where there was none.
+- `support.ts` — What every `fixtest` section shares: a song compiled, walked and diagnosed as the editor does, and the checks on a fix.
+- `text.ts` — `fixtest`: a stray character deleted and upper-case note letters lowered, both to the same bytes.
+
 ## scripts/palettetest
 
 **Rules:** `harnesses/*.md`
@@ -561,7 +576,7 @@ something in the directory, which load by themselves when such a file is opened.
 
 **Rules:** `state-and-editor.md`
 
-- `source-view.ts` (300+ lines) — The MML source, as a CodeMirror view.
+- `source-view.ts` (500+ lines) — The MML source, as a CodeMirror view.
 
 ## web/src/app/held-song-banner
 
@@ -747,7 +762,28 @@ something in the directory, which load by themselves when such a file is opened.
 
 **Rules:** `problems.md`
 
-- `diagnostics-list.ts` — The Problems list: each diagnostic, a click that reveals its span in the source, and the suppression beside it.
+- `diagnostics-list.ts` — The Problems list: each diagnostic, a click that reveals its span in the source, and the fix or suppression beside it.
+
+## web/src/app/output/diagnostics-list/fix-diff
+
+**Rules:** `problems.md`
+
+- `fix-diff.ts` — A fix's change to the song, as a diff trimmed to the lines it touches.
+
+## web/src/app/output/diagnostics-list/fixes
+
+**Rules:** `problems.md`
+
+- `directive-fixes.ts` — Fixes to the song's directives: a redundant one deleted, a misplaced one moved above the channels, the target marker written or switched, `#pad` grown and `#spc` text cut to length.
+- `fix-diff.ts` (300+ lines) — A fix's edits as the rows of a diff: whole lines removed and added, lines changed inside, a little unchanged text around each change, and the rest folded away.
+- `fix-text.ts` — What every family of fixes shares: building a {@link Fix}, finding tokens near a span, and taking a line out.
+- `fixes.ts` — The fixes the Problems list offers: for a diagnostic with one mechanical answer, the edits that make it.
+- `hazard-fixes.ts` — Fixes to the bytes that compile clean and break the song: a runaway echo's feedback lowered, a dead `$F7` deleted, and a `$DD` moved back against the note it was written to ride on.
+- `length-fixes.ts` — SST0502's two fixes, for a song that ends before some of its channels do: Pad lengthens every channel that ends early, so all of it is heard, and Trim cuts what can never be heard, so the song keeps its length.
+- `name-fixes.ts` — Fixes to a name AddmusicK could not find: a sample, a sample group or an `#spc` field whose only fault is letter case, or a sample missing its extension.
+- `repeat-fixes.ts` — Fixes for a setting that carries into the song's repeat (`SST0510`-`SST0512`): the first pass's setting written again where the loop starts, the remote code reset the message names written there, or a toggle switched back at the end of the song.
+- `sample-fixes.ts` — Fixes to the `#samples` list: a sample the song uses added to it, and `#default` put first where a stock instrument reaches past the list's end.
+- `text-fixes.ts` — Fixes that change spelling and nothing else: a stray character deleted, upper-case note letters lowered.
 
 ## web/src/app/output/hex-dump
 

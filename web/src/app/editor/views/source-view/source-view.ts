@@ -406,6 +406,20 @@ export class SourceView {
     if (batch.immediate) {
       this.store.compileNow();
     }
+
+    // A shown batch is a summons, as a shown reveal is: the source comes forward with the
+    // change on screen and focus in the text, so the keyboard's undo reaches it at once.
+    if (batch.show) {
+      this.activate.emit();
+      afterNextRender(
+        () => {
+          const { from } = this.view.state.selection.main;
+          this.view.dispatch({ effects: EditorView.scrollIntoView(from, { y: 'center' }) });
+          this.view.focus();
+        },
+        { injector: this.injector },
+      );
+    }
   }
 
   /** Flips word wrap without rebuilding the view. */

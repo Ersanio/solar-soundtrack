@@ -35,7 +35,11 @@ code, message)` covers `severe`. A span must map back to the text the author wro
 6. **Suppression**: a code that is never an error gets an entry in `SUPPRESSIBLE`
    (`web/src/app/state/suppressible.ts`), described by its own catalog entry with `GAP` for the
    values, so the top bar's picker can offer it. An error never gets one.
-7. **Verify**: `npm run selftest`, then `npm run i18n:check`, then the
+7. **A fix**, where the finding has one mechanical answer that neither widens what AddmusicK accepts
+   nor changes the music it was not asked to: a family in
+   `web/src/app/output/diagnostics-list/fixes/`, with a `fixtest` case for the fix and one for each
+   song it must not be offered on (`.claude/rules/problems.md`).
+8. **Verify**: `npm run selftest`, then `npm run i18n:check`, then the
    `verify-change` skill for the rest.
 
 If the new code is an `SST05xx`, add it to the list of what that band covers in

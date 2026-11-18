@@ -1,10 +1,10 @@
 # Harnesses
 
-Fourteen byte-level checks, each a standalone esbuild-bundled Node script with its own npm script.
+Fifteen byte-level checks, each a standalone esbuild-bundled Node script with its own npm script.
 There are no `.spec.ts` files anywhere in the repository and no `npm run test`. These are the suite.
 
 Run one by name (`npm run selftest`), or let `npm run affected` pick the ones that import what you
-changed. `npm run check` runs all fourteen, one step each, in the order of these groups, which are
+changed. `npm run check` runs all fifteen, one step each, in the order of these groups, which are
 also runnable on their own:
 
 | Group               | Harnesses                                         |
@@ -13,15 +13,15 @@ also runnable on their own:
 | `check:tokens`      | `tokentest`, `edittest`, `palettetest`            |
 | `check:spc`         | `adsrtest`, `instrtest`, `brrtest`, `firtest`     |
 | `check:integration` | `spctest`, `audiotest`, `worklettest`, `walktest` |
-| `check:app`         | `charttest`, `pianorolltest`                      |
+| `check:app`         | `charttest`, `pianorolltest`, `fixtest`           |
 
-Ten of the fourteen import a value from two or more `@amk/*` packages — every one but `adsrtest`,
+Eleven of the fifteen import a value from two or more `@amk/*` packages — every one but `adsrtest`,
 `edittest`, `selftest` and `tokentest` — which is why they all live here rather than one per package,
 and why they share `harness.ts` rather than each carrying a copy: copies drift. Recount that rule
 rather than bumping the number when one is added.
 
-Seven are split into section files — `selftest`, `tokentest`, `palettetest`, `audiotest`,
-`walktest`, `charttest` and `pianorolltest` — each a `scripts/<name>/` holding `main.ts`, which lists the
+Eight are split into section files — `selftest`, `tokentest`, `palettetest`, `audiotest`,
+`walktest`, `charttest`, `pianorolltest` and `fixtest` — each a `scripts/<name>/` holding `main.ts`, which lists the
 sections in order, `support.ts`, which holds what they share, and one file per section. The other
 seven are one file each, `scripts/<name>.ts`.
 
@@ -44,6 +44,7 @@ harness. In one line each:
 - `palettetest` — The command palette's catalogue, and it is the one harness whose oracle is the compiler rather than a table of expected bytes.
 - `edittest` — The splices the command inspector writes back into the source.
 - `pianorolltest` — The piano roll's edits: `roll-strip.ts` and `roll-edit.ts`, driven the way the roll drives them.
+- `fixtest` — The Problems list's fixes, each held to the song it leaves, and the diff the fix dialog draws.
 
 ## Running one, and reading what it prints
 
@@ -85,7 +86,7 @@ a table of step, result, duration and tally, and for each failure its first FAIL
 is written `-`). The exit code is non-zero when any step failed.
 
 - **`npm run check`** (`check.mjs`) is the gate: `format:check`, `codemap:check`,
-  `citations:check`, `typecheck`, `typecheck:packages`, `typecheck:scripts`, the fourteen harnesses,
+  `citations:check`, `typecheck`, `typecheck:packages`, `typecheck:scripts`, the fifteen harnesses,
   `i18n:check`. It carries on past a failure, so one run reports everything that is broken;
   `-- --bail` stops at the first. `npm run check -- pianorolltest i18n:check` runs only the steps named,
   and `-- --list` prints the names.

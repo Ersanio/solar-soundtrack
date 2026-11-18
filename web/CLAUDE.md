@@ -201,7 +201,9 @@ it, and `roll-edit.ts` asserts it where the edits are made. It also carries `imm
 the editor to compile without waiting out the typing debounce: a gesture is committed once and the
 roll's spans are stale until the compile lands, where a slider fires per frame and must not. The
 call is the **view's**, not the mailbox's, because `EditorRequests` depends on nothing and reaching
-`EditorStore` from it would turn the spine round.
+`EditorStore` from it would turn the spine round. And it carries `show`, which brings the source
+forward focused on the change as a shown `reveal` does: a fix from the Problems list asks for it, so
+the keyboard's Ctrl+Z undoes the fix at once.
 
 The whole write-back path rests on one fact: the source view is hidden, never destroyed, when another
 tab is showing, so its effects are live while the roll is in front. If that `[class.hidden]` in

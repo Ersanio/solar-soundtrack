@@ -215,7 +215,7 @@ ledger beside the others and a row here. A ledger file has no frontmatter, and n
 | `inspector-and-palette.md`   | the command inspector, a note's Length row, the instrument picker, the command palette, the `$DD` and `q` readouts, the bend graph, the FIR designer     |
 | `compiler.md`                | `packages/mml-compiler`, the `@amk/tokens` scanner, diagnostics, `#path`                                                                                 |
 | `state-and-editor.md`        | `EditorStore`'s scan and compile, the write-back path through `EditorRequests`, `DriverStore`, `SampleStore`, the CodeMirror adapter, the sample browser |
-| `problems.md`                | the Problems list's suppression and the top bar's list of suppressed warnings                                                                            |
+| `problems.md`                | the Problems list: its fixes, the fix dialog and its diff, suppression and the top bar's list of suppressed warnings, `fixtest`                          |
 | `i18n.md`                    | any text a porter reads: templates, `$localize`, the AMK/SST catalogs, command names and descriptions, `web/src/locale/messages.en.json`                 |
 | `ui-and-theme.md`            | `styles.css` colours, `ThemeStore` and presets, the panes, sidebar, tabs and shared controls                                                             |
 | `tooling.md`                 | the pre-hooks, `eslint.config.js`, `.prettierrc`, CI and deployment, the after-edit hook                                                                 |

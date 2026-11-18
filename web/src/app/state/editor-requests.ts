@@ -61,6 +61,11 @@ export interface EditBatch {
    * retargets the inspector.
    */
   select: { anchor: number; head: number } | null;
+  /**
+   * Bring the source forward and focus it once the batch lands, as a shown {@link Reveal} does.
+   * A fix from the Problems list asks for it, so the change is on screen and Ctrl+Z undoes it.
+   */
+  show: boolean;
 }
 
 /**
@@ -132,6 +137,7 @@ export class EditorRequests {
         immediate: false,
         select: null,
         keepsNotes,
+        show: false,
       });
     }
   }
@@ -147,11 +153,14 @@ export class EditorRequests {
    * The ranges must be non-overlapping and in the document's own coordinates:
    * CodeMirror merges overlapping ones rather than refusing them, so nothing
    * downstream can catch it. `roll-edit.ts` asserts it where the edits are made.
+   *
+   * `show` is {@link EditBatch.show}.
    */
   applyAll(
     edits: readonly Edit[] | null,
     select: { anchor: number; head: number } | null = null,
     keepsNotes = false,
+    show = false,
   ): void {
     if (edits && edits.length > 0) {
       this.replace.set({
@@ -159,6 +168,7 @@ export class EditorRequests {
         immediate: true,
         select: select && { ...select },
         keepsNotes,
+        show,
       });
     }
   }
