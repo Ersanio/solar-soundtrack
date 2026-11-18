@@ -354,9 +354,15 @@ something in the directory, which load by themselves when such a file is opened.
 
 - `history-buttons.ts` — Undo and redo, for the two toolbars that need them.
 
+## web/src/app/editor/top-bar/suppressions-button
+
+**Rules:** `problems.md`
+
+- `suppressions-button.ts` — The top bar's list of suppressed warnings: a button, and the dialog it opens to edit the list.
+
 ## web/src/app/editor/top-bar
 
-- `top-bar.ts` — The top bar: the transport, the ARAM meter, the MIDI keyboard switch, the exports, the theme picker, the changelog and the commit link.
+- `top-bar.ts` — The top bar: the transport, the ARAM meter, the suppressed warnings, the MIDI keyboard switch, the exports, the theme picker, the changelog and the commit link.
 
 ## web/src/app/editor/transport-controls
 
@@ -739,7 +745,9 @@ something in the directory, which load by themselves when such a file is opened.
 
 ## web/src/app/output/diagnostics-list
 
-- `diagnostics-list.ts` — The Problems list: each diagnostic, and a click that reveals its span in the source.
+**Rules:** `problems.md`
+
+- `diagnostics-list.ts` — The Problems list: each diagnostic, a click that reveals its span in the source, and the suppression beside it.
 
 ## web/src/app/output/hex-dump
 
@@ -803,7 +811,7 @@ something in the directory, which load by themselves when such a file is opened.
 
 **Rules:** `ui-and-theme.md`
 
-- 24 icon components, `icon-<name>.ts`, one glyph each: `book`, `chevron-down`, `chevron-right`, `close`, `download`, `github`, `lock`, `loop`, `minus`, `palette`, `pause`, `play`, `plus`, `record`, `recording`, `redo`, `roll`, `samples`, `source`, `stop`, `undo`, `unlock`, `volume`, `wrap`
+- 25 icon components, `icon-<name>.ts`, one glyph each: `book`, `chevron-down`, `chevron-right`, `close`, `download`, `github`, `lock`, `loop`, `minus`, `palette`, `pause`, `play`, `plus`, `record`, `recording`, `redo`, `roll`, `samples`, `source`, `stop`, `suppress`, `undo`, `unlock`, `volume`, `wrap`
 
 ## web/src/app/shared/modal
 
@@ -862,7 +870,7 @@ something in the directory, which load by themselves when such a file is opened.
 
 ## web/src/app/state
 
-**Rules:** `audition.md`, `commands-in-the-roll.md`, `state-and-editor.md`, `transport-and-clock.md`, `ui-and-theme.md`
+**Rules:** `audition.md`, `commands-in-the-roll.md`, `problems.md`, `state-and-editor.md`, `transport-and-clock.md`, `ui-and-theme.md`
 
 - `audition.ts` (500+ lines) — Playing one sample, one note of the song, or one stretch of it, on its own AudioContext.
 - `clock-measurer.ts` — Measures how fast the song really runs on the emulator, and raises `SST0503` when the driver falls behind.
@@ -887,6 +895,8 @@ something in the directory, which load by themselves when such a file is opened.
 - `song-clock.ts` — Ticks to seconds, for a song the compiler could not put a clock on.
 - `spc-core.ts` — One emulator per worker, brought up on demand.
 - `stop-all.ts` — Stops whatever is sounding: the song, and a note or selection being previewed.
+- `suppressible.ts` — Every code that is never an error, and so may be suppressed, with what each one says.
+- `suppressions.ts` — The diagnostic codes the porter has suppressed, in every song, kept in the browser as the theme is.
 - `theme-store.ts` — What the app is painted in, and the porter's changes to it, written onto `<html>` as custom properties.
 - `transport-view.ts` — The transport's readings of the mixer and the walk: silenced channels and why, sounding spans, estimated seconds.
 

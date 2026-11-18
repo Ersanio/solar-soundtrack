@@ -166,7 +166,7 @@ with everything else. Only the shadows are black, being darkness rather than a c
   mixer's mute is a light, lit while the channel is heard. FL Studio draws both that way.
 - **Dialogs.** `shared/modal/` is the one window over the app: a native `<dialog>` opened with
   `showModal()`, in the popover's chrome on a `bg-inset/70` backdrop, and `wide` for a body that is
-  a listing. The roll's Record settings are its consumer.
+  a listing. The roll's Record settings and the top bar's suppressed warnings are its consumers.
 
 ## Decisions already made
 

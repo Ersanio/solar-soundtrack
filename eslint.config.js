@@ -286,6 +286,7 @@ module.exports = defineConfig([
             'clip-path',
             'd',
             'dominant-baseline',
+            'maskUnits',
             'origin',
             'patternTransform',
             'patternUnits',

@@ -30,6 +30,7 @@ import { dropHeld, keepDraft, openDraft, parsing, settleDraft } from './draft-gu
 import { DriverStore } from './driver-store';
 import { SAMPLE_SONG } from './sample-song';
 import { SampleStore } from './sample-store';
+import { Suppressions } from './suppressions';
 
 /** How long typing pauses before a compile fires. */
 const DEBOUNCE_MS = 150;
@@ -56,6 +57,7 @@ export class EditorStore {
   private readonly drivers = inject(DriverStore);
   private readonly library = inject(SampleStore);
   private readonly measurer = inject(ClockMeasurer);
+  private readonly suppressions = inject(Suppressions);
 
   /** The stored draft as startup found it, read once, before anything parses it. */
   private readonly opened = openDraft();
@@ -198,7 +200,7 @@ export class EditorStore {
    * play is not worth holding back 150 ms, and the compiler has no opinion to offer anyway: it
    * copies `$F5` through on its length alone, because `Music.cpp` has no `$F5` code to port.
    */
-  readonly diagnostics = computed<Diagnostic[]>(() => {
+  readonly allDiagnostics = computed<Diagnostic[]>(() => {
     const order = { error: 0, severe: 1, warning: 2, info: 3 } as const;
     const timeline = this.timeline();
     const compiled = this.compilation();
@@ -221,6 +223,23 @@ export class EditorStore {
     ];
     return all.sort((a, b) => order[a.severity] - order[b.severity] || a.span.start - b.span.start);
   });
+
+  /**
+   * {@link allDiagnostics} less every one whose code the porter has suppressed, which is what the
+   * Problems list, its counts and the editor's underlines show. An error is never suppressed.
+   */
+  readonly diagnostics = computed<Diagnostic[]>(() => {
+    const suppressed = this.suppressions.codes();
+    const all = this.allDiagnostics();
+    return suppressed.size === 0
+      ? all
+      : all.filter((d) => d.severity === 'error' || !suppressed.has(d.code));
+  });
+
+  /** How many diagnostics {@link diagnostics} leaves out. */
+  readonly suppressedCount = computed(
+    () => this.allDiagnostics().length - this.diagnostics().length,
+  );
 
   /** The `t` or `$E2`/`$E3` that set the rate, or the top of the document. */
   private tempoSpan(): Span {

@@ -285,6 +285,17 @@ export class EditorRequests {
   }
 
   /**
+   * How many times the list of suppressed warnings has been asked for from the Problems list,
+   * whose count opens it where the top bar has no room for its button. A count for
+   * {@link notesKept}'s reason.
+   */
+  readonly suppressedListOpens = signal(0);
+
+  openSuppressedList(): void {
+    this.suppressedListOpens.update((count) => count + 1);
+  }
+
+  /**
    * The caret the inspector's question was withdrawn at, or `null` for none.
    *
    * The roll's `Escape` lets a note or a command go, and the panel that was

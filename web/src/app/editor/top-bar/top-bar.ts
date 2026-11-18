@@ -1,4 +1,4 @@
-/** The top bar: the transport, the ARAM meter, the MIDI keyboard switch, the exports, the theme picker, the changelog and the commit link. */
+/** The top bar: the transport, the ARAM meter, the suppressed warnings, the MIDI keyboard switch, the exports, the theme picker, the changelog and the commit link. */
 
 import { Component, computed, inject } from '@angular/core';
 
@@ -14,6 +14,7 @@ import { EditorStore } from '../../state/editor-store';
 import { MidiInput } from '../../state/midi-input';
 import { ThemePicker } from '../../theme/theme-picker/theme-picker';
 import { AramMeter } from '../aram-meter/aram-meter';
+import { SuppressionsButton } from './suppressions-button/suppressions-button';
 import { TransportControls } from '../transport-controls/transport-controls';
 
 const REPO_URL = 'https://github.com/Ersanio/solar-soundtrack';
@@ -27,7 +28,8 @@ const REPO_URL = 'https://github.com/Ersanio/solar-soundtrack';
  * way first, each where the row stops holding it: the exports' below `2xl`, the
  * MIDI switch's below 98rem, the ARAM meter's free figure below 107rem, and below
  * `xl` the Loop label and the ARAM word, with the volume slider a step
- * narrower. Without them the transport overflows its box at 1024–1279px and
+ * narrower. Below 67rem the suppressed warnings' button goes too, the Problems
+ * list's count opening its list instead. Without them the transport overflows its box at 1024–1279px and
  * 1536–1711px, and its volume slider lies over the ARAM meter.
  */
 @Component({
@@ -39,6 +41,7 @@ const REPO_URL = 'https://github.com/Ersanio/solar-soundtrack';
     IconDownload,
     IconGithub,
     IconRoll,
+    SuppressionsButton,
     ThemePicker,
     Toggle,
     TransportControls,

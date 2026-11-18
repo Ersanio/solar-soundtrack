@@ -1,24 +1,43 @@
-@let items = store.diagnostics();
+@let items = rows();
 
 <ul class="divide-edge divide-y">
-  @for (diagnostic of items; track $index) {
-    <li>
+  @for (row of items; track $index) {
+    <li class="hover:bg-raised flex items-start gap-2 px-3 py-1">
       <button
         type="button"
-        class="hover:bg-raised flex w-full cursor-pointer items-baseline gap-2 px-3 py-2 text-left"
-        (click)="reveal(diagnostic)"
+        class="flex min-w-0 flex-1 cursor-pointer items-baseline gap-2 py-1 text-left"
+        (click)="reveal(row.diagnostic)"
       >
         <span i18n="@@output.problems.line" class="text-ink-muted shrink-0 font-mono text-xs"
           >output.problems.line
           {{
-            diagnostic.span.line // i18n(ph='line')
+            row.diagnostic.span.line // i18n(ph='line')
           }}</span
         >
-        <span class="shrink-0 font-mono text-xs" [class]="severityClass[diagnostic.severity]">
-          {{ diagnostic.severity }} {{ diagnostic.code }}
+        <span class="shrink-0 font-mono text-xs" [class]="severityClass[row.diagnostic.severity]">
+          {{ row.diagnostic.severity }} {{ row.diagnostic.code }}
         </span>
-        <span class="text-ink">{{ diagnostic.message }}</span>
+        <span class="text-ink">{{ row.diagnostic.message }}</span>
       </button>
+
+      <!-- On the right of the message: Suppress, on anything but an error. -->
+      @if (row.suppressible) {
+        <div class="flex shrink-0 items-center gap-1">
+          <button
+            i18n="@@output.problems.suppress"
+            amk-button
+            variant="ghost"
+            size="sm"
+            title="output.problems.suppress.title {{
+              row.diagnostic.code // i18n(ph='code')
+            }}"
+            i18n-title="@@output.problems.suppress.title"
+            (click)="suppress(row.diagnostic)"
+          >
+            output.problems.suppress
+          </button>
+        </div>
+      }
     </li>
   } @empty {
     <li i18n="@@output.problems.no-problems" class="text-ink-muted px-3 py-2">
@@ -26,3 +45,19 @@
     </li>
   }
 </ul>
+
+@if (store.suppressedCount() > 0) {
+  <!-- Opens the top bar's list, which is the only way to it where the top bar hides its button. -->
+  <button
+    type="button"
+    class="text-ink-muted hover:text-ink border-edge w-full cursor-pointer border-t px-3 py-1.5 text-left text-xs hover:underline"
+    title="output.problems.suppressed.title"
+    i18n-title="@@output.problems.suppressed.title"
+    (click)="requests.openSuppressedList()"
+  >
+    <ng-container i18n="@@output.problems.suppressed">{store.suppressedCount(), plural,
+      =1 {output.problems.suppressed}
+      other {output.problems.suppressed {{ store.suppressedCount() // i18n(ph='count') }}}
+    }</ng-container>
+  </button>
+}

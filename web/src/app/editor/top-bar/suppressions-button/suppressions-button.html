@@ -1,0 +1,91 @@
+<!-- Left of the MIDI switch: the warnings kept out of the Problems list. One glyph wide whatever
+     the count, and gone below 67rem, where the Problems list's count opens the same list. -->
+<button
+  amk-button
+  variant="dark"
+  size="md"
+  icon
+  class="relative max-[67rem]:hidden"
+  [title]="text.title"
+  (click)="open()"
+>
+  <amk-icon-suppress />
+  @if (suppressions.codes().size > 0) {
+    <span
+      class="bg-ink-muted text-inset absolute -top-1 -right-1 min-w-4 rounded-full px-1 font-mono text-[10px] leading-4 tabular-nums"
+      >{{ suppressions.codes().size }}</span
+    >
+  }
+</button>
+
+<amk-modal #dialog wide [heading]="text.heading">
+  <div class="flex flex-col gap-3">
+    @if (rows().length === 0) {
+      <p i18n="@@topbar.suppressed.none" class="text-ink-muted text-xs leading-relaxed">
+        topbar.suppressed.none
+      </p>
+    } @else {
+      <ul class="divide-edge border-edge divide-y rounded-sm border">
+        @for (row of rows(); track row.code) {
+          <li class="flex items-start gap-2 px-2 py-1.5">
+            <span class="shrink-0 font-mono text-xs" [class]="row.chip">{{ row.code }}</span>
+            <div class="text-ink min-w-0 flex-1 text-xs leading-relaxed">
+              @for (line of row.lines; track $index) {
+                <p>{{ line }}</p>
+              }
+            </div>
+            <button
+              i18n="@@topbar.suppressed.restore"
+              amk-button
+              variant="ghost"
+              size="sm"
+              (click)="suppressions.restore(row.code)"
+            >
+              topbar.suppressed.restore
+            </button>
+          </li>
+        }
+      </ul>
+    }
+
+    <div class="flex items-center gap-2">
+      <select
+        class="bg-inset border-edge text-ink h-7 min-w-0 flex-1 cursor-pointer rounded-md border px-1.5 text-xs"
+        [value]="picked()"
+        (change)="pick($event)"
+      >
+        <option i18n="@@topbar.suppressed.pick" value="" [selected]="picked() === ''">
+          topbar.suppressed.pick
+        </option>
+        @for (option of options(); track option.code) {
+          <option [value]="option.code" [selected]="option.code === picked()">
+            {{ option.label }}
+          </option>
+        }
+      </select>
+      <button
+        i18n="@@topbar.suppressed.add"
+        amk-button
+        size="sm"
+        [disabled]="picked() === ''"
+        (click)="add()"
+      >
+        topbar.suppressed.add
+      </button>
+    </div>
+  </div>
+
+  <button
+    i18n="@@topbar.suppressed.restore-all"
+    amk-button
+    variant="danger"
+    modalFooter
+    [disabled]="rows().length === 0"
+    (click)="suppressions.restoreAll()"
+  >
+    topbar.suppressed.restore-all
+  </button>
+  <button i18n="@@topbar.suppressed.close" amk-button modalFooter (click)="dialog.close()">
+    topbar.suppressed.close
+  </button>
+</amk-modal>

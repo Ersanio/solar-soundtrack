@@ -1,0 +1,38 @@
+<svg viewBox="0 0 16 16" width="14" height="14" fill="none">
+  <defs>
+    <!-- The eye, cut back a unit clear of the triangle. -->
+    <mask maskUnits="userSpaceOnUse" x="0" y="0" width="16" height="16" [attr.id]="eyeId">
+      <rect width="16" height="16" fill="white" />
+      <path
+        d="M11.75 7.75 15.25 14.25H8.25z"
+        fill="black"
+        stroke="black"
+        stroke-width="3.5"
+        stroke-linejoin="round"
+      />
+    </mask>
+    <!-- The triangle, its "!" cut out. -->
+    <mask maskUnits="userSpaceOnUse" x="0" y="0" width="16" height="16" [attr.id]="signId">
+      <rect width="16" height="16" fill="white" />
+      <path d="M11.75 9.9v1.85" stroke="black" stroke-width="1.3" stroke-linecap="round" />
+      <circle cx="11.75" cy="13.45" r="0.7" fill="black" />
+    </mask>
+  </defs>
+  <g [attr.mask]="eyeMask">
+    <path
+      d="M1 6s2.1-3.75 5.5-3.75S12 6 12 6 9.9 9.75 6.5 9.75 1 6 1 6z"
+      stroke="currentColor"
+      stroke-width="1.5"
+      stroke-linejoin="round"
+    />
+    <circle cx="6.5" cy="6" r="1.75" stroke="currentColor" stroke-width="1.5" />
+  </g>
+  <path
+    d="M11.75 7.75 15.25 14.25H8.25z"
+    fill="currentColor"
+    stroke="currentColor"
+    stroke-width="1.5"
+    stroke-linejoin="round"
+    [attr.mask]="signMask"
+  />
+</svg>
