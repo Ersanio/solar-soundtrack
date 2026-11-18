@@ -64,7 +64,9 @@ and moved away from, with the reason. The rule carries one index line per entry.
   to zero, where the `$00` it found walked the phrase table over every pointer at once and six
   channels of eight went silent. `arrive` waits for the target voice's own fetch mark to move and for
   `$48` to say no per-voice loop is in flight, then steps to the top of a pass so the point is the
-  same one every time; the settle waits for the driver to clear `$5C` rather than counting blocks;
+  same one every time; the settle waited for the driver to clear `$5C` rather than counting blocks,
+  until the mute moved into the DSP and left it nothing to wait for (`transport-and-clock`'s
+  ledger, **Muting by taking the track volume**);
   and the voice is parked meanwhile, since a halt would stop `L_0D1C` taking its volume. Not
   sample-identical even so, and no arrangement of this is: a mixer mask, or a different voice's fetch
   to wait for, moves the key-on a few CPU cycles and the DSP's free-running envelope counter with it.

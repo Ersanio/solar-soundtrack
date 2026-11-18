@@ -12,7 +12,7 @@ import { type BrrSample, emptySample } from "@amk/spc/brr";
 import { loadDriver } from "@amk/spc/driver";
 import { buildSpc } from "@amk/spc/export";
 import { SPC_CHANNELS, SPC_SAMPLE_RATE, instantiate } from "@amk/spc/wasm-host";
-import { TICK_POLL_HZ, applyChannelMutes, createMuteBackup } from "@amk/spc/driver-state";
+import { TICK_POLL_HZ } from "@amk/spc/driver-state";
 import { SPC_ASSETS, stubFetch } from "../harness";
 
 stubFetch();
@@ -139,9 +139,9 @@ export function compileToSpc(source: string): Uint8Array {
 export const BLOCK = SPC_SAMPLE_RATE / TICK_POLL_HZ;
 
 /**
- * Renders with channels muted the way the app mutes them: by taking the muted
- * voices' track volume after every emulated block, exactly as `worklet.ts` does.
- * Nothing about the SPC image changes, and `$5E` is left to the song.
+ * Renders with channels muted the way the app mutes them: in the DSP, between
+ * emulated blocks, as `worklet.ts` does when a mask arrives. Nothing about the
+ * SPC image or the driver changes.
  *
  * `warmup` frames are rendered and thrown away first, so the song is past its
  * boot handshake by the time the level is measured; keep it and `frames` whole
@@ -155,7 +155,6 @@ export function renderMuted(
 	maskAt: (frame: number) => number,
 ): Int16Array {
 	emu.loadSpc(spc);
-	const backup = createMuteBackup();
 	const out = new Int16Array(frames * SPC_CHANNELS);
 
 	let written = 0;
@@ -168,7 +167,7 @@ export function renderMuted(
 
 		// After the block, like the worklet: a mask posted now takes effect on
 		// the next one.
-		applyChannelMutes(emu.aram(), maskAt(done), backup);
+		emu.muteVoices(maskAt(done));
 	}
 
 	return out.subarray(0, written);

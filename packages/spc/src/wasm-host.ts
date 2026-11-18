@@ -21,6 +21,38 @@ export const SPC_CHANNELS = 2;
 const SPC_RAM_AT = 0x100;
 export const ARAM_SIZE = 0x10000;
 
+/** And the DSP's 128 registers at this one. */
+const SPC_DSP_REGS_AT = 0x10100;
+const DSP_REGISTER_COUNT = 128;
+
+/**
+ * The vendored build's DSP state (snes_spc's "fast" `SPC_DSP::state_t`), laid
+ * out relative to its `ram` pointer, which is the one word in the heap holding
+ * the address of APU RAM. In front of that pointer sit `counter_select[32]`, then
+ * `voices[8]`; the register file opens the struct, 308 bytes before the voices.
+ * Read off the binary, and checked by `findDsp` every time an instance starts.
+ */
+const DSP_VOICES = 8;
+const VOICE_STATE_SIZE = 140;
+/** `voice_t.volume[2]`: the `VxVOL` pair the DSP mixes with, already masked. */
+const VOICE_VOLUME_AT = 128;
+/** `voice_t.enabled`: -1 for a voice that is heard, 0 for one that is muted. */
+const VOICE_ENABLED_AT = 136;
+const COUNTER_SELECT_SIZE = 32 * 4;
+const VOICES_AFTER_REGS = 308;
+/** `counters[4]`, which every `counter_select` entry points into. */
+const COUNTERS_AFTER_REGS = 284;
+const COUNTERS_SIZE = 4 * 4;
+/** `surround_threshold`, two words past the `ram` pointer, and its value with surround allowed. */
+const SURROUND_AFTER_RAM = 8;
+const SURROUND_ALLOWED = -0x4000;
+
+/** Where {@link instantiate} found the DSP's state: heap addresses. */
+export interface DspLayout {
+	regs: number;
+	voices: number;
+}
+
 /**
  * `EM_ASM` blocks compiled into the binary, keyed by the code address the wasm
  * passes to `_emscripten_asm_const_int`. Upstream routed these at its backend
@@ -74,13 +106,34 @@ export interface SpcCore {
 	 *
 	 * A window onto the heap rather than a copy, so it can be written as well as
 	 * read and the SPC700 sees the change on its next instruction — which is how
-	 * channel muting works, with no help from the core, which exports nothing for
-	 * it. `loadSpc` puts the pristine image back over anything written here.
+	 * the note previewer hands the driver a note. `loadSpc` puts the pristine
+	 * image back over anything written here.
 	 *
 	 * A fresh view each call: the wasm heap can be reallocated by `memory.grow`,
 	 * which detaches any array handed out earlier. Valid only after `loadSpc`.
 	 */
 	aram(): Uint8Array;
+	/**
+	 * Silences the voices in `mask` inside the DSP, and gives every other voice
+	 * this muted its volume back at once, mid-note.
+	 *
+	 * In the DSP because nothing the driver does can reach it there. The DSP masks
+	 * every `VxVOL` write with the voice's `enabled` flag as the write lands, so a
+	 * muted voice stays silent through a `v`, a `$E8` fade, a `q` or a tremolo, and
+	 * the driver goes on doing exactly the work it does unmuted — see
+	 * `packages/spc/CLAUDE.md` for why its own registers are the wrong place.
+	 *
+	 * Holds until the mask changes or `loadSpc` runs, which clears it. A snapshot
+	 * carries it. Valid only after `loadSpc`.
+	 */
+	muteVoices(mask: number): void;
+	/**
+	 * Takes `voice` out of the mute without giving it a volume: it stays silent
+	 * until the driver next writes its `VxVOL`, which a key-on always does
+	 * (`NoteVCMD` sets the voice's flag in `$5C`, `main.asm:459`). A voice that is
+	 * not muted is left as it is.
+	 */
+	unmuteOnNextWrite(voice: number): void;
 	/**
 	 * The whole emulator as it stands, to be put back with {@link restore}.
 	 *
@@ -104,6 +157,8 @@ export interface CoreSnapshot {
 	readonly scratchFrames: number;
 	/** Where APU RAM sits in {@link memory}. */
 	readonly aramAt: number;
+	/** And the DSP's registers and voices. */
+	readonly dsp: DspLayout;
 }
 
 interface Exports {
@@ -370,7 +425,68 @@ export function instantiate(module: WebAssembly.Module): SpcCore {
 		return live[0];
 	};
 
+	/**
+	 * Finds the DSP's state inside the wasm heap, with `spc` freshly loaded.
+	 *
+	 * The DSP keeps a pointer to APU RAM, so the struct is found by looking for the
+	 * one word holding {@link findAram}'s answer with the surround threshold beside
+	 * it. Everything else is then checked rather than assumed: every voice heard,
+	 * every `counter_select` entry pointing into `counters`, and the register file
+	 * holding the image's own 128 registers.
+	 */
+	const findDsp = (spc: Uint8Array, ramAt: number): DspLayout => {
+		const fields: number[] = [];
+		for (let at = 0; at + SURROUND_AFTER_RAM + 4 <= u8.length; at += 4) {
+			if (view.getUint32(at, true) === ramAt && view.getInt32(at + SURROUND_AFTER_RAM, true) === SURROUND_ALLOWED) {
+				fields.push(at);
+			}
+		}
+
+		if (fields.length !== 1) {
+			throw new SpcCoreError(
+				`expected exactly one DSP state in the wasm heap, found ${fields.length}; spc.wasm is not the vendored build`,
+			);
+		}
+
+		const select = fields[0] - COUNTER_SELECT_SIZE;
+		const voices = select - DSP_VOICES * VOICE_STATE_SIZE;
+		const regs = voices - VOICES_AFTER_REGS;
+		const fail = (what: string): never => {
+			throw new SpcCoreError(`the DSP state in the wasm heap ${what}; spc.wasm is not the vendored build`);
+		};
+
+		for (let voice = 0; voice < DSP_VOICES; voice++) {
+			if (view.getInt32(voices + voice * VOICE_STATE_SIZE + VOICE_ENABLED_AT, true) !== -1) {
+				fail(`has voice ${voice} muted at load`);
+			}
+		}
+
+		for (let at = select; at < fields[0]; at += 4) {
+			const counter = view.getUint32(at, true) - regs;
+			if (counter < COUNTERS_AFTER_REGS || counter >= COUNTERS_AFTER_REGS + COUNTERS_SIZE) {
+				fail("has a counter_select entry outside its counters");
+			}
+		}
+
+		for (let reg = 0; reg < DSP_REGISTER_COUNT; reg++) {
+			if (u8[regs + reg] !== spc[SPC_DSP_REGS_AT + reg]) {
+				fail(`disagrees with the image at register $${reg.toString(16)}`);
+			}
+		}
+
+		return { regs, voices };
+	};
+
 	let aramAt = -1;
+	let dsp: DspLayout | null = null;
+
+	const located = (): DspLayout => {
+		if (!dsp) {
+			throw new SpcCoreError("the DSP is only available once an SPC has been loaded");
+		}
+
+		return dsp;
+	};
 
 	return {
 		loadSpc(spc: Uint8Array): void {
@@ -379,6 +495,7 @@ export function instantiate(module: WebAssembly.Module): SpcCore {
 				aramAt = findAram(spc);
 				// Finding it meant running the emulator, so put the song back.
 				load(spc);
+				dsp = findDsp(spc, aramAt);
 			}
 		},
 
@@ -413,12 +530,42 @@ export function instantiate(module: WebAssembly.Module): SpcCore {
 			return aramView;
 		},
 
+		muteVoices(mask: number): void {
+			const { regs, voices } = located();
+			for (let voice = 0; voice < DSP_VOICES; voice++) {
+				const at = voices + voice * VOICE_STATE_SIZE;
+				if (mask & (1 << voice)) {
+					view.setInt32(at + VOICE_ENABLED_AT, 0, true);
+					view.setInt32(at + VOICE_VOLUME_AT, 0, true);
+					view.setInt32(at + VOICE_VOLUME_AT + 4, 0, true);
+					continue;
+				}
+
+				if (view.getInt32(at + VOICE_ENABLED_AT, true) !== 0) {
+					continue;
+				}
+
+				// `update_voice_vol`, which the DSP runs on every VOL write: the pair
+				// as signed bytes. It also negates the negative side when their product
+				// is below the surround threshold, and at the -0x4000 `findDsp` requires
+				// no two signed bytes get there.
+				const vol = regs + voice * 0x10;
+				view.setInt32(at + VOICE_ENABLED_AT, -1, true);
+				view.setInt32(at + VOICE_VOLUME_AT, view.getInt8(vol), true);
+				view.setInt32(at + VOICE_VOLUME_AT + 4, view.getInt8(vol + 1), true);
+			}
+		},
+
+		unmuteOnNextWrite(voice: number): void {
+			view.setInt32(located().voices + voice * VOICE_STATE_SIZE + VOICE_ENABLED_AT, -1, true);
+		},
+
 		snapshot(): CoreSnapshot {
-			if (aramAt < 0) {
+			if (aramAt < 0 || !dsp) {
 				throw new SpcCoreError("a snapshot can only be taken once an SPC has been loaded");
 			}
 
-			return { memory: u8.slice(), scratch, scratchFrames, aramAt };
+			return { memory: u8.slice(), scratch, scratchFrames, aramAt, dsp };
 		},
 
 		restore(snapshot: CoreSnapshot): void {
@@ -432,6 +579,7 @@ export function instantiate(module: WebAssembly.Module): SpcCore {
 			scratch = snapshot.scratch;
 			scratchFrames = snapshot.scratchFrames;
 			aramAt = snapshot.aramAt;
+			dsp = snapshot.dsp;
 			audioView = null;
 			aramView = null;
 		},

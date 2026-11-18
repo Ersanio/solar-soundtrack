@@ -207,7 +207,7 @@ section("one note, auditioned where the song is playing");
 
 	// `$F1 $02` reserves 4 KiB, and the `$FA $04` the linker puts at the top of the
 	// lowest channel (link.ts:171) clears it byte by byte inside the driver's first
-	// pass — tens of milliseconds, far longer than the four settle blocks. So the
+	// pass — tens of milliseconds, far longer than a pass of the main loop. So the
 	// tick the fast-forward counts has to be a tick of music: stopping on the fetch
 	// that reads that command hands the note to a driver still in the clear, and
 	// `SetInstrument` has already put `@0`'s tuning on the voice (Commands.asm:107).
@@ -345,9 +345,9 @@ section("one note, auditioned where the song is playing");
 	const unmasked = auditionNote(emu, wet, { atTicks: 96, channel: 0, note: NOTE, ticks: 96, scratchAt });
 	check("no mask at all is the same as an empty one", identical(unmasked.pcm, open.pcm));
 
-	// Honouring it would take the target's volume during the fast-forward and
-	// `restoreTrackVolume` would hand it straight back, so the note would sound
-	// anyway and the only effect would be the target missing from its own echo.
+	// Honouring it would mute the target through the fast-forward and the
+	// hand-over would unmute it again, so the note would sound anyway and the only
+	// effect would be the target missing from its own echo.
 	check("the target channel's own bit is ignored", identical(heard(wet, 0b01).pcm, open.pcm));
 	check("however it is spelled", identical(heard(wet, 0xff).pcm, heard(wet, 0xfe).pcm));
 	check("and a masked audition still leaves the image alone", identical(wetPristine, wet));

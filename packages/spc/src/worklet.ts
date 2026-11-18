@@ -12,14 +12,10 @@
 import { SPC_CHANNELS, SPC_SAMPLE_RATE, type SpcCore, instantiate } from "./wasm-host";
 import {
 	MAX_SEEK_SECONDS,
-	type MuteBackup,
 	POLL_BLOCK_FRAMES,
 	SEEK_STALL_BLOCKS,
-	applyChannelMutes,
-	createMuteBackup,
 	createTickPhase,
 	readDriverState,
-	resetMuteBackup,
 	sawTick,
 	seedTickPhase,
 	tickVoice,
@@ -53,9 +49,8 @@ class SpcProcessor extends AudioWorkletProcessor {
 	private fadeSeconds = 0;
 	private songLoops = false;
 
-	/** Voices the mixer has silenced, and the volumes taken off them. */
+	/** Voices the mixer has silenced. */
 	private muteMask = 0;
-	private readonly MuteBackup: MuteBackup = createMuteBackup();
 
 	/** One pass through the song, in ticks: the intro plus one trip round. */
 	private introTicks = 0;
@@ -150,13 +145,17 @@ class SpcProcessor extends AudioWorkletProcessor {
 					break;
 				case "mute":
 					this.muteMask = message.mask;
+					// No song yet means nothing to mute; the next load applies it.
+					if (this.core && this.spc) {
+						this.core.muteVoices(this.muteMask);
+					}
+
 					break;
 				case "stop":
 					this.playing = false;
 					this.spc = null;
 					this.frames = 0;
 					this.postedAt = -1;
-					resetMuteBackup(this.MuteBackup);
 					break;
 			}
 		} catch (error) {
@@ -192,10 +191,8 @@ class SpcProcessor extends AudioWorkletProcessor {
 
 		this.ticks = 0;
 		this.voice = -1;
-		// The reload puts the pristine image back, so `$5E` and every track
-		// volume are the song's own again. A volume saved from the position just
-		// left would be restored into a song that has moved on.
-		resetMuteBackup(this.MuteBackup);
+		// The reload clears the DSP's mutes along with everything else.
+		core.muteVoices(this.muteMask);
 
 		let rendered = 0;
 		let stalledFor = 0;
@@ -226,13 +223,9 @@ class SpcProcessor extends AudioWorkletProcessor {
 	}
 
 	/**
-	 * Everything that happens in APU RAM between emulated blocks.
-	 *
-	 * Two things, sharing the one look at it: the driver's tempo accumulator is
-	 * folded into the running tick count, and the mixer's mute mask is pressed
-	 * back onto the driver. Running at the block rate is what keeps tick sampling
-	 * above the driver's iteration rate, and it is also what makes the mute
-	 * stick — see {@link applyChannelMutes}.
+	 * Folds the driver's tempo accumulator into the running tick count, between
+	 * emulated blocks. Running at the block rate is what keeps tick sampling above
+	 * the driver's iteration rate.
 	 */
 	private afterBlock(): void {
 		if (!this.core) {
@@ -240,7 +233,6 @@ class SpcProcessor extends AudioWorkletProcessor {
 		}
 
 		const aram = this.core.aram();
-		applyChannelMutes(aram, this.muteMask, this.MuteBackup);
 
 		// The song has not keyed on yet at load; latch the voice once it has.
 		if (this.voice < 0) {

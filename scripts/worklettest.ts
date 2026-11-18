@@ -516,7 +516,7 @@ section("muting a channel without breaking stride");
 	const one = render(fresh, 300);
 
 	port.onmessage!({ data: { type: "mute", mask: 0b11 } });
-	render(fresh, 40); // the driver needs a music tick to write the volumes
+	render(fresh, 1); // the block rendered before the mask arrived plays out first
 	const none = render(fresh, 300);
 
 	port.onmessage!({ data: { type: "mute", mask: 0 } });

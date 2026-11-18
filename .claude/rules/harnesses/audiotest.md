@@ -6,10 +6,14 @@ paths:
 # `audiotest`: what it proves
 
 MML → SPC → actual PCM through the real wasm host. **This is what proves the whole pipeline**: a
-wrong compiler, layout, sample directory or CPUIO handshake produces silence. It also pins that **muting
-does not change how fast the song plays**: the mixer takes a voice's volume and leaves `$5E` alone,
-because disabling a channel makes the driver's main loop cheaper and a song at the one-tick-per-pass
-ceiling turns that into a 29% speed-up. Checked on eight channels at t254, where an easy song shows
+wrong compiler, layout, sample directory or CPUIO handshake produces silence. It pins that **muting
+happens in the DSP and the driver never sees it**: APU RAM after a muted run is byte for byte what an
+unmuted run leaves. A channel whose volume the song rewrites every tick — an `$E8` fade with a `v` and
+a `q` at the head of every pass, which used to play louder muted than unmuted — is silent, and comes
+back mid-fade at the song's own level. A ringing note is cut and comes back mid-note. And **muting does
+not change how fast the song plays**: `$5E` is left alone, because disabling a channel makes the
+driver's main loop cheaper and a song at the one-tick-per-pass ceiling turns that into a 29% speed-up.
+Checked on eight channels at t254, where an easy song shows
 nothing at all. It also pins that the voice the tick count runs on is one the driver plays: a song
 whose lowest channel is `#1` is counted off voice 1 and ticks exactly as the same music on `#0` does
 — the latch reads the track pointer's high byte as the driver does (`main.asm:2315`), because a
@@ -28,8 +32,8 @@ back the note on its own — plus that a note auditioned into the last bar of th
 ticks, which is what says the parking kept a voice from walking the phrase table over the frames.
 The tick the fast-forward reached does not move either, because `$5E` is still untouched. The target
 channel's own bit is ignored, in both spellings: a note on a silenced channel is refused before an
-emulator is asked for, and honouring the bit here would take that voice's volume and then hand it
-straight back. It also pins **where the note is handed over**: on a tick the whole song fetches on,
+emulator is asked for, and honouring the bit here would mute that voice and then unmute it at the
+hand-over. It also pins **where the note is handed over**: on a tick the whole song fetches on,
 every one of the eight channels is heard, hears the `@` written immediately in front of it, and keys
 on once at its own pitch — reaching the tick is not the same as arriving at it, and a hand-over made
 inside the driver's own per-voice walk gets a different answer per channel, since the walk runs 0 to 7.
@@ -66,15 +70,15 @@ holds what they share: the driver, the one emulator instance every section loads
 `compileToSpc`, `renderMuted`, and the level and pitch measures. `HARNESS_ONLY=<file name>` runs one
 section alone.
 
-| File                     | What it pins                                                                                                                                        |
-| ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `sound.ts`               | The emulator boots, a compiled song makes sound, silence is silent, notes differ audibly, and fast-forward lands somewhere different.               |
-| `muting.ts`              | Muting takes a channel's volume and nothing else: the mix, the song carried on underneath, its speed, a ringing note, and unmuting.                 |
-| `pitch.ts`               | The DSP plays the pitch `@amk/spc/pitch` says: true, wrapped past `$4000` on `@0`, `@8` and a custom ×3.5, and silent past o7 b and below o1 c.     |
-| `samples.ts`             | Sample sets through the emulator: `#samples`, a custom instrument, `optimizeSampleUsage` and a `.bnk` bank.                                         |
-| `loop-and-ticks.ts`      | The loop lasts as long as the compiler says, the driver's ticks are counted exactly, and the voice the count is latched on is one the driver plays. |
-| `note-map.ts`            | The note map lands on what the driver is playing.                                                                                                   |
-| `audition.ts`            | One note, auditioned where the song is playing.                                                                                                     |
-| `audition-in-song.ts`    | An auditioned note with the rest of the song under it, and handed over on a tick the whole song fetches on.                                         |
-| `audition-slide.ts`      | An auditioned note sliding as the `$DD` riding on it says.                                                                                          |
-| `audition-checkpoint.ts` | A note auditioned from a checkpoint is the note auditioned from the top of the song, byte for byte.                                                 |
+| File                     | What it pins                                                                                                                                                                    |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `sound.ts`               | The emulator boots, a compiled song makes sound, silence is silent, notes differ audibly, and fast-forward lands somewhere different.                                           |
+| `muting.ts`              | Muting happens in the DSP and nowhere else: the driver never sees it, nothing the song writes undoes it, and the mix, the song's speed, a ringing note and unmuting all behave. |
+| `pitch.ts`               | The DSP plays the pitch `@amk/spc/pitch` says: true, wrapped past `$4000` on `@0`, `@8` and a custom ×3.5, and silent past o7 b and below o1 c.                                 |
+| `samples.ts`             | Sample sets through the emulator: `#samples`, a custom instrument, `optimizeSampleUsage` and a `.bnk` bank.                                                                     |
+| `loop-and-ticks.ts`      | The loop lasts as long as the compiler says, the driver's ticks are counted exactly, and the voice the count is latched on is one the driver plays.                             |
+| `note-map.ts`            | The note map lands on what the driver is playing.                                                                                                                               |
+| `audition.ts`            | One note, auditioned where the song is playing.                                                                                                                                 |
+| `audition-in-song.ts`    | An auditioned note with the rest of the song under it, and handed over on a tick the whole song fetches on.                                                                     |
+| `audition-slide.ts`      | An auditioned note sliding as the `$DD` riding on it says.                                                                                                                      |
+| `audition-checkpoint.ts` | A note auditioned from a checkpoint is the note auditioned from the top of the song, byte for byte.                                                                             |

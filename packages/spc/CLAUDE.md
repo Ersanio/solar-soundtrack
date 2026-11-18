@@ -11,7 +11,7 @@ main thread, and inside an `AudioWorkletGlobalScope`.
 | `adsr.ts`            | Envelope and tuning maths for an instrument's six bytes           |
 | `brr.ts`             | The SNES's ADPCM container and decoder                            |
 | `driver.ts`          | Loads `assets/driver/` — program, base images, `#default` samples |
-| `driver-state.ts`    | Reads the running driver out of APU RAM; takes a voice's volume   |
+| `driver-state.ts`    | Reads the running driver out of APU RAM                           |
 | `export.ts`          | Assembles the 0x10200-byte `.spc`                                 |
 | `fir.ts`             | The echo filter: response, stability, headroom, design            |
 | `instruments.ts`     | Finds the driver's own instrument and percussion tables           |
@@ -23,7 +23,7 @@ main thread, and inside an `AudioWorkletGlobalScope`.
 | `slots.ts`           | The slots of driver state a VCMD writes or clears                 |
 | `song-walk.ts`       | Reads a compiled song the way the driver does: what sounds when   |
 | `song-walk-types.ts` | The walk's public model, re-exported from `song-walk.ts`          |
-| `wasm-host.ts`       | Blargg's snes_spc, called directly                                |
+| `wasm-host.ts`       | Blargg's snes_spc, called directly, and its DSP's voice mute      |
 | `worklet.ts`         | The renderer on the audio thread                                  |
 
 ## Assets
@@ -67,23 +67,37 @@ That matters because prediction is not exact and cannot be made exact. The drive
 gives it enough work drops ticks — measurably, around 0.8% on eight busy channels. No formula over
 tempo accounts for that, and a playhead built on one drifts further every pass round the loop.
 
-`applyChannelMutes` is the same knowledge pointed the other way: APU RAM is a live window into the
-emulator's heap, so a voice's track volume can be taken away as easily as the tempo is read. Mutes
-never touch song data, so preview and export build identical bytes.
-
-It takes the **volume** and deliberately not `$5E`, the driver's own mute register, and the paragraph
-above is why. Disabling a channel makes each pass of the main loop cheaper, and a song already at the
-one-tick-per-pass ceiling turns that straight into more ticks a second — measured on a `t254` song,
-233 unmuted, 273 with seven voices muted and 301 with all eight. Muting is a monitoring aid, and one
-that plays the song 29% fast is telling the porter something untrue about their own music. Taking the
-volume costs the driver nothing, because the channel goes on being parsed and keyed on with 0 in its
-`VxVOL`, and it is the register that actually silences — `$5E` only stops the _next_ note, where this
-cuts the one already ringing. With every voice taken the output is exactly zero either way.
-`audiotest` pins both halves: that the rate does not move, and that the silence is still silence.
-`note-audition.ts` is the third caller, holding the same mask through its fast-forward.
-
 The module is useful beyond the transport — where each voice is right now and at what tempo is
 exactly what the piano roll follows.
+
+## Muting is the DSP's, not the driver's
+
+The mixer mutes a voice inside the emulator's DSP (`SpcCore.muteVoices`), and the driver never
+knows. Mutes never touch song data either, so preview and export build identical bytes.
+
+**Not `$5E`**, the driver's own mute register, and the tick paragraph above is why. Disabling a
+channel makes each pass of the main loop cheaper, and a song already at the one-tick-per-pass ceiling
+turns that straight into more ticks a second — measured on a `t254` song, 233 unmuted, 273 with
+seven voices muted and 301 with all eight. Muting is a monitoring aid, and one that plays the song
+29% fast is telling the porter something untrue about their own music. `$5E` also stops only the
+_next_ note, where a mute has to cut the one already ringing.
+
+**Not any register the driver writes, either.** Muting from outside is done between emulated blocks,
+and the driver writes a voice's volume inputs and turns them into `VxVOL` inside one tick, faster
+than a block. The track volume `$0241+x` is written by every `v` and stepped by every tick of an
+`$E8` fade (`L_0FDB`, `L_1075`, `main.asm:2783-2791, 2913-2947`), and the fade's delta is computed from
+it (`SlideToParamIndexed`, `:2737-2757`). So a held zero there wraps round to nearly full on a
+fade down, and a muted channel plays _louder_ than an unmuted one. The velocity `$0211+x` is written
+by every `q` byte (`:2380`), and the compiler emits one after every loop start, so holding that leaks
+a tick of every loop's first note.
+
+The DSP has no such window. Its "fast" core masks every VOL write with the voice's `enabled` flag as
+the write lands, so a muted voice stays silent through anything the song does, and the voice's
+envelope runs on underneath it, so an unmute mid-note comes back mid-note. The driver's work per pass
+is unchanged, so the rate does not move at all. `audiotest` pins the whole of it: APU RAM byte for
+byte as unmuted, a fade with a `v` and a `q` every pass silent and then back at the song's own level,
+a ringing note cut and restored, and the rate. `note-audition.ts` is the third caller, holding the
+mixer's mask through its fast-forward and muting the target while it hands the note over.
 
 ## Reading a song without playing it
 
@@ -405,9 +419,21 @@ Both are pinned to the vendored binary. Swapping in a different build means re-r
 
 The binary exports no save state, and needs none: its memory is fixed at 16 MiB (min pages equal
 max) and holds every byte the emulator keeps, so `SpcCore.snapshot` is a copy of that memory with
-the three things the host knows about it — the scratch buffer, its size, and where APU RAM sits —
-and `restore` puts all four back. A snapshot belongs to the instance it was taken from.
+what the host knows about it — the scratch buffer, its size, and where APU RAM and the DSP sit — and
+`restore` puts it all back. A snapshot belongs to the instance it was taken from.
 `note-audition.ts` builds its checkpoints on it (`.claude/rules/audition.md`).
+
+Nor does it export `mute_voices`, so the DSP's state is found in the heap the way APU RAM is. This
+build's DSP is snes_spc's "fast" one, whose `state_t` holds a pointer to APU RAM followed by the
+surround threshold (-0x4000), with `counter_select[32]` before them, `voices[8]` before that at
+140 bytes each, and the register file opening the struct 308 bytes ahead of the voices. Each
+`voice_t` ends with its `volume[2]` and `enabled` (-1 heard, 0 muted), and `update_voice_vol`
+stores `VxVOL & enabled` into `volume` on every VOL write. `findDsp` looks for the one word
+holding APU RAM's address with the threshold beside it, and then refuses anything that is not that
+layout: all eight voices heard at load, every `counter_select` entry inside `counters[4]`, and the
+register file equal to the image's 128 DSP registers. `muteVoices` writes `enabled` and zeroes
+`volume`, and on unmute reads the pair back out of the register file, which holds what the driver
+last wrote. `mute_mask` sits beside the pointer and does nothing in this build.
 
 ## The page/worklet seam
 

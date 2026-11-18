@@ -35,15 +35,11 @@ import {
 	POLL_BLOCK_FRAMES,
 	SEEK_STALL_BLOCKS,
 	VOICES,
-	applyChannelMutes,
-	createMuteBackup,
 	createTickPhase,
-	type MuteBackup,
 	type TickPhase,
 	inVoiceLoop,
 	parkVoice,
 	passMark,
-	restoreTrackVolume,
 	sawTick,
 	seedTickPhase,
 	startVoiceAt,
@@ -53,7 +49,6 @@ import {
 	voiceHasQuantization,
 	voicePlaying,
 	voiceStarted,
-	volumesSettled,
 } from "./driver-state";
 
 /**
@@ -103,18 +98,6 @@ const LONG_CHUNK = 0x60;
  * size the rests that follow the note, which have to outlast the tail.
  */
 const MAX_TICK_HZ = 500;
-
-/**
- * Blocks of silence before the note: the least the driver is ever given, and the
- * most it is ever waited for.
- *
- * The settle runs until the driver says it has written the `VxVOL`s it was asked
- * for, which is `$5C` going to zero (`main.asm:2512`). That is on a music tick,
- * and a tick is 0.512 s at the slowest tempo the driver can hold, so the wait is
- * bounded rather than left to the song — and a stopped song has no tick at all.
- */
-const SETTLE_BLOCKS = 4;
-const MAX_SETTLE_BLOCKS = 100;
 
 /**
  * Frames per step while waiting for a voice's fetch, and how long either half of
@@ -171,16 +154,13 @@ export interface NoteAuditionRequest {
 	 * **This is what the note is heard against.** The other seven voices are
 	 * parked rather than halted, so they go on sounding whatever they are playing
 	 * at that tick and the note arrives in the middle of it; the mask is what says
-	 * which of them. It is held through the fast-forward the way `worklet.ts`
-	 * holds it — so the echo the note lands on is the echo the transport is
-	 * making — and pressed back on after every block of the recording, since the
-	 * driver rewrites `VxVOL` as it goes and a mute that is not reapplied does not
-	 * stick.
+	 * which of them. It is held in the DSP from the load on, as `worklet.ts` holds
+	 * it, so the echo the note lands on is the echo the transport is making.
 	 *
-	 * The target's own bit is ignored. Honouring it would take that voice's volume
-	 * during the fast-forward and step 5 below would hand it straight back, so the
-	 * note would sound anyway and the only effect would be the target going
-	 * missing from its own echo. A caller that wants silence needs no emulator.
+	 * The target's own bit is ignored. Honouring it would mute that voice through
+	 * the fast-forward and step 5 below would unmute it again, so the note would
+	 * sound anyway and the only effect would be the target going missing from its
+	 * own echo. A caller that wants silence needs no emulator.
 	 */
 	silenced?: number;
 }
@@ -334,12 +314,10 @@ export function auditionFrames(
  *    land on is the echo the transport is making. See `silenced`.
  * 1. **Arrive**, which is not the same as reaching the tick: {@link arrive} waits
  *    for the target voice to have read that tick's music and for the driver to be
- *    out of its per-voice loop. Then {@link parkVoice}, so the settle cannot
- *    carry the voice past the tick that was asked for.
- * 2. **Silence every voice** through {@link applyChannelMutes} until the driver
- *    has cleared `$5C`, so whatever was ringing stops without a click and
- *    `MuteBackup` is holding the target voice's own volume. Then arrive again,
- *    the settle having rendered.
+ *    out of its per-voice loop.
+ * 2. **Mute the target in the DSP**, so whatever it was ringing is not heard
+ *    under the note. The DSP takes it at once, so nothing has to be rendered
+ *    first and the hand-over is made at the point the arrival reached.
  * 3. **Park the other seven** with {@link parkOthers}, so they sound what they
  *    are playing at that tick and read no further music data. Nothing else
  *    parses from here, which is what makes the note repeatable and what frees
@@ -350,8 +328,8 @@ export function auditionFrames(
  *    `$0300+x` on every key-on (`main.asm:465-466`) and the note about to sound
  *    is a key-on. A voice under an `$EE` pitch envelope is the exception, and
  *    does not bend in the song either.
- * 5. **Give it its volume back** without the dirty bit, so the DSP keeps 0 until
- *    the new note keys on and recomputes it. See {@link restoreTrackVolume}.
+ * 5. **Unmute it at no volume**, so it stays silent until the new note keys on
+ *    and the driver writes its `VxVOL` (`SpcCore.unmuteOnNextWrite`).
  * 6. **Count the note's ticks off the driver's tempo**, the same `sawTick`
  *    machinery the worklet and the clock measurement use, then render the tail.
  */
@@ -378,43 +356,13 @@ export function auditionNote(
 
 	const silenced = (request.silenced ?? 0) & ~(1 << channel);
 
-	// One backup across both, so a voice the mixer silenced arrives at the settle
-	// loop with 0 already in its track volume: `applyChannelMutes` keeps the value
-	// it saved earlier rather than saving that zero over it.
 	const seek = resumeSeek(core, spc, from, target, silenced);
-	const backup = seek.backup;
-	const reachedTicks = fastForward(core, seek, target, channel, silenced);
+	const reachedTicks = fastForward(core, seek, target, channel);
 
-	// The target voice has read the tick's music, so it can be parked: 127 ticks
-	// it cannot fetch inside is what stops the settle below carrying it past the
-	// tick that was asked for.
-	parkVoice(core.aram(), channel);
-
-	// Silence the target, and let the driver say when it has: `L_0D1C` walks every
-	// voice and then clears `$5C` (`main.asm:2502-2512`), so a zero there is the
-	// driver's own word for "the mute has reached the DSP" where a block count can
-	// only guess at it — and the clear is on a music tick, 37 ms apart at `t55`.
-	// Two readings of it, because the walk can clear the flags out from under a
-	// write that landed inside it, and never fewer blocks than four, which is what
-	// the settle was before it was asked.
-	//
 	// The target alone, plus whatever the mixer is already holding. The other
 	// voices are about to be heard, and every one of them keyed on the note it
-	// plays at this tick during the walk the arrival waited for — muting them here
-	// would take the front off that attack and then hand it back a tick later.
-	let quiet = 0;
-	const hushed = silenced | (1 << channel);
-	for (let settle = 0; settle < MAX_SETTLE_BLOCKS && (settle < SETTLE_BLOCKS || quiet < 2); settle++) {
-		applyChannelMutes(core.aram(), hushed, backup);
-		core.renderView(POLL_BLOCK_FRAMES);
-		quiet = volumesSettled(core.aram()) ? quiet + 1 : 0;
-	}
-
-	// The settle rendered, so the driver has moved on: arrive again before any
-	// voice's pointer is written. The note's own fetch is long past, so what this
-	// is waiting for is the pass boundary — which is also what makes the settle's
-	// own length stop mattering, a block either way landing at the same place.
-	arrive(core, channel, true);
+	// plays at this tick during the walk the arrival waited for.
+	core.muteVoices(silenced | (1 << channel));
 
 	const aram = core.aram();
 	parkOthers(aram, channel);
@@ -441,11 +389,11 @@ export function auditionNote(
 
 	// `PlaySong` gives every channel `$FF` before a note of the song is read
 	// (`main.asm:2137-2138`), so a channel the song never touches still has a
-	// volume to be given back and a note auditioned on it is heard.
+	// volume and a note auditioned on it is heard.
 	startVoiceAt(aram, channel, scratchAt);
-	restoreTrackVolume(aram, channel, backup);
+	core.unmuteOnNextWrite(channel);
 
-	return { ...record(core, held, channel, silenced, backup), reachedTicks };
+	return { ...record(core, held, channel), reachedTicks };
 }
 
 /**
@@ -479,17 +427,12 @@ function parkOthers(aram: Uint8Array, channel: number): void {
  * does, and has to: a playhead a tick out is a playhead a tick out, where a note
  * handed to a driver a tick early is not played at all. See the latch below.
  *
- * `silenced` is pressed back onto the driver after every block, exactly as
- * `worklet.ts`'s `afterBlock` does it and for the same reason: the driver rewrites
- * `VxVOL` as it goes, so a mute that is not reapplied does not stick. It costs
- * the tick count nothing — `$5E` is untouched, so the driver's work per pass of
- * its main loop is unchanged and `ticks` comes out the same either way.
- *
- * The mask is constant for the whole run, which is what keeps `MuteBackup.restoring`
- * at zero: bits enter it only when they leave the mask, and none do here.
+ * The mixer's mask is already in the DSP, put there by {@link resumeSeek}, and it
+ * costs the tick count nothing: the driver never sees it, so its work per pass of
+ * the main loop is unchanged and `ticks` comes out the same either way.
  */
-function fastForward(core: SpcCore, seek: Seek, target: number, channel: number | null, silenced: number): number {
-	arrive(core, channel, seekTo(core, seek, target, channel, silenced));
+function fastForward(core: SpcCore, seek: Seek, target: number, channel: number | null): number {
+	arrive(core, channel, seekTo(core, seek, target, channel));
 	return seek.ticks;
 }
 
@@ -504,7 +447,6 @@ export interface Seek {
 	tick: TickPhase;
 	rendered: number;
 	stalledFor: number;
-	backup: MuteBackup;
 }
 
 function createSeek(): Seek {
@@ -514,16 +456,11 @@ function createSeek(): Seek {
 		tick: createTickPhase(),
 		rendered: 0,
 		stalledFor: 0,
-		backup: createMuteBackup(),
 	};
 }
 
 function copySeek(seek: Seek): Seek {
-	return {
-		...seek,
-		tick: { ...seek.tick },
-		backup: { ...seek.backup, saved: seek.backup.saved.slice() },
-	};
+	return { ...seek, tick: { ...seek.tick } };
 }
 
 /**
@@ -564,13 +501,14 @@ export function prepareCheckpoint(
 	const target = Math.max(1, Math.floor(request.atTicks));
 	const silenced = request.silenced ?? 0;
 	const seek = resumeSeek(core, spc, from, target + 1, silenced);
-	seekTo(core, seek, target, null, silenced);
+	seekTo(core, seek, target, null);
 	return { ticks: seek.ticks, silenced, snapshot: core.snapshot(), seek: copySeek(seek) };
 }
 
 /**
- * The emulator at the start of a run to `target`: at `from` where that is a
- * checkpoint the run passes through, and at the top of the song otherwise.
+ * The emulator at the start of a run to `target`, with the mixer's mask in the
+ * DSP: at `from` where that is a checkpoint the run passes through, and at the
+ * top of the song otherwise.
  *
  * Strictly before the target, so at least one block is rendered after the
  * restore: whether the target voice fetched in the block that reached the tick is
@@ -585,11 +523,14 @@ function resumeSeek(
 	silenced: number,
 ): Seek {
 	if (from !== null && from.ticks < target && from.silenced === silenced) {
+		// The snapshot carries the mask it was made under, which is this one.
 		core.restore(from.snapshot);
 		return copySeek(from.seek);
 	}
 
+	// A load clears the DSP's mutes, so the mask goes in after it.
 	core.loadSpc(spc);
+	core.muteVoices(silenced);
 	return createSeek();
 }
 
@@ -597,8 +538,8 @@ function resumeSeek(
  * The fast-forward's loop: blocks rendered and thrown away until the count
  * reaches `target`. Answers whether the target voice fetched in the last of them.
  */
-function seekTo(core: SpcCore, seek: Seek, target: number, channel: number | null, silenced: number): boolean {
-	const { tick, backup } = seek;
+function seekTo(core: SpcCore, seek: Seek, target: number, channel: number | null): boolean {
+	const { tick } = seek;
 	let fetched = false;
 	const cap = MAX_SEEK_SECONDS * SPC_SAMPLE_RATE;
 
@@ -611,10 +552,6 @@ function seekTo(core: SpcCore, seek: Seek, target: number, channel: number | nul
 		seek.rendered += POLL_BLOCK_FRAMES;
 
 		const aram = core.aram();
-		// Before the latch below returns, so a song that has not keyed on yet is
-		// still being muted while we wait for it.
-		applyChannelMutes(aram, silenced, backup);
-
 		if (seek.voice < 0) {
 			// The song has not keyed on yet; latch the voice once it has, and once it
 			// has read a duration byte. `worklet.ts` latches on the pointer alone,
@@ -720,24 +657,14 @@ function arrive(core: SpcCore, channel: number | null, fetched: boolean): void {
  * the slide was going.
  *
  * The other seven are held here rather than left to themselves: {@link parkOthers}
- * every block, so none of them reaches the next note or a `$00`, and the mixer's
- * mask pressed back on, since the driver rewrites `VxVOL` as it goes and a mute
- * that is not reapplied does not stick. The target is out of that mask's reach —
- * {@link restoreTrackVolume} took it out of the backup — so the note keeps the
- * volume it was given.
+ * every block, so none of them reaches the next note or a `$00`. The mixer's mask
+ * needs nothing: the DSP holds it through every `VxVOL` the driver writes.
  *
  * A `null` channel is the region case: nothing is parked, so every voice reads
- * on through its own music, and the mask arrives as the caller means it — there
- * is no target to keep out of it. What ends the span parks **every** voice, so
- * its last notes ring out and nothing new starts.
+ * on through its own music. What ends the span parks **every** voice, so its last
+ * notes ring out and nothing new starts.
  */
-function record(
-	core: SpcCore,
-	held: number,
-	channel: number | null,
-	silenced: number,
-	backup: MuteBackup,
-): { pcm: Int16Array; heldTicks: number } {
+function record(core: SpcCore, held: number, channel: number | null): { pcm: Int16Array; heldTicks: number } {
 	const cap = MAX_AUDITION_SECONDS * SPC_SAMPLE_RATE;
 	const pcm = new Int16Array(cap * SPC_CHANNELS);
 
@@ -757,8 +684,6 @@ function record(
 		} else if (tail >= 0) {
 			parkAll(aram);
 		}
-
-		applyChannelMutes(aram, silenced, backup);
 
 		if (tail < 0) {
 			ticks += sawTick(tick, core.aram());
@@ -824,13 +749,14 @@ export function auditionRegion(core: SpcCore, spc: Uint8Array, request: RegionAu
 	const target = Math.max(1, Math.floor(request.atTicks));
 	const span = Math.max(1, Math.floor(request.ticks));
 
+	// A load clears the DSP's mutes, so the mask goes in after it.
 	core.loadSpc(spc);
+	core.muteVoices(request.silenced ?? 0);
 
 	const seek = createSeek();
-	const silenced = request.silenced ?? 0;
-	const reachedTicks = fastForward(core, seek, target, null, silenced);
+	const reachedTicks = fastForward(core, seek, target, null);
 
-	return { ...record(core, span, null, silenced, seek.backup), reachedTicks };
+	return { ...record(core, span, null), reachedTicks };
 }
 
 /** Ramps the last {@link FADE_SECONDS} to zero, and takes a copy while it is there. */

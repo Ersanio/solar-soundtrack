@@ -25,7 +25,21 @@ considered there and moved away from, with the reason. The rule carries one inde
   the same small lag, so one frame in ten lurched. It carries its position across frames and eases
   the gap shut (`roll-clock-step.ts`).
 - **Muting by writing the driver's `$5E`** — a disabled channel does less work per tick, so a busy
-  song sped up. The mixer takes track volume and leaves `$5E` alone (`applyChannelMutes`).
+  song sped up. The mixer mutes in the DSP and leaves `$5E` alone (`SpcCore.muteVoices`).
+- **Muting by taking the track volume** — `applyChannelMutes` zeroed `$0241+x` between emulated
+  blocks and set the voice's `$5C` bit, and `restoreTrackVolume` gave it back. The driver writes
+  that register itself: every `v`, and every tick of an `$E8` fade, which adds its 16-bit delta to
+  `$0240/$0241` (`L_0FDB`, `L_1075`, `main.asm:2783-2791, 2913-2947`) and computes the delta from it
+  (`SlideToParamIndexed`, `:2737-2757`). A fade down from a held zero wrapped to about `$FB` on every
+  tick, and `VxVOL` was written from that before the next block could zero it again, so a muted
+  channel under `v140 $E8 $18 $18` played six times louder than unmuted, at a steady level. Unmuting
+  mid-fade brought back a corrupted fade as well. A `v` leaked a tick the same way. The velocity
+  `$0211+x` was considered instead, since nothing fades it, but every `q` byte writes it (`:2380`)
+  and the compiler emits one after every loop start (`parseLoopStart`), so it leaked a tick of every
+  loop's first note. Any register the driver writes loses this race within a tick. The DSP's
+  per-voice `enabled` flag is applied as each VOL write lands, and nothing on the SPC700 can reach it
+  (`SpcCore.muteVoices`, `unmuteOnNextWrite`). The audition's settle, which waited for the driver to
+  clear `$5C` so that the mute had reached the DSP, went with it.
 - **A 1024-frame render block in the worklet** — a tick counter that only looks every 1024 frames
   drifts. 32 frames costs ~4% and keeps the count exact.
 - **The mixer's mutes, solo and output level living on `Playback`** — the note previewer has to

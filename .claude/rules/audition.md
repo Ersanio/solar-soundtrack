@@ -36,10 +36,10 @@ eight track pointers from what the audition has just written. A parked voice nev
 only 127 ticks, so `parkOthers` runs again after every block.
 
 The mixer's mask decides which of those channels are in it, and the mask is what the fast-forward
-runs under as well — held the way `worklet.ts` holds it — so the echo the note lands on is the echo
-the transport is making. The **target's own bit is ignored**: honouring it would take that voice's
-volume on the way through and step 5 below would hand it straight back, so the note would sound
-regardless. A caller that wants silence needs no emulator at all.
+runs under as well — put into the DSP after the load, the way `worklet.ts` puts it — so the echo the
+note lands on is the echo the transport is making. The **target's own bit is ignored**: honouring it
+would mute that voice on the way through and step 4 below would unmute it again, so the note would
+sound regardless. A caller that wants silence needs no emulator at all.
 
 **Reaching the tick is not arriving at it.** `sawTick` reports a tick off `$44`, which the driver
 writes at the very top of a pass — a `$49` update and a `ProcessAPU2Input` call before that tick's
@@ -60,27 +60,24 @@ and a voice that is not parked reads on to the next note and to the `$00` past i
 
 The recipe, once the fast-forward has arrived:
 
-1. `parkVoice` on the target, so the settle below cannot carry it past the tick that was asked for.
-2. `applyChannelMutes` over the target voice, plus whatever the mixer is already holding, until the
-   driver has cleared `$5C`, so the note that was ringing there stops without a click and the backup
-   is holding that voice's own volume. The driver clears it once it has walked every voice
-   (`main.asm:2502-2512`), which is what a block count could only guess at — a music tick is 37 ms
-   apart at `t55`. Then arrive again, the settle having rendered. The other six are left alone: every
-   one of them keyed on the note it plays at this tick during the walk the arrival waited for, and
-   muting them here would take the front off that attack and hand it back a tick later.
-3. `parkOthers`, so nothing else reads music data from here. Tempo and the global fades run on
+1. `muteVoices` over the target voice, plus whatever the mixer is already holding, so the note that
+   was ringing there is not heard under the new one. The DSP takes it at once, so nothing is rendered
+   between the arrival and the hand-over. The other six are left alone: every one of them keyed on
+   the note it plays at this tick during the walk the arrival waited for.
+2. `parkOthers`, so nothing else reads music data from here. Tempo and the global fades run on
    regardless, and so do every parked voice's own fade, vibrato and key-off.
-4. The note's frames at the caller's scratch address, the voice pointed there, its duration counter
+3. The note's frames at the caller's scratch address, the voice pointed there, its duration counter
    forced to 1 — which is how the driver starts its own voices (`main.asm:2314-2318`).
-5. `restoreTrackVolume`, deliberately without the `$5C` dirty bit, so the DSP keeps 0 until the new
-   note keys on and recomputes it. `NoteVCMD` sets the flag itself (`main.asm:459`).
+4. `unmuteOnNextWrite`, which takes the target out of the mute at no volume, so it stays silent until
+   the new note keys on and the driver writes its `VxVOL`. `NoteVCMD` sets the flag that asks for
+   that write (`main.asm:459`).
 
 The hand-over therefore happens where the driver says rather than after a fixed count of blocks, and
-the last of the arrival steps to the top of a pass so that where it says is the _same_ place every
-time. It is not the same sample-for-sample: a mixer mask, or a different voice's fetch to wait for,
-moves the key-on by a few CPU cycles, and the DSP's free-running envelope counter sits differently
-under the attack. `audiotest` measures that at a few ten-thousandths of the signal, with the body of
-the note unmoved.
+the arrival steps to the top of a pass so that where it says is the _same_ place every time. It is
+not the same sample-for-sample: a mixer mask, or a different voice's fetch to wait for, moves the
+key-on by a few CPU cycles, and the DSP's free-running envelope counter sits differently under the
+attack. `audiotest` measures that at a few ten-thousandths of the signal, with the body of the note
+unmoved.
 
 `auditionFrames` mirrors the compiler's `emitNote` (Music.cpp:2254), so the bytes are the ones a note of
 that length would really be written as. **It writes no `q` byte**, because the driver only reads one

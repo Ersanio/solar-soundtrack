@@ -132,7 +132,9 @@ A new entry goes there, with its line here, in the same change.
 - **The tempo shortfall taken over the whole pass from `loadSpc`** — `main.asm`, `ModifyEchoDelay`,
   `tempoShortfall`, `Measurement.leadSeconds`, `clock.seconds`
 - **Re-deriving the roll's playhead from the newest anchor each frame** — `roll-clock-step.ts`
-- **Muting by writing the driver's `$5E`** — `applyChannelMutes`
+- **Muting by writing the driver's `$5E`** — `muteVoices`
+- **Muting by taking the track volume** — `applyChannelMutes`, `$0241`, `$E8`, `L_1075`, `$0211`,
+  `parseLoopStart`, `restoreTrackVolume`, `muteVoices`, `unmuteOnNextWrite`
 - **A 1024-frame render block in the worklet**
 - **The mixer's mutes, solo and output level living on `Playback`** — `Mixer`, `volume`,
   `EditorStore`, `Audition`, `GainNode`, `AudioContext`

@@ -113,7 +113,7 @@ something in the directory, which load by themselves when such a file is opened.
 - `song-walk-types.ts` (300+ lines) — The song walk's public model: the timeline `walkSong` returns, and the notes, commands, loops and state in it.
 - `song-walk.ts` (1000+ lines) — Reads a compiled song the way the driver reads it, and says what sounds when.
   - `KEY_COUNT`:105 `vcmdLength`:125 `remoteReach`:292 `walkSong`:334 `listOf`:1395 `unreachableChannels`:1412
-- `wasm-host.ts` (300+ lines) — Host for `assets/player/spc.wasm` — Blargg's snes_spc, Emscripten-built.
+- `wasm-host.ts` (500+ lines) — Host for `assets/player/spc.wasm` — Blargg's snes_spc, Emscripten-built.
 - `worklet.ts` (300+ lines) — The SPC700 renderer, running on the audio thread.
 
 ## scripts
@@ -149,7 +149,7 @@ something in the directory, which load by themselves when such a file is opened.
 - `audition.ts` (300+ lines) — `audiotest`: one note, auditioned where the song is playing.
 - `loop-and-ticks.ts` (300+ lines) — `audiotest`: the loop lasts as long as the compiler says, the driver's ticks are counted exactly, and the voice the count is latched on is one the driver plays.
 - `main.ts` — End-to-end audio check: MML -> SPC -> actual PCM samples.
-- `muting.ts` (300+ lines) — `audiotest`: muting takes a channel's volume and nothing else: the mix, the song carried on underneath, its speed, a ringing note, and unmuting.
+- `muting.ts` (300+ lines) — `audiotest`: muting happens in the DSP and nowhere else — the driver never sees it, nothing the song writes undoes it, and the mix, the song's speed, a ringing note and unmuting all behave.
 - `note-map.ts` — `audiotest`: the note map lands on what the driver is playing.
 - `pitch.ts` — `audiotest`: the DSP plays the pitch the driver's arithmetic says it will, the wrapped and the silent ones included.
 - `samples.ts` — `audiotest`: sample sets through the emulator: `#samples`, a custom instrument, `optimizeSampleUsage` and a `.bnk` bank.

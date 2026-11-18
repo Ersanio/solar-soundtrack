@@ -40,10 +40,10 @@ const ON_CHANNEL = 'text-(--on-ch) font-semibold';
 /**
  * Per-channel mute and solo for previewing parts in isolation.
  *
- * The song is not rebuilt: the mask goes to the running emulator, which takes
- * each muted voice's track volume in APU RAM and leaves the driver's own mute
- * register alone (`applyChannelMutes` in `@amk/spc/driver-state`, which says why
- * disabling a channel would make a busy song play faster).
+ * The song is not rebuilt: the mask goes to the running emulator, which mutes
+ * each voice inside its DSP and leaves the driver alone (`SpcCore.muteVoices`;
+ * `packages/spc/CLAUDE.md` says why the driver's own registers are the wrong
+ * place).
  *
  * Toggling is immediate and costs no gap in playback. It reaches the note
  * previewer too, which refuses to sound a channel these buttons have silenced.

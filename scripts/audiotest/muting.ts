@@ -1,54 +1,75 @@
 /**
- * `audiotest`: muting takes a channel's volume and nothing else: the mix, the
- * song carried on underneath, its speed, a ringing note, and unmuting.
+ * `audiotest`: muting happens in the DSP and nowhere else — the driver never sees
+ * it, nothing the song writes undoes it, and the mix, the song's speed, a ringing
+ * note and unmuting all behave.
  */
 
 import "../localize";
 import { compiler } from "@amk/compiler";
 import { SPC_CHANNELS, SPC_SAMPLE_RATE } from "@amk/spc/wasm-host";
-import {
-	applyChannelMutes,
-	createMuteBackup,
-	createTickPhase,
-	readDriverState,
-	sawTick,
-	seedTickPhase,
-	tickVoice,
-} from "@amk/spc/driver-state";
+import { createTickPhase, readDriverState, sawTick, seedTickPhase, tickVoice } from "@amk/spc/driver-state";
 import { check, section } from "../harness";
 import { peak, rms, driver, OPTIONS, compileToSpc, BLOCK, renderMuted, emu } from "./support";
 
-section("muting takes the volume and nothing else");
+section("muting leaves the driver alone");
 {
-	// A pure check of the bookkeeping, with no emulator involved. `$5E`, the
-	// driver's own mute register, is deliberately never written: disabling a
-	// channel makes the driver's main loop cheaper, and since the loop handles at
-	// most one music tick per pass, a song already at that ceiling *speeds up*
-	// when a channel is muted. A song muting its own channels through `$F4 $06`
-	// therefore also finds its bits untouched.
-	const aram = new Uint8Array(0x10000);
-	const backup = createMuteBackup();
+	// The driver's whole state is APU RAM, so a mute it cannot see leaves every
+	// byte of it as an unmuted run does: `$5E`, which a song can set through
+	// `$F4 $06`, every track volume and velocity, every pointer and counter. No
+	// echo here, since the echo buffer is the one thing in APU RAM the DSP writes.
+	const spc = compileToSpc(`#amk 4
+#0 t60 o4 v220 q7F @0 l8 [c d e f g4 e4]4
+#1 o3 v200 q7D @1 l4 $E8 $C0 $40 [c e g e]4
+`);
+	const after = (mask: number): Uint8Array => {
+		renderMuted(spc, 0, 64000, () => mask);
+		return emu.aram().slice();
+	};
 
-	aram[0x5e] = 0b0000_1000; // the song's own doing
-	aram[0x0241 + 2 * 1] = 200;
+	const open = after(0);
+	for (const [label, mask] of [
+		["one channel", 0b10],
+		["both", 0b11],
+	] as const) {
+		const muted = after(mask);
+		const differs = muted.findIndex((value, at) => value !== open[at]);
+		check(
+			`muting ${label} leaves APU RAM byte for byte as unmuted`,
+			differs < 0,
+			`$${differs.toString(16)}: ${muted[differs]} muted vs ${open[differs]} open`,
+		);
+	}
+}
 
-	applyChannelMutes(aram, 0b0000_0010, backup);
-	check("the mixer leaves $5E to the song", aram[0x5e] === 0b0000_1000, `$5E = ${aram[0x5e].toString(2)}`);
-	check("the muted channel's volume is taken", aram[0x0241 + 2 * 1] === 0);
-	check("and its bit is flagged for rewriting", (aram[0x5c] & 0b10) !== 0);
+section("nothing the song writes undoes a mute");
+{
+	// A channel the driver rewrites the volume of on every tick: an `$E8` fade
+	// over the whole pass, and a `v` and a `q` at the head of each one. Muting
+	// that from the driver's side loses to it — the fade steps the very register a
+	// mute would hold at zero, and wraps it round to nearly full — so the mute has
+	// to be where the driver cannot reach.
+	const spc = compileToSpc(`#amk 4
+#option amk109hotpatch
 
-	aram[0x5c] = 0;
-	applyChannelMutes(aram, 0, backup);
-	check("lifting it still leaves $5E alone", aram[0x5e] === 0b0000_1000, `$5E = ${aram[0x5e].toString(2)}`);
-	check("and hands the volume back", aram[0x0241 + 2 * 1] === 200);
+t20
+#0 @0 y8 v160
+o4
+(31)[v140 $e8 $18 $18 l192 q7f [[o3b>c+<b>c+dedeo3b>c+<b>c+]]2]4
+`);
+	const open = renderMuted(spc, 32000, 96000, () => 0);
+	const muted = renderMuted(spc, 32000, 96000, () => 1);
+	check("the channel is audible to begin with", peak(open) > 0.02, `peak ${peak(open).toFixed(4)}`);
+	check("and muted it is silent, fade and all", peak(muted) < 0.002, `peak ${peak(muted).toFixed(4)}`);
 
-	// A volume written while muted is the one that comes back.
-	applyChannelMutes(aram, 0b0000_0010, backup);
-	aram[0x0241 + 2 * 1] = 90; // as a `v` command mid-mute would
-	applyChannelMutes(aram, 0b0000_0010, backup);
-	aram[0x5c] = 0;
-	applyChannelMutes(aram, 0, backup);
-	check("a volume set during the mute survives it", aram[0x0241 + 2 * 1] === 90, `got ${aram[0x0241 + 2 * 1]}`);
+	// The fade runs on underneath exactly as it does unmuted, so lifting the mute
+	// part way through one comes back at the level the song has there.
+	const lifted = renderMuted(spc, 32000, 96000, (frame) => (frame < 64000 ? 1 : 0));
+	const tail = (samples: Int16Array) => samples.subarray(32000 * SPC_CHANNELS);
+	check(
+		"and lifting it mid-fade comes back at the song's own level",
+		Math.abs(rms(tail(lifted)) - rms(tail(open))) < rms(tail(open)) * 0.01,
+		`${rms(tail(lifted)).toFixed(5)} vs ${rms(tail(open)).toFixed(5)}`,
+	);
 }
 
 section("muting a channel takes it out of the mix");
@@ -91,12 +112,12 @@ section("muting a channel takes it out of the mix");
 
 section("a muted channel goes on carrying the song");
 {
-	// The whole point of muting at the driver rather than by blanking the
-	// channel's pointer. Everything song-global here lives in `#0`: the tempo,
-	// and the `/` that says where the intro ends. `#0` is also the shortest
-	// channel, and the driver turns the song over when its *first* channel runs
-	// out of data — so a `#0` that stopped being read would move the loop point
-	// as well as losing the tempo.
+	// The whole point of muting in the DSP rather than by blanking the channel's
+	// pointer. Everything song-global here lives in `#0`: the tempo, and the `/`
+	// that says where the intro ends. `#0` is also the shortest channel, and the
+	// driver turns the song over when its *first* channel runs out of data — so a
+	// `#0` that stopped being read would move the loop point as well as losing the
+	// tempo.
 	const source = `#amk 4
 #0 t192 v200 @0 o4 q7F a1 / g1
 #1 v180 @1 o3 q7F c1 d1 e1
@@ -110,12 +131,11 @@ section("a muted channel goes on carrying the song");
 	/** Ticks counted and loop turnovers seen over `seconds`, with `mask` held. */
 	function follow(mask: number, seconds: number) {
 		emu.loadSpc(spc);
-		const backup = createMuteBackup();
+		emu.muteVoices(mask);
 
 		// Let the song key on, so the count runs at the song's own tempo.
 		for (let done = 0; done < SPC_SAMPLE_RATE / 20; done += BLOCK) {
 			emu.renderView(BLOCK);
-			applyChannelMutes(emu.aram(), mask, backup);
 		}
 
 		const tick = createTickPhase();
@@ -129,7 +149,6 @@ section("a muted channel goes on carrying the song");
 		for (let frame = 0; frame < SPC_SAMPLE_RATE * seconds; frame += BLOCK) {
 			emu.renderView(BLOCK);
 			const aram = emu.aram();
-			applyChannelMutes(aram, mask, backup);
 
 			ticks += sawTick(tick, aram);
 
@@ -173,9 +192,9 @@ section("a muted channel goes on carrying the song");
 		`${mutedGap} muted vs ${openGap} open`,
 	);
 	// If `t192` had gone with the channel the driver would fall back to its own
-	// tempo and the count would be out by a factor. It is not out at all: muting
-	// takes a volume and leaves the driver's workload alone, so the song runs at
-	// exactly the rate it does unmuted.
+	// tempo and the count would be out by a factor. It is not out at all: the
+	// driver never sees the mute, so the song runs at exactly the rate it does
+	// unmuted.
 	check(
 		"and it still sets the tempo it declares",
 		muted.ticks === open.ticks,
@@ -191,11 +210,11 @@ section("a muted channel goes on carrying the song");
 
 section("muting does not change how fast the song plays");
 {
-	// The reason `applyChannelMutes` leaves `$5E` alone. The driver's main loop
-	// handles at most one music tick per pass, so a song already at that ceiling
-	// gets *more* ticks a second the less work each one costs — and disabling a
-	// channel is exactly that. Writing `$5E` made this song play 29% fast with
-	// every voice muted, which is a monitoring aid lying about the music.
+	// The reason the mixer leaves `$5E` alone. The driver's main loop handles at
+	// most one music tick per pass, so a song already at that ceiling gets *more*
+	// ticks a second the less work each one costs — and disabling a channel is
+	// exactly that. Writing `$5E` made this song play 29% fast with every voice
+	// muted, which is a monitoring aid lying about the music.
 	//
 	// Eight busy channels at t254, which asks for 498 ticks a second and gets
 	// around 230. An easy song shows none of this, so it has to be a hard one.
@@ -207,7 +226,7 @@ section("muting does not change how fast the song plays");
 	/** Ticks the driver manages over `seconds`, with `mask` held throughout. */
 	function rate(mask: number, seconds: number): number {
 		emu.loadSpc(spc);
-		const backup = createMuteBackup();
+		emu.muteVoices(mask);
 		let voice = -1;
 		const tick = createTickPhase();
 		let ticks = 0;
@@ -215,7 +234,6 @@ section("muting does not change how fast the song plays");
 		for (let done = 0; done < SPC_SAMPLE_RATE * seconds; done += BLOCK) {
 			emu.renderView(BLOCK);
 			const aram = emu.aram();
-			applyChannelMutes(aram, mask, backup);
 
 			if (voice < 0) {
 				voice = tickVoice(aram);
@@ -249,9 +267,9 @@ section("muting does not change how fast the song plays");
 
 section("muting cuts a note that is already ringing");
 {
-	// `$5E` alone only stops the *next* note; the volume has to be taken too.
-	// One very long note, muted a third of the way in, so anything still audible
-	// afterwards is the ringing note the mute failed to cut.
+	// `$5E` alone only stops the *next* note. One very long note, muted a third
+	// of the way in, so anything still audible afterwards is the ringing note the
+	// mute failed to cut.
 	const source = "#amk 4\n#0 t20 v220 @0 o4 q7F c1\n";
 	const spc = compileToSpc(source);
 
@@ -262,7 +280,7 @@ section("muting cuts a note that is already ringing");
 	const open = renderMuted(spc, warmup, frames, () => 0);
 	const cut = renderMuted(spc, warmup, frames, (frame) => (frame >= cutAt ? 0b1 : 0));
 
-	// Skip past the cut itself: the driver needs a music tick to write VxVOL.
+	// Measured from 100 ms past the cut, which the mask lands after the block of.
 	const after = (samples: Int16Array) => samples.subarray((3200 + 3200) * SPC_CHANNELS);
 
 	check("the note is ringing to begin with", peak(after(open)) > 0.02, `peak ${peak(after(open)).toFixed(4)}`);
@@ -270,6 +288,19 @@ section("muting cuts a note that is already ringing");
 	check(
 		"without touching what came before",
 		rms(cut.subarray(0, 3200 * SPC_CHANNELS)) === rms(open.subarray(0, 3200 * SPC_CHANNELS)),
+	);
+
+	// Lifted again while the note still has seconds to run: the DSP kept its
+	// envelope going under the mute, so it comes back mid-note, at the level the
+	// unmuted note has there, with no key-on to bring it.
+	const lift = cutAt + 9600;
+	const back = renderMuted(spc, warmup, frames, (frame) => (frame >= cutAt && frame < lift ? 0b1 : 0));
+	const tail = (samples: Int16Array) => samples.subarray((lift - warmup + 3200) * SPC_CHANNELS);
+	check("lifted mid-note, the note comes back", peak(tail(back)) > 0.02, `peak ${peak(tail(back)).toFixed(4)}`);
+	check(
+		"at the level it has unmuted",
+		Math.abs(rms(tail(back)) - rms(tail(open))) < rms(tail(open)) * 0.01,
+		`${rms(tail(back)).toFixed(5)} vs ${rms(tail(open)).toFixed(5)}`,
 	);
 }
 
@@ -290,7 +321,7 @@ section("unmuting gives the channel its volume back");
 
 	const tail = (samples: Int16Array) => samples.subarray(64000 * SPC_CHANNELS);
 
-	check("the track volume register is back", volume === 220, `$0241 = ${volume}`);
+	check("the song's own track volume was never taken", volume === 220, `$0241 = ${volume}`);
 	check("the channel is audible again", peak(tail(restored)) > 0.02, `peak ${peak(tail(restored)).toFixed(4)}`);
 	check(
 		"and at the level it had",

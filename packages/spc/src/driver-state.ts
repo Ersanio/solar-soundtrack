@@ -15,10 +15,9 @@ export const Addr = {
 	TickPhase: 0x49,
 	/** `$51`: music tempo, as the `t` command and any fade leave it. */
 	Tempo: 0x51,
-	/** `$5C`: voice bits whose `VxVOL` the driver must rewrite this tick. */
-	VolumeDirty: 0x5c,
-	// `$5E` is the driver's own mute mask, and nothing here writes it — see
-	// {@link applyChannelMutes} for why disabling a channel is the wrong tool.
+	// `$5E` is the driver's own mute mask, and nothing here writes it — the
+	// mixer mutes inside the DSP instead (`SpcCore.muteVoices`), and
+	// `packages/spc/CLAUDE.md` says why disabling a channel is the wrong tool.
 	/** `$70-$7F`: music note duration, one byte per voice. */
 	NoteDurations: 0x70,
 	/** `$C1+2n`: the instrument the voice is playing, 0 for one never given any. */
@@ -29,15 +28,10 @@ export const Addr = {
 	NoteGates: 0x0201,
 	/** `$0211+2n`: the velocity `q`'s low nybble chose, which scales `VxVOL`. */
 	NoteVelocities: 0x0211,
-	/** `$0241+2n`: per-voice track volume, as `v` and `$E8` leave it. */
-	TrackVolumes: 0x0241,
 } as const;
 
 /** N-SPC songs have eight music channels. */
 export const VOICES = 8;
-
-/** Every voice, as a bitmask. */
-const ALL_VOICES = 0xff;
 
 /** Where the driver has got to, as of the last emulated sample. */
 export interface DriverState {
@@ -160,18 +154,6 @@ export function voiceFetchMark(aram: Uint8Array, voice: number): number {
  */
 export function parkVoice(aram: Uint8Array, voice: number): void {
 	aram[Addr.NoteDurations + voice * 2] = 0x7f;
-}
-
-/**
- * Whether the driver has finished writing the `VxVOL`s it was asked for.
- *
- * `L_0D1C` walks every voice and then clears `$5C` (`main.asm:2502-2512`), so a
- * zero is the driver saying it has consumed the flags rather than a caller
- * guessing how long that takes. It is cleared on a music tick, which is 37 ms
- * apart at `t55`, so the guess is not a small one.
- */
-export function volumesSettled(aram: Uint8Array): boolean {
-	return aram[Addr.VolumeDirty] === 0;
 }
 
 /** What `$44` is stepped by per pass of the main loop, per timer count. */
@@ -338,121 +320,4 @@ export function voiceHasInstrument(aram: Uint8Array, voice: number): boolean {
  */
 export function voiceHasQuantization(aram: Uint8Array, voice: number): boolean {
 	return aram[Addr.NoteGates + voice * 2] !== 0 && aram[Addr.NoteVelocities + voice * 2] !== 0;
-}
-
-/**
- * Gives a voice its track volume back without asking for a `VxVOL` rewrite, and
- * hands it back to the caller.
- *
- * The opposite half of {@link applyChannelMutes}, which sets the dirty bit
- * precisely so a note already ringing is cut. Leaving the bit alone means the
- * DSP keeps whatever it has until the voice's next note keys on and recomputes
- * it — `NoteVCMD` sets the flag itself (`main.asm:459`). So the volume is in
- * place for the note about to start and inaudible for the one about to end.
- *
- * The voice leaves the backup as well, because a caller that goes on applying a
- * mask afterwards would otherwise take this straight back off again: a voice in
- * neither `applied` nor `restoring` is one {@link applyChannelMutes} does not
- * touch at all.
- */
-export function restoreTrackVolume(aram: Uint8Array, voice: number, backup: MuteBackup): void {
-	aram[Addr.TrackVolumes + voice * 2] = backup.saved[voice];
-	backup.applied &= ~(1 << voice);
-	backup.restoring &= ~(1 << voice);
-}
-
-/**
- * What {@link applyChannelMutes} has to remember between calls.
- *
- * Muting takes a channel's volume away from it, so the value has to be kept
- * somewhere until the channel is given it back.
- */
-export interface MuteBackup {
-	/** The mask last applied, so a voice let go of can be told from one still held. */
-	applied: number;
-	/** The track volume taken off each voice, waiting to be put back. */
-	saved: Uint8Array;
-	/** Voices whose volume has not been restored yet. */
-	restoring: number;
-}
-
-export function createMuteBackup(): MuteBackup {
-	return { applied: 0, saved: new Uint8Array(VOICES), restoring: 0 };
-}
-
-/** Forgets everything, for when the emulator is reloaded from the SPC image. */
-export function resetMuteBackup(backup: MuteBackup): void {
-	backup.applied = 0;
-	backup.restoring = 0;
-	backup.saved.fill(0);
-}
-
-/**
- * Silences the voices in `mask`, by taking their volume away.
- *
- * **By volume alone, and `$5E` is deliberately left alone.** The driver's own
- * mute register disables a channel, which makes the driver's main loop cheaper —
- * and the loop handles at most one music tick per pass, so on a song already at
- * that ceiling the song *speeds up* when a channel is muted. Measured on a
- * `t254` song: 233 ticks a second unmuted, 273 with seven voices muted, 301 with
- * all eight. Muting is a monitoring aid, and one that plays the song 29% fast is
- * telling the porter something untrue about their own music.
- *
- * Taking the track volume costs the driver nothing — it goes on parsing, keying
- * on and writing `VxVOL`, just with 0 in it — so the rate does not move at all,
- * and it is the register that actually silences: `$5E` only stops the *next*
- * note, where this cuts the one already ringing. With every voice taken the
- * output is exactly zero either way, so `$5E` bought nothing that this does not.
- *
- * Not touching `$5E` also means a song muting its own channels through
- * `$F4 $06` can never have those bits disturbed by the mixer.
- */
-export function applyChannelMutes(aram: Uint8Array, mask: number, backup: MuteBackup): void {
-	const wanted = mask & ALL_VOICES;
-	if (wanted === 0 && backup.applied === 0 && backup.restoring === 0) {
-		return;
-	}
-
-	// Voices let go of since the last call owe their volume back; ones muted
-	// again before that happened can keep waiting.
-	backup.restoring = (backup.restoring | (backup.applied & ~wanted)) & ~wanted;
-	backup.applied = wanted;
-
-	let dirty = 0;
-	for (let voice = 0; voice < VOICES; voice++) {
-		const bit = 1 << voice;
-		const at = Addr.TrackVolumes + voice * 2;
-
-		if (wanted & bit) {
-			// Non-zero means the song has written a volume since we last looked —
-			// a `v` command, or a step of a volume fade. Keep the newest one.
-			const volume = aram[at];
-			if (volume !== 0) {
-				backup.saved[voice] = volume;
-				aram[at] = 0;
-				dirty |= bit;
-			}
-
-			continue;
-		}
-
-		if (!(backup.restoring & bit)) {
-			continue;
-		}
-
-		// Done once the value is back and the driver has consumed the flag. It
-		// can be cleared out from under a write that lands mid-loop, in which
-		// case the voice simply returns at its next note rather than mid-note.
-		if (aram[at] === backup.saved[voice] && (aram[Addr.VolumeDirty] & bit) === 0) {
-			backup.restoring &= ~bit;
-			continue;
-		}
-
-		aram[at] = backup.saved[voice];
-		dirty |= bit;
-	}
-
-	// OR rather than assign, matching the driver's own `or ($5c),($48)`, so
-	// voices that do not need a rewrite are not given one.
-	aram[Addr.VolumeDirty] |= dirty;
 }
