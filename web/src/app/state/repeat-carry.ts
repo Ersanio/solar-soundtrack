@@ -20,22 +20,57 @@ import { hex2, hexBytes } from '@amk/core/hex';
 import { SST } from '@amk/core/messages/sst';
 import type { CommandAddress, CompileResult, Diagnostic, Span } from '@amk/core/types';
 import type { SettingCarry, SettingCommand } from '@amk/spc/repeat-settings';
-import type { SongTimeline } from '@amk/spc/song-walk';
+import type { SongTimeline, TempoChange } from '@amk/spc/song-walk';
 import { type Command, type TokenIndex, commandStartingAt, tokenize } from '@amk/tokens';
 import { parseTimeInForce } from '@amk/tokens/commands/in-force';
 import { DEFAULT_TEMPO, tempoName } from '@amk/tokens/commands/units';
 
 const NOWHERE: Span = { start: 0, end: 0, line: 1 };
 
+/** One carry-over, with what a fix needs to write the first pass's setting back. */
+export interface RepeatFinding {
+  diagnostic: Diagnostic;
+  /** The channel the setting is kept for, or `null` for one the whole song shares. */
+  channel: number | null;
+  /**
+   * The first pass's setting as written, or `null` where the loop starts under the song's own
+   * start value. For the tempo, what to write: the `t` or `$E2` as written, or `t` and the byte
+   * where a `t` is not divided on its way in, and `null` where neither will do.
+   */
+  first: string | null;
+  /** The command the pass ends on, as written. */
+  repeat: string;
+  /** It flips the setting, so writing it again switches it back. */
+  toggle: boolean;
+  /** The remote code reset the message names, where it names one. */
+  reset: string | null;
+}
+
 /**
- * Compares the tempo at the loop's first note or rest on the first pass with
- * the one there on a repeat, which starts at {@link SongTimeline.tempoAtEnd} and
- * runs only the tempo changes marked `repeats`. A `$E3` counts as its target.
+ * {@link repeatTempoFindings}' diagnostic, which is all the editor's list needs.
  */
 export function repeatTempo(
   timeline: SongTimeline,
   commandMap: readonly CommandAddress[],
 ): Diagnostic[] {
+  return repeatTempoFindings(timeline, commandMap, null).map((finding) => finding.diagnostic);
+}
+
+/**
+ * Compares the tempo at the loop's first note or rest on the first pass with
+ * the one there on a repeat, which starts at {@link SongTimeline.tempoAtEnd} and
+ * runs only the tempo changes marked `repeats`. A `$E3` counts as its target.
+ *
+ * `text` is what `commandMap`'s spans index, for {@link RepeatFinding.first}; without it that is
+ * `null`. `tempoRatio` is what a written `t` is divided by (`parser.ts:691`), so a byte can be
+ * written back as a `t` only at 1.
+ */
+export function repeatTempoFindings(
+  timeline: SongTimeline,
+  commandMap: readonly CommandAddress[],
+  text: string | null,
+  tempoRatio = 1,
+): RepeatFinding[] {
   const loop = timeline.loopTick;
   const carried = timeline.tempoAtEnd;
   if (loop === null || carried === null || timeline.truncated || loop >= timeline.ticks) {
@@ -43,30 +78,48 @@ export function repeatTempo(
   }
 
   // `null` is the tempo the driver boots at, until the song sets one.
-  let first: number | null = null;
+  let first: TempoChange | null = null;
   let again = carried.tempo;
   for (const change of timeline.tempoChanges) {
     if (change.tick > loop) {
       break;
     }
 
-    first = change.tempo;
+    first = change;
     if (change.repeats) {
       again = change.tempo;
     }
   }
 
-  if ((first ?? DEFAULT_TEMPO) === again) {
+  const tempo = first?.tempo ?? null;
+  if ((tempo ?? DEFAULT_TEMPO) === again) {
     return [];
   }
 
-  const span = commandMap.find((command) => command.address === carried.address)?.span;
+  const spanOf = (address: number) =>
+    commandMap.find((command) => command.address === address)?.span;
+  const span = spanOf(carried.address);
+  const written = first?.fadeTicks === 0 ? spanOf(first.address) : undefined;
   return [
     {
-      severity: 'severe',
-      code: 'SST0510',
-      message: SST['0510'](tempoName(first), tempoName(again)),
-      span: span ?? NOWHERE,
+      diagnostic: {
+        severity: 'severe',
+        code: 'SST0510',
+        message: SST['0510'](tempoName(tempo), tempoName(again)),
+        span: span ?? NOWHERE,
+      },
+      channel: null,
+      first:
+        text === null
+          ? null
+          : written
+            ? text.slice(written.start, written.end)
+            : tempoRatio === 1
+              ? `t${tempo ?? DEFAULT_TEMPO}`
+              : null,
+      repeat: text !== null && span ? text.slice(span.start, span.end) : `t${again}`,
+      toggle: false,
+      reset: null,
     },
   ];
 }
@@ -82,15 +135,15 @@ const COUNTING_TYPES: ReadonlySet<number> = new Set([1, 2, 5]);
 
 /**
  * The remote code wording for a call the first pass does not have at the loop
- * start, or `null` where the generic one stands: another call in the first
- * pass, or a song below `#amk 2`, which has no remote code syntax.
+ * start, and the reset it names, or `null` where the generic one stands: another
+ * call in the first pass, or a song below `#amk 2`, which has no remote code syntax.
  */
 function remoteMessage(
   carry: SettingCarry,
   command: string,
   channel: number,
   amkVersion: number,
-): string | null {
+): { message: string; reset: string } | null {
   const [lead, , , type] = carry.repeat.bytes;
   if (carry.first !== null || amkVersion < 2 || lead !== VCMD.RemoteCode || type === undefined) {
     return null;
@@ -102,27 +155,36 @@ function remoteMessage(
   const reset =
     amkVersion >= 3 ? (keyOn ? '(!!-1)' : `(!!${type})`) : keyOn ? '(!0, 8)' : '(!0, 7)';
   const keyOff = carry.onRest ? SST['0511.remote.key-off-rest'] : SST['0511.remote.key-off'];
-  if (keyOn) {
-    return type === 0xff
+  const message = keyOn
+    ? type === 0xff
       ? SST['0511.remote.key-on'](command, channel, reset)
       : type === 6
         ? keyOff(command, channel, reset)
+        : null
+    : COUNTING_TYPES.has(type)
+      ? SST['0511.remote.timed'](command, channel, reset)
+      : type === 3
+        ? keyOff(command, channel, reset)
         : null;
-  }
-
-  return COUNTING_TYPES.has(type)
-    ? SST['0511.remote.timed'](command, channel, reset)
-    : type === 3
-      ? keyOff(command, channel, reset)
-      : null;
+  return message === null ? null : { message, reset };
 }
 
 /**
- * `SST0511` and `SST0512`: each setting in {@link SongTimeline.carries}, named as
- * it was written and underlined where it was. Remote code names the reset that
- * cancels it.
+ * `SST0511` and `SST0512`: {@link repeatSettingFindings}' diagnostics, which is all the editor's
+ * list needs.
  */
 export function repeatSettings(timeline: SongTimeline, compiled: CompiledSong): Diagnostic[] {
+  return repeatSettingFindings(timeline, compiled).map((finding) => finding.diagnostic);
+}
+
+/**
+ * Each setting in {@link SongTimeline.carries}, named as it was written and
+ * underlined where it was. Remote code names the reset that cancels it.
+ */
+export function repeatSettingFindings(
+  timeline: SongTimeline,
+  compiled: CompiledSong,
+): RepeatFinding[] {
   if (timeline.carries.length === 0) {
     return [];
   }
@@ -175,29 +237,42 @@ export function repeatSettings(timeline: SongTimeline, compiled: CompiledSong): 
       : { span: source.span, text: text.slice(source.span.start, source.span.end) };
   };
 
-  return timeline.carries.map((carry: SettingCarry): Diagnostic => {
+  return timeline.carries.map((carry: SettingCarry): RepeatFinding => {
     const repeat = written(carry.repeat);
     const first = carry.first === null ? null : written(carry.first).text;
     const { channel } = carry;
+    const toggle = carry.repeat.toggle;
     let code: string;
     let message: string;
+    let reset: string | null = null;
     if (channel !== null) {
       code = 'SST0511';
-      message = carry.repeat.toggle
+      const remote = toggle
+        ? null
+        : remoteMessage(carry, repeat.text, channel, result.stats?.targetAMKVersion ?? 0);
+      reset = remote?.reset ?? null;
+      message = toggle
         ? SST['0511.toggle'](repeat.text, channel)
-        : (remoteMessage(carry, repeat.text, channel, result.stats?.targetAMKVersion ?? 0) ??
+        : (remote?.message ??
           (first === null
             ? SST['0511.default'](repeat.text, channel)
             : SST['0511'](repeat.text, channel, first)));
     } else {
       code = 'SST0512';
-      message = carry.repeat.toggle
+      message = toggle
         ? SST['0512.toggle'](repeat.text)
         : first === null
           ? SST['0512.default'](repeat.text)
           : SST['0512'](repeat.text, first);
     }
 
-    return { severity: 'severe', code, message, span: repeat.span ?? NOWHERE };
+    return {
+      diagnostic: { severity: 'severe', code, message, span: repeat.span ?? NOWHERE },
+      channel,
+      first,
+      repeat: repeat.text,
+      toggle,
+      reset,
+    };
   });
 }
