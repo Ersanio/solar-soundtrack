@@ -35,15 +35,15 @@ stay true of `EditorStore` and the write-back path is `.claude/rules/state-and-e
 
 ## Layout
 
-| Path                    | What it is                                                                                         |
-| ----------------------- | -------------------------------------------------------------------------------------------------- |
-| `src/app/state/`        | Thirteen `@Service()` singletons in dependency order, and the transport's clock                    |
-| `src/app/editor/`       | The editor pane and its chrome: top bar, transport, ARAM meter, mixer, palette, CodeMirror adapter |
-| `src/app/editor/views/` | What the pane's tabs switch between: source, sample library, piano roll, Song Inspector            |
-| `src/app/output/`       | The sidebar: the command and loop inspectors, stats, the ARAM budget, the hex dump, diagnostics    |
-| `src/app/status-bar/`   | The status bar: compile status, the problems count, the development notice, the credit             |
-| `src/app/shared/`       | Form controls, toggles, sections, popovers, tabs, icons, chart helpers                             |
-| `src/app/util/`         | Formatting, IndexedDB, `clamp`                                                                     |
+| Path                    | What it is                                                                                                   |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `src/app/state/`        | Thirteen `@Service()` singletons in dependency order, and the transport's clock                              |
+| `src/app/editor/`       | The editor pane and its chrome: top bar, transport, ARAM meter, mixer, palette, CodeMirror adapter           |
+| `src/app/editor/views/` | What the pane's tabs switch between: source, sample library, piano roll, Song Inspector, Audio Visualization |
+| `src/app/output/`       | The sidebar: the command and loop inspectors, stats, the ARAM budget, the hex dump, diagnostics              |
+| `src/app/status-bar/`   | The status bar: compile status, the problems count, the development notice, the credit                       |
+| `src/app/shared/`       | Form controls, toggles, sections, popovers, tabs, icons, chart helpers                                       |
+| `src/app/util/`         | Formatting, IndexedDB, `clamp`                                                                               |
 
 State flows one way: `DriverStore` → `SampleStore` → `EditorStore` → `Playback`. Nine more sit off
 that spine: `ClockMeasurer`, which `EditorStore` owns and which drives the clock measurement in
@@ -81,8 +81,9 @@ sample — wasted work on each keystroke.
 `editor-pane.ts` is a shell. It owns which tab is selected and nothing else, so a view is a folder
 under `editor/views/`, an entry in its `VIEWS` const and a `@case` in its template. The tab row is
 built from that const: each entry is a `TabDef`, which carries the view's icon and whether it sits
-on the right of the row (`aside`) — Samples stands apart from Source and Piano roll that way, being
-a library rather than a view of the song.
+on the right of the row (`aside`) — the Song Inspector, Audio Visualization and Samples stand apart
+from Source and Piano roll that way, being what a porter reads and gathers from rather than where
+they write the song.
 
 **A view brings its own controls.** The tab row is the tab row and only that; anything that is a
 setting on one view goes in an `<amk-toolbar>` as that view's first child, grouped with dividers,
@@ -228,8 +229,9 @@ exhausted quota — and must never stop someone compiling a song.
 
 ## Charts
 
-Every chart here is Angular-templated SVG but the Song Inspector's frame-rate and raster ones —
-the spectrum, the scopes, the vectorscope and the spectrogram — which are canvases drawn in the
+Every chart here is Angular-templated SVG but the frame-rate and raster ones — Audio
+Visualization's spectrum, scopes and vectorscope, the top bar's scope, and the Song Inspector's
+spectrogram — which are canvases drawn in the
 theme's tokens through `shared/chart/canvas-colors.ts`; nothing draws with a charting library. The four inspector
 graphs work in a fixed viewBox from `shared/chart/plot.ts`, stretched to their container, so stroke
 widths and offsets are in viewBox units rather than pixels.

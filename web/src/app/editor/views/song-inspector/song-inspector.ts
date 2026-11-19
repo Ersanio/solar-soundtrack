@@ -6,21 +6,19 @@ import { Toolbar } from '../../../shared/toolbar/toolbar';
 import { SongAnalyzer } from '../../../state/song-analyzer';
 import { InspectorTimeline } from './inspector-timeline/inspector-timeline';
 import { dbfs, lufs, percent } from './inspector-units';
-import { LiveMeters } from './live-meters/live-meters';
 import { SampleUsage } from './sample-usage/sample-usage';
 
 /**
  * The Song Inspector: what the song sounds like, rather than what it says.
  *
- * Two halves. The live meters follow the transport — the spectrum, a scope per channel, the
- * stereo field. Under them is the whole pass at once, played silently on a worker by
- * `SongAnalyzer` with the mixer's mutes applied: levels per channel and per sample, loudness and
- * clipping, the stereo correlation, the echo, the spectrogram and what each sample costs. Holding
- * this view open is what keeps that analysis current.
+ * The whole pass at once, played silently on a worker by `SongAnalyzer` with the mixer's mutes
+ * applied: levels per channel and per sample, loudness and clipping, the stereo correlation, the
+ * echo, the spectrogram and what each sample costs. Holding this view open is what keeps that
+ * analysis current. What follows the transport is the Audio Visualization tab.
  */
 @Component({
   selector: 'amk-song-inspector',
-  imports: [Toolbar, StatTile, Section, LiveMeters, InspectorTimeline, SampleUsage],
+  imports: [Toolbar, StatTile, Section, InspectorTimeline, SampleUsage],
   templateUrl: './song-inspector.html',
   host: { class: 'flex min-h-0 min-w-0 flex-col' },
 })
@@ -28,7 +26,6 @@ export class SongInspector {
   protected readonly analyzer = inject(SongAnalyzer);
 
   protected readonly text = {
-    live: $localize`:@@analysis.section.live:analysis.section.live`,
     timeline: $localize`:@@analysis.section.timeline:analysis.section.timeline`,
     samples: $localize`:@@analysis.section.samples:analysis.section.samples`,
   };

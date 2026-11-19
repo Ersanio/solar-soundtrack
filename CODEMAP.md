@@ -378,17 +378,16 @@ something in the directory, which load by themselves when such a file is opened.
 
 - `history-buttons.ts` — Undo and redo, for the two toolbars that need them.
 
-## web/src/app/editor/spectrum-mini
+## web/src/app/editor/scope-mini
 
 **Rules:** `song-inspector.md`
 
-- `spectrum-mini.ts` — The top bar's spectrum: the song's fourteen bands as it plays, beside the ARAM meter as FL keeps its small meters together.
+- `scope-mini.ts` — The top bar's oscilloscope: the channels that are heard added together into one trace, beside the ARAM meter as FL keeps its small meters together.
 
 ## web/src/app/editor/spectrum
 
 **Rules:** `song-inspector.md`
 
-- `spectrum-bars.ts` — The bars a spectrum meter draws from its band levels: all 28 at full size, or fourteen for the top bar, each the louder of a pair, so a narrow peak still shows in the small one.
 - `spectrum.ts` — The song's spectrum as it plays: the 28 third-octave bands from 31.5 Hz to 16 kHz, on the fixed scale every song is read on (`state/analysis/spectrum-bands.ts`).
 
 ## web/src/app/editor/top-bar/suppressions-button
@@ -406,6 +405,18 @@ something in the directory, which load by themselves when such a file is opened.
 **Rules:** `transport-and-clock.md`
 
 - `transport-controls.ts` — The transport: play, pause and stop, Loop, Hot Reload, the seek bar with its clock, and the volume.
+
+## web/src/app/editor/views/audio-visualization
+
+**Rules:** `song-inspector.md`
+
+- `audio-visualization.ts` — The Audio Visualization tab: the song as it plays, read off the transport — the spectrum, a scope per channel and the stereo field.
+
+## web/src/app/editor/views/audio-visualization/live-meters
+
+**Rules:** `song-inspector.md`
+
+- `live-meters.ts` — The Audio Visualization tab's meters: the spectrum, an oscilloscope per channel, and the stereo vectorscope with its correlation, all following the song as it plays.
 
 ## web/src/app/editor/views/piano-roll
 
@@ -607,12 +618,6 @@ something in the directory, which load by themselves when such a file is opened.
 - `inspector-units.ts` — The Song Inspector's figures with their units, each a message so its wording lives with the rest of the English.
 - `song-inspector.ts` — The Song Inspector: what the song sounds like, rather than what it says.
 - `timeline-paths.ts` — The Song Inspector's timeline as paths: buckets of a pass squeezed into a fixed number of columns, keeping each column's loudest bucket so a short peak is never averaged away.
-
-## web/src/app/editor/views/song-inspector/live-meters
-
-**Rules:** `song-inspector.md`
-
-- `live-meters.ts` — The live half of the Song Inspector: the spectrum, an oscilloscope per channel, and the stereo vectorscope with its correlation, all following the song as it plays.
 
 ## web/src/app/editor/views/song-inspector/sample-usage
 
@@ -880,6 +885,7 @@ something in the directory, which load by themselves when such a file is opened.
 - `frame-clock.ts` — The animation frame timestamp, as a signal, while `active` is true.
 - `plot.ts` — The fixed drawing space the command inspector's graphs share.
 - `stack.ts` — Lays out one stacked proportion bar.
+- `voice-trace.ts` — One voice of a capture as an oscilloscope trace across a box, as heard and on the scopes' one scale (`SCOPE_FULL_SCALE`), started on a rising zero crossing so a steady tone holds still.
 
 ## web/src/app/shared/color-field
 
@@ -897,7 +903,7 @@ something in the directory, which load by themselves when such a file is opened.
 
 **Rules:** `ui-and-theme.md`
 
-- 26 icon components, `icon-<name>.ts`, one glyph each: `analysis`, `book`, `chevron-down`, `chevron-right`, `close`, `download`, `github`, `lock`, `loop`, `minus`, `palette`, `pause`, `play`, `plus`, `record`, `recording`, `redo`, `roll`, `samples`, `source`, `stop`, `suppress`, `undo`, `unlock`, `volume`, `wrap`
+- 27 icon components, `icon-<name>.ts`, one glyph each: `analysis`, `book`, `chevron-down`, `chevron-right`, `close`, `download`, `github`, `lock`, `loop`, `minus`, `palette`, `pause`, `play`, `plus`, `record`, `recording`, `redo`, `roll`, `samples`, `scope`, `source`, `stop`, `suppress`, `undo`, `unlock`, `volume`, `wrap`
 
 ## web/src/app/shared/modal
 

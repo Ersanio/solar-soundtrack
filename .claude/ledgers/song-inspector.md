@@ -31,3 +31,9 @@ considered there and moved away from, with the reason. The rule carries one inde
   full at full scale meets that literally. But a mix of eight leaves each voice around a tenth of
   full scale: on the sample song every scope was a flat line. Full at −6 dBFS (`SCOPE_FULL_SCALE`)
   keeps the one shared scale and makes an ordinary voice legible.
+- **A spectrum in the top bar** — fourteen bars, each the louder of two bands (`compact`,
+  `spectrumBars`), read off the analyser and so free to run. The user wanted the channels instead,
+  as a scope of the heard ones. It costs a held capture whenever the top bar shows it.
+- **The top bar's scope as one trace per channel** — the heard channels overlaid in one box, each
+  in its colour. Tried and replaced by their sum, one trace in the accent (`strokeHeardSum`): in a
+  box that small, eight traces crossing are the tangle the timeline's lanes were split to avoid.

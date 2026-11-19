@@ -14,7 +14,7 @@ import { EditorStore } from '../../state/editor-store';
 import { MidiInput } from '../../state/midi-input';
 import { ThemePicker } from '../../theme/theme-picker/theme-picker';
 import { AramMeter } from '../aram-meter/aram-meter';
-import { SpectrumMini } from '../spectrum-mini/spectrum-mini';
+import { ScopeMini } from '../scope-mini/scope-mini';
 import { SuppressionsButton } from './suppressions-button/suppressions-button';
 import { TransportControls } from '../transport-controls/transport-controls';
 
@@ -43,7 +43,7 @@ const REPO_URL = 'https://github.com/Ersanio/solar-soundtrack';
     IconDownload,
     IconGithub,
     IconRoll,
-    SpectrumMini,
+    ScopeMini,
     SuppressionsButton,
     ThemePicker,
     Toggle,

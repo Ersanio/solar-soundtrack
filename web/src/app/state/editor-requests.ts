@@ -110,10 +110,10 @@ export class EditorRequests {
 
   /**
    * A tab of the editor pane to bring forward, set by the top bar's spectrum,
-   * which opens the Song Inspector. Consumed and put back to `null` by the pane,
+   * which opens Audio Visualization. Consumed and put back to `null` by the pane,
    * as {@link revealSection} is by the output pane.
    */
-  readonly revealView = signal<'inspector' | null>(null);
+  readonly revealView = signal<'visualization' | null>(null);
 
   /**
    * A splice the editor should apply, set when a panel edits a command in

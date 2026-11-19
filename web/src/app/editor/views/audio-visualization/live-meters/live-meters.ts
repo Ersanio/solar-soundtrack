@@ -13,25 +13,21 @@ import { CAPTURE_FRAMES, type VoiceCapture } from '@amk/spc/protocol';
 import { canvasColors, fitCanvas } from '../../../../shared/chart/canvas-colors';
 import { elementSize } from '../../../../shared/chart/element-size';
 import { frameClock } from '../../../../shared/chart/frame-clock';
+import { strokeVoiceTrace } from '../../../../shared/chart/voice-trace';
 import {
   type CorrelationMeter,
   SCOPE_FULL_SCALE,
   correlation,
-  heardGain,
   stepCorrelation,
-  triggerFrame,
 } from '../../../../state/analysis/scope';
 import { Mixer } from '../../../../state/mixer';
 import { Playback } from '../../../../state/playback';
 import { Spectrum } from '../../../spectrum/spectrum';
 
-/** Frames a scope shows: 16 ms, two cycles of anything from 125 Hz up. */
-const SCOPE_SPAN = CAPTURE_FRAMES / 2;
-
 const VOICES = 8;
 
 /**
- * The live half of the Song Inspector: the spectrum, an oscilloscope per channel, and the stereo
+ * The Audio Visualization tab's meters: the spectrum, an oscilloscope per channel, and the stereo
  * vectorscope with its correlation, all following the song as it plays.
  *
  * The scopes draw each voice as heard — its waveform times its volume and the main volume, on one
@@ -142,29 +138,9 @@ export class LiveMeters {
         continue;
       }
 
-      const gain = heardGain(capture.volumes, voice) / SCOPE_FULL_SCALE;
-      if (gain === 0) {
-        continue;
-      }
-
-      const start = triggerFrame(capture.outx, CAPTURE_FRAMES, SCOPE_SPAN, VOICES, voice);
       context.strokeStyle = this.colors.color(`ch-${voice}`);
       context.lineWidth = 1.25;
-      context.beginPath();
-      const mid = y + cellH / 2;
-      const half = cellH / 2 - 2;
-      for (let n = 0; n < SCOPE_SPAN; n++) {
-        const value = capture.outx[(start + n) * VOICES + voice] * gain;
-        const px = x + (n / (SCOPE_SPAN - 1)) * cellW;
-        const py = mid - Math.max(-1, Math.min(1, value)) * half;
-        if (n === 0) {
-          context.moveTo(px, py);
-        } else {
-          context.lineTo(px, py);
-        }
-      }
-
-      context.stroke();
+      strokeVoiceTrace(context, capture, voice, x, y + 1, cellW, cellH - 2);
     }
   }
 

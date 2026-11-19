@@ -11,16 +11,12 @@ export const CHANGELOG: readonly ChangelogEntry[] = [
   {
     date: '19 November 2026',
     items: [
-      'Song Inspector: channel and sample levels, loudness, clipping, echo, spectrum, oscilloscopes and a spectrogram',
-      'Spectrum analyzer in the top bar, which opens the Song Inspector',
+      'Song Inspector: channel and sample levels, loudness, clipping, echo and a spectrogram, over the whole song',
+      'Audio Visualization: a live spectrum, oscilloscopes and a stereo vectorscope',
       'New theme: Praise The (Happy) Sun',
       'Add support for light themes; Certain UI elements automatically change colors to match the theme',
       'Allow changing the piano keys and the sheen on buttons in the theme editor',
-      "Warn when a note's arpeggio, trill or glissando reaches past the instrument's playable pitch range",
-      'Warn when a note is too short for its arpeggio to play it at all',
-      'Warn when an arpeggio has more than one loop point, and offer to auto-fix it',
-      'Warn when an arpeggio ends on a loop point, and offer to auto-fix it',
-      "Warn when an arpeggio's note count doesn't match the notes written after it, and offer to auto-fix it",
+      'Add extra checks and warnings for the arpeggio command',
     ],
   },
   {

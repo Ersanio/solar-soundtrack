@@ -3,17 +3,19 @@ import { Component, effect, inject, signal, untracked } from '@angular/core';
 import { IconAnalysis } from '../../shared/icons/icon-analysis';
 import { IconRoll } from '../../shared/icons/icon-roll';
 import { IconSamples } from '../../shared/icons/icon-samples';
+import { IconScope } from '../../shared/icons/icon-scope';
 import { IconSource } from '../../shared/icons/icon-source';
 import { type TabDef, Tabs } from '../../shared/tabs/tabs';
 import { ChannelMixer } from '../channel-mixer/channel-mixer';
 import { EditorRequests } from '../../state/editor-requests';
+import { AudioVisualization } from '../views/audio-visualization/audio-visualization';
 import { PianoRoll } from '../views/piano-roll/piano-roll';
 import { SampleBrowser } from '../views/sample-browser/sample-browser';
 import { SongInspector } from '../views/song-inspector/song-inspector';
 import { SourceView } from '../views/source-view/source-view';
 import { readStored, writeStored } from '../../util/storage';
 
-type ViewId = 'source' | 'samples' | 'roll' | 'inspector';
+type ViewId = 'source' | 'samples' | 'roll' | 'inspector' | 'visualization';
 
 const VIEW_KEY = 'solar-soundtrack.view';
 
@@ -28,6 +30,13 @@ const VIEWS: readonly TabDef<ViewId>[] = [
     id: 'inspector',
     label: $localize`:@@editor.tab.inspector:editor.tab.inspector`,
     icon: IconAnalysis,
+    aside: true,
+  },
+  {
+    id: 'visualization',
+    label: $localize`:@@editor.tab.visualization:editor.tab.visualization`,
+    icon: IconScope,
+    aside: true,
   },
   {
     id: 'samples',
@@ -59,7 +68,15 @@ function readView(): ViewId {
  */
 @Component({
   selector: 'amk-editor-pane',
-  imports: [Tabs, ChannelMixer, SourceView, SampleBrowser, PianoRoll, SongInspector],
+  imports: [
+    Tabs,
+    ChannelMixer,
+    SourceView,
+    SampleBrowser,
+    PianoRoll,
+    SongInspector,
+    AudioVisualization,
+  ],
   templateUrl: './editor-pane.html',
   host: { class: 'flex min-h-0 min-w-0 flex-col' },
 })

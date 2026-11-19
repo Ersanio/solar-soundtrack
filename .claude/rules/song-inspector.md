@@ -1,8 +1,10 @@
 ---
 paths:
   - 'web/src/app/editor/views/song-inspector/**'
+  - 'web/src/app/editor/views/audio-visualization/**'
   - 'web/src/app/editor/spectrum/**'
-  - 'web/src/app/editor/spectrum-mini/**'
+  - 'web/src/app/editor/scope-mini/**'
+  - 'web/src/app/shared/chart/voice-trace.ts'
   - 'web/src/app/state/analysis/**'
   - 'web/src/app/state/{analysis.worker,song-analyzer,live-tap}.ts'
   - 'web/src/app/shared/chart/canvas-colors.ts'
@@ -10,12 +12,15 @@ paths:
 
 # Song Inspector
 
-Read before changing the Song Inspector tab, the top bar's spectrum, `SongAnalyzer`, the analysis
-worker, the live capture or the canvas colours.
+Read before changing the Song Inspector or Audio Visualization tab, the top bar's scope,
+`SongAnalyzer`, the analysis worker, the live capture or the canvas colours.
 
-## Two halves, two sources
+## Two tabs, two sources
 
-**The whole-song half is played, not predicted.** `state/analysis/song-analysis.ts` plays one pass
+The Song Inspector is the whole song at once; Audio Visualization is the song as it plays. Each
+asks for its own source only while it is open, so neither costs anything behind the other.
+
+**The Song Inspector is played, not predicted.** `state/analysis/song-analysis.ts` plays one pass
 silently on `analysis.worker.ts`, in the mould of the clock measurement, and reads every voice off
 the DSP as it goes. The DSP stores each voice's `VxOUTX` — its waveform after the envelope and
 before volume — on every sample, so rendering **a frame at a time** (`SpcCore.renderVoices`) turns
@@ -24,10 +29,12 @@ pins it, audio and APU RAM both, so the transport is free to capture while it pl
 heard is `OUTX × VxVOL/128 × MVOL/128` (`scope.ts`, `heardGain`), which the mix agrees with to the
 sample on a lone voice.
 
-**The live half reads the transport.** The spectrum is an `AnalyserNode` `SpcPlayer` hangs beside
-its gain, so it reads the song and not the listening level. The scopes and the vectorscope read
-`VoiceCapture`s the worklet posts about forty times a second, and only while something holds
-`Playback.watchVoices` — the live meters, while the tab is open. A capture is the last 32 ms of
+**Audio Visualization reads the transport.** The spectrum is an `AnalyserNode` `SpcPlayer` hangs
+beside its gain, so it reads the song and not the listening level. The scopes and the vectorscope
+read `VoiceCapture`s the worklet posts about forty times a second, and only while something holds
+`Playback.watchVoices` — the live meters while the tab is open, and the top bar's scope while the
+window is wide enough to show it. That one adds the heard channels together as heard into one
+trace (`strokeHeardSum`), on the scale the eight boxes use, and opens this tab. A capture is the last 32 ms of
 every voice's `OUTX`, the mix and the volumes; `LiveTap` holds the newest and the canvases pull from
 it on the frame clock.
 
@@ -74,3 +81,5 @@ entry goes there, with its line here, in the same change.
 - **Overlaid lines for the channel and sample levels** — `areaPath`, `columnMax`
 - **Muting by subtracting a channel from one analysis** — `analyseSong`, `mask`
 - **Scopes full at 0 dBFS** — `SCOPE_FULL_SCALE`
+- **A spectrum in the top bar** — `compact`, `spectrumBars`, `ScopeMini`
+- **The top bar's scope as one trace per channel** — `ScopeMini`, `strokeHeardSum`

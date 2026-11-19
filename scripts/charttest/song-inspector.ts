@@ -31,7 +31,6 @@ import {
 	columnMax,
 	spectrogramColumns,
 } from "../../web/src/app/editor/views/song-inspector/timeline-paths";
-import { spectrumBars } from "../../web/src/app/editor/spectrum/spectrum-bars";
 import { check, section } from "../harness";
 
 const RATE = 32000;
@@ -98,11 +97,6 @@ section("a full-scale sine reads 0 dB in its own band");
 	analyser[Math.round(1000 / (48000 / 8192))] = (BLACKMAN.coherent / 2) ** 2;
 	const read = bandLevels(analyser, 48000 / 8192, THIRD_OCTAVES, BLACKMAN, 1 / 4)[15];
 	check("an analyser's peak bin at a unit sine reads 0 dB", Math.abs(read) < 0.01, `${read.toFixed(2)} dB`);
-
-	check(
-		"the top bar's meter keeps the louder of each pair",
-		spectrumBars(Float32Array.from([-10, -3, -50, -60]), true).join() === "-3,-50",
-	);
 }
 
 section("loudness as BS.1770 measures it, at the DSP's rate");
