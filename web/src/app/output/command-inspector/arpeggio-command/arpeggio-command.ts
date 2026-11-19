@@ -250,8 +250,9 @@ export class ArpeggioCommand {
     const duration = this.duration() || 0x18;
     switch (mode) {
       case 0x00:
-        // `$FB $00` turns arpeggio off and takes nothing further.
-        this.rewrite([0x00]);
+        // Off still takes its duration byte (Music.cpp:1738-1741, Commands.asm:1099),
+        // which a zero count never reads.
+        this.rewrite([0x00, 0x00]);
         break;
       case 0x01:
         this.rewrite([2, duration, 0x04, 0x07]);

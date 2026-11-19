@@ -3893,9 +3893,9 @@ instrToSample[30] = { 00 01 02 03 04 07 08 09 05 0A 0B 01 10 0C 0D 12 0C 11 01  
       <dl>
         <dt>Syntax</dt>
         <dd>
-          <code>$FB $00</code> off · <code>$FB $NN $LL d₁ … d_NN</code> arpeggio, NN &lt;
-          <code>$80</code> notes of LL ticks each, dᵢ signed semitone offsets, a <code>$80</code> in
-          the list marks the loop point · <code>$FB $80 $LL $DD</code> trill ·
+          <code>$FB $00 $LL</code> off, LL unread · <code>$FB $NN $LL d₁ … d_NN</code> arpeggio, NN
+          &lt; <code>$80</code> notes of LL ticks each, dᵢ signed semitone offsets, a
+          <code>$80</code> in the list marks the loop point · <code>$FB $80 $LL $DD</code> trill ·
           <code>$FB $81 $LL $DD</code> glissando.
           <span class="cite">hex_command_reference.html:806-853</span>
         </dd>
