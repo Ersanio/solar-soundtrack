@@ -52,9 +52,11 @@ it on the frame clock.
   DSP's Nyquist, on −72…0 dBFS (`spectrum-bands.ts`). A band takes the louder of its bins' power
   over the window's bandwidth and its loudest bin, so a full-scale sine reads 0 dB in its band
   however few bins the band holds; `charttest` pins the calibration for both windows.
-- **The scopes are drawn as heard, on one scale for all eight**, full at −6 dBFS
-  (`SCOPE_FULL_SCALE`) and held at the edge past it. A mix of eight runs each voice far below full
-  scale, so a box full at 0 dBFS draws every ordinary voice as a flat line.
+- **The scopes are drawn as heard, on one scale for all eight**, full at 0.3
+  (`SCOPE_FULL_SCALE`, about −10.5 dBFS) and held at the edge past it: the loudest voice on the
+  default velocity table peaks at 0.29, so it nearly fills its box. A mix of eight runs each voice
+  far below full scale, so a box full at 0 dBFS draws every ordinary voice as a flat line. The
+  N-SPC velocity table and `$FA $03` push a voice past the edge.
 - **The analysis is replaced, never cleared**, and drawn dimmed while stale, as the clock
   measurement is held. It runs only while watched: a second after a compile, 300 ms after a mute,
   and at once when there is nothing to show.

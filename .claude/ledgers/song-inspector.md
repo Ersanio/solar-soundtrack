@@ -29,8 +29,9 @@ considered there and moved away from, with the reason. The rule carries one inde
   the song's length.
 - **Scopes full at 0 dBFS** — the user asked for the channels as heard, on one scale, and a box
   full at full scale meets that literally. But a mix of eight leaves each voice around a tenth of
-  full scale: on the sample song every scope was a flat line. Full at −6 dBFS (`SCOPE_FULL_SCALE`)
-  keeps the one shared scale and makes an ordinary voice legible.
+  full scale: on the sample song every scope was a flat line. Full at 0.3 (`SCOPE_FULL_SCALE`)
+  keeps the one shared scale and makes an ordinary voice legible. At 0.5 (−6 dBFS) the loudest
+  voice the default velocity table allows reached only 58% of its box.
 - **A spectrum in the top bar** — fourteen bars, each the louder of two bands (`compact`,
   `spectrumBars`), read off the analyser and so free to run. The user wanted the channels instead,
   as a scope of the heard ones. It costs a held capture whenever the top bar shows it.

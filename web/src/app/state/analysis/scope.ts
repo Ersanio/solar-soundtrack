@@ -4,10 +4,11 @@
  */
 
 /**
- * The level a scope's box is full at: -6 dBFS, which one ordinary voice stays inside.
+ * The level a scope's box is full at: about -10.5 dBFS, just above the loudest a voice reaches on
+ * the default velocity table (v255, w255, q7F, centred: VxVOL 38, so 127/128 × 38/128 × 127/128).
  * One scale for every box, so channels compare; a voice louder than it is held at the edge.
  */
-export const SCOPE_FULL_SCALE = 0.5;
+export const SCOPE_FULL_SCALE = 0.3;
 
 /**
  * The frame a scope of `span` frames starts at: the last rising zero crossing that leaves a whole
