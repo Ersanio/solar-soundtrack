@@ -62,7 +62,7 @@ something in the directory, which load by themselves when such a file is opened.
 **Rules:** `compiler.md`, `inspector-and-palette.md`
 
 - `arpeggio-count.ts` — An `$FB` sequence whose count disagrees with the notes written after it, and the count that fits them.
-- `command-hazards.ts` (500+ lines) — The command hazards: commands that compile clean and misbehave — `$F7`'s dead slot, an unreachable `$DD`, `#am4`'s `$E4`, an arpeggio's dead loop points.
+- `command-hazards.ts` (500+ lines) — The command hazards: commands that compile clean and misbehave — `$F7`'s dead slot, an unreachable `$DD`, `#am4`'s `$E4`, an arpeggio's dead loop points and one looping past its end.
 - `dialect.ts` — What was in force at a point in the song: which dialect the `#amk` / `#am4` / `#amm` markers put it in; tempo; which velocity table `q` reads against, from the hex as well as the directives.
 - `echo-hazards.ts` — The echo hazards: every runaway echo in the document, one diagnostic per command that causes one.
 - `edits.ts` — Rewriting a command in the source it was scanned from — the inverse of `gather`.
@@ -195,7 +195,7 @@ something in the directory, which load by themselves when such a file is opened.
 - `arpeggio.ts` — `fixtest`: an arpeggio's count written as the notes there are, which clears AddmusicK's own errors with it, and left alone where no one count fits.
 - `diff.ts` — `fixtest`: the diff the fix dialog draws — kinds, line numbers, context and what is folded away.
 - `directives.ts` — `fixtest`: directives deleted, moved, written and switched, `#pad` grown and `#spc` text cut.
-- `hazards.ts` — `fixtest`: a dead `$F7` deleted, a stranded `$DD` moved back to its note, an arpeggio's dead loop points deleted, and a runaway echo's feedback lowered as far as it must go and no further.
+- `hazards.ts` — `fixtest`: a dead `$F7` deleted, a stranded `$DD` moved back to its note, an arpeggio's dead loop points deleted and the ones it ends in, and a runaway echo's feedback lowered as far as it must go and no further.
 - `lengths.ts` — `fixtest`: SST0502's Pad, which makes every channel reach the longest, and Trim, which cuts what the song never reaches.
 - `main.ts` — The Problems list's fixes: each one offered where it should be and nowhere else, writing what it says it writes, and leaving a song that no longer raises what it fixed and raises no new error.
 - `names.ts` — `fixtest`: a sample, group or `#spc` field name put right where exactly one name fits.
@@ -785,7 +785,7 @@ something in the directory, which load by themselves when such a file is opened.
 - `fix-diff.ts` (300+ lines) — A fix's edits as the rows of a diff: whole lines removed and added, lines changed inside, a little unchanged text around each change, and the rest folded away.
 - `fix-text.ts` — What every family of fixes shares: building a {@link Fix}, finding tokens near a span, and taking a line out.
 - `fixes.ts` — The fixes the Problems list offers: for a diagnostic with one mechanical answer, the edits that make it.
-- `hazard-fixes.ts` — Fixes to the bytes that compile clean and break the song: a runaway echo's feedback lowered, a dead `$F7` deleted, a `$DD` moved back against the note it was written to ride on, and an arpeggio's earlier loop points deleted.
+- `hazard-fixes.ts` — Fixes to the bytes that compile clean and break the song: a runaway echo's feedback lowered, a dead `$F7` deleted, a `$DD` moved back against the note it was written to ride on, and an arpeggio's earlier loop points deleted, and the ones it ends in.
 - `length-fixes.ts` — SST0502's two fixes, for a song that ends before some of its channels do: Pad lengthens every channel that ends early, so all of it is heard, and Trim cuts what can never be heard, so the song keeps its length.
 - `name-fixes.ts` — Fixes to a name AddmusicK could not find: a sample, a sample group or an `#spc` field whose only fault is letter case, or a sample missing its extension.
 - `repeat-fixes.ts` — Fixes for a setting that carries into the song's repeat (`SST0510`-`SST0512`): the first pass's setting written again where the loop starts, the remote code reset the message names written there, or a toggle switched back at the end of the song.

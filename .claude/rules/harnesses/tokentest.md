@@ -71,8 +71,9 @@ and is why the pass takes the whole `TokenIndex`: `(` raises no command at all, 
 alone cannot see it. `SST0506` is then every `$F7` at every dialect, `SST0507` every slide the
 walk-free answer says is stranded, `SST0508` a `$E4` under `#am4` and nowhere else, and `SST0517`
 an `$FB` list holding loop points before its last — a warning on the whole run, but not for a list
-that ends in one or is nothing else, which the arpeggio inspector names, nor for one not yet
-written to its end, nor for a trill's interval. `SST0518` is an `$FB` sequence whose count
+that ends in one or is nothing else, nor for one not yet written to its end, nor for a trill's
+interval. A list that ends in one or is nothing else is `SST0519`, severe on the whole run, and a
+loop point before the last note, Off and a half-written list are not. `SST0518` is an `$FB` sequence whose count
 disagrees with its notes, read as the parser reads the run: short only where something it does not
 read on through ends it, so a comment inside the run and a run at the end of the document raise
 nothing, and over only by bytes it refuses as commands, so a command byte ends the notes over and a

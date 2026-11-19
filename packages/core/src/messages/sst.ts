@@ -74,4 +74,5 @@ export const SST = {
 		$localize`:@@sst.0518.long:sst.0518.long ${count}:count: ${written}:written:`,
 	"0518.ambiguous": (count: string, written: number, command: string) =>
 		$localize`:@@sst.0518.ambiguous:sst.0518.ambiguous ${count}:count: ${written}:written: ${command}:command:`,
+	"0519": () => $localize`:@@sst.0519:sst.0519`,
 };

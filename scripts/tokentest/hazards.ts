@@ -277,9 +277,14 @@ section("command hazards — bytes that compile clean and then break the song");
 		["three, two of them adjacent", "$06 $06 $80 $00 $80 $80 $07 $0C", "SST0517"],
 		["one loop point", "$04 $06 $00 $80 $04 $07", ""],
 		["none", "$03 $06 $00 $04 $07", ""],
-		// The arpeggio inspector names these two as the hazards they are.
-		["two, the last in the last slot", "$04 $06 $00 $80 $04 $80", ""],
-		["nothing but loop points", "$02 $06 $80 $80", ""],
+		// The last loop point sends the index past the list (`Commands.asm:1216-1220`), which is the
+		// hazard, whatever came before it.
+		["one in the last slot", "$03 $06 $00 $04 $80", "SST0519"],
+		["two in the last slots", "$04 $06 $00 $04 $80 $80", "SST0519"],
+		["two, the last in the last slot", "$04 $06 $00 $80 $04 $80", "SST0519"],
+		["nothing but loop points", "$02 $06 $80 $80", "SST0519"],
+		["a single loop point", "$01 $06 $80", "SST0519"],
+		["a loop point before the last note", "$02 $06 $80 $04", ""],
 		// A trill's or glissando's one argument is an interval, whatever it equals.
 		["a trill of $80", "$80 $06 $80", ""],
 	] as const) {
@@ -300,4 +305,17 @@ section("command hazards — bytes that compile clean and then break the song");
 			loopPoints[0].message.startsWith("This arpeggio has 2 loop points"),
 		JSON.stringify(loopPoints),
 	);
+
+	const ending = "$FB $03 $06 $00 $04 $80";
+	const endingSong = `#amk 4\n#0 @0 o4 ${ending} c4\n`;
+	const pastEnd = commandHazards(tokenize(endingSong));
+	check(
+		"SST0519 is severe on the whole $FB run",
+		pastEnd.length === 1 &&
+			pastEnd[0].severity === "severe" &&
+			endingSong.slice(pastEnd[0].span.start, pastEnd[0].span.end) === ending &&
+			pastEnd[0].message.startsWith("This arpeggio ends on a loop point"),
+		JSON.stringify(pastEnd),
+	);
+	check("Off is not a list at all", codesIn("#amk 4\n#0 @0 o4 $FB $00 $06 c4\n") === "");
 }

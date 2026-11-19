@@ -1,4 +1,4 @@
-/** `fixtest`: a dead `$F7` deleted, a stranded `$DD` moved back to its note, an arpeggio's dead loop points deleted, and a runaway echo's feedback lowered as far as it must go and no further. */
+/** `fixtest`: a dead `$F7` deleted, a stranded `$DD` moved back to its note, an arpeggio's dead loop points deleted and the ones it ends in, and a runaway echo's feedback lowered as far as it must go and no further. */
 
 import { echoStability, signedByte } from "@amk/spc/fir";
 import { builtInTaps } from "@amk/tokens/echo-hazards";
@@ -75,6 +75,57 @@ section("an arpeggio's earlier loop points are deleted, and every note steps as 
 
 section("a loop point a replacement wrote is left alone");
 expectNoFix("through a replacement", '#amk 4\n"mark=$80"\n#0 @0 o4 $FB $05 $06 $00 mark $04 $80 $07 c4', "SST0517");
+
+section("an arpeggio's loop points at the end are deleted, and the walk can follow it again");
+{
+	const stepsOf = (built: Song | null): string =>
+		(built?.timeline?.notes ?? []).map((note) => note.arpeggioSteps?.join(",") ?? "null").join(" ");
+
+	// Read past its end, the list's steps are the song's bytes, which the walk does not follow.
+	for (const [name, text, fixed, heard] of [
+		[
+			"one loop point",
+			"#amk 4\n#0 @0 o4 $FB $03 $06 $00 $04 $80 c4",
+			"#amk 4\n#0 @0 o4 $FB $02 $06 $00 $04 c4",
+			"0,4,0,4,0,4,0,4",
+		],
+		["two", "#amk 4\n#0 @0 o4 $FB $03 $06 $04 $80 $80 c4", "#amk 4\n#0 @0 o4 $FB $01 $06 $04 c4", "4,4,4,4,4,4,4,4"],
+		[
+			"an earlier one, which is kept",
+			"#amk 4\n#0 @0 o4 $FB $04 $06 $00 $80 $04 $80 c4",
+			"#amk 4\n#0 @0 o4 $FB $03 $06 $00 $80 $04 c4",
+			"0,4,4,4,4,4,4,4",
+		],
+		[
+			"across a line break, which stays",
+			"#amk 4\n#0 @0 o4 $FB $04 $06 $00 $04\n$80 $80 c4",
+			"#amk 4\n#0 @0 o4 $FB $02 $06 $00 $04\n c4",
+			"0,4,0,4,0,4,0,4",
+		],
+	] as const) {
+		const after = expectFix(name, text, "SST0519", fixed);
+		check(`${name}: the walk could not follow it`, stepsOf(song(text)) === "null", stepsOf(song(text)));
+		check(`${name}: and now steps through the list`, stepsOf(after) === heard, stepsOf(after));
+	}
+
+	// The duration stays, as the inspector's Off keeps it.
+	const off = expectFix(
+		"nothing but loop points",
+		"#amk 4\n#0 @0 o4 $FB $02 $06 $80 $80 c4",
+		"SST0519",
+		"#amk 4\n#0 @0 o4 $FB $00 $06 c4",
+	);
+	check(
+		"nothing but loop points: is Off",
+		stepsOf(off) === "null" && off?.timeline?.notes[0]?.state.arpeggio === false,
+	);
+	check(
+		"and says so",
+		fixesOf(song("#amk 4\n#0 @0 o4 $FB $02 $06 $80 $80 c4"), "SST0519")[0]?.summary.includes("turns the arpeggio off"),
+	);
+}
+
+expectNoFix("a loop point a replacement wrote", '#amk 4\n"mark=$80"\n#0 @0 o4 $FB $03 $06 $00 $04 mark c4', "SST0519");
 
 /**
  * The fix lowers the governing `$F1`'s feedback to a value that fades and one step past it does

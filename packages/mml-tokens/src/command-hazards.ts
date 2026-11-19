@@ -1,4 +1,4 @@
-/** The command hazards: commands that compile clean and misbehave — `$F7`'s dead slot, an unreachable `$DD`, `#am4`'s `$E4`, an arpeggio's dead loop points. */
+/** The command hazards: commands that compile clean and misbehave — `$F7`'s dead slot, an unreachable `$DD`, `#am4`'s `$E4`, an arpeggio's dead loop points and one looping past its end. */
 
 import type { Command, NoteLengthSegment, Token, TokenIndex } from "./tokens";
 import type { Diagnostic, Span } from "@amk/core/types";
@@ -9,12 +9,13 @@ import { commandScope, isPercussionInstrument } from "./commands/in-force";
 /**
  * Diagnostics for bytes that compile without a word and then break the song.
  *
- * Four findings, and what puts them together is that the compiler is silent on
- * all four: `$F7` is a command this driver never implemented, a `$DD` the
+ * Five findings, and what puts them together is that the compiler is silent on
+ * all five: `$F7` is a command this driver never implemented, a `$DD` the
  * read-ahead cannot reach is dispatched into the same empty slot, `#am4`
- * rewrites a `$E4` on its way past, and an `$FB` list keeps only the last of its
- * loop points. AddmusicK builds every one of them cleanly, so nothing here can
- * be an `AMK` code.
+ * rewrites a `$E4` on its way past, an `$FB` list keeps only the last of its
+ * loop points, and one ending in a loop point plays the song after it as
+ * offsets. AddmusicK builds every one of them cleanly, so nothing here can be
+ * an `AMK` code.
  *
  * A pure pass over the scanner's output, as `echo-hazards.ts` is, and read off
  * the undebounced scan for the same reason: a byte written in the wrong place is
@@ -40,8 +41,34 @@ const CODE_AM4_TRANSPOSE = "SST0508";
 /** An `$FB` list with loop points before its last, which the driver steps over. */
 const CODE_DEAD_LOOP_POINTS = "SST0517";
 
+/** An `$FB` list ending in a loop point, which sends the driver past the list. */
+const CODE_LOOP_PAST_END = "SST0519";
+
 /** The byte that marks a loop point in an `$FB` list (`Commands.asm:1212-1213`). */
 const ARPEGGIO_LOOP_POINT = 0x80;
+
+/**
+ * How many loop points end a written `$FB` sequence, 0 for anything else.
+ *
+ * The last of them sets the loop point to the count (`.setLoopPoint`, `Commands.asm:1216-1220`), so
+ * at the wrap `.normal` reads the byte after the list (`Commands.asm:1196-1213`): the song after the
+ * command, played as offsets. A list of nothing but loop points goes the same way, on its first
+ * step. A list still being written is not judged, since its next entry may be a note.
+ */
+export function trailingLoopPoints(command: Command): number {
+	const count = command.args[0]?.value ?? 0;
+	if (command.vcmd !== VCMD.Arpeggio || !command.complete || count === 0 || count >= 0x80) {
+		return 0;
+	}
+
+	const entries = command.args.slice(2).map((arg) => arg.value);
+	let trailing = 0;
+	while (trailing < entries.length && entries[entries.length - 1 - trailing] === ARPEGGIO_LOOP_POINT) {
+		trailing++;
+	}
+
+	return trailing;
+}
 
 /**
  * The entries of each loop point an `$FB` list holds before its last, which the driver passes over
@@ -53,8 +80,8 @@ const ARPEGGIO_LOOP_POINT = 0x80;
  * count, past every marker, so the loop point in force at every wrap is the one after the last,
  * and an earlier marker takes no step and changes nothing.
  *
- * A list that is nothing but markers, or ends in one, is left to the arpeggio inspector, which names
- * those as the hazards they are; so is a list still being written, whose last entry is not yet known.
+ * A list that is nothing but markers, or ends in one, is {@link trailingLoopPoints}' finding instead,
+ * and a list still being written, whose last entry is not yet known, is neither's.
  */
 export function deadLoopPoints(command: Command): number[] {
 	const count = command.args[0]?.value ?? 0;
@@ -537,13 +564,13 @@ function describeBend(anchor: BendAnchor): string {
 /**
  * Every command in the document that compiles clean and then misbehaves.
  *
- * Only the `$FB` finding waits for `complete`, as `echoHazards` does. That guard
+ * Only the `$FB` findings wait for `complete`, as `echoHazards` does. That guard
  * is about a warning flashing through the middle of writing a good command, and no
  * argument redeems a `$F7` or moves a `$DD` off the byte in front of it — a
  * slide's duration not yet written holds no later one back — so there is no
  * half-written state either finding would be wrong about. An `$FB` list's last
- * entry decides which inspector hazard it is instead, and is not known until it
- * is written.
+ * entry decides which of its two findings it raises, if either, and is not known
+ * until it is written.
  */
 export function commandHazards(index: TokenIndex): Diagnostic[] {
 	const diagnostics: Diagnostic[] = [];
@@ -580,6 +607,16 @@ export function commandHazards(index: TokenIndex): Diagnostic[] {
 				severity: "warning",
 				code: CODE_AM4_TRANSPOSE,
 				message: SST["0508"](),
+				span: { ...command.span },
+			});
+			continue;
+		}
+
+		if (trailingLoopPoints(command) > 0) {
+			diagnostics.push({
+				severity: "severe",
+				code: CODE_LOOP_PAST_END,
+				message: SST["0519"](),
 				span: { ...command.span },
 			});
 			continue;

@@ -134,6 +134,15 @@ considered there and moved away from, with the reason. The rule carries one inde
   the `$FB` selected, nothing in the source or the Problems list said so, and the sentence had no
   answer to press. The driver passes over every marker before the last without taking a step
   (`Commands.asm:1211-1220`), so deleting them is a fix that leaves the music alone: it is
-  `SST0517` (`command-hazards.ts`) on the whole run, with that fix in `hazard-fixes.ts`. The panel's
-  `hazard` keeps the two shapes a button must not produce, a list that ends in a marker or is
-  nothing else, and `SST0517` leaves both to it.
+  `SST0517` (`command-hazards.ts`) on the whole run, with that fix in `hazard-fixes.ts`. A list that
+  ends in a marker or is nothing else is `SST0519`'s, and `SST0517` leaves both to it.
+- **The arpeggio inspector warning of a loop point in the last slot, and of a list of nothing
+  else** — the panel's `hazard` said these as two sentences, the second claiming the driver hangs.
+  It does not: the last marker sets the loop point to the count (`Commands.asm:1216-1220`), so at
+  the wrap the driver reads the song after the list as offsets (`:1196-1213`), and a list of
+  nothing but markers is that same shape on its first step. Said only with the `$FB` selected, with
+  nothing in the source or the Problems list and no answer to press, as the several-loop-points
+  sentence was. It is `SST0519` (`trailingLoopPoints`, `command-hazards.ts`), severe on the whole
+  run, whose fix deletes the markers the list ends in and lowers the count; a list left empty keeps
+  its duration and is Off. `hazard` is gone, and `canMark` still keeps the last slot from offering
+  a marker.

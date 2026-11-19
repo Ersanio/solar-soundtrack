@@ -1,14 +1,14 @@
 /**
  * Fixes to the bytes that compile clean and break the song: a runaway echo's feedback lowered, a
  * dead `$F7` deleted, a `$DD` moved back against the note it was written to ride on, and an
- * arpeggio's earlier loop points deleted.
+ * arpeggio's earlier loop points deleted, and the ones it ends in.
  */
 
 import { VCMD } from '@amk/core/hardcoded-tables';
 import { hex2 } from '@amk/core/hex';
 import { FIR_TAPS, type FirTaps, echoStability, signedByte } from '@amk/spc/fir';
 import type { Command } from '@amk/tokens';
-import { bendAnchor, deadLoopPoints } from '@amk/tokens/command-hazards';
+import { bendAnchor, deadLoopPoints, trailingLoopPoints } from '@amk/tokens/command-hazards';
 import { builtInTaps, echoDelayBefore } from '@amk/tokens/echo-hazards';
 import {
   argEditable,
@@ -138,6 +138,45 @@ function deadLoopPointsFix(request: FixRequest): Fix[] {
 }
 
 /**
+ * SST0519: the loop points the list ends in deleted and the count lowered to match, so the list
+ * wraps to the loop point before them, or to its start. A list of nothing else is left with a count
+ * of `$00` and its duration, which is Off as the inspector writes it.
+ */
+function loopPastEndFix(request: FixRequest): Fix[] {
+  const song = request.context.live;
+  const command = commandOf(song, request);
+  if (command?.vcmd !== VCMD.Arpeggio || !commandRewritable(command)) {
+    return [];
+  }
+
+  const trailing = trailingLoopPoints(command);
+  const count = command.args[0]?.value;
+  const dropped = command.args.slice(command.args.length - trailing);
+  if (
+    trailing === 0 ||
+    count !== command.args.length - 2 ||
+    !argEditable(command, 0) ||
+    dropped.some((arg) => arg.replacement !== undefined)
+  ) {
+    return [];
+  }
+
+  const kept = count - trailing;
+  const summary =
+    kept === 0
+      ? $localize`:@@output.fix.arpeggio-off:output.fix.arpeggio-off`
+      : trailing === 1
+        ? $localize`:@@output.fix.trailing-loop-points.one:output.fix.trailing-loop-points.one`
+        : $localize`:@@output.fix.trailing-loop-points.other:output.fix.trailing-loop-points.other ${trailing}:count:`;
+  return [
+    makeFix(song.text, summary, [
+      spliceArg(song.text, command, 0, argumentText(command, kept)),
+      ...dropped.map((arg) => spliceOut(song.text, arg.span)),
+    ]),
+  ];
+}
+
+/**
  * The feedback nearest `feedback` on its own side of zero, and below it, that fades through
  * `taps`; 0 always does.
  */
@@ -191,7 +230,7 @@ function runawayEcho(request: FixRequest): Fix[] {
 }
 
 export const hazardFixes = {
-  codes: new Set(['SST0500', 'SST0501', 'SST0506', 'SST0507', 'SST0517']),
+  codes: new Set(['SST0500', 'SST0501', 'SST0506', 'SST0507', 'SST0517', 'SST0519']),
   fixes(request: FixRequest): readonly Fix[] {
     switch (request.diagnostic.code) {
       case 'SST0506':
@@ -200,6 +239,8 @@ export const hazardFixes = {
         return strandedBend(request);
       case 'SST0517':
         return deadLoopPointsFix(request);
+      case 'SST0519':
+        return loopPastEndFix(request);
       default:
         return runawayEcho(request);
     }

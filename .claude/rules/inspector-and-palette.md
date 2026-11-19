@@ -55,3 +55,5 @@ A new entry goes there, with its line here, in the same change.
 - **The vibrato readout measured from the emitted byte** — `vibrato-swing.ts`, `NoteAddress.written`
 - **The arpeggio inspector stating that several loop points are written** — `hazard`, `SST0517`,
   `command-hazards.ts`, `hazard-fixes.ts`
+- **The arpeggio inspector warning of a loop point in the last slot, and of a list of nothing
+  else** — `hazard`, `SST0519`, `trailingLoopPoints`, `canMark`, `Commands.asm:1216-1220`

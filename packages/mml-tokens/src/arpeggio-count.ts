@@ -142,16 +142,16 @@ function swallowedCommand(notes: readonly number[], refused: readonly number[], 
 }
 
 /**
- * A sequence the driver cannot play: a loop point in the last slot sends it past the end, and one
- * of nothing but loop points never reaches a note (`Commands.asm:1177-1224`).
+ * A sequence the driver cannot play: a loop point in the last slot, a list of nothing but loop
+ * points among them, sends it past the end and into the song after it (`SST0519`).
  */
-function hangs(notes: readonly number[]): boolean {
-	return notes.length > 0 && (notes[notes.length - 1] === LOOP_POINT || notes.every((note) => note === LOOP_POINT));
+function loopsPastEnd(notes: readonly number[]): boolean {
+	return notes.length > 0 && notes[notes.length - 1] === LOOP_POINT;
 }
 
 /** The count, or `null` where it would not be a sequence or would be one the driver cannot play. */
 function fitFor(notes: readonly number[]): number | null {
-	return notes.length === 0 || notes.length > MAX_COUNT || hangs(notes) ? null : notes.length;
+	return notes.length === 0 || notes.length > MAX_COUNT || loopsPastEnd(notes) ? null : notes.length;
 }
 
 /** What one `$FB` gets wrong about its count, or `null` where nothing does. */

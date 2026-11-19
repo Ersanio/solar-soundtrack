@@ -137,9 +137,7 @@ export class ArpeggioCommand {
   protected readonly notes = computed(() => {
     const shown = this.shown();
     const all = this.args().slice(2);
-    // A marker in the last slot sends the loop index past the end, and a list
-    // with only one other entry would leave nothing but markers once that one is
-    // cleared. Both are hangs, so neither slot offers the button.
+    // A marker in the last slot sends the loop index past the end (SST0519), so that slot has no button.
     const markable = this.canResize();
     return all.slice(0, MAX_ROWS).map((value, index) => {
       const showing = shown[index + 2] ?? value;
@@ -155,31 +153,6 @@ export class ArpeggioCommand {
         canMark: markable && index < all.length - 1,
       };
     });
-  });
-
-  /**
-   * The two shapes that break the driver rather than merely surprising it.
-   *
-   * A marker in the last slot sets the loop index past the end of the list, and
-   * the walker then reads the song data after the command as note deltas. A list
-   * of nothing but markers never lands on a note at all and spins forever with
-   * the driver wedged. Neither is worth letting a button produce.
-   */
-  protected readonly hazard = computed(() => {
-    const notes = this.args().slice(2);
-    if (notes.length === 0) {
-      return null;
-    }
-
-    if (notes.every((value) => value === LOOP_MARKER)) {
-      return $localize`:@@inspector.arpeggio.every-entry-is-a-loop:inspector.arpeggio.every-entry-is-a-loop`;
-    }
-
-    if (notes[notes.length - 1] === LOOP_MARKER) {
-      return $localize`:@@inspector.arpeggio.a-loop-point-in-the:inspector.arpeggio.a-loop-point-in-the`;
-    }
-
-    return null;
   });
 
   protected readonly omitted = computed(() => Math.max(0, this.args().length - 2 - MAX_ROWS));
