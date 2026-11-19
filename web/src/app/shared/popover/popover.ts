@@ -38,7 +38,13 @@ import { IconClose } from '../icons/icon-close';
 })
 export class Popover {
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
-  private readonly trigger = viewChild.required<ElementRef<HTMLButtonElement>>('trigger');
+  /**
+   * `read: ElementRef` because the trigger hosts `amk-button`: a reference on a
+   * component's host resolves to the component, which has no `nativeElement`.
+   */
+  private readonly trigger = viewChild.required<Button, ElementRef<HTMLButtonElement>>('trigger', {
+    read: ElementRef,
+  });
 
   /** The panel's heading. */
   readonly heading = input.required<string>();
