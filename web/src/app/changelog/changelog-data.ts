@@ -11,8 +11,9 @@ export const CHANGELOG: readonly ChangelogEntry[] = [
   {
     date: '19 November 2026',
     items: [
-      'Song Inspector: channel and sample levels, loudness, clipping, echo and a spectrogram, over the whole song',
-      'Audio Visualization: a live spectrum, oscilloscopes and a stereo vectorscope',
+      'Add Song Inspector: channel and sample levels, loudness, clipping, echo and a spectrogram, over the whole song',
+      'Add Audio Visualization: a live spectrum, oscilloscopes and a stereo vectorscope',
+      'Moved build statistics to the Song Inspector',
       'New theme: Praise The (Happy) Sun',
       'Add support for light themes; Certain UI elements automatically change colors to match the theme',
       'Allow changing the piano keys and the sheen on buttons in the theme editor',

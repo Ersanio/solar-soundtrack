@@ -24,7 +24,6 @@ import { AramBudget } from '../aram-budget/aram-budget';
 import { CommandInspector } from '../command-inspector/command-inspector';
 import { DiagnosticsList } from '../diagnostics-list/diagnostics-list';
 import { HexDump } from '../hex-dump/hex-dump';
-import { StatsGrid } from '../stats-grid/stats-grid';
 
 const BUILD_KEY = 'solar-soundtrack.build';
 const PROBLEMS_KEY = 'solar-soundtrack.problems';
@@ -44,7 +43,6 @@ const PROBLEMS_KEY = 'solar-soundtrack.problems';
     IconChevronDown,
     IconChevronRight,
     Section,
-    StatsGrid,
   ],
   templateUrl: './output-pane.html',
   host: { class: 'flex min-h-0 min-w-0 flex-col' },

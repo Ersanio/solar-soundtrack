@@ -40,7 +40,7 @@ stay true of `EditorStore` and the write-back path is `.claude/rules/state-and-e
 | `src/app/state/`        | Thirteen `@Service()` singletons in dependency order, and the transport's clock                              |
 | `src/app/editor/`       | The editor pane and its chrome: top bar, transport, ARAM meter, mixer, palette, CodeMirror adapter           |
 | `src/app/editor/views/` | What the pane's tabs switch between: source, sample library, piano roll, Song Inspector, Audio Visualization |
-| `src/app/output/`       | The sidebar: the command and loop inspectors, stats, the ARAM budget, the hex dump, diagnostics              |
+| `src/app/output/`       | The sidebar: the command and loop inspectors, the ARAM budget, the hex dump, diagnostics                     |
 | `src/app/status-bar/`   | The status bar: compile status, the problems count, the development notice, the credit                       |
 | `src/app/shared/`       | Form controls, toggles, sections, popovers, tabs, icons, chart helpers                                       |
 | `src/app/util/`         | Formatting, IndexedDB, `clamp`                                                                               |
@@ -72,7 +72,7 @@ the image by `spctest`. **There is no fallback address** — until the driver lo
 blocked rather than run against a guess.
 
 `EditorStore` debounces typing (150 ms) into a `committed` signal that a `computed` compiles.
-Diagnostics, stats, the ARAM budget and the hex dump are all `computed` off that one result.
+Diagnostics, the build statistics, the ARAM budget and the hex dump are all `computed` off that one result.
 `assembleSpc()` is a method rather than a `computed` because it copies 64 KiB of ARAM plus every
 sample — wasted work on each keystroke.
 
@@ -108,7 +108,7 @@ numbers, where CodeMirror's undo history is not something anything could hand ba
 `output/output-pane/` is three sections, in the order a porter needs them. **Inspector** is first —
 the command inspector, with the loop inspector under it — because it is what a porter edits with,
 and it answers every click in the source and every click on a bar. **Build** is collapsible under
-it: the stats, the ARAM budget and the hex dump, read once a session and folded away the rest of
+it: the ARAM budget and the hex dump, read once a session and folded away the rest of
 the time. **Problems** is pinned below the scroll column with a count badge, so a diagnostic stays
 in view whatever height the inspector takes. Each is an `amk-section`, and whether Build and
 Problems are open is persisted (`solar-soundtrack.build`, `solar-soundtrack.problems`).
@@ -245,7 +245,7 @@ layout maths and the transport's clock — anything here that is arithmetic rath
 ## Panels build view models, not methods
 
 A `computed` of rows with everything resolved, rather than a method called per row in the template —
-see `sample-browser.ts`, `aram-budget.ts` and `stats-grid.ts`. `@angular-eslint`'s
+see `sample-browser.ts`, `aram-budget.ts` and `build-stats.ts`. `@angular-eslint`'s
 `template/no-call-expression` is the rule that would enforce this, and it cannot be used in a signals
 codebase where every read is a call; the structure is what keeps the bug out instead.
 

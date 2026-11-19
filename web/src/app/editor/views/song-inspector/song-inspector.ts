@@ -4,6 +4,7 @@ import { Section } from '../../../shared/section/section';
 import { StatTile } from '../../../shared/stat-tile/stat-tile';
 import { Toolbar } from '../../../shared/toolbar/toolbar';
 import { SongAnalyzer } from '../../../state/song-analyzer';
+import { BuildStats } from './build-stats/build-stats';
 import { InspectorTimeline } from './inspector-timeline/inspector-timeline';
 import { dbfs, lufs, percent } from './inspector-units';
 import { SampleUsage } from './sample-usage/sample-usage';
@@ -18,7 +19,7 @@ import { SampleUsage } from './sample-usage/sample-usage';
  */
 @Component({
   selector: 'amk-song-inspector',
-  imports: [Toolbar, StatTile, Section, InspectorTimeline, SampleUsage],
+  imports: [Toolbar, StatTile, Section, BuildStats, InspectorTimeline, SampleUsage],
   templateUrl: './song-inspector.html',
   host: { class: 'flex min-h-0 min-w-0 flex-col' },
 })
@@ -26,6 +27,7 @@ export class SongInspector {
   protected readonly analyzer = inject(SongAnalyzer);
 
   protected readonly text = {
+    build: $localize`:@@analysis.section.build:analysis.section.build`,
     timeline: $localize`:@@analysis.section.timeline:analysis.section.timeline`,
     samples: $localize`:@@analysis.section.samples:analysis.section.samples`,
   };

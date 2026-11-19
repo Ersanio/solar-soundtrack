@@ -264,7 +264,7 @@ module.exports = defineConfig([
       //
       // So that class of bug is kept out structurally instead: panels build a
       // `computed` of view models with everything resolved — see the `rows` in
-      // sample-browser.ts, aram-budget.ts and stats-grid.ts — rather than
+      // sample-browser.ts, aram-budget.ts and build-stats.ts — rather than
       // calling a method per row.
     },
   },

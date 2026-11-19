@@ -605,6 +605,12 @@ something in the directory, which load by themselves when such a file is opened.
 
 - `slot-row.ts` — One slot of an opened bank.
 
+## web/src/app/editor/views/song-inspector/build-stats
+
+**Rules:** `song-inspector.md`
+
+- `build-stats.ts` — The Song Inspector's build statistics: sizes, addresses and lengths from the compile, as stat tiles.
+
 ## web/src/app/editor/views/song-inspector/inspector-timeline
 
 **Rules:** `song-inspector.md`
@@ -853,10 +859,6 @@ something in the directory, which load by themselves when such a file is opened.
 ## web/src/app/output/output-pane
 
 - `output-pane.ts` — The sidebar: the inspector, a collapsible Build section under it, and Problems pinned beneath the scroll column so it stays in view whatever the inspector's height.
-
-## web/src/app/output/stats-grid
-
-- `stats-grid.ts` — The Build section's grid of stat tiles: sizes, addresses and lengths from the compile.
 
 ## web/src/app/shared/bit-toggles
 

@@ -13,7 +13,7 @@ list disagrees with `web/.claude/CLAUDE.md` or an installed Angular skill, this 
 
 1. **A folder per component**, `kebab-name/kebab-name.ts` and `kebab-name.html`, under the area it
    belongs to (`web/CLAUDE.md`, Layout). No `.spec.ts`, no stylesheet.
-2. **Selector prefix `amk`**: `amk-stats-grid` for an element; an attribute selector on a native
+2. **Selector prefix `amk`**: `amk-build-stats` for an element; an attribute selector on a native
    element where the element matters (`button[amk-toggle]`); and inside an `<svg>` always an
    attribute on a real `<g>` with the template's elements prefixed `svg:`
    (`.claude/rules/piano-roll-architecture.md`, Files and components). ESLint enforces the prefix.
@@ -32,7 +32,7 @@ list disagrees with `web/.claude/CLAUDE.md` or an installed Angular skill, this 
   imperative sink (storage, the player, CodeMirror) and carries a `// Sanctioned effect:` comment
   saying which.
 - **Build a view model, not methods.** A `computed` of rows with everything resolved; the template
-  calls nothing per row (`stats-grid.ts`, `aram-budget.ts`, `sample-rows.ts`). The lint rule that
+  calls nothing per row (`build-stats.ts`, `aram-budget.ts`, `sample-rows.ts`). The lint rule that
   would enforce it is off, so the structure is what keeps the bug out.
 - **State lives in the `@Service()` singletons in `web/src/app/state/`** and flows one way
   (`DriverStore` → `SampleStore` → `EditorStore` → `Playback`). A new service uses `@Service()`,
