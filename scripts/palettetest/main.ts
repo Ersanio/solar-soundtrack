@@ -43,7 +43,7 @@
  *    each play the same number of notes either way.
  *
  * 6. **A hazard the compiler is silent about is said somewhere, or the byte is
- *    not offered.** `SST0506`-`SST0508` and the catalogue are held to the same
+ *    not offered.** `SST0506`-`SST0508`, `SST0517` and the catalogue are held to the same
  *    set at every dialect: a `caveat` with no diagnostic behind it is a warning
  *    nothing checks, and a diagnostic no button warns of is a hazard the palette
  *    writes in silence. Neither half can be read off the other, so the iff is

@@ -16,6 +16,7 @@ export const CHANGELOG: readonly ChangelogEntry[] = [
       'Allow changing the piano keys and the sheen on buttons in the theme editor',
       "Warn when a note's arpeggio, trill or glissando reaches past the instrument's playable pitch range",
       'Warn when a note is too short for its arpeggio to play it at all',
+      'Warn when an arpeggio has more than one loop point, and offer to auto-fix it',
     ],
   },
   {

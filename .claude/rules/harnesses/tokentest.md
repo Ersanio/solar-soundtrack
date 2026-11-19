@@ -69,7 +69,10 @@ before the next `$DD` gives its last segment up as a frame of its own; a slide a
 has what is left of the frame from its own tick. A loop call is in that list
 and is why the pass takes the whole `TokenIndex`: `(` raises no command at all, so the command list
 alone cannot see it. `SST0506` is then every `$F7` at every dialect, `SST0507` every slide the
-walk-free answer says is stranded, and `SST0508` a `$E4` under `#am4` and nowhere else. And a remote
+walk-free answer says is stranded, `SST0508` a `$E4` under `#am4` and nowhere else, and `SST0517`
+an `$FB` list holding loop points before its last — a warning on the whole run, but not for a list
+that ends in one or is nothing else, which the arpeggio inspector names, nor for one not yet
+written to its end, nor for a trill's interval. And a remote
 call's `$` wait is an argument whatever it equals: `(!1, 1, $E0)` opens no `$E0`, so the `$ED` after
 it keeps both its arguments, across a line break too, and a call left unclosed ends at the first
 token that is not part of one.

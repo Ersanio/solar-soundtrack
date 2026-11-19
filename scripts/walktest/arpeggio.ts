@@ -36,6 +36,14 @@ section("a note carries the steps of the $FB in force");
 		walked("$FB $04 $06 $00 $80 $04 $07 c4").steps[0] === "0,4,7,4,7,4,7,4",
 		walked("$FB $04 $06 $00 $80 $04 $07 c4").steps[0],
 	);
+	// Each `$80` moves the loop point and takes no step (`Commands.asm:1211-1220`), and a key-on
+	// leaves it standing, so the last is the one every wrap returns to.
+	const twice = walked("$FB $06 $06 $00 $80 $04 $80 $07 $0C c4 c4").steps;
+	check(
+		"an earlier $80 is passed over, and the last is where it loops back to",
+		twice.join(" ") === "0,4,7,12,7,12,7,12 0,4,7,12,7,12,7,12",
+		twice.join(" "),
+	);
 	check(
 		"a negative offset is a signed byte",
 		walked("$FB $02 $06 $00 $F4 c8").steps[0] === "0,-12,0,-12",

@@ -33,9 +33,10 @@ partial UI stays populated. **The prefix says whose finding it is, not which fil
 line cited; `SST####` is one `Music.cpp` does not produce at all, so a porter is never told
 AddmusicK objects to something it has no opinion about. The echo hazards, the unreachable-channel
 warning, the tempo shortfall, a tempo, channel setting or song setting that carries over into the
-song's repeat (`SST0510`-`SST0512`), the `#path` notice, the runaway-replacement guard, the three
-command hazards — `$F7`'s dead dispatch slot, a `$DD` no note's read-ahead can reach, and `#am4`'s
-silent `$E4` offset — a remote call that points at no body (`SST0509`), and a note pitched past
+song's repeat (`SST0510`-`SST0512`), the `#path` notice, the runaway-replacement guard, the four
+command hazards — `$F7`'s dead dispatch slot, a `$DD` no note's read-ahead can reach, `#am4`'s
+silent `$E4` offset, and an arpeggio with more than one loop point (`SST0517`) — a remote call that
+points at no body (`SST0509`), and a note pitched past
 what its instrument can play or a vibrato or an arpeggio that takes one there (`SST0513`-`SST0515`),
 and a note an arpeggio never keys on (`SST0516`) are `SST05xx`, which is
 also where a finding goes when the reference does not

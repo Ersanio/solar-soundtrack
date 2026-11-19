@@ -268,4 +268,36 @@ section("command hazards — bytes that compile clean and then break the song");
 		anchorsIn("#amk 4\n(!1)[ o4 c4 $DD $00 $18 $A4 ]\n#0 c4\n") === "rides:48",
 	);
 	check("and a note outside it does not", anchorsIn("#amk 4\no4 c4\n(!1)[ $DD $00 $18 $A4 ]\n#0 d4\n") === "nothing");
+
+	// Stepping onto a `$80` moves the loop point and reads on (`Commands.asm:1211-1220`), so every
+	// marker before the last is passed over and the last is the one in force.
+	const arpeggio = (list: string): string => codesIn(`#amk 4\n#0 @0 o4 $FB ${list} c4\n`);
+	for (const [name, list, want] of [
+		["two loop points", "$06 $06 $00 $80 $04 $80 $07 $0C", "SST0517"],
+		["three, two of them adjacent", "$06 $06 $80 $00 $80 $80 $07 $0C", "SST0517"],
+		["one loop point", "$04 $06 $00 $80 $04 $07", ""],
+		["none", "$03 $06 $00 $04 $07", ""],
+		// The arpeggio inspector names these two as the hazards they are.
+		["two, the last in the last slot", "$04 $06 $00 $80 $04 $80", ""],
+		["nothing but loop points", "$02 $06 $80 $80", ""],
+		// A trill's or glissando's one argument is an interval, whatever it equals.
+		["a trill of $80", "$80 $06 $80", ""],
+	] as const) {
+		check(`an arpeggio with ${name} raises ${want || "nothing"}`, arpeggio(list) === want, arpeggio(list));
+	}
+
+	// Until its last entry is written there is no telling which of the three it is.
+	check("a half-written one raises nothing", codesIn("#amk 4\n#0 $FB $05 $06 $00 $80 $04 $80\n") === "");
+
+	const run = "$FB $06 $06 $00 $80 $04 $80 $07 $0C";
+	const written = `#amk 4\n#0 @0 o4 ${run} c4\n`;
+	const loopPoints = commandHazards(tokenize(written));
+	check(
+		"SST0517 is a warning on the whole $FB run, and counts the loop points",
+		loopPoints.length === 1 &&
+			loopPoints[0].severity === "warning" &&
+			written.slice(loopPoints[0].span.start, loopPoints[0].span.end) === run &&
+			loopPoints[0].message.startsWith("This arpeggio has 2 loop points"),
+		JSON.stringify(loopPoints),
+	);
 }

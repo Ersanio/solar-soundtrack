@@ -3895,8 +3895,9 @@ instrToSample[30] = { 00 01 02 03 04 07 08 09 05 0A 0B 01 10 0C 0D 12 0C 11 01  
         <dd>
           <code>$FB $00 $LL</code> off, LL unread · <code>$FB $NN $LL d₁ … d_NN</code> arpeggio, NN
           &lt; <code>$80</code> notes of LL ticks each, dᵢ signed semitone offsets, a
-          <code>$80</code> in the list marks the loop point · <code>$FB $80 $LL $DD</code> trill ·
-          <code>$FB $81 $LL $DD</code> glissando.
+          <code>$80</code> in the list marks the loop point — the last one written, each moving it
+          without a step (<code>Commands.asm:1211-1220</code>), so <code>SST0517</code> reports more
+          than one · <code>$FB $80 $LL $DD</code> trill · <code>$FB $81 $LL $DD</code> glissando.
           <span class="cite">hex_command_reference.html:806-853</span>
         </dd>
         <dt>Driver</dt>
@@ -4839,9 +4840,10 @@ EchoFilter1:    $7F $00 $00 $00 $00 $00 $00 $00   ; flat</code></pre>
         <code>VCMD_NAMES</code> still names <code>$F7</code> “write byte”, which is what it was
         meant to be; <code>packages/mml-tokens/src/command-hazards.ts</code> raises
         <code>SST0506</code> wherever one is written, saying the slot is <code>$0000</code> and the
-        SPC dies. A <code>$DD</code> no note’s read-ahead can reach is <code>SST0507</code>, and
-        <code>#am4</code>'s silent <code>$E4</code> offset is <code>SST0508</code> —
-        <code>availability.ts</code> answers to the compiler's diagnostics and none of the three
+        SPC dies. A <code>$DD</code> no note’s read-ahead can reach is <code>SST0507</code>,
+        <code>#am4</code>'s silent <code>$E4</code> offset is <code>SST0508</code>, and an
+        <code>$FB</code> list with loop points before its last is <code>SST0517</code> —
+        <code>availability.ts</code> answers to the compiler's diagnostics and none of the four
         produces one, so these are the editor's own findings rather than AddmusicK's. The catalogue
         in <code>web/src/app/editor/command-palette/catalog.ts</code> carries the
         <code>$DD</code> and <code>$E4</code> notes as a <code>caveat</code>, which is the same

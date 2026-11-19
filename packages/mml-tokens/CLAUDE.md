@@ -9,18 +9,18 @@ an echo will run away. Nothing else. No CodeMirror, no Angular, no third-party d
 `TOKEN_TAGS` holds `@lezer/highlight` tag _names_ as plain strings so the adapter can live in the
 app.
 
-| Module                     | What it is                                                                       |
-| -------------------------- | -------------------------------------------------------------------------------- |
-| `tokens.ts`                | The scanner: `step`, `tokenize`, `Command`, `InstrumentDefinition`               |
-| `edits.ts`                 | Splices that rewrite a command in the source it was scanned from                 |
-| `dialect.ts`               | What was in force at a point in the song — dialect, tempo, v-table               |
-| `echo-hazards.ts`          | Diagnostics for an echo that compounds instead of decaying                       |
-| `command-hazards.ts`       | Bytes that compile clean and then break the song: `$F7`, a stranded `$DD`, `$E4` |
-| `fir-override.ts`          | Which `$F5`s a later `$F1` throws away                                           |
-| `commands/`                | What each argument _means_, in a form a panel can render and edit                |
-| `commands/availability.ts` | Which dialects will take a command, for a palette asking before the text exists  |
-| `commands/loops.ts`        | Where a song's brackets are, what each construct repeats, and what it names      |
-| `commands/remote.ts`       | Remote code calls and resets, read off the text, and the body a call runs        |
+| Module                     | What it is                                                                                                 |
+| -------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `tokens.ts`                | The scanner: `step`, `tokenize`, `Command`, `InstrumentDefinition`                                         |
+| `edits.ts`                 | Splices that rewrite a command in the source it was scanned from                                           |
+| `dialect.ts`               | What was in force at a point in the song — dialect, tempo, v-table                                         |
+| `echo-hazards.ts`          | Diagnostics for an echo that compounds instead of decaying                                                 |
+| `command-hazards.ts`       | Bytes that compile clean and then break the song: `$F7`, a stranded `$DD`, `$E4`, `$FB`'s dead loop points |
+| `fir-override.ts`          | Which `$F5`s a later `$F1` throws away                                                                     |
+| `commands/`                | What each argument _means_, in a form a panel can render and edit                                          |
+| `commands/availability.ts` | Which dialects will take a command, for a palette asking before the text exists                            |
+| `commands/loops.ts`        | Where a song's brackets are, what each construct repeats, and what it names                                |
+| `commands/remote.ts`       | Remote code calls and resets, read off the text, and the body a call runs                                  |
 
 ## A resumable scanner, not a second parser
 
@@ -158,11 +158,12 @@ upstream has an opinion to report. That is why the echo diagnostics are `SST05xx
 anything: the prefix is the claim that AddmusicK would say nothing here.
 
 That is the band less the parser's own `SST0505` and `SST0509` (`.claude/rules/compiler.md`), and what puts it under `SST` is that **`Music.cpp` produces none of them**:
-`SST0500`/`SST0501` and `SST0506`-`SST0508` here, `SST0502` in `@amk/spc`, `SST0503` and
-`SST0510`-`SST0512` in the app, and `SST0504` for a `#path` this editor deliberately ignores. Nine of these eleven are `severe` because what
+`SST0500`/`SST0501`, `SST0506`-`SST0508` and `SST0517` here, `SST0502` in `@amk/spc`, `SST0503` and
+`SST0510`-`SST0512` in the app, and `SST0504` for a `#path` this editor deliberately ignores. Nine of these twelve are `severe` because what
 they report compiles cleanly and then misbehaves on playback, but the severity is a property of each
 rather than of the range — `SST0504` is `info`, since nothing about that song misbehaves anywhere,
-and `SST0508` is a plain `warning`, since a song a semitone out plays perfectly well.
+and `SST0508` and `SST0517` are plain warnings, since a song a semitone out plays perfectly well
+and an arpeggio's earlier loop points are bytes the driver steps over.
 
 There is one blind spot, left alone deliberately: a replacement collapses everything it expands to
 onto its use site, so a `$F5` and a `$F1` written inside the _same_ macro share a `span.start` and

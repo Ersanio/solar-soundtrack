@@ -1,10 +1,10 @@
-/** `fixtest`: a dead `$F7` deleted, a stranded `$DD` moved back to its note, and a runaway echo's feedback lowered as far as it must go and no further. */
+/** `fixtest`: a dead `$F7` deleted, a stranded `$DD` moved back to its note, an arpeggio's dead loop points deleted, and a runaway echo's feedback lowered as far as it must go and no further. */
 
 import { echoStability, signedByte } from "@amk/spc/fir";
 import { builtInTaps } from "@amk/tokens/echo-hazards";
 import { applied } from "../../web/src/app/output/diagnostics-list/fixes/fix-diff";
 import { check, section } from "../harness";
-import { codes, expectFix, expectNoFix, fixesOf, song } from "./support";
+import { codes, expectFix, expectNoFix, fixesOf, type Song, song } from "./support";
 
 section("a $F7 is deleted with its arguments");
 expectFix("$F7", "#amk 2\n#0 @0 o4 c4 $F7 $00 $01 $02 d4", "SST0506", "#amk 2\n#0 @0 o4 c4 d4");
@@ -35,6 +35,46 @@ expectNoFix("nothing before", "#amk 2\n#0 @0 $DD $00 $08 $A4 o4 c4", "SST0507");
 expectNoFix("across an octave", "#amk 2\n#0 @0 o4 c4 v200 > $DD $00 $08 e d4", "SST0507");
 expectNoFix("across a loop end", "#amk 2\n#0 @0 o4 [c4 d4]2 $DD $00 $08 $A4 e4", "SST0507");
 expectNoFix("behind a slide still running", "#amk 2\n#0 @0 o4 c8 $DD $00 $18 $B0 $DD $00 $18 $B5 d4", "SST0507");
+
+section("an arpeggio's earlier loop points are deleted, and every note steps as it did");
+{
+	/** Each note's arpeggio steps, as the walk follows `HandleArpeggio`. */
+	const stepsOf = (built: Song | null): string =>
+		(built?.timeline?.notes ?? []).map((note) => note.arpeggioSteps?.join(",") ?? "null").join(" ");
+
+	// The second note restarts the list with the loop point the first left standing (`main.asm:2423`).
+	for (const [name, text, fixed, heard] of [
+		[
+			"two loop points",
+			"#amk 4\n#0 @0 o4 $FB $06 $06 $00 $80 $04 $80 $07 $0C c4 c4",
+			"#amk 4\n#0 @0 o4 $FB $05 $06 $00 $04 $80 $07 $0C c4 c4",
+			"0,4,7,12,7,12,7,12",
+		],
+		[
+			"three, two of them adjacent",
+			"#amk 4\n#0 @0 o4 $FB $06 $06 $80 $00 $80 $80 $07 $0C c4 c4",
+			"#amk 4\n#0 @0 o4 $FB $04 $06 $00 $80 $07 $0C c4 c4",
+			"0,7,12,7,12,7,12,7",
+		],
+		[
+			"across a line break, which stays",
+			"#amk 4\n#0 @0 o4 $FB $05 $06 $00 $80\n$04 $80 $07 c4 c4",
+			"#amk 4\n#0 @0 o4 $FB $04 $06 $00\n$04 $80 $07 c4 c4",
+			"0,4,7,7,7,7,7,7",
+		],
+	] as const) {
+		const after = expectFix(name, text, "SST0517", fixed);
+		const before = stepsOf(song(text));
+		check(
+			`${name}: every note steps as it did`,
+			before === `${heard} ${heard}` && stepsOf(after) === before,
+			`${before} | ${stepsOf(after)}`,
+		);
+	}
+}
+
+section("a loop point a replacement wrote is left alone");
+expectNoFix("through a replacement", '#amk 4\n"mark=$80"\n#0 @0 o4 $FB $05 $06 $00 mark $04 $80 $07 c4', "SST0517");
 
 /**
  * The fix lowers the governing `$F1`'s feedback to a value that fades and one step past it does

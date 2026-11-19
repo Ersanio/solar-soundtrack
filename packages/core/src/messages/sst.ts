@@ -66,4 +66,5 @@ export const SST = {
 	"0515.no-true-pitch": (instrument: string) =>
 		$localize`:@@sst.0515.no-true-pitch:sst.0515.no-true-pitch ${instrument}:instrument:`,
 	"0516": (wait: number) => $localize`:@@sst.0516:sst.0516 ${wait}:wait:`,
+	"0517": (count: number) => $localize`:@@sst.0517:sst.0517 ${count}:count:`,
 };

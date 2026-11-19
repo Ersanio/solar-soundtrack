@@ -238,7 +238,8 @@ the note does not outlast and a rate of 0, and nothing for a drum or under noise
 ### `arpeggio.ts`
 
 The steps an `$FB` plays each note at (`WalkNote.arpeggioSteps`, from `@amk/spc/arpeggio`): a
-sequence's offsets in turn and from the start on every note, a `$80` loop point, a negative offset
+sequence's offsets in turn and from the start on every note, a `$80` loop point, an earlier `$80`
+passed over without a step so the last is the one every wrap returns to, a negative offset
 read as a signed byte, a trill starting on its other note, a glissando climbing from its first step
 and ending itself on the next note — on the first under the 1.0.9 hot patch, unknown under a preset
 past the table, never at `$82` and up — a note too short for any step, a trailing `$80` that leaves

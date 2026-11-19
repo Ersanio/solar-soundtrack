@@ -118,8 +118,8 @@ export class ArpeggioCommand {
    * sets the loop index to the position *after* it and immediately advances
    * again ($125F-$1261 in the assembled driver). So after one full pass the
    * **last** marker is the one in force, and every earlier one is unreachable —
-   * which is why the panel offers exactly one and reports rather than rewrites a
-   * source that has several.
+   * which is why the panel offers exactly one, and leaves a source that has
+   * several to SST0517 and its fix.
    */
   private readonly markers = computed(() =>
     this.args()
@@ -177,10 +177,6 @@ export class ArpeggioCommand {
 
     if (notes[notes.length - 1] === LOOP_MARKER) {
       return $localize`:@@inspector.arpeggio.a-loop-point-in-the:inspector.arpeggio.a-loop-point-in-the`;
-    }
-
-    if (this.markers().length > 1) {
-      return $localize`:@@inspector.arpeggio.loop-points-are-written-only:inspector.arpeggio.loop-points-are-written-only ${this.markers().length}:length:`;
     }
 
     return null;

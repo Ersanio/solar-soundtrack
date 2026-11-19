@@ -26,13 +26,13 @@ Three things here are load-bearing in ways the name does not suggest:
   further does not, on the same side of zero, so a fix that lowered it too far would fail as surely
   as one that did not lower it enough.
 
-| Section      | What it pins                                                                                       |
-| ------------ | -------------------------------------------------------------------------------------------------- |
-| `directives` | redundant directives deleted, misplaced ones moved, the target written or switched, `#pad`, `#spc` |
-| `text`       | upper-case notes lowered and a stray character deleted, both to the same bytes                     |
-| `names`      | a sample, group or `#spc` field put right only where exactly one name fits                         |
-| `samples`    | a used sample added to `#samples`, a list written where there was none, `#default` put first       |
-| `hazards`    | `$F7` deleted, a stranded `$DD` moved back to its note, a runaway echo's feedback lowered          |
-| `lengths`    | SST0502's Pad and Trim, each leaving every channel the same length and nothing unreachable         |
-| `repeat`     | a carried setting written again after the `/`, remote code reset, a toggle switched back           |
-| `diff`       | the dialog's rows: kinds, line numbers, context, what is folded, CRLF and long lines               |
+| Section      | What it pins                                                                                                                                                           |
+| ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `directives` | redundant directives deleted, misplaced ones moved, the target written or switched, `#pad`, `#spc`                                                                     |
+| `text`       | upper-case notes lowered and a stray character deleted, both to the same bytes                                                                                         |
+| `names`      | a sample, group or `#spc` field put right only where exactly one name fits                                                                                             |
+| `samples`    | a used sample added to `#samples`, a list written where there was none, `#default` put first                                                                           |
+| `hazards`    | `$F7` deleted, a stranded `$DD` moved back to its note, an arpeggio's earlier loop points deleted with every note's steps unchanged, a runaway echo's feedback lowered |
+| `lengths`    | SST0502's Pad and Trim, each leaving every channel the same length and nothing unreachable                                                                             |
+| `repeat`     | a carried setting written again after the `/`, remote code reset, a toggle switched back                                                                               |
+| `diff`       | the dialog's rows: kinds, line numbers, context, what is folded, CRLF and long lines                                                                                   |

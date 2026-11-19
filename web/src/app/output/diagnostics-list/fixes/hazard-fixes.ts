@@ -1,13 +1,14 @@
 /**
  * Fixes to the bytes that compile clean and break the song: a runaway echo's feedback lowered, a
- * dead `$F7` deleted, and a `$DD` moved back against the note it was written to ride on.
+ * dead `$F7` deleted, a `$DD` moved back against the note it was written to ride on, and an
+ * arpeggio's earlier loop points deleted.
  */
 
 import { VCMD } from '@amk/core/hardcoded-tables';
 import { hex2 } from '@amk/core/hex';
 import { FIR_TAPS, type FirTaps, echoStability, signedByte } from '@amk/spc/fir';
 import type { Command } from '@amk/tokens';
-import { bendAnchor } from '@amk/tokens/command-hazards';
+import { bendAnchor, deadLoopPoints } from '@amk/tokens/command-hazards';
 import { builtInTaps, echoDelayBefore } from '@amk/tokens/echo-hazards';
 import {
   argEditable,
@@ -107,6 +108,36 @@ function strandedBend(request: FixRequest): Fix[] {
 }
 
 /**
+ * SST0517: every loop point before the last deleted and the count lowered to match. The driver
+ * passes over those without taking a step, so the arpeggio plays the same steps.
+ */
+function deadLoopPointsFix(request: FixRequest): Fix[] {
+  const song = request.context.live;
+  const command = commandOf(song, request);
+  if (command?.vcmd !== VCMD.Arpeggio || !commandRewritable(command)) {
+    return [];
+  }
+
+  const dead = deadLoopPoints(command);
+  const count = command.args[0]?.value;
+  if (
+    dead.length === 0 ||
+    count !== command.args.length - 2 ||
+    !argEditable(command, 0) ||
+    !dead.every((entry) => argEditable(command, entry + 2))
+  ) {
+    return [];
+  }
+
+  return [
+    makeFix(song.text, $localize`:@@output.fix.remove-loop-points:output.fix.remove-loop-points`, [
+      spliceArg(song.text, command, 0, argumentText(command, count - dead.length)),
+      ...dead.map((entry) => spliceOut(song.text, command.args[entry + 2].span)),
+    ]),
+  ];
+}
+
+/**
  * The feedback nearest `feedback` on its own side of zero, and below it, that fades through
  * `taps`; 0 always does.
  */
@@ -160,13 +191,15 @@ function runawayEcho(request: FixRequest): Fix[] {
 }
 
 export const hazardFixes = {
-  codes: new Set(['SST0500', 'SST0501', 'SST0506', 'SST0507']),
+  codes: new Set(['SST0500', 'SST0501', 'SST0506', 'SST0507', 'SST0517']),
   fixes(request: FixRequest): readonly Fix[] {
     switch (request.diagnostic.code) {
       case 'SST0506':
         return deadCommand(request);
       case 'SST0507':
         return strandedBend(request);
+      case 'SST0517':
+        return deadLoopPointsFix(request);
       default:
         return runawayEcho(request);
     }

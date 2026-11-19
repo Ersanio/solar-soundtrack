@@ -61,7 +61,7 @@ something in the directory, which load by themselves when such a file is opened.
 
 **Rules:** `compiler.md`, `inspector-and-palette.md`
 
-- `command-hazards.ts` (500+ lines) — The command hazards: commands that compile clean and misbehave — `$F7`'s dead slot, an unreachable `$DD`, `#am4`'s `$E4`.
+- `command-hazards.ts` (500+ lines) — The command hazards: commands that compile clean and misbehave — `$F7`'s dead slot, an unreachable `$DD`, `#am4`'s `$E4`, an arpeggio's dead loop points.
 - `dialect.ts` — What was in force at a point in the song: which dialect the `#amk` / `#am4` / `#amm` markers put it in; tempo; which velocity table `q` reads against, from the hex as well as the directives.
 - `echo-hazards.ts` — The echo hazards: every runaway echo in the document, one diagnostic per command that causes one.
 - `edits.ts` — Rewriting a command in the source it was scanned from — the inverse of `gather`.
@@ -193,7 +193,7 @@ something in the directory, which load by themselves when such a file is opened.
 
 - `diff.ts` — `fixtest`: the diff the fix dialog draws — kinds, line numbers, context and what is folded away.
 - `directives.ts` — `fixtest`: directives deleted, moved, written and switched, `#pad` grown and `#spc` text cut.
-- `hazards.ts` — `fixtest`: a dead `$F7` deleted, a stranded `$DD` moved back to its note, and a runaway echo's feedback lowered as far as it must go and no further.
+- `hazards.ts` — `fixtest`: a dead `$F7` deleted, a stranded `$DD` moved back to its note, an arpeggio's dead loop points deleted, and a runaway echo's feedback lowered as far as it must go and no further.
 - `lengths.ts` — `fixtest`: SST0502's Pad, which makes every channel reach the longest, and Trim, which cuts what the song never reaches.
 - `main.ts` — The Problems list's fixes: each one offered where it should be and nowhere else, writing what it says it writes, and leaving a song that no longer raises what it fixed and raises no new error.
 - `names.ts` — `fixtest`: a sample, group or `#spc` field name put right where exactly one name fits.
@@ -279,7 +279,7 @@ something in the directory, which load by themselves when such a file is opened.
 - `command-reach.ts` — `tokentest`: what a command reaches (`commandScope`), and the parse-time half of what is in force on a note.
 - `dialect.ts` — `tokentest`: the dialect a command is read under: the velocity table, the target markers, `#am4`'s `$ED` and `$E5`, and a command stopping at its argument count.
 - `driver-lengths.ts` — `tokentest`: the scanner agrees with the driver about command lengths.
-- `hazards.ts` — `tokentest`: command hazards, the bytes that compile clean and then break the song.
+- `hazards.ts` (300+ lines) — `tokentest`: command hazards, the bytes that compile clean and then break the song.
 - `hex-arguments.ts` — `tokentest`: a hex command gathers exactly its arguments: counted, incomplete, outside `$DA`-`$FE`, `$FB`'s variable length, and abandoned at a bar line.
 - `instruments-and-divergences.ts` — `tokentest`: `q` and `n` read as hex, the `@` forms, the `#instruments` block, the divergences from AddmusicK pinned on purpose, and a directive's bare-word argument.
 - `letters-and-fades.ts` — `tokentest`: letter commands and their arguments, the comma forms of `t`, `v` and `w` as fades, and the fade arithmetic the inspector label and the clock share.
@@ -294,7 +294,7 @@ something in the directory, which load by themselves when such a file is opened.
 
 **Rules:** `harnesses/*.md`
 
-- `arpeggio.ts` — `walktest`: the steps an `$FB` plays a note at, the driver taking them on the ticks the walk says, and a note it never keys on (`SST0516`).
+- `arpeggio.ts` (300+ lines) — `walktest`: the steps an `$FB` plays a note at, the driver taking them on the ticks the walk says, and a note it never keys on (`SST0516`).
 - `clock-agrees.ts` — `walktest`: the clock and the compiler agree about the songs the compiler can time.
 - `command-lane.ts` — `walktest`: what the roll's command lane holds.
 - `command-lengths.ts` — `walktest`: both packages agree on how long a command is.
@@ -612,7 +612,7 @@ something in the directory, which load by themselves when such a file is opened.
 
 **Rules:** `inspector-and-palette.md`
 
-- `arpeggio-command.ts` (300+ lines) — `$FB` — arpeggio, and the one command whose _length_ you edit.
+- `arpeggio-command.ts` — `$FB` — arpeggio, and the one command whose _length_ you edit.
 
 ## web/src/app/output/command-inspector/arpeggio-note
 
@@ -781,7 +781,7 @@ something in the directory, which load by themselves when such a file is opened.
 - `fix-diff.ts` (300+ lines) — A fix's edits as the rows of a diff: whole lines removed and added, lines changed inside, a little unchanged text around each change, and the rest folded away.
 - `fix-text.ts` — What every family of fixes shares: building a {@link Fix}, finding tokens near a span, and taking a line out.
 - `fixes.ts` — The fixes the Problems list offers: for a diagnostic with one mechanical answer, the edits that make it.
-- `hazard-fixes.ts` — Fixes to the bytes that compile clean and break the song: a runaway echo's feedback lowered, a dead `$F7` deleted, and a `$DD` moved back against the note it was written to ride on.
+- `hazard-fixes.ts` — Fixes to the bytes that compile clean and break the song: a runaway echo's feedback lowered, a dead `$F7` deleted, a `$DD` moved back against the note it was written to ride on, and an arpeggio's earlier loop points deleted.
 - `length-fixes.ts` — SST0502's two fixes, for a song that ends before some of its channels do: Pad lengthens every channel that ends early, so all of it is heard, and Trim cuts what can never be heard, so the song keeps its length.
 - `name-fixes.ts` — Fixes to a name AddmusicK could not find: a sample, a sample group or an `#spc` field whose only fault is letter case, or a sample missing its extension.
 - `repeat-fixes.ts` — Fixes for a setting that carries into the song's repeat (`SST0510`-`SST0512`): the first pass's setting written again where the loop starts, the remote code reset the message names written there, or a toggle switched back at the end of the song.

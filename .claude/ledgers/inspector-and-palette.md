@@ -130,3 +130,10 @@ considered there and moved away from, with the reason. The rule carries one inde
   from `NoteAddress.written`, the row the roll draws the bar on. The bend graph takes the byte only
   because the driver compares a `$DD`'s target against it; a vibrato has no target, only a swing
   either side of whatever is playing.
+- **The arpeggio inspector stating that several loop points are written** — it was read only with
+  the `$FB` selected, nothing in the source or the Problems list said so, and the sentence had no
+  answer to press. The driver passes over every marker before the last without taking a step
+  (`Commands.asm:1211-1220`), so deleting them is a fix that leaves the music alone: it is
+  `SST0517` (`command-hazards.ts`) on the whole run, with that fix in `hazard-fixes.ts`. The panel's
+  `hazard` keeps the two shapes a button must not produce, a list that ends in a marker or is
+  nothing else, and `SST0517` leaves both to it.

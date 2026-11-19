@@ -53,3 +53,5 @@ A new entry goes there, with its line here, in the same change.
 - **The `$DD` bend graph drawn against `o4 c` as a stand-in** — `NoteAddress.note`, `bendAnchor`,
   `slide-start.ts`, `WalkNote.bend`
 - **The vibrato readout measured from the emitted byte** — `vibrato-swing.ts`, `NoteAddress.written`
+- **The arpeggio inspector stating that several loop points are written** — `hazard`, `SST0517`,
+  `command-hazards.ts`, `hazard-fixes.ts`
