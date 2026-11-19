@@ -82,6 +82,17 @@ export class OutputPane {
       : 'flex min-h-0 flex-1 flex-col',
   );
 
+  /** Problems takes the column's space while Build is folded, keeping 30% when the inspector is tall. */
+  private readonly problemsFills = computed(() => !this.buildOpen() && this.problemsOpen());
+
+  protected readonly columnClass = computed(() =>
+    this.problemsFills() ? 'min-h-0 overflow-auto' : 'min-h-0 flex-1 overflow-auto',
+  );
+
+  protected readonly problemsClass = computed(() =>
+    this.problemsFills() ? 'min-h-[30%] flex-1' : 'max-h-[30%] shrink-0',
+  );
+
   protected readonly overflowing = computed(() => (this.store.budget()?.overflowBytes ?? 0) > 0);
 
   protected readonly problemsCount = computed(() => this.store.diagnostics().length);
