@@ -6,6 +6,7 @@ import type { CompileResult, Diagnostic } from "@amk/core/types";
 import { loadDriver } from "@amk/spc/driver";
 import { type SongTimeline, unreachableChannels, walkSong } from "@amk/spc/song-walk";
 import { tokenize } from "@amk/tokens";
+import { arpeggioCounts } from "@amk/tokens/arpeggio-count";
 import { commandHazards } from "@amk/tokens/command-hazards";
 import { echoHazards } from "@amk/tokens/echo-hazards";
 import { applied } from "../../web/src/app/output/diagnostics-list/fixes/fix-diff";
@@ -44,6 +45,7 @@ export function song(text: string): Song {
 		...result.diagnostics,
 		...echoHazards(index.commands),
 		...commandHazards(index),
+		...arpeggioCounts(index, text),
 		...(timeline ? unreachableChannels(timeline, result.noteMap ?? []) : []),
 		...(timeline ? repeatTempo(timeline, result.commandMap ?? []) : []),
 		...(timeline ? repeatSettings(timeline, { result, text }) : []),

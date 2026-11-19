@@ -18,6 +18,7 @@ import { readLoops } from '@amk/tokens/commands/loops';
 import { readRemote, remoteAt } from '@amk/tokens/commands/remote';
 import { echoHazards } from '@amk/tokens/echo-hazards';
 import { commandHazards } from '@amk/tokens/command-hazards';
+import { arpeggioCounts } from '@amk/tokens/arpeggio-count';
 import { songTarget } from '@amk/tokens/dialect';
 import { commandsInForceOf } from './commands-in-force';
 import { type TimelineCommand, commandTimeline } from './command-timeline';
@@ -210,6 +211,7 @@ export class EditorStore {
       ...(this.result()?.diagnostics ?? []), // Compiler diagnostics
       ...echoHazards(this.tokens().commands), // Echo hazard diagnostics
       ...commandHazards(this.tokens()), // Bytes that compile clean and then break the song
+      ...arpeggioCounts(this.tokens(), this.source()), // An $FB count that disagrees with its notes
       ...(timeline ? unreachableChannels(timeline, this.result()?.noteMap ?? []) : []), // Unreachable notes in channels
       ...(timeline ? repeatTempo(timeline, this.result()?.commandMap ?? []) : []), // A tempo that carries into the repeat
       ...(timeline && compiled ? repeatSettings(timeline, compiled) : []), // Settings that carry into the repeat

@@ -24,7 +24,7 @@ clear. Each family is Angular-free so `fixtest` can hold it to the song it leave
   taking the diagnostic's span as a hint, because most spans are wherever the parser was standing
   (`warnOnce` reports at `pos`).
 - **The text a diagnostic indexes is the text its fix is built on.** The scan's own findings
-  (`SST0500`, `SST0501`, `SST0506`, `SST0507`, `SST0517`) use `FixContext.live`; everything the compiler or
+  (`SST0500`, `SST0501`, `SST0506`, `SST0507`, `SST0517`, `SST0518`) use `FixContext.live`; everything the compiler or
   the walk raises uses `FixContext.compiled`, the compiled text and `EditorStore.compiledTokens`,
   which may be one edit behind the document. `Fix.against` names that text. `openFix` forces the
   compile and rebuilds a fix whose text has moved on, and `apply` refuses one that still has.

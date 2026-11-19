@@ -72,7 +72,13 @@ alone cannot see it. `SST0506` is then every `$F7` at every dialect, `SST0507` e
 walk-free answer says is stranded, `SST0508` a `$E4` under `#am4` and nowhere else, and `SST0517`
 an `$FB` list holding loop points before its last — a warning on the whole run, but not for a list
 that ends in one or is nothing else, which the arpeggio inspector names, nor for one not yet
-written to its end, nor for a trill's interval. And a remote
+written to its end, nor for a trill's interval. `SST0518` is an `$FB` sequence whose count
+disagrees with its notes, read as the parser reads the run: short only where something it does not
+read on through ends it, so a comment inside the run and a run at the end of the document raise
+nothing, and over only by bytes it refuses as commands, so a command byte ends the notes over and a
+byte below `$DA` under a legacy target is no note. No count fits where the bytes past it complete a
+counted command byte, where the count would be Off or pass `$7F`, or where the sequence would end on
+a loop point. And a remote
 call's `$` wait is an argument whatever it equals: `(!1, 1, $E0)` opens no `$E0`, so the `$ED` after
 it keeps both its arguments, across a line break too, and a call left unclosed ends at the first
 token that is not part of one.
@@ -94,6 +100,7 @@ name>` runs one section alone.
 | `dialect.ts`                     | The dialect a command is read under: the velocity table, the target markers, `#am4`'s `$ED` and `$E5`, and a command stopping at its argument count.        |
 | `pitch-slide-note.ts`            | `$DD`'s note target and `bendAnchor`, and a remote call's `$` wait read as an argument.                                                                     |
 | `hazards.ts`                     | Command hazards, the bytes that compile clean and then break the song.                                                                                      |
+| `arpeggio-count.ts`              | `SST0518`: an `$FB` sequence one short or over, the count that fits, and where none does or nothing is raised.                                              |
 | `restartability.ts`              | Restartability, that `copyState` copies, that the scanner always makes progress, and the empty document.                                                    |
 | `driver-lengths.ts`              | The scanner agrees with the driver about command lengths.                                                                                                   |
 | `command-reach.ts`               | What a command reaches (`commandScope`), and the parse-time half of what is in force on a note.                                                             |

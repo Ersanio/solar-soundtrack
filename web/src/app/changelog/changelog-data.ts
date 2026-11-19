@@ -17,6 +17,7 @@ export const CHANGELOG: readonly ChangelogEntry[] = [
       "Warn when a note's arpeggio, trill or glissando reaches past the instrument's playable pitch range",
       'Warn when a note is too short for its arpeggio to play it at all',
       'Warn when an arpeggio has more than one loop point, and offer to auto-fix it',
+      "Warn when an arpeggio's note count doesn't match the notes written after it, and offer to auto-fix it",
     ],
   },
   {

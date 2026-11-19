@@ -12,6 +12,7 @@ import type { CompileResult, Diagnostic } from '@amk/core/types';
 import type { SongTimeline } from '@amk/spc/song-walk';
 import type { TokenIndex } from '@amk/tokens';
 import type { Edit } from '@amk/tokens/edits';
+import { arpeggioFixes } from './arpeggio-fixes';
 import { directiveFixes } from './directive-fixes';
 import { hazardFixes } from './hazard-fixes';
 import { lengthFixes } from './length-fixes';
@@ -75,6 +76,7 @@ const FAMILIES: readonly FixFamily[] = [
   nameFixes,
   sampleFixes,
   hazardFixes,
+  arpeggioFixes,
   lengthFixes,
   repeatFixes,
 ];

@@ -21,6 +21,7 @@ await runSections([
 	["names", () => import("./names")],
 	["samples", () => import("./samples")],
 	["hazards", () => import("./hazards")],
+	["arpeggio", () => import("./arpeggio")],
 	["lengths", () => import("./lengths")],
 	["repeat", () => import("./repeat")],
 	["diff", () => import("./diff")],

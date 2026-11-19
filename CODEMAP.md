@@ -61,6 +61,7 @@ something in the directory, which load by themselves when such a file is opened.
 
 **Rules:** `compiler.md`, `inspector-and-palette.md`
 
+- `arpeggio-count.ts` — An `$FB` sequence whose count disagrees with the notes written after it, and the count that fits them.
 - `command-hazards.ts` (500+ lines) — The command hazards: commands that compile clean and misbehave — `$F7`'s dead slot, an unreachable `$DD`, `#am4`'s `$E4`, an arpeggio's dead loop points.
 - `dialect.ts` — What was in force at a point in the song: which dialect the `#amk` / `#am4` / `#amm` markers put it in; tempo; which velocity table `q` reads against, from the hex as well as the directives.
 - `echo-hazards.ts` — The echo hazards: every runaway echo in the document, one diagnostic per command that causes one.
@@ -191,6 +192,7 @@ something in the directory, which load by themselves when such a file is opened.
 
 **Rules:** `harnesses/*.md`, `problems.md`
 
+- `arpeggio.ts` — `fixtest`: an arpeggio's count written as the notes there are, which clears AddmusicK's own errors with it, and left alone where no one count fits.
 - `diff.ts` — `fixtest`: the diff the fix dialog draws — kinds, line numbers, context and what is folded away.
 - `directives.ts` — `fixtest`: directives deleted, moved, written and switched, `#pad` grown and `#spc` text cut.
 - `hazards.ts` — `fixtest`: a dead `$F7` deleted, a stranded `$DD` moved back to its note, an arpeggio's dead loop points deleted, and a runaway echo's feedback lowered as far as it must go and no further.
@@ -275,6 +277,7 @@ something in the directory, which load by themselves when such a file is opened.
 
 **Rules:** `harnesses/*.md`
 
+- `arpeggio-count.ts` — `tokentest`: an `$FB` sequence whose count disagrees with the notes written after it (`SST0518`), and the count that fits.
 - `channels-and-tags.ts` — `tokentest`: comments and strings, directives and channel markers, the channel a command is written under, remote definitions, lookup by offset, and the highlight tags.
 - `command-reach.ts` — `tokentest`: what a command reaches (`commandScope`), and the parse-time half of what is in force on a note.
 - `dialect.ts` — `tokentest`: the dialect a command is read under: the velocity table, the target markers, `#am4`'s `$ED` and `$E5`, and a command stopping at its argument count.
@@ -777,6 +780,7 @@ something in the directory, which load by themselves when such a file is opened.
 
 **Rules:** `problems.md`
 
+- `arpeggio-fixes.ts` — The fix to an arpeggio whose count disagrees with its notes: the count written as the notes there are.
 - `directive-fixes.ts` — Fixes to the song's directives: a redundant one deleted, a misplaced one moved above the channels, the target marker written or switched, `#pad` grown and `#spc` text cut to length.
 - `fix-diff.ts` (300+ lines) — A fix's edits as the rows of a diff: whole lines removed and added, lines changed inside, a little unchanged text around each change, and the rest folded away.
 - `fix-text.ts` — What every family of fixes shares: building a {@link Fix}, finding tokens near a span, and taking a line out.

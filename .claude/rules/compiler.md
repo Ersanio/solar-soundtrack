@@ -1,7 +1,7 @@
 ---
 paths:
   - 'packages/mml-compiler/**'
-  - 'packages/mml-tokens/src/{tokens,dialect,echo-hazards,fir-override}.ts'
+  - 'packages/mml-tokens/src/{tokens,dialect,echo-hazards,fir-override,arpeggio-count}.ts'
   - 'packages/mml-tokens/src/commands/availability.ts'
   - 'packages/core/src/messages/**'
   - 'scripts/selftest/**'
@@ -11,7 +11,7 @@ paths:
 
 Read before changing `packages/mml-compiler`, the `@amk/tokens` scanner, a diagnostic, or the
 scanner-side files that restate the parser's conditions or raise findings of their own
-(`commands/availability.ts`, `echo-hazards.ts`, `fir-override.ts`). Adding a diagnostic is the
+(`commands/availability.ts`, `echo-hazards.ts`, `fir-override.ts`, `arpeggio-count.ts`). Adding a diagnostic is the
 `add-diagnostic` skill; adding or changing a command is `add-command`.
 
 ## `#path`, the one deliberate divergence
@@ -38,7 +38,9 @@ command hazards — `$F7`'s dead dispatch slot, a `$DD` no note's read-ahead can
 silent `$E4` offset, and an arpeggio with more than one loop point (`SST0517`) — a remote call that
 points at no body (`SST0509`), and a note pitched past
 what its instrument can play or a vibrato or an arpeggio that takes one there (`SST0513`-`SST0515`),
-and a note an arpeggio never keys on (`SST0516`) are `SST05xx`, which is
+a note an arpeggio never keys on (`SST0516`), and an `$FB` whose count disagrees with the notes
+written after it (`SST0518`, beside the AMK0151, AMK0152 or AMK0155 AddmusicK raises there without
+saying why) are `SST05xx`, which is
 also where a finding goes when the reference does not
 _finish_ rather than not object: `SST0505` bounds a replacement that expands into itself, and
 AddmusicK grows its buffer forever on the same song, so there is no run to be faithful to and

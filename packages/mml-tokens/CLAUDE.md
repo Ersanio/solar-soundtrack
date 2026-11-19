@@ -17,6 +17,7 @@ app.
 | `echo-hazards.ts`          | Diagnostics for an echo that compounds instead of decaying                                                 |
 | `command-hazards.ts`       | Bytes that compile clean and then break the song: `$F7`, a stranded `$DD`, `$E4`, `$FB`'s dead loop points |
 | `fir-override.ts`          | Which `$F5`s a later `$F1` throws away                                                                     |
+| `arpeggio-count.ts`        | An `$FB` sequence whose count disagrees with the notes written after it, and the count that fits them      |
 | `commands/`                | What each argument _means_, in a form a panel can render and edit                                          |
 | `commands/availability.ts` | Which dialects will take a command, for a palette asking before the text exists                            |
 | `commands/loops.ts`        | Where a song's brackets are, what each construct repeats, and what it names                                |
@@ -158,12 +159,13 @@ upstream has an opinion to report. That is why the echo diagnostics are `SST05xx
 anything: the prefix is the claim that AddmusicK would say nothing here.
 
 That is the band less the parser's own `SST0505` and `SST0509` (`.claude/rules/compiler.md`), and what puts it under `SST` is that **`Music.cpp` produces none of them**:
-`SST0500`/`SST0501`, `SST0506`-`SST0508` and `SST0517` here, `SST0502` in `@amk/spc`, `SST0503` and
-`SST0510`-`SST0512` in the app, and `SST0504` for a `#path` this editor deliberately ignores. Nine of these twelve are `severe` because what
+`SST0500`/`SST0501`, `SST0506`-`SST0508`, `SST0517` and `SST0518` here, `SST0502` in `@amk/spc`, `SST0503` and
+`SST0510`-`SST0512` in the app, and `SST0504` for a `#path` this editor deliberately ignores. Nine of these thirteen are `severe` because what
 they report compiles cleanly and then misbehaves on playback, but the severity is a property of each
 rather than of the range — `SST0504` is `info`, since nothing about that song misbehaves anywhere,
-and `SST0508` and `SST0517` are plain warnings, since a song a semitone out plays perfectly well
-and an arpeggio's earlier loop points are bytes the driver steps over.
+and `SST0508`, `SST0517` and `SST0518` are plain warnings, since a song a semitone out plays perfectly
+well, an arpeggio's earlier loop points are bytes the driver steps over, and an `$FB` count that
+disagrees with its notes stands beside the error AddmusicK already raises there, saying why.
 
 There is one blind spot, left alone deliberately: a replacement collapses everything it expands to
 onto its use site, so a `$F5` and a `$F1` written inside the _same_ macro share a `span.start` and

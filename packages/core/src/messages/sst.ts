@@ -67,4 +67,11 @@ export const SST = {
 		$localize`:@@sst.0515.no-true-pitch:sst.0515.no-true-pitch ${instrument}:instrument:`,
 	"0516": (wait: number) => $localize`:@@sst.0516:sst.0516 ${wait}:wait:`,
 	"0517": (count: number) => $localize`:@@sst.0517:sst.0517 ${count}:count:`,
+	"0518.short": (count: string, written: number) =>
+		$localize`:@@sst.0518.short:sst.0518.short ${count}:count: ${written}:written:`,
+	"0518.none": (count: string) => $localize`:@@sst.0518.none:sst.0518.none ${count}:count:`,
+	"0518.long": (count: string, written: number) =>
+		$localize`:@@sst.0518.long:sst.0518.long ${count}:count: ${written}:written:`,
+	"0518.ambiguous": (count: string, written: number, command: string) =>
+		$localize`:@@sst.0518.ambiguous:sst.0518.ambiguous ${count}:count: ${written}:written: ${command}:command:`,
 };

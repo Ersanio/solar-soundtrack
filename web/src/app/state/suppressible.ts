@@ -69,4 +69,5 @@ export const SUPPRESSIBLE: readonly Suppressible[] = [
   },
   { code: 'SST0516', severity: 'severe', describe: () => [SST['0516'](GAP)] },
   { code: 'SST0517', severity: 'warning', describe: () => [SST['0517'](GAP)] },
+  { code: 'SST0518', severity: 'warning', describe: () => [SST['0518.short'](GAP, GAP)] },
 ];

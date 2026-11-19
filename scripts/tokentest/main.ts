@@ -28,6 +28,7 @@ await runSections([
 	["dialect", () => import("./dialect")],
 	["pitch-slide-note", () => import("./pitch-slide-note")],
 	["hazards", () => import("./hazards")],
+	["arpeggio-count", () => import("./arpeggio-count")],
 	["restartability", () => import("./restartability")],
 	["driver-lengths", () => import("./driver-lengths")],
 	["command-reach", () => import("./command-reach")],
