@@ -1,13 +1,7 @@
-<svg
-  #svg
-  class="block w-full"
-  [attr.height]="height"
-  [attr.viewBox]="viewBox()"
-  (mouseleave)="hover.set(null)"
->
+<svg #svg class="block w-full" [attr.height]="height()" [attr.viewBox]="viewBox()">
   <defs>
     <clipPath [attr.id]="clipId">
-      <rect x="0" y="0" [attr.width]="width()" [attr.height]="height" [attr.rx]="radius" />
+      <rect x="0" y="0" [attr.width]="width()" [attr.height]="height()" [attr.rx]="radius" />
     </clipPath>
   </defs>
 
@@ -18,19 +12,8 @@
         [class]="mark.fill"
         [attr.x]="mark.x"
         [attr.width]="mark.width"
-        [attr.height]="height"
-        (mouseenter)="hover.set(mark)"
-        (mouseleave)="hover.set(null)"
+        [attr.height]="height()"
       />
     }
   </g>
 </svg>
-
-@if (tooltip(); as tip) {
-  <div
-    class="border-edge bg-raised text-ink pointer-events-none absolute bottom-full z-10 mb-1 -translate-x-1/2 rounded border px-2 py-1 font-mono text-xs whitespace-nowrap"
-    [style.left.px]="tip.x"
-  >
-    {{ tip.text }}
-  </div>
-}

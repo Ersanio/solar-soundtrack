@@ -1,7 +1,6 @@
 <button
   type="button"
   class="hover:bg-control/10 flex h-8 shrink-0 cursor-pointer items-center gap-2 rounded-md px-1.5"
-  [title]="breakdown()"
   (click)="requests.revealSection.set('build')"
 >
   <span
@@ -9,12 +8,15 @@
     class="text-ink-muted text-[11px] font-semibold tracking-wide uppercase max-xl:hidden"
     >topbar.aram.aram</span
   >
-  <amk-aram-bar class="w-28" [segments]="segments()" [hoverTip]="false" />
-  <!-- The figure is on the status bar at every width; here it shows only where the row has room. -->
-  <span
-    class="font-mono text-xs tabular-nums whitespace-nowrap max-[107rem]:hidden"
-    [class.text-danger]="overflowing()"
-  >
-    {{ store.freeLabel() }}
+  <span class="relative block w-28">
+    <amk-aram-bar [segments]="segments()" [height]="28" />
+    <!-- Outlined in the darkest surface, so it reads over the pale fills and the dark free one alike. -->
+    <span
+      class="pointer-events-none absolute inset-0 flex items-center justify-center font-mono text-xs leading-none font-semibold tabular-nums whitespace-nowrap [-webkit-text-stroke:3px_var(--color-inset)] [paint-order:stroke_fill]"
+      [class.text-ink]="!overflowing()"
+      [class.text-danger]="overflowing()"
+    >
+      {{ label() }}
+    </span>
   </span>
 </button>

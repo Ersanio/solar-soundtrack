@@ -1,4 +1,4 @@
-import { Component, type ElementRef, computed, input, signal, viewChild } from '@angular/core';
+import { Component, type ElementRef, computed, input, viewChild } from '@angular/core';
 
 import type { BudgetRow } from '@amk/spc/layout';
 import { elementSize } from '../../shared/chart/element-size';
@@ -16,8 +16,6 @@ export interface Segment {
 interface Mark extends Segment {
   x: number;
   width: number;
-  /** Centre of the mark, in px from the bar's left edge, where its tooltip points. */
-  centre: number;
   /** The `fill-seg-*` utility this group is drawn in. */
   fill: string;
 }
@@ -64,25 +62,19 @@ let nextId = 0;
 @Component({
   selector: 'amk-aram-bar',
   templateUrl: './aram-bar.html',
-  host: { class: 'relative block' },
+  host: { class: 'block' },
 })
 export class AramBar {
   readonly segments = input.required<Segment[]>();
 
-  /**
-   * Whether hovering a segment shows its tooltip. The tooltip is drawn above
-   * the bar, so a bar sitting in the top bar turns it off — up there it would
-   * land above the viewport.
-   */
-  readonly hoverTip = input(true);
+  /** In px; the top bar draws it taller, to the height of the transport's time readout. */
+  readonly height = input(HEIGHT);
 
   private readonly svg = viewChild.required<ElementRef<SVGSVGElement>>('svg');
   private readonly size = elementSize(this.svg);
 
-  protected readonly hover = signal<Mark | null>(null);
   protected readonly clipId = `aram-bar-clip-${nextId++}`;
   protected readonly clipUrl = `url(#${this.clipId})`;
-  protected readonly height = HEIGHT;
   protected readonly radius = RADIUS;
 
   /** The measured width, which is also the bar's own coordinate space. */
@@ -97,7 +89,7 @@ export class AramBar {
    */
   protected readonly viewBox = computed(() => {
     const width = this.width();
-    return width > 0 ? `0 0 ${width} ${HEIGHT}` : null;
+    return width > 0 ? `0 0 ${width} ${this.height()}` : null;
   });
 
   /**
@@ -118,21 +110,8 @@ export class AramBar {
       return {
         ...segment,
         ...placement,
-        centre: placement.x + placement.width / 2,
         fill: FILL[segment.group],
       };
     });
-  });
-
-  protected readonly tooltip = computed(() => {
-    const mark = this.hover();
-    if (!mark || !this.hoverTip()) {
-      return null;
-    }
-
-    return {
-      x: mark.centre,
-      text: `${mark.label}: ${mark.bytes.toLocaleString()} B`,
-    };
   });
 }
