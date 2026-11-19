@@ -45,7 +45,8 @@ there and moved away from, with the reason. The rule carries one index line per 
   theme's is darker than that (Slate, the default, `#1e272e`, Graphite `#191919`, Midnight
   `#16181d`, Contrast `#0a0a0a`, Warm grey `#1a1918`), so under each of them every channel's
   contrast only rises. The one direction that would need re-validating is a **lighter** surface,
-  in the default or in a preset.
+  in the default or in a preset. Praise The (Happy) Sun is that direction, and carries its own eight,
+  validated in light mode on its own lanes, rather than re-hueing the defaults.
 - **The controls painted in `--color-accent`** — a primary button's plate, a checked box, a slider's
   fill and every toggle were the same token as the playhead, the lit keys, the caret and a syntax
   keyword, so there was no way to recolour the chrome without taking the roll's own markers with it.
@@ -256,3 +257,13 @@ there and moved away from, with the reason. The rule carries one index line per 
   ground, `--color-seg-free` included, is taken 0.07 down in OKLCH lightness at its own hue and
   chroma, so the steps between them are FL's and everything drawn on them only gains contrast.
   Re-sampling FL's screen would undo it.
+- **The piano keys and the controls' light catch borrowing ink, inset and surface.** White keys
+  were `fill-ink` with `fill-surface` names, black keys `fill-inset` with `fill-ink-muted` names
+  over a `fill-surface` column, and `plate`, `recess` and `well` mixed toward `--color-ink` wherever
+  they meant lighter. That holds only while the ink is the light colour: on a light theme the
+  keyboard came out inverted and every button sunk, and no porter could move the keys or the
+  controls' light without moving the text. `--color-key`, `--color-key-sharp`, their two label
+  tokens and `--color-sheen` each default to the colour they used to borrow, and every dark preset
+  names them at its own, so only a theme that wants them apart moves them. Making the light preset
+  a special case instead, with `light:` variants and a white sheen keyed off the scheme, was
+  turned down: it gave a dark theme none of the same control.

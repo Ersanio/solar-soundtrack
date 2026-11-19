@@ -17,7 +17,8 @@ or shared controls.
 ## Colour sets
 
 Styling is Tailwind v4, with the entire theme as CSS variables in `web/src/styles.css` (v4 has no
-`tailwind.config.js`). Dark-only on purpose. Two **categorical sets** live there — `--color-seg-*`
+`tailwind.config.js`). The defaults are dark; a light theme is a preset carrying sets of its own
+(below). Two **categorical sets** live there — `--color-seg-*`
 for the ARAM bar and `--color-ch-*` for the eight music channels — and neither may be reordered or
 re-hued **in that file** without re-validating, since adjacent-pair CVD separation and contrast
 against `--color-surface` are the properties measured. The order is the mechanism, not decoration:
@@ -58,7 +59,11 @@ the paragraph's last sentence buys: the app never said anything with a channel's
 not also saying with a number, a tooltip or a strike-through, so a porter putting two channels on
 one hue loses a convenience and breaks no claim. What still has to be re-validated is a change to
 the defaults themselves, which is the set every porter starts from. A preset in
-`theme-presets.ts` is held to the same bar and none of the shipped six touch the eight.
+`theme-presets.ts` is held to the same bar. The six dark ones leave the eight alone; **Praise The
+(Happy) Sun**, the light one, carries its own eight and four, since pastels vanish on a light ground. Its
+eight are the same hues in the same order, validated in light mode on its darker lane, and each
+takes `--on-ch` at 4.5:1 or better; its four are validated on its `raised` and the meter's darker
+ground over all pairs. `styles.css` records the figures.
 
 ## The theme is one file, and the porter may change it
 
@@ -84,6 +89,16 @@ and a black key's row, and `--color-lane-rule` for its bar, beat and row lines, 
 `roll-lanes` and `roll-grid` draw at strengths rather than in three colours. By default they are
 the chrome's own surface, inset and edge, as in every preset but Juicy Loops, whose roll is FL's
 blue taken darker with its chrome, so the music reads as a different place from the controls.
+The key column has four of its own — `--color-key`, `--color-key-sharp` and a label colour for
+each — and the black keys' colour is also the keyboard's body, which shows between the keys.
+
+**A light theme needs nothing but tokens.** Nothing outside the theme assumes the ink is the light
+one: the keys have their own tokens, and the controls' material mixes toward `--color-sheen` where
+it means lighter. `ThemeStore` sets `color-scheme: light` on `<html>` whenever the surface's
+relative luminance is above 0.179 and removes it otherwise, so scrollbars, native lists and the
+editor's selection follow a porter's own light theme as well as the preset.
+`mml-theme.ts` keeps `{ dark: true }`: the only base rules that flag picks which the editor shows
+are the caret, the gutters and the tooltip, and `structure` sets all three from tokens.
 
 **Juicy Loops' greys are mid-tones**, so the colours the themes share for text — the status
 colours and the coloured `--color-syn-*` — sit lighter than a dark theme's would: 6.1:1 or better
@@ -150,7 +165,8 @@ tells an action from a state:
 - `led` and `led-on` are the round light.
 
 Every colour in them is mixed from tokens, so a preset or a porter's override re-tints the controls
-with everything else. Only the shadows are black, being darkness rather than a colour.
+with everything else. Only the shadows are black, being darkness rather than a colour; the light
+is `--color-sheen` — a plate's upper half and hover, its lit top edge, a recess's and a well's lip.
 
 - **Who wears what.** `shared/button/` and `shared/toggle/` say which variant wears which.
   `buttonClass()` lends a button's classes to an element that cannot be one: the Add samples
@@ -232,3 +248,5 @@ entry goes there, with its line here, in the same change.
 - **The transport in a darker box of its own inside the top bar** — `amk-transport-controls`,
   `amk-top-bar`
 - **Juicy Loops' grounds at FL Studio's sampled values** — `--color-surface`, `--color-lane`
+- **The piano keys and the controls' light catch borrowing ink, inset and surface** —
+  `--color-key`, `--color-key-sharp`, `--color-sheen`, `roll-keys`, `plate`

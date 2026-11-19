@@ -41,7 +41,7 @@ export class ThemePicker {
   /** Shown after a paste that was not a theme, and cleared by the next one. */
   protected readonly importFailed = signal(false);
 
-  /** A preset's button, and the first one spanning both columns so five do not leave an orphan. */
+  /** A preset's button, and the first one spanning both columns so the six after it pair off. */
   private static readonly PRESET =
     'border-edge bg-inset hover:border-control flex cursor-pointer flex-col gap-1 rounded-md border px-2 py-1.5 text-left transition-colors';
   private static readonly PRESET_WIDE = `${ThemePicker.PRESET} col-span-2`;

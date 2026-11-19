@@ -20,7 +20,8 @@ Selector prefix is `amk` — `amk-root`, `amk-editor-pane` for components, camel
 directives. ESLint enforces both.
 
 Styling is Tailwind v4, with the entire theme as CSS variables in `src/styles.css` (v4 has no
-`tailwind.config.js`). Dark-only on purpose. `--color-seg-*` and `--color-ch-*` are categorical
+`tailwind.config.js`). The defaults are dark, and a light theme is a preset carrying its own
+validated sets. `--color-seg-*` and `--color-ch-*` are categorical
 sets: never reorder or re-hue their defaults, and never change the default `--color-surface`,
 without re-validating them — and never leave channel identity to colour alone, nor draw on a
 channel's colour in anything but its `--on-ch` ink (`.claude/rules/ui-and-theme.md`).
@@ -53,8 +54,8 @@ member of any of them, and the level is there for the same reason the mask is: b
 apply it, the transport to the player's gain and the previewer to a `GainNode` of its own;
 `EditorRequests`, which injects nothing at all, because a mailbox between the panels and the
 source view has nothing to read; `ThemeStore`, which injects nothing either and which nothing
-injects, because what it writes is CSS custom properties on `<html>` and every reader of those is
-a stylesheet; `CommitAudition`, the command inspector's write path, which
+injects, because what it writes is CSS custom properties and `color-scheme` on `<html>` and every
+reader of those is a stylesheet; `CommitAudition`, the command inspector's write path, which
 forwards a panel's commit to `EditorRequests` and replays the selected note through `Audition`
 once the compile that includes it lands; `Suppressions`, which injects nothing and holds the
 diagnostic codes the porter has suppressed, which `EditorStore.diagnostics` leaves out of

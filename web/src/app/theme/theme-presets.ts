@@ -4,9 +4,10 @@
  * A preset carries only what it moves off the stylesheet's own values, so the
  * default one, Slate, carries nothing at all. Every other preset names every
  * token it needs, the accent included, so it renders the same whatever the
- * stylesheet's own accent is. None of them touch `--color-ch-*`: the eight are
- * a set that was validated together, and repainting one channel is what the
- * per-colour rows are for.
+ * stylesheet's own accent is. The dark ones leave `--color-ch-*` alone: the
+ * eight are a set that was validated together, and repainting one channel is
+ * what the per-colour rows are for. Praise The (Happy) Sun, the light one, carries its
+ * own eight and its own ARAM four, since pastels vanish on a light ground.
  */
 
 import type { Overrides } from './theme-tokens';
@@ -52,6 +53,70 @@ export const PRESETS: readonly ThemePreset[] = [
       lane: '#22323b',
       'lane-sharp': '#1d2c36',
       'lane-rule': '#000a14',
+      sheen: '#e9ebec',
+      key: '#e9ebec',
+      'key-sharp': '#22282d',
+      'key-label': '#31393e',
+      'key-sharp-label': '#c1c7cb',
+    },
+  },
+  {
+    // Text and status colours are 4.5:1 or better on `surface` and `raised`.
+    // The eight and the four are validated in light mode: see `styles.css`.
+    id: 'praise-the-happy-sun',
+    name: $localize`:@@theme.praise-the-happy-sun:theme.praise-the-happy-sun`,
+    note: $localize`:@@theme.cool-white-and-light-grey:theme.cool-white-and-light-grey`,
+    overrides: {
+      surface: '#ffffff',
+      raised: '#f0f2f5',
+      inset: '#e3e7ec',
+      edge: '#c3cad3',
+      ink: '#1f2328',
+      'ink-muted': '#57606a',
+      control: '#3d74a8',
+      sheen: '#ffffff',
+      led: '#278800',
+      accent: '#ad4a00',
+      'accent-soft': '#8d5234',
+      danger: '#c62828',
+      severe: '#b54708',
+      warn: '#8a6100',
+      good: '#1a7f37',
+      'diff-add': '#1a7f37',
+      'diff-remove': '#c62828',
+      'diff-change': '#8a6100',
+      'syn-note': '#1f2328',
+      'syn-command': '#1a7f37',
+      'syn-hex': '#0b5cad',
+      'syn-hex-arg': '#3d6ea8',
+      'syn-number': '#1f2328',
+      'syn-loop': '#b54708',
+      'syn-operator': '#57606a',
+      'syn-directive': '#0b5cad',
+      'syn-channel': '#0b5cad',
+      'syn-string': '#8a6100',
+      'syn-comment': '#57606a',
+      'syn-invalid': '#c62828',
+      'seg-driver': '#2573d1',
+      'seg-song': '#009969',
+      'seg-samples': '#b77b00',
+      'seg-echo': '#9f3964',
+      'seg-free': '#d0d6dd',
+      lane: '#ffffff',
+      'lane-sharp': '#f0f2f5',
+      'lane-rule': '#aab3bd',
+      key: '#ffffff',
+      'key-sharp': '#2b3138',
+      'key-label': '#57606a',
+      'key-sharp-label': '#c3cad3',
+      'ch-0': '#408cec',
+      'ch-1': '#e5632e',
+      'ch-2': '#009f6d',
+      'ch-3': '#bb7e00',
+      'ch-4': '#d36891',
+      'ch-5': '#007d00',
+      'ch-6': '#857aff',
+      'ch-7': '#c72c31',
     },
   },
   {
@@ -76,6 +141,11 @@ export const PRESETS: readonly ThemePreset[] = [
       lane: '#191919',
       'lane-sharp': '#141414',
       'lane-rule': '#333333',
+      sheen: '#e3e3e3',
+      key: '#e3e3e3',
+      'key-sharp': '#141414',
+      'key-label': '#191919',
+      'key-sharp-label': '#909090',
     },
   },
   {
@@ -102,6 +172,11 @@ export const PRESETS: readonly ThemePreset[] = [
       lane: '#16181d',
       'lane-sharp': '#12141a',
       'lane-rule': '#2c313b',
+      sheen: '#d8dce4',
+      key: '#d8dce4',
+      'key-sharp': '#12141a',
+      'key-label': '#16181d',
+      'key-sharp-label': '#838b9b',
     },
   },
   {
@@ -129,6 +204,11 @@ export const PRESETS: readonly ThemePreset[] = [
       lane: '#0a0a0a',
       'lane-sharp': '#000000',
       'lane-rule': '#4a4a4a',
+      sheen: '#f5f5f5',
+      key: '#f5f5f5',
+      'key-sharp': '#000000',
+      'key-label': '#0a0a0a',
+      'key-sharp-label': '#b0b0b0',
     },
   },
   {
@@ -153,6 +233,11 @@ export const PRESETS: readonly ThemePreset[] = [
       lane: '#1a1918',
       'lane-sharp': '#141312',
       'lane-rule': '#37342f',
+      sheen: '#e6e3dd',
+      key: '#e6e3dd',
+      'key-sharp': '#141312',
+      'key-label': '#1a1918',
+      'key-sharp-label': '#968f86',
     },
   },
 ];

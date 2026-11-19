@@ -16,6 +16,7 @@ export type ThemeTokenName =
   | 'ink'
   | 'ink-muted'
   | 'control'
+  | 'sheen'
   | 'lit'
   | 'led'
   | 'accent'
@@ -47,6 +48,10 @@ export type ThemeTokenName =
   | 'lane'
   | 'lane-sharp'
   | 'lane-rule'
+  | 'key'
+  | 'key-sharp'
+  | 'key-label'
+  | 'key-sharp-label'
   | 'ch-0'
   | 'ch-1'
   | 'ch-2'
@@ -148,6 +153,12 @@ export const THEME_TOKENS: readonly ThemeToken[] = [
     label: $localize`:@@theme.token.controls.label:theme.token.controls.label`,
     group: 'status',
     hint: $localize`:@@theme.token.sliders-and-primary-buttons.hint:theme.token.sliders-and-primary-buttons.hint`,
+  },
+  {
+    name: 'sheen',
+    label: $localize`:@@theme.token.sheen.label:theme.token.sheen.label`,
+    group: 'status',
+    hint: $localize`:@@theme.token.the-light-buttons-and-toggles.hint:theme.token.the-light-buttons-and-toggles.hint`,
   },
   {
     name: 'lit',
@@ -338,6 +349,30 @@ export const THEME_TOKENS: readonly ThemeToken[] = [
     label: $localize`:@@theme.token.grid-lines.label:theme.token.grid-lines.label`,
     group: 'roll',
     hint: $localize`:@@theme.token.bar-beat-and-row-lines.hint:theme.token.bar-beat-and-row-lines.hint`,
+  },
+  {
+    name: 'key',
+    label: $localize`:@@theme.token.keys.label:theme.token.keys.label`,
+    group: 'roll',
+    hint: $localize`:@@theme.token.the-keyboard-s-white-keys.hint:theme.token.the-keyboard-s-white-keys.hint`,
+  },
+  {
+    name: 'key-sharp',
+    label: $localize`:@@theme.token.sharp-keys.label:theme.token.sharp-keys.label`,
+    group: 'roll',
+    hint: $localize`:@@theme.token.the-keyboard-s-black-keys.hint:theme.token.the-keyboard-s-black-keys.hint`,
+  },
+  {
+    name: 'key-label',
+    label: $localize`:@@theme.token.key-labels.label:theme.token.key-labels.label`,
+    group: 'roll',
+    hint: $localize`:@@theme.token.note-names-on-white-keys.hint:theme.token.note-names-on-white-keys.hint`,
+  },
+  {
+    name: 'key-sharp-label',
+    label: $localize`:@@theme.token.sharp-key-labels.label:theme.token.sharp-key-labels.label`,
+    group: 'roll',
+    hint: $localize`:@@theme.token.note-names-on-black-keys.hint:theme.token.note-names-on-black-keys.hint`,
   },
 
   {

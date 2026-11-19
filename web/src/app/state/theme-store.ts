@@ -79,7 +79,22 @@ export function parseOverrides(value: unknown): Overrides {
 }
 
 /**
- * Puts the overrides on `<html>` as inline custom properties.
+ * Whether dark text reads better than light on `hex`: WCAG relative luminance
+ * above 0.179, where the contrast against black and against white is equal.
+ */
+function isLight(hex: string): boolean {
+  const digits = hex.length === 4 ? [...hex.slice(1)].map((d) => d + d).join('') : hex.slice(1);
+  const [r, g, b] = [0, 2, 4].map((at) => {
+    const channel = parseInt(digits.slice(at, at + 2), 16) / 255;
+    return channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
+  });
+
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b > 0.179;
+}
+
+/**
+ * Puts the overrides on `<html>` as inline custom properties, with the
+ * `color-scheme` their surface calls for.
  *
  * An element's own style beats the `:root` rule Tailwind emits, so this reaches
  * every utility and every `var()` reader without a second selector or an
@@ -97,6 +112,14 @@ function applyOverrides(overrides: Overrides, surface: string): void {
     } else {
       style.removeProperty(propertyOf(token.name));
     }
+  }
+
+  // Scrollbars, native lists and the editor's selection follow the ground;
+  // removed, `:root`'s dark shows through.
+  if (isLight(surface)) {
+    style.setProperty('color-scheme', 'light');
+  } else {
+    style.removeProperty('color-scheme');
   }
 
   // The one copy of the colour that lives outside the CSS, and the only one

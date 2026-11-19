@@ -4,16 +4,16 @@ import type { Lane } from '../roll-layout';
 import { KEY_WIDTH } from '../roll-metrics';
 
 /**
- * The key itself, which is a real keyboard: white keys pale, black keys dark,
- * and a lit one in the accent. The label is painted to suit — dark on a pale
- * key, pale on a dark one — so it stays readable in all three states.
+ * The key itself, which is a real keyboard: white and black keys in their own
+ * tokens, and a lit one in the accent. Each label has a token of its own too,
+ * so it stays readable in all three states whatever the theme.
  */
 function keyClass(lane: Lane): string {
   if (lane.kind !== 'key') {
     return 'fill-edge';
   }
 
-  return lane.black ? 'fill-inset' : 'fill-ink';
+  return lane.black ? 'fill-key-sharp' : 'fill-key';
 }
 
 function keyTextClass(lane: Lane): string {
@@ -21,7 +21,7 @@ function keyTextClass(lane: Lane): string {
     return 'fill-ink';
   }
 
-  return lane.black ? 'fill-ink-muted' : 'fill-surface';
+  return lane.black ? 'fill-key-sharp-label' : 'fill-key-label';
 }
 
 /**

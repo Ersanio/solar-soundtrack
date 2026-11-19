@@ -1,4 +1,4 @@
-<svg:rect x="0" y="0" class="fill-surface" [attr.width]="keyWidth" [attr.height]="height()" />
+<svg:rect x="0" y="0" class="fill-key-sharp" [attr.width]="keyWidth" [attr.height]="height()" />
 @for (key of rows(); track key.row) {
   @let lit = held().has(key.row);
   <!-- A press sounds the key on the channel being edited, through the same

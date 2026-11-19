@@ -9,6 +9,14 @@ export interface ChangelogEntry {
 export const CHANGELOG: readonly ChangelogEntry[] = [
   // ─── newest first; add new blocks here ──────────────────────────────────
   {
+    date: '19 November 2026',
+    items: [
+      'New theme: Praise The (Happy) Sun',
+      'Add support for light themes; Certain UI elements automatically change colors to match the theme',
+      'Allow changing the piano keys and the sheen on buttons in the theme editor',
+    ],
+  },
+  {
     date: '18 November 2026',
     items: [
       'Fix chained or tied pitch bends falsely reporting an SST0507 error',
