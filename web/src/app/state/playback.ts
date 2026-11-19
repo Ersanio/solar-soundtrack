@@ -7,6 +7,7 @@ import { SpcPlayer, type SongTiming } from '@amk/spc/player';
 import type { DriverState } from '@amk/spc/driver-state';
 import { errorMessage, formatTime } from '../util/format';
 import { EditorStore } from './editor-store';
+import { LiveTap } from './live-tap';
 import { Mixer } from './mixer';
 import { secondsAtTick } from './song-clock';
 import { estimatedSecondsAt, soundingSpans } from './transport-view';
@@ -47,6 +48,10 @@ export class Playback {
   /** Reload the running song in place whenever it recompiles. */
   readonly hotReload = signal(true);
   readonly loop = signal(false);
+
+  /** Each voice's waveform as the audio thread last posted it, while {@link watchVoices} is held. */
+  readonly tap = new LiveTap();
+  private voiceWatchers = 0;
 
   /** Where the seek bar is being dragged to, in ticks, while the drag goes on. */
   private readonly scrubbing = signal<number | null>(null);
@@ -191,6 +196,7 @@ export class Playback {
       this.songTicks.set({ ticks: songTicks, at: performance.now() });
 
     this.player.onDriverState = (state) => this.driver.set(state);
+    this.player.onVoices = (capture) => this.tap.receive(capture);
     this.player.onEnded = () => this.rest();
 
     this.player.onError = (error) => {
@@ -273,6 +279,36 @@ export class Playback {
     return map && text !== null ? { map, text } : null;
   }
 
+  /**
+   * Asks the audio thread for each voice's waveform until the function returned
+   * is called. Counted, so two meters on screen share one capture.
+   */
+  watchVoices(): () => void {
+    this.player.setCapture(++this.voiceWatchers > 0);
+    let released = false;
+    return () => {
+      if (!released) {
+        released = true;
+        this.player.setCapture(--this.voiceWatchers > 0);
+      }
+    };
+  }
+
+  /**
+   * The output's spectrum as the player's analyser reads it, in dB per bin, and
+   * the width of a bin in Hz; `null` before the player has started.
+   */
+  readSpectrum(out: Float32Array<ArrayBuffer>): number | null {
+    return this.player.readSpectrum(out)
+      ? this.player.sampleRate / (this.player.spectrumBins * 2)
+      : null;
+  }
+
+  /** How many bins {@link readSpectrum} fills. */
+  get spectrumBins(): number {
+    return this.player.spectrumBins;
+  }
+
   /** Play, pause or resume. The first press doubles as the audio unlock gesture. */
   async toggle(): Promise<void> {
     if (this.state() === 'playing') {
@@ -335,6 +371,7 @@ export class Playback {
     this.scrubbing.set(null);
     this.driver.set(null);
     this.loaded.set(null);
+    this.tap.clear();
   }
 
   /**

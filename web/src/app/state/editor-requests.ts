@@ -109,6 +109,13 @@ export class EditorRequests {
   readonly revealSection = signal<SidebarSection | null>(null);
 
   /**
+   * A tab of the editor pane to bring forward, set by the top bar's spectrum,
+   * which opens the Song Inspector. Consumed and put back to `null` by the pane,
+   * as {@link revealSection} is by the output pane.
+   */
+  readonly revealView = signal<'inspector' | null>(null);
+
+  /**
    * A splice the editor should apply, set when a panel edits a command in
    * place. The counterpart to {@link reveal}: that one asks for a selection,
    * this one asks for a change, and both exist because the editor owns the view

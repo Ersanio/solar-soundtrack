@@ -47,6 +47,36 @@ const COUNTERS_SIZE = 4 * 4;
 const SURROUND_AFTER_RAM = 8;
 const SURROUND_ALLOWED = -0x4000;
 
+/**
+ * Where a voice's registers sit in the DSP's register file: voice `x` owns
+ * `$x0-$x9`. The rest of each row of sixteen is global (SNES Development Manual
+ * §3.7, and the `r_*`/`v_*` enums in snes_spc's `SPC_DSP.h`).
+ */
+export const DspReg = {
+	/** `VxSRCN`: the sample directory entry the voice plays. */
+	Srcn: 0x04,
+	/** `VxENVX`: the envelope, as its top seven bits. */
+	Envx: 0x08,
+	/** `VxOUTX`: the voice's output after the envelope and before volume, its top eight bits. */
+	Outx: 0x09,
+	MainVolumeL: 0x0c,
+	MainVolumeR: 0x1c,
+	EchoVolumeL: 0x2c,
+	EchoVolumeR: 0x3c,
+	/** `EFB`: echo feedback, signed. */
+	EchoFeedback: 0x0d,
+	/** `NON`: which voices play noise rather than their sample. */
+	Noise: 0x3d,
+	/** `EON`: which voices send to the echo. */
+	EchoOn: 0x4d,
+	/** `FLG`: bit 5 set stops the DSP writing the echo buffer. */
+	Flags: 0x6c,
+	/** `ESA`: the echo buffer's page. */
+	EchoStart: 0x6d,
+	/** `EDL`: the echo delay, 2 KiB of buffer per step in its low nybble. */
+	EchoDelay: 0x7d,
+} as const;
+
 /** Where {@link instantiate} found the DSP's state: heap addresses. */
 export interface DspLayout {
 	regs: number;
@@ -95,6 +125,27 @@ export interface SpcCore {
 	renderView(frames: number): Int16Array;
 	/** As `renderView`, but returns an independent copy. */
 	render(frames: number): Int16Array;
+	/**
+	 * As `renderView`, emulated one frame at a time, writing each frame's eight
+	 * `VxOUTX` bytes into `outx` from `at` onward — voice-major within a frame, so
+	 * frame `f` voice `v` lands at `at + f * 8 + v`, wrapping at the array's end.
+	 *
+	 * `VxOUTX` is the voice's own waveform: the DSP stores it on every sample, so
+	 * stepping a frame at a time is what turns a register into a signal. The
+	 * output is the same bytes `renderView(frames)` produces (`audiotest` pins it).
+	 */
+	renderVoices(frames: number, outx: Int8Array, at: number): Int16Array;
+	/**
+	 * The DSP's 128 registers, live: a window onto the heap, as {@link aram} is.
+	 * Valid only after `loadSpc`.
+	 */
+	dspRegisters(): Uint8Array;
+	/**
+	 * The volume pair each voice is mixed at, left then right, as signed bytes
+	 * into `out[0..15]`: the DSP's own copy of `VxVOL`, which a mute holds at 0,
+	 * so a muted voice reads silent here as it is heard.
+	 */
+	voiceVolumes(out: Int8Array): void;
 	/**
 	 * The emulator's 64 KiB of APU RAM, live.
 	 *
@@ -204,6 +255,7 @@ export function instantiate(module: WebAssembly.Module): SpcCore {
 	let audioView: Int16Array | null = null;
 	let audioFrames = -1;
 	let aramView: Uint8Array | null = null;
+	let dspView: Uint8Array | null = null;
 
 	const refresh = (): void => {
 		u8 = new Uint8Array(memory.buffer);
@@ -211,6 +263,7 @@ export function instantiate(module: WebAssembly.Module): SpcCore {
 		view = new DataView(memory.buffer);
 		audioView = null;
 		aramView = null;
+		dspView = null;
 	};
 
 	const cstring = (ptr: number): string => {
@@ -521,6 +574,46 @@ export function instantiate(module: WebAssembly.Module): SpcCore {
 			return this.renderView(frames).slice();
 		},
 
+		renderVoices(frames: number, outx: Int8Array, at: number): Int16Array {
+			const { regs } = located();
+			reserve(frames);
+			const bytes = SPC_CHANNELS * 2;
+			let write = at;
+			for (let frame = 0; frame < frames; frame++) {
+				core.m(scratch + frame * bytes, SPC_CHANNELS);
+				for (let voice = 0; voice < DSP_VOICES; voice++) {
+					outx[write++] = u8[regs + voice * 0x10 + DspReg.Outx];
+				}
+
+				if (write >= outx.length) {
+					write = 0;
+				}
+			}
+
+			const count = frames * SPC_CHANNELS;
+			if (!audioView || audioFrames !== frames) {
+				audioView = i16.subarray(scratch >> 1, (scratch >> 1) + count);
+				audioFrames = frames;
+			}
+
+			return audioView;
+		},
+
+		dspRegisters(): Uint8Array {
+			const { regs } = located();
+			dspView ??= u8.subarray(regs, regs + DSP_REGISTER_COUNT);
+			return dspView;
+		},
+
+		voiceVolumes(out: Int8Array): void {
+			const { voices } = located();
+			for (let voice = 0; voice < DSP_VOICES; voice++) {
+				const at = voices + voice * VOICE_STATE_SIZE + VOICE_VOLUME_AT;
+				out[voice * 2] = view.getInt32(at, true);
+				out[voice * 2 + 1] = view.getInt32(at + 4, true);
+			}
+		},
+
 		aram(): Uint8Array {
 			if (aramAt < 0) {
 				throw new SpcCoreError("APU RAM is only available once an SPC has been loaded");
@@ -582,6 +675,7 @@ export function instantiate(module: WebAssembly.Module): SpcCore {
 			dsp = snapshot.dsp;
 			audioView = null;
 			aramView = null;
+			dspView = null;
 		},
 
 		get output(): string {

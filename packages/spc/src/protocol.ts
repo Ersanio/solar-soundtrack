@@ -65,7 +65,36 @@ export type ToWorklet =
 	 * worklet holds the mask and re-applies it, so it survives loads and seeks.
 	 */
 	| { type: "mute"; mask: number }
+	/**
+	 * Start or stop posting {@link VoiceCapture}s. Off by default: a capture is
+	 * read a frame at a time, which is only worth doing while something on the
+	 * page is drawing it. Held across loads, as the mute mask is.
+	 */
+	| { type: "capture"; on: boolean }
 	| { type: "stop" };
+
+/** Frames of each voice's waveform a {@link VoiceCapture} carries: 32 ms at the DSP's rate. */
+export const CAPTURE_FRAMES = 1024;
+
+/**
+ * The last {@link CAPTURE_FRAMES} of the song as the DSP made it, voice by voice,
+ * oldest first.
+ */
+export interface VoiceCapture {
+	/** Each frame's eight `VxOUTX` bytes, voice-major within a frame. */
+	outx: Int8Array;
+	/** The mixed output those frames produced, interleaved stereo. */
+	mix: Int16Array;
+	/**
+	 * Each voice's volume pair as the DSP mixes it, left then right — 0 for a
+	 * muted voice — then the main volume pair: 18 signed bytes.
+	 */
+	volumes: Int8Array;
+	/** Each voice's `VxSRCN`. */
+	srcn: Uint8Array;
+	/** `NON`: the voices playing noise. */
+	noise: number;
+}
 
 /** Audio thread to page. */
 export type FromWorklet =
@@ -103,5 +132,7 @@ export type FromWorklet =
 			 */
 			epoch: number;
 	  }
+	/** About forty a second while capture is on; see {@link VoiceCapture}. */
+	| ({ type: "voices"; epoch: number } & VoiceCapture)
 	| { type: "ended" }
 	| { type: "error"; message: string };

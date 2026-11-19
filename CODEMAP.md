@@ -146,6 +146,7 @@ something in the directory, which load by themselves when such a file is opened.
 
 **Rules:** `harnesses/*.md`
 
+- `analysis.ts` — `audiotest`: the Song Inspector's analysis on real songs — a lane per voice the song plays and none for the rest, a mute that empties its lane and quietens the mix, samples on their SRCN, the echo heard only where the song turns it on, and clipping counted where the DSP clamps.
 - `audition-checkpoint.ts` — `audiotest`: a note auditioned from a checkpoint is the note auditioned from the top of the song, byte for byte.
 - `audition-in-song.ts` — `audiotest`: an auditioned note with the rest of the song under it, and handed over on a tick the whole song fetches on.
 - `audition-slide.ts` — `audiotest`: an auditioned note sliding as the `$DD` riding on it says.
@@ -158,6 +159,7 @@ something in the directory, which load by themselves when such a file is opened.
 - `samples.ts` — `audiotest`: sample sets through the emulator: `#samples`, a custom instrument, `optimizeSampleUsage` and a `.bnk` bank.
 - `sound.ts` — `audiotest`: the emulator boots, a compiled song makes sound, silence is silent, notes differ audibly, and fast-forward lands somewhere different.
 - `support.ts` — What the `audiotest` sections share: the driver, the one emulator instance, `compileToSpc`, `renderMuted`, and the level and pitch measures.
+- `voices.ts` — `audiotest`: reading each voice off the DSP — rendering a frame at a time produces the same bytes a block does, `VxOUTX` follows the voices the song plays, and a mute reads as volume 0.
 
 ## scripts/charttest
 
@@ -176,6 +178,7 @@ something in the directory, which load by themselves when such a file is opened.
 - `playhead-clock.ts` — `charttest`: the pull at the end of the scrub bar, and the playhead's own clock.
 - `record-pointer.ts` — `charttest`: the pointer a MIDI recording is timed against.
 - `slider-track.ts` — `charttest`: the slider's track.
+- `song-inspector.ts` — `charttest`: the Song Inspector's arithmetic — the fixed frequency axis and the band levels read off it, BS.1770 loudness at the DSP's rate, the scope's trigger and gain, and the timeline's columns, which keep a column's loudest bucket.
 - `stack-plot-clamp.ts` — `charttest`: the stacked bar's geometry, the plot space, and `clamp`.
 - `support.ts` — What the `charttest` sections share: `EPSILON`, the tolerance a computed coordinate is compared within.
 - `transport-clock.ts` — `charttest`: the transport's tick-to-seconds clock over songs the compiler will not time, and the roll's playhead following the music rather than the written tempo.
@@ -374,6 +377,19 @@ something in the directory, which load by themselves when such a file is opened.
 ## web/src/app/editor/history-buttons
 
 - `history-buttons.ts` — Undo and redo, for the two toolbars that need them.
+
+## web/src/app/editor/spectrum-mini
+
+**Rules:** `song-inspector.md`
+
+- `spectrum-mini.ts` — The top bar's spectrum: the song's fourteen bands as it plays, beside the ARAM meter as FL keeps its small meters together.
+
+## web/src/app/editor/spectrum
+
+**Rules:** `song-inspector.md`
+
+- `spectrum-bars.ts` — The bars a spectrum meter draws from its band levels: all 28 at full size, or fourteen for the top bar, each the louder of a pair, so a narrow peak still shows in the small one.
+- `spectrum.ts` — The song's spectrum as it plays: the 28 third-octave bands from 31.5 Hz to 16 kHz, on the fixed scale every song is read on (`state/analysis/spectrum-bands.ts`).
 
 ## web/src/app/editor/top-bar/suppressions-button
 
@@ -577,6 +593,32 @@ something in the directory, which load by themselves when such a file is opened.
 **Rules:** `state-and-editor.md`
 
 - `slot-row.ts` — One slot of an opened bank.
+
+## web/src/app/editor/views/song-inspector/inspector-timeline
+
+**Rules:** `song-inspector.md`
+
+- `inspector-timeline.ts` (300+ lines) — The whole pass at once, as the analysis heard it: a lane per channel, a lane per sample, the loudness, the stereo field, the echo and the spectrogram, on one tick axis with the playhead across all of them.
+
+## web/src/app/editor/views/song-inspector
+
+**Rules:** `song-inspector.md`
+
+- `inspector-units.ts` — The Song Inspector's figures with their units, each a message so its wording lives with the rest of the English.
+- `song-inspector.ts` — The Song Inspector: what the song sounds like, rather than what it says.
+- `timeline-paths.ts` — The Song Inspector's timeline as paths: buckets of a pass squeezed into a fixed number of columns, keeping each column's loudest bucket so a short peak is never averaged away.
+
+## web/src/app/editor/views/song-inspector/live-meters
+
+**Rules:** `song-inspector.md`
+
+- `live-meters.ts` — The live half of the Song Inspector: the spectrum, an oscilloscope per channel, and the stereo vectorscope with its correlation, all following the song as it plays.
+
+## web/src/app/editor/views/song-inspector/sample-usage
+
+**Rules:** `song-inspector.md`
+
+- `sample-usage.ts` — Every sample the song is built with against what the analysis heard of it: what it costs in ARAM, how much of the pass it sounds in and how loud it gets.
 
 ## web/src/app/editor/views/source-view
 
@@ -831,8 +873,9 @@ something in the directory, which load by themselves when such a file is opened.
 
 ## web/src/app/shared/chart
 
-**Rules:** `ui-and-theme.md`
+**Rules:** `song-inspector.md`, `ui-and-theme.md`
 
+- `canvas-colors.ts` — The theme's colours for a `<canvas>`, which cannot read `var()`.
 - `element-size.ts` — An element's content box, as a signal.
 - `frame-clock.ts` — The animation frame timestamp, as a signal, while `active` is true.
 - `plot.ts` — The fixed drawing space the command inspector's graphs share.
@@ -854,7 +897,7 @@ something in the directory, which load by themselves when such a file is opened.
 
 **Rules:** `ui-and-theme.md`
 
-- 25 icon components, `icon-<name>.ts`, one glyph each: `book`, `chevron-down`, `chevron-right`, `close`, `download`, `github`, `lock`, `loop`, `minus`, `palette`, `pause`, `play`, `plus`, `record`, `recording`, `redo`, `roll`, `samples`, `source`, `stop`, `suppress`, `undo`, `unlock`, `volume`, `wrap`
+- 26 icon components, `icon-<name>.ts`, one glyph each: `analysis`, `book`, `chevron-down`, `chevron-right`, `close`, `download`, `github`, `lock`, `loop`, `minus`, `palette`, `pause`, `play`, `plus`, `record`, `recording`, `redo`, `roll`, `samples`, `source`, `stop`, `suppress`, `undo`, `unlock`, `volume`, `wrap`
 
 ## web/src/app/shared/modal
 
@@ -913,8 +956,9 @@ something in the directory, which load by themselves when such a file is opened.
 
 ## web/src/app/state
 
-**Rules:** `audition.md`, `commands-in-the-roll.md`, `problems.md`, `state-and-editor.md`, `transport-and-clock.md`, `ui-and-theme.md`
+**Rules:** `audition.md`, `commands-in-the-roll.md`, `problems.md`, `song-inspector.md`, `state-and-editor.md`, `transport-and-clock.md`, `ui-and-theme.md`
 
+- `analysis.worker.ts` — Runs {@link analyseSong} off the page.
 - `audition.ts` (500+ lines) — Playing one sample, one note of the song, or one stretch of it, on its own AudioContext.
 - `clock-measurer.ts` — Measures how fast the song really runs on the emulator, and raises `SST0503` when the driver falls behind.
 - `clock.worker.ts` — Runs {@link measureClock} off the page.
@@ -925,6 +969,7 @@ something in the directory, which load by themselves when such a file is opened.
 - `driver-store.ts` — The N-SPC driver and the ARAM layout that goes with it.
 - `editor-requests.ts` (300+ lines) — What a panel asks the editor to do, and what the view and the roll report back.
 - `editor-store.ts` (500+ lines) — The document and everything compiled from it: the debounced compile, diagnostics, stats, the budget, the walk, the SPC.
+- `live-tap.ts` — The newest voice capture from the audio thread, held for the live meters to read at frame rate.
 - `measure-clock.ts` — The song's clock as the driver actually keeps it, by running the emulator.
 - `midi-input.ts` — The connected MIDI keyboards, as a stream of keys.
 - `mixer.ts` — Which channels are heard, how loudly, and which the porter has taken out.
@@ -936,6 +981,7 @@ something in the directory, which load by themselves when such a file is opened.
 - `sample-song.ts` — The song a fresh editor opens on.
 - `sample-store.ts` (500+ lines) — The sample library: the bundled `.brr` files plus whatever the user has uploaded over or alongside them.
 - `silent-arpeggio.ts` — `SST0516` — a note under an arpeggio that never takes a step, and so is never keyed on.
+- `song-analyzer.ts` — Plays the song on a worker for the Song Inspector, and holds what it heard.
 - `song-clock.ts` — Ticks to seconds, for a song the compiler could not put a clock on.
 - `spc-core.ts` — One emulator per worker, brought up on demand.
 - `stop-all.ts` — Stops whatever is sounding: the song, and a note or selection being previewed.
@@ -943,6 +989,16 @@ something in the directory, which load by themselves when such a file is opened.
 - `suppressions.ts` — The diagnostic codes the porter has suppressed, in every song, kept in the browser as the theme is.
 - `theme-store.ts` — What the app is painted in, and the porter's changes to it, written onto `<html>` as custom properties.
 - `transport-view.ts` — The transport's readings of the mixer and the walk: silenced channels and why, sounding spans, estimated seconds.
+
+## web/src/app/state/analysis
+
+**Rules:** `song-inspector.md`
+
+- `fft.ts` — A radix-2 FFT over a Hann window, for the spectrogram: one size, its tables built once, and the power of each bin out.
+- `loudness.ts` — Loudness as ITU-R BS.1770-4 measures it — K-weighting, 400 ms momentary blocks, the gated integrated figure — at whatever rate the samples arrive at.
+- `scope.ts` — What the live oscilloscopes and the vectorscope compute from a capture: where to start drawing so a waveform holds still, a voice as it is heard, and how alike the two sides of the mix are.
+- `song-analysis.ts` (300+ lines) — One pass of the song, played silently and read voice by voice: what the Song Inspector's timelines, spectrogram, tiles and sample table draw.
+- `spectrum-bands.ts` — The frequency axis every spectrum in the Song Inspector shares: one fixed range for every song, so two songs can be read against each other.
 
 ## web/src/app/status-bar
 

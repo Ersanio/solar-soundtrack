@@ -118,6 +118,12 @@ That is a wall clock going in and a tick coming out, once per frame, and still n
 nothing looks a second up in the clock's table, and a key's tick is the pointer carried to the
 moment the key was pressed.
 
+**The Song Inspector reads the worklet without moving it.** A `capture` renders the same bytes a
+frame at a time and posts each voice's waveform; the tick count still runs once a 32-frame block, so
+nothing about the playhead changes with it on (`worklettest`). The inspector's timeline is a tick
+axis like the roll's and runs its playhead on the same `rollClock`
+(`.claude/rules/song-inspector.md`).
+
 ## Decisions already made
 
 Designs built or considered here and moved away from, one line each: the entry's title and the

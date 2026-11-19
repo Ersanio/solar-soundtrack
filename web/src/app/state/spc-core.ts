@@ -1,7 +1,7 @@
 /**
  * One emulator per worker, brought up on demand.
  *
- * Both of the app's workers want the same thing — a `SpcCore` that outlives the
+ * Every one of the app's workers wants the same thing — a `SpcCore` that outlives the
  * request that asked for it, because `instantiate` and the ARAM search inside it
  * are what cost, not the emulation. Module state is per worker instance, so each
  * worker importing this gets its own core and its own compiled module.

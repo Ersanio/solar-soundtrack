@@ -36,4 +36,5 @@ await runSections([
 	["slider-track", () => import("./slider-track")],
 	["transport-view", () => import("./transport-view")],
 	["record-pointer", () => import("./record-pointer")],
+	["song-inspector", () => import("./song-inspector")],
 ]);

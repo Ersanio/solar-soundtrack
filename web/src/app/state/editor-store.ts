@@ -347,6 +347,14 @@ export class EditorStore {
   });
 
   /**
+   * The samples the song is built with, by SRCN — the directory's order — with
+   * the bytes each takes in ARAM, for the Song Inspector to name what it hears.
+   */
+  readonly sampleSet = computed(() =>
+    this.samples().map((sample) => ({ name: sample.sampleName, bytes: sample.data.length })),
+  );
+
+  /**
    * An echo delay being dragged, before the document has it.
    *
    * The echo buffer is the largest single thing a song can spend ARAM on — 2 KiB

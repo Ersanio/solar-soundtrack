@@ -1,0 +1,41 @@
+<div class="flex gap-2">
+  <div class="flex min-w-0 flex-1 flex-col gap-1">
+    <span
+      i18n="@@analysis.live.spectrum"
+      class="text-ink-muted text-[11px] font-semibold tracking-wide uppercase"
+      >analysis.live.spectrum</span
+    >
+    <amk-spectrum class="h-40" />
+  </div>
+
+  <div class="flex shrink-0 flex-col gap-1">
+    <span
+      i18n="@@analysis.live.stereo"
+      class="text-ink-muted text-[11px] font-semibold tracking-wide uppercase"
+      >analysis.live.stereo</span
+    >
+    <div class="flex gap-2">
+      <canvas
+        #vector
+        class="block h-36 w-36"
+        title="analysis.live.stereo.title"
+        i18n-title="@@analysis.live.stereo.title"
+      ></canvas>
+      <canvas
+        #meter
+        class="block h-36 w-12"
+        title="analysis.live.correlation.title"
+        i18n-title="@@analysis.live.correlation.title"
+      ></canvas>
+    </div>
+  </div>
+</div>
+
+<div class="flex flex-col gap-1">
+  <span
+    i18n="@@analysis.live.scopes"
+    class="text-ink-muted text-[11px] font-semibold tracking-wide uppercase"
+    >analysis.live.scopes</span
+  >
+  <canvas #scopes class="block h-36 w-full"></canvas>
+</div>

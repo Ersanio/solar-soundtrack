@@ -300,6 +300,7 @@ module.exports = defineConfig([
             'tone',
             'transform',
             'variant',
+            'vector-effect',
           ],
         },
       ],

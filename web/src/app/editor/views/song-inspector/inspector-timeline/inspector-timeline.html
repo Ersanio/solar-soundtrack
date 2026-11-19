@@ -1,0 +1,89 @@
+<div class="grid grid-cols-[9rem_1fr] gap-x-2" [class.opacity-60]="stale()">
+  @for (group of groups(); track group.key) {
+    <span
+      class="text-ink-muted col-span-2 pt-2 pb-1 text-[11px] font-semibold tracking-wide uppercase"
+      >{{ group.heading }}</span
+    >
+    @for (row of group.lanes; track row.key) {
+      <span
+        class="text-ink-muted truncate font-mono text-[11px] leading-none"
+        [class]="row.labelClass"
+        [style.height.px]="row.height"
+        [style.line-height.px]="row.height"
+        [title]="row.title || row.label"
+        >{{ row.label }}</span
+      >
+      <div
+        class="bg-inset relative cursor-pointer overflow-hidden"
+        [style.height.px]="row.height"
+        [class.opacity-40]="row.quiet"
+        (click)="seekAt($event)"
+      >
+        <svg
+          class="absolute inset-0 block h-full w-full"
+          preserveAspectRatio="none"
+          [attr.viewBox]="row.box"
+        >
+          @for (area of row.areas; track $index) {
+            <path [attr.d]="area.d" [attr.class]="area.class" />
+          }
+          @for (line of row.lines; track $index) {
+            <path
+              fill="none"
+              stroke-width="1.25"
+              vector-effect="non-scaling-stroke"
+              [attr.d]="line.d"
+              [attr.stroke-dasharray]="line.dashed ? '4 3' : null"
+              [attr.class]="line.class"
+            />
+          }
+          @for (x of row.marks; track x) {
+            <rect
+              y="0"
+              width="1"
+              [attr.x]="x"
+              [attr.height]="row.height"
+              [attr.class]="row.markClass"
+            />
+          }
+        </svg>
+        @if (loopAt() !== null) {
+          <span
+            class="border-ink-muted pointer-events-none absolute inset-y-0 border-l border-dashed"
+            [style.left.%]="loopAt()"
+          ></span>
+        }
+        <span
+          class="bg-accent pointer-events-none absolute inset-y-0 w-px"
+          [style.left.%]="playheadAt()"
+        ></span>
+      </div>
+    }
+  }
+
+  @if (analysis()) {
+    <span
+      i18n="@@analysis.timeline.spectrogram"
+      class="text-ink-muted col-span-2 pt-2 pb-1 text-[11px] font-semibold tracking-wide uppercase"
+      >analysis.timeline.spectrogram</span
+    >
+    <div class="text-ink-muted flex h-32 flex-col justify-between font-mono text-[10px]">
+      @for (label of frequencyLabels; track label) {
+        <span>{{ label }}</span>
+      }
+    </div>
+    <div class="bg-inset relative h-32 cursor-pointer overflow-hidden" (click)="seekAt($event)">
+      <canvas #spectrogram class="absolute inset-0 block h-full w-full"></canvas>
+      @if (loopAt() !== null) {
+        <span
+          class="border-ink-muted pointer-events-none absolute inset-y-0 border-l border-dashed"
+          [style.left.%]="loopAt()"
+        ></span>
+      }
+      <span
+        class="bg-accent pointer-events-none absolute inset-y-0 w-px"
+        [style.left.%]="playheadAt()"
+      ></span>
+    </div>
+  }
+</div>

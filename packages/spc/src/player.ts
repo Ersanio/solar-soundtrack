@@ -8,7 +8,13 @@
  * context clock — which stays accurate across pause and seek.
  */
 
-import { SPC_PROCESSOR, type FromWorklet, type SpcProcessorOptions, type ToWorklet } from "./protocol";
+import {
+	SPC_PROCESSOR,
+	type FromWorklet,
+	type SpcProcessorOptions,
+	type ToWorklet,
+	type VoiceCapture,
+} from "./protocol";
 import type { DriverState } from "./driver-state";
 
 export class PlayerError extends Error {}
@@ -49,6 +55,12 @@ const ID666_FADE = 0xac; // 5 digits, milliseconds
 /** The player allows a little headroom above unity. */
 const MAX_VOLUME = 5;
 
+/**
+ * The analyser's window: 8192 frames at 48 kHz is 5.9 Hz a bin, fine enough to
+ * resolve the bottom third-octave band, 28 Hz wide at 31.5 Hz.
+ */
+const ANALYSER_FFT = 8192;
+
 function readDigits(spc: Uint8Array, offset: number, length: number): number {
 	if (spc.length < offset + length) {
 		return 0;
@@ -72,12 +84,14 @@ export class SpcPlayer {
 	private context: AudioContext | null = null;
 	private node: AudioWorkletNode | null = null;
 	private gain: GainNode | null = null;
+	private analyser: AnalyserNode | null = null;
 
 	private state: PlayerState = "idle";
 	private songTicks = 0;
 	private volume = 1;
 	private looping = false;
 	private muteMask = 0;
+	private capturing = false;
 	/**
 	 * Counts loads and seeks, so a position that was already in flight when the
 	 * playhead moved can be told from one that reflects the move.
@@ -101,6 +115,8 @@ export class SpcPlayer {
 	 */
 	onDriverState: ((state: DriverState) => void) | null = null;
 	/** The song reached the end of its length and fade, and is not looping. */
+	/** Each voice's waveform, while {@link setCapture} has asked for it. */
+	onVoices: ((capture: VoiceCapture) => void) | null = null;
 	onEnded: (() => void) | null = null;
 	/** The emulator or the audio graph failed; playback has stopped. */
 	onError: ((error: PlayerError) => void) | null = null;
@@ -158,6 +174,14 @@ export class SpcPlayer {
 			gain.gain.value = this.volume;
 			node.connect(gain).connect(context.destination);
 
+			// Beside the gain rather than after it, so what it reads is the song and
+			// not the listening level.
+			const analyser = context.createAnalyser();
+			analyser.fftSize = ANALYSER_FFT;
+			analyser.smoothingTimeConstant = 0.5;
+			node.connect(analyser);
+			this.analyser = analyser;
+
 			this.context = context;
 			this.node = node;
 			this.gain = gain;
@@ -170,6 +194,7 @@ export class SpcPlayer {
 		await context.resume();
 		this.post({ type: "loop", loop: this.looping });
 		this.post({ type: "mute", mask: this.muteMask });
+		this.post({ type: "capture", on: this.capturing });
 	}
 
 	private async compile(): Promise<WebAssembly.Module> {
@@ -289,6 +314,35 @@ export class SpcPlayer {
 		}
 	}
 
+	/** Asks the audio thread for {@link onVoices}, or tells it to stop. */
+	setCapture(on: boolean): void {
+		this.capturing = on;
+		if (this.node) {
+			this.post({ type: "capture", on });
+		}
+	}
+
+	/**
+	 * The output's spectrum in dB per bin, as `AnalyserNode.getFloatFrequencyData`
+	 * gives it, into `out` (sized {@link spectrumBins}). False before `init`.
+	 */
+	readSpectrum(out: Float32Array<ArrayBuffer>): boolean {
+		if (!this.analyser) {
+			return false;
+		}
+
+		this.analyser.getFloatFrequencyData(out);
+		return true;
+	}
+
+	/** How many bins {@link readSpectrum} fills. */
+	readonly spectrumBins = ANALYSER_FFT / 2;
+
+	/** The output's sample rate, which sets the width of a spectrum bin. 0 before `init`. */
+	get sampleRate(): number {
+		return this.context?.sampleRate ?? 0;
+	}
+
 	/** The playhead folded into one pass, in music ticks. */
 	getSongTicks(): number {
 		return this.songTicks;
@@ -308,6 +362,7 @@ export class SpcPlayer {
 		this.node?.port.close();
 		this.node = null;
 		this.gain = null;
+		this.analyser = null;
 		this.context = null;
 		this.state = "idle";
 		if (context) {
@@ -328,6 +383,12 @@ export class SpcPlayer {
 				this.songTicks = message.songTicks;
 				this.onPosition?.(message.songTicks);
 				this.onDriverState?.(message.driver);
+				break;
+			case "voices":
+				if (message.epoch === this.epoch) {
+					this.onVoices?.(message);
+				}
+
 				break;
 			case "ended":
 				this.state = "idle";

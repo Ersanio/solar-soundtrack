@@ -1,0 +1,32 @@
+<amk-toolbar>
+  <span class="text-ink-muted text-xs">{{ status() }}</span>
+  @if (analyzer.running()) {
+    <span class="bg-inset h-1.5 w-24 overflow-hidden rounded-full">
+      <span class="bg-control block h-full" [style.width.%]="analyzer.progress() * 100"></span>
+    </span>
+  }
+</amk-toolbar>
+
+<div class="min-h-0 flex-1 overflow-y-auto">
+  @if (tiles().length > 0) {
+    <div
+      class="bg-edge border-edge grid grid-cols-[repeat(auto-fill,minmax(9rem,1fr))] gap-px border-b"
+    >
+      @for (tile of tiles(); track tile.label) {
+        <amk-stat-tile [label]="tile.label" [value]="tile.value" [dim]="tile.dim" />
+      }
+    </div>
+  }
+
+  <amk-section collapsible [heading]="text.live">
+    <amk-live-meters class="p-3" />
+  </amk-section>
+
+  <amk-section collapsible [heading]="text.timeline">
+    <amk-inspector-timeline class="px-3 pb-3" />
+  </amk-section>
+
+  <amk-section collapsible [heading]="text.samples">
+    <amk-sample-usage class="p-3" />
+  </amk-section>
+</div>

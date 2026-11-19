@@ -17,4 +17,7 @@ is latched on the voice the driver plays, and without that every playhead in the
 the music does. Last, that a looping song of one-tick notes keeps the rate its tempo asks for over
 five passes: the playhead is folded by `ticks % loopTicks` against the compiler's count, so a
 counter that runs slow never wobbles, it walks away, and by the fourth pass the line is most of a
-loop from the notes it is drawn over.
+loop from the notes it is drawn over. And that a **voice capture** is posted only on request,
+about forty times a second, a full window per voice with the played voices moving and the rest
+still, a mute captured at volume 0 — and that with it on the output is the same sample for sample
+and the tick stream the same tick for tick.

@@ -1,7 +1,7 @@
 # The editor
 
 The Angular application. Everything it compiles, assembles and plays lives in `../packages`; what is
-here is the UI, the twelve state services, and the adapters that join CodeMirror and Web Audio to
+here is the UI, the thirteen state services, and the adapters that join CodeMirror and Web Audio to
 framework-free code.
 
 Run everything from the repository root, not from here. `npm start`, `npm run build` and
@@ -37,15 +37,15 @@ stay true of `EditorStore` and the write-back path is `.claude/rules/state-and-e
 
 | Path                    | What it is                                                                                         |
 | ----------------------- | -------------------------------------------------------------------------------------------------- |
-| `src/app/state/`        | Twelve `@Service()` singletons in dependency order, and the transport's clock                      |
+| `src/app/state/`        | Thirteen `@Service()` singletons in dependency order, and the transport's clock                    |
 | `src/app/editor/`       | The editor pane and its chrome: top bar, transport, ARAM meter, mixer, palette, CodeMirror adapter |
-| `src/app/editor/views/` | What the pane's tabs switch between: source, sample library, piano roll                            |
+| `src/app/editor/views/` | What the pane's tabs switch between: source, sample library, piano roll, Song Inspector            |
 | `src/app/output/`       | The sidebar: the command and loop inspectors, stats, the ARAM budget, the hex dump, diagnostics    |
 | `src/app/status-bar/`   | The status bar: compile status, the problems count, the development notice, the credit             |
 | `src/app/shared/`       | Form controls, toggles, sections, popovers, tabs, icons, chart helpers                             |
 | `src/app/util/`         | Formatting, IndexedDB, `clamp`                                                                     |
 
-State flows one way: `DriverStore` → `SampleStore` → `EditorStore` → `Playback`. Eight more sit off
+State flows one way: `DriverStore` → `SampleStore` → `EditorStore` → `Playback`. Nine more sit off
 that spine: `ClockMeasurer`, which `EditorStore` owns and which drives the clock measurement in
 `.claude/rules/transport-and-clock.md`; `Audition`, which hangs off `EditorStore` beside `Playback` and owns the second
 `AudioContext`; `Mixer`, which holds the per-channel mutes, the solo and the output level and is
@@ -62,7 +62,9 @@ diagnostic codes the porter has suppressed, which `EditorStore.diagnostics` leav
 everything it feeds (`.claude/rules/problems.md`); and `MidiInput`, which injects nothing and holds the Web
 MIDI connection the top bar's MIDI switch asks for — every input plugged in, as one stream of
 keys with one listener slot, which the piano roll takes while it is open
-(`.claude/rules/piano-roll-architecture.md`, Recording from a MIDI keyboard).
+(`.claude/rules/piano-roll-architecture.md`, Recording from a MIDI keyboard); and `SongAnalyzer`,
+which reads `EditorStore` and `Mixer` and plays the song on a worker for the Song Inspector while
+that tab is open (`.claude/rules/song-inspector.md`).
 
 `DriverStore` loads `packages/spc/assets/driver/`. The song's ARAM load address is the slot the
 driver's own song pointer table reserves, stated in the bundle's `manifest.json` and checked against
@@ -226,14 +228,16 @@ exhausted quota — and must never stop someone compiling a song.
 
 ## Charts
 
-Every chart here is Angular-templated SVG; nothing draws with a charting library. The four inspector
+Every chart here is Angular-templated SVG but the Song Inspector's frame-rate and raster ones —
+the spectrum, the scopes, the vectorscope and the spectrogram — which are canvases drawn in the
+theme's tokens through `shared/chart/canvas-colors.ts`; nothing draws with a charting library. The four inspector
 graphs work in a fixed viewBox from `shared/chart/plot.ts`, stretched to their container, so stroke
 widths and offsets are in viewBox units rather than pixels.
 
 `aram-bar` is the one that does not. It is measured with `element-size.ts` and laid out in real
 pixels by `stack.ts`, because the surface gap between its fills and the floor under a small region
-are pixel sizes, not fractions of the bar that would vanish as it narrows. It is the only component
-that needs either file. `npm run charttest` pins both `stack.ts` and `plot.ts`, along with the roll's
+are pixel sizes, not fractions of the bar that would vanish as it narrows. It is the only component that
+needs `stack.ts`; the canvases are sized with `element-size.ts` too. `npm run charttest` pins both `stack.ts` and `plot.ts`, along with the roll's
 layout maths and the transport's clock — anything here that is arithmetic rather than markup.
 
 ## Panels build view models, not methods

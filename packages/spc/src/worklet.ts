@@ -9,7 +9,7 @@
  * out every time it does.
  */
 
-import { SPC_CHANNELS, SPC_SAMPLE_RATE, type SpcCore, instantiate } from "./wasm-host";
+import { DspReg, SPC_CHANNELS, SPC_SAMPLE_RATE, type SpcCore, instantiate } from "./wasm-host";
 import {
 	MAX_SEEK_SECONDS,
 	POLL_BLOCK_FRAMES,
@@ -20,7 +20,7 @@ import {
 	seedTickPhase,
 	tickVoice,
 } from "./driver-state";
-import { SPC_PROCESSOR, type FromWorklet, type SpcProcessorOptions, type ToWorklet } from "./protocol";
+import { CAPTURE_FRAMES, SPC_PROCESSOR, type FromWorklet, type SpcProcessorOptions, type ToWorklet } from "./protocol";
 
 // AudioWorkletGlobalScope is not in lib.dom, which only describes the page side.
 declare const sampleRate: number;
@@ -35,6 +35,11 @@ declare function registerProcessor(
 
 /** How often to tell the page where playback has got to. */
 const POSITION_INTERVAL = 0.1;
+
+/** How often to post a voice capture while one is asked for. */
+const CAPTURE_INTERVAL = 1 / 40;
+
+const VOICES = 8;
 
 const FULL_SCALE = 32768;
 
@@ -93,6 +98,14 @@ class SpcProcessor extends AudioWorkletProcessor {
 	private pullL = 0;
 	private pullR = 0;
 
+	/** Whether the page wants {@link VoiceCapture}s, and the rings they are cut from. */
+	private capturing = false;
+	private readonly outxRing = new Int8Array(CAPTURE_FRAMES * VOICES);
+	private readonly mixRing = new Int16Array(CAPTURE_FRAMES * SPC_CHANNELS);
+	/** The ring frame the next block lands on; a multiple of the block, so a block never wraps. */
+	private ringAt = 0;
+	private capturePostedAt = -1;
+
 	constructor(options: AudioWorkletNodeOptions) {
 		super(options);
 		this.port.onmessage = (event: MessageEvent<ToWorklet>) => this.receive(event.data);
@@ -105,8 +118,8 @@ class SpcProcessor extends AudioWorkletProcessor {
 		}
 	}
 
-	private send(message: FromWorklet): void {
-		this.port.postMessage(message);
+	private send(message: FromWorklet, transfer: Transferable[] = []): void {
+		this.port.postMessage(message, transfer);
 	}
 
 	private fail(error: unknown): void {
@@ -150,6 +163,10 @@ class SpcProcessor extends AudioWorkletProcessor {
 						this.core.muteVoices(this.muteMask);
 					}
 
+					break;
+				case "capture":
+					this.capturing = message.on;
+					this.capturePostedAt = -1;
 					break;
 				case "stop":
 					this.playing = false;
@@ -287,10 +304,47 @@ class SpcProcessor extends AudioWorkletProcessor {
 		return this.introTicks + ((this.ticks - this.introTicks) % this.loopTicks);
 	}
 
+	/** Posts the rings oldest frame first, with the volumes and samples standing now. */
+	private postCapture(core: SpcCore): void {
+		const outx = new Int8Array(this.outxRing.length);
+		const split = this.ringAt * VOICES;
+		outx.set(this.outxRing.subarray(split));
+		outx.set(this.outxRing.subarray(0, split), outx.length - split);
+
+		const mix = new Int16Array(this.mixRing.length);
+		const mixSplit = this.ringAt * SPC_CHANNELS;
+		mix.set(this.mixRing.subarray(mixSplit));
+		mix.set(this.mixRing.subarray(0, mixSplit), mix.length - mixSplit);
+
+		const regs = core.dspRegisters();
+		const volumes = new Int8Array(VOICES * 2 + 2);
+		core.voiceVolumes(volumes);
+		volumes[VOICES * 2] = regs[DspReg.MainVolumeL];
+		volumes[VOICES * 2 + 1] = regs[DspReg.MainVolumeR];
+
+		const srcn = new Uint8Array(VOICES);
+		for (let voice = 0; voice < VOICES; voice++) {
+			srcn[voice] = regs[voice * 0x10 + DspReg.Srcn];
+		}
+
+		this.send({ type: "voices", epoch: this.epoch, outx, mix, volumes, srcn, noise: regs[DspReg.Noise] }, [
+			outx.buffer,
+			mix.buffer,
+		]);
+	}
+
 	/** Reads one emulator frame, rendering another block when the last runs out. */
 	private pull(): void {
 		if (this.blockPos >= POLL_BLOCK_FRAMES) {
-			this.block.set(this.core!.renderView(POLL_BLOCK_FRAMES));
+			if (this.capturing) {
+				const view = this.core!.renderVoices(POLL_BLOCK_FRAMES, this.outxRing, this.ringAt * VOICES);
+				this.mixRing.set(view, this.ringAt * SPC_CHANNELS);
+				this.ringAt = (this.ringAt + POLL_BLOCK_FRAMES) % CAPTURE_FRAMES;
+				this.block.set(view);
+			} else {
+				this.block.set(this.core!.renderView(POLL_BLOCK_FRAMES));
+			}
+
 			this.blockPos = 0;
 			this.afterBlock();
 		}
@@ -414,6 +468,11 @@ class SpcProcessor extends AudioWorkletProcessor {
 					driver: readDriverState(this.core.aram()),
 					epoch: this.epoch,
 				});
+			}
+
+			if (this.capturing && (this.capturePostedAt < 0 || now - this.capturePostedAt >= CAPTURE_INTERVAL)) {
+				this.capturePostedAt = now;
+				this.postCapture(this.core);
 			}
 		} catch (error) {
 			left.fill(0);

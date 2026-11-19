@@ -1,16 +1,19 @@
-import { Component, effect, signal } from '@angular/core';
+import { Component, effect, inject, signal, untracked } from '@angular/core';
 
+import { IconAnalysis } from '../../shared/icons/icon-analysis';
 import { IconRoll } from '../../shared/icons/icon-roll';
 import { IconSamples } from '../../shared/icons/icon-samples';
 import { IconSource } from '../../shared/icons/icon-source';
 import { type TabDef, Tabs } from '../../shared/tabs/tabs';
 import { ChannelMixer } from '../channel-mixer/channel-mixer';
+import { EditorRequests } from '../../state/editor-requests';
 import { PianoRoll } from '../views/piano-roll/piano-roll';
 import { SampleBrowser } from '../views/sample-browser/sample-browser';
+import { SongInspector } from '../views/song-inspector/song-inspector';
 import { SourceView } from '../views/source-view/source-view';
 import { readStored, writeStored } from '../../util/storage';
 
-type ViewId = 'source' | 'samples' | 'roll';
+type ViewId = 'source' | 'samples' | 'roll' | 'inspector';
 
 const VIEW_KEY = 'solar-soundtrack.view';
 
@@ -20,6 +23,11 @@ const VIEWS: readonly TabDef<ViewId>[] = [
     id: 'roll',
     label: $localize`:@@editor.tab.roll:editor.tab.roll`,
     icon: IconRoll,
+  },
+  {
+    id: 'inspector',
+    label: $localize`:@@editor.tab.inspector:editor.tab.inspector`,
+    icon: IconAnalysis,
   },
   {
     id: 'samples',
@@ -51,11 +59,13 @@ function readView(): ViewId {
  */
 @Component({
   selector: 'amk-editor-pane',
-  imports: [Tabs, ChannelMixer, SourceView, SampleBrowser, PianoRoll],
+  imports: [Tabs, ChannelMixer, SourceView, SampleBrowser, PianoRoll, SongInspector],
   templateUrl: './editor-pane.html',
   host: { class: 'flex min-h-0 min-w-0 flex-col' },
 })
 export class EditorPane {
+  private readonly requests = inject(EditorRequests);
+
   protected readonly VIEWS = VIEWS;
   protected readonly view = signal<ViewId>(readView());
 
@@ -63,5 +73,17 @@ export class EditorPane {
     // Sanctioned effect: mirroring state into localStorage, as `app.ts` does
     // for the split and the palette for its category.
     effect(() => writeStored(VIEW_KEY, this.view()));
+
+    // Sanctioned effect: consuming a request from outside the pane, as the output pane consumes
+    // `revealSection`; put back to `null` so asking twice still takes.
+    effect(() => {
+      const view = this.requests.revealView();
+      if (view) {
+        untracked(() => {
+          this.requests.revealView.set(null);
+          this.view.set(view);
+        });
+      }
+    });
   }
 }

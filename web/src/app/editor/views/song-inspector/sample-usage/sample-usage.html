@@ -1,0 +1,42 @@
+@if (rows().length > 0) {
+  <table class="w-full font-mono text-xs">
+    <thead>
+      <tr class="text-ink-muted border-edge border-b text-left text-[11px] tracking-wide uppercase">
+        <th i18n="@@analysis.samples.srcn" class="py-1 pr-3 font-semibold">
+          analysis.samples.srcn
+        </th>
+        <th i18n="@@analysis.samples.sample" class="py-1 pr-3 font-semibold">
+          analysis.samples.sample
+        </th>
+        <th i18n="@@analysis.samples.aram" class="py-1 pr-3 text-right font-semibold">
+          analysis.samples.aram
+        </th>
+        <th i18n="@@analysis.samples.sounds" class="py-1 pr-3 text-right font-semibold">
+          analysis.samples.sounds
+        </th>
+        <th i18n="@@analysis.samples.peak" class="py-1 text-right font-semibold">
+          analysis.samples.peak
+        </th>
+      </tr>
+    </thead>
+    <tbody>
+      @for (row of rows(); track row.key) {
+        <tr class="border-edge border-b" [class.text-warn]="row.unheard">
+          <td class="py-0.5 pr-3">{{ row.srcn }}</td>
+          <td class="max-w-48 truncate py-0.5 pr-3" [title]="row.name">{{ row.name }}</td>
+          <td class="py-0.5 pr-3 text-right tabular-nums">{{ row.bytes }}</td>
+          <td class="py-0.5 pr-3 text-right tabular-nums">{{ row.share }}</td>
+          <td class="py-0.5 text-right tabular-nums">{{ row.peak }}</td>
+        </tr>
+      }
+    </tbody>
+  </table>
+  @if (unheardBytes() > 0) {
+    <p i18n="@@analysis.samples.unheard" class="text-warn pt-2 text-xs">
+      analysis.samples.unheard
+      {{
+        unheardLabel() // i18n(ph='bytes')
+      }}
+    </p>
+  }
+}

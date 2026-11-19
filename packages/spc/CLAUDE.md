@@ -450,6 +450,15 @@ register file equal to the image's 128 DSP registers. `muteVoices` writes `enabl
 `volume`, and on unmute reads the pair back out of the register file, which holds what the driver
 last wrote. `mute_mask` sits beside the pointer and does nothing in this build.
 
+The register file is also how a voice is **read**. The DSP stores each voice's `VxOUTX` (its
+waveform after the envelope and before volume, the top eight bits), `VxENVX` and the rest on every
+sample, so `renderVoices` emulates a frame at a time and copies the eight `OUTX` bytes after each:
+a signal per voice from a binary that exports none. Splitting a render into one-frame calls changes
+nothing it produces — `audiotest` (`voices.ts`) holds the audio and APU RAM byte for byte against a
+block render — and costs about a sixth more. `voiceVolumes` reads the `volume[2]` pair the mute
+holds at 0, so a muted voice reads silent as it is heard. The Song Inspector is the reader
+(`.claude/rules/song-inspector.md`).
+
 ## The page/worklet seam
 
 `protocol.ts` is the sole contract between the two threads, and it is a separate module so both
@@ -468,7 +477,14 @@ across pause and seek. Each carries an `epoch` — messages cross asynchronously
 just before a seek arrives just after it, and a transport that trusted it would show the thumb
 snapping back to where the song _was_.
 
-Neither thread of the worklet, nor the app's two workers, has a `$localize`, so the modules they
+A `capture` message asks the worklet to render frame by frame and post a `VoiceCapture` about forty
+times a second: the last 32 ms of every voice's `OUTX`, the mix and the volumes, for the Song
+Inspector's scopes. It is off unless asked for and held across loads, as the mute mask is, and the
+tick count, which still runs per 32-frame block, does not notice it (`worklettest`). The player's
+`AnalyserNode` hangs beside its gain rather than after it, so the spectrum reads the song and not
+the listening level.
+
+Neither thread of the worklet, nor the app's three workers, has a `$localize`, so the modules they
 load — `worklet.ts`, `protocol.ts`, `driver-state.ts`, `wasm-host.ts`, `note-audition.ts` — hold no
 message and their errors are written in English in the code. Everything else here that a porter
 reads (the FIR presets, the ARAM segment labels, the GAIN mode names, the BRR and driver errors) is

@@ -27,6 +27,7 @@ const GROUPS = new Set([
   'editor',
   'source',
   'samples',
+  'analysis',
   'transport',
   'mixer',
   'topbar',

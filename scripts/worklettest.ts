@@ -24,7 +24,7 @@ import { createContext, runInContext } from "node:vm";
 import { compiler } from "@amk/compiler";
 import { loadDriver } from "@amk/spc/driver";
 import { buildSpc } from "@amk/spc/export";
-import type { FromWorklet, ToWorklet } from "@amk/spc/protocol";
+import { CAPTURE_FRAMES, type FromWorklet, type ToWorklet } from "@amk/spc/protocol";
 
 import { SPC_ASSETS, check, section, stubFetch, summarise } from "./harness";
 
@@ -547,6 +547,63 @@ section("muting a channel without breaking stride");
 		ticks.length > 1 && ticks.at(-1)! > ticks[0],
 		`${ticks[0]} -> ${ticks.at(-1)}`,
 	);
+}
+
+section("a voice capture is posted on request and changes nothing heard");
+{
+	type Voices = Extract<FromWorklet, { type: "voices" }>;
+	const voices = (messages: FromWorklet[]) => messages.filter((m): m is Voices => m.type === "voices");
+
+	const plain = restart({ spc: duet, loopTicks: 0 });
+	const without = render(plain.processor, 600);
+	const plainTicks = positions(plain.sent).map((p) => p.ticks);
+	check("nothing is captured unasked", voices(plain.sent).length === 0);
+
+	port.onmessage!({ data: { type: "capture", on: true } });
+	const captured = restart({ spc: duet, loopTicks: 0 });
+	const withCapture = render(captured.processor, 600);
+	const capturedTicks = positions(captured.sent).map((p) => p.ticks);
+	const posted = voices(captured.sent);
+
+	check(
+		"the output is the same sample for sample",
+		without.every((value, n) => value === withCapture[n]),
+	);
+	check(
+		"and so is the tick stream",
+		plainTicks.length === capturedTicks.length && plainTicks.every((t, n) => t === capturedTicks[n]),
+		`${plainTicks.join(",")} vs ${capturedTicks.join(",")}`,
+	);
+	// 600 quanta at 48 kHz is 1.6 s, at forty a second.
+	check("captures arrive about forty times a second", posted.length >= 55 && posted.length <= 70, `${posted.length}`);
+
+	const last = posted.at(-1)!;
+	check(
+		"each carries a full window per voice",
+		last.outx.length === CAPTURE_FRAMES * 8 && last.mix.length === CAPTURE_FRAMES * 2,
+		`${last.outx.length} / ${last.mix.length}`,
+	);
+	const moved = (voice: number) => last.outx.some((value, n) => n % 8 === voice && value !== last.outx[voice]);
+	check("the two voices the song plays move", moved(0) && moved(1));
+	check(
+		"the six it does not stay still",
+		[2, 3, 4, 5, 6, 7].every((voice) => !moved(voice)),
+	);
+
+	port.onmessage!({ data: { type: "mute", mask: 0b10 } });
+	render(captured.processor, 40);
+	const muted = voices(captured.sent).at(-1)!;
+	check(
+		"a muted voice is captured at volume 0",
+		muted.volumes[2] === 0 && muted.volumes[3] === 0 && muted.volumes[0] !== 0,
+		Array.from(muted.volumes).join(","),
+	);
+
+	port.onmessage!({ data: { type: "capture", on: false } });
+	port.onmessage!({ data: { type: "mute", mask: 0 } });
+	const before = voices(captured.sent).length;
+	render(captured.processor, 100);
+	check("switching it off stops the posts", voices(captured.sent).length === before);
 }
 
 summarise();
