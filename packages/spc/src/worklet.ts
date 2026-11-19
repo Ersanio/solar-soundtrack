@@ -229,6 +229,11 @@ class SpcProcessor extends AudioWorkletProcessor {
 		this.endsAtTicks = this.durationTicks();
 		this.fadeFrom = -1;
 		this.postedAt = -1;
+		// `frames` has just moved, backwards too, and the rings hold audio from before the jump.
+		this.capturePostedAt = -1;
+		this.outxRing.fill(0);
+		this.mixRing.fill(0);
+		this.ringAt = 0;
 		this.primed = false;
 		this.blockPos = POLL_BLOCK_FRAMES;
 		this.phase = 0;

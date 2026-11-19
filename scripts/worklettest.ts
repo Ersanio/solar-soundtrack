@@ -590,6 +590,16 @@ section("a voice capture is posted on request and changes nothing heard");
 		[2, 3, 4, 5, 6, 7].every((voice) => !moved(voice)),
 	);
 
+	const beforeSeek = voices(captured.sent).length;
+	port.onmessage!({ data: { type: "seek", ticks: 0, epoch: 20 } });
+	render(captured.processor, 40);
+	const afterSeek = voices(captured.sent).slice(beforeSeek);
+	check(
+		"captures go on arriving after a seek backwards",
+		afterSeek.length >= 3 && afterSeek.every((capture) => capture.epoch === 20),
+		`${afterSeek.length}`,
+	);
+
 	port.onmessage!({ data: { type: "mute", mask: 0b10 } });
 	render(captured.processor, 40);
 	const muted = voices(captured.sent).at(-1)!;
