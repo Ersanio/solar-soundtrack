@@ -195,8 +195,8 @@ x) / zoom`, which holds in both follow modes because the key column cancels.
   (`page.addInitScript` from a steps file, then `page.reload()`) and count. `Audition` is the only
   buffer-source user on the page — the transport is an AudioWorklet — and a note renders on a
   worker, so poll for the increment for a few seconds.
-- **The inspector's empty state** is its placeholder, the message `inspector.put-the-cursor-on`
-  ("Put the cursor on a note or command …").
+- **The inspector's empty state** is its placeholder, the message `inspector.no-note-or-command-selected`
+  ("No note or command selected.").
 
 ## Gestures
 

@@ -2,16 +2,14 @@
 @if (row.isMarker) {
   <!-- A marker occupies the slot rather than sitting between two, so it
        replaces the row rather than decorating it. -->
-  <span class="flex-1 py-1 text-xs" [class.text-accent]="row.isLive">
-    <span class="font-mono">$80</span>
-    —
+  <span class="flex-1 py-1 text-center text-xs font-semibold" [class.text-accent]="row.isLive">
     @if (row.isLive) {
-      <ng-container i18n="@@inspector.arpeggio-note.restarts-here"
-        >inspector.arpeggio-note.restarts-here</ng-container
+      <ng-container i18n="@@inspector.arpeggio-note.loop-point"
+        >inspector.arpeggio-note.loop-point</ng-container
       >
     } @else {
-      <ng-container i18n="@@inspector.arpeggio-note.overridden"
-        >inspector.arpeggio-note.overridden</ng-container
+      <ng-container i18n="@@inspector.arpeggio-note.warning-this-loop-point"
+        >inspector.arpeggio-note.warning-this-loop-point</ng-container
       >
     }
   </span>
@@ -37,7 +35,6 @@
 <button
   amk-button
   variant="ghost"
-  [title]="row.isMarker ? text.clearLoop : text.restartHere"
   [disabled]="!row.canMark && !row.isMarker"
   (click)="looped.emit(row.index)"
 >
@@ -53,8 +50,6 @@
   i18n="@@inspector.arpeggio-note.remove"
   amk-button
   variant="ghost"
-  i18n-title="@@inspector.arpeggio-note.remove-this-entry.title"
-  title="inspector.arpeggio-note.remove-this-entry.title"
   [disabled]="!resizable()"
   (click)="removed.emit(row.index)"
 >

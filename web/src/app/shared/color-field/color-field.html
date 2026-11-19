@@ -37,8 +37,6 @@
     spellcheck="false"
     autocomplete="off"
     class="bg-inset w-16 shrink-0 rounded-sm border px-1.5 py-0.5 font-mono text-[11px] tabular-nums uppercase disabled:cursor-not-allowed disabled:opacity-40"
-    i18n-title="@@common.a-colour-as-hex.title"
-    title="common.a-colour-as-hex.title"
     [class.border-edge]="!invalid()"
     [class.text-ink]="!invalid()"
     [class.border-danger]="invalid()"
@@ -58,8 +56,6 @@
         i18n="@@common.reset"
         type="button"
         class="text-ink-muted hover:text-ink cursor-pointer text-[11px] hover:underline"
-        i18n-title="@@common.back-to-the-default.title"
-        title="common.back-to-the-default.title"
         (click)="cleared.emit()"
       >
         common.reset

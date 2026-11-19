@@ -188,16 +188,6 @@ export class ArpeggioCommand {
 
   protected readonly omitted = computed(() => Math.max(0, this.args().length - 2 - MAX_ROWS));
 
-  protected readonly countNote = computed(() => {
-    const written = this.count();
-    const actual = this.args().length - 2;
-    if (this.isSequence() && written !== actual) {
-      return $localize`:@@inspector.arpeggio.the-count-says-but-follow:inspector.arpeggio.the-count-says-but-follow ${written}:written: ${actual}:actual:`;
-    }
-
-    return null;
-  });
-
   /** The single argument the trill and glissando forms take past the duration. */
   protected readonly extra = computed(() => toSigned(this.args()[2] ?? 0));
 

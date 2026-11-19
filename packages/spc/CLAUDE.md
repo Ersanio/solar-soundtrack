@@ -6,25 +6,26 @@ Depends on `@amk/core` and nothing else. No DOM outside `driver.ts` and `player.
 no framework anywhere. That is what lets the same modules run in Node under the harnesses, on the
 main thread, and inside an `AudioWorkletGlobalScope`.
 
-| Module               | What it is                                                        |
-| -------------------- | ----------------------------------------------------------------- |
-| `adsr.ts`            | Envelope and tuning maths for an instrument's six bytes           |
-| `brr.ts`             | The SNES's ADPCM container and decoder                            |
-| `driver.ts`          | Loads `assets/driver/` — program, base images, `#default` samples |
-| `driver-state.ts`    | Reads the running driver out of APU RAM                           |
-| `export.ts`          | Assembles the 0x10200-byte `.spc`                                 |
-| `fir.ts`             | The echo filter: response, stability, headroom, design            |
-| `instruments.ts`     | Finds the driver's own instrument and percussion tables           |
-| `layout.ts`          | Where things sit in ARAM, and what is left                        |
-| `pitch.ts`           | `SetPitch`'s arithmetic, and where a pitch stops being the note   |
-| `player.ts`          | AudioContext, worklet node, transport                             |
-| `protocol.ts`        | The one message contract between page and audio thread            |
-| `repeat-settings.ts` | The settings a pass carries into the song's repeat                |
-| `slots.ts`           | The slots of driver state a VCMD writes or clears                 |
-| `song-walk.ts`       | Reads a compiled song the way the driver does: what sounds when   |
-| `song-walk-types.ts` | The walk's public model, re-exported from `song-walk.ts`          |
-| `wasm-host.ts`       | Blargg's snes_spc, called directly, and its DSP's voice mute      |
-| `worklet.ts`         | The renderer on the audio thread                                  |
+| Module               | What it is                                                            |
+| -------------------- | --------------------------------------------------------------------- |
+| `adsr.ts`            | Envelope and tuning maths for an instrument's six bytes               |
+| `arpeggio.ts`        | `HandleArpeggio` over every voice: the offsets an `$FB` steps through |
+| `brr.ts`             | The SNES's ADPCM container and decoder                                |
+| `driver.ts`          | Loads `assets/driver/` — program, base images, `#default` samples     |
+| `driver-state.ts`    | Reads the running driver out of APU RAM                               |
+| `export.ts`          | Assembles the 0x10200-byte `.spc`                                     |
+| `fir.ts`             | The echo filter: response, stability, headroom, design                |
+| `instruments.ts`     | Finds the driver's own instrument and percussion tables               |
+| `layout.ts`          | Where things sit in ARAM, and what is left                            |
+| `pitch.ts`           | `SetPitch`'s arithmetic, and where a pitch stops being the note       |
+| `player.ts`          | AudioContext, worklet node, transport                                 |
+| `protocol.ts`        | The one message contract between page and audio thread                |
+| `repeat-settings.ts` | The settings a pass carries into the song's repeat                    |
+| `slots.ts`           | The slots of driver state a VCMD writes or clears                     |
+| `song-walk.ts`       | Reads a compiled song the way the driver does: what sounds when       |
+| `song-walk-types.ts` | The walk's public model, re-exported from `song-walk.ts`              |
+| `wasm-host.ts`       | Blargg's snes_spc, called directly, and its DSP's voice mute          |
+| `worklet.ts`         | The renderer on the audio thread                                      |
 
 ## Assets
 
@@ -199,16 +200,30 @@ tick that fetches nothing, so each frame's first tick does neither, and a key-on
 
 ## Where a pitch stops being the note
 
-`pitch.ts` is `SetPitch` (`main.asm:484-554`) transcribed, and it is what `SST0513` and `SST0514`
-are raised on (`web/src/app/state/pitch-range.ts`). Two limits come out of it, and neither is a
+`pitch.ts` is `SetPitch` (`main.asm:484-554`) transcribed, and it is what `SST0513`, `SST0514` and
+`SST0515` are raised on (`web/src/app/state/pitch-range.ts`). Two limits come out of it, and neither is a
 written note's octave. The DSP reads fourteen bits of the pitch register (`SPC_DSP.cpp:436`), so
 once the instrument's multiplier carries a pitch to `$4000` it wraps round low: `@0`'s ×6 from
 o6 f, `@8`'s ×30 from o4 c+. And `SetPitch`'s octave counter counts up to 6, so a note number of
 84 or more, o8 c, sends it round through 255 and the pitch to nothing — which is also where a note
-transposed below o1 c lands. Only `$E4`, `$FA $02`, `$EE` and a vibrato get a note past o6 a, so
-the walk reports all four, and says when a `$F3`, an arpeggio or a remote body leaves the tuning
-unknown. `audiotest` holds the arithmetic to the chip on rendered audio: the pitch ratio of each
-wrapped note to an in-range one on the same sample, and silence past o7 b.
+transposed below o1 c lands. Only `$E4`, `$FA $02`, `$EE`, a vibrato and an arpeggio get a note
+past o6 a, so the walk reports all five, and says when a `$F3`, an arpeggio it cannot follow or a
+remote body leaves the tuning unknown.
+
+An arpeggio is followed tick by tick, because under one a note's own key-on plays nothing: it
+restarts the arpeggio's timer, and each step replays the note at the next offset, so the steps are
+the pitches heard (`arpeggio.ts`, `WalkNote.arpeggioSteps`). The timer runs over rests and ties as
+well as notes, which is what carries a trill's parity and a glissando's climb from one note to the
+next, and it is held on the last `!WaitTime` ticks of a frame while the read-ahead says the voice
+keys off. That answer lives in one opcode every voice's read-ahead rewrites, so the walk records
+each channel's frames and the commands that bear on it, and once it has walked them all it runs the
+eight voices together, tick by tick in the driver's own order — a tie ahead, legato, remote code
+that runs at the key-off and three hot-patch bits each change what a read-ahead answers. A note the
+timer is held on for every tick is never keyed on (`SST0516`, `web/src/app/state/silent-arpeggio.ts`),
+and is reported empty only where the voice was keyed off going in. `walktest` holds the steps to the
+running driver on one channel and on several. `audiotest` holds the arithmetic to the chip on
+rendered audio: the pitch ratio of each wrapped note to an in-range one on the same sample, and
+silence past o7 b.
 
 The traps are all in the grammar and each carries its citation in the source: a `$00` after a
 duration byte is a quantization byte and not the end of the channel, `$C7`-`$CF` are _all_ rests,

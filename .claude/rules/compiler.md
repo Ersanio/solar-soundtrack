@@ -36,8 +36,8 @@ warning, the tempo shortfall, a tempo, channel setting or song setting that carr
 song's repeat (`SST0510`-`SST0512`), the `#path` notice, the runaway-replacement guard, the three
 command hazards — `$F7`'s dead dispatch slot, a `$DD` no note's read-ahead can reach, and `#am4`'s
 silent `$E4` offset — a remote call that points at no body (`SST0509`), and a note pitched past
-what its instrument can play or a vibrato that swings one there (`SST0513`, `SST0514`) are
-`SST05xx`, which is
+what its instrument can play or a vibrato or an arpeggio that takes one there (`SST0513`-`SST0515`),
+and a note an arpeggio never keys on (`SST0516`) are `SST05xx`, which is
 also where a finding goes when the reference does not
 _finish_ rather than not object: `SST0505` bounds a replacement that expands into itself, and
 AddmusicK grows its buffer forever on the same song, so there is no run to be faithful to and

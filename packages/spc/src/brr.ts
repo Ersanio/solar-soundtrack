@@ -37,7 +37,7 @@ export function validateBrr(bytes: Uint8Array): string | null {
 	}
 
 	if (bytes.length < 2 + BRR_BLOCK_BYTES) {
-		return $localize`:@@error.brr.only-bytes-too-short-to:error.brr.only-bytes-too-short-to ${bytes.length}:length:`;
+		return $localize`:@@error.brr.it-is-too-small-to:error.brr.it-is-too-small-to`;
 	}
 
 	if ((bytes.length - 2) % BRR_BLOCK_BYTES !== 0) {

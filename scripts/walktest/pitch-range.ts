@@ -1,4 +1,4 @@
-/** `walktest`: what a note's pitch depends on, and the notes and vibratos past what their instrument can play (`SST0513`, `SST0514`). */
+/** `walktest`: what a note's pitch depends on, and the notes, vibratos and arpeggios past what their instrument can play (`SST0513`-`SST0515`). */
 
 import "../localize";
 import { readInstrumentTables } from "@amk/spc/instruments";
@@ -163,11 +163,95 @@ section("a vibrato that swings a note past its range is SST0514");
 }
 
 // ---------------------------------------------------------------------------
+section("an arpeggio that takes a note past its range is SST0515");
+// ---------------------------------------------------------------------------
+{
+	const high =
+		"The arpeggio on this note plays it at o6 g, above o6 e, the highest pitch @0 can play: past that the SNES runs out of pitch and that step comes out as about o3 a+ instead. Make the arpeggio's steps smaller, or play the note lower.";
+	const sequence = findings("#0 @0 $FB $02 $06 $00 $0C o5 g4");
+	check(
+		"a sequence's step, on the note, named by the step and what is heard",
+		spell(sequence) === "SST0515@g4" && sequence[0]?.message === high,
+		sequence[0]?.message,
+	);
+	check(
+		"a trill's the same",
+		spell(findings("#0 @0 $FB $80 $06 $0C o5 g4")) === "SST0515@g4",
+		spell(findings("#0 @0 $FB $80 $06 $0C o5 g4")),
+	);
+
+	// Sixteen steps of a semitone in a half note: o6 c climbs to o7 e.
+	const glissando = findings("#0 @0 $FB $81 $06 $01 o6 c2 d4");
+	check(
+		"a glissando's highest step, and nothing on the note after it ends",
+		spell(glissando) === "SST0515@c2" &&
+			glissando[0]?.message.startsWith("The arpeggio on this note plays it at o7 e,"),
+		glissando[0]?.message,
+	);
+	check(
+		"a step below o1 c is silent",
+		findings("#0 @0 $FB $81 $06 $FF o1 e2")[0]?.message ===
+			"The arpeggio on this note takes it below o1 c, the lowest pitch the driver can play, so those steps play nothing. Make the arpeggio's steps smaller, or play the note higher.",
+		findings("#0 @0 $FB $81 $06 $FF o1 e2")[0]?.message,
+	);
+	check(
+		"and one far enough below sounds somewhere else",
+		findings("#0 @0 $FB $01 $06 $9C o2 c4")[0]?.message ===
+			"The arpeggio on this note takes it below o1 c, the lowest pitch the driver can play, and that step comes out as about o4 e instead. Make the arpeggio's steps smaller, or play the note higher.",
+		findings("#0 @0 $FB $01 $06 $9C o2 c4")[0]?.message,
+	);
+	check(
+		"a step past o7 b is silent",
+		findings("#0 @1 $FB $01 $06 $18 o6 a4")[0]?.message ===
+			"The arpeggio on this note takes it above o7 b, the highest pitch the driver can play, so those steps play nothing. Make the arpeggio's steps smaller, or play the note lower.",
+		findings("#0 @1 $FB $01 $06 $18 o6 a4")[0]?.message,
+	);
+	check(
+		"an instrument with no true pitch is named as one",
+		findings("#instruments { @0 $FF $E0 $B8 $FF $00 }\n#0 @30 $FB $01 $06 $0C o4 c4")[0]?.message ===
+			"@30 is tuned too high for the SNES to play any note true, so every step of the arpeggio on this note comes out wrong. Play it on an instrument tuned lower.",
+	);
+	check(
+		"named in the frame the note is written in",
+		findings("#0 $FA $02 $05 @0 $FB $01 $06 $0C o5 c4")[0]?.message.startsWith(
+			"The arpeggio on this note plays it at o6 c, above o5 b,",
+		) === true,
+	);
+
+	// The written pitch is heard only where a step plays it.
+	check(
+		"o6 f is not judged where no step plays it, and the step that is, is",
+		spell(findings("#0 @0 $FB $01 $06 $0C o6 f4")) === "SST0515@f4",
+		spell(findings("#0 @0 $FB $01 $06 $0C o6 f4")),
+	);
+	check(
+		"where a step does, SST0513 says it, and a step that also wraps adds nothing",
+		spell(findings("#0 @0 $FB $02 $06 $00 $04 o6 f4")) === "SST0513@f4",
+		spell(findings("#0 @0 $FB $02 $06 $00 $04 o6 f4")),
+	);
+	check(
+		"a step the note is too short to reach is not judged",
+		findings("#0 @0 $FB $02 $30 $00 $0C o5 g8").length === 0,
+	);
+	check("nor a note too short for any step", findings("#0 @0 $FB $02 $06 $00 $0C o6 f=2").length === 0);
+	check("a note played three times is one finding", findings("#0 @0 $FB $02 $06 $00 $0C [o5 g4]3").length === 1);
+	check(
+		"and a vibrato under one is not judged, each step restarting it",
+		spell(findings("#0 @0 p44,255 $FB $01 $06 $00 o6 a1")) === "SST0513@a1",
+		spell(findings("#0 @0 p44,255 $FB $01 $06 $00 o6 a1")),
+	);
+}
+
+// ---------------------------------------------------------------------------
 section("a note whose tuning the walk cannot vouch for is left alone");
 // ---------------------------------------------------------------------------
 {
 	check("under a $F3, until a $DA", spell(findings("#0 @0 $F3 $00 $03 o6 f4 @0 o6 f4")) === "SST0513@f4");
-	check("under an arpeggio", findings("#0 @0 $FB $02 $06 $00 $04 o6 f4").length === 0);
+	check("a drum under an arpeggio", findings("#0 @0 $FB $02 $06 $00 $0C @21 c4").length === 0);
+	check(
+		"a glissando under a hot-patch preset past the table",
+		findings("#0 $FA $7F $08 @0 $FB $81 $06 $18 o6 c4").length === 0,
+	);
 	check(
 		"under a remote body that moves the pitch, and not under one that only sets GAIN",
 		findings("(!1)[$FA $02 $05]\n#0 (!1, -1) @0 o6 f4").length === 0 &&

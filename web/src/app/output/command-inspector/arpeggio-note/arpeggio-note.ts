@@ -34,11 +34,6 @@ export interface ArpeggioNote {
   host: { class: 'flex items-start gap-1.5' },
 })
 export class ArpeggioNoteRow {
-  protected readonly text = {
-    clearLoop: $localize`:@@inspector.arpeggio-note.clear-loop.title:inspector.arpeggio-note.clear-loop.title`,
-    restartHere: $localize`:@@inspector.arpeggio-note.restart-here.title:inspector.arpeggio-note.restart-here.title`,
-  };
-
   readonly note = input.required<ArpeggioNote>();
   /** Whether the sliders take an edit at all — a macro's bytes do not. */
   readonly editable = input.required<boolean>();

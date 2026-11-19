@@ -30,7 +30,7 @@
  *   - `$F6`, a raw DSP write that the driver's own copies overwrite, so nothing
  *     says what it leaves behind.
  *   - `$FA $04`, which AddmusicK writes ahead of the song itself.
- *   - Hot-patch bit 6's one-note glissando and bit 4's `$F3` sub-multiplier.
+ *   - Hot-patch bit 4's `$F3` sub-multiplier.
  *   - Anything inside a `$FC` body, which the walk does not follow.
  */
 
@@ -266,9 +266,12 @@ const to = (setting: CarriedSetting, values: readonly number[]): SettingChange =
 const withAt = (values: readonly number[], at: number, value: number): readonly number[] =>
 	values.map((each, index) => (index === at ? value : each));
 
-/** `HandleArpeggio`'s glissando ends itself after its notes (`main.asm:2425-2432`). */
+/**
+ * A pitched note counts down a glissando of type 2, the `$FB $81`, which ends itself on the last
+ * (`main.asm:2425-2432`); every other type is never counted.
+ */
 const glissandoNote = change("arpeggio", (values) => {
-	if (values[0] === 0 || values[1] < 2) {
+	if (values[0] === 0 || values[1] !== 2) {
 		return values;
 	}
 
@@ -279,9 +282,10 @@ const glissandoNote = change("arpeggio", (values) => {
  * What the bytes the driver just read do to the settings, on `channel`.
  *
  * `bytes` is a command and its operands, a frame's `q` byte (below `$80`), or a
- * note byte.
+ * note byte. `glissandoOneNote` is hot patch byte 0 bit 6, which an `$FB`
+ * starts a glissando's count under (`Commands.asm:902-908`).
  */
-export function settingChanges(bytes: readonly number[], channel: number): SettingChange[] {
+export function settingChanges(bytes: readonly number[], channel: number, glissandoOneNote = false): SettingChange[] {
 	const [lead, ...operands] = bytes;
 	const arg = (n: number): number => operands[n] ?? 0;
 	if (lead === undefined) {
@@ -301,8 +305,9 @@ export function settingChanges(bytes: readonly number[], channel: number): Setti
 	}
 
 	if (lead < FIRST_VCMD) {
-		// `PercNote` loads the drum's whole record (`main.asm:382-387`).
-		return [to("instrument", [DRUM + lead, ...NO_RECORD]), glissandoNote];
+		// `PercNote` loads the drum's whole record (`main.asm:382-387`), and a drum
+		// byte passes the glissando by uncounted (`main.asm:2415-2416`).
+		return [to("instrument", [DRUM + lead, ...NO_RECORD])];
 	}
 
 	switch (lead) {
@@ -370,7 +375,7 @@ export function settingChanges(bytes: readonly number[], channel: number): Setti
 		case VCMD.Settings:
 			return settings(arg(0), arg(1), operands);
 		case VCMD.Arpeggio:
-			return [to("arpeggio", arpeggio(operands))];
+			return [to("arpeggio", arpeggio(operands, glissandoOneNote))];
 		case VCMD.RemoteCode:
 			return remote(operands);
 		default:
@@ -430,15 +435,17 @@ function settings(sub: number, value: number, operands: readonly number[]): Sett
 }
 
 /** `$FB`: count, type, step length, then the notes or the trill/glissando delta (`Commands.asm:1094-1240`). */
-function arpeggio(operands: readonly number[]): readonly number[] {
+function arpeggio(operands: readonly number[], glissandoOneNote: boolean): readonly number[] {
 	const [count = 0, length = 0, ...rest] = operands;
 	if (count === 0) {
 		return [0];
 	}
 
 	// A count below `$80` is a list of notes; at `$80` and up, a trill (type 1)
-	// or a glissando (2 and up), forced to two notes.
-	return count < 0x80 ? [count, 0, length, ...rest.slice(0, count)] : [2, (count & 0x7f) + 1, length, rest[0] ?? 0];
+	// or a glissando (2 and up), its count forced to `glissNoteCounter`'s.
+	return count < 0x80
+		? [count, 0, length, ...rest.slice(0, count)]
+		: [glissandoOneNote ? 1 : 2, (count & 0x7f) + 1, length, rest[0] ?? 0];
 }
 
 /** `$FC`'s two slots, normal and key-on (`Commands.asm:1242-1352`). */

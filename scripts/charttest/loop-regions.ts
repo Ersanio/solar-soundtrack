@@ -39,6 +39,7 @@ section("the loop regions behind the bars");
 		ticks,
 		gateTicks: ticks,
 		vibratoTicks: 0,
+		arpeggioSteps: null,
 		note: 0x80 + key,
 		key,
 		percussion: null,

@@ -14,6 +14,8 @@ export const CHANGELOG: readonly ChangelogEntry[] = [
       'New theme: Praise The (Happy) Sun',
       'Add support for light themes; Certain UI elements automatically change colors to match the theme',
       'Allow changing the piano keys and the sheen on buttons in the theme editor',
+      "Warn when a note's arpeggio, trill or glissando reaches past the instrument's playable pitch range",
+      'Warn when a note is too short for its arpeggio to play it at all',
     ],
   },
   {

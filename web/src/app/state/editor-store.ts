@@ -24,6 +24,7 @@ import { type TimelineCommand, commandTimeline } from './command-timeline';
 import { type SongClock, songClock } from './song-clock';
 import { ClockMeasurer, tempoDiagnostic } from './clock-measurer';
 import { pitchRange } from './pitch-range';
+import { silentArpeggioNotes } from './silent-arpeggio';
 import { repeatSettings, repeatTempo } from './repeat-carry';
 import { caretPosition, downloadBlob, errorMessage } from '../util/format';
 import { dropHeld, keepDraft, openDraft, parsing, settleDraft } from './draft-guard';
@@ -214,7 +215,8 @@ export class EditorStore {
       ...(timeline && compiled ? repeatSettings(timeline, compiled) : []), // Settings that carry into the repeat
       ...(timeline && compiled && instruments
         ? pitchRange(timeline, compiled.result, instruments)
-        : []), // Notes and vibratos past what the instrument can play
+        : []), // Notes, vibratos and arpeggios past what the instrument can play
+      ...(timeline ? silentArpeggioNotes(timeline, this.result()?.noteMap ?? []) : []), // Notes an arpeggio never keys on
       // The driver cannot keep up with the tempo. It stands on the last
       // measurement rather than only on one taken from the current bytes, which
       // is what stops it blinking out on every keystroke; the span comes from

@@ -256,9 +256,7 @@ export class CommandInspector {
 
     const command = this.params();
     if (!command) {
-      return this.loop()
-        ? $localize`:@@inspector.a-loop:inspector.a-loop`
-        : $localize`:@@inspector.nothing-at-the-caret:inspector.nothing-at-the-caret`;
+      return this.loop() ? $localize`:@@inspector.a-loop:inspector.a-loop` : '';
     }
 
     const via = this.replacement();

@@ -280,6 +280,29 @@ section("a setting that carries over into the repeat is reported");
 			0,
 			false,
 		],
+		// `!ArpNoteCount` ($0261): only a glissando of type 2 counts its base notes, and only pitched
+		// ones (`main.asm:2415-2432`).
+		[
+			"a glissando past $81, which never ends itself",
+			"#0 / o4 c4 $FB $82 $04 $02 c4 c4 c4",
+			(aram: Uint8Array) => aram[0x0261],
+			2,
+			true,
+		],
+		[
+			"a drum after a glissando's first note, which it does not count",
+			"#0 / @21 c4 @0 o4 c4 $FB $81 $04 $02 c4 @21 c4",
+			(aram: Uint8Array) => aram[0x0261],
+			1,
+			true,
+		],
+		[
+			"a glissando under the 1.0.9 hot patch, which its one note ends",
+			"#0 $FA $7F $01 / o4 c4 $FB $81 $04 $02 c4",
+			(aram: Uint8Array) => aram[0x0261],
+			0,
+			false,
+		],
 	] as const) {
 		const source = song(body);
 		const { aram } = aramInRepeat(source);

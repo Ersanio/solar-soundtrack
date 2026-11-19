@@ -198,7 +198,8 @@ runs.
 each warns where changed inside the loop and is quiet where written at the loop start, a toggle at
 the loop start fixes nothing, and the running driver's volume, instrument, legato, echo, master
 volume, transpose, fine tune and tremolo registers a few ticks into the repeat are what the walk
-says carried. Remote code a rest cannot run is judged at the loop's first note, held to the driver
+says carried, and so is a glissando's count, which only a pitched note under `$FB $81` takes down,
+from 1 under the 1.0.9 hot patch. Remote code a rest cannot run is judged at the loop's first note, held to the driver
 the same way: a rest runs no key-on code, and a type 3 keeps a voice on through the loop's first
 rest only under legato or on a channel the phrase change cuts short.
 
@@ -234,6 +235,29 @@ compiles: `$F2` a cent short of two semitones at each end, a sub-semitone depth 
 reading the same both ways, the written pitch rather than `@2`'s byte, the steady lines for a delay
 the note does not outlast and a rate of 0, and nothing for a drum or under noise.
 
+### `arpeggio.ts`
+
+The steps an `$FB` plays each note at (`WalkNote.arpeggioSteps`, from `@amk/spc/arpeggio`): a
+sequence's offsets in turn and from the start on every note, a `$80` loop point, a negative offset
+read as a signed byte, a trill starting on its other note, a glissando climbing from its first step
+and ending itself on the next note — on the first under the 1.0.9 hot patch, unknown under a preset
+past the table, never at `$82` and up — a note too short for any step, a trailing `$80` that leaves
+nothing known until the next `$FB`, and a drum, which is not followed. Then the running driver is
+the oracle: under `$FB $82` with a step of 1, each channel's `!ArpCurrentDelta` (`$0270+x`) counts
+every step and each one's value names it, so the steps seen over each note's ticks are held to the
+walk's, and a note with none to `!PlayingVoices`, which never shows its voice keyed on. The lengths
+straddle a frame too short to step on, the timer held on a keyed-off frame's last `!WaitTime`
+ticks, a tie that does not hold it, and a last piece of one tick, at step lengths either side of
+`!WaitTime` and under `$F4 $02`, and a trill's parity is carried through the rests between.
+
+The hold turns on one opcode every voice's read-ahead rewrites, and that is the part a single
+channel cannot reach: a short note that is silent on `#0` alone steps beside a `#1` whose read-ahead
+answers last that a tie follows, and four channels with legato and key-off remote code are held to
+the driver too — the legato answer and the remote-code answer each fail them when left out. Last,
+`SST0516` (`state/silent-arpeggio.ts`) on the note, named by `!WaitTime`, `$F4 $02` making it 1, a
+note one tick longer or under steps of `!WaitTime` raising nothing, a `[ ]3` once, and nothing for
+a note another channel's read-ahead keeps stepping or one under legato.
+
 ### `pitch-range.ts`
 
 What a note's pitch depends on, as the walk reports it — `$EE`'s fine tune, a `$F3` until the next
@@ -245,8 +269,14 @@ own entry's pitch, a note in a `[ ]3` is one finding, and `@30` and up are judge
 `#instruments` entry, a noise one not at all. `SST0514` lands on each note the
 vibrato swings out, a note in a `[ ]2` once: a crest past the instrument's highest true note, one
 carried past o7 b by `$EE $10` — the margin `$FF` leaves at o6 a is 15/256 of a semitone — and a dip
-below o1 c, but not a slow rate on a short note, a delay the note does not outlast, or a fade. Under a `$F3`, an arpeggio or a pitch-moving remote
-body nothing is raised.
+below o1 c, but not a slow rate on a short note, a delay the note does not outlast, or a fade.
+`SST0515` lands on the note an arpeggio's steps take out — a sequence's, a trill's and a
+glissando's, a step past o7 b or below o1 c, one far enough below to sound elsewhere, an instrument
+with no true pitch — and the written pitch is judged only where a step plays it, `SST0513` then
+saying it and an upward step that also wraps adding nothing. A step the note is too short to reach
+and a vibrato under an arpeggio, which each step restarts, are not judged. Under a `$F3`, a drum
+under an arpeggio, a glissando under an unknown hot-patch preset or a pitch-moving remote body
+nothing is raised.
 
 ### `tempo-shortfall.ts`
 

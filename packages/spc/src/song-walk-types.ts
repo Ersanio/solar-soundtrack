@@ -46,7 +46,10 @@ export interface NoteState {
 	 * hot-patch bit the walk does not track, so the tuning the note plays at is not known here.
 	 */
 	sampleLoaded: boolean;
-	/** An `$FB` with a count is in force, playing notes of its own at offsets the walk does not follow. */
+	/**
+	 * An `$FB` plays this note's pitches ({@link WalkNote.arpeggioSteps}), or might where the walk
+	 * cannot follow it, as on a drum. False again once a glissando has ended itself.
+	 */
 	arpeggio: boolean;
 	/**
 	 * A remote code body run on this channel moves the pitch, the tuning or the vibrato, in a way the
@@ -159,6 +162,13 @@ export interface WalkNote {
 	 * own step, which then does nothing (`main.asm:2577-2578, 3239-3243, 3298-3300`).
 	 */
 	vibratoTicks: number;
+	/**
+	 * The offset in semitones of each step the arpeggio takes over the note and its ties, in order:
+	 * the pitches it sounds at, since under an arpeggio its key-on plays nothing (`arpeggio.ts`).
+	 * Empty where no step comes before the next frame and the voice was keyed off going in, so the
+	 * note is silent; `null` with no arpeggio, on a drum, or where the steps cannot be known.
+	 */
+	arpeggioSteps: readonly number[] | null;
 	/** The emitted byte. `$80`-`$C5` pitched, `$D0`-`$D8` a drum. */
 	note: number;
 	/** 0-69 for a pitched note, `null` for a drum. */

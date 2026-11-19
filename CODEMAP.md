@@ -97,6 +97,7 @@ something in the directory, which load by themselves when such a file is opened.
 **Rules:** `audition.md`, `commands-in-the-roll.md`, `i18n.md`, `transport-and-clock.md`
 
 - `adsr.ts` — The DSP's volume envelope: what an instrument's ADSR, GAIN and tuning bytes do.
+- `arpeggio.ts` (300+ lines) — `HandleArpeggio` over the whole song: the pitch offsets each `$FB` steps a note through, tick by tick.
 - `brr.ts` (300+ lines) — BRR — the SNES's ADPCM sample format.
 - `driver-state.ts` (300+ lines) — Our SPC driver's I/O through the emulator's ARAM.
 - `driver.ts` — Loads the prebuilt AddmusicK driver bundle: the SPC700 program, the SPC/DSP base images, and the `#default` BRR sample group.
@@ -111,8 +112,9 @@ something in the directory, which load by themselves when such a file is opened.
 - `repeat-settings.ts` (500+ lines) — The driver settings a looping song can carry from the end of one pass into the next.
 - `slots.ts` — The slots of driver state a VCMD writes or clears, which is how the song walk names the command a note sounds under.
 - `song-walk-types.ts` (300+ lines) — The song walk's public model: the timeline `walkSong` returns, and the notes, commands, loops and state in it.
-- `song-walk.ts` (1000+ lines) — Reads a compiled song the way the driver reads it, and says what sounds when.
-  - `KEY_COUNT`:105 `vcmdLength`:125 `remoteReach`:292 `walkSong`:334 `listOf`:1395 `unreachableChannels`:1412
+- `song-walk.ts` (1500+ lines) — Reads a compiled song the way the driver reads it, and says what sounds when.
+  - `KEY_COUNT`:117 `vcmdLength`:137 `readAhead`:173 `remoteReach`:347 `walkSong`:389 `listOf`:1504
+  - `unreachableChannels`:1521
 - `wasm-host.ts` (500+ lines) — Host for `assets/player/spc.wasm` — Blargg's snes_spc, Emscripten-built.
 - `worklet.ts` (300+ lines) — The SPC700 renderer, running on the audio thread.
 
@@ -292,6 +294,7 @@ something in the directory, which load by themselves when such a file is opened.
 
 **Rules:** `harnesses/*.md`
 
+- `arpeggio.ts` — `walktest`: the steps an `$FB` plays a note at, the driver taking them on the ticks the walk says, and a note it never keys on (`SST0516`).
 - `clock-agrees.ts` — `walktest`: the clock and the compiler agree about the songs the compiler can time.
 - `command-lane.ts` — `walktest`: what the roll's command lane holds.
 - `command-lengths.ts` — `walktest`: both packages agree on how long a command is.
@@ -307,8 +310,8 @@ something in the directory, which load by themselves when such a file is opened.
 - `not-notes.ts` — `walktest`: the commands that must not be walked as notes.
 - `notes-mapped.ts` — `walktest`: every note the walk finds is a note the compiler mapped.
 - `percussion.ts` — `walktest`: percussion follows the channel it is written on.
-- `pitch-range.ts` — `walktest`: what a note's pitch depends on, and the notes and vibratos past what their instrument can play (`SST0513`, `SST0514`).
-- `repeat-settings.ts` — `walktest`: a setting that carries over into the repeat is reported.
+- `pitch-range.ts` — `walktest`: what a note's pitch depends on, and the notes, vibratos and arpeggios past what their instrument can play (`SST0513`-`SST0515`).
+- `repeat-settings.ts` (300+ lines) — `walktest`: a setting that carries over into the repeat is reported.
 - `repeat-tempo.ts` — `walktest`: a tempo that carries over into the repeat is reported.
 - `slide-read-ahead.ts` — `walktest`: the pitch slide a note reads ahead into.
 - `slide-start.ts` — `walktest`: the note the bend inspector draws a slide from.
@@ -923,11 +926,12 @@ something in the directory, which load by themselves when such a file is opened.
 - `mixer.ts` — Which channels are heard, how loudly, and which the porter has taken out.
 - `note-transpose.ts` — Which byte to play for a pitch the porter has not written yet.
 - `note.worker.ts` — Runs {@link auditionNote} and {@link auditionRegion} off the page.
-- `pitch-range.ts` — `SST0513` and `SST0514` — a note pitched past what its instrument can play, and a vibrato that swings one there.
+- `pitch-range.ts` — `SST0513`, `SST0514` and `SST0515` — a note pitched past what its instrument can play, and a vibrato or an arpeggio that takes one there.
 - `playback.ts` (300+ lines) — The transport: plays the compiled song through the worklet player and holds the one playhead, in driver ticks.
 - `repeat-carry.ts` — `SST0510`-`SST0512` — a looping song whose repeat starts its loop under a different tempo, channel setting or song setting from its first pass.
 - `sample-song.ts` — The song a fresh editor opens on.
 - `sample-store.ts` (500+ lines) — The sample library: the bundled `.brr` files plus whatever the user has uploaded over or alongside them.
+- `silent-arpeggio.ts` — `SST0516` — a note under an arpeggio that never takes a step, and so is never keyed on.
 - `song-clock.ts` — Ticks to seconds, for a song the compiler could not put a clock on.
 - `spc-core.ts` — One emulator per worker, brought up on demand.
 - `stop-all.ts` — Stops whatever is sounding: the song, and a note or selection being previewed.

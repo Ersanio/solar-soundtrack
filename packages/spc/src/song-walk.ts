@@ -26,7 +26,8 @@
  *     the emitted byte's; all three are reported as state. Which row a note
  *     draws on is the roll's decision, made from the written pitch in
  *     `noteMap`, and the transposition is a tooltip line rather than a moved bar.
- *   - `ShouldSkipKeyOff`'s (main.asm:2949) readahead, which is articulation.
+ *   - `ShouldSkipKeyOff`'s (main.asm:2949) readahead, which is articulation,
+ *     beyond the answer the arpeggio's timer turns on (`arpeggio.ts`).
  *   - the second trip round the loop, whose channel state carries over from the
  *     end of the first. Every {@link WalkNote.state} is the first pass's.
  *   - what `$F3`, the sample load, loads. It changes a voice's sample without
@@ -53,6 +54,17 @@ import {
 	VCMD,
 } from "@amk/core/hardcoded-tables";
 import { SST } from "@amk/core/messages/sst";
+import {
+	type ArpeggioEvent,
+	type ArpeggioRun,
+	type HotPatches,
+	hotPatchesAfter,
+	keyOn,
+	NO_HOT_PATCHES,
+	setArpeggio,
+	startRun,
+	stepArpeggios,
+} from "./arpeggio";
 import { VOICES } from "./driver-state";
 import { CHANNEL_SLOTS, INSTRUMENT_SLOT, SLOTS, slotAt, slotsOf } from "./slots";
 import type { LoopRun, NoteState, SongTimeline, TempoChange, Vibrato, WalkCommand, WalkNote } from "./song-walk-types";
@@ -152,6 +164,45 @@ export function vcmdLength(song: Uint8Array, index: number): number {
 	return HEX_LENGTHS[vcmd - FIRST_VCMD];
 }
 
+/**
+ * What `ShouldSkipKeyOff`'s read-ahead (`main.asm:2964-3039`) stops at from `index`, reading past
+ * durations and commands in a straight line as its loop gates leave it by default: a note, tie, rest
+ * or drum byte, or 0 for a `$00`; and whether it passed a loop, a call or a `$00`, which the gates
+ * open to.
+ */
+function readAhead(song: Uint8Array, index: number): { next: number; crossed: boolean } {
+	let crossed = false;
+	for (let at = index; at < song.length;) {
+		const byte = song[at];
+		if (byte === 0) {
+			return { next: 0, crossed: true };
+		}
+
+		if (byte < NOTE_LOWEST) {
+			// `.L_10BA` steps over every byte below `$80` from here, a `q` byte of zero among them.
+			while (at < song.length && song[at] < NOTE_LOWEST) {
+				at++;
+			}
+
+			continue;
+		}
+
+		if (byte < FIRST_VCMD) {
+			return { next: byte, crossed };
+		}
+
+		const length = vcmdLength(song, at);
+		if (length === 0) {
+			return { next: 0, crossed };
+		}
+
+		crossed ||= byte === VCMD.Subloop || byte === VCMD.CallLoop;
+		at += length;
+	}
+
+	return { next: 0, crossed };
+}
+
 /** Where one channel has got to, and the two loop frames it can be inside. */
 interface Track {
 	/** Blob index of the next byte to read, or -1 once the channel has ended. */
@@ -214,6 +265,10 @@ interface Track {
 	/** The `$E6` run being played, or null. */
 	pendingSub: PendingRun | null;
 	state: ChannelState;
+	/** The `$FB` as far as a key-on reads it, for {@link NoteState.arpeggio}. */
+	arpeggio: ArpeggioRun;
+	/** The frames and commands {@link stepArpeggios} runs, for {@link WalkNote.arpeggioSteps}. */
+	arpeggioEvents: ArpeggioEvent[];
 	/** Where each of this channel's slots was last written. See {@link WalkNote.origins}. */
 	origins: (number | null)[];
 	/**
@@ -458,6 +513,8 @@ export function walkSong(song: Uint8Array, aramAddress: number): SongTimeline {
 				arpeggio: false,
 				remotePitch: false,
 			},
+			arpeggio: startRun(),
+			arpeggioEvents: [],
 			snapshot: null,
 		});
 	}
@@ -472,6 +529,10 @@ export function walkSong(song: Uint8Array, aramAddress: number): SongTimeline {
 		secondVelocityTable: true,
 		/** `!WaitTime`, which `$F4 $02` flips between 2 and 1 for every channel at once. */
 		waitTime: WAIT_TIME,
+		/** The hot patches the next `$FB` reads; `null` where a preset leaves them unknown. */
+		patches: NO_HOT_PATCHES as HotPatches | null,
+		/** Whether any channel has run an `$FB`, without which there is nothing to step. */
+		arpeggios: false,
 		/** Song-wide slots, which every channel's next note reports. */
 		origins: new Array<number | null>(SLOTS.length).fill(null),
 		/** Their owners, as {@link Track.owners} is. Only the tail is ever used. */
@@ -500,7 +561,7 @@ export function walkSong(song: Uint8Array, aramAddress: number): SongTimeline {
 		bytes: readonly number[],
 		onNote: boolean,
 	): void => {
-		for (const change of settingChanges(bytes, channel)) {
+		for (const change of settingChanges(bytes, channel, shared.patches?.glissandoOneNote === true)) {
 			const by: SettingCommand = { address, bytes, onNote, toggle: change.toggle };
 			if (isChannelSetting(change.setting)) {
 				const state = track.settings[change.setting];
@@ -833,11 +894,22 @@ export function walkSong(song: Uint8Array, aramAddress: number): SongTimeline {
 		}
 
 		const ticks = track.duration;
+		const run = track.arpeggio;
+		const frame = (note: number): ArpeggioEvent => ({
+			kind: "frame",
+			tick: track.ticks,
+			ticks,
+			gateCounter: Math.max(1, (ticks * track.state.gate) >> 8),
+			byte,
+			note,
+			...readAhead(song, track.at),
+		});
 
 		// `$C6` returns before any key-on or key-off (`main.asm:361-363`), so the
 		// note already sounding simply runs longer. Folding the tie into that note
 		// is what makes a piano roll draw one bar rather than several.
 		if (byte === NOTE_TIE_BYTE) {
+			track.arpeggioEvents.push(frame(track.held));
 			if (track.held >= 0) {
 				const previous = notes[track.held];
 				previous.ticks += ticks;
@@ -853,6 +925,7 @@ export function walkSong(song: Uint8Array, aramAddress: number): SongTimeline {
 		}
 
 		if (byte >= REST_FIRST && byte < PERCUSSION_FIRST) {
+			track.arpeggioEvents.push(frame(-1));
 			track.held = -1;
 			track.ticks += ticks;
 			return;
@@ -890,16 +963,27 @@ export function walkSong(song: Uint8Array, aramAddress: number): SongTimeline {
 			}
 		}
 
+		// A drum keys on at its own pitch and leaves the arpeggio stepping over it, replaying the
+		// last pitched note (`main.asm:2404-2436`), which the walk does not follow.
+		const plays = percussion === null && keyOn(run);
+		const arpeggio = !run.vouched || plays || (percussion !== null && run.count !== 0);
+		if (track.state.arpeggio !== arpeggio) {
+			track.state.arpeggio = arpeggio;
+			track.snapshot = null;
+		}
+
 		track.held = notes.length;
 		track.heldFrames = 1;
 		const state = snapshot(track);
 		const gateTicks = frameSoundingTicks(ticks, track.state.gate, shared.waitTime);
+		track.arpeggioEvents.push(frame(notes.length));
 		notes.push({
 			channel,
 			tick: track.ticks,
 			ticks,
 			gateTicks,
 			vibratoTicks: vibratoSteps(state.vibrato, gateTicks, 1),
+			arpeggioSteps: null,
 			note: byte,
 			key: percussion === null ? byte - NOTE_LOWEST : null,
 			percussion,
@@ -947,13 +1031,17 @@ export function walkSong(song: Uint8Array, aramAddress: number): SongTimeline {
 				state.fineTune = arg(0);
 				break;
 			case VCMD.Arpeggio:
-				// A count of 0 is no arpeggio; `$80` and up is a trill or a glissando (`main.asm:2988-2997`).
-				state.arpeggio = arg(0) !== 0;
+				// Whether it plays the next note is that note's key-on to say.
+				setArpeggio(track.arpeggio, [...song.subarray(argAt, track.at + length)], shared.patches);
+				track.arpeggioEvents.push({ kind: "set", operands: [...song.subarray(argAt, track.at + length)] });
+				shared.arpeggios = true;
+				state.arpeggio = !track.arpeggio.vouched || track.arpeggio.count !== 0;
 				break;
 			case VCMD.RemoteCode: {
 				// `cmdFC` (`Commands.asm:1242-1304`): types 0, 7 and 8 only clear, and a body address of
 				// `$01xx` is the GAIN shortcut rather than a body (`main.asm:317-323`).
 				const type = arg(2);
+				track.arpeggioEvents.push({ kind: "remote", type, time: arg(3) });
 				const body = indexOf(arg(0) | (arg(1) << 8));
 				const reach =
 					type === 0 || type === 7 || type === 8 || arg(1) === 0x01
@@ -1093,6 +1181,10 @@ export function walkSong(song: Uint8Array, aramAddress: number): SongTimeline {
 					for (const each of tracks) {
 						each.snapshot = null;
 					}
+
+					track.arpeggioEvents.push({ kind: "wait" });
+				} else if (arg(0) === 0x01) {
+					track.arpeggioEvents.push({ kind: "legato" });
 				}
 
 				dirty = false;
@@ -1102,6 +1194,12 @@ export function walkSong(song: Uint8Array, aramAddress: number): SongTimeline {
 				// against zero, so anything non-zero is the N-SPC half.
 				if (arg(0) === 0x06) {
 					shared.secondVelocityTable = arg(1) !== 0;
+				}
+
+				// A preset or the bits themselves, which the next `$FB` and every read-ahead read.
+				if (arg(0) === 0x7f || arg(0) === 0xfe) {
+					shared.patches = hotPatchesAfter(arg(0), [...song.subarray(argAt + 1, track.at + length)]);
+					track.arpeggioEvents.push({ kind: "patches", patches: shared.patches });
 				}
 
 				// `$FA $02` is the channel's semitone tune, and the one `$FA` that
@@ -1244,6 +1342,17 @@ export function walkSong(song: Uint8Array, aramAddress: number): SongTimeline {
 	const channelTicks = tracks.map((track) => track.ticks);
 	const playing = channelTicks.filter((_, channel) => used[channel]);
 	const ticks = playing.length > 0 ? Math.min(...playing) : 0;
+
+	if (shared.arpeggios) {
+		const steps = stepArpeggios(
+			tracks.map((track) => track.arpeggioEvents),
+			ticks,
+			notes.length,
+		);
+		notes.forEach((note, at) => {
+			note.arpeggioSteps = steps[at];
+		});
+	}
 
 	const played: WalkNote[] = [];
 	const dropped: number[] = [];

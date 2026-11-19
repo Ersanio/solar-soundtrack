@@ -1,12 +1,13 @@
 /**
- * `SST0513` and `SST0514` — a note pitched past what its instrument can play, and a vibrato that
- * swings one there.
+ * `SST0513`, `SST0514` and `SST0515` — a note pitched past what its instrument can play, and a
+ * vibrato or an arpeggio that takes one there.
  *
  * From `$4000` the DSP's pitch register wraps round low, and past o7 b or below o1 c the driver's
  * own arithmetic gives it nothing (`@amk/spc/pitch`). Which notes get there turns on the
- * instrument's multiplier and the transposition and fine tune the walk reports. A note whose tuning
- * the walk cannot vouch for is left alone: under a `$F3`, an arpeggio, a remote body that moves the
- * pitch, noise, or an instrument no table holds.
+ * instrument's multiplier and the transposition and fine tune the walk reports. Under an arpeggio a
+ * note sounds only at its steps, so its written pitch is judged only where a step plays it. A note
+ * whose tuning the walk cannot vouch for is left alone: under a `$F3`, an arpeggio it cannot follow,
+ * a remote body that moves the pitch, noise, or an instrument no table holds.
  */
 
 import { SST } from '@amk/core/messages/sst';
@@ -78,9 +79,10 @@ function driverKey(note: WalkNote, tables: InstrumentTables): number | null {
 }
 
 /**
- * The two findings over every note of the pass, each on the note written, once for its own pitch
- * and once for each way its vibrato swings it out. Names are in the frame the note is written in,
- * which is the row the roll draws it on, so `$FA $02 $05 @0 o6 c` is said to be above o5 b.
+ * The three findings over every note of the pass, each on the note written, once for its own pitch
+ * and once for each way its vibrato or arpeggio takes it out. Names are in the frame the note is
+ * written in, which is the row the roll draws it on, so `$FA $02 $05 @0 o6 c` is said to be above
+ * o5 b.
  */
 export function pitchRange(
   timeline: SongTimeline,
@@ -99,6 +101,7 @@ export function pitchRange(
 
   for (const note of timeline.notes) {
     const { state } = note;
+    const steps = note.arpeggioSteps;
     const mapped = notes.get(note.address);
     const tuning = tuningOf(state.instrument, tables, timeline.customInstruments);
     const key = driverKey(note, tables);
@@ -109,7 +112,7 @@ export function pitchRange(
       (tuning.srcn & NOISE_FLAG) !== 0 ||
       state.noise !== null ||
       state.sampleLoaded ||
-      state.arpeggio ||
+      (state.arpeggio && steps === null) ||
       state.remotePitch
     ) {
       continue;
@@ -125,8 +128,9 @@ export function pitchRange(
     const own = pitchFate(pitch, multiplier, sub);
     const highest = highestTrue(multiplier, sub, state.fineTune);
     const at = `note:${mapped.span.start}`;
+    const heardOwn = steps === null || steps.includes(0);
 
-    if (own.fate === 'silent') {
+    if (heardOwn && own.fate === 'silent') {
       report(
         at,
         'SST0513',
@@ -138,9 +142,9 @@ export function pitchRange(
       continue;
     }
 
-    if (own.fate === 'misplaced' && pitch < 0) {
+    if (heardOwn && own.fate === 'misplaced' && pitch < 0) {
       report(at, 'SST0513', SST['0513.low'](name(0), heard(own.register)), mapped.span);
-    } else if (own.fate !== 'true') {
+    } else if (heardOwn && own.fate !== 'true') {
       report(
         at,
         'SST0513',
@@ -149,6 +153,52 @@ export function pitchRange(
           : SST['0513.high'](name(highest), instrument, heard(own.register)),
         mapped.span,
       );
+    }
+
+    if (steps !== null) {
+      const fate = (step: number) => pitchFate(step * SEMITONE + state.fineTune, multiplier, sub);
+      const stepped = steps.filter((offset) => offset !== 0).map((offset) => key + offset);
+      const above = stepped.filter((step) => step >= 0);
+      const below = stepped.filter((step) => step < 0);
+      const top = above.length > 0 ? Math.max(...above) : null;
+      const reach = top === null ? null : fate(top);
+      if (above.some((step) => fate(step).fate === 'silent')) {
+        report(
+          `arp-up:${at}`,
+          'SST0515',
+          SST['0515.silent-high'](name(SILENT_FROM - 1)),
+          mapped.span,
+        );
+      } else if (
+        top !== null &&
+        reach !== null &&
+        reach.fate !== 'true' &&
+        (!heardOwn || own.fate === 'true')
+      ) {
+        report(
+          `arp-up:${at}`,
+          'SST0515',
+          highest < 0
+            ? SST['0515.no-true-pitch'](instrument)
+            : SST['0515.high'](name(top), name(highest), instrument, heard(reach.register)),
+          mapped.span,
+        );
+      }
+
+      if (below.some((step) => fate(step).fate === 'silent')) {
+        report(`arp-down:${at}`, 'SST0515', SST['0515.silent-low'](name(0)), mapped.span);
+      } else if (below.length > 0) {
+        const lowest = fate(Math.min(...below));
+        report(
+          `arp-down:${at}`,
+          'SST0515',
+          SST['0515.low'](name(0), heard(lowest.register)),
+          mapped.span,
+        );
+      }
+
+      // Each step restarts the vibrato (`main.asm:453-457`), which `vibratoTicks` does not follow.
+      continue;
     }
 
     // A fade ramps the depth in from nothing on every note, which `vibratoReach` does not follow.

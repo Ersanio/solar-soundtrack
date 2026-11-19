@@ -6,7 +6,6 @@
  * bytes; CLAUDE.md has the map.
  */
 
-import { hex4 as hex } from "@amk/core/hex";
 import { clamp } from "@amk/core/math";
 import type { SongTags } from "@amk/core/types";
 import type { BrrSample } from "./brr";
@@ -128,7 +127,7 @@ export function buildSpc(request: SpcExportRequest): SpcExportResult {
 		const end = samplePos + sample.data.length;
 		if (end > ARAM_SIZE) {
 			throw new SpcExportError(
-				$localize`:@@error.export.sample-data-overflows-aram-by:error.export.sample-data-overflows-aram-by ${end - ARAM_SIZE}:excess: ${hex(songData.length)}:song: ${hex(totalSampleBytes(samples))}:samples:`,
+				$localize`:@@error.export.sample-data-overflows-aram-by:error.export.sample-data-overflows-aram-by ${end - ARAM_SIZE}:excess:`,
 			);
 		}
 
@@ -156,7 +155,7 @@ export function buildSpc(request: SpcExportRequest): SpcExportResult {
 
 	if (samplePos > layout.echoStart) {
 		throw new SpcExportError(
-			$localize`:@@error.export.sample-data-runs-into-the:error.export.sample-data-runs-into-the ${hex(samplePos)}:samplePos: ${hex(layout.echoStart)}:echoStart:`,
+			$localize`:@@error.export.sample-data-overflows-into-the:error.export.sample-data-overflows-into-the`,
 		);
 	}
 
@@ -167,17 +166,6 @@ export function buildSpc(request: SpcExportRequest): SpcExportResult {
 export function spcFilename(tags: SongTags): string {
 	const base = (tags.title ?? "song").trim() || "song";
 	return `${base.replace(/[^\w.\- ]+/g, "_")}.spc`;
-}
-
-// ---------------------------------------------------------------------------
-
-function totalSampleBytes(samples: BrrSample[]): number {
-	let total = 0;
-	for (const sample of samples) {
-		total += sample.data.length + 4;
-	}
-
-	return total;
 }
 
 /** Latin-1, NUL-padded, hard-truncated — matching AddmusicK's byte copy. */

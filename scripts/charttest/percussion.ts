@@ -28,6 +28,7 @@ section("the drum lanes are the driver's own drums");
 		ticks: 24,
 		gateTicks: 24,
 		vibratoTicks: 0,
+		arpeggioSteps: null,
 		note: byte,
 		key: byte >= 0x80 && byte < 0xc6 ? byte - 0x80 : null,
 		percussion: byte >= 0xd0 ? byte - 0xd0 : null,

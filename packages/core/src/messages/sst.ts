@@ -58,4 +58,12 @@ export const SST = {
 		$localize`:@@sst.0514.wraps:sst.0514.wraps ${highest}:highest: ${instrument}:instrument:`,
 	"0514.silent-high": (limit: string) => $localize`:@@sst.0514.silent-high:sst.0514.silent-high ${limit}:limit:`,
 	"0514.silent-low": (limit: string) => $localize`:@@sst.0514.silent-low:sst.0514.silent-low ${limit}:limit:`,
+	"0515.high": (reached: string, highest: string, instrument: string, heard: string) =>
+		$localize`:@@sst.0515.high:sst.0515.high ${reached}:reached: ${highest}:highest: ${instrument}:instrument: ${heard}:heard:`,
+	"0515.low": (limit: string, heard: string) => $localize`:@@sst.0515.low:sst.0515.low ${limit}:limit: ${heard}:heard:`,
+	"0515.silent-high": (limit: string) => $localize`:@@sst.0515.silent-high:sst.0515.silent-high ${limit}:limit:`,
+	"0515.silent-low": (limit: string) => $localize`:@@sst.0515.silent-low:sst.0515.silent-low ${limit}:limit:`,
+	"0515.no-true-pitch": (instrument: string) =>
+		$localize`:@@sst.0515.no-true-pitch:sst.0515.no-true-pitch ${instrument}:instrument:`,
+	"0516": (wait: number) => $localize`:@@sst.0516:sst.0516 ${wait}:wait:`,
 };

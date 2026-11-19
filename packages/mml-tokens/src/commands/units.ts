@@ -280,7 +280,7 @@ export function intervalLabel(semitones: number): string {
 		return intervalName(0);
 	}
 
-	return `${semitones > 0 ? "+" : ""}${semitones} — ${intervalName(semitones)}`;
+	return `${semitones > 0 ? "+" : ""}${semitones} (${intervalName(semitones)})`;
 }
 
 /** AddmusicK's pan, which runs 0 (hard right) to 20 (hard left) with 10 centre. */

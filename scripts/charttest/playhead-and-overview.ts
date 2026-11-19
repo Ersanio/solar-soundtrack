@@ -165,6 +165,7 @@ section("the overview bar's minimap");
 		ticks,
 		gateTicks: ticks,
 		vibratoTicks: 0,
+		arpeggioSteps: null,
 		note: 0x80 + key,
 		key,
 		percussion: null,
