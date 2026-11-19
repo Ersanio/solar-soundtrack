@@ -5,7 +5,7 @@ import { DestroyRef, Service, computed, effect, inject, signal, untracked } from
 import type { CompileResult, NoteAddress, Span } from '@amk/core/types';
 import { SpcPlayer, type SongTiming } from '@amk/spc/player';
 import type { DriverState } from '@amk/spc/driver-state';
-import { errorMessage, formatTime } from '../util/format';
+import { errorMessage, formatTime, minuteDigits } from '../util/format';
 import { EditorStore } from './editor-store';
 import { LiveTap } from './live-tap';
 import { Mixer } from './mixer';
@@ -78,7 +78,10 @@ export class Playback {
   readonly position = computed(() => this.scrubbing() ?? this.songTicks().ticks);
   /** Whether {@link position} is the drag's target rather than the song's own count. */
   readonly isScrubbing = computed(() => this.scrubbing() !== null);
-  readonly timeLabel = computed(() => formatTime(this.secondsAt(this.position())));
+  /** Padded to the duration's minute digits, so `05:12 / 12:40` keeps its width. */
+  readonly timeLabel = computed(() =>
+    formatTime(this.secondsAt(this.position()), minuteDigits(this.durationSeconds())),
+  );
 
   /**
    * One pass through the song in ticks — intro plus a single trip round the loop

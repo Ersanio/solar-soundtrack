@@ -101,7 +101,10 @@ export class TransportControls {
     }
 
     const tick = this.counting() ? this.displayClock.tick() : this.playback.position();
-    return $localize`:@@transport.tick:transport.tick ${Math.round(tick).toLocaleString()}:count: ${this.playback.durationTicks().toLocaleString()}:total:`;
+    // Zero-padded to the total's width, so the readout holds still as it counts.
+    const total = String(this.playback.durationTicks());
+    const count = String(Math.round(tick)).padStart(total.length, '0');
+    return $localize`:@@transport.tick:transport.tick ${count}:count: ${total}:total:`;
   });
 
   protected readonly clockTitle = computed(() =>

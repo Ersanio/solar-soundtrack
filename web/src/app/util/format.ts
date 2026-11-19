@@ -15,10 +15,19 @@ export function duration(seconds: number): string {
   return seconds >= 1 ? `${seconds.toFixed(2)} s` : `${(seconds * 1000).toFixed(0)} ms`;
 }
 
-/** `m:ss`, clamped at zero — the transport never shows negative time. */
-export function formatTime(seconds: number): string {
+/**
+ * `m:ss`, clamped at zero — the transport never shows negative time. The minutes
+ * are zero-padded to `width` digits, so a position can match its duration's width.
+ */
+export function formatTime(seconds: number, width = 1): string {
   const whole = Math.max(0, Math.floor(seconds));
-  return `${Math.floor(whole / 60)}:${String(whole % 60).padStart(2, '0')}`;
+  const minutes = String(Math.floor(whole / 60)).padStart(width, '0');
+  return `${minutes}:${String(whole % 60).padStart(2, '0')}`;
+}
+
+/** How many digits {@link formatTime} writes for the minutes of `seconds`. */
+export function minuteDigits(seconds: number): number {
+  return String(Math.floor(Math.max(0, Math.floor(seconds)) / 60)).length;
 }
 
 /** Line/column of a caret offset, 1-based, for the editor's position readout. */
