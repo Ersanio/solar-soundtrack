@@ -144,11 +144,6 @@ export class CommandPalette {
 
   private readonly requests = inject(EditorRequests);
 
-  protected readonly text = {
-    dialectAssumed: $localize`:@@palette.dialect.assumed.title:palette.dialect.assumed.title`,
-    dialectMarked: $localize`:@@palette.dialect.marked.title:palette.dialect.marked.title`,
-  };
-
   protected readonly CATEGORIES = CATEGORIES;
 
   /**

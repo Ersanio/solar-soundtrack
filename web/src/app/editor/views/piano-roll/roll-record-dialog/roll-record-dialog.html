@@ -23,11 +23,7 @@
       </button>
     </div>
 
-    <div
-      class="flex items-center gap-1"
-      i18n-title="@@roll.record.chord.title"
-      title="roll.record.chord.title"
-    >
+    <div class="flex items-center gap-1">
       <span i18n="@@roll.record.chord" class="text-ink-muted mr-1 text-xs">roll.record.chord</span>
       @for (chip of chordChips(); track chip.channel) {
         <button
@@ -65,8 +61,6 @@
     size="sm"
     variant="danger"
     modalFooter
-    i18n-title="@@roll.record.arm.title"
-    title="roll.record.arm.title"
     (click)="confirm()"
   >
     roll.record.arm

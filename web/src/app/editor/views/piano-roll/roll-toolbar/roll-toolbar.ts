@@ -51,12 +51,6 @@ import {
   host: { class: 'contents' },
 })
 export class RollToolbar {
-  protected readonly text = {
-    startRecording: $localize`:@@roll.record.start.title:roll.record.start.title`,
-    armed: $localize`:@@roll.record.armed.title:roll.record.armed.title`,
-    stopRecording: $localize`:@@roll.record.stop.title:roll.record.stop.title`,
-  };
-
   private readonly recordDialog = viewChild.required(RollRecordDialog);
 
   readonly recordPhase = input.required<RecordPhase>();
@@ -151,17 +145,6 @@ export class RollToolbar {
         return notes === 1
           ? $localize`:@@roll.record.recording.one:roll.record.recording.one`
           : $localize`:@@roll.record.recording.other:roll.record.recording.other ${notes.toLocaleString()}:count:`;
-    }
-  });
-
-  protected readonly recordTitle = computed(() => {
-    switch (this.recordPhase()) {
-      case 'idle':
-        return this.text.startRecording;
-      case 'armed':
-        return this.text.armed;
-      case 'recording':
-        return this.text.stopRecording;
     }
   });
 

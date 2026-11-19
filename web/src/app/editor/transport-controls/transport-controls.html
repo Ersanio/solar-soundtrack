@@ -17,16 +17,7 @@
     }
   </button>
 
-  <button
-    amk-button
-    variant="dark"
-    size="md"
-    icon
-    i18n-title="@@transport.stop-the-song-or.title"
-    title="transport.stop-the-song-or.title"
-    [disabled]="!canStop()"
-    (click)="stop()"
-  >
+  <button amk-button variant="dark" size="md" icon [disabled]="!canStop()" (click)="stop()">
     <amk-icon-stop />
   </button>
 </amk-button-group>
@@ -34,8 +25,6 @@
 <button
   amk-toggle
   size="md"
-  i18n-title="@@transport.keep-playing-past-the.title"
-  title="transport.keep-playing-past-the.title"
   [pressed]="playback.loop()"
   (click)="playback.loop.set(!playback.loop())"
 >
@@ -47,8 +36,8 @@
   i18n="@@transport.hot-reload"
   amk-toggle
   size="md"
-  i18n-title="@@transport.while-playing-reload-the.title"
-  title="transport.while-playing-reload-the.title"
+  i18n-title="@@transport.hot-reload.title"
+  title="transport.hot-reload.title"
   [pressed]="playback.hotReload()"
   (click)="playback.hotReload.set(!playback.hotReload())"
 >

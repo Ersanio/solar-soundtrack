@@ -84,13 +84,8 @@ export class TopBar {
       case 'denied':
         return $localize`:@@topbar.midi.denied.title:topbar.midi.denied.title`;
       case 'off':
-        return $localize`:@@topbar.midi.off.title:topbar.midi.off.title`;
-      case 'on': {
-        const devices = this.midi.devices().join(', ');
-        return devices === ''
-          ? $localize`:@@topbar.midi.no-keyboard.title:topbar.midi.no-keyboard.title`
-          : $localize`:@@topbar.midi.on.title:topbar.midi.on.title ${devices}:devices:`;
-      }
+      case 'on':
+        return null;
     }
   });
 

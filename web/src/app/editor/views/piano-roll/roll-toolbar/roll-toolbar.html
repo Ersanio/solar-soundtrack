@@ -170,13 +170,7 @@
   <!-- Lit red while armed, as FL Studio's record button is, and its dot a
        square once the first key has started the take. Idle, a press asks for
        the settings first; armed or recording, it stops. -->
-  <button
-    amk-toggle
-    tone="danger"
-    [pressed]="recordPhase() !== 'idle'"
-    [title]="recordTitle()"
-    (click)="pressRecord()"
-  >
+  <button amk-toggle tone="danger" [pressed]="recordPhase() !== 'idle'" (click)="pressRecord()">
     @if (recordPhase() === 'recording') {
       <amk-icon-recording />
     } @else {

@@ -15,8 +15,6 @@ import type { Overrides } from './theme-tokens';
 export interface ThemePreset {
   readonly id: string;
   readonly name: string;
-  /** One line for the picker, saying what the preset is for. */
-  readonly note: string;
   readonly overrides: Overrides;
 }
 
@@ -24,7 +22,6 @@ export const PRESETS: readonly ThemePreset[] = [
   {
     id: 'slate',
     name: $localize`:@@theme.slate:theme.slate`,
-    note: $localize`:@@theme.blue-grey-chrome-with-an:theme.blue-grey-chrome-with-an`,
     overrides: {},
   },
   {
@@ -34,7 +31,6 @@ export const PRESETS: readonly ThemePreset[] = [
     // `edge`. The inks are its plate labels and the control its display face.
     id: 'juicy-loops',
     name: $localize`:@@theme.juicy-loops:theme.juicy-loops`,
-    note: $localize`:@@theme.fl-studio-s-own-greys:theme.fl-studio-s-own-greys`,
     overrides: {
       surface: '#31393e',
       raised: '#464f53',
@@ -65,7 +61,6 @@ export const PRESETS: readonly ThemePreset[] = [
     // The eight and the four are validated in light mode: see `styles.css`.
     id: 'praise-the-happy-sun',
     name: $localize`:@@theme.praise-the-happy-sun:theme.praise-the-happy-sun`,
-    note: $localize`:@@theme.cool-white-and-light-grey:theme.cool-white-and-light-grey`,
     overrides: {
       surface: '#ffffff',
       raised: '#f0f2f5',
@@ -122,7 +117,6 @@ export const PRESETS: readonly ThemePreset[] = [
   {
     id: 'graphite',
     name: $localize`:@@theme.graphite:theme.graphite`,
-    note: $localize`:@@theme.neutral-grey:theme.neutral-grey`,
     overrides: {
       surface: '#191919',
       raised: '#212121',
@@ -151,7 +145,6 @@ export const PRESETS: readonly ThemePreset[] = [
   {
     id: 'midnight',
     name: $localize`:@@theme.midnight:theme.midnight`,
-    note: $localize`:@@theme.the-cooler-blue-tinted-grey:theme.the-cooler-blue-tinted-grey`,
     overrides: {
       surface: '#16181d',
       raised: '#1d2027',
@@ -182,7 +175,6 @@ export const PRESETS: readonly ThemePreset[] = [
   {
     id: 'contrast',
     name: $localize`:@@theme.contrast:theme.contrast`,
-    note: $localize`:@@theme.near-black-with-brighter-text:theme.near-black-with-brighter-text`,
     overrides: {
       surface: '#0a0a0a',
       raised: '#161616',
@@ -214,7 +206,6 @@ export const PRESETS: readonly ThemePreset[] = [
   {
     id: 'warm',
     name: $localize`:@@theme.warm-grey:theme.warm-grey`,
-    note: $localize`:@@theme.the-same-greys-turned-a:theme.the-same-greys-turned-a`,
     overrides: {
       surface: '#1a1918',
       raised: '#232120',

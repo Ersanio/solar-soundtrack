@@ -2,7 +2,7 @@
   <button
     type="button"
     class="text-ink-muted hover:text-ink flex cursor-pointer items-center gap-1 self-start text-xs font-semibold tracking-wide uppercase"
-    [title]="open() ? text.hidePalette : text.addCommand"
+    [attr.title]="open() ? text.hidePalette : null"
     (click)="open.set(!open())"
   >
     @if (open()) {

@@ -101,7 +101,6 @@ export class NotePalette {
 
   protected readonly text = {
     hidePalette: $localize`:@@source.palette.hide.title:source.palette.hide.title`,
-    addCommand: $localize`:@@inspector.note-palette.add-command.title:inspector.note-palette.add-command.title`,
   };
 
   readonly note = input.required<Command>();
