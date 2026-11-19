@@ -6,7 +6,7 @@
     i18n="@@inspector.envelope-tuner.adsr"
     amk-toggle
     size="md"
-    [pressed]="usingAdsr()"
+    [pressed]="usingAdsr() && !incomplete()"
     [disabled]="disabled()"
     (click)="setMode(true)"
   >
@@ -16,7 +16,7 @@
     i18n="@@inspector.envelope-tuner.gain"
     amk-toggle
     size="md"
-    [pressed]="!usingAdsr()"
+    [pressed]="!usingAdsr() && !incomplete()"
     [disabled]="disabled()"
     (click)="setMode(false)"
   >

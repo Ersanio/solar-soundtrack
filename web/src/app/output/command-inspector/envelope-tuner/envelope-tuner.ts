@@ -150,6 +150,8 @@ export class EnvelopeTuner {
   readonly disabled = input(false);
   /** Why editing is off, shown in place of the controls. */
   readonly lockedBecause = input<string | null>(null);
+  /** The bytes are not all written yet, so neither mode is chosen and either button writes. */
+  readonly incomplete = input(false);
 
   readonly commit = output<EnvelopeValue>();
 
@@ -287,7 +289,7 @@ export class EnvelopeTuner {
 
   /** Switches which of the two the DSP obeys, leaving both sets of bytes intact. */
   protected setMode(adsr: boolean): void {
-    if (adsr === this.usingAdsr()) {
+    if (adsr === this.usingAdsr() && !this.incomplete()) {
       return;
     }
 

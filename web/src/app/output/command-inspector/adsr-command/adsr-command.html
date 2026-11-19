@@ -10,6 +10,7 @@
 <amk-envelope-tuner
   [value]="value()"
   [disabled]="!editable() && args().length >= 2"
+  [incomplete]="args().length < 2"
   [lockedBecause]="lockedBecause()"
   (commit)="apply($event)"
 />
