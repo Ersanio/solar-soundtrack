@@ -176,10 +176,6 @@ export function modWarningText(
       return warning.count === 1
         ? $localize`:@@import.mod.warn.arpeggio.one:import.mod.warn.arpeggio.one`
         : $localize`:@@import.mod.warn.arpeggio.other:import.mod.warn.arpeggio.other ${warning.count}:count:`;
-    case 'tremolo':
-      return warning.count === 1
-        ? $localize`:@@import.mod.warn.tremolo.one:import.mod.warn.tremolo.one`
-        : $localize`:@@import.mod.warn.tremolo.other:import.mod.warn.tremolo.other ${warning.count}:count:`;
     case 'unsupported':
       return warning.count === 1
         ? $localize`:@@import.mod.warn.unsupported.one:import.mod.warn.unsupported.one`

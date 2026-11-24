@@ -269,7 +269,7 @@ export function centsOff(imp: Imported, walked: WalkNote, modPeriod: number): nu
 		return Infinity;
 	}
 
-	const register = setPitchWide(walked.key * 256, sample.tuning.multiplier, sample.tuning.sub);
+	const register = setPitchWide(walked.key * 256 + walked.state.fineTune, sample.tuning.multiplier, sample.tuning.sub);
 	const heard = (register * 32_000) / 0x1000;
 	const finetune = imp.mod.file.samples[sample.index - 1].finetune;
 	const semitones = Math.round(12 * Math.log2(C2 / modPeriod));

@@ -144,6 +144,9 @@ export function fitFactor(
 	return low;
 }
 
+/** How far a channel's `$EE` may raise its notes, in cents: the 64 256ths of a semitone the writer tries. */
+export const FINE_TUNE_CENTS = 25;
+
 /** An instrument's tuning bytes and the key a MOD C-2 is written at under them. */
 export interface Tuning {
 	multiplier: number;
@@ -153,7 +156,7 @@ export interface Tuning {
 }
 
 /** The register value a MOD C-2 needs from a sample resampled by `factor` at `finetune`. */
-function c2Register(factor: number, finetune: number): number {
+export function c2Register(factor: number, finetune: number): number {
 	return ((PAULA_HZ / C2_PERIOD) * factor * 2 ** (finetune / 96) * UNITY_REGISTER) / DSP_HZ;
 }
 
@@ -163,8 +166,10 @@ function c2Register(factor: number, finetune: number): number {
  * keeps fewer bits, while a high one leaves a small multiplier coarse (`main.asm:484-554`); so every
  * octave for C-2 and the four multipliers nearest each is tried against every key the song plays on
  * the sample (`low`..`high` semitones from C-2), and the one whose worst note is nearest is kept. A
- * choice that leaves notes outside o1 c to o6 a, or past the DSP's fourteen bits, loses to one that
- * does not.
+ * channel's `$EE` raises every note it plays by up to {@link FINE_TUNE_CENTS}, in far finer steps than
+ * a small multiplier takes, so each choice is judged after the upward shift that serves it best: a
+ * multiplier a little flat is as good as exact once the channel's fine tune lifts it. A choice that
+ * leaves notes outside o1 c to o6 a, or past the DSP's fourteen bits, loses to one that does not.
  */
 export function tuningFor(factor: number, finetune: number, low: number, high: number): Tuning {
 	const wanted = c2Register(factor, finetune);
@@ -179,7 +184,8 @@ export function tuningFor(factor: number, finetune: number, low: number, high: n
 			const multiplier = total >> 8;
 			const sub = total & 0xff;
 			let outside = 0;
-			let error = 0;
+			let flattest = Infinity;
+			let sharpest = -Infinity;
 			for (let semis = low; semis <= high; semis++) {
 				const key = c2Key + semis;
 				const register = key >= 0 && key <= HIGHEST_KEY ? setPitchWide(key * SEMITONE, multiplier, sub) : 0;
@@ -188,8 +194,14 @@ export function tuningFor(factor: number, finetune: number, low: number, high: n
 					continue;
 				}
 
-				error = Math.max(error, Math.abs(1200 * Math.log2(register / (wanted * 2 ** (semis / 12)))));
+				const cents = 1200 * Math.log2(register / (wanted * 2 ** (semis / 12)));
+				flattest = Math.min(flattest, cents);
+				sharpest = Math.max(sharpest, cents);
 			}
+
+			// The worst note once the shift that centres the spread is applied, as far as `$EE` reaches.
+			const shift = Math.min(FINE_TUNE_CENTS, Math.max(0, -(flattest + sharpest) / 2));
+			const error = sharpest === -Infinity ? 0 : Math.max(Math.abs(flattest + shift), Math.abs(sharpest + shift));
 
 			if (best === null || outside < best.outside || (outside === best.outside && error < best.error)) {
 				best = { multiplier, sub, c2Key, outside, error };

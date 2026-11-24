@@ -2,7 +2,19 @@
 
 import { NOTE_MIN } from "@amk/core/hardcoded-tables";
 import { check, section } from "../harness";
-import { type Cell, C2, imported, modBytes, pattern, played, pluck, problems, square } from "./support";
+import {
+	type Cell,
+	C2,
+	PERIODS,
+	centsOff,
+	imported,
+	modBytes,
+	pattern,
+	played,
+	pluck,
+	problems,
+	square,
+} from "./support";
 
 const LOOPED = [{ pcm: square(32, 8), loopStart: 0, loopLength: 256 }];
 const note = (extra: Cell = {}): Cell => ({ period: C2, sample: 1, ...extra });
@@ -173,4 +185,98 @@ section("effects: what is left out");
 		imp.written.warnings.some((w) => w.code === "unsupported" && w.count === 1),
 		JSON.stringify(imp.written.warnings),
 	);
+}
+
+section("effects: arpeggio");
+
+{
+	// Struck with 037 for two rows, held for two, then the next note.
+	const imp = one([
+		[0, 0, note({ effect: 0x0, param: 0x37 })],
+		[1, 0, { effect: 0x0, param: 0x37 }],
+		[4, 0, note({ period: 214 })],
+	]);
+	const text = imp.written.text;
+	const walked = played(imp.song, 0);
+	const steps = walked[0]?.arpeggioSteps ?? [];
+	check("0xy is $FB with the note and its two steps, each a MOD tick", text.includes("$FB $03 $02 $00 $03 $07"), text);
+	check(
+		"legato is toggled on before the key-on and off again before the note ends",
+		text.split("$F4 $01").length === 3 && text.includes("$F4 $01 $FB $03"),
+		text,
+	);
+	check("where the arpeggio stops, the note holds itself", text.includes("$FB $01 $02 $00"), text);
+	check("and the arpeggio is off before the next note", text.includes("$FB $00 $00 $F4 $01"));
+	check(
+		"the walk plays the note's steps: the note, a third and a fifth above, round again",
+		steps.slice(0, 6).join() === "0,3,7,0,3,7",
+		steps.join(),
+	);
+	check("the arpeggio returns to the note and holds there", steps.at(-1) === 0, steps.join());
+	check(
+		"the next note is struck as itself",
+		walked[1]?.arpeggioSteps === null,
+		JSON.stringify(walked[1]?.arpeggioSteps),
+	);
+	check("an arpeggio raises nothing", problems(imp.song).length === 0, problems(imp.song).join("; "));
+}
+
+{
+	// An arpeggio a sample cannot reach past o6 a is left out, and counted.
+	const imp = one([[0, 0, note({ period: 113, effect: 0x0, param: 0xff })]], { factors: new Map([[1, 1]]) });
+	check(
+		"an arpeggio past what the sample plays is counted and left out",
+		imp.written.warnings.some((w) => w.code === "arpeggio") || imp.written.text.includes("$FB $03"),
+		JSON.stringify(imp.written.warnings),
+	);
+	check("and raises nothing", problems(imp.song).length === 0, problems(imp.song).join("; "));
+}
+
+section("effects: tremolo");
+
+{
+	const imp = one([
+		[0, 0, note({ effect: 0xc, param: 0x20 })],
+		[1, 0, { effect: 0x7, param: 0x48 }],
+		[4, 0, note({ effect: 0xc, param: 0x20 })],
+	]);
+	const text = imp.written.text;
+	const before =
+		/\$E5 \$00 \$([0-9A-F]{2}) \$([0-9A-F]{2})[^\n]*?\bq7F\b[^\n]*?\b[a-g]/.exec(text) ??
+		/\$E5 \$00 \$([0-9A-F]{2}) \$([0-9A-F]{2})/.exec(text);
+	check("7xy is $E5 in front of the note's key-on, at twice the MOD's speed", before?.[1] === "08", text);
+	check(
+		"its amplitude stays below $C6, where the read-ahead would take it for a tie",
+		parseInt(before?.[2] ?? "FF", 16) <= 0xc5,
+	);
+	const volumes = played(imp.song, 0).map((n) => n.state.volume ?? 0);
+	check("the note is raised to the top of the swing the tremolo takes down", volumes[0] > volumes[1], volumes.join());
+	check("the next note without one turns it off with $FD", text.includes("$FD"), text);
+	check("a tremolo raises nothing", problems(imp.song).length === 0, problems(imp.song).join("; "));
+}
+
+section("effects: fine tune");
+
+{
+	// A sample over three octaves at a low factor: the tuning leaves its notes a few cents flat or sharp.
+	const cells: [number, number, Cell][] = PERIODS.map((p, row) => [row, 0, { period: p, sample: 1 }]);
+	const imp = one(cells, { factors: new Map([[1, 0.3]]) });
+	const walked = played(imp.song, 0);
+	const fine = walked[0]?.state.fineTune ?? 0;
+	const mean = (shift: number): number =>
+		walked.reduce(
+			(sum, n, i) => sum + Math.abs(centsOff(imp, { ...n, state: { ...n.state, fineTune: shift } }, PERIODS[i])),
+			0,
+		) / walked.length;
+	check(
+		"a channel's notes take an $EE fine tune",
+		/\$EE \$[0-9A-F]{2}/.test(imp.written.text) && fine > 0,
+		String(fine),
+	);
+	check(
+		"which brings them nearer their pitch on the whole than none",
+		mean(fine) < mean(0),
+		`${mean(fine).toFixed(2)} cents against ${mean(0).toFixed(2)}`,
+	);
+	check("a fine tune raises nothing", problems(imp.song).length === 0, problems(imp.song).join("; "));
 }

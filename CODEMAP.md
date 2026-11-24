@@ -126,7 +126,7 @@ something in the directory, which load by themselves when such a file is opened.
 - `file.ts` — A ProTracker-family `.mod` file, read into its samples, its order list and its patterns of cells.
 - `play.ts` (300+ lines) — A MOD played tick by tick, the way ProTracker's replayer plays it: what each channel sounds on every tick, and where the song loops.
 - `samples.ts` — A MOD's samples made ready for BRR: resampled to fit ARAM, their loops moved onto block boundaries, and the tuning an AddmusicK instrument needs to play each at the MOD's pitch.
-- `write-mml.ts` (500+ lines) — A played MOD written out as an `#amk 4` song: each kept channel on one of AddmusicK's, each sample a custom instrument after `#default`.
+- `write-mml.ts` (750+ lines) — A played MOD written out as an `#amk 4` song: each kept channel on one of AddmusicK's, each sample a custom instrument after `#default`.
 
 ## packages/spc/src
 

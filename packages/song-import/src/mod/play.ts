@@ -3,11 +3,10 @@
  * every tick, and where the song loops.
  *
  * The effects follow 8bitbubsy's `pt2_replayer.c`: tick 0 reads the row and runs 9, B, C, D, F and
- * the E commands; the ticks after it run the slides (1, 2, 3, 5, A) and the vibrato. The periods are
- * the file's own, and slide in period units; what a writer needs of the vibrato is its parameters on
- * each tick rather than the wobble it makes, since `$DE` makes its own. The arpeggio and the tremolo
- * are counted and not played: `$FB` re-keys or, under legato, leaves the pitch where its last step
- * put it, and `$E5` is only safe in front of a key-on (COMMANDS.html, the `$FB` and `$E5` cards). Times are MOD ticks: one is
+ * the E commands; the ticks after it run the slides (1, 2, 3, 5, A), the vibrato, the tremolo and
+ * the arpeggio. The periods are the file's own, and slide in period units. What a writer needs of the
+ * vibrato, the tremolo and the arpeggio is their parameters on each tick rather than what they do to
+ * the period and the volume, since `$DE`, `$E5` and `$FB` make their own. Times are MOD ticks: one is
  * 2500/BPM ms.
  */
 
@@ -37,6 +36,10 @@ export interface ChannelTicks {
 	sample: number[];
 	/** `speed << 4 | depth` on the rows a vibrato (4xy, 6xy) runs, else 0. */
 	vibrato: number[];
+	/** `speed << 4 | depth` on the rows a tremolo (7xy) runs, else 0. */
+	tremolo: number[];
+	/** `x << 4 | y` on the rows an arpeggio (0xy) runs, else 0. */
+	arpeggio: number[];
 }
 
 /** Where a pass through an order starts: the writer's unit of text, and the place a loop can return to. */
@@ -50,10 +53,6 @@ export interface Segment {
 export interface Ignored {
 	/** 9xx on a struck note: AddmusicK plays a sample from its start. */
 	offsets: number;
-	/** Rows of 0xy arpeggio, played at the base note. */
-	arpeggio: number;
-	/** Rows of 7xy tremolo, played at the note's volume. */
-	tremolo: number;
 	/** E3x glissando, EFx invert loop, and a note delay past its row. */
 	unsupported: number;
 }
@@ -88,6 +87,8 @@ interface Channel {
 	portaSpeed: number;
 	vibratoSpeed: number;
 	vibratoDepth: number;
+	tremoloSpeed: number;
+	tremoloDepth: number;
 	loopRow: number;
 	loopCount: number;
 }
@@ -106,6 +107,8 @@ export function playMod(mod: ModFile): ModPlay {
 		keyOn: [],
 		sample: [],
 		vibrato: [],
+		tremolo: [],
+		arpeggio: [],
 	}));
 	// Amiga hard panning, L R R L, repeated across the channels.
 	const channels: Channel[] = Array.from({ length: mod.channels }, (_, i) => ({
@@ -121,10 +124,12 @@ export function playMod(mod: ModFile): ModPlay {
 		portaSpeed: 0,
 		vibratoSpeed: 0,
 		vibratoDepth: 0,
+		tremoloSpeed: 0,
+		tremoloDepth: 0,
 		loopRow: 0,
 		loopCount: 0,
 	}));
-	const ignored: Ignored = { offsets: 0, arpeggio: 0, tremolo: 0, unsupported: 0 };
+	const ignored: Ignored = { offsets: 0, unsupported: 0 };
 	const minPeriod = mod.amiga ? 113 : 14;
 	const maxPeriod = mod.amiga ? 856 : 6848;
 	const tempos: { tick: number; bpm: number }[] = [{ tick: 0, bpm: 125 }];
@@ -149,7 +154,14 @@ export function playMod(mod: ModFile): ModPlay {
 		ch.left = sample && sample.loopLength > 0 ? Infinity : (sample?.pcm.length ?? 0);
 	};
 
-	const record = (index: number, ch: Channel, struck: boolean, vibrato: number): void => {
+	const record = (
+		index: number,
+		ch: Channel,
+		struck: boolean,
+		vibrato: number,
+		tremolo: number,
+		arpeggio: number,
+	): void => {
 		const o = out[index];
 		const sounding = ch.sounding && ch.period > 0;
 		o.period.push(sounding ? ch.period : 0);
@@ -158,6 +170,8 @@ export function playMod(mod: ModFile): ModPlay {
 		o.keyOn.push(struck && sounding ? 1 : 0);
 		o.sample.push(sounding ? ch.playing : 0);
 		o.vibrato.push(vibrato);
+		o.tremolo.push(tremolo);
+		o.arpeggio.push(arpeggio);
 		// A one-shot runs out as it plays: the frames this tick takes at this period and tempo.
 		if (sounding && ch.left !== Infinity) {
 			ch.left -= PAULA_HZ / ch.period / (bpm * 0.4);
@@ -250,14 +264,9 @@ export function playMod(mod: ModFile): ModPlay {
 					ch.vibratoSpeed = x || ch.vibratoSpeed;
 					ch.vibratoDepth = y || ch.vibratoDepth;
 					break;
-				case 0x0:
-					if (cell.param !== 0) {
-						ignored.arpeggio++;
-					}
-
-					break;
 				case 0x7:
-					ignored.tremolo++;
+					ch.tremoloSpeed = x || ch.tremoloSpeed;
+					ch.tremoloDepth = y || ch.tremoloDepth;
 					break;
 				case 0x8:
 					ch.pan = cell.param;
@@ -399,7 +408,9 @@ export function playMod(mod: ModFile): ModPlay {
 					}
 
 					const vibrato = cell.effect === 0x4 || cell.effect === 0x6 ? (ch.vibratoSpeed << 4) | ch.vibratoDepth : 0;
-					record(index, ch, struck, vibrato);
+					const tremolo = cell.effect === 0x7 ? (ch.tremoloSpeed << 4) | ch.tremoloDepth : 0;
+					const arpeggio = cell.effect === 0x0 ? cell.param : 0;
+					record(index, ch, struck, vibrato, tremolo, arpeggio);
 				});
 				tick++;
 			}

@@ -133,15 +133,14 @@ inside its samples keeps what is there. ProTracker's period limits apply only to
 ### Playing
 
 `mod/play.ts` plays the song tick by tick as 8bitbubsy's `pt2_replayer.c` does: tick 0 reads the
-row and runs 9, B, C, D, F and the E commands, the later ticks the slides and the vibrato; Bxx and
-Dxx (in BCD) move the order, E6x loops rows, EEx repeats one, EDx strikes late. It records, for
-every channel and tick, the period sounding (vibrato left out), the volume, the pan, the key-ons
-and the vibrato's parameters, and stops at the first row it comes back to outside a pattern loop,
-which is the song's loop point; running off the end loops to the restart order. A one-shot sample
-ends where its frames run out at the period and tempo it plays at. 9xx, arpeggio, tremolo, E3x,
-EFx and a note delay past its row are counted rather than played: AddmusicK plays a sample from its
-start, `$FB` re-keys or, under legato, leaves the pitch where its last step put it, and `$E5` is
-only safe in front of a key-on (COMMANDS.html).
+row and runs 9, B, C, D, F and the E commands, the later ticks the slides, the vibrato, the tremolo
+and the arpeggio; Bxx and Dxx (in BCD) move the order, E6x loops rows, EEx repeats one, EDx strikes
+late. It records, for every channel and tick, the period sounding (vibrato and arpeggio left out),
+the volume (tremolo left out), the pan, the key-ons and the parameters of the vibrato, the tremolo
+and the arpeggio, and stops at the first row it comes back to outside a pattern loop, which is the
+song's loop point; running off the end loops to the restart order. A one-shot sample ends where its
+frames run out at the period and tempo it plays at. 9xx, E3x, EFx and a note delay past its row are
+counted rather than played, 9xx because AddmusicK plays a sample from its start.
 
 ### Samples
 
@@ -155,7 +154,9 @@ frames are copied. `fitFactor` bisects the largest factor every Auto sample can 
 against every key the song plays on the sample: `SetPitch` shifts its table value before it
 multiplies, so low keys lose bits and a small multiplier is coarse, and the choice that is worst
 on fewest cents wins, one that leaves notes outside o1 c-o6 a or the DSP's fourteen bits losing to
-one that does not. The encoding itself is the caller's (`@amk/spc/brr-encode`).
+one that does not. Each is judged after the upward shift a channel's `$EE` can give it, up to
+`FINE_TUNE_CENTS`, since that shift is far finer than a small multiplier's step: a tuning a little
+flat is as good as exact once the fine tune lifts it. The encoding itself is the caller's (`@amk/spc/brr-encode`).
 
 ### Writing
 
@@ -172,6 +173,20 @@ kept channels play, and `#instruments` giving each `$FF $E0 $7F` and its tuning 
   **Pitch** within a note is simplified to ramps written as `$DD` after the piece each starts in,
   under the same frame rules as the MIDI writer's. **Vibrato** is `$DE` at twice the MOD's speed and
   the swing its depth makes at the note's period, and `$DF` where it stops.
+- **Tremolo** is `$E5`, written only in front of a key-on, since its read-ahead counts its
+  arguments one short (COMMANDS.html, `$E5`) and anywhere else it can key a held note off. A note
+  takes the first tremolo its rows run, from its key-on; it is raised to the top of the swing,
+  because the driver's tremolo only takes volume away, and the amplitude is capped at `$C5`, where
+  the stray read would take it for a tie. `$FD` turns it off in front of a note without one.
+- **Arpeggio** is `$FB` under legato. Toggling `$F4 $01` on clears the voice's keyed bit, so the
+  note's own key-on sounds, and every key-on after it is held back while legato lasts
+  (`main.asm:2517-2530`), so the steps move the pitch and leave the sample playing. Where the MOD's
+  arpeggio stops, the note becomes an arpeggio of itself (`$FB $01`), which brings the pitch home;
+  a MOD tick before the note ends the arpeggio and legato are turned off, so it keys off as any note
+  does and legato never crosses a loop point. A note one tick long, or one whose steps go past what
+  its sample plays, keeps its base pitch and is counted.
+- **Fine tune.** Each channel takes the `$EE` that brings its notes nearest their pitch on the whole:
+  256ths of a semitone under every note (`main.asm:434-435`), upward only.
 - **Cuts.** The text is written one pass through an order at a time, each with its octave stated
   afresh, so a pass's text depends only on the driver state it starts under. A pass that comes round
   again in the same state is a label loop (`(n)[ … ]`, then `(n)` or `(n)k`), unless it or the pass

@@ -12,7 +12,13 @@
  * - a slide in pitch (1xx, 2xx, 3xx, 5xy, the fine slides) as `$DD` ramps, each directly after a tied
  *   piece of the note that it plays within;
  * - vibrato (4xy, 6xy) as `$DE`, its rate twice the MOD's speed and its extent the swing its depth
- *   makes at the note's pitch, and `$DF` where it stops.
+ *   makes at the note's pitch, and `$DF` where it stops;
+ * - tremolo (7xy) as `$E5` in front of the key-on, the only place its read-ahead is safe, and `$FD`
+ *   in front of a note with none;
+ * - arpeggio (0xy) as `$FB` under legato, so its steps move the pitch without striking the sample
+ *   again (`main.asm:2517-2530`), legato and the arpeggio turned off a MOD tick before the note ends
+ *   so that it keys off as any note does;
+ * - and on each channel the `$EE` fine tune that brings its notes nearest their pitch.
  *
  * The text is cut at every pass through an order. A cut that comes round again in the same state is
  * written once as a label loop and called after that, which is where a MOD's repeats save the ARAM
@@ -26,7 +32,8 @@ import { spellRestTicks, spellTicks } from "../mml/lengths";
 import { simplify, tagText, tempoForBpm } from "../mml/song-text";
 import type { ModFile } from "./file";
 import { type ChannelTicks, C2_PERIOD, type ModPlay } from "./play";
-import { HIGHEST_KEY, type Tuning, playsTrue, plannedFrames, tuningFor } from "./samples";
+import { SEMITONE, setPitchWide } from "@amk/spc/pitch";
+import { HIGHEST_KEY, type Tuning, c2Register, playsTrue, plannedFrames, tuningFor } from "./samples";
 
 /** AddmusicK's channels. */
 export const MOD_CHANNEL_LIMIT = 8;
@@ -43,6 +50,8 @@ const ROWS_A_LINE = 16;
 const VOLUME_TOLERANCE = 6;
 /** How far, in semitones, a run of `$DD` ramps may stray from the slide it stands for. */
 const PITCH_TOLERANCE = 0.3;
+/** The `$EE` values tried: a quarter of a semitone, the reach `tuningFor` counts on (`FINE_TUNE_CENTS`). */
+const FINE_TUNE_REACH = 64;
 
 /** What the writer was asked for. */
 export interface ModSongOptions {
@@ -64,7 +73,6 @@ export interface ModSongOptions {
 export type ModImportWarning =
 	| { code: "offsets"; count: number }
 	| { code: "arpeggio"; count: number }
-	| { code: "tremolo"; count: number }
 	| { code: "unsupported"; count: number }
 	| { code: "mod-truncated" }
 	| { code: "too-long" }
@@ -160,15 +168,58 @@ function vibratoOf(packed: number, period: number): number {
 	return (rate << 8) | extent;
 }
 
+/** `$E5`'s rate and amplitude for a MOD tremolo at a volume, packed `rate << 8 | amplitude`, and how far the volume is raised to centre the swing. */
+function tremoloOf(packed: number, volume: number): { command: number; swing: number } | null {
+	const speed = packed >> 4;
+	const depth = packed & 0x0f;
+	if (speed === 0 || depth === 0 || volume === 0) {
+		return null;
+	}
+
+	// The MOD's volume swings by up to `255 × depth >> 6` either way (`pt2_replayer.c`); the driver's
+	// tremolo only takes away, from the velocity it then squares (`L_122D`, `L_124D`), so the note is
+	// raised to the top of the swing and the amplitude carries it down to the bottom.
+	const swing = (255 * depth) >> 6;
+	const top = Math.min(64, volume + swing);
+	const bottom = Math.max(0, volume - swing);
+	const amplitude = Math.round(256 * (1 - Math.sqrt(bottom / top)));
+	// Above `$C5` the read-ahead would take the amplitude for a tie or a command (COMMANDS.html, `$E5`).
+	const rate = Math.min(255, (4 * speed) / DRIVER_TICKS);
+	return { command: (rate << 8) | Math.max(1, Math.min(0xc5, amplitude)), swing: top - volume };
+}
+
+/** `$FB`'s steps for a MOD arpeggio: the note, `x` above it and `y` above it, each a MOD tick. */
+function arpeggioText(param: number): string {
+	return `$FB $03 $${hex2(DRIVER_TICKS)} $00 $${hex2(param >> 4)} $${hex2(param & 0x0f)}`;
+}
+
+/** An arpeggio of the note alone: the pitch returns to it and holds while legato lasts. */
+const HOLD = -1;
+
 interface ChannelState {
 	instrument: number | null;
 	volume: number | null;
 	pan: number | null;
 	vibrato: number | null;
+	tremolo: number | null;
+	/** The `$FB` in force: a MOD `0xy`, {@link HOLD}, or 0 for none. */
+	arpeggio: number;
+	legato: boolean;
+	fineTune: number | null;
 	q: boolean;
 }
 
-const FORGOTTEN: ChannelState = { instrument: null, volume: null, pan: null, vibrato: null, q: false };
+const FORGOTTEN: ChannelState = {
+	instrument: null,
+	volume: null,
+	pan: null,
+	vibrato: null,
+	tremolo: null,
+	arpeggio: 0,
+	legato: false,
+	fineTune: null,
+	q: false,
+};
 
 /** What a channel of the song is made of, ready to be written cut by cut. */
 interface Context {
@@ -181,6 +232,8 @@ interface Context {
 	tempoAt: (tick: number) => string | null;
 	rowStarts: readonly number[];
 	folded: Map<number, number>;
+	/** Notes whose arpeggio is not played: one MOD tick long, or stepping past what the sample plays. */
+	unplayedArpeggios: { count: number };
 }
 
 /** One cut of a channel's text. */
@@ -203,6 +256,14 @@ class ChannelWriter {
 	private tempoWritten = -1;
 	/** Each note's key at its key-on, from o1 c, folded by octaves into what the instrument plays. */
 	private readonly keys = new Map<Note, number>();
+	/** The notes that play an arpeggio, under legato from their key-on to a MOD tick before their end. */
+	private readonly arpeggios = new Set<Note>();
+	/** Each note's tremolo: the first a row of it runs, from the key-on, since `$E5` is safe nowhere later. */
+	private readonly tremolos = new Map<Note, { command: number; swing: number }>();
+	/** Whether any note has a tremolo, so a channel without one never writes `$FD`. */
+	private readonly usesTremolo: boolean;
+	/** The channel's `$EE`, in 256ths of a semitone. */
+	readonly fineTune: number;
 
 	constructor(private readonly ctx: Context) {
 		for (const note of ctx.notes) {
@@ -226,7 +287,72 @@ class ChannelWriter {
 			}
 
 			this.keys.set(note, key);
+			const tuning = sample.tuning;
+			let reach = -1;
+			for (let t = note.start; t < note.end; t++) {
+				const param = ctx.ticks.arpeggio[t];
+				if (param !== 0) {
+					reach = Math.max(reach, param >> 4, param & 0x0f);
+				}
+			}
+
+			if (reach >= 0) {
+				const fits = key + reach <= HIGHEST_KEY && playsTrue(tuning, key + reach);
+				if (note.end - note.start >= 2 && fits) {
+					this.arpeggios.add(note);
+				} else {
+					ctx.unplayedArpeggios.count++;
+				}
+			}
+
+			for (let t = note.start; t < note.end; t++) {
+				if (ctx.ticks.tremolo[t] !== 0) {
+					const tremolo = tremoloOf(ctx.ticks.tremolo[t], ctx.ticks.volume[note.start]);
+					if (tremolo) {
+						this.tremolos.set(note, tremolo);
+					}
+
+					break;
+				}
+			}
 		}
+
+		this.usesTremolo = this.tremolos.size > 0;
+		this.fineTune = this.bestFineTune();
+	}
+
+	/**
+	 * The `$EE` that brings the channel's notes nearest their pitch on the whole. `SetPitch` keeps fewer
+	 * bits of a low key and a small multiplier is coarse, so the tuning leaves each note a few cents
+	 * out; `$EE` puts 256ths of a semitone under every note (`main.asm:434-435`), and only upward.
+	 */
+	private bestFineTune(): number {
+		const notes = [...this.keys].flatMap(([note, key]) => {
+			const sample = this.ctx.samples.get(note.sample);
+			if (!sample) {
+				return [];
+			}
+
+			const wanted =
+				c2Register(sample.factor, this.ctx.finetuneOf(note.sample)) * 2 ** ((key - sample.tuning.c2Key) / 12);
+			return [{ key, tuning: sample.tuning, wanted }];
+		});
+		let best = 0;
+		let bestError = Infinity;
+		for (let fine = 0; fine < FINE_TUNE_REACH; fine++) {
+			let error = 0;
+			for (const n of notes) {
+				const register = setPitchWide(n.key * SEMITONE + fine, n.tuning.multiplier, n.tuning.sub);
+				error += Math.abs(Math.log2(register / n.wanted));
+			}
+
+			if (error < bestError) {
+				best = fine;
+				bestError = error;
+			}
+		}
+
+		return best;
 	}
 
 	/** Forgets what the channel plays under, as at the loop point: the repeat restates it. */
@@ -248,6 +374,11 @@ class ChannelWriter {
 		return key + this.semitones(t, note.sample) - Math.round(this.semitones(note.start, note.sample));
 	}
 
+	/** `v` for a note on tick `t`: raised by the tremolo's swing, which `$E5` takes back down. */
+	private volumeIn(note: Note, t: number): number {
+		return volumeOf(Math.min(64, this.ctx.ticks.volume[t] + (this.tremolos.get(note)?.swing ?? 0)));
+	}
+
 	private noteSettings(at: number, note: Note, t: number): void {
 		const sample = this.ctx.samples.get(note.sample);
 		if (sample && this.state.instrument !== sample.instrument) {
@@ -255,13 +386,45 @@ class ChannelWriter {
 			this.state.instrument = sample.instrument;
 		}
 
-		this.setVolume(at, volumeOf(this.ctx.ticks.volume[t]));
+		this.setVolume(at, this.volumeIn(note, t));
 		this.setPan(at, panOf(this.ctx.ticks.pan[t], this.ctx.separation));
 		this.setVibrato(at, vibratoOf(this.ctx.ticks.vibrato[t], this.ctx.ticks.period[t]));
+		this.setTremolo(at, this.tremolos.get(note)?.command ?? 0);
+		if (this.fineTune > 0 && this.state.fineTune !== this.fineTune) {
+			this.push(at, `$EE $${hex2(this.fineTune)}`);
+			this.state.fineTune = this.fineTune;
+		}
+
 		if (!this.state.q) {
 			this.push(at, Q);
 			this.state.q = true;
 		}
+	}
+
+	/** `$E5`, or `$FD` for none; written only in front of a key-on or a rest, where its read-ahead is safe. */
+	private setTremolo(at: number, tremolo: number): void {
+		if (!this.usesTremolo || this.state.tremolo === tremolo) {
+			return;
+		}
+
+		this.push(at, tremolo === 0 ? "$FD" : `$E5 $00 $${hex2(tremolo >> 8)} $${hex2(tremolo & 0xff)}`);
+		this.state.tremolo = tremolo;
+	}
+
+	private setArpeggio(at: number, arpeggio: number): void {
+		if (this.state.arpeggio === arpeggio) {
+			return;
+		}
+
+		this.push(
+			at,
+			arpeggio === 0
+				? "$FB $00 $00"
+				: arpeggio === HOLD
+					? `$FB $01 $${hex2(DRIVER_TICKS)} $00`
+					: arpeggioText(arpeggio),
+		);
+		this.state.arpeggio = arpeggio;
 	}
 
 	private setVolume(at: number, volume: number): void {
@@ -376,11 +539,20 @@ class ChannelWriter {
 	private notePart(note: Note, s: number, e: number): void {
 		const ticks = this.ctx.ticks;
 		const struck = s === note.start;
+		const arpeggio = this.arpeggios.has(note);
 		if (struck) {
 			this.noteSettings(s, note, s);
+			if (arpeggio) {
+				// Toggling legato on lets this key-on through and holds back every one after it, so the
+				// arpeggio's steps move the pitch and leave the sample playing.
+				this.push(s, "$F4 $01");
+				this.state.legato = true;
+				this.setArpeggio(s, ticks.arpeggio[s]);
+			}
 		}
 
-		// The pitch simplified to ramps: each a `$DD` after the piece it starts in.
+		// The pitch simplified to ramps: each a `$DD` after the piece it starts in. An arpeggio sets the
+		// pitch at every step, so a note playing one slides nowhere.
 		const pitch = [];
 		for (let t = s; t < e; t++) {
 			pitch.push({ tick: t, value: this.pitchAt(note, t) });
@@ -392,7 +564,7 @@ class ChannelWriter {
 		let was = Math.round(ramps[0].value);
 		for (let i = 0; i + 1 < ramps.length; i++) {
 			const target = Math.round(ramps[i + 1].value);
-			if (target !== was && target >= 0 && target <= HIGHEST_KEY) {
+			if (!arpeggio && target !== was && target >= 0 && target <= HIGHEST_KEY) {
 				slides.set(ramps[i].tick, { duration: (ramps[i + 1].tick - ramps[i].tick) * DRIVER_TICKS, target });
 				was = target;
 			}
@@ -401,7 +573,7 @@ class ChannelWriter {
 		// The volume simplified to steps and fades, each written at the tick it starts on.
 		const volume = [];
 		for (let t = s; t < e; t++) {
-			volume.push({ tick: t, value: volumeOf(ticks.volume[t]) });
+			volume.push({ tick: t, value: this.volumeIn(note, t) });
 		}
 
 		const levels = simplify(volume, VOLUME_TOLERANCE);
@@ -428,6 +600,15 @@ class ChannelWriter {
 			if (ticks.pan[t] !== ticks.pan[t - 1] || ticks.vibrato[t] !== ticks.vibrato[t - 1] || this.ctx.tempoAt(t)) {
 				stops.add(t);
 			}
+
+			if (arpeggio && ticks.arpeggio[t] !== ticks.arpeggio[t - 1]) {
+				stops.add(t);
+			}
+		}
+
+		// A MOD tick before the end the arpeggio and legato stop, so the note keys off as any does.
+		if (arpeggio) {
+			stops.add(note.end - 1);
 		}
 
 		const key = this.keys.get(note) ?? 0;
@@ -437,9 +618,19 @@ class ChannelWriter {
 		let at = s;
 		for (const until of [...points, e]) {
 			this.tempo(at);
-			if (at > s) {
+			if (at > s || !struck) {
 				this.setPan(at, panOf(ticks.pan[at], this.ctx.separation));
 				this.setVibrato(at, vibratoOf(ticks.vibrato[at], ticks.period[at]));
+				if (arpeggio && at === note.end - 1) {
+					this.setArpeggio(at, 0);
+					this.push(at, "$F4 $01");
+					this.state.legato = false;
+				} else if (arpeggio) {
+					// Where the MOD's arpeggio stops, the note is held as an arpeggio of itself, which brings
+					// the pitch back from the step it was on.
+					const param = ticks.arpeggio[at];
+					this.setArpeggio(at, param !== 0 ? param : this.state.arpeggio !== 0 ? HOLD : 0);
+				}
 			}
 
 			for (const step of fades.get(at) ?? []) {
@@ -501,14 +692,6 @@ export function writeModSong(mod: ModFile, play: ModPlay, options: ModSongOption
 	const warnings: ModImportWarning[] = [];
 	if (play.ignored.offsets > 0) {
 		warnings.push({ code: "offsets", count: play.ignored.offsets });
-	}
-
-	if (play.ignored.arpeggio > 0) {
-		warnings.push({ code: "arpeggio", count: play.ignored.arpeggio });
-	}
-
-	if (play.ignored.tremolo > 0) {
-		warnings.push({ code: "tremolo", count: play.ignored.tremolo });
 	}
 
 	if (play.ignored.unsupported > 0) {
@@ -603,6 +786,7 @@ export function writeModSong(mod: ModFile, play: ModPlay, options: ModSongOption
 		to: play.segments[i + 1]?.tick ?? end,
 	}));
 	const folded = new Map<number, number>();
+	const unplayedArpeggios = { count: 0 };
 	const master = Math.round(255 * Math.sqrt(Math.min(1, 4 / Math.max(1, keep.length))));
 
 	// Each channel's cuts, written in order, then each cut that comes round again in the same state
@@ -617,6 +801,7 @@ export function writeModSong(mod: ModFile, play: ModPlay, options: ModSongOption
 			tempoAt: (tick) => (i === 0 ? (changes.get(tick) ?? null) : null),
 			rowStarts: play.rowStarts,
 			folded,
+			unplayedArpeggios,
 		});
 		return cuts.map((cut, n) => {
 			const opening = n === 0 && i === 0 ? ["w" + String(master), `t${tempos[0].tempo}`] : [];
@@ -632,6 +817,10 @@ export function writeModSong(mod: ModFile, play: ModPlay, options: ModSongOption
 
 	for (const [sample, count] of folded) {
 		warnings.push({ code: "mod-folded", sample, count });
+	}
+
+	if (unplayedArpeggios.count > 0) {
+		warnings.push({ code: "arpeggio", count: unplayedArpeggios.count });
 	}
 
 	const counts = new Map<string, number>();

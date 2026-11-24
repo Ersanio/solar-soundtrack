@@ -11,6 +11,7 @@ export const CHANGELOG: readonly ChangelogEntry[] = [
   {
     date: '24 November 2026',
     items: [
+      'Arpeggio, tremolo and finer tuning in imported MOD files',
       'Import MOD files as a new song, with their samples resampled to fit and a preview',
       "Download samples from the sample library, one at a time or all of a song's as a .zip",
       'Choose which instrument plays each drum sound when importing a MIDI file',

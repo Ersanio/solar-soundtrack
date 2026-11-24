@@ -8,7 +8,7 @@ import { type Cell, PERIODS, centsOff, imported, modBytes, pattern, played, prob
  * (`main.asm:484-554`), so a sample played over three octaves loses bits at its lowest, and a low
  * resampling factor leaves a small multiplier coarse: this is the driver's floor, not the importer's.
  */
-const TOLERANCE = 12;
+const TOLERANCE = 11;
 
 /** Each period struck on its own row, in order. */
 function scale(periods: readonly number[], sample = 1): Cell[][] {
@@ -30,7 +30,7 @@ for (const finetune of [0, 3, -5]) {
 		const notes = played(imp.song, 0);
 		const worst = Math.max(...notes.map((n, i) => Math.abs(centsOff(imp, n, PERIODS[i]))));
 		check(
-			`finetune ${finetune} at factor ${factor}: 36 notes, each within 12 cents`,
+			`finetune ${finetune} at factor ${factor}: 36 notes, each within 11 cents`,
 			notes.length === 36 && worst < TOLERANCE,
 			`${notes.length} notes, worst ${worst.toFixed(2)} cents`,
 		);
@@ -58,7 +58,7 @@ section("pitch: past the Amiga's range");
 	const notes = played(imp.song, 0);
 	const worst = Math.max(...notes.map((n, i) => Math.abs(centsOff(imp, n, periods[i]))));
 	check(
-		"periods to 28 play true within 12 cents",
+		"periods to 28 play true within 11 cents",
 		notes.length === periods.length && worst < TOLERANCE,
 		`worst ${worst.toFixed(2)}`,
 	);

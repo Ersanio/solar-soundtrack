@@ -32,8 +32,10 @@ true.
 - **A MOD is two driver ticks to a MOD tick**, so its BPM is the song's quarter-note BPM and its
   per-tick effects land on whole ticks. `#default` is always listed first, so the song is safe beside
   SMW's sound effects, and the MOD's samples come after it at `@30` up. 9xx sample offset has no
-  AddmusicK equivalent and is counted, its note played from the sample's start; so are arpeggio and
-  tremolo, which `$FB` and `$E5` cannot follow (the package's `CLAUDE.md`).
+  AddmusicK equivalent and is counted, its note played from the sample's start. Arpeggio is `$FB`
+  under legato, which is on only from an arpeggio note's key-on to a MOD tick before its end, so it
+  never crosses a loop point; tremolo is `$E5` only in front of a key-on; each channel takes one
+  `$EE` (the package's `CLAUDE.md`).
 - **A MOD's repeated passes are label loops** only where a pass and the one after it open on no
   tie, and each pass states its octave afresh, so two passes alike in text and in the driver state
   they start under play alike.
