@@ -1,0 +1,23 @@
+<button
+  #trigger
+  amk-button
+  size="md"
+  [variant]="variant()"
+  [disabled]="disabled()"
+  [attr.title]="title()"
+  (click)="toggle()"
+  (keydown)="onKeydown($event)"
+>
+  <ng-content select="[menuTrigger]" />
+  <amk-icon-chevron-down />
+</button>
+
+@if (open() && !disabled()) {
+  <div
+    class="border-edge bg-raised absolute top-full right-0 z-20 mt-2 flex min-w-40 flex-col gap-0.5 rounded-md border p-1 shadow-lg *:w-full *:justify-start"
+    (keydown)="onKeydown($event)"
+    (click)="onPanelClick($event)"
+  >
+    <ng-content />
+  </div>
+}

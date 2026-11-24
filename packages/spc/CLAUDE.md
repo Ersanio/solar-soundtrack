@@ -20,6 +20,7 @@ main thread, and inside an `AudioWorkletGlobalScope`.
 | `pitch.ts`           | `SetPitch`'s arithmetic, and where a pitch stops being the note       |
 | `player.ts`          | AudioContext, worklet node, transport                                 |
 | `protocol.ts`        | The one message contract between page and audio thread                |
+| `render.ts`          | The whole song to PCM, and that PCM as a `.wav`                       |
 | `repeat-settings.ts` | The settings a pass carries into the song's repeat                    |
 | `slots.ts`           | The slots of driver state a VCMD writes or clears                     |
 | `song-walk.ts`       | Reads a compiled song the way the driver does: what sounds when       |
@@ -484,8 +485,8 @@ tick count, which still runs per 32-frame block, does not notice it (`worklettes
 `AnalyserNode` hangs beside its gain rather than after it, so the spectrum reads the song and not
 the listening level.
 
-Neither thread of the worklet, nor the app's three workers, has a `$localize`, so the modules they
-load — `worklet.ts`, `protocol.ts`, `driver-state.ts`, `wasm-host.ts`, `note-audition.ts` — hold no
+Neither thread of the worklet, nor the app's four workers, has a `$localize`, so the modules they
+load — `worklet.ts`, `protocol.ts`, `driver-state.ts`, `wasm-host.ts`, `note-audition.ts`, `render.ts` — hold no
 message and their errors are written in English in the code. Everything else here that a porter
 reads (the FIR presets, the ARAM segment labels, the GAIN mode names, the BRR and driver errors) is
 a `$localize` message written by its ID, with its English in `web/src/locale/messages.en.json`;

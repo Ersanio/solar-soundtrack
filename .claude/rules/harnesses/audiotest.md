@@ -84,3 +84,4 @@ section alone.
 | `audition-checkpoint.ts` | A note auditioned from a checkpoint is the note auditioned from the top of the song, byte for byte.                                                                             |
 | `voices.ts`              | Rendering a frame at a time is the same bytes as a block, audio and APU RAM; `VxOUTX` moves on a keyed voice only; a mute reads as volume 0.                                    |
 | `analysis.ts`            | The Song Inspector's analysis: a lane per voice played, a mute that empties its lane and quietens the mix, samples on their SRCN, echo only where it is on, clipping counted.   |
+| `render.ts`              | The `.wav` export: the song unchanged to the tick that ends its second loop, then a fade to a silent last frame; a song that does not loop rings out; the RIFF header.          |

@@ -680,6 +680,16 @@ export class EditorStore {
     this.override.set({ kind: 'error', text });
   }
 
+  /** Reports an action that finished, as an export does. */
+  succeed(text: string): void {
+    this.override.set({ kind: 'ok', text });
+  }
+
+  /** Reports an action still under way, as a `.wav` render is. */
+  working(text: string): void {
+    this.override.set({ kind: 'busy', text });
+  }
+
   /**
    * Says why an action did nothing, where nothing went wrong — a note not
    * sounded because the mixer has its channel silenced, say. Not `fail`, which

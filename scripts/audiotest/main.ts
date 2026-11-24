@@ -31,4 +31,5 @@ await runSections([
 	["audition-checkpoint", () => import("./audition-checkpoint")],
 	["voices", () => import("./voices")],
 	["analysis", () => import("./analysis")],
+	["render", () => import("./render")],
 ]);

@@ -1,4 +1,4 @@
-/** The top bar: the transport, the ARAM meter, the suppressed warnings, the MIDI keyboard switch, the exports and the import, the theme picker, the changelog and the commit link. */
+/** The top bar: the transport, the ARAM meter, the suppressed warnings, the MIDI keyboard switch, the Export menu and the import, the theme picker, the changelog and the commit link. */
 
 import { Component, computed, inject, viewChild } from '@angular/core';
 
@@ -9,10 +9,12 @@ import { IconDownload } from '../../shared/icons/icon-download';
 import { IconGithub } from '../../shared/icons/icon-github';
 import { IconRoll } from '../../shared/icons/icon-roll';
 import { IconUpload } from '../../shared/icons/icon-upload';
+import { Menu } from '../../shared/menu/menu';
 import { Toggle } from '../../shared/toggle/toggle';
 import { Audition } from '../../state/audition';
 import { EditorStore } from '../../state/editor-store';
 import { MidiInput } from '../../state/midi-input';
+import { WavExport } from '../../state/wav-export';
 import { ThemePicker } from '../../theme/theme-picker/theme-picker';
 import { AramMeter } from '../aram-meter/aram-meter';
 import { ImportDialog } from '../import-dialog/import-dialog';
@@ -28,7 +30,7 @@ const REPO_URL = 'https://github.com/Ersanio/solar-soundtrack';
  * slack, so everything else keeps its width.
  *
  * The slider stops giving at its least width, so on a short row labels give
- * way first, each where the row stops holding it: the exports' below `2xl`, the
+ * way first, each where the row stops holding it: the Export menu's and the import's below `2xl`, the
  * MIDI switch's below 98rem, the ARAM meter's free figure below 107rem, and below
  * `xl` the Loop label and the ARAM word, with the volume slider a step
  * narrower. Below 67rem the suppressed warnings' button goes too, the Problems
@@ -47,6 +49,7 @@ const REPO_URL = 'https://github.com/Ersanio/solar-soundtrack';
     IconRoll,
     IconUpload,
     ImportDialog,
+    Menu,
     ScopeMini,
     SuppressionsButton,
     ThemePicker,
@@ -66,6 +69,7 @@ const REPO_URL = 'https://github.com/Ersanio/solar-soundtrack';
 export class TopBar {
   protected readonly store = inject(EditorStore);
   protected readonly midi = inject(MidiInput);
+  protected readonly wav = inject(WavExport);
   private readonly audition = inject(Audition);
 
   private readonly importer = viewChild.required(ImportDialog);

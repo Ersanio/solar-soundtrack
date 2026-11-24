@@ -1,7 +1,7 @@
 # The editor
 
 The Angular application. Everything it compiles, assembles and plays lives in `../packages`; what is
-here is the UI, the thirteen state services, and the adapters that join CodeMirror and Web Audio to
+here is the UI, the fourteen state services, and the adapters that join CodeMirror and Web Audio to
 framework-free code.
 
 Run everything from the repository root, not from here. `npm start`, `npm run build` and
@@ -37,7 +37,7 @@ stay true of `EditorStore` and the write-back path is `.claude/rules/state-and-e
 
 | Path                    | What it is                                                                                                   |
 | ----------------------- | ------------------------------------------------------------------------------------------------------------ |
-| `src/app/state/`        | Thirteen `@Service()` singletons in dependency order, and the transport's clock                              |
+| `src/app/state/`        | Fourteen `@Service()` singletons in dependency order, and the transport's clock                              |
 | `src/app/editor/`       | The editor pane and its chrome: top bar, transport, ARAM meter, mixer, palette, CodeMirror adapter           |
 | `src/app/editor/views/` | What the pane's tabs switch between: source, sample library, piano roll, Song Inspector, Audio Visualization |
 | `src/app/output/`       | The sidebar: the command and loop inspectors, the ARAM budget, the hex dump, diagnostics                     |
@@ -45,7 +45,7 @@ stay true of `EditorStore` and the write-back path is `.claude/rules/state-and-e
 | `src/app/shared/`       | Form controls, toggles, sections, popovers, tabs, icons, chart helpers                                       |
 | `src/app/util/`         | Formatting, IndexedDB, `clamp`                                                                               |
 
-State flows one way: `DriverStore` → `SampleStore` → `EditorStore` → `Playback`. Nine more sit off
+State flows one way: `DriverStore` → `SampleStore` → `EditorStore` → `Playback`. Ten more sit off
 that spine: `ClockMeasurer`, which `EditorStore` owns and which drives the clock measurement in
 `.claude/rules/transport-and-clock.md`; `Audition`, which hangs off `EditorStore` beside `Playback` and owns the second
 `AudioContext`; `Mixer`, which holds the per-channel mutes, the solo and the output level and is
@@ -59,12 +59,13 @@ reader of those is a stylesheet; `CommitAudition`, the command inspector's write
 forwards a panel's commit to `EditorRequests` and replays the selected note through `Audition`
 once the compile that includes it lands; `Suppressions`, which injects nothing and holds the
 diagnostic codes the porter has suppressed, which `EditorStore.diagnostics` leaves out of
-everything it feeds (`.claude/rules/problems.md`); and `MidiInput`, which injects nothing and holds the Web
+everything it feeds (`.claude/rules/problems.md`); `MidiInput`, which injects nothing and holds the Web
 MIDI connection the top bar's MIDI switch asks for — every input plugged in, as one stream of
 keys with one listener slot, which the piano roll takes while it is open
-(`.claude/rules/piano-roll-architecture.md`, Recording from a MIDI keyboard); and `SongAnalyzer`,
+(`.claude/rules/piano-roll-architecture.md`, Recording from a MIDI keyboard); `SongAnalyzer`,
 which reads `EditorStore` and `Mixer` and plays the song on a worker for the Song Inspector while
-that tab is open (`.claude/rules/song-inspector.md`).
+that tab is open (`.claude/rules/song-inspector.md`); and `WavExport`, which reads `EditorStore` and
+renders the whole song to a `.wav` on a worker for the top bar's Export menu.
 
 `DriverStore` loads `packages/spc/assets/driver/`. The song's ARAM load address is the slot the
 driver's own song pointer table reserves, stated in the bundle's `manifest.json` and checked against

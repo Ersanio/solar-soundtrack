@@ -28,27 +28,20 @@
     <span class="max-[98rem]:hidden">{{ midiLabel() }}</span>
   </button>
 
-  <button
-    amk-button
-    variant="dark"
-    size="md"
-    [disabled]="!store.canDownload()"
-    (click)="store.downloadBin()"
-  >
-    <amk-icon-download />
-    <span i18n="@@topbar.download-bin" class="max-2xl:hidden">topbar.download-bin</span>
-  </button>
+  <amk-menu variant="dark" [disabled]="!store.canDownload()">
+    <amk-icon-download menuTrigger />
+    <span i18n="@@topbar.export" menuTrigger class="max-2xl:hidden">topbar.export</span>
 
-  <button
-    amk-button
-    variant="dark"
-    size="md"
-    [disabled]="!store.canDownload()"
-    (click)="store.downloadSpc()"
-  >
-    <amk-icon-download />
-    <span i18n="@@topbar.export-spc" class="max-2xl:hidden">topbar.export-spc</span>
-  </button>
+    <button amk-button variant="ghost" size="sm" [disabled]="wav.running()" (click)="wav.export()">
+      <span i18n="@@topbar.export.wav">topbar.export.wav</span>
+    </button>
+    <button amk-button variant="ghost" size="sm" (click)="store.downloadSpc()">
+      <span i18n="@@topbar.export-spc">topbar.export-spc</span>
+    </button>
+    <button amk-button variant="ghost" size="sm" (click)="store.downloadBin()">
+      <span i18n="@@topbar.export.bin">topbar.export.bin</span>
+    </button>
+  </amk-menu>
 
   <!-- A label rather than a button, so the press is the file picker's own; what it
        picked opens the Import dialog whatever its format, which says why if it cannot. -->

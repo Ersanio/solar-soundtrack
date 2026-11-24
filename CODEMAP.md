@@ -127,6 +127,7 @@ something in the directory, which load by themselves when such a file is opened.
 - `pitch.ts` — The driver's pitch arithmetic: how a note number becomes the DSP's pitch register, and where that stops being the note.
 - `player.ts` (300+ lines) — SPC700 playback.
 - `protocol.ts` — The message contract between `player.ts` on the page and `worklet.ts` on the audio thread.
+- `render.ts` — A whole song rendered to PCM and wrapped as a `.wav`: the intro, the loop twice and a fade, as the ID666 tag `export.ts` writes describes it.
 - `repeat-settings.ts` (500+ lines) — The driver settings a looping song can carry from the end of one pass into the next.
 - `slots.ts` — The slots of driver state a VCMD writes or clears, which is how the song walk names the command a note sounds under.
 - `song-walk-types.ts` (300+ lines) — The song walk's public model: the timeline `walkSong` returns, and the notes, commands, loops and state in it.
@@ -173,6 +174,7 @@ something in the directory, which load by themselves when such a file is opened.
 - `muting.ts` (300+ lines) — `audiotest`: muting happens in the DSP and nowhere else — the driver never sees it, nothing the song writes undoes it, and the mix, the song's speed, a ringing note and unmuting all behave.
 - `note-map.ts` — `audiotest`: the note map lands on what the driver is playing.
 - `pitch.ts` — `audiotest`: the DSP plays the pitch the driver's arithmetic says it will, the wrapped and the silent ones included.
+- `render.ts` — `audiotest`: the `.wav` export — the song as it plays up to the end of its second loop, counted in driver ticks, then a ten-second fade to silence; a song that does not loop rings out after its one pass; and the RIFF header a player reads.
 - `samples.ts` — `audiotest`: sample sets through the emulator: `#samples`, a custom instrument, `optimizeSampleUsage` and a `.bnk` bank.
 - `sound.ts` — `audiotest`: the emulator boots, a compiled song makes sound, silence is silent, notes differ audibly, and fast-forward lands somewhere different.
 - `support.ts` — What the `audiotest` sections share: the driver, the one emulator instance, `compileToSpc`, `renderMuted`, and the level and pitch measures.
@@ -438,7 +440,7 @@ something in the directory, which load by themselves when such a file is opened.
 
 ## web/src/app/editor/top-bar
 
-- `top-bar.ts` — The top bar: the transport, the ARAM meter, the suppressed warnings, the MIDI keyboard switch, the exports and the import, the theme picker, the changelog and the commit link.
+- `top-bar.ts` — The top bar: the transport, the ARAM meter, the suppressed warnings, the MIDI keyboard switch, the Export menu and the import, the theme picker, the changelog and the commit link.
 
 ## web/src/app/editor/transport-controls
 
@@ -947,6 +949,12 @@ something in the directory, which load by themselves when such a file is opened.
 
 - 28 icon components, `icon-<name>.ts`, one glyph each: `analysis`, `book`, `chevron-down`, `chevron-right`, `close`, `download`, `github`, `lock`, `loop`, `minus`, `palette`, `pause`, `play`, `plus`, `record`, `recording`, `redo`, `roll`, `samples`, `scope`, `source`, `stop`, `suppress`, `undo`, `unlock`, `upload`, `volume`, `wrap`
 
+## web/src/app/shared/menu
+
+**Rules:** `ui-and-theme.md`
+
+- `menu.ts` — A labelled button that drops down a list of actions under it.
+
 ## web/src/app/shared/modal
 
 **Rules:** `ui-and-theme.md`
@@ -1025,6 +1033,7 @@ something in the directory, which load by themselves when such a file is opened.
 - `note.worker.ts` — Runs {@link auditionNote} and {@link auditionRegion} off the page.
 - `pitch-range.ts` — `SST0513`, `SST0514` and `SST0515` — a note pitched past what its instrument can play, and a vibrato or an arpeggio that takes one there.
 - `playback.ts` (300+ lines) — The transport: plays the compiled song through the worklet player and holds the one playhead, in driver ticks.
+- `render.worker.ts` — Runs {@link renderSong} off the page, and hands back the `.wav`.
 - `repeat-carry.ts` — `SST0510`-`SST0512` — a looping song whose repeat starts its loop under a different tempo, channel setting or song setting from its first pass.
 - `sample-song.ts` — The song a fresh editor opens on.
 - `sample-store.ts` (500+ lines) — The sample library: the bundled `.brr` files plus whatever the user has uploaded over or alongside them.
@@ -1037,6 +1046,7 @@ something in the directory, which load by themselves when such a file is opened.
 - `suppressions.ts` — The diagnostic codes the porter has suppressed, in every song, kept in the browser as the theme is.
 - `theme-store.ts` — What the app is painted in, and the porter's changes to it, written onto `<html>` as custom properties.
 - `transport-view.ts` — The transport's readings of the mixer and the walk: silenced channels and why, sounding spans, estimated seconds.
+- `wav-export.ts` — Renders the whole song to a `.wav` on a worker, and downloads it.
 
 ## web/src/app/state/analysis
 

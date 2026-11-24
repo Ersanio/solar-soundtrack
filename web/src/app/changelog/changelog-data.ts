@@ -11,6 +11,7 @@ export const CHANGELOG: readonly ChangelogEntry[] = [
   {
     date: '24 November 2026',
     items: [
+      'Export the song as a .wav, from a new Export menu that also holds the .spc and .bin exports',
       'Import MIDI files as a new song, with channel picking, instrument matching and a preview',
       'Name the stock instruments and drums in the instrument picker',
     ],
