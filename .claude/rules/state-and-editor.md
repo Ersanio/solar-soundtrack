@@ -82,5 +82,10 @@ source's colours on `--color-syn-*` tokens of their own.
 `SampleStore` never writes the bundle in `packages/spc/assets/driver/`: a replaced stock file is an
 override in IndexedDB, and the bundled files keep their order, because `INSTRUMENT_TO_SAMPLE` fixes
 which SRCN `@0`-`@29` mean. Its `names`, `groups`, `importantSamples` and `optimize` are read inside
-`compilation`, so the compile tracks the library. The browser's rows are built by free functions in
+`compilation`, so the compile tracks the library. `#default` and `#optimized` list the same flat
+names, so the compile's `stats.sampleGroups` says which group each entry came from and `resolve`
+takes it beside the names: an `#optimized` entry gets the bundle's optimized copy unless the porter
+replaced that name. The song decides the set, never a setting: the browser's Use Optimized SMW
+Samples toggle reads `EditorStore.stockGroup` and writes the song (`spliceSampleGroup`), and its
+rows show `optimizedFiles` while the song takes `#optimized`. The browser's rows are built by free functions in
 `sample-rows.ts` as a `computed`, not by methods called per row.

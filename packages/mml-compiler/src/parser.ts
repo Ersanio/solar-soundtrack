@@ -105,6 +105,8 @@ export interface ParseOutput {
 	introTicks: number;
 	sampleList: readonly string[] | null;
 	requestedSamples: readonly string[] | null;
+	/** The group each of `requestedSamples` came from, or `null` for a name written out. */
+	requestedSampleGroups: readonly (string | null)[] | null;
 	usedSamples: boolean[];
 	minSize: number;
 	tags: SongTags;
@@ -263,6 +265,7 @@ export class AddmusicKParser {
 	private readonly tempoChanges: [number, number][] = [];
 	private readonly sampleList: string[] = [];
 	private readonly sampleImportant: boolean[] = [];
+	private readonly sampleGroupOf: (string | null)[] = [];
 	private readonly usedSamples = new Array<boolean>(256).fill(false);
 	private inRemoteDefinition = false;
 	private minSize = 0;
@@ -1246,9 +1249,13 @@ export class AddmusicKParser {
 	 * of intent it had. Here the user marks samples directly, and an inference
 	 * would silently override that.
 	 */
-	private pushSample(name: string): void {
+	private pushSample(name: string, group: string | null = null): void {
 		this.sampleList.push(name);
 		this.sampleImportant.push(this.isImportantName(name));
+		// Not AMK's: its group members are paths (`"optimized/00 SMW @0.brr"`), so the file
+		// itself says which copy it is. The host's library is flat and `#default` and
+		// `#optimized` name the same files, so the group is carried beside the name instead.
+		this.sampleGroupOf.push(group);
 	}
 
 	/**
@@ -1389,7 +1396,7 @@ export class AddmusicKParser {
 
 		// Group members are resolved unprefixed; `#path` does not apply to them.
 		for (const member of members) {
-			this.pushSample(member);
+			this.pushSample(member, group);
 		}
 
 		return true;
@@ -3590,6 +3597,16 @@ export class AddmusicKParser {
 		return fallback && fallback.length > 0 ? [...fallback] : null;
 	}
 
+	/** {@link requestedSampleList}'s groups, the implicit fallback's being all `"default"`. */
+	private requestedSampleGroups(): readonly (string | null)[] | null {
+		if (this.sampleList.length > 0) {
+			return [...this.sampleGroupOf];
+		}
+
+		const names = this.requestedSampleList();
+		return names ? names.map(() => "default") : null;
+	}
+
 	private resolveSampleList(): readonly string[] | null {
 		const names = this.requestedSampleList();
 		if (!names) {
@@ -3814,6 +3831,7 @@ export class AddmusicKParser {
 			introTicks: this.introTicks,
 			sampleList: this.resolveSampleList(),
 			requestedSamples: this.requestedSampleList(),
+			requestedSampleGroups: this.requestedSampleGroups(),
 			usedSamples: this.usedSamples,
 			minSize: this.minSize,
 			tags: this.tags,

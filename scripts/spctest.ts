@@ -134,6 +134,26 @@ section("driver bundle");
 	}
 
 	{
+		// The optimized copies stand behind the same names, so the browser's toggle can swap
+		// one set for the other without moving an SRCN.
+		const optimized = driver.optimizedSamples.map((sample) => sample.sampleName);
+		const parsed = driver.samples.map((sample) => sample.sampleName);
+		check(
+			"the optimized samples carry the default names, in order",
+			optimized.length === 20 && optimized.every((name, index) => name === parsed[index]),
+			optimized.slice(0, 3).join(", "),
+		);
+		check(
+			"and come from their own files",
+			driver.optimizedSamples.every((sample, index) => sample.data.length < driver.samples[index].data.length),
+		);
+		check(
+			"the #optimized group lists the same names",
+			JSON.stringify(driver.manifest.sampleGroups["optimized"]) === JSON.stringify(parsed),
+		);
+	}
+
+	{
 		// The `!`-marked names from AddmusicK's `Addmusic_sample groups.txt`. A name
 		// here that is not in the group would silently protect nothing, and the
 		// count is worth pinning so an edit to one list is noticed in the other.
@@ -365,6 +385,18 @@ section("#samples reaches the sample directory");
 		"the samples row counts one",
 		budget.rows.find((row) => row.key === "samples")?.detail === "1 sample",
 		budget.rows.find((row) => row.key === "samples")?.detail,
+	);
+
+	// AddmusicK ships `#optimized` beside `#default`, so the bundled manifest has to name it.
+	const optimized = compiler.compile({
+		source: "#amk 4\n#samples { #optimized }\n#0 o4 @0 c4\n",
+		aramAddress: driver.manifest.localPos,
+		options,
+	});
+	check(
+		"#samples { #optimized } compiles against the bundled manifest",
+		optimized.ok && optimized.sampleList?.length === 20,
+		optimized.diagnostics.map((d) => `${d.code} ${d.message}`).join("; "),
 	);
 }
 

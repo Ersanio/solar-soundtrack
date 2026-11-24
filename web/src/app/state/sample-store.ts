@@ -109,9 +109,12 @@ export class SampleStore {
   /** Why samples will not survive a reload, or `null`. */
   readonly storageError = signal<string | null>(null);
 
-  /** The bundled samples, in manifest order. */
-  private readonly stock = computed<readonly BrrSample[]>(
-    () => this.drivers.driver()?.samples ?? [],
+  /** The bundled samples, in manifest order: `#default`'s copies. */
+  readonly stock = computed<BrrSample[]>(() => this.drivers.driver()?.samples ?? []);
+
+  /** The same names' `#optimized` copies, which a song gets by naming that group. */
+  private readonly optimizedStock = computed<BrrSample[]>(
+    () => this.drivers.driver()?.optimizedSamples ?? [],
   );
 
   /** Named sample groups from the driver manifest — `#default` and friends. */
@@ -176,8 +179,14 @@ export class SampleStore {
    * being read in here, because it is a checkbox: folding it in would make one
    * tick re-decode the whole library.
    */
-  private readonly described = computed<SampleFile[]>(() => {
-    const stock = this.stock();
+  private readonly described = computed<SampleFile[]>(() => this.describeLibrary(this.stock()));
+
+  /** {@link described} with the stock rows' `#optimized` copies, for a song that names that group. */
+  private readonly describedOptimized = computed<SampleFile[]>(() =>
+    this.describeLibrary(this.optimizedStock()),
+  );
+
+  private describeLibrary(stock: readonly BrrSample[]): SampleFile[] {
     const overrides = this.overrides();
     const stockNames = new Set(stock.map((sample) => sample.sampleName));
 
@@ -198,11 +207,18 @@ export class SampleStore {
     }
 
     return out;
-  });
+  }
 
   /** {@link described}, with each row's current importance. */
-  readonly files = computed<SampleFile[]>(() =>
-    this.described().map((file) => ({
+  readonly files = computed<SampleFile[]>(() => this.withImportance(this.described()));
+
+  /** {@link files} with the stock rows' `#optimized` copies. */
+  readonly optimizedFiles = computed<SampleFile[]>(() =>
+    this.withImportance(this.describedOptimized()),
+  );
+
+  private withImportance(files: readonly SampleFile[]): SampleFile[] {
+    return files.map((file) => ({
       ...file,
       // A bank has no importance of its own; each slot carries one, so the row
       // reports whether *any* slot is pinned rather than inventing an answer.
@@ -210,8 +226,8 @@ export class SampleStore {
         file.kind === 'bank'
           ? this.decodedSlots(file.name).some((slot) => this.isImportant(slot.name))
           : this.isImportant(file.name),
-    })),
-  );
+    }));
+  }
 
   /** Filenames that are safe to reference from MML, in library order. */
   readonly names = computed(() =>
@@ -276,19 +292,40 @@ export class SampleStore {
   });
 
   /**
+   * The `#optimized` copies by name, for the entries a song took from that group. A replaced
+   * stock name is left out, so the porter's bytes stand behind it in either group.
+   */
+  private readonly optimizedByName = computed<ReadonlyMap<string, BrrSample>>(() => {
+    const overrides = this.overrides();
+    return new Map(
+      this.optimizedStock()
+        .filter((sample) => !overrides.has(sample.sampleName))
+        .map((sample) => [sample.sampleName, sample]),
+    );
+  });
+
+  /**
    * Resolves names to samples, in the order given — that order is the SRCN
    * assignment. Unknown or invalid names are skipped; the compiler is what
    * reports them, since only it knows where in the source they came from.
+   *
+   * `groups` is the compile's `stats.sampleGroups`: an entry taken from `#optimized` resolves to
+   * that group's copy of its name.
    */
-  resolve(names: readonly string[]): BrrSample[] {
+  resolve(names: readonly string[], groups: readonly (string | null)[] = []): BrrSample[] {
     const map = this.byName();
+    const optimized = this.optimizedByName();
     const out: BrrSample[] = [];
-    for (const name of names) {
+    for (const [srcn, name] of names.entries()) {
       // An unresolvable name must still occupy its slot. Skipping it would shift
       // every later SRCN down by one and silently rewire the whole directory —
       // the song would play the wrong samples rather than miss one. The compiler
       // is what reports the name; here it just has to not corrupt the indexing.
-      out.push(map.get(name) ?? this.placeholder(name));
+      out.push(
+        (groups[srcn] === 'optimized' ? optimized.get(name) : undefined) ??
+          map.get(name) ??
+          this.placeholder(name),
+      );
     }
 
     return out;
@@ -443,9 +480,13 @@ export class SampleStore {
    * {@link resolve}, with `extra` answering for any name it holds: a candidate song's own samples,
    * before they are added to the library.
    */
-  resolveWith(names: readonly string[], extra: readonly BrrSample[]): BrrSample[] {
+  resolveWith(
+    names: readonly string[],
+    extra: readonly BrrSample[],
+    groups: readonly (string | null)[] = [],
+  ): BrrSample[] {
     const extras = new Map(extra.map((sample) => [sample.sampleName, sample]));
-    const resolved = this.resolve(names);
+    const resolved = this.resolve(names, groups);
     return resolved.map((sample, i) => extras.get(names[i]) ?? sample);
   }
 
@@ -587,8 +628,9 @@ export class SampleStore {
   }
 
   /** Decoded PCM for auditioning. Not cached — it is one click, not a render loop. */
-  pcm(name: string): Int16Array | null {
-    const sample = this.byName().get(name);
+  pcm(name: string, optimized = false): Int16Array | null {
+    const sample =
+      (optimized ? this.optimizedByName().get(name) : undefined) ?? this.byName().get(name);
     return sample ? decodeBrr(sample) : null;
   }
 }

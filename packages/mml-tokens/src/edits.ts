@@ -5,7 +5,7 @@
 
 import { hex2 } from "@amk/core/hex";
 import type { Span } from "@amk/core/types";
-import { type Command, HEX_ARG_LETTERS, type InstrumentDefinition } from "./tokens";
+import { type Command, HEX_ARG_LETTERS, type InstrumentDefinition, type Token } from "./tokens";
 
 /** An 8-bit hex argument, used by q and n. */
 export function argumentText(command: Command, byte: number): string {
@@ -243,4 +243,60 @@ export function padAround(source: string, start: number, end = start): { before:
 		before: start > 0 && !/\s/.test(source[start - 1]) ? " " : "",
 		after: end < source.length && !/\s/.test(source[end]) ? " " : "",
 	};
+}
+
+/**
+ * The splices that move a song onto one of the two stock sample groups: every `#default` or
+ * `#optimized` in a `#samples` block renamed to `group`, or, in a song with no `#samples`,
+ * `#samples { #optimized }` written on the line after `#amk` (the top without one). `null` when
+ * nothing would change — a song with no `#samples` already takes `#default` (Music.cpp:3064).
+ *
+ * `#samples` is matched as `strnicmp` matches it and a group name exactly, as
+ * `parser.ts:addSampleGroup` looks it up.
+ */
+export function spliceSampleGroup(
+	source: string,
+	tokens: readonly Token[],
+	group: "default" | "optimized",
+): Edit[] | null {
+	const other = group === "default" ? "#optimized" : "#default";
+	const edits: Edit[] = [];
+	let blocks = 0;
+	let pending = false;
+	let inBlock = false;
+	for (const token of tokens) {
+		const text = source.slice(token.start, token.end);
+		if (token.kind === "directive" && !inBlock) {
+			pending = text.toLowerCase() === "#samples";
+			blocks += pending ? 1 : 0;
+		} else if (token.kind === "operator" && text === "{" && pending) {
+			pending = false;
+			inBlock = true;
+		} else if (token.kind === "operator" && text === "}") {
+			inBlock = false;
+		} else if (token.kind === "directive" && inBlock && text === other) {
+			const edit = spliceRange(source, { start: token.start, end: token.end, line: token.line }, `#${group}`);
+			if (edit) {
+				edits.push(edit);
+			}
+		}
+	}
+
+	if (blocks > 0 || group === "default") {
+		return edits.length > 0 ? edits : null;
+	}
+
+	const amk = tokens.find(
+		(token) => token.kind === "directive" && source.slice(token.start, token.end).toLowerCase() === "#amk",
+	);
+	const block = "#samples\n{\n\t#optimized\n}\n";
+	if (!amk) {
+		const edit = insertAt(0, block);
+		return edit ? [edit] : null;
+	}
+
+	const newline = source.indexOf("\n", amk.end);
+	const edit =
+		newline === -1 ? insertAt(source.length, `\n${block}`, amk.line) : insertAt(newline + 1, block, amk.line + 1);
+	return edit ? [edit] : null;
 }

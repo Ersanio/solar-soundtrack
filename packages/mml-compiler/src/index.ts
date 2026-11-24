@@ -46,6 +46,7 @@ export class AddmusicKCompiler {
 		stats.loopTicks = played.length ? Math.min(...played) - stats.introTicks : 0;
 		stats.echoBufferSize = parsed.echoBufferSize;
 		stats.sampleNames = [...(parsed.requestedSamples ?? [])];
+		stats.sampleGroups = [...(parsed.requestedSampleGroups ?? [])];
 		stats.usedSampleNames = [...new Set(stats.sampleNames.filter((_, srcn) => parsed.usedSamples[srcn]))];
 		stats.hasIntro = parsed.hasIntro;
 		stats.loops = !parsed.doesntLoop;
@@ -144,6 +145,7 @@ export class AddmusicKCompiler {
 			loopTicks: 0,
 			echoBufferSize: 0,
 			sampleNames: [],
+			sampleGroups: [],
 			usedSampleNames: [],
 			hasIntro: false,
 			loops: true,

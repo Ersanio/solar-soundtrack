@@ -117,6 +117,8 @@ export class ModImportDialog {
   private readonly choices = signal<ReadonlyMap<number, Choice>>(new Map());
   protected readonly separation = signal(0.5);
   protected readonly loopAtJump = signal(true);
+  /** Write `#optimized` rather than `#default`, leaving the song's own samples more room. */
+  protected readonly optimized = signal(false);
   protected readonly preview = signal<ImportPreview | null>(null);
   protected readonly previewError = signal<string | null>(null);
 
@@ -176,6 +178,7 @@ export class ModImportDialog {
       loop: this.loopAtJump() ? 'jump' : 'song',
       sampleName: (index) => this.sampleName(index),
       fallbackTitle: stemOf(this.fileName()),
+      optimized: this.optimized(),
     };
   }
 
@@ -196,7 +199,7 @@ export class ModImportDialog {
     return writeMod(mod, this.options(factors));
   });
 
-  /** The bytes ARAM has for the Auto samples, once the song, `#default` and the samples with a factor of their own are in. */
+  /** The bytes ARAM has for the Auto samples, once the song, the stock set and the samples with a factor of their own are in. */
   private readonly room = computed(() => {
     const mod = this.mod();
     const written = this.provisional();
@@ -219,7 +222,11 @@ export class ModImportDialog {
         ? emptySample(s.name)
         : this.encoded(mod, s.index, s.factor).sample,
     );
-    const samples = this.library.resolveWith(result.sampleList ?? [], extra);
+    const samples = this.library.resolveWith(
+      result.sampleList ?? [],
+      extra,
+      result.stats?.sampleGroups,
+    );
     return computeSpcLayout(driver, samples, result.data.length, result.stats?.echoBufferSize ?? 0)
       .freeBytes;
   });
@@ -278,7 +285,7 @@ export class ModImportDialog {
     const extra = this.brrs().map((b) => b.sample);
     return buildCandidate(this.store, written.text, {
       names: extra.map((s) => s.sampleName),
-      resolve: (list) => this.library.resolveWith(list, extra),
+      resolve: (list, groups) => this.library.resolveWith(list, extra, groups),
     });
   });
 
@@ -297,7 +304,11 @@ export class ModImportDialog {
     }
 
     const extra = this.brrs().map((b) => b.sample);
-    const samples = this.library.resolveWith(result.sampleList ?? [], extra);
+    const samples = this.library.resolveWith(
+      result.sampleList ?? [],
+      extra,
+      result.stats?.sampleGroups,
+    );
     const free = computeSpcLayout(
       driver,
       samples,

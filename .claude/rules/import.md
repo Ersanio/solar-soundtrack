@@ -30,7 +30,8 @@ true.
 - **Ticks.** Times are file ticks until the writer and driver ticks after it; the snap grid is in
   driver ticks.
 - **A MOD is two driver ticks to a MOD tick**, so its BPM is the song's quarter-note BPM and its
-  per-tick effects land on whole ticks. `#default` is always listed first, so the song is safe beside
+  per-tick effects land on whole ticks. `#default` is always listed first (`#optimized` with the
+  dialog's Use Optimized SMW Samples, `ModSongOptions.optimized`), so the song is safe beside
   SMW's sound effects, and the MOD's samples come after it at `@30` up. 9xx sample offset has no
   AddmusicK equivalent and is counted, its note played from the sample's start. Arpeggio is `$FB`
   under legato, which is on only from an arpeggio note's key-on to a MOD tick before its end, so it
@@ -68,7 +69,7 @@ true.
   candidate chain (`import-candidate.ts`), with the song's samples passed beside the library
   (`EditorStore.compileText`'s extra names, `SampleStore.resolveWith`) until Import adds them
   (`SampleStore.add`); Undo brings the old song back and leaves the samples. Every sample on Auto
-  shares the one factor that fills what ARAM has left once the song, `#default` and the samples with a
+  shares the one factor that fills what ARAM has left once the song, its stock set and the samples with a
   factor of their own are in: the song's bytes do not depend on the factors, so the room is measured
   on a write with every Auto sample at 1 and the factor found from it (`fitFactor`). Each encoding is
   kept per sample and factor while the dialog is open.

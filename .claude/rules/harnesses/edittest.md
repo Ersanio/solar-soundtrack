@@ -19,4 +19,5 @@ is written onto the note**: a bare `c` under an `l8` has no argument to splice a
 long, so the digits are inserted where none were written, and they go in front of the dots — which
 compose rather than add (`Music.cpp:2956-2957`) — so `l8 c.` written back at its own denominator is `c8.`
 and still 36 ticks; the standing `l`, the notes around it and a tie's other segment are read back
-unmoved.
+unmoved. It also pins `spliceSampleGroup`, the sample browser's set toggle: a group renamed in place
+inside `#samples` and nowhere else, or the block written on the line after `#amk`.

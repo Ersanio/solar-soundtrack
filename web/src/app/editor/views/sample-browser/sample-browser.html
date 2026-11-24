@@ -7,12 +7,24 @@
   </label>
 
   <button
-    i18n="@@samples.optimize-samples"
+    i18n="@@samples.exclude-unused-samples"
     amk-toggle
     [pressed]="library.optimize()"
     (click)="library.optimize.set(!library.optimize())"
   >
-    samples.optimize-samples
+    samples.exclude-unused-samples
+  </button>
+
+  <button
+    i18n="@@samples.use-optimized-smw-samples"
+    amk-toggle
+    i18n-title="@@samples.use-optimized-smw-samples.title"
+    title="samples.use-optimized-smw-samples.title"
+    [pressed]="usesOptimized()"
+    [disabled]="!canSwitchSet()"
+    (click)="switchSet()"
+  >
+    samples.use-optimized-smw-samples
   </button>
 
   @if (library.resetCount() > 0) {

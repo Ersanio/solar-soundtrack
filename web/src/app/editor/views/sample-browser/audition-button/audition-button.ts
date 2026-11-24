@@ -2,6 +2,7 @@ import { Component, computed, inject, input } from '@angular/core';
 
 import { Button } from '../../../../shared/button/button';
 import { Audition } from '../../../../state/audition';
+import { EditorStore } from '../../../../state/editor-store';
 import { SampleStore } from '../../../../state/sample-store';
 
 /**
@@ -33,6 +34,7 @@ import { SampleStore } from '../../../../state/sample-store';
 export class AuditionButton {
   private readonly audition = inject(Audition);
   private readonly library = inject(SampleStore);
+  private readonly editor = inject(EditorStore);
 
   readonly name = input.required<string>();
   readonly disabled = input(false);
@@ -46,7 +48,7 @@ export class AuditionButton {
       return;
     }
 
-    const pcm = this.library.pcm(name);
+    const pcm = this.library.pcm(name, this.editor.stockGroup() === 'optimized');
     if (pcm) {
       this.audition.play(name, pcm);
     }

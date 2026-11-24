@@ -12,7 +12,7 @@ main thread, and inside an `AudioWorkletGlobalScope`.
 | `arpeggio.ts`        | `HandleArpeggio` over every voice: the offsets an `$FB` steps through |
 | `brr.ts`             | The SNES's ADPCM container and decoder                                |
 | `brr-encode.ts`      | PCM encoded as a `.brr`, block by block against the decoder           |
-| `driver.ts`          | Loads `assets/driver/` — program, base images, `#default` samples     |
+| `driver.ts`          | Loads `assets/driver/` — program, base images, both sample sets       |
 | `driver-state.ts`    | Reads the running driver out of APU RAM                               |
 | `export.ts`          | Assembles the 0x10200-byte `.spc`                                     |
 | `fir.ts`             | The echo filter: response, stability, headroom, design                |

@@ -50,6 +50,12 @@ export interface CompileStats {
 	 */
 	sampleNames: string[];
 	/**
+	 * Beside {@link sampleNames}, the `#group` each entry came from (`"default"`, `"optimized"`),
+	 * or `null` for one written out by name. A group's members are filenames that two groups can
+	 * share, so this is what tells the host which group's copy of a name the song asked for.
+	 */
+	sampleGroups: (string | null)[];
+	/**
 	 * The subset of {@link sampleNames} the song actually plays — through an
 	 * instrument, a `$F3` load, or a custom instrument's own sample.
 	 */

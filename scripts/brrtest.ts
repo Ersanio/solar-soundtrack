@@ -339,16 +339,25 @@ section("the twenty bundled samples decode");
 {
 	const manifest = JSON.parse(readFileSync(join(SPC_ASSETS, "driver", "manifest.json"), "utf8")) as {
 		sampleGroups: Record<string, string[]>;
+		optimizedSamples: string;
 	};
 	const names = manifest.sampleGroups["default"];
 	check("the default group has 20 names", names.length === 20, `${names.length}`);
+	check(
+		"the optimized group names the same twenty, in order",
+		JSON.stringify(manifest.sampleGroups["optimized"]) === JSON.stringify(names),
+	);
 
 	let allValid = true;
 	let allSized = true;
 	let allAudible = true;
 	let quiet = "";
-	for (const name of names) {
-		const raw = new Uint8Array(readFileSync(join(SPC_ASSETS, "driver", "samples", name)));
+	const files = [
+		...names.map((name) => join(SPC_ASSETS, "driver", "samples", name)),
+		...names.map((name) => join(SPC_ASSETS, "driver", manifest.optimizedSamples, name)),
+	];
+	for (const name of files) {
+		const raw = new Uint8Array(readFileSync(name));
 		if (validateBrr(raw) !== null) {
 			allValid = false;
 			quiet = `${name}: ${validateBrr(raw)}`;

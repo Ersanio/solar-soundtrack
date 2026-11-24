@@ -339,12 +339,28 @@ export class EditorStore {
 
   /** The sample set every export and budget is measured against. */
   private readonly samples = computed(() => {
-    const named = this.result()?.sampleList;
-    if (named) {
-      return this.library.resolve(named);
+    const result = this.result();
+    if (result?.sampleList) {
+      return this.library.resolve(result.sampleList, result.stats?.sampleGroups);
     }
 
-    return this.drivers.driver()?.samples ?? [];
+    return this.library.stock();
+  });
+
+  /**
+   * Which of the stock sets the song's `#samples` takes: `default` when it names `#default` or
+   * no `#samples` at all, `optimized` when it names `#optimized`, `mixed` for both, and `none`
+   * when its `#samples` names no group.
+   */
+  readonly stockGroup = computed<'default' | 'optimized' | 'mixed' | 'none'>(() => {
+    const groups = this.result()?.stats?.sampleGroups ?? [];
+    const plain = groups.includes('default');
+    const optimized = groups.includes('optimized');
+    if (plain && optimized) {
+      return 'mixed';
+    }
+
+    return optimized ? 'optimized' : plain ? 'default' : 'none';
   });
 
   /**
@@ -637,7 +653,9 @@ export class EditorStore {
       driver,
       samples: [
         ...(samples ??
-          (result.sampleList ? this.library.resolve(result.sampleList) : driver.samples)),
+          (result.sampleList
+            ? this.library.resolve(result.sampleList, result.stats?.sampleGroups)
+            : this.library.stock())),
       ],
       tags: result.stats?.tags,
       seconds: result.stats?.tagSeconds,

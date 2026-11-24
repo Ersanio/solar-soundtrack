@@ -36,6 +36,17 @@
             import.mod.loop-jump
           </button>
         }
+
+        <button
+          i18n="@@import.mod.optimized"
+          amk-toggle
+          i18n-title="@@import.mod.optimized.title"
+          title="import.mod.optimized.title"
+          [pressed]="optimized()"
+          (click)="optimized.set(!optimized())"
+        >
+          import.mod.optimized
+        </button>
       </div>
 
       <div class="border-edge overflow-auto rounded-md border">

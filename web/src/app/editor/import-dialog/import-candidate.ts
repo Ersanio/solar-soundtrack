@@ -19,7 +19,7 @@ export interface Candidate {
 /** Samples the text names that the library does not hold yet, and how a compile's sample list resolves with them. */
 export interface CandidateSamples {
   names: readonly string[];
-  resolve: (sampleList: readonly string[]) => BrrSample[];
+  resolve: (sampleList: readonly string[], groups: readonly (string | null)[]) => BrrSample[];
 }
 
 /** `text` compiled with `samples` beside the library, assembled into an SPC, and walked for its clock. */
@@ -43,7 +43,9 @@ export function buildCandidate(
   try {
     spc = store.spcFor(
       result,
-      samples && result.sampleList ? samples.resolve(result.sampleList) : undefined,
+      samples && result.sampleList
+        ? samples.resolve(result.sampleList, result.stats?.sampleGroups ?? [])
+        : undefined,
     );
   } catch (error) {
     return { song: null, error: errorMessage(error), result };

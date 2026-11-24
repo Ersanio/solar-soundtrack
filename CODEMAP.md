@@ -32,29 +32,29 @@ something in the directory, which load by themselves when such a file is opened.
 - `index.ts` — The compiler's entry point: `compiler.compile` parses and links one request and gathers its stats and diagnostics.
 - `link.ts` (300+ lines) — Turns the parser's per-channel byte vectors into the final relocated blob.
 - `parser.ts` (3000+ lines) — AddmusicK MML parser.
-  - `AddmusicKParser`:184 `parse`:308 `stripBOM`:348 `applyTarget`:363 `detectStartingChannel`:387 `scan`:400
-  - `recordCommand`:494 `terminateChannels`:525 `append`:541 `skipSpaces`:545 `getInt`:555
-  - `getIntWithNegative`:568 `getHex`:591 `getPitch`:620 `getNoteLength`:634 `getNoteLengthModifier`:661
-  - `divideByTempoRatio`:691 `multiplyByTempoRatio`:708 `parseReplacementDirective`:721 `doReplacement`:753
-  - `parseComment`:813 `parseQMark`:837 `parseHash`:845 `matchWord`:875 `matchPrefix`:886
-  - `parseSpecialDirective`:890 `parseOptionDirective`:963 `parsePath`:1051 `skipPastBlockEnd`:1073
-  - `parseBlock`:1084 `checkTempoRatio`:1100 `parsePadDefinition`:1119 `parseSampleDefinitions`:1144
-  - `addSampleByName`:1201 `pushSample`:1249 `parseInstrumentDefinitions`:1266 `readInstrumentSample`:1316
-  - `addSampleGroup`:1377 `parseSpcInfo`:1402 `parseLengthField`:1488 `truncateTag`:1512 `getQuotedString`:1529
-  - `parseDefaultLength`:1556 `parseGlobalVolume`:1584 `parseVolume`:1605 `parseFadeableValue`:1627
-  - `parseQuantization`:1665 `parsePan`:1684 `parseIntro`:1732 `parseT`:1766 `parseTempo`:1775
-  - `parseTuningDirective`:1826 `parseOctave`:1879 `parseRaiseOctave`:1893 `parseLowerOctave`:1902
-  - `parseInstrument`:1912 `parseTranspose`:1981 `parseNoise`:1995 `parseVibrato`:2006 `parseTripletOpen`:2067
-  - `parseTripletClose`:2076 `parsePitchSlide`:2085 `parseOpenParen`:2099 `parseSampleLoad`:2115
-  - `parseLabelLoop`:2177 `parseRemoteDefinition`:2270 `parseRemoteCall`:2301 `tryGetIntWithNegative`:2422
-  - `parseLoopStart`:2430 `parseLoopEnd`:2490 `parseStarLoop`:2564 `handleNormalLoopEnter`:2600
-  - `handleSuperLoopEnter`:2615 `handleNormalLoopExit`:2631 `handleSuperLoopExit`:2647
-  - `handleNormalLoopRemoteCall`:2660 `addNoteLength`:2668 `parseNote`:2686 `accumulateTiedLength`:2798
-  - `emitNote`:2839 `emitPendingQuantization`:2881 `parseHexCommand`:2904 `applyTempoRatioToHexArgument`:3235
-  - `parseHFDHex`:3311 `parseHFDInstrumentHack`:3435 `markEchoBufferAllocVCMD`:3466 `estimateSeconds`:3490
-  - `noteSampleUse`:3565 `requestedSampleList`:3584 `resolveSampleList`:3593 `isImportantName`:3613
-  - `optimizeSamples`:3630 `spanAt`:3651 `lineOf`:3670 `originAt`:3697 `error`:3709 `report`:3724 `errorAt`:3738
-  - `warn`:3742 `info`:3747 `warnOnce`:3751 `lengths`:3769 `output`:3796
+  - `AddmusicKParser`:186 `parse`:311 `stripBOM`:351 `applyTarget`:366 `detectStartingChannel`:390 `scan`:403
+  - `recordCommand`:497 `terminateChannels`:528 `append`:544 `skipSpaces`:548 `getInt`:558
+  - `getIntWithNegative`:571 `getHex`:594 `getPitch`:623 `getNoteLength`:637 `getNoteLengthModifier`:664
+  - `divideByTempoRatio`:694 `multiplyByTempoRatio`:711 `parseReplacementDirective`:724 `doReplacement`:756
+  - `parseComment`:816 `parseQMark`:840 `parseHash`:848 `matchWord`:878 `matchPrefix`:889
+  - `parseSpecialDirective`:893 `parseOptionDirective`:966 `parsePath`:1054 `skipPastBlockEnd`:1076
+  - `parseBlock`:1087 `checkTempoRatio`:1103 `parsePadDefinition`:1122 `parseSampleDefinitions`:1147
+  - `addSampleByName`:1204 `pushSample`:1252 `parseInstrumentDefinitions`:1273 `readInstrumentSample`:1323
+  - `addSampleGroup`:1384 `parseSpcInfo`:1409 `parseLengthField`:1495 `truncateTag`:1519 `getQuotedString`:1536
+  - `parseDefaultLength`:1563 `parseGlobalVolume`:1591 `parseVolume`:1612 `parseFadeableValue`:1634
+  - `parseQuantization`:1672 `parsePan`:1691 `parseIntro`:1739 `parseT`:1773 `parseTempo`:1782
+  - `parseTuningDirective`:1833 `parseOctave`:1886 `parseRaiseOctave`:1900 `parseLowerOctave`:1909
+  - `parseInstrument`:1919 `parseTranspose`:1988 `parseNoise`:2002 `parseVibrato`:2013 `parseTripletOpen`:2074
+  - `parseTripletClose`:2083 `parsePitchSlide`:2092 `parseOpenParen`:2106 `parseSampleLoad`:2122
+  - `parseLabelLoop`:2184 `parseRemoteDefinition`:2277 `parseRemoteCall`:2308 `tryGetIntWithNegative`:2429
+  - `parseLoopStart`:2437 `parseLoopEnd`:2497 `parseStarLoop`:2571 `handleNormalLoopEnter`:2607
+  - `handleSuperLoopEnter`:2622 `handleNormalLoopExit`:2638 `handleSuperLoopExit`:2654
+  - `handleNormalLoopRemoteCall`:2667 `addNoteLength`:2675 `parseNote`:2693 `accumulateTiedLength`:2805
+  - `emitNote`:2846 `emitPendingQuantization`:2888 `parseHexCommand`:2911 `applyTempoRatioToHexArgument`:3242
+  - `parseHFDHex`:3318 `parseHFDInstrumentHack`:3442 `markEchoBufferAllocVCMD`:3473 `estimateSeconds`:3497
+  - `noteSampleUse`:3572 `requestedSampleList`:3591 `requestedSampleGroups`:3601 `resolveSampleList`:3610
+  - `isImportantName`:3630 `optimizeSamples`:3647 `spanAt`:3668 `lineOf`:3687 `originAt`:3714 `error`:3726
+  - `report`:3741 `errorAt`:3755 `warn`:3759 `info`:3764 `warnOnce`:3768 `lengths`:3786 `output`:3813
 - `preprocess.ts` (300+ lines) — Port of `preprocess()` (globals.cpp:735), which runs before the MML scanner.
 
 ## packages/mml-tokens/src
@@ -65,7 +65,7 @@ something in the directory, which load by themselves when such a file is opened.
 - `command-hazards.ts` (500+ lines) — The command hazards: commands that compile clean and misbehave — `$F7`'s dead slot, an unreachable `$DD`, `#am4`'s `$E4`, an arpeggio's dead loop points and one looping past its end.
 - `dialect.ts` — What was in force at a point in the song: which dialect the `#amk` / `#am4` / `#amm` markers put it in; tempo; which velocity table `q` reads against, from the hex as well as the directives.
 - `echo-hazards.ts` — The echo hazards: every runaway echo in the document, one diagnostic per command that causes one.
-- `edits.ts` — Rewriting a command in the source it was scanned from — the inverse of `gather`.
+- `edits.ts` (300+ lines) — Rewriting a command in the source it was scanned from — the inverse of `gather`.
 - `fir-override.ts` — The `$F1`/`$F5` override, looked at from either end.
 - `index.ts` — The scanner.
 - `tokens.ts` (2000+ lines) — A resumable scanner over MML source.
@@ -126,7 +126,7 @@ something in the directory, which load by themselves when such a file is opened.
 - `file.ts` — A ProTracker-family `.mod` file, read into its samples, its order list and its patterns of cells.
 - `play.ts` (300+ lines) — A MOD played tick by tick, the way ProTracker's replayer plays it: what each channel sounds on every tick, and where the song loops.
 - `samples.ts` — A MOD's samples made ready for BRR: resampled to fit ARAM, their loops moved onto block boundaries, and the tuning an AddmusicK instrument needs to play each at the MOD's pitch.
-- `write-mml.ts` (750+ lines) — A played MOD written out as an `#amk 4` song: each kept channel on one of AddmusicK's, each sample a custom instrument after `#default`.
+- `write-mml.ts` (750+ lines) — A played MOD written out as an `#amk 4` song: each kept channel on one of AddmusicK's, each sample a custom instrument after `#default` (or `#optimized`).
 
 ## packages/spc/src
 
@@ -137,7 +137,7 @@ something in the directory, which load by themselves when such a file is opened.
 - `brr-encode.ts` — PCM encoded as a `.brr` file: the 2-byte loop offset, then 9-byte blocks.
 - `brr.ts` (300+ lines) — BRR — the SNES's ADPCM sample format.
 - `driver-state.ts` (300+ lines) — Our SPC driver's I/O through the emulator's ARAM.
-- `driver.ts` — Loads the prebuilt AddmusicK driver bundle: the SPC700 program, the SPC/DSP base images, and the `#default` BRR sample group.
+- `driver.ts` — Loads the prebuilt AddmusicK driver bundle: the SPC700 program, the SPC/DSP base images, and the `#default` BRR sample group in both its regular and optimized copies.
 - `export.ts` — Assembles a playable .spc file from compiled song data plus the prebuilt driver bundle.
 - `fir.ts` (500+ lines) — The DSP's echo FIR filter: what eight signed bytes actually do to a sound.
 - `instruments.ts` — The driver's own instrument and percussion tables: what `@n` actually selects.
@@ -166,7 +166,7 @@ something in the directory, which load by themselves when such a file is opened.
 - `check.mjs` — The merge gate behind `npm run check`: formatting, the code map, the citations, three typechecks, every harness, and the English, as separate steps reported in one table.
 - `citations.mjs` — Checks that every line citation into this repository's own files still points at lines that exist.
 - `codemap.mjs` (300+ lines) — Keeps CODEMAP.md, an index of every source file and what it is for, in step with the code.
-- `edittest.ts` (300+ lines) — `@amk/tokens`'s `edits.ts` — the splices the command inspector writes back.
+- `edittest.ts` (500+ lines) — `@amk/tokens`'s `edits.ts` — the splices the command inspector writes back.
 - `firtest.ts` (500+ lines) — The echo FIR filter's maths.
 - `generate-git-info.mjs` — Writes web/src/app/git-info.generated.ts, the commit the top bar links to.
 - `harness.ts` — What the byte-level harnesses share: the assertion, the tally, the section runner and the asset stub.
@@ -174,7 +174,7 @@ something in the directory, which load by themselves when such a file is opened.
 - `instrtest.ts` — The driver's instrument and percussion tables.
 - `localize.ts` — What the page's build does to every message, done at run time instead: defines `$localize` and loads the English from web/src/locale/messages.en.json, so a message reads as a porter sees it rather than as its ID.
 - `run-harness.mjs` — Bundles one harness into `.selftest/<name>.mjs` and runs it under `node --enable-source-maps`.
-- `spctest.ts` (300+ lines) — End-to-end check: compile MML -> assemble an SPC -> verify its structure.
+- `spctest.ts` (500+ lines) — End-to-end check: compile MML -> assemble an SPC -> verify its structure.
 - `steps.mjs` — What `check.mjs` and `affected.mjs` share: running a list of steps and reporting them as one table.
 - `sync-spc-assets.mjs` — Mirrors `packages/spc/assets/` into `web/public/`.
 - `worklettest.ts` (500+ lines) — Runs the shipped worklet bundle the way the browser will.
@@ -460,7 +460,7 @@ something in the directory, which load by themselves when such a file is opened.
 
 **Rules:** `import.md`
 
-- `mod-import-dialog.ts` (300+ lines) — The Import dialog for a MOD: its channels to keep, each sample's resampling, and a preview of the song they make before it replaces the document and its samples join the library.
+- `mod-import-dialog.ts` (500+ lines) — The Import dialog for a MOD: its channels to keep, each sample's resampling, and a preview of the song they make before it replaces the document and its samples join the library.
 
 ## web/src/app/editor/scope-mini
 

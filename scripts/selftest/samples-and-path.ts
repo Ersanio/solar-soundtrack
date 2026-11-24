@@ -50,6 +50,26 @@ section("#samples and #path");
 		`${names(otherGroup).length}`,
 	);
 
+	// The two stock groups name the same flat files, so the host reads which group
+	// each entry came from to pick that group's copy.
+	const groups = (result: CompileResult) => result.stats?.sampleGroups ?? [];
+	check(
+		"the implicit fallback's entries are all #default's",
+		groups(implicit).length === 20 && groups(implicit).every((group) => group === "default"),
+		groups(implicit).slice(0, 3).join(", "),
+	);
+	check(
+		"each entry says which group it came from, and a written name none",
+		JSON.stringify(groups(resolved('#amk 4\n#samples { #optimized "kick.brr" }\n#0 o4 c4\n'))) ===
+			JSON.stringify([...Array.from({ length: 5 }, () => "optimized"), null]),
+		groups(resolved('#amk 4\n#samples { #optimized "kick.brr" }\n#0 o4 c4\n')).join(", "),
+	);
+	check(
+		"and they line up with the sample list",
+		groups(otherGroup).length === names(otherGroup).length,
+		`${groups(otherGroup).length} vs ${names(otherGroup).length}`,
+	);
+
 	// #path is the one deliberate divergence from AddmusicK (AUDIT.md): the
 	// library is one flat folder, so the directive is parsed, reported and
 	// applied to nothing.

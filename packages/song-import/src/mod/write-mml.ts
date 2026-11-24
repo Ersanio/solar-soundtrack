@@ -1,6 +1,6 @@
 /**
  * A played MOD written out as an `#amk 4` song: each kept channel on one of AddmusicK's, each sample
- * a custom instrument after `#default`.
+ * a custom instrument after `#default` (or `#optimized`).
  *
  * Two driver ticks make one MOD tick, which makes the MOD's BPM the song's quarter-note BPM (`t` is
  * BPM × 0.4096 − 1) and a row at speed 6 a sixteenth. What the MOD does to a note is written as the
@@ -67,6 +67,8 @@ export interface ModSongOptions {
 	sampleName: (index: number) => string;
 	/** The title when the file has none: the file's own name. */
 	fallbackTitle: string | null;
+	/** Open `#samples` with `#optimized`, AddmusicK's smaller copies of the stock set, rather than `#default`. */
+	optimized?: boolean;
 }
 
 /** Something the writer changed to make the song fit, for the porter to read. */
@@ -891,7 +893,7 @@ export function writeModSong(mod: ModFile, play: ModPlay, options: ModSongOption
 		"",
 		"#samples",
 		"{",
-		"\t#default",
+		options.optimized ? "\t#optimized" : "\t#default",
 		...sampleList.map((s) => `\t"${s.name}"`),
 		"}",
 		"",

@@ -1,10 +1,12 @@
 import { Component, computed, inject, signal } from '@angular/core';
 
 import { ARAM_SIZE } from '@amk/spc/layout';
+import { spliceSampleGroup } from '@amk/tokens/edits';
 import { Button, buttonClass } from '../../../shared/button/button';
 import { IconDownload } from '../../../shared/icons/icon-download';
 import { Toggle } from '../../../shared/toggle/toggle';
 import { Toolbar } from '../../../shared/toolbar/toolbar';
+import { EditorRequests } from '../../../state/editor-requests';
 import { EditorStore } from '../../../state/editor-store';
 import { SampleStore } from '../../../state/sample-store';
 import { downloadBlob } from '../../../util/format';
@@ -32,6 +34,7 @@ import { type FileRow, fileRow } from './sample-rows';
 export class SampleBrowser {
   protected readonly library = inject(SampleStore);
   private readonly editor = inject(EditorStore);
+  private readonly requests = inject(EditorRequests);
 
   protected readonly addClass = buttonClass('default', 'md');
 
@@ -125,8 +128,28 @@ export class SampleBrowser {
       slotsOf: (name: string) => this.library.bankSlots(name),
     };
 
-    return this.library.files().map((file) => fileRow(file, context));
+    const files = this.usesOptimized() ? this.library.optimizedFiles() : this.library.files();
+    return files.map((file) => fileRow(file, context));
   });
+
+  /** Lit while the song's `#samples` takes `#optimized`; the rows then show those copies. */
+  protected readonly usesOptimized = computed(() => this.editor.stockGroup() === 'optimized');
+
+  /** A song naming both groups, or neither, has no one set for the toggle to switch. */
+  protected readonly canSwitchSet = computed(() => {
+    const set = this.editor.stockGroup();
+    return set === 'default' || set === 'optimized';
+  });
+
+  /** Writes the other group into the song's `#samples`, as one undo step. */
+  protected switchSet(): void {
+    const edits = spliceSampleGroup(
+      this.editor.source(),
+      this.editor.tokens().tokens,
+      this.usesOptimized() ? 'default' : 'optimized',
+    );
+    this.requests.applyAll(edits, null, true);
+  }
 
   protected readonly freeLabel = computed(() => {
     const free = this.freeBytes();

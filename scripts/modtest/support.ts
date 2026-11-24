@@ -195,7 +195,13 @@ export function song(text: string, extra: readonly BrrSample[]): Song {
 	const index = tokenize(text);
 	const timeline = result.data ? walkSong(result.data, ARAM) : null;
 	const byName = new Map([...driver.samples, ...extra].map((s) => [s.sampleName, s]));
-	const samples = (result.sampleList ?? []).map((name) => byName.get(name) ?? emptySample(name));
+	const optimized = new Map(driver.optimizedSamples.map((s) => [s.sampleName, s]));
+	// As `SampleStore.resolve` does: an entry from `#optimized` takes that group's copy.
+	const groups = result.stats?.sampleGroups ?? [];
+	const samples = (result.sampleList ?? []).map(
+		(name, srcn) =>
+			(groups[srcn] === "optimized" ? optimized.get(name) : undefined) ?? byName.get(name) ?? emptySample(name),
+	);
 	let spc: Uint8Array | string = "no song data";
 	let freeBytes = 0;
 	if (result.data) {

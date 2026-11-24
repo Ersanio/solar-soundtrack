@@ -4,7 +4,7 @@ import { fitFactor, planSample, plannedFrames } from "@amk/import/mod";
 import type { ModSample } from "@amk/import/mod/file";
 import { brrDataBytes } from "@amk/spc/brr-encode";
 import { check, section } from "../harness";
-import { pluck, square } from "./support";
+import { C2, imported, modBytes, pattern, pluck, problems, square } from "./support";
 
 const sample = (pcm: Int8Array, loopStart = 0, loopLength = 0): ModSample => ({
 	index: 1,
@@ -87,4 +87,30 @@ section("samples: fitting a room");
 	check("the factor found fits the room", bytes(factor) <= room, `${bytes(factor)} at ${factor}`);
 	check("and a little more would not", bytes(factor * 1.02) > room, `${bytes(factor * 1.02)}`);
 	check("samples that fit whole are left at 1", fitFactor(samples, 1_000_000, brrDataBytes) === 1);
+}
+
+section("samples: the optimized stock set");
+
+{
+	const bytes = modBytes({
+		samples: [{ pcm: square(32, 8), loopStart: 0, loopLength: 32 }],
+		orders: [0],
+		patterns: [pattern([[0, 0, { period: C2, sample: 1 }]])],
+	});
+	const plain = imported(bytes);
+	const optimized = imported(bytes, { optimized: true });
+	check(
+		"the option writes #optimized in #default's place",
+		optimized.written.text.includes("\n\t#optimized\n") && !optimized.written.text.includes("#default"),
+	);
+	check(
+		"and the song still raises nothing",
+		problems(optimized.song).length === 0,
+		problems(optimized.song).join("; "),
+	);
+	check(
+		"it leaves the song's own samples more room",
+		optimized.song.freeBytes > plain.song.freeBytes,
+		`${optimized.song.freeBytes} vs ${plain.song.freeBytes}`,
+	);
 }

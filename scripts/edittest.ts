@@ -44,6 +44,7 @@ import {
 	spliceHead,
 	spliceInstrumentByte,
 	spliceInstrumentSample,
+	spliceSampleGroup,
 } from "@amk/tokens/edits";
 import {
 	LAST_DRIVER_INSTRUMENT,
@@ -445,6 +446,60 @@ section("an insertion is padded to stand as a token of its own");
 	check("at the start of the text none in front", pad(0) === "| ", pad(0));
 	check("at the end none behind", pad(song.length) === " |", pad(song.length));
 	check("a run is padded by its own two ends", pad(3, 5) === "|", pad(3, 5));
+}
+
+section("the sample browser's set toggle rewrites #samples");
+{
+	const to = (song: string, group: "default" | "optimized"): string | null => {
+		const edits = spliceSampleGroup(song, tokenize(song).tokens, group);
+		if (!edits) {
+			return null;
+		}
+
+		let out = song;
+		for (const edit of [...edits].sort((a, b) => b.span.start - a.span.start)) {
+			check(`its expect holds (${edit.expect})`, song.slice(edit.span.start, edit.span.end) === edit.expect);
+			out = out.slice(0, edit.span.start) + edit.text + out.slice(edit.span.end);
+		}
+
+		return out;
+	};
+
+	const block = '#amk 4\n#samples\n{\n\t#default ; the stock set\n\t"kick.brr"\n}\n#0 c4\n';
+	const swapped = to(block, "optimized");
+	check(
+		"#default becomes #optimized, the rest of the block as written",
+		swapped === '#amk 4\n#samples\n{\n\t#optimized ; the stock set\n\t"kick.brr"\n}\n#0 c4\n',
+		JSON.stringify(swapped),
+	);
+	check("and back again", to(swapped ?? "", "default") === block, JSON.stringify(to(swapped ?? "", "default")));
+	check("a song already on the group is left alone", to(block, "default") === null);
+
+	const bare = "#amk 4\n#0 c4\n";
+	check(
+		"with no #samples, the block goes on the line after #amk",
+		to(bare, "optimized") === "#amk 4\n#samples\n{\n\t#optimized\n}\n#0 c4\n",
+		JSON.stringify(to(bare, "optimized")),
+	);
+	check("and no #samples is already #default", to(bare, "default") === null);
+	check(
+		"with no #amk, at the top",
+		to("#0 c4\n", "optimized") === "#samples\n{\n\t#optimized\n}\n#0 c4\n",
+		JSON.stringify(to("#0 c4\n", "optimized")),
+	);
+
+	// Group names are looked up exactly (`addSampleGroup`), so `#Default` is not the group, and
+	// `#samples` itself is matched as strnicmp matches it.
+	check(
+		"a group spelt in another case is not rewritten",
+		to('#amk 4\n#SAMPLES { #Default "a.brr" }\n#0 c4\n', "optimized") === null,
+	);
+	check(
+		"a #default outside a #samples block is not touched",
+		to("#amk 4\n#samples { #optimized }\n#spc { #default }\n#0 c4\n", "default") ===
+			"#amk 4\n#samples { #default }\n#spc { #default }\n#0 c4\n",
+		JSON.stringify(to("#amk 4\n#samples { #optimized }\n#spc { #default }\n#0 c4\n", "default")),
+	);
 }
 
 summarise();

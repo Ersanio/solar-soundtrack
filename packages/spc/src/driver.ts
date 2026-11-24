@@ -1,6 +1,6 @@
 /**
  * Loads the prebuilt AddmusicK driver bundle: the SPC700 program, the SPC/DSP
- * base images, and the `#default` BRR sample group.
+ * base images, and the `#default` BRR sample group in both its regular and optimized copies.
  *
  * These are build-time artifacts produced by running AddmusicK once.
  */
@@ -41,6 +41,8 @@ export interface DriverManifest {
 	/** The local song's 1-based slot in that table, and so its CPUIO `$F6` value. */
 	songIndex: number;
 	sampleGroups: Record<string, string[]>;
+	/** The directory holding AddmusicK's optimized copies of the group's samples, under the same names. */
+	optimizedSamples?: string;
 	importantSamples?: string[];
 }
 
@@ -58,6 +60,8 @@ export interface DriverBundle {
 	/** DSP registers + IPL area, written at SPC offset 0x10100 (256 bytes). */
 	dspBase: Uint8Array;
 	samples: BrrSample[];
+	/** `samples`' optimized copies: the same names in the same order. `samples` itself without a directory. */
+	optimizedSamples: BrrSample[];
 	/** main.bin as it sits in ARAM at `manifest.programPos`, upload header stripped. */
 	programData: Uint8Array;
 }
@@ -148,11 +152,15 @@ async function load(baseUrl: string, sampleGroup: string): Promise<DriverBundle>
 		);
 	}
 
-	const [spcBase, dspBase, rawProgram, ...sampleBlobs] = await Promise.all([
+	const optimizedDir = manifest.optimizedSamples;
+	const [spcBase, dspBase, rawProgram, sampleBlobs, optimizedBlobs] = await Promise.all([
 		fetchBytes(`${baseUrl}/${manifest.spcBase}`),
 		fetchBytes(`${baseUrl}/${manifest.dspBase}`),
 		fetchBytes(`${baseUrl}/${manifest.driver}`),
-		...names.map((name) => fetchBytes(`${baseUrl}/samples/${encodePathSegment(name)}`)),
+		Promise.all(names.map((name) => fetchBytes(`${baseUrl}/samples/${encodePathSegment(name)}`))),
+		optimizedDir
+			? Promise.all(names.map((name) => fetchBytes(`${baseUrl}/${optimizedDir}/${encodePathSegment(name)}`)))
+			: null,
 	]);
 
 	if (spcBase.length < 0x100) {
@@ -172,11 +180,13 @@ async function load(baseUrl: string, sampleGroup: string): Promise<DriverBundle>
 		);
 	}
 
+	const samples = names.map((name, index) => parseBrr(name, sampleBlobs[index]));
 	return {
 		manifest,
 		spcBase,
 		dspBase,
-		samples: names.map((name, index) => parseBrr(name, sampleBlobs[index])),
+		samples,
+		optimizedSamples: optimizedBlobs ? names.map((name, index) => parseBrr(name, optimizedBlobs[index])) : samples,
 		programData: rawProgram.subarray(UPLOAD_HEADER_BYTES),
 	};
 }

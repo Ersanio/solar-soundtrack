@@ -160,7 +160,7 @@ flat is as good as exact once the fine tune lifts it. The encoding itself is the
 
 ### Writing
 
-`mod/write-mml.ts` writes an `#amk 4` song: `#samples` with `#default` first, then each sample the
+`mod/write-mml.ts` writes an `#amk 4` song: `#samples` with `#default` (or `#optimized`, `ModSongOptions.optimized`) first, then each sample the
 kept channels play, and `#instruments` giving each `$FF $E0 $7F` and its tuning at `@30` up.
 
 - **Two driver ticks to a MOD tick**, so the MOD's BPM is the song's quarter-note BPM (`t` is
