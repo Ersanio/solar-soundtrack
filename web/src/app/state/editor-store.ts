@@ -6,6 +6,7 @@ import { Service, computed, effect, inject, linkedSignal, signal, untracked } fr
 import { compiler } from '@amk/compiler';
 import { type Command, commandAt, tokenize } from '@amk/tokens';
 import type { CommandAddress, CompileResult, Diagnostic, NoteAddress, Span } from '@amk/core/types';
+import type { BrrSample } from '@amk/spc/brr';
 import { buildSpc, spcFilename } from '@amk/spc/export';
 import { ARAM_SIZE, type AramBudget, computeBudget } from '@amk/spc/layout';
 import {
@@ -600,25 +601,41 @@ export class EditorStore {
    * rather than baked in here, so preview and export build the same bytes.
    */
   assembleSpc(): Uint8Array | null {
-    const driver = this.drivers.driver();
     const result = this.result();
-    if (!driver || !result?.ok || !result.data) {
+    if (!result) {
       return null;
     }
 
     try {
-      return buildSpc({
-        songData: result.data,
-        driver,
-        samples: this.samples(),
-        tags: result.stats?.tags,
-        seconds: result.stats?.tagSeconds,
-        echoBufferSize: result.stats?.echoBufferSize,
-      }).spc;
+      return this.spcFor(result, this.samples());
     } catch (error) {
       this.override.set({ kind: 'error', text: errorMessage(error) });
       return null;
     }
+  }
+
+  /**
+   * A playable SPC from a compile of any text — {@link compileText}'s, say — built as the
+   * document's is. `null` before the driver loads or for a failed compile; throws
+   * `SpcExportError` where the song does not fit.
+   */
+  spcFor(result: CompileResult, samples?: readonly BrrSample[]): Uint8Array | null {
+    const driver = this.drivers.driver();
+    if (!driver || !result.ok || !result.data) {
+      return null;
+    }
+
+    return buildSpc({
+      songData: result.data,
+      driver,
+      samples: [
+        ...(samples ??
+          (result.sampleList ? this.library.resolve(result.sampleList) : driver.samples)),
+      ],
+      tags: result.stats?.tags,
+      seconds: result.stats?.tagSeconds,
+      echoBufferSize: result.stats?.echoBufferSize,
+    }).spc;
   }
 
   /** Compiles first, as {@link downloadSpc} does, so a pending edit is in the file. */

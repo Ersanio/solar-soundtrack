@@ -1,19 +1,21 @@
-/** The top bar: the transport, the ARAM meter, the suppressed warnings, the MIDI keyboard switch, the exports, the theme picker, the changelog and the commit link. */
+/** The top bar: the transport, the ARAM meter, the suppressed warnings, the MIDI keyboard switch, the exports and the import, the theme picker, the changelog and the commit link. */
 
-import { Component, computed, inject } from '@angular/core';
+import { Component, computed, inject, viewChild } from '@angular/core';
 
 import { Changelog } from '../../changelog/changelog';
 import { GIT_COMMIT_SHA } from '../../git-info.generated';
-import { Button } from '../../shared/button/button';
+import { Button, buttonClass } from '../../shared/button/button';
 import { IconDownload } from '../../shared/icons/icon-download';
 import { IconGithub } from '../../shared/icons/icon-github';
 import { IconRoll } from '../../shared/icons/icon-roll';
+import { IconUpload } from '../../shared/icons/icon-upload';
 import { Toggle } from '../../shared/toggle/toggle';
 import { Audition } from '../../state/audition';
 import { EditorStore } from '../../state/editor-store';
 import { MidiInput } from '../../state/midi-input';
 import { ThemePicker } from '../../theme/theme-picker/theme-picker';
 import { AramMeter } from '../aram-meter/aram-meter';
+import { ImportDialog } from '../import-dialog/import-dialog';
 import { ScopeMini } from '../scope-mini/scope-mini';
 import { SuppressionsButton } from './suppressions-button/suppressions-button';
 import { TransportControls } from '../transport-controls/transport-controls';
@@ -43,6 +45,8 @@ const REPO_URL = 'https://github.com/Ersanio/solar-soundtrack';
     IconDownload,
     IconGithub,
     IconRoll,
+    IconUpload,
+    ImportDialog,
     ScopeMini,
     SuppressionsButton,
     ThemePicker,
@@ -63,6 +67,10 @@ export class TopBar {
   protected readonly store = inject(EditorStore);
   protected readonly midi = inject(MidiInput);
   private readonly audition = inject(Audition);
+
+  private readonly importer = viewChild.required(ImportDialog);
+
+  protected readonly importClass = `${buttonClass('dark', 'md')} cursor-pointer`;
 
   protected readonly commitUrl = `${REPO_URL}/commit/${GIT_COMMIT_SHA}`;
   protected readonly commitShort = GIT_COMMIT_SHA.slice(0, 7);
@@ -91,6 +99,16 @@ export class TopBar {
         return null;
     }
   });
+
+  /** Opens the Import dialog on the picked file, and lets the same file be picked again. */
+  protected async onImportFile(event: Event): Promise<void> {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = '';
+    if (file) {
+      this.importer().openWith(file.name, new Uint8Array(await file.arrayBuffer()));
+    }
+  }
 
   /**
    * The press is what the browser's permission prompt answers to, and what lets

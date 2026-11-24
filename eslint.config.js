@@ -57,6 +57,7 @@ module.exports = defineConfig([
       'packages/core/**/*.ts',
       'packages/mml-tokens/**/*.ts',
       'packages/spc/**/*.ts',
+      'packages/song-import/**/*.ts',
       'web/src/**/*.ts',
       'scripts/**/*.ts',
     ],
@@ -117,6 +118,7 @@ module.exports = defineConfig([
   //   compiler → core
   //   spc      → core
   //   tokens   → core, and two modules of spc
+  //   import   → core, and spc's instrument tables and pitch maths
   //
   // `$localize` is no exception: it is a global the host provides, not an
   // import, so a package's messages need nothing from Angular.
@@ -133,22 +135,45 @@ module.exports = defineConfig([
     // program to build — this block exists only to hold the import boundary.
     languageOptions: { parser: tseslint.parser },
     rules: forbid(
-      ['@amk/tokens', '@amk/tokens/*', '@amk/spc/*', ...FRAMEWORKS],
+      ['@amk/tokens', '@amk/tokens/*', '@amk/spc/*', '@amk/import/*', ...FRAMEWORKS],
       'The compiler is a port of AddmusicK 1.0.11 and reaches for nothing but @amk/core.',
     ),
   },
   {
     files: ['packages/spc/**/*.ts'],
     rules: forbid(
-      ['@amk/compiler', '@amk/compiler/*', '@amk/tokens', '@amk/tokens/*', ...FRAMEWORKS],
+      [
+        '@amk/compiler',
+        '@amk/compiler/*',
+        '@amk/tokens',
+        '@amk/tokens/*',
+        '@amk/import/*',
+        ...FRAMEWORKS,
+      ],
       'The SPC layer runs in a worklet and depends on nothing but @amk/core.',
     ),
   },
   {
     files: ['packages/mml-tokens/**/*.ts'],
     rules: forbid(
-      ['@amk/compiler', '@amk/compiler/*', ...SPC_BEYOND_THE_MATHS, ...FRAMEWORKS],
+      ['@amk/compiler', '@amk/compiler/*', '@amk/import/*', ...SPC_BEYOND_THE_MATHS, ...FRAMEWORKS],
       'The scanner may read @amk/spc/adsr and @amk/spc/fir — what a byte sounds like — and nothing else.',
+    ),
+  },
+  {
+    files: ['packages/song-import/**/*.ts'],
+    rules: forbid(
+      [
+        '@amk/compiler',
+        '@amk/compiler/*',
+        '@amk/tokens',
+        '@amk/tokens/*',
+        '@amk/spc/*',
+        '!@amk/spc/instruments',
+        '!@amk/spc/pitch',
+        ...FRAMEWORKS,
+      ],
+      'An importer writes MML text; it may read the stock instruments and their pitch range from @amk/spc, and nothing else.',
     ),
   },
 

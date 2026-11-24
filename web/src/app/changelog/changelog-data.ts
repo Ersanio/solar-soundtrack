@@ -10,7 +10,10 @@ export const CHANGELOG: readonly ChangelogEntry[] = [
   // ─── newest first; add new blocks here ──────────────────────────────────
   {
     date: '24 November 2026',
-    items: ['Name the stock instruments and drums in the instrument picker'],
+    items: [
+      'Import MIDI files as a new song, with channel picking, instrument matching and a preview',
+      'Name the stock instruments and drums in the instrument picker',
+    ],
   },
   {
     date: '19 November 2026',

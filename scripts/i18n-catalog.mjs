@@ -31,6 +31,7 @@ const GROUPS = new Set([
   'transport',
   'mixer',
   'topbar',
+  'import',
   'output',
   'status',
   'theme',

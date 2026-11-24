@@ -93,6 +93,23 @@ something in the directory, which load by themselves when such a file is opened.
 - `remote.ts` (300+ lines) — Remote code calls and resets — `(!n, type[, wait])` and `(!!n)` — and the body a call runs.
 - `units.ts` (300+ lines) — Turning driver bytes into the units a musician thinks in.
 
+## packages/song-import/src
+
+**Rules:** `import.md`
+
+- `format.ts` — Which importer can read a file, from its first bytes rather than its name.
+- `midi.ts` — Importing a MIDI file: read once into parts, then written as a song as often as the porter changes what to keep.
+
+## packages/song-import/src/midi
+
+**Rules:** `import.md`
+
+- `gm.ts` — General MIDI's programs and drum keys, matched to the instruments the driver ships.
+- `parts.ts` — A MIDI channel's notes split into parts that each play one note at a time, which is all an AddmusicK channel can do.
+- `performance.ts` (500+ lines) — What a MIDI file plays: each channel's notes and controller curves, the tempo and metre maps, the loop markers and the song's names, with every track merged onto one time line.
+- `smf.ts` — A Standard MIDI File, read into its tracks of timed events.
+- `write-mml.ts` (750+ lines) — A MIDI performance written out as an `#amk 4` song on the stock instruments, one kept part per channel.
+
 ## packages/spc/src
 
 **Rules:** `audition.md`, `commands-in-the-roll.md`, `i18n.md`, `transport-and-clock.md`
@@ -206,6 +223,21 @@ something in the directory, which load by themselves when such a file is opened.
 - `samples.ts` — `fixtest`: a used sample added to `#samples`, `#default` put first, and a list written where there was none.
 - `support.ts` — What every `fixtest` section shares: a song compiled, walked and diagnosed as the editor does, and the checks on a fix.
 - `text.ts` — `fixtest`: a stray character deleted and upper-case note letters lowered, both to the same bytes.
+
+## scripts/miditest
+
+**Rules:** `harnesses/*.md`
+
+- `drums.ts` — `miditest`: drums — channel 10, a GS rhythm part and XG's drum bank read as kits, kit families split apart, and every GM key played on a stock drum or the bongo.
+- `effects.ts` — `miditest`: what a MIDI does to a note, as the driver hears it — volume, pan, velocity, pitch bend as `$DD`, modulation as vibrato, reverb as echo, and the loop markers.
+- `end-to-end.ts` — `miditest`: a multi-track song imported whole — it compiles clean, and every note the file plays is walked at its tick and pitch.
+- `instruments.ts` — `miditest`: every GM program on a reachable stock instrument, a part played where its instrument plays true, and the porter's choice of instrument written.
+- `main.ts` — MIDI import: `@amk/import/midi` reading a Standard MIDI File and writing it as a song.
+- `parser.ts` — `miditest`: the SMF reader — variable-length quantities, running status, a velocity-0 key-off, RMID, unknown chunks, a file cut short, and the files it refuses.
+- `stress.ts` — `miditest`: a busy, seeded song — chords, bends, controller sweeps, a kit, tempo changes and a loop — imported at every grid without raising a problem.
+- `support.ts` — What every `miditest` section shares: a MIDI file built in memory, imported, compiled, walked and diagnosed as the editor does.
+- `timing.ts` — `miditest`: time — every division lands on the driver's 48 ticks a quarter, each snap grid rounds as it says, and a tempo change is a `t` at its tick.
+- `voices.ts` — `miditest`: a channel's chords split into parts that play one note at a time, a melody and its bass kept apart, the pedal held, and eight parts kept out of more.
 
 ## scripts/palettetest
 
@@ -378,6 +410,14 @@ something in the directory, which load by themselves when such a file is opened.
 
 - `history-buttons.ts` — Undo and redo, for the two toolbars that need them.
 
+## web/src/app/editor/import-dialog
+
+**Rules:** `import.md`
+
+- `import-dialog.ts` (300+ lines) — The Import dialog: a file read into parts, the parts to keep and what to play them on, and a preview of the song they make before it replaces the document.
+- `import-preview.ts` — The Import dialog's preview: the candidate song on a player of its own, with a playhead in driver ticks and a seek bar over them.
+- `import-text.ts` — What the Import dialog says: why a file could not be read, what the writer changed to fit it, and what each part is called.
+
 ## web/src/app/editor/scope-mini
 
 **Rules:** `song-inspector.md`
@@ -398,7 +438,7 @@ something in the directory, which load by themselves when such a file is opened.
 
 ## web/src/app/editor/top-bar
 
-- `top-bar.ts` — The top bar: the transport, the ARAM meter, the suppressed warnings, the MIDI keyboard switch, the exports, the theme picker, the changelog and the commit link.
+- `top-bar.ts` — The top bar: the transport, the ARAM meter, the suppressed warnings, the MIDI keyboard switch, the exports and the import, the theme picker, the changelog and the commit link.
 
 ## web/src/app/editor/transport-controls
 
@@ -905,7 +945,7 @@ something in the directory, which load by themselves when such a file is opened.
 
 **Rules:** `ui-and-theme.md`
 
-- 27 icon components, `icon-<name>.ts`, one glyph each: `analysis`, `book`, `chevron-down`, `chevron-right`, `close`, `download`, `github`, `lock`, `loop`, `minus`, `palette`, `pause`, `play`, `plus`, `record`, `recording`, `redo`, `roll`, `samples`, `scope`, `source`, `stop`, `suppress`, `undo`, `unlock`, `volume`, `wrap`
+- 28 icon components, `icon-<name>.ts`, one glyph each: `analysis`, `book`, `chevron-down`, `chevron-right`, `close`, `download`, `github`, `lock`, `loop`, `minus`, `palette`, `pause`, `play`, `plus`, `record`, `recording`, `redo`, `roll`, `samples`, `scope`, `source`, `stop`, `suppress`, `undo`, `unlock`, `upload`, `volume`, `wrap`
 
 ## web/src/app/shared/modal
 

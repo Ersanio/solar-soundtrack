@@ -28,6 +28,7 @@ export const HARNESSES = [
   'audiotest',
   'worklettest',
   'walktest',
+  'miditest',
   'charttest',
   'pianorolltest',
   'fixtest',

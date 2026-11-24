@@ -26,7 +26,8 @@
       "@amk/compiler/*": ["./packages/mml-compiler/src/*.ts"],
       "@amk/tokens": ["./packages/mml-tokens/src/index.ts"],
       "@amk/tokens/*": ["./packages/mml-tokens/src/*.ts"],
-      "@amk/spc/*": ["./packages/spc/src/*.ts"]
+      "@amk/spc/*": ["./packages/spc/src/*.ts"],
+      "@amk/import/*": ["./packages/song-import/src/*.ts"]
     }
   }
 }

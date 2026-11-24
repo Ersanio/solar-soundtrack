@@ -3,6 +3,7 @@
   class="border-edge bg-raised text-ink backdrop:bg-inset/70 m-auto max-w-[calc(100vw-2rem)] rounded-md border p-0 shadow-lg"
   [class]="wide() ? 'w-[48rem]' : 'w-96'"
   (click)="onClick($event)"
+  (close)="closed.emit()"
 >
   <div class="flex max-h-[80vh] flex-col">
     <div class="border-edge flex shrink-0 items-center justify-between gap-3 border-b px-3 py-2">

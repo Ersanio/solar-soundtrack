@@ -50,6 +50,21 @@
     <span i18n="@@topbar.export-spc" class="max-2xl:hidden">topbar.export-spc</span>
   </button>
 
+  <!-- A label rather than a button, so the press is the file picker's own; what it
+       picked opens the Import dialog whatever its format, which says why if it cannot. -->
+  <label i18n-title="@@topbar.import.title" title="topbar.import.title" [class]="importClass">
+    <amk-icon-upload />
+    <span i18n="@@topbar.import" class="max-2xl:hidden">topbar.import</span>
+    <input
+      type="file"
+      class="hidden"
+      accept=".mid,.midi,.rmi,.kar,audio/midi"
+      (change)="onImportFile($event)"
+    />
+  </label>
+
+  <amk-import-dialog #importer />
+
   <span class="bg-edge h-5 w-px shrink-0"></span>
 
   <div class="flex items-center gap-1">

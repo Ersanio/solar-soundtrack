@@ -83,7 +83,7 @@ export function instrumentEdit(source: string, command: Command, instrument: num
 }
 
 /** What SMW's stock instruments and drums are known as. */
-const STOCK_NAMES: ReadonlyMap<number, string> = new Map([
+export const STOCK_NAMES: ReadonlyMap<number, string> = new Map([
   [0, $localize`:@@inspector.instrument.stock.flute:inspector.instrument.stock.flute`],
   [1, $localize`:@@inspector.instrument.stock.string:inspector.instrument.stock.string`],
   [

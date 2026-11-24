@@ -1,4 +1,11 @@
-import { Component, type ElementRef, booleanAttribute, input, viewChild } from '@angular/core';
+import {
+  Component,
+  type ElementRef,
+  booleanAttribute,
+  input,
+  output,
+  viewChild,
+} from '@angular/core';
 
 import { Button } from '../button/button';
 import { IconClose } from '../icons/icon-close';
@@ -34,6 +41,8 @@ export class Modal {
   readonly heading = input.required<string>();
   /** Twice the width, for a body that is a listing rather than a form. */
   readonly wide = input(false, { transform: booleanAttribute });
+  /** However it closed: a button, Escape or the backdrop. */
+  readonly closed = output();
 
   open(): void {
     const dialog = this.dialog().nativeElement;

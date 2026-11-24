@@ -1,0 +1,228 @@
+<amk-modal wide [heading]="heading()" (closed)="onClosed()">
+  @if (refusal(); as why) {
+    <p class="text-danger text-sm leading-relaxed">{{ why }}</p>
+  } @else {
+    <div class="flex flex-col gap-3">
+      <p class="text-ink-muted text-xs">{{ summary() }}</p>
+
+      <div class="flex flex-wrap items-center gap-3">
+        <label class="flex items-center gap-1.5">
+          <span i18n="@@import.snap" class="text-ink-muted text-xs">import.snap</span>
+          <select
+            class="bg-inset border-edge text-ink h-7 cursor-pointer rounded-md border px-1.5 text-xs"
+            i18n-title="@@import.snap.title"
+            title="import.snap.title"
+            [value]="grid()"
+            (change)="setSnap($event)"
+          >
+            @for (snap of snaps; track snap.ticks) {
+              <option [value]="snap.ticks" [selected]="snap.ticks === grid()">
+                {{ snap.label }}
+              </option>
+            }
+          </select>
+        </label>
+
+        <button
+          i18n="@@import.echo"
+          amk-toggle
+          i18n-title="@@import.echo.title"
+          title="import.echo.title"
+          [pressed]="echo()"
+          (click)="echo.set(!echo())"
+        >
+          import.echo
+        </button>
+
+        @if (hasMarkers()) {
+          <button
+            i18n="@@import.loop-markers"
+            amk-toggle
+            i18n-title="@@import.loop-markers.title"
+            title="import.loop-markers.title"
+            [pressed]="loopAtMarkers()"
+            (click)="loopAtMarkers.set(!loopAtMarkers())"
+          >
+            import.loop-markers
+          </button>
+        }
+      </div>
+
+      <div class="border-edge overflow-auto rounded-md border">
+        <table class="w-full text-xs">
+          <thead class="bg-inset text-ink-muted text-left">
+            <tr>
+              <th i18n="@@import.column.keep" class="px-2 py-1 font-medium">import.column.keep</th>
+              <th i18n="@@import.column.channel" class="px-2 py-1 font-medium">
+                import.column.channel
+              </th>
+              <th i18n="@@import.column.part" class="px-2 py-1 font-medium">import.column.part</th>
+              <th i18n="@@import.column.from" class="px-2 py-1 font-medium">import.column.from</th>
+              <th i18n="@@import.column.notes" class="px-2 py-1 text-right font-medium">
+                import.column.notes
+              </th>
+              <th i18n="@@import.column.range" class="px-2 py-1 font-medium">
+                import.column.range
+              </th>
+              <th i18n="@@import.column.instrument" class="px-2 py-1 font-medium">
+                import.column.instrument
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (row of rows(); track row.id) {
+              <tr class="border-edge border-t" [class.opacity-50]="!row.on">
+                <td class="px-2 py-1">
+                  <button
+                    i18n="@@import.keep"
+                    amk-toggle
+                    [pressed]="row.on"
+                    [disabled]="row.disabled"
+                    (click)="toggleKeep(row.id)"
+                  >
+                    import.keep
+                  </button>
+                </td>
+                <td class="px-2 py-1">
+                  @if (row.channel; as channel) {
+                    <span [class]="row.chipClass">{{ channel }}</span>
+                  }
+                </td>
+                <td class="text-ink px-2 py-1">
+                  <div class="max-w-48 truncate" [title]="row.name">{{ row.name }}</div>
+                  @if (row.name !== row.kind) {
+                    <div class="text-ink-muted">{{ row.kind }}</div>
+                  }
+                </td>
+                <td class="text-ink-muted px-2 py-1 whitespace-nowrap">{{ row.source }}</td>
+                <td class="px-2 py-1 text-right font-mono tabular-nums">{{ row.notes }}</td>
+                <td class="px-2 py-1 font-mono whitespace-nowrap">{{ row.range }}</td>
+                <td class="px-2 py-1">
+                  @if (row.drums) {
+                    <span class="text-ink-muted">{{ text.kit }}</span>
+                  } @else {
+                    <select
+                      class="bg-inset border-edge text-ink h-6 max-w-44 cursor-pointer rounded-md border px-1 text-xs"
+                      [disabled]="!row.on"
+                      (change)="setInstrument(row.id, $event)"
+                    >
+                      @for (option of instrumentOptions; track option.value) {
+                        <option [value]="option.value" [selected]="option.value === row.instrument">
+                          {{ option.label }}
+                        </option>
+                      }
+                    </select>
+                  }
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+
+      <p
+        i18n="@@import.kept"
+        class="text-xs"
+        [class.text-warn]="full()"
+        [class.text-ink-muted]="!full()"
+      >
+        import.kept
+        {{
+          keptCount() // i18n(ph='kept')
+        }}
+        {{
+          limit // i18n(ph='limit')
+        }}
+      </p>
+
+      @if (warnings().length > 0) {
+        <ul class="text-warn flex flex-col gap-0.5 text-xs leading-relaxed">
+          @for (warning of warnings(); track $index) {
+            <li>{{ warning }}</li>
+          }
+        </ul>
+      }
+
+      @if (error(); as error) {
+        <p class="text-danger text-xs leading-relaxed">{{ error }}</p>
+      }
+
+      @if (preview(); as player) {
+        <div class="flex items-center gap-2">
+          <amk-button-group pill>
+            <button
+              amk-button
+              variant="dark"
+              size="md"
+              icon
+              [title]="player.state() === 'playing' ? text.pause : text.play"
+              [disabled]="!canImport()"
+              (click)="player.toggle()"
+            >
+              @if (player.state() === 'playing') {
+                <amk-icon-pause class="text-accent" />
+              } @else {
+                <amk-icon-play />
+              }
+            </button>
+            <button
+              amk-button
+              variant="dark"
+              size="md"
+              icon
+              i18n-title="@@import.preview.stop.title"
+              title="import.preview.stop.title"
+              [disabled]="player.state() === 'idle'"
+              (click)="player.stop()"
+            >
+              <amk-icon-stop />
+            </button>
+          </amk-button-group>
+
+          <input
+            type="range"
+            min="0"
+            step="1"
+            class="accent-control min-w-16 flex-1 cursor-pointer disabled:cursor-not-allowed disabled:opacity-40"
+            i18n-title="@@import.preview.seek.title"
+            title="import.preview.seek.title"
+            [max]="player.durationTicks()"
+            [value]="player.position()"
+            [disabled]="!player.canSeek() || !canImport()"
+            (input)="onScrub($event)"
+            (change)="player.commitScrub()"
+            (pointerup)="player.commitScrub()"
+            (pointercancel)="player.commitScrub()"
+          />
+
+          <span
+            class="well text-ink flex h-7 items-center rounded-sm px-2 font-mono text-sm tabular-nums whitespace-nowrap"
+          >
+            {{ player.clock() }}
+          </span>
+        </div>
+
+        @if (previewError(); as problem) {
+          <p class="text-danger text-xs">{{ problem }}</p>
+        }
+      }
+    </div>
+  }
+
+  <button i18n="@@import.cancel" amk-button size="sm" variant="ghost" modalFooter (click)="close()">
+    import.cancel
+  </button>
+  <button
+    i18n="@@import.confirm"
+    amk-button
+    size="sm"
+    variant="primary"
+    modalFooter
+    i18n-title="@@import.confirm.title"
+    title="import.confirm.title"
+    [disabled]="!canImport()"
+    (click)="confirm()"
+  >
+    import.confirm
+  </button>
+</amk-modal>
