@@ -19,7 +19,7 @@ true.
   boundary allows nothing more, so a MOD's samples are planned here (`planSample`) and encoded by the
   caller (`@amk/spc/brr-encode`).
 - **Codes, not words.** A refusal is an `SmfError` or `ModError` code, a warning an
-  `ImportWarning` or `ModImportWarning`; `import-text.ts` words them under the `import` i18n group.
+  `ImportWarning` or `TrackerImportWarning`; `import-text.ts` words them under the `import` i18n group.
 - **Read once, write often.** `readMidi` does the parsing and the split into parts and takes no
   options; `writeMidi` takes the grid, the parts kept and their instruments and runs on every
   change. A part's `id` does not depend on any option, so a choice survives a new grid.
@@ -31,12 +31,17 @@ true.
   driver ticks.
 - **A MOD is two driver ticks to a MOD tick**, so its BPM is the song's quarter-note BPM and its
   per-tick effects land on whole ticks. `#default` is always listed first (`#optimized` with the
-  dialog's Use Optimized SMW Samples, `ModSongOptions.optimized`), so the song is safe beside
+  dialog's Use Optimized SMW Samples, `TrackerSongOptions.optimized`), so the song is safe beside
   SMW's sound effects, and the MOD's samples come after it at `@30` up. 9xx sample offset has no
   AddmusicK equivalent and is counted, its note played from the sample's start. Arpeggio is `$FB`
   under legato, which is on only from an arpeggio note's key-on to a MOD tick before its end, so it
   never crosses a loop point; tremolo is `$E5` only in front of a key-on; each channel takes one
   `$EE` (the package's `CLAUDE.md`).
+- **Formats meet at the tracker model.** A format's reader and player are the only code that knows
+  its units: they hand `tracker/model.ts`'s `TrackerSong` and `TrackerPlay` (pitch in semitones from
+  a sample's reference note, `baseHz`, 16-bit PCM, the vibrato's and tremolo's phase step and swing)
+  to `tracker/samples.ts` and `tracker/write-mml.ts`, which never branch on the format. A change for
+  one format belongs in its player, not in the writer.
 - **A MOD's repeated passes are label loops** only where a pass and the one after it open on no
   tie, and each pass states its octave afresh, so two passes alike in text and in the driver state
   they start under play alike.

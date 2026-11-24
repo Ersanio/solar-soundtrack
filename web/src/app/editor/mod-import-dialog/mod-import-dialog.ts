@@ -1,15 +1,13 @@
 import { Component, computed, effect, inject, signal, untracked, viewChild } from '@angular/core';
 
+import { type ModImport, ModError, readMod } from '@amk/import/mod';
 import {
-  type ModImport,
-  ModError,
-  type ModSongOptions,
-  MOD_CHANNEL_LIMIT,
+  TRACKER_CHANNEL_LIMIT,
+  type TrackerSongOptions,
   fitFactor,
   planSample,
-  readMod,
-  writeMod,
-} from '@amk/import/mod';
+  writeTracker,
+} from '@amk/import/tracker';
 import { UmxError, isUmx, unwrapUmx } from '@amk/import/umx';
 import { type BrrSample, decodeBrr, emptySample, parseBrr } from '@amk/spc/brr';
 import { brrDataBytes, encodeBrr } from '@amk/spc/brr-encode';
@@ -150,7 +148,7 @@ export class ModImportDialog {
     { value: 0.25, label: '25%' },
     { value: 0, label: $localize`:@@import.mod.separation.mono:import.mod.separation.mono` },
   ];
-  protected readonly limit = MOD_CHANNEL_LIMIT;
+  protected readonly limit = TRACKER_CHANNEL_LIMIT;
 
   protected readonly fileName = signal('');
   protected readonly refusal = signal<string | null>(null);
@@ -178,8 +176,7 @@ export class ModImportDialog {
       return '';
     }
 
-    const { tag, channels, orders } = mod.file;
-    const count = orders.length;
+    const { tag, channels, orders: count } = mod.song;
     const samples = mod.samples.length;
     return $localize`:@@import.mod.summary:import.mod.summary ${tag}:tag: ${channels}:channels: ${count}:orders: ${samples}:samples:`;
   });
@@ -199,7 +196,7 @@ export class ModImportDialog {
     let entry = this.encodings.get(key);
     if (!entry) {
       const name = this.sampleName(index);
-      const plan = planSample(mod.file.samples[index - 1], factor);
+      const plan = planSample(mod.song.samples[index - 1], factor);
       const bytes = encodeBrr(plan.pcm, plan.loopStart);
       entry = {
         sample: parseBrr(name, bytes),
@@ -213,7 +210,7 @@ export class ModImportDialog {
     return entry;
   }
 
-  private options(factors: ReadonlyMap<number, number | 'drop'>): ModSongOptions {
+  private options(factors: ReadonlyMap<number, number | 'drop'>): TrackerSongOptions {
     return {
       keep: this.keep(),
       factors,
@@ -239,7 +236,7 @@ export class ModImportDialog {
       }
     }
 
-    return writeMod(mod, this.options(factors));
+    return writeTracker(mod, this.options(factors));
   });
 
   /** The bytes ARAM has for the Auto samples, once the song, the stock set and the samples with a factor of their own are in. */
@@ -285,7 +282,7 @@ export class ModImportDialog {
 
     const autos = written.samples
       .filter((s) => this.choiceOf(s.index) === 'auto')
-      .map((s) => mod.file.samples[s.index - 1]);
+      .map((s) => mod.song.samples[s.index - 1]);
     return Math.floor(fitFactor(autos, room, brrDataBytes) * 1000) / 1000;
   });
 
@@ -301,7 +298,7 @@ export class ModImportDialog {
       factors.set(summary.index, choice === 'auto' ? this.autoFactor() : choice);
     }
 
-    return writeMod(mod, this.options(factors));
+    return writeTracker(mod, this.options(factors));
   });
 
   /** The song's samples, encoded, in `#instruments` order. */
@@ -380,7 +377,7 @@ export class ModImportDialog {
         index,
         number: index + 1,
         on: at >= 0,
-        disabled: at < 0 && keep.length >= MOD_CHANNEL_LIMIT,
+        disabled: at < 0 && keep.length >= TRACKER_CHANNEL_LIMIT,
         channel: at >= 0 ? `#${at}` : null,
         chipClass: at >= 0 ? `${CHIP_CLASS} ${CHANNEL_BG[at]} ${CHANNEL_SCOPE[at]}` : '',
         notes,
@@ -506,7 +503,7 @@ export class ModImportDialog {
     const kept = new Set(this.keep());
     if (kept.has(index)) {
       kept.delete(index);
-    } else if (kept.size < MOD_CHANNEL_LIMIT) {
+    } else if (kept.size < TRACKER_CHANNEL_LIMIT) {
       kept.add(index);
     }
 

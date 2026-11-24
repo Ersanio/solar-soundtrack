@@ -99,7 +99,8 @@ something in the directory, which load by themselves when such a file is opened.
 
 - `format.ts` — Which importer can read a file, from its first bytes rather than its name.
 - `midi.ts` — Importing a MIDI file: read once into parts, then written as a song as often as the porter changes what to keep.
-- `mod.ts` — Importing a MOD: read and played once, then written as a song, with its samples planned for BRR, as often as the porter changes what to keep.
+- `mod.ts` — Importing a MOD: read, played as ProTracker plays it, and handed to the tracker importer, which writes it as a song with its samples planned for BRR.
+- `tracker.ts` — Importing a tracker module, whatever its format: a song and its play summed up for the dialog once, then written as an `#amk 4` song as often as the porter changes what to keep.
 - `umx.ts` — An Unreal package (`.umx`) unwrapped to the tracker module its `Music` object holds.
 
 ## packages/song-import/src/midi
@@ -126,8 +127,14 @@ something in the directory, which load by themselves when such a file is opened.
 
 - `file.ts` — A ProTracker-family `.mod` file, read into its samples, its order list and its patterns of cells.
 - `play.ts` (300+ lines) — A MOD played tick by tick, the way ProTracker's replayer plays it: what each channel sounds on every tick, and where the song loops.
-- `samples.ts` — A MOD's samples made ready for BRR: resampled to fit ARAM, their loops moved onto block boundaries, and the tuning an AddmusicK instrument needs to play each at the MOD's pitch.
-- `write-mml.ts` (750+ lines) — A played MOD written out as an `#amk 4` song: each kept channel on one of AddmusicK's, each sample a custom instrument after `#default` (or `#optimized`).
+
+## packages/song-import/src/tracker
+
+**Rules:** `import.md`
+
+- `model.ts` — What a tracker module's reader and player hand the writer, in units no one format owns: a sample's PCM and the rate it plays at on its reference note, and every channel's pitch in semitones from that note, tick by tick.
+- `samples.ts` — A tracker module's samples made ready for BRR: resampled to fit ARAM, their loops moved onto block boundaries, and the tuning an AddmusicK instrument needs to play each at the module's pitch.
+- `write-mml.ts` (750+ lines) — A played tracker module written out as an `#amk 4` song: each kept channel on one of AddmusicK's, each sample a custom instrument after `#default` (or `#optimized`).
 
 ## packages/spc/src
 

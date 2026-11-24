@@ -4,12 +4,14 @@
  *
  * The effects follow 8bitbubsy's `pt2_replayer.c`: tick 0 reads the row and runs 9, B, C, D, F and
  * the E commands; the ticks after it run the slides (1, 2, 3, 5, A), the vibrato, the tremolo and
- * the arpeggio. The periods are the file's own, and slide in period units. What a writer needs of the
- * vibrato, the tremolo and the arpeggio is their parameters on each tick rather than what they do to
- * the period and the volume, since `$DE`, `$E5` and `$FB` make their own. Times are MOD ticks: one is
- * 2500/BPM ms.
+ * the arpeggio. The periods are the file's own, and slide in period units; each tick is recorded in
+ * the tracker model's units, the period as semitones from the sample's C-2. What a writer needs of the
+ * vibrato, the tremolo and the arpeggio is their rate and swing on each tick rather than what they do
+ * to the period and the volume, since `$DE`, `$E5` and `$FB` make their own. Times are MOD ticks: one
+ * is 2500/BPM ms.
  */
 
+import { type ChannelTicks, type Ignored, type Segment, type TrackerPlay, channelTicks } from "../tracker/model";
 import type { ModFile } from "./file";
 
 /** PAL Paula's clock over two: a period of P plays `PAULA_HZ / P` frames a second. */
@@ -21,57 +23,6 @@ export const C2_PERIOD = 428;
 const ROWS = 64;
 /** About an hour at 125 BPM: a song still running here is taken to never end. */
 const TICK_LIMIT = 180_000;
-
-/** What one channel sounds on every tick of the song. */
-export interface ChannelTicks {
-	/** The period sounding, 0 where nothing does. Vibrato and arpeggio are not folded in. */
-	period: number[];
-	/** 0-64, tremolo not folded in. */
-	volume: number[];
-	/** 0 (left) to 255 (right). */
-	pan: number[];
-	/** 1 on a tick a note is struck. */
-	keyOn: number[];
-	/** The sample sounding, 1-31, or 0. */
-	sample: number[];
-	/** `speed << 4 | depth` on the rows a vibrato (4xy, 6xy) runs, else 0. */
-	vibrato: number[];
-	/** `speed << 4 | depth` on the rows a tremolo (7xy) runs, else 0. */
-	tremolo: number[];
-	/** `x << 4 | y` on the rows an arpeggio (0xy) runs, else 0. */
-	arpeggio: number[];
-}
-
-/** Where a pass through an order starts: the writer's unit of text, and the place a loop can return to. */
-export interface Segment {
-	tick: number;
-	order: number;
-	row: number;
-}
-
-/** Effects the conversion leaves out, counted for the porter. */
-export interface Ignored {
-	/** 9xx on a struck note: AddmusicK plays a sample from its start. */
-	offsets: number;
-	/** E3x glissando, EFx invert loop, and a note delay past its row. */
-	unsupported: number;
-}
-
-export interface ModPlay {
-	/** The song's length in ticks, to its end or its jump back. */
-	ticks: number;
-	/** The tick the song loops back to. */
-	loopTick: number;
-	/** The tempo, from tick 0, at each change. */
-	tempos: { tick: number; bpm: number }[];
-	segments: Segment[];
-	/** The tick each row starts on. */
-	rowStarts: number[];
-	channels: ChannelTicks[];
-	ignored: Ignored;
-	/** The song ran past {@link TICK_LIMIT} without coming back round. */
-	tooLong: boolean;
-}
 
 interface Channel {
 	sample: number;
@@ -99,17 +50,8 @@ function finetuned(period: number, finetune: number): number {
 }
 
 /** Plays the song once through, to its end or to the first row it comes back to. */
-export function playMod(mod: ModFile): ModPlay {
-	const out: ChannelTicks[] = Array.from({ length: mod.channels }, () => ({
-		period: [],
-		volume: [],
-		pan: [],
-		keyOn: [],
-		sample: [],
-		vibrato: [],
-		tremolo: [],
-		arpeggio: [],
-	}));
+export function playMod(mod: ModFile): TrackerPlay {
+	const out: ChannelTicks[] = Array.from({ length: mod.channels }, channelTicks);
 	// Amiga hard panning, L R R L, repeated across the channels.
 	const channels: Channel[] = Array.from({ length: mod.channels }, (_, i) => ({
 		sample: 0,
@@ -164,13 +106,24 @@ export function playMod(mod: ModFile): ModPlay {
 	): void => {
 		const o = out[index];
 		const sounding = ch.sounding && ch.period > 0;
-		o.period.push(sounding ? ch.period : 0);
+		const finetune = mod.samples[ch.playing - 1]?.finetune ?? 0;
+		o.sample.push(sounding ? ch.playing : 0);
+		o.pitch.push(sounding ? 12 * Math.log2(C2_PERIOD / ch.period) - finetune / 8 : 0);
 		o.volume.push(ch.volume);
 		o.pan.push(ch.pan);
 		o.keyOn.push(struck && sounding ? 1 : 0);
-		o.sample.push(sounding ? ch.playing : 0);
-		o.vibrato.push(vibrato);
-		o.tremolo.push(tremolo);
+		// The phase steps 4 × speed of 256 a tick; the period swings by up to `255 × depth >> 7` either way,
+		// the volume by `255 × depth >> 6` (`pt2_replayer.c`).
+		const vibratoDepth = vibrato & 0x0f;
+		const swing = (255 * vibratoDepth) >> 7;
+		o.vibratoRate.push(4 * (vibrato >> 4));
+		o.vibratoDepth.push(
+			vibratoDepth > 0 && ch.period > 0
+				? (12 * Math.log2((ch.period + swing) / Math.max(1, ch.period - swing))) / 2
+				: 0,
+		);
+		o.tremoloRate.push(4 * (tremolo >> 4));
+		o.tremoloDepth.push((255 * (tremolo & 0x0f)) >> 6);
 		o.arpeggio.push(arpeggio);
 		// A one-shot runs out as it plays: the frames this tick takes at this period and tempo.
 		if (sounding && ch.left !== Infinity) {

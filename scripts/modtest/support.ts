@@ -3,14 +3,8 @@
 import "../localize";
 import { compiler } from "@amk/compiler";
 import type { CompileResult, Diagnostic } from "@amk/core/types";
-import {
-	type ModImport,
-	type ModSongOptions,
-	type WrittenModSong,
-	planSample,
-	readMod,
-	writeMod,
-} from "@amk/import/mod";
+import { type ModImport, readMod } from "@amk/import/mod";
+import { type TrackerSongOptions, type WrittenTrackerSong, planSample, writeTracker } from "@amk/import/tracker";
 import { type BrrSample, emptySample, parseBrr } from "@amk/spc/brr";
 import { encodeBrr } from "@amk/spc/brr-encode";
 import { loadDriver } from "@amk/spc/driver";
@@ -273,15 +267,15 @@ export interface Song {
 
 export interface Imported {
 	mod: ModImport;
-	written: WrittenModSong;
+	written: WrittenTrackerSong;
 	brrs: BrrSample[];
 	song: Song;
 }
 
 /** Each kept sample planned at its factor and encoded, as the dialog does. */
-export function encoded(mod: ModImport, written: WrittenModSong): BrrSample[] {
+export function encoded(mod: ModImport, written: WrittenTrackerSong): BrrSample[] {
 	return written.samples.map((s) => {
-		const plan = planSample(mod.file.samples[s.index - 1], s.factor);
+		const plan = planSample(mod.song.samples[s.index - 1], s.factor);
 		return parseBrr(s.name, encodeBrr(plan.pcm, plan.loopStart));
 	});
 }
@@ -345,9 +339,9 @@ export function song(text: string, extra: readonly BrrSample[]): Song {
 }
 
 /** Reads `bytes`, writes every suggested channel with every sample at factor 1 (or as `options` says), and builds the song. */
-export function imported(bytes: Uint8Array, options: Partial<ModSongOptions> = {}): Imported {
+export function imported(bytes: Uint8Array, options: Partial<TrackerSongOptions> = {}): Imported {
 	const mod = readMod(bytes);
-	const written = writeMod(mod, {
+	const written = writeTracker(mod, {
 		keep: mod.suggested,
 		factors: new Map(),
 		separation: 0.5,

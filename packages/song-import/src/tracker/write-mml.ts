@@ -1,27 +1,27 @@
 /**
- * A played MOD written out as an `#amk 4` song: each kept channel on one of AddmusicK's, each sample
- * a custom instrument after `#default` (or `#optimized`).
+ * A played tracker module written out as an `#amk 4` song: each kept channel on one of AddmusicK's,
+ * each sample a custom instrument after `#default` (or `#optimized`).
  *
- * Two driver ticks make one MOD tick, which makes the MOD's BPM the song's quarter-note BPM (`t` is
- * BPM × 0.4096 − 1) and a row at speed 6 a sixteenth. What the MOD does to a note is written as the
- * command the driver has for it:
+ * Two driver ticks make one tracker tick, which makes the module's BPM the song's quarter-note BPM
+ * (`t` is BPM × 0.4096 − 1) and a row at speed 6 a sixteenth. What the module does to a note is
+ * written as the command the driver has for it (the effects named here are MOD's):
  *
  * - volume as `v`, through a square root since the driver squares it (`main.asm`, `L_124D`), with
  *   `vD,N` where it slides;
  * - panning as `y`, the Amiga's hard left and right narrowed by the stereo separation;
  * - a slide in pitch (1xx, 2xx, 3xx, 5xy, the fine slides) as `$DD` ramps, each directly after a tied
  *   piece of the note that it plays within;
- * - vibrato (4xy, 6xy) as `$DE`, its rate twice the MOD's speed and its extent the swing its depth
- *   makes at the note's pitch, and `$DF` where it stops;
+ * - vibrato (4xy, 6xy) as `$DE`, its rate the player's phase step over the driver ticks to a tracker
+ *   tick and its extent the swing the player recorded, and `$DF` where it stops;
  * - tremolo (7xy) as `$E5` in front of the key-on, the only place its read-ahead is safe, and `$FD`
  *   in front of a note with none;
  * - arpeggio (0xy) as `$FB` under legato, so its steps move the pitch without striking the sample
- *   again (`main.asm:2517-2530`), legato and the arpeggio turned off a MOD tick before the note ends
+ *   again (`main.asm:2517-2530`), legato and the arpeggio turned off a tracker tick before the note ends
  *   so that it keys off as any note does;
  * - and on each channel the `$EE` fine tune that brings its notes nearest their pitch.
  *
  * The text is cut at every pass through an order. A cut that comes round again in the same state is
- * written once as a label loop and called after that, which is where a MOD's repeats save the ARAM
+ * written once as a label loop and called after that, which is where a module's repeats save the ARAM
  * its samples need.
  */
 
@@ -30,19 +30,18 @@ import { hex2 } from "@amk/core/hex";
 import { octaveFor, spellNote } from "@amk/core/mml-text";
 import { spellRestTicks, spellTicks } from "../mml/lengths";
 import { simplify, tagText, tempoForBpm } from "../mml/song-text";
-import type { ModFile } from "./file";
-import { type ChannelTicks, C2_PERIOD, type ModPlay } from "./play";
 import { SEMITONE, setPitchWide } from "@amk/spc/pitch";
-import { HIGHEST_KEY, type Tuning, c2Register, playsTrue, plannedFrames, tuningFor } from "./samples";
+import type { ChannelTicks, TrackerPlay, TrackerSong } from "./model";
+import { HIGHEST_KEY, type Tuning, baseRegister, playsTrue, plannedFrames, tuningFor } from "./samples";
 
 /** AddmusicK's channels. */
-export const MOD_CHANNEL_LIMIT = 8;
-/** Driver ticks to a MOD tick. */
+export const TRACKER_CHANNEL_LIMIT = 8;
+/** Driver ticks to a tracker tick. */
 export const DRIVER_TICKS = 2;
 const FIRST_CUSTOM = 30;
 /** The longest piece a `$DD` can follow: one frame. */
 const ONE_FRAME = 0x7f;
-/** Full gate and velocity: a MOD note sounds until the next one. */
+/** Full gate and velocity: a tracker note sounds until the next one. */
 const Q = "q7F";
 /** Rows to a line of text. */
 const ROWS_A_LINE = 16;
@@ -54,12 +53,12 @@ const PITCH_TOLERANCE = 0.3;
 const FINE_TUNE_REACH = 64;
 
 /** What the writer was asked for. */
-export interface ModSongOptions {
-	/** The MOD channels to write, at most eight, in the order they take AddmusicK's. */
+export interface TrackerSongOptions {
+	/** The module's channels to write, at most eight, in the order they take AddmusicK's. */
 	keep: readonly number[];
 	/** Each sample's resampling factor, or `drop` to leave its notes out. A sample not named is at 1. */
 	factors: ReadonlyMap<number, number | "drop">;
-	/** 1 is the Amiga's hard left and right, 0 is mono. */
+	/** 1 is the module's own panning, 0 is mono. */
 	separation: number;
 	/** Loop where the song jumps back, or the whole song from the start. */
 	loop: "jump" | "song";
@@ -72,7 +71,7 @@ export interface ModSongOptions {
 }
 
 /** Something the writer changed to make the song fit, for the porter to read. */
-export type ModImportWarning =
+export type TrackerImportWarning =
 	| { code: "offsets"; count: number }
 	| { code: "arpeggio"; count: number }
 	| { code: "unsupported"; count: number }
@@ -92,13 +91,13 @@ export interface SongSample {
 	tuning: Tuning;
 }
 
-export interface WrittenModSong {
+export interface WrittenTrackerSong {
 	text: string;
 	samples: SongSample[];
-	warnings: ModImportWarning[];
+	warnings: TrackerImportWarning[];
 }
 
-/** A note as the channel sounds it, in MOD ticks. */
+/** A note as the channel sounds it, in tracker ticks. */
 interface Note {
 	start: number;
 	end: number;
@@ -127,7 +126,7 @@ function notesOf(ch: ChannelTicks, end: number, split: number | null, playable: 
 	};
 
 	for (let t = 0; t < end; t++) {
-		const sounding = ch.period[t] > 0;
+		const sounding = ch.sample[t] > 0;
 		if (ch.keyOn[t] || (t === split && sounding && current)) {
 			close(t);
 			if (sounding && playable(ch.sample[t])) {
@@ -142,55 +141,53 @@ function notesOf(ch: ChannelTicks, end: number, split: number | null, playable: 
 	return notes;
 }
 
-/** `v` for a MOD volume: the driver squares the volume it is given, so the root of the MOD's linear one. */
+/** `v` for a tracker volume of 64: the driver squares the volume it is given, so the root of the module's linear one. */
 function volumeOf(volume: number): number {
 	return Math.round(255 * Math.sqrt(volume / 64));
 }
 
-/** `y` for a MOD pan of 0 (left) to 255 (right): AddmusicK's 20 is hard left. */
+/** `y` for a tracker pan of 0 (left) to 255 (right): AddmusicK's 20 is hard left. */
 function panOf(pan: number, separation: number): number {
 	return Math.round(10 - ((pan - 127.5) / 127.5) * 10 * separation);
 }
 
-/** `$DE`'s rate and extent for a MOD vibrato at a period, packed `rate << 8 | extent`. */
-function vibratoOf(packed: number, period: number): number {
-	const speed = packed >> 4;
-	const depth = packed & 0x0f;
-	if (speed === 0 || depth === 0 || period <= 0) {
+/** The driver's phase step, of 256 a driver tick, for a tracker's of 256 a tracker tick. */
+function rateOf(phase: number): number {
+	return Math.max(1, Math.min(255, Math.round(phase / DRIVER_TICKS)));
+}
+
+/** `$DE`'s rate and extent for a vibrato's phase step and swing in semitones, packed `rate << 8 | extent`. */
+function vibratoOf(phase: number, semitones: number): number {
+	if (phase === 0 || semitones === 0) {
 		return 0;
 	}
 
-	// The MOD's phase steps 4 × speed of 256 a tick (`pt2_replayer.c`), the driver's `rate` of 256 a tick.
-	const rate = Math.min(255, (4 * speed) / DRIVER_TICKS);
-	// The period swings by up to `255 × depth >> 7` either way.
-	const swing = (255 * depth) >> 7;
-	const semitones = (12 * Math.log2((period + swing) / Math.max(1, period - swing))) / 2;
+	const rate = rateOf(phase);
 	const fine = Math.round(semitones * 256);
 	const extent = fine < 0xf1 ? Math.max(1, fine) : 0xf0 | Math.min(15, Math.round(semitones));
 	return (rate << 8) | extent;
 }
 
-/** `$E5`'s rate and amplitude for a MOD tremolo at a volume, packed `rate << 8 | amplitude`, and how far the volume is raised to centre the swing. */
-function tremoloOf(packed: number, volume: number): { command: number; swing: number } | null {
-	const speed = packed >> 4;
-	const depth = packed & 0x0f;
-	if (speed === 0 || depth === 0 || volume === 0) {
+/**
+ * `$E5`'s rate and amplitude for a tremolo's phase step and swing at a volume, packed
+ * `rate << 8 | amplitude`, and how far the volume is raised to centre the swing.
+ */
+function tremoloOf(phase: number, swing: number, volume: number): { command: number; swing: number } | null {
+	if (phase === 0 || swing === 0 || volume === 0) {
 		return null;
 	}
 
-	// The MOD's volume swings by up to `255 × depth >> 6` either way (`pt2_replayer.c`); the driver's
-	// tremolo only takes away, from the velocity it then squares (`L_122D`, `L_124D`), so the note is
-	// raised to the top of the swing and the amplitude carries it down to the bottom.
-	const swing = (255 * depth) >> 6;
+	// The driver's tremolo only takes away, from the velocity it then squares (`L_122D`, `L_124D`),
+	// so the note is raised to the top of the swing and the amplitude carries it down to the bottom.
 	const top = Math.min(64, volume + swing);
 	const bottom = Math.max(0, volume - swing);
 	const amplitude = Math.round(256 * (1 - Math.sqrt(bottom / top)));
 	// Above `$C5` the read-ahead would take the amplitude for a tie or a command (COMMANDS.html, `$E5`).
-	const rate = Math.min(255, (4 * speed) / DRIVER_TICKS);
+	const rate = rateOf(phase);
 	return { command: (rate << 8) | Math.max(1, Math.min(0xc5, amplitude)), swing: top - volume };
 }
 
-/** `$FB`'s steps for a MOD arpeggio: the note, `x` above it and `y` above it, each a MOD tick. */
+/** `$FB`'s steps for an arpeggio: the note, `x` above it and `y` above it, each a tracker tick. */
 function arpeggioText(param: number): string {
 	return `$FB $03 $${hex2(DRIVER_TICKS)} $00 $${hex2(param >> 4)} $${hex2(param & 0x0f)}`;
 }
@@ -204,7 +201,7 @@ interface ChannelState {
 	pan: number | null;
 	vibrato: number | null;
 	tremolo: number | null;
-	/** The `$FB` in force: a MOD `0xy`, {@link HOLD}, or 0 for none. */
+	/** The `$FB` in force: an arpeggio's `xy`, {@link HOLD}, or 0 for none. */
 	arpeggio: number;
 	legato: boolean;
 	fineTune: number | null;
@@ -228,13 +225,13 @@ interface Context {
 	ticks: ChannelTicks;
 	notes: Note[];
 	samples: ReadonlyMap<number, SongSample>;
-	finetuneOf: (sample: number) => number;
+	baseHzOf: (sample: number) => number;
 	separation: number;
 	/** The tempo token due at a tick on this channel: the first channel's changes, none on the others. */
 	tempoAt: (tick: number) => string | null;
 	rowStarts: readonly number[];
 	folded: Map<number, number>;
-	/** Notes whose arpeggio is not played: one MOD tick long, or stepping past what the sample plays. */
+	/** Notes whose arpeggio is not played: one tracker tick long, or stepping past what the sample plays. */
 	unplayedArpeggios: { count: number };
 }
 
@@ -258,7 +255,7 @@ class ChannelWriter {
 	private tempoWritten = -1;
 	/** Each note's key at its key-on, from o1 c, folded by octaves into what the instrument plays. */
 	private readonly keys = new Map<Note, number>();
-	/** The notes that play an arpeggio, under legato from their key-on to a MOD tick before their end. */
+	/** The notes that play an arpeggio, under legato from their key-on to a tracker tick before their end. */
 	private readonly arpeggios = new Set<Note>();
 	/** Each note's tremolo: the first a row of it runs, from the key-on, since `$E5` is safe nowhere later. */
 	private readonly tremolos = new Map<Note, { command: number; swing: number }>();
@@ -274,7 +271,7 @@ class ChannelWriter {
 				continue;
 			}
 
-			const written = sample.tuning.c2Key + Math.round(this.semitones(note.start, note.sample));
+			const written = sample.tuning.baseKey + Math.round(this.ctx.ticks.pitch[note.start]);
 			let key = written;
 			while (key < 0) {
 				key += 12;
@@ -308,8 +305,8 @@ class ChannelWriter {
 			}
 
 			for (let t = note.start; t < note.end; t++) {
-				if (ctx.ticks.tremolo[t] !== 0) {
-					const tremolo = tremoloOf(ctx.ticks.tremolo[t], ctx.ticks.volume[note.start]);
+				if (ctx.ticks.tremoloRate[t] !== 0 || ctx.ticks.tremoloDepth[t] !== 0) {
+					const tremolo = tremoloOf(ctx.ticks.tremoloRate[t], ctx.ticks.tremoloDepth[t], ctx.ticks.volume[note.start]);
 					if (tremolo) {
 						this.tremolos.set(note, tremolo);
 					}
@@ -336,7 +333,7 @@ class ChannelWriter {
 			}
 
 			const wanted =
-				c2Register(sample.factor, this.ctx.finetuneOf(note.sample)) * 2 ** ((key - sample.tuning.c2Key) / 12);
+				baseRegister(sample.factor, this.ctx.baseHzOf(note.sample)) * 2 ** ((key - sample.tuning.baseKey) / 12);
 			return [{ key, tuning: sample.tuning, wanted }];
 		});
 		let best = 0;
@@ -366,14 +363,11 @@ class ChannelWriter {
 		this.tokens.push({ tick, text });
 	}
 
-	private semitones(t: number, sample: number): number {
-		return 12 * Math.log2(C2_PERIOD / this.ctx.ticks.period[t]) - this.ctx.finetuneOf(sample) / 8;
-	}
-
 	/** The key a note sounds at on tick `t`, fractional through a slide. */
 	private pitchAt(note: Note, t: number): number {
 		const key = this.keys.get(note) ?? 0;
-		return key + this.semitones(t, note.sample) - Math.round(this.semitones(note.start, note.sample));
+		const pitch = this.ctx.ticks.pitch;
+		return key + pitch[t] - Math.round(pitch[note.start]);
 	}
 
 	/** `v` for a note on tick `t`: raised by the tremolo's swing, which `$E5` takes back down. */
@@ -390,7 +384,7 @@ class ChannelWriter {
 
 		this.setVolume(at, this.volumeIn(note, t));
 		this.setPan(at, panOf(this.ctx.ticks.pan[t], this.ctx.separation));
-		this.setVibrato(at, vibratoOf(this.ctx.ticks.vibrato[t], this.ctx.ticks.period[t]));
+		this.setVibrato(at, vibratoOf(this.ctx.ticks.vibratoRate[t], this.ctx.ticks.vibratoDepth[t]));
 		this.setTremolo(at, this.tremolos.get(note)?.command ?? 0);
 		if (this.fineTune > 0 && this.state.fineTune !== this.fineTune) {
 			this.push(at, `$EE $${hex2(this.fineTune)}`);
@@ -474,7 +468,7 @@ class ChannelWriter {
 	}
 
 	/**
-	 * Writes the cut `[from, to)`, in MOD ticks. The octave is stated afresh in every cut, so a cut's
+	 * Writes the cut `[from, to)`, in tracker ticks. The octave is stated afresh in every cut, so a cut's
 	 * text depends on nothing before it but the driver state it starts under.
 	 */
 	cut(from: number, to: number, opening: readonly string[], restates: boolean): Cut {
@@ -599,7 +593,9 @@ class ChannelWriter {
 
 		const stops = new Set<number>([...slides.keys(), ...fades.keys()]);
 		for (let t = s + 1; t < e; t++) {
-			if (ticks.pan[t] !== ticks.pan[t - 1] || ticks.vibrato[t] !== ticks.vibrato[t - 1] || this.ctx.tempoAt(t)) {
+			const vibratoMoves =
+				ticks.vibratoRate[t] !== ticks.vibratoRate[t - 1] || ticks.vibratoDepth[t] !== ticks.vibratoDepth[t - 1];
+			if (ticks.pan[t] !== ticks.pan[t - 1] || vibratoMoves || this.ctx.tempoAt(t)) {
 				stops.add(t);
 			}
 
@@ -608,7 +604,7 @@ class ChannelWriter {
 			}
 		}
 
-		// A MOD tick before the end the arpeggio and legato stop, so the note keys off as any does.
+		// A tracker tick before the end the arpeggio and legato stop, so the note keys off as any does.
 		if (arpeggio) {
 			stops.add(note.end - 1);
 		}
@@ -622,13 +618,13 @@ class ChannelWriter {
 			this.tempo(at);
 			if (at > s || !struck) {
 				this.setPan(at, panOf(ticks.pan[at], this.ctx.separation));
-				this.setVibrato(at, vibratoOf(ticks.vibrato[at], ticks.period[at]));
+				this.setVibrato(at, vibratoOf(ticks.vibratoRate[at], ticks.vibratoDepth[at]));
 				if (arpeggio && at === note.end - 1) {
 					this.setArpeggio(at, 0);
 					this.push(at, "$F4 $01");
 					this.state.legato = false;
 				} else if (arpeggio) {
-					// Where the MOD's arpeggio stops, the note is held as an arpeggio of itself, which brings
+					// Where the module's arpeggio stops, the note is held as an arpeggio of itself, which brings
 					// the pitch back from the step it was on.
 					const param = ticks.arpeggio[at];
 					this.setArpeggio(at, param !== 0 ? param : this.state.arpeggio !== 0 ? HOLD : 0);
@@ -690,8 +686,12 @@ class ChannelWriter {
 }
 
 /** Writes the kept channels as a song. */
-export function writeModSong(mod: ModFile, play: ModPlay, options: ModSongOptions): WrittenModSong {
-	const warnings: ModImportWarning[] = [];
+export function writeTrackerSong(
+	song: TrackerSong,
+	play: TrackerPlay,
+	options: TrackerSongOptions,
+): WrittenTrackerSong {
+	const warnings: TrackerImportWarning[] = [];
 	if (play.ignored.offsets > 0) {
 		warnings.push({ code: "offsets", count: play.ignored.offsets });
 	}
@@ -700,7 +700,7 @@ export function writeModSong(mod: ModFile, play: ModPlay, options: ModSongOption
 		warnings.push({ code: "unsupported", count: play.ignored.unsupported });
 	}
 
-	if (mod.truncated) {
+	if (song.truncated) {
 		warnings.push({ code: "mod-truncated" });
 	}
 
@@ -708,12 +708,12 @@ export function writeModSong(mod: ModFile, play: ModPlay, options: ModSongOption
 		warnings.push({ code: "too-long" });
 	}
 
-	const keep = options.keep.filter((c) => c >= 0 && c < mod.channels).slice(0, MOD_CHANNEL_LIMIT);
+	const keep = options.keep.filter((c) => c >= 0 && c < song.channels).slice(0, TRACKER_CHANNEL_LIMIT);
 	const end = play.ticks;
 	const loopAt = options.loop === "jump" && play.loopTick > 0 && play.loopTick < end ? play.loopTick : null;
 	const factorOf = (index: number): number | "drop" => options.factors.get(index) ?? 1;
 	const playable = (index: number): boolean =>
-		factorOf(index) !== "drop" && (mod.samples[index - 1]?.pcm.length ?? 0) > 0;
+		factorOf(index) !== "drop" && (song.samples[index - 1]?.pcm.length ?? 0) > 0;
 
 	// The notes each kept channel plays, and the range each sample is played over, for its tuning.
 	const dropped = new Map<number, number>();
@@ -736,10 +736,9 @@ export function writeModSong(mod: ModFile, play: ModPlay, options: ModSongOption
 	keep.forEach((c, i) => {
 		const ticks = play.channels[c];
 		for (const note of channelNotes[i]) {
-			const finetune = mod.samples[note.sample - 1].finetune;
 			const range = ranges.get(note.sample) ?? { low: Infinity, high: -Infinity };
 			for (let t = note.start; t < note.end; t++) {
-				const semis = Math.round(12 * Math.log2(C2_PERIOD / ticks.period[t]) - finetune / 8);
+				const semis = Math.round(ticks.pitch[t]);
 				range.low = Math.min(range.low, semis);
 				range.high = Math.max(range.high, semis);
 			}
@@ -751,7 +750,7 @@ export function writeModSong(mod: ModFile, play: ModPlay, options: ModSongOption
 	const used = [...ranges.keys()].sort((a, b) => a - b);
 	const samples = new Map<number, SongSample>();
 	used.forEach((index, i) => {
-		const sample = mod.samples[index - 1];
+		const sample = song.samples[index - 1];
 		const asked = factorOf(index);
 		const factor = plannedFrames(sample, asked === "drop" ? 1 : asked).factor;
 		const range = ranges.get(index) ?? { low: 0, high: 0 };
@@ -760,7 +759,7 @@ export function writeModSong(mod: ModFile, play: ModPlay, options: ModSongOption
 			name: options.sampleName(index),
 			factor,
 			instrument: FIRST_CUSTOM + i,
-			tuning: tuningFor(factor, sample.finetune, range.low, range.high),
+			tuning: tuningFor(factor, sample.baseHz, range.low, range.high),
 		});
 	});
 
@@ -798,7 +797,7 @@ export function writeModSong(mod: ModFile, play: ModPlay, options: ModSongOption
 			ticks: play.channels[c],
 			notes: channelNotes[i],
 			samples,
-			finetuneOf: (sample) => mod.samples[sample - 1]?.finetune ?? 0,
+			baseHzOf: (sample) => song.samples[sample - 1]?.baseHz ?? 0,
 			separation: options.separation,
 			tempoAt: (tick) => (i === 0 ? (changes.get(tick) ?? null) : null),
 			rowStarts: play.rowStarts,
@@ -884,7 +883,7 @@ export function writeModSong(mod: ModFile, play: ModPlay, options: ModSongOption
 			}
 		});
 		flush();
-		return `#${i} ; MOD channel ${keep[i] + 1}\n${parts.filter((p) => p.length > 0).join("\n")}`;
+		return `#${i} ; ${song.format} channel ${keep[i] + 1}\n${parts.filter((p) => p.length > 0).join("\n")}`;
 	});
 
 	const sampleList = [...samples.values()];
@@ -905,8 +904,14 @@ export function writeModSong(mod: ModFile, play: ModPlay, options: ModSongOption
 		),
 		"}",
 	];
-	const title = tagText(mod.title) ?? tagText(options.fallbackTitle);
-	const spc = ["#spc", "{", ...(title ? [`\t#title "${title}"`] : []), `\t#comment "Imported from MOD"`, "}"];
+	const title = tagText(song.title) ?? tagText(options.fallbackTitle);
+	const spc = [
+		"#spc",
+		"{",
+		...(title ? [`\t#title "${title}"`] : []),
+		`\t#comment "Imported from ${song.format}"`,
+		"}",
+	];
 	const text = [...header, "", ...spc, "", body.join("\n\n"), ""].join("\n");
 	return { text, samples: sampleList, warnings };
 }

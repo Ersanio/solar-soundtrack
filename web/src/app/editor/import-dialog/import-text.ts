@@ -2,7 +2,8 @@
 
 import type { GmFamily, DrumFamily } from '@amk/import/midi/gm';
 import type { ImportWarning, Part, SmfErrorCode } from '@amk/import/midi';
-import type { ModErrorCode, ModImportWarning } from '@amk/import/mod';
+import type { ModErrorCode } from '@amk/import/mod';
+import type { TrackerImportWarning } from '@amk/import/tracker';
 import type { TrackerFormat, UmxErrorCode } from '@amk/import/umx';
 
 export const REFUSALS: Readonly<Record<SmfErrorCode, string>> = {
@@ -178,7 +179,7 @@ export const UMX_HOLDS: Readonly<Record<Exclude<TrackerFormat, 'mod'>, string>> 
 
 /** A MOD import's warning in words, naming the sample it is about by `label`. */
 export function modWarningText(
-  warning: ModImportWarning,
+  warning: TrackerImportWarning,
   label: (index: number) => string,
 ): string {
   switch (warning.code) {

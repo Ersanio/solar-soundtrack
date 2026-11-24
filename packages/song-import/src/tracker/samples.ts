@@ -1,6 +1,6 @@
 /**
- * A MOD's samples made ready for BRR: resampled to fit ARAM, their loops moved onto block
- * boundaries, and the tuning an AddmusicK instrument needs to play each at the MOD's pitch.
+ * A tracker module's samples made ready for BRR: resampled to fit ARAM, their loops moved onto block
+ * boundaries, and the tuning an AddmusicK instrument needs to play each at the module's pitch.
  *
  * A BRR loop starts on a 16-frame block and runs to the sample's end, so a looped sample is
  * resampled with its loop rounded to whole blocks, the factor nudged to make that exact, and
@@ -10,8 +10,7 @@
  */
 
 import { DSP_PITCH_LIMIT, SEMITONE, setPitchWide } from "@amk/spc/pitch";
-import type { ModSample } from "./file";
-import { C2_PERIOD, PAULA_HZ } from "./play";
+import type { TrackerSample } from "./model";
 
 const BLOCK = 16;
 /** Zero crossings either side of the sinc's centre. */
@@ -32,12 +31,15 @@ export interface PlannedSample {
 }
 
 /** The loop's length after resampling: whole blocks, at least one. */
-function loopFrames(sample: ModSample, factor: number): number {
+function loopFrames(sample: TrackerSample, factor: number): number {
 	return Math.max(BLOCK, Math.round((sample.loopLength * factor) / BLOCK) * BLOCK);
 }
 
 /** What resampling `sample` by `factor` makes, without doing it: frames, whether it loops, and the factor it ends up at. */
-export function plannedFrames(sample: ModSample, factor: number): { frames: number; loops: boolean; factor: number } {
+export function plannedFrames(
+	sample: TrackerSample,
+	factor: number,
+): { frames: number; loops: boolean; factor: number } {
 	if (sample.pcm.length === 0) {
 		return { frames: 0, loops: false, factor };
 	}
@@ -56,7 +58,7 @@ function blackman(x: number): number {
 }
 
 /** `sample` resampled by `factor` (above 0, at most 1 bar a short loop's rounding), with its loop on a block. */
-export function planSample(sample: ModSample, factor: number): PlannedSample {
+export function planSample(sample: TrackerSample, factor: number): PlannedSample {
 	const plan = plannedFrames(sample, factor);
 	const k = plan.factor;
 	const source = sample.pcm;
@@ -79,7 +81,7 @@ export function planSample(sample: ModSample, factor: number): PlannedSample {
 	if (k === 1 && Number.isInteger(offset)) {
 		// Nothing to resample: the frames as they are, behind the silence that puts the loop on a block.
 		return {
-			pcm: Int16Array.from({ length: plan.frames }, (_, j) => at(j - offset) * 256),
+			pcm: Int16Array.from({ length: plan.frames }, (_, j) => at(j - offset)),
 			loopStart: plan.loops ? loopOut : null,
 			factor: k,
 		};
@@ -101,7 +103,7 @@ export function planSample(sample: ModSample, factor: number): PlannedSample {
 			weight += s * w;
 		}
 
-		const value = Math.round((sum / (weight || 1)) * 256);
+		const value = Math.round(sum / (weight || 1));
 		pcm[j] = value > 32767 ? 32767 : value < -32768 ? -32768 : value;
 	}
 
@@ -117,7 +119,7 @@ export const LOWEST_FACTOR = 0.05;
  * none does. A loop's rounding makes the size step rather than slide, so it is bisected.
  */
 export function fitFactor(
-	samples: readonly ModSample[],
+	samples: readonly TrackerSample[],
 	room: number,
 	bytes: (frames: number, loops: boolean) => number,
 ): number {
@@ -147,35 +149,35 @@ export function fitFactor(
 /** How far a channel's `$EE` may raise its notes, in cents: the 64 256ths of a semitone the writer tries. */
 export const FINE_TUNE_CENTS = 25;
 
-/** An instrument's tuning bytes and the key a MOD C-2 is written at under them. */
+/** An instrument's tuning bytes and the key the sample's reference note is written at under them. */
 export interface Tuning {
 	multiplier: number;
 	sub: number;
-	/** The key, from o1 c, that plays the sample at its C-2 rate. */
-	c2Key: number;
+	/** The key, from o1 c, that plays the sample at its base rate. */
+	baseKey: number;
 }
 
-/** The register value a MOD C-2 needs from a sample resampled by `factor` at `finetune`. */
-export function c2Register(factor: number, finetune: number): number {
-	return ((PAULA_HZ / C2_PERIOD) * factor * 2 ** (finetune / 96) * UNITY_REGISTER) / DSP_HZ;
+/** The register value the reference note needs from a sample of `baseHz` resampled by `factor`. */
+export function baseRegister(factor: number, baseHz: number): number {
+	return (baseHz * factor * UNITY_REGISTER) / DSP_HZ;
 }
 
 /**
- * The tuning that plays the sample at the MOD's pitch, with C-2 on a `c`, chosen by what the driver
+ * The tuning that plays the sample at the module's pitch, with its reference note on a `c`, chosen by what the driver
  * would actually play. `SetPitch` shifts its table value right before it multiplies, so a low key
  * keeps fewer bits, while a high one leaves a small multiplier coarse (`main.asm:484-554`); so every
- * octave for C-2 and the four multipliers nearest each is tried against every key the song plays on
- * the sample (`low`..`high` semitones from C-2), and the one whose worst note is nearest is kept. A
+ * octave for the reference note and the four multipliers nearest each is tried against every key the song plays on
+ * the sample (`low`..`high` semitones from the reference note), and the one whose worst note is nearest is kept. A
  * channel's `$EE` raises every note it plays by up to {@link FINE_TUNE_CENTS}, in far finer steps than
  * a small multiplier takes, so each choice is judged after the upward shift that serves it best: a
  * multiplier a little flat is as good as exact once the channel's fine tune lifts it. A choice that
  * leaves notes outside o1 c to o6 a, or past the DSP's fourteen bits, loses to one that does not.
  */
-export function tuningFor(factor: number, finetune: number, low: number, high: number): Tuning {
-	const wanted = c2Register(factor, finetune);
+export function tuningFor(factor: number, baseHz: number, low: number, high: number): Tuning {
+	const wanted = baseRegister(factor, baseHz);
 	let best: (Tuning & { outside: number; error: number }) | null = null;
-	for (let c2Key = 0; c2Key <= HIGHEST_KEY; c2Key += 12) {
-		const ideal = (wanted / setPitchWide(c2Key * SEMITONE, 1, 0)) * 256;
+	for (let baseKey = 0; baseKey <= HIGHEST_KEY; baseKey += 12) {
+		const ideal = (wanted / setPitchWide(baseKey * SEMITONE, 1, 0)) * 256;
 		for (const total of [Math.floor(ideal) - 1, Math.floor(ideal), Math.ceil(ideal), Math.ceil(ideal) + 1]) {
 			if (total < 1 || total >= 256 * 256) {
 				continue;
@@ -187,7 +189,7 @@ export function tuningFor(factor: number, finetune: number, low: number, high: n
 			let flattest = Infinity;
 			let sharpest = -Infinity;
 			for (let semis = low; semis <= high; semis++) {
-				const key = c2Key + semis;
+				const key = baseKey + semis;
 				const register = key >= 0 && key <= HIGHEST_KEY ? setPitchWide(key * SEMITONE, multiplier, sub) : 0;
 				if (register === 0 || register >= DSP_PITCH_LIMIT) {
 					outside++;
@@ -204,14 +206,14 @@ export function tuningFor(factor: number, finetune: number, low: number, high: n
 			const error = sharpest === -Infinity ? 0 : Math.max(Math.abs(flattest + shift), Math.abs(sharpest + shift));
 
 			if (best === null || outside < best.outside || (outside === best.outside && error < best.error)) {
-				best = { multiplier, sub, c2Key, outside, error };
+				best = { multiplier, sub, baseKey, outside, error };
 			}
 		}
 	}
 
 	return best
-		? { multiplier: best.multiplier, sub: best.sub, c2Key: best.c2Key }
-		: { multiplier: 1, sub: 0, c2Key: 36 };
+		? { multiplier: best.multiplier, sub: best.sub, baseKey: best.baseKey }
+		: { multiplier: 1, sub: 0, baseKey: 36 };
 }
 
 /** Whether a key, from o1 c, plays true under the tuning: its register below the DSP's fourteen bits. */

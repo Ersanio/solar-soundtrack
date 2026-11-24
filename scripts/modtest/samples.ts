@@ -1,17 +1,15 @@
 /** `modtest`: samples made ready for BRR — the loop moved onto a block at every factor, a tiny loop widened to one, a one-shot's length, the planned frames matching what is planned, and the factor that fits a room. */
 
-import { fitFactor, planSample, plannedFrames } from "@amk/import/mod";
-import type { ModSample } from "@amk/import/mod/file";
+import { type TrackerSample, fitFactor, planSample, plannedFrames } from "@amk/import/tracker";
 import { brrDataBytes } from "@amk/spc/brr-encode";
 import { check, section } from "../harness";
 import { C2, imported, modBytes, pattern, pluck, problems, square } from "./support";
 
-const sample = (pcm: Int8Array, loopStart = 0, loopLength = 0): ModSample => ({
+const sample = (pcm: Int8Array, loopStart = 0, loopLength = 0): TrackerSample => ({
 	index: 1,
 	name: "",
-	pcm,
-	finetune: 0,
-	volume: 64,
+	pcm: Int16Array.from(pcm, (v) => v * 256),
+	baseHz: 8287,
 	loopStart,
 	loopLength,
 });
