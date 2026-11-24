@@ -9,6 +9,10 @@ export interface ChangelogEntry {
 export const CHANGELOG: readonly ChangelogEntry[] = [
   // ─── newest first; add new blocks here ──────────────────────────────────
   {
+    date: '24 November 2026',
+    items: ['Name the stock instruments and drums in the instrument picker'],
+  },
+  {
     date: '19 November 2026',
     items: [
       'Add Song Inspector: channel and sample levels, loudness, clipping, echo and a spectrogram, over the whole song',

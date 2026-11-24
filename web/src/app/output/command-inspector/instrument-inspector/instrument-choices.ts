@@ -82,17 +82,79 @@ export function instrumentEdit(source: string, command: Command, instrument: num
   );
 }
 
+/** What SMW's stock instruments and drums are known as. */
+const STOCK_NAMES: ReadonlyMap<number, string> = new Map([
+  [0, $localize`:@@inspector.instrument.stock.flute:inspector.instrument.stock.flute`],
+  [1, $localize`:@@inspector.instrument.stock.string:inspector.instrument.stock.string`],
+  [
+    2,
+    $localize`:@@inspector.instrument.stock.glockenspiel:inspector.instrument.stock.glockenspiel`,
+  ],
+  [3, $localize`:@@inspector.instrument.stock.marimba:inspector.instrument.stock.marimba`],
+  [4, $localize`:@@inspector.instrument.stock.cello:inspector.instrument.stock.cello`],
+  [
+    5,
+    $localize`:@@inspector.instrument.stock.acoustic-steel-guitar:inspector.instrument.stock.acoustic-steel-guitar`,
+  ],
+  [6, $localize`:@@inspector.instrument.stock.trumpet:inspector.instrument.stock.trumpet`],
+  [7, $localize`:@@inspector.instrument.stock.steel-drums:inspector.instrument.stock.steel-drums`],
+  [
+    8,
+    $localize`:@@inspector.instrument.stock.acoustic-bass:inspector.instrument.stock.acoustic-bass`,
+  ],
+  [9, $localize`:@@inspector.instrument.stock.piano:inspector.instrument.stock.piano`],
+  [10, $localize`:@@inspector.instrument.stock.snare-drum:inspector.instrument.stock.snare-drum`],
+  [11, $localize`:@@inspector.instrument.stock.string-2:inspector.instrument.stock.string-2`],
+  [12, $localize`:@@inspector.instrument.stock.bongo:inspector.instrument.stock.bongo`],
+  [
+    13,
+    $localize`:@@inspector.instrument.stock.electric-piano:inspector.instrument.stock.electric-piano`,
+  ],
+  [14, $localize`:@@inspector.instrument.stock.slap-bass:inspector.instrument.stock.slap-bass`],
+  [
+    15,
+    $localize`:@@inspector.instrument.stock.orchestra-hit:inspector.instrument.stock.orchestra-hit`,
+  ],
+  [16, $localize`:@@inspector.instrument.stock.harp:inspector.instrument.stock.harp`],
+  [
+    17,
+    $localize`:@@inspector.instrument.stock.distortion-guitar:inspector.instrument.stock.distortion-guitar`,
+  ],
+  [18, $localize`:@@inspector.instrument.stock.string-3:inspector.instrument.stock.string-3`],
+  [21, $localize`:@@inspector.instrument.stock.bass-drum:inspector.instrument.stock.bass-drum`],
+  [
+    22,
+    $localize`:@@inspector.instrument.stock.light-cymbal:inspector.instrument.stock.light-cymbal`,
+  ],
+  [23, $localize`:@@inspector.instrument.stock.maracas:inspector.instrument.stock.maracas`],
+  [24, $localize`:@@inspector.instrument.stock.wood-block:inspector.instrument.stock.wood-block`],
+  [
+    25,
+    $localize`:@@inspector.instrument.stock.high-wood-block:inspector.instrument.stock.high-wood-block`,
+  ],
+  [26, $localize`:@@inspector.instrument.stock.low-snare:inspector.instrument.stock.low-snare`],
+  [27, $localize`:@@inspector.instrument.stock.loud-snare:inspector.instrument.stock.loud-snare`],
+  [28, $localize`:@@inspector.instrument.stock.soft-snare:inspector.instrument.stock.soft-snare`],
+  [29, $localize`:@@inspector.instrument.stock.power-set:inspector.instrument.stock.power-set`],
+]);
+
 /**
- * Numbers, because that is what the source says.
+ * Numbers first, because that is what the source says, with a stock
+ * instrument's name beside its number.
  *
  * The one entry with no number of its own is the driver's last table slot: a
  * written 19 emits nothing, so only a raw `$DA $13` reaches it and there is no
  * `@19` to call it by.
  */
 function labelOf(instrument: number): string {
-  return instrument === LAST_DRIVER_INSTRUMENT
-    ? $localize`:@@inspector.instrument.entry:inspector.instrument.entry ${instrument}:instrument:`
-    : `@${instrument}`;
+  if (instrument === LAST_DRIVER_INSTRUMENT) {
+    return $localize`:@@inspector.instrument.entry:inspector.instrument.entry ${instrument}:instrument:`;
+  }
+
+  const name = STOCK_NAMES.get(instrument);
+  return name === undefined
+    ? `@${instrument}`
+    : $localize`:@@inspector.instrument.named:inspector.instrument.named ${instrument}:instrument: ${name}:name:`;
 }
 
 /** What this spelling leaves out, said once under the control. */
