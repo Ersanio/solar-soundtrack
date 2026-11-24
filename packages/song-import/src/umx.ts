@@ -7,6 +7,7 @@
  * name the package gives it, which can be wrong.
  */
 
+import { isIt } from "./it/file";
 import { isMod } from "./mod/file";
 import { isS3m } from "./s3m/file";
 import { isXm } from "./xm/file";
@@ -32,19 +33,9 @@ export interface UmxModule {
 const MAGIC = 0x9e2a83c1;
 const HEADER_BYTES = 36;
 
-function ascii(bytes: Uint8Array, at: number, text: string): boolean {
-	for (let i = 0; i < text.length; i++) {
-		if (bytes[at + i] !== text.charCodeAt(i)) {
-			return false;
-		}
-	}
-
-	return true;
-}
-
 /** The tracker format `bytes` are in, by signature; `null` for anything else. */
 export function trackerFormatOf(bytes: Uint8Array): TrackerFormat | null {
-	if (ascii(bytes, 0, "IMPM")) {
+	if (isIt(bytes)) {
 		return "it";
 	}
 

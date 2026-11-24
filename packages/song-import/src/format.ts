@@ -5,13 +5,14 @@
  * file that is not one is turned away before any reader sees it.
  */
 
+import { isIt } from "./it/file";
 import { isMod } from "./mod/file";
 import { isS3m } from "./s3m/file";
 import { isXm } from "./xm/file";
 import { isUmx } from "./umx";
 
 /** The formats there is a reader for. */
-export type ImportFormat = "midi" | "mod" | "s3m" | "xm" | "umx";
+export type ImportFormat = "midi" | "mod" | "s3m" | "xm" | "it" | "umx";
 
 function ascii(bytes: Uint8Array, at: number, text: string): boolean {
 	for (let i = 0; i < text.length; i++) {
@@ -67,6 +68,10 @@ export function detectFormat(bytes: Uint8Array): ImportFormat | null {
 
 	if (isXm(bytes)) {
 		return "xm";
+	}
+
+	if (isIt(bytes)) {
+		return "it";
 	}
 
 	return isMod(bytes) ? "mod" : null;

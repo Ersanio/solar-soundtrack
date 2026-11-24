@@ -1,5 +1,6 @@
 import { Component, computed, effect, inject, signal, untracked, viewChild } from '@angular/core';
 
+import { ItError, readIt } from '@amk/import/it';
 import { ModError, readMod } from '@amk/import/mod';
 import { S3mError, readS3m } from '@amk/import/s3m';
 import { XmError, readXm } from '@amk/import/xm';
@@ -39,9 +40,9 @@ import { type Candidate, buildCandidate } from '../import-dialog/import-candidat
 import { ImportPreview } from '../import-dialog/import-preview';
 import {
   MOD_REFUSALS,
+  IT_REFUSALS,
   S3M_REFUSALS,
   XM_REFUSALS,
-  UMX_HOLDS,
   UMX_REFUSALS,
   modWarningText,
 } from '../import-dialog/import-text';
@@ -59,6 +60,39 @@ interface Encoding {
 
 /** The most BRR a sample may be encoded to: its loop is a 16-bit offset, and no more would fit ARAM. */
 const BRR_LIMIT = 0xffff;
+/** Each format's reader. */
+const READERS: Readonly<Record<TrackerFormat, (bytes: Uint8Array) => TrackerImport>> = {
+  mod: readMod,
+  s3m: readS3m,
+  xm: readXm,
+  it: readIt,
+};
+
+/** Why a file could not be read, in words. */
+function refusalOf(error: unknown): string {
+  if (error instanceof ModError) {
+    return MOD_REFUSALS[error.code];
+  }
+
+  if (error instanceof S3mError) {
+    return S3M_REFUSALS[error.code];
+  }
+
+  if (error instanceof XmError) {
+    return XM_REFUSALS[error.code];
+  }
+
+  if (error instanceof ItError) {
+    return IT_REFUSALS[error.code];
+  }
+
+  if (error instanceof UmxError) {
+    return UMX_REFUSALS[error.code];
+  }
+
+  return errorMessage(error);
+}
+
 /** What the heading calls each format. */
 const FORMAT_NAMES: Readonly<Record<TrackerFormat, string>> = {
   mod: 'MOD',
@@ -121,7 +155,7 @@ function stemOf(fileName: string): string {
 }
 
 /**
- * The Import dialog for a tracker module (a MOD, an S3M or an XM, or a UMX holding one): its channels to
+ * The Import dialog for a tracker module (a MOD, an S3M, an XM or an IT, or a UMX holding one): its channels to
  * keep, each sample's resampling, and a preview of the song they make before it replaces the document
  * and its samples join the library.
  *
@@ -497,7 +531,7 @@ export class ModImportDialog {
     });
   }
 
-  /** Reads `bytes`, a MOD, an S3M, an XM or a UMX holding one, and opens the dialog on them, or on why they cannot be read. */
+  /** Reads `bytes`, a tracker module or a UMX holding one, and opens the dialog on them, or on why they cannot be read. */
   openWith(name: string, bytes: Uint8Array): void {
     this.fileName.set(name);
     this.previewError.set(null);
@@ -512,33 +546,12 @@ export class ModImportDialog {
         ? unwrapUmx(bytes)
         : { format: trackerFormatOf(bytes) ?? 'mod', bytes };
       this.format.set(FORMAT_NAMES[inner.format]);
-      const read =
-        inner.format === 'mod'
-          ? readMod(inner.bytes)
-          : inner.format === 's3m'
-            ? readS3m(inner.bytes)
-            : inner.format === 'xm'
-              ? readXm(inner.bytes)
-              : null;
-      if (read) {
-        this.keep.set(read.suggested);
-        this.loopAtJump.set(read.play.loopTick > 0);
-        this.mod.set(read);
-      } else if (inner.format === 'it') {
-        this.refusal.set(UMX_HOLDS[inner.format]);
-      }
+      const read = READERS[inner.format](inner.bytes);
+      this.keep.set(read.suggested);
+      this.loopAtJump.set(read.play.loopTick > 0);
+      this.mod.set(read);
     } catch (error) {
-      this.refusal.set(
-        error instanceof ModError
-          ? MOD_REFUSALS[error.code]
-          : error instanceof S3mError
-            ? S3M_REFUSALS[error.code]
-            : error instanceof XmError
-              ? XM_REFUSALS[error.code]
-              : error instanceof UmxError
-                ? UMX_REFUSALS[error.code]
-                : errorMessage(error),
-      );
+      this.refusal.set(refusalOf(error));
     }
 
     this.preview.set(

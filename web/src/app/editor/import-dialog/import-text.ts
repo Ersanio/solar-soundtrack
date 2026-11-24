@@ -6,7 +6,8 @@ import type { ModErrorCode } from '@amk/import/mod';
 import type { S3mErrorCode } from '@amk/import/s3m';
 import type { XmErrorCode } from '@amk/import/xm';
 import type { TrackerImportWarning } from '@amk/import/tracker';
-import type { TrackerFormat, UmxErrorCode } from '@amk/import/umx';
+import type { UmxErrorCode } from '@amk/import/umx';
+import type { ItErrorCode } from '@amk/import/it';
 
 export const REFUSALS: Readonly<Record<SmfErrorCode, string>> = {
   'not-midi': $localize`:@@import.refuse.not-midi:import.refuse.not-midi`,
@@ -180,9 +181,9 @@ export const XM_REFUSALS: Readonly<Record<XmErrorCode, string>> = {
   'not-xm': $localize`:@@import.refuse.not-xm:import.refuse.not-xm`,
 };
 
-/** Why a UMX holding a module of another format cannot be imported yet. */
-export const UMX_HOLDS: Readonly<Record<Exclude<TrackerFormat, 'mod' | 's3m' | 'xm'>, string>> = {
-  it: $localize`:@@import.refuse.umx.it:import.refuse.umx.it`,
+export const IT_REFUSALS: Readonly<Record<ItErrorCode, string>> = {
+  'not-it': $localize`:@@import.refuse.not-it:import.refuse.not-it`,
+  'old-instruments': $localize`:@@import.refuse.it-old-instruments:import.refuse.it-old-instruments`,
 };
 
 /** A MOD import's warning in words, naming the sample it is about by `label`. */

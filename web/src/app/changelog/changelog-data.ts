@@ -11,6 +11,7 @@ export const CHANGELOG: readonly ChangelogEntry[] = [
   {
     date: '25 November 2026',
     items: [
+      'Import IT files (Impulse Tracker), and UMX files that hold one',
       'Import XM files (FastTracker II), and UMX files that hold one',
       'Import S3M files (Scream Tracker 3), and UMX files that hold one',
     ],

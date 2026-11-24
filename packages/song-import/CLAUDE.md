@@ -1,8 +1,8 @@
 # @amk/import
 
 Importers: another music format read and written out as AddmusicK MML. MIDI and tracker modules
-(MOD, S3M and XM) are what there are, and a UMX is unwrapped to the module it holds; older AddMusic SPCs and
-other `.spc` rips are meant to join them as readers beside `midi/`, `mod/`, `s3m/` and `xm/`, picked by `format.ts`'s `detectFormat`, which sniffs a file's signature rather than
+(MOD, S3M, XM and IT) are what there are, and a UMX is unwrapped to the module it holds; older AddMusic SPCs and
+other `.spc` rips are meant to join them as readers beside `midi/`, `mod/`, `s3m/`, `xm/` and `it/`, picked by `format.ts`'s `detectFormat`, which sniffs a file's signature rather than
 trusting its name.
 
 Depends on `@amk/core` (the MML spellers' tables, `DEFAULT_TRANSPOSE`, the velocity table) and on
@@ -10,7 +10,7 @@ Depends on `@amk/core` (the MML spellers' tables, `DEFAULT_TRANSPOSE`, the veloc
 playing true), and nothing else — `eslint.config.js` holds it. It writes text, and for a module the
 PCM of each sample planned for BRR; encoding, compiling, walking and playing the result is the
 caller's. It returns **codes and values, never words**: a refusal is an `SmfError`, `ModError`,
-`S3mError`, `XmError` or `UmxError` code and a warning an `ImportWarning` or `TrackerImportWarning`, which the Import dialogs word.
+`S3mError`, `XmError`, `ItError` or `UmxError` code and a warning an `ImportWarning` or `TrackerImportWarning`, which the Import dialogs word.
 
 | Module                 | What it is                                                              |
 | ---------------------- | ----------------------------------------------------------------------- |
@@ -37,6 +37,9 @@ caller's. It returns **codes and values, never words**: a refusal is an `SmfErro
 | `xm.ts`                | `readXm`: an XM read, played and summed up for the dialog               |
 | `xm/file.ts`           | The XM reader: patterns, instruments, envelopes, delta-coded samples    |
 | `xm/play.ts`           | The song played tick by tick as FastTracker II plays it                 |
+| `it.ts`                | `readIt`: an IT read, played and summed up for the dialog               |
+| `it/file.ts`           | The IT reader: packed patterns, samples, compression, instruments       |
+| `it/play.ts`           | The song played tick by tick as Impulse Tracker 2 plays it              |
 | `tracker/pingpong.ts`  | A ping-pong loop laid out forward, as a BRR loop runs                   |
 | `umx.ts`               | An Unreal package unwrapped to the module its Music object holds        |
 
@@ -212,7 +215,7 @@ kept channels play, and `#instruments` giving each `$FF $E0 $7F` and its tuning 
   after it opens on a tie, which a loop's body cannot start or end on. `/` and the song's start
   state the next note's settings ahead of everything (`SST0511`).
 
-`modtest`, `s3mtest` and `xmtest` pin all of it against the compiler and the walk, and seeded busy songs at
+`modtest`, `s3mtest`, `xmtest` and `ittest` pin all of it against the compiler and the walk, and seeded busy songs at
 several factors against the editor's diagnostics.
 
 ## S3M
@@ -270,6 +273,36 @@ envelope's. FT2's arpeggio counts down the ticks left in the row, so its steps c
 and it is recorded that way round. The auto-vibrato is recorded at its full depth where no vibrato
 command runs, its sweep not followed. 9xx, E3x, Lxx and a note delay past its row are counted.
 
+## IT
+
+### Reading
+
+`it/file.ts` follows 8bitbubsy's `it2play` (`loaders/it.c`). The header holds 64 channel pans
+(+128 disabled, 100 surround) and volumes, then the order list and file offsets to each
+instrument, sample and pattern. A pattern's rows are packed per channel, a mask saying which of
+note, instrument, volume and command follow and which repeat the channel's last; the channels kept
+run to the last any pattern uses. Samples are 8- or 16-bit, signed or unsigned, stereo mixed to
+mono, or compressed as IT 2.14 compresses them (`decompress8`, `decompress16`, ported bit for bit:
+blocks of 0x8000 bytes of output, each value a delta at a width escape codes change) and, with
+convert bit 4, as 2.15 does, the values summed again. A BRR sample has one loop, so the loop is
+taken, or the sustain loop where there is none; a ping-pong one is laid out forward. Instruments
+of the format before 2.00 are refused (`old-instruments`): every IT example uses the later one.
+
+### Playing
+
+`it/play.ts` follows `it2play`'s `it_music.c` and `it_m_eff.c`. Tick 0 reads the row's notes and
+runs each command's init, the later ticks those that run on. D, K and L share a memory, E, F and G
+another (G its own with the compatible-Gxx flag). Frequencies are Hz: a note plays at
+`C5Speed × 2^((note - 60) / 12)`, which the model records as semitones from the C5Speed, and slides
+by 768ths of an octave, or as an Amiga period (`1712 × 8363 / Hz`) would without linear slides. The
+volume recorded is the note's under the channel volume, the sample's and instrument's global
+volumes, the volume envelope, the fadeout and the global volume; the pan takes the panning
+envelope and the separation, the pitch the pitch envelope at half a semitone a step. An envelope
+loop plays its end and its start a tick each, as `UpdateEnvelope` does. A note off in sample mode
+stops a sample that has no sustain loop; in instrument mode it releases the envelope and fades the
+note. One voice plays on a channel, so a New Note Action that would keep the old note sounding is
+counted; so are panbrello, the S7x envelope switches, Oxx and a note delay past its row.
+
 ## UMX
 
 `umx.ts` follows OpenMPT's `UMXTools.cpp`. An Unreal package names its name, import and export
@@ -280,6 +313,5 @@ between its property list and its payload differs at 62, 100 and 120 (62 rather 
 63, for Mech8.umx and others). The first export whose class is `Music` and whose bytes are a tracker
 module is taken, and the module's format is read from its signature, since the name a package gives
 it can be wrong. Music that is recorded audio (MP2, Ogg, WAV) has no notes and is refused as
-`audio`. The tracker dialog reads a MOD, an S3M or an XM unwrapped and names any other format it cannot
-read yet.
+`audio`. The tracker dialog reads any of the four formats unwrapped and names the format it refuses.
 `modtest`'s `umx` section builds packages at each version's layout.

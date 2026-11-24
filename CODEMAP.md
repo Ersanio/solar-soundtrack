@@ -98,12 +98,20 @@ something in the directory, which load by themselves when such a file is opened.
 **Rules:** `import.md`
 
 - `format.ts` — Which importer can read a file, from its first bytes rather than its name.
+- `it.ts` — Importing an IT: read, played as Impulse Tracker 2 plays it, and handed to the tracker importer, which writes it as a song with its samples planned for BRR.
 - `midi.ts` — Importing a MIDI file: read once into parts, then written as a song as often as the porter changes what to keep.
 - `mod.ts` — Importing a MOD: read, played as ProTracker plays it, and handed to the tracker importer, which writes it as a song with its samples planned for BRR.
 - `s3m.ts` — Importing an S3M: read, played as Scream Tracker 3 plays it, and handed to the tracker importer, which writes it as a song with its samples planned for BRR.
 - `tracker.ts` — Importing a tracker module, whatever its format: a song and its play summed up for the dialog once, then written as an `#amk 4` song as often as the porter changes what to keep.
 - `umx.ts` — An Unreal package (`.umx`) unwrapped to the tracker module its `Music` object holds.
 - `xm.ts` — Importing an XM: read, played as FastTracker II plays it, and handed to the tracker importer, which writes it as a song with its samples planned for BRR.
+
+## packages/song-import/src/it
+
+**Rules:** `import.md`
+
+- `file.ts` (500+ lines) — An Impulse Tracker module (`.it`), read into its samples, its instruments, its order list and its patterns of cells.
+- `play.ts` (750+ lines) — An IT played tick by tick, the way Impulse Tracker 2 plays it: what each channel sounds on every tick, and where the song loops.
 
 ## packages/song-import/src/midi
 
@@ -269,6 +277,19 @@ something in the directory, which load by themselves when such a file is opened.
 - `samples.ts` — `fixtest`: a used sample added to `#samples`, `#default` put first, and a list written where there was none.
 - `support.ts` — What every `fixtest` section shares: a song compiled, walked and diagnosed as the editor does, and the checks on a fix.
 - `text.ts` — `fixtest`: a stray character deleted and upper-case note letters lowered, both to the same bytes.
+
+## scripts/ittest
+
+**Rules:** `harnesses/*.md`
+
+- `effects.ts` — `ittest`: effects — the volume column, Dxy and its fine slides, Mxx and Nxy, Vxx and Wxy, E, F and G as `$DD`, H, U and the column's vibrato as `$DE`, J, R, Q and I, the cuts and the note off, Xxx, S8x and Pxy, and what is left out counted.
+- `instruments.ts` — `ittest`: instruments — the volume envelope with its sustain loop released by a note off, the fadeout, a looped envelope, the panning and pitch envelopes, the instrument's and sample's global volumes, a sample's auto-vibrato, and a New Note Action counted.
+- `main.ts` — IT import: `@amk/import/it` reading an IT, playing it as Impulse Tracker 2 does and writing it through the tracker writer as a song on custom instruments made from its samples.
+- `pitch.ts` — `ittest`: pitch — three octaves with linear and Amiga slides at three C5Speeds and three factors, each walked within a few cents; and an instrument's keymap translating its notes and choosing its samples.
+- `reader.ts` — `ittest`: the IT reader — the header and channels, packed cells with their masks and last values, every sample encoding, IT 2.14 and 2.15 compression, loops, instruments and envelopes, what is refused, and an IT inside a UMX.
+- `stress.ts` — `ittest`: busy, seeded ITs — twelve channels, every command and the volume column, in sample mode and with instruments, envelopes and keymaps, on linear and Amiga slides, repeats and a jump back — imported at several factors and both loop modes without raising a problem, and assembled.
+- `support.ts` (300+ lines) — What every `ittest` section shares: an IT file built in memory, imported, its samples encoded, and the song compiled, walked, diagnosed and assembled as the editor does.
+- `timing.ts` — `ittest`: timing on the walk — twelve driver ticks a row at speed 6, Axx, Txx and its slides, Bxx as the loop point, Cxx, SBx, SEx, S6x and SDx, a short pattern, and the order markers.
 
 ## scripts/miditest
 
@@ -511,7 +532,7 @@ something in the directory, which load by themselves when such a file is opened.
 
 **Rules:** `import.md`
 
-- `mod-import-dialog.ts` (500+ lines) — The Import dialog for a tracker module (a MOD, an S3M or an XM, or a UMX holding one): its channels to keep, each sample's resampling, and a preview of the song they make before it replaces the document and its samples join the library.
+- `mod-import-dialog.ts` (500+ lines) — The Import dialog for a tracker module (a MOD, an S3M, an XM or an IT, or a UMX holding one): its channels to keep, each sample's resampling, and a preview of the song they make before it replaces the document and its samples join the library.
 
 ## web/src/app/editor/scope-mini
 

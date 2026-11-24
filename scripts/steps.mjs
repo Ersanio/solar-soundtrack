@@ -32,6 +32,7 @@ export const HARNESSES = [
   'modtest',
   's3mtest',
   'xmtest',
+  'ittest',
   'charttest',
   'pianorolltest',
   'fixtest',
