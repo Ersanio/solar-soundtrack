@@ -170,8 +170,12 @@
                     <option value="auto" [selected]="row.choice === 'auto'">
                       {{ row.autoLabel }}
                     </option>
-                    @for (option of factorOptions; track option.value) {
-                      <option [value]="option.value" [selected]="option.value === row.choice">
+                    @for (option of row.options; track option.value) {
+                      <option
+                        [value]="option.value"
+                        [selected]="option.value === row.choice"
+                        [disabled]="option.disabled"
+                      >
                         {{ option.label }}
                       </option>
                     }

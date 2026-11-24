@@ -1,4 +1,4 @@
-/** `modtest`: samples made ready for BRR — the loop moved onto a block at every factor, a tiny loop widened to one, a one-shot's length, the planned frames matching what is planned, and the factor that fits a room. */
+/** `modtest`: samples made ready for BRR — the loop moved onto a block at every factor, a short loop laid end to end until it fills one, a one-shot's length, the planned frames matching what is planned, and the factor that fits a room. */
 
 import { type TrackerSample, fitFactor, planSample, plannedFrames } from "@amk/import/tracker";
 import { brrDataBytes } from "@amk/spc/brr-encode";
@@ -35,7 +35,7 @@ for (const factor of [1, 0.75, 0.5, 0.33, 0.2]) {
 }
 
 {
-	// A loop that would resample to under a block is widened to one: sixteen frames, the factor raised.
+	// A loop that would resample to under a block is laid end to end until it fills one, at its own factor.
 	const chip = sample(square(8, 4), 0, 8);
 	const plan = planSample(chip, 0.25);
 	check(
@@ -43,7 +43,18 @@ for (const factor of [1, 0.75, 0.5, 0.33, 0.2]) {
 		plan.pcm.length === 16 && plan.loopStart === 0,
 		String(plan.pcm.length),
 	);
-	check("and its factor is 2", plan.factor === 2, String(plan.factor));
+	check("and its factor stays 0.25: eight repeats of the loop", plan.factor === 0.25, String(plan.factor));
+}
+
+{
+	// A 1-frame loop holding a long sample's last value keeps the sample at its factor.
+	const held = sample(new Int8Array([...pluck(30000), 40]), 30000, 1);
+	const plan = planSample(held, 0.5);
+	check(
+		"a 1-frame loop after 30000 frames at 0.5 plans about 15000 frames",
+		plan.factor === 0.5 && plan.pcm.length < 15100 && plan.loopStart === plan.pcm.length - 16,
+		`${plan.pcm.length} at ${plan.factor}`,
+	);
 }
 
 {

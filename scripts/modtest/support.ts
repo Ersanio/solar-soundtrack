@@ -4,7 +4,13 @@ import "../localize";
 import { compiler } from "@amk/compiler";
 import type { CompileResult, Diagnostic } from "@amk/core/types";
 import { type ModImport, readMod } from "@amk/import/mod";
-import { type TrackerSongOptions, type WrittenTrackerSong, planSample, writeTracker } from "@amk/import/tracker";
+import {
+	type TrackerImport,
+	type TrackerSongOptions,
+	type WrittenTrackerSong,
+	planSample,
+	writeTracker,
+} from "@amk/import/tracker";
 import { type BrrSample, emptySample, parseBrr } from "@amk/spc/brr";
 import { encodeBrr } from "@amk/spc/brr-encode";
 import { loadDriver } from "@amk/spc/driver";
@@ -273,7 +279,7 @@ export interface Imported {
 }
 
 /** Each kept sample planned at its factor and encoded, as the dialog does. */
-export function encoded(mod: ModImport, written: WrittenTrackerSong): BrrSample[] {
+export function encoded(mod: TrackerImport, written: WrittenTrackerSong): BrrSample[] {
 	return written.samples.map((s) => {
 		const plan = planSample(mod.song.samples[s.index - 1], s.factor);
 		return parseBrr(s.name, encodeBrr(plan.pcm, plan.loopStart));

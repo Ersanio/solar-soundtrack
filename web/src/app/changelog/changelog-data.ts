@@ -9,6 +9,10 @@ export interface ChangelogEntry {
 export const CHANGELOG: readonly ChangelogEntry[] = [
   // ─── newest first; add new blocks here ──────────────────────────────────
   {
+    date: '25 November 2026',
+    items: ['Import S3M files (Scream Tracker 3), and UMX files that hold one'],
+  },
+  {
     date: '24 November 2026',
     items: [
       'Import UMX files (Unreal music) that hold a MOD',

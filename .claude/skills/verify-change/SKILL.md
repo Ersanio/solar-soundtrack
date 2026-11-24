@@ -21,8 +21,8 @@ One harness on its own is `npm run <name>`; a passing run prints one line,
 
 - `HARNESS_ONLY=<section>[,<section>]` runs only those sections of a harness split into section
   files, named as the files under its `scripts/<name>/` are (`selftest`, `tokentest`,
-  `palettetest`, `audiotest`, `walktest`, `charttest`, `pianorolltest`, `fixtest`, `miditest` and
-  `modtest` are split).
+  `palettetest`, `audiotest`, `walktest`, `charttest`, `pianorolltest`, `fixtest`, `miditest`,
+  `modtest` and `s3mtest` are split).
   PowerShell:
   `$env:HARNESS_ONLY='loop-resize'; npm run pianorolltest; Remove-Item Env:HARNESS_ONLY`. Bash:
   `HARNESS_ONLY=loop-resize npm run pianorolltest`.

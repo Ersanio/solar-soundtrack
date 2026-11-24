@@ -13,12 +13,12 @@ true.
 
 ## The package
 
-- **It writes text, and a MOD's samples as PCM.** No encoder, compile, walk or player: the dialogs,
-  `miditest` and `modtest` do that with what it returns. It reads `@amk/spc/instruments` and
-  `@amk/spc/pitch` for the stock instruments' ranges and the driver's pitch arithmetic, and the lint
-  boundary allows nothing more, so a MOD's samples are planned here (`planSample`) and encoded by the
+- **It writes text, and a module's samples as PCM.** No encoder, compile, walk or player: the
+  dialogs, `miditest`, `modtest` and `s3mtest` do that with what it returns. It reads
+  `@amk/spc/instruments` and `@amk/spc/pitch` for the stock instruments' ranges and the driver's pitch
+  arithmetic, and the lint boundary allows nothing more, so a module's samples are planned here (`planSample`) and encoded by the
   caller (`@amk/spc/brr-encode`).
-- **Codes, not words.** A refusal is an `SmfError` or `ModError` code, a warning an
+- **Codes, not words.** A refusal is an `SmfError`, `ModError`, `S3mError` or `UmxError` code, a warning an
   `ImportWarning` or `TrackerImportWarning`; `import-text.ts` words them under the `import` i18n group.
 - **Read once, write often.** `readMidi` does the parsing and the split into parts and takes no
   options; `writeMidi` takes the grid, the parts kept and their instruments and runs on every
@@ -29,12 +29,12 @@ true.
   diagnostic catches belongs there as well as in the section it is about.
 - **Ticks.** Times are file ticks until the writer and driver ticks after it; the snap grid is in
   driver ticks.
-- **A MOD is two driver ticks to a MOD tick**, so its BPM is the song's quarter-note BPM and its
+- **A module is two driver ticks to a tracker tick**, so its BPM is the song's quarter-note BPM and its
   per-tick effects land on whole ticks. `#default` is always listed first (`#optimized` with the
   dialog's Use Optimized SMW Samples, `TrackerSongOptions.optimized`), so the song is safe beside
-  SMW's sound effects, and the MOD's samples come after it at `@30` up. 9xx sample offset has no
-  AddmusicK equivalent and is counted, its note played from the sample's start. Arpeggio is `$FB`
-  under legato, which is on only from an arpeggio note's key-on to a MOD tick before its end, so it
+  SMW's sound effects, and the module's samples come after it at `@30` up. A sample offset (9xx, Oxx)
+  has no AddmusicK equivalent and is counted, its note played from the sample's start. Arpeggio is `$FB`
+  under legato, which is on only from an arpeggio note's key-on to a tracker tick before its end, so it
   never crosses a loop point; tremolo is `$E5` only in front of a key-on; each channel takes one
   `$EE` (the package's `CLAUDE.md`).
 - **Formats meet at the tracker model.** A format's reader and player are the only code that knows
@@ -53,9 +53,10 @@ true.
 ## The dialog
 
 - `top-bar.html`'s Import is a `<label>` round a file input, so the press is the picker's own. Any
-  file opens a dialog: `detectFormat` sends a MOD or a UMX to `ModImportDialog` and everything
-  else to `ImportDialog`, which says why when it cannot read it. The MOD dialog unwraps a UMX
-  (`unwrapUmx`) and reads the MOD inside, or says which format it holds instead.
+  file opens a dialog: `detectFormat` sends a MOD, an S3M or a UMX to `ModImportDialog`, the
+  tracker dialog, and everything else to `ImportDialog`, which says why when it cannot read it. The
+  tracker dialog unwraps a UMX (`unwrapUmx`) and reads the MOD or S3M inside, or says which format
+  it holds instead.
 - The candidate is a `computed` chain: written, compiled with `EditorStore.compileText`, assembled
   with `EditorStore.spcFor`, walked for its clock. Import is held back while it has no SPC.
 - **The preview is a third `AudioContext`** (`import-preview.ts`), not `Playback` or `Audition`:
@@ -71,13 +72,16 @@ true.
   across imports (`solar-soundtrack.import-drums`), each entry checked as it is read.
 - Import replaces the whole document through `EditorRequests.applyAll` with `show`, one undo step
   back to the song that was open, as `held-song-banner.ts` does.
-- **The MOD dialog** (`mod-import-dialog/`) is the MIDI dialog's shape on the same preview and
+- **The tracker dialog** (`mod-import-dialog/`), for a MOD or an S3M, is the MIDI dialog's shape on the same preview and
   candidate chain (`import-candidate.ts`), with the song's samples passed beside the library
   (`EditorStore.compileText`'s extra names, `SampleStore.resolveWith`) until Import adds them
   (`SampleStore.add`); Undo brings the old song back and leaves the samples. Every sample on Auto
   shares the one factor that fills what ARAM has left once the song, its stock set and the samples with a
-  factor of their own are in: the song's bytes do not depend on the factors, so the room is measured
-  on a write with every Auto sample at 1 and the factor found from it (`fitFactor`). Each encoding is
+  factor of their own are in. The room is measured on a write with every Auto sample at 1 and the
+  factor found from it (`fitFactor`), then measured again on a write at that factor and the factor
+  lowered where it no longer fits, since each instrument's tuning, and so the octave its notes are
+  written in, moves with the factor (`firstFactor`, `autoFactor`). A factor whose BRR would pass 64 KB
+  is offered disabled. Each encoding is
   kept per sample and factor while the dialog is open.
 
 ## Decisions already made
@@ -94,3 +98,5 @@ entry goes there, with its line here, in the same change.
 - **Each note of a chord to the free voice nearest its pitch** — `allocate`, `match`, `NEW_VOICE`
 - **The parts that sound the most suggested by weight alone** — `suggestedParts`
 - **BRR encoded inside `@amk/import`** — `planSample`, `brr-encode`, `eslint.config.js`
+- **A short loop widened by raising the factor** — `loopRepeats`, `plannedFrames`
+- **The song's bytes taken to be the same at every factor** — `firstFactor`, `autoFactor`

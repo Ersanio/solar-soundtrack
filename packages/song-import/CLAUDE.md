@@ -1,16 +1,16 @@
 # @amk/import
 
 Importers: another music format read and written out as AddmusicK MML. MIDI and tracker modules
-(MOD) are what there are, and a UMX is unwrapped to the module it holds; older AddMusic SPCs and
-other `.spc` rips are meant to join them as readers beside `midi/` and `mod/`, picked by `format.ts`'s `detectFormat`, which sniffs a file's signature rather than
+(MOD and S3M) are what there are, and a UMX is unwrapped to the module it holds; older AddMusic SPCs and
+other `.spc` rips are meant to join them as readers beside `midi/`, `mod/` and `s3m/`, picked by `format.ts`'s `detectFormat`, which sniffs a file's signature rather than
 trusting its name.
 
 Depends on `@amk/core` (the MML spellers' tables, `DEFAULT_TRANSPOSE`, the velocity table) and on
 `@amk/spc/instruments` and `@amk/spc/pitch` (the driver's stock instruments and where each stops
 playing true), and nothing else — `eslint.config.js` holds it. It writes text, and for a module the
 PCM of each sample planned for BRR; encoding, compiling, walking and playing the result is the
-caller's. It returns **codes and values, never words**: a refusal is an `SmfError` or `ModError`
-code and a warning an `ImportWarning` or `TrackerImportWarning`, which the Import dialogs word.
+caller's. It returns **codes and values, never words**: a refusal is an `SmfError`, `ModError`,
+`S3mError` or `UmxError` code and a warning an `ImportWarning` or `TrackerImportWarning`, which the Import dialogs word.
 
 | Module                 | What it is                                                              |
 | ---------------------- | ----------------------------------------------------------------------- |
@@ -31,6 +31,9 @@ code and a warning an `ImportWarning` or `TrackerImportWarning`, which the Impor
 | `mod.ts`               | `readMod`: a MOD read, played and summed up for the dialog              |
 | `mod/file.ts`          | The MOD reader: signatures, patterns, sample headers                    |
 | `mod/play.ts`          | The song played tick by tick as ProTracker plays it                     |
+| `s3m.ts`               | `readS3m`: an S3M read, played and summed up for the dialog             |
+| `s3m/file.ts`          | The S3M reader: the header, parapointers, packed patterns, samples      |
+| `s3m/play.ts`          | The song played tick by tick as Scream Tracker 3 plays it               |
 | `umx.ts`               | An Unreal package unwrapped to the module its Music object holds        |
 
 ## Reading
@@ -156,7 +159,8 @@ counted rather than played, 9xx because AddmusicK plays a sample from its start.
 `tracker/samples.ts` plans each sample's PCM for BRR at a factor. A BRR loop starts on a 16-frame
 block and runs to the end, so the loop is resampled to whole blocks, the factor nudged to make that
 exact (`plannedFrames`), silence put in front so it starts on a block, and what follows the loop
-dropped; a loop under a block is widened to one. The resampler is a Blackman-windowed sinc whose
+dropped. A loop under a block at the factor is laid end to end until it fills one, so the factor
+stays where it was asked (`loopRepeats`). The resampler is a Blackman-windowed sinc whose
 cutoff follows the factor and which reads the loop round past its end, and at a factor of 1 the
 frames are copied. `fitFactor` bisects the largest factor every Auto sample can share in a room.
 `tuningFor` picks the instrument's multiplier and the octave the reference note is written in by trying each
@@ -178,10 +182,12 @@ kept channels play, and `#instruments` giving each `$FF $E0 $7F` and its tuning 
   struck again at the loop point. Its key is the reference note's plus its semitones, folded by octaves into what
   the instrument plays true.
 - **Volume** is `v` = 255 × √(vol / 64), since the driver squares it (`L_124D`), and a slide is
-  simplified to `vD,N` fades. **Pan** is `y`, the Amiga's L R R L narrowed by the separation.
+  simplified to `vD,N` fades. **Pan** is `y`, the module's pan narrowed by the separation.
   **Pitch** within a note is simplified to ramps written as `$DD` after the piece each starts in,
   under the same frame rules as the MIDI writer's. **Vibrato** is `$DE` at the player's phase step over
-  two and the swing it recorded, and `$DF` where it stops.
+  two and the swing it recorded, and `$DF` where it stops. The swing is room the tuning leaves either
+  side of the note, and a note still at the edge, which the swing would carry below o1 c or past what
+  the instrument plays true, has its vibrato left off (`vibratoIn`, `SST0514`).
 - **Tremolo** is `$E5`, written only in front of a key-on, since its read-ahead counts its
   arguments one short (COMMANDS.html, `$E5`) and anywhere else it can key a held note off. A note
   takes the first tremolo its rows run, from its key-on; it is raised to the top of the swing,
@@ -202,8 +208,36 @@ kept channels play, and `#instruments` giving each `$FF $E0 $7F` and its tuning 
   after it opens on a tie, which a loop's body cannot start or end on. `/` and the song's start
   state the next note's settings ahead of everything (`SST0511`).
 
-`modtest` pins all of it against the compiler and the walk, and seeded busy songs at several factors
-against the editor's diagnostics.
+`modtest` and `s3mtest` pin all of it against the compiler and the walk, and seeded busy songs at
+several factors against the editor's diagnostics.
+
+## S3M
+
+### Reading
+
+`s3m/file.ts` follows OpenMPT's `Load_s3m.cpp`: `SCRM` at 44, the order list, then parapointers
+(offsets over 16) to each instrument and pattern. A pattern is 64 packed rows, each cell a byte
+naming its channel and what follows (32 a note and an instrument, 64 a volume, 128 a command), and
+a 0 ending the row. Channel settings under 16 are the PCM channels kept, in file order; AdLib and
+disabled channels are left out, and an AdLib instrument has no PCM. Samples are 8- or 16-bit, signed
+or unsigned (header byte 42), a stereo one mixed to mono, its loop held to its frames; a C2SPD of 0
+plays at 8363 and one past 16 bits is kept as Impulse Tracker writes it. The panning is OpenMPT's,
+since ST3 on a Sound Blaster pans by channel alone: each channel's side, the pan table where byte 53
+is 252, all centred in a mono song.
+
+### Playing
+
+`s3m/play.ts` follows 8bitbubsy's `st3play`. Tick 0 reads the notes (`doamiga`) and runs the
+once-a-row commands (`docmd1`), the later ticks the rest (`docmd2`); most commands share one
+remembered info byte per channel, H and U another, G and L a third. A period is
+`notespd >> octave × 8363 / C2SPD` and plays at 14317056 / period Hz, which the model records as
+semitones from the sample's C2SPD, its C-4 rate. Dxy's fine slides run on tick 0, its normal ones on
+the later ticks, and on tick 0 too with header flag 64 or a file saved by ST3.00; E and F slide in
+ST3's period units, fine and extra fine on tick 0; SBx loops rows for the whole song, SEx repeats a
+row's ticks without its notes, SDx strikes late, Qxy strikes again with its volume change, SCx and
+`^^` cut. The volume is the channel's 63 under the global volume's 256ths (`setvol`), Vxx taking
+hold from the tick after its first. Oxx, S1x, a note delay past its row and a note on an AdLib
+instrument are counted rather than played.
 
 ## UMX
 
@@ -215,5 +249,6 @@ between its property list and its payload differs at 62, 100 and 120 (62 rather 
 63, for Mech8.umx and others). The first export whose class is `Music` and whose bytes are a tracker
 module is taken, and the module's format is read from its signature, since the name a package gives
 it can be wrong. Music that is recorded audio (MP2, Ogg, WAV) has no notes and is refused as
-`audio`. The MOD dialog reads a MOD unwrapped and names any other tracker format it cannot read yet.
+`audio`. The tracker dialog reads a MOD or an S3M unwrapped and names any other format it cannot
+read yet.
 `modtest`'s `umx` section builds packages at each version's layout.

@@ -1,14 +1,18 @@
 import { Component, computed, effect, inject, signal, untracked, viewChild } from '@angular/core';
 
-import { type ModImport, ModError, readMod } from '@amk/import/mod';
+import { ModError, readMod } from '@amk/import/mod';
+import { S3mError, readS3m } from '@amk/import/s3m';
 import {
   TRACKER_CHANNEL_LIMIT,
+  type TrackerImport,
   type TrackerSongOptions,
+  type WrittenTrackerSong,
   fitFactor,
   planSample,
+  plannedFrames,
   writeTracker,
 } from '@amk/import/tracker';
-import { UmxError, isUmx, unwrapUmx } from '@amk/import/umx';
+import { type TrackerFormat, UmxError, isUmx, trackerFormatOf, unwrapUmx } from '@amk/import/umx';
 import { type BrrSample, decodeBrr, emptySample, parseBrr } from '@amk/spc/brr';
 import { brrDataBytes, encodeBrr } from '@amk/spc/brr-encode';
 import { computeSpcLayout } from '@amk/spc/layout';
@@ -34,6 +38,7 @@ import { type Candidate, buildCandidate } from '../import-dialog/import-candidat
 import { ImportPreview } from '../import-dialog/import-preview';
 import {
   MOD_REFUSALS,
+  S3M_REFUSALS,
   UMX_HOLDS,
   UMX_REFUSALS,
   modWarningText,
@@ -50,8 +55,15 @@ interface Encoding {
   rate: number;
 }
 
-/** The rate a sample plays a MOD's C-2 at, before resampling (PAL Paula over period 428). */
-const C2_HZ = 3_546_895 / 428;
+/** The most BRR a sample may be encoded to: its loop is a 16-bit offset, and no more would fit ARAM. */
+const BRR_LIMIT = 0xffff;
+/** What the heading calls each format. */
+const FORMAT_NAMES: Readonly<Record<TrackerFormat, string>> = {
+  mod: 'MOD',
+  s3m: 'S3M',
+  xm: 'XM',
+  it: 'IT',
+};
 const CHIP_CLASS =
   'inline-flex h-5 min-w-5 items-center justify-center rounded-[3px] px-1 font-mono text-[10px] leading-none font-semibold text-(--on-ch)';
 /** The factors a sample may be set to, besides Auto and Drop. */
@@ -103,14 +115,15 @@ function stemOf(fileName: string): string {
     .replace(/\.[^.]*$/, '')
     .replace(/[#;"]/g, '')
     .trim();
-  return stem === '' ? 'MOD' : stem;
+  return stem === '' ? 'Module' : stem;
 }
 
 /**
- * The Import dialog for a MOD: its channels to keep, each sample's resampling, and a preview of the
- * song they make before it replaces the document and its samples join the library.
+ * The Import dialog for a tracker module (a MOD or an S3M, or a UMX holding one): its channels to
+ * keep, each sample's resampling, and a preview of the song they make before it replaces the document
+ * and its samples join the library.
  *
- * AddmusicK has far less room for samples than a MOD carries, so every sample left on Auto shares the
+ * AddmusicK has far less room for samples than a module carries, so every sample left on Auto shares the
  * one factor that fills what ARAM has left once the song and `#default` are in, and a porter can set a
  * sample's own factor or drop it. Every change rewrites, re-encodes and recompiles the candidate, and a
  * playing preview carries on from where it was.
@@ -152,7 +165,9 @@ export class ModImportDialog {
 
   protected readonly fileName = signal('');
   protected readonly refusal = signal<string | null>(null);
-  private readonly mod = signal<ModImport | null>(null);
+  private readonly mod = signal<TrackerImport | null>(null);
+  /** The format the heading names: the module's, or `UMX` for a package it could not open. */
+  private readonly format = signal('MOD');
   protected readonly keep = signal<readonly number[]>([]);
   private readonly choices = signal<ReadonlyMap<number, Choice>>(new Map());
   protected readonly separation = signal(0.5);
@@ -167,7 +182,8 @@ export class ModImportDialog {
 
   protected readonly heading = computed(() => {
     const name = this.fileName();
-    return $localize`:@@import.mod.heading:import.mod.heading ${name}:name:`;
+    const format = this.format();
+    return $localize`:@@import.mod.heading:import.mod.heading ${format}:format: ${name}:name:`;
   });
 
   protected readonly summary = computed(() => {
@@ -191,18 +207,19 @@ export class ModImportDialog {
     return this.choices().get(index) ?? 'auto';
   }
 
-  private encoded(mod: ModImport, index: number, factor: number): Encoding {
+  private encoded(mod: TrackerImport, index: number, factor: number): Encoding {
     const key = `${index}:${factor}`;
     let entry = this.encodings.get(key);
     if (!entry) {
       const name = this.sampleName(index);
-      const plan = planSample(mod.song.samples[index - 1], factor);
+      const source = mod.song.samples[index - 1];
+      const plan = planSample(source, factor);
       const bytes = encodeBrr(plan.pcm, plan.loopStart);
       entry = {
         sample: parseBrr(name, bytes),
         bytes,
         loopStart: plan.loopStart,
-        rate: C2_HZ * plan.factor,
+        rate: source.baseHz * plan.factor,
       };
       this.encodings.set(key, entry);
     }
@@ -222,29 +239,25 @@ export class ModImportDialog {
     };
   }
 
-  /** The song with every Auto sample at 1: its bytes are what the room is measured after, and they do not depend on the factors. */
-  private readonly provisional = computed(() => {
-    const mod = this.mod();
-    if (!mod) {
-      return null;
-    }
-
+  /** Each sample's factor: its own, or `auto` for those left on Auto (1 where `auto` is `null`). */
+  private factorsWith(auto: number | null): Map<number, number | 'drop'> {
     const factors = new Map<number, number | 'drop'>();
-    for (const [index, choice] of this.choices()) {
+    for (const summary of this.mod()?.samples ?? []) {
+      const choice = this.choiceOf(summary.index);
       if (choice !== 'auto') {
-        factors.set(index, choice);
+        factors.set(summary.index, choice);
+      } else if (auto !== null) {
+        factors.set(summary.index, auto);
       }
     }
 
-    return writeTracker(mod, this.options(factors));
-  });
+    return factors;
+  }
 
-  /** The bytes ARAM has for the Auto samples, once the song, the stock set and the samples with a factor of their own are in. */
-  private readonly room = computed(() => {
-    const mod = this.mod();
-    const written = this.provisional();
+  /** The bytes ARAM has for the Auto samples once `written`, the stock set and the samples with a factor of their own are in. */
+  private roomAfter(mod: TrackerImport, written: WrittenTrackerSong): number | null {
     const driver = this.drivers.driver();
-    if (!mod || !written || !driver) {
+    if (!driver) {
       return null;
     }
 
@@ -269,21 +282,43 @@ export class ModImportDialog {
     );
     return computeSpcLayout(driver, samples, result.data.length, result.stats?.echoBufferSize ?? 0)
       .freeBytes;
-  });
+  }
 
-  /** The one factor every Auto sample shares, the largest that fits the room, to a thousandth. */
-  protected readonly autoFactor = computed(() => {
-    const mod = this.mod();
-    const written = this.provisional();
-    const room = this.room();
-    if (!mod || !written || room === null) {
-      return 1;
-    }
-
+  /** The largest factor, to a thousandth, that the Auto samples of `written` can share in `room`. */
+  private fitIn(mod: TrackerImport, written: WrittenTrackerSong, room: number): number {
     const autos = written.samples
       .filter((s) => this.choiceOf(s.index) === 'auto')
       .map((s) => mod.song.samples[s.index - 1]);
     return Math.floor(fitFactor(autos, room, brrDataBytes) * 1000) / 1000;
+  }
+
+  /** The factor found on a write with every Auto sample at 1. */
+  private readonly firstFactor = computed(() => {
+    const mod = this.mod();
+    if (!mod) {
+      return 1;
+    }
+
+    const written = writeTracker(mod, this.options(this.factorsWith(null)));
+    const room = this.roomAfter(mod, written);
+    return room === null ? 1 : this.fitIn(mod, written, room);
+  });
+
+  /**
+   * The one factor every Auto sample shares, the largest that fits the room, to a thousandth. Each
+   * instrument's tuning, and so the octave its notes are written in, moves with the factor, so the
+   * song is measured again at the first factor found and the factor lowered if it no longer fits.
+   */
+  protected readonly autoFactor = computed(() => {
+    const mod = this.mod();
+    const first = this.firstFactor();
+    if (!mod) {
+      return first;
+    }
+
+    const written = writeTracker(mod, this.options(this.factorsWith(first)));
+    const room = this.roomAfter(mod, written);
+    return room === null ? first : Math.min(first, this.fitIn(mod, written, room));
   });
 
   private readonly written = computed(() => {
@@ -292,13 +327,7 @@ export class ModImportDialog {
       return null;
     }
 
-    const factors = new Map<number, number | 'drop'>();
-    for (const summary of mod.samples) {
-      const choice = this.choiceOf(summary.index);
-      factors.set(summary.index, choice === 'auto' ? this.autoFactor() : choice);
-    }
-
-    return writeTracker(mod, this.options(factors));
+    return writeTracker(mod, this.options(this.factorsWith(this.autoFactor())));
   });
 
   /** The song's samples, encoded, in `#instruments` order. */
@@ -415,7 +444,14 @@ export class ModImportDialog {
         notes: summary.notes,
         choice: String(choice),
         autoLabel,
-        rate: factor === undefined ? '' : `${((C2_HZ * factor) / 1000).toFixed(1)} kHz`,
+        rate:
+          factor === undefined
+            ? ''
+            : `${((mod.song.samples[summary.index - 1].baseHz * factor) / 1000).toFixed(1)} kHz`,
+        options: this.factorOptions.map((option) => {
+          const plan = plannedFrames(mod.song.samples[summary.index - 1], Number(option.value));
+          return { ...option, disabled: brrDataBytes(plan.frames, plan.loops) > BRR_LIMIT };
+        }),
         size:
           size === undefined
             ? choice === 'drop'
@@ -459,7 +495,7 @@ export class ModImportDialog {
     });
   }
 
-  /** Reads `bytes`, a MOD or a UMX holding one, and opens the dialog on them, or on why they cannot be read. */
+  /** Reads `bytes`, a MOD, an S3M or a UMX holding one, and opens the dialog on them, or on why they cannot be read. */
   openWith(name: string, bytes: Uint8Array): void {
     this.fileName.set(name);
     this.previewError.set(null);
@@ -468,23 +504,34 @@ export class ModImportDialog {
     this.encodings.clear();
     this.mod.set(null);
     this.refusal.set(null);
+    this.format.set(isUmx(bytes) ? 'UMX' : FORMAT_NAMES[trackerFormatOf(bytes) ?? 'mod']);
     try {
-      const inner = isUmx(bytes) ? unwrapUmx(bytes) : { format: 'mod' as const, bytes };
-      if (inner.format === 'mod') {
-        const mod = readMod(inner.bytes);
-        this.keep.set(mod.suggested);
-        this.loopAtJump.set(mod.play.loopTick > 0);
-        this.mod.set(mod);
-      } else {
+      const inner = isUmx(bytes)
+        ? unwrapUmx(bytes)
+        : { format: trackerFormatOf(bytes) ?? 'mod', bytes };
+      this.format.set(FORMAT_NAMES[inner.format]);
+      const read =
+        inner.format === 'mod'
+          ? readMod(inner.bytes)
+          : inner.format === 's3m'
+            ? readS3m(inner.bytes)
+            : null;
+      if (read) {
+        this.keep.set(read.suggested);
+        this.loopAtJump.set(read.play.loopTick > 0);
+        this.mod.set(read);
+      } else if (inner.format === 'xm' || inner.format === 'it') {
         this.refusal.set(UMX_HOLDS[inner.format]);
       }
     } catch (error) {
       this.refusal.set(
         error instanceof ModError
           ? MOD_REFUSALS[error.code]
-          : error instanceof UmxError
-            ? UMX_REFUSALS[error.code]
-            : errorMessage(error),
+          : error instanceof S3mError
+            ? S3M_REFUSALS[error.code]
+            : error instanceof UmxError
+              ? UMX_REFUSALS[error.code]
+              : errorMessage(error),
       );
     }
 

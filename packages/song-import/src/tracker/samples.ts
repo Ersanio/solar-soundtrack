@@ -3,9 +3,9 @@
  * boundaries, and the tuning an AddmusicK instrument needs to play each at the module's pitch.
  *
  * A BRR loop starts on a 16-frame block and runs to the sample's end, so a looped sample is
- * resampled with its loop rounded to whole blocks, the factor nudged to make that exact, and
- * silence put in front so the loop starts on a block; anything after the loop is never heard and
- * is dropped. The resampler is a windowed sinc whose cutoff follows the factor, and it reads the
+ * resampled with its loop rounded to whole blocks (a loop too short for one laid end to end until it
+ * fills one), the factor nudged to make that exact, and silence put in front so the loop starts on
+ * a block; anything after the loop is never heard and is dropped. The resampler is a windowed sinc whose cutoff follows the factor, and it reads the
  * loop round past its end, so the seam is filtered as the loop sounds.
  */
 
@@ -30,9 +30,19 @@ export interface PlannedSample {
 	factor: number;
 }
 
-/** The loop's length after resampling: whole blocks, at least one. */
+/**
+ * How many times the loop is laid end to end, so that at `factor` it fills a block. Widening a short
+ * loop by raising the factor would raise it for the whole sample: a 1-frame loop holding a sample's
+ * last value would make the sample sixteen times longer.
+ */
+function loopRepeats(sample: TrackerSample, factor: number): number {
+	return Math.max(1, Math.ceil(BLOCK / (sample.loopLength * factor)));
+}
+
+/** The loop's length after resampling, its repeats laid end to end: whole blocks, at least one. */
 function loopFrames(sample: TrackerSample, factor: number): number {
-	return Math.max(BLOCK, Math.round((sample.loopLength * factor) / BLOCK) * BLOCK);
+	const repeated = loopRepeats(sample, factor) * sample.loopLength;
+	return Math.max(BLOCK, Math.round((repeated * factor) / BLOCK) * BLOCK);
 }
 
 /** What resampling `sample` by `factor` makes, without doing it: frames, whether it loops, and the factor it ends up at. */
@@ -49,7 +59,7 @@ export function plannedFrames(
 	}
 
 	const loop = loopFrames(sample, factor);
-	const exact = loop / sample.loopLength;
+	const exact = loop / (loopRepeats(sample, factor) * sample.loopLength);
 	return { frames: Math.ceil((sample.loopStart * exact) / BLOCK) * BLOCK + loop, loops: true, factor: exact };
 }
 

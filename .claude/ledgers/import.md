@@ -36,3 +36,12 @@ and moved away from, with the reason. The rule carries one index line per entry.
   encoder written beside the decoder it must match. The encoder sits beside `brr.ts` in `@amk/spc`,
   where `brrtest` holds it to the decoder; the package plans each sample's PCM, loop and tuning
   (`planSample`), and the dialog and `modtest` encode it.
+- **A short loop widened by raising the factor** — a loop under a block at its factor was made one
+  block by raising the factor until it was, which raises it for the whole sample: an S3M's 1-frame
+  loop holding its last value made a 30000-frame sample sixteen times longer than ARAM. The loop is
+  laid end to end until it fills a block (`loopRepeats`), and the factor stays where it was asked.
+- **The song's bytes taken to be the same at every factor** — the dialog measured the room once, on
+  a write with every Auto sample at 1, and took the factor that filled it. Each instrument's tuning,
+  and so the octave its notes are written in, moves with the factor, and an S3M's song came out 19
+  bytes longer at the factor found than at 1, past the room. The room is measured again at that
+  factor and the factor lowered where it no longer fits (`firstFactor`, `autoFactor`).

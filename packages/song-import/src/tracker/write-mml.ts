@@ -375,6 +375,27 @@ class ChannelWriter {
 		return volumeOf(Math.min(64, this.ctx.ticks.volume[t] + (this.tremolos.get(note)?.swing ?? 0)));
 	}
 
+	/**
+	 * `$DE` for a note on tick `t`, or none where its swing would carry the note below o1 c or past
+	 * what the instrument plays true (`SST0514`): a vibrato at the edge of the range is left off.
+	 */
+	private vibratoIn(note: Note, t: number): number {
+		const vibrato = vibratoOf(this.ctx.ticks.vibratoRate[t], this.ctx.ticks.vibratoDepth[t]);
+		const sample = this.ctx.samples.get(note.sample);
+		if (vibrato === 0 || !sample) {
+			return vibrato;
+		}
+
+		const extent = vibrato & 0xff;
+		const swing = extent < 0xf1 ? extent / 256 : extent & 0x0f;
+		// The key as written and the pitch a slide has moved it to: the driver plays the first.
+		const key = this.keys.get(note) ?? 0;
+		const pitch = this.pitchAt(note, t);
+		const top = Math.ceil(Math.max(key, pitch) + swing);
+		const fits = Math.min(key, pitch) - swing >= 0 && top <= HIGHEST_KEY && playsTrue(sample.tuning, top);
+		return fits ? vibrato : 0;
+	}
+
 	private noteSettings(at: number, note: Note, t: number): void {
 		const sample = this.ctx.samples.get(note.sample);
 		if (sample && this.state.instrument !== sample.instrument) {
@@ -384,7 +405,7 @@ class ChannelWriter {
 
 		this.setVolume(at, this.volumeIn(note, t));
 		this.setPan(at, panOf(this.ctx.ticks.pan[t], this.ctx.separation));
-		this.setVibrato(at, vibratoOf(this.ctx.ticks.vibratoRate[t], this.ctx.ticks.vibratoDepth[t]));
+		this.setVibrato(at, this.vibratoIn(note, t));
 		this.setTremolo(at, this.tremolos.get(note)?.command ?? 0);
 		if (this.fineTune > 0 && this.state.fineTune !== this.fineTune) {
 			this.push(at, `$EE $${hex2(this.fineTune)}`);
@@ -618,7 +639,7 @@ class ChannelWriter {
 			this.tempo(at);
 			if (at > s || !struck) {
 				this.setPan(at, panOf(ticks.pan[at], this.ctx.separation));
-				this.setVibrato(at, vibratoOf(ticks.vibratoRate[at], ticks.vibratoDepth[at]));
+				this.setVibrato(at, this.vibratoIn(note, at));
 				if (arpeggio && at === note.end - 1) {
 					this.setArpeggio(at, 0);
 					this.push(at, "$F4 $01");
@@ -738,9 +759,11 @@ export function writeTrackerSong(
 		for (const note of channelNotes[i]) {
 			const range = ranges.get(note.sample) ?? { low: Infinity, high: -Infinity };
 			for (let t = note.start; t < note.end; t++) {
+				// A vibrato's swing is room the tuning has to leave either side of the note.
+				const swing = ticks.vibratoRate[t] > 0 ? Math.ceil(ticks.vibratoDepth[t]) : 0;
 				const semis = Math.round(ticks.pitch[t]);
-				range.low = Math.min(range.low, semis);
-				range.high = Math.max(range.high, semis);
+				range.low = Math.min(range.low, semis - swing);
+				range.high = Math.max(range.high, semis + swing);
 			}
 
 			ranges.set(note.sample, range);

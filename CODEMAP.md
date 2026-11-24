@@ -100,6 +100,7 @@ something in the directory, which load by themselves when such a file is opened.
 - `format.ts` — Which importer can read a file, from its first bytes rather than its name.
 - `midi.ts` — Importing a MIDI file: read once into parts, then written as a song as often as the porter changes what to keep.
 - `mod.ts` — Importing a MOD: read, played as ProTracker plays it, and handed to the tracker importer, which writes it as a song with its samples planned for BRR.
+- `s3m.ts` — Importing an S3M: read, played as Scream Tracker 3 plays it, and handed to the tracker importer, which writes it as a song with its samples planned for BRR.
 - `tracker.ts` — Importing a tracker module, whatever its format: a song and its play summed up for the dialog once, then written as an `#amk 4` song as often as the porter changes what to keep.
 - `umx.ts` — An Unreal package (`.umx`) unwrapped to the tracker module its `Music` object holds.
 
@@ -127,6 +128,13 @@ something in the directory, which load by themselves when such a file is opened.
 
 - `file.ts` — A ProTracker-family `.mod` file, read into its samples, its order list and its patterns of cells.
 - `play.ts` (300+ lines) — A MOD played tick by tick, the way ProTracker's replayer plays it: what each channel sounds on every tick, and where the song loops.
+
+## packages/song-import/src/s3m
+
+**Rules:** `import.md`
+
+- `file.ts` — A Scream Tracker 3 module (`.s3m`), read into its samples, its order list and its patterns of cells.
+- `play.ts` (500+ lines) — An S3M played tick by tick, the way Scream Tracker 3.21 plays it: what each channel sounds on every tick, and where the song loops.
 
 ## packages/song-import/src/tracker
 
@@ -278,7 +286,7 @@ something in the directory, which load by themselves when such a file is opened.
 - `main.ts` — MOD import: `@amk/import/mod` reading a MOD, playing it tick by tick and writing it as a song on custom instruments made from its samples.
 - `pitch.ts` — `modtest`: pitch — every note of ProTracker's three octaves, at finetunes and resampling factors, played by the walk within a few cents of where the MOD plays it; FastTracker's periods past the Amiga's; and a range too wide for one octave choice folded.
 - `reader.ts` — `modtest`: the MOD reader — each signature's channel count, FLT8's pattern pairs, the pattern count, the sample headers' loop quirks, a file cut short, and what is refused.
-- `samples.ts` — `modtest`: samples made ready for BRR — the loop moved onto a block at every factor, a tiny loop widened to one, a one-shot's length, the planned frames matching what is planned, and the factor that fits a room.
+- `samples.ts` — `modtest`: samples made ready for BRR — the loop moved onto a block at every factor, a short loop laid end to end until it fills one, a one-shot's length, the planned frames matching what is planned, and the factor that fits a room.
 - `stress.ts` — `modtest`: busy, seeded MODs — eight channels, every effect, repeats, a jump back — imported at several factors and both loop modes without raising a problem, and assembled.
 - `support.ts` (300+ lines) — What every `modtest` section shares: a MOD file built in memory, imported, its samples encoded, and the song compiled, walked, diagnosed and assembled as the editor does.
 - `timing.ts` — `modtest`: time — two driver ticks to a MOD tick, speed and BPM, and the order list's flow through Bxx, Dxx, E6x, EEx and EDx, each held to the ticks the walk plays its notes at.
@@ -330,6 +338,18 @@ something in the directory, which load by themselves when such a file is opened.
 - `selection.ts` — `pianorolltest`: the selection survives an edit.
 - `spelling.ts` — `pianorolltest`: the spellings the roll and the compiler have to agree on.
 - `support.ts` (750+ lines) — What every `pianorolltest` section shares: the driver, building and stripping a song, applying edits, and the `expect*` checks.
+
+## scripts/s3mtest
+
+**Rules:** `harnesses/*.md`
+
+- `effects.ts` — `s3mtest`: effects — the volume column and Dxy with its fine and fast slides, E, F and G as `$DD`, H and U as `$DE`, J, R and Q, the cuts, S8x and Xxx panning, Vxx, Ixy, and what is left out counted.
+- `main.ts` — S3M import: `@amk/import/s3m` reading an S3M, playing it as Scream Tracker 3 does and writing it through the tracker writer as a song on custom instruments made from its samples.
+- `pitch.ts` — `s3mtest`: pitch — three octaves at three C2SPDs and three factors, each note walked within a few cents of the semitone ST3's period plays it nearest; ST3's period arithmetic; S2x's finetune; and the octaves past what a letter reaches folded.
+- `reader.ts` — `s3mtest`: the S3M reader — the channels kept and their panning, packed cells, every sample encoding, the loop, the order markers, a file cut short, what is refused, and an S3M inside a UMX.
+- `stress.ts` — `s3mtest`: busy, seeded S3Ms — twelve channels, every effect, the volume column, repeats and a jump back — imported at several factors and both loop modes without raising a problem, and assembled.
+- `support.ts` — What every `s3mtest` section shares: an S3M file built in memory, imported, its samples encoded, and the song compiled, walked, diagnosed and assembled as the editor does.
+- `timing.ts` — `s3mtest`: timing on the walk — twelve driver ticks a row at speed 6, Axx, Txx as `t`, Bxx as the loop point, Cxx in BCD, SBx's pattern loop, SEx's row repeats and SDx's late note.
 
 ## scripts/selftest
 
@@ -469,7 +489,7 @@ something in the directory, which load by themselves when such a file is opened.
 
 **Rules:** `import.md`
 
-- `mod-import-dialog.ts` (500+ lines) — The Import dialog for a MOD: its channels to keep, each sample's resampling, and a preview of the song they make before it replaces the document and its samples join the library.
+- `mod-import-dialog.ts` (500+ lines) — The Import dialog for a tracker module (a MOD or an S3M, or a UMX holding one): its channels to keep, each sample's resampling, and a preview of the song they make before it replaces the document and its samples join the library.
 
 ## web/src/app/editor/scope-mini
 
