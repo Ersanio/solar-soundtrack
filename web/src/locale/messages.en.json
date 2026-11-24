@@ -521,6 +521,8 @@
     "import.mod.replaces": "{$COUNT} samples of the same name in the sample library will be replaced.",
     "import.mod.sample.loop": "{$start} + {$length}",
     "import.mod.sample.one-shot": "one-shot",
+    "import.mod.sample.play.title": "Hear this sample as it will be encoded, at the pitch of the MOD's C-2",
+    "import.mod.sample.stop.title": "Stop the sample",
     "import.mod.sample.unnamed": "Sample {$index}",
     "import.mod.sample.unused": "not played",
     "import.mod.separation": "Stereo separation",

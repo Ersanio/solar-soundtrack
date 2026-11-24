@@ -10,9 +10,10 @@ import {
   readMod,
   writeMod,
 } from '@amk/import/mod';
-import { type BrrSample, emptySample, parseBrr } from '@amk/spc/brr';
+import { type BrrSample, decodeBrr, emptySample, parseBrr } from '@amk/spc/brr';
 import { brrDataBytes, encodeBrr } from '@amk/spc/brr-encode';
 import { computeSpcLayout } from '@amk/spc/layout';
+import { SPC_SAMPLE_RATE } from '@amk/spc/wasm-host';
 import { Button } from '../../shared/button/button';
 import { ButtonGroup } from '../../shared/button-group/button-group';
 import { IconPause } from '../../shared/icons/icon-pause';
@@ -37,6 +38,14 @@ import { MOD_REFUSALS, modWarningText } from '../import-dialog/import-text';
 /** What the porter chose for a sample: the factor that fits, a factor of their own, or none of its notes. */
 type Choice = 'auto' | 'drop' | number;
 
+/** A sample planned and encoded at one factor, with the loop frame and the rate it plays C-2 at. */
+interface Encoding {
+  sample: BrrSample;
+  bytes: Uint8Array;
+  loopStart: number | null;
+  rate: number;
+}
+
 /** The rate a sample plays a MOD's C-2 at, before resampling (PAL Paula over period 428). */
 const C2_HZ = 3_546_895 / 428;
 const CHIP_CLASS =
@@ -53,7 +62,32 @@ const FACTORS: readonly { value: number; label: string }[] = [
   { value: 1 / 8, label: '1/8' },
 ];
 
+/** How long a looping sample is heard for at least, so a short loop is a tone rather than a click. */
+const LOOP_SECONDS = 2;
+
 const kilobytes = (bytes: number): string => (bytes / 1024).toFixed(1);
+
+/** Decoded `pcm` at `rate` as 32 kHz, interpolated linearly, its loop repeated out to {@link LOOP_SECONDS}. */
+function heardAt(pcm: Int16Array, loopStart: number | null, rate: number): Int16Array {
+  const frames = pcm.length;
+  const start = loopStart ?? frames;
+  const loops = start < frames;
+  const step = rate / SPC_SAMPLE_RATE;
+  const length = Math.ceil(
+    loops ? Math.max(frames / step, LOOP_SECONDS * SPC_SAMPLE_RATE) : frames / step,
+  );
+  const at = (i: number): number =>
+    i < frames ? pcm[i] : loops ? pcm[start + ((i - start) % (frames - start))] : 0;
+
+  const out = new Int16Array(length);
+  for (let j = 0; j < length; j++) {
+    const position = j * step;
+    const i = Math.floor(position);
+    out[j] = Math.round(at(i) + (at(i + 1) - at(i)) * (position - i));
+  }
+
+  return out;
+}
 
 /** `text`, or `null` where there is none to show. */
 const nonEmpty = (text: string | undefined): string | null =>
@@ -100,6 +134,8 @@ export class ModImportDialog {
     oneShot: $localize`:@@import.mod.sample.one-shot:import.mod.sample.one-shot`,
     drop: $localize`:@@import.mod.rate.drop:import.mod.rate.drop`,
     unused: $localize`:@@import.mod.sample.unused:import.mod.sample.unused`,
+    hear: $localize`:@@import.mod.sample.play.title:import.mod.sample.play.title`,
+    stopHearing: $localize`:@@import.mod.sample.stop.title:import.mod.sample.stop.title`,
   };
 
   protected readonly separations = [
@@ -123,7 +159,7 @@ export class ModImportDialog {
   protected readonly previewError = signal<string | null>(null);
 
   /** Each sample planned and encoded at a factor, kept for the dialog's life so a change re-encodes only what it moved. */
-  private readonly encodings = new Map<string, { sample: BrrSample; bytes: Uint8Array }>();
+  private readonly encodings = new Map<string, Encoding>();
 
   protected readonly heading = computed(() => {
     const name = this.fileName();
@@ -152,18 +188,19 @@ export class ModImportDialog {
     return this.choices().get(index) ?? 'auto';
   }
 
-  private encoded(
-    mod: ModImport,
-    index: number,
-    factor: number,
-  ): { sample: BrrSample; bytes: Uint8Array } {
+  private encoded(mod: ModImport, index: number, factor: number): Encoding {
     const key = `${index}:${factor}`;
     let entry = this.encodings.get(key);
     if (!entry) {
       const name = this.sampleName(index);
       const plan = planSample(mod.file.samples[index - 1], factor);
       const bytes = encodeBrr(plan.pcm, plan.loopStart);
-      entry = { sample: parseBrr(name, bytes), bytes };
+      entry = {
+        sample: parseBrr(name, bytes),
+        bytes,
+        loopStart: plan.loopStart,
+        rate: C2_HZ * plan.factor,
+      };
       this.encodings.set(key, entry);
     }
 
@@ -356,12 +393,15 @@ export class ModImportDialog {
     const autoLabel = $localize`:@@import.mod.rate.auto:import.mod.rate.auto ${auto.toFixed(2)}:factor:`;
     const bytes = new Map(this.brrs().map((b) => [b.index, b.sample.data.length]));
     const factors = new Map(written.samples.map((s) => [s.index, s.factor]));
+    const sounding = this.audition.playing();
     return mod.samples.map((summary) => {
       const choice = this.choiceOf(summary.index);
       const factor = factors.get(summary.index);
       const size = bytes.get(summary.index);
       return {
         index: summary.index,
+        playable: size !== undefined,
+        sounding: sounding === this.sampleName(summary.index),
         name:
           nonEmpty(summary.name) ??
           $localize`:@@import.mod.sample.unnamed:import.mod.sample.unnamed ${summary.index}:index:`,
@@ -464,6 +504,28 @@ export class ModImportDialog {
     this.choices.set(next);
   }
 
+  /** Plays a sample as encoded at its factor, at the pitch of the MOD's C-2, or stops it. */
+  protected toggleSample(index: number): void {
+    const name = this.sampleName(index);
+    if (this.audition.playing() === name) {
+      this.audition.stop();
+      return;
+    }
+
+    const entry = this.brrs().find((b) => b.index === index);
+    if (!entry) {
+      return;
+    }
+
+    const preview = this.preview();
+    if (preview?.state() === 'playing') {
+      void preview.toggle();
+    }
+
+    stopAll(this.playback, this.audition);
+    this.audition.play(name, heardAt(decodeBrr(entry.sample), entry.loopStart, entry.rate));
+  }
+
   protected setSeparation(event: Event): void {
     this.separation.set(Number((event.target as HTMLSelectElement).value));
   }
@@ -497,6 +559,11 @@ export class ModImportDialog {
 
   /** However the dialog closed, the preview stops and lets its audio go. */
   protected onClosed(): void {
+    const sounding = this.audition.playing();
+    if (sounding !== null && this.brrs().some((b) => b.name === sounding)) {
+      this.audition.stop();
+    }
+
     this.preview()?.dispose();
     this.preview.set(null);
     this.mod.set(null);

@@ -138,9 +138,23 @@
             @for (row of sampleRows(); track row.index) {
               <tr class="border-edge border-t">
                 <td class="text-ink px-2 py-1">
-                  <div class="max-w-48 truncate" [title]="row.name">
-                    <span class="text-ink-muted mr-1 font-mono tabular-nums">{{ row.index }}</span>
-                    {{ row.name }}
+                  <div class="flex items-center gap-1.5">
+                    <button
+                      amk-button
+                      size="sm"
+                      class="shrink-0 font-mono"
+                      [title]="row.sounding ? text.stopHearing : text.hear"
+                      [disabled]="!row.playable"
+                      (click)="toggleSample(row.index)"
+                    >
+                      {{ row.sounding ? '■' : '▶' }}
+                    </button>
+                    <div class="max-w-48 truncate" [title]="row.name">
+                      <span class="text-ink-muted mr-1 font-mono tabular-nums">{{
+                        row.index
+                      }}</span>
+                      {{ row.name }}
+                    </div>
                   </div>
                 </td>
                 <td class="px-2 py-1 text-right font-mono tabular-nums">{{ row.frames }}</td>

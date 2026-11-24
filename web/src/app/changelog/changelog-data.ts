@@ -11,6 +11,7 @@ export const CHANGELOG: readonly ChangelogEntry[] = [
   {
     date: '24 November 2026',
     items: [
+      'Hear each sample at its chosen quality in MOD import',
       "AddmusicK's optimized SMW samples: #samples { #optimized }, a sample library toggle that switches the song between the two sets, and an option in MOD import",
       'Arpeggio, tremolo and finer tuning in imported MOD files',
       'Import MOD files as a new song, with their samples resampled to fit and a preview',
