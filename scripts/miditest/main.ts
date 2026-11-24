@@ -23,5 +23,6 @@ await runSections([
 	["instruments", () => import("./instruments")],
 	["effects", () => import("./effects")],
 	["end-to-end", () => import("./end-to-end")],
+	["sharing", () => import("./sharing")],
 	["stress", () => import("./stress")],
 ]);

@@ -34,10 +34,17 @@ function busySong(seed: number, ppq: number): Uint8Array {
 		}
 
 		let tick = pick(ppq);
+		// Some parts sit out whole bars, so some can share a channel.
+		const restsIn = new Set(Array.from({ length: bars }, (_, i) => i).filter(() => pick(3) === 0));
 		while (tick < bars * bar) {
 			const length = Math.max(1, Math.round(ppq * [0.25, 0.5, 1, 1.5, 2, 4][pick(6)] + (pick(9) - 4)));
 			const voices = 1 + (pick(4) === 0 ? pick(3) : 0);
 			const root = 36 + pick(48);
+			if (restsIn.has(Math.floor(tick / bar))) {
+				tick += bar - (tick % bar);
+				continue;
+			}
+
 			for (let v = 0; v < voices; v++) {
 				events.push(...note(tick, channel, root + v * 4, length, 20 + pick(108)));
 			}
@@ -84,11 +91,21 @@ section("stress: busy songs at every grid");
 for (const seed of [1, 2, 3, 4, 5, 6]) {
 	const ppq = [96, 120, 480, 192, 384, 960][seed - 1];
 	const bytes = busySong(seed, ppq);
+	const shared = imported(bytes, { share: true }).written.channels;
+	check(
+		`seed ${seed}: sharing puts more parts than channels`,
+		shared.flat().length > shared.length,
+		JSON.stringify(shared),
+	);
 	for (const grid of [1, 2, 3, 4, 6, 12]) {
-		for (const loop of ["markers", "song"] as const) {
-			const { song } = imported(bytes, { grid, loop });
+		for (const [loop, share] of [
+			["markers", false],
+			["song", false],
+			["markers", true],
+		] as const) {
+			const { song } = imported(bytes, { grid, loop, share });
 			check(
-				`seed ${seed} at ${ppq} a quarter, a grid of ${grid}, looping ${loop}: no problems`,
+				`seed ${seed} at ${ppq} a quarter, a grid of ${grid}, looping ${loop}${share ? ", shared" : ""}: no problems`,
 				song.result.ok && problems(song).length === 0,
 				problems(song).slice(0, 4).join("; "),
 			);

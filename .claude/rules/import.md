@@ -25,8 +25,10 @@ Read before changing an importer in `@amk/import` or the Import dialog. The pack
   diagnostic catches belongs there as well as in the section it is about.
 - **Ticks.** Times are file ticks until the writer and driver ticks after it; the snap grid is in
   driver ticks.
-- **At most eight parts are written**, in part order, on `#0` up. `CHANNEL_LIMIT` is the one place
-  the number is stated.
+- **At most eight channels are written**, on `#0` up: one part each, or with `share` the parts
+  `packChannels` puts together, which never cut one another short (`clashes`). `CHANNEL_LIMIT` is
+  the one place the number is stated. A hand-over between parts is the only overlap allowed, and
+  the writer trims it as it trims one within a part.
 
 ## The dialog
 
@@ -38,6 +40,9 @@ Read before changing an importer in `@amk/import` or the Import dialog. The pack
   the candidate is not the document. It is made when the dialog opens and disposed when it closes,
   however it closes (`Modal.closed`). Pressing play stops the transport and the previewer first
   (`stopAll`). Its position and seek bar are ticks; seconds only label them.
+- **Share channels** is off until pressed. Pressing it keeps the porter's choice and adds the parts
+  that now fit (`addWhileFits`); releasing it keeps the first eight by priority (`oneEach`). While
+  it is on, a Keep toggle is disabled only where the part would need a ninth channel (`fits`).
 - Import replaces the whole document through `EditorRequests.applyAll` with `show`, one undo step
   back to the song that was open, as `held-song-banner.ts` does.
 

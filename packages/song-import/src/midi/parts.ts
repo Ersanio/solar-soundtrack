@@ -257,16 +257,26 @@ export function splitParts(performance: Performance): Split {
 }
 
 /**
- * The parts an import keeps unless the porter says otherwise, in part order: every channel's and
- * every kit family's first voice before any second one, so each instrument is heard, and within
- * that the parts that sound the most.
+ * The parts in the order they are offered a channel: every channel's and every kit family's first
+ * voice before any second one, so each instrument is heard, and within that the parts that sound
+ * the most.
  */
+export function byPriority(parts: readonly Part[]): Part[] {
+	return [...parts].sort((a, b) => Number(a.voice > 0) - Number(b.voice > 0) || b.weight - a.weight);
+}
+
+/** `ids` in part order, which is the order kept parts are written in. */
+export function inPartOrder(parts: readonly Part[], ids: Iterable<string>): string[] {
+	const chosen = new Set(ids);
+	return parts.filter((p) => chosen.has(p.id)).map((p) => p.id);
+}
+
+/** The parts an import keeps unless the porter says otherwise, one a channel: the first `limit` by priority. */
 export function suggestedParts(parts: readonly Part[], limit = 8): string[] {
-	const chosen = new Set(
-		[...parts]
-			.sort((a, b) => Number(a.voice > 0) - Number(b.voice > 0) || b.weight - a.weight)
+	return inPartOrder(
+		parts,
+		byPriority(parts)
 			.slice(0, limit)
 			.map((p) => p.id),
 	);
-	return parts.filter((p) => chosen.has(p.id)).map((p) => p.id);
 }

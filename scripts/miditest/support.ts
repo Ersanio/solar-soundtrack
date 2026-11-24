@@ -158,16 +158,20 @@ export interface Imported {
 	song: Song;
 }
 
-/** Reads `bytes`, writes the suggested parts at a 1/64 grid (or as `options` says), and compiles the song. */
+/**
+ * Reads `bytes`, writes the suggested parts at a 1/64 grid (or as `options` says), and compiles the
+ * song. With `share` and no `keep`, the parts suggested for sharing are kept.
+ */
 export function imported(bytes: Uint8Array, options: Partial<SongOptions> = {}): Imported {
 	const midi = readMidi(bytes);
 	const written = writeMidi(
 		midi,
 		{
 			grid: 3,
-			keep: midi.suggested,
+			keep: options.share ? midi.suggestedShared : midi.suggested,
 			instruments: new Map(),
 			echo: true,
+			share: false,
 			loop: "markers",
 			fallbackTitle: null,
 			...options,

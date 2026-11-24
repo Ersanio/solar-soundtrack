@@ -34,6 +34,17 @@
           import.echo
         </button>
 
+        <button
+          i18n="@@import.share"
+          amk-toggle
+          i18n-title="@@import.share.title"
+          title="import.share.title"
+          [pressed]="share()"
+          (click)="toggleShare()"
+        >
+          import.share
+        </button>
+
         @if (hasMarkers()) {
           <button
             i18n="@@import.loop-markers"
@@ -120,20 +131,40 @@
         </table>
       </div>
 
-      <p
-        i18n="@@import.kept"
-        class="text-xs"
-        [class.text-warn]="full()"
-        [class.text-ink-muted]="!full()"
-      >
-        import.kept
-        {{
-          keptCount() // i18n(ph='kept')
-        }}
-        {{
-          limit // i18n(ph='limit')
-        }}
-      </p>
+      @if (share()) {
+        <p
+          i18n="@@import.kept.shared"
+          class="text-xs"
+          [class.text-warn]="full()"
+          [class.text-ink-muted]="!full()"
+        >
+          import.kept.shared
+          {{
+            keptCount() // i18n(ph='kept')
+          }}
+          {{
+            channelCount() // i18n(ph='channels')
+          }}
+          {{
+            limit // i18n(ph='limit')
+          }}
+        </p>
+      } @else {
+        <p
+          i18n="@@import.kept"
+          class="text-xs"
+          [class.text-warn]="full()"
+          [class.text-ink-muted]="!full()"
+        >
+          import.kept
+          {{
+            keptCount() // i18n(ph='kept')
+          }}
+          {{
+            limit // i18n(ph='limit')
+          }}
+        </p>
+      }
 
       @if (warnings().length > 0) {
         <ul class="text-warn flex flex-col gap-0.5 text-xs leading-relaxed">

@@ -1,6 +1,6 @@
 /**
- * A MIDI performance written out as an `#amk 4` song on the stock instruments, one kept part per
- * channel.
+ * A MIDI performance written out as an `#amk 4` song on the stock instruments, each kept part on a
+ * channel of its own or, where the porter lets them, sharing one with parts it never overlaps.
  *
  * Time is the file's quarter note made AddmusicK's 48 ticks, snapped to the porter's grid. Every
  * channel is padded with rests to one bar-rounded end, so none of them drifts against the others
@@ -30,6 +30,7 @@ import { octaveFor, spellNote } from "@amk/core/mml-text";
 import type { InstrumentTables } from "@amk/spc/instruments";
 import { highestTrue } from "@amk/spc/pitch";
 import { GM_PROGRAMS } from "./gm";
+import { type Clashes, packChannels } from "./channels";
 import type { Part, PartNote } from "./parts";
 import { type ChannelPerformance, type Performance, type Point, quarterTicks, valueAt } from "./performance";
 
@@ -37,8 +38,10 @@ import { type ChannelPerformance, type Performance, type Point, quarterTicks, va
 export interface SongOptions {
 	/** The snap grid, in driver ticks: 1 (exact) to 12 (a sixteenth). */
 	grid: number;
-	/** The parts to write, at most eight, each on the next channel in part order. */
+	/** The parts to write, on at most eight channels, in part order. */
 	keep: readonly string[];
+	/** Let parts that never sound at once share a channel; otherwise each part has one. */
+	share: boolean;
 	/** A stock instrument chosen for a melodic part in place of its program's. */
 	instruments: ReadonlyMap<string, number>;
 	/** Write the reverb send as echo. */
@@ -62,8 +65,8 @@ export type ImportWarning =
 export interface WrittenSong {
 	text: string;
 	warnings: ImportWarning[];
-	/** Which channel each kept part was written to, in channel order. */
-	channels: readonly string[];
+	/** The parts written to each channel, in channel order. */
+	channels: readonly (readonly string[])[];
 }
 
 /** AddmusicK's channels. */
@@ -308,6 +311,13 @@ function barStarts(performance: Performance, time: Timebase, end: number): numbe
 
 interface PartPlan {
 	part: Part;
+	notes: Written[];
+	reverb: boolean;
+}
+
+/** A channel: the parts it holds, and their notes as one stream. */
+interface ChannelPlan {
+	parts: readonly Part[];
 	notes: Written[];
 	reverb: boolean;
 }
@@ -785,6 +795,59 @@ class ChannelText {
 	}
 }
 
+/**
+ * The parts sharing a channel as one stream of notes, in order of start. Where one part hands over
+ * to another, the earlier note is trimmed to meet the later; two struck together keep the first, and
+ * the other is counted with its part's merged notes.
+ */
+function mergePlans(plans: readonly PartPlan[], warnings: ImportWarning[]): ChannelPlan {
+	const tagged = plans.flatMap((plan) => plan.notes.map((note) => ({ note, part: plan.part.id })));
+	tagged.sort((a, b) => a.note.start - b.note.start);
+	const notes: Written[] = [];
+	const dropped = new Map<string, number>();
+	for (const { note, part } of tagged) {
+		const last = notes.at(-1);
+		if (last?.start === note.start) {
+			dropped.set(part, (dropped.get(part) ?? 0) + 1);
+			continue;
+		}
+
+		if (last && last.end > note.start) {
+			trimTo(last, note.start);
+		}
+
+		notes.push(note);
+	}
+
+	for (const [part, count] of dropped) {
+		warnings.push({ code: "merged", part, count });
+	}
+
+	return { parts: plans.map((plan) => plan.part), notes, reverb: plans.some((plan) => plan.reverb) };
+}
+
+/**
+ * A note cut to end at `end`: its pieces cut with it, and a slide kept only where its piece still
+ * has room for it (`slidePieces`).
+ */
+function trimTo(note: Written, end: number): void {
+	const length = end - note.start;
+	note.end = end;
+	const kept: Piece[] = [];
+	for (const piece of note.pieces) {
+		if (piece.start >= length) {
+			break;
+		}
+
+		const room = Math.min(piece.length, length - piece.start);
+		const slide =
+			piece.slide && room >= 3 ? { ...piece.slide, duration: Math.min(piece.slide.duration, room - 2) } : null;
+		kept.push({ start: piece.start, length: room, slide });
+	}
+
+	note.pieces = kept;
+}
+
 /** The part's line in the song's comments. */
 function describe(part: Part): string {
 	const voice = `${part.voice + 1}/${part.voices}`;
@@ -799,6 +862,7 @@ function describe(part: Part): string {
 export function writeSong(
 	performance: Performance,
 	parts: readonly Part[],
+	clash: Clashes,
 	unmappedDrums: number,
 	options: SongOptions,
 	tables: InstrumentTables | null,
@@ -814,7 +878,14 @@ export function writeSong(
 
 	const time = timebase(performance, options.grid);
 	const keep = new Set(options.keep);
-	const kept = parts.filter((p) => keep.has(p.id)).slice(0, CHANNEL_LIMIT);
+	const ordered = parts.filter((p) => keep.has(p.id)).map((p) => p.id);
+	const layout = (options.share ? packChannels(parts, ordered, clash) : ordered.map((id) => [id])).slice(
+		0,
+		CHANNEL_LIMIT,
+	);
+	const byId = new Map(parts.map((p) => [p.id, p]));
+	const grouped = layout.map((ids) => ids.map((id) => byId.get(id)).filter((p): p is Part => p !== undefined));
+	const kept = grouped.flat();
 
 	// The tempo map in driver ticks; an SMPTE file is played at 120 BPM throughout.
 	const tempos =
@@ -856,14 +927,19 @@ export function writeSong(
 	const loopTick = markers ? time.snap(time.amk(markers.start)) : null;
 	const loopAt = loopTick !== null && loopTick > 0 && loopTick < songEnd ? loopTick : null;
 
-	const plans = kept.map((part) => {
-		const channel = performance.channels.find((c) => c.channel === part.channel);
-		if (!channel) {
-			throw new Error(`part ${part.id} has no channel`);
-		}
+	const plans = grouped.map((group) =>
+		mergePlans(
+			group.map((part) => {
+				const channel = performance.channels.find((c) => c.channel === part.channel);
+				if (!channel) {
+					throw new Error(`part ${part.id} has no channel`);
+				}
 
-		return planPart(part, channel, options, time, tables, songEnd, loopAt, tempoAt, warnings);
-	});
+				return planPart(part, channel, options, time, tables, songEnd, loopAt, tempoAt, warnings);
+			}),
+			warnings,
+		),
+	);
 
 	const echoMask = options.echo
 		? plans.reduce((mask, plan, index) => (plan.reverb ? mask | (1 << index) : mask), 0)
@@ -897,7 +973,7 @@ export function writeSong(
 			]);
 		}
 
-		return `#${index} ${describe(plan.part)}\n${writer.write(songEnd)}`;
+		return `#${index} ${plan.parts.map(describe).join("\n")}\n${writer.write(songEnd)}`;
 	});
 
 	const title = tagText(performance.title) ?? tagText(options.fallbackTitle);
@@ -912,5 +988,5 @@ export function writeSong(
 	];
 
 	const text = ["#amk 4", "", ...spc, "", body.join("\n\n"), ""].join("\n");
-	return { text, warnings, channels: plans.map((plan) => plan.part.id) };
+	return { text, warnings, channels: plans.map((plan) => plan.parts.map((part) => part.id)) };
 }

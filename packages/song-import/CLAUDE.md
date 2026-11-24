@@ -17,6 +17,7 @@ and playing the result is the caller's. It returns **codes and values, never wor
 | `midi/smf.ts`         | The Standard MIDI File reader                                         |
 | `midi/performance.ts` | Every track merged onto one time line: notes and GM controller curves |
 | `midi/parts.ts`       | A channel split into parts that play one note at a time               |
+| `midi/channels.ts`    | Which parts can share a channel, and packing them onto eight          |
 | `midi/gm.ts`          | GM programs and drum keys matched to the stock instruments and drums  |
 | `midi/write-mml.ts`   | The parts kept, written as an `#amk 4` song                           |
 
@@ -48,6 +49,26 @@ and holding it for that 64th. A part's `id` stays the same however the options c
 dialog's choices survive a new grid. The suggestion keeps every channel's and every family's first
 voice before any second one, so each instrument is heard, and the parts that sound the most within
 that.
+
+## Sharing a channel
+
+With `share` on, parts that never sound at once take turns on one channel, so the limit is eight
+channels rather than eight parts. `channels.ts` decides which may: `clashes` (computed once, in
+`readMidi`) marks two parts that cannot, and a pair clashes where a note of one would cut a note of
+the other short. Only a hand-over may overlap — the later note starting within a 64th of the
+earlier one's end and outlasting it, which the writer trims as it trims a legato line. A note inside
+another, two struck together, or any overlap with a drum hit is a clash. `packChannels` puts each
+kept part, in part order, on the lowest channel holding nothing it clashes with, so keeping or
+dropping one part moves as few others as it can; `fits` is whether that comes to eight or fewer.
+`suggestedShared` and `addWhileFits` take parts in the suggestion's priority while they still fit.
+
+The writer plans each part as it would alone — its own instrument, octave shift, folding and slides
+— and `mergePlans` lays a channel's parts out as one stream of notes: a note running into the next
+part's is trimmed to meet it, with its pieces and slides cut to what still fits (`trimTo`). Nothing
+else is needed at a hand-over: `ChannelText` already writes the instrument, volume, pan, vibrato
+and `q` wherever the next note needs them, so the `@` switch and its settings come for free. A
+channel takes the echo when any of its parts sends reverb, and its `#N` line names every part on
+it.
 
 ## Writing
 

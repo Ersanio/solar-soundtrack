@@ -104,11 +104,12 @@ something in the directory, which load by themselves when such a file is opened.
 
 **Rules:** `import.md`
 
+- `channels.ts` — Which parts can share a channel: two parts whose notes never sound at the same time, give or take a short overlap the writer trims, take turns on one channel.
 - `gm.ts` — General MIDI's programs and drum keys, matched to the instruments the driver ships.
 - `parts.ts` — A MIDI channel's notes split into parts that each play one note at a time, which is all an AddmusicK channel can do.
 - `performance.ts` (500+ lines) — What a MIDI file plays: each channel's notes and controller curves, the tempo and metre maps, the loop markers and the song's names, with every track merged onto one time line.
 - `smf.ts` — A Standard MIDI File, read into its tracks of timed events.
-- `write-mml.ts` (750+ lines) — A MIDI performance written out as an `#amk 4` song on the stock instruments, one kept part per channel.
+- `write-mml.ts` (750+ lines) — A MIDI performance written out as an `#amk 4` song on the stock instruments, each kept part on a channel of its own or, where the porter lets them, sharing one with parts it never overlaps.
 
 ## packages/spc/src
 
@@ -236,6 +237,7 @@ something in the directory, which load by themselves when such a file is opened.
 - `instruments.ts` — `miditest`: every GM program on a reachable stock instrument, a part played where its instrument plays true, and the porter's choice of instrument written.
 - `main.ts` — MIDI import: `@amk/import/midi` reading a Standard MIDI File and writing it as a song.
 - `parser.ts` — `miditest`: the SMF reader — variable-length quantities, running status, a velocity-0 key-off, RMID, unknown chunks, a file cut short, and the files it refuses.
+- `sharing.ts` — `miditest`: parts that never sound at once sharing a channel — when the porter asks for it, never for parts that overlap, and with every note still walked where the file plays it.
 - `stress.ts` — `miditest`: a busy, seeded song — chords, bends, controller sweeps, a kit, tempo changes and a loop — imported at every grid without raising a problem.
 - `support.ts` — What every `miditest` section shares: a MIDI file built in memory, imported, compiled, walked and diagnosed as the editor does.
 - `timing.ts` — `miditest`: time — every division lands on the driver's 48 ticks a quarter, each snap grid rounds as it says, and a tempo change is a `t` at its tick.

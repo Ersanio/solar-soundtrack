@@ -1,7 +1,16 @@
 import { Component, computed, effect, inject, signal, untracked, viewChild } from '@angular/core';
 
 import { detectFormat } from '@amk/import/format';
-import { CHANNEL_LIMIT, type MidiImport, SmfError, readMidi, writeMidi } from '@amk/import/midi';
+import {
+  CHANNEL_LIMIT,
+  type MidiImport,
+  SmfError,
+  addWhileFits,
+  fits,
+  oneEach,
+  readMidi,
+  writeMidi,
+} from '@amk/import/midi';
 import { familyOf } from '@amk/import/midi/gm';
 import { walkSong } from '@amk/spc/song-walk';
 import { STOCK_NAMES } from '../../output/command-inspector/instrument-inspector/instrument-choices';
@@ -47,9 +56,11 @@ function keyName(key: number): string {
  * preview of the song they make before it replaces the document.
  *
  * A MIDI channel playing chords is split into parts that play one note at a time, and a kit into
- * its families, so a file may make more parts than AddmusicK has channels; the eight that sound
- * the most are kept until the porter chooses. Every change rewrites and recompiles the candidate,
- * and a playing preview carries on from where it was.
+ * its families, so a file may make more parts than AddmusicK has channels; every instrument's first
+ * voice, then the parts that sound the most, are kept until the porter chooses. Share channels lets
+ * parts that never sound at once take turns on one channel, so the limit is eight channels rather
+ * than eight parts. Every change rewrites and recompiles the candidate, and a playing preview
+ * carries on from where it was.
  */
 @Component({
   selector: 'amk-import-dialog',
@@ -92,6 +103,7 @@ export class ImportDialog {
   private readonly instruments = signal<ReadonlyMap<string, number>>(new Map());
   protected readonly echo = signal(true);
   protected readonly loopAtMarkers = signal(true);
+  protected readonly share = signal(false);
   protected readonly preview = signal<ImportPreview | null>(null);
   protected readonly previewError = signal<string | null>(null);
 
@@ -128,6 +140,7 @@ export class ImportDialog {
         keep: this.keep(),
         instruments: this.instruments(),
         echo: this.echo(),
+        share: this.share(),
         loop: this.loopAtMarkers() ? 'markers' : 'song',
         fallbackTitle: this.fileName().replace(/\.[^.]*$/, ''),
       },
@@ -188,18 +201,20 @@ export class ImportDialog {
       return [];
     }
 
-    const kept = new Set(this.keep());
-    const channels = this.written()?.channels ?? [];
-    const full = kept.size >= CHANNEL_LIMIT;
+    const keep = this.keep();
+    const kept = new Set(keep);
+    const channelOf = new Map(
+      (this.written()?.channels ?? []).flatMap((ids, channel) => ids.map((id) => [id, channel])),
+    );
     const chosen = this.instruments();
     return midi.parts.map((part) => {
       const on = kept.has(part.id);
-      const channel = channels.indexOf(part.id);
+      const channel = channelOf.get(part.id) ?? -1;
       const kind = kindOf(part, familyOf(part.program));
       return {
         id: part.id,
         on,
-        disabled: !on && full,
+        disabled: !on && !this.room(midi, keep, part.id),
         channel: channel >= 0 ? `#${channel}` : null,
         chipClass:
           channel >= 0 ? `${CHIP_CLASS} ${CHANNEL_BG[channel]} ${CHANNEL_SCOPE[channel]}` : '',
@@ -215,7 +230,17 @@ export class ImportDialog {
   });
 
   protected readonly keptCount = computed(() => this.keep().length);
-  protected readonly full = computed(() => this.keep().length >= CHANNEL_LIMIT);
+  protected readonly channelCount = computed(() => this.written()?.channels.length ?? 0);
+  /** Whether no part left out could be kept. */
+  protected readonly full = computed(() => {
+    const midi = this.midi();
+    if (!midi) {
+      return false;
+    }
+
+    const keep = this.keep();
+    return midi.parts.every((part) => keep.includes(part.id) || !this.room(midi, keep, part.id));
+  });
 
   protected readonly warnings = computed(() => {
     const midi = this.midi();
@@ -257,7 +282,7 @@ export class ImportDialog {
     } else {
       try {
         const midi = readMidi(bytes);
-        this.keep.set(midi.suggested);
+        this.keep.set(this.share() ? midi.suggestedShared : midi.suggested);
         this.loopAtMarkers.set(midi.performance.loop !== null);
         this.midi.set(midi);
       } catch (error) {
@@ -276,6 +301,35 @@ export class ImportDialog {
     this.modal().open();
   }
 
+  /** Whether keeping `id` as well as `keep` still fits on AddmusicK's channels. */
+  private room(midi: MidiImport, keep: readonly string[], id: string): boolean {
+    if (!this.share()) {
+      return keep.length < CHANNEL_LIMIT;
+    }
+
+    const next = midi.parts
+      .filter((part) => part.id === id || keep.includes(part.id))
+      .map((part) => part.id);
+    return fits(midi.parts, next, midi.clash, CHANNEL_LIMIT);
+  }
+
+  /**
+   * Sharing on keeps the porter's choice and adds the parts that now fit; sharing off keeps the
+   * first eight of it by priority, one a channel.
+   */
+  protected toggleShare(): void {
+    const midi = this.midi();
+    const share = !this.share();
+    this.share.set(share);
+    if (midi) {
+      this.keep.set(
+        share
+          ? addWhileFits(midi.parts, this.keep(), midi.clash, CHANNEL_LIMIT)
+          : oneEach(midi.parts, this.keep(), CHANNEL_LIMIT),
+      );
+    }
+  }
+
   protected toggleKeep(id: string): void {
     const midi = this.midi();
     if (!midi) {
@@ -285,7 +339,7 @@ export class ImportDialog {
     const kept = new Set(this.keep());
     if (kept.has(id)) {
       kept.delete(id);
-    } else if (kept.size < CHANNEL_LIMIT) {
+    } else if (this.room(midi, this.keep(), id)) {
       kept.add(id);
     }
 
