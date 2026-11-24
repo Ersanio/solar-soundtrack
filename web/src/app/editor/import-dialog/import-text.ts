@@ -4,6 +4,7 @@ import type { GmFamily, DrumFamily } from '@amk/import/midi/gm';
 import type { ImportWarning, Part, SmfErrorCode } from '@amk/import/midi';
 import type { ModErrorCode } from '@amk/import/mod';
 import type { S3mErrorCode } from '@amk/import/s3m';
+import type { XmErrorCode } from '@amk/import/xm';
 import type { TrackerImportWarning } from '@amk/import/tracker';
 import type { TrackerFormat, UmxErrorCode } from '@amk/import/umx';
 
@@ -175,9 +176,12 @@ export const S3M_REFUSALS: Readonly<Record<S3mErrorCode, string>> = {
   'not-s3m': $localize`:@@import.refuse.not-s3m:import.refuse.not-s3m`,
 };
 
+export const XM_REFUSALS: Readonly<Record<XmErrorCode, string>> = {
+  'not-xm': $localize`:@@import.refuse.not-xm:import.refuse.not-xm`,
+};
+
 /** Why a UMX holding a module of another format cannot be imported yet. */
-export const UMX_HOLDS: Readonly<Record<Exclude<TrackerFormat, 'mod' | 's3m'>, string>> = {
-  xm: $localize`:@@import.refuse.umx.xm:import.refuse.umx.xm`,
+export const UMX_HOLDS: Readonly<Record<Exclude<TrackerFormat, 'mod' | 's3m' | 'xm'>, string>> = {
   it: $localize`:@@import.refuse.umx.it:import.refuse.umx.it`,
 };
 

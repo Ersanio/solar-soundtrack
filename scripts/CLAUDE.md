@@ -1,27 +1,27 @@
 # Harnesses
 
-Eighteen byte-level checks, each a standalone esbuild-bundled Node script with its own npm script.
+Nineteen byte-level checks, each a standalone esbuild-bundled Node script with its own npm script.
 There are no `.spec.ts` files anywhere in the repository and no `npm run test`. These are the suite.
 
 Run one by name (`npm run selftest`), or let `npm run affected` pick the ones that import what you
-changed. `npm run check` runs all eighteen, one step each, in the order of these groups, which are
+changed. `npm run check` runs all nineteen, one step each, in the order of these groups, which are
 also runnable on their own:
 
-| Group               | Harnesses                                                                           |
-| ------------------- | ----------------------------------------------------------------------------------- |
-| `check:compiler`    | `selftest`                                                                          |
-| `check:tokens`      | `tokentest`, `edittest`, `palettetest`                                              |
-| `check:spc`         | `adsrtest`, `instrtest`, `brrtest`, `firtest`                                       |
-| `check:integration` | `spctest`, `audiotest`, `worklettest`, `walktest`, `miditest`, `modtest`, `s3mtest` |
-| `check:app`         | `charttest`, `pianorolltest`, `fixtest`                                             |
+| Group               | Harnesses                                                                                     |
+| ------------------- | --------------------------------------------------------------------------------------------- |
+| `check:compiler`    | `selftest`                                                                                    |
+| `check:tokens`      | `tokentest`, `edittest`, `palettetest`                                                        |
+| `check:spc`         | `adsrtest`, `instrtest`, `brrtest`, `firtest`                                                 |
+| `check:integration` | `spctest`, `audiotest`, `worklettest`, `walktest`, `miditest`, `modtest`, `s3mtest`, `xmtest` |
+| `check:app`         | `charttest`, `pianorolltest`, `fixtest`                                                       |
 
-Fourteen of the eighteen import a value from two or more `@amk/*` packages — every one but `adsrtest`,
+Fifteen of the nineteen import a value from two or more `@amk/*` packages — every one but `adsrtest`,
 `edittest`, `selftest` and `tokentest` — which is why they all live here rather than one per package,
 and why they share `harness.ts` rather than each carrying a copy: copies drift. Recount that rule
 rather than bumping the number when one is added.
 
-Eleven are split into section files — `selftest`, `tokentest`, `palettetest`, `audiotest`,
-`walktest`, `charttest`, `pianorolltest`, `fixtest`, `miditest`, `modtest` and `s3mtest` — each a `scripts/<name>/` holding `main.ts`, which lists the
+Twelve are split into section files — `selftest`, `tokentest`, `palettetest`, `audiotest`,
+`walktest`, `charttest`, `pianorolltest`, `fixtest`, `miditest`, `modtest`, `s3mtest` and `xmtest` — each a `scripts/<name>/` holding `main.ts`, which lists the
 sections in order, `support.ts`, which holds what they share, and one file per section. The other
 seven are one file each, `scripts/<name>.ts`.
 
@@ -47,6 +47,7 @@ harness. In one line each:
 - `fixtest` — The Problems list's fixes, each held to the song it leaves, and the diff the fix dialog draws.
 - `miditest` — MIDI import: a file built in memory, imported, compiled and walked, its notes held to the walk's and the song held to raise no problem.
 - `s3mtest` — S3M import: a file built in memory, imported, its samples encoded, the song compiled, walked and assembled, its notes held to the ticks and pitches Scream Tracker 3 plays them at and the song held to raise no problem.
+- `xmtest` — XM import: a file built in memory, imported, its samples encoded, the song compiled, walked and assembled, its notes held to the ticks and pitches FastTracker II plays them at, its envelopes to the volumes FT2 steps, and the song held to raise no problem.
 - `modtest` — MOD import, and a UMX unwrapped to its MOD: a file built in memory, imported, its samples encoded, the song compiled, walked and assembled, its notes held to the MOD's ticks and pitches and the song held to raise no problem.
 
 ## Running one, and reading what it prints
@@ -89,7 +90,7 @@ a table of step, result, duration and tally, and for each failure its first FAIL
 is written `-`). The exit code is non-zero when any step failed.
 
 - **`npm run check`** (`check.mjs`) is the gate: `format:check`, `codemap:check`,
-  `citations:check`, `typecheck`, `typecheck:packages`, `typecheck:scripts`, the eighteen harnesses,
+  `citations:check`, `typecheck`, `typecheck:packages`, `typecheck:scripts`, the nineteen harnesses,
   `i18n:check`. It carries on past a failure, so one run reports everything that is broken;
   `-- --bail` stops at the first. `npm run check -- pianorolltest i18n:check` runs only the steps named,
   and `-- --list` prints the names.

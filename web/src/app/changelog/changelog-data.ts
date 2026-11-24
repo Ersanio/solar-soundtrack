@@ -10,7 +10,10 @@ export const CHANGELOG: readonly ChangelogEntry[] = [
   // ─── newest first; add new blocks here ──────────────────────────────────
   {
     date: '25 November 2026',
-    items: ['Import S3M files (Scream Tracker 3), and UMX files that hold one'],
+    items: [
+      'Import XM files (FastTracker II), and UMX files that hold one',
+      'Import S3M files (Scream Tracker 3), and UMX files that hold one',
+    ],
   },
   {
     date: '24 November 2026',

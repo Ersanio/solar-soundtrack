@@ -9,6 +9,7 @@
 
 import { isMod } from "./mod/file";
 import { isS3m } from "./s3m/file";
+import { isXm } from "./xm/file";
 
 /** Why a package gave no module. */
 export type UmxErrorCode = "not-umx" | "no-music" | "audio";
@@ -47,7 +48,7 @@ export function trackerFormatOf(bytes: Uint8Array): TrackerFormat | null {
 		return "it";
 	}
 
-	if (ascii(bytes, 0, "Extended Module: ")) {
+	if (isXm(bytes)) {
 		return "xm";
 	}
 

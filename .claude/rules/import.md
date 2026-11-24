@@ -14,11 +14,11 @@ true.
 ## The package
 
 - **It writes text, and a module's samples as PCM.** No encoder, compile, walk or player: the
-  dialogs, `miditest`, `modtest` and `s3mtest` do that with what it returns. It reads
+  dialogs, `miditest`, `modtest`, `s3mtest` and `xmtest` do that with what it returns. It reads
   `@amk/spc/instruments` and `@amk/spc/pitch` for the stock instruments' ranges and the driver's pitch
   arithmetic, and the lint boundary allows nothing more, so a module's samples are planned here (`planSample`) and encoded by the
   caller (`@amk/spc/brr-encode`).
-- **Codes, not words.** A refusal is an `SmfError`, `ModError`, `S3mError` or `UmxError` code, a warning an
+- **Codes, not words.** A refusal is an `SmfError`, `ModError`, `S3mError`, `XmError` or `UmxError` code, a warning an
   `ImportWarning` or `TrackerImportWarning`; `import-text.ts` words them under the `import` i18n group.
 - **Read once, write often.** `readMidi` does the parsing and the split into parts and takes no
   options; `writeMidi` takes the grid, the parts kept and their instruments and runs on every
@@ -53,9 +53,9 @@ true.
 ## The dialog
 
 - `top-bar.html`'s Import is a `<label>` round a file input, so the press is the picker's own. Any
-  file opens a dialog: `detectFormat` sends a MOD, an S3M or a UMX to `ModImportDialog`, the
+  file opens a dialog: `detectFormat` sends a MOD, an S3M, an XM or a UMX to `ModImportDialog`, the
   tracker dialog, and everything else to `ImportDialog`, which says why when it cannot read it. The
-  tracker dialog unwraps a UMX (`unwrapUmx`) and reads the MOD or S3M inside, or says which format
+  tracker dialog unwraps a UMX (`unwrapUmx`) and reads the MOD, S3M or XM inside, or says which format
   it holds instead.
 - The candidate is a `computed` chain: written, compiled with `EditorStore.compileText`, assembled
   with `EditorStore.spcFor`, walked for its clock. Import is held back while it has no SPC.
@@ -72,7 +72,7 @@ true.
   across imports (`solar-soundtrack.import-drums`), each entry checked as it is read.
 - Import replaces the whole document through `EditorRequests.applyAll` with `show`, one undo step
   back to the song that was open, as `held-song-banner.ts` does.
-- **The tracker dialog** (`mod-import-dialog/`), for a MOD or an S3M, is the MIDI dialog's shape on the same preview and
+- **The tracker dialog** (`mod-import-dialog/`), for a MOD, an S3M or an XM, is the MIDI dialog's shape on the same preview and
   candidate chain (`import-candidate.ts`), with the song's samples passed beside the library
   (`EditorStore.compileText`'s extra names, `SampleStore.resolveWith`) until Import adds them
   (`SampleStore.add`); Undo brings the old song back and leaves the samples. Every sample on Auto

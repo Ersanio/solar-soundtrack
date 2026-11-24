@@ -1,8 +1,8 @@
 # @amk/import
 
 Importers: another music format read and written out as AddmusicK MML. MIDI and tracker modules
-(MOD and S3M) are what there are, and a UMX is unwrapped to the module it holds; older AddMusic SPCs and
-other `.spc` rips are meant to join them as readers beside `midi/`, `mod/` and `s3m/`, picked by `format.ts`'s `detectFormat`, which sniffs a file's signature rather than
+(MOD, S3M and XM) are what there are, and a UMX is unwrapped to the module it holds; older AddMusic SPCs and
+other `.spc` rips are meant to join them as readers beside `midi/`, `mod/`, `s3m/` and `xm/`, picked by `format.ts`'s `detectFormat`, which sniffs a file's signature rather than
 trusting its name.
 
 Depends on `@amk/core` (the MML spellers' tables, `DEFAULT_TRANSPOSE`, the velocity table) and on
@@ -10,7 +10,7 @@ Depends on `@amk/core` (the MML spellers' tables, `DEFAULT_TRANSPOSE`, the veloc
 playing true), and nothing else — `eslint.config.js` holds it. It writes text, and for a module the
 PCM of each sample planned for BRR; encoding, compiling, walking and playing the result is the
 caller's. It returns **codes and values, never words**: a refusal is an `SmfError`, `ModError`,
-`S3mError` or `UmxError` code and a warning an `ImportWarning` or `TrackerImportWarning`, which the Import dialogs word.
+`S3mError`, `XmError` or `UmxError` code and a warning an `ImportWarning` or `TrackerImportWarning`, which the Import dialogs word.
 
 | Module                 | What it is                                                              |
 | ---------------------- | ----------------------------------------------------------------------- |
@@ -34,6 +34,10 @@ caller's. It returns **codes and values, never words**: a refusal is an `SmfErro
 | `s3m.ts`               | `readS3m`: an S3M read, played and summed up for the dialog             |
 | `s3m/file.ts`          | The S3M reader: the header, parapointers, packed patterns, samples      |
 | `s3m/play.ts`          | The song played tick by tick as Scream Tracker 3 plays it               |
+| `xm.ts`                | `readXm`: an XM read, played and summed up for the dialog               |
+| `xm/file.ts`           | The XM reader: patterns, instruments, envelopes, delta-coded samples    |
+| `xm/play.ts`           | The song played tick by tick as FastTracker II plays it                 |
+| `tracker/pingpong.ts`  | A ping-pong loop laid out forward, as a BRR loop runs                   |
 | `umx.ts`               | An Unreal package unwrapped to the module its Music object holds        |
 
 ## Reading
@@ -208,7 +212,7 @@ kept channels play, and `#instruments` giving each `$FF $E0 $7F` and its tuning 
   after it opens on a tie, which a loop's body cannot start or end on. `/` and the song's start
   state the next note's settings ahead of everything (`SST0511`).
 
-`modtest` and `s3mtest` pin all of it against the compiler and the walk, and seeded busy songs at
+`modtest`, `s3mtest` and `xmtest` pin all of it against the compiler and the walk, and seeded busy songs at
 several factors against the editor's diagnostics.
 
 ## S3M
@@ -239,6 +243,33 @@ row's ticks without its notes, SDx strikes late, Qxy strikes again with its volu
 hold from the tick after its first. Oxx, S1x, a note delay past its row and a note on an AdLib
 instrument are counted rather than played.
 
+## XM
+
+### Reading
+
+`xm/file.ts` follows 8bitbubsy's `ft2_load_xm.c`. The header's size field says where the patterns
+start; a pattern's cells are packed, a byte with bit 7 set naming which of note, instrument,
+volume, effect and parameter follow. Version 1.04 stores the patterns and then each instrument's
+header beside its samples' data; 1.02 and 1.03 store every instrument header, the patterns, then all
+the data. An instrument header of size 0 is 263 bytes. Samples are delta-coded, 8- or 16-bit, their
+lengths in bytes; a ping-pong loop is laid out forward and back (`unrollPingPong`), since a BRR loop
+runs one way. Every instrument's samples are numbered in one list, so each is an instrument of the
+song, and an instrument's keymap says which plays each note.
+
+### Playing
+
+`xm/play.ts` follows `ft2_replayer.c`. Tick 0 reads the row (`getNewNote`, with its order of tone
+portamento, K00, an instrument alone and a note) and runs the volume column's and the effects'
+tick-zero work; the later ticks the rest; EEx replays the row with the later ticks' work only;
+`getNextPos` moves on, E6x's break row left standing as FT2 leaves it. Periods are FT2's: linear,
+`(1936 - index) × 4`, 64 to a semitone, at `8363 × 2^((4608 - period) / 768)` Hz, or Amiga, 1712 at
+C-4, at `8363 × 1712 / period`; a sample's C-4 rate is 8363 Hz moved by its relative note and
+finetune. The volume recorded is the note's volume under the global volume, the fadeout after a
+key off and the volume envelope, stepped as `updateVolPanAutoVib` steps it; the pan is the panning
+envelope's. FT2's arpeggio counts down the ticks left in the row, so its steps come y before x,
+and it is recorded that way round. The auto-vibrato is recorded at its full depth where no vibrato
+command runs, its sweep not followed. 9xx, E3x, Lxx and a note delay past its row are counted.
+
 ## UMX
 
 `umx.ts` follows OpenMPT's `UMXTools.cpp`. An Unreal package names its name, import and export
@@ -249,6 +280,6 @@ between its property list and its payload differs at 62, 100 and 120 (62 rather 
 63, for Mech8.umx and others). The first export whose class is `Music` and whose bytes are a tracker
 module is taken, and the module's format is read from its signature, since the name a package gives
 it can be wrong. Music that is recorded audio (MP2, Ogg, WAV) has no notes and is refused as
-`audio`. The tracker dialog reads a MOD or an S3M unwrapped and names any other format it cannot
+`audio`. The tracker dialog reads a MOD, an S3M or an XM unwrapped and names any other format it cannot
 read yet.
 `modtest`'s `umx` section builds packages at each version's layout.

@@ -103,6 +103,7 @@ something in the directory, which load by themselves when such a file is opened.
 - `s3m.ts` — Importing an S3M: read, played as Scream Tracker 3 plays it, and handed to the tracker importer, which writes it as a song with its samples planned for BRR.
 - `tracker.ts` — Importing a tracker module, whatever its format: a song and its play summed up for the dialog once, then written as an `#amk 4` song as often as the porter changes what to keep.
 - `umx.ts` — An Unreal package (`.umx`) unwrapped to the tracker module its `Music` object holds.
+- `xm.ts` — Importing an XM: read, played as FastTracker II plays it, and handed to the tracker importer, which writes it as a song with its samples planned for BRR.
 
 ## packages/song-import/src/midi
 
@@ -141,8 +142,16 @@ something in the directory, which load by themselves when such a file is opened.
 **Rules:** `import.md`
 
 - `model.ts` — What a tracker module's reader and player hand the writer, in units no one format owns: a sample's PCM and the rate it plays at on its reference note, and every channel's pitch in semitones from that note, tick by tick.
+- `pingpong.ts` — A ping-pong loop laid out as a forward one: the loop, then the loop backwards, since a BRR loop only runs forward.
 - `samples.ts` — A tracker module's samples made ready for BRR: resampled to fit ARAM, their loops moved onto block boundaries, and the tuning an AddmusicK instrument needs to play each at the module's pitch.
 - `write-mml.ts` (750+ lines) — A played tracker module written out as an `#amk 4` song: each kept channel on one of AddmusicK's, each sample a custom instrument after `#default` (or `#optimized`).
+
+## packages/song-import/src/xm
+
+**Rules:** `import.md`
+
+- `file.ts` (300+ lines) — A FastTracker II module (`.xm`), read into its instruments and their samples, its order list and its patterns of cells.
+- `play.ts` (750+ lines) — An XM played tick by tick, the way FastTracker II plays it: what each channel sounds on every tick, and where the song loops.
 
 ## packages/spc/src
 
@@ -426,6 +435,19 @@ something in the directory, which load by themselves when such a file is opened.
 - `vibrato.ts` — `walktest`: the vibrato a note sounds under, how long it moves before the key-off, and the note inspector's reading of it.
 - `written-pitch.ts` — `walktest`: the note map keeps the pitch that was written.
 
+## scripts/xmtest
+
+**Rules:** `harnesses/*.md`
+
+- `effects.ts` — `xmtest`: effects — the volume column, Axy and the fine slides, Cxx and Gxx, 1xx, 2xx, 3xx and X1x as `$DD`, 4xy and the volume column's vibrato as `$DE`, 0xy in FT2's order, 7xy, E9x, Rxy, ECx, 8xx and Pxy, Kxx, Txy, and what is left out counted.
+- `instruments.ts` — `xmtest`: instruments — the volume envelope with its sustain and loop, a key off releasing it and the fadeout ending the note, the panning envelope, an instrument with no note, and the auto-vibrato as `$DE`.
+- `main.ts` — XM import: `@amk/import/xm` reading an XM, playing it as FastTracker II does and writing it through the tracker writer as a song on custom instruments made from its samples.
+- `pitch.ts` — `xmtest`: pitch — FT2's periods and rates, three octaves on linear and Amiga frequencies at three relative notes and factors, each walked within a few cents; E5x and a relative note; and the keymap's sample for each note.
+- `reader.ts` — `xmtest`: the XM reader — the header, packed and unpacked cells, delta-coded 8- and 16-bit samples, a ping-pong loop laid out forward, instruments and their keymaps, a cut file, what is refused, and an XM inside a UMX.
+- `stress.ts` — `xmtest`: busy, seeded XMs — twelve channels, every effect, the volume column, instruments with envelopes, fadeouts, keymaps and auto-vibrato, repeats and a jump back — imported at several factors, on both frequency tables and both loop modes, without raising a problem, and assembled.
+- `support.ts` — What every `xmtest` section shares: an XM file built in memory, imported, its samples encoded, and the song compiled, walked, diagnosed and assembled as the editor does.
+- `timing.ts` — `xmtest`: timing on the walk — twelve driver ticks a row at speed 6, Fxx as speed and BPM, Bxx as the loop point, Dxx in BCD, E6x, EEx and EDx, a short pattern, and the restart order.
+
 ## web/src/app
 
 - `app.config.ts` — The app's providers: global error listeners, and the service worker in production builds.
@@ -489,7 +511,7 @@ something in the directory, which load by themselves when such a file is opened.
 
 **Rules:** `import.md`
 
-- `mod-import-dialog.ts` (500+ lines) — The Import dialog for a tracker module (a MOD or an S3M, or a UMX holding one): its channels to keep, each sample's resampling, and a preview of the song they make before it replaces the document and its samples join the library.
+- `mod-import-dialog.ts` (500+ lines) — The Import dialog for a tracker module (a MOD, an S3M or an XM, or a UMX holding one): its channels to keep, each sample's resampling, and a preview of the song they make before it replaces the document and its samples join the library.
 
 ## web/src/app/editor/scope-mini
 

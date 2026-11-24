@@ -7,10 +7,11 @@
 
 import { isMod } from "./mod/file";
 import { isS3m } from "./s3m/file";
+import { isXm } from "./xm/file";
 import { isUmx } from "./umx";
 
 /** The formats there is a reader for. */
-export type ImportFormat = "midi" | "mod" | "s3m" | "umx";
+export type ImportFormat = "midi" | "mod" | "s3m" | "xm" | "umx";
 
 function ascii(bytes: Uint8Array, at: number, text: string): boolean {
 	for (let i = 0; i < text.length; i++) {
@@ -62,6 +63,10 @@ export function detectFormat(bytes: Uint8Array): ImportFormat | null {
 
 	if (isS3m(bytes)) {
 		return "s3m";
+	}
+
+	if (isXm(bytes)) {
+		return "xm";
 	}
 
 	return isMod(bytes) ? "mod" : null;

@@ -2,6 +2,7 @@ import { Component, computed, effect, inject, signal, untracked, viewChild } fro
 
 import { ModError, readMod } from '@amk/import/mod';
 import { S3mError, readS3m } from '@amk/import/s3m';
+import { XmError, readXm } from '@amk/import/xm';
 import {
   TRACKER_CHANNEL_LIMIT,
   type TrackerImport,
@@ -39,6 +40,7 @@ import { ImportPreview } from '../import-dialog/import-preview';
 import {
   MOD_REFUSALS,
   S3M_REFUSALS,
+  XM_REFUSALS,
   UMX_HOLDS,
   UMX_REFUSALS,
   modWarningText,
@@ -119,7 +121,7 @@ function stemOf(fileName: string): string {
 }
 
 /**
- * The Import dialog for a tracker module (a MOD or an S3M, or a UMX holding one): its channels to
+ * The Import dialog for a tracker module (a MOD, an S3M or an XM, or a UMX holding one): its channels to
  * keep, each sample's resampling, and a preview of the song they make before it replaces the document
  * and its samples join the library.
  *
@@ -495,7 +497,7 @@ export class ModImportDialog {
     });
   }
 
-  /** Reads `bytes`, a MOD, an S3M or a UMX holding one, and opens the dialog on them, or on why they cannot be read. */
+  /** Reads `bytes`, a MOD, an S3M, an XM or a UMX holding one, and opens the dialog on them, or on why they cannot be read. */
   openWith(name: string, bytes: Uint8Array): void {
     this.fileName.set(name);
     this.previewError.set(null);
@@ -515,12 +517,14 @@ export class ModImportDialog {
           ? readMod(inner.bytes)
           : inner.format === 's3m'
             ? readS3m(inner.bytes)
-            : null;
+            : inner.format === 'xm'
+              ? readXm(inner.bytes)
+              : null;
       if (read) {
         this.keep.set(read.suggested);
         this.loopAtJump.set(read.play.loopTick > 0);
         this.mod.set(read);
-      } else if (inner.format === 'xm' || inner.format === 'it') {
+      } else if (inner.format === 'it') {
         this.refusal.set(UMX_HOLDS[inner.format]);
       }
     } catch (error) {
@@ -529,9 +533,11 @@ export class ModImportDialog {
           ? MOD_REFUSALS[error.code]
           : error instanceof S3mError
             ? S3M_REFUSALS[error.code]
-            : error instanceof UmxError
-              ? UMX_REFUSALS[error.code]
-              : errorMessage(error),
+            : error instanceof XmError
+              ? XM_REFUSALS[error.code]
+              : error instanceof UmxError
+                ? UMX_REFUSALS[error.code]
+                : errorMessage(error),
       );
     }
 
