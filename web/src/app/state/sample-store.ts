@@ -220,9 +220,18 @@ export class SampleStore {
       .map((file) => file.name),
   );
 
-  readonly overrideCount = computed(
-    () => this.files().filter((file) => file.source !== 'stock').length,
-  );
+  /** Names whose bytes or lock differ from the bundle — what `resetAll` puts back. */
+  readonly resetCount = computed(() => {
+    const names = new Set(this.overrides().keys());
+    const defaults = this.defaultImportant();
+    for (const [name, important] of this.importantOverrides()) {
+      if (important !== defaults.has(name)) {
+        names.add(name);
+      }
+    }
+
+    return names.size;
+  });
 
   /**
    * Name → sample, rebuilt only when a file actually changes.
@@ -447,6 +456,8 @@ export class SampleStore {
     }
 
     this.drop(name);
+    // Back to the manifest's `importantSamples` answer for this name.
+    this.setImportant(name, this.defaultImportant().has(name));
   }
 
   /** Removes a user-uploaded file. No-op for bundled names — use `revert`. */
@@ -468,9 +479,10 @@ export class SampleStore {
     void del(name);
   }
 
-  /** Restores the bundled library exactly. */
+  /** Restores the bundled library exactly, importance included. */
   resetAll(): void {
     this.overrides.set(new Map());
+    this.importantOverrides.set(new Map());
   }
 
   private describe(name: string, bytes: Uint8Array, source: SampleFile['source']): SampleFile {
