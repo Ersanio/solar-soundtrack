@@ -110,7 +110,15 @@
                 <td class="px-2 py-1 font-mono whitespace-nowrap">{{ row.range }}</td>
                 <td class="px-2 py-1">
                   @if (row.drums) {
-                    <span class="text-ink-muted">{{ text.kit }}</span>
+                    <button
+                      amk-toggle
+                      i18n-title="@@import.part.kit.title"
+                      title="import.part.kit.title"
+                      [pressed]="showDrums()"
+                      (click)="showDrums.set(!showDrums())"
+                    >
+                      {{ customDrums() ? text.kitCustom : text.kit }}
+                    </button>
                   } @else {
                     <select
                       class="bg-inset border-edge text-ink h-6 max-w-44 cursor-pointer rounded-md border px-1 text-xs"
@@ -130,6 +138,91 @@
           </tbody>
         </table>
       </div>
+
+      @if (showDrums() && drumRows().length > 0) {
+        <div class="flex flex-col gap-1.5">
+          <div class="flex items-center gap-2">
+            <h3 i18n="@@import.drums.heading" class="text-ink text-xs font-medium">
+              import.drums.heading
+            </h3>
+            <button
+              i18n="@@import.drums.reset"
+              amk-button
+              size="sm"
+              variant="ghost"
+              i18n-title="@@import.drums.reset.title"
+              title="import.drums.reset.title"
+              [disabled]="!customDrums()"
+              (click)="resetDrums()"
+            >
+              import.drums.reset
+            </button>
+          </div>
+
+          <div class="border-edge overflow-auto rounded-md border">
+            <table class="w-full text-xs">
+              <thead class="bg-inset text-ink-muted text-left">
+                <tr>
+                  <th i18n="@@import.drums.column.sound" class="px-2 py-1 font-medium">
+                    import.drums.column.sound
+                  </th>
+                  <th i18n="@@import.drums.column.hits" class="px-2 py-1 text-right font-medium">
+                    import.drums.column.hits
+                  </th>
+                  <th i18n="@@import.drums.column.instrument" class="px-2 py-1 font-medium">
+                    import.drums.column.instrument
+                  </th>
+                  <th i18n="@@import.drums.column.pitch" class="px-2 py-1 font-medium">
+                    import.drums.column.pitch
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (drum of drumRows(); track drum.key) {
+                  <tr class="border-edge border-t">
+                    <td class="px-2 py-1 whitespace-nowrap">
+                      <span [class.text-accent]="drum.custom" [class.text-ink]="!drum.custom">
+                        {{ drum.name }}
+                      </span>
+                      <span class="text-ink-muted ml-1 font-mono tabular-nums">{{ drum.key }}</span>
+                    </td>
+                    <td class="px-2 py-1 text-right font-mono tabular-nums">{{ drum.hits }}</td>
+                    <td class="px-2 py-1">
+                      <select
+                        class="bg-inset border-edge text-ink h-6 max-w-44 cursor-pointer rounded-md border px-1 text-xs"
+                        (change)="setDrumInstrument(drum.key, $event)"
+                      >
+                        @for (option of instrumentOptions; track option.value) {
+                          <option
+                            [value]="option.value"
+                            [selected]="option.value === drum.instrument"
+                          >
+                            {{ option.label }}
+                          </option>
+                        }
+                      </select>
+                    </td>
+                    <td class="px-2 py-1">
+                      @if (drum.pitched) {
+                        <select
+                          class="bg-inset border-edge text-ink h-6 cursor-pointer rounded-md border px-1 font-mono text-xs"
+                          (change)="setDrumPitch(drum.key, $event)"
+                        >
+                          @for (option of pitchOptions; track option.value) {
+                            <option [value]="option.value" [selected]="option.value === drum.pitch">
+                              {{ option.label }}
+                            </option>
+                          }
+                        </select>
+                      }
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        </div>
+      }
 
       @if (share()) {
         <p

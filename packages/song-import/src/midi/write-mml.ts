@@ -29,7 +29,7 @@ import { hex2 } from "@amk/core/hex";
 import { octaveFor, spellNote } from "@amk/core/mml-text";
 import type { InstrumentTables } from "@amk/spc/instruments";
 import { highestTrue } from "@amk/spc/pitch";
-import { GM_PROGRAMS } from "./gm";
+import { type DrumSound, GM_PROGRAMS } from "./gm";
 import { type Clashes, packChannels } from "./channels";
 import type { Part, PartNote } from "./parts";
 import { type ChannelPerformance, type Performance, type Point, quarterTicks, valueAt } from "./performance";
@@ -44,6 +44,8 @@ export interface SongOptions {
 	share: boolean;
 	/** A stock instrument chosen for a melodic part in place of its program's. */
 	instruments: ReadonlyMap<string, number>;
+	/** The sound the porter chose for a GM drum key in place of `GM_DRUMS`'; the kit's families stay GM's. */
+	drums: ReadonlyMap<number, DrumSound>;
 	/** Write the reverb send as echo. */
 	echo: boolean;
 	/** Loop from the file's loop markers, or the whole song. */
@@ -334,8 +336,9 @@ function planPart(
 	warnings: ImportWarning[],
 ): PartPlan {
 	const override = options.instruments.get(part.id);
+	const soundOf = (note: PartNote): DrumSound | null => (note.drum ? (options.drums.get(note.key) ?? note.drum) : null);
 	const instrumentOf = (note: PartNote): number =>
-		note.drum ? note.drum.instrument : (override ?? GM_PROGRAMS[note.program] ?? 0);
+		soundOf(note)?.instrument ?? override ?? GM_PROGRAMS[note.program] ?? 0;
 
 	// Snap, then let no two notes start together and none run into the next.
 	interface Snapped {
@@ -384,7 +387,8 @@ function planPart(
 	// The octave shift that leaves fewest notes outside their instrument's range, and folds the rest.
 	const pitched = snapped.filter((s) => !isDrum(instrumentOf(s.note)));
 	const bendAt = (tick: number): number => Math.round(valueAt(channel.bend, tick));
-	const baseKey = (s: Snapped): number => (s.note.drum?.key ?? s.note.key) + (s.note.drum ? 0 : bendAt(s.note.start));
+	const baseKey = (s: Snapped): number =>
+		s.note.drum ? (soundOf(s.note)?.key ?? s.note.key) : s.note.key + bendAt(s.note.start);
 	const outside = (octaves: number): number =>
 		pitched.filter((s) => {
 			const range = keyRange(instrumentOf(s.note), tables);

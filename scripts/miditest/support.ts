@@ -170,6 +170,7 @@ export function imported(bytes: Uint8Array, options: Partial<SongOptions> = {}):
 			grid: 3,
 			keep: options.share ? midi.suggestedShared : midi.suggested,
 			instruments: new Map(),
+			drums: new Map(),
 			echo: true,
 			share: false,
 			loop: "markers",

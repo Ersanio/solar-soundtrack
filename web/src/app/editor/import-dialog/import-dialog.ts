@@ -33,8 +33,19 @@ import { stopAll } from '../../state/stop-all';
 import { CHANNEL_BG, CHANNEL_SCOPE } from '../../util/channel-palette';
 import { errorMessage } from '../../util/format';
 import { readStored, writeStored } from '../../util/storage';
+import {
+  HIGHEST_PITCH,
+  LOWEST_PITCH,
+  isStock,
+  isStockDrum,
+  readDrumMap,
+  soundOf,
+  withInstrument,
+  withPitch,
+  writeDrumMap,
+} from './import-drums';
 import { type PreviewSong, ImportPreview } from './import-preview';
-import { REFUSALS, kindOf, sourceOf, warningText } from './import-text';
+import { DRUM_NAMES, REFUSALS, kindOf, sourceOf, warningText } from './import-text';
 
 const SNAP_KEY = 'solar-soundtrack.import-snap';
 const LETTERS = ['c', 'c+', 'd', 'd+', 'e', 'f', 'f+', 'g', 'g+', 'a', 'a+', 'b'];
@@ -51,6 +62,12 @@ function keyName(key: number): string {
   return `o${Math.floor((key - 24) / 12) + 1} ${LETTERS[key % 12]}`;
 }
 
+/** The pitches a drum sound on a pitched instrument may be set to. */
+const PITCHES = Array.from({ length: HIGHEST_PITCH - LOWEST_PITCH + 1 }, (_, i) => ({
+  value: LOWEST_PITCH + i,
+  label: keyName(LOWEST_PITCH + i),
+}));
+
 /**
  * The Import dialog: a file read into parts, the parts to keep and what to play them on, and a
  * preview of the song they make before it replaces the document.
@@ -59,7 +76,8 @@ function keyName(key: number): string {
  * its families, so a file may make more parts than AddmusicK has channels; every instrument's first
  * voice, then the parts that sound the most, are kept until the porter chooses. Share channels lets
  * parts that never sound at once take turns on one channel, so the limit is eight channels rather
- * than eight parts. Every change rewrites and recompiles the candidate, and a playing preview
+ * than eight parts. The drum map plays each GM drum sound on the instrument the porter picks, and is
+ * kept across imports. Every change rewrites and recompiles the candidate, and a playing preview
  * carries on from where it was.
  */
 @Component({
@@ -82,6 +100,7 @@ export class ImportDialog {
     play: $localize`:@@import.preview.play.title:import.preview.play.title`,
     pause: $localize`:@@import.preview.pause.title:import.preview.pause.title`,
     kit: $localize`:@@import.part.kit:import.part.kit`,
+    kitCustom: $localize`:@@import.part.kit.custom:import.part.kit.custom`,
   };
 
   protected readonly snaps = [
@@ -93,6 +112,7 @@ export class ImportDialog {
     { ticks: 1, label: $localize`:@@import.snap.exact:import.snap.exact` },
   ];
   protected readonly instrumentOptions = INSTRUMENTS;
+  protected readonly pitchOptions = PITCHES;
   protected readonly limit = CHANNEL_LIMIT;
 
   protected readonly fileName = signal('');
@@ -101,6 +121,9 @@ export class ImportDialog {
   protected readonly grid = signal(this.storedSnap());
   protected readonly keep = signal<readonly string[]>([]);
   private readonly instruments = signal<ReadonlyMap<string, number>>(new Map());
+  /** The porter's sound for each GM drum key, kept across imports. */
+  protected readonly drumMap = signal(readDrumMap());
+  protected readonly showDrums = signal(false);
   protected readonly echo = signal(true);
   protected readonly loopAtMarkers = signal(true);
   protected readonly share = signal(false);
@@ -139,6 +162,7 @@ export class ImportDialog {
         grid: this.grid(),
         keep: this.keep(),
         instruments: this.instruments(),
+        drums: this.drumMap(),
         echo: this.echo(),
         share: this.share(),
         loop: this.loopAtMarkers() ? 'markers' : 'song',
@@ -229,6 +253,28 @@ export class ImportDialog {
     });
   });
 
+  protected readonly customDrums = computed(() => this.drumMap().size > 0);
+
+  /** The drum sounds the file plays, lowest key first, each on its stock sound or the porter's. */
+  protected readonly drumRows = computed(() => {
+    const keys = this.midi()?.drumKeys ?? new Map<number, number>();
+    const map = this.drumMap();
+    return [...keys]
+      .sort((a, b) => a[0] - b[0])
+      .map(([key, hits]) => {
+        const sound = soundOf(map, key);
+        return {
+          key,
+          name: DRUM_NAMES[key] ?? String(key),
+          hits,
+          instrument: sound.instrument,
+          pitched: !isStockDrum(sound.instrument),
+          pitch: sound.key ?? null,
+          custom: !isStock(key, sound),
+        };
+      });
+  });
+
   protected readonly keptCount = computed(() => this.keep().length);
   protected readonly channelCount = computed(() => this.written()?.channels.length ?? 0);
   /** Whether no part left out could be kept. */
@@ -262,6 +308,9 @@ export class ImportDialog {
 
     // Sanctioned effect: mirrors the Snap choice into storage.
     effect(() => writeStored(SNAP_KEY, String(this.grid())));
+
+    // Sanctioned effect: mirrors the drum map into storage.
+    effect(() => writeDrumMap(this.drumMap()));
   }
 
   private storedSnap(): number {
@@ -274,6 +323,7 @@ export class ImportDialog {
     this.fileName.set(name);
     this.previewError.set(null);
     this.instruments.set(new Map());
+    this.showDrums.set(false);
     this.echo.set(true);
     this.midi.set(null);
     this.refusal.set(null);
@@ -351,6 +401,20 @@ export class ImportDialog {
     const next = new Map(this.instruments());
     next.set(id, value);
     this.instruments.set(next);
+  }
+
+  protected setDrumInstrument(key: number, event: Event): void {
+    const instrument = Number((event.target as HTMLSelectElement).value);
+    this.drumMap.set(withInstrument(this.drumMap(), key, instrument));
+  }
+
+  protected setDrumPitch(key: number, event: Event): void {
+    const pitch = Number((event.target as HTMLSelectElement).value);
+    this.drumMap.set(withPitch(this.drumMap(), key, pitch));
+  }
+
+  protected resetDrums(): void {
+    this.drumMap.set(new Map());
   }
 
   protected setSnap(event: Event): void {

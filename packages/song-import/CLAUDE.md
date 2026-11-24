@@ -45,7 +45,8 @@ one channel each keep a voice, and a texture of ten makes ten parts and no more.
 its last note has ended, less an allowance of a 64th or half the shorter note, so a legato line
 stays one part. A kit is split by family first — kick and snare, hi-hats and cymbals, toms and hand
 percussion — and then by hits struck together, each hit taking the first free voice of its family
-and holding it for that 64th. A part's `id` stays the same however the options change, so the
+and holding it for that 64th. The porter's drum map (`SongOptions.drums`) is applied by the writer, so
+it changes what a key is played on and never which family or part it lands in. A part's `id` stays the same however the options change, so the
 dialog's choices survive a new grid. The suggestion keeps every channel's and every family's first
 voice before any second one, so each instrument is heard, and the parts that sound the most within
 that.

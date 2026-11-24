@@ -43,6 +43,10 @@ Read before changing an importer in `@amk/import` or the Import dialog. The pack
 - **Share channels** is off until pressed. Pressing it keeps the porter's choice and adds the parts
   that now fit (`addWhileFits`); releasing it keeps the first eight by priority (`oneEach`). While
   it is on, a Keep toggle is disabled only where the part would need a ninth channel (`fits`).
+- **The drum map** (`import-drums.ts`) is a write option, `SongOptions.drums`: it changes the
+  instrument and pitch a GM drum key is written with, never the kit's families or its parts, which
+  `GM_DRUMS` fixes at read time. It holds only what differs from stock and is kept in storage
+  across imports (`solar-soundtrack.import-drums`), each entry checked as it is read.
 - Import replaces the whole document through `EditorRequests.applyAll` with `show`, one undo step
   back to the song that was open, as `held-song-banner.ts` does.
 

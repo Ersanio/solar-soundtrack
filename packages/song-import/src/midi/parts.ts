@@ -47,6 +47,8 @@ export interface Split {
 	parts: Part[];
 	/** Kit hits on a key no stock drum stands in for. */
 	unmappedDrums: number;
+	/** The hits on each kit key a stock drum stands in for, by GM key. */
+	drumKeys: Map<number, number>;
 }
 
 const FAMILY_ORDER: readonly DrumFamily[] = ["kick-snare", "cymbals", "percussion"];
@@ -220,6 +222,7 @@ export function splitParts(performance: Performance): Split {
 	const melodic: Part[] = [];
 	const kits: Part[] = [];
 	let unmappedDrums = 0;
+	const drumKeys = new Map<number, number>();
 
 	for (const channel of performance.channels) {
 		if (!channel.drums) {
@@ -237,6 +240,7 @@ export function splitParts(performance: Performance): Split {
 				continue;
 			}
 
+			drumKeys.set(note.key, (drumKeys.get(note.key) ?? 0) + 1);
 			const list = byFamily.get(drum.family) ?? [];
 			list.push({ ...note, drum });
 			byFamily.set(drum.family, list);
@@ -253,7 +257,7 @@ export function splitParts(performance: Performance): Split {
 		}
 	}
 
-	return { parts: [...melodic, ...kits], unmappedDrums };
+	return { parts: [...melodic, ...kits], unmappedDrums, drumKeys };
 }
 
 /**

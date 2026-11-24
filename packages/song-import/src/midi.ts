@@ -17,6 +17,7 @@ import { CHANNEL_LIMIT, type SongOptions, type WrittenSong, writeSong } from "./
 export { CHANNEL_LIMIT, type ImportWarning, type SongOptions, type WrittenSong } from "./midi/write-mml";
 export { SmfError, type SmfErrorCode } from "./midi/smf";
 export type { Part } from "./midi/parts";
+export type { DrumSound } from "./midi/gm";
 export { type Clashes, addWhileFits, fits, oneEach, packChannels } from "./midi/channels";
 export type { Performance } from "./midi/performance";
 
@@ -25,6 +26,8 @@ export interface MidiImport {
 	parts: Part[];
 	/** Kit hits no stock drum stands in for, dropped. */
 	unmappedDrums: number;
+	/** The hits on each kit key a stock drum stands in for, by GM key: the sounds a drum map can change. */
+	drumKeys: ReadonlyMap<number, number>;
 	/** The parts kept until the porter chooses, one a channel: every instrument's first voice, then the ones that sound the most. */
 	suggested: string[];
 	/** Which parts cannot share a channel, by part index. */
@@ -36,13 +39,14 @@ export interface MidiImport {
 /** Reads a MIDI file into parts. Throws {@link SmfError} for a file it cannot read at all. */
 export function readMidi(bytes: Uint8Array): MidiImport {
 	const performance = perform(readSmf(bytes));
-	const { parts, unmappedDrums } = splitParts(performance);
+	const { parts, unmappedDrums, drumKeys } = splitParts(performance);
 	// A sixty-fourth note, the overlap a hand-over may have, as the voice split allows within a part.
 	const clash = clashes(parts, quarterTicks(performance) / 16);
 	return {
 		performance,
 		parts,
 		unmappedDrums,
+		drumKeys,
 		suggested: suggestedParts(parts, CHANNEL_LIMIT),
 		clash,
 		suggestedShared: addWhileFits(parts, [], clash, CHANNEL_LIMIT),

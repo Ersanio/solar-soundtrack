@@ -231,7 +231,7 @@ something in the directory, which load by themselves when such a file is opened.
 
 **Rules:** `harnesses/*.md`
 
-- `drums.ts` — `miditest`: drums — channel 10, a GS rhythm part and XG's drum bank read as kits, kit families split apart, and every GM key played on a stock drum or the bongo.
+- `drums.ts` — `miditest`: drums — channel 10, a GS rhythm part and XG's drum bank read as kits, kit families split apart, every GM key played on a stock drum or the bongo, and the porter's drum map.
 - `effects.ts` — `miditest`: what a MIDI does to a note, as the driver hears it — volume, pan, velocity, pitch bend as `$DD`, modulation as vibrato, reverb as echo, and the loop markers.
 - `end-to-end.ts` — `miditest`: a multi-track song imported whole — it compiles clean, and every note the file plays is walked at its tick and pitch.
 - `instruments.ts` — `miditest`: every GM program on a reachable stock instrument, a part played where its instrument plays true, and the porter's choice of instrument written.
@@ -419,6 +419,7 @@ something in the directory, which load by themselves when such a file is opened.
 **Rules:** `import.md`
 
 - `import-dialog.ts` (300+ lines) — The Import dialog: a file read into parts, the parts to keep and what to play them on, and a preview of the song they make before it replaces the document.
+- `import-drums.ts` — The Import dialog's drum map: the porter's sound for each GM drum key, kept in storage across imports.
 - `import-preview.ts` — The Import dialog's preview: the candidate song on a player of its own, with a playhead in driver ticks and a seek bar over them.
 - `import-text.ts` — What the Import dialog says: why a file could not be read, what the writer changed to fit it, and what each part is called.
 

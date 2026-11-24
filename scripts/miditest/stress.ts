@@ -1,5 +1,6 @@
 /** `miditest`: a busy, seeded song — chords, bends, controller sweeps, a kit, tempo changes and a loop — imported at every grid without raising a problem. */
 
+import type { DrumSound } from "@amk/import/midi";
 import { check, section } from "../harness";
 import { type Ev, bend, cc, imported, marker, note, problems, program, smf, tempo } from "./support";
 
@@ -86,6 +87,16 @@ function busySong(seed: number, ppq: number): Uint8Array {
 	return smf(tracks, 1, ppq);
 }
 
+/** The kit's keys on another stock drum, on pitched instruments in and out of their range, and one left stock. */
+const DRUM_MAP: ReadonlyMap<number, DrumSound> = new Map([
+	[36, { instrument: 26 }],
+	[38, { instrument: 10, key: 60 }],
+	[42, { instrument: 2, key: 24 }],
+	[45, { instrument: 8, key: 93 }],
+	[49, { instrument: 12, key: 55 }],
+	[54, { instrument: 0 }],
+]);
+
 section("stress: busy songs at every grid");
 
 for (const seed of [1, 2, 3, 4, 5, 6]) {
@@ -103,9 +114,9 @@ for (const seed of [1, 2, 3, 4, 5, 6]) {
 			["song", false],
 			["markers", true],
 		] as const) {
-			const { song } = imported(bytes, { grid, loop, share });
+			const { song } = imported(bytes, { grid, loop, share, drums: share ? DRUM_MAP : new Map() });
 			check(
-				`seed ${seed} at ${ppq} a quarter, a grid of ${grid}, looping ${loop}${share ? ", shared" : ""}: no problems`,
+				`seed ${seed} at ${ppq} a quarter, a grid of ${grid}, looping ${loop}${share ? ", shared, on a drum map" : ""}: no problems`,
 				song.result.ok && problems(song).length === 0,
 				problems(song).slice(0, 4).join("; "),
 			);

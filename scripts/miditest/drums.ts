@@ -1,8 +1,8 @@
-/** `miditest`: drums — channel 10, a GS rhythm part and XG's drum bank read as kits, kit families split apart, and every GM key played on a stock drum or the bongo. */
+/** `miditest`: drums — channel 10, a GS rhythm part and XG's drum bank read as kits, kit families split apart, every GM key played on a stock drum or the bongo, and the porter's drum map. */
 
 import { GM_DRUMS } from "@amk/import/midi/gm";
 import { check, section } from "../harness";
-import { cc, imported, note, played, problems, program, smf, sysex } from "./support";
+import { cc, imported, midiKey, note, played, problems, program, smf, sysex } from "./support";
 
 const Q = 96;
 
@@ -87,9 +87,48 @@ section("drums: every key");
 }
 
 {
-	const { written } = imported(smf([[...note(0, 9, 36, Q), ...note(Q, 9, 100, Q)]]));
+	const { midi, written } = imported(smf([[...note(0, 9, 36, Q), ...note(Q, 9, 100, Q)]]));
 	check(
 		"a key no drum stands in for is counted",
 		written.warnings.some((w) => w.code === "unmapped-drums" && w.count === 1),
 	);
+	check("and is not among the drum keys", [...midi.drumKeys].join(";") === "36,1");
+}
+
+section("drums: the porter's drum map");
+
+{
+	const events = [0, 1, 2, 3].flatMap((i) => [...note(i * Q, 9, i % 2 ? 38 : 36, 12), ...note(i * Q, 9, 42, 12)]);
+	const bytes = smf([events]);
+	const stock = imported(bytes);
+	const counted = [...stock.midi.drumKeys].sort((a, b) => a[0] - b[0]).join(";");
+	check("drum keys count the hits on each key", counted === "36,2;38,2;42,4", counted);
+
+	const snare = imported(bytes, { drums: new Map([[38, { instrument: 26 }]]) });
+	check(
+		"the snare on @26 is walked as @26, the kick still @21",
+		played(snare.song, 0)
+			.map((n) => n.percussion)
+			.join(",") === "0,5,0,5",
+	);
+
+	const pitched = imported(bytes, { drums: new Map([[36, { instrument: 12, key: 48 }]]) });
+	const kicks = played(pitched.song, 0).filter((n) => n.percussion === null);
+	check(
+		"the kick on @12 at a pitch is walked there",
+		kicks.length === 2 && kicks.every((n) => n.state.instrument === 12 && midiKey(n) === 48),
+		JSON.stringify(kicks.map((n) => [n.state.instrument, midiKey(n)])),
+	);
+	check("and raises nothing", problems(pitched.song).length === 0, problems(pitched.song).join("; "));
+	check(
+		"the parts are the same whatever the map",
+		JSON.stringify(pitched.written.channels) === JSON.stringify(stock.written.channels),
+	);
+
+	const high = imported(bytes, { drums: new Map([[42, { instrument: 8, key: 100 }]]) });
+	check(
+		"a sound pitched past its instrument's range is folded",
+		high.written.warnings.some((w) => w.code === "folded"),
+	);
+	check("and raises nothing", problems(high.song).length === 0, problems(high.song).join("; "));
 }

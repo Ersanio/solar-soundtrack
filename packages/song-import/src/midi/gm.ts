@@ -82,6 +82,9 @@ export interface DrumMatch {
 	key?: number;
 }
 
+/** What a drum key is played on: a stock drum, or any other instrument at {@link DrumMatch.key}. */
+export type DrumSound = Pick<DrumMatch, "instrument" | "key">;
+
 const kick = (instrument: number): DrumMatch => ({ instrument, family: "kick-snare" });
 const cymbal = (instrument: number): DrumMatch => ({ instrument, family: "cymbals" });
 const perc = (instrument: number): DrumMatch => ({ instrument, family: "percussion" });

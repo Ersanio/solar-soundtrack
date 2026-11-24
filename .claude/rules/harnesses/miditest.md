@@ -21,14 +21,14 @@ Two things here are load-bearing in ways the name does not suggest:
 - **`problems` excludes only `info`.** A warning is a failure, because an imported song a porter
   opens to warnings is an import that did not finish its job.
 
-| Section       | What it pins                                                                                                                                                                           |
-| ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `parser`      | variable-length quantities, running status across delta times and cancelled by a meta event, velocity-0 key-off, RMID, unknown chunks, a cut file, refusals                            |
-| `timing`      | PPQ 96/480/960 and SMPTE on 48 ticks a quarter, each snap grid, `t` from BPM and its clamp, a tempo walked at its tick and tied across a note, the padded end                          |
-| `voices`      | a chord split top line first, a melody kept from its bass, a legato overlap kept one part, the sustain pedal, eight kept out of ten and in part order                                  |
-| `drums`       | channel 10, a GS rhythm part and XG's bank 127 as kits, families split, every GM key on a stock drum or the bongo, an unmapped key counted                                             |
-| `instruments` | 128 programs on reachable instruments, the whole keyboard folded into each one's range, a part moved by octaves, the porter's choice and a program change                              |
-| `effects`     | `v`, `y`, `q`, a volume fade, the bend at the key-on and RPN 0, `$DD` slides that raise no SST0507, vibrato, reverb as one echo, the loop markers                                      |
-| `end-to-end`  | a four-part file, title and kit included, walked note for note                                                                                                                         |
-| `sharing`     | parts taking turns on one channel, walked in their own bars; overlaps, drum hits inside notes and an all-at-once chord kept apart; a hand-over trimmed; twelve parts on three channels |
-| `stress`      | the seeded busy songs at every grid and loop mode, and shared, raising nothing                                                                                                         |
+| Section       | What it pins                                                                                                                                                                                                                |
+| ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `parser`      | variable-length quantities, running status across delta times and cancelled by a meta event, velocity-0 key-off, RMID, unknown chunks, a cut file, refusals                                                                 |
+| `timing`      | PPQ 96/480/960 and SMPTE on 48 ticks a quarter, each snap grid, `t` from BPM and its clamp, a tempo walked at its tick and tied across a note, the padded end                                                               |
+| `voices`      | a chord split top line first, a melody kept from its bass, a legato overlap kept one part, the sustain pedal, eight kept out of ten and in part order                                                                       |
+| `drums`       | channel 10, a GS rhythm part and XG's bank 127 as kits, families split, every GM key on a stock drum or the bongo, an unmapped key counted, the porter's drum map on drums and pitched instruments with the parts unchanged |
+| `instruments` | 128 programs on reachable instruments, the whole keyboard folded into each one's range, a part moved by octaves, the porter's choice and a program change                                                                   |
+| `effects`     | `v`, `y`, `q`, a volume fade, the bend at the key-on and RPN 0, `$DD` slides that raise no SST0507, vibrato, reverb as one echo, the loop markers                                                                           |
+| `end-to-end`  | a four-part file, title and kit included, walked note for note                                                                                                                                                              |
+| `sharing`     | parts taking turns on one channel, walked in their own bars; overlaps, drum hits inside notes and an all-at-once chord kept apart; a hand-over trimmed; twelve parts on three channels                                      |
+| `stress`      | the seeded busy songs at every grid and loop mode, and shared on a drum map, raising nothing                                                                                                                                |
