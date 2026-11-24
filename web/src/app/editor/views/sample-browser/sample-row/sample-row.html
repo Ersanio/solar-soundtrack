@@ -97,6 +97,17 @@
     }
   }
 
+  <button
+    amk-button
+    variant="ghost"
+    icon
+    i18n-title="@@samples.download.title"
+    title="samples.download.title"
+    (click)="download(file.name, file.bytes)"
+  >
+    <amk-icon-download />
+  </button>
+
   @if (file.source === 'override') {
     <button i18n="@@samples.revert" amk-button variant="ghost" (click)="revert(file.name)">
       samples.revert

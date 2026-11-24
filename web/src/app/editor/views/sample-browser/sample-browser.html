@@ -30,6 +30,19 @@
     </button>
   }
 
+  <button
+    amk-button
+    variant="ghost"
+    size="sm"
+    i18n-title="@@samples.download-song.title"
+    title="samples.download-song.title"
+    [disabled]="songFiles().length === 0"
+    (click)="downloadSongFiles()"
+  >
+    <amk-icon-download />
+    <ng-container i18n="@@samples.download-song">samples.download-song</ng-container>
+  </button>
+
   <span class="ml-auto font-mono text-xs" [class.text-danger]="overflowing()">{{
     freeLabel()
   }}</span>

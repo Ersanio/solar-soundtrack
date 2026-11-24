@@ -31,3 +31,8 @@ and moved away from, with the reason. The rule carries one index line per entry.
 - **The parts that sound the most suggested by weight alone** — sustained pad voices outweighed a
   kit's short hits, so a song's drums were left out of its first preview. Every channel's and every
   kit family's first voice comes before any second voice; weight orders within that.
+- **BRR encoded inside `@amk/import`** — the MOD importer could have returned finished `.brr` files,
+  which would have needed the lint boundary to let the package reach `@amk/spc`'s encoder, or a second
+  encoder written beside the decoder it must match. The encoder sits beside `brr.ts` in `@amk/spc`,
+  where `brrtest` holds it to the decoder; the package plans each sample's PCM, loop and tuning
+  (`planSample`), and the dialog and `modtest` encode it.

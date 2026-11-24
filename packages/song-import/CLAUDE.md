@@ -1,14 +1,16 @@
 # @amk/import
 
-Importers: another music format read and written out as AddmusicK MML. MIDI is the one there is;
-older AddMusic SPCs and other `.spc` rips are meant to join it as readers beside `midi/`, picked by
-`format.ts`'s `detectFormat`, which sniffs a file's signature rather than trusting its name.
+Importers: another music format read and written out as AddmusicK MML. MIDI and MOD are the two
+there are; older AddMusic SPCs and other `.spc` rips are meant to join them as readers beside `midi/`
+and `mod/`, picked by `format.ts`'s `detectFormat`, which sniffs a file's signature rather than
+trusting its name.
 
 Depends on `@amk/core` (the MML spellers' tables, `DEFAULT_TRANSPOSE`, the velocity table) and on
 `@amk/spc/instruments` and `@amk/spc/pitch` (the driver's stock instruments and where each stops
-playing true), and nothing else — `eslint.config.js` holds it. It writes text; compiling, walking
-and playing the result is the caller's. It returns **codes and values, never words**: a refusal is an
-`SmfError` code and a warning an `ImportWarning`, which the Import dialog words.
+playing true), and nothing else — `eslint.config.js` holds it. It writes text, and for a MOD the
+PCM of each sample planned for BRR; encoding, compiling, walking and playing the result is the
+caller's. It returns **codes and values, never words**: a refusal is an `SmfError` or `ModError`
+code and a warning an `ImportWarning` or `ModImportWarning`, which the Import dialogs word.
 
 | Module                | What it is                                                            |
 | --------------------- | --------------------------------------------------------------------- |
@@ -20,6 +22,13 @@ and playing the result is the caller's. It returns **codes and values, never wor
 | `midi/channels.ts`    | Which parts can share a channel, and packing them onto eight          |
 | `midi/gm.ts`          | GM programs and drum keys matched to the stock instruments and drums  |
 | `midi/write-mml.ts`   | The parts kept, written as an `#amk 4` song                           |
+| `mml/lengths.ts`      | Note and rest lengths in driver ticks, spelled without AMK0200        |
+| `mml/song-text.ts`    | `t` for a BPM, a polyline simplified to ramps, text for a `#spc` tag  |
+| `mod.ts`              | `readMod` (once per file) and `writeMod` (once per option change)     |
+| `mod/file.ts`         | The MOD reader: signatures, patterns, sample headers                  |
+| `mod/play.ts`         | The song played tick by tick: what each channel sounds, and its loop  |
+| `mod/samples.ts`      | Resampling, loops onto BRR blocks, the tuning, the factor that fits   |
+| `mod/write-mml.ts`    | The channels kept, on custom instruments, as an `#amk 4` song         |
 
 ## Reading
 
@@ -106,4 +115,68 @@ point is struck again there.
   otherwise, since a dot that halves an odd count is AMK0200.
 
 `miditest` pins all of it against the compiler and the walk, and a seeded busy song at every grid
+against the editor's diagnostics.
+
+## MOD
+
+### Reading
+
+`mod/file.ts` follows OpenMPT's `Load_mod.cpp`: the four bytes at 1080 name the channel count
+(`M.K.`, `xCHN`, `xxCH`, `CD81`, `OKTA`, `TDZx` and the rest), FLT8 stores eight channels as two
+four-channel patterns with its orders doubled, and the pattern count is the highest of all 128
+order entries, the song's own orders only where the file is too short for that. A loop under four
+bytes is no loop, and a loop start some trackers wrote in bytes is halved where only the half fits.
+A 15-sample Soundtracker file has no signature, so it is refused rather than guessed at. A file cut
+inside its samples keeps what is there. ProTracker's period limits apply only to a 4-channel
+`M.K.`/`M!K!`/`PATT` file whose notes stay in the Amiga's range.
+
+### Playing
+
+`mod/play.ts` plays the song tick by tick as 8bitbubsy's `pt2_replayer.c` does: tick 0 reads the
+row and runs 9, B, C, D, F and the E commands, the later ticks the slides and the vibrato; Bxx and
+Dxx (in BCD) move the order, E6x loops rows, EEx repeats one, EDx strikes late. It records, for
+every channel and tick, the period sounding (vibrato left out), the volume, the pan, the key-ons
+and the vibrato's parameters, and stops at the first row it comes back to outside a pattern loop,
+which is the song's loop point; running off the end loops to the restart order. A one-shot sample
+ends where its frames run out at the period and tempo it plays at. 9xx, arpeggio, tremolo, E3x,
+EFx and a note delay past its row are counted rather than played: AddmusicK plays a sample from its
+start, `$FB` re-keys or, under legato, leaves the pitch where its last step put it, and `$E5` is
+only safe in front of a key-on (COMMANDS.html).
+
+### Samples
+
+`mod/samples.ts` plans each sample's PCM for BRR at a factor. A BRR loop starts on a 16-frame
+block and runs to the end, so the loop is resampled to whole blocks, the factor nudged to make that
+exact (`plannedFrames`), silence put in front so it starts on a block, and what follows the loop
+dropped; a loop under a block is widened to one. The resampler is a Blackman-windowed sinc whose
+cutoff follows the factor and which reads the loop round past its end, and at a factor of 1 the
+frames are copied. `fitFactor` bisects the largest factor every Auto sample can share in a room.
+`tuningFor` picks the instrument's multiplier and the octave C-2 is written in by trying each
+against every key the song plays on the sample: `SetPitch` shifts its table value before it
+multiplies, so low keys lose bits and a small multiplier is coarse, and the choice that is worst
+on fewest cents wins, one that leaves notes outside o1 c-o6 a or the DSP's fourteen bits losing to
+one that does not. The encoding itself is the caller's (`@amk/spc/brr-encode`).
+
+### Writing
+
+`mod/write-mml.ts` writes an `#amk 4` song: `#samples` with `#default` first, then each sample the
+kept channels play, and `#instruments` giving each `$FF $E0 $7F` and its tuning at `@30` up.
+
+- **Two driver ticks to a MOD tick**, so the MOD's BPM is the song's quarter-note BPM (`t` is
+  BPM × 0.4096 − 1) and a row at speed 6 a sixteenth; per-tick effects stay exact.
+- **A note** lasts to the next key-on, its sample's end or a silence that lasts, tied through, and is
+  struck again at the loop point. Its key is C-2's plus its semitones, folded by octaves into what
+  the instrument plays true.
+- **Volume** is `v` = 255 × √(vol / 64), since the driver squares it (`L_124D`), and a slide is
+  simplified to `vD,N` fades. **Pan** is `y`, the Amiga's L R R L narrowed by the separation.
+  **Pitch** within a note is simplified to ramps written as `$DD` after the piece each starts in,
+  under the same frame rules as the MIDI writer's. **Vibrato** is `$DE` at twice the MOD's speed and
+  the swing its depth makes at the note's period, and `$DF` where it stops.
+- **Cuts.** The text is written one pass through an order at a time, each with its octave stated
+  afresh, so a pass's text depends only on the driver state it starts under. A pass that comes round
+  again in the same state is a label loop (`(n)[ … ]`, then `(n)` or `(n)k`), unless it or the pass
+  after it opens on a tie, which a loop's body cannot start or end on. `/` and the song's start
+  state the next note's settings ahead of everything (`SST0511`).
+
+`modtest` pins all of it against the compiler and the walk, and seeded busy songs at several factors
 against the editor's diagnostics.

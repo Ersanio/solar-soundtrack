@@ -42,7 +42,7 @@ packages/core/          @amk/core      types, AddmusicK's tables, hex
 packages/mml-compiler/  @amk/compiler  preprocess -> parser -> link
 packages/mml-tokens/    @amk/tokens    scanner, splices, command model
 packages/spc/           @amk/spc       BRR, echo FIR, ARAM, emulator, worklet
-packages/song-import/   @amk/import    other formats (MIDI) read and written out as MML
+packages/song-import/   @amk/import    other formats (MIDI, MOD) read and written out as MML
 web/                    the Angular editor
 scripts/                the byte-level harnesses, the code map, the i18n catalog
 .claude/                rules, ledgers, skills, the after-edit hook
@@ -221,6 +221,6 @@ ledger beside the others and a row here. A ledger file has no frontmatter, and n
 | `song-inspector.md`          | the Song Inspector and Audio Visualization tabs, the top bar's scope, `SongAnalyzer` and its worker, the live voice capture, the canvas colours          |
 | `i18n.md`                    | any text a porter reads: templates, `$localize`, the AMK/SST catalogs, command names and descriptions, `web/src/locale/messages.en.json`                 |
 | `ui-and-theme.md`            | `styles.css` colours, `ThemeStore` and presets, the panes, sidebar, tabs and shared controls                                                             |
-| `import.md`                  | `@amk/import` and its MIDI reader and writer, the Import dialog and its preview                                                                          |
+| `import.md`                  | `@amk/import` and its MIDI and MOD readers and writers, the two Import dialogs and their preview                                                         |
 | `tooling.md`                 | the pre-hooks, `eslint.config.js`, `.prettierrc`, CI and deployment, the after-edit hook                                                                 |
 | `harnesses/<name>.md`        | what each harness proves, loaded with that harness                                                                                                       |

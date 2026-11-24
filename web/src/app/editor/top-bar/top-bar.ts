@@ -2,6 +2,7 @@
 
 import { Component, computed, inject, viewChild } from '@angular/core';
 
+import { detectFormat } from '@amk/import/format';
 import { Changelog } from '../../changelog/changelog';
 import { GIT_COMMIT_SHA } from '../../git-info.generated';
 import { Button, buttonClass } from '../../shared/button/button';
@@ -18,6 +19,7 @@ import { WavExport } from '../../state/wav-export';
 import { ThemePicker } from '../../theme/theme-picker/theme-picker';
 import { AramMeter } from '../aram-meter/aram-meter';
 import { ImportDialog } from '../import-dialog/import-dialog';
+import { ModImportDialog } from '../mod-import-dialog/mod-import-dialog';
 import { ScopeMini } from '../scope-mini/scope-mini';
 import { SuppressionsButton } from './suppressions-button/suppressions-button';
 import { TransportControls } from '../transport-controls/transport-controls';
@@ -50,6 +52,7 @@ const REPO_URL = 'https://github.com/Ersanio/solar-soundtrack';
     IconUpload,
     ImportDialog,
     Menu,
+    ModImportDialog,
     ScopeMini,
     SuppressionsButton,
     ThemePicker,
@@ -73,6 +76,7 @@ export class TopBar {
   private readonly audition = inject(Audition);
 
   private readonly importer = viewChild.required(ImportDialog);
+  private readonly modImporter = viewChild.required(ModImportDialog);
 
   protected readonly importClass = `${buttonClass('dark', 'md')} cursor-pointer`;
 
@@ -104,13 +108,18 @@ export class TopBar {
     }
   });
 
-  /** Opens the Import dialog on the picked file, and lets the same file be picked again. */
+  /** Opens the Import dialog for the picked file's format, and lets the same file be picked again. */
   protected async onImportFile(event: Event): Promise<void> {
     const input = event.target as HTMLInputElement;
     const file = input.files?.[0];
     input.value = '';
     if (file) {
-      this.importer().openWith(file.name, new Uint8Array(await file.arrayBuffer()));
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      if (detectFormat(bytes) === 'mod') {
+        this.modImporter().openWith(file.name, bytes);
+      } else {
+        this.importer().openWith(file.name, bytes);
+      }
     }
   }
 

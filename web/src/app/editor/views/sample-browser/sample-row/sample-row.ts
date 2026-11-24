@@ -1,10 +1,12 @@
 import { Component, inject, input, output } from '@angular/core';
 
 import { Button } from '../../../../shared/button/button';
+import { IconDownload } from '../../../../shared/icons/icon-download';
 import { IconLock } from '../../../../shared/icons/icon-lock';
 import { IconUnlock } from '../../../../shared/icons/icon-unlock';
 import { Toggle } from '../../../../shared/toggle/toggle';
 import { SampleStore } from '../../../../state/sample-store';
+import { downloadBlob } from '../../../../util/format';
 import { AuditionButton } from '../audition-button/audition-button';
 import { SampleWave } from '../sample-wave/sample-wave';
 import { SlotRowView } from '../slot-row/slot-row';
@@ -24,7 +26,16 @@ import type { FileRow } from '../sample-rows';
  */
 @Component({
   selector: 'li[amk-sample-row]',
-  imports: [AuditionButton, Button, IconLock, IconUnlock, SampleWave, SlotRowView, Toggle],
+  imports: [
+    AuditionButton,
+    Button,
+    IconDownload,
+    IconLock,
+    IconUnlock,
+    SampleWave,
+    SlotRowView,
+    Toggle,
+  ],
   templateUrl: './sample-row.html',
   host: { class: 'hover:bg-raised block px-3 py-2' },
 })
@@ -44,6 +55,11 @@ export class SampleRowView {
 
   protected revert(name: string): void {
     this.library.revert(name);
+  }
+
+  /** Saves the file as the library holds it, for AddmusicK's own `samples/` folder. */
+  protected download(name: string, bytes: Uint8Array): void {
+    downloadBlob(name, bytes);
   }
 
   protected remove(name: string): void {

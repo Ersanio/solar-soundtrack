@@ -1,7 +1,8 @@
-/** What the Import dialog says: why a file could not be read, what the writer changed to fit it, and what each part is called. */
+/** What the Import dialogs say: why a file could not be read, what the writer changed to fit it, and what each part is called. */
 
 import type { GmFamily, DrumFamily } from '@amk/import/midi/gm';
 import type { ImportWarning, Part, SmfErrorCode } from '@amk/import/midi';
+import type { ModErrorCode, ModImportWarning } from '@amk/import/mod';
 
 export const REFUSALS: Readonly<Record<SmfErrorCode, string>> = {
   'not-midi': $localize`:@@import.refuse.not-midi:import.refuse.not-midi`,
@@ -154,5 +155,54 @@ export function warningText(warning: ImportWarning, label: (id: string) => strin
         : $localize`:@@import.warn.unmapped-drums.other:import.warn.unmapped-drums.other ${warning.count}:count:`;
     case 'smpte':
       return $localize`:@@import.warn.smpte:import.warn.smpte`;
+  }
+}
+
+export const MOD_REFUSALS: Readonly<Record<ModErrorCode, string>> = {
+  'not-mod': $localize`:@@import.refuse.not-mod:import.refuse.not-mod`,
+};
+
+/** A MOD import's warning in words, naming the sample it is about by `label`. */
+export function modWarningText(
+  warning: ModImportWarning,
+  label: (index: number) => string,
+): string {
+  switch (warning.code) {
+    case 'offsets':
+      return warning.count === 1
+        ? $localize`:@@import.mod.warn.offsets.one:import.mod.warn.offsets.one`
+        : $localize`:@@import.mod.warn.offsets.other:import.mod.warn.offsets.other ${warning.count}:count:`;
+    case 'arpeggio':
+      return warning.count === 1
+        ? $localize`:@@import.mod.warn.arpeggio.one:import.mod.warn.arpeggio.one`
+        : $localize`:@@import.mod.warn.arpeggio.other:import.mod.warn.arpeggio.other ${warning.count}:count:`;
+    case 'tremolo':
+      return warning.count === 1
+        ? $localize`:@@import.mod.warn.tremolo.one:import.mod.warn.tremolo.one`
+        : $localize`:@@import.mod.warn.tremolo.other:import.mod.warn.tremolo.other ${warning.count}:count:`;
+    case 'unsupported':
+      return warning.count === 1
+        ? $localize`:@@import.mod.warn.unsupported.one:import.mod.warn.unsupported.one`
+        : $localize`:@@import.mod.warn.unsupported.other:import.mod.warn.unsupported.other ${warning.count}:count:`;
+    case 'mod-truncated':
+      return $localize`:@@import.mod.warn.truncated:import.mod.warn.truncated`;
+    case 'too-long':
+      return $localize`:@@import.mod.warn.too-long:import.mod.warn.too-long`;
+    case 'dropped-notes': {
+      const sample = label(warning.sample);
+      return warning.count === 1
+        ? $localize`:@@import.mod.warn.dropped.one:import.mod.warn.dropped.one ${sample}:sample:`
+        : $localize`:@@import.mod.warn.dropped.other:import.mod.warn.dropped.other ${warning.count}:count: ${sample}:sample:`;
+    }
+
+    case 'mod-folded': {
+      const sample = label(warning.sample);
+      return warning.count === 1
+        ? $localize`:@@import.mod.warn.folded.one:import.mod.warn.folded.one ${sample}:sample:`
+        : $localize`:@@import.mod.warn.folded.other:import.mod.warn.folded.other ${warning.count}:count: ${sample}:sample:`;
+    }
+
+    case 'mod-tempo-clamped':
+      return $localize`:@@import.warn.tempo-clamped:import.warn.tempo-clamped ${warning.bpm}:bpm: ${warning.tempo}:tempo:`;
   }
 }

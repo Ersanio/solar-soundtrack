@@ -99,6 +99,7 @@ something in the directory, which load by themselves when such a file is opened.
 
 - `format.ts` — Which importer can read a file, from its first bytes rather than its name.
 - `midi.ts` — Importing a MIDI file: read once into parts, then written as a song as often as the porter changes what to keep.
+- `mod.ts` — Importing a MOD: read and played once, then written as a song, with its samples planned for BRR, as often as the porter changes what to keep.
 
 ## packages/song-import/src/midi
 
@@ -111,12 +112,29 @@ something in the directory, which load by themselves when such a file is opened.
 - `smf.ts` — A Standard MIDI File, read into its tracks of timed events.
 - `write-mml.ts` (750+ lines) — A MIDI performance written out as an `#amk 4` song on the stock instruments, each kept part on a channel of its own or, where the porter lets them, sharing one with parts it never overlaps.
 
+## packages/song-import/src/mml
+
+**Rules:** `import.md`
+
+- `lengths.ts` — Note and rest lengths in driver ticks, spelled as MML: whole notes tied to what is left, with a dot only where it halves exactly and `=ticks` otherwise, since a dot that halves an odd count is AMK0200.
+- `song-text.ts` — What every importer writes the same way: the tempo byte for a BPM, a polyline simplified to ramps, and text fit for a `#spc` tag.
+
+## packages/song-import/src/mod
+
+**Rules:** `import.md`
+
+- `file.ts` — A ProTracker-family `.mod` file, read into its samples, its order list and its patterns of cells.
+- `play.ts` (300+ lines) — A MOD played tick by tick, the way ProTracker's replayer plays it: what each channel sounds on every tick, and where the song loops.
+- `samples.ts` — A MOD's samples made ready for BRR: resampled to fit ARAM, their loops moved onto block boundaries, and the tuning an AddmusicK instrument needs to play each at the MOD's pitch.
+- `write-mml.ts` (500+ lines) — A played MOD written out as an `#amk 4` song: each kept channel on one of AddmusicK's, each sample a custom instrument after `#default`.
+
 ## packages/spc/src
 
 **Rules:** `audition.md`, `commands-in-the-roll.md`, `i18n.md`, `transport-and-clock.md`
 
 - `adsr.ts` — The DSP's volume envelope: what an instrument's ADSR, GAIN and tuning bytes do.
 - `arpeggio.ts` (300+ lines) — `HandleArpeggio` over the whole song: the pitch offsets each `$FB` steps a note through, tick by tick.
+- `brr-encode.ts` — PCM encoded as a `.brr` file: the 2-byte loop offset, then 9-byte blocks.
 - `brr.ts` (300+ lines) — BRR — the SNES's ADPCM sample format.
 - `driver-state.ts` (300+ lines) — Our SPC driver's I/O through the emulator's ARAM.
 - `driver.ts` — Loads the prebuilt AddmusicK driver bundle: the SPC700 program, the SPC/DSP base images, and the `#default` BRR sample group.
@@ -242,6 +260,20 @@ something in the directory, which load by themselves when such a file is opened.
 - `support.ts` — What every `miditest` section shares: a MIDI file built in memory, imported, compiled, walked and diagnosed as the editor does.
 - `timing.ts` — `miditest`: time — every division lands on the driver's 48 ticks a quarter, each snap grid rounds as it says, and a tempo change is a `t` at its tick.
 - `voices.ts` — `miditest`: a channel's chords split into parts that play one note at a time, a melody and its bass kept apart, the pedal held, and eight parts kept out of more.
+
+## scripts/modtest
+
+**Rules:** `harnesses/*.md`
+
+- `effects.ts` — `modtest`: effects — vibrato as `$DE` and `$DF`, slides as `$DD`, volume as `v` through a square root and slides as fades, a cut, panning narrowed by the separation, a sample's end, and the effects left out counted.
+- `loops.ts` — `modtest`: a pass through an order that comes round again in the same state written once as a label loop and called after, with every note still walked where the MOD plays it.
+- `main.ts` — MOD import: `@amk/import/mod` reading a MOD, playing it tick by tick and writing it as a song on custom instruments made from its samples.
+- `pitch.ts` — `modtest`: pitch — every note of ProTracker's three octaves, at finetunes and resampling factors, played by the walk within a few cents of where the MOD plays it; FastTracker's periods past the Amiga's; and a range too wide for one octave choice folded.
+- `reader.ts` — `modtest`: the MOD reader — each signature's channel count, FLT8's pattern pairs, the pattern count, the sample headers' loop quirks, a file cut short, and what is refused.
+- `samples.ts` — `modtest`: samples made ready for BRR — the loop moved onto a block at every factor, a tiny loop widened to one, a one-shot's length, the planned frames matching what is planned, and the factor that fits a room.
+- `stress.ts` — `modtest`: busy, seeded MODs — eight channels, every effect, repeats, a jump back — imported at several factors and both loop modes without raising a problem, and assembled.
+- `support.ts` — What every `modtest` section shares: a MOD file built in memory, imported, its samples encoded, and the song compiled, walked, diagnosed and assembled as the editor does.
+- `timing.ts` — `modtest`: time — two driver ticks to a MOD tick, speed and BPM, and the order list's flow through Bxx, Dxx, E6x, EEx and EDx, each held to the ticks the walk plays its notes at.
 
 ## scripts/palettetest
 
@@ -418,10 +450,17 @@ something in the directory, which load by themselves when such a file is opened.
 
 **Rules:** `import.md`
 
+- `import-candidate.ts` — A written import compiled, assembled and walked as the document would be: what an Import dialog's preview plays and what its Import is held back by.
 - `import-dialog.ts` (300+ lines) — The Import dialog: a file read into parts, the parts to keep and what to play them on, and a preview of the song they make before it replaces the document.
 - `import-drums.ts` — The Import dialog's drum map: the porter's sound for each GM drum key, kept in storage across imports.
 - `import-preview.ts` — The Import dialog's preview: the candidate song on a player of its own, with a playhead in driver ticks and a seek bar over them.
-- `import-text.ts` — What the Import dialog says: why a file could not be read, what the writer changed to fit it, and what each part is called.
+- `import-text.ts` — What the Import dialogs say: why a file could not be read, what the writer changed to fit it, and what each part is called.
+
+## web/src/app/editor/mod-import-dialog
+
+**Rules:** `import.md`
+
+- `mod-import-dialog.ts` (300+ lines) — The Import dialog for a MOD: its channels to keep, each sample's resampling, and a preview of the song they make before it replaces the document and its samples join the library.
 
 ## web/src/app/editor/scope-mini
 
@@ -1095,6 +1134,7 @@ something in the directory, which load by themselves when such a file is opened.
 - `math.ts` — Arithmetic the app shares: `clamp` is `@amk/core`'s, under the path the app imports it by.
 - `on-change.ts` — Runs `handler` when `source` changes value, and never on the value it starts at.
 - `storage.ts` — `localStorage`, for code that would rather carry on without it.
+- `zip.ts` — A `.zip` of files stored as they are, with no compression: a local header before each file, then the central directory and its end record (PKWARE's APPNOTE, §4.3).
 
 ## web/src
 

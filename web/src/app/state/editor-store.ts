@@ -567,17 +567,24 @@ export class EditorStore {
    * Compiles a text that is not the document, exactly as the document is
    * compiled. For a writer that has to read back text it has not committed yet.
    */
-  compileText(text: string): { result: CompileResult; aramAddress: number } | null {
+  compileText(
+    text: string,
+    extraSamples: readonly string[] = [],
+  ): { result: CompileResult; aramAddress: number } | null {
     const driver = this.drivers.driver();
     if (!driver) {
       return null;
     }
 
     const aramAddress = driver.manifest.localPos;
+    const options = this.compileOptions();
+    // Samples the text brings that the library does not hold yet, such as an import's.
+    if (extraSamples.length > 0) {
+      options['sampleNames'] = [...this.library.names(), ...extraSamples];
+    }
+
     return {
-      result: parsing(() =>
-        compiler.compile({ source: text, aramAddress, options: this.compileOptions() }),
-      ),
+      result: parsing(() => compiler.compile({ source: text, aramAddress, options })),
       aramAddress,
     };
   }

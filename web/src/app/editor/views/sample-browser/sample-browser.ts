@@ -2,10 +2,13 @@ import { Component, computed, inject, signal } from '@angular/core';
 
 import { ARAM_SIZE } from '@amk/spc/layout';
 import { Button, buttonClass } from '../../../shared/button/button';
+import { IconDownload } from '../../../shared/icons/icon-download';
 import { Toggle } from '../../../shared/toggle/toggle';
 import { Toolbar } from '../../../shared/toolbar/toolbar';
 import { EditorStore } from '../../../state/editor-store';
 import { SampleStore } from '../../../state/sample-store';
+import { downloadBlob } from '../../../util/format';
+import { storedZip } from '../../../util/zip';
 import { SampleRowView } from './sample-row/sample-row';
 import { type FileRow, fileRow } from './sample-rows';
 
@@ -22,7 +25,7 @@ import { type FileRow, fileRow } from './sample-rows';
  */
 @Component({
   selector: 'amk-sample-browser',
-  imports: [Button, Toggle, Toolbar, SampleRowView],
+  imports: [Button, IconDownload, Toggle, Toolbar, SampleRowView],
   templateUrl: './sample-browser.html',
   host: { class: 'flex min-h-0 min-w-0 flex-col' },
 })
@@ -47,6 +50,37 @@ export class SampleBrowser {
     }
 
     this.rejected.set(await this.library.upload(files));
+  }
+
+  /**
+   * The song's own files: every upload or replaced file the song asks for, which a porter takes to
+   * AddmusicK beside the MML. A bank counts where the song asks for any of its slots.
+   */
+  protected readonly songFiles = computed(() => {
+    const requested = [...this.requested()];
+    return this.library
+      .files()
+      .filter(
+        (file) =>
+          file.source !== 'stock' &&
+          file.error === null &&
+          requested.some(
+            (name) => name === file.name || (file.kind === 'bank' && name.startsWith(file.name)),
+          ),
+      );
+  });
+
+  protected downloadSongFiles(): void {
+    const files = this.songFiles();
+    if (files.length === 0) {
+      return;
+    }
+
+    const title = (this.editor.result()?.stats?.tags.title ?? 'song').replace(/[^w.-]+/g, '_');
+    downloadBlob(
+      `${title} samples.zip`,
+      storedZip(files.map((file) => ({ name: file.name, bytes: file.bytes }))),
+    );
   }
 
   /** Bank rows the user has opened. Collapsed by default — 64 slots is a lot. */

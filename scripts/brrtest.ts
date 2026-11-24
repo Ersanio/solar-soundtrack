@@ -41,6 +41,7 @@ import {
 	usedBankSlots,
 	validateSampleBank,
 } from "@amk/spc/brr";
+import { brrDataBytes, encodeBrr } from "@amk/spc/brr-encode";
 import { BANK_SLOT_COUNT, bankSlotName } from "@amk/core/hardcoded-tables";
 
 import { SPC_ASSETS, check, section, summarise } from "./harness";
@@ -518,6 +519,75 @@ section("sample banks split into their slots");
 		(() => {
 			try {
 				parseSampleBank(new Uint8Array(16), names("t.bnk"));
+				return false;
+			} catch {
+				return true;
+			}
+		})(),
+	);
+}
+
+section("the encoder decodes back to what it was given");
+{
+	/** Signal-to-noise of `decoded` against `source`, in dB, over the first `frames`. */
+	const snr = (source: Int16Array, decoded: Int16Array, frames: number): number => {
+		let signal = 0;
+		let noise = 0;
+		for (let i = 0; i < frames; i++) {
+			signal += source[i] * source[i];
+			noise += (source[i] - decoded[i]) ** 2;
+		}
+
+		return 10 * Math.log10(signal / Math.max(1, noise));
+	};
+
+	const sine = new Int16Array(1000).map((_, i) => Math.round(12000 * Math.sin((2 * Math.PI * i) / 37)));
+	const oneShot = encodeBrr(sine, null);
+	check("a one-shot encoding is a valid .brr", validateBrr(oneShot) === null, String(validateBrr(oneShot)));
+	const parsed = parseBrr("sine.brr", oneShot);
+	const decoded = decodeBrr(parsed);
+	const sineSnr = snr(sine, decoded, sine.length);
+	check("a sine decodes within 30 dB of itself", sineSnr > 30, `${sineSnr.toFixed(1)} dB`);
+	check(
+		"a one-shot is whole blocks and a silent end block, the last one flagged end and not loop",
+		parsed.data.length === brrDataBytes(sine.length, false) &&
+			(parsed.data[parsed.data.length - BRR_BLOCK_BYTES] & 0x03) === 0x01 &&
+			parsed.data.slice(-BRR_BLOCK_BYTES).every((byte, i) => (i === 0 ? byte === 0x01 : byte === 0)),
+		`${parsed.data.length} bytes`,
+	);
+	check(
+		"only the end block of a one-shot carries a flag",
+		Array.from({ length: blockCount(parsed) - 1 }, (_, b) => parsed.data[b * BRR_BLOCK_BYTES] & 0x03).every(
+			(flags) => flags === 0,
+		),
+	);
+
+	let state = 7;
+	const noise = new Int16Array(512).map(() => {
+		state = (state * 1103515245 + 12345) >>> 0;
+		return ((state >>> 16) & 0xffff) - 0x8000;
+	});
+	const noiseSnr = snr(noise, decodeBrr(parseBrr("noise.brr", encodeBrr(noise, null))), noise.length);
+	check("full-scale noise still decodes within 10 dB", noiseSnr > 10, `${noiseSnr.toFixed(1)} dB`);
+
+	const looped = parseBrr("loop.brr", encodeBrr(sine.subarray(0, 992), 320));
+	const lastHeader = looped.data[looped.data.length - BRR_BLOCK_BYTES];
+	check(
+		"a looped sample has no extra block, flags its last block loop and end, and points at its loop block",
+		looped.data.length === brrDataBytes(992, true) &&
+			(lastHeader & 0x03) === 0x03 &&
+			looped.loopOffset === (320 / BRR_BLOCK_SAMPLES) * BRR_BLOCK_BYTES,
+		`${looped.data.length} bytes, header ${lastHeader}, loop ${looped.loopOffset}`,
+	);
+	check(
+		"the first block and the loop block take filter 0, so neither depends on what came before",
+		(looped.data[0] & 0x0c) === 0 && (looped.data[looped.loopOffset] & 0x0c) === 0,
+	);
+	check(
+		"a loop start inside a block is refused",
+		(() => {
+			try {
+				encodeBrr(sine, 17);
 				return false;
 			} catch {
 				return true;

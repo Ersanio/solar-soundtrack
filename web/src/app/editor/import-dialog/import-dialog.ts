@@ -12,7 +12,6 @@ import {
   writeMidi,
 } from '@amk/import/midi';
 import { familyOf } from '@amk/import/midi/gm';
-import { walkSong } from '@amk/spc/song-walk';
 import { STOCK_NAMES } from '../../output/command-inspector/instrument-inspector/instrument-choices';
 import { Button } from '../../shared/button/button';
 import { ButtonGroup } from '../../shared/button-group/button-group';
@@ -22,13 +21,11 @@ import { IconStop } from '../../shared/icons/icon-stop';
 import { Modal } from '../../shared/modal/modal';
 import { Toggle } from '../../shared/toggle/toggle';
 import { Audition } from '../../state/audition';
-import { parsing } from '../../state/draft-guard';
 import { DriverStore } from '../../state/driver-store';
 import { EditorRequests } from '../../state/editor-requests';
 import { EditorStore } from '../../state/editor-store';
 import { Mixer } from '../../state/mixer';
 import { Playback } from '../../state/playback';
-import { songClock } from '../../state/song-clock';
 import { stopAll } from '../../state/stop-all';
 import { CHANNEL_BG, CHANNEL_SCOPE } from '../../util/channel-palette';
 import { errorMessage } from '../../util/format';
@@ -44,7 +41,8 @@ import {
   withPitch,
   writeDrumMap,
 } from './import-drums';
-import { type PreviewSong, ImportPreview } from './import-preview';
+import { type Candidate, buildCandidate } from './import-candidate';
+import { ImportPreview } from './import-preview';
 import { DRUM_NAMES, REFUSALS, kindOf, sourceOf, warningText } from './import-text';
 
 const SNAP_KEY = 'solar-soundtrack.import-snap';
@@ -173,45 +171,13 @@ export class ImportDialog {
   });
 
   /** The candidate compiled, assembled and walked: what the preview plays and what Import is held back by. */
-  private readonly candidate = computed<{ song: PreviewSong | null; error: string | null }>(() => {
+  private readonly candidate = computed<Candidate>(() => {
     const written = this.written();
     if (!written || written.channels.length === 0) {
-      return { song: null, error: null };
+      return { song: null, error: null, result: null };
     }
 
-    const compiled = this.store.compileText(written.text);
-    if (!compiled) {
-      return { song: null, error: null };
-    }
-
-    const { result, aramAddress } = compiled;
-    const failure = result.diagnostics.find((d) => d.severity === 'error');
-    if (!result.ok || !result.data || failure) {
-      return { song: null, error: failure ? `${failure.code}: ${failure.message}` : null };
-    }
-
-    let spc: Uint8Array | null;
-    try {
-      spc = this.store.spcFor(result);
-    } catch (error) {
-      return { song: null, error: errorMessage(error) };
-    }
-
-    const data = result.data;
-    const timeline = parsing(() => walkSong(data, aramAddress));
-    const stats = result.stats;
-    return {
-      song: spc
-        ? {
-            spc,
-            introTicks: stats?.introTicks ?? 0,
-            loopTicks: stats?.loopTicks ?? 0,
-            loops: stats?.loops ?? true,
-            clock: songClock(timeline),
-          }
-        : null,
-      error: null,
-    };
+    return buildCandidate(this.store, written.text);
   });
 
   protected readonly error = computed(() => this.candidate().error);

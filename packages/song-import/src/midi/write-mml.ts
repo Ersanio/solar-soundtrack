@@ -29,6 +29,8 @@ import { hex2 } from "@amk/core/hex";
 import { octaveFor, spellNote } from "@amk/core/mml-text";
 import type { InstrumentTables } from "@amk/spc/instruments";
 import { highestTrue } from "@amk/spc/pitch";
+import { spellRestTicks, spellTicks } from "../mml/lengths";
+import { simplify, tagText, tempoForBpm } from "../mml/song-text";
 import { type DrumSound, GM_PROGRAMS } from "./gm";
 import { type Clashes, packChannels } from "./channels";
 import type { Part, PartNote } from "./parts";
@@ -83,17 +85,13 @@ const VIBRATO_HZ = 5.5;
 const VIBRATO_DEPTH = 0x60;
 const ECHO = "$F1 $02 $30 $00";
 const ECHO_SEND = 16;
-const TAG_LIMIT = 32;
 
 const isDrum = (instrument: number): boolean =>
 	instrument >= FIRST_PERCUSSION_INSTRUMENT && instrument < FIRST_CUSTOM_INSTRUMENT;
 
 /** `t` for a tempo in microseconds per quarter: BPM × 0.4096 − 1 (`units.ts`, `bpm`). */
 export function tempoFor(microsPerQuarter: number): { tempo: number; bpm: number; clamped: boolean } {
-	const bpm = 60_000_000 / microsPerQuarter;
-	const exact = Math.round(bpm * 0.4096) - 1;
-	const tempo = Math.min(254, Math.max(1, exact));
-	return { tempo, bpm, clamped: tempo !== exact };
+	return tempoForBpm(60_000_000 / microsPerQuarter);
 }
 
 /** The nearest `q` velocity nybble for a MIDI velocity, against the N-SPC table `#amk 4` uses. */
@@ -125,18 +123,6 @@ function emitted(key: number, instrument: number): number {
 	return NOTE_MIN + key - MIN_KEY - (DEFAULT_TRANSPOSE[instrument] ?? 0);
 }
 
-function tagText(value: string | null): string | null {
-	if (value === null) {
-		return null;
-	}
-
-	const clean = value
-		.replace(/["\\]/g, "")
-		.replace(/[^\x20-\x7e]/g, "")
-		.trim();
-	return clean === "" ? null : clean.slice(0, TAG_LIMIT).trim();
-}
-
 /** Points of a curve within `(from, to)`, and the value at `from` first. */
 function within(curve: readonly Point[], from: number, to: number): Point[] {
 	const out: Point[] = [{ tick: from, value: valueAt(curve, from) }];
@@ -147,101 +133,6 @@ function within(curve: readonly Point[], from: number, to: number): Point[] {
 	}
 
 	return out;
-}
-
-/** Ramer–Douglas–Peucker over a polyline. */
-function simplify(points: readonly Point[], tolerance: number): Point[] {
-	if (points.length <= 2) {
-		return [...points];
-	}
-
-	const first = points[0];
-	const last = points[points.length - 1];
-	let worst = 0;
-	let at = 0;
-	for (let i = 1; i < points.length - 1; i++) {
-		const span = last.tick - first.tick;
-		const expected =
-			span === 0 ? first.value : first.value + ((points[i].tick - first.tick) / span) * (last.value - first.value);
-		const off = Math.abs(points[i].value - expected);
-		if (off > worst) {
-			worst = off;
-			at = i;
-		}
-	}
-
-	if (worst <= tolerance) {
-		return [first, last];
-	}
-
-	const left = simplify(points.slice(0, at + 1), tolerance);
-	return [...left.slice(0, -1), ...simplify(points.slice(at), tolerance)];
-}
-
-/**
- * A length of any size, as whole notes tied to what is left. The remainder is `N`, `N.` or `N..` only
- * where the dots halve it exactly, and `=ticks` otherwise: a dot that halves an odd count is AMK0200.
- */
-export function spellTicks(ticks: number): string {
-	const parts: string[] = [];
-	let left = ticks;
-	while (left > TICKS_PER_WHOLE) {
-		parts.push("1");
-		left -= TICKS_PER_WHOLE;
-	}
-
-	parts.push(oneLength(left));
-	return parts.join("^");
-}
-
-/** The lengths a rest is tied from, each one a plain or dotted length that halves exactly. */
-const REST_PIECES = [192, 144, 96, 72, 48, 36, 24, 18, 12, 9, 6, 3];
-
-/** {@link spellTicks} for a rest, which reads better as up to three common lengths tied: 60 ticks is `4^16`. */
-export function spellRestTicks(ticks: number): string {
-	const parts: string[] = [];
-	let left = ticks;
-	while (left > TICKS_PER_WHOLE) {
-		parts.push("1");
-		left -= TICKS_PER_WHOLE;
-	}
-
-	const tied: number[] = [];
-	for (const piece of REST_PIECES) {
-		while (left >= piece && tied.length < 3) {
-			tied.push(piece);
-			left -= piece;
-		}
-	}
-
-	if (left !== 0) {
-		return spellTicks(ticks);
-	}
-
-	return [...parts, ...tied.map(oneLength)].join("^");
-}
-
-function oneLength(ticks: number): string {
-	if (TICKS_PER_WHOLE % ticks === 0) {
-		return String(TICKS_PER_WHOLE / ticks);
-	}
-
-	for (let divisor = 1; divisor <= TICKS_PER_WHOLE; divisor++) {
-		const base = TICKS_PER_WHOLE / divisor;
-		if (!Number.isInteger(base)) {
-			continue;
-		}
-
-		if (base % 2 === 0 && (base * 3) / 2 === ticks) {
-			return `${divisor}.`;
-		}
-
-		if (base % 4 === 0 && (base * 7) / 4 === ticks) {
-			return `${divisor}..`;
-		}
-	}
-
-	return `=${ticks}`;
 }
 
 /** A stretch of a note as one written token: the key-on, or a tie, and the slide that follows it. */

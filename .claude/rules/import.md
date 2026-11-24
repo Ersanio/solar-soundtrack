@@ -2,20 +2,24 @@
 paths:
   - 'packages/song-import/**'
   - 'web/src/app/editor/import-dialog/**'
+  - 'web/src/app/editor/mod-import-dialog/**'
 ---
 
 # Import
 
-Read before changing an importer in `@amk/import` or the Import dialog. The package's own
-`CLAUDE.md` explains each step of reading and writing a MIDI file; this is what must stay true.
+Read before changing an importer in `@amk/import` or an Import dialog. The package's own
+`CLAUDE.md` explains each step of reading and writing a MIDI or a MOD file; this is what must stay
+true.
 
 ## The package
 
-- **It writes text and nothing else.** No compile, walk or player: the dialog and `miditest` do
-  that with the song it returns. It reads `@amk/spc/instruments` and `@amk/spc/pitch` for the stock
-  instruments' ranges, and the lint boundary allows nothing more.
-- **Codes, not words.** A refusal is an `SmfError` code, a warning an `ImportWarning`; the dialog's
-  `import-text.ts` words them under the `import` i18n group.
+- **It writes text, and a MOD's samples as PCM.** No encoder, compile, walk or player: the dialogs,
+  `miditest` and `modtest` do that with what it returns. It reads `@amk/spc/instruments` and
+  `@amk/spc/pitch` for the stock instruments' ranges and the driver's pitch arithmetic, and the lint
+  boundary allows nothing more, so a MOD's samples are planned here (`planSample`) and encoded by the
+  caller (`@amk/spc/brr-encode`).
+- **Codes, not words.** A refusal is an `SmfError` or `ModError` code, a warning an
+  `ImportWarning` or `ModImportWarning`; `import-text.ts` words them under the `import` i18n group.
 - **Read once, write often.** `readMidi` does the parsing and the split into parts and takes no
   options; `writeMidi` takes the grid, the parts kept and their instruments and runs on every
   change. A part's `id` does not depend on any option, so a choice survives a new grid.
@@ -25,6 +29,14 @@ Read before changing an importer in `@amk/import` or the Import dialog. The pack
   diagnostic catches belongs there as well as in the section it is about.
 - **Ticks.** Times are file ticks until the writer and driver ticks after it; the snap grid is in
   driver ticks.
+- **A MOD is two driver ticks to a MOD tick**, so its BPM is the song's quarter-note BPM and its
+  per-tick effects land on whole ticks. `#default` is always listed first, so the song is safe beside
+  SMW's sound effects, and the MOD's samples come after it at `@30` up. 9xx sample offset has no
+  AddmusicK equivalent and is counted, its note played from the sample's start; so are arpeggio and
+  tremolo, which `$FB` and `$E5` cannot follow (the package's `CLAUDE.md`).
+- **A MOD's repeated passes are label loops** only where a pass and the one after it open on no
+  tie, and each pass states its octave afresh, so two passes alike in text and in the driver state
+  they start under play alike.
 - **At most eight channels are written**, on `#0` up: one part each, or with `share` the parts
   `packChannels` puts together, which never cut one another short (`clashes`). `CHANNEL_LIMIT` is
   the one place the number is stated. A hand-over between parts is the only overlap allowed, and
@@ -33,7 +45,8 @@ Read before changing an importer in `@amk/import` or the Import dialog. The pack
 ## The dialog
 
 - `top-bar.html`'s Import is a `<label>` round a file input, so the press is the picker's own. Any
-  file opens the dialog, which says why when it cannot read it; `detectFormat` picks the reader.
+  file opens a dialog: `detectFormat` sends a MOD to `ModImportDialog` and everything else to
+  `ImportDialog`, which says why when it cannot read it.
 - The candidate is a `computed` chain: written, compiled with `EditorStore.compileText`, assembled
   with `EditorStore.spcFor`, walked for its clock. Import is held back while it has no SPC.
 - **The preview is a third `AudioContext`** (`import-preview.ts`), not `Playback` or `Audition`:
@@ -49,6 +62,14 @@ Read before changing an importer in `@amk/import` or the Import dialog. The pack
   across imports (`solar-soundtrack.import-drums`), each entry checked as it is read.
 - Import replaces the whole document through `EditorRequests.applyAll` with `show`, one undo step
   back to the song that was open, as `held-song-banner.ts` does.
+- **The MOD dialog** (`mod-import-dialog/`) is the MIDI dialog's shape on the same preview and
+  candidate chain (`import-candidate.ts`), with the song's samples passed beside the library
+  (`EditorStore.compileText`'s extra names, `SampleStore.resolveWith`) until Import adds them
+  (`SampleStore.add`); Undo brings the old song back and leaves the samples. Every sample on Auto
+  shares the one factor that fills what ARAM has left once the song, `#default` and the samples with a
+  factor of their own are in: the song's bytes do not depend on the factors, so the room is measured
+  on a write with every Auto sample at 1 and the factor found from it (`fitFactor`). Each encoding is
+  kept per sample and factor while the dialog is open.
 
 ## Decisions already made
 
@@ -63,3 +84,4 @@ entry goes there, with its line here, in the same change.
 - **Drum hits struck together sharing a voice** — `allocate`, `allowance`
 - **Each note of a chord to the free voice nearest its pitch** — `allocate`, `match`, `NEW_VOICE`
 - **The parts that sound the most suggested by weight alone** — `suggestedParts`
+- **BRR encoded inside `@amk/import`** — `planSample`, `brr-encode`, `eslint.config.js`

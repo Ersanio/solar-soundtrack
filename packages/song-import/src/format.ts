@@ -5,8 +5,10 @@
  * file that is not one is turned away before any reader sees it.
  */
 
+import { isMod } from "./mod/file";
+
 /** The formats there is a reader for. */
-export type ImportFormat = "midi";
+export type ImportFormat = "midi" | "mod";
 
 function ascii(bytes: Uint8Array, at: number, text: string): boolean {
 	for (let i = 0; i < text.length; i++) {
@@ -48,5 +50,9 @@ export function smfBytes(bytes: Uint8Array): Uint8Array | null {
 
 /** The format `bytes` are in, or `null` when no importer reads them. */
 export function detectFormat(bytes: Uint8Array): ImportFormat | null {
-	return smfBytes(bytes) ? "midi" : null;
+	if (smfBytes(bytes)) {
+		return "midi";
+	}
+
+	return isMod(bytes) ? "mod" : null;
 }

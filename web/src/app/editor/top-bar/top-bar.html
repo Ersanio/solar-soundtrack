@@ -51,12 +51,13 @@
     <input
       type="file"
       class="hidden"
-      accept=".mid,.midi,.rmi,.kar,audio/midi"
+      accept=".mid,.midi,.rmi,.kar,.mod,audio/midi,audio/mod,audio/x-mod"
       (change)="onImportFile($event)"
     />
   </label>
 
   <amk-import-dialog #importer />
+  <amk-mod-import-dialog />
 
   <span class="bg-edge h-5 w-px shrink-0"></span>
 

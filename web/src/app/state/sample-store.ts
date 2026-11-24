@@ -415,6 +415,31 @@ export class SampleStore {
     return rejected;
   }
 
+  /** Adds or replaces files the app made itself, such as an import's samples, by name. */
+  add(files: readonly { name: string; bytes: Uint8Array }[]): void {
+    const next = new Map(this.overrides());
+    for (const file of files) {
+      next.set(file.name, file.bytes);
+    }
+
+    this.overrides.set(next);
+  }
+
+  /** Whether the library holds a file of this name. */
+  has(name: string): boolean {
+    return this.overrides().has(name) || this.stock().some((sample) => sample.sampleName === name);
+  }
+
+  /**
+   * {@link resolve}, with `extra` answering for any name it holds: a candidate song's own samples,
+   * before they are added to the library.
+   */
+  resolveWith(names: readonly string[], extra: readonly BrrSample[]): BrrSample[] {
+    const extras = new Map(extra.map((sample) => [sample.sampleName, sample]));
+    const resolved = this.resolve(names);
+    return resolved.map((sample, i) => extras.get(names[i]) ?? sample);
+  }
+
   /** Drops an override, restoring the bundled file. No-op for user files. */
   revert(name: string): void {
     if (!this.stock().some((sample) => sample.sampleName === name)) {

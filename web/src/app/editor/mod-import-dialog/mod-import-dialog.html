@@ -1,0 +1,296 @@
+<amk-modal wide [heading]="heading()" (closed)="onClosed()">
+  @if (refusal(); as why) {
+    <p class="text-danger text-sm leading-relaxed">{{ why }}</p>
+  } @else {
+    <div class="flex flex-col gap-3">
+      <p class="text-ink-muted text-xs">{{ summary() }}</p>
+
+      <div class="flex flex-wrap items-center gap-3">
+        <label class="flex items-center gap-1.5">
+          <span i18n="@@import.mod.separation" class="text-ink-muted text-xs">
+            import.mod.separation
+          </span>
+          <select
+            class="bg-inset border-edge text-ink h-7 cursor-pointer rounded-md border px-1.5 text-xs"
+            i18n-title="@@import.mod.separation.title"
+            title="import.mod.separation.title"
+            (change)="setSeparation($event)"
+          >
+            @for (option of separations; track option.value) {
+              <option [value]="option.value" [selected]="option.value === separation()">
+                {{ option.label }}
+              </option>
+            }
+          </select>
+        </label>
+
+        @if (loops()) {
+          <button
+            i18n="@@import.mod.loop-jump"
+            amk-toggle
+            i18n-title="@@import.mod.loop-jump.title"
+            title="import.mod.loop-jump.title"
+            [pressed]="loopAtJump()"
+            (click)="loopAtJump.set(!loopAtJump())"
+          >
+            import.mod.loop-jump
+          </button>
+        }
+      </div>
+
+      <div class="border-edge overflow-auto rounded-md border">
+        <table class="w-full text-xs">
+          <thead class="bg-inset text-ink-muted text-left">
+            <tr>
+              <th i18n="@@import.column.keep" class="px-2 py-1 font-medium">import.column.keep</th>
+              <th i18n="@@import.column.channel" class="px-2 py-1 font-medium">
+                import.column.channel
+              </th>
+              <th i18n="@@import.mod.column.mod-channel" class="px-2 py-1 font-medium">
+                import.mod.column.mod-channel
+              </th>
+              <th i18n="@@import.column.notes" class="px-2 py-1 text-right font-medium">
+                import.column.notes
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (row of channelRows(); track row.index) {
+              <tr class="border-edge border-t" [class.opacity-50]="!row.on">
+                <td class="px-2 py-1">
+                  <button
+                    i18n="@@import.keep"
+                    amk-toggle
+                    [pressed]="row.on"
+                    [disabled]="row.disabled"
+                    (click)="toggleKeep(row.index)"
+                  >
+                    import.keep
+                  </button>
+                </td>
+                <td class="px-2 py-1">
+                  @if (row.channel; as channel) {
+                    <span [class]="row.chipClass">{{ channel }}</span>
+                  }
+                </td>
+                <td i18n="@@import.mod.channel" class="text-ink px-2 py-1">
+                  import.mod.channel
+                  {{
+                    row.number // i18n(ph='number')
+                  }}
+                </td>
+                <td class="px-2 py-1 text-right font-mono tabular-nums">{{ row.notes }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+
+      <p i18n="@@import.kept" class="text-ink-muted text-xs">
+        import.kept
+        {{
+          keptCount() // i18n(ph='kept')
+        }}
+        {{
+          limit // i18n(ph='limit')
+        }}
+      </p>
+
+      <div class="border-edge overflow-auto rounded-md border">
+        <table class="w-full text-xs">
+          <thead class="bg-inset text-ink-muted text-left">
+            <tr>
+              <th i18n="@@import.mod.column.sample" class="px-2 py-1 font-medium">
+                import.mod.column.sample
+              </th>
+              <th i18n="@@import.mod.column.frames" class="px-2 py-1 text-right font-medium">
+                import.mod.column.frames
+              </th>
+              <th i18n="@@import.mod.column.loop" class="px-2 py-1 font-medium">
+                import.mod.column.loop
+              </th>
+              <th i18n="@@import.column.notes" class="px-2 py-1 text-right font-medium">
+                import.column.notes
+              </th>
+              <th i18n="@@import.mod.column.rate" class="px-2 py-1 font-medium">
+                import.mod.column.rate
+              </th>
+              <th i18n="@@import.mod.column.c2" class="px-2 py-1 text-right font-medium">
+                import.mod.column.c2
+              </th>
+              <th i18n="@@import.mod.column.size" class="px-2 py-1 text-right font-medium">
+                import.mod.column.size
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (row of sampleRows(); track row.index) {
+              <tr class="border-edge border-t">
+                <td class="text-ink px-2 py-1">
+                  <div class="max-w-48 truncate" [title]="row.name">
+                    <span class="text-ink-muted mr-1 font-mono tabular-nums">{{ row.index }}</span>
+                    {{ row.name }}
+                  </div>
+                </td>
+                <td class="px-2 py-1 text-right font-mono tabular-nums">{{ row.frames }}</td>
+                <td class="text-ink-muted px-2 py-1 font-mono whitespace-nowrap">{{ row.loop }}</td>
+                <td class="px-2 py-1 text-right font-mono tabular-nums">{{ row.notes }}</td>
+                <td class="px-2 py-1">
+                  <select
+                    class="bg-inset border-edge text-ink h-6 cursor-pointer rounded-md border px-1 text-xs"
+                    i18n-title="@@import.mod.rate.title"
+                    title="import.mod.rate.title"
+                    (change)="setChoice(row.index, $event)"
+                  >
+                    <option value="auto" [selected]="row.choice === 'auto'">
+                      {{ row.autoLabel }}
+                    </option>
+                    @for (option of factorOptions; track option.value) {
+                      <option [value]="option.value" [selected]="option.value === row.choice">
+                        {{ option.label }}
+                      </option>
+                    }
+                    <option value="drop" [selected]="row.choice === 'drop'">{{ text.drop }}</option>
+                  </select>
+                </td>
+                <td class="px-2 py-1 text-right font-mono whitespace-nowrap tabular-nums">
+                  {{ row.rate }}
+                </td>
+                <td
+                  class="text-ink-muted px-2 py-1 text-right font-mono whitespace-nowrap tabular-nums"
+                >
+                  {{ row.size }}
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+
+      @if (budget(); as budget) {
+        <div class="flex items-center gap-2">
+          <div class="bg-inset h-2 flex-1 overflow-hidden rounded-full">
+            <div
+              class="h-full rounded-full"
+              [class.bg-accent]="!budget.over"
+              [class.bg-danger]="budget.over"
+              [style.width.%]="budget.percent"
+            ></div>
+          </div>
+          <span
+            i18n="@@import.mod.budget"
+            class="text-xs whitespace-nowrap"
+            [class.text-danger]="budget.over"
+            [class.text-ink-muted]="!budget.over"
+          >
+            import.mod.budget
+            {{
+              budget.used // i18n(ph='used')
+            }}
+            {{
+              budget.available // i18n(ph='available')
+            }}
+          </span>
+        </div>
+      }
+
+      @if (replacing() > 0) {
+        <p i18n="@@import.mod.replaces" class="text-ink-muted text-xs">
+          import.mod.replaces
+          {{
+            replacing() // i18n(ph='count')
+          }}
+        </p>
+      }
+
+      @if (warnings().length > 0) {
+        <ul class="text-warn flex flex-col gap-0.5 text-xs leading-relaxed">
+          @for (warning of warnings(); track $index) {
+            <li>{{ warning }}</li>
+          }
+        </ul>
+      }
+
+      @if (error(); as error) {
+        <p class="text-danger text-xs leading-relaxed">{{ error }}</p>
+      }
+
+      @if (preview(); as player) {
+        <div class="flex items-center gap-2">
+          <amk-button-group pill>
+            <button
+              amk-button
+              variant="dark"
+              size="md"
+              icon
+              [title]="player.state() === 'playing' ? text.pause : text.play"
+              [disabled]="!canImport()"
+              (click)="player.toggle()"
+            >
+              @if (player.state() === 'playing') {
+                <amk-icon-pause class="text-accent" />
+              } @else {
+                <amk-icon-play />
+              }
+            </button>
+            <button
+              amk-button
+              variant="dark"
+              size="md"
+              icon
+              i18n-title="@@import.preview.stop.title"
+              title="import.preview.stop.title"
+              [disabled]="player.state() === 'idle'"
+              (click)="player.stop()"
+            >
+              <amk-icon-stop />
+            </button>
+          </amk-button-group>
+
+          <input
+            type="range"
+            min="0"
+            step="1"
+            class="accent-control min-w-16 flex-1 cursor-pointer disabled:cursor-not-allowed disabled:opacity-40"
+            i18n-title="@@import.preview.seek.title"
+            title="import.preview.seek.title"
+            [max]="player.durationTicks()"
+            [value]="player.position()"
+            [disabled]="!player.canSeek() || !canImport()"
+            (input)="onScrub($event)"
+            (change)="player.commitScrub()"
+            (pointerup)="player.commitScrub()"
+            (pointercancel)="player.commitScrub()"
+          />
+
+          <span
+            class="well text-ink flex h-7 items-center rounded-sm px-2 font-mono text-sm tabular-nums whitespace-nowrap"
+          >
+            {{ player.clock() }}
+          </span>
+        </div>
+
+        @if (previewError(); as problem) {
+          <p class="text-danger text-xs">{{ problem }}</p>
+        }
+      }
+    </div>
+  }
+
+  <button i18n="@@import.cancel" amk-button size="sm" variant="ghost" modalFooter (click)="close()">
+    import.cancel
+  </button>
+  <button
+    i18n="@@import.mod.confirm"
+    amk-button
+    size="sm"
+    variant="primary"
+    modalFooter
+    i18n-title="@@import.mod.confirm.title"
+    title="import.mod.confirm.title"
+    [disabled]="!canImport()"
+    (click)="confirm()"
+  >
+    import.mod.confirm
+  </button>
+</amk-modal>
