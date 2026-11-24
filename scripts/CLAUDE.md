@@ -46,7 +46,7 @@ harness. In one line each:
 - `pianorolltest` — The piano roll's edits: `roll-strip.ts` and `roll-edit.ts`, driven the way the roll drives them.
 - `fixtest` — The Problems list's fixes, each held to the song it leaves, and the diff the fix dialog draws.
 - `miditest` — MIDI import: a file built in memory, imported, compiled and walked, its notes held to the walk's and the song held to raise no problem.
-- `modtest` — MOD import: a file built in memory, imported, its samples encoded, the song compiled, walked and assembled, its notes held to the MOD's ticks and pitches and the song held to raise no problem.
+- `modtest` — MOD import, and a UMX unwrapped to its MOD: a file built in memory, imported, its samples encoded, the song compiled, walked and assembled, its notes held to the MOD's ticks and pitches and the song held to raise no problem.
 
 ## Running one, and reading what it prints
 

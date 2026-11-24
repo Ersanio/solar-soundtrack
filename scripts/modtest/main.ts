@@ -24,5 +24,6 @@ await runSections([
 	["effects", () => import("./effects")],
 	["loops", () => import("./loops")],
 	["samples", () => import("./samples")],
+	["umx", () => import("./umx")],
 	["stress", () => import("./stress")],
 ]);

@@ -100,6 +100,7 @@ something in the directory, which load by themselves when such a file is opened.
 - `format.ts` — Which importer can read a file, from its first bytes rather than its name.
 - `midi.ts` — Importing a MIDI file: read once into parts, then written as a song as often as the porter changes what to keep.
 - `mod.ts` — Importing a MOD: read and played once, then written as a song, with its samples planned for BRR, as often as the porter changes what to keep.
+- `umx.ts` — An Unreal package (`.umx`) unwrapped to the tracker module its `Music` object holds.
 
 ## packages/song-import/src/midi
 
@@ -272,8 +273,9 @@ something in the directory, which load by themselves when such a file is opened.
 - `reader.ts` — `modtest`: the MOD reader — each signature's channel count, FLT8's pattern pairs, the pattern count, the sample headers' loop quirks, a file cut short, and what is refused.
 - `samples.ts` — `modtest`: samples made ready for BRR — the loop moved onto a block at every factor, a tiny loop widened to one, a one-shot's length, the planned frames matching what is planned, and the factor that fits a room.
 - `stress.ts` — `modtest`: busy, seeded MODs — eight channels, every effect, repeats, a jump back — imported at several factors and both loop modes without raising a problem, and assembled.
-- `support.ts` — What every `modtest` section shares: a MOD file built in memory, imported, its samples encoded, and the song compiled, walked, diagnosed and assembled as the editor does.
+- `support.ts` (300+ lines) — What every `modtest` section shares: a MOD file built in memory, imported, its samples encoded, and the song compiled, walked, diagnosed and assembled as the editor does.
 - `timing.ts` — `modtest`: time — two driver ticks to a MOD tick, speed and BPM, and the order list's flow through Bxx, Dxx, E6x, EEx and EDx, each held to the ticks the walk plays its notes at.
+- `umx.ts` — `modtest`: a UMX unwrapped to its module at every package version's layout, the module named by its signature, and each refusal.
 
 ## scripts/palettetest
 

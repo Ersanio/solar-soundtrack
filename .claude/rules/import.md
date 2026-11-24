@@ -48,8 +48,9 @@ true.
 ## The dialog
 
 - `top-bar.html`'s Import is a `<label>` round a file input, so the press is the picker's own. Any
-  file opens a dialog: `detectFormat` sends a MOD to `ModImportDialog` and everything else to
-  `ImportDialog`, which says why when it cannot read it.
+  file opens a dialog: `detectFormat` sends a MOD or a UMX to `ModImportDialog` and everything
+  else to `ImportDialog`, which says why when it cannot read it. The MOD dialog unwraps a UMX
+  (`unwrapUmx`) and reads the MOD inside, or says which format it holds instead.
 - The candidate is a `computed` chain: written, compiled with `EditorStore.compileText`, assembled
   with `EditorStore.spcFor`, walked for its clock. Import is held back while it has no SPC.
 - **The preview is a third `AudioContext`** (`import-preview.ts`), not `Playback` or `Audition`:

@@ -10,6 +10,7 @@ import {
   readMod,
   writeMod,
 } from '@amk/import/mod';
+import { UmxError, isUmx, unwrapUmx } from '@amk/import/umx';
 import { type BrrSample, decodeBrr, emptySample, parseBrr } from '@amk/spc/brr';
 import { brrDataBytes, encodeBrr } from '@amk/spc/brr-encode';
 import { computeSpcLayout } from '@amk/spc/layout';
@@ -33,7 +34,12 @@ import { CHANNEL_BG, CHANNEL_SCOPE } from '../../util/channel-palette';
 import { errorMessage } from '../../util/format';
 import { type Candidate, buildCandidate } from '../import-dialog/import-candidate';
 import { ImportPreview } from '../import-dialog/import-preview';
-import { MOD_REFUSALS, modWarningText } from '../import-dialog/import-text';
+import {
+  MOD_REFUSALS,
+  UMX_HOLDS,
+  UMX_REFUSALS,
+  modWarningText,
+} from '../import-dialog/import-text';
 
 /** What the porter chose for a sample: the factor that fits, a factor of their own, or none of its notes. */
 type Choice = 'auto' | 'drop' | number;
@@ -456,7 +462,7 @@ export class ModImportDialog {
     });
   }
 
-  /** Reads `bytes` and opens the dialog on them, or on why they cannot be read. */
+  /** Reads `bytes`, a MOD or a UMX holding one, and opens the dialog on them, or on why they cannot be read. */
   openWith(name: string, bytes: Uint8Array): void {
     this.fileName.set(name);
     this.previewError.set(null);
@@ -466,12 +472,23 @@ export class ModImportDialog {
     this.mod.set(null);
     this.refusal.set(null);
     try {
-      const mod = readMod(bytes);
-      this.keep.set(mod.suggested);
-      this.loopAtJump.set(mod.play.loopTick > 0);
-      this.mod.set(mod);
+      const inner = isUmx(bytes) ? unwrapUmx(bytes) : { format: 'mod' as const, bytes };
+      if (inner.format === 'mod') {
+        const mod = readMod(inner.bytes);
+        this.keep.set(mod.suggested);
+        this.loopAtJump.set(mod.play.loopTick > 0);
+        this.mod.set(mod);
+      } else {
+        this.refusal.set(UMX_HOLDS[inner.format]);
+      }
     } catch (error) {
-      this.refusal.set(error instanceof ModError ? MOD_REFUSALS[error.code] : errorMessage(error));
+      this.refusal.set(
+        error instanceof ModError
+          ? MOD_REFUSALS[error.code]
+          : error instanceof UmxError
+            ? UMX_REFUSALS[error.code]
+            : errorMessage(error),
+      );
     }
 
     this.preview.set(

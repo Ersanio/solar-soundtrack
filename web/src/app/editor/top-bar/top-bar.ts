@@ -115,7 +115,8 @@ export class TopBar {
     input.value = '';
     if (file) {
       const bytes = new Uint8Array(await file.arrayBuffer());
-      if (detectFormat(bytes) === 'mod') {
+      const format = detectFormat(bytes);
+      if (format === 'mod' || format === 'umx') {
         this.modImporter().openWith(file.name, bytes);
       } else {
         this.importer().openWith(file.name, bytes);

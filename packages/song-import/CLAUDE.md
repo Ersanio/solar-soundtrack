@@ -1,7 +1,7 @@
 # @amk/import
 
 Importers: another music format read and written out as AddmusicK MML. MIDI and MOD are the two
-there are; older AddMusic SPCs and other `.spc` rips are meant to join them as readers beside `midi/`
+there are, and a UMX is unwrapped to the module it holds; older AddMusic SPCs and other `.spc` rips are meant to join them as readers beside `midi/`
 and `mod/`, picked by `format.ts`'s `detectFormat`, which sniffs a file's signature rather than
 trusting its name.
 
@@ -29,6 +29,7 @@ code and a warning an `ImportWarning` or `ModImportWarning`, which the Import di
 | `mod/play.ts`         | The song played tick by tick: what each channel sounds, and its loop  |
 | `mod/samples.ts`      | Resampling, loops onto BRR blocks, the tuning, the factor that fits   |
 | `mod/write-mml.ts`    | The channels kept, on custom instruments, as an `#amk 4` song         |
+| `umx.ts`              | An Unreal package unwrapped to the module its Music object holds      |
 
 ## Reading
 
@@ -195,3 +196,16 @@ kept channels play, and `#instruments` giving each `$FF $E0 $7F` and its tuning 
 
 `modtest` pins all of it against the compiler and the walk, and seeded busy songs at several factors
 against the editor's diagnostics.
+
+## UMX
+
+`umx.ts` follows OpenMPT's `UMXTools.cpp`. An Unreal package names its name, import and export
+tables in a 36-byte header, and every count and index in them is a compact index. Fields come and go
+with the package version: a name has a length in front from 64, an import or export entry has a
+4-byte package from 60, an object's data has 8 and 16 bytes in front below 40 and 60, and what sits
+between its property list and its payload differs at 62, 100 and 120 (62 rather than Unreal's own
+63, for Mech8.umx and others). The first export whose class is `Music` and whose bytes are a tracker
+module is taken, and the module's format is read from its signature, since the name a package gives
+it can be wrong. Music that is recorded audio (MP2, Ogg, WAV) has no notes and is refused as
+`audio`. The MOD dialog reads a MOD unwrapped and names any other tracker format it cannot read yet.
+`modtest`'s `umx` section builds packages at each version's layout.

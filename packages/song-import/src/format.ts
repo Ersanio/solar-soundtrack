@@ -6,9 +6,10 @@
  */
 
 import { isMod } from "./mod/file";
+import { isUmx } from "./umx";
 
 /** The formats there is a reader for. */
-export type ImportFormat = "midi" | "mod";
+export type ImportFormat = "midi" | "mod" | "umx";
 
 function ascii(bytes: Uint8Array, at: number, text: string): boolean {
 	for (let i = 0; i < text.length; i++) {
@@ -52,6 +53,10 @@ export function smfBytes(bytes: Uint8Array): Uint8Array | null {
 export function detectFormat(bytes: Uint8Array): ImportFormat | null {
 	if (smfBytes(bytes)) {
 		return "midi";
+	}
+
+	if (isUmx(bytes)) {
+		return "umx";
 	}
 
 	return isMod(bytes) ? "mod" : null;

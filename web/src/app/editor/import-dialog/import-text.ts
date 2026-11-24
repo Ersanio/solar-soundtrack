@@ -3,6 +3,7 @@
 import type { GmFamily, DrumFamily } from '@amk/import/midi/gm';
 import type { ImportWarning, Part, SmfErrorCode } from '@amk/import/midi';
 import type { ModErrorCode, ModImportWarning } from '@amk/import/mod';
+import type { TrackerFormat, UmxErrorCode } from '@amk/import/umx';
 
 export const REFUSALS: Readonly<Record<SmfErrorCode, string>> = {
   'not-midi': $localize`:@@import.refuse.not-midi:import.refuse.not-midi`,
@@ -160,6 +161,19 @@ export function warningText(warning: ImportWarning, label: (id: string) => strin
 
 export const MOD_REFUSALS: Readonly<Record<ModErrorCode, string>> = {
   'not-mod': $localize`:@@import.refuse.not-mod:import.refuse.not-mod`,
+};
+
+export const UMX_REFUSALS: Readonly<Record<UmxErrorCode, string>> = {
+  'not-umx': $localize`:@@import.refuse.umx.damaged:import.refuse.umx.damaged`,
+  'no-music': $localize`:@@import.refuse.umx.no-music:import.refuse.umx.no-music`,
+  audio: $localize`:@@import.refuse.umx.audio:import.refuse.umx.audio`,
+};
+
+/** Why a UMX holding a module of another format cannot be imported yet. */
+export const UMX_HOLDS: Readonly<Record<Exclude<TrackerFormat, 'mod'>, string>> = {
+  s3m: $localize`:@@import.refuse.umx.s3m:import.refuse.umx.s3m`,
+  xm: $localize`:@@import.refuse.umx.xm:import.refuse.umx.xm`,
+  it: $localize`:@@import.refuse.umx.it:import.refuse.umx.it`,
 };
 
 /** A MOD import's warning in words, naming the sample it is about by `label`. */

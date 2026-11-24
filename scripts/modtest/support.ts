@@ -141,6 +141,112 @@ export function modBytes(spec: ModSpec): Uint8Array {
 	return spec.cut === undefined ? bytes : bytes.subarray(0, spec.cut);
 }
 
+// --- A UMX writer --------------------------------------------------------------
+
+/** One object in a package: its class, the format name it gives, and its bytes. */
+export interface UmxObject {
+	payload: Uint8Array;
+	/** `Music` unless given. */
+	className?: string;
+	/** The name the object gives its format, `mod` unless given. */
+	format?: string;
+}
+
+/** A compact index, as `ReadIndexImpl` reads it. */
+function compactIndex(value: number): number[] {
+	let rest = Math.abs(value);
+	const out = [(value < 0 ? 0x80 : 0) | (rest & 0x3f) | (rest >= 0x40 ? 0x40 : 0)];
+	rest = Math.floor(rest / 64);
+	while (rest > 0) {
+		const b = rest & 0x7f;
+		rest = Math.floor(rest / 128);
+		out.push(b | (rest > 0 ? 0x80 : 0));
+	}
+
+	return out;
+}
+
+const u32 = (value: number): number[] => [
+	value & 0xff,
+	(value >> 8) & 0xff,
+	(value >> 16) & 0xff,
+	(value >>> 24) & 0xff,
+];
+
+/** An Unreal package at `version` holding `objects`, laid out as `UMXTools.cpp` reads one. */
+export function umxBytes(objects: readonly UmxObject[], version = 69): Uint8Array {
+	const names = ["None", "Core", "Engine", "Class", "Song"];
+	const nameOf = (name: string): number => {
+		if (!names.includes(name)) {
+			names.push(name);
+		}
+
+		return names.indexOf(name);
+	};
+
+	const classes = [...new Set(objects.map((o) => o.className ?? "Music"))];
+	classes.forEach(nameOf);
+	objects.forEach((o) => nameOf(o.format ?? "mod"));
+
+	const nameTable = names.flatMap((name) => [
+		...(version >= 64 ? compactIndex(name.length + 1) : []),
+		...[...name].map((c) => c.charCodeAt(0)),
+		0,
+		...u32(0),
+	]);
+	const importTable = classes.flatMap((cls) => [
+		...compactIndex(nameOf("Engine")),
+		...compactIndex(nameOf("Class")),
+		...(version >= 60 ? u32(0) : compactIndex(0)),
+		...compactIndex(nameOf(cls)),
+	]);
+	const dataAt = 36 + nameTable.length + importTable.length;
+	const data: number[] = [];
+	const exportTable: number[] = [];
+	for (const object of objects) {
+		const body = [
+			...(version < 40 ? new Array<number>(8).fill(0) : []),
+			...(version < 60 ? [0x81, 0, 0, 0, 0, 0, ...new Array<number>(8).fill(0xff), 0, 0] : []),
+			...compactIndex(nameOf("None")),
+			...(version >= 120
+				? [...compactIndex(nameOf(object.format ?? "mod")), ...u32(0), ...u32(0)]
+				: version >= 100
+					? [...u32(0), ...compactIndex(nameOf(object.format ?? "mod")), ...u32(0)]
+					: version >= 62
+						? [...compactIndex(nameOf(object.format ?? "mod")), ...u32(0)]
+						: compactIndex(nameOf(object.format ?? "mod"))),
+			...compactIndex(object.payload.length),
+			...object.payload,
+		];
+		exportTable.push(
+			...compactIndex(-1 - classes.indexOf(object.className ?? "Music")),
+			...compactIndex(0),
+			...(version >= 60 ? u32(0) : []),
+			...compactIndex(nameOf("Song")),
+			...u32(0),
+			...compactIndex(body.length),
+			...compactIndex(dataAt + data.length),
+		);
+		data.push(...body);
+	}
+
+	const header = [
+		...u32(0x9e2a83c1),
+		version & 0xff,
+		version >> 8,
+		0,
+		0,
+		...u32(0),
+		...u32(names.length),
+		...u32(36),
+		...u32(objects.length),
+		...u32(dataAt + data.length),
+		...u32(classes.length),
+		...u32(36 + nameTable.length),
+	];
+	return new Uint8Array([...header, ...nameTable, ...importTable, ...data, ...exportTable]);
+}
+
 /** A pattern of 64 rows with `cells` placed at `[row, channel]`. */
 export function pattern(cells: [row: number, channel: number, cell: Cell][]): Cell[][] {
 	const rows: Cell[][] = Array.from({ length: 64 }, () => []);
