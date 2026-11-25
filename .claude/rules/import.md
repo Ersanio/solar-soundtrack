@@ -40,6 +40,9 @@ true.
   scaled so the two sides sum alike at every pan (`panOf`, `heardAt`); a centred song is about 2 dB
   under a hard-panned one's full volume, the price of never clipping. A slot that copies an earlier
   one shares its file (`copiesOf`), and a one-shot's end fades to silence.
+- **Pan goes through `PanValues`' curve in both importers** (`yForBalance`): a module's balance is
+  linear, so its volume is also scaled to even the two sides' sum; a MIDI's is GM's constant power,
+  which the curve already comes within a decibel of, so its volume is left alone.
 - **Formats meet at the tracker model.** A format's reader and player are the only code that knows
   its units: they hand `tracker/model.ts`'s `TrackerSong` and `TrackerPlay` (pitch in semitones from
   a sample's reference note, `baseHz`, 16-bit PCM, the vibrato's and tremolo's phase step and swing)
@@ -113,5 +116,5 @@ entry goes there, with its line here, in the same change.
 - **A short loop widened by raising the factor** — `loopRepeats`, `plannedFrames`
 - **The song's bytes taken to be the same at every factor** — `firstFactor`, `autoFactor`
 - **Songs found by an order walk apart from the player** — `findSongs`
-- **Pan mapped straight onto y** — `panOf`, `heardAt`
+- **Pan mapped straight onto y** — `panOf`, `heardAt`, `yForBalance`
 - **Every sample slot its own BRR** — `copiesOf`, `sameAs`

@@ -130,7 +130,7 @@ something in the directory, which load by themselves when such a file is opened.
 
 - `channels.ts` — Which voices can share an AddmusicK channel, whatever the format: two whose notes never sound at the same time, give or take a short hand-over the writer trims, take turns on one channel.
 - `lengths.ts` — Note and rest lengths in driver ticks, spelled as MML: whole notes tied to what is left, with a dot only where it halves exactly and `=ticks` otherwise, since a dot that halves an odd count is AMK0200.
-- `song-text.ts` — What every importer writes the same way: the tempo byte for a BPM, a polyline simplified to ramps, and text fit for a `#spc` tag.
+- `song-text.ts` — What every importer writes the same way: the tempo byte for a BPM, `y` for a balance, a polyline simplified to ramps, and text fit for a `#spc` tag.
 
 ## packages/song-import/src/mod
 
@@ -154,11 +154,11 @@ something in the directory, which load by themselves when such a file is opened.
 - `pingpong.ts` — A ping-pong loop laid out as a forward one: the loop, then the loop backwards, since a BRR loop only runs forward.
 - `samples.ts` — A tracker module's samples made ready for BRR: resampled to fit ARAM, their loops moved onto block boundaries, and the tuning an AddmusicK instrument needs to play each at the module's pitch.
 - `write-mml.ts` (1000+ lines) — A played tracker module written out as an `#amk 4` song: each kept channel on one of AddmusicK's, or with `share` channels whose notes never overlap taking turns on one, each sample a custom instrument after `#default` (or `#optimized`).
-  - `TRACKER_CHANNEL_LIMIT`:41 `DRIVER_TICKS`:43 `notesOf`:115 `mergeChannels`:166 `volumeOf`:191 `panOf`:206
-  - `panLoudness`:222 `heardAt`:227 `rateOf`:237 `vibratoOf`:242 `tremoloOf`:257 `arpeggioText`:273
-  - `ChannelWriter`:332 `bestFineTune`:410 `forget`:440 `push`:444 `pitchAt`:449 `volumeIn`:456 `vibratoIn`:464
-  - `noteSettings`:481 `setTremolo`:504 `setArpeggio`:513 `setVolume`:529 `setPan`:536 `setVibrato`:543
-  - `setOctave`:550 `tempo`:565 `cut`:577 `rest`:623 `notePart`:638 `lines`:767 `writeTrackerSong`:792
+  - `TRACKER_CHANNEL_LIMIT`:41 `DRIVER_TICKS`:43 `notesOf`:115 `mergeChannels`:166 `volumeOf`:191 `panOf`:200
+  - `panLoudness`:205 `heardAt`:210 `rateOf`:220 `vibratoOf`:225 `tremoloOf`:240 `arpeggioText`:256
+  - `ChannelWriter`:315 `bestFineTune`:393 `forget`:423 `push`:427 `pitchAt`:432 `volumeIn`:439 `vibratoIn`:447
+  - `noteSettings`:464 `setTremolo`:487 `setArpeggio`:496 `setVolume`:512 `setPan`:519 `setVibrato`:526
+  - `setOctave`:533 `tempo`:548 `cut`:560 `rest`:606 `notePart`:621 `lines`:750 `writeTrackerSong`:775
 
 ## packages/song-import/src/xm
 
@@ -484,7 +484,7 @@ something in the directory, which load by themselves when such a file is opened.
 
 ## web/src/app/changelog
 
-- `changelog-data.ts` — What the changelog popup in the top bar shows.
+- `changelog-data.ts` (300+ lines) — What the changelog popup in the top bar shows.
 - `changelog.ts` — The top bar's changelog control and the panel it drops down.
 
 ## web/src/app/editor/aram-meter

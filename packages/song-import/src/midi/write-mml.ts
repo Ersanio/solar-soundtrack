@@ -30,7 +30,7 @@ import { octaveFor, spellNote } from "@amk/core/mml-text";
 import type { InstrumentTables } from "@amk/spc/instruments";
 import { highestTrue } from "@amk/spc/pitch";
 import { spellRestTicks, spellTicks } from "../mml/lengths";
-import { simplify, tagText, tempoForBpm } from "../mml/song-text";
+import { simplify, tagText, tempoForBpm, yForBalance } from "../mml/song-text";
 import { type DrumSound, GM_PROGRAMS } from "./gm";
 import { type Clashes, packChannels } from "./channels";
 import type { Part, PartNote } from "./parts";
@@ -334,7 +334,11 @@ function planPart(
 		const endTick = Math.max(startTick, s.note.end - 1);
 		const volumeOf = (tick: number): number =>
 			Math.round((255 * valueAt(channel.volume, tick) * valueAt(channel.expression, tick)) / (127 * 127));
-		const panOf = (tick: number): number => Math.round(((127 - valueAt(channel.pan, tick)) * 20) / 127);
+		// GM pans at constant power, the left cos θ and the right sin θ over CC10's quarter turn.
+		const panOf = (tick: number): number => {
+			const angle = (valueAt(channel.pan, tick) / 127) * (Math.PI / 2);
+			return yForBalance(Math.cos(angle) / (Math.cos(angle) + Math.sin(angle)));
+		};
 		// A vibrato swings either side of the note, so one at the edge of the range would leave it.
 		const bytes = [emitted(key, instrument), ...pieces.flatMap((piece) => (piece.slide ? [piece.slide.target] : []))];
 		const range = isDrum(instrument) ? null : keyRange(instrument, tables);

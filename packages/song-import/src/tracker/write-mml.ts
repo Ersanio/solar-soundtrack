@@ -31,7 +31,7 @@ import { NOTE_MIN } from "@amk/core/hardcoded-tables";
 import { hex2 } from "@amk/core/hex";
 import { octaveFor, spellNote } from "@amk/core/mml-text";
 import { spellRestTicks, spellTicks } from "../mml/lengths";
-import { simplify, tagText, tempoForBpm } from "../mml/song-text";
+import { PAN_VALUES, simplify, tagText, tempoForBpm, yForBalance } from "../mml/song-text";
 import { SEMITONE, setPitchWide } from "@amk/spc/pitch";
 import { type Clashes, packChannels } from "../mml/channels";
 import { type ChannelTicks, type TrackerPlay, type TrackerSong, channelTicks } from "./model";
@@ -192,30 +192,13 @@ function volumeOf(volume: number): number {
 	return Math.round(255 * Math.sqrt(volume / 64));
 }
 
-/** `PanValues` (`main.asm:3486`): a side's level at each `y`, the left reading `y` and the right `20 - y`. */
-const PAN_VALUES = [
-	0x00, 0x01, 0x03, 0x07, 0x0d, 0x15, 0x1e, 0x29, 0x34, 0x42, 0x51, 0x5e, 0x67, 0x6e, 0x73, 0x77, 0x7a, 0x7c, 0x7d,
-	0x7e, 0x7f,
-];
-
 /**
  * `y` for a tracker pan of 0 (left) to 255 (right), narrowed by the separation: the one whose share
  * of the level on the left, through `PanValues`'s curve, is nearest the module's. AddmusicK's 20 is
  * hard left.
  */
 function panOf(pan: number, separation: number): number {
-	const left = 0.5 - ((pan - 127.5) / 255) * separation;
-	let best = 10;
-	let distance = Infinity;
-	for (let y = 0; y <= 20; y++) {
-		const d = Math.abs(PAN_VALUES[y] / (PAN_VALUES[y] + PAN_VALUES[20 - y]) - left);
-		if (d < distance) {
-			best = y;
-			distance = d;
-		}
-	}
-
-	return best;
+	return yForBalance(0.5 - ((pan - 127.5) / 255) * separation);
 }
 
 /** What a note's volume is scaled by at `y`, so the two sides sum alike at every pan: 1 hard over, 0.78 centred. */

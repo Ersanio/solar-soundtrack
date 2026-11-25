@@ -23,7 +23,7 @@ caller's. It returns **codes and values, never words**: a refusal is an `SmfErro
 | `midi/gm.ts`           | GM programs and drum keys matched to the stock instruments and drums   |
 | `midi/write-mml.ts`    | The parts kept, written as an `#amk 4` song                            |
 | `mml/lengths.ts`       | Note and rest lengths in driver ticks, spelled without AMK0200         |
-| `mml/song-text.ts`     | `t` for a BPM, a polyline simplified to ramps, text for a `#spc` tag   |
+| `mml/song-text.ts`     | `t` for a BPM, `y` for a balance, ramps, text for a `#spc` tag         |
 | `mml/channels.ts`      | Which voices can share a channel, and packing them onto eight          |
 | `tracker.ts`           | `findSongs`, `summarise` and `withSong`, and `writeTracker` per change |
 | `tracker/model.ts`     | What every format's reader and player hand over: samples, ticks        |
@@ -115,7 +115,8 @@ point is struck again there.
   compiler takes it off a letter.
 - **Commands at the key-on**, each only when it changes: `@` (always, before a drum: on #0-#5 the
   compiler forgets a drum after one hit), `v` from CC7 × CC11 and `vD,N` where the curve moves under
-  the note, `y` from CC10 reversed and `$DC` likewise, `$DE` vibrato from CC1 at about 5.5 Hz (left
+  the note, `y` from CC10 and `$DC` likewise, the `y` whose balance through `PanValues`'s curve is nearest
+  GM's constant-power one (`yForBalance`), `$DE` vibrato from CC1 at about 5.5 Hz (left
   off a note at the edge of its range, which the swing would leave), and `q7X` from the velocity.
 - **Song-wide.** `w255` and the first `t` open the first channel; later tempos are `t` on that
   channel at their tick, tying a held note across one. CC91 on any kept part is one `$EF`/`$F1` on

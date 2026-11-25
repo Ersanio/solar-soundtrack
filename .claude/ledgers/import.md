@@ -54,6 +54,8 @@ and moved away from, with the reason. The rule carries one index line per entry.
   y0, but `PanValues` is an S-curve, so a quarter-left pan came out 85:15 and a centred note louder
   than a hard-panned one. The `y` is the one whose left share through the curve is nearest the
   module's, and the volume is scaled by `$7F` over the two sides' sum (it2amk's `accurate` panning).
+  The MIDI writer read CC10 off the same straight line; its `y` is matched to GM's constant-power
+  balance through the curve (`yForBalance`), CC10 32 giving y13 where the line gave y15.
 - **Every sample slot its own BRR** — a module that lists one sample under several slots wrote it to
   ARAM once a slot. Copies share the first's file (`copiesOf`) and keep instruments of their own,
   since a copy's rate can differ (XMSNES merges them the same way).

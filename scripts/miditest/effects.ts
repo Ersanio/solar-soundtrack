@@ -34,6 +34,13 @@ section("effects: volume, pan, velocity");
 }
 
 {
+	// CC10 32 at constant power is 71% on the left: y13 gives $6E against $29 (73%), y12 $67 against $34 (66%).
+	const events = [cc(0, 0, 10, 32), ...note(0, 0, 60, Q), cc(Q, 0, 10, 96), ...note(Q, 0, 62, Q)];
+	const pans = played(imported(smf([events])).song, 0).map((n) => n.state.pan);
+	check("a quarter turn either way is matched through the pan curve", pans.join(",") === "13,7", pans.join(","));
+}
+
+{
 	const { song } = imported(smf([[...note(0, 0, 60, Q, 127), ...note(Q, 0, 62, Q, 20)]]));
 	const q = played(song, 0).map((n) => n.state.quantization);
 	check("velocity 127 is q7F", q[0] === 0x7f, `${q[0]?.toString(16)}`);
