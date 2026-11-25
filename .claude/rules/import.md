@@ -50,7 +50,9 @@ true.
   one format belongs in its player, not in the writer.
 - **A MOD's repeated passes are label loops** only where a pass and the one after it open on no
   tie, and each pass states its octave afresh, so two passes alike in text and in the driver state
-  they start under play alike.
+  they start under play alike. `TrackerSongOptions.passLoops: false` turns them off, for the
+  dialog's Loop Repeated Music, which loops the flat text through `@amk/optimize` instead
+  (`.claude/rules/optimizer.md`).
 - **At most eight channels are written**, on `#0` up: one part (or module channel) each, or with
   `share` the ones `mml/channels.ts`'s `packChannels` puts together, which never cut one another
   short (`clashes`). `CHANNEL_LIMIT` and `TRACKER_CHANNEL_LIMIT` are where the number is stated. A
@@ -94,7 +96,10 @@ true.
   factor found from it (`fitFactor`), then measured again on a write at that factor and the factor
   lowered where it no longer fits, since each instrument's tuning, and so the octave its notes are
   written in, moves with the factor (`firstFactor`, `autoFactor`). A factor whose BRR would pass 64 KB
-  is offered disabled. Each encoding is
+  is offered disabled. With **Loop Repeated Music** (on by default) every one of those writes is
+  written flat and optimized (`write`, memoised by text), so the room is measured on the song as it
+  will be; one the optimizer cannot shorten, such as one too long to compile even flat, is written
+  with the pass loops and optimized from there. Each encoding is
   kept per sample and factor while the dialog is open, encoded with `encodeBrrWithHeadroom` so no
   sample wraps the DSP's interpolation. A module holding more than one song shows
   a Song select; choosing another suggests its channels afresh and keeps each sample's choice.

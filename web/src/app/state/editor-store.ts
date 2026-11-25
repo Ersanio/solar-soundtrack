@@ -581,18 +581,20 @@ export class EditorStore {
 
   /**
    * Compiles a text that is not the document, exactly as the document is
-   * compiled. For a writer that has to read back text it has not committed yet.
+   * compiled. For a writer that has to read back text it has not committed yet. `at` loads it
+   * somewhere other than the driver's slot, which the optimizer reads a song too long for it at.
    */
   compileText(
     text: string,
     extraSamples: readonly string[] = [],
+    at?: number,
   ): { result: CompileResult; aramAddress: number } | null {
     const driver = this.drivers.driver();
     if (!driver) {
       return null;
     }
 
-    const aramAddress = driver.manifest.localPos;
+    const aramAddress = at ?? driver.manifest.localPos;
     const options = this.compileOptions();
     // Samples the text brings that the library does not hold yet, such as an import's.
     if (extraSamples.length > 0) {

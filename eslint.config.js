@@ -58,6 +58,7 @@ module.exports = defineConfig([
       'packages/mml-tokens/**/*.ts',
       'packages/spc/**/*.ts',
       'packages/song-import/**/*.ts',
+      'packages/mml-optimizer/**/*.ts',
       'web/src/**/*.ts',
       'scripts/**/*.ts',
     ],
@@ -119,6 +120,7 @@ module.exports = defineConfig([
   //   spc      → core
   //   tokens   → core, and two modules of spc
   //   import   → core, and spc's instrument tables and pitch maths
+  //   optimize → core, compiler, tokens and spc
   //
   // `$localize` is no exception: it is a global the host provides, not an
   // import, so a package's messages need nothing from Angular.
@@ -135,7 +137,14 @@ module.exports = defineConfig([
     // program to build — this block exists only to hold the import boundary.
     languageOptions: { parser: tseslint.parser },
     rules: forbid(
-      ['@amk/tokens', '@amk/tokens/*', '@amk/spc/*', '@amk/import/*', ...FRAMEWORKS],
+      [
+        '@amk/tokens',
+        '@amk/tokens/*',
+        '@amk/spc/*',
+        '@amk/import/*',
+        '@amk/optimize/*',
+        ...FRAMEWORKS,
+      ],
       'The compiler is a port of AddmusicK 1.0.11 and reaches for nothing but @amk/core.',
     ),
   },
@@ -148,6 +157,7 @@ module.exports = defineConfig([
         '@amk/tokens',
         '@amk/tokens/*',
         '@amk/import/*',
+        '@amk/optimize/*',
         ...FRAMEWORKS,
       ],
       'The SPC layer runs in a worklet and depends on nothing but @amk/core.',
@@ -156,7 +166,14 @@ module.exports = defineConfig([
   {
     files: ['packages/mml-tokens/**/*.ts'],
     rules: forbid(
-      ['@amk/compiler', '@amk/compiler/*', '@amk/import/*', ...SPC_BEYOND_THE_MATHS, ...FRAMEWORKS],
+      [
+        '@amk/compiler',
+        '@amk/compiler/*',
+        '@amk/import/*',
+        '@amk/optimize/*',
+        ...SPC_BEYOND_THE_MATHS,
+        ...FRAMEWORKS,
+      ],
       'The scanner may read @amk/spc/adsr and @amk/spc/fir — what a byte sounds like — and nothing else.',
     ),
   },
@@ -171,9 +188,18 @@ module.exports = defineConfig([
         '@amk/spc/*',
         '!@amk/spc/instruments',
         '!@amk/spc/pitch',
+        '@amk/optimize/*',
         ...FRAMEWORKS,
       ],
       'An importer writes MML text; it may read the stock instruments and their pitch range from @amk/spc, and nothing else.',
+    ),
+  },
+
+  {
+    files: ['packages/mml-optimizer/**/*.ts'],
+    rules: forbid(
+      ['@amk/import/*', ...FRAMEWORKS],
+      'The optimizer reads a song through the compiler, the scanner and the walk and writes MML; it knows no importer.',
     ),
   },
 

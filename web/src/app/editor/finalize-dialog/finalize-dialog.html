@@ -1,0 +1,90 @@
+<amk-modal #dialog [heading]="text.heading">
+  <div class="flex flex-col gap-3 text-xs leading-relaxed">
+    <p i18n="@@topbar.finalize.intro" class="text-ink-muted">topbar.finalize.intro</p>
+
+    <div class="flex items-center gap-2">
+      <span i18n="@@topbar.finalize.loops" class="text-ink-muted">topbar.finalize.loops</span>
+      <button
+        i18n="@@topbar.finalize.loops.keep"
+        amk-toggle
+        i18n-title="@@topbar.finalize.loops.keep.title"
+        title="topbar.finalize.loops.keep.title"
+        [pressed]="existingLoops() === 'keep'"
+        (click)="choose('keep')"
+      >
+        topbar.finalize.loops.keep
+      </button>
+      <button
+        i18n="@@topbar.finalize.loops.redo"
+        amk-toggle
+        i18n-title="@@topbar.finalize.loops.redo.title"
+        title="topbar.finalize.loops.redo.title"
+        [pressed]="existingLoops() === 'redo'"
+        (click)="choose('redo')"
+      >
+        topbar.finalize.loops.redo
+      </button>
+    </div>
+
+    @if (result(); as result) {
+      @if (saved() > 0) {
+        <p i18n="@@topbar.finalize.saved" class="text-ink">
+          topbar.finalize.saved
+          {{
+            result.before // i18n(ph='before')
+          }}
+          {{
+            result.after // i18n(ph='after')
+          }}
+          {{
+            percent() // i18n(ph='percent')
+          }}
+        </p>
+        @if (pages() > 0) {
+          <p i18n="@@topbar.finalize.pages" class="text-ink">
+            topbar.finalize.pages
+            {{
+              pages() * 256 // i18n(ph='bytes')
+            }}
+          </p>
+        }
+        <p i18n="@@topbar.finalize.moves" class="text-ink-muted">
+          topbar.finalize.moves
+          {{
+            result.moves.labels // i18n(ph='labels')
+          }}
+          {{
+            result.moves.calls // i18n(ph='calls')
+          }}
+          {{
+            result.moves.transposed // i18n(ph='transposed')
+          }}
+          {{
+            result.moves.superloops // i18n(ph='superloops')
+          }}
+          {{
+            result.moves.restLoops // i18n(ph='rests')
+          }}
+        </p>
+        <p i18n="@@topbar.finalize.proof" class="text-ink-muted">topbar.finalize.proof</p>
+      } @else {
+        <p i18n="@@topbar.finalize.nothing" class="text-ink-muted">topbar.finalize.nothing</p>
+      }
+    } @else {
+      <p i18n="@@topbar.finalize.cannot" class="text-ink-muted">topbar.finalize.cannot</p>
+    }
+  </div>
+
+  <button
+    i18n="@@topbar.finalize.apply"
+    amk-button
+    modalFooter
+    [disabled]="saved() <= 0"
+    (click)="apply()"
+  >
+    topbar.finalize.apply
+  </button>
+  <button i18n="@@topbar.finalize.cancel" amk-button modalFooter (click)="dialog.close()">
+    topbar.finalize.cancel
+  </button>
+</amk-modal>

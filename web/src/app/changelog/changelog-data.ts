@@ -11,6 +11,7 @@ export const CHANGELOG: readonly ChangelogEntry[] = [
   {
     date: '25 November 2026',
     items: [
+      'Song size optimizer: repeated music looped, on tracker import and as Finalize in the top bar',
       'Truer panning when importing a MIDI file',
       'Truer panning, fewer clicks and duplicate samples stored once, when importing a MOD, S3M, XM or IT file',
       "Choose which song to import from a module or UMX file that holds several, as Deus Ex's do",

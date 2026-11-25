@@ -57,6 +57,18 @@ something in the directory, which load by themselves when such a file is opened.
   - `report`:3741 `errorAt`:3755 `warn`:3759 `info`:3764 `warnOnce`:3768 `lengths`:3786 `output`:3813
 - `preprocess.ts` (300+ lines) — Port of `preprocess()` (globals.cpp:735), which runs before the MML scanner.
 
+## packages/mml-optimizer/src
+
+**Rules:** `optimizer.md`
+
+- `equivalence.ts` — Whether two compiled songs play alike: their walks compared note by note and command by command, loops and `$FA $02` aside.
+- `optimize.ts` (300+ lines) — Rewriting a song to compile smaller and play exactly as it did: planned, written, compiled, and proven against the original's walk, a move that fails barred and the rest tried again.
+- `plan.ts` (750+ lines) — The passes: repeated runs made label loops, transposed or not, then superloops, then long rests looped, each checked against what the compiler would make of it.
+- `read.ts` (500+ lines) — A compiled song read into per-channel items: each note, rest, tie and command with the bytes it compiled to, and everything else kept as fixed text.
+- `repeats.ts` — Repeated runs in a sequence of keys: a suffix array, its longest common prefixes, and the groups of positions that share one.
+- `unroll.ts` — A song's loops written out pass by pass, so the passes can loop it again their own way: each copy in the octave and default length its body was written under.
+- `write.ts` — A plan written back out as MML: each note in an octave it states, each label defined where it is first used, and a transposed call wrapped in `$FA $02`.
+
 ## packages/mml-tokens/src
 
 **Rules:** `compiler.md`, `inspector-and-palette.md`
@@ -154,11 +166,11 @@ something in the directory, which load by themselves when such a file is opened.
 - `pingpong.ts` — A ping-pong loop laid out as a forward one: the loop, then the loop backwards, since a BRR loop only runs forward.
 - `samples.ts` — A tracker module's samples made ready for BRR: resampled to fit ARAM, their loops moved onto block boundaries, and the tuning an AddmusicK instrument needs to play each at the module's pitch.
 - `write-mml.ts` (1000+ lines) — A played tracker module written out as an `#amk 4` song: each kept channel on one of AddmusicK's, or with `share` channels whose notes never overlap taking turns on one, each sample a custom instrument after `#default` (or `#optimized`).
-  - `TRACKER_CHANNEL_LIMIT`:41 `DRIVER_TICKS`:43 `notesOf`:115 `mergeChannels`:166 `volumeOf`:191 `panOf`:200
-  - `panLoudness`:205 `heardAt`:210 `rateOf`:220 `vibratoOf`:225 `tremoloOf`:240 `arpeggioText`:256
-  - `ChannelWriter`:315 `bestFineTune`:393 `forget`:423 `push`:427 `pitchAt`:432 `volumeIn`:439 `vibratoIn`:447
-  - `noteSettings`:464 `setTremolo`:487 `setArpeggio`:496 `setVolume`:512 `setPan`:519 `setVibrato`:526
-  - `setOctave`:533 `tempo`:548 `cut`:560 `rest`:606 `notePart`:621 `lines`:750 `writeTrackerSong`:775
+  - `TRACKER_CHANNEL_LIMIT`:41 `DRIVER_TICKS`:43 `notesOf`:117 `mergeChannels`:168 `volumeOf`:193 `panOf`:202
+  - `panLoudness`:207 `heardAt`:212 `rateOf`:222 `vibratoOf`:227 `tremoloOf`:242 `arpeggioText`:258
+  - `ChannelWriter`:317 `bestFineTune`:395 `forget`:425 `push`:429 `pitchAt`:434 `volumeIn`:441 `vibratoIn`:449
+  - `noteSettings`:466 `setTremolo`:489 `setArpeggio`:498 `setVolume`:514 `setPan`:521 `setVibrato`:528
+  - `setOctave`:535 `tempo`:550 `cut`:562 `rest`:608 `notePart`:623 `lines`:752 `writeTrackerSong`:777
 
 ## packages/song-import/src/xm
 
@@ -329,6 +341,17 @@ something in the directory, which load by themselves when such a file is opened.
 - `support.ts` (300+ lines) — What every `modtest` section shares: a MOD file built in memory, imported, its samples encoded, and the song compiled, walked, diagnosed and assembled as the editor does.
 - `timing.ts` — `modtest`: time — two driver ticks to a MOD tick, speed and BPM, and the order list's flow through Bxx, Dxx, E6x, EEx and EDx, each held to the ticks the walk plays its notes at.
 - `umx.ts` — `modtest`: a UMX unwrapped to its module at every package version's layout, the module named by its signature, and each refusal.
+
+## scripts/optimizetest
+
+**Rules:** `harnesses/*.md`
+
+- `constraints.ts` — `optimizetest`: what a rewrite must leave alone — a tie on either side of a loop edge, the porter's loops, labels and macros, a hot-patched song, a `$DD` under a transpose — and that it is never larger.
+- `constructs.ts` — `optimizetest`: each move on a song written for it — a label loop, a call from another channel, a transposed call, a superloop, and a long rest looped only when finalizing.
+- `main.ts` — The MML optimizer: `@amk/optimize` rewriting a song with loops to compile smaller and play the same.
+- `redo.ts` — `optimizetest`: Redo — a song's own loops in every spelling played out and looped again, playing the same and never larger than keeping them.
+- `support.ts` — What every `optimizetest` section shares: a song compiled as the editor compiles it, optimized, its walk read back a second way, and each channel opened as the piano roll opens it.
+- `tracker.ts` — `optimizetest`: seeded tracker modules written flat and optimized as the Import dialog does — smaller, playing the same, raising no problem, every channel open in the roll, and in time.
 
 ## scripts/palettetest
 
@@ -521,6 +544,13 @@ something in the directory, which load by themselves when such a file is opened.
 ## web/src/app/editor/editor-pane
 
 - `editor-pane.ts` — The left pane: one view of the song at a time, and the channel mixer under all of them.
+
+## web/src/app/editor/finalize-dialog
+
+**Rules:** `optimizer.md`
+
+- `finalize-dialog.ts` — The top bar's Finalize: the open song optimized to compile smaller, shown before it replaces the document.
+- `optimize-text.ts` — The optimizer run on a text as the editor compiles it, with the samples it brings beside the library's.
 
 ## web/src/app/editor/history-buttons
 

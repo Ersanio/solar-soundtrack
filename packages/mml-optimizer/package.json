@@ -1,0 +1,17 @@
+{
+  "name": "@amk/optimize",
+  "version": "0.0.0",
+  "description": "MML size optimizer: a song rewritten with loops to compile smaller and play the same",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./*": "./src/*.ts"
+  },
+  "sideEffects": false,
+  "dependencies": {
+    "@amk/compiler": "*",
+    "@amk/core": "*",
+    "@amk/spc": "*",
+    "@amk/tokens": "*"
+  }
+}

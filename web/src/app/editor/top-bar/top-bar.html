@@ -28,6 +28,20 @@
     <span class="max-[98rem]:hidden">{{ midiLabel() }}</span>
   </button>
 
+  <button
+    amk-button
+    variant="dark"
+    size="md"
+    i18n-title="@@topbar.finalize.title"
+    title="topbar.finalize.title"
+    [disabled]="!store.canDownload()"
+    (click)="finalize.open()"
+  >
+    <amk-icon-loop />
+    <span i18n="@@topbar.finalize" class="max-2xl:hidden">topbar.finalize</span>
+  </button>
+  <amk-finalize-dialog #finalize />
+
   <amk-menu variant="dark" [disabled]="!store.canDownload()">
     <amk-icon-download menuTrigger />
     <span i18n="@@topbar.export" menuTrigger class="max-2xl:hidden">topbar.export</span>

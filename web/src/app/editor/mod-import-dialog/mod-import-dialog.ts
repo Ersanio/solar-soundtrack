@@ -40,6 +40,7 @@ import { SampleStore } from '../../state/sample-store';
 import { stopAll } from '../../state/stop-all';
 import { CHANNEL_BG, CHANNEL_SCOPE } from '../../util/channel-palette';
 import { errorMessage } from '../../util/format';
+import { optimizeText } from '../finalize-dialog/optimize-text';
 import { type Candidate, buildCandidate } from '../import-dialog/import-candidate';
 import { ImportPreview } from '../import-dialog/import-preview';
 import {
@@ -237,6 +238,8 @@ export class ModImportDialog {
   protected readonly loopAtJump = signal(true);
   /** Write `#optimized` rather than `#default`, leaving the song's own samples more room. */
   protected readonly optimized = signal(false);
+  /** Loop the music that repeats, through `@amk/optimize`, so the song takes less of ARAM. */
+  protected readonly loopRepeats = signal(true);
   /** Let channels whose notes never overlap take turns on one of AddmusicK's. */
   protected readonly share = signal(false);
   protected readonly preview = signal<ImportPreview | null>(null);
@@ -338,6 +341,48 @@ export class ModImportDialog {
     return factors;
   }
 
+  /** Optimized writes by the text written, so a factor that writes the same song again costs nothing. */
+  private readonly optimizedWrites = new Map<string, { text: string; saved: number }>();
+
+  /**
+   * The song at `factors`. With Loop Repeated Music it is written flat and optimized; a song too
+   * long to compile flat, or that the optimizer cannot shorten, is written with the writer's own
+   * pass loops and optimized from there.
+   */
+  private write(
+    mod: TrackerImport,
+    factors: ReadonlyMap<number, number | 'drop'>,
+  ): WrittenTrackerSong & { saved: number } {
+    const options = this.options(factors);
+    if (!this.loopRepeats()) {
+      return { ...writeTracker(mod, options), saved: 0 };
+    }
+
+    const aram = this.drivers.driver()?.manifest.localPos;
+    const attempt = (passLoops: boolean) => {
+      const written = writeTracker(mod, { ...options, passLoops });
+      let optimized = this.optimizedWrites.get(written.text);
+      if (!optimized) {
+        const names = filesOf(mod, written).map((s) => s.name);
+        const result = optimizeText(this.store, aram, written.text, 'import', names);
+        optimized = {
+          text: result?.text ?? written.text,
+          saved: result ? result.before - result.after : 0,
+        };
+        if (this.optimizedWrites.size > 16) {
+          this.optimizedWrites.clear();
+        }
+
+        this.optimizedWrites.set(written.text, optimized);
+      }
+
+      return { ...written, text: optimized.text, saved: optimized.saved };
+    };
+
+    const flat = attempt(false);
+    return flat.saved > 0 ? flat : attempt(true);
+  }
+
   /** The bytes ARAM has for the Auto samples once `written`, the stock set and the samples with a factor of their own are in. */
   private roomAfter(mod: TrackerImport, written: WrittenTrackerSong): number | null {
     const driver = this.drivers.driver();
@@ -383,7 +428,7 @@ export class ModImportDialog {
       return 1;
     }
 
-    const written = writeTracker(mod, this.options(this.factorsWith(null)));
+    const written = this.write(mod, this.factorsWith(null));
     const room = this.roomAfter(mod, written);
     return room === null ? 1 : this.fitIn(mod, written, room);
   });
@@ -400,7 +445,7 @@ export class ModImportDialog {
       return first;
     }
 
-    const written = writeTracker(mod, this.options(this.factorsWith(first)));
+    const written = this.write(mod, this.factorsWith(first));
     const room = this.roomAfter(mod, written);
     return room === null ? first : Math.min(first, this.fitIn(mod, written, room));
   });
@@ -411,7 +456,7 @@ export class ModImportDialog {
       return null;
     }
 
-    return writeTracker(mod, this.options(this.factorsWith(this.autoFactor())));
+    return this.write(mod, this.factorsWith(this.autoFactor()));
   });
 
   /** The song's samples, encoded, in `#instruments` order. */
@@ -442,6 +487,8 @@ export class ModImportDialog {
     });
   });
 
+  /** Song bytes Loop Repeated Music saved. */
+  protected readonly saved = computed(() => this.written()?.saved ?? 0);
   protected readonly error = computed(() => this.candidate().error);
   protected readonly canImport = computed(
     () => this.written() !== null && this.candidate().song !== null,

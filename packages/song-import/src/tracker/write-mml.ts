@@ -73,6 +73,8 @@ export interface TrackerSongOptions {
 	optimized?: boolean;
 	/** Let channels whose notes never overlap take turns on one of AddmusicK's; otherwise each has one. */
 	share?: boolean;
+	/** Write a pass that comes round again as a label loop; off when `@amk/optimize` loops the song instead. */
+	passLoops?: boolean;
 }
 
 /** Something the writer changed to make the song fit, for the porter to read. */
@@ -929,6 +931,7 @@ export function writeTrackerSong(
 
 	const counts = new Map<string, number>();
 	const loopable = (cutsOf: (typeof written)[number], n: number): boolean =>
+		options.passLoops !== false &&
 		!cutsOf[n].opensOnTie &&
 		!(cutsOf[n + 1]?.opensOnTie ?? false) &&
 		cutsOf[n].prefix.length === 0 &&

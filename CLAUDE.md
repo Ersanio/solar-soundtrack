@@ -43,6 +43,7 @@ packages/mml-compiler/  @amk/compiler  preprocess -> parser -> link
 packages/mml-tokens/    @amk/tokens    scanner, splices, command model
 packages/spc/           @amk/spc       BRR, echo FIR, ARAM, emulator, worklet
 packages/song-import/   @amk/import    other formats (MIDI, MOD) read and written out as MML
+packages/mml-optimizer/ @amk/optimize  a song rewritten with loops to compile smaller and play the same
 web/                    the Angular editor
 scripts/                the byte-level harnesses, the code map, the i18n catalog
 .claude/                rules, ledgers, skills, the after-edit hook
@@ -55,7 +56,8 @@ docs/                   the author's guide and README; deployed beside the app u
 @amk/spc       → core
 @amk/tokens    → core, and @amk/spc/{adsr,fir}
 @amk/import    → core, and @amk/spc/{instruments,pitch}
-web            → all five
+@amk/optimize  → core, compiler, tokens, spc
+web            → all six
 ```
 
 `AddmusicKsrc/` and `AddmusicKreadme/` hold a local copy of AddmusicK 1.0.11's C++ sources and its
@@ -222,5 +224,6 @@ ledger beside the others and a row here. A ledger file has no frontmatter, and n
 | `i18n.md`                    | any text a porter reads: templates, `$localize`, the AMK/SST catalogs, command names and descriptions, `web/src/locale/messages.en.json`                 |
 | `ui-and-theme.md`            | `styles.css` colours, `ThemeStore` and presets, the panes, sidebar, tabs and shared controls                                                             |
 | `import.md`                  | `@amk/import` and its MIDI and MOD readers and writers, the two Import dialogs and their preview                                                         |
+| `optimizer.md`               | `@amk/optimize`, the top bar's Finalize, Loop Repeated Music in the tracker Import dialog                                                                |
 | `tooling.md`                 | the pre-hooks, `eslint.config.js`, `.prettierrc`, CI and deployment, the after-edit hook                                                                 |
 | `harnesses/<name>.md`        | what each harness proves, loaded with that harness                                                                                                       |

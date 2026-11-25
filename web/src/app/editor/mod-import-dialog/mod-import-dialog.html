@@ -67,6 +67,17 @@
         </button>
 
         <button
+          i18n="@@import.mod.loop-repeats"
+          amk-toggle
+          i18n-title="@@import.mod.loop-repeats.title"
+          title="import.mod.loop-repeats.title"
+          [pressed]="loopRepeats()"
+          (click)="loopRepeats.set(!loopRepeats())"
+        >
+          import.mod.loop-repeats
+        </button>
+
+        <button
           i18n="@@import.share"
           amk-toggle
           i18n-title="@@import.mod.share.title"
@@ -273,6 +284,15 @@
             }}
           </span>
         </div>
+      }
+
+      @if (saved() > 0) {
+        <p i18n="@@import.mod.loop-repeats.saved" class="text-ink-muted text-xs">
+          import.mod.loop-repeats.saved
+          {{
+            saved() // i18n(ph='bytes')
+          }}
+        </p>
       }
 
       @if (replacing() > 0) {

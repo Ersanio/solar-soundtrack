@@ -22,6 +22,7 @@
     "@amk/compiler": "*",
     "@amk/core": "*",
     "@amk/import": "*",
+    "@amk/optimize": "*",
     "@amk/spc": "*",
     "@amk/tokens": "*",
     "@angular/common": "^22.0.0",

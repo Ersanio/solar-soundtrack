@@ -7,6 +7,7 @@ import { Changelog } from '../../changelog/changelog';
 import { GIT_COMMIT_SHA } from '../../git-info.generated';
 import { Button, buttonClass } from '../../shared/button/button';
 import { IconDownload } from '../../shared/icons/icon-download';
+import { IconLoop } from '../../shared/icons/icon-loop';
 import { IconGithub } from '../../shared/icons/icon-github';
 import { IconRoll } from '../../shared/icons/icon-roll';
 import { IconUpload } from '../../shared/icons/icon-upload';
@@ -18,6 +19,7 @@ import { MidiInput } from '../../state/midi-input';
 import { WavExport } from '../../state/wav-export';
 import { ThemePicker } from '../../theme/theme-picker/theme-picker';
 import { AramMeter } from '../aram-meter/aram-meter';
+import { FinalizeDialog } from '../finalize-dialog/finalize-dialog';
 import { ImportDialog } from '../import-dialog/import-dialog';
 import { ModImportDialog } from '../mod-import-dialog/mod-import-dialog';
 import { ScopeMini } from '../scope-mini/scope-mini';
@@ -46,8 +48,10 @@ const REPO_URL = 'https://github.com/Ersanio/solar-soundtrack';
     AramMeter,
     Button,
     Changelog,
+    FinalizeDialog,
     IconDownload,
     IconGithub,
+    IconLoop,
     IconRoll,
     IconUpload,
     ImportDialog,
