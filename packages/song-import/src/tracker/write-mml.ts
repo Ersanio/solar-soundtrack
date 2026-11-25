@@ -1,6 +1,7 @@
 /**
  * A played tracker module written out as an `#amk 4` song: each kept channel on one of AddmusicK's,
- * each sample a custom instrument after `#default` (or `#optimized`).
+ * or with `share` channels whose notes never overlap taking turns on one, each sample a custom
+ * instrument after `#default` (or `#optimized`).
  *
  * Two driver ticks make one tracker tick, which makes the module's BPM the song's quarter-note BPM
  * (`t` is BPM × 0.4096 − 1) and a row at speed 6 a sixteenth. What the module does to a note is
@@ -31,7 +32,8 @@ import { octaveFor, spellNote } from "@amk/core/mml-text";
 import { spellRestTicks, spellTicks } from "../mml/lengths";
 import { simplify, tagText, tempoForBpm } from "../mml/song-text";
 import { SEMITONE, setPitchWide } from "@amk/spc/pitch";
-import type { ChannelTicks, TrackerPlay, TrackerSong } from "./model";
+import { type Clashes, packChannels } from "../mml/channels";
+import { type ChannelTicks, type TrackerPlay, type TrackerSong, channelTicks } from "./model";
 import { HIGHEST_KEY, type Tuning, baseRegister, playsTrue, plannedFrames, tuningFor } from "./samples";
 
 /** AddmusicK's channels. */
@@ -54,7 +56,7 @@ const FINE_TUNE_REACH = 64;
 
 /** What the writer was asked for. */
 export interface TrackerSongOptions {
-	/** The module's channels to write, at most eight, in the order they take AddmusicK's. */
+	/** The module's channels to write, in the order they take AddmusicK's: at most eight, or as many as share eight. */
 	keep: readonly number[];
 	/** Each sample's resampling factor, or `drop` to leave its notes out. A sample not named is at 1. */
 	factors: ReadonlyMap<number, number | "drop">;
@@ -68,6 +70,8 @@ export interface TrackerSongOptions {
 	fallbackTitle: string | null;
 	/** Open `#samples` with `#optimized`, AddmusicK's smaller copies of the stock set, rather than `#default`. */
 	optimized?: boolean;
+	/** Let channels whose notes never overlap take turns on one of AddmusicK's; otherwise each has one. */
+	share?: boolean;
 }
 
 /** Something the writer changed to make the song fit, for the porter to read. */
@@ -93,21 +97,30 @@ export interface SongSample {
 
 export interface WrittenTrackerSong {
 	text: string;
+	/** The module channels on each of AddmusicK's, `#0` first. */
+	channels: number[][];
 	samples: SongSample[];
 	warnings: TrackerImportWarning[];
 }
 
 /** A note as the channel sounds it, in tracker ticks. */
-interface Note {
+export interface Note {
 	start: number;
 	end: number;
 	sample: number;
 }
 
 /** The notes on a channel: each key-on until the next, the sample's end or a lasting silence, struck again at `split`. */
-function notesOf(ch: ChannelTicks, end: number, split: number | null, playable: (sample: number) => boolean): Note[] {
+export function notesOf(
+	ch: ChannelTicks,
+	end: number,
+	split: number | null,
+	playable: (sample: number) => boolean,
+): Note[] {
 	const notes: Note[] = [];
 	let current: Note | null = null;
+	/** `current` was opened at `split` rather than by a key-on. */
+	let restruck = false;
 	const close = (at: number): void => {
 		if (current) {
 			// A volume of 0 to the end of the note is a cut: the note ends where the silence starts.
@@ -117,7 +130,9 @@ function notesOf(ch: ChannelTicks, end: number, split: number | null, playable: 
 			}
 
 			current.end = last;
-			if (current.end > current.start) {
+			// Struck again at `split` into a silence that lasts, it is no note: the cut came before the split.
+			const silent = restruck && last === current.start + 1 && ch.volume[current.start] === 0;
+			if (current.end > current.start && !silent) {
 				notes.push(current);
 			}
 
@@ -129,6 +144,7 @@ function notesOf(ch: ChannelTicks, end: number, split: number | null, playable: 
 		const sounding = ch.sample[t] > 0;
 		if (ch.keyOn[t] || (t === split && sounding && current)) {
 			close(t);
+			restruck = !ch.keyOn[t];
 			if (sounding && playable(ch.sample[t])) {
 				current = { start: t, end: t + 1, sample: ch.sample[t] };
 			}
@@ -139,6 +155,35 @@ function notesOf(ch: ChannelTicks, end: number, split: number | null, playable: 
 
 	close(end);
 	return notes;
+}
+
+/**
+ * Channels sharing one of AddmusicK's, as one: each tick as the channel whose note covers it plays it,
+ * and every note in order. Their notes never overlap (`clashes` with no slack), so each tick has at
+ * most one owner; a tick none covers is a rest, and the writer reads nothing of it.
+ */
+function mergeChannels(
+	channels: readonly ChannelTicks[],
+	notes: readonly Note[][],
+): { ticks: ChannelTicks; notes: Note[] } {
+	if (channels.length === 1) {
+		return { ticks: channels[0], notes: notes[0] };
+	}
+
+	const owner: number[] = [];
+	notes.forEach((list, k) => {
+		for (const note of list) {
+			for (let t = note.start; t < note.end; t++) {
+				owner[t] = k;
+			}
+		}
+	});
+	const ticks = channelTicks();
+	for (const key of Object.keys(ticks) as (keyof ChannelTicks)[]) {
+		ticks[key] = channels[0][key].map((_, t) => channels[owner[t] ?? 0][key][t]);
+	}
+
+	return { ticks, notes: notes.flat().sort((a, b) => a.start - b.start) };
 }
 
 /** `v` for a tracker volume of 64: the driver squares the volume it is given, so the root of the module's linear one. */
@@ -711,6 +756,7 @@ export function writeTrackerSong(
 	song: TrackerSong,
 	play: TrackerPlay,
 	options: TrackerSongOptions,
+	clash: Clashes | null = null,
 ): WrittenTrackerSong {
 	const warnings: TrackerImportWarning[] = [];
 	if (play.ignored.offsets > 0) {
@@ -729,7 +775,12 @@ export function writeTrackerSong(
 		warnings.push({ code: "too-long" });
 	}
 
-	const keep = options.keep.filter((c) => c >= 0 && c < song.channels).slice(0, TRACKER_CHANNEL_LIMIT);
+	const valid = [...new Set(options.keep.filter((c) => c >= 0 && c < song.channels))];
+	const groups = (options.share && clash ? packChannels(valid, clash) : valid.map((c) => [c])).slice(
+		0,
+		TRACKER_CHANNEL_LIMIT,
+	);
+	const keep = groups.flat();
 	const end = play.ticks;
 	const loopAt = options.loop === "jump" && play.loopTick > 0 && play.loopTick < end ? play.loopTick : null;
 	const factorOf = (index: number): number | "drop" => options.factors.get(index) ?? 1;
@@ -811,14 +862,19 @@ export function writeTrackerSong(
 	}));
 	const folded = new Map<number, number>();
 	const unplayedArpeggios = { count: 0 };
-	const master = Math.round(255 * Math.sqrt(Math.min(1, 4 / Math.max(1, keep.length))));
+	const master = Math.round(255 * Math.sqrt(Math.min(1, 4 / Math.max(1, groups.length))));
+	const notesFor = new Map(keep.map((c, i) => [c, channelNotes[i]]));
 
 	// Each channel's cuts, written in order, then each cut that comes round again in the same state
 	// made a label loop.
-	const written = keep.map((c, i) => {
+	const written = groups.map((group, i) => {
+		const merged = mergeChannels(
+			group.map((c) => play.channels[c]),
+			group.map((c) => notesFor.get(c) ?? []),
+		);
 		const writer = new ChannelWriter({
-			ticks: play.channels[c],
-			notes: channelNotes[i],
+			ticks: merged.ticks,
+			notes: merged.notes,
 			samples,
 			baseHzOf: (sample) => song.samples[sample - 1]?.baseHz ?? 0,
 			separation: options.separation,
@@ -906,7 +962,10 @@ export function writeTrackerSong(
 			}
 		});
 		flush();
-		return `#${i} ; ${song.format} channel ${keep[i] + 1}\n${parts.filter((p) => p.length > 0).join("\n")}`;
+		const group = groups[i];
+		const named =
+			group.length === 1 ? `channel ${group[0] + 1}` : `channels ${group.map((c) => String(c + 1)).join(", ")}`;
+		return `#${i} ; ${song.format} ${named}\n${parts.filter((p) => p.length > 0).join("\n")}`;
 	});
 
 	const sampleList = [...samples.values()];
@@ -936,5 +995,5 @@ export function writeTrackerSong(
 		"}",
 	];
 	const text = [...header, "", ...spc, "", body.join("\n\n"), ""].join("\n");
-	return { text, samples: sampleList, warnings };
+	return { text, channels: groups, samples: sampleList, warnings };
 }

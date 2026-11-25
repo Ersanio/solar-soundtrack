@@ -19,11 +19,12 @@ caller's. It returns **codes and values, never words**: a refusal is an `SmfErro
 | `midi/smf.ts`          | The Standard MIDI File reader                                           |
 | `midi/performance.ts`  | Every track merged onto one time line: notes and GM controller curves   |
 | `midi/parts.ts`        | A channel split into parts that play one note at a time                 |
-| `midi/channels.ts`     | Which parts can share a channel, and packing them onto eight            |
+| `midi/channels.ts`     | `mml/channels.ts`'s packing by part id and part order                   |
 | `midi/gm.ts`           | GM programs and drum keys matched to the stock instruments and drums    |
 | `midi/write-mml.ts`    | The parts kept, written as an `#amk 4` song                             |
 | `mml/lengths.ts`       | Note and rest lengths in driver ticks, spelled without AMK0200          |
 | `mml/song-text.ts`     | `t` for a BPM, a polyline simplified to ramps, text for a `#spc` tag    |
+| `mml/channels.ts`      | Which voices can share a channel, and packing them onto eight           |
 | `tracker.ts`           | `summarise` (once per file) and `writeTracker` (once per option change) |
 | `tracker/model.ts`     | What every format's reader and player hand over: samples, ticks         |
 | `tracker/samples.ts`   | Resampling, loops onto BRR blocks, the tuning, the factor that fits     |
@@ -76,8 +77,9 @@ that.
 ## Sharing a channel
 
 With `share` on, parts that never sound at once take turns on one channel, so the limit is eight
-channels rather than eight parts. `channels.ts` decides which may: `clashes` (computed once, in
-`readMidi`) marks two parts that cannot, and a pair clashes where a note of one would cut a note of
+channels rather than eight parts. `mml/channels.ts` decides which may, for a tracker module's
+channels as well (Tracker modules, Writing), and `midi/channels.ts` puts it in part ids: `clashes`
+(computed once, in `readMidi`) marks two parts that cannot, and a pair clashes where a note of one would cut a note of
 the other short. Only a hand-over may overlap — the later note starting within a 64th of the
 earlier one's end and outlasting it, which the writer trims as it trims a legato line. A note inside
 another, two struck together, or any overlap with a drum hit is a clash. `packChannels` puts each
@@ -186,8 +188,16 @@ kept channels play, and `#instruments` giving each `$FF $E0 $7F` and its tuning 
 - **Two driver ticks to a tracker tick**, so the module's BPM is the song's quarter-note BPM (`t` is
   BPM × 0.4096 − 1) and a row at speed 6 a sixteenth; per-tick effects stay exact.
 - **A note** lasts to the next key-on, its sample's end or a silence that lasts, tied through, and is
-  struck again at the loop point. Its key is the reference note's plus its semitones, folded by octaves into what
+  struck again at the loop point, unless it has fallen silent by then for good. Its key is the reference note's plus its semitones, folded by octaves into what
   the instrument plays true.
+- **Sharing.** With `share` (`TrackerSongOptions.share`), channels whose notes never overlap at all
+  take turns on one of AddmusicK's: `summarise` computes `clashes` once with no slack, every sample
+  played, and `packChannels` lays the kept channels out first-fit. A tracker note already ends where
+  it stops sounding, so there is no hand-over to trim. A shared channel's channels are merged into one
+  `ChannelTicks`, each tick taken from the channel whose note covers it (`mergeChannels`), and written
+  as any channel is, since the writer already states `@`, `v`, `y`, vibrato, tremolo and `q` wherever
+  the next note needs them. Dropping a sample only takes notes away, so the clashes stay true; the
+  loop point never adds one, since a note struck again there into silence is no note.
 - **Volume** is `v` = 255 × √(vol / 64), since the driver squares it (`L_124D`), and a slide is
   simplified to `vD,N` fades. **Pan** is `y`, the module's pan narrowed by the separation.
   **Pitch** within a note is simplified to ramps written as `$DD` after the piece each starts in,

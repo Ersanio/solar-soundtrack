@@ -165,3 +165,22 @@ for (const seed of [1, 2, 3, 4]) {
 		}
 	}
 }
+
+section("stress: the busy songs with channels shared");
+
+for (const seed of [1, 2, 3]) {
+	const bytes = busyIt(seed, true, true);
+	const keep = imported(bytes).it.suggestedShared;
+	for (const loop of ["jump", "song"] as const) {
+		const { song, written } = imported(bytes, { keep, share: true, loop, separation: 0.5 });
+		check(
+			`seed ${seed}, shared, looping at the ${loop}: at most eight channels, no problems, and it assembles`,
+			written.channels.length <= 8 && song.result.ok && problems(song).length === 0 && song.spc instanceof Uint8Array,
+			[
+				JSON.stringify(written.channels),
+				...problems(song).slice(0, 4),
+				typeof song.spc === "string" ? song.spc : "",
+			].join("; "),
+		);
+	}
+}

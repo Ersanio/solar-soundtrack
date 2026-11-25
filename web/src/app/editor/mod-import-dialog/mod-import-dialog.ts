@@ -9,7 +9,10 @@ import {
   type TrackerImport,
   type TrackerSongOptions,
   type WrittenTrackerSong,
+  addWhileFits,
   fitFactor,
+  fitsShared,
+  oneEach,
   planSample,
   plannedFrames,
   writeTracker,
@@ -210,6 +213,8 @@ export class ModImportDialog {
   protected readonly loopAtJump = signal(true);
   /** Write `#optimized` rather than `#default`, leaving the song's own samples more room. */
   protected readonly optimized = signal(false);
+  /** Let channels whose notes never overlap take turns on one of AddmusicK's. */
+  protected readonly share = signal(false);
   protected readonly preview = signal<ImportPreview | null>(null);
   protected readonly previewError = signal<string | null>(null);
 
@@ -272,6 +277,7 @@ export class ModImportDialog {
       sampleName: (index) => this.sampleName(index),
       fallbackTitle: stemOf(this.fileName()),
       optimized: this.optimized(),
+      share: this.share(),
     };
   }
 
@@ -436,13 +442,19 @@ export class ModImportDialog {
     }
 
     const keep = this.keep();
+    const channelOf = new Map(
+      (this.written()?.channels ?? []).flatMap((group, channel) =>
+        group.map((index) => [index, channel]),
+      ),
+    );
     return mod.channelNotes.map((notes, index) => {
-      const at = keep.indexOf(index);
+      const on = keep.includes(index);
+      const at = channelOf.get(index) ?? -1;
       return {
         index,
         number: index + 1,
-        on: at >= 0,
-        disabled: at < 0 && keep.length >= TRACKER_CHANNEL_LIMIT,
+        on,
+        disabled: !on && !this.room(mod, keep, index),
         channel: at >= 0 ? `#${at}` : null,
         chipClass: at >= 0 ? `${CHIP_CLASS} ${CHANNEL_BG[at]} ${CHANNEL_SCOPE[at]}` : '',
         notes,
@@ -522,6 +534,19 @@ export class ModImportDialog {
   );
 
   protected readonly keptCount = computed(() => this.keep().length);
+  protected readonly channelCount = computed(() => this.written()?.channels.length ?? 0);
+  /** Whether no channel left out could be kept. */
+  protected readonly full = computed(() => {
+    const mod = this.mod();
+    if (!mod) {
+      return false;
+    }
+
+    const keep = this.keep();
+    return mod.channelNotes.every(
+      (_, index) => keep.includes(index) || !this.room(mod, keep, index),
+    );
+  });
 
   constructor() {
     // Sanctioned effect: mirrors the candidate into the preview's player.
@@ -547,7 +572,7 @@ export class ModImportDialog {
         : { format: trackerFormatOf(bytes) ?? 'mod', bytes };
       this.format.set(FORMAT_NAMES[inner.format]);
       const read = READERS[inner.format](inner.bytes);
-      this.keep.set(read.suggested);
+      this.keep.set(this.share() ? read.suggestedShared : read.suggested);
       this.loopAtJump.set(read.play.loopTick > 0);
       this.mod.set(read);
     } catch (error) {
@@ -565,11 +590,34 @@ export class ModImportDialog {
     this.modal().open();
   }
 
+  /** Whether keeping `index` as well as `keep` still fits on AddmusicK's channels. */
+  private room(mod: TrackerImport, keep: readonly number[], index: number): boolean {
+    return this.share() ? fitsShared(mod, [...keep, index]) : keep.length < TRACKER_CHANNEL_LIMIT;
+  }
+
+  /**
+   * Sharing on keeps the porter's choice and adds the channels that now fit; sharing off keeps the
+   * eight of it that strike the most notes, one each.
+   */
+  protected toggleShare(): void {
+    const mod = this.mod();
+    const share = !this.share();
+    this.share.set(share);
+    if (mod) {
+      this.keep.set(share ? addWhileFits(mod, this.keep()) : oneEach(mod, this.keep()));
+    }
+  }
+
   protected toggleKeep(index: number): void {
+    const mod = this.mod();
+    if (!mod) {
+      return;
+    }
+
     const kept = new Set(this.keep());
     if (kept.has(index)) {
       kept.delete(index);
-    } else if (kept.size < TRACKER_CHANNEL_LIMIT) {
+    } else if (this.room(mod, this.keep(), index)) {
       kept.add(index);
     }
 

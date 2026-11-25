@@ -33,4 +33,4 @@ Three things here are load-bearing in ways the name does not suggest:
 | `timing`  | twelve driver ticks a row at speed 6, Axx, Txx as `t` and T20 ignored, Bxx as the loop point, Cxx in BCD and not, SBx, SEx, SDx and a delay past its row counted                                        |
 | `pitch`   | ST3's periods, 36 notes at three C2SPDs and three factors within the tolerance, S2x's finetune, and a seven-octave range folded with its pitch class kept                                               |
 | `effects` | the volume column, Dxy and its fine and fast slides and memory, Vxx, Ixy, E, F and G as `$DD`, H and U as `$DE`, J as `$FB`, R as `$E5`, Qxy, SCx and `^^`, S8x and Xxx, and Oxx, S1x and AdLib counted |
-| `stress`  | the seeded busy songs at every factor, loop mode and separation raising nothing and assembling                                                                                                          |
+| `stress`  | the seeded busy songs at every factor, loop mode and separation raising nothing and assembling, and shared with every channel that fits kept                                                            |

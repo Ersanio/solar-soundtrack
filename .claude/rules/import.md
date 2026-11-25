@@ -45,10 +45,13 @@ true.
 - **A MOD's repeated passes are label loops** only where a pass and the one after it open on no
   tie, and each pass states its octave afresh, so two passes alike in text and in the driver state
   they start under play alike.
-- **At most eight channels are written**, on `#0` up: one part each, or with `share` the parts
-  `packChannels` puts together, which never cut one another short (`clashes`). `CHANNEL_LIMIT` is
-  the one place the number is stated. A hand-over between parts is the only overlap allowed, and
-  the writer trims it as it trims one within a part.
+- **At most eight channels are written**, on `#0` up: one part (or module channel) each, or with
+  `share` the ones `mml/channels.ts`'s `packChannels` puts together, which never cut one another
+  short (`clashes`). `CHANNEL_LIMIT` and `TRACKER_CHANNEL_LIMIT` are where the number is stated. A
+  MIDI hand-over between parts is the only overlap allowed, and the writer trims it as it trims one
+  within a part; module channels share only where their notes never overlap at all, and a shared
+  channel is written from one merged `ChannelTicks` (`mergeChannels`). Clashes are computed once,
+  at read time, from notes that every later write's are a subset of in time.
 
 ## The dialog
 
@@ -62,9 +65,11 @@ true.
   the candidate is not the document. It is made when the dialog opens and disposed when it closes,
   however it closes (`Modal.closed`). Pressing play stops the transport and the previewer first
   (`stopAll`). Its position and seek bar are ticks; seconds only label them.
-- **Share channels** is off until pressed. Pressing it keeps the porter's choice and adds the parts
-  that now fit (`addWhileFits`); releasing it keeps the first eight by priority (`oneEach`). While
-  it is on, a Keep toggle is disabled only where the part would need a ninth channel (`fits`).
+- **Share channels**, in both dialogs, is off until pressed. Pressing it keeps the porter's choice
+  and adds the parts (or module channels) that now fit (`addWhileFits`); releasing it keeps the
+  first eight by priority (`oneEach`; a module's by notes struck). While it is on, a Keep toggle is
+  disabled only where it would need a ninth channel (`fits`, `fitsShared`), and each row's `#N`
+  chip is read from the written song's `channels`.
 - **The drum map** (`import-drums.ts`) is a write option, `SongOptions.drums`: it changes the
   instrument and pitch a GM drum key is written with, never the kit's families or its parts, which
   `GM_DRUMS` fixes at read time. It holds only what differs from stock and is kept in storage

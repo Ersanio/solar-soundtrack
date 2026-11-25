@@ -47,6 +47,17 @@
         >
           import.mod.optimized
         </button>
+
+        <button
+          i18n="@@import.share"
+          amk-toggle
+          i18n-title="@@import.mod.share.title"
+          title="import.mod.share.title"
+          [pressed]="share()"
+          (click)="toggleShare()"
+        >
+          import.share
+        </button>
       </div>
 
       <div class="border-edge overflow-auto rounded-md border">
@@ -97,15 +108,35 @@
         </table>
       </div>
 
-      <p i18n="@@import.kept" class="text-ink-muted text-xs">
-        import.kept
-        {{
-          keptCount() // i18n(ph='kept')
-        }}
-        {{
-          limit // i18n(ph='limit')
-        }}
-      </p>
+      @if (share()) {
+        <p
+          i18n="@@import.mod.kept.shared"
+          class="text-xs"
+          [class.text-warn]="full()"
+          [class.text-ink-muted]="!full()"
+        >
+          import.mod.kept.shared
+          {{
+            keptCount() // i18n(ph='kept')
+          }}
+          {{
+            channelCount() // i18n(ph='channels')
+          }}
+          {{
+            limit // i18n(ph='limit')
+          }}
+        </p>
+      } @else {
+        <p i18n="@@import.kept" class="text-ink-muted text-xs">
+          import.kept
+          {{
+            keptCount() // i18n(ph='kept')
+          }}
+          {{
+            limit // i18n(ph='limit')
+          }}
+        </p>
+      }
 
       <div class="border-edge overflow-auto rounded-md border">
         <table class="w-full text-xs">

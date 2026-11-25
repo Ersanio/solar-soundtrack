@@ -11,6 +11,7 @@ export const CHANGELOG: readonly ChangelogEntry[] = [
   {
     date: '25 November 2026',
     items: [
+      'Share one channel between module channels that never play at once, when importing a MOD, S3M, XM or IT file',
       'Import IT files (Impulse Tracker), and UMX files that hold one',
       'Import XM files (FastTracker II), and UMX files that hold one',
       'Import S3M files (Scream Tracker 3), and UMX files that hold one',

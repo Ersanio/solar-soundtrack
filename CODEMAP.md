@@ -117,7 +117,7 @@ something in the directory, which load by themselves when such a file is opened.
 
 **Rules:** `import.md`
 
-- `channels.ts` — Which parts can share a channel: two parts whose notes never sound at the same time, give or take a short overlap the writer trims, take turns on one channel.
+- `channels.ts` — Which MIDI parts can share a channel: `mml/channels.ts`'s packing, by part id and in part order.
 - `gm.ts` — General MIDI's programs and drum keys, matched to the instruments the driver ships.
 - `parts.ts` — A MIDI channel's notes split into parts that each play one note at a time, which is all an AddmusicK channel can do.
 - `performance.ts` (500+ lines) — What a MIDI file plays: each channel's notes and controller curves, the tempo and metre maps, the loop markers and the song's names, with every track merged onto one time line.
@@ -128,6 +128,7 @@ something in the directory, which load by themselves when such a file is opened.
 
 **Rules:** `import.md`
 
+- `channels.ts` — Which voices can share an AddmusicK channel, whatever the format: two whose notes never sound at the same time, give or take a short hand-over the writer trims, take turns on one channel.
 - `lengths.ts` — Note and rest lengths in driver ticks, spelled as MML: whole notes tied to what is left, with a dot only where it halves exactly and `=ticks` otherwise, since a dot that halves an odd count is AMK0200.
 - `song-text.ts` — What every importer writes the same way: the tempo byte for a BPM, a polyline simplified to ramps, and text fit for a `#spc` tag.
 
@@ -152,7 +153,12 @@ something in the directory, which load by themselves when such a file is opened.
 - `model.ts` — What a tracker module's reader and player hand the writer, in units no one format owns: a sample's PCM and the rate it plays at on its reference note, and every channel's pitch in semitones from that note, tick by tick.
 - `pingpong.ts` — A ping-pong loop laid out as a forward one: the loop, then the loop backwards, since a BRR loop only runs forward.
 - `samples.ts` — A tracker module's samples made ready for BRR: resampled to fit ARAM, their loops moved onto block boundaries, and the tuning an AddmusicK instrument needs to play each at the module's pitch.
-- `write-mml.ts` (750+ lines) — A played tracker module written out as an `#amk 4` song: each kept channel on one of AddmusicK's, each sample a custom instrument after `#default` (or `#optimized`).
+- `write-mml.ts` (1000+ lines) — A played tracker module written out as an `#amk 4` song: each kept channel on one of AddmusicK's, or with `share` channels whose notes never overlap taking turns on one, each sample a custom instrument after `#default` (or `#optimized`).
+  - `TRACKER_CHANNEL_LIMIT`:40 `DRIVER_TICKS`:42 `notesOf`:114 `mergeChannels`:165 `volumeOf`:190 `panOf`:195
+  - `rateOf`:200 `vibratoOf`:205 `tremoloOf`:220 `arpeggioText`:236 `ChannelWriter`:295 `bestFineTune`:373
+  - `forget`:403 `push`:407 `pitchAt`:412 `volumeIn`:419 `vibratoIn`:427 `noteSettings`:444 `setTremolo`:467
+  - `setArpeggio`:476 `setVolume`:492 `setPan`:499 `setVibrato`:506 `setOctave`:513 `tempo`:528 `cut`:540
+  - `rest`:586 `notePart`:601 `lines`:730 `writeTrackerSong`:755
 
 ## packages/song-import/src/xm
 
@@ -317,7 +323,8 @@ something in the directory, which load by themselves when such a file is opened.
 - `pitch.ts` — `modtest`: pitch — every note of ProTracker's three octaves, at finetunes and resampling factors, played by the walk within a few cents of where the MOD plays it; FastTracker's periods past the Amiga's; and a range too wide for one octave choice folded.
 - `reader.ts` — `modtest`: the MOD reader — each signature's channel count, FLT8's pattern pairs, the pattern count, the sample headers' loop quirks, a file cut short, and what is refused.
 - `samples.ts` — `modtest`: samples made ready for BRR — the loop moved onto a block at every factor, a short loop laid end to end until it fills one, a one-shot's length, the planned frames matching what is planned, and the factor that fits a room.
-- `stress.ts` — `modtest`: busy, seeded MODs — eight channels, every effect, repeats, a jump back — imported at several factors and both loop modes without raising a problem, and assembled.
+- `sharing.ts` — `modtest`: sharing — module channels whose notes never overlap taking turns on one of AddmusicK's, each note walked at its tick and pitch, and channels that overlap kept apart.
+- `stress.ts` — `modtest`: busy, seeded MODs — eight channels, every effect, repeats, a jump back — imported at several factors and both loop modes without raising a problem, and assembled; and twelve channels shared onto eight.
 - `support.ts` (300+ lines) — What every `modtest` section shares: a MOD file built in memory, imported, its samples encoded, and the song compiled, walked, diagnosed and assembled as the editor does.
 - `timing.ts` — `modtest`: time — two driver ticks to a MOD tick, speed and BPM, and the order list's flow through Bxx, Dxx, E6x, EEx and EDx, each held to the ticks the walk plays its notes at.
 - `umx.ts` — `modtest`: a UMX unwrapped to its module at every package version's layout, the module named by its signature, and each refusal.

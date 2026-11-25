@@ -1,4 +1,4 @@
-/** `modtest`: busy, seeded MODs — eight channels, every effect, repeats, a jump back — imported at several factors and both loop modes without raising a problem, and assembled. */
+/** `modtest`: busy, seeded MODs — eight channels, every effect, repeats, a jump back — imported at several factors and both loop modes without raising a problem, and assembled; and twelve channels shared onto eight. */
 
 import { check, section } from "../harness";
 import { type Cell, PERIODS, imported, modBytes, pluck, problems, square } from "./support";
@@ -39,7 +39,11 @@ const EFFECTS: ((pick: (n: number) => number) => [number, number])[] = [
 	(pick) => [0xf, 80 + pick(120)],
 ];
 
-function busyMod(seed: number): Uint8Array {
+/**
+ * A busy song on `channels`. Past eight, every channel from the fifth sits out alternate patterns,
+ * silenced on their first row, so pairs of them can share.
+ */
+function busyMod(seed: number, channels = 8): Uint8Array {
 	const next = random(seed);
 	const pick = (n: number): number => Math.floor(next() * n);
 	const patterns: Cell[][][] = [];
@@ -47,7 +51,12 @@ function busyMod(seed: number): Uint8Array {
 		const rows: Cell[][] = [];
 		for (let row = 0; row < 64; row++) {
 			const cells: Cell[] = [];
-			for (let channel = 0; channel < 8; channel++) {
+			for (let channel = 0; channel < channels; channel++) {
+				if (channels > 8 && channel >= 4 && (channel + p) % 2 !== 0) {
+					cells.push(row === 0 ? { effect: 0xc, param: 0 } : {});
+					continue;
+				}
+
 				if (pick(3) !== 0) {
 					cells.push({});
 					continue;
@@ -72,7 +81,8 @@ function busyMod(seed: number): Uint8Array {
 	// The last order jumps back to the second.
 	patterns[3][63][7] = { effect: 0xb, param: 1 };
 	return modBytes({
-		channels: 8,
+		channels,
+		tag: channels === 8 ? undefined : `${channels}CH`,
 		samples: [
 			{ pcm: square(32, 16), loopStart: 0, loopLength: 512, finetune: pick(16) - 8 },
 			{ pcm: new Int8Array([...pluck(800), ...square(40, 4)]), loopStart: 800, loopLength: 160, volume: 40 + pick(24) },
@@ -117,4 +127,30 @@ for (const seed of [1, 2, 3, 4, 5]) {
 		problems(song).length === 0,
 		problems(song).slice(0, 4).join("; "),
 	);
+}
+
+section("stress: busy twelve-channel songs sharing eight");
+
+for (const seed of [1, 2, 3]) {
+	const bytes = busyMod(seed, 12);
+	const mod = imported(bytes).mod;
+	for (const factor of [1, 0.25]) {
+		for (const loop of ["jump", "song"] as const) {
+			const factors = new Map([1, 2, 3, 4].map((index) => [index, factor]));
+			const { song, written } = imported(bytes, { keep: mod.suggestedShared, share: true, factors, loop });
+			check(
+				`seed ${seed} at ${factor}, looping at the ${loop}: more than eight kept, no problems, and it assembles`,
+				written.channels.flat().length > 8 &&
+					written.channels.length <= 8 &&
+					song.result.ok &&
+					problems(song).length === 0 &&
+					song.spc instanceof Uint8Array,
+				[
+					JSON.stringify(written.channels),
+					...problems(song).slice(0, 4),
+					typeof song.spc === "string" ? song.spc : "",
+				].join("; "),
+			);
+		}
+	}
 }
