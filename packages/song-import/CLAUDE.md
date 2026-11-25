@@ -181,14 +181,23 @@ exact (`plannedFrames`), silence put in front so it starts on a block, and what 
 dropped. A loop under a block at the factor is laid end to end until it fills one, so the factor
 stays where it was asked (`loopRepeats`). The resampler is a Blackman-windowed sinc whose
 cutoff follows the factor and which reads the loop round past its end, and at a factor of 1 the
-frames are copied. `fitFactor` bisects the largest factor every Auto sample can share in a room.
+frames are copied. A one-shot's last frames, up to 32 and never more than its last quarter, fade
+to silence, so a sample that stops mid-wave does not click against the silent block after it
+(XMSNES's `-m`). `fitFactor` bisects the largest factor every Auto sample can share in a room.
 `tuningFor` picks the instrument's multiplier and the octave the reference note is written in by trying each
 against every key the song plays on the sample: `SetPitch` shifts its table value before it
 multiplies, so low keys lose bits and a small multiplier is coarse, and the choice that is worst
 on fewest cents wins, one that leaves notes outside o1 c-o6 a or the DSP's fourteen bits losing to
 one that does not. Each is judged after the upward shift a channel's `$EE` can give it, up to
 `FINE_TUNE_CENTS`, since that shift is far finer than a small multiplier's step: a tuning a little
-flat is as good as exact once the fine tune lifts it. The encoding itself is the caller's (`@amk/spc/brr-encode`).
+flat is as good as exact once the fine tune lifts it. The encoding itself is the caller's
+(`@amk/spc/brr-encode`'s `encodeBrrWithHeadroom`, which lowers a sample 5% at a time until no three
+samples it decodes to can wrap the DSP's Gaussian interpolation).
+
+A slot whose frames and loop are an earlier slot's is a copy of it (`copiesOf`, as XMSNES merges
+them): the dialog lists the first with its copies, and the writer gives a copy the first's factor and
+file but an instrument and tuning of its own, since their rates can differ. `#samples` names each
+file once.
 
 ### Writing
 
@@ -209,7 +218,11 @@ kept channels play, and `#instruments` giving each `$FF $E0 $7F` and its tuning 
   the next note needs them. Dropping a sample only takes notes away, so the clashes stay true; the
   loop point never adds one, since a note struck again there into silence is no note.
 - **Volume** is `v` = 255 × √(vol / 64), since the driver squares it (`L_124D`), and a slide is
-  simplified to `vD,N` fades. **Pan** is `y`, the module's pan narrowed by the separation.
+  simplified to `vD,N` fades. **Pan** is `y`, the module's pan narrowed by the separation and matched through
+  `PanValues`'s curve (`main.asm:3486`): the `y` whose share of the level on the left is nearest
+  the module's. The curve gives a centred note `$51` a side and a hard one `$7F` on one, so each
+  tick's volume is scaled by `$7F` over the two sides' sum (`heardAt`, as it2amk does): the sides
+  sum alike at every pan, and nothing passes full volume.
   **Pitch** within a note is simplified to ramps written as `$DD` after the piece each starts in,
   under the same frame rules as the MIDI writer's. **Vibrato** is `$DE` at the player's phase step over
   two and the swing it recorded, and `$DF` where it stops. The swing is room the tuning leaves either

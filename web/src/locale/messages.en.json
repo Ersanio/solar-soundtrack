@@ -520,6 +520,7 @@
     "import.mod.rate.drop": "Drop",
     "import.mod.rate.title": "How much to shrink this sample. Auto shares the one factor that fills what ARAM has left; a smaller factor saves ARAM and dulls the sound. Drop leaves its notes out.",
     "import.mod.replaces": "{$COUNT} samples of the same name in the sample library will be replaced.",
+    "import.mod.sample.copies": "also {$copies}",
     "import.mod.sample.loop": "{$start} + {$length}",
     "import.mod.sample.one-shot": "one-shot",
     "import.mod.sample.play.title": "Hear this sample as it will be encoded, at the pitch of its base note (C-2 in a MOD, C-4 in an S3M or an XM, C-5 in an IT)",

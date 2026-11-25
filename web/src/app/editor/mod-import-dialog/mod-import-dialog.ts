@@ -20,7 +20,7 @@ import {
 } from '@amk/import/tracker';
 import { type TrackerFormat, UmxError, isUmx, trackerFormatOf, unwrapUmx } from '@amk/import/umx';
 import { type BrrSample, decodeBrr, emptySample, parseBrr } from '@amk/spc/brr';
-import { brrDataBytes, encodeBrr } from '@amk/spc/brr-encode';
+import { brrDataBytes, encodeBrrWithHeadroom } from '@amk/spc/brr-encode';
 import { computeSpcLayout } from '@amk/spc/layout';
 import { SPC_SAMPLE_RATE } from '@amk/spc/wasm-host';
 import { Button } from '../../shared/button/button';
@@ -143,6 +143,29 @@ function heardAt(pcm: Int16Array, loopStart: number | null, rate: number): Int16
   }
 
   return out;
+}
+
+/** A sample file the song needs: its name, the slot it is planned from and its factor. */
+interface SampleFile {
+  name: string;
+  index: number;
+  factor: number;
+}
+
+/** The files `written` needs, one a name: a copy of an earlier slot shares that slot's. */
+function filesOf(mod: TrackerImport, written: WrittenTrackerSong): SampleFile[] {
+  const files = new Map<string, SampleFile>();
+  for (const s of written.samples) {
+    if (!files.has(s.name)) {
+      files.set(s.name, {
+        name: s.name,
+        index: mod.sameAs.get(s.index) ?? s.index,
+        factor: s.factor,
+      });
+    }
+  }
+
+  return [...files.values()];
 }
 
 /** `text`, or `null` where there is none to show. */
@@ -274,7 +297,7 @@ export class ModImportDialog {
       const name = this.sampleName(index);
       const source = mod.song.samples[index - 1];
       const plan = planSample(source, factor);
-      const bytes = encodeBrr(plan.pcm, plan.loopStart);
+      const { bytes } = encodeBrrWithHeadroom(plan.pcm, plan.loopStart);
       entry = {
         sample: parseBrr(name, bytes),
         bytes,
@@ -324,14 +347,14 @@ export class ModImportDialog {
 
     const compiled = this.store.compileText(
       written.text,
-      written.samples.map((s) => s.name),
+      filesOf(mod, written).map((s) => s.name),
     );
     const result = compiled?.result;
     if (!result?.ok || !result.data) {
       return null;
     }
 
-    const extra = written.samples.map((s) =>
+    const extra = filesOf(mod, written).map((s) =>
       this.choiceOf(s.index) === 'auto'
         ? emptySample(s.name)
         : this.encoded(mod, s.index, s.factor).sample,
@@ -347,7 +370,7 @@ export class ModImportDialog {
 
   /** The largest factor, to a thousandth, that the Auto samples of `written` can share in `room`. */
   private fitIn(mod: TrackerImport, written: WrittenTrackerSong, room: number): number {
-    const autos = written.samples
+    const autos = filesOf(mod, written)
       .filter((s) => this.choiceOf(s.index) === 'auto')
       .map((s) => mod.song.samples[s.index - 1]);
     return Math.floor(fitFactor(autos, room, brrDataBytes) * 1000) / 1000;
@@ -399,7 +422,7 @@ export class ModImportDialog {
       return [];
     }
 
-    return written.samples.map((s) => ({
+    return filesOf(mod, written).map((s) => ({
       name: s.name,
       index: s.index,
       ...this.encoded(mod, s.index, s.factor),
@@ -491,7 +514,7 @@ export class ModImportDialog {
     const auto = this.autoFactor();
     const autoLabel = $localize`:@@import.mod.rate.auto:import.mod.rate.auto ${auto.toFixed(2)}:factor:`;
     const bytes = new Map(this.brrs().map((b) => [b.index, b.sample.data.length]));
-    const factors = new Map(written.samples.map((s) => [s.index, s.factor]));
+    const factors = new Map(filesOf(mod, written).map((s) => [s.index, s.factor]));
     const sounding = this.audition.playing();
     return mod.samples.map((summary) => {
       const choice = this.choiceOf(summary.index);
@@ -504,6 +527,10 @@ export class ModImportDialog {
         name:
           nonEmpty(summary.name) ??
           $localize`:@@import.mod.sample.unnamed:import.mod.sample.unnamed ${summary.index}:index:`,
+        copies:
+          summary.copies.length === 0
+            ? null
+            : $localize`:@@import.mod.sample.copies:import.mod.sample.copies ${summary.copies.join(', ')}:copies:`,
         frames: summary.frames.toLocaleString(),
         loop: summary.loop
           ? $localize`:@@import.mod.sample.loop:import.mod.sample.loop ${summary.loop.start}:start: ${summary.loop.length}:length:`

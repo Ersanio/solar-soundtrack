@@ -92,15 +92,26 @@ section("effects: slides");
 section("effects: volume");
 
 {
-	const imp = one([
-		[0, 0, note({ effect: 0xc, param: 0x10 })],
-		[4, 0, note({ effect: 0xc, param: 0x40 })],
-		[8, 0, note()],
-	]);
+	const imp = one(
+		[
+			[0, 0, note({ effect: 0xc, param: 0x10 })],
+			[4, 0, note({ effect: 0xc, param: 0x40 })],
+			[8, 0, note()],
+		],
+		{ separation: 1 },
+	);
 	const volumes = played(imp.song, 0).map((n) => n.state.volume);
-	// A quarter of the MOD's volume is half the driver's, which squares it.
+	// Hard left, where the pan takes nothing away: a quarter of the MOD's volume is half the
+	// driver's, which squares it.
 	check("C10 is v128 and C40 is v255", volumes[0] === 128 && volumes[1] === 255, volumes.join());
 	check("a note with its sample takes the sample's volume", volumes[2] === 255);
+	const centred = played(one([[0, 0, note({ effect: 0xc, param: 0x40 })]], { separation: 0 }).song, 0);
+	// Centred, `PanValues` gives each side $51 of $7F, so the volume is scaled by $7F / ($51 + $51).
+	check(
+		"centred, C40 is scaled so both sides sum as one hard over: v226",
+		centred[0]?.state.volume === 226,
+		String(centred[0]?.state.volume),
+	);
 }
 
 {
@@ -164,7 +175,12 @@ section("effects: panning");
 		pans(1).join() === "20,10,0",
 		pans(1).join(),
 	);
-	check("half the separation is halfway", pans(0.5).join() === "15,10,5", pans(0.5).join());
+	// Three quarters on the left: y13 gives $6E against $29 (73%), y14 $73 against $1E (79%).
+	check(
+		"half the separation is three quarters, through the pan curve",
+		pans(0.5).join() === "13,10,7",
+		pans(0.5).join(),
+	);
 	check("no separation is mono", pans(0).join() === "10,10,10", pans(0).join());
 }
 

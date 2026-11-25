@@ -35,8 +35,10 @@ export interface TrackerSampleSummary {
 	frames: number;
 	/** The loop in frames, or `null` for a one-shot. */
 	loop: { start: number; length: number } | null;
-	/** Notes the song strikes on it, on every channel. */
+	/** Notes the song strikes on it and on its copies, on every channel. */
 	notes: number;
+	/** The later slots holding the same frames and loop, which share its BRR. */
+	copies: number[];
 }
 
 /** One of the songs a module holds: where it starts, and how it plays from there. */
@@ -65,8 +67,39 @@ export interface TrackerImport {
 	clash: shared.Clashes;
 	/** The channels kept when they may share: by notes struck, each taken while the packing fits eight. */
 	suggestedShared: number[];
-	/** The slots that hold a sample. */
+	/** The slots that hold a sample, a copy of an earlier one left out. */
 	samples: TrackerSampleSummary[];
+	/** Each slot holding the same frames and loop as an earlier one, to that earlier one (`copiesOf`). */
+	sameAs: ReadonlyMap<number, number>;
+}
+
+/**
+ * Each sample slot whose frames and loop are an earlier slot's, to that earlier slot: a module that
+ * lists one sample under several slots (XMSNES merges them the same way) needs it in ARAM once.
+ * Their rates can differ, so each keeps an instrument of its own.
+ */
+export function copiesOf(song: TrackerSong): Map<number, number> {
+	const sameAs = new Map<number, number>();
+	const firsts = new Map<string, number[]>();
+	for (const s of song.samples) {
+		if (s.pcm.length === 0) {
+			continue;
+		}
+
+		const key = `${s.pcm.length}:${s.loopStart}:${s.loopLength}`;
+		const candidates = firsts.get(key) ?? [];
+		const first = candidates.find((index) => {
+			const other = song.samples[index - 1].pcm;
+			return other.every((v, i) => v === s.pcm[i]);
+		});
+		if (first === undefined) {
+			firsts.set(key, [...candidates, s.index]);
+		} else {
+			sameAs.set(s.index, first);
+		}
+	}
+
+	return sameAs;
 }
 
 /** Channel order is the order kept channels are written in. */
@@ -160,6 +193,12 @@ export function summarise(song: TrackerSong, songs: readonly TrackerSongStart[],
 		});
 	}
 
+	const sameAs = copiesOf(song);
+	const copies = new Map<number, number[]>();
+	for (const [copy, first] of sameAs) {
+		copies.set(first, [...(copies.get(first) ?? []), copy]);
+	}
+
 	return {
 		song,
 		play,
@@ -169,19 +208,21 @@ export function summarise(song: TrackerSong, songs: readonly TrackerSongStart[],
 		suggested: ranked,
 		clash,
 		suggestedShared: shared.addWhileFits(byNotes(channelNotes), [], clash, TRACKER_CHANNEL_LIMIT, inOrder),
+		sameAs,
 		samples: song.samples
-			.filter((s) => s.pcm.length > 0)
+			.filter((s) => s.pcm.length > 0 && !sameAs.has(s.index))
 			.map((s) => ({
 				index: s.index,
 				name: s.name,
 				frames: s.pcm.length,
 				loop: s.loopLength > 0 ? { start: s.loopStart, length: s.loopLength } : null,
-				notes: struck.get(s.index) ?? 0,
+				notes: [s.index, ...(copies.get(s.index) ?? [])].reduce((sum, i) => sum + (struck.get(i) ?? 0), 0),
+				copies: copies.get(s.index) ?? [],
 			})),
 	};
 }
 
 /** Writes the import as an `#amk 4` song. */
 export function writeTracker(imported: TrackerImport, options: TrackerSongOptions): WrittenTrackerSong {
-	return writeTrackerSong(imported.song, imported.play, options, imported.clash);
+	return writeTrackerSong(imported.song, imported.play, options, imported.clash, imported.sameAs);
 }

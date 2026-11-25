@@ -41,7 +41,7 @@ import {
 	usedBankSlots,
 	validateSampleBank,
 } from "@amk/spc/brr";
-import { brrDataBytes, encodeBrr } from "@amk/spc/brr-encode";
+import { brrDataBytes, encodeBrr, encodeBrrWithHeadroom } from "@amk/spc/brr-encode";
 import { BANK_SLOT_COUNT, bankSlotName } from "@amk/core/hardcoded-tables";
 
 import { SPC_ASSETS, check, section, summarise } from "./harness";
@@ -602,6 +602,39 @@ section("the encoder decodes back to what it was given");
 				return true;
 			}
 		})(),
+	);
+}
+
+section("the encoder leaves the interpolator headroom");
+{
+	// The three weight sets of SPC_DSP.cpp's gauss table whose sum passes 2048 (offsets 0, 1 and 9).
+	const WEIGHTS = [
+		[370, 1305, 374],
+		[366, 1305, 378],
+		[336, 1303, 410],
+	];
+	const wraps = (decoded: Int16Array): boolean =>
+		decoded.some((_, i) =>
+			i + 2 < decoded.length
+				? WEIGHTS.some(([a, b, c]) => {
+						const sum = ((a * decoded[i]) >> 11) + ((b * decoded[i + 1]) >> 11) + ((c * decoded[i + 2]) >> 11);
+						return sum > 0x7fff || sum < -0x8000;
+					})
+				: false,
+		);
+	const square = new Int16Array(512).map((_, i) => ((i >> 5) & 1 ? -32768 : 32767));
+	check(
+		"a full-scale square wraps the interpolator as encoded plainly",
+		wraps(decodeBrr(parseBrr("square.brr", encodeBrr(square, 0)))),
+	);
+	const safe = encodeBrrWithHeadroom(square, 0);
+	check("so it is lowered", safe.level < 1 && safe.level >= 0.9, String(safe.level));
+	check("and then nothing wraps", !wraps(decodeBrr(parseBrr("square.brr", safe.bytes))));
+	const quiet = new Int16Array(512).map((_, i) => Math.round(12000 * Math.sin((2 * Math.PI * i) / 37)));
+	const kept = encodeBrrWithHeadroom(quiet, null);
+	check(
+		"a sample with room is encoded as it is",
+		kept.level === 1 && kept.bytes.every((b, i) => b === encodeBrr(quiet, null)[i]),
 	);
 }
 

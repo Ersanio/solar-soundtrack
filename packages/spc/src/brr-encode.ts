@@ -8,7 +8,7 @@
  * loop block is reached from the sample's end, whose history differs from the block before it.
  */
 
-import { BRR_BLOCK_BYTES, BRR_BLOCK_SAMPLES } from "./brr";
+import { BRR_BLOCK_BYTES, BRR_BLOCK_SAMPLES, decodeBrr } from "./brr";
 
 /** Shifts 13-15 are invalid (`decodeBrr`), so 12 is the coarsest a block may use. */
 const MAX_SHIFT = 12;
@@ -166,6 +166,64 @@ export function encodeBrr(pcm: Int16Array, loopStart: number | null): Uint8Array
 	}
 
 	return out;
+}
+
+/**
+ * The DSP's interpolation weights for its three oldest samples at the three positions where they sum
+ * past 2048 (`SPC_DSP.cpp`'s `gauss` table at :102, offsets 0, 1 and 9). `interpolate` adds those
+ * three terms and wraps the sum to 16 bits before the newest sample's (`out = (int16_t) out`), so
+ * only there can three loud samples of one sign wrap round and click.
+ */
+const OVERFLOWING_WEIGHTS: readonly (readonly [number, number, number])[] = [
+	[370, 1305, 374],
+	[366, 1305, 378],
+	[336, 1303, 410],
+];
+
+/** `samples` as the voice plays them through, the loop's first two after the end. */
+function heardThrough(samples: Int16Array, loopStart: number | null): Int16Array {
+	return loopStart === null ? samples : Int16Array.from([...samples, ...samples.subarray(loopStart, loopStart + 2)]);
+}
+
+/** The largest sum of three consecutive samples' interpolation terms, either sign. */
+function peakTriple(heard: Int16Array): number {
+	let peak = 0;
+	for (let i = 0; i + 2 < heard.length; i++) {
+		for (const [a, b, c] of OVERFLOWING_WEIGHTS) {
+			const sum = ((a * heard[i]) >> 11) + ((b * heard[i + 1]) >> 11) + ((c * heard[i + 2]) >> 11);
+			peak = Math.max(peak, sum > 0 ? sum / 0x7fff : sum / -0x8000);
+		}
+	}
+
+	return peak;
+}
+
+/** Whether any three consecutive decoded samples, the loop's seam included, would wrap the interpolator. */
+function overflows(bytes: Uint8Array, loopStart: number | null): boolean {
+	const loopOffset = bytes[0] | (bytes[1] << 8);
+	const decoded = decodeBrr({ sampleName: "", data: bytes.subarray(2), loopOffset });
+	// The loop block is filter 0, so it decodes the same after the end as after the block before it.
+	return peakTriple(heardThrough(decoded, loopStart)) > 1;
+}
+
+/**
+ * `pcm` as {@link encodeBrr} encodes it, lowered by 5% at a time until no three samples it decodes to
+ * can wrap the DSP's interpolation (XMSNES's `CompressSample` and `test_overflow` do the same), and
+ * the level it was encoded at. The first level tried is the one the PCM itself needs, since an
+ * encoding costs far more than the test.
+ */
+export function encodeBrrWithHeadroom(pcm: Int16Array, loopStart: number | null): { bytes: Uint8Array; level: number } {
+	const needed = peakTriple(heardThrough(pcm, loopStart));
+	let level = needed > 1 ? Math.max(0.05, Math.floor(20 / needed) / 20) : 1;
+	for (;;) {
+		const scaled = level === 1 ? pcm : Int16Array.from(pcm, (v) => Math.round(v * level));
+		const bytes = encodeBrr(scaled, loopStart);
+		if (level <= 0.05 || !overflows(bytes, loopStart)) {
+			return { bytes, level };
+		}
+
+		level = Math.round((level - 0.05) * 100) / 100;
+	}
 }
 
 /** The bytes {@link encodeBrr} gives `frames` of PCM in ARAM, the 2-byte header left off: whole blocks, and a silent one after a one-shot. */

@@ -154,11 +154,11 @@ something in the directory, which load by themselves when such a file is opened.
 - `pingpong.ts` — A ping-pong loop laid out as a forward one: the loop, then the loop backwards, since a BRR loop only runs forward.
 - `samples.ts` — A tracker module's samples made ready for BRR: resampled to fit ARAM, their loops moved onto block boundaries, and the tuning an AddmusicK instrument needs to play each at the module's pitch.
 - `write-mml.ts` (1000+ lines) — A played tracker module written out as an `#amk 4` song: each kept channel on one of AddmusicK's, or with `share` channels whose notes never overlap taking turns on one, each sample a custom instrument after `#default` (or `#optimized`).
-  - `TRACKER_CHANNEL_LIMIT`:40 `DRIVER_TICKS`:42 `notesOf`:114 `mergeChannels`:165 `volumeOf`:190 `panOf`:195
-  - `rateOf`:200 `vibratoOf`:205 `tremoloOf`:220 `arpeggioText`:236 `ChannelWriter`:295 `bestFineTune`:373
-  - `forget`:403 `push`:407 `pitchAt`:412 `volumeIn`:419 `vibratoIn`:427 `noteSettings`:444 `setTremolo`:467
-  - `setArpeggio`:476 `setVolume`:492 `setPan`:499 `setVibrato`:506 `setOctave`:513 `tempo`:528 `cut`:540
-  - `rest`:586 `notePart`:601 `lines`:730 `writeTrackerSong`:755
+  - `TRACKER_CHANNEL_LIMIT`:41 `DRIVER_TICKS`:43 `notesOf`:115 `mergeChannels`:166 `volumeOf`:191 `panOf`:206
+  - `panLoudness`:222 `heardAt`:227 `rateOf`:237 `vibratoOf`:242 `tremoloOf`:257 `arpeggioText`:273
+  - `ChannelWriter`:332 `bestFineTune`:410 `forget`:440 `push`:444 `pitchAt`:449 `volumeIn`:456 `vibratoIn`:464
+  - `noteSettings`:481 `setTremolo`:504 `setArpeggio`:513 `setVolume`:529 `setPan`:536 `setVibrato`:543
+  - `setOctave`:550 `tempo`:565 `cut`:577 `rest`:623 `notePart`:638 `lines`:767 `writeTrackerSong`:792
 
 ## packages/song-import/src/xm
 
@@ -540,7 +540,7 @@ something in the directory, which load by themselves when such a file is opened.
 
 **Rules:** `import.md`
 
-- `mod-import-dialog.ts` (500+ lines) — The Import dialog for a tracker module (a MOD, an S3M, an XM or an IT, or a UMX holding one): its channels to keep, each sample's resampling, and a preview of the song they make before it replaces the document and its samples join the library.
+- `mod-import-dialog.ts` (750+ lines) — The Import dialog for a tracker module (a MOD, an S3M, an XM or an IT, or a UMX holding one): its channels to keep, each sample's resampling, and a preview of the song they make before it replaces the document and its samples join the library.
 
 ## web/src/app/editor/scope-mini
 

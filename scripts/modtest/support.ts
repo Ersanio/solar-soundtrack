@@ -12,7 +12,7 @@ import {
 	writeTracker,
 } from "@amk/import/tracker";
 import { type BrrSample, emptySample, parseBrr } from "@amk/spc/brr";
-import { encodeBrr } from "@amk/spc/brr-encode";
+import { encodeBrrWithHeadroom } from "@amk/spc/brr-encode";
 import { loadDriver } from "@amk/spc/driver";
 import { buildSpc } from "@amk/spc/export";
 import { readInstrumentTables } from "@amk/spc/instruments";
@@ -282,7 +282,7 @@ export interface Imported {
 export function encoded(mod: TrackerImport, written: WrittenTrackerSong): BrrSample[] {
 	return written.samples.map((s) => {
 		const plan = planSample(mod.song.samples[s.index - 1], s.factor);
-		return parseBrr(s.name, encodeBrr(plan.pcm, plan.loopStart));
+		return parseBrr(s.name, encodeBrrWithHeadroom(plan.pcm, plan.loopStart).bytes);
 	});
 }
 

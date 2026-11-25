@@ -9,7 +9,8 @@
  *
  * - volume as `v`, through a square root since the driver squares it (`main.asm`, `L_124D`), with
  *   `vD,N` where it slides;
- * - panning as `y`, the Amiga's hard left and right narrowed by the stereo separation;
+ * - panning as `y`, narrowed by the stereo separation and matched through `PanValues`'s curve, the
+ *   volume scaled so the two sides sum alike at every pan;
  * - a slide in pitch (1xx, 2xx, 3xx, 5xy, the fine slides) as `$DD` ramps, each directly after a tied
  *   piece of the note that it plays within;
  * - vibrato (4xy, 6xy) as `$DE`, its rate the player's phase step over the driver ticks to a tracker
@@ -191,9 +192,45 @@ function volumeOf(volume: number): number {
 	return Math.round(255 * Math.sqrt(volume / 64));
 }
 
-/** `y` for a tracker pan of 0 (left) to 255 (right): AddmusicK's 20 is hard left. */
+/** `PanValues` (`main.asm:3486`): a side's level at each `y`, the left reading `y` and the right `20 - y`. */
+const PAN_VALUES = [
+	0x00, 0x01, 0x03, 0x07, 0x0d, 0x15, 0x1e, 0x29, 0x34, 0x42, 0x51, 0x5e, 0x67, 0x6e, 0x73, 0x77, 0x7a, 0x7c, 0x7d,
+	0x7e, 0x7f,
+];
+
+/**
+ * `y` for a tracker pan of 0 (left) to 255 (right), narrowed by the separation: the one whose share
+ * of the level on the left, through `PanValues`'s curve, is nearest the module's. AddmusicK's 20 is
+ * hard left.
+ */
 function panOf(pan: number, separation: number): number {
-	return Math.round(10 - ((pan - 127.5) / 127.5) * 10 * separation);
+	const left = 0.5 - ((pan - 127.5) / 255) * separation;
+	let best = 10;
+	let distance = Infinity;
+	for (let y = 0; y <= 20; y++) {
+		const d = Math.abs(PAN_VALUES[y] / (PAN_VALUES[y] + PAN_VALUES[20 - y]) - left);
+		if (d < distance) {
+			best = y;
+			distance = d;
+		}
+	}
+
+	return best;
+}
+
+/** What a note's volume is scaled by at `y`, so the two sides sum alike at every pan: 1 hard over, 0.78 centred. */
+function panLoudness(y: number): number {
+	return 0x7f / (PAN_VALUES[y] + PAN_VALUES[20 - y]);
+}
+
+/** `ticks` with its volume and tremolo swing scaled by the loudness of the pan each tick is written at. */
+function heardAt(ticks: ChannelTicks, separation: number): ChannelTicks {
+	const loudness = ticks.pan.map((pan) => panLoudness(panOf(pan, separation)));
+	return {
+		...ticks,
+		volume: ticks.volume.map((v, t) => v * loudness[t]),
+		tremoloDepth: ticks.tremoloDepth.map((d, t) => d * loudness[t]),
+	};
 }
 
 /** The driver's phase step, of 256 a driver tick, for a tracker's of 256 a tracker tick. */
@@ -757,6 +794,7 @@ export function writeTrackerSong(
 	play: TrackerPlay,
 	options: TrackerSongOptions,
 	clash: Clashes | null = null,
+	sameAs: ReadonlyMap<number, number> = new Map(),
 ): WrittenTrackerSong {
 	const warnings: TrackerImportWarning[] = [];
 	if (play.ignored.offsets > 0) {
@@ -781,16 +819,19 @@ export function writeTrackerSong(
 		TRACKER_CHANNEL_LIMIT,
 	);
 	const keep = groups.flat();
+	const heard = new Map(keep.map((c) => [c, heardAt(play.channels[c], options.separation)]));
 	const end = play.ticks;
 	const loopAt = options.loop === "jump" && play.loopTick > 0 && play.loopTick < end ? play.loopTick : null;
-	const factorOf = (index: number): number | "drop" => options.factors.get(index) ?? 1;
+	// A copy of an earlier slot shares its factor and its file, and keeps its own instrument.
+	const firstOf = (index: number): number => sameAs.get(index) ?? index;
+	const factorOf = (index: number): number | "drop" => options.factors.get(firstOf(index)) ?? 1;
 	const playable = (index: number): boolean =>
 		factorOf(index) !== "drop" && (song.samples[index - 1]?.pcm.length ?? 0) > 0;
 
 	// The notes each kept channel plays, and the range each sample is played over, for its tuning.
 	const dropped = new Map<number, number>();
 	const channelNotes = keep.map((c) => {
-		const ticks = play.channels[c];
+		const ticks = heard.get(c) ?? play.channels[c];
 		for (let t = 0; t < end; t++) {
 			if (ticks.keyOn[t] && !playable(ticks.sample[t]) && ticks.sample[t] > 0) {
 				dropped.set(ticks.sample[t], (dropped.get(ticks.sample[t]) ?? 0) + 1);
@@ -806,7 +847,7 @@ export function writeTrackerSong(
 
 	const ranges = new Map<number, { low: number; high: number }>();
 	keep.forEach((c, i) => {
-		const ticks = play.channels[c];
+		const ticks = heard.get(c) ?? play.channels[c];
 		for (const note of channelNotes[i]) {
 			const range = ranges.get(note.sample) ?? { low: Infinity, high: -Infinity };
 			for (let t = note.start; t < note.end; t++) {
@@ -830,7 +871,7 @@ export function writeTrackerSong(
 		const range = ranges.get(index) ?? { low: 0, high: 0 };
 		samples.set(index, {
 			index,
-			name: options.sampleName(index),
+			name: options.sampleName(firstOf(index)),
 			factor,
 			instrument: FIRST_CUSTOM + i,
 			tuning: tuningFor(factor, sample.baseHz, range.low, range.high),
@@ -869,7 +910,7 @@ export function writeTrackerSong(
 	// made a label loop.
 	const written = groups.map((group, i) => {
 		const merged = mergeChannels(
-			group.map((c) => play.channels[c]),
+			group.map((c) => heard.get(c) ?? play.channels[c]),
 			group.map((c) => notesFor.get(c) ?? []),
 		);
 		const writer = new ChannelWriter({
@@ -975,7 +1016,7 @@ export function writeTrackerSong(
 		"#samples",
 		"{",
 		options.optimized ? "\t#optimized" : "\t#default",
-		...sampleList.map((s) => `\t"${s.name}"`),
+		...[...new Set(sampleList.map((s) => s.name))].map((name) => `\t"${name}"`),
 		"}",
 		"",
 		"#instruments",

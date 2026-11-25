@@ -1,9 +1,9 @@
 /** `modtest`: samples made ready for BRR — the loop moved onto a block at every factor, a short loop laid end to end until it fills one, a one-shot's length, the planned frames matching what is planned, and the factor that fits a room. */
 
-import { type TrackerSample, fitFactor, planSample, plannedFrames } from "@amk/import/tracker";
+import { type TrackerSample, copiesOf, fitFactor, planSample, plannedFrames } from "@amk/import/tracker";
 import { brrDataBytes } from "@amk/spc/brr-encode";
 import { check, section } from "../harness";
-import { C2, imported, modBytes, pattern, pluck, problems, square } from "./support";
+import { C2, centsOff, imported, modBytes, pattern, played, pluck, problems, square } from "./support";
 
 const sample = (pcm: Int8Array, loopStart = 0, loopLength = 0): TrackerSample => ({
 	index: 1,
@@ -121,5 +121,75 @@ section("samples: the optimized stock set");
 		"it leaves the song's own samples more room",
 		optimized.song.freeBytes > plain.song.freeBytes,
 		`${optimized.song.freeBytes} vs ${plain.song.freeBytes}`,
+	);
+}
+
+section("samples: a one-shot's end");
+
+{
+	const flat = sample(new Int8Array(400).fill(40));
+	const plan = planSample(flat, 1);
+	check("a one-shot fades to silence at its end", plan.pcm[plan.pcm.length - 1] === 0, String(plan.pcm.at(-1)));
+	check(
+		"over its last 32 frames, the rest untouched",
+		plan.pcm[plan.pcm.length - 33] === 40 * 256 && plan.pcm[plan.pcm.length - 32] < 40 * 256,
+		`${plan.pcm[plan.pcm.length - 33]} ${plan.pcm[plan.pcm.length - 32]}`,
+	);
+	const short = planSample(sample(new Int8Array(40).fill(40)), 1);
+	check("a short one keeps all but its last quarter", short.pcm[29] === 40 * 256 && short.pcm[39] === 0);
+	const loop = planSample(sample(square(32, 8), 0, 256), 1);
+	check("a looped sample is not faded", loop.pcm[loop.pcm.length - 1] !== 0);
+}
+
+section("samples: copies share a file");
+
+{
+	// One sample under two slots, the second at finetune 7, seven eighths of a semitone higher: one file, two instruments.
+	const pcm = square(32, 8);
+	const spec = (second: Int8Array) =>
+		modBytes({
+			samples: [
+				{ pcm, loopStart: 0, loopLength: 256 },
+				{ pcm: second, loopStart: 0, loopLength: 256, finetune: 7 },
+			],
+			orders: [0],
+			patterns: [
+				pattern([
+					[0, 0, { period: C2, sample: 1 }],
+					[0, 1, { period: C2, sample: 2 }],
+				]),
+			],
+		});
+	const shared = imported(spec(pcm));
+	const other = Int8Array.from(pcm, (v, i) => (i === 0 ? v - 1 : v));
+	const apart = imported(spec(other));
+	check("the second slot is found to be the first's", copiesOf(shared.mod.song).get(2) === 1);
+	check(
+		"the dialog lists the first, with its copy",
+		shared.mod.samples.length === 1 && shared.mod.samples[0].copies.join() === "2" && shared.mod.samples[0].notes === 2,
+		JSON.stringify(shared.mod.samples.map((s) => ({ index: s.index, copies: s.copies, notes: s.notes }))),
+	);
+	const listed = /^#samples\n\{\n([^}]*)\}/m.exec(shared.written.text)?.[1] ?? "";
+	check(
+		"#samples lists its file once",
+		(listed.match(/MOD 01\.brr/g) ?? []).length === 1 && !listed.includes("MOD 02"),
+		listed,
+	);
+	check(
+		"and #instruments gives each slot its own tuning on it",
+		(shared.written.text.match(/^\t"MOD 01\.brr" \$FF/gm) ?? []).length === 2,
+		shared.written.text,
+	);
+	check("a copy raises nothing", problems(shared.song).length === 0, problems(shared.song).join("; "));
+	for (const channel of [0, 1]) {
+		const walked = played(shared.song, channel)[0];
+		const cents = walked ? centsOff(shared, walked, C2) : Infinity;
+		check(`slot ${channel + 1} plays at its own pitch`, Math.abs(cents) <= 11, cents.toFixed(1));
+	}
+
+	check(
+		"and the song keeps a copy's worth of ARAM",
+		shared.song.freeBytes > apart.song.freeBytes,
+		`${shared.song.freeBytes} vs ${apart.song.freeBytes}`,
 	);
 }

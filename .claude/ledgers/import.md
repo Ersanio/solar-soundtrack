@@ -50,3 +50,10 @@ and moved away from, with the reason. The rule carries one index line per entry.
   wherever a format's jump rules, pattern loops or end markers differ, and the player is what gets
   written. Each song is found by its format's player started at its order (`findSongs`), which
   takes well under a second on a game's module.
+- **Pan mapped straight onto y** — `panOf` read the tracker's pan off a straight line from y20 to
+  y0, but `PanValues` is an S-curve, so a quarter-left pan came out 85:15 and a centred note louder
+  than a hard-panned one. The `y` is the one whose left share through the curve is nearest the
+  module's, and the volume is scaled by `$7F` over the two sides' sum (it2amk's `accurate` panning).
+- **Every sample slot its own BRR** — a module that lists one sample under several slots wrote it to
+  ARAM once a slot. Copies share the first's file (`copiesOf`) and keep instruments of their own,
+  since a copy's rate can differ (XMSNES merges them the same way).

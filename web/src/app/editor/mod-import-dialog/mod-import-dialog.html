@@ -203,6 +203,9 @@
                         row.index
                       }}</span>
                       {{ row.name }}
+                      @if (row.copies; as copies) {
+                        <span class="text-ink-muted ml-1">{{ copies }}</span>
+                      }
                     </div>
                   </div>
                 </td>

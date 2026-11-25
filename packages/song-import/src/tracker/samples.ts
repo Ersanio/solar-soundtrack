@@ -63,11 +63,28 @@ export function plannedFrames(
 	return { frames: Math.ceil((sample.loopStart * exact) / BLOCK) * BLOCK + loop, loops: true, factor: exact };
 }
 
+/** The most frames a one-shot's end is faded over (XMSNES's `nramp_size`). */
+const END_FADE = 32;
+
+/**
+ * `pcm` with its last frames faded to silence, so a one-shot that stops mid-wave does not click
+ * against the silent block after it: up to {@link END_FADE}, and never more than its last quarter.
+ */
+function fadeEnd(pcm: Int16Array): Int16Array {
+	const length = Math.min(END_FADE, Math.floor(pcm.length / 4));
+	for (let i = 0; i < length; i++) {
+		const at = pcm.length - length + i;
+		pcm[at] = Math.round((pcm[at] * (length - 1 - i)) / length);
+	}
+
+	return pcm;
+}
+
 function blackman(x: number): number {
 	return 0.42 + 0.5 * Math.cos(Math.PI * x) + 0.08 * Math.cos(2 * Math.PI * x);
 }
 
-/** `sample` resampled by `factor` (above 0, at most 1 bar a short loop's rounding), with its loop on a block. */
+/** `sample` resampled by `factor` (above 0, at most 1 bar a short loop's rounding), with its loop on a block and a one-shot's end faded. */
 export function planSample(sample: TrackerSample, factor: number): PlannedSample {
 	const plan = plannedFrames(sample, factor);
 	const k = plan.factor;
@@ -90,8 +107,9 @@ export function planSample(sample: TrackerSample, factor: number): PlannedSample
 	const offset = plan.loops ? loopOut - sample.loopStart * k : 0;
 	if (k === 1 && Number.isInteger(offset)) {
 		// Nothing to resample: the frames as they are, behind the silence that puts the loop on a block.
+		const copied = Int16Array.from({ length: plan.frames }, (_, j) => at(j - offset));
 		return {
-			pcm: Int16Array.from({ length: plan.frames }, (_, j) => at(j - offset)),
+			pcm: plan.loops ? copied : fadeEnd(copied),
 			loopStart: plan.loops ? loopOut : null,
 			factor: k,
 		};
@@ -117,7 +135,7 @@ export function planSample(sample: TrackerSample, factor: number): PlannedSample
 		pcm[j] = value > 32767 ? 32767 : value < -32768 ? -32768 : value;
 	}
 
-	return { pcm, loopStart: plan.loops ? loopOut : null, factor: k };
+	return { pcm: plan.loops ? pcm : fadeEnd(pcm), loopStart: plan.loops ? loopOut : null, factor: k };
 }
 
 /** The lowest factor {@link fitFactor} offers: a sample that does not fit at this does not fit. */

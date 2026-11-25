@@ -16,13 +16,22 @@ const clean = (name: string, imp: ReturnType<typeof one>): void =>
 section("effects: volume");
 
 {
-	const imp = one([
-		[0, 0, hit({ volume: 16 })],
-		[1, 0, { instrument: 1 }],
-	]);
+	const imp = one(
+		[
+			[0, 0, hit({ volume: 16 })],
+			[1, 0, { instrument: 1 }],
+		],
+		{},
+		{ separation: 0 },
+	);
 	check("the volume column sets the volume", volumes(imp, 0, 1)[0] === 16, String(volumes(imp, 0, 1)));
 	check("an instrument with no note restores its own", volumes(imp, 6, 1)[0] === 63, String(volumes(imp, 6, 1)));
-	check("v is the square root of the volume: v128 for 16", imp.written.text.includes("v128"), imp.written.text);
+	// The root of 16 / 64, under the centre's loudness, $7F / ($51 + $51).
+	check(
+		"v is the square root of the volume: v113 for 16, centred",
+		imp.written.text.includes("v113"),
+		imp.written.text,
+	);
 }
 
 {

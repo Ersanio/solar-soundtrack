@@ -36,7 +36,10 @@ true.
   has no AddmusicK equivalent and is counted, its note played from the sample's start. Arpeggio is `$FB`
   under legato, which is on only from an arpeggio note's key-on to a tracker tick before its end, so it
   never crosses a loop point; tremolo is `$E5` only in front of a key-on; each channel takes one
-  `$EE` (the package's `CLAUDE.md`).
+  `$EE` (the package's `CLAUDE.md`). Pan is matched through `PanValues`'s curve and the volume
+  scaled so the two sides sum alike at every pan (`panOf`, `heardAt`); a centred song is about 2 dB
+  under a hard-panned one's full volume, the price of never clipping. A slot that copies an earlier
+  one shares its file (`copiesOf`), and a one-shot's end fades to silence.
 - **Formats meet at the tracker model.** A format's reader and player are the only code that knows
   its units: they hand `tracker/model.ts`'s `TrackerSong` and `TrackerPlay` (pitch in semitones from
   a sample's reference note, `baseHz`, 16-bit PCM, the vibrato's and tremolo's phase step and swing)
@@ -89,7 +92,8 @@ true.
   lowered where it no longer fits, since each instrument's tuning, and so the octave its notes are
   written in, moves with the factor (`firstFactor`, `autoFactor`). A factor whose BRR would pass 64 KB
   is offered disabled. Each encoding is
-  kept per sample and factor while the dialog is open. A module holding more than one song shows
+  kept per sample and factor while the dialog is open, encoded with `encodeBrrWithHeadroom` so no
+  sample wraps the DSP's interpolation. A module holding more than one song shows
   a Song select; choosing another suggests its channels afresh and keeps each sample's choice.
 
 ## Decisions already made
@@ -109,3 +113,5 @@ entry goes there, with its line here, in the same change.
 - **A short loop widened by raising the factor** — `loopRepeats`, `plannedFrames`
 - **The song's bytes taken to be the same at every factor** — `firstFactor`, `autoFactor`
 - **Songs found by an order walk apart from the player** — `findSongs`
+- **Pan mapped straight onto y** — `panOf`, `heardAt`
+- **Every sample slot its own BRR** — `copiesOf`, `sameAs`
