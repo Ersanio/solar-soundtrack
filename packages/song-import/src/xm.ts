@@ -5,7 +5,7 @@
  * The steps and why they are shaped as they are is in this package's `CLAUDE.md`.
  */
 
-import { type TrackerImport, summarise } from "./tracker";
+import { type TrackerImport, findSongs, summarise } from "./tracker";
 import type { TrackerSong } from "./tracker/model";
 import { type XmFile, readXmFile } from "./xm/file";
 import { playXm, xmBaseHz } from "./xm/play";
@@ -38,8 +38,13 @@ export function xmSong(file: XmFile): TrackerSong {
 	};
 }
 
-/** Reads and plays an XM. Throws {@link XmError} for a file it cannot read at all. */
+/** Reads an XM and plays each song it holds. Throws {@link XmError} for a file it cannot read at all. */
 export function readXm(bytes: Uint8Array): XmImport {
 	const file = readXmFile(bytes);
-	return { ...summarise(xmSong(file), playXm(file)), file };
+	const songs = findSongs(
+		file.orders,
+		() => true,
+		(start) => playXm(file, start),
+	);
+	return { ...summarise(xmSong(file), songs), file };
 }

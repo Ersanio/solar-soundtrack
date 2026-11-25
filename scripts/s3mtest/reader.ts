@@ -167,6 +167,23 @@ section("reader: orders and refusals");
 }
 
 {
+	// A second song after a `---`, as a game's module lists them.
+	const read = readS3m(
+		s3mBytes({
+			...SIMPLE,
+			orders: [0, 255, 1],
+			patterns: [SIMPLE.patterns[0], pattern([[0, 1, { note: "E-4", instrument: 1 }]])],
+		}),
+	);
+	const second = read.songs[1];
+	check("a song after a 255 is a song of its own", read.songs.map((s) => s.order).join() === "0,2");
+	check(
+		"it plays only its order and loops to its own start",
+		second.play.segments.map((s) => s.order).join() === "2" && second.play.loopTick === 0 && !second.play.tooLong,
+	);
+}
+
+{
 	const notS3m = s3mBytes(SIMPLE);
 	notS3m[44] = 0x41;
 	let code: string | null = null;

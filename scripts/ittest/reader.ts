@@ -241,3 +241,20 @@ section("reader: instruments and refusals");
 	const inner = unwrapUmx(umxBytes([{ payload: itBytes(SIMPLE), format: "it" }], 69));
 	check("a UMX holding an IT unwraps to it", inner.format === "it" && readIt(inner.bytes).song.channels === 1);
 }
+
+{
+	// A second song after a `---`, as a game's module lists them.
+	const read = readIt(
+		itBytes({
+			...SIMPLE,
+			orders: [0, 255, 1, 255],
+			patterns: [SIMPLE.patterns[0], pattern([[0, 1, { note: "E-5", instrument: 1 }]])],
+		}),
+	);
+	const second = read.songs[1];
+	check("a song after a 255 is a song of its own", read.songs.map((s) => s.order).join() === "0,2");
+	check(
+		"it plays only its order and loops to its own start",
+		second.play.segments.map((s) => s.order).join() === "2" && second.play.loopTick === 0 && !second.play.tooLong,
+	);
+}

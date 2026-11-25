@@ -1,6 +1,6 @@
 /**
- * Importing a tracker module, whatever its format: a song and its play summed up for the dialog once,
- * then written as an `#amk 4` song as often as the porter changes what to keep.
+ * Importing a tracker module, whatever its format: its songs found, the chosen one's play summed up
+ * for the dialog, then written as an `#amk 4` song as often as the porter changes what to keep.
  *
  * Each format's reader and player hand over a {@link TrackerSong} and a {@link TrackerPlay}; from
  * there every format is alike. The package hands back PCM and never BRR: encoding is `@amk/spc`'s,
@@ -39,9 +39,24 @@ export interface TrackerSampleSummary {
 	notes: number;
 }
 
+/** One of the songs a module holds: where it starts, and how it plays from there. */
+export interface TrackerSongStart {
+	/** The order it starts at. */
+	order: number;
+	/** The pattern that order plays. */
+	pattern: number;
+	/** How many orders it plays. */
+	orders: number;
+	play: TrackerPlay;
+}
+
 export interface TrackerImport {
 	song: TrackerSong;
+	/** The chosen song's play: `songs[chosen].play`. */
 	play: TrackerPlay;
+	/** Every song the module holds (`findSongs`), the one from its first order first. */
+	songs: readonly TrackerSongStart[];
+	chosen: number;
 	/** Notes struck on each channel. */
 	channelNotes: number[];
 	/** The channels kept until the porter chooses: all of them, or the eight that strike the most notes. */
@@ -80,8 +95,54 @@ export function oneEach(imported: TrackerImport, keep: readonly number[]): numbe
 	return shared.oneEach(byNotes(imported.channelNotes), keep, TRACKER_CHANNEL_LIMIT, inOrder);
 }
 
-/** What the dialog needs of a song its format's player has played. */
-export function summarise(song: TrackerSong, play: TrackerPlay): TrackerImport {
+/**
+ * Every song in a module, found as libopenmpt finds subsongs (`RowVisitor::GetFirstUnvisitedRow`):
+ * played from the first order `startsAt` accepts, then from each first order no song before has
+ * played, until every order has been. A game's module can hold several, each entered at its own
+ * order (Deus Ex's), or a module can list them between `---` markers. The first is always kept, a
+ * later one only where it strikes a note.
+ */
+export function findSongs(
+	orders: readonly number[],
+	startsAt: (order: number) => boolean,
+	play: (start: number) => TrackerPlay,
+): TrackerSongStart[] {
+	const visited = new Set<number>();
+	const songs: TrackerSongStart[] = [];
+	for (let order = 0; order < orders.length; order++) {
+		if (visited.has(order) || !startsAt(order)) {
+			continue;
+		}
+
+		const played = play(order);
+		const its = new Set(played.segments.map((s) => s.order));
+		its.add(order);
+		for (const o of its) {
+			visited.add(o);
+		}
+
+		const strikes = played.channels.some((ch) => ch.keyOn.includes(1));
+		if (songs.length === 0 || strikes) {
+			songs.push({ order, pattern: orders[order], orders: its.size, play: played });
+		}
+	}
+
+	if (songs.length === 0) {
+		const played = play(0);
+		songs.push({ order: 0, pattern: orders[0] ?? 0, orders: played.segments.length, play: played });
+	}
+
+	return songs;
+}
+
+/** `imported` summed up again for another of its songs. */
+export function withSong<T extends TrackerImport>(imported: T, chosen: number): T {
+	return { ...imported, ...summarise(imported.song, imported.songs, chosen) };
+}
+
+/** What the dialog needs of a module, for the song `chosen` of the ones its format's player found. */
+export function summarise(song: TrackerSong, songs: readonly TrackerSongStart[], chosen = 0): TrackerImport {
+	const play = songs[chosen].play;
 	const channelNotes = play.channels.map((ch) => ch.keyOn.reduce((sum, on) => sum + on, 0));
 	const ranked = inOrder(byNotes(channelNotes).slice(0, TRACKER_CHANNEL_LIMIT));
 	// With every sample played: dropping one only takes notes away, so a pair apart stays apart.
@@ -102,6 +163,8 @@ export function summarise(song: TrackerSong, play: TrackerPlay): TrackerImport {
 	return {
 		song,
 		play,
+		songs,
+		chosen,
 		channelNotes,
 		suggested: ranked,
 		clash,

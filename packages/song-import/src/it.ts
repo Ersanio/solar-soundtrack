@@ -7,7 +7,7 @@
 
 import { type ItFile, readItFile } from "./it/file";
 import { playIt } from "./it/play";
-import { type TrackerImport, summarise } from "./tracker";
+import { type TrackerImport, findSongs, summarise } from "./tracker";
 import type { TrackerSong } from "./tracker/model";
 
 export { ItError, type ItErrorCode, type ItFile } from "./it/file";
@@ -36,8 +36,13 @@ export function itSong(file: ItFile): TrackerSong {
 	};
 }
 
-/** Reads and plays an IT. Throws {@link ItError} for a file it cannot read at all. */
+/** Reads an IT and plays each song it holds. Throws {@link ItError} for a file it cannot read at all. */
 export function readIt(bytes: Uint8Array): ItImport {
 	const file = readItFile(bytes);
-	return { ...summarise(itSong(file), playIt(file)), file };
+	const songs = findSongs(
+		file.orders,
+		(o) => file.orders[o] < 200,
+		(start) => playIt(file, start),
+	);
+	return { ...summarise(itSong(file), songs), file };
 }

@@ -45,3 +45,8 @@ and moved away from, with the reason. The rule carries one index line per entry.
   and so the octave its notes are written in, moves with the factor, and an S3M's song came out 19
   bytes longer at the factor found than at 1, past the room. The room is measured again at that
   factor and the factor lowered where it no longer fits (`firstFactor`, `autoFactor`).
+- **Songs found by an order walk apart from the player** — a walk of the order list following only
+  Bxx and Cxx would find a module's songs without playing them, but it disagrees with the player
+  wherever a format's jump rules, pattern loops or end markers differ, and the player is what gets
+  written. Each song is found by its format's player started at its order (`findSongs`), which
+  takes well under a second on a game's module.

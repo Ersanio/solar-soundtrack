@@ -102,7 +102,7 @@ something in the directory, which load by themselves when such a file is opened.
 - `midi.ts` — Importing a MIDI file: read once into parts, then written as a song as often as the porter changes what to keep.
 - `mod.ts` — Importing a MOD: read, played as ProTracker plays it, and handed to the tracker importer, which writes it as a song with its samples planned for BRR.
 - `s3m.ts` — Importing an S3M: read, played as Scream Tracker 3 plays it, and handed to the tracker importer, which writes it as a song with its samples planned for BRR.
-- `tracker.ts` — Importing a tracker module, whatever its format: a song and its play summed up for the dialog once, then written as an `#amk 4` song as often as the porter changes what to keep.
+- `tracker.ts` — Importing a tracker module, whatever its format: its songs found, the chosen one's play summed up for the dialog, then written as an `#amk 4` song as often as the porter changes what to keep.
 - `umx.ts` — An Unreal package (`.umx`) unwrapped to the tracker module its `Music` object holds.
 - `xm.ts` — Importing an XM: read, played as FastTracker II plays it, and handed to the tracker importer, which writes it as a song with its samples planned for BRR.
 
@@ -324,6 +324,7 @@ something in the directory, which load by themselves when such a file is opened.
 - `reader.ts` — `modtest`: the MOD reader — each signature's channel count, FLT8's pattern pairs, the pattern count, the sample headers' loop quirks, a file cut short, and what is refused.
 - `samples.ts` — `modtest`: samples made ready for BRR — the loop moved onto a block at every factor, a short loop laid end to end until it fills one, a one-shot's length, the planned frames matching what is planned, and the factor that fits a room.
 - `sharing.ts` — `modtest`: sharing — module channels whose notes never overlap taking turns on one of AddmusicK's, each note walked at its tick and pitch, and channels that overlap kept apart.
+- `songs.ts` — `modtest`: songs — a module that holds several, each entered at an order of its own, found as libopenmpt finds subsongs, and one of them chosen, written and walked.
 - `stress.ts` — `modtest`: busy, seeded MODs — eight channels, every effect, repeats, a jump back — imported at several factors and both loop modes without raising a problem, and assembled; and twelve channels shared onto eight.
 - `support.ts` (300+ lines) — What every `modtest` section shares: a MOD file built in memory, imported, its samples encoded, and the song compiled, walked, diagnosed and assembled as the editor does.
 - `timing.ts` — `modtest`: time — two driver ticks to a MOD tick, speed and BPM, and the order list's flow through Bxx, Dxx, E6x, EEx and EDx, each held to the ticks the walk plays its notes at.

@@ -97,8 +97,8 @@ interface Channel {
 	tremorOn: boolean;
 }
 
-/** Plays the song once through, to its end or to the first row it comes back to. */
-export function playS3m(s3m: S3mFile): TrackerPlay {
+/** Plays the song once through from order `start`, to its end or to the first row it comes back to. */
+export function playS3m(s3m: S3mFile, start = 0): TrackerPlay {
 	const out: ChannelTicks[] = Array.from({ length: s3m.channels }, channelTicks);
 	const channels: Channel[] = s3m.pans.map((pan) => ({
 		instrument: 0,
@@ -136,7 +136,7 @@ export function playS3m(s3m: S3mFile): TrackerPlay {
 	let bpm = s3m.tempo;
 	let globalVolume = s3m.globalVolume;
 	let tick = 0;
-	let order = 0;
+	let order = start;
 	let row = 0;
 	let loopTick: number;
 	let tooLong = false;
@@ -368,7 +368,8 @@ export function playS3m(s3m: S3mFile): TrackerPlay {
 
 		const pattern = s3m.orders[order];
 		if (order >= s3m.orders.length || pattern === 255 || pattern === undefined) {
-			let first = 0;
+			// The song loops to its own start, so a song after a `---` stays itself.
+			let first = start;
 			while (first < s3m.orders.length && s3m.orders[first] === 254) {
 				first++;
 			}

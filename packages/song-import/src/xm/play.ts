@@ -138,8 +138,8 @@ interface Channel {
 	delayed: XmCell | null;
 }
 
-/** Plays the song once through, to its end or to the first row it comes back to. */
-export function playXm(xm: XmFile): TrackerPlay {
+/** Plays the song once through from order `start`, to its end or to the first row it comes back to. */
+export function playXm(xm: XmFile, start = 0): TrackerPlay {
 	const out: ChannelTicks[] = Array.from({ length: xm.channels }, channelTicks);
 	const channels: Channel[] = Array.from({ length: xm.channels }, () => ({
 		instrumentNumber: 0,
@@ -186,7 +186,7 @@ export function playXm(xm: XmFile): TrackerPlay {
 	let bpm = xm.bpm;
 	let globalVolume = 64;
 	let tick = 0;
-	let order = 0;
+	let order = start;
 	let row = 0;
 	let loopTick: number;
 	let tooLong = false;
@@ -874,11 +874,13 @@ export function playXm(xm: XmFile): TrackerPlay {
 			row = breakRow;
 			breakRow = 0;
 			jumpFlag = false;
+			// FT2 wraps to order 0 and the restart order; a song that starts past one wraps to its own start
+			// instead, which is another song's ground.
 			if (jumpOverflow) {
-				order = 0;
+				order = start;
 				jumpOverflow = false;
 			} else if (++order >= xm.orders.length) {
-				order = xm.restart;
+				order = xm.restart >= start ? xm.restart : start;
 			}
 
 			const next = xm.patterns[xm.orders[order]]?.length ?? 64;

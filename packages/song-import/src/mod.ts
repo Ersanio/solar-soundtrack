@@ -7,7 +7,7 @@
 
 import { type ModFile, readModFile } from "./mod/file";
 import { C2_PERIOD, PAULA_HZ, playMod } from "./mod/play";
-import { type TrackerImport, summarise } from "./tracker";
+import { type TrackerImport, findSongs, summarise } from "./tracker";
 import type { TrackerSong } from "./tracker/model";
 
 export { ModError, type ModErrorCode, type ModFile, type ModSample } from "./mod/file";
@@ -36,8 +36,13 @@ export function modSong(file: ModFile): TrackerSong {
 	};
 }
 
-/** Reads and plays a MOD. Throws {@link ModError} for a file it cannot read at all. */
+/** Reads a MOD and plays each song it holds. Throws {@link ModError} for a file it cannot read at all. */
 export function readMod(bytes: Uint8Array): ModImport {
 	const file = readModFile(bytes);
-	return { ...summarise(modSong(file), playMod(file)), file };
+	const songs = findSongs(
+		file.orders,
+		() => true,
+		(start) => playMod(file, start),
+	);
+	return { ...summarise(modSong(file), songs), file };
 }

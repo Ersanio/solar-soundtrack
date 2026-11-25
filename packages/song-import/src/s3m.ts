@@ -7,7 +7,7 @@
 
 import { type S3mFile, readS3mFile } from "./s3m/file";
 import { playS3m } from "./s3m/play";
-import { type TrackerImport, summarise } from "./tracker";
+import { type TrackerImport, findSongs, summarise } from "./tracker";
 import type { TrackerSong } from "./tracker/model";
 
 export { S3mError, type S3mErrorCode, type S3mFile, type S3mSample } from "./s3m/file";
@@ -36,8 +36,13 @@ export function s3mSong(file: S3mFile): TrackerSong {
 	};
 }
 
-/** Reads and plays an S3M. Throws {@link S3mError} for a file it cannot read at all. */
+/** Reads an S3M and plays each song it holds. Throws {@link S3mError} for a file it cannot read at all. */
 export function readS3m(bytes: Uint8Array): S3mImport {
 	const file = readS3mFile(bytes);
-	return { ...summarise(s3mSong(file), playS3m(file)), file };
+	const songs = findSongs(
+		file.orders,
+		(o) => file.orders[o] < 254,
+		(start) => playS3m(file, start),
+	);
+	return { ...summarise(s3mSong(file), songs), file };
 }

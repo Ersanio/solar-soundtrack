@@ -15,6 +15,7 @@ import {
   oneEach,
   planSample,
   plannedFrames,
+  withSong,
   writeTracker,
 } from '@amk/import/tracker';
 import { type TrackerFormat, UmxError, isUmx, trackerFormatOf, unwrapUmx } from '@amk/import/umx';
@@ -239,6 +240,24 @@ export class ModImportDialog {
   });
 
   protected readonly loops = computed(() => (this.mod()?.play.loopTick ?? 0) > 0);
+
+  /** The songs the module holds, where it holds more than one. */
+  protected readonly songs = computed(() => {
+    const mod = this.mod();
+    if (!mod || mod.songs.length < 2) {
+      return [];
+    }
+
+    return mod.songs.map((s, index) => {
+      const number = index + 1;
+      const { order, pattern, orders } = s;
+      return {
+        index,
+        selected: index === mod.chosen,
+        label: $localize`:@@import.mod.song.option:import.mod.song.option ${number}:number: ${order}:order: ${pattern}:pattern: ${orders}:orders:`,
+      };
+    });
+  });
 
   private sampleName(index: number): string {
     return `${stemOf(this.fileName())} ${String(index).padStart(2, '0')}.brr`;
@@ -606,6 +625,19 @@ export class ModImportDialog {
     if (mod) {
       this.keep.set(share ? addWhileFits(mod, this.keep()) : oneEach(mod, this.keep()));
     }
+  }
+
+  /** Switches to another of the module's songs, its channels suggested afresh; each sample's choice stays. */
+  protected chooseSong(event: Event): void {
+    const mod = this.mod();
+    if (!mod) {
+      return;
+    }
+
+    const next = withSong(mod, Number((event.target as HTMLSelectElement).value));
+    this.keep.set(this.share() ? next.suggestedShared : next.suggested);
+    this.loopAtJump.set(next.play.loopTick > 0);
+    this.mod.set(next);
   }
 
   protected toggleKeep(index: number): void {

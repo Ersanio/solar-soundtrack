@@ -49,8 +49,8 @@ function finetuned(period: number, finetune: number): number {
 	return finetune === 0 ? period : Math.round(period * 2 ** (-finetune / 96));
 }
 
-/** Plays the song once through, to its end or to the first row it comes back to. */
-export function playMod(mod: ModFile): TrackerPlay {
+/** Plays the song once through from order `start`, to its end or to the first row it comes back to. */
+export function playMod(mod: ModFile, start = 0): TrackerPlay {
 	const out: ChannelTicks[] = Array.from({ length: mod.channels }, channelTicks);
 	// Amiga hard panning, L R R L, repeated across the channels.
 	const channels: Channel[] = Array.from({ length: mod.channels }, (_, i) => ({
@@ -82,7 +82,7 @@ export function playMod(mod: ModFile): TrackerPlay {
 	let speed = 6;
 	let bpm = 125;
 	let tick = 0;
-	let order = 0;
+	let order = start;
 	let row = 0;
 	let loopTick: number;
 	let tooLong = false;
@@ -136,6 +136,7 @@ export function playMod(mod: ModFile): TrackerPlay {
 
 	for (;;) {
 		if (order >= mod.orders.length) {
+			// A song that never reached the restart order loops to its own start.
 			loopTick = visited.get(`${mod.restart}:0`) ?? 0;
 			break;
 		}

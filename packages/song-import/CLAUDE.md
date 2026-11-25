@@ -12,37 +12,37 @@ PCM of each sample planned for BRR; encoding, compiling, walking and playing the
 caller's. It returns **codes and values, never words**: a refusal is an `SmfError`, `ModError`,
 `S3mError`, `XmError`, `ItError` or `UmxError` code and a warning an `ImportWarning` or `TrackerImportWarning`, which the Import dialogs word.
 
-| Module                 | What it is                                                              |
-| ---------------------- | ----------------------------------------------------------------------- |
-| `format.ts`            | Which importer reads a file, and the SMF inside an RMID wrapper         |
-| `midi.ts`              | `readMidi` (once per file) and `writeMidi` (once per option change)     |
-| `midi/smf.ts`          | The Standard MIDI File reader                                           |
-| `midi/performance.ts`  | Every track merged onto one time line: notes and GM controller curves   |
-| `midi/parts.ts`        | A channel split into parts that play one note at a time                 |
-| `midi/channels.ts`     | `mml/channels.ts`'s packing by part id and part order                   |
-| `midi/gm.ts`           | GM programs and drum keys matched to the stock instruments and drums    |
-| `midi/write-mml.ts`    | The parts kept, written as an `#amk 4` song                             |
-| `mml/lengths.ts`       | Note and rest lengths in driver ticks, spelled without AMK0200          |
-| `mml/song-text.ts`     | `t` for a BPM, a polyline simplified to ramps, text for a `#spc` tag    |
-| `mml/channels.ts`      | Which voices can share a channel, and packing them onto eight           |
-| `tracker.ts`           | `summarise` (once per file) and `writeTracker` (once per option change) |
-| `tracker/model.ts`     | What every format's reader and player hand over: samples, ticks         |
-| `tracker/samples.ts`   | Resampling, loops onto BRR blocks, the tuning, the factor that fits     |
-| `tracker/write-mml.ts` | The channels kept, on custom instruments, as an `#amk 4` song           |
-| `mod.ts`               | `readMod`: a MOD read, played and summed up for the dialog              |
-| `mod/file.ts`          | The MOD reader: signatures, patterns, sample headers                    |
-| `mod/play.ts`          | The song played tick by tick as ProTracker plays it                     |
-| `s3m.ts`               | `readS3m`: an S3M read, played and summed up for the dialog             |
-| `s3m/file.ts`          | The S3M reader: the header, parapointers, packed patterns, samples      |
-| `s3m/play.ts`          | The song played tick by tick as Scream Tracker 3 plays it               |
-| `xm.ts`                | `readXm`: an XM read, played and summed up for the dialog               |
-| `xm/file.ts`           | The XM reader: patterns, instruments, envelopes, delta-coded samples    |
-| `xm/play.ts`           | The song played tick by tick as FastTracker II plays it                 |
-| `it.ts`                | `readIt`: an IT read, played and summed up for the dialog               |
-| `it/file.ts`           | The IT reader: packed patterns, samples, compression, instruments       |
-| `it/play.ts`           | The song played tick by tick as Impulse Tracker 2 plays it              |
-| `tracker/pingpong.ts`  | A ping-pong loop laid out forward, as a BRR loop runs                   |
-| `umx.ts`               | An Unreal package unwrapped to the module its Music object holds        |
+| Module                 | What it is                                                             |
+| ---------------------- | ---------------------------------------------------------------------- |
+| `format.ts`            | Which importer reads a file, and the SMF inside an RMID wrapper        |
+| `midi.ts`              | `readMidi` (once per file) and `writeMidi` (once per option change)    |
+| `midi/smf.ts`          | The Standard MIDI File reader                                          |
+| `midi/performance.ts`  | Every track merged onto one time line: notes and GM controller curves  |
+| `midi/parts.ts`        | A channel split into parts that play one note at a time                |
+| `midi/channels.ts`     | `mml/channels.ts`'s packing by part id and part order                  |
+| `midi/gm.ts`           | GM programs and drum keys matched to the stock instruments and drums   |
+| `midi/write-mml.ts`    | The parts kept, written as an `#amk 4` song                            |
+| `mml/lengths.ts`       | Note and rest lengths in driver ticks, spelled without AMK0200         |
+| `mml/song-text.ts`     | `t` for a BPM, a polyline simplified to ramps, text for a `#spc` tag   |
+| `mml/channels.ts`      | Which voices can share a channel, and packing them onto eight          |
+| `tracker.ts`           | `findSongs`, `summarise` and `withSong`, and `writeTracker` per change |
+| `tracker/model.ts`     | What every format's reader and player hand over: samples, ticks        |
+| `tracker/samples.ts`   | Resampling, loops onto BRR blocks, the tuning, the factor that fits    |
+| `tracker/write-mml.ts` | The channels kept, on custom instruments, as an `#amk 4` song          |
+| `mod.ts`               | `readMod`: a MOD read, played and summed up for the dialog             |
+| `mod/file.ts`          | The MOD reader: signatures, patterns, sample headers                   |
+| `mod/play.ts`          | The song played tick by tick as ProTracker plays it                    |
+| `s3m.ts`               | `readS3m`: an S3M read, played and summed up for the dialog            |
+| `s3m/file.ts`          | The S3M reader: the header, parapointers, packed patterns, samples     |
+| `s3m/play.ts`          | The song played tick by tick as Scream Tracker 3 plays it              |
+| `xm.ts`                | `readXm`: an XM read, played and summed up for the dialog              |
+| `xm/file.ts`           | The XM reader: patterns, instruments, envelopes, delta-coded samples   |
+| `xm/play.ts`           | The song played tick by tick as FastTracker II plays it                |
+| `it.ts`                | `readIt`: an IT read, played and summed up for the dialog              |
+| `it/file.ts`           | The IT reader: packed patterns, samples, compression, instruments      |
+| `it/play.ts`           | The song played tick by tick as Impulse Tracker 2 plays it             |
+| `tracker/pingpong.ts`  | A ping-pong loop laid out forward, as a BRR loop runs                  |
+| `umx.ts`               | An Unreal package unwrapped to the module its Music object holds       |
 
 ## Reading
 
@@ -162,6 +162,16 @@ its finetune and the vibrato's period swing as semitones at the period it plays 
 song's loop point; running off the end loops to the restart order. A one-shot sample ends where its
 frames run out at the period and tempo it plays at. 9xx, E3x, EFx and a note delay past its row are
 counted rather than played, 9xx because AddmusicK plays a sample from its start.
+
+### Songs
+
+A module can hold several songs: a game's, entered at an order of its own for each scene (Deus Ex's
+first orders each jump into a loop of their own), or ones listed between `---` markers. Every
+player takes the order to start at, and `findSongs` (`tracker.ts`) finds them as libopenmpt finds
+subsongs: played from the first order, then from each first order no song before has played, a
+later one kept only where it strikes a note. A song that runs off its end loops to its own start
+where it never reached the restart order. Each song's play is kept, `summarise` sums up the chosen
+one, and `withSong` switches; the samples are the module's whichever is chosen.
 
 ### Samples
 

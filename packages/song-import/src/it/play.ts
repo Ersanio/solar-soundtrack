@@ -127,8 +127,8 @@ interface Channel {
 	volumeValue: number;
 }
 
-/** Plays the song once through, to its end or to the first row it comes back to. */
-export function playIt(it: ItFile): TrackerPlay {
+/** Plays the song once through from order `start`, to its end or to the first row it comes back to. */
+export function playIt(it: ItFile, start = 0): TrackerPlay {
 	const out: ChannelTicks[] = Array.from({ length: it.channels }, channelTicks);
 	const channels: Channel[] = Array.from({ length: it.channels }, (_, i) => {
 		const pan = it.channelPans[i] & 0x7f;
@@ -181,7 +181,7 @@ export function playIt(it: ItFile): TrackerPlay {
 	let tempo = it.tempo;
 	let globalVolume = it.globalVolume;
 	let tick = 0;
-	let order = 0;
+	let order = start;
 	let row = 0;
 	let loopTick: number;
 	let tooLong = false;
@@ -456,7 +456,8 @@ export function playIt(it: ItFile): TrackerPlay {
 		}
 
 		if (order >= it.orders.length || it.orders[order] >= 200) {
-			let first = 0;
+			// The song loops to its own start, so a song after a `---` stays itself.
+			let first = start;
 			while (first < it.orders.length && it.orders[first] === 254) {
 				first++;
 			}

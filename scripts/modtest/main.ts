@@ -26,5 +26,6 @@ await runSections([
 	["samples", () => import("./samples")],
 	["umx", () => import("./umx")],
 	["sharing", () => import("./sharing")],
+	["songs", () => import("./songs")],
 	["stress", () => import("./stress")],
 ]);

@@ -6,6 +6,24 @@
       <p class="text-ink-muted text-xs">{{ summary() }}</p>
 
       <div class="flex flex-wrap items-center gap-3">
+        @if (songs().length > 0) {
+          <label class="flex items-center gap-1.5">
+            <span i18n="@@import.mod.song" class="text-ink-muted text-xs">import.mod.song</span>
+            <select
+              class="bg-inset border-edge text-ink h-7 cursor-pointer rounded-md border px-1.5 text-xs"
+              i18n-title="@@import.mod.song.title"
+              title="import.mod.song.title"
+              (change)="chooseSong($event)"
+            >
+              @for (option of songs(); track option.index) {
+                <option [value]="option.index" [selected]="option.selected">
+                  {{ option.label }}
+                </option>
+              }
+            </select>
+          </label>
+        }
+
         <label class="flex items-center gap-1.5">
           <span i18n="@@import.mod.separation" class="text-ink-muted text-xs">
             import.mod.separation

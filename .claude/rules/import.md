@@ -52,6 +52,9 @@ true.
   within a part; module channels share only where their notes never overlap at all, and a shared
   channel is written from one merged `ChannelTicks` (`mergeChannels`). Clashes are computed once,
   at read time, from notes that every later write's are a subset of in time.
+- **A module's songs are found by its own player**, started at each order no song before has
+  played (`findSongs`), so what is listed is what the writer gets. A reader plays them all once;
+  choosing one is `withSong`, which sums it up again and replays nothing.
 
 ## The dialog
 
@@ -86,7 +89,8 @@ true.
   lowered where it no longer fits, since each instrument's tuning, and so the octave its notes are
   written in, moves with the factor (`firstFactor`, `autoFactor`). A factor whose BRR would pass 64 KB
   is offered disabled. Each encoding is
-  kept per sample and factor while the dialog is open.
+  kept per sample and factor while the dialog is open. A module holding more than one song shows
+  a Song select; choosing another suggests its channels afresh and keeps each sample's choice.
 
 ## Decisions already made
 
@@ -104,3 +108,4 @@ entry goes there, with its line here, in the same change.
 - **BRR encoded inside `@amk/import`** — `planSample`, `brr-encode`, `eslint.config.js`
 - **A short loop widened by raising the factor** — `loopRepeats`, `plannedFrames`
 - **The song's bytes taken to be the same at every factor** — `firstFactor`, `autoFactor`
+- **Songs found by an order walk apart from the player** — `findSongs`

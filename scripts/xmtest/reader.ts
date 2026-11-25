@@ -129,3 +129,30 @@ section("reader: refusals and UMX");
 	const inner = unwrapUmx(umxBytes([{ payload: xmBytes(SIMPLE), format: "xm" }], 68));
 	check("a UMX holding an XM unwraps to it", inner.format === "xm" && readXm(inner.bytes).song.channels === 4);
 }
+
+section("reader: songs");
+
+{
+	// Order 0 loops on itself; order 1 runs off the end, past the restart order.
+	const xm = readXm(
+		xmBytes({
+			...SIMPLE,
+			orders: [0, 1],
+			restart: 0,
+			patterns: [
+				pattern([
+					[0, 0, { note: "C-4", instrument: 1 }],
+					[63, 0, { effect: "B", param: 0 }],
+				]),
+				pattern([[0, 1, { note: "E-4", instrument: 1 }]]),
+			],
+		}),
+	);
+	const second = xm.songs[1];
+	check("an order the first song never plays starts a second", xm.songs.map((s) => s.order).join() === "0,1");
+	check(
+		"which wraps to its own start rather than the restart order",
+		second.play.segments.map((s) => s.order).join() === "1" && second.play.loopTick === 0 && !second.play.tooLong,
+		JSON.stringify(second.play.segments),
+	);
+}
