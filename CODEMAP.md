@@ -846,6 +846,10 @@ something in the directory, which load by themselves when such a file is opened.
 
 - `aram-budget.ts` — The Build section's ARAM budget: the bar, and a table row per region.
 
+## web/src/app/output/channel-stats
+
+- `channel-stats.ts` — The Build section's per-channel tiles: each used channel's data size and length in ticks.
+
 ## web/src/app/output/command-inspector/adsr-command
 
 **Rules:** `inspector-and-palette.md`

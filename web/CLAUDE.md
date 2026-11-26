@@ -109,7 +109,7 @@ numbers, where CodeMirror's undo history is not something anything could hand ba
 `output/output-pane/` is three sections, in the order a porter needs them. **Inspector** is first —
 the command inspector, with the loop inspector under it — because it is what a porter edits with,
 and it answers every click in the source and every click on a bar. **Build** is collapsible under
-it: the ARAM budget and the hex dump, read once a session and folded away the rest of
+it: each used channel's size and length in ticks, the ARAM budget and the hex dump, read once a session and folded away the rest of
 the time. **Problems** is pinned below the scroll column with a count badge, so a diagnostic stays
 in view whatever height the inspector takes. Each is an `amk-section`, and whether Build and
 Problems are open is persisted (`solar-soundtrack.build`, `solar-soundtrack.problems`).

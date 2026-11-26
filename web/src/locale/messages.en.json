@@ -1145,6 +1145,7 @@
     "output.aram.segment.spc-700-engine": "SPC-700 engine",
     "output.aram.segment.your-song": "Your song",
     "output.aram.this-will-not-fit-in": "This will not fit in ARAM. Reduce samples, shorten the song, or lower the echo buffer.",
+    "output.build.channel": "Channel {$channel}",
     "output.build.heading": "Build",
     "output.cannot-compile-without-a": "Cannot compile without a driver — {$PROBLEM} The song's load address comes from the driver's song pointer table, so there is nothing to compile against.",
     "output.fix.add-default": "Add #default as the first entry of #samples, so the stock instruments find their samples.",

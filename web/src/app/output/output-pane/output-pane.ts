@@ -21,6 +21,7 @@ import { EditorRequests } from '../../state/editor-requests';
 import { EditorStore } from '../../state/editor-store';
 import { readStored, writeStored } from '../../util/storage';
 import { AramBudget } from '../aram-budget/aram-budget';
+import { ChannelStats } from '../channel-stats/channel-stats';
 import { CommandInspector } from '../command-inspector/command-inspector';
 import { DiagnosticsList } from '../diagnostics-list/diagnostics-list';
 import { HexDump } from '../hex-dump/hex-dump';
@@ -37,6 +38,7 @@ const PROBLEMS_KEY = 'solar-soundtrack.problems';
   selector: 'amk-output-pane',
   imports: [
     AramBudget,
+    ChannelStats,
     CommandInspector,
     DiagnosticsList,
     HexDump,
