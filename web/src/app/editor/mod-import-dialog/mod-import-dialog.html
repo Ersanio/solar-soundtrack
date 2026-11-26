@@ -203,7 +203,13 @@
                       amk-button
                       size="sm"
                       class="shrink-0 font-mono"
-                      [title]="row.sounding ? text.stopHearing : text.hear"
+                      [title]="
+                        row.sounding
+                          ? text.stopHearing
+                          : row.replaced
+                            ? text.hearLibrary
+                            : text.hear
+                      "
                       [disabled]="!row.playable"
                       (click)="toggleSample(row.index)"
                     >
@@ -224,26 +230,65 @@
                 <td class="text-ink-muted px-2 py-1 font-mono whitespace-nowrap">{{ row.loop }}</td>
                 <td class="px-2 py-1 text-right font-mono tabular-nums">{{ row.notes }}</td>
                 <td class="px-2 py-1">
-                  <select
-                    class="bg-inset border-edge text-ink h-6 cursor-pointer rounded-md border px-1 text-xs"
-                    i18n-title="@@import.mod.rate.title"
-                    title="import.mod.rate.title"
-                    (change)="setChoice(row.index, $event)"
-                  >
-                    <option value="auto" [selected]="row.choice === 'auto'">
-                      {{ row.autoLabel }}
-                    </option>
-                    @for (option of row.options; track option.value) {
-                      <option
-                        [value]="option.value"
-                        [selected]="option.value === row.choice"
-                        [disabled]="option.disabled"
-                      >
-                        {{ option.label }}
+                  <div class="flex items-center gap-1">
+                    <select
+                      class="bg-inset border-edge text-ink h-6 max-w-40 cursor-pointer rounded-md border px-1 text-xs"
+                      i18n-title="@@import.mod.rate.title"
+                      title="import.mod.rate.title"
+                      (change)="setChoice(row.index, $event)"
+                    >
+                      <option value="auto" [selected]="row.choice === 'auto'">
+                        {{ row.autoLabel }}
                       </option>
+                      @for (option of row.options; track option.value) {
+                        <option
+                          [value]="option.value"
+                          [selected]="option.value === row.choice"
+                          [disabled]="option.disabled"
+                        >
+                          {{ option.label }}
+                        </option>
+                      }
+                      <option value="drop" [selected]="row.choice === 'drop'">
+                        {{ text.drop }}
+                      </option>
+                      @if (libraryOptions().length > 0) {
+                        <optgroup
+                          i18n-label="@@import.mod.rate.library"
+                          label="import.mod.rate.library"
+                        >
+                          @for (option of libraryOptions(); track option.value) {
+                            <option [value]="option.value" [selected]="option.value === row.choice">
+                              {{ option.label }}
+                            </option>
+                          }
+                        </optgroup>
+                      }
+                    </select>
+                    @if (row.replaced) {
+                      <input
+                        type="number"
+                        step="1"
+                        class="bg-inset border-edge text-ink h-6 w-12 rounded-md border px-1 font-mono text-xs tabular-nums"
+                        i18n-title="@@import.mod.sample.semitones.title"
+                        title="import.mod.sample.semitones.title"
+                        [min]="-semitoneReach"
+                        [max]="semitoneReach"
+                        [value]="row.semitones"
+                        (change)="setSemitones(row.index, $event)"
+                      />
+                      @if (row.unpitched) {
+                        <span
+                          i18n="@@import.mod.sample.unpitched"
+                          class="text-ink-muted whitespace-nowrap"
+                          i18n-title="@@import.mod.sample.unpitched.title"
+                          title="import.mod.sample.unpitched.title"
+                        >
+                          import.mod.sample.unpitched
+                        </span>
+                      }
                     }
-                    <option value="drop" [selected]="row.choice === 'drop'">{{ text.drop }}</option>
-                  </select>
+                  </div>
                 </td>
                 <td class="px-2 py-1 text-right font-mono whitespace-nowrap tabular-nums">
                   {{ row.rate }}

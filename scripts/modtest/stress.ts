@@ -1,4 +1,4 @@
-/** `modtest`: busy, seeded MODs — eight channels, every effect, repeats, a jump back — imported at several factors and both loop modes without raising a problem, and assembled; and twelve channels shared onto eight. */
+/** `modtest`: busy, seeded MODs — eight channels, every effect, repeats, a jump back — imported at several factors and both loop modes without raising a problem, and assembled, a sample on a stock file among them; and twelve channels shared onto eight. */
 
 import { check, section } from "../harness";
 import { type Cell, PERIODS, imported, modBytes, pluck, problems, square } from "./support";
@@ -127,6 +127,21 @@ for (const seed of [1, 2, 3, 4, 5]) {
 		problems(song).length === 0,
 		problems(song).slice(0, 4).join("; "),
 	);
+}
+
+for (const seed of [7, 8]) {
+	// A sample played on a stock file, high and low, beside samples at a shrunk factor.
+	for (const factor of [0.4, 3]) {
+		const { song } = imported(busyMod(seed), {
+			factors: new Map([2, 3, 4].map((index) => [index, 0.5])),
+			library: new Map([[1, { name: "02 SMW @2.brr", factor, listed: false }]]),
+		});
+		check(
+			`seed ${seed} with a sample on a stock file at ${factor}: no problems, and it assembles`,
+			song.result.ok && problems(song).length === 0 && song.spc instanceof Uint8Array,
+			[...problems(song).slice(0, 4), typeof song.spc === "string" ? song.spc : ""].join("; "),
+		);
+	}
 }
 
 section("stress: busy twelve-channel songs sharing eight");

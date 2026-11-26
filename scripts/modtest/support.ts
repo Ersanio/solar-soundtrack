@@ -278,12 +278,14 @@ export interface Imported {
 	song: Song;
 }
 
-/** Each kept sample planned at its factor and encoded, as the dialog does. */
+/** Each kept sample planned at its factor and encoded, as the dialog does; one played on a library file has none. */
 export function encoded(mod: TrackerImport, written: WrittenTrackerSong): BrrSample[] {
-	return written.samples.map((s) => {
-		const plan = planSample(mod.song.samples[s.index - 1], s.factor);
-		return parseBrr(s.name, encodeBrrWithHeadroom(plan.pcm, plan.loopStart).bytes);
-	});
+	return written.samples
+		.filter((s) => !s.library)
+		.map((s) => {
+			const plan = planSample(mod.song.samples[s.index - 1], s.factor);
+			return parseBrr(s.name, encodeBrrWithHeadroom(plan.pcm, plan.loopStart).bytes);
+		});
 }
 
 /** `text` compiled with `extra` beside the stock samples, walked, diagnosed and assembled. */
@@ -344,8 +346,12 @@ export function song(text: string, extra: readonly BrrSample[]): Song {
 	};
 }
 
-/** Reads `bytes`, writes every suggested channel with every sample at factor 1 (or as `options` says), and builds the song. */
-export function imported(bytes: Uint8Array, options: Partial<TrackerSongOptions> = {}): Imported {
+/** Reads `bytes`, writes every suggested channel with every sample at factor 1 (or as `options` says), and builds the song beside `library`. */
+export function imported(
+	bytes: Uint8Array,
+	options: Partial<TrackerSongOptions> = {},
+	library: readonly BrrSample[] = [],
+): Imported {
 	const mod = readMod(bytes);
 	const written = writeTracker(mod, {
 		keep: mod.suggested,
@@ -357,7 +363,7 @@ export function imported(bytes: Uint8Array, options: Partial<TrackerSongOptions>
 		...options,
 	});
 	const brrs = encoded(mod, written);
-	return { mod, written, brrs, song: song(written.text, brrs) };
+	return { mod, written, brrs, song: song(written.text, [...brrs, ...library]) };
 }
 
 /** Errors and warnings, not notes: what a clean import must not raise. */

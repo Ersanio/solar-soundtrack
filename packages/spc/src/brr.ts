@@ -280,6 +280,16 @@ export function decodeBrr(sample: BrrSample): Int16Array {
 	return out;
 }
 
+/** The frame a sample's loop starts at, or `null` where its last block does not set the loop flag. */
+export function loopFrame(sample: BrrSample): number | null {
+	const last = blockCount(sample) - 1;
+	if (last < 0 || (sample.data[last * BRR_BLOCK_BYTES] & 0x02) === 0) {
+		return null;
+	}
+
+	return (sample.loopOffset / BRR_BLOCK_BYTES) * BRR_BLOCK_SAMPLES;
+}
+
 /** Reduces PCM to a min/max envelope for drawing. Peaks are grouped in "buckets". */
 export function peaks(pcm: Int16Array, buckets: number): Float32Array {
 	const out = new Float32Array(buckets * 2);

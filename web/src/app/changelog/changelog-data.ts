@@ -11,6 +11,7 @@ export const CHANGELOG: readonly ChangelogEntry[] = [
   {
     date: '25 November 2026',
     items: [
+      'Play a module sample on a sample from the library instead, tuned to match, when importing a MOD, S3M, XM or IT file',
       'Song size optimizer: repeated music looped, on tracker import and as Finalize in the top bar',
       'Truer panning when importing a MIDI file',
       'Truer panning, fewer clicks and duplicate samples stored once, when importing a MOD, S3M, XM or IT file',

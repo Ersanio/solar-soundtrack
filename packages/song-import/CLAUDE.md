@@ -12,37 +12,38 @@ PCM of each sample planned for BRR; encoding, compiling, walking and playing the
 caller's. It returns **codes and values, never words**: a refusal is an `SmfError`, `ModError`,
 `S3mError`, `XmError`, `ItError` or `UmxError` code and a warning an `ImportWarning` or `TrackerImportWarning`, which the Import dialogs word.
 
-| Module                 | What it is                                                             |
-| ---------------------- | ---------------------------------------------------------------------- |
-| `format.ts`            | Which importer reads a file, and the SMF inside an RMID wrapper        |
-| `midi.ts`              | `readMidi` (once per file) and `writeMidi` (once per option change)    |
-| `midi/smf.ts`          | The Standard MIDI File reader                                          |
-| `midi/performance.ts`  | Every track merged onto one time line: notes and GM controller curves  |
-| `midi/parts.ts`        | A channel split into parts that play one note at a time                |
-| `midi/channels.ts`     | `mml/channels.ts`'s packing by part id and part order                  |
-| `midi/gm.ts`           | GM programs and drum keys matched to the stock instruments and drums   |
-| `midi/write-mml.ts`    | The parts kept, written as an `#amk 4` song                            |
-| `mml/lengths.ts`       | Note and rest lengths in driver ticks, spelled without AMK0200         |
-| `mml/song-text.ts`     | `t` for a BPM, `y` for a balance, ramps, text for a `#spc` tag         |
-| `mml/channels.ts`      | Which voices can share a channel, and packing them onto eight          |
-| `tracker.ts`           | `findSongs`, `summarise` and `withSong`, and `writeTracker` per change |
-| `tracker/model.ts`     | What every format's reader and player hand over: samples, ticks        |
-| `tracker/samples.ts`   | Resampling, loops onto BRR blocks, the tuning, the factor that fits    |
-| `tracker/write-mml.ts` | The channels kept, on custom instruments, as an `#amk 4` song          |
-| `mod.ts`               | `readMod`: a MOD read, played and summed up for the dialog             |
-| `mod/file.ts`          | The MOD reader: signatures, patterns, sample headers                   |
-| `mod/play.ts`          | The song played tick by tick as ProTracker plays it                    |
-| `s3m.ts`               | `readS3m`: an S3M read, played and summed up for the dialog            |
-| `s3m/file.ts`          | The S3M reader: the header, parapointers, packed patterns, samples     |
-| `s3m/play.ts`          | The song played tick by tick as Scream Tracker 3 plays it              |
-| `xm.ts`                | `readXm`: an XM read, played and summed up for the dialog              |
-| `xm/file.ts`           | The XM reader: patterns, instruments, envelopes, delta-coded samples   |
-| `xm/play.ts`           | The song played tick by tick as FastTracker II plays it                |
-| `it.ts`                | `readIt`: an IT read, played and summed up for the dialog              |
-| `it/file.ts`           | The IT reader: packed patterns, samples, compression, instruments      |
-| `it/play.ts`           | The song played tick by tick as Impulse Tracker 2 plays it             |
-| `tracker/pingpong.ts`  | A ping-pong loop laid out forward, as a BRR loop runs                  |
-| `umx.ts`               | An Unreal package unwrapped to the module its Music object holds       |
+| Module                   | What it is                                                             |
+| ------------------------ | ---------------------------------------------------------------------- |
+| `format.ts`              | Which importer reads a file, and the SMF inside an RMID wrapper        |
+| `midi.ts`                | `readMidi` (once per file) and `writeMidi` (once per option change)    |
+| `midi/smf.ts`            | The Standard MIDI File reader                                          |
+| `midi/performance.ts`    | Every track merged onto one time line: notes and GM controller curves  |
+| `midi/parts.ts`          | A channel split into parts that play one note at a time                |
+| `midi/channels.ts`       | `mml/channels.ts`'s packing by part id and part order                  |
+| `midi/gm.ts`             | GM programs and drum keys matched to the stock instruments and drums   |
+| `midi/write-mml.ts`      | The parts kept, written as an `#amk 4` song                            |
+| `mml/lengths.ts`         | Note and rest lengths in driver ticks, spelled without AMK0200         |
+| `mml/song-text.ts`       | `t` for a BPM, `y` for a balance, ramps, text for a `#spc` tag         |
+| `mml/channels.ts`        | Which voices can share a channel, and packing them onto eight          |
+| `tracker.ts`             | `findSongs`, `summarise` and `withSong`, and `writeTracker` per change |
+| `tracker/model.ts`       | What every format's reader and player hand over: samples, ticks        |
+| `tracker/samples.ts`     | Resampling, loops onto BRR blocks, the tuning, the factor that fits    |
+| `tracker/fundamental.ts` | A sample's pitch, to tune a library file played in its place           |
+| `tracker/write-mml.ts`   | The channels kept, on custom instruments, as an `#amk 4` song          |
+| `mod.ts`                 | `readMod`: a MOD read, played and summed up for the dialog             |
+| `mod/file.ts`            | The MOD reader: signatures, patterns, sample headers                   |
+| `mod/play.ts`            | The song played tick by tick as ProTracker plays it                    |
+| `s3m.ts`                 | `readS3m`: an S3M read, played and summed up for the dialog            |
+| `s3m/file.ts`            | The S3M reader: the header, parapointers, packed patterns, samples     |
+| `s3m/play.ts`            | The song played tick by tick as Scream Tracker 3 plays it              |
+| `xm.ts`                  | `readXm`: an XM read, played and summed up for the dialog              |
+| `xm/file.ts`             | The XM reader: patterns, instruments, envelopes, delta-coded samples   |
+| `xm/play.ts`             | The song played tick by tick as FastTracker II plays it                |
+| `it.ts`                  | `readIt`: an IT read, played and summed up for the dialog              |
+| `it/file.ts`             | The IT reader: packed patterns, samples, compression, instruments      |
+| `it/play.ts`             | The song played tick by tick as Impulse Tracker 2 plays it             |
+| `tracker/pingpong.ts`    | A ping-pong loop laid out forward, as a BRR loop runs                  |
+| `umx.ts`                 | An Unreal package unwrapped to the module its Music object holds       |
 
 ## Reading
 
@@ -200,10 +201,18 @@ them): the dialog lists the first with its copies, and the writer gives a copy t
 file but an instrument and tuning of its own, since their rates can differ. `#samples` names each
 file once.
 
+A sample can be played on a library file instead (`TrackerSongOptions.library`, keyed by its first
+slot, so its copies follow): nothing is planned or encoded for it, and its instrument is tuned as any
+is, the factor standing for the rate the file plays at on the reference note over `baseHz`.
+`libraryFactor` finds that rate from the pitch heard in both (`fundamentalHz`: YIN over the loop laid
+end to end, or a one-shot from its attack, a loop of whole periods read off its length), and plays the
+file at the DSP's 32 kHz where either has none; the porter's semitones go on top. A name the stock
+group already lists is not listed again (`listed: false`), since a second entry would be a second SRCN.
+
 ### Writing
 
 `tracker/write-mml.ts` writes an `#amk 4` song: `#samples` with `#default` (or `#optimized`, `TrackerSongOptions.optimized`) first, then each sample the
-kept channels play, and `#instruments` giving each `$FF $E0 $7F` and its tuning at `@30` up.
+kept channels play (a library file only where the stock group does not already name it), and `#instruments` giving each `$FF $E0 $7F` and its tuning at `@30` up.
 
 - **Two driver ticks to a tracker tick**, so the module's BPM is the song's quarter-note BPM (`t` is
   BPM × 0.4096 − 1) and a row at speed 6 a sixteenth; per-tick effects stay exact.

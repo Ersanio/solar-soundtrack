@@ -162,15 +162,16 @@ something in the directory, which load by themselves when such a file is opened.
 
 **Rules:** `import.md`
 
+- `fundamental.ts` — A sample's fundamental, so a library sample standing in for a module's can be tuned to sound the module's notes: YIN's cumulative mean normalised difference over a window of the sample, a loop laid end to end or a one-shot from its attack.
 - `model.ts` — What a tracker module's reader and player hand the writer, in units no one format owns: a sample's PCM and the rate it plays at on its reference note, and every channel's pitch in semitones from that note, tick by tick.
 - `pingpong.ts` — A ping-pong loop laid out as a forward one: the loop, then the loop backwards, since a BRR loop only runs forward.
 - `samples.ts` — A tracker module's samples made ready for BRR: resampled to fit ARAM, their loops moved onto block boundaries, and the tuning an AddmusicK instrument needs to play each at the module's pitch.
 - `write-mml.ts` (1000+ lines) — A played tracker module written out as an `#amk 4` song: each kept channel on one of AddmusicK's, or with `share` channels whose notes never overlap taking turns on one, each sample a custom instrument after `#default` (or `#optimized`).
-  - `TRACKER_CHANNEL_LIMIT`:41 `DRIVER_TICKS`:43 `notesOf`:117 `mergeChannels`:168 `volumeOf`:193 `panOf`:202
-  - `panLoudness`:207 `heardAt`:212 `rateOf`:222 `vibratoOf`:227 `tremoloOf`:242 `arpeggioText`:258
-  - `ChannelWriter`:317 `bestFineTune`:395 `forget`:425 `push`:429 `pitchAt`:434 `volumeIn`:441 `vibratoIn`:449
-  - `noteSettings`:466 `setTremolo`:489 `setArpeggio`:498 `setVolume`:514 `setPan`:521 `setVibrato`:528
-  - `setOctave`:535 `tempo`:550 `cut`:562 `rest`:608 `notePart`:623 `lines`:752 `writeTrackerSong`:777
+  - `TRACKER_CHANNEL_LIMIT`:41 `DRIVER_TICKS`:43 `notesOf`:130 `mergeChannels`:181 `volumeOf`:206 `panOf`:215
+  - `panLoudness`:220 `heardAt`:225 `rateOf`:235 `vibratoOf`:240 `tremoloOf`:255 `arpeggioText`:271
+  - `ChannelWriter`:330 `bestFineTune`:408 `forget`:438 `push`:442 `pitchAt`:447 `volumeIn`:454 `vibratoIn`:462
+  - `noteSettings`:479 `setTremolo`:502 `setArpeggio`:511 `setVolume`:527 `setPan`:534 `setVibrato`:541
+  - `setOctave`:548 `tempo`:563 `cut`:575 `rest`:621 `notePart`:636 `lines`:765 `writeTrackerSong`:790
 
 ## packages/song-import/src/xm
 
@@ -334,10 +335,10 @@ something in the directory, which load by themselves when such a file is opened.
 - `main.ts` — MOD import: `@amk/import/mod` reading a MOD, playing it tick by tick and writing it as a song on custom instruments made from its samples.
 - `pitch.ts` — `modtest`: pitch — every note of ProTracker's three octaves, at finetunes and resampling factors, played by the walk within a few cents of where the MOD plays it; FastTracker's periods past the Amiga's; and a range too wide for one octave choice folded.
 - `reader.ts` — `modtest`: the MOD reader — each signature's channel count, FLT8's pattern pairs, the pattern count, the sample headers' loop quirks, a file cut short, and what is refused.
-- `samples.ts` — `modtest`: samples made ready for BRR — the loop moved onto a block at every factor, a short loop laid end to end until it fills one, a one-shot's length, the planned frames matching what is planned, and the factor that fits a room.
+- `samples.ts` (300+ lines) — `modtest`: samples made ready for BRR — the loop moved onto a block at every factor, a short loop laid end to end until it fills one, a one-shot's length, the planned frames matching what is planned, the factor that fits a room, and a library file played in a sample's place.
 - `sharing.ts` — `modtest`: sharing — module channels whose notes never overlap taking turns on one of AddmusicK's, each note walked at its tick and pitch, and channels that overlap kept apart.
 - `songs.ts` — `modtest`: songs — a module that holds several, each entered at an order of its own, found as libopenmpt finds subsongs, and one of them chosen, written and walked.
-- `stress.ts` — `modtest`: busy, seeded MODs — eight channels, every effect, repeats, a jump back — imported at several factors and both loop modes without raising a problem, and assembled; and twelve channels shared onto eight.
+- `stress.ts` — `modtest`: busy, seeded MODs — eight channels, every effect, repeats, a jump back — imported at several factors and both loop modes without raising a problem, and assembled, a sample on a stock file among them; and twelve channels shared onto eight.
 - `support.ts` (300+ lines) — What every `modtest` section shares: a MOD file built in memory, imported, its samples encoded, and the song compiled, walked, diagnosed and assembled as the editor does.
 - `timing.ts` — `modtest`: time — two driver ticks to a MOD tick, speed and BPM, and the order list's flow through Bxx, Dxx, E6x, EEx and EDx, each held to the ticks the walk plays its notes at.
 - `umx.ts` — `modtest`: a UMX unwrapped to its module at every package version's layout, the module named by its signature, and each refusal.

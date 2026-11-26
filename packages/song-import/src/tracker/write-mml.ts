@@ -75,6 +75,17 @@ export interface TrackerSongOptions {
 	share?: boolean;
 	/** Write a pass that comes round again as a label loop; off when `@amk/optimize` loops the song instead. */
 	passLoops?: boolean;
+	/** Samples played on a library file in place of their own, by slot; a copy follows its first slot. */
+	library?: ReadonlyMap<number, LibrarySample>;
+}
+
+/** A library file a sample is played on instead of its own. */
+export interface LibrarySample {
+	name: string;
+	/** The rate it plays at on the module's reference note, over the sample's `baseHz` (`libraryFactor`). */
+	factor: number;
+	/** Whether `#samples` must name it: not where the stock group already does. */
+	listed: boolean;
 }
 
 /** Something the writer changed to make the song fit, for the porter to read. */
@@ -96,6 +107,8 @@ export interface SongSample {
 	factor: number;
 	instrument: number;
 	tuning: Tuning;
+	/** Played on a library file, so there is nothing to encode. */
+	library: boolean;
 }
 
 export interface WrittenTrackerSong {
@@ -809,7 +822,9 @@ export function writeTrackerSong(
 	const loopAt = options.loop === "jump" && play.loopTick > 0 && play.loopTick < end ? play.loopTick : null;
 	// A copy of an earlier slot shares its factor and its file, and keeps its own instrument.
 	const firstOf = (index: number): number => sameAs.get(index) ?? index;
-	const factorOf = (index: number): number | "drop" => options.factors.get(firstOf(index)) ?? 1;
+	const libraryOf = (index: number): LibrarySample | undefined => options.library?.get(firstOf(index));
+	const factorOf = (index: number): number | "drop" =>
+		libraryOf(index)?.factor ?? options.factors.get(firstOf(index)) ?? 1;
 	const playable = (index: number): boolean =>
 		factorOf(index) !== "drop" && (song.samples[index - 1]?.pcm.length ?? 0) > 0;
 
@@ -852,14 +867,17 @@ export function writeTrackerSong(
 	used.forEach((index, i) => {
 		const sample = song.samples[index - 1];
 		const asked = factorOf(index);
-		const factor = plannedFrames(sample, asked === "drop" ? 1 : asked).factor;
+		const library = libraryOf(index);
+		// A library file is played as it is, so its factor is not moved onto the loop's blocks.
+		const factor = library?.factor ?? plannedFrames(sample, asked === "drop" ? 1 : asked).factor;
 		const range = ranges.get(index) ?? { low: 0, high: 0 };
 		samples.set(index, {
 			index,
-			name: options.sampleName(firstOf(index)),
+			name: library?.name ?? options.sampleName(firstOf(index)),
 			factor,
 			instrument: FIRST_CUSTOM + i,
 			tuning: tuningFor(factor, sample.baseHz, range.low, range.high),
+			library: library !== undefined,
 		});
 	});
 
@@ -1002,7 +1020,9 @@ export function writeTrackerSong(
 		"#samples",
 		"{",
 		options.optimized ? "\t#optimized" : "\t#default",
-		...[...new Set(sampleList.map((s) => s.name))].map((name) => `\t"${name}"`),
+		...[...new Set(sampleList.filter((s) => !s.library || libraryOf(s.index)?.listed).map((s) => s.name))].map(
+			(name) => `\t"${name}"`,
+		),
 		"}",
 		"",
 		"#instruments",

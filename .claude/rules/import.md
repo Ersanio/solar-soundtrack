@@ -101,7 +101,11 @@ true.
   will be; one the optimizer cannot shorten, such as one too long to compile even flat, is written
   with the pass loops and optimized from there. Each encoding is
   kept per sample and factor while the dialog is open, encoded with `encodeBrrWithHeadroom` so no
-  sample wraps the DSP's interpolation. A module holding more than one song shows
+  sample wraps the DSP's interpolation. A sample can instead be played on any valid library `.brr`
+  but the import's own names (`libraryOptions`): it is neither encoded nor added, its rate comes
+  from `libraryFactor` over the pitch heard in both and the porter's semitones (`replacements`), and
+  a stock name is not listed again in `#samples`; the room and the budget count its real bytes
+  through `SampleStore.resolveWith`'s fall-back to the library. A module holding more than one song shows
   a Song select; choosing another suggests its channels afresh and keeps each sample's choice.
 
 ## Decisions already made

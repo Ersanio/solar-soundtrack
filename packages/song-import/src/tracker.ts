@@ -18,9 +18,11 @@ import {
 } from "./tracker/write-mml";
 
 export type { TrackerPlay, TrackerSample, TrackerSong } from "./tracker/model";
+export { fundamentalHz, libraryFactor } from "./tracker/fundamental";
 export { LOWEST_FACTOR, type PlannedSample, fitFactor, planSample, plannedFrames } from "./tracker/samples";
 export {
 	DRIVER_TICKS,
+	type LibrarySample,
 	type SongSample,
 	TRACKER_CHANNEL_LIMIT,
 	type TrackerImportWarning,

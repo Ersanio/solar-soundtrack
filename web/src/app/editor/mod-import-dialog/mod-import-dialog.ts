@@ -5,6 +5,7 @@ import { ModError, readMod } from '@amk/import/mod';
 import { S3mError, readS3m } from '@amk/import/s3m';
 import { XmError, readXm } from '@amk/import/xm';
 import {
+  type LibrarySample,
   TRACKER_CHANNEL_LIMIT,
   type TrackerImport,
   type TrackerSongOptions,
@@ -12,6 +13,8 @@ import {
   addWhileFits,
   fitFactor,
   fitsShared,
+  fundamentalHz,
+  libraryFactor,
   oneEach,
   planSample,
   plannedFrames,
@@ -19,7 +22,7 @@ import {
   writeTracker,
 } from '@amk/import/tracker';
 import { type TrackerFormat, UmxError, isUmx, trackerFormatOf, unwrapUmx } from '@amk/import/umx';
-import { type BrrSample, decodeBrr, emptySample, parseBrr } from '@amk/spc/brr';
+import { type BrrSample, decodeBrr, emptySample, loopFrame, parseBrr } from '@amk/spc/brr';
 import { brrDataBytes, encodeBrrWithHeadroom } from '@amk/spc/brr-encode';
 import { computeSpcLayout } from '@amk/spc/layout';
 import { SPC_SAMPLE_RATE } from '@amk/spc/wasm-host';
@@ -52,8 +55,28 @@ import {
   modWarningText,
 } from '../import-dialog/import-text';
 
-/** What the porter chose for a sample: the factor that fits, a factor of their own, or none of its notes. */
-type Choice = 'auto' | 'drop' | number;
+/** A library file played in a sample's place, shifted by semitones from the pitch heard in both. */
+interface LibraryChoice {
+  library: string;
+  semitones: number;
+}
+
+/** What the porter chose for a sample: the factor that fits, a factor of their own, none of its notes, or a library file. */
+type Choice = 'auto' | 'drop' | number | LibraryChoice;
+
+/** A library file standing in for a sample, as the writer and the row need it. */
+interface Replacement {
+  library: LibrarySample;
+  file: BrrSample;
+  /** The rate it plays at on the module's reference note. */
+  rate: number;
+  pitched: boolean;
+}
+
+/** The select's value for a library file. */
+const LIBRARY_PREFIX = 'lib:';
+/** How far the semitone shift reaches either way. */
+const SEMITONE_REACH = 36;
 
 /** A sample planned and encoded at one factor, with the loop frame and the rate it plays C-2 at. */
 interface Encoding {
@@ -153,11 +176,11 @@ interface SampleFile {
   factor: number;
 }
 
-/** The files `written` needs, one a name: a copy of an earlier slot shares that slot's. */
+/** The files `written` needs encoded, one a name: a copy of an earlier slot shares that slot's, and a library file is the library's. */
 function filesOf(mod: TrackerImport, written: WrittenTrackerSong): SampleFile[] {
   const files = new Map<string, SampleFile>();
   for (const s of written.samples) {
-    if (!files.has(s.name)) {
+    if (!s.library && !files.has(s.name)) {
       files.set(s.name, {
         name: s.name,
         index: mod.sameAs.get(s.index) ?? s.index,
@@ -189,7 +212,7 @@ function stemOf(fileName: string): string {
  *
  * AddmusicK has far less room for samples than a module carries, so every sample left on Auto shares the
  * one factor that fills what ARAM has left once the song and `#default` are in, and a porter can set a
- * sample's own factor or drop it. Every change rewrites, re-encodes and recompiles the candidate, and a
+ * sample's own factor, drop it, or play its notes on a library file, tuned to the pitch heard in both. Every change rewrites, re-encodes and recompiles the candidate, and a
  * playing preview carries on from where it was.
  */
 @Component({
@@ -216,8 +239,11 @@ export class ModImportDialog {
     drop: $localize`:@@import.mod.rate.drop:import.mod.rate.drop`,
     unused: $localize`:@@import.mod.sample.unused:import.mod.sample.unused`,
     hear: $localize`:@@import.mod.sample.play.title:import.mod.sample.play.title`,
+    hearLibrary: $localize`:@@import.mod.sample.play-library.title:import.mod.sample.play-library.title`,
     stopHearing: $localize`:@@import.mod.sample.stop.title:import.mod.sample.stop.title`,
+    inAram: $localize`:@@import.mod.sample.in-aram:import.mod.sample.in-aram`,
   };
+  protected readonly semitoneReach = SEMITONE_REACH;
 
   protected readonly separations = [
     { value: 1, label: '100%' },
@@ -247,6 +273,77 @@ export class ModImportDialog {
 
   /** Each sample planned and encoded at a factor, kept for the dialog's life so a change re-encodes only what it moved. */
   private readonly encodings = new Map<string, Encoding>();
+  /** The pitch heard in each module sample and library file, `null` for none, kept for the dialog's life. */
+  private readonly fundamentals = new Map<string, number | null>();
+
+  private heard(key: string, find: () => number | null): number | null {
+    if (!this.fundamentals.has(key)) {
+      this.fundamentals.set(key, find());
+    }
+
+    return this.fundamentals.get(key) ?? null;
+  }
+
+  /** The library files a sample can be played on: every valid `.brr` but those this import writes. */
+  protected readonly libraryOptions = computed(() => {
+    const own = new Set((this.mod()?.song.samples ?? []).map((s) => this.sampleName(s.index)));
+    const files = this.optimized() ? this.library.optimizedFiles() : this.library.files();
+    return files
+      .filter((f) => f.kind === 'sample' && f.error === null && f.frames > 0 && !own.has(f.name))
+      .map((f) => ({ value: LIBRARY_PREFIX + f.name, label: f.name.replace(/\.brr$/i, '') }));
+  });
+
+  /** Each sample the porter put on a library file, tuned so the module's notes sound at their pitch. */
+  private readonly replacements = computed(() => {
+    const mod = this.mod();
+    const out = new Map<number, Replacement>();
+    if (!mod) {
+      return out;
+    }
+
+    const group = this.optimized() ? 'optimized' : 'default';
+    const stock = this.library.groups()[group] ?? [];
+    for (const [index, choice] of this.choices()) {
+      if (typeof choice !== 'object') {
+        continue;
+      }
+
+      const source = mod.song.samples[index - 1];
+      const file = this.library.resolve(
+        [choice.library],
+        [group === 'optimized' ? group : null],
+      )[0];
+      if (!source || file.data.length === 0) {
+        continue;
+      }
+
+      const loops = source.loopLength > 0;
+      const moduleHz = this.heard(`module:${index}`, () =>
+        fundamentalHz(
+          loops ? source.pcm.subarray(0, source.loopStart + source.loopLength) : source.pcm,
+          loops ? source.loopStart : null,
+          source.baseHz,
+        ),
+      );
+      const libraryHz = this.heard(`${group}:${choice.library}`, () =>
+        fundamentalHz(decodeBrr(file), loopFrame(file), SPC_SAMPLE_RATE),
+      );
+      const { factor, pitched } = libraryFactor(
+        source.baseHz,
+        moduleHz,
+        libraryHz,
+        choice.semitones,
+      );
+      out.set(index, {
+        library: { name: choice.library, factor, listed: !stock.includes(choice.library) },
+        file,
+        rate: source.baseHz * factor,
+        pitched,
+      });
+    }
+
+    return out;
+  });
 
   protected readonly heading = computed(() => {
     const name = this.fileName();
@@ -293,6 +390,12 @@ export class ModImportDialog {
     return this.choices().get(index) ?? 'auto';
   }
 
+  /** Whether a sample shares the Auto factor: left on Auto, or on a library file that is no longer there. */
+  private isAuto(index: number): boolean {
+    const choice = this.choiceOf(index);
+    return choice === 'auto' || (typeof choice === 'object' && !this.replacements().has(index));
+  }
+
   private encoded(mod: TrackerImport, index: number, factor: number): Encoding {
     const key = `${index}:${factor}`;
     let entry = this.encodings.get(key);
@@ -323,14 +426,22 @@ export class ModImportDialog {
       fallbackTitle: stemOf(this.fileName()),
       optimized: this.optimized(),
       share: this.share(),
+      library: new Map([...this.replacements()].map(([index, r]) => [index, r.library])),
     };
   }
 
-  /** Each sample's factor: its own, or `auto` for those left on Auto (1 where `auto` is `null`). */
+  /** Each sample's factor: its own, or `auto` for those left on Auto (1 where `auto` is `null`); a library file's is the writer's. */
   private factorsWith(auto: number | null): Map<number, number | 'drop'> {
     const factors = new Map<number, number | 'drop'>();
+    const replacements = this.replacements();
     for (const summary of this.mod()?.samples ?? []) {
-      const choice = this.choiceOf(summary.index);
+      const chosen = this.choiceOf(summary.index);
+      if (replacements.has(summary.index)) {
+        continue;
+      }
+
+      // A library file that is no longer there leaves the sample on Auto.
+      const choice = typeof chosen === 'object' ? 'auto' : chosen;
       if (choice !== 'auto') {
         factors.set(summary.index, choice);
       } else if (auto !== null) {
@@ -400,9 +511,7 @@ export class ModImportDialog {
     }
 
     const extra = filesOf(mod, written).map((s) =>
-      this.choiceOf(s.index) === 'auto'
-        ? emptySample(s.name)
-        : this.encoded(mod, s.index, s.factor).sample,
+      this.isAuto(s.index) ? emptySample(s.name) : this.encoded(mod, s.index, s.factor).sample,
     );
     const samples = this.library.resolveWith(
       result.sampleList ?? [],
@@ -416,7 +525,7 @@ export class ModImportDialog {
   /** The largest factor, to a thousandth, that the Auto samples of `written` can share in `room`. */
   private fitIn(mod: TrackerImport, written: WrittenTrackerSong, room: number): number {
     const autos = filesOf(mod, written)
-      .filter((s) => this.choiceOf(s.index) === 'auto')
+      .filter((s) => this.isAuto(s.index))
       .map((s) => mod.song.samples[s.index - 1]);
     return Math.floor(fitFactor(autos, room, brrDataBytes) * 1000) / 1000;
   }
@@ -551,6 +660,25 @@ export class ModImportDialog {
     });
   });
 
+  /** What a sample's row shows of the module's own sample, whatever it is played on. */
+  private sampleRow(summary: TrackerImport['samples'][number]) {
+    return {
+      index: summary.index,
+      name:
+        nonEmpty(summary.name) ??
+        $localize`:@@import.mod.sample.unnamed:import.mod.sample.unnamed ${summary.index}:index:`,
+      copies:
+        summary.copies.length === 0
+          ? null
+          : $localize`:@@import.mod.sample.copies:import.mod.sample.copies ${summary.copies.join(', ')}:copies:`,
+      frames: summary.frames.toLocaleString(),
+      loop: summary.loop
+        ? $localize`:@@import.mod.sample.loop:import.mod.sample.loop ${summary.loop.start}:start: ${summary.loop.length}:length:`
+        : this.text.oneShot,
+      notes: summary.notes,
+    };
+  }
+
   protected readonly sampleRows = computed(() => {
     const mod = this.mod();
     const written = this.written();
@@ -563,28 +691,44 @@ export class ModImportDialog {
     const bytes = new Map(this.brrs().map((b) => [b.index, b.sample.data.length]));
     const factors = new Map(filesOf(mod, written).map((s) => [s.index, s.factor]));
     const sounding = this.audition.playing();
+    const replacements = this.replacements();
+    const onLibrary = new Set(written.samples.filter((s) => s.library).map((s) => s.index));
     return mod.samples.map((summary) => {
       const choice = this.choiceOf(summary.index);
+      const replacement = replacements.get(summary.index);
+      if (replacement && typeof choice === 'object') {
+        const { file, library } = replacement;
+        const free = !library.listed && this.library.isImportant(library.name);
+        return {
+          ...this.sampleRow(summary),
+          playable: true,
+          sounding: sounding === this.sampleName(summary.index),
+          choice: LIBRARY_PREFIX + choice.library,
+          autoLabel,
+          replaced: true,
+          semitones: choice.semitones,
+          unpitched: !replacement.pitched,
+          rate: `${(replacement.rate / 1000).toFixed(1)} kHz`,
+          options: this.factorOptions.map((option) => ({ ...option, disabled: false })),
+          size: !onLibrary.has(summary.index)
+            ? this.text.unused
+            : free
+              ? this.text.inAram
+              : `${kilobytes(file.data.length)} KB`,
+        };
+      }
+
       const factor = factors.get(summary.index);
       const size = bytes.get(summary.index);
       return {
-        index: summary.index,
+        ...this.sampleRow(summary),
         playable: size !== undefined,
         sounding: sounding === this.sampleName(summary.index),
-        name:
-          nonEmpty(summary.name) ??
-          $localize`:@@import.mod.sample.unnamed:import.mod.sample.unnamed ${summary.index}:index:`,
-        copies:
-          summary.copies.length === 0
-            ? null
-            : $localize`:@@import.mod.sample.copies:import.mod.sample.copies ${summary.copies.join(', ')}:copies:`,
-        frames: summary.frames.toLocaleString(),
-        loop: summary.loop
-          ? $localize`:@@import.mod.sample.loop:import.mod.sample.loop ${summary.loop.start}:start: ${summary.loop.length}:length:`
-          : this.text.oneShot,
-        notes: summary.notes,
-        choice: String(choice),
+        choice: typeof choice === 'object' ? LIBRARY_PREFIX + choice.library : String(choice),
         autoLabel,
+        replaced: false,
+        semitones: 0,
+        unpitched: false,
         rate:
           factor === undefined
             ? ''
@@ -656,6 +800,7 @@ export class ModImportDialog {
     this.choices.set(new Map());
     this.separation.set(0.5);
     this.encodings.clear();
+    this.fundamentals.clear();
     this.mod.set(null);
     this.refusal.set(null);
     this.format.set(isUmx(bytes) ? 'UMX' : FORMAT_NAMES[trackerFormatOf(bytes) ?? 'mod']);
@@ -732,13 +877,35 @@ export class ModImportDialog {
 
   protected setChoice(index: number, event: Event): void {
     const value = (event.target as HTMLSelectElement).value;
-    const choice: Choice = value === 'auto' || value === 'drop' ? value : Number(value);
+    const previous = this.choiceOf(index);
+    const choice: Choice = value.startsWith(LIBRARY_PREFIX)
+      ? {
+          library: value.slice(LIBRARY_PREFIX.length),
+          semitones: typeof previous === 'object' ? previous.semitones : 0,
+        }
+      : value === 'auto' || value === 'drop'
+        ? value
+        : Number(value);
     const next = new Map(this.choices());
     next.set(index, choice);
     this.choices.set(next);
   }
 
-  /** Plays a sample as encoded at its factor, at the pitch of the MOD's C-2, or stops it. */
+  /** Shifts the library file a sample is played on by whole semitones. */
+  protected setSemitones(index: number, event: Event): void {
+    const choice = this.choiceOf(index);
+    const value = Math.round(Number((event.target as HTMLInputElement).value));
+    if (typeof choice !== 'object' || !Number.isFinite(value)) {
+      return;
+    }
+
+    const semitones = Math.max(-SEMITONE_REACH, Math.min(SEMITONE_REACH, value));
+    const next = new Map(this.choices());
+    next.set(index, { ...choice, semitones });
+    this.choices.set(next);
+  }
+
+  /** Plays a sample as encoded at its factor, or the library file it is played on, at the pitch of its base note, or stops it. */
   protected toggleSample(index: number): void {
     const name = this.sampleName(index);
     if (this.audition.playing() === name) {
@@ -746,8 +913,14 @@ export class ModImportDialog {
       return;
     }
 
+    const replacement = this.replacements().get(index);
     const entry = this.brrs().find((b) => b.index === index);
-    if (!entry) {
+    const heard = replacement
+      ? heardAt(decodeBrr(replacement.file), loopFrame(replacement.file), replacement.rate)
+      : entry
+        ? heardAt(decodeBrr(entry.sample), entry.loopStart, entry.rate)
+        : null;
+    if (!heard) {
       return;
     }
 
@@ -757,7 +930,7 @@ export class ModImportDialog {
     }
 
     stopAll(this.playback, this.audition);
-    this.audition.play(name, heardAt(decodeBrr(entry.sample), entry.loopStart, entry.rate));
+    this.audition.play(name, heard);
   }
 
   protected setSeparation(event: Event): void {
@@ -794,7 +967,8 @@ export class ModImportDialog {
   /** However the dialog closed, the preview stops and lets its audio go. */
   protected onClosed(): void {
     const sounding = this.audition.playing();
-    if (sounding !== null && this.brrs().some((b) => b.name === sounding)) {
+    const own = (this.mod()?.samples ?? []).map((s) => this.sampleName(s.index));
+    if (sounding !== null && own.includes(sounding)) {
       this.audition.stop();
     }
 
@@ -802,5 +976,6 @@ export class ModImportDialog {
     this.preview.set(null);
     this.mod.set(null);
     this.encodings.clear();
+    this.fundamentals.clear();
   }
 }
