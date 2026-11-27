@@ -173,7 +173,8 @@ player takes the order to start at, and `findSongs` (`tracker.ts`) finds them as
 subsongs: played from the first order, then from each first order no song before has played, a
 later one kept only where it strikes a note. A song that runs off its end loops to its own start
 where it never reached the restart order. Each song's play is kept, `summarise` sums up the chosen
-one, and `withSong` switches; the samples are the module's whichever is chosen.
+one, and `withSong` switches; the samples are the module's whichever is chosen, the channels only
+those the song strikes a note on (`used`).
 
 ### Samples
 

@@ -58,6 +58,15 @@ section("songs: a module holding several");
 		`${second.channelNotes.join()} / ${mod.channelNotes.join()}`,
 	);
 	check(
+		"only the channels a song plays are listed and suggested",
+		second.used.join() === "1" &&
+			second.suggested.join() === "1" &&
+			second.suggestedShared.join() === "1" &&
+			mod.used.join() === "0" &&
+			mod.suggested.join() === "0",
+		`${second.used.join()} ${second.suggested.join()} ${second.suggestedShared.join()} / ${mod.used.join()} ${mod.suggested.join()}`,
+	);
+	check(
 		"the samples stay, counted for the song chosen",
 		second.samples.length === mod.samples.length && second.samples[0].notes === 2,
 	);
@@ -71,6 +80,7 @@ section("songs: a module holding several");
 		sampleName: (index) => `MOD ${String(index).padStart(2, "0")}.brr`,
 		fallbackTitle: null,
 	});
+	check("its one channel is written alone", written.channels.length === 1, String(written.channels.length));
 	const built = song(written.text, encoded(second, written));
 	check("the second song raises nothing", problems(built).length === 0, problems(built).join("; "));
 	const at = second.suggested.indexOf(1);

@@ -9,6 +9,10 @@ export interface ChangelogEntry {
 export const CHANGELOG: readonly ChangelogEntry[] = [
   // ─── newest first; add new blocks here ──────────────────────────────────
   {
+    date: '27 November 2026',
+    items: ['Channels a song never plays left out when importing a MOD, S3M, XM, IT or UMX file'],
+  },
+  {
     date: '25 November 2026',
     items: [
       'Play a module sample on a sample from the library instead, tuned to match, when importing a MOD, S3M, XM or IT file',

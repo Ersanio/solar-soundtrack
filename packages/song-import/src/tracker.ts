@@ -63,7 +63,9 @@ export interface TrackerImport {
 	chosen: number;
 	/** Notes struck on each channel. */
 	channelNotes: number[];
-	/** The channels kept until the porter chooses: all of them, or the eight that strike the most notes. */
+	/** The channels that strike a note in the chosen song, in channel order: the only ones listed or kept. */
+	used: number[];
+	/** The channels kept until the porter chooses: every used one, or the eight that strike the most notes. */
 	suggested: number[];
 	/** Which channels cannot share one of AddmusicK's: any of their notes overlap. */
 	clash: shared.Clashes;
@@ -107,10 +109,11 @@ export function copiesOf(song: TrackerSong): Map<number, number> {
 /** Channel order is the order kept channels are written in. */
 const inOrder = (channels: Iterable<number>): number[] => [...new Set(channels)].sort((a, b) => a - b);
 
-/** Every channel, the one that strikes the most notes first. */
+/** Every channel that strikes a note, the one that strikes the most first. */
 function byNotes(channelNotes: readonly number[]): number[] {
 	return channelNotes
 		.map((notes, channel) => ({ notes, channel }))
+		.filter((c) => c.notes > 0)
 		.sort((a, b) => b.notes - a.notes || a.channel - b.channel)
 		.map((c) => c.channel);
 }
@@ -207,6 +210,7 @@ export function summarise(song: TrackerSong, songs: readonly TrackerSongStart[],
 		songs,
 		chosen,
 		channelNotes,
+		used: inOrder(byNotes(channelNotes)),
 		suggested: ranked,
 		clash,
 		suggestedShared: shared.addWhileFits(byNotes(channelNotes), [], clash, TRACKER_CHANNEL_LIMIT, inOrder),

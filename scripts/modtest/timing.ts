@@ -84,6 +84,7 @@ section("timing: the order list's flow");
 			pattern([[0, 0, note()]]),
 			pattern([
 				[0, 0, note({ period: 214 })],
+				[0, 1, note()],
 				[63, 1, { effect: 0xb, param: 1 }],
 			]),
 		],
@@ -92,7 +93,8 @@ section("timing: the order list's flow");
 	check("a Bxx back is the song's loop point", imp.mod.play.loopTick === 64 * 6 && imp.mod.play.ticks === 128 * 6);
 	check(
 		"the loop point is a / in every channel",
-		(imp.written.text.match(/^\/|\n\/| \//g) ?? []).length >= 4,
+		imp.written.channels.length === 2 &&
+			(imp.written.text.match(/^\/|\n\/| \//g) ?? []).length >= imp.written.channels.length,
 		imp.written.text,
 	);
 	check("the walk loops there", imp.song.timeline?.loopTick === 64 * 12, String(imp.song.timeline?.loopTick));

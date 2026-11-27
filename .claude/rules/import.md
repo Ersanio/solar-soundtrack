@@ -106,7 +106,9 @@ true.
   from `libraryFactor` over the pitch heard in both and the porter's semitones (`replacements`), and
   a stock name is not listed again in `#samples`; the room and the budget count its real bytes
   through `SampleStore.resolveWith`'s fall-back to the library. A module holding more than one song shows
-  a Song select; choosing another suggests its channels afresh and keeps each sample's choice.
+  a Song select; choosing another suggests its channels afresh and keeps each sample's choice. Only the
+  channels that strike a note in the chosen song are listed or suggested (`used`, `byNotes`), so a
+  song that leaves some of the module's channels silent, as a UMX's often do, writes none of them.
 
 ## Decisions already made
 

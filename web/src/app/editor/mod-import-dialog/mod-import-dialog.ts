@@ -645,7 +645,8 @@ export class ModImportDialog {
         group.map((index) => [index, channel]),
       ),
     );
-    return mod.channelNotes.map((notes, index) => {
+    return mod.used.map((index) => {
+      const notes = mod.channelNotes[index];
       const on = keep.includes(index);
       const at = channelOf.get(index) ?? -1;
       return {
@@ -780,9 +781,7 @@ export class ModImportDialog {
     }
 
     const keep = this.keep();
-    return mod.channelNotes.every(
-      (_, index) => keep.includes(index) || !this.room(mod, keep, index),
-    );
+    return mod.used.every((index) => keep.includes(index) || !this.room(mod, keep, index));
   });
 
   constructor() {
