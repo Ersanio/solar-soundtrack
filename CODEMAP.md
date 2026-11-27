@@ -1104,7 +1104,7 @@ something in the directory, which load by themselves when such a file is opened.
 
 **Rules:** `ui-and-theme.md`
 
-- 28 icon components, `icon-<name>.ts`, one glyph each: `analysis`, `book`, `chevron-down`, `chevron-right`, `close`, `download`, `github`, `lock`, `loop`, `minus`, `palette`, `pause`, `play`, `plus`, `record`, `recording`, `redo`, `roll`, `samples`, `scope`, `source`, `stop`, `suppress`, `undo`, `unlock`, `upload`, `volume`, `wrap`
+- 29 icon components, `icon-<name>.ts`, one glyph each: `analysis`, `book`, `chevron-down`, `chevron-right`, `close`, `download`, `file-export`, `file-import`, `github`, `lock`, `loop`, `minus`, `palette`, `pause`, `play`, `plus`, `record`, `recording`, `redo`, `roll`, `samples`, `scope`, `source`, `stop`, `suppress`, `undo`, `unlock`, `volume`, `wrap`
 
 ## web/src/app/shared/menu
 

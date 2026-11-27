@@ -6,11 +6,11 @@ import { detectFormat } from '@amk/import/format';
 import { Changelog } from '../../changelog/changelog';
 import { GIT_COMMIT_SHA } from '../../git-info.generated';
 import { Button, buttonClass } from '../../shared/button/button';
-import { IconDownload } from '../../shared/icons/icon-download';
+import { IconFileExport } from '../../shared/icons/icon-file-export';
+import { IconFileImport } from '../../shared/icons/icon-file-import';
 import { IconLoop } from '../../shared/icons/icon-loop';
 import { IconGithub } from '../../shared/icons/icon-github';
 import { IconRoll } from '../../shared/icons/icon-roll';
-import { IconUpload } from '../../shared/icons/icon-upload';
 import { Menu } from '../../shared/menu/menu';
 import { Toggle } from '../../shared/toggle/toggle';
 import { Audition } from '../../state/audition';
@@ -49,11 +49,11 @@ const REPO_URL = 'https://github.com/Ersanio/solar-soundtrack';
     Button,
     Changelog,
     FinalizeDialog,
-    IconDownload,
+    IconFileExport,
+    IconFileImport,
     IconGithub,
     IconLoop,
     IconRoll,
-    IconUpload,
     ImportDialog,
     Menu,
     ModImportDialog,
