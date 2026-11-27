@@ -19,8 +19,8 @@ export const CHANGELOG: readonly ChangelogEntry[] = [
       'Add ability to import S3M files (Scream Tracker 3)',
       'Add ability to import UMX files (Unreal music)',
       'Add song optimizer that triggers upon an import, or the "Finalize" button (work in progress)',
-      "Add ability to download samples from the sample library",
-      "Add ability to export songs as a .wav",
+      'Add ability to download samples from the sample library',
+      'Add ability to export songs as a .wav',
     ],
   },
   {

@@ -508,7 +508,7 @@ something in the directory, which load by themselves when such a file is opened.
 
 ## web/src/app/changelog
 
-- `changelog-data.ts` (300+ lines) — What the changelog popup in the top bar shows.
+- `changelog-data.ts` — What the changelog popup in the top bar shows.
 - `changelog.ts` — The top bar's changelog control and the panel it drops down.
 
 ## web/src/app/editor/aram-meter
